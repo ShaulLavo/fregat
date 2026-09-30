@@ -1,8 +1,11 @@
 # Plan 198: Keep editor analysis with the document
 
-Status: implementation partly landed; foundations publication, cancellation, configuration,
-range and retention contract proofs delivered 2026-09-30. Full browser/memory acceptance remains
-unverified. See [current proof and limits](../docs/document-contributions/foundations-publication-proof.md). The owner superseded the fixed “first after wave 2” priority on 2026-09-28.
+Status: Approved; implementation partly landed. Foundations publication, cancellation,
+configuration, range and retention contract proofs merged in
+[PR #203](https://github.com/ShaulLavo/fregat/pull/203) (`cf4e84419`) and shipped in web release
+`20260930T153009Z-cf4e8441-main` on 2026-09-30. The full acceptance matrix below remains open:
+chat/workbench pixel-level token comparison, retained parser/WASM byte accounting, an inactive
+analysis budget, the memory-pressure/first-frame matrix and physical hardware. See [current proof and limits](../docs/document-contributions/foundations-publication-proof.md). The owner superseded the fixed “first after wave 2” priority on 2026-09-28.
 Schedule by the [current dependency order](../PLAN.md#wave-2-closeout-and-dependency-order).
 Owners: Editor for analysis and view attachment; Platform for document retention and file opening.
 

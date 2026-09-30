@@ -21,6 +21,9 @@ Editor core and terminal resource owners use native page reloads. The terminal p
 saved viewport hold cached modules and WASM resources, so Fast Refresh would retain old
 implementations. Their explicit React-plugin exclusions let ordinary Vite propagation
 reach the page boundary. No source plugin or reload callback is needed.
+Main `3ca862a4b` (2026-09-30, outside the foundations wave) removed the last dev-server
+interception: the app-save hot-update skip plugin, `GET /fs/app-write` and server `AppWrites`.
+Vite now hot-updates every changed source file, including saves made from the app.
 
 All web typecheck entry points run the browser/Node project build and the generated source
 configuration. The source configuration shares Vite's alias map. Producer packages own

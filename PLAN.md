@@ -10,33 +10,50 @@ The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remai
 work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
 snapshot; this file remains the scheduler and each plan remains its scope authority.
 
-1. **Close delivered residues and the existing wave-2 queue, starting with 179.** Verify before retiring
-   implemented plans. Keep **179 → 099 units 0–1 → 114 → 126 → 156 P0–P2** as
-   the default closeout order. Independent proofs and Platform-only slices can run
-   alongside the active lane. 207's source migration and tooling alignment landed in
-   PRs #199 and #201; all three mirrors passed ancestry and exact-tree checks. Editor
-   and Ghostty work now lands in their canonical folders here. npm publication remains deferred.
-2. **Complete one keymap cutover: 204 + 205 → 206.** 203 has landed. Prepare the
-   producer APIs in parallel, migrate every consumer, then remove obsolete APIs in
-   the same verified release. Align E026 command metadata; Platform owns the shadow report.
-3. **Finish document guarantees and shared highlighting.** Prove landed 198 contracts
-   alongside 099 publication; implement 197 independently. Then migrate 200 consumers
-   against the exact contracts they need. 099 units 2–7 remain explicitly gated.
-4. **Take bounded product slices.** Prefer finishing an active lane before opening a
-   second architecture program. Markdown block/range authoring in 111/108 precedes
-   171's composer swap. 202's local controls can proceed independently; its semantic
-   Markdown cutover waits for parser producer/consumer gates. 201 owns measured typing
-   improvements, 178 owns remaining tree slices, and Ghostty 016 owns standalone readiness.
-5. **Run broad migrations and later programs by unit.** Establish 208's catalog and
-   package contract after 207, coordinate command/settings extraction with 206, then
-   migrate stable domains. 209 design work can proceed earlier but retains its design
-   and implementation gates. Native stays editor-first; 088 follows 087 interoperability.
+1. **Finish the foundations wave.** 132, 179, 197, 099 unit 1, 198's foundation contracts and
+   126's bounded proofs are delivered and deployed; #212 merged the WebKit Settings and bounded
+   typing harness proof. Still required: bounded Shiki/Tree-sitter worker disposal, Plan 099's
+   reconciliation of the unsupported long-line consumer cases, 099 unit 0's calibration
+   matrix, the unresolved Undo probe and a final verified release. Marking the long-line
+   fixture unsupported does not close unit 0 or the wave. See
+   [the wave record](docs/next-wave.md#foundations-wave-2026-09-30).
+2. **Continue the owner's closeout queue: 114 → 126 → 156 P0–P2.** This is a default work
+   order, not a chain of prerequisites; [the closeout table](#wave-2-closeout-and-dependency-order)
+   names the dependencies that matter.
+3. **Take the keymap cutover (204 + 205 → 206) as the next structural cutover**, then the
+   document runtime, whose 099 units stay gated. Localization and workspace implementation
+   follow as broad migrations.
+   The [next programs](#next-programs) table gives each program's gates and what can start now.
 
-The default is one active structural cutover plus independent closeout/proof work.
-This order schedules Approved work; it does not expand any plan's authorization.
+The default is one active structural cutover plus independent closeout/proof work. This order
+schedules Approved work; it does not expand any plan's authorization.
+
+## Next programs
+
+Each program groups Approved plans that share owners and gates. Grouping does not merge their
+scopes into one package rewrite, lift a gate or approve gated units. Sizes are in the
+[inventory](plans/inventory-2026-09-29.md); each plan keeps its own checklist.
+
+| Program              | Plans                                                                                                                                                                                | When                                                                                          | Gates and boundaries                                                                                                                                                                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop shell        | [114](plans/114-polaron-shell.md) Gates 1–4                                                                                                                                          | Next in the closeout queue                                                                    | Preserve mesh-owned servers and terminals. Gate 3 needs a Mac and owns 132's vibrancy check; Mac verification precedes Gate 4's Electrobun removal.                                                                                                        |
+| T3 alignment residue | [126](plans/126-t3code-alignment.md) remaining A–F/J rows, G/H/I follow-ups                                                                                                          | Server, chat and provider proofs any time; desktop rows after 114                             | LIFE-06 schema/state-loss gate, live-account checks and the frozen `7445aa73` oracle stay. Close only rows with fresh evidence.                                                                                                                            |
+| Rich documents       | [156](plans/156-documents-in-the-editor.md) P0 binary guard, P1 PDF, P2 CSV                                                                                                          | After 126 by default; independent of 099 units 2–7 and 126, so it can move earlier            | Uses existing file identity and 179's isolation policy. P3–P6 follow; P7 DOCX editing stays parked on Markdown and fidelity decisions.                                                                                                                     |
+| Keymap cutover       | [204](plans/204-editor-on-fregat-hotkeys.md) + [205](plans/205-ghostty-on-fregat-hotkeys.md) → [206](plans/206-platform-one-keymap.md); E026 metadata                                | Next structural cutover; 204/205 producer prep can start now                                  | One verified release migrates every web and TUI caller and deletes the old APIs; Platform builds the shadow report. Before a mirror carries a hotkeys consumer, prove standalone install and publish hotkeys (207's gate). Zed/Vim 220–280 bind after 206. |
+| Document runtime     | [099](plans/099-document-contributions.md) units 2–7 and [198](plans/198-document-owned-editor-analysis.md) acceptance → [200](plans/200-document-backed-content-views.md) consumers | After the keymap cutover by default; 198 acceptance proofs and 200 baseline research any time | 099 units 2–7 need unit 0's calibration and an explicit owner request. 200 migrates each consumer against the exact 099/198 contract it uses; 197's diff service is delivered. 122's document scope follows 099; 182 and 171 stay separate.                |
+| TUI                  | [202](plans/202-tui-ui.md) on upstream OpenTUI                                                                                                                                       | Local controls any time                                                                       | Production Markdown cutover waits for the tree-sitter-md M1–M4 producer and Editor semantic S0–S4 consumer gates. Controls use 206's dispatcher. No toolkit package, maintained fork or native release pipeline.                                           |
+| Localization         | [208](plans/208-all-text-in-json.md)                                                                                                                                                 | Broad migration, by unit                                                                      | Catalog and typed generation, then structured-error transport, bounded caller migrations, locale/plural/RTL acceptance. 207 no longer blocks the catalog contract; command/settings metadata coordinates with 206.                                         |
+| Unified workspace    | [209](plans/209-unified-workspace.md)                                                                                                                                                | Design review any time                                                                        | Resolve D1–D6 before affected units. Production implementation needs a separate owner decision. Uses 206 commands, 200 content ownership and 208 catalogs.                                                                                                 |
+
+Work that can start without waiting for another program: 114, 126's server and provider proofs,
+156 P0–P2, 204/205 producer prep, 202's local controls, 198's acceptance proofs, 200's baseline
+research and 209's design review. Bounded product lanes continue beside them: Markdown authoring
+in 111/108 before 171's composer swap (parser work in 176/189), measured typing in 201, tree
+slices in 178 and Ghostty 016's standalone readiness. Native stays editor-first; 088 follows 087.
 
 ## Package cutover delivered
 
+This is separate from the foundations wave and from the product programs above.
 [207](plans/207-one-repo-with-mirrors.md) delivered source migration on 2026-09-30.
 The scoped cutover hold has ended. Develop Editor in `editor/packages/`, Ghostty in
 `ghostty-webgpu/`, and hotkeys in `hotkeys/`; their standalone repositories are mirrors.
@@ -48,18 +65,20 @@ Before 204/205 mirror a consumer of hotkeys, prove standalone installation and s
 
 [132](plans/132-process-and-dev-ownership.md) delivered development ownership closeout on
 2026-09-30: standard Vite updates, unified typechecks, cold-cache proof and explicit terminal
-capture ownership. Its Mac vibrancy checks are owned by 114 Gate 3.
+capture ownership. Its Mac vibrancy checks are owned by 114 Gate 3. Main `3ca862a4b` later
+removed the remaining app-save hot-update interception.
 
-The owner's remaining closeout queue is **179 → 099 → 114 → 126 → 156**. This is a
-default work order, not a chain of prerequisites. Independent work can move earlier. See the
+The owner's closeout queue was **179 → 099 → 114 → 126 → 156**. 179 is delivered and 099 is
+down to unit 0's calibration, so **114 → 126 → 156** remains. This is a default work order, not
+a chain of prerequisites. Independent work can move earlier. See the
 [remaining phase checklist](docs/next-wave.md#wave-2-closeout-reconciled-2026-09-28).
 
 | Work                                                               | Dependency that matters                                                                                                                                                        |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [179: content isolation](plans/179-isolating-foreign-content.md)   | Instrument style costs before Mermaid/CSS performance claims. Its isolation policy also applies to 156.                                                                        |
-| [099: document contributions](plans/099-document-contributions.md) | Units 0–1 refresh the consumer baseline and implement canonical publication. Include 198's landed retained-analysis subscriber. Units 2–7 retain their explicit gate.          |
+| [179: content isolation](plans/179-isolating-foreign-content.md)   | Delivered in PR #204. Its isolation policy applies to 156.                                                                                                                     |
+| [099: document contributions](plans/099-document-contributions.md) | Unit 1 publication, with 198's retained-analysis subscriber, is delivered in PR #203. Unit 0's native-input calibration is in progress. Units 2–7 retain their explicit gate.  |
 | [114: desktop shell](plans/114-polaron-shell.md)                   | Preserve mesh-owned servers and terminals. Native host checks precede Electrobun removal.                                                                                      |
-| [126: T3 alignment](plans/126-t3code-alignment.md)                 | Reconcile delivered batches first. Desktop host cases consume 114; independent chat/provider/server proofs can run earlier.                                                    |
+| [126: T3 alignment](plans/126-t3code-alignment.md)                 | Bounded proofs shipped in PR #210; the row ledger stays open. Desktop host cases consume 114; independent chat/provider/server proofs can run earlier.                         |
 | [156: rich documents](plans/156-documents-in-the-editor.md)        | P0–P2 use existing file/buffer identity and the isolation policy. Binary guards and PDF viewing do not need all of 099 or 126. Later format/editing phases retain their gates. |
 
 This queue does not certify other plans as complete or authorize gated implementation, account
@@ -70,11 +89,12 @@ spending, or state deletion. Their explicit decisions remain in the owning plans
 The owner removed the fixed “198 first after wave 2” priority on 2026-09-28. Schedule by the
 contracts a consumer needs:
 
-- [198](plans/198-document-owned-editor-analysis.md) has retained-analysis code. Prove its
-  acquisition, range/configuration admission, cancellation, retention and attachment guarantees
-  against that implementation. Coordinate its subscriber with 099 unit 1; no second analysis owner.
-- [197](plans/197-editor-highlighting-service.md) owns standalone highlighting and diff analysis.
-  It is independent of 198's retained-view lifetime.
+- [198](plans/198-document-owned-editor-analysis.md)'s publication, range/configuration
+  admission, cancellation and retention contracts are proved (PR #203), and its subscriber
+  consumes 099 unit 1's frames. Its browser/memory acceptance matrix remains. No second
+  analysis owner.
+- [197](plans/197-editor-highlighting-service.md) is delivered (PR #202): Editor owns standalone
+  highlighting and prepared diff syntax. It is independent of 198's retained-view lifetime.
 - [200](plans/200-document-backed-content-views.md) consumes the relevant 099 publication and
   198 acquisition/attachment guarantees. Comparison integration also needs 197's diff service.
   Its baseline research can run before those contracts land.
