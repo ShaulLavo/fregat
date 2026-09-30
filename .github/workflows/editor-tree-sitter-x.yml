@@ -3,6 +3,7 @@ name: tree-sitter-x
 # Keeps web-tree-sitter on the newest tree-sitter-x build: when the fork's web-tree-sitter branch
 # moves, this opens (or updates) a pull request with the new pin. Pull requests opened with the
 # workflow token do not trigger `pull_request` runs, so it starts CI on the branch itself.
+# Repository Actions settings must allow GitHub Actions to create and approve pull requests.
 
 on:
   schedule:
@@ -29,23 +30,34 @@ jobs:
         run: bun run --cwd editor tree-sitter-x:update
 
       - name: Open a pull request
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet; then exit 0; fi
-          pin=$(grep -oh 'tree-sitter-x#[0-9a-f]*' editor/packages/tree-sitter/package.json | cut -d'#' -f2)
+          pin=$(command grep -oh 'tree-sitter-x#[0-9a-f]*' editor/packages/tree-sitter/package.json | cut -d'#' -f2)
           branch="tree-sitter-x/$pin"
-          if git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null 2>&1; then exit 0; fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -c "$branch"
-          git commit -qam "Update tree-sitter-x to $pin"
-          git push -q origin "$branch"
+          state=$(gh pr list --base main --head "$branch" --state all --limit 1 --json state -q '.[0].state // ""')
+          if [ "$state" = CLOSED ] || [ "$state" = MERGED ]; then exit 0; fi
+          remote=$(git ls-remote origin "refs/heads/$branch")
+          if [ -z "$remote" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git switch -c "$branch"
+            git commit -qam "Update tree-sitter-x to $pin"
+            git push -q origin "$branch"
+            commit=$(git rev-parse HEAD)
+          else
+            read -r commit _ <<< "$remote"
+          fi
           title="Update tree-sitter-x to $pin"
-          body="Pins web-tree-sitter to [tree-sitter-x@$pin](https://github.com/ShaulLavo/tree-sitter-x/commit/$pin), the newest build of the fork's master."
-          if gh pr view "$branch" --json state -q .state 2>/dev/null | grep -q OPEN; then
+          body="Pins web-tree-sitter to [tree-sitter-x@$pin](https://github.com/ShaulLavo/tree-sitter-x/commit/$pin), the newest build of the fork's web-tree-sitter branch."
+          if [ "$state" = OPEN ]; then
             gh pr edit "$branch" --title "$title" --body "$body"
           else
-            gh pr create --head "$branch" --title "$title" --body "$body"
+            gh pr create --base main --head "$branch" --title "$title" --body "$body"
           fi
-          gh workflow run ci.yml --ref "$branch"
+          runs=$(gh run list --workflow ci.yml --branch "$branch" --commit "$commit" --limit 1 --json databaseId -q length)
+          if [ "$runs" -eq 0 ]; then
+            gh workflow run ci.yml --ref "$branch"
+          fi
