@@ -6112,6 +6112,12 @@
         },
         {
           "kind": "unknown",
+          "name": "effectiveEditorTheme",
+          "source": "packages/editor/src/theme.ts",
+          "via": "packages/editor/src/public/rendering.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "firstEditorColor",
           "source": "packages/editor/src/theme.ts",
           "via": "packages/editor/src/public/rendering.ts"
@@ -6143,6 +6149,12 @@
         {
           "kind": "unknown",
           "name": "registerEditorColor",
+          "source": "packages/editor/src/theme.ts",
+          "via": "packages/editor/src/public/rendering.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "resolveEditorThemeColor",
           "source": "packages/editor/src/theme.ts",
           "via": "packages/editor/src/public/rendering.ts"
         },
@@ -6436,6 +6448,12 @@
         },
         {
           "kind": "type",
+          "name": "ShikiWorkerHighlightRequest",
+          "source": "packages/editor/src/shiki/workerTypes.ts",
+          "via": "packages/editor/src/shiki/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "ShikiWorkerLanguageRegistration",
           "source": "packages/editor/src/shiki/workerTypes.ts",
           "via": "packages/editor/src/shiki/index.ts"
@@ -6461,6 +6479,12 @@
         {
           "kind": "type",
           "name": "ShikiWorkerThemeRegistration",
+          "source": "packages/editor/src/shiki/workerTypes.ts",
+          "via": "packages/editor/src/shiki/index.ts"
+        },
+        {
+          "kind": "type",
+          "name": "ShikiWorkerTransportResult",
           "source": "packages/editor/src/shiki/workerTypes.ts",
           "via": "packages/editor/src/shiki/index.ts"
         },
