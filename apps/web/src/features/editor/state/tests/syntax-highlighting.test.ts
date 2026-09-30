@@ -1,8 +1,7 @@
 import { afterAll } from 'vitest'
 
 import {
-  disposeEditorShikiWorkerOwner,
-  disposeEditorTreeSitterSyntaxProvider,
+  disposeEditorSyntaxHighlighting,
   editorDiffSyntaxConfiguration,
   editorSyntaxHighlightingSource,
   editorShikiHighlighterProvider,
@@ -11,8 +10,7 @@ import {
 import { expect, test } from '../../../../../test/fixtures'
 
 afterAll(async () => {
-  await disposeEditorShikiWorkerOwner()
-  await disposeEditorTreeSitterSyntaxProvider()
+  await disposeEditorSyntaxHighlighting()
 })
 
 test('diffs receive the same Shiki provider used by regular editors', () => {

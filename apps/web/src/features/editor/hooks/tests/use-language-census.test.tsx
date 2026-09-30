@@ -9,7 +9,6 @@ import {
 } from '@/features/editor/state/language-census'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
 import { languageCensusQueryOptions } from '@/features/editor/utils/language-census-query'
-import { EDITOR_SHIKI_PRELOAD_LANGUAGES } from '@/features/editor/utils/shiki-languages'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { openWorkspaceRootPath } from '@/lib/file-server'
 import { expect, test } from '../../../../../test/fixtures'
@@ -44,7 +43,7 @@ test('the hook loads the census the preload getter reads for the bound root and 
   const root = () => workspaceStore.getState().rootFolder?.path ?? null
   let unbind = bindLanguageCensus({ queryClient, root })
   const getter = workspacePreloadLanguages
-  expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+  expect(getter()).toBeNull()
   expect(workspaceWarmLanguages()).toEqual([])
   act(() =>
     workspaceStore.getState().switchWorkspace({ ...one.entry, name: 'one', type: 'directory' }),
@@ -59,7 +58,7 @@ test('the hook loads the census the preload getter reads for the bound root and 
   expect(getter()).toEqual(['tsx'])
   expect(workspaceWarmLanguages()).toEqual(['tsx'])
   act(() => queryClient.setQueryData(first, { readiness: 'failed', scanRoot: null, counts: {} }))
-  expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+  expect(getter()).toBeNull()
   expect(workspaceWarmLanguages()).toEqual([])
 
   const two = await openWorkspaceRootPath(
@@ -82,7 +81,7 @@ test('the hook loads the census the preload getter reads for the bound root and 
   expect(getter()).toEqual(['rust'])
   unbind()
   unmount()
-  expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+  expect(getter()).toBeNull()
   queryClient.clear()
   otherMachine.clear()
   await watchOne.stop()

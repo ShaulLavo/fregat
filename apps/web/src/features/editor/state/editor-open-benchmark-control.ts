@@ -18,9 +18,8 @@ import { type EditorOpenBenchmarkControl } from '@/features/editor/state/perform
 import type { EditorUiStoreApi } from '@/features/editor/state/ui-state'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {
-  awaitEditorShikiRuntimeSessionIdle,
+  awaitEditorSyntaxRuntimeSessionIdle,
   awaitEditorSyntaxWorkerIdleFences,
-  awaitEditorTreeSitterRuntimeSessionIdle,
 } from '@/features/editor/state/syntax-highlighting'
 import type { SearchBufferStoreApi } from '@/features/search/state/buffer-state'
 import { removeEditorVisibleSnapshotCacheForPath } from '@/lib/editor-visible-snapshot-cache'
@@ -175,14 +174,11 @@ async function resetEditorOpenSample({
   const result = await sample.quiesce()
   deleteCleanTargetDocument(request.path, documentStore)
   removeEditorVisibleSnapshotCacheForPath(storage, request)
-  await Promise.all([
-    ...result.highlighterRuntimeSessionIds.map((runtimeSessionId) =>
-      awaitEditorShikiRuntimeSessionIdle(runtimeSessionId),
+  await Promise.all(
+    [...result.highlighterRuntimeSessionIds, ...result.structuralRuntimeSessionIds].map(
+      awaitEditorSyntaxRuntimeSessionIdle,
     ),
-    ...result.structuralRuntimeSessionIds.map((runtimeSessionId) =>
-      awaitEditorTreeSitterRuntimeSessionIdle(runtimeSessionId),
-    ),
-  ])
+  )
   await awaitEditorSyntaxWorkerIdleFences()
   await nextTaskAndFrame()
   removeEditorVisibleSnapshotCacheForPath(storage, request)

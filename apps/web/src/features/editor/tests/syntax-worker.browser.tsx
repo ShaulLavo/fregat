@@ -4,18 +4,13 @@ import { createEditorRuntimeSessionId } from '@singapore-editor/core/syntax'
 import { createEditorLoggingPlugin, type EditorLogEvent } from '@singapore-editor/core/logging'
 import { Editor } from '@singapore-editor/core/editor'
 import { createPieceTableSnapshot } from '@singapore-editor/core/document'
-import { createShikiHighlighterPlugin, createShikiWorkerOwner } from '@singapore-editor/core/shiki'
+import { createHighlightingPlugin, createHighlightingService } from '@singapore-editor/highlighting'
 import {
   resolveTreeSitterLanguageContribution,
   TreeSitterWorkerClient,
 } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 import { resolveEditorShikiThemeRegistration } from '@/features/editor/state/color-theme-store'
-import {
-  EDITOR_SHIKI_LANGUAGE_MAP,
-  EDITOR_SHIKI_PRELOAD_LANGUAGES,
-  resolveShikiLanguageRegistrations,
-} from '@/features/editor/utils/shiki-languages'
 import { createPlatformEditorLoggingPlugin } from '@/features/editor/utils/plugins'
 import { clientLoggingEnabled, initializeClientLogging } from '@/lib/client-logging'
 
@@ -52,11 +47,10 @@ test('parses chat-model.ts through the editor Tree-sitter worker', async () => {
   }
 })
 
-test('highlights TypeScript through the built inline Shiki worker', async () => {
+test('highlights TypeScript under an imported theme through the highlighting service', async () => {
   initializeClientLogging()
-  const owner = createShikiWorkerOwner()
+  const service = createHighlightingService({ resolveTheme: resolveEditorShikiThemeRegistration })
   const events: EditorLogEvent[] = []
-  const resolvedLanguageIds = new Set<string>()
   const container = document.createElement('div')
   container.style.height = '240px'
   container.style.width = '640px'
@@ -64,18 +58,7 @@ test('highlights TypeScript through the built inline Shiki worker', async () => 
 
   const editor = new Editor(container, {
     plugins: [
-      createShikiHighlighterPlugin({
-        languages: EDITOR_SHIKI_LANGUAGE_MAP,
-        preloadLanguages: EDITOR_SHIKI_PRELOAD_LANGUAGES,
-        preloadThemes: [],
-        resolveLanguage: async (languageId) => {
-          resolvedLanguageIds.add(languageId)
-          return resolveShikiLanguageRegistrations(languageId)
-        },
-        resolveTheme: resolveEditorShikiThemeRegistration,
-        theme: 'github-dark',
-        workerOwner: owner,
-      }),
+      createHighlightingPlugin({ service, theme: { format: 'vscode', id: 'github-dark' } }),
       createPlatformEditorLoggingPlugin(),
       createEditorLoggingPlugin((event) => events.push(event)),
     ],
@@ -91,16 +74,12 @@ test('highlights TypeScript through the built inline Shiki worker', async () => 
     await expect
       .poll(() => appliedHighlightTokenCount(events), { timeout: 20_000 })
       .toBeGreaterThan(0)
-    await expect
-      .poll(() => resolvedLanguageIds.size, { timeout: 20_000 })
-      .toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES.length)
-
-    expect(resolvedLanguageIds).toEqual(new Set(EDITOR_SHIKI_PRELOAD_LANGUAGES))
+    expect(service.inspect().shiki?.lifecycle).toBe('ready')
     if (clientLoggingEnabled()) await new Promise((resolve) => setTimeout(resolve, 2_500))
   } finally {
     editor.dispose()
     container.remove()
-    await owner.dispose()
+    await service.dispose()
   }
 })
 

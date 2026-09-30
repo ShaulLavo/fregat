@@ -1,9 +1,18 @@
 import { expect, test } from '../../../../../test/fixtures'
 import { loadCodeThemePreview } from '@/lib/code-theme/state/preview'
-import { CODE_THEME_PREVIEW_SAMPLE } from '@/lib/code-theme/utils/preview'
-import { vi } from 'vitest'
+import { CODE_THEME_PREVIEW_SAMPLE, previewLines } from '@/lib/code-theme/utils/preview'
+import type { HighlightResult } from '@singapore-editor/highlighting'
 
-test('native and imported previews parse the same sample with their actual syntax colors', async () => {
+function lines(preview: HighlightResult) {
+  return previewLines(CODE_THEME_PREVIEW_SAMPLE, preview.tokens)
+}
+
+function colorOf(preview: HighlightResult, word: string) {
+  const start = CODE_THEME_PREVIEW_SAMPLE.indexOf(word)
+  return preview.tokens.find((token) => token.start <= start && token.end > start)?.style.color
+}
+
+test('native and imported previews parse the same sample in the worker with their own colors', async () => {
   const [native, imported] = await Promise.all([
     loadCodeThemePreview('tree-sitter-dark'),
     loadCodeThemePreview('dracula'),
@@ -11,38 +20,25 @@ test('native and imported previews parse the same sample with their actual synta
 
   for (const preview of [native, imported]) {
     expect(
-      preview.tokens.map((line) => line.map((token) => token.content).join('')).join('\n'),
+      lines(preview)
+        .map((line) => line.map((segment) => segment.text).join(''))
+        .join('\n'),
     ).toBe(CODE_THEME_PREVIEW_SAMPLE)
-    expect(preview.tokens).toHaveLength(9)
-    expect(
-      new Set(preview.tokens.flatMap((line) => line.map((token) => token.color))).size,
-    ).toBeGreaterThan(4)
+    expect(lines(preview)).toHaveLength(9)
+    expect(new Set(preview.tokens.map((token) => token.style.color)).size).toBeGreaterThan(4)
   }
-  expect(native.tokens[0]?.find((token) => token.content.includes('Format'))?.color).toBe('#71717A')
-  expect(imported.tokens[0]?.[0]?.color).not.toBe(native.tokens[0]?.[0]?.color)
+  expect(colorOf(native, 'Format')).toBe('#71717A')
+  expect(colorOf(imported, 'Format')).not.toBe(colorOf(native, 'Format'))
+  expect(native.themeRevision).not.toBe(imported.themeRevision)
+})
+
+test('a light built-in palette keeps its own comment color', async () => {
+  const preview = await loadCodeThemePreview('tree-sitter-light')
+  expect(colorOf(preview, 'Format')).toBe('#6E7781')
 })
 
 test('an unavailable preview rejects instead of displaying a different theme', async () => {
   await expect(loadCodeThemePreview('missing-preview-theme')).rejects.toMatchObject({
     data: { code: 'UNKNOWN_CODE_THEME' },
   })
-})
-
-test('preview syntax colors survive a slow tokenizer clock', async () => {
-  let clock = Date.now()
-  const now = vi.spyOn(Date, 'now').mockImplementation(() => {
-    clock += 600
-    return clock
-  })
-  try {
-    const preview = await loadCodeThemePreview('tree-sitter-light')
-    expect(preview.tokens[0]?.find((token) => token.content.includes('Format'))?.color).toBe(
-      '#6E7781',
-    )
-    expect(
-      new Set(preview.tokens.flatMap((line) => line.map((token) => token.color))).size,
-    ).toBeGreaterThan(4)
-  } finally {
-    now.mockRestore()
-  }
 })

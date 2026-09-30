@@ -41,7 +41,12 @@ export type {
 } from './theme'
 export type { ShikiThemeLike } from './theme-extract'
 export type { VscodeThemeDefinition, VscodeThemeRegistration } from './vscode-themes'
-export type { ShikiWorkerLanguageRegistration, ShikiWorkerThemeRegistration } from './workerTypes'
+export type {
+  ShikiWorkerHighlightRequest,
+  ShikiWorkerLanguageRegistration,
+  ShikiWorkerThemeRegistration,
+  ShikiWorkerTransportResult,
+} from './workerTypes'
 export type {
   ShikiHighlighterSessionOptions,
   ShikiPreloadRegistrations,

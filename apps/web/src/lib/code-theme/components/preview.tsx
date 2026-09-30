@@ -3,7 +3,7 @@ import { cn } from '@workspace/ui/lib/utils'
 
 import type { useCodeThemePreview } from '@/lib/code-theme/hooks/use-preview'
 import { editorThemeColorMode } from '@/lib/code-theme/utils/catalog'
-import { previewTokenStyle } from '@/lib/code-theme/utils/preview'
+import { CODE_THEME_PREVIEW_SAMPLE, previewLines } from '@/lib/code-theme/utils/preview'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 export function CodeThemePreview({
@@ -53,27 +53,29 @@ export function CodeThemePreview({
             colorMode === 'light' ? 'bg-card-light-solid' : 'bg-card-dark-solid',
           )}
           data-theme-id={themeId}
-          style={{ color: preview.result.fg }}
+          style={{ color: preview.result.foreground }}
         >
           <code>
-            {preview.result.tokens.map((line, lineIndex) => (
-              <span className='flex min-w-max pr-4' key={lineIndex}>
-                <span
-                  aria-hidden='true'
-                  className='text-muted-foreground text-2xs w-10 shrink-0 pr-3 text-right font-mono tabular-nums select-none'
-                >
-                  {lineIndex + 1}
+            {previewLines(CODE_THEME_PREVIEW_SAMPLE, preview.result.tokens).map(
+              (line, lineIndex) => (
+                <span className='flex min-w-max pr-4' key={lineIndex}>
+                  <span
+                    aria-hidden='true'
+                    className='text-muted-foreground text-2xs w-10 shrink-0 pr-3 text-right font-mono tabular-nums select-none'
+                  >
+                    {lineIndex + 1}
+                  </span>
+                  <span>
+                    {line.map((segment) => (
+                      <span key={segment.start} style={segment.style ?? undefined}>
+                        {segment.text}
+                      </span>
+                    ))}
+                    {line.length === 0 ? '\u00a0' : null}
+                  </span>
                 </span>
-                <span>
-                  {line.map((token) => (
-                    <span key={token.offset} style={previewTokenStyle(token)}>
-                      {token.content}
-                    </span>
-                  ))}
-                  {line.length === 0 ? '\u00a0' : null}
-                </span>
-              </span>
-            ))}
+              ),
+            )}
           </code>
         </pre>
       )}

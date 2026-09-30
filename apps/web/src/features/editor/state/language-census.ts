@@ -4,7 +4,8 @@ import {
   shikiGrammarsForCensus,
   treeSitterLanguagesForCensus,
 } from '@/features/editor/utils/census-languages'
-import { EDITOR_SHIKI_PRELOAD_LANGUAGES } from '@/features/editor/utils/shiki-languages'
+import type { HighlightingLanguage } from '@singapore-editor/highlighting'
+import { bindHighlightingLanguages } from '@/lib/highlighting/state/service'
 
 type CensusSource = {
   readonly queryClient: QueryClient
@@ -17,14 +18,17 @@ let activeSource: CensusSource | null = null
 
 export function bindLanguageCensus(source: CensusSource): () => void {
   activeSource = source
+  const unbindHighlighting = bindHighlightingLanguages(workspaceHighlightingLanguages)
   return () => {
+    unbindHighlighting()
     if (activeSource === source) activeSource = null
   }
 }
 
-export function workspacePreloadLanguages(): readonly string[] {
+/** Null until a census is usable: the highlighting service then prepares its default grammars. */
+export function workspacePreloadLanguages(): readonly string[] | null {
   const counts = usableCensusCounts()
-  return counts ? shikiGrammarsForCensus(counts) : EDITOR_SHIKI_PRELOAD_LANGUAGES
+  return counts ? shikiGrammarsForCensus(counts) : null
 }
 
 /** Tree-sitter warms nothing without a census: compiling every bundled grammar is the cost. */
@@ -39,4 +43,11 @@ function usableCensusCounts() {
   const census = activeSource.queryClient.getQueryData(languageCensusQueryOptions(root).queryKey)
   if (!census || (census.readiness !== 'ready' && census.readiness !== 'stale')) return null
   return census.counts
+}
+
+function workspaceHighlightingLanguages(): readonly HighlightingLanguage[] | null {
+  const grammars = workspacePreloadLanguages()
+  if (!grammars) return null
+  const ids = new Set([...grammars, ...workspaceWarmLanguages()])
+  return [...ids].map((languageId) => ({ languageId }))
 }
