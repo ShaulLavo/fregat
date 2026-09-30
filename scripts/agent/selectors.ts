@@ -1,5 +1,6 @@
 import type { Locator, Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
+import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
 export const treeScrollSelectors = {
   scroll: '[data-file-tree-virtualized-scroll]',
@@ -1233,9 +1234,17 @@ export const selectors = {
 
 export const chords = {
   commandPalette: 'ControlOrMeta+Shift+P',
+  settings: 'ControlOrMeta+,',
   togglePanel: 'ControlOrMeta+J',
   nextItem: 'ControlOrMeta+Alt+BracketRight',
   toggleSidebar: 'ControlOrMeta+B',
+}
+
+export async function pressShortcut(page: Page, chord: string) {
+  // Playwright resolves ControlOrMeta from the host; the app resolves Mod from the browser.
+  const platform = await page.evaluate(detectPlatform)
+  const modifier = platform === 'mac' ? 'Meta' : 'Control'
+  await page.keyboard.press(chord.replace(/\b(?:ControlOrMeta|Mod)\b/g, modifier))
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {
@@ -1248,7 +1257,7 @@ export async function waitForApp(page: Page, timeoutMs = 45_000) {
 }
 
 export async function openGitPanel(page: Page) {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill('>Focus Git')
@@ -1314,7 +1323,7 @@ function hasLspErrorHighlight() {
 }
 
 export async function openFileByName(page: Page, name: string) {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill(name)
@@ -1342,7 +1351,7 @@ export async function openFileFromTree(page: Page, name: string) {
 }
 
 export async function runPaletteCommand(page: Page, title: string) {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill(`>${title}`)
@@ -1350,7 +1359,7 @@ export async function runPaletteCommand(page: Page, title: string) {
 }
 
 export async function chooseColorMode(page: Page, value: 'light' | 'dark' | 'system') {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   await selectors.paletteInput(page).fill('>Choose light / dark mode')
   await selectors.commandOption(page, 'Choose light / dark mode').click()
   await selectors.colorModeOption(page, value).click()
@@ -1407,7 +1416,7 @@ export function paintedTokenColors(target: Locator): Promise<string[]> {
 
 /** Opens the palette's code theme picker and lists its theme ids in order. */
 export async function codeThemePickerIds(page: Page): Promise<string[]> {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   await selectors.paletteInput(page).fill('code ')
   const rows = selectors.codeThemeOptions(page)
   await rows.first().waitFor()
