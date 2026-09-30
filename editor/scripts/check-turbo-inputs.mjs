@@ -10,6 +10,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workspaceRoot } from './workspace-root.ts'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SCANNED_DIRECTORIES = ['src', 'test', 'scripts']
@@ -30,9 +31,7 @@ const NOT_READS = new Set([
   'examples/stress/fallback-experiment.mjs reads .',
 ])
 
-const turboRoot = existsSync(path.join(repoRoot, '../editor/package.json'))
-  ? path.dirname(repoRoot)
-  : repoRoot
+const turboRoot = workspaceRoot
 const turbo = JSON.parse(readFileSync(path.join(turboRoot, 'turbo.json'), 'utf8'))
 const globalGlobs = (turbo.globalDependencies ?? []).map((pattern) => new Bun.Glob(pattern))
 const workspaces = readWorkspaces()
