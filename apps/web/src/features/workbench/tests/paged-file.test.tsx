@@ -159,5 +159,5 @@ test('a changed source invalidates cached pages and every view', async ({ server
 })
 
 test('completed paged-file tests restore the file client after fixture teardown', () => {
-  expect(getClient()).toBe(fileClient)
+  expect(getClient() === fileClient).toBe(true)
 })
