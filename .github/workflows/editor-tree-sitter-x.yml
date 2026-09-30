@@ -37,7 +37,13 @@ jobs:
           if git diff --quiet; then exit 0; fi
           pin=$(command grep -oh 'tree-sitter-x#[0-9a-f]*' editor/packages/tree-sitter/package.json | cut -d'#' -f2)
           branch="tree-sitter-x/$pin"
-          state=$(gh pr list --base main --head "$branch" --state all --limit 1 --json state -q '.[0].state // ""')
+          pull=$(gh api --method GET --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=all -f base=main -f head="${GITHUB_REPOSITORY%%/*}:$branch" \
+            -f sort=created -f direction=desc -F per_page=100 |
+            jq -r --arg repository "$GITHUB_REPOSITORY" '
+              [.[][] | select(.head.repo.full_name == $repository)][0] |
+              if . == null then "" else [.number, (if .merged_at then "MERGED" else (.state | ascii_upcase) end)] | @tsv end')
+          read -r number state <<< "$pull"
           if [ "$state" = CLOSED ] || [ "$state" = MERGED ]; then exit 0; fi
           remote=$(git ls-remote origin "refs/heads/$branch")
           if [ -z "$remote" ]; then
@@ -53,9 +59,9 @@ jobs:
           title="Update tree-sitter-x to $pin"
           body="Pins web-tree-sitter to [tree-sitter-x@$pin](https://github.com/ShaulLavo/tree-sitter-x/commit/$pin), the newest build of the fork's web-tree-sitter branch."
           if [ "$state" = OPEN ]; then
-            gh pr edit "$branch" --title "$title" --body "$body"
+            gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
           else
-            gh pr create --base main --head "$branch" --title "$title" --body "$body"
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --title "$title" --body "$body"
           fi
           runs=$(gh run list --workflow ci.yml --branch "$branch" --commit "$commit" --limit 1 --json databaseId -q length)
           if [ "$runs" -eq 0 ]; then

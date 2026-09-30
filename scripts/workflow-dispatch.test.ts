@@ -83,14 +83,36 @@ function updaterFixture(existingBranch: boolean) {
     `#!/usr/bin/env bash
 set -eu
 printf '%s\\n' "$*" >> "$FIXTURE_GITHUB/commands"
+pulls() {
+  if [ -f "$FIXTURE_GITHUB/pull-pages.json" ]; then cat "$FIXTURE_GITHUB/pull-pages.json"; else echo '[[]]'; fi |
+    jq --arg state "$(if [ -f "$FIXTURE_GITHUB/pr" ]; then cat "$FIXTURE_GITHUB/pr"; fi)" --arg repository "$GITHUB_REPOSITORY" '
+      if $state == "" then . else .[-1] += [{number: 208, state: ($state | ascii_downcase), merged_at: (if $state == "MERGED" then "2026-01-02" else null end), created_at: "2026-01-01", head: {repo: {full_name: $repository}}}] end'
+}
 case "$1 $2" in
-  'pr list') if [ -f "$FIXTURE_GITHUB/pr" ]; then cat "$FIXTURE_GITHUB/pr"; fi ;;
-  'pr view') if [ -f "$FIXTURE_GITHUB/pr" ]; then cat "$FIXTURE_GITHUB/pr"; else exit 1; fi ;;
+  'pr list')
+    if [ -f "$FIXTURE_GITHUB/deny-pr-query" ]; then exit 78; fi
+    shift 2
+    limit=30
+    query='.'
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --limit) limit=$2; shift 2 ;;
+        -q|--jq) query=$2; shift 2 ;;
+        --base|--head|--state|--json) shift 2 ;;
+        *) exit 64 ;;
+      esac
+    done
+    pulls | jq --argjson limit "$limit" '[.[][] | .state = (if .merged_at then "MERGED" else (.state | ascii_upcase) end)] | sort_by(.created_at) | reverse | .[0:$limit]' | jq -r "$query" ;;
+  api*)
+    if [ -f "$FIXTURE_GITHUB/deny-pr-query" ]; then exit 78; fi
+    if [[ " $* " == *" --paginate "* ]] && [[ " $* " == *" --slurp "* ]]; then pulls; else pulls | jq '.[0]'; fi ;;
   'pr create')
     if [ -f "$FIXTURE_GITHUB/deny-create" ]; then echo 'GitHub Actions is not permitted to create pull requests' >&2; exit 1; fi
     echo OPEN > "$FIXTURE_GITHUB/pr" ;;
   'pr edit') ;;
-  'run list') if [ -f "$FIXTURE_GITHUB/run" ]; then echo 1; else echo 0; fi ;;
+  'run list')
+    if [ -f "$FIXTURE_GITHUB/deny-run-query" ]; then exit 78; fi
+    if [ -f "$FIXTURE_GITHUB/run" ]; then echo 1; else echo 0; fi ;;
   'workflow run')
     if [ -f "$FIXTURE_GITHUB/deny-dispatch" ]; then exit 1; fi
     touch "$FIXTURE_GITHUB/run" ;;
@@ -111,6 +133,7 @@ esac
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         GH_TOKEN: 'fixture',
+        GITHUB_REPOSITORY: 'fixture/parser',
         FIXTURE_GITHUB: github,
       },
     })
@@ -171,6 +194,63 @@ test.each(['CLOSED', 'MERGED'])('parser update preserves a %s pull request', (st
     expect(fixture.invoke().exitCode).toBe(0)
     expect(readFileSync(path.join(fixture.github, 'pr'), 'utf8')).toBe(state)
     expect(existsSync(path.join(fixture.github, 'run'))).toBe(false)
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true })
+  }
+})
+
+test.each([false, true])(
+  'parser update ignores fork PRs before choosing an existing native PR: %s',
+  (nativePr) => {
+    const fixture = updaterFixture(nativePr)
+    try {
+      const foreign = Array.from({ length: 100 }, (_, index) => ({
+        number: 1000 + index,
+        state: 'closed',
+        merged_at: index % 2 ? '2026-02-03' : null,
+        created_at: '2026-02-01',
+        head: { repo: { full_name: 'fixture/fork' } },
+      }))
+      const own = nativePr
+        ? [
+            {
+              number: 42,
+              state: 'open',
+              merged_at: null,
+              created_at: '2026-01-01',
+              head: { repo: { full_name: 'fixture/parser' } },
+            },
+          ]
+        : []
+      writeFileSync(path.join(fixture.github, 'pull-pages.json'), JSON.stringify([foreign, own]))
+      const result = fixture.invoke()
+      expect(result.exitCode, result.stderr.toString()).toBe(0)
+      expect(fixture.git('ls-remote', 'origin', 'refs/heads/tree-sitter-x/ba4f1d2')).toContain(
+        'refs/heads/tree-sitter-x/ba4f1d2',
+      )
+      expect(existsSync(path.join(fixture.github, 'run'))).toBe(true)
+      const commands = readFileSync(path.join(fixture.github, 'commands'), 'utf8')
+      if (nativePr) {
+        expect(commands).toMatch(/^pr edit 42 /m)
+        expect(commands).not.toMatch(/^pr create /m)
+      } else {
+        expect(readFileSync(path.join(fixture.github, 'pr'), 'utf8').trim()).toBe('OPEN')
+        expect(commands).toMatch(/^pr create /m)
+      }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  },
+)
+
+test.each(['pr', 'run'])('parser update propagates %s query failures', (operation) => {
+  const fixture = updaterFixture(true)
+  try {
+    writeFileSync(path.join(fixture.github, `deny-${operation}-query`), '')
+    const before = fixture.git('ls-remote', 'origin', 'refs/heads/tree-sitter-x/ba4f1d2')
+    expect(fixture.invoke().exitCode).toBe(78)
+    expect(existsSync(path.join(fixture.github, 'run'))).toBe(false)
+    expect(fixture.git('ls-remote', 'origin', 'refs/heads/tree-sitter-x/ba4f1d2')).toBe(before)
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
