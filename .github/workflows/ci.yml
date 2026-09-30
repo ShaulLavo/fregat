@@ -120,7 +120,7 @@ jobs:
         env:
           FILES: ${{ needs.changes.outputs.docs_files }}
         run: |
-          version=$(jq -r '.devDependencies.oxfmt' package.json)
+          version=$(jq -r '.workspaces.catalog.oxfmt' package.json)
           jq -r '.[] | "./" + .' <<<"$FILES" | xargs -d '\n' bunx "oxfmt@$version" --check
 
   # Jobs instead of one runner doing everything in turn: each pays for setup once,
