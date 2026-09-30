@@ -798,7 +798,7 @@ export class InputSelectionController {
         ],
       },
     )
-    this.autoClose.track(change.snapshot, caret + opening.open.length, opening.close)
+    this.autoClose.track(snapshot, change.snapshot, caret + opening.open.length, opening.close)
     this.markSessionSelectionForNextInput()
     return change
   }

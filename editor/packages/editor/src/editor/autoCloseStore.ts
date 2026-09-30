@@ -27,9 +27,15 @@ export class AutoCloseStore {
   private validForSnapshot: PieceTableSnapshot | null = null
   private pairs: TrackedPair[] = []
 
-  /** Records a closer inserted at `offset` in `snapshot`. */
-  track(snapshot: PieceTableSnapshot, offset: number, closerChar: string): void {
-    this.adoptSnapshot(snapshot)
+  /** Keeps outer pairs only when the insertion starts from the snapshot this editor owns. */
+  track(
+    previousSnapshot: PieceTableSnapshot,
+    snapshot: PieceTableSnapshot,
+    offset: number,
+    closerChar: string,
+  ): void {
+    if (this.validForSnapshot !== previousSnapshot) this.pairs = []
+    this.validForSnapshot = snapshot
     // Right bias: text typed between the delimiters must push the closer along, which is exactly
     // what makes type-over still work after editing inside the pair.
     this.pairs.push({ closerAnchor: anchorAfter(snapshot, offset), closerChar })
@@ -79,13 +85,6 @@ export class AutoCloseStore {
 
   clear(): void {
     this.validForSnapshot = null
-    this.pairs = []
-  }
-
-  private adoptSnapshot(snapshot: PieceTableSnapshot): void {
-    if (this.validForSnapshot === snapshot) return
-
-    this.validForSnapshot = snapshot
     this.pairs = []
   }
 }
