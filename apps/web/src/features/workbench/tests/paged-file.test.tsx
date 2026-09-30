@@ -1,7 +1,10 @@
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { waitFor } from '@testing-library/react'
+import { onTestFinished } from 'vitest'
 import { test, expect } from '../../../../test/fixtures'
+import { installTestClient } from '../../../../test/factories/client-binding'
+import { createDeferredReadSessionClient } from '../../../../test/factories/deferred-read-session-client'
 import { createTestQueryClient, renderHookWithProviders } from '../../../../test/render'
 import { usePagedFile } from '@/features/workbench/hooks/use-paged-file'
 
@@ -67,16 +70,65 @@ test('UTF-16 is refused explicitly and changed files require a new session', asy
   await waitFor(() => expect(utf16.result.current.page.isError).toBe(true))
   expect(utf16.result.current.page.error).toMatchObject({ code: 'PAGED_ENCODING_UNSUPPORTED' })
   utf16.unmount()
+  const deferred = createDeferredReadSessionClient(server)
+  const restore = installTestClient(deferred.client)
+  onTestFinished(() => {
+    deferred.release()
+    restore()
+  })
   const target = path.join(server.root, 'mutable.txt')
   await writeFile(target, 'before\n')
   const mutable = renderHookWithProviders(() => usePagedFile('mutable.txt', 0, 0))
   await waitFor(() => expect(mutable.result.current.page.isSuccess).toBe(true))
   const resource = mutable.result.current.resource.data!
+  await deferred.entered
+  expect(mutable.result.current.index.isPending).toBe(true)
+  expect(resource.document.stats.inFlight).toBe(1)
+  expect(deferred.requests).toHaveLength(2)
+  deferred.release()
+  await waitFor(() => expect(mutable.result.current.index.isSuccess).toBe(true))
+  expect(resource.document.stats.inFlight).toBe(0)
   await writeFile(target, 'after\n')
   await expect(resource.source.readBytes(0, 4, new AbortController().signal)).rejects.toMatchObject(
     { code: 'FILE_CHANGED' },
   )
   mutable.unmount()
+})
+
+test('a background index invalidation closes the read session before a later direct read', async ({
+  server,
+  client,
+}) => {
+  void client
+  const deferred = createDeferredReadSessionClient(server)
+  const restore = installTestClient(deferred.client)
+  onTestFinished(() => {
+    deferred.release()
+    restore()
+  })
+  const target = path.join(server.root, 'index-first.txt')
+  await writeFile(target, 'before\n')
+  const view = renderHookWithProviders(() => usePagedFile('index-first.txt', 0, 0))
+  await waitFor(() => expect(view.result.current.page.isSuccess).toBe(true))
+  await deferred.entered
+  const resource = view.result.current.resource.data!
+  expect(view.result.current.index.isPending).toBe(true)
+  expect(resource.document.stats.inFlight).toBe(1)
+  expect(deferred.requests).toHaveLength(2)
+  await writeFile(target, 'after\n')
+  deferred.release()
+  await waitFor(() => expect(view.result.current.index.isError).toBe(true))
+  expect(resource.document.stats.state).toBe('stale')
+  expect(resource.document.stats.cachedBytes).toBe(0)
+  await expect(resource.source.readBytes(0, 4, new AbortController().signal)).rejects.toMatchObject(
+    {
+      code: 'READ_SESSION_EXPIRED',
+    },
+  )
+  await expect(resource.view.readLines(0, 1)).rejects.toMatchObject({
+    code: 'PAGED_DOCUMENT_INVALID',
+  })
+  view.unmount()
 })
 
 test('a changed source invalidates cached pages and every view', async ({ server, client }) => {
