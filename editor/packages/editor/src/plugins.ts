@@ -704,6 +704,7 @@ type EditorFeatureDomContributionContext = {
   readonly highlightPrefix: string
 }
 
+/** Source reads and synchronization cursors identify the delivered publication during its callbacks. */
 type EditorDocumentContributionContext = {
   hasDocument(): boolean
   log(event: EditorLogInput): void
@@ -771,6 +772,11 @@ export type EditorCapabilityContributionContext = {
 
 export type EditorEditContributionContext = EditorDocumentContributionContext &
   EditorCapabilityContributionContext & {
+    /** Commands acquire the current head; publication readers keep the delivered source and cursor. */
+    getCurrentDocumentSnapshot(): Pick<
+      EditorViewSnapshot,
+      'textSnapshot' | 'documentSyncPoint'
+    > | null
     getSelections(): readonly EditorResolvedSelection[]
     focusEditor(): void
     applyEdits(

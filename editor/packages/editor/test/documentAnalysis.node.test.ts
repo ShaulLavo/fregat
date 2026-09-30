@@ -11,6 +11,89 @@ import {
 } from '../src/syntax/session'
 
 describe('retained document analysis', () => {
+  it('applies every captured event when a preceding listener commits a newer head', async () => {
+    const buffer = createEditorTextBuffer('a')
+    const view = createEditorBufferSession(buffer)
+    buffer.subscribe((event) => {
+      if (event.revisionAfter === 1) view.applyText('c')
+    })
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'nested.md' })
+    const parser = provider()
+    const lease = analysis.borrowStructural({ provider: parser.provider, languageId: 'markdown' })!
+    await lease.refresh(buffer.getTextSnapshot())
+    view.applyText('b')
+    await lease.refresh(buffer.getTextSnapshot())
+    expect(
+      parser.edits.mock.calls.map(([change]) => change.textSnapshot.materializeFullText()),
+    ).toEqual(['ab', 'abc'])
+    const state = lease.read()
+    expect(state.kind).toBe('ready')
+    if (state.kind === 'ready') expect(state.snapshot.materializeFullText()).toBe('abc')
+    analysis.dispose()
+  })
+
+  it('settles superseded interest while an older provider request is still running', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const view = createEditorBufferSession(buffer)
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'superseded.md' })
+    const gate = deferred<EditorSyntaxResult>()
+    const parser = provider(gate.promise)
+    const lease = analysis.borrowStructural({ provider: parser.provider, languageId: 'markdown' })!
+    const old = lease.refresh(buffer.getTextSnapshot())
+    const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
+    view.applyText('!')
+    await rejected
+    expect(lease.read()).toMatchObject({ kind: 'pending', revision: 1 })
+    gate.resolve(createEmptySyntaxResult())
+    await lease.refresh(buffer.getTextSnapshot())
+    expect(parser.edits).toHaveBeenCalledTimes(1)
+    analysis.dispose()
+  })
+
+  it('shares unchanged configuration values and separates each effective structural option', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'options.md' })
+    const parser = provider()
+    const request = {
+      provider: parser.provider,
+      languageId: 'markdown',
+      configurationTag: ['theme', 1],
+    }
+    const first = analysis.borrowStructural(request)!
+    const second = analysis.borrowStructural({ ...request, configurationTag: ['theme', 1] })!
+    expect(second.runtimeSessionId).toBe(first.runtimeSessionId)
+    for (const option of [
+      { includeCaptures: false },
+      { includeHighlights: false },
+      { syntaxMode: 'range' as const },
+    ]) {
+      const different = analysis.borrowStructural({ ...request, ...option })!
+      expect(different.runtimeSessionId).not.toBe(first.runtimeSessionId)
+      different.dispose()
+    }
+    expect(parser.create).toHaveBeenCalledTimes(4)
+    analysis.dispose()
+    expect(parser.dispose).toHaveBeenCalledTimes(4)
+  })
+
+  it('releases document sessions once per open/close cycle without disposing the shared provider', async () => {
+    const parser = provider()
+    for (let cycle = 0; cycle < 20; cycle++) {
+      const buffer = createEditorTextBuffer('alpha')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reopened.md' })
+      const lease = analysis.borrowStructural({
+        provider: parser.provider,
+        languageId: 'markdown',
+      })!
+      await lease.refresh(buffer.getTextSnapshot())
+      lease.dispose()
+      analysis.dispose()
+      analysis.dispose()
+      expect(parser.dispose).toHaveBeenCalledTimes(cycle + 1)
+    }
+    expect(parser.create).toHaveBeenCalledTimes(20)
+  })
+
   it('shares a parser and applies each committed revision once across detached views', async () => {
     const buffer = createEditorTextBuffer('alpha beta')
     const view = createEditorBufferSession(buffer)
@@ -244,7 +327,9 @@ describe('retained document analysis', () => {
 
 function provider(initial?: Promise<EditorSyntaxResult>) {
   const dispose = vi.fn()
-  const edits = vi.fn(async () => createEmptySyntaxResult())
+  const edits = vi.fn(async (_change: import('../src/documentSession').DocumentSessionChange) =>
+    createEmptySyntaxResult(),
+  )
   const ranges = vi.fn(async (range: EditorSyntaxRange) =>
     createEmptySyntaxResult({ requestedRanges: [range] }),
   )

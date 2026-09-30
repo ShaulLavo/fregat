@@ -1,6 +1,8 @@
 # Plan 099 unit 0: baseline and consumer inventory
 
 Research record for [Plan 099](../../plans/099-document-contributions.md) unit 0, taken 2026-09-25.
+Current canonical sources, publication proof and remaining acceptance limits are recorded in
+[the 2026-09-30 foundations closeout](foundations-publication-proof.md).
 It covers the inventory, the baseline identity, and the measurements that run without changing
 product code. The harness extension the plan puts first in unit 0 is Editor code, so it is listed
 under [Not done](#not-done).

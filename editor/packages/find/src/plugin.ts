@@ -276,7 +276,7 @@ class EditorFindEditContribution implements EditorEditContribution {
 
   public constructor(context: EditorEditContributionContext, controller: EditorFindController) {
     this.registration = controller.attachEditHost({
-      textSnapshot: () => context.getTextSnapshot(),
+      textSnapshot: () => context.getCurrentDocumentSnapshot()?.textSnapshot ?? null,
       getSelections: () => findSelections(context.getSelections()),
       applyEdits: (edits, timingName, selection) =>
         context.applyEdits(edits, timingName, selection),

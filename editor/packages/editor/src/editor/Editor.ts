@@ -3426,8 +3426,9 @@ export class Editor {
     return {
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
-      materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => this.session?.getTextSnapshot() ?? null,
+      materializeFullText: () => this.contributionTextSnapshot().materializeFullText(),
+      getTextSnapshot: () => (this.session ? this.contributionTextSnapshot() : null),
+      getCurrentDocumentSnapshot: () => this.currentDocumentSnapshot(),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3450,8 +3451,8 @@ export class Editor {
       decorations: this.decorations,
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
-      materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => this.session?.getTextSnapshot() ?? null,
+      materializeFullText: () => this.contributionTextSnapshot().materializeFullText(),
+      getTextSnapshot: () => (this.session ? this.contributionTextSnapshot() : null),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3475,8 +3476,9 @@ export class Editor {
       highlightPrefix: this.highlightPrefix,
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
-      materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => this.session?.getTextSnapshot() ?? null,
+      materializeFullText: () => this.contributionTextSnapshot().materializeFullText(),
+      getTextSnapshot: () => (this.session ? this.contributionTextSnapshot() : null),
+      getCurrentDocumentSnapshot: () => this.currentDocumentSnapshot(),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3527,9 +3529,35 @@ export class Editor {
     })
   }
 
+  private bufferPublication: EditorTextBufferChange | null = null
+
+  private contributionTextSnapshot(): TextSnapshot {
+    return this.bufferPublication?.change.textSnapshot ?? this.getTextSnapshot()
+  }
+
+  private currentDocumentSnapshot(): Pick<
+    EditorViewSnapshot,
+    'textSnapshot' | 'documentSyncPoint'
+  > | null {
+    if (!this.session) return null
+    return {
+      textSnapshot: this.session.getTextSnapshot(),
+      documentSyncPoint:
+        editorBufferSession(this.session)?.buffer.getDocumentSyncPoint() ??
+        this.detachedEditChain.point,
+    }
+  }
+
   private currentDocumentEditChain(): Pick<DocumentEditChain, 'changesSince' | 'point'> {
     const session = editorBufferSession(this.session)
     if (!session) return this.detachedEditChain
+    const publication = this.bufferPublication
+    if (publication) {
+      return {
+        point: publication.syncPointAfter,
+        changesSince: publication.changesSinceDocumentSyncPoint,
+      }
+    }
     return {
       point: session.buffer.getDocumentSyncPoint(),
       changesSince: (point, scope) => session.buffer.changesSinceDocumentSyncPoint(point, scope),
@@ -3561,26 +3589,32 @@ export class Editor {
 
   private handleBufferChange(session: EditorBufferSession, event: EditorTextBufferChange): void {
     if (this.session !== session) return
-    const pending = this.pendingBufferChangeOptions.get(event.change.textSnapshot)
-    if (event.change.kind !== 'synchronize' && event.sourceViewId !== session.view.viewId) {
-      session.view.acceptBufferSelections(markSelectionSetDirty(session.view.getSelections()))
+    this.bufferPublication = event
+    try {
+      const pending = this.pendingBufferChangeOptions.get(event.change.textSnapshot)
+      if (event.change.kind !== 'synchronize' && event.sourceViewId !== session.view.viewId) {
+        session.view.acceptBufferSelections(markSelectionSetDirty(session.view.getSelections()))
+      }
+      this.pendingBufferChangeOptions.delete(event.change.textSnapshot)
+      const change = {
+        ...event.change,
+        timings: pending?.change.timings ?? event.change.timings,
+        selections: session.view.getSelections(),
+      }
+      if (isTextSessionChange(change)) this.publishedBufferSnapshots.add(change.textSnapshot)
+      this.applyPublishedSessionChange(
+        change,
+        pending?.totalName ?? 'editor.bufferChange',
+        pending?.totalStart ?? nowMs(),
+        pending?.options ?? {},
+      )
+    } finally {
+      if (this.bufferPublication === event) this.bufferPublication = null
     }
-    this.pendingBufferChangeOptions.delete(event.change.textSnapshot)
-    const change = {
-      ...event.change,
-      timings: pending?.change.timings ?? event.change.timings,
-      selections: session.view.getSelections(),
-    }
-    if (isTextSessionChange(change)) this.publishedBufferSnapshots.add(change.textSnapshot)
-    this.applyPublishedSessionChange(
-      change,
-      pending?.totalName ?? 'editor.bufferChange',
-      pending?.totalStart ?? nowMs(),
-      pending?.options ?? {},
-    )
   }
 
   private disposeBufferSubscriptions(): void {
+    this.bufferPublication = null
     this.unsubscribeBufferChanges?.()
     this.unsubscribeLeaseChanges?.()
     this.unsubscribeBufferChanges = null

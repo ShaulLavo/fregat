@@ -1,9 +1,10 @@
 # Plan 099: Route document consumers through one contribution runtime
 
-Status: wave 2 units 0–1 remaining, reconciled 2026-09-28. The session diff correction and
-Editor E057 transport removal landed. Unit 0's old inventory/probes require a current baseline;
-unit 1 publication remains open. Retained-analysis code has landed and changes the consumer
-migration. Units 2–7 retain their explicit implementation gate. Requested on 2026-09-12.
+Status: unit 1 publication implemented and focused proof delivered in the foundations wave,
+2026-09-30. Unit 0 is partial: current inventory and headless controls are refreshed; the full expanded
+consumer-matrix native-input calibration remains unverified. The session diff correction and
+Editor E057 transport removal landed. Retained-analysis subscribers now consume captured frames.
+See [current publication proof](../docs/document-contributions/foundations-publication-proof.md). Units 2–7 retain their explicit implementation gate. Requested on 2026-09-12.
 Owner: Editor and Platform. Priority P1, effort XL, change risk high.
 Inspected Platform: `2f9528ac1e147615cf81431ef8509f551af4b290`.
 Inspected Editor: `64926519bfdd39f4afcfae225019a932d3e27785`.
@@ -80,24 +81,24 @@ publication paths remain at completion.
 Editor paths below are relative to the sibling `Editor` repository. Platform paths are relative
 to this repository. Line numbers describe the inspected baseline and must be checked for drift.
 
-| Existing source                                                                                                                                                 | What the refactor must preserve or replace                                                                                                                       |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Text buffer](../../Editor/packages/editor/src/documentSession.ts), `PieceTableEditorTextBuffer`, around lines 488 and 1320                                     | Owns history, snapshots, revisions, edit chain, and publication. Extend this owner.                                                                              |
-| Same file, `undo`, `redo`, `commitPrepared`, `reverseReceipt`, sequence operations, `commitLogicalOnly`, and `emitChange`                                       | Several mutation paths separately update revision state and emit. Include every path, including logical changes with unchanged text.                             |
-| [TextSnapshot](../../Editor/packages/editor/src/documentTextSnapshot.ts), line 20                                                                               | Supplies range reads, line lookup, and chunk iteration. Keep this reader contract; do not expose piece-tree internals to contributions.                          |
-| [DocumentEditChain](../../Editor/packages/editor/src/editor/editChain.ts), line 103                                                                             | Composes edits since a sync point and detects gaps and segment changes. Extend it instead of creating feature-local edit journals.                               |
-| [Plugin contracts](../../Editor/packages/editor/src/plugins.ts), lines 618 and 950                                                                              | Already provide typed registration and view lifecycle. Add document lifetime below view lifetime.                                                                |
-| [Secondary-view projection](../../Editor/packages/editor/src/public/secondaryViews.ts), line 70                                                                 | Shares document/version/view data with minimap. Its callable JS reader is not itself a worker message.                                                           |
-| [Work scheduler](../../Editor/packages/editor/src/editor/workScheduler.ts)                                                                                      | Already supplies task classes, cancellation, deadlines, and replacement. Reuse it without imposing one serial queue across workers.                              |
-| [Tree-sitter source](../../Editor/packages/tree-sitter/src/treeSitter/source.ts) and [client](../../Editor/packages/tree-sitter/src/treeSitter/workerClient.ts) | Build complete piece descriptors and track sent chunks. Optional SAB payloads are converted back into cached worker strings. Replace generic source bookkeeping. |
-| [Shiki client](../../Editor/packages/editor/src/shiki/workerClient.ts), lines 394 and 465                                                                       | Materializes initial text and independently chooses incremental edits or a text-diff fallback. Preserve tokenizer state; remove source-history reconstruction.   |
-| [Minimap client](../../Editor/packages/minimap/src/workerClient.ts), lines 210, 1106, and 1477                                                                  | Owns another update baseline, edit rebasing, and rendering sequence. Keep clipped summaries and raster behavior; move common document progress out.              |
-| [LSP document sync](../../Editor/packages/lsp-plugin/src/documentSync.ts), lines 45 and 388                                                                     | Already consumes the shared edit chain, but owns attachment and progress per lane. Keep protocol-specific version and URI rules.                                 |
-| [Prepared documents](../../Editor/packages/editor/src/editor/preparedDocument.ts) and [diff syntax](../../Editor/packages/diff/src/diffSyntax.ts)               | Create or transfer sessions outside the ordinary mounted-view path. They must use the same contribution runtime.                                                 |
-| [Platform runtime](../apps/web/src/features/editor/state/runtime.ts) and [document state](../apps/web/src/features/editor/state/document-state.tsx)             | Own retained documents within an environment. They must supply explicit ownership, not an active-editor singleton.                                               |
-| [WorkspaceEdit service](../apps/web/src/features/editor/state/workspace-edit-service.ts), around line 1000                                                      | Commits local buffer changes before awaiting server finalization. Compensation can emit reverse changes later. Preserve this visibility and ordering.            |
+| Existing source                                                                                                                                           | What the refactor must preserve or replace                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Text buffer](../editor/packages/editor/src/documentSession.ts), `PieceTableEditorTextBuffer`, around lines 488 and 1320                                  | Owns history, snapshots, revisions, edit chain, and publication. Extend this owner.                                                                              |
+| Same file, `undo`, `redo`, `commitPrepared`, `reverseReceipt`, sequence operations, `commitLogicalOnly`, and `emitChange`                                 | Several mutation paths separately update revision state and emit. Include every path, including logical changes with unchanged text.                             |
+| [TextSnapshot](../editor/packages/editor/src/documentTextSnapshot.ts), line 20                                                                            | Supplies range reads, line lookup, and chunk iteration. Keep this reader contract; do not expose piece-tree internals to contributions.                          |
+| [DocumentEditChain](../editor/packages/editor/src/editor/editChain.ts), line 103                                                                          | Composes edits since a sync point and detects gaps and segment changes. Extend it instead of creating feature-local edit journals.                               |
+| [Plugin contracts](../editor/packages/editor/src/plugins.ts), lines 618 and 950                                                                           | Already provide typed registration and view lifecycle. Add document lifetime below view lifetime.                                                                |
+| [Secondary-view projection](../editor/packages/editor/src/public/secondaryViews.ts), line 70                                                              | Shares document/version/view data with minimap. Its callable JS reader is not itself a worker message.                                                           |
+| [Work scheduler](../editor/packages/editor/src/editor/workScheduler.ts)                                                                                   | Already supplies task classes, cancellation, deadlines, and replacement. Reuse it without imposing one serial queue across workers.                              |
+| [Tree-sitter source](../editor/packages/tree-sitter/src/treeSitter/source.ts) and [client](../editor/packages/tree-sitter/src/treeSitter/workerClient.ts) | Build complete piece descriptors and track sent chunks. Optional SAB payloads are converted back into cached worker strings. Replace generic source bookkeeping. |
+| [Shiki client](../editor/packages/editor/src/shiki/workerClient.ts), lines 394 and 465                                                                    | Materializes initial text and independently chooses incremental edits or a text-diff fallback. Preserve tokenizer state; remove source-history reconstruction.   |
+| [Minimap client](../editor/packages/minimap/src/workerClient.ts), lines 210, 1106, and 1477                                                               | Owns another update baseline, edit rebasing, and rendering sequence. Keep clipped summaries and raster behavior; move common document progress out.              |
+| [LSP document sync](../editor/packages/lsp-plugin/src/documentSync.ts), lines 45 and 388                                                                  | Already consumes the shared edit chain, but owns attachment and progress per lane. Keep protocol-specific version and URI rules.                                 |
+| [Prepared documents](../editor/packages/editor/src/editor/preparedDocument.ts) and [diff syntax](../editor/packages/diff/src/diffSyntax.ts)               | Create or transfer sessions outside the ordinary mounted-view path. They must use the same contribution runtime.                                                 |
+| [Platform runtime](../apps/web/src/features/editor/state/runtime.ts) and [document state](../apps/web/src/features/editor/state/document-state.tsx)       | Own retained documents within an environment. They must supply explicit ownership, not an active-editor singleton.                                               |
+| [WorkspaceEdit service](../apps/web/src/features/editor/state/workspace-edit-service.ts), around line 1000                                                | Commits local buffer changes before awaiting server finalization. Compensation can emit reverse changes later. Preserve this visibility and ordering.            |
 
-The [2026-09-12 measurements](../../Editor/docs/performance/sab-transport-2026-09-12.md) found no
+The [2026-09-12 measurements](../editor/docs/performance/sab-transport-2026-09-12.md) found no
 repeatable overall Tree-sitter SAB advantage. Direct shared readers gained in a synthetic four-worker
 case, but that gain does not justify shared-storage complexity for this refactor. The text transport
 decision is strings; implementation validation must still prove correctness and latency budgets.
@@ -116,7 +117,7 @@ the blob route because a turn can touch every file in a repository.
 
 [`editorDiffFiles`](../packages/client-core/src/git/diff-files.ts) passes those patches through
 `parseGitPatch`. The parser concatenates hunk lines without omitted source lines, but
-[`diffSyntax`](../../Editor/packages/diff/src/diffSyntax.ts) indexes the resulting arrays by original
+[`diffSyntax`](../editor/packages/diff/src/diffSyntax.ts) indexes the resulting arrays by original
 file line number. In the reproduced session, visible source line 2 receives line 3's tokens.
 Using the captured response, all 48 displayed new-side rows select different source text;
 using the same checkpoint blobs as complete files produces zero mismatches.
@@ -546,7 +547,7 @@ Record bytes/units read, encoded, cloned or transferred; resets and their reason
 live pins; queue length; and discarded work. Rejected application attempts are not accepted results.
 
 Count total `readRange` units and index/descriptor work, not only full-text method calls.
-[E031's measurements](../../Editor/docs/performance/e031-projection.md) show that line-by-line
+[E031's measurements](../editor/docs/performance/e031-projection.md) show that line-by-line
 reads can hide a whole-document pass behind a zero full-read counter.
 
 Do not put a generic runtime mode, cache budget, or SAB toggle in user settings merely for this
@@ -603,7 +604,7 @@ common reader advances.
 
 Keep their separate workers. The `shared-utf16` payload, transport helpers and capability
 selection are already removed. That deletion landed as Editor E057 on 2026-09-26 ([singapore#52](https://github.com/ShaulLavo/singapore/pull/52),
-record in [sab-transport-2026-09-12.md](../../Editor/docs/performance/sab-transport-2026-09-12.md)),
+record in [sab-transport-2026-09-12.md](../editor/docs/performance/sab-transport-2026-09-12.md)),
 so this unit has no SAB work left. Carry forward exact
 UTF-16, chunk identity, and retention coverage against strings. Preserve atomic cancellation and
 packed-result transfer behavior; neither is shared document storage.
@@ -740,7 +741,7 @@ does not prove that a patch-backed session view uses the correct source coordina
 
 ### Measurement matrix
 
-Use the existing [input latency instrument](../../Editor/docs/performance/input-latency.md) and
+Use the existing [input latency instrument](../editor/docs/performance/input-latency.md) and
 its calibrated ordinary-code, 500,000-short-line, and one-megabyte-line fixtures. Preserve the
 single-view and two-visible-plus-one-hidden configurations and the six native input scenarios.
 
@@ -829,19 +830,19 @@ and complete validation. Writing the plan does not schedule production execution
   operation service. Baseline/publication work in units 0–1 can proceed independently. Public
   backend cutover starts in unit 2 and follows completed 098 and 097 contracts. Refresh anchors and measurements
   at that cutover rather than implement against a competing draft identity or provenance model.
-- [E007](../../Editor/docs/performance/e007-consumer-copies.md) and
-  [E033](../../Editor/docs/performance/e033-full-text-boundary.md) supply range/full-text constraints.
+- [E007](../editor/docs/performance/e007-consumer-copies.md) and
+  [E033](../editor/docs/performance/e033-full-text-boundary.md) supply range/full-text constraints.
   Reconcile overlapping consumer moves instead of implementing parallel abstractions.
-- [Completed E032](../../Editor/docs/performance/e032-edit-batches.md) supplies incremental batch
+- [Completed E032](../editor/docs/performance/e032-edit-batches.md) supplies incremental batch
   behavior and measurements. Preserve its sparse-region requirements and canonical batch semantics.
 - E009 supplied transport measurement scope and is folded into unit 6 (2026-09-25).
   Its initial measurements informed the SAB text-transport removal completed in E057. Unit 6
   validates string delivery under the new runtime and records remaining measurement gaps.
 - E010, E012 and E013, the shared-storage research, were closed as no-go on 2026-09-25
-  ([decision](../../Editor/docs/performance/sab-transport-2026-09-12.md#decision-2026-09-25)); E011
+  ([decision](../editor/docs/performance/sab-transport-2026-09-12.md#decision-2026-09-25)); E011
   is parked under Plan 112. All were outside this architecture. Reopening shared text storage requires a separate explicit
   decision; this plan provides no production abstraction or implementation dependency for it.
-- [E014](../../Editor/plans/e014-parallel-search.md) must reuse the common reader and job lifecycle
+- [E014](../editor/plans/e014-parallel-search.md) must reuse the common reader and job lifecycle
   if parallel search is implemented. This plan does not add a parallel search engine.
 - The highlight retry (Plan 071, landed with Editor E050 row 11) stays in the syntax controller.
   Common endpoint lifecycle must not accidentally introduce retries or replay failed requests as
@@ -849,7 +850,7 @@ and complete validation. Writing the plan does not schedule production execution
 
 ## Completion checklist
 
-- [ ] Every accepted buffer transition has one canonical publication path and preserved semantics.
+- [x] Every accepted buffer transition has one canonical publication path and preserved semantics.
 - [ ] Every first-party secondary document consumer enters through contribution registration.
 - [ ] Domain APIs remain typed; synchronous view/input behavior stays synchronous.
 - [ ] Source synchronization and result provenance have one owner, including prepared and diff callers.

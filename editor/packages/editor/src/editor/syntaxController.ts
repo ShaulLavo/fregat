@@ -1207,7 +1207,7 @@ export class EditorSyntaxController {
     this.structuralDispatchPoint = chain.point
     if (!change) return this.syntaxSession.refresh(session.getTextSnapshot())
 
-    return this.syntaxSession.applyChange(composeSkippedChanges(session, chain, point, change))
+    return this.syntaxSession.applyChange(composeSkippedChanges(chain, point, change))
   }
 
   private loadCurrentSyntaxRangeResult(options: {
@@ -1274,7 +1274,7 @@ export class EditorSyntaxController {
     this.highlightDispatchPoint = chain.point
     if (!change) return this.highlighterSession.refresh(session.getTextSnapshot())
 
-    return this.highlighterSession.applyChange(composeSkippedChanges(session, chain, point, change))
+    return this.highlighterSession.applyChange(composeSkippedChanges(chain, point, change))
   }
 
   private applySyntaxResult(
@@ -2320,15 +2320,13 @@ const boundedIndex = (index: number, documentLength: number): number =>
  * between two distant edits. The edit chain returns the skipped edits in the session's coordinates.
  */
 function composeSkippedChanges(
-  session: DocumentSession,
-  chain: Pick<DocumentEditChain, 'changesSince'>,
+  chain: Pick<DocumentEditChain, 'changesSince' | 'point'>,
   point: DocumentSyncPoint | null,
   change: DocumentSessionChange,
 ): DocumentSessionChange {
   if (!point) return change
-  if (session.getSnapshot() !== change.snapshot) return change
 
   const composed = chain.changesSince(point, null)
-  if (!composed?.edits) return change
+  if (!composed?.edits || composed.syncPointAfter !== chain.point) return change
   return { ...change, edits: composed.edits }
 }
