@@ -588,7 +588,7 @@
       "dependencies": {
         "@singapore-editor/core": "workspace:*",
         "tree-sitter-md": "0.1.1",
-        "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0",
+        "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#f73fbfd",
       },
       "devDependencies": {
         "@playwright/test": "^1.63.0",
@@ -637,7 +637,7 @@
         "tree-sitter-cli": "0.27.0",
         "typescript": "7.0.2",
         "vitest": "5.0.2",
-        "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0",
+        "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#f73fbfd",
       },
       "peerDependencies": {
         "@singapore-editor/core": "workspace:*",
@@ -979,7 +979,7 @@
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
     "@opentui/react": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz",
     "lodash-es": "4.18.1",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0",
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#f73fbfd",
   },
   "catalog": {
     "@opentui/core": "0.5.12",
@@ -3516,7 +3516,7 @@
 
     "web-push": ["web-push@3.6.7", "", { "dependencies": { "asn1.js": "^5.3.0", "http_ece": "1.2.0", "https-proxy-agent": "^7.0.0", "jws": "^4.0.0", "minimist": "^1.2.5" }, "bin": { "web-push": "src/cli.js" } }, "sha512-OpiIUe8cuGjrj3mMBFWY+e4MMIkW3SVT+7vEIjvD9kejGUypv8GPDf84JdPWskK8zMRIJ6xYGm+Kxr8YkPyA0A=="],
 
-    "web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#e2985e0", {}, "ShaulLavo-tree-sitter-x-e2985e0", "sha512-lq4zLvvfasW+Iiy4Mv2yfoOOkRSsPDD73NuUihEhnlCePmEaaZdHP8vLywtwiCW/521twM6otnzfSYggiIvQBg=="],
+    "web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#f73fbfd", {}, "ShaulLavo-tree-sitter-x-f73fbfd", "sha512-FU/J9hgvZyX8bQxUDexg5+wCny1/CGQPG1ZL0QSF3UVgL08UBZ25EByu/pkD2afWKcSYoD6dgMt/0zdEr3I58w=="],
 
     "whatwg-mimetype": ["whatwg-mimetype@3.0.0", "", {}, "sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q=="],
 
