@@ -209,6 +209,7 @@ import { physicalChat } from './physical-chat'
 import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { settingsDependentRow } from './settings-dependent-row'
+import { settingsTokenizationLimit } from './settings-tokenization-limit'
 import { settingsRowDetails } from './settings-row-details'
 import { settingsKeybindings } from './settings-keybindings'
 import { tailFollow } from './tail-follow'
@@ -594,6 +595,7 @@ export const scenarios: readonly Scenario[] = [
   connectionFrame,
   settingsValueGrids,
   settingsDependentRow,
+  settingsTokenizationLimit,
   settingsRowDetails,
   settingsKeybindings,
   tailFollow,
