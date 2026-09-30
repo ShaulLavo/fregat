@@ -80,6 +80,24 @@ fregat/
   ask the owner before force-pushing a mirror.
 - Mirror repos keep their URLs, stars, issues and releases.
 
+- Built in `.github/workflows/mirror.yml`: one matrix entry per family, full-depth checkout,
+  `git subtree split --prefix=<folder> HEAD`, then a regular push to the mirror's `main`.
+  Missing folders skip individually; an absent `MIRROR_TOKEN` skips every entry. The job uses
+  no split cache, serializes main runs, and fails with an error annotation on any rejected push.
+- Owner setup:
+  - [ ] Create the empty public `ShaulLavo/hotkeys` repository. Keep its initial history empty
+        so the first hotkeys split can create `main` with a regular push.
+  - [ ] Add Fregat's Actions secret `MIRROR_TOKEN`, a fine-grained GitHub token restricted to
+        `ShaulLavo/singapore`, `ShaulLavo/ghostty-webgpu` and `ShaulLavo/hotkeys`, with
+        **Contents: Read and write**. Also grant **Workflows: Read and write** for copying the
+        families' `.github/workflows` files. This token authenticates only mirror pushes.
+  - [ ] Freeze direct writes to the mirror mains at the final source-head capture and inspect
+        the first successful split pushes before releasing the cutover hold.
+- Local verification used the workflow's exact shell against three temporary bare repos:
+  first pushes, repeated unchanged splits and later fast-forwards passed. A divergent mirror
+  rejected the push, returned exit 1 and retained its outside commit. Missing-folder and
+  absent-token paths passed. No remote mirror was pushed during verification.
+
 ## Rehearsal findings (2026-09-29)
 
 Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan207-rehearsal-LV9V1Y`).
@@ -109,22 +127,57 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 
 ## Publishing
 
-- Changesets at Fregat's root. Fixed version groups: all `@singapore-editor/*` packages release
+- Changesets at Fregat's root. Fixed version groups: the 20 public `@singapore-editor/*` packages release
   together (they are on independent `0.1.x`/`0.2.0` versions today; the first grouped release
   aligns them), `@fregat/hotkeys` with `@fregat/react-hotkeys`, and `ghostty-webgpu` alone.
-- `workspace:*` dependencies become real version ranges at publish, so a published
-  `@singapore-editor/core` depends on a published `@fregat/hotkeys`.
-- Publishing runs from Fregat CI with npm trusted publishing; release notes land on the mirrors'
-  GitHub releases.
+- Built at the root: `@changesets/cli` 3.0.3, `.changeset/config.json` and the `changeset`
+  and `release` scripts. Private workspaces have versioning and tags disabled. Editor and
+  ghostty fixed groups warn while their workspace folders are absent, then activate after the move.
+- npm packs `workspace:*` verbatim even after `changeset version`. The release script first
+  builds public packages, then `scripts/release/prepare.mjs` resolves workspace references
+  against package versions and catalog references against the root catalogs. It validates all
+  public manifests before writing them in the disposable CI checkout; private manifests stay
+  unchanged. Preparation sets each public manifest's repository to `ShaulLavo/fregat` and its
+  package directory for npm provenance, and verifies the publishing repository before writing.
+  Committed source and version PRs keep their workspace references.
+- Dry run in a scratch copy: a patch changeset for `@fregat/react-hotkeys` versioned both
+  hotkeys packages from `0.0.0` to `0.0.1`. After building and preparation,
+  `npm pack --dry-run --json ./hotkeys/packages/react-hotkeys` listed 18 files, including
+  `dist/index.js` and `dist/index.d.ts`, with 36,864 unpacked bytes. Reading an actual local
+  tarball's `package/package.json` confirmed `@fregat/hotkeys: "0.0.1"` and no workspace or
+  catalog references. A second scratch run with the 20 Editor manifests and ghostty's manifest
+  exercised all three fixed groups: Editor aligned at `0.2.1`, the hotkeys pair at `0.0.1`,
+  ghostty at `0.1.3`; all 23 public manifests prepared and the private app stayed unchanged.
+  No package was published. Regression tests cover workspace shorthand,
+  explicit ranges, both catalog forms, private consumers and invalid public-to-private dependencies.
+- `.github/workflows/release.yml` uses Changesets action v2.1.2 to open/update a version PR
+  and refresh the Bun lockfile in a version job with no OIDC permission. A separate publish job
+  requires no pending changesets and the Fregat repository variable
+  `NPM_TRUSTED_PUBLISHING` equal to `true`; version PRs work before that switch is enabled.
+  After the switch, merging the version PR runs `bun run release`. Changesets runs under Node
+  and invokes `npm publish`, using npm 11.19.0 and `id-token: write` on a GitHub-hosted runner.
+  The workflow needs no `NPM_TOKEN`. npm's supported minimum is 11.5.1 with Node 22.14.0 or
+  higher, per [npm's trusted publishing documentation](https://docs.npmjs.com/trusted-publishers/).
+- Changesets creates package tags and GitHub release notes in Fregat. Package changelogs copy
+  into the family mirrors with the next main split. Creating mirror GitHub releases remains a
+  separate follow-up; this workflow does not project Fregat tags or releases into mirror repos.
 - Owner checklist for trusted publishing (no token, no 2FA prompt in CI):
   - [x] `@fregat` npm organisation created (2026-09-29).
   - [ ] Publish `@fregat/hotkeys` and `@fregat/react-hotkeys` once by hand (npm needs the package
         to exist before a trusted publisher can be set).
+  - [ ] Publish any other public package that has never existed on npm once by hand too.
+        Confirm every package exists before enabling the CI publishing switch.
   - [ ] For each of the 20 `@singapore-editor/*` packages, `ghostty-webgpu` and the two
         `@fregat/*` packages: npmjs.com → package → Settings → Trusted Publisher → GitHub Actions,
-        repo `ShaulLavo/fregat`, workflow `release.yml`.
-  - The workflow job needs `permissions: id-token: write` and npm CLI ≥ 11.5; changesets calls
-    `npm publish`. Do not rely on `bun publish` for this.
+        repo `ShaulLavo/fregat`, workflow `release.yml`. In **Allowed actions**, enable direct
+        `npm publish`; this workflow publishes packages directly.
+  - [ ] Enable Actions → General → "Allow GitHub Actions to create and approve pull requests"
+        in `ShaulLavo/fregat`. The workflow uses its built-in GitHub token for version PRs.
+        GitHub does not automatically run PR CI for that token's commits; run CI manually for
+        each version PR, or configure a GitHub App token in a later CI change.
+  - [ ] After first publication and trusted publisher configuration for every public package,
+        set Fregat's Actions repository variable `NPM_TRUSTED_PUBLISHING=true`. Leave it
+        unset until all packages are ready. No npm secret is needed.
 
 ## Steps
 
@@ -143,9 +196,11 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
       path filters; keep each family's standalone workflows inside its folder.
 - [x] One set of tooling: a single formatter version, one vitest patch, one lockfile; delete the
       duplicates. Keep `bun run gates` and the Editor's health checks green.
-- [ ] Mirror workflow; first push to `singapore` and `ghostty-webgpu`; update both READMEs.
-- [ ] Changesets with the fixed groups; a dry-run publish, then the first real publish after the
-      owner sets up npm.
+- [x] Mirror workflow with local fast-forward/rejection proofs and missing-folder/token skips.
+- [ ] First authorized pushes to the three mirrors; update their READMEs.
+- [x] Root Changesets, fixed groups and a scratch hotkeys npm pack dry run with resolved ranges.
+- [x] Release workflow opening version PRs, with tokenless npm publishing behind the owner switch.
+- [ ] First real publish after the owner sets up npm; mirror GitHub release projection.
 - [ ] Retire the old checkouts: `/work/projects/Editor` and `/work/projects/ghostty-webgpu`
       become read-only references (the owner decides when to delete them); update AGENTS.md
       (Editor symlink, `ghostty-webgpu` link, `editor-ref` rules), memory notes and scripts that

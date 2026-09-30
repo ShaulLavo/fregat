@@ -139,6 +139,14 @@ tab/group and session owners. Schedule command changes against 206, preserve 200
 content ownership, and apply 208 catalogs to new copy. It follows the package cutover
 for implementation; its design work can proceed during the scoped freeze.
 
+## Zed parity workstream
+
+Plans 220–280 implement the Zed actions Fregat lacks, from the 2026-09-29 triage
+(`/work/reports/keymap-wave/zed-feature-triage.md`: 432 input actions plus Zed's Vim keymap, 46
+groups). They bind through [206's keymap](plans/206-platform-one-keymap.md), so 206 comes first
+for their bindings; each plan lists its own dependencies. Vim is plans 274–280. Plans 272–273 only
+record Zed actions that do not apply.
+
 ## Other work and boundaries
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their
