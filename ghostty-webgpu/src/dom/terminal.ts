@@ -1081,8 +1081,6 @@ export class Terminal {
   }
 
   private handleFocused(focused: boolean): void {
-    const root = this.elementsValue?.root
-    if (root?.classList.contains('xterm')) root.classList.toggle('focus', focused)
     this.renderer?.setFocused(focused)
     if (!focused) this.pointer?.cancel()
   }
