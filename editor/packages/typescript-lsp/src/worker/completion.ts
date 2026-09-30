@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from 'typescript-api'
 import type * as lsp from 'vscode-languageserver-protocol'
 import type { DocumentContext, ServiceContext } from './context'
 import { textEdits } from './edits'

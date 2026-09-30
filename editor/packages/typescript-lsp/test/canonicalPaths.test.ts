@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { ProjectHost } from '../src/worker/projectHost'
 
 it('renames one symbol through its package alias and canonical source', () => {

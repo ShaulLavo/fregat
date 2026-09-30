@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { describe, expect, it } from 'vitest'
 import { BUNDLED_LIBRARY_FILES } from '../src/worker/bundledLibraries'
 import { libraryFileName, loadLibraryFiles } from '../src/worker/libraries'

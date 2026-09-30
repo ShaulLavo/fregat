@@ -1,5 +1,5 @@
 import { offsetToLspPosition } from '@singapore-editor/lsp/positions'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 const WARNING = 2

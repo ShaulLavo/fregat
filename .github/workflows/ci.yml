@@ -89,6 +89,7 @@ jobs:
               - '.github/actions/setup/**'
               - 'package.json'
               - 'bun.lock'
+              - 'turbo.json'
               - '.github/workflows/site.yml'
             # Written by `generated:check`'s generators, so a hand edit is a code change.
             generated:
@@ -119,7 +120,7 @@ jobs:
         env:
           FILES: ${{ needs.changes.outputs.docs_files }}
         run: |
-          version=$(jq -r '.devDependencies.oxfmt' package.json)
+          version=$(jq -r '.workspaces.catalog.oxfmt' package.json)
           jq -r '.[] | "./" + .' <<<"$FILES" | xargs -d '\n' bunx "oxfmt@$version" --check
 
   # Jobs instead of one runner doing everything in turn: each pays for setup once,
@@ -137,6 +138,9 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      - name: Check shared tooling
+        run: bun run workspace:check
+
       # `format:check`, never `format` — a CI job that rewrites files and then
       # passes is a job that reports on a tree nobody reviewed.
       - name: Format
@@ -149,6 +153,9 @@ jobs:
 
       - name: Query API
         run: bun run query:check
+
+      - name: Structured errors census
+        run: bun run errors:census
 
       - name: Design language census
         run: bun run design:census
@@ -338,12 +345,27 @@ jobs:
       - name: Build landing page and interactive app
         working-directory: apps/site
         run: bun run site:build
+      - name: Build Editor example
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/editor/
+        run: bun x turbo run build --filter=@singapore-editor/example-app
+      - name: Build ghostty site
+        run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
+
+  libraries:
+    name: Libraries
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/workspace-libraries.yml
 
   # The one status to read: red when any job failed or was cancelled; a job skipped because the
   # change cannot affect it counts as passed.
   verdict:
     name: CI
-    needs: [changes, docs, lint, typecheck, test-web, test-server, test-tui, browser, site]
+    needs:
+      [changes, docs, lint, typecheck, test-web, test-server, test-tui, browser, site, libraries]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

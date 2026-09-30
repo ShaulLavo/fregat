@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { isTypeScriptLspSourceFileName, sourcePathToFileName } from '../paths'
 import { libraryFileName } from './libraries'
 import { isRecord } from './protocol'

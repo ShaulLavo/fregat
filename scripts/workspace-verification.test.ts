@@ -1,11 +1,41 @@
 import { expect, test } from 'vitest'
 import { readWorkflow } from './workflow-fixtures'
 
+test('the main CI verdict includes all reusable library checks', () => {
+  const workflow = readWorkflow('ci.yml')
+  expect(workflow.jobs.libraries!.uses).toBe('./.github/workflows/workspace-libraries.yml')
+  expect(workflow.jobs.verdict!.needs).toContain('libraries')
+  expect(readWorkflow('workspace-libraries.yml').on).toHaveProperty('workflow_call')
+})
+
+test('standalone checks cover every mirror family from an exact folder export', () => {
+  const steps = readWorkflow('workspace-libraries.yml').jobs.standalone!.steps
+  expect(steps.find((step) => step.name === 'Export exact mirror folder')?.run).toContain(
+    'git archive "HEAD:$FAMILY"',
+  )
+  expect(
+    steps.find((step) => step.name === 'Install and verify standalone package graph')?.run,
+  ).toBe(
+    'bun install && bun run build && bun run typecheck && bun run lint && bun run format:check',
+  )
+})
+
+test('CI verifies the family sites that the Pages workflow deploys', () => {
+  const steps = readWorkflow('ci.yml').jobs.site!.steps
+  expect(steps.map((step) => step.name)).toContain('Build Editor example')
+  expect(steps.map((step) => step.name)).toContain('Build ghostty site')
+})
+
 test('canonical Editor CI checks the generated language catalog', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.editor!.steps
   expect(steps.map((step) => step.run).join('\n')).toContain(
     'bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check',
   )
+})
+
+test('canonical Editor CI includes architecture health', () => {
+  const steps = readWorkflow('workspace-libraries.yml').jobs.editor!.steps
+  expect(steps.map((step) => step.run)).toContain('bun run --cwd editor health')
 })
 
 test('canonical ghostty CI runs the standalone verification contract', () => {

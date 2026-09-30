@@ -1,5 +1,8 @@
 # singapore
 
+Development happens in the [Fregat monorepo](https://github.com/ShaulLavo/fregat/tree/main/editor).
+This repository mirrors its `editor/` folder. Submit changes to Fregat.
+
 a code editor for the browser, written from scratch. same shelf as monaco and codemirror
 
 ![](docs/images/editor.webp)
@@ -57,5 +60,5 @@ bun run build
 - [architecture](ARCHITECTURE.md), main thread vs worker, open questions
 - [progress](PROGRESS.md), what's implemented vs designed
 - [piece table](docs/storage/piece-table.md), [positions](docs/positions/types-and-conversions.md), [anchors](docs/positions/anchors.md), [selections and undo](docs/editing/selections-and-undo.md), [transforms](docs/display/transforms.md), [virtualization](docs/display/browser-virtualization.md), [tree-sitter](docs/syntax/tree-sitter.md)
-- [fregat's roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) sets execution order across both repos
+- [fregat's roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) sets execution order across the workspace
 - [shared Markdown semantics for Editor and Fregat TUI](plans/bubli-markdown-consumer.md), the existing consumer work package aligned with Fregat's app-local terminal UI

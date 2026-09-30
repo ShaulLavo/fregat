@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import ts from 'typescript-api'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const configFile = ts.readConfigFile(path.join(root, 'tsconfig.build.json'), ts.sys.readFile)

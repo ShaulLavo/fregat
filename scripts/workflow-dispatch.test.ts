@@ -20,9 +20,9 @@ test('every explicitly dispatched workflow accepts workflow_dispatch', () => {
   }
 })
 
-test('the parser updater dispatches Editor library and health checks', () => {
+test('the parser updater dispatches the CI verdict that includes Editor checks', () => {
   const workflow = readWorkflow('editor-tree-sitter-x.yml')
   const commands = workflow.jobs.update!.steps.map((step) => step.run ?? '').join('\n')
-  expect(commands).toContain('gh workflow run workspace-libraries.yml --ref "$branch"')
-  expect(commands).toContain('gh workflow run editor-architecture-health.yml --ref "$branch"')
+  expect(commands).toContain('gh workflow run ci.yml --ref "$branch"')
+  expect(readWorkflow('ci.yml').jobs.verdict!.needs).toContain('libraries')
 })

@@ -12,17 +12,22 @@ const workflowSchema = v.object({
   jobs: v.record(
     v.string(),
     v.object({
+      uses: v.optional(v.string()),
+      needs: v.optional(v.union([v.string(), v.array(v.string())])),
       defaults: v.optional(runDefaults),
-      steps: v.array(
-        v.object({
-          name: v.optional(v.string()),
-          id: v.optional(v.string()),
-          if: v.optional(v.string()),
-          uses: v.optional(v.string()),
-          run: v.optional(v.string()),
-          'working-directory': v.optional(v.string()),
-          with: v.optional(v.record(v.string(), v.unknown())),
-        }),
+      steps: v.optional(
+        v.array(
+          v.object({
+            name: v.optional(v.string()),
+            id: v.optional(v.string()),
+            if: v.optional(v.string()),
+            uses: v.optional(v.string()),
+            run: v.optional(v.string()),
+            'working-directory': v.optional(v.string()),
+            with: v.optional(v.record(v.string(), v.unknown())),
+          }),
+        ),
+        [],
       ),
     }),
   ),

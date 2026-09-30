@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { fileHashes, packageRoot, upstreamRoot } from './support.mjs'
 
 // These probes run only in disposable builds, never in dist/ or the timing workers.

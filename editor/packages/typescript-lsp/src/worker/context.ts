@@ -1,4 +1,4 @@
-import type ts from 'typescript'
+import type ts from 'typescript-api'
 import type * as lsp from 'vscode-languageserver-protocol'
 import type { LineIndex } from './lineIndex'
 import type { ProjectService } from './projectHost'

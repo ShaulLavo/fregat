@@ -18,6 +18,12 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["global.d.ts", "examples/app/src", "examples/app/test", "packages/*/src", "packages/*/test"],
+  "include": [
+    "global.d.ts",
+    "examples/app/src",
+    "examples/app/test",
+    "packages/*/src",
+    "packages/*/test"
+  ],
   "exclude": ["**/dist", "node_modules", "opensrc"]
 }

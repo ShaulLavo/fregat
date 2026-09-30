@@ -1,0 +1,28 @@
+{
+  "name": "hotkeys-workspace",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "catalog": {
+      "vitest": "5.0.2"
+    }
+  },
+  "scripts": {
+    "build": "turbo run build --filter='@fregat/*'",
+    "typecheck": "turbo run typecheck --filter='@fregat/*'",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "test": "turbo run test --filter='@fregat/*'",
+    "verify": "bun run build && bun run typecheck && bun run lint && bun run format:check && bun run test"
+  },
+  "devDependencies": {
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "turbo": "2.11.5",
+    "typescript": "7.0.2"
+  },
+  "packageManager": "bun@1.4.2"
+}

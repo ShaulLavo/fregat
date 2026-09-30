@@ -3,7 +3,7 @@
  *
  * The worker loads its `lib.*.d.ts` files off the TypeScript playground CDN by default. No suite of
  * ours may do that: a test that fails when a CDN blinks is a test nobody trusts, and CI has no
- * business dialling out. The identical lib files already sit in `node_modules/typescript/lib`, and
+ * business dialling out. The identical lib files already sit in `node_modules/typescript-api/lib`, and
  * this reads them from there for the session's `loadLibraryFiles` seam.
  *
  * The suites and `bench/semanticClassification.ts` share this module because a benchmark that
@@ -65,4 +65,4 @@ const isLibraryFileName = (entry: string): boolean =>
 // `require.resolve` rather than a relative path: bun hoists this package's `typescript` to wherever
 // it likes, and a hardcoded `../../node_modules` walks off a cliff the first time it does.
 const typeScriptLibraryDirectory = (): string =>
-  dirname(createRequire(import.meta.url).resolve('typescript'))
+  dirname(createRequire(import.meta.url).resolve('typescript-api'))

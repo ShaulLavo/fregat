@@ -3,6 +3,7 @@ name: Mirrors
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,33 +22,41 @@ jobs:
         include:
           - folder: editor
             repository: ShaulLavo/singapore
+            deploy_key: MIRROR_EDITOR_SSH_KEY
           - folder: ghostty-webgpu
             repository: ShaulLavo/ghostty-webgpu
+            deploy_key: MIRROR_GHOSTTY_SSH_KEY
           - folder: hotkeys
             repository: ShaulLavo/hotkeys
+            deploy_key: MIRROR_HOTKEYS_SSH_KEY
     steps:
-      - name: Check mirror token
-        id: token
+      - name: Configure repository deploy key
         env:
-          MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
+          MIRROR_SSH_KEY: ${{ secrets[matrix.deploy_key] }}
+          MIRROR_KEY_SECRET: ${{ matrix.deploy_key }}
+        shell: bash
         run: |
-          if [ -n "$MIRROR_TOKEN" ]; then
-            echo 'enabled=true' >> "$GITHUB_OUTPUT"
-          else
-            echo '::notice::Mirrors skipped: configure MIRROR_TOKEN to enable them.'
+          set -euo pipefail
+          if [ -z "$MIRROR_SSH_KEY" ]; then
+            echo "::error::Configure $MIRROR_KEY_SECRET to push this mirror."
+            exit 1
           fi
+          key_dir="$RUNNER_TEMP/mirror-ssh"
+          mkdir -p "$key_dir"
+          chmod 700 "$key_dir"
+          printf '%s\n' "$MIRROR_SSH_KEY" > "$key_dir/id_ed25519"
+          chmod 600 "$key_dir/id_ed25519"
+          curl -fsSL https://api.github.com/meta | jq -r '.ssh_keys[] | "github.com " + .' > "$key_dir/known_hosts"
+          echo "GIT_SSH_COMMAND=ssh -i '$key_dir/id_ed25519' -o IdentitiesOnly=yes -o UserKnownHostsFile='$key_dir/known_hosts' -o StrictHostKeyChecking=yes" >> "$GITHUB_ENV"
 
       - name: Checkout full history
-        if: steps.token.outputs.enabled == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Split and push family
-        if: steps.token.outputs.enabled == 'true'
         env:
-          MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
           FAMILY_FOLDER: ${{ matrix.folder }}
           MIRROR_REPOSITORY: ${{ matrix.repository }}
         run: |
@@ -62,10 +71,11 @@ jobs:
             exit 0
           fi
           split=$(git subtree split --prefix="$FAMILY_FOLDER" HEAD)
-          credentials=$(printf 'x-access-token:%s' "$MIRROR_TOKEN" | base64 -w0)
-          echo "::add-mask::$credentials"
-          if ! git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $credentials" \
-            push "https://github.com/$MIRROR_REPOSITORY.git" "$split:refs/heads/main"; then
+          if ! git push "git@github.com:$MIRROR_REPOSITORY.git" "$split:refs/heads/main"; then
             echo "::error::Mirror push rejected or failed for $MIRROR_REPOSITORY. Reconcile its main with the family split before retrying."
             exit 1
           fi
+
+      - name: Remove deploy key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/mirror-ssh/id_ed25519"

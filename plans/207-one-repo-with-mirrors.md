@@ -32,6 +32,10 @@ final-head capture through the first verified mirror push. Release the hold with
 as canonical source. Documentation, read-only baselines and independent Platform work
 can continue during the hold. Do not discard another session's changes or delete old checkouts.
 
+The owner requested complete source migration, tooling alignment and CI verification on
+2026-09-30, with all npm setup and publication deferred until that work is finished. The
+execution checklist is [migration completion](207-migration-completion.md).
+
 Source import and npm publication are separate delivery units. Before 204/205 add a
 cross-family hotkeys dependency, prove that the exact mirrored Editor/ghostty folder
 installs and builds without sibling workspaces. `workspace:*` rewriting during npm publish
@@ -81,28 +85,28 @@ fregat/
   README says development happens in Fregat; outside PRs are ported into Fregat by hand and
   closed with a link.
 - The Editor and ghostty-webgpu are brought in with `git subtree add` (not squashed), so their
-  history is part of Fregat. Verify on a scratch clone that the split of `editor/` reproduces
-  singapore's existing commit ids so the first mirror push fast-forwards. If it cannot, stop and
+  history is part of Fregat. Verify that each existing mirror head is an ancestor of its new
+  split so the first mirror push fast-forwards. Integration edits may change the split head. If it cannot, stop and
   ask the owner before force-pushing a mirror.
 - Mirror repos keep their URLs, stars, issues and releases.
 
 - Built in `.github/workflows/mirror.yml`: one matrix entry per family, full-depth checkout,
   `git subtree split --prefix=<folder> HEAD`, then a regular push to the mirror's `main`.
-  Missing folders skip individually; an absent `MIRROR_TOKEN` skips every entry. The job uses
+  Missing folders skip individually; missing repository deploy keys fail visibly. The job uses
   no split cache, serializes main runs, and fails with an error annotation on any rejected push.
-- Owner setup:
-  - [ ] Create the empty public `ShaulLavo/hotkeys` repository. Keep its initial history empty
+- Mirror setup:
+  - [x] Create the empty public `ShaulLavo/hotkeys` repository. Keep its initial history empty
         so the first hotkeys split can create `main` with a regular push.
-  - [ ] Add Fregat's Actions secret `MIRROR_TOKEN`, a fine-grained GitHub token restricted to
-        `ShaulLavo/singapore`, `ShaulLavo/ghostty-webgpu` and `ShaulLavo/hotkeys`, with
-        **Contents: Read and write**. Also grant **Workflows: Read and write** for copying the
-        families' `.github/workflows` files. This token authenticates only mirror pushes.
+  - [x] Configure a separate writable deploy key for each mirror. Fregat Actions secrets
+        `MIRROR_EDITOR_SSH_KEY`, `MIRROR_GHOSTTY_SSH_KEY` and `MIRROR_HOTKEYS_SSH_KEY`
+        authenticate only their respective repository. SSH verifies GitHub's published host
+        keys. The workflow removes its temporary private key after each job.
   - [ ] Freeze direct writes to the mirror mains at the final source-head capture and inspect
         the first successful split pushes before releasing the cutover hold.
 - Local verification used the workflow's exact shell against three temporary bare repos:
   first pushes, repeated unchanged splits and later fast-forwards passed. A divergent mirror
   rejected the push, returned exit 1 and retained its outside commit. Missing-folder and
-  absent-token paths passed. No remote mirror was pushed during verification.
+  missing-credential paths passed. First remote pushes are verified after the completion PR lands.
 
 ## Rehearsal findings (2026-09-29)
 
@@ -211,7 +215,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
       become read-only references (the owner decides when to delete them); update AGENTS.md
       (Editor symlink, `ghostty-webgpu` link, `editor-ref` rules), memory notes and scripts that
       assume `../Editor`. PR #199 updates the repository rules and current scripts; checkout retirement and external memory edits remain with the coordinator.
-- [ ] Deploy with `bun run deploy --server --restart` and confirm the live check.
+- [x] Deploy PR #199 with `bun run deploy --server --restart` and confirm the live check.
 
 ## Source-integration validation
 

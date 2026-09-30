@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { YAML } from 'bun'
@@ -9,6 +9,58 @@ const workflow = YAML.parse(
   await readFile(new URL('../../.github/workflows/mirror.yml', import.meta.url), 'utf8'),
 )
 const script = workflow.jobs.mirror.steps.find((step) => step.name === 'Split and push family').run
+const keyScript = workflow.jobs.mirror.steps.find(
+  (step) => step.name === 'Configure repository deploy key',
+).run
+
+test('missing mirror credentials fail visibly before the checkout', async () => {
+  await withWorkspace(async ({ root }) => {
+    const result = spawnSync('bash', ['-c', keyScript], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        MIRROR_SSH_KEY: '',
+        MIRROR_KEY_SECRET: 'FIXTURE_KEY',
+        RUNNER_TEMP: root,
+      },
+    })
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('::error::Configure FIXTURE_KEY')
+  })
+})
+
+test('mirror credentials stay private and SSH requires GitHub host verification', async () => {
+  await withWorkspace(async ({ root }) => {
+    const bin = join(root, 'bin')
+    await mkdir(bin)
+    const curl = join(bin, 'curl')
+    await writeFile(
+      curl,
+      '#!/bin/sh\nprintf \'{"ssh_keys":["ssh-ed25519 fixture-host-key"]}\\n\'\n',
+    )
+    await chmod(curl, 0o700)
+    const env = {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      MIRROR_SSH_KEY: 'fixture-private-key',
+      MIRROR_KEY_SECRET: 'FIXTURE_KEY',
+      RUNNER_TEMP: root,
+      GITHUB_ENV: join(root, 'github-env'),
+    }
+    const result = spawnSync('bash', ['-c', keyScript], { encoding: 'utf8', env })
+    expect(result.status, result.stderr).toBe(0)
+    expect(`${result.stdout}${result.stderr}`).not.toContain('fixture-private-key')
+    const key = join(root, 'mirror-ssh/id_ed25519')
+    expect((await stat(key)).mode & 0o777).toBe(0o600)
+    expect(await readFile(join(root, 'mirror-ssh/known_hosts'), 'utf8')).toContain(
+      'github.com ssh-ed25519 fixture-host-key',
+    )
+    expect(await readFile(env.GITHUB_ENV, 'utf8')).toContain('StrictHostKeyChecking=yes')
+    const cleanup = workflow.jobs.mirror.steps.find((step) => step.name === 'Remove deploy key').run
+    expect(spawnSync('bash', ['-c', cleanup], { env }).status).toBe(0)
+    await expect(stat(key)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+})
 
 function git(cwd, ...args) {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' })
@@ -22,7 +74,6 @@ function mirror(cwd, family = 'hotkeys') {
     encoding: 'utf8',
     env: {
       ...process.env,
-      MIRROR_TOKEN: 'fixture-token',
       FAMILY_FOLDER: family,
       MIRROR_REPOSITORY: 'fixture/mirror',
     },
@@ -41,7 +92,7 @@ test.each(['editor', 'ghostty-webgpu'])(
       git(root, 'clone', origin, source)
       git(source, 'config', 'user.name', 'Fixture')
       git(source, 'config', 'user.email', 'fixture@example.com')
-      git(source, 'config', `url.${destination}.insteadOf`, 'https://github.com/fixture/mirror.git')
+      git(source, 'config', `url.${destination}.insteadOf`, 'git@github.com:fixture/mirror.git')
       await mkdir(join(source, 'outside'))
       await symlink('outside', join(source, family))
       git(source, 'add', family)
@@ -105,13 +156,13 @@ test('mirrors current snapshots and skips an older replay while preserving the n
     await mkdir(join(source, 'hotkeys'))
     await commitFamily(source, 'first')
     git(root, 'clone', origin, older)
-    git(older, 'config', `url.${destination}.insteadOf`, 'https://github.com/fixture/mirror.git')
+    git(older, 'config', `url.${destination}.insteadOf`, 'git@github.com:fixture/mirror.git')
     const initial = mirror(older)
     expect(initial.status, `${initial.stdout}\n${initial.stderr}`).toBe(0)
     const first = git(destination, 'rev-parse', 'main')
     await commitFamily(source, 'second')
     git(root, 'clone', origin, newer)
-    git(newer, 'config', `url.${destination}.insteadOf`, 'https://github.com/fixture/mirror.git')
+    git(newer, 'config', `url.${destination}.insteadOf`, 'git@github.com:fixture/mirror.git')
     const current = mirror(newer)
     expect(current.status, `${current.stdout}\n${current.stderr}`).toBe(0)
     const second = git(destination, 'rev-parse', 'main')
