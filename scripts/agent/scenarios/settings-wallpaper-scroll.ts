@@ -1,5 +1,5 @@
 import { ok } from 'node:assert/strict'
-import { selectors } from '../selectors'
+import { chords, pressShortcut, selectors } from '../selectors'
 import type { Scenario } from './index'
 
 export const settingsWallpaperScroll: Scenario = {
@@ -8,7 +8,7 @@ export const settingsWallpaperScroll: Scenario = {
     'Rapidly scroll the phone Settings page through Appearance into Wallpaper, without changing appearance.',
   capture: { width: 390, height: 844, touch: true },
   async run(page, { step }) {
-    await page.keyboard.press('Control+,')
+    await pressShortcut(page, chords.settings)
     await selectors.settingsRow(page, 'keybindings.overrides').waitFor({ state: 'attached' })
     await step('settings-ready')
     const form = selectors.settingsForm(page)
