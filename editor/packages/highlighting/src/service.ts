@@ -17,6 +17,7 @@ import {
   type ShikiWorkerLanguageRegistration,
   type ShikiWorkerOwner,
   type ShikiWorkerOwnerSnapshot,
+  type ShikiWorkerThemeRegistration,
   type VscodeThemeRegistration,
 } from '@singapore-editor/core/shiki'
 import { unpackEditorTokens } from '@singapore-editor/core/syntax'
@@ -200,7 +201,11 @@ class EditorHighlightingService implements HighlightingService {
   // Imported themes by id: the content revision documents were last given, and the worker name
   // that carries it, so same-id content changes reach open sessions as a theme change.
   private readonly documentThemes = new Map<string, { revision: string; name: string }>()
-  private readonly documentThemeIds = new Map<string, string>()
+  // The exact registration each worker name was given, captured with its revision: resolving the
+  // id again later could return newer content under an older revision's name.
+  private readonly documentThemeContent = new Map<string, ShikiWorkerThemeRegistration>()
+  // The latest notification per id; an acquisition that a newer one overtook publishes nothing.
+  private readonly documentThemeRefreshes = new Map<string, number>()
   private disposeTask: Promise<void> | null = null
 
   public constructor(private readonly options: HighlightingServiceOptions) {}
@@ -256,6 +261,7 @@ class EditorHighlightingService implements HighlightingService {
   }
 
   public documentBackend(theme: HighlightingThemeSource): HighlightingDocumentBackend {
+    this.assertLive()
     const kind = this.usesHighlighter(theme) ? 'highlighter' : 'tree-sitter'
     const cached = this.backends.get(theme) ?? {}
     this.backends.set(theme, cached)
@@ -268,11 +274,12 @@ class EditorHighlightingService implements HighlightingService {
   }
 
   public canPrepareDiff(file: DiffFile, theme: HighlightingThemeSource): boolean {
+    this.assertLive()
     return this.diffs.canPrepare(file, this.diffScope(theme))
   }
 
   public prepareDiff(file: DiffFile, theme: HighlightingThemeSource): Promise<boolean> {
-    this.assertLive()
+    if (this.disposeTask) return Promise.reject(disposedError())
     return this.diffs.prepare(file, this.diffScope(theme), this.documentBackend(theme))
   }
 
@@ -282,6 +289,7 @@ class EditorHighlightingService implements HighlightingService {
     side: DiffGutterSide,
     theme: HighlightingThemeSource,
   ): { dispose(): void } {
+    this.assertLive()
     return this.diffs.show(view, file, side, this.diffScope(theme))
   }
 
@@ -485,10 +493,13 @@ class EditorHighlightingService implements HighlightingService {
 
   // `name` is the id, or the id's revision name after its content changed.
   private async importedTheme(name: string) {
-    const id = this.documentThemeIds.get(name) ?? name
-    const registration = await this.resolveImported(id)
-    if (!this.documentThemes.has(id)) {
-      this.documentThemes.set(id, { revision: revisionName(id, registration), name })
+    const captured = this.documentThemeContent.get(name)
+    if (captured) return workerThemeRegistration(captured, name)
+
+    const registration = await this.resolveImported(name)
+    if (!this.documentThemes.has(name)) {
+      this.documentThemes.set(name, { revision: revisionName(name, registration), name })
+      this.documentThemeContent.set(name, registration)
     }
     return workerThemeRegistration(registration, name)
   }
@@ -521,13 +532,18 @@ class EditorHighlightingService implements HighlightingService {
     if (selection.format !== 'vscode') return
 
     const id = selection.id
-    const revision = revisionName(id, await this.resolveImported(id))
+    const refresh = (this.documentThemeRefreshes.get(id) ?? 0) + 1
+    this.documentThemeRefreshes.set(id, refresh)
+    const registration = await this.resolveImported(id)
+    if (this.documentThemeRefreshes.get(id) !== refresh) return
+
+    const revision = revisionName(id, registration)
     const known = this.documentThemes.get(id)
     if (known?.revision === revision) return
 
     const name = known ? revision : id
     this.documentThemes.set(id, { revision, name })
-    this.documentThemeIds.set(name, id)
+    this.documentThemeContent.set(name, registration)
   }
 
   // A document asked for colors in the instant a built-in palette replaced the imported one keeps
