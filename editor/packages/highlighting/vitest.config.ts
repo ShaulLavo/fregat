@@ -27,6 +27,22 @@ export default defineConfig({
           },
         },
       },
+      {
+        // Workers, WebAssembly and transfers in the other engines; run with `test:engines`.
+        test: {
+          name: 'engines',
+          include: ['test/service.browser.test.ts', 'test/structure.browser.test.ts'],
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [
+              { browser: 'firefox', name: 'engines-firefox' },
+              { browser: 'webkit', name: 'engines-webkit' },
+            ],
+          },
+        },
+      },
     ],
   },
 })

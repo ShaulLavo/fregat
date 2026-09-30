@@ -22,6 +22,7 @@
     "build": "bun ../../scripts/build-package.ts",
     "test": "vitest run --project node && bun run test:browser",
     "test:browser": "vitest run --project browser",
+    "test:engines": "vitest run --project engines",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
