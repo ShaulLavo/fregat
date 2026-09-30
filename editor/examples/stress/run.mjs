@@ -16,7 +16,7 @@ import { operationsPerSample, runInputSuite } from './input-scenarios.mjs'
 import { inputScenarios, inputViewModes, validateInputResult } from './input-results.mjs'
 import { profileScenario, profileSourceMaps } from './profile.mjs'
 import { hashBenchmarkSource, loadCorePackage } from './core-package.mjs'
-import { loadPackageSet } from './package-set.mjs'
+import { externalReceipt, loadPackageSet } from './package-set.mjs'
 import { inputConsumerIds } from './input-configurations.mjs'
 import { installInputWorkerProof } from './input-worker-proof.mjs'
 
@@ -403,8 +403,20 @@ async function environment(browser) {
           manifest: packageSet.manifest,
           sourceHash: packageSet.sourceHash,
           buildHash: packageSet.buildHash,
+          externalHash: packageSet.externalHash,
         }
       : null,
+    // The stress page bundles these itself; their bytes are part of the instrument's identity.
+    instrumentExternal: (
+      await externalReceipt(
+        root,
+        [],
+        [
+          { from: root, name: '@shikijs/langs' },
+          { from: root, name: '@shikijs/themes' },
+        ],
+      )
+    ).sha256,
     coreDirectory: core.directory,
     browser: { engine: 'chromium', version: browser.version(), headless: true },
     hardware: {

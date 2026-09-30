@@ -360,6 +360,11 @@ function comparable(left, right, allowSlowdown = false) {
   same(left.environment.browser, right.environment.browser, 'browser')
   same(left.environment.hardware, right.environment.hardware, 'hardware')
   same(left.environment.runtime, right.environment.runtime, 'runner runtime')
+  same(
+    left.environment.instrumentExternal,
+    right.environment.instrumentExternal,
+    'instrument external dependencies',
+  )
 }
 
 function range(values) {
