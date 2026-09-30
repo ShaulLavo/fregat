@@ -11,11 +11,14 @@ import {
 } from './abi.js'
 import type { AbiLayout } from './abi.js'
 import { assertGhosttyResult, createGhosttyError } from './error.js'
+import { readTerminalLines } from './grid-text.js'
 import { requireLayout } from './memory.js'
 import type { GhosttyRuntime } from './runtime.js'
 import type {
+  ReadLinesOptions,
   RgbColor,
   TerminalColors,
+  TerminalLine,
   TerminalCursor,
   TerminalCursorStyle,
   TerminalEffects,
@@ -229,6 +232,15 @@ export class GhosttyTerminal {
 
   get totalRows(): number {
     return this.readUint32(TerminalData.TotalRows, 'TOTAL_ROWS')
+  }
+
+  lineCount(): number {
+    return this.totalRows
+  }
+
+  readLines(start: number, end: number, options: ReadLinesOptions = {}): readonly TerminalLine[] {
+    this.ensureActive()
+    return readTerminalLines(this, start, end, options)
   }
 
   get scrollbackLength(): number {
