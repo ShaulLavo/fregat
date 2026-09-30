@@ -35,11 +35,11 @@ test('Markdown preparation selects the structural color source for custom themes
   }
   expect(
     editorPreparedDocumentTags('/repo/file.md', environment, true).documentConfigurationTag,
-  ).toEqual(['platform-editor', 'markdown', 'tree-sitter', true])
+  ).toEqual(['platform-editor', 'markdown', 'editor', true])
   expect(
     editorPreparedDocumentTags('/repo/file.mdx', environment, true).documentConfigurationTag,
-  ).toEqual(['platform-editor', 'mdx', 'tree-sitter', true])
+  ).toEqual(['platform-editor', 'mdx', 'editor', true])
   expect(
     editorPreparedDocumentTags('/repo/file.ts', environment, true).documentConfigurationTag,
-  ).toEqual(['platform-editor', 'typescript', 'shiki', true])
+  ).toEqual(['platform-editor', 'typescript', 'vscode', true])
 })

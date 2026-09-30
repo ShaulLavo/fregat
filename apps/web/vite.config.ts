@@ -5,10 +5,9 @@ import { createRequire } from 'node:module'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { portFromEnv, runtimeUrl, serverUrlFromEnv } from '../../scripts/runtime-network'
+import { portFromEnv } from '../../scripts/runtime-network'
 import { createScriptError } from '../../scripts/structured-errors'
 import { readDevSources, sourceAliases } from '../../scripts/dev-sources'
-import { appSaveHmrPlugin } from './scripts/app-save-hmr-plugin'
 import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
 import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
 import { devPagePlugin } from './scripts/dev-page-plugin'
@@ -101,6 +100,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
         '@singapore-editor/core > shiki/core',
         '@singapore-editor/core > shiki/textmate',
         '@singapore-editor/diff > diff',
+        '@singapore-editor/highlighting > shiki/langs',
         '@singapore-editor/plugin-ui > remark-stringify',
         '@singapore-editor/spellcheck > cspell-trie-lib',
         '@singapore-editor/tree-sitter > web-tree-sitter',
@@ -111,10 +111,6 @@ export default defineConfig(({ command, isPreview, mode }) => {
       shellChunksPlugin(import.meta.dirname),
       demoPreviewPlugin(import.meta.dirname),
       devPagePlugin(),
-      appSaveHmrPlugin({
-        url: serverUrlFromEnv(process.env),
-        origin: runtimeUrl(devServerHost, devServerPort),
-      }),
       react({
         // Vitest configs keep `compiler: true`: the flag would reprint every diagnostic per run.
         compiler: { logDiagnostics: true },

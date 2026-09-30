@@ -1,7 +1,7 @@
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { activeServerOrigin } from '@/lib/client'
-import { clearPreparedDiffSyntax } from '@/features/editor/state/prepared-diff-syntax'
+import { disposeHighlightingService } from '@/lib/highlighting/state/service'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { TEST_ENVIRONMENT_ID } from '../factories/chat'
 import { act, cleanup } from '@testing-library/react'
@@ -67,8 +67,7 @@ afterEach(async () => {
     })
   }
   cleanup()
-  // Unmounted diff views hand their parse to this module store; the next test starts empty.
-  clearPreparedDiffSyntax('tree-sitter')
-  clearPreparedDiffSyntax('shiki')
+  // Unmounted diff views hand their parse to the shared service; the next test starts empty.
+  await disposeHighlightingService()
   if (showedToast) await new Promise((resolve) => setTimeout(resolve, TOAST_REMOVAL_MS + 20))
 })

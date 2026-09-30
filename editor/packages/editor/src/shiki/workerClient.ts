@@ -19,6 +19,7 @@ import type { EditorTheme } from '../theme'
 import type {
   ShikiWorkerDocumentOptions,
   ShikiWorkerEditRequest,
+  ShikiWorkerHighlightRequest,
   ShikiWorkerLanguageRegistration,
   ShikiWorkerRequest,
   ShikiWorkerRequestPayload,
@@ -161,6 +162,13 @@ export class ShikiWorkerOwner {
       return this.trackRuntimeTask(payload.runtimeSessionId, request)
     }
     return this.trackClientTask(request)
+  }
+
+  /** Tokenizes one snippet in the shared worker; the worker keeps no state for it. */
+  public highlight(
+    request: Omit<ShikiWorkerHighlightRequest, 'type'>,
+  ): Promise<ShikiWorkerTransportResult | undefined> {
+    return this.trackClientTask(this.postRequest({ type: 'highlight', ...request }, true))
   }
 
   public preload(registrations: ShikiPreloadRegistrations): Promise<void> {

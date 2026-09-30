@@ -30,8 +30,7 @@ import {
 } from '@/features/editor/state/document-state'
 import {
   awaitEditorSyntaxWorkerIdleFences,
-  disposeEditorShikiWorkerOwner,
-  disposeEditorTreeSitterSyntaxProvider,
+  disposeEditorSyntaxHighlighting,
 } from '@/features/editor/state/syntax-highlighting'
 import {
   useEditorWorkspaceState,
@@ -89,7 +88,7 @@ afterEach(async () => {
   treeDocumentStore = null
   treeEditorCommands = null
   treeWorkspaceStore = null
-  await Promise.all([disposeEditorShikiWorkerOwner(), disposeEditorTreeSitterSyntaxProvider()])
+  await disposeEditorSyntaxHighlighting()
   document.body.replaceChildren()
   delete document.documentElement.dataset.density
   localStorage.clear()

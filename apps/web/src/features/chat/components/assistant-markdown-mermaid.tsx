@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
+import { useDiagramTheme } from '@/features/chat/hooks/use-diagram-theme'
 import type { MermaidRenderer } from '@/features/chat/state/mermaid'
-import { log } from '@/lib/client-logging'
 import { CopyButton } from '@/components/copy-button'
+import { mountDiagram } from '@/features/chat/state/diagram-display'
 
 type DiagramState = {
   readonly chart: string
@@ -22,13 +22,14 @@ export function AssistantMarkdownMermaid({
   readonly chart: string
   readonly mermaid: MermaidRenderer
 }) {
-  const { colorMode } = useEditorColorTheme()
+  const theme = useDiagramTheme()
+  const diagram = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<DiagramState | null>(null)
   const current = state?.chart === chart ? state : null
 
   useEffect(() => {
     let cancelled = false
-    mermaid.render(chart, colorMode).then(
+    mermaid.render(chart, theme).then(
       (svg) => {
         if (!cancelled) setState({ chart, error: null, svg })
       },
@@ -36,14 +37,17 @@ export function AssistantMarkdownMermaid({
         if (cancelled) return
 
         const message = error instanceof Error ? error.message : String(error)
-        log.warn({ action: 'chat.mermaid.render', area: 'chat', error: message, outcome: 'failed' })
         setState({ chart, error: message, svg: null })
       },
     )
     return () => {
       cancelled = true
     }
-  }, [chart, colorMode, mermaid])
+  }, [chart, theme, mermaid])
+
+  useLayoutEffect(() => {
+    if (diagram.current && current?.svg) mountDiagram(diagram.current, current.svg)
+  }, [current?.svg])
 
   return (
     <div
@@ -63,8 +67,8 @@ export function AssistantMarkdownMermaid({
       {current?.svg ? (
         <div
           aria-label='Mermaid diagram'
-          className='flex justify-center overflow-x-auto p-2 [&_svg]:max-w-full'
-          dangerouslySetInnerHTML={{ __html: current.svg }}
+          className='overflow-x-auto p-2'
+          ref={diagram}
           role='img'
         />
       ) : (

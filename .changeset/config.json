@@ -9,6 +9,7 @@
       "@singapore-editor/diff",
       "@singapore-editor/find",
       "@singapore-editor/gutters",
+      "@singapore-editor/highlighting",
       "@singapore-editor/lsp",
       "@singapore-editor/lsp-plugin",
       "@singapore-editor/markdown",

@@ -778,15 +778,19 @@
    wheel, each pulled a fifth toward the ground so it never shouts. Declared on
    the spinner, not :root, so it follows a scoped primary. A hueless source
    (Graphite) rotates to itself and the mark stays grey. */
-:where(.spinner-bands, .spinner-rings) {
+:where(.spinner-bands),
+:where(.spinner-rings) {
   --spinner-source: var(--primary);
   --spinner-ground: var(--muted-foreground);
   --spinner-1: color-mix(in oklch, var(--spinner-source) 80%, var(--spinner-ground));
   --spinner-2: var(--spinner-1);
   --spinner-3: var(--spinner-1);
   --spinner-4: var(--spinner-1);
+}
 
-  @supports (color: oklch(from red l c h)) {
+@supports (color: oklch(from red l c h)) {
+  :where(.spinner-bands),
+  :where(.spinner-rings) {
     --spinner-2: color-mix(
       in oklch,
       oklch(from var(--spinner-source) l c calc(h + 70)) 80%,

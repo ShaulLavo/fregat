@@ -104,8 +104,8 @@ export function mountApp(): void {
   })
   const sharedPlugins: readonly EditorPlugin[] = [
     foldGutter,
-    // Shiki highlighter: import createShikiHighlighterPlugin from "@singapore-editor/core/shiki".
-    // createShikiHighlighterPlugin({ theme: "github-dark" }),
+    // Imported VS Code theme colours over the same structure: createHighlightingPlugin from
+    // "@singapore-editor/highlighting", given a service that resolves the theme by id.
     createMergeConflictPlugin(),
     createEditorFindPlugin(),
     createScopeLinesPlugin(),

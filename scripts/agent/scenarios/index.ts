@@ -89,6 +89,8 @@ import { approvalReconnect } from './approval-reconnect'
 import { stoppedTurnReasons } from './stopped-turn-reasons'
 import { streamAmbiguousTail } from './stream-ambiguous-tail'
 import { streamCodeColour } from './stream-code-colour'
+import { chatMermaid } from './chat-mermaid'
+import { editorMermaidStyle, editorStyleBaseline } from './editor-mermaid-style'
 import { claudeApprovalRules, codexApprovalRules } from './approval-rules'
 import { checkpointRewind } from './checkpoint-rewind'
 import { archiveLifecycle } from './archive-lifecycle'
@@ -249,6 +251,7 @@ import { editorExternalEdit } from './editor-external-edit'
 import { editorLinkedPackage } from './editor-linked-package'
 import { editorOfflineResync } from './editor-offline-resync'
 import { editorThemePreview } from './editor-theme-preview'
+import { codeThemeNativePreview } from './code-theme-native-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
 import { bundleWallpapers } from './bundle-wallpapers'
@@ -457,6 +460,9 @@ export const scenarios: readonly Scenario[] = [
   stoppedTurnReasons,
   streamAmbiguousTail,
   streamCodeColour,
+  chatMermaid,
+  editorMermaidStyle,
+  editorStyleBaseline,
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
@@ -608,6 +614,7 @@ export const scenarios: readonly Scenario[] = [
   settingsProviderUpdate,
   claudeUsageImport,
   editorThemePreview,
+  codeThemeNativePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),
   editorNativeCoverage('dark'),

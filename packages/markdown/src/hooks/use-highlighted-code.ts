@@ -1,5 +1,5 @@
 import { use, useEffect, useState } from 'react'
-import type { TokensResult } from 'shiki/core'
+import type { HighlightResult } from '@singapore-editor/highlighting'
 
 import { CodeHighlighterContext } from '../providers/code-highlighter-context'
 import { highlightCache } from '../state/highlight-cache'
@@ -7,10 +7,23 @@ import { estimateHighlightBytes, highlightCacheKey } from '../utils/highlight'
 
 type HighlightState = {
   readonly key: string
-  readonly result: TokensResult
+  readonly code: string
+  readonly language: string
+  readonly themeKey: string
+  readonly result: HighlightResult
+}
+
+/** Tokens and the exact text they cover, which may be a prefix of the text on screen. */
+export type HighlightedText = {
+  readonly code: string
+  readonly result: HighlightResult
 }
 
 /**
+ * Streaming only appends, so while the worker highlights a longer prefix the last answer still
+ * covers the start of the text and keeps painting; the new lines stay plain until it replies. Only
+ * an answer from the current theme and language is held: any other would paint wrong colours.
+ *
  * `cacheable` is false while a fence is still streaming: those token arrays are
  * superseded by the next chunk, so caching them would fill the budget with
  * garbage and evict the finished blocks the user scrolls back to.
@@ -23,7 +36,7 @@ export function useHighlightedCode({
   readonly cacheable: boolean
   readonly code: string
   readonly language: string
-}): TokensResult | null {
+}): HighlightedText | null {
   const highlighter = use(CodeHighlighterContext)
   const [highlighted, setHighlighted] = useState<HighlightState | null>(null)
   const key = highlighter
@@ -37,15 +50,15 @@ export function useHighlightedCode({
     if (cacheable && highlightCache.get(key)) return
 
     let active = true
-    const accept = (result: TokensResult) => {
+    const accept = (result: HighlightResult) => {
       if (cacheable) highlightCache.set(key, result, estimateHighlightBytes(result))
       if (!active) return
 
-      setHighlighted({ key, result })
+      setHighlighted({ key, code, language, themeKey: highlighter.themeKey, result })
     }
 
-    // A loaded grammar answers synchronously and never calls back; an unloaded
-    // one returns null now and calls back once the grammar is in.
+    // A highlighter that already holds the answer returns it and never calls back; otherwise it
+    // returns null now and calls back once the worker replies.
     const immediate = highlighter.highlight({ code, language }, accept)
     if (immediate) accept(immediate)
 
@@ -54,8 +67,10 @@ export function useHighlightedCode({
     }
   }, [cacheable, code, highlighter, key, language])
 
-  if (cached) return cached
-  if (highlighted?.key === key) return highlighted.result
-
-  return null
+  if (cached) return { code, result: cached }
+  if (!highlighter || !highlighted) return null
+  if (highlighted.key === key) return highlighted
+  if (highlighted.themeKey !== highlighter.themeKey || highlighted.language !== language)
+    return null
+  return code.startsWith(highlighted.code) ? highlighted : null
 }

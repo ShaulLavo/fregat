@@ -6,6 +6,7 @@ import {
 } from './trace-profile'
 import { sourceResolver, type CapturedSourceMap, type OriginalFrame } from './trace-source-maps'
 import { mainThread, readTrace, traceRecord, type TraceEvent } from './trace-types'
+import { summarizeStyles, type StyleSummary } from './style-summary'
 
 export type TraceSummary = {
   readonly durationMs: number
@@ -13,6 +14,7 @@ export type TraceSummary = {
   readonly phaseTasks: readonly LongTask[]
   readonly marks: readonly string[]
   readonly split: Readonly<Record<Bucket, number>>
+  readonly recalcs: StyleSummary
   readonly tasksOver16ms: number
   readonly tasksOver50ms: number
   readonly worstTaskMs: number
@@ -26,7 +28,7 @@ type LongTask = {
   readonly startMs: number
 }
 
-type Bucket = 'scripting' | 'layout' | 'paint' | 'other'
+type Bucket = 'scripting' | 'style' | 'layout' | 'paint' | 'other'
 
 const BUCKETS: Readonly<Record<string, Bucket>> = {
   EvaluateScript: 'scripting',
@@ -40,9 +42,10 @@ const BUCKETS: Readonly<Record<string, Bucket>> = {
   MajorGC: 'scripting',
   MinorGC: 'scripting',
   Layout: 'layout',
-  UpdateLayoutTree: 'layout',
-  RecalculateStyles: 'layout',
-  ScheduleStyleRecalculation: 'layout',
+  UpdateLayoutTree: 'style',
+  RecalculateStyles: 'style',
+  ParseAuthorStyleSheet: 'style',
+  ScheduleStyleRecalculation: 'style',
   Paint: 'paint',
   PrePaint: 'paint',
   Layerize: 'paint',
@@ -59,7 +62,7 @@ export function summarizeTrace(
   const main = mainThread(events)
   const onMain = events
     .filter((e) => e.pid === main.pid && e.tid === main.tid && e.ph === 'X')
-    .sort((a, b) => a.ts - b.ts)
+    .sort((a, b) => a.ts - b.ts || b.dur - a.dur)
   const tasks = onMain.filter((e) => e.name === 'RunTask' && (e.dur ?? 0) > 0)
   const first = onMain[0]?.ts ?? 0
   const last = onMain.reduce((end, event) => Math.max(end, event.ts + event.dur), first)
@@ -67,11 +70,11 @@ export function summarizeTrace(
   const resolve = sourceResolver(sources)
   const describe = (task: TraceEvent, phase: string | null = null) =>
     describeTask(task, { first, phase, samples, siblings: onMain, resolve })
-  const split: Record<Bucket, number> = { scripting: 0, layout: 0, paint: 0, other: 0 }
-  for (const event of onMain) {
+  const split: Record<Bucket, number> = { scripting: 0, style: 0, layout: 0, paint: 0, other: 0 }
+  for (const [index, event] of onMain.entries()) {
     const bucket = BUCKETS[event.name]
     if (!bucket) continue
-    split[bucket] += selfTime(event, onMain) / 1000
+    split[bucket] += selfTime(event, onMain, index) / 1000
   }
   const longTasks = tasks
     .filter((task) => (task.dur ?? 0) >= 50_000)
@@ -94,10 +97,16 @@ export function summarizeTrace(
     marks,
     split: {
       scripting: round(split.scripting),
+      style: round(split.style),
       layout: round(split.layout),
       paint: round(split.paint),
       other: round(split.other),
     },
+    recalcs: summarizeStyles(
+      events
+        .filter((event) => event.pid === main.pid && event.tid === main.tid)
+        .sort((a, b) => a.ts - b.ts),
+    ),
     tasksOver16ms: tasks.filter((t) => (t.dur ?? 0) >= 16_000).length,
     tasksOver50ms: tasks.filter((t) => (t.dur ?? 0) >= 50_000).length,
     worstTaskMs: round(tasks.reduce((duration, task) => Math.max(duration, task.dur), 0) / 1000),
@@ -107,7 +116,9 @@ export function summarizeTrace(
 export function formatTraceSummary(summary: TraceSummary): string[] {
   const lines = [
     `duration: ${summary.durationMs}ms`,
-    `main thread: scripting ${summary.split.scripting}ms, layout ${summary.split.layout}ms, paint ${summary.split.paint}ms`,
+    `main thread: scripting ${summary.split.scripting}ms, style ${summary.split.style}ms, layout ${summary.split.layout}ms, paint ${summary.split.paint}ms`,
+    `style recalcs: ${summary.recalcs.count}, element p90 ${summary.recalcs.elementP90}, max ${summary.recalcs.elementMax}; ≥100 elements ${summary.recalcs.largeCount} (${summary.recalcs.largeDurationMs}ms)`,
+    `style writes: ${summary.recalcs.writes}, following recalcs ${summary.recalcs.afterWriteCount} (${summary.recalcs.afterWriteDurationMs}ms)`,
     `tasks over 16ms: ${summary.tasksOver16ms}, over 50ms: ${summary.tasksOver50ms}`,
   ]
   const table = new Map(summary.longTasks.map((task) => [task.startMs, task]))
@@ -140,6 +151,16 @@ export function compareTraceSummaries(before: TraceSummary, after: TraceSummary)
     '| --- | --- | --- | --- |',
     row('duration ms', before.durationMs, after.durationMs),
     row('scripting ms', before.split.scripting, after.split.scripting),
+    row('style ms', before.split.style, after.split.style),
+    row('style recalcs', before.recalcs.count, after.recalcs.count),
+    row('recalc element p90', before.recalcs.elementP90, after.recalcs.elementP90),
+    row('recalcs ≥100 elements ms', before.recalcs.largeDurationMs, after.recalcs.largeDurationMs),
+    row('style writes', before.recalcs.writes, after.recalcs.writes),
+    row(
+      'recalcs after style write ms',
+      before.recalcs.afterWriteDurationMs,
+      after.recalcs.afterWriteDurationMs,
+    ),
     row('layout ms', before.split.layout, after.split.layout),
     row('paint ms', before.split.paint, after.split.paint),
     row('tasks over 16ms', before.tasksOver16ms, after.tasksOver16ms),
@@ -210,12 +231,14 @@ function formatSampledFrame(frame: LongTask['sampledFrames'][number]): string {
 }
 
 // Self time: the event's duration minus its direct children on the same thread.
-function selfTime(event: TraceEvent, siblings: readonly TraceEvent[]) {
+function selfTime(event: TraceEvent, siblings: readonly TraceEvent[], index: number) {
   const end = event.ts + (event.dur ?? 0)
   let children = 0
   let cursor = event.ts
-  for (const other of siblings) {
-    if (other === event || other.ts < event.ts || other.ts + (other.dur ?? 0) > end) continue
+  for (let child = index + 1; child < siblings.length; child += 1) {
+    const other = siblings[child]!
+    if (other.ts >= end) break
+    if (other.ts + (other.dur ?? 0) > end) continue
     if (!BUCKETS[other.name] || other.ts < cursor) continue
     children += other.dur ?? 0
     cursor = other.ts + (other.dur ?? 0)

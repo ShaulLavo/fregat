@@ -1,25 +1,20 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript-api'
-import { fileHashes, gitBlobHash, pin, upstreamRoot } from './support.mjs'
+import { fileHashes, gitBlobHash, pin, upstreamRoot, vendorRoot } from './support.mjs'
 
 export async function prepare() {
   mkdirSync(upstreamRoot, { recursive: true })
+  // The pinned control is vendored: a benchmark gate that downloads its inputs fails with the host.
   for (const [filename, expected] of Object.entries(pin.files)) {
     const destination = path.join(upstreamRoot, filename)
-    let bytes = existsSync(destination) ? readFileSync(destination) : null
-    if (!bytes) {
-      const url = `https://raw.githubusercontent.com/${pin.repository}/${pin.commit}/${filename}`
-      const response = await fetch(url, { signal: AbortSignal.timeout(30000) })
-      if (!response.ok) throw new Error(`Cannot fetch pinned source: ${response.status} ${url}`)
-      bytes = Buffer.from(await response.arrayBuffer())
-    }
+    const bytes = readFileSync(path.join(vendorRoot, filename))
     assert.equal(
       gitBlobHash(bytes),
       expected,
-      `Pinned source mismatch: ${filename}; remove bench/.cache to retry`,
+      `Vendored control differs from ${pin.repository}@${pin.commit}: ${filename}`,
     )
     mkdirSync(path.dirname(destination), { recursive: true })
     writeFileSync(destination, bytes)

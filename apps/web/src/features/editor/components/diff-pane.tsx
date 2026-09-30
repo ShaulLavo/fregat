@@ -26,7 +26,7 @@ import {
   bindDiffPlugin,
   createDiffPresentationBinding,
 } from '@/features/editor/state/diff-presentation'
-import type { EditorSyntaxHighlightingSource } from '@/features/editor/state/syntax-highlighting'
+import type { HighlightingThemeSource } from '@singapore-editor/highlighting'
 import type {
   DiffPanePresentation,
   DiffScrollPosition,
@@ -44,7 +44,7 @@ export function DiffPane({
   side,
   syntaxBackend,
   syntaxHighlight = true,
-  syntaxSource = null,
+  syntaxTheme = null,
   tabId,
   theme,
   onFocus,
@@ -59,8 +59,8 @@ export function DiffPane({
   side: DiffGutterSide
   syntaxBackend: DiffSyntaxBackend
   syntaxHighlight?: boolean
-  /** Names the configuration prepared diff syntax is kept under; omit to parse every time. */
-  syntaxSource?: EditorSyntaxHighlightingSource | null
+  /** The palette prepared diff syntax is kept under; omit to parse every time. */
+  syntaxTheme?: HighlightingThemeSource | null
   tabId?: TabId
   theme: EditorTheme
   onFocus?: (side: DiffGutterSide) => void
@@ -90,7 +90,7 @@ export function DiffPane({
     plugin,
     file,
     side,
-    highlight && syntaxSource !== 'disabled' ? syntaxSource : null,
+    highlight ? syntaxTheme : null,
   )
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()

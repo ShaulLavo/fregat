@@ -5,13 +5,9 @@ import {
   type DiffPlugin,
   type DiffRenderRow,
 } from '@singapore-editor/diff'
-import { useQueryClient } from '@tanstack/react-query'
+import type { HighlightingThemeSource } from '@singapore-editor/highlighting'
 import { useLayoutEffect, useState } from 'react'
-import {
-  claimPreparedDiffSyntax,
-  storePreparedDiffSyntax,
-  viewDiffSyntax,
-} from '@/features/editor/state/prepared-diff-syntax'
+import { highlightingService } from '@/lib/highlighting/state/service'
 
 export type DiffRowsState = {
   readonly rows: readonly DiffRenderRow[]
@@ -29,34 +25,26 @@ export type DiffRowsState = {
  * plugin hands out a stable reference until it rebuilds, so React bails out on its own when a
  * notification changes nothing.
  *
- * With a `syntaxSource`, the file takes syntax prepared on intent or kept from an earlier view,
- * and hands its own parse back when the pane leaves it, so a revisit paints coloured at once.
+ * With a `syntaxTheme`, the highlighting service shows the file with syntax prepared on intent or
+ * kept from an earlier view, and takes the pane's parse back when it leaves, so a revisit paints
+ * coloured at once.
  */
 export function useDiffRows(
   plugin: DiffPlugin,
   file: DiffFile | null,
   side: DiffGutterSide,
-  syntaxSource: string | null,
+  syntaxTheme: HighlightingThemeSource | null,
 ): DiffRowsState {
   const [rows, setRows] = useState<readonly DiffRenderRow[]>(() => plugin.getRows())
   const [tokensRevision, setTokensRevision] = useState(0)
-  const queryClient = useQueryClient()
-
   useLayoutEffect(() => {
-    if (!file || syntaxSource === null) {
+    if (!file || syntaxTheme === null) {
       plugin.setFile(file)
       return
     }
-    let current = true
-    const claim = claimPreparedDiffSyntax(queryClient, file, side, syntaxSource, () => current)
-    plugin.setFile(file, claim)
-    const leave = viewDiffSyntax(file, syntaxSource)
-    return () => {
-      current = false
-      leave()
-      storePreparedDiffSyntax(file, syntaxSource, plugin.releasePreparedSyntax())
-    }
-  }, [file, plugin, queryClient, side, syntaxSource])
+    const shown = highlightingService().showDiff(plugin, file, side, syntaxTheme)
+    return () => shown.dispose()
+  }, [file, plugin, side, syntaxTheme])
 
   useLayoutEffect(() => {
     const pull = () => setRows(plugin.getRows())

@@ -48,12 +48,12 @@
     "@lexical/react": "^0.51.0",
     "@lexical/text": "^0.51.0",
     "@phosphor-icons/react": "^2.1.10",
-    "@shikijs/langs": "4.4.3",
     "@singapore-editor/core": "workspace:*",
     "@singapore-editor/decode": "workspace:*",
     "@singapore-editor/diff": "workspace:*",
     "@singapore-editor/find": "workspace:*",
     "@singapore-editor/gutters": "workspace:*",
+    "@singapore-editor/highlighting": "workspace:*",
     "@singapore-editor/lsp": "workspace:*",
     "@singapore-editor/lsp-plugin": "workspace:*",
     "@singapore-editor/markdown": "workspace:*",
@@ -96,6 +96,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/history": "1.162.4",
     "@testing-library/dom": "^10.4.2",

@@ -23,6 +23,13 @@ export const editorViewportSelector = '.editor-virtualized-viewport'
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
 export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
+export const mermaidSelectors = {
+  diagram: '[data-markdown="mermaid-block"] [role="img"]',
+  svg: 'svg',
+  node: '.node',
+  label: '.nodeLabel',
+  styleFixture: '[data-mermaid-style-fixture]',
+}
 export const editorRowSelector = '[data-editor-virtual-row]'
 export const sharedTokenHighlightPrefix = 'editor-shared-token-'
 /** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
@@ -555,6 +562,8 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Choose code theme', exact: true }),
   codeThemeOptions: (page: Page) => page.locator('[data-value^="color-theme:"]'),
   codeThemeOption: (page: Page, id: string) => page.locator(`[data-value="color-theme:${id}"]`),
+  codeThemePreviewTokens: (page: Page, id: string) =>
+    page.locator(`[data-code-theme-preview="${id}"] pre code span[style*="color"]`),
   wallpaperAsset: (page: Page, id: string) =>
     page.locator(`${wallpaperStillSelector}[src*="${id}"]`),
   themeRoot: (page: Page) => page.locator('html'),
@@ -1394,6 +1403,59 @@ export function paintedTokenColors(target: Locator): Promise<string[]> {
       .filter(([name, highlight]) => name.startsWith('editor-shared-token-') && highlight.size > 0)
       .map(([name]) => getComputedStyle(element, `::highlight(${name})`).color),
   )
+}
+
+/** Opens the palette's code theme picker and lists its theme ids in order. */
+export async function codeThemePickerIds(page: Page): Promise<string[]> {
+  await page.keyboard.press(chords.commandPalette)
+  await selectors.paletteInput(page).fill('code ')
+  const rows = selectors.codeThemeOptions(page)
+  await rows.first().waitFor()
+  const values = await rows.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute('data-value') ?? ''),
+  )
+  return values.map((value) => value.slice('color-theme:'.length))
+}
+
+/**
+ * Each painted token's text and colour, with editor variables resolved. `getComputedStyle(el,
+ * '::highlight(x)')` leaves a `var()` colour unresolved in Chromium, so each active rule's colour is
+ * resolved on a probe inside the editor, where the theme's variables are in scope.
+ */
+export function paintedTokenWords(target: Locator): Promise<[string, string][]> {
+  return target.evaluate((element) => {
+    const sheets = [...document.styleSheets, ...document.adoptedStyleSheets]
+    const rules = sheets.flatMap((sheet) => {
+      try {
+        return [...sheet.cssRules]
+      } catch {
+        return []
+      }
+    })
+    const probe = document.createElement('span')
+    element.append(probe)
+    const words: [string, string][] = []
+    for (const [name, highlight] of CSS.highlights.entries()) {
+      if (!name.startsWith('editor-shared-token-') || highlight.size === 0) continue
+      const rule = rules.find(
+        (candidate): candidate is CSSStyleRule =>
+          candidate instanceof CSSStyleRule && candidate.selectorText.includes(`(${name})`),
+      )
+      const color = rule?.style.getPropertyValue('color')
+      if (!color) continue
+      probe.style.color = color
+      const resolved = getComputedStyle(probe).color
+      for (const painted of highlight) {
+        // The editor paints with StaticRanges, which carry no text of their own.
+        const range = document.createRange()
+        range.setStart(painted.startContainer, painted.startOffset)
+        range.setEnd(painted.endContainer, painted.endOffset)
+        words.push([range.toString().trim(), resolved])
+      }
+    }
+    probe.remove()
+    return words
+  })
 }
 
 export async function selectedEditorTabId(page: Page, group: number) {

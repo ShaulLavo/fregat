@@ -1,12 +1,12 @@
 import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { useQuery } from '@tanstack/react-query'
-import type { TokensResult } from 'shiki/core'
+import type { HighlightResult } from '@singapore-editor/highlighting'
 import { codeThemePreviewQueryOptions } from '@/lib/code-theme/state/preview'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 type PreviewState =
   | { readonly themeId: string; readonly kind: 'loading' }
-  | { readonly themeId: string; readonly kind: 'ready'; readonly result: TokensResult }
+  | { readonly themeId: string; readonly kind: 'ready'; readonly result: HighlightResult }
   | { readonly themeId: string; readonly kind: 'error' }
 
 /** While `enabled` is false it starts no highlight; a preview already in the cache still shows. */

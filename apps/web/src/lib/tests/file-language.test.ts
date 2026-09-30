@@ -1,10 +1,6 @@
 import { expect, test } from '../../../test/fixtures'
 import { languageIdForFilePath } from '@/lib/file-language'
-import {
-  EDITOR_SHIKI_LANGUAGE_MAP,
-  EDITOR_SHIKI_PRELOAD_LANGUAGES,
-  resolveShikiLanguageRegistrations,
-} from '@/features/editor/utils/shiki-languages'
+import { HIGHLIGHTING_DOCUMENT_LANGUAGES } from '@singapore-editor/highlighting'
 
 test('keeps the tree-sitter-backed language ids stable', () => {
   expect(languageIdForFilePath('/repo/src/app.ts')).toBe('typescript')
@@ -132,33 +128,7 @@ test('resolves every language id to a registered shiki grammar', () => {
   for (const path of paths) {
     const languageId = languageIdForFilePath(path)
     expect(languageId).not.toBeNull()
-    expect(EDITOR_SHIKI_LANGUAGE_MAP).toHaveProperty(languageId!)
-  }
-})
-
-test('preloads every language it can produce', () => {
-  for (const languageId of Object.keys(EDITOR_SHIKI_LANGUAGE_MAP)) {
-    expect(EDITOR_SHIKI_PRELOAD_LANGUAGES).toContain(languageId)
-  }
-})
-
-test('resolves every preload id to a concrete grammar registration', async () => {
-  const resolved = await Promise.all(
-    EDITOR_SHIKI_PRELOAD_LANGUAGES.map(async (languageId) => ({
-      languageId,
-      registrations: await resolveShikiLanguageRegistrations(languageId),
-    })),
-  )
-
-  for (const { languageId, registrations } of resolved) {
-    expect(registrations.length, languageId).toBeGreaterThan(0)
-    expect(
-      registrations.some(
-        (registration) =>
-          registration.name === languageId || registration.aliases?.includes(languageId),
-      ),
-      languageId,
-    ).toBe(true)
+    expect(HIGHLIGHTING_DOCUMENT_LANGUAGES).toHaveProperty(languageId!)
   }
 })
 
