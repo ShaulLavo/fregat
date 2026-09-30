@@ -13,18 +13,28 @@ export const inputConsumerIds = Object.freeze([
   'platform',
 ])
 
-export function inputConsumerConfiguration(id, fixture) {
+// Platform's large-file policy (editor.largeFile.* defaults): analysis consumers pause above
+// 10 Mi UTF-16 code units and the minimap above 50 Mi, so those fixtures measure the paused set.
+const miCodeUnits = 1_048_576
+export const analysisLimitCodeUnits = 10 * miCodeUnits
+export const minimapLimitCodeUnits = 50 * miCodeUnits
+
+export function inputConsumerConfiguration(id, fixture, length) {
   if (!inputConsumerIds.includes(id))
     throw new TypeError(`Unknown input consumer configuration: ${id}`)
+  if (!Number.isInteger(length) || length < 0) throw new TypeError('Missing fixture length')
   const native = id === 'native'
   const platform = id === 'platform'
+  const analysis = native || length <= analysisLimitCodeUnits
   return {
     id,
+    analysis,
     treeSitter: native
       ? fixture === 'ordinary'
-      : id.includes('tree-sitter') || id === 'all' || platform,
-    shiki: id.includes('shiki') || id === 'all' || platform,
-    minimap: id.includes('minimap') || id === 'all' || platform,
+      : analysis && (id.includes('tree-sitter') || id === 'all' || platform),
+    shiki: analysis && (id.includes('shiki') || id === 'all' || platform),
+    minimap:
+      length <= minimapLimitCodeUnits && (id.includes('minimap') || id === 'all' || platform),
     find: native || platform,
     platform,
     language: 'typescript',
@@ -52,8 +62,8 @@ function minimapSource(proof) {
 }
 
 // Proves each configured consumer is live and produced output, and that no other consumer is.
-export function assertConsumerReadiness(readiness, id, fixture, views, scenario, opened) {
-  const expected = inputConsumerConfiguration(id, fixture)
+export function assertConsumerReadiness(readiness, id, fixture, length, views, scenario, opened) {
+  const expected = inputConsumerConfiguration(id, fixture, length)
   const label = `${id}/${fixture}/${views}/${scenario}${opened ? ' after input' : ''}`
   const check = (condition, message) => {
     if (condition) return
@@ -103,6 +113,8 @@ export function assertConsumerReadiness(readiness, id, fixture, views, scenario,
       expected.minimap ? view.minimapElements > 0 : view.minimapElements === 0,
       'minimap element presence',
     )
+    // A hidden view mounts no rows, so its gutter proves nothing until it is revealed.
+    if (!view.visible) continue
     check(
       expected.platform ? view.gutterElements > 0 : view.gutterElements === 0,
       'gutter element presence',

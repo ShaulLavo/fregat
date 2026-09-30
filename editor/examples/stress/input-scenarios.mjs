@@ -110,7 +110,7 @@ export async function runSample(
   const opened =
     consumerId === 'native'
       ? null
-      : await settleConsumers(page, consumerId, fixture.id, views, scenario)
+      : await settleConsumers(page, consumerId, fixture, views, scenario)
   const target = await page.evaluate(
     ({ scenario, slowdownMs, count }) => {
       const target = __stress.inputLatency.prepare(scenario, slowdownMs)
@@ -143,7 +143,7 @@ export async function runSample(
     const rendered = await page.evaluate(() => __stress.inputLatency.verifyRendered())
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
     const settled = opened
-      ? await settleConsumers(page, consumerId, fixture.id, views, scenario, opened)
+      ? await settleConsumers(page, consumerId, fixture, views, scenario, opened)
       : null
     const diagnostic = await page.evaluate(() => {
       const { diagnostics, droppedDiagnostics } = __stress.observe()
@@ -284,6 +284,14 @@ async function settleConsumers(page, consumerId, fixture, views, scenario, opene
     ...(await __stress.settleConsumers()),
     workers: globalThis.__inputWorkerProof.map((worker) => ({ ...worker })),
   }))
-  assertConsumerReadiness(readiness, consumerId, fixture, views, scenario, opened)
+  assertConsumerReadiness(
+    readiness,
+    consumerId,
+    fixture.id,
+    fixture.utf16Length,
+    views,
+    scenario,
+    opened,
+  )
   return readiness
 }

@@ -116,7 +116,7 @@ function open(multiple: boolean, highlight: boolean, consumerId?: string) {
   const buffer = createEditorTextBuffer(source)
   const editors: Editor[] = []
   const inputAbort = new AbortController()
-  const consumers = consumerId ? createInputConsumers(consumerId, fixture) : null
+  const consumers = consumerId ? createInputConsumers(consumerId, fixture, source.length) : null
   active = { buffer, editors, inputAbort, consumers }
   for (let index = 0; index < (multiple ? 3 : 1); index++) {
     const editor = new Editor(createHost(index), {

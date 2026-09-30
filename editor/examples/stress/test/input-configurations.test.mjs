@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest'
-import { assertConsumerReadiness, inputConsumerConfiguration } from '../input-configurations.mjs'
+import {
+  analysisLimitCodeUnits,
+  assertConsumerReadiness,
+  inputConsumerConfiguration,
+  minimapLimitCodeUnits,
+} from '../input-configurations.mjs'
 
 const owner = { lifecycle: 'ready', pendingRequests: 0, lastError: null }
 const worker = (name, extra = {}) => ({
@@ -15,7 +20,7 @@ const minimap = (sourceUpdates = 1) =>
   worker('minimap', { sourceUpdates, latestRender: 3, acceptedRender: 3 })
 
 function readiness(id, overrides = {}) {
-  const configuration = inputConsumerConfiguration(id, 'ordinary')
+  const configuration = inputConsumerConfiguration(id, 'ordinary', 4469)
   const syntax = configuration.treeSitter || configuration.shiki
   return {
     configuration,
@@ -25,6 +30,7 @@ function readiness(id, overrides = {}) {
     views: [
       {
         initialHighlightStatus: syntax ? 'painted' : 'plain',
+        visible: true,
         minimapElements: configuration.minimap ? 1 : 0,
         gutterElements: configuration.platform ? 2 : 0,
       },
@@ -41,7 +47,7 @@ function readiness(id, overrides = {}) {
 test('accepts each configuration when exactly its consumers produced output', () => {
   for (const id of ['disabled', 'tree-sitter', 'shiki', 'minimap', 'all', 'platform'])
     expect(() =>
-      assertConsumerReadiness(readiness(id), id, 'ordinary', 'single', 'typing', null),
+      assertConsumerReadiness(readiness(id), id, 'ordinary', 4469, 'single', 'typing', null),
     ).not.toThrow()
 })
 
@@ -57,12 +63,29 @@ test('rejects a missing, extra, stalled or silent consumer', () => {
     ['disabled', { workers: [worker('shiki')] }],
     [
       'platform',
-      { views: [{ initialHighlightStatus: 'painted', minimapElements: 1, gutterElements: 0 }] },
+      {
+        views: [
+          {
+            initialHighlightStatus: 'painted',
+            visible: true,
+            minimapElements: 1,
+            gutterElements: 0,
+          },
+        ],
+      },
     ],
   ]
   for (const [id, overrides] of cases)
     expect(() =>
-      assertConsumerReadiness(readiness(id, overrides), id, 'ordinary', 'single', 'typing', null),
+      assertConsumerReadiness(
+        readiness(id, overrides),
+        id,
+        'ordinary',
+        4469,
+        'single',
+        'typing',
+        null,
+      ),
     ).toThrow(/Consumer readiness/)
 })
 
@@ -73,6 +96,7 @@ test('requires the minimap to receive the input edit', () => {
       readiness('minimap'),
       'minimap',
       'ordinary',
+      4469,
       'single',
       'typing',
       opened,
@@ -80,6 +104,14 @@ test('requires the minimap to receive the input edit', () => {
   ).toThrow(/no edit/)
   const edited = readiness('minimap', { workers: [minimap(2)] })
   expect(() =>
-    assertConsumerReadiness(edited, 'minimap', 'ordinary', 'single', 'typing', opened),
+    assertConsumerReadiness(edited, 'minimap', 'ordinary', 4469, 'single', 'typing', opened),
   ).not.toThrow()
+})
+
+test('pauses analysis consumers above the Platform analysis limit', () => {
+  const paused = inputConsumerConfiguration('platform', 'short-lines', analysisLimitCodeUnits + 1)
+  expect(paused).toMatchObject({ analysis: false, treeSitter: false, shiki: false, minimap: true })
+  expect(inputConsumerConfiguration('all', 'long-line', minimapLimitCodeUnits + 1)).toMatchObject({
+    minimap: false,
+  })
 })

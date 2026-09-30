@@ -25,8 +25,8 @@ import typescript from '@shikijs/langs/typescript'
 import githubDark from '@shikijs/themes/github-dark'
 import { inputConsumerConfiguration } from '../input-configurations.mjs'
 
-export function createInputConsumers(id: string, fixture: string) {
-  const configuration = inputConsumerConfiguration(id, fixture)
+export function createInputConsumers(id: string, fixture: string, length: number) {
+  const configuration = inputConsumerConfiguration(id, fixture, length)
   const plugins: EditorPlugin[] = []
   const tree = configuration.treeSitter && id !== 'native' ? new TreeSitterWorkerClient() : null
   const shiki = configuration.shiki ? createShikiWorkerOwner() : null
@@ -50,13 +50,14 @@ export function createInputConsumers(id: string, fixture: string) {
   if (configuration.platform)
     plugins.push(
       createLineGutterPlugin(),
-      createFoldGutterPlugin(),
       createMergeConflictPlugin(),
       createBracketMatchPlugin(),
       createOccurrenceHighlightPlugin(),
       createDocumentLinkPlugin(),
-      createScopeLinesPlugin(),
     )
+  // Platform pauses folding and scope guides with the other analysis consumers.
+  if (configuration.platform && configuration.analysis)
+    plugins.push(createFoldGutterPlugin(), createScopeLinesPlugin())
   return {
     configuration,
     plugins,
@@ -65,11 +66,29 @@ export function createInputConsumers(id: string, fixture: string) {
       await until(() =>
         editors.every((editor) => editor.getState().initialHighlightStatus !== 'loading'),
       )
-      await tree?.awaitIdleFence()
-      await shiki?.awaitIdleFence()
-      if (configuration.minimap) await minimapRendersAccepted()
+      // Edits schedule follow-up syntax requests and re-highlighting after a fence resolves;
+      // settle until both owners are quiet and tokens are live again.
+      const syntax = configuration.treeSitter || configuration.shiki
+      const tokensLive = () =>
+        !syntax ||
+        [...CSS.highlights].some(
+          ([name, ranges]) => name.startsWith('editor-shared-token-') && ranges.size > 0,
+        )
+      const quiet = () =>
+        (tree?.inspect().pendingRequests ?? 0) === 0 &&
+        (shiki?.inspect().pendingRequests ?? 0) === 0 &&
+        tokensLive()
+      const startedAt = performance.now()
+      const deadline = startedAt + 30_000
+      do {
+        await tree?.awaitIdleFence()
+        await shiki?.awaitIdleFence()
+        if (configuration.minimap) await minimapRendersAccepted()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      } while (!quiet() && performance.now() < deadline)
       return {
         configuration,
+        settleMs: performance.now() - startedAt,
         tree: tree?.inspect() ?? null,
         shiki: shiki?.inspect() ?? null,
         plugins: plugins.map((plugin) => plugin.name ?? 'unnamed'),
@@ -77,6 +96,7 @@ export function createInputConsumers(id: string, fixture: string) {
           const host = document.getElementById(`view-${index}`)
           return {
             initialHighlightStatus: editor.getState().initialHighlightStatus,
+            visible: host?.checkVisibility() ?? false,
             gutterElements:
               host?.querySelectorAll(
                 '.editor-virtualized-gutter-label, .editor-virtualized-fold-gutter-cell',
