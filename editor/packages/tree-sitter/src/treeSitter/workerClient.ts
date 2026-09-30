@@ -177,6 +177,8 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     if (!handle) return
 
     await this.postRequest({ type: 'registerLanguages', languages: nextLanguages })
+    if (this.worker !== handle) return
+
     for (const language of nextLanguages) {
       this.registeredLanguages.set(language.id, language)
       // A changed registration drops the worker's compiled runtime for that id.
@@ -195,6 +197,8 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     if (!handle) return
 
     await this.finishRegisterLanguages(languages)
+    if (this.worker !== handle) return
+
     const languageIds = [...new Set(languages.map((language) => language.id))].filter(
       (languageId) => !this.warmedLanguages.has(languageId),
     )
@@ -352,15 +356,15 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
 
   private async finishDispose(): Promise<void> {
     const handle = this.worker
-    if (!handle) {
-      this.clearRetainedState('disposed')
-      return
-    }
+    this.worker = null
     try {
-      await this.postRequest({ type: 'dispose' }, false)
+      if (handle) {
+        handle.onmessage = null
+        handle.onerror = null
+        // A busy worker cannot acknowledge disposal; termination releases its message loop.
+        handle.terminate()
+      }
     } finally {
-      handle.terminate()
-      if (this.worker === handle) this.worker = null
       this.clearRetainedState('disposed')
       this.rejectPendingRequests(new Error('Tree-sitter worker disposed'))
     }
