@@ -2,7 +2,7 @@
 
 ## Status and outcome
 
-- Status: APPROVED, 2026-09-27. Implemented 2026-09-30 on branch `wave/foundations-highlighting` (PR #202), awaiting independent review; not merged or deployed. Remaining limits are listed under "Progress 2026-09-30".
+- Status: APPROVED, 2026-09-27. Delivered 2026-09-30: [PR #202](https://github.com/ShaulLavo/fregat/pull/202) was independently reviewed, its repairs were checked, and it merged as `bfabd3cb7`. Web release `20260930T163634Z-bfabd3cb-main` passed its live check and a read-back mesh `look`; the Editor, Ghostty and hotkeys mirrors were green at their exact heads. [PR #212](https://github.com/ShaulLavo/fregat/pull/212) (`c65b3407e`) added the WebKit Settings and bounded typing harness proofs recorded below. Remaining limits are listed under "Progress 2026-09-30".
 - Inspected: Platform `9c08916bf`, linked Editor `52099144`. Recheck both heads and CI's `editor-ref` before implementation.
 - Outcome: Editor supplies one reusable highlighting service. Plugins, diffs, Settings previews, and rendered code consume it. Platform supplies configuration and theme data without selecting engines or constructing workers.
 - Scope: a facade over existing Editor providers/workers, followed by bounded consumer migrations. Other plugin candidates are assessment only. Wallpaper image loading and Settings layout remain separate work.
@@ -221,8 +221,8 @@ Unsupported syntax may return documented plain text. Operational failures must r
   - `contention.browser.test.ts`, three runs: an interactive request waits 12.2–12.4 ms behind 12 Settings previews on Shiki (1.6–1.7 ms alone) and 6.2–9.6 ms on Tree-sitter (0.5–0.7 ms alone). One burst per screen of rows; no scheduling added. The full-checkout `trace editor-type-burst` reached the memory limit. A subsequent small-fixture trace verifies comment typing while Settings requests previews; it does not establish full-checkout performance or the original burst's undo correctness. Census prewarming is unchanged (`preloadLanguages`).
 - [x] Run affected Editor tests/types/build/export checks and Platform gates/types/bundle checks. Use package test scripts, not `bun test`.
   - `build:workspaces`, package typechecks, web typecheck, `bun run gates`, `bundle:gate` (first load 1,717,080 gz, pin 1,735,134).
-- [ ] Commit/push verified implementation units by path. Deploy completed Platform consumer changes to Mesh; inspect release/UI/logs/live check. This docs-only plan requires no runtime deployment.
-  - Committed and pushed by path (PR #202). Deployment waits for independent review and merge; this wave does not deploy.
+- [x] Commit/push verified implementation units by path. Deploy completed Platform consumer changes to Mesh; inspect release/UI/logs/live check. This docs-only plan requires no runtime deployment.
+  - Merged in PR #202 as `bfabd3cb7`, shipped as web release `20260930T163634Z-bfabd3cb-main`. The live check passed, the mesh screenshot `/work/tmp/fregat-evidence/20260930T163726Z-look-platform-1440x1000` was read back, and production `warn` logs for the next five minutes were empty.
 
 ## Other plugin candidates
 
