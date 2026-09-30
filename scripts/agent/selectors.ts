@@ -23,6 +23,13 @@ export const editorViewportSelector = '.editor-virtualized-viewport'
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
 export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
+export const mermaidSelectors = {
+  diagram: '[data-markdown="mermaid-block"] [role="img"]',
+  svg: 'svg',
+  node: '.node',
+  label: '.nodeLabel',
+  styleFixture: '[data-mermaid-style-fixture]',
+}
 export const editorRowSelector = '[data-editor-virtual-row]'
 export const sharedTokenHighlightPrefix = 'editor-shared-token-'
 /** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */

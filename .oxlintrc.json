@@ -8,7 +8,11 @@
       "specifier": "./scripts/lint/web-boundaries.mjs"
     }
   ],
-  "ignorePatterns": ["apps/desktop/build/**", "apps/desktop/.hutch/**"],
+  "ignorePatterns": [
+    "apps/desktop/build/**",
+    "apps/desktop/.hutch/**",
+    "editor/packages/textbuffer/bench/vscode-textbuffer/**"
+  ],
   "rules": {
     "no-alert": "error",
     "react/rules-of-hooks": "error",

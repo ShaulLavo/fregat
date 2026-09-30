@@ -59,6 +59,7 @@ import { bufferStorageIdentity, copyTextRange } from '@singapore-editor/textbuff
 import {
   DocumentEditChain,
   type DocumentChangesSinceSyncPoint,
+  type DocumentEditChainRecord,
   type DocumentLogicalRevisionScope,
   type DocumentSyncPoint,
 } from './editor/editChain'
@@ -145,6 +146,14 @@ export type EditorViewMetadataValue =
 
 export type EditorTextBufferChange = {
   readonly change: DocumentSessionChange
+  readonly revisionBefore: number
+  readonly revisionAfter: number
+  readonly textSnapshotBefore: DocumentTextSnapshot
+  readonly syncPointAfter: DocumentSyncPoint
+  changesSinceDocumentSyncPoint(
+    point: DocumentSyncPoint,
+    scope: DocumentLogicalRevisionScope | null,
+  ): DocumentChangesSinceSyncPoint | null
   readonly origin: 'external' | 'view'
   readonly sourceViewId: string | null
 }
@@ -787,24 +796,24 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     }
 
     this.history = next
-    this.textSnapshot = createDocumentTextSnapshot(this.history.current)
-    const revisionBefore = this.revision
-    this.revision += 1
-    this.editChain.record({
+    const publication = {
       edits: transaction?.inverseEdits ?? null,
       logicalRevisionCount: 1,
       logicalRevisionScope: null,
-      revisionAfter: this.revision,
-      revisionBefore,
       textChanged: true,
+    }
+
+    const change = this.publish({
+      revision: publication,
+      createChange: () =>
+        appendTiming(
+          this.createChange('undo', transaction?.inverseEdits ?? [], transaction),
+          'session.undo',
+          start,
+        ),
+      sourceView,
+      updateSelections: true,
     })
-    const change = appendTiming(
-      this.createChange('undo', transaction?.inverseEdits ?? [], transaction),
-      'session.undo',
-      start,
-    )
-    sourceView?.acceptBufferSelections(change.selections)
-    this.emitChange(change, sourceView?.viewId)
     return change
   }
 
@@ -820,24 +829,24 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     }
 
     this.history = next
-    this.textSnapshot = createDocumentTextSnapshot(this.history.current)
-    const revisionBefore = this.revision
-    this.revision += 1
-    this.editChain.record({
+    const publication = {
       edits: transaction?.edits ?? null,
       logicalRevisionCount: 1,
       logicalRevisionScope: null,
-      revisionAfter: this.revision,
-      revisionBefore,
       textChanged: true,
+    }
+
+    const change = this.publish({
+      revision: publication,
+      createChange: () =>
+        appendTiming(
+          this.createChange('redo', transaction?.edits ?? [], transaction),
+          'session.redo',
+          start,
+        ),
+      sourceView,
+      updateSelections: true,
     })
-    const change = appendTiming(
-      this.createChange('redo', transaction?.edits ?? [], transaction),
-      'session.redo',
-      start,
-    )
-    sourceView?.acceptBufferSelections(change.selections)
-    this.emitChange(change, sourceView?.viewId)
     return change
   }
 
@@ -938,24 +947,20 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       selectionAfter: next.selections,
       metadata: ordinaryTransactionMetadata('history', 'checkout'),
     }
-    this.textSnapshot = createDocumentTextSnapshot(next.current)
-    const revisionBefore = this.revision
-    this.revision += 1
-    this.editChain.record({
+    const publication = {
       edits,
       logicalRevisionCount: 1,
       logicalRevisionScope: null,
-      revisionAfter: this.revision,
-      revisionBefore,
       textChanged: edits.length > 0,
+    }
+
+    const change = this.publish({
+      revision: publication,
+      createChange: () =>
+        appendTiming(this.createChange('checkout', edits, transaction), 'session.checkout', start),
+      sourceView,
+      updateSelections: true,
     })
-    const change = appendTiming(
-      this.createChange('checkout', edits, transaction),
-      'session.checkout',
-      start,
-    )
-    sourceView?.acceptBufferSelections(change.selections)
-    this.emitChange(change, sourceView?.viewId)
     return change
   }
 
@@ -969,8 +974,11 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     this.storageMaintenance.request(0, true)
     // No text moved, so no revision either; a checkout change with no edits tells every
     // view that undo and redo just went away.
-    const change = appendTiming(this.createChange('checkout', []), 'session.clearHistory', start)
-    this.emitChange(change, sourceView?.viewId)
+    const change = this.publish({
+      createChange: () =>
+        appendTiming(this.createChange('checkout', []), 'session.clearHistory', start),
+      sourceView,
+    })
     return change
   }
 
@@ -989,7 +997,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     this.history = restored
     this.typingRun = null
     // No text moved; an empty checkout tells every view that undo and redo arrived.
-    this.emitChange(this.createChange('checkout', []), null, 'external')
+    this.publish({ createChange: () => this.createChange('checkout', []), origin: 'external' })
     return true
   }
 
@@ -1151,19 +1159,18 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
 
     target.sourceView?.acceptBufferSelections(selectionAfter)
     this.typingRun = null
-    this.textSnapshot = createDocumentTextSnapshot(prepared.snapshotAfter)
-    this.revision += 1
-    barrier.revisionAfter = this.revision
-    this.editChain.record({
-      edits: prepared.edits,
-      logicalRevisionCount: prepared.logicalRevisionCount,
-      logicalRevisionScope: prepared.logicalRevisionScope,
-      revisionAfter: this.revision,
-      revisionBefore,
-      textChanged: true,
+    barrier.revisionAfter = revisionBefore + 1
+    const change = this.publish({
+      revision: {
+        edits: prepared.edits,
+        logicalRevisionCount: prepared.logicalRevisionCount,
+        logicalRevisionScope: prepared.logicalRevisionScope,
+        textChanged: true,
+      },
+      createChange: () => this.createChange('edit', prepared.edits, transaction),
+      sourceView: target.sourceView,
+      origin: 'external',
     })
-    const change = this.createChange('edit', prepared.edits, transaction)
-    this.emitChange(change, target.sourceView?.viewId ?? null, 'external')
     const receipt = createReceipt(barrier)
     return { status: 'committed', change, receipt }
   }
@@ -1184,20 +1191,20 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     this.restoreHistoryForReverse(barrier, transaction)
     target.sourceView?.acceptBufferSelections(transaction.selectionBefore)
     const revisionBefore = this.revision
-    this.textSnapshot = createDocumentTextSnapshot(receipt.snapshotBefore)
-    this.revision += 1
-    this.editChain.record({
+    const publication = {
       edits: receipt.inverseEdits,
       logicalRevisionCount: 1,
       logicalRevisionScope: null,
-      revisionAfter: this.revision,
-      revisionBefore,
       textChanged: true,
-    })
+    }
 
     const reverseTransaction = reciprocalTransaction(transaction)
-    const change = this.createChange('edit', receipt.inverseEdits, reverseTransaction)
-    this.emitChange(change, target.sourceView?.viewId ?? null, 'external')
+    const change = this.publish({
+      revision: publication,
+      createChange: () => this.createChange('edit', receipt.inverseEdits, reverseTransaction),
+      sourceView: target.sourceView,
+      origin: 'external',
+    })
     const reciprocalBarrier = this.createReciprocalBarrier(
       barrier,
       reverseTransaction,
@@ -1260,22 +1267,23 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     this.setHistoryForSequenceReverse(state, transaction, segmentIndex)
     target.sourceView?.acceptBufferSelections(transaction.selectionBefore)
     const revisionBefore = this.revision
-    this.textSnapshot = createDocumentTextSnapshot(transaction.snapshotBefore)
-    this.revision += 1
-    this.editChain.record({
+    const publication = {
       edits: transaction.inverseEdits,
       logicalRevisionCount: 1,
       logicalRevisionScope: null,
-      revisionAfter: this.revision,
-      revisionBefore,
       textChanged: true,
-    })
-    state.expectedRevision = this.revision
+    }
+
+    state.expectedRevision = revisionBefore + 1
     const reciprocal = reciprocalTransaction(transaction)
     state.reversedTransactions.push(reciprocal)
     state.nextSegmentIndex -= 1
-    const change = this.createChange('edit', transaction.inverseEdits, reciprocal)
-    this.emitChange(change, target.sourceView?.viewId ?? null, 'external')
+    const change = this.publish({
+      revision: publication,
+      createChange: () => this.createChange('edit', transaction.inverseEdits, reciprocal),
+      sourceView: target.sourceView,
+      origin: 'external',
+    })
     const nextCursor = createReverseCursor(state.nextSegmentIndex)
     reverseCursorStates.set(nextCursor, state)
     return { status: 'reversed', change, cursor: nextCursor }
@@ -1375,18 +1383,20 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     cumulativeBarrier: DocumentBarrierState | null,
   ): PreparedDocumentCommitResult {
     const revisionBefore = this.revision
-    this.revision += 1
-    this.editChain.record({
+    const publication = {
       edits: [],
       logicalRevisionCount: prepared.logicalRevisionCount,
       logicalRevisionScope: prepared.logicalRevisionScope,
-      revisionAfter: this.revision,
-      revisionBefore,
       textChanged: false,
+    }
+
+    if (cumulativeBarrier) cumulativeBarrier.revisionAfter = revisionBefore + 1
+    const change = this.publish({
+      revision: publication,
+      createChange: () => this.createSynchronizeChange(prepared, target.sourceView),
+      sourceView: target.sourceView,
+      origin: 'external',
     })
-    if (cumulativeBarrier) cumulativeBarrier.revisionAfter = this.revision
-    const change = this.createSynchronizeChange(prepared, target.sourceView)
-    this.emitChange(change, target.sourceView?.viewId ?? null, 'external')
     return { status: 'logical-only', change }
   }
 
@@ -1598,20 +1608,19 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     }
 
     this.typingRun = createTypingRun(this.typingRun, edits, options.metadata.intent, transaction)
-    this.textSnapshot = createDocumentTextSnapshot(snapshot)
-    const revisionBefore = this.revision
-    this.revision += 1
-    this.editChain.record({
+    const publication = {
       edits,
       logicalRevisionCount: options.metadata.logicalRevisionCount,
       logicalRevisionScope: options.metadata.logicalRevisionScope,
-      revisionAfter: this.revision,
-      revisionBefore,
       textChanged: true,
+    }
+
+    const change = this.publish({
+      revision: publication,
+      createChange: () => this.createChange('edit', edits, transaction),
+      sourceView: options.sourceView,
+      updateSelections: true,
     })
-    const change = this.createChange('edit', edits, transaction)
-    options.sourceView?.acceptBufferSelections(change.selections)
-    this.emitChange(change, options.sourceView?.viewId)
     return change
   }
 
@@ -1714,19 +1723,50 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     })
   }
 
-  private emitChange(
-    change: DocumentSessionChange,
-    sourceViewId: string | null | undefined,
-    origin: EditorTextBufferChange['origin'] = 'view',
-  ): void {
-    if (change.kind === 'none') return
-
+  private publish(transition: {
+    readonly revision?: Omit<DocumentEditChainRecord, 'revisionBefore' | 'revisionAfter'>
+    readonly createChange: () => DocumentSessionChange
+    readonly sourceView?: EditorViewSession | null
+    readonly updateSelections?: boolean
+    readonly origin?: EditorTextBufferChange['origin']
+  }): DocumentSessionChange {
+    const revisionBefore = this.revision
+    const textSnapshotBefore = this.textSnapshot
+    if (transition.revision) {
+      if (this.textSnapshot.snapshot !== this.history.current) {
+        this.textSnapshot = createDocumentTextSnapshot(this.history.current)
+      }
+      this.revision += 1
+      this.editChain.record({
+        ...transition.revision,
+        revisionBefore,
+        revisionAfter: this.revision,
+      })
+    }
+    const change = transition.createChange()
+    if (transition.updateSelections)
+      transition.sourceView?.acceptBufferSelections(change.selections)
+    const syncPointAfter = this.editChain.point
+    const event: EditorTextBufferChange = {
+      change,
+      revisionBefore,
+      revisionAfter: this.revision,
+      textSnapshotBefore,
+      syncPointAfter,
+      changesSinceDocumentSyncPoint: (point, scope) =>
+        this.editChain.changesSince(point, scope, syncPointAfter),
+      origin: transition.origin ?? 'view',
+      sourceViewId: transition.sourceView?.viewId ?? null,
+    }
     const deletedUnits = change.edits.reduce((sum, edit) => sum + edit.to - edit.from, 0)
     this.storageMaintenance.request(deletedUnits)
+    this.pendingChanges.push(event)
+    this.dispatchChanges()
+    return change
+  }
 
-    this.pendingChanges.push({ change, origin, sourceViewId: sourceViewId ?? null })
+  private dispatchChanges(): void {
     if (this.publishingChanges) return
-
     this.publishingChanges = true
     try {
       for (const event of this.pendingChanges) this.changes.fire(event)

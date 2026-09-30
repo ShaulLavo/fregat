@@ -1,4 +1,8 @@
-import type { DocumentSessionChange, EditorTextBuffer } from '@singapore-editor/core/document'
+import type {
+  DocumentSessionChange,
+  EditorTextBuffer,
+  EditorTextBufferChange,
+} from '@singapore-editor/core/document'
 import type {
   EditorContributionChange,
   EditorDisposable,
@@ -92,10 +96,19 @@ export class LanguageServerDocument {
 export function createLanguageServerDocument(
   options: LanguageServerDocumentOptions,
 ): LanguageServerDocument {
+  let publication: EditorTextBufferChange | undefined
   return new LanguageServerDocument(
     {
-      getSnapshot: () => bufferDocumentSnapshot(options),
-      subscribe: (listener) => options.buffer.subscribe(({ change }) => listener(change)),
+      getSnapshot: () => bufferDocumentSnapshot({ ...options, publication }),
+      subscribe: (listener) =>
+        options.buffer.subscribe((event) => {
+          publication = event
+          try {
+            listener(event.change)
+          } finally {
+            publication = undefined
+          }
+        }),
     },
     {
       lanes: options.lanes.map((lane) =>

@@ -1,4 +1,6 @@
 {
+  // Pinned upstream bytes, checked by hash before the benchmark builds them.
+  "ignorePatterns": ["packages/textbuffer/bench/vscode-textbuffer/**"],
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
   "plugins": ["unicorn", "typescript", "oxc"]
 }

@@ -88,6 +88,8 @@ import { approvalReconnect } from './approval-reconnect'
 import { stoppedTurnReasons } from './stopped-turn-reasons'
 import { streamAmbiguousTail } from './stream-ambiguous-tail'
 import { streamCodeColour } from './stream-code-colour'
+import { chatMermaid } from './chat-mermaid'
+import { editorMermaidStyle, editorStyleBaseline } from './editor-mermaid-style'
 import { claudeApprovalRules, codexApprovalRules } from './approval-rules'
 import { checkpointRewind } from './checkpoint-rewind'
 import { archiveLifecycle } from './archive-lifecycle'
@@ -456,6 +458,9 @@ export const scenarios: readonly Scenario[] = [
   stoppedTurnReasons,
   streamAmbiguousTail,
   streamCodeColour,
+  chatMermaid,
+  editorMermaidStyle,
+  editorStyleBaseline,
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,

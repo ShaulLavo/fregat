@@ -1,4 +1,4 @@
-import { notEqual, ok, strictEqual } from 'node:assert/strict'
+import { notEqual, ok, deepStrictEqual, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { chords, openFileByName, paintedTokenColors, selectors, waitForApp } from '../selectors'
@@ -6,7 +6,7 @@ import { chords, openFileByName, paintedTokenColors, selectors, waitForApp } fro
 export const editorThemePreview: Scenario = {
   name: 'editor-theme-preview',
   description: 'Preview three syntax themes, revisit them, and cancel without changing settings.',
-  async run(page, { file, step }) {
+  async run(page, { evidence, file, step }) {
     const url = new URL(page.url())
     url.searchParams.set('editorPerfTrace', '1')
     await page.goto(url.href)
@@ -68,16 +68,26 @@ export const editorThemePreview: Scenario = {
         mark.detail?.family === 'shiki' &&
         mark.detail.type !== 'highlight',
     )
-    strictEqual(requests.length, 5, 'Each theme switch sends one worker request')
+    await evidence.json('theme-worker-requests.json', { steadyStart, finish, requests })
+    ok(requests.length > 0, 'Theme switches produce worker recolors')
     ok(
       requests.every((mark) => mark.detail.type === 'recolor'),
-      'Theme switches never reopen documents',
+      'Theme switches keep documents open',
     )
-    strictEqual(
-      new Set(requests.map((mark) => mark.detail.runtimeSessionId)).size,
-      1,
-      'The worker session survives all previews',
-    )
+    const switches = marks.filter((mark) => mark.name === 'theme-preview:hover').slice(1)
+    let sessions: readonly string[] | null = null
+    for (const [index, hover] of switches.entries()) {
+      const end = switches[index + 1]?.at ?? finish
+      const switchRequests = requests.filter((mark) => mark.at >= hover.at && mark.at < end)
+      const ids = switchRequests.map((mark) => mark.detail.runtimeSessionId).sort()
+      ok(
+        ids.every((id) => typeof id === 'string'),
+        'Each recolor identifies its worker session',
+      )
+      strictEqual(new Set(ids).size, ids.length, 'Each session recolors once per theme switch')
+      if (sessions) deepStrictEqual(ids, sessions, 'The same worker sessions survive every preview')
+      sessions = ids
+    }
   },
   inspect: (page) => page.evaluate('window.__editorPerfTrace.report()'),
 }

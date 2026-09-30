@@ -103,8 +103,9 @@ export class DocumentEditChain {
   public changesSince(
     point: DocumentSyncPoint,
     scope: DocumentLogicalRevisionScope | null,
+    current: DocumentSyncPoint = this.#point,
   ): DocumentChangesSinceSyncPoint | null {
-    const current = this.#point
+    if (current.segment !== this.#point.segment) return null
     if (point.segment !== current.segment) return null
     if (point.revision === current.revision && point.textVersion === current.textVersion) {
       return {
@@ -115,7 +116,7 @@ export class DocumentEditChain {
       }
     }
 
-    const entries = this.entriesFrom(point)
+    const entries = this.entriesFrom(point, current)
     if (!entries) return null
 
     return {
@@ -126,14 +127,19 @@ export class DocumentEditChain {
     }
   }
 
-  private entriesFrom(point: DocumentSyncPoint): readonly EditChainEntry[] | null {
+  private entriesFrom(
+    point: DocumentSyncPoint,
+    current: DocumentSyncPoint,
+  ): readonly EditChainEntry[] | null {
     const start = this.#entries.findIndex(
       (entry) =>
         entry.revisionBefore === point.revision && entry.textVersionBefore === point.textVersion,
     )
     if (start === -1) return null
 
-    const entries = this.#entries.slice(start)
+    const entries = this.#entries
+      .slice(start)
+      .filter((entry) => entry.revisionAfter <= current.revision)
     let revision = point.revision
     let textVersion = point.textVersion
     for (const entry of entries) {
@@ -142,7 +148,7 @@ export class DocumentEditChain {
       textVersion = entry.textVersionAfter
     }
 
-    if (revision !== this.#point.revision || textVersion !== this.#point.textVersion) return null
+    if (revision !== current.revision || textVersion !== current.textVersion) return null
     return entries
   }
 

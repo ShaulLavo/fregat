@@ -1,7 +1,8 @@
 # Plan 198: Keep editor analysis with the document
 
-Status: implementation partly landed; acceptance closeout remains unverified, reconciled
-2026-09-28. The owner superseded the fixed “first after wave 2” priority on 2026-09-28.
+Status: implementation partly landed; foundations publication, cancellation, configuration,
+range and retention contract proofs delivered 2026-09-30. Full browser/memory acceptance remains
+unverified. See [current proof and limits](../docs/document-contributions/foundations-publication-proof.md). The owner superseded the fixed “first after wave 2” priority on 2026-09-28.
 Schedule by the [current dependency order](../PLAN.md#wave-2-closeout-and-dependency-order).
 Owners: Editor for analysis and view attachment; Platform for document retention and file opening.
 
@@ -336,9 +337,9 @@ scenario against the affected app URL.
 | Disk read ownership                    | `apps/web/src/lib/file-snapshot-query-cache.ts`                                                                                                                                          |
 | Retained documents and views           | `apps/web/src/features/editor/state/workspace-document-service.ts`, `runtime.ts`                                                                                                         |
 | Open and hover preparation             | `apps/web/src/lib/file-open-intent/state/service.ts`, `apps/web/src/features/editor/utils/prepared-document.ts`                                                                          |
-| Syntax session ownership               | `../Editor/packages/editor/src/editor/syntaxController.ts`, `preparedDocument.ts`, `Editor.ts`                                                                                           |
-| Immutable tokens and runtime snapshots | `../Editor/packages/editor/src/syntax/tokenStore.ts`, `../Editor/packages/editor/src/editor/viewSnapshot.ts`                                                                             |
-| React attachment                       | `../Editor/packages/react/src/index.tsx`                                                                                                                                                 |
+| Syntax session ownership               | `../editor/packages/editor/src/editor/syntaxController.ts`, `preparedDocument.ts`, `Editor.ts`                                                                                           |
+| Immutable tokens and runtime snapshots | `../editor/packages/editor/src/syntax/tokenStore.ts`, `../editor/packages/editor/src/editor/viewSnapshot.ts`                                                                             |
+| React attachment                       | `../editor/packages/react/src/index.tsx`                                                                                                                                                 |
 | Reload fallback                        | `apps/web/src/features/workbench/hooks/use-editor-visible-snapshot.ts`, `apps/web/src/features/workbench/state/snapshot-capture.ts`, `apps/web/src/lib/editor-visible-snapshot-cache.ts` |
 | Frame evidence                         | `scripts/agent/scenarios/editor-tab-hover-highlights.ts`, `scripts/agent/press-timing.ts`, `scripts/agent/selectors.ts`                                                                  |
 
