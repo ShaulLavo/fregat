@@ -552,6 +552,27 @@ describe('git diff size budget', () => {
     expect(hydrated).toMatchObject([{ newText: saved }])
   })
 
+  it('diffs files whose names hold spaces and non-ASCII characters', async () => {
+    const root = await fixtureRepo()
+    await writeFile(path.join(root, 'tracked copy.txt'), 'one\n')
+    await runGit(root, ['add', '.'])
+    await runGit(root, ['commit', '-m', 'spaced file'])
+    await writeFile(path.join(root, 'tracked copy.txt'), 'two\n')
+    await writeFile(path.join(root, 'new notes.md'), 'new\n')
+    await writeFile(path.join(root, 'café menu.md'), 'menu\n')
+    const service = new GitService(createWorkspacePaths(root))
+
+    expect(await service.diff('tracked copy.txt')).toMatchObject([
+      { path: 'tracked copy.txt', oldText: 'one\n', newText: 'two\n' },
+    ])
+    expect(await service.diff('new notes.md')).toMatchObject([
+      { path: 'new notes.md', newText: 'new\n' },
+    ])
+    expect(await service.diff('café menu.md')).toMatchObject([
+      { path: 'café menu.md', newText: 'menu\n' },
+    ])
+  })
+
   it('keeps small diffs when a neighboring path exceeds the budget', async () => {
     const root = await fixtureRepo()
     await writeFile(path.join(root, 'large [x].txt'), 'a'.repeat(64))
