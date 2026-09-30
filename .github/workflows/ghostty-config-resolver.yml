@@ -415,6 +415,9 @@ jobs:
             zig_archive_sha256: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
             zig_archive_url: https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
     runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
     env:
       EXPECTED_NATIVE_INPUTS_SHA256: ${{ inputs.expected_native_inputs_sha256 }}
       EXPECTED_SOURCE_HEAD: ${{ inputs.expected_source_head }}
@@ -494,13 +497,13 @@ jobs:
             echo 'release source checkout is not clean' >&2
             exit 1
           fi
-          native_inputs_sha256="$(shasum -a 256 native-source/scripts/config-resolver-native/native-inputs.json | awk '{print $1}')"
+          native_inputs_sha256="$(shasum -a 256 native-source/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json | awk '{print $1}')"
           if [[ "$native_inputs_sha256" != "$EXPECTED_NATIVE_INPUTS_SHA256" ]]; then
             echo 'native-build source input digest differs' >&2
             exit 1
           fi
-          cmp native-source/scripts/config-resolver-native/native-inputs.json \
-            package-source/scripts/config-resolver-native/native-inputs.json
+          cmp native-source/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json \
+            package-source/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json
           if [[ "$RUNNER_OS" != '${{ matrix.runner_os }}' || "$RUNNER_ARCH" != '${{ matrix.runner_arch }}' ]]; then
             echo 'release rebuild runner does not match the target' >&2
             exit 1
@@ -619,7 +622,7 @@ jobs:
           set -euo pipefail
           bun_binary="$(bun -e 'import { realpathSync } from "node:fs"; process.stdout.write(realpathSync(process.argv[1]))' "$(command -v bun)")"
           node_binary="$(bun -e 'import { realpathSync } from "node:fs"; process.stdout.write(realpathSync(process.argv[1]))' "$(command -v node)")"
-          archive_sha256="$(cd native-source && bun scripts/build-config-resolver.ts \
+          archive_sha256="$(cd native-source/ghostty-webgpu && bun scripts/build-config-resolver.ts \
             --mode build-target \
             --upstream "$NATIVE_UPSTREAM" \
             --zig "$NATIVE_ZIG" \
@@ -641,7 +644,7 @@ jobs:
             echo 'release rebuild archive digest changed' >&2
             exit 1
           fi
-          producer_result="$(cd package-source && bun scripts/create-release-provenance.ts \
+          producer_result="$(cd package-source/ghostty-webgpu && bun scripts/create-release-provenance.ts \
             --rebuild \
             --run-id "$NATIVE_RUN_ID" \
             --run-attempt "$NATIVE_RUN_ATTEMPT" \
