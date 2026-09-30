@@ -15,7 +15,8 @@ type DocumentContext = Pick<
   | 'materializeFullText'
   | 'getDocumentSyncPoint'
   | 'changesSinceDocumentSyncPoint'
->
+> &
+  Partial<Pick<EditorEditContributionContext, 'getCurrentDocumentSnapshot'>>
 
 const editors: Editor[] = []
 
@@ -77,6 +78,7 @@ test('mounted public contributions expose the live segment after eventless rotat
 test('mounted public source reads and bounded cursors share each nested publication', () => {
   const contexts: DocumentContext[] = []
   const observed: unknown[] = []
+  const currentSources: unknown[] = []
   const buffer = createEditorTextBuffer('a')
   const session = createEditorBufferSession(buffer)
   const initial = buffer.getDocumentSyncPoint()
@@ -96,6 +98,12 @@ test('mounted public source reads and bounded cursors share each nested publicat
       for (const context of contexts) {
         const point = context.getDocumentSyncPoint()
         const source = context.getTextSnapshot()
+        const current = context.getCurrentDocumentSnapshot?.()
+        if (current)
+          currentSources.push([
+            current.textSnapshot.readRange(0, current.textSnapshot.length),
+            current.documentSyncPoint.revision,
+          ])
         const changes = context.changesSinceDocumentSyncPoint(initial, null)
         observed.push([
           text,
@@ -113,10 +121,45 @@ test('mounted public source reads and bounded cursors share each nested publicat
 
   expect(contexts).toHaveLength(3)
   expect(observed).toEqual([
-    ['ab', 'ab', 'ab'],
+    ['ab', 'abc', 'abc'],
     ...contexts.map(() => ['ab', 'ab', 'ab', 1, 1]),
     ['abc', 'abc', 'abc'],
     ...contexts.map(() => ['abc', 'abc', 'abc', 2, 2]),
   ])
+  expect(currentSources).toEqual(Array.from({ length: 4 }, () => ['abc', 2]))
   expect(editor.getTextSnapshot()).toBe(buffer.getTextSnapshot())
 })
+
+test.each(['plain', 'shared'])(
+  'command acquisitions retain their source/point pair on the %s path',
+  (path) => {
+    const contexts: DocumentContext[] = []
+    const editor = new Editor(document.createElement('div'), {
+      defaultText: 'a',
+      plugins: [contributionPlugin(contexts)],
+    })
+    editors.push(editor)
+    if (path === 'shared')
+      editor.attachSession(createEditorBufferSession(createEditorTextBuffer('a')))
+    editor.edit({ from: 1, to: 1, text: 'b' })
+    const acquired = contexts.flatMap((context) => {
+      const current = context.getCurrentDocumentSnapshot?.()
+      return current ? [current] : []
+    })
+    expect(acquired).toHaveLength(2)
+    for (const current of acquired) {
+      expect(current.textSnapshot.readRange(0, current.textSnapshot.length)).toBe('ab')
+      expect(current.documentSyncPoint).toEqual(contexts[0]?.getDocumentSyncPoint())
+    }
+    const points = acquired.map((current) => current.documentSyncPoint)
+    editor.edit({ from: 2, to: 2, text: 'c' })
+    for (const [index, current] of acquired.entries()) {
+      expect(current.textSnapshot.readRange(0, current.textSnapshot.length)).toBe('ab')
+      expect(current.documentSyncPoint).toBe(points[index])
+      expect(contexts[0]?.getDocumentSyncPoint().revision).toBe(
+        current.documentSyncPoint.revision + 1,
+      )
+    }
+    expect(editor.materializeFullText()).toBe('abc')
+  },
+)

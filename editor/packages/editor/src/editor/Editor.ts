@@ -1713,11 +1713,7 @@ export class Editor {
   }
 
   getTextSnapshot(): TextSnapshot {
-    return (
-      this.bufferPublication?.change.textSnapshot ??
-      this.session?.getTextSnapshot() ??
-      this.textSnapshot
-    )
+    return this.session?.getTextSnapshot() ?? this.textSnapshot
   }
 
   getMergeConflicts(): readonly MergeConflictRegion[] {
@@ -3430,8 +3426,9 @@ export class Editor {
     return {
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
-      materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => (this.session ? this.getTextSnapshot() : null),
+      materializeFullText: () => this.contributionTextSnapshot().materializeFullText(),
+      getTextSnapshot: () => (this.session ? this.contributionTextSnapshot() : null),
+      getCurrentDocumentSnapshot: () => this.currentDocumentSnapshot(),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3454,8 +3451,8 @@ export class Editor {
       decorations: this.decorations,
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
-      materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => (this.session ? this.getTextSnapshot() : null),
+      materializeFullText: () => this.contributionTextSnapshot().materializeFullText(),
+      getTextSnapshot: () => (this.session ? this.contributionTextSnapshot() : null),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3479,8 +3476,9 @@ export class Editor {
       highlightPrefix: this.highlightPrefix,
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
-      materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => (this.session ? this.getTextSnapshot() : null),
+      materializeFullText: () => this.contributionTextSnapshot().materializeFullText(),
+      getTextSnapshot: () => (this.session ? this.contributionTextSnapshot() : null),
+      getCurrentDocumentSnapshot: () => this.currentDocumentSnapshot(),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3532,6 +3530,23 @@ export class Editor {
   }
 
   private bufferPublication: EditorTextBufferChange | null = null
+
+  private contributionTextSnapshot(): TextSnapshot {
+    return this.bufferPublication?.change.textSnapshot ?? this.getTextSnapshot()
+  }
+
+  private currentDocumentSnapshot(): Pick<
+    EditorViewSnapshot,
+    'textSnapshot' | 'documentSyncPoint'
+  > | null {
+    if (!this.session) return null
+    return {
+      textSnapshot: this.session.getTextSnapshot(),
+      documentSyncPoint:
+        editorBufferSession(this.session)?.buffer.getDocumentSyncPoint() ??
+        this.detachedEditChain.point,
+    }
+  }
 
   private currentDocumentEditChain(): Pick<DocumentEditChain, 'changesSince' | 'point'> {
     const session = editorBufferSession(this.session)

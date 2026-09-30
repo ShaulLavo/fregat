@@ -72,10 +72,17 @@ compensation continue publishing at their existing accepted local boundary.
 Independent review found that the mounted editor kept a publication after dispatch, so an eventless
 segment rotation left contribution cursors on the old segment. It also found that source readers
 used the mutable buffer head during nested delivery. The publication now exists only within the
-synchronous delivery scope, and public editor, edit, decoration and feature source readers use its
+synchronous delivery scope, and edit, decoration and feature source readers use its
 captured snapshot. Two mounted-plugin regressions failed at `1cbdeae7847f` and pass after the fix;
 they verify source/cursor agreement and live segment rotation. Their raw logs are
 `public-contributions-red.log` and `public-contributions-green.log` in the evidence directory.
+
+Host editor reads remain on the committed buffer head for snapshot-based commands. Edit and
+feature contributions explicitly acquire that head as a source/sync-point pair through
+`getCurrentDocumentSnapshot`; Find's command reader uses that acquisition. Event source readers
+and bounded cursors remain on the delivered frame. All 11 shared-view Find replacement tests pass
+at frozen `2ac20743c`; nine fail before this separation. The fixed Find package passes all 102 tests.
+The public mounted regression checks both source contracts within the same delivery callback.
 
 Retained-analysis proofs cover equivalent/incompatible configurations, distinct ranges, source
 shortening, stale range replies, edit supersession, hover cancellation with an active view,
@@ -92,7 +99,7 @@ three unchanged headless publication controls, an independent holdout, candidate
 samples retain checkout's size-dependent snapshot diff as mutation work. They are diagnostic
 samples, not a browser input-latency acceptance or a performance improvement claim.
 
-Checks: 161 focused core tests, 20 LSP synchronization tests, 61 Platform document/retention/runtime
+Checks: 2,900 core Node/DOM tests, 102 Find tests, 20 LSP synchronization tests, 61 Platform document/retention/runtime
 and language-server admission tests, and seven real-worker prepared-open browser tests. The latter
 run against private ports 5219/33319 and cover query-ready first-frame attachment, prepared
 promotion without duplicate requests, dirty retained text before a delayed read and independent
