@@ -15,10 +15,10 @@ import {
 import { documentAnalysisAllowed } from '@/features/editor/utils/large-file-policy'
 import { languageIdForFilePath } from '@/lib/file-language'
 import {
-  editorShikiHighlighterProvider,
-  editorSyntaxHighlightingSource,
-  editorTreeSitterSyntaxProvider,
-  type EditorSyntaxHighlightingSource,
+  editorHighlighterProvider,
+  editorSyntaxColors,
+  editorSyntaxProvider,
+  type EditorSyntaxColors,
 } from '@/features/editor/state/syntax-highlighting'
 import type {
   FileOpenIntentPreparationConfiguration,
@@ -47,10 +47,10 @@ export function createPlatformFileOpenPreparer(
   environment: EditorPreparedEnvironment,
 ): FileOpenIntentPreparer {
   const source = environment.syntaxHighlightingEnabled
-    ? editorSyntaxHighlightingSource(environment.selectedThemeId)
+    ? editorSyntaxColors(environment.selectedThemeId)
     : 'disabled'
-  const highlighterProvider = source === 'shiki' ? editorShikiHighlighterProvider() : null
-  const structuralProvider = source === 'disabled' ? null : editorTreeSitterSyntaxProvider()
+  const highlighterProvider = source === 'vscode' ? editorHighlighterProvider() : null
+  const structuralProvider = source === 'disabled' ? null : editorSyntaxProvider()
   return {
     environment: {
       configurationTag: preparedEnvironmentConfigurationTag(environment),
@@ -102,7 +102,7 @@ export function editorPreparedDocumentTags(
 ): EditorPreparedDocumentTags {
   const source =
     environment.syntaxHighlightingEnabled && analysisAllowed
-      ? editorSyntaxHighlightingSource(environment.selectedThemeId, languageId)
+      ? editorSyntaxColors(environment.selectedThemeId, languageId)
       : 'disabled'
   const captures = languageId === 'markdown'
   return {
@@ -160,7 +160,7 @@ function preparedDocumentConfiguration(
   )
   const source =
     environment.syntaxHighlightingEnabled && analysisAllowed
-      ? editorSyntaxHighlightingSource(environment.selectedThemeId, languageId)
+      ? editorSyntaxColors(environment.selectedThemeId, languageId)
       : 'disabled'
   const tags = editorPreparedDocumentTags(path, environment, analysisAllowed)
   const highlighter = highlighterPreparationStage(
@@ -191,7 +191,7 @@ function preparedDocumentConfiguration(
 function structuralPreparationStage(
   prepared: EditorPreparedDocument,
   languageId: EditorSyntaxLanguageId | null,
-  source: EditorSyntaxHighlightingSource,
+  source: EditorSyntaxColors,
   tags: EditorPreparedDocumentTags,
   abortSignal: AbortSignal,
   range: FileOpenIntentStructuralRange,
@@ -209,7 +209,7 @@ function structuralPreparationStage(
         abortSignal,
         configuration: {
           includeCaptures: languageId === 'markdown',
-          includeHighlights: source === 'tree-sitter',
+          includeHighlights: source === 'editor',
           syntaxMode: 'range',
         },
         configurationTag: tags.structuralConfigurationTag,
@@ -222,13 +222,13 @@ function structuralPreparationStage(
 
 function highlighterPreparationStage(
   prepared: EditorPreparedDocument,
-  source: EditorSyntaxHighlightingSource,
+  source: EditorSyntaxColors,
   environment: EditorPreparedEnvironment,
   tags: EditorPreparedDocumentTags,
   abortSignal: AbortSignal,
   provider: EditorHighlighterProvider | null,
 ): FileOpenIntentPreparationStage | null {
-  if (source !== 'shiki') return null
+  if (source !== 'vscode') return null
   if (!environment.appliedThemeId) return null
   if (environment.appliedThemeId !== environment.selectedThemeId) return null
   if (!provider) return null

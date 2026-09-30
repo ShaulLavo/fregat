@@ -1,5 +1,6 @@
 import type { Locator, Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
+import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
 export const treeScrollSelectors = {
   scroll: '[data-file-tree-virtualized-scroll]',
@@ -124,6 +125,9 @@ export const selectors = {
   snoozeCustomSubmit: (page: Page) =>
     page.getByRole('button', { name: 'Snooze until chosen time', exact: true }),
   snoozeDialog: (page: Page) => page.getByRole('dialog', { name: 'Snooze sessions', exact: true }),
+  selectedSessionsToolbar: (page: Page) => page.getByRole('toolbar', { name: 'Selected sessions' }),
+  markedSession: (page: Page, title: string) =>
+    page.getByTitle(title, { exact: true }).and(page.locator('[data-marked]')),
   sessionBulkActions: (page: Page) =>
     page
       .getByRole('toolbar', { name: 'Selected sessions' })
@@ -559,6 +563,8 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Choose code theme', exact: true }),
   codeThemeOptions: (page: Page) => page.locator('[data-value^="color-theme:"]'),
   codeThemeOption: (page: Page, id: string) => page.locator(`[data-value="color-theme:${id}"]`),
+  codeThemePreviewTokens: (page: Page, id: string) =>
+    page.locator(`[data-code-theme-preview="${id}"] pre code span[style*="color"]`),
   wallpaperAsset: (page: Page, id: string) =>
     page.locator(`${wallpaperStillSelector}[src*="${id}"]`),
   themeRoot: (page: Page) => page.locator('html'),
@@ -1228,9 +1234,17 @@ export const selectors = {
 
 export const chords = {
   commandPalette: 'ControlOrMeta+Shift+P',
+  settings: 'ControlOrMeta+,',
   togglePanel: 'ControlOrMeta+J',
   nextItem: 'ControlOrMeta+Alt+BracketRight',
   toggleSidebar: 'ControlOrMeta+B',
+}
+
+export async function pressShortcut(page: Page, chord: string) {
+  // Playwright resolves ControlOrMeta from the host; the app resolves Mod from the browser.
+  const platform = await page.evaluate(detectPlatform)
+  const modifier = platform === 'mac' ? 'Meta' : 'Control'
+  await page.keyboard.press(chord.replace(/\b(?:ControlOrMeta|Mod)\b/g, modifier))
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {
@@ -1243,7 +1257,7 @@ export async function waitForApp(page: Page, timeoutMs = 45_000) {
 }
 
 export async function openGitPanel(page: Page) {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill('>Focus Git')
@@ -1309,7 +1323,7 @@ function hasLspErrorHighlight() {
 }
 
 export async function openFileByName(page: Page, name: string) {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill(name)
@@ -1337,7 +1351,7 @@ export async function openFileFromTree(page: Page, name: string) {
 }
 
 export async function runPaletteCommand(page: Page, title: string) {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill(`>${title}`)
@@ -1345,7 +1359,7 @@ export async function runPaletteCommand(page: Page, title: string) {
 }
 
 export async function chooseColorMode(page: Page, value: 'light' | 'dark' | 'system') {
-  await page.keyboard.press(chords.commandPalette)
+  await pressShortcut(page, chords.commandPalette)
   await selectors.paletteInput(page).fill('>Choose light / dark mode')
   await selectors.commandOption(page, 'Choose light / dark mode').click()
   await selectors.colorModeOption(page, value).click()
@@ -1398,6 +1412,59 @@ export function paintedTokenColors(target: Locator): Promise<string[]> {
       .filter(([name, highlight]) => name.startsWith('editor-shared-token-') && highlight.size > 0)
       .map(([name]) => getComputedStyle(element, `::highlight(${name})`).color),
   )
+}
+
+/** Opens the palette's code theme picker and lists its theme ids in order. */
+export async function codeThemePickerIds(page: Page): Promise<string[]> {
+  await pressShortcut(page, chords.commandPalette)
+  await selectors.paletteInput(page).fill('code ')
+  const rows = selectors.codeThemeOptions(page)
+  await rows.first().waitFor()
+  const values = await rows.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute('data-value') ?? ''),
+  )
+  return values.map((value) => value.slice('color-theme:'.length))
+}
+
+/**
+ * Each painted token's text and colour, with editor variables resolved. `getComputedStyle(el,
+ * '::highlight(x)')` leaves a `var()` colour unresolved in Chromium, so each active rule's colour is
+ * resolved on a probe inside the editor, where the theme's variables are in scope.
+ */
+export function paintedTokenWords(target: Locator): Promise<[string, string][]> {
+  return target.evaluate((element) => {
+    const sheets = [...document.styleSheets, ...document.adoptedStyleSheets]
+    const rules = sheets.flatMap((sheet) => {
+      try {
+        return [...sheet.cssRules]
+      } catch {
+        return []
+      }
+    })
+    const probe = document.createElement('span')
+    element.append(probe)
+    const words: [string, string][] = []
+    for (const [name, highlight] of CSS.highlights.entries()) {
+      if (!name.startsWith('editor-shared-token-') || highlight.size === 0) continue
+      const rule = rules.find(
+        (candidate): candidate is CSSStyleRule =>
+          candidate instanceof CSSStyleRule && candidate.selectorText.includes(`(${name})`),
+      )
+      const color = rule?.style.getPropertyValue('color')
+      if (!color) continue
+      probe.style.color = color
+      const resolved = getComputedStyle(probe).color
+      for (const painted of highlight) {
+        // The editor paints with StaticRanges, which carry no text of their own.
+        const range = document.createRange()
+        range.setStart(painted.startContainer, painted.startOffset)
+        range.setEnd(painted.endContainer, painted.endOffset)
+        words.push([range.toString().trim(), resolved])
+      }
+    }
+    probe.remove()
+    return words
+  })
 }
 
 export async function selectedEditorTabId(page: Page, group: number) {

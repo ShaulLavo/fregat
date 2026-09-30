@@ -4,22 +4,19 @@ import { vi } from 'vitest'
 import { Editor } from '@singapore-editor/core/editor'
 import {
   createEmptySyntaxResult,
+  type EditorSyntaxSession,
   type EditorSyntaxSessionOptions,
   type EditorToken,
 } from '@singapore-editor/core/syntax'
 import {
   createDiffRegionStore,
   createTextDiff,
-  prepareDiffSyntax,
   type DiffSyntaxBackend,
 } from '@singapore-editor/diff'
 
 import { DiffPane } from '@/features/editor/components/diff-pane'
-import {
-  clearPreparedDiffSyntax,
-  hasPreparedDiffSyntax,
-  storePreparedDiffSyntax,
-} from '@/features/editor/state/prepared-diff-syntax'
+import { EDITOR_PALETTE_SOURCE } from '@/features/editor/state/syntax-highlighting'
+import { highlightingService } from '@/lib/highlighting/state/service'
 import { expect, test } from '../../../../../test/fixtures'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
 import { renderWithProviders } from '../../../../../test/render'
@@ -58,7 +55,12 @@ test('a prepared diff paints coloured with its first text, and a revisit reuses 
   stubHighlightApi()
   const setText = vi.spyOn(Editor.prototype, 'setText')
   const sessions = { created: 0 }
-  const backend = tokenBackend(sessions)
+  // The service's own Tree-sitter provider, parsing with the stand-in sessions below.
+  const service = highlightingService()
+  const backend = service.documentBackend(EDITOR_PALETTE_SOURCE)
+  const createSession = vi
+    .spyOn(service.syntaxProvider(), 'createSession')
+    .mockImplementation(tokenSessions(sessions))
   const diff = () =>
     createTextDiff({
       newFile: { languageId: 'typescript', path: 'repo/a.ts', text: 'const b = 2\n' },
@@ -71,21 +73,20 @@ test('a prepared diff paints coloured with its first text, and a revisit reuses 
         regions={createDiffRegionStore()}
         side='stacked'
         syntaxBackend={backend}
-        syntaxSource='tree-sitter'
+        syntaxTheme={EDITOR_PALETTE_SOURCE}
         theme={{}}
       />
     </StrictMode>
   )
   try {
-    const prepared = diff()
-    storePreparedDiffSyntax(prepared, 'tree-sitter', await prepareDiffSyntax(prepared, { backend }))
+    expect(await service.prepareDiff(diff(), EDITOR_PALETTE_SOURCE)).toBe(true)
     const parsedAhead = sessions.created
 
     const first = renderWithProviders(pane())
     await waitFor(() => expect(setText).toHaveBeenCalled())
     expect(firstTextTokens(setText)).toHaveLength(2)
     first.unmount()
-    expect(hasPreparedDiffSyntax(diff(), 'tree-sitter')).toBe(true)
+    expect(service.canPrepareDiff(diff(), EDITOR_PALETTE_SOURCE)).toBe(false)
 
     setText.mockClear()
     renderWithProviders(pane())
@@ -94,7 +95,7 @@ test('a prepared diff paints coloured with its first text, and a revisit reuses 
     expect(sessions.created).toBe(parsedAhead)
   } finally {
     setText.mockRestore()
-    clearPreparedDiffSyntax('tree-sitter')
+    createSession.mockRestore()
   }
 })
 
@@ -110,23 +111,22 @@ function appliedTokens(spy: { mock: { calls: readonly unknown[][] } }) {
 /** A parse that colours the word `const` wherever it appears, so a token has to be anchored to
  *  reach the editor rather than merely counted. */
 function tokenBackend(sessions = { created: 0 }): DiffSyntaxBackend {
-  return {
-    kind: 'tree-sitter',
-    provider: {
-      createSession: (options: EditorSyntaxSessionOptions) => {
-        sessions.created += 1
-        return {
-          foldingSupport: 'supported',
-          applyChange: async () => result(options),
-          dispose: () => undefined,
-          getResult: () => result(options),
-          getSnapshotVersion: () => 0,
-          getTokens: () => result(options).tokens,
-          refresh: async () => result(options),
-        }
-      },
-    },
-  } as DiffSyntaxBackend
+  return { kind: 'tree-sitter', provider: { createSession: tokenSessions(sessions) } }
+}
+
+function tokenSessions(sessions: { created: number }) {
+  return (options: EditorSyntaxSessionOptions): EditorSyntaxSession => {
+    sessions.created += 1
+    return {
+      foldingSupport: 'supported',
+      applyChange: async () => result(options),
+      dispose: () => undefined,
+      getResult: () => result(options),
+      getSnapshotVersion: () => 0,
+      getTokens: () => result(options).tokens,
+      refresh: async () => result(options),
+    }
+  }
 }
 
 function result(options: EditorSyntaxSessionOptions) {

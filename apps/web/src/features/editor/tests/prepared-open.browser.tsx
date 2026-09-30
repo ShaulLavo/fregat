@@ -32,10 +32,9 @@ import {
   type EditorOpenSampleResetResult,
 } from '@/features/editor/state/performance-trace'
 import {
-  awaitEditorShikiRuntimeSessionIdle,
+  awaitEditorSyntaxRuntimeSessionIdle,
   awaitEditorSyntaxWorkerIdleFences,
-  disposeEditorShikiWorkerOwner,
-  disposeEditorTreeSitterSyntaxProvider,
+  disposeEditorSyntaxHighlighting,
 } from '@/features/editor/state/syntax-highlighting'
 import {
   useEditorWorkspaceState,
@@ -81,7 +80,7 @@ afterEach(async () => {
   editorDiagnosticGlobal.__editorPerfTrace = undefined
   history.replaceState(null, '', originalUrl)
   vi.unstubAllEnvs()
-  await Promise.all([disposeEditorShikiWorkerOwner(), disposeEditorTreeSitterSyntaxProvider()])
+  await disposeEditorSyntaxHighlighting()
   resetEditorColorThemeStore()
   document.body.replaceChildren()
   document.documentElement.classList.remove('dark', 'light')
@@ -303,7 +302,7 @@ test(
     await triggerForesightIntent()
     await expect.poll(workerRequestGate.heldTypes, { timeout: 20_000 }).toEqual(['queryRange'])
     // Both stages start together; Shiki finishes while Tree-sitter's query is held.
-    await Promise.all(workerRuntimeSessionIds('shiki').map(awaitEditorShikiRuntimeSessionIdle))
+    await Promise.all(workerRuntimeSessionIds('shiki').map(awaitEditorSyntaxRuntimeSessionIdle))
     diagnostics = []
     performance.clearMarks('editor.worker.request')
     performance.clearMarks('editor.authoritative_text_paint')

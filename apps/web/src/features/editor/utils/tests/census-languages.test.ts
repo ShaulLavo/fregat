@@ -17,7 +17,7 @@ test('maps extensions, JSX variants and named files through the document grammar
       '.mdx': 10,
       '.unknown': 10,
     }),
-  ).toEqual(['typescript', 'tsx', 'javascript', 'jsx', 'dockerfile', 'makefile', 'json'])
+  ).toEqual(['typescript', 'tsx', 'javascript', 'jsx', 'docker', 'make', 'json', 'mdx'])
 })
 
 test('combines aliases before applying the inclusive 0.5% share of all counted files', () => {

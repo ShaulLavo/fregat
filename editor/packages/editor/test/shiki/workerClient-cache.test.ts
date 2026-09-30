@@ -61,6 +61,9 @@ class FakeWorker {
 describe('Shiki worker client theme cache', () => {
   afterEach(async () => {
     FakeWorker.autoResolve = true
+    for (const worker of fakeWorkers) {
+      for (const request of worker.messages) worker.resolveRequest(request)
+    }
     await currentOwner?.dispose()
     currentOwner = null
     fakeWorkers.length = 0
@@ -162,6 +165,60 @@ describe('Shiki worker client theme cache', () => {
 
     expect(fakeWorkers).toHaveLength(2)
   }, 20_000)
+
+  it('terminates a busy owned worker and settles requests and idle fences without its reply', async () => {
+    FakeWorker.autoResolve = false
+    const owner = await loadWorkerOwner()
+    const theme = owner.loadTheme(themeOptions())
+    const highlight = owner.highlight({
+      text: 'const value = 1',
+      lang: 'typescript',
+      theme: 'github-dark',
+      languageRegistrations: [],
+      themeRegistration: { name: 'github-dark' },
+    })
+    const preload = owner.preload({ languageRegistrations: [], themeRegistrations: [] })
+    const results = Promise.allSettled([theme, highlight, preload])
+    await untilRequested('theme')
+    const worker = fakeWorkerAt(0)
+    const terminate = vi.spyOn(worker, 'terminate')
+    const lateMessage = worker.onmessage
+    const lateError = worker.onerror
+    const idle = owner.awaitIdleFence()
+    expect(owner.inspect().pendingRequests).toBe(3)
+
+    const disposed = owner.dispose()
+    expect(owner.dispose()).toBe(disposed)
+    expect(worker.isTerminated).toBe(true)
+    await disposed
+    const outcomes = await results
+    expect(outcomes.every((outcome) => outcome.status === 'rejected')).toBe(true)
+    for (const outcome of outcomes) {
+      if (outcome.status === 'rejected')
+        expect(outcome.reason.message).toBe('Shiki worker disposed')
+    }
+    await idle
+    expect(terminate).toHaveBeenCalledOnce()
+    lateMessage?.(
+      new MessageEvent('message', {
+        data: {
+          id: requestOfType('theme').id,
+          ok: true,
+          result: { theme: { backgroundColor: 'late' } },
+        },
+      }),
+    )
+    lateError?.(new ErrorEvent('error', { message: 'late worker error' }))
+    expect(owner.inspect()).toMatchObject({
+      lifecycle: 'disposed',
+      pendingRequests: 0,
+      cache: { themeRequests: 0 },
+      lastError: null,
+    })
+    await expect(owner.loadTheme(themeOptions())).resolves.toBeUndefined()
+    expect(owner.canUseWorker()).toBe(false)
+    expect(fakeWorkers).toHaveLength(1)
+  })
 
   it('posts resolved preloads only after the first document result', async () => {
     FakeWorker.autoResolve = false

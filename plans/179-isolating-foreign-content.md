@@ -2,8 +2,11 @@
 
 ## Status and authorization
 
-- Status: IMPLEMENTED AND VERIFIED, 2026-09-30 foundations/closeout wave. Phases 0–6 are complete;
-  coordinated PR review, merge and mesh deployment follow. The owner declined an editor shadow root
+- Status: DELIVERED, 2026-09-30 foundations/closeout wave. Phases 0–6 are complete.
+  [PR #204](https://github.com/ShaulLavo/fregat/pull/204) passed independent review with its
+  repairs and a narrow parser re-review, merged as `3293142d2`, and shipped in web release
+  `20260930T161942Z-7076858b-main` (live check passed, mesh `look` read back). Physical Mac and
+  iPhone rendering are unconfirmed. The owner declined an editor shadow root
   on 2026-09-26; no editor-root decision is pending. Research measurements below describe the
   historical baseline.
 - Phase 1 done 2026-09-26 (wave 2, lane E1): [singapore#42](https://github.com/ShaulLavo/singapore/pull/42),

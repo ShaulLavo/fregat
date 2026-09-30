@@ -361,6 +361,7 @@
     "thread.cwd": 2,
     "thread.id": 3,
     "thread.path": 2,
+    "thread/backgroundTerminals/list": 1,
     "thread/compact/start": 1,
     "thread/compacted": 2,
     "thread/fork": 1,
@@ -383,7 +384,7 @@
     "thread/started": 3,
     "thread/status/changed": 2,
     "thread/tokenUsage/updated": 2,
-    "threadId": 35,
+    "threadId": 36,
     "threadResumeParams": 4,
     "threadStartParams": 2,
     "threadStateFromValue": 2
@@ -427,8 +428,9 @@
     "agentThreadId": 5,
     "parent_thread_id": 4,
     "providerThreadId": 2,
-    "thread": 103,
+    "thread": 104,
     "thread_spawn": 4,
+    "thread/backgroundTerminals/list": 6,
     "thread/compact/start": 3,
     "thread/compacted": 1,
     "thread/fork": 3,
@@ -448,7 +450,7 @@
     "thread/turns/list": 8,
     "threadApprovalsReviewer": 3,
     "threadEphemeral": 4,
-    "threadId": 105,
+    "threadId": 106,
     "threadPersistsExtendedHistory": 4,
     "threadSettings": 1,
     "threadStartCount": 3,
@@ -456,6 +458,9 @@
   },
   "apps/server/src/provider/adapters/tests/mock-turn-anatomy.test.ts": {
     "threadId": 1
+  },
+  "apps/server/src/provider/adapters/utils/codex-background-terminals.ts": {
+    "threadId": 4
   },
   "apps/server/src/provider/adapters/utils/codex-child-notifications.ts": {
     "agentThreadId": 1,
@@ -507,6 +512,10 @@
   "apps/server/src/provider/adapters/utils/mock-turn-anatomy.ts": {
     "parentThreadId": 1,
     "threadId": 3
+  },
+  "apps/server/src/provider/adapters/utils/tests/codex-background-terminals.test.ts": {
+    "thread": 4,
+    "threadId": 4
   },
   "apps/server/src/provider/adapters/utils/tests/codex-elicitation.test.ts": {
     "thread": 1,

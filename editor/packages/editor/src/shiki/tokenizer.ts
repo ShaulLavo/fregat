@@ -25,6 +25,8 @@ export interface IncrementalTokenizerSnapshot {
 export interface LineTokens {
   tokens: readonly ThemedToken[]
   state: unknown
+  /** The line exceeded the tokenization limit and is one plain token. */
+  untokenized?: boolean
 }
 
 export type TokenizeLineFn = (line: string, previousState: unknown) => LineTokens
@@ -39,6 +41,8 @@ export interface CreateIncrementalTokenizerOptions<
   theme: string
   code?: string
   highlighter: Highlighter
+  /** Longest line, in UTF-16 units, that is tokenized; longer lines stay plain. */
+  maxLineLength: number
 }
 
 export interface CreateIncrementalTokenizerResult<
@@ -56,12 +60,24 @@ export interface IncrementalTokenizer {
   getCode(): string
   getSnapshot(): IncrementalTokenizerSnapshot
   getTokens(): readonly (readonly ThemedToken[])[]
+  /** Lines of the current text left plain by the tokenization limit. */
+  untokenizedLineCount(): number
 }
 
 interface LineState {
   text: string
   tokens: readonly ThemedToken[]
   endState: unknown
+  untokenized: boolean
+}
+
+function lineState(text: string, result: LineTokens): LineState {
+  return {
+    text,
+    tokens: result.tokens,
+    endState: result.state,
+    untokenized: result.untokenized === true,
+  }
 }
 
 function splitLines(code: string): string[] {
@@ -99,6 +115,7 @@ function tokenLinesEqual(left: readonly ThemedToken[], right: readonly ThemedTok
 export class IncrementalShikiTokenizer implements IncrementalTokenizer {
   private code: string
   private lines: LineState[]
+  private untokenized = 0
   private readonly tokenize: TokenizeLineFn
   private readonly statesEqual: StatesEqualFn
 
@@ -138,7 +155,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
       if (this.statesEqual(state, this.lines[i - 1]?.endState)) break
 
       const result = this.tokenize(oldLine.text, state)
-      retokenized.push({ text: oldLine.text, tokens: result.tokens, endState: result.state })
+      retokenized.push(lineState(oldLine.text, result))
       state = result.state
       stableAt = i + 1
     }
@@ -146,7 +163,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     const fromOffset = from - start.col
     const oldEndOffset = lineOffset(this.lines, stableAt)
     this.code = newCode
-    this.lines = this.lines.slice(0, start.line).concat(retokenized, this.lines.slice(stableAt))
+    this.replaceLines(start.line, stableAt, retokenized)
 
     return {
       fromLine: start.line,
@@ -207,7 +224,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     const fromOffset = lineOffset(this.lines, startLine)
     const oldEndOffset = this.code.length
     this.code += chunk
-    this.lines = prefix.concat(nextTail)
+    this.replaceLines(startLine, previousLength, nextTail)
 
     return {
       fromLine: startLine,
@@ -257,11 +274,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     for (let nextIndex = prefixLength; nextIndex < nextLength; nextIndex++) {
       const line = nextLines[nextIndex] ?? ''
       const result = this.tokenize(line, previousState)
-      const tokenizedLine: LineState = {
-        text: line,
-        tokens: result.tokens,
-        endState: result.state,
-      }
+      const tokenizedLine = lineState(line, result)
       previousState = tokenizedLine.endState
 
       const inSharedSuffix = suffixLength > 0 && nextIndex >= nextTailStart
@@ -274,10 +287,9 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
           tokenLinesEqual(tokenizedLine.tokens, previousLine.tokens) &&
           this.statesEqual(tokenizedLine.endState, previousLine.endState)
         ) {
-          const nextDocument = nextPrefix.concat(rebuiltMiddle, previousLines.slice(previousIndex))
-
           this.code = code
-          this.lines = nextDocument
+          this.replaceLines(prefixLength, previousIndex, rebuiltMiddle)
+          const nextDocument = this.lines
 
           return {
             fromLine: prefixLength,
@@ -295,7 +307,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
 
     const oldEndOffset = this.code.length
     this.code = code
-    this.lines = nextPrefix.concat(rebuiltMiddle)
+    this.replaceLines(prefixLength, previousLength, rebuiltMiddle)
 
     return {
       fromLine: prefixLength,
@@ -311,7 +323,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     const previousLength = this.lines.length
     const oldEndOffset = this.code.length
     this.code = code
-    this.lines = this.tokenizeLines(splitLines(code))
+    this.replaceLines(0, previousLength, this.tokenizeLines(splitLines(code)))
 
     return {
       fromLine: 0,
@@ -325,6 +337,18 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
 
   public getCode(): string {
     return this.code
+  }
+
+  public untokenizedLineCount(): number {
+    return this.untokenized
+  }
+
+  // Every line replacement goes through here so the plain-line count follows the current text.
+  private replaceLines(start: number, end: number, next: readonly LineState[]): void {
+    for (let index = start; index < end; index++)
+      if (this.lines[index]?.untokenized) this.untokenized--
+    for (const line of next) if (line.untokenized) this.untokenized++
+    this.lines = this.lines.slice(0, start).concat(next, this.lines.slice(end))
   }
 
   public getSnapshot(): IncrementalTokenizerSnapshot {
@@ -344,8 +368,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
 
     for (const line of lines) {
       const result = this.tokenize(line, previousState)
-      const lineState: LineState = { text: line, tokens: result.tokens, endState: result.state }
-      tokenized.push(lineState)
+      tokenized.push(lineState(line, result))
       previousState = result.state
     }
 
@@ -376,7 +399,12 @@ export async function createIncrementalTokenizer<Highlighter extends TokenizerHi
 ): Promise<CreateIncrementalTokenizerResult<Highlighter>> {
   const { highlighter } = options
 
-  const engine = createScopedLineTokenizer(highlighter, options.lang, options.theme)
+  const engine = createScopedLineTokenizer(
+    highlighter,
+    options.lang,
+    options.theme,
+    options.maxLineLength,
+  )
 
   return {
     tokenizer: Object.assign(

@@ -25,6 +25,12 @@ export const settingsProviderUpdate: Scenario = {
   description:
     'Settings › Providers shows a CLI against its latest npm release: a fixture codex at a standalone-installer path updates in one click and reads Up to date after. No real CLI is touched.',
   async run(page, { step }) {
+    const disabledChecks: string[] = []
+    page.on('request', (request) => {
+      const path = new URL(request.url()).pathname
+      if (request.method() === 'GET' && /^\/providers\/(codex|claude)\/update$/.test(path))
+        disabledChecks.push(path)
+    })
     const base = (await openChat(page)).replace(/\/orchestration$/, '')
     const root = await mkdtemp(scratchPath('fregat-provider-update-'))
     const bin = join(root, 'packages', 'standalone', 'bin')
@@ -64,6 +70,10 @@ export const settingsProviderUpdate: Scenario = {
       await fixture.getByText('Up to date').waitFor({ timeout: 10_000 })
       const runs = (await readFile(join(bin, 'updates'), 'utf8')).split('\n').filter(Boolean)
       ok(runs.length === 1, `The update ran once, not ${runs.length} times`)
+      ok(
+        disabledChecks.length === 0,
+        `Disabled providers triggered update checks: ${disabledChecks.join(', ')}`,
+      )
       await step('fixture-updated')
     } finally {
       await rm(root, { force: true, recursive: true })

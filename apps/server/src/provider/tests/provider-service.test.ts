@@ -125,6 +125,103 @@ describe('ProviderService', () => {
     }
   })
 
+  it('keeps a silent background runtime during periodic sweeps and reaps it after work ends', async () => {
+    vi.useFakeTimers()
+    const fixture = createFixture()
+    const hasBackgroundWork = vi.fn(async () => true)
+    const adapter = Object.assign(new MockProviderAdapter(), { hasBackgroundWork })
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    try {
+      const input = await startReadyRuntime(service, fixture.database)
+      await vi.advanceTimersByTimeAsync(35 * 60 * 1000)
+      expect(hasBackgroundWork).toHaveBeenCalledWith({ sessionId: input.sessionId })
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+      hasBackgroundWork.mockResolvedValue(false)
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(false)
+    } finally {
+      await service.shutdown()
+      fixture.close()
+      vi.useRealTimers()
+    }
+  })
+
+  it.each(['runtime-activity', 'child-task', 'concurrent-resume', 'shutdown'] as const)(
+    'rechecks %s after an asynchronous silent terminal check',
+    async (activity) => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      const fixture = createFixture()
+      const entered = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<boolean>()
+      const adapter = Object.assign(new MockProviderAdapter(), {
+        hasBackgroundWork: async () => {
+          entered.resolve()
+          return release.promise
+        },
+      })
+      const stream = new ProviderRuntimeEventStream()
+      const subscribe = adapter.subscribeEvents.bind(adapter)
+      adapter.subscribeEvents = (subscriber) => {
+        const original = subscribe(subscriber),
+          tasks = stream.subscribe(subscriber)
+        return () => {
+          original()
+          tasks()
+        }
+      }
+      const directory = new ProviderSessionDirectory(fixture.database)
+      const service = new ProviderService({
+        adapterRegistry: new ProviderAdapterRegistry([adapter]),
+        sessionDirectory: directory,
+      })
+      try {
+        const input = await startReadyRuntime(service, fixture.database)
+        const stop = service.stopRuntime({
+          sessionId: input.sessionId,
+          idleBefore: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        })
+        await entered.promise
+        let shutdown: Promise<void> | undefined
+        if (activity === 'runtime-activity') {
+          vi.setSystemTime(Date.now() + 6_000)
+          directory.markSeen(input.sessionId)
+        }
+        if (activity === 'child-task') {
+          stream.publish({
+            type: 'task.started',
+            eventId: 'silent-check-child',
+            createdAt: new Date().toISOString(),
+            sessionId: input.sessionId,
+            runtimeEpoch: input.runtimeEpoch,
+            payload: { taskId: 'child', taskType: 'agent', status: 'running' },
+          })
+          await service.drainRuntimeEvents()
+        }
+        if (activity === 'concurrent-resume')
+          await service.ensureRuntime({
+            providerInstanceId: input.providerInstanceId,
+            runtimeMode: input.runtimeMode,
+            runtimeEpoch: 'resumed-epoch',
+            sessionId: input.sessionId,
+            runtimePayload: providerSessionPayload(input),
+          })
+        if (activity === 'shutdown') shutdown = service.shutdown()
+        release.resolve(false)
+        expect(await stop).toBeNull()
+        if (shutdown) await shutdown
+        else expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+      } finally {
+        release.resolve(false)
+        await service.shutdown()
+        fixture.close()
+        vi.useRealTimers()
+      }
+    },
+  )
+
   it('names the schedules a settings change ends, on the new runtime’s timeline', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({ wakeupMinutes: 30 })

@@ -2,6 +2,12 @@ import { errorStringField } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
+  BACKGROUND_CHECK_FAILED: {
+    status: 502,
+    message: 'The provider background work check failed.',
+    why: 'The provider returned an unreadable terminal list.',
+    fix: 'Check the provider CLI version and retry.',
+  },
   UPDATE_MANUAL_ONLY: {
     status: 409,
     message: 'This CLI updates from outside the app.',

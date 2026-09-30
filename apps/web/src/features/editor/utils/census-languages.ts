@@ -1,5 +1,5 @@
 import { shikiLanguageForDocument } from '@singapore-editor/core/shiki'
-import { EDITOR_SHIKI_LANGUAGE_MAP } from '@/features/editor/utils/shiki-languages'
+import { HIGHLIGHTING_DOCUMENT_LANGUAGES } from '@singapore-editor/highlighting'
 import { languageIdForFilePath, treeSitterLanguageId } from '@/lib/file-language'
 
 const PRELOAD_FILE_SHARE = 0.005
@@ -10,7 +10,7 @@ export function shikiGrammarsForCensus(
   return languagesAboveFloor(counts, (key) =>
     shikiLanguageForDocument(
       { documentId: key, languageId: languageIdForFilePath(key) },
-      EDITOR_SHIKI_LANGUAGE_MAP,
+      HIGHLIGHTING_DOCUMENT_LANGUAGES,
     ),
   )
 }

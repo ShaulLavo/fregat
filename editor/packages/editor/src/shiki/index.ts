@@ -11,7 +11,12 @@ export {
 } from './theme'
 export { editorThemeFromShikiTheme } from './theme-extract'
 export { editorThemeFromVscodeTheme, VSCODE_THEMES } from './vscode-themes'
-export { canUseShikiWorker, createShikiWorkerOwner, ShikiWorkerOwner } from './workerClient'
+export {
+  canUseShikiWorker,
+  createShikiWorkerOwner,
+  DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
+  ShikiWorkerOwner,
+} from './workerClient'
 
 export { snapshotToEditorTokens, tokenLinesToEditorTokens } from './editor-tokens'
 
@@ -41,7 +46,12 @@ export type {
 } from './theme'
 export type { ShikiThemeLike } from './theme-extract'
 export type { VscodeThemeDefinition, VscodeThemeRegistration } from './vscode-themes'
-export type { ShikiWorkerLanguageRegistration, ShikiWorkerThemeRegistration } from './workerTypes'
+export type {
+  ShikiWorkerHighlightRequest,
+  ShikiWorkerLanguageRegistration,
+  ShikiWorkerThemeRegistration,
+  ShikiWorkerTransportResult,
+} from './workerTypes'
 export type {
   ShikiHighlighterSessionOptions,
   ShikiPreloadRegistrations,

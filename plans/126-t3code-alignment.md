@@ -9,8 +9,15 @@ still need implementation/evidence reconciliation. See the
 Harness batch A and batches D/F landed; batch C has recorded scenario deliveries. Project
 settings and device pairing also exist. Do not schedule those implementations again or treat
 historical open PR numbers as current blockers. Recheck the remaining acceptance cases before
-closing their rows. Upstream is at `d15210cd`, 18 commits after the last delta's `295d7cba`;
-the acceptance pin remains `7445aa73`.
+closing their rows. The reference was refreshed on 2026-09-30 to `c2fa9fc911daeac97df4760f95fc57dca42b84c8`,
+30 commits after `d15210cd`; the acceptance pin remains `7445aa73`.
+
+The [bounded foundations delivery](126-t3code-alignment/bounded-closeout-2026-09-30.md) records
+fresh two-owner lifecycle proofs, partial bulk failures, a scoped Codex background-terminal
+cleanup guard and actual fixture API restart evidence. It merged in
+[PR #210](https://github.com/ShaulLavo/fregat/pull/210) as `4edb43b18` after independent review;
+it shipped to server and web as `20260930T173217Z-4edb43b1-main`. Whole-row statuses and the remaining desktop,
+state-loss and live-account gates stay open.
 
 LIFE-01/02 shipped on 2026-09-20. Rewind/native permissions/PR lookup have an initial deployment and follow-up validation in [delivery evidence](126-t3code-alignment/rewind-permissions-delivery.md); bounded delivery and MCP approval implementation are recorded in [their delivery evidence](126-t3code-alignment/live-delivery-approvals-delivery.md). The active-list exceptions and automatic unarchive are removed; archive eligibility is separate from settlement. See [archive delivery evidence](126-t3code-alignment/archive-delivery.md). The source-derived archive fixture is the first focused conformance case, not completion of Wave 0 or proof of full upstream parity.
 

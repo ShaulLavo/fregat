@@ -51,7 +51,7 @@ test('custom snooze rejects invalid input and persists a duration', async ({ cli
   await waitFor(async () => expect((await h.refresh()).sessions[0]?.snoozedUntil).not.toBeNull())
 })
 
-test('bulk snooze reports skipped archived sessions, retains them selected and Undo changes only successful refs', async ({
+test('bulk snooze reports skipped archived sessions, clears selection and Undo changes only successful refs', async ({
   client,
   server,
 }) => {
@@ -67,7 +67,7 @@ test('bulk snooze reports skipped archived sessions, retains them selected and U
   useSessionMultiSelectStore.setState({ refs, anchor: refs[0]! })
   useSessionSnoozeRequestStore.getState().requestSnooze({ refs, title: 'Selected sessions' })
   await userEvent.click(await screen.findByRole('button', { name: /In 1 hour/ }))
-  await waitFor(() => expect(useSessionMultiSelectStore.getState().refs).toEqual([refs[0]]))
+  await waitFor(() => expect(useSessionMultiSelectStore.getState().refs).toEqual([]))
   const notification = await screen.findByText('1 snoozed, 1 skipped')
   await userEvent.click(
     within(notification.closest('[data-sonner-toast]')!).getByRole('button', { name: 'Undo' }),

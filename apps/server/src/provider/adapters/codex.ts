@@ -1,3 +1,4 @@
+import { hasCodexBackgroundTerminals } from './utils/codex-background-terminals'
 import { createHash } from 'node:crypto'
 import { providerResetCreditOutcomeSchema } from '@workspace/contracts'
 import path from 'node:path'
@@ -633,6 +634,11 @@ export class CodexProviderAdapter
     await this.sessions.get(sessionId)?.interruptTurn(turnId)
   }
 
+  async hasBackgroundWork({ sessionId }: { sessionId: SessionId }) {
+    const session = this.sessions.get(sessionId)
+    return session?.isActive() ? session.hasBackgroundWork() : false
+  }
+
   async stopRuntime({ sessionId }: { sessionId: SessionId }) {
     recordChatPipelineInfo('chat.pipeline.codex_adapter.stop', { sessionId })
     const session = this.sessions.get(sessionId)
@@ -959,6 +965,33 @@ class CodexAppServerSession extends SessionContext {
 
   isActive() {
     return !this.client.isClosed() && this.status !== 'stopped'
+  }
+
+  async hasBackgroundWork() {
+    if (
+      this.isBusy() ||
+      this.pendingApprovals.size ||
+      this.pendingUserInputs.size ||
+      this.client.hasPendingRequests()
+    )
+      return true
+    const live = await hasCodexBackgroundTerminals({
+      threadId: this.providerConversationMarker,
+      deadline: Date.now() + PROVIDER_PROBE_TIMEOUT_MS,
+      read: (params) =>
+        this.client.requestRaw(
+          'thread/backgroundTerminals/list',
+          params,
+          PROVIDER_PROBE_TIMEOUT_MS,
+        ),
+    })
+    return (
+      live ||
+      this.isBusy() ||
+      this.pendingApprovals.size > 0 ||
+      this.pendingUserInputs.size > 0 ||
+      this.client.hasPendingRequests()
+    )
   }
 
   snapshot(): ProviderAdapterRuntime {
@@ -2760,6 +2793,10 @@ class CodexAppServerRpcClient {
 
   isClosed() {
     return this.closed
+  }
+
+  hasPendingRequests() {
+    return this.pending.size > 0
   }
 
   request<Method extends CodexClientRequestMethod>(

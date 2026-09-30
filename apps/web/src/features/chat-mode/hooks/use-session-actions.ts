@@ -1,7 +1,10 @@
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { errorMessage } from '@/lib/error-message'
 import { useSessionSnoozeRequestStore } from '@/features/chat-mode/state/session-snooze-request-store'
-import { removeSuccessfulSelection } from '@/features/chat-mode/state/session-multi-select-store'
+import {
+  removeSuccessfulSelection,
+  useSessionMultiSelectStore,
+} from '@/features/chat-mode/state/session-multi-select-store'
 import { currentSessionLifecyclePolicy } from '@/features/chat-mode/state/session-lifecycle'
 import { canApplyLifecycle } from '@/features/chat-mode/utils/session-lifecycle'
 import { updateSessionRead } from '@/features/chat-mode/state/session-read-actions'
@@ -70,6 +73,7 @@ export function useSessionActions() {
         readonly refs: readonly ScopedSessionRef[]
         readonly change: SessionLifecycleChange
       }) => {
+        if (change.type === 'snooze') useSessionMultiSelectStore.getState().clear()
         const succeeded: ScopedSessionRef[] = []
         const undo: SessionUndoEntry[] = []
         let skipped = 0

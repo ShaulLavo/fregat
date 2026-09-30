@@ -1,7 +1,7 @@
-import type { ComponentProps, CSSProperties } from 'react'
-import type { ThemedToken, TokensResult } from 'shiki/core'
+import type { ComponentProps } from 'react'
+import { highlightLines } from '@singapore-editor/highlighting'
 
-import { useHighlightedCode } from '../hooks/use-highlighted-code'
+import { useHighlightedCode, type HighlightedText } from '../hooks/use-highlighted-code'
 import { completedCodePrefix } from '../utils/highlight'
 
 type HighlightedCodeProps = Omit<ComponentProps<'pre'>, 'children'> & {
@@ -10,9 +10,6 @@ type HighlightedCodeProps = Omit<ComponentProps<'pre'>, 'children'> & {
   readonly incomplete: boolean
   readonly language: string
 }
-
-const TOKEN_CLASS_NAME =
-  'text-[var(--code-token-color,inherit)] dark:text-[var(--shiki-dark,var(--code-token-color,inherit))]'
 
 /**
  * Token markup for one fence, through the shared byte-bounded cache. The
@@ -29,7 +26,8 @@ export function HighlightedCode({ code, incomplete, language, ...props }: Highli
   return (
     <pre {...props}>
       <code className='font-mono'>
-        {highlighted ? renderTokenLines(highlighted) : prefix.highlightable}
+        {highlighted ? renderTokenLines(highlighted) : null}
+        {prefix.highlightable.slice(highlighted?.code.length ?? 0)}
         {trailingText(prefix.highlightable, prefix.trailing)}
       </code>
     </pre>
@@ -43,34 +41,19 @@ function trailingText(highlightable: string, trailing: string) {
   return `\n${trailing}`
 }
 
-function renderTokenLines(highlighted: TokensResult) {
-  const lastLineIndex = highlighted.tokens.length - 1
+// Token colours are theme values computed at runtime, so they can only be inline styles.
+function renderTokenLines(highlighted: HighlightedText) {
+  const lines = highlightLines(highlighted.code, highlighted.result.tokens)
+  const lastLineIndex = lines.length - 1
 
-  return highlighted.tokens.map((line, lineIndex) => (
+  return lines.map((line, lineIndex) => (
     <span key={`line-${lineIndex}`}>
-      {line.map((token, tokenIndex) => (
-        <span className={TOKEN_CLASS_NAME} key={`token-${tokenIndex}`} style={tokenStyle(token)}>
-          {token.content}
+      {line.map((segment) => (
+        <span key={segment.start} style={segment.style ?? undefined}>
+          {segment.text}
         </span>
       ))}
       {lineIndex < lastLineIndex ? '\n' : null}
     </span>
   ))
-}
-
-/** Colours are values shiki computes at runtime, so they can only be inline styles. */
-function tokenStyle(token: ThemedToken): CSSProperties {
-  const style: Record<string, string> = {}
-  if (token.color) style['--code-token-color'] = token.color
-
-  for (const [property, value] of Object.entries(token.htmlStyle ?? {})) {
-    if (value === undefined) continue
-    if (property === 'color') {
-      style['--code-token-color'] = value
-      continue
-    }
-    style[property] = value
-  }
-
-  return style as CSSProperties
 }

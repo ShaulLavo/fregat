@@ -14,6 +14,7 @@ export function createScopedLineTokenizer(
   highlighter: Pick<HighlighterGeneric<string, string>, 'getLanguage' | 'getTheme'>,
   language: string,
   initialTheme: string,
+  maxLineLength: number,
 ): { tokenize: TokenizeLineFn; statesEqual: StatesEqualFn; setTheme: (name: string) => void } {
   const grammar = highlighter.getLanguage(language)
   const styles = new Map<string, ScopeStyle>()
@@ -35,6 +36,14 @@ export function createScopedLineTokenizer(
   const tokenize: TokenizeLineFn = (line, previousState) => {
     const state = previousState instanceof GrammarLineState ? previousState.stack : null
     if (!line) return { tokens: [], state: previousState }
+    // Grammars have no time bound here, so an oversized line stays one plain token and the
+    // grammar state passes through unchanged for the next line.
+    if (line.length > maxLineLength)
+      return {
+        tokens: [scopedToken(line, 0, line.length, styleFor([]))],
+        state: previousState,
+        untokenized: true,
+      }
 
     const result = grammar.tokenizeLine(line, state, 0)
     return {

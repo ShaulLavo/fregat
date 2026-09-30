@@ -1,174 +1,90 @@
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
-import {
-  createShikiHighlighterProvider,
-  createShikiWorkerOwner,
-  type ShikiWorkerOwner,
-} from '@singapore-editor/core/shiki'
 import type { DiffSyntaxBackend } from '@singapore-editor/diff'
-import {
-  createTreeSitterSyntaxProvider,
-  createTreeSitterWorkerBackend,
-  type TreeSitterBackend,
-  type TreeSitterSyntaxProvider,
-} from '@singapore-editor/tree-sitter'
-import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
+import type {
+  HighlightingThemeSelection,
+  HighlightingThemeSource,
+} from '@singapore-editor/highlighting'
+import type { TreeSitterSyntaxProvider } from '@singapore-editor/tree-sitter'
 
-import {
-  workspacePreloadLanguages,
-  workspaceWarmLanguages,
-} from '@/features/editor/state/language-census'
-import { clearPreparedDiffSyntax } from '@/features/editor/state/prepared-diff-syntax'
 import {
   activeEditorThemeUsesShiki,
   activeShikiThemeId,
   subscribeActiveShikiTheme,
-  getResolvedShikiThemeContentHash,
-  resolveEditorShikiThemeRegistration,
 } from '@/features/editor/state/color-theme-store'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
-import {
-  EDITOR_SHIKI_LANGUAGE_MAP,
-  resolveShikiLanguageRegistrations,
-} from '@/features/editor/utils/shiki-languages'
 import { isBuiltinEditorThemeId } from '@/lib/code-theme/utils/catalog'
+import { disposeHighlightingService, highlightingService } from '@/lib/highlighting/state/service'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
-import { log } from '@/lib/client-logging'
 
-let treeSitterSyntaxProvider: TreeSitterSyntaxProvider | null = null
-let treeSitterSyntaxBackend: TreeSitterBackend | null = null
-let shikiHighlighterProvider: EditorHighlighterProvider | null = null
-let shikiWorkerOwner: ShikiWorkerOwner | null = null
+/** Which palette colors documents: an imported theme, the editor palette, or nothing. */
+export type EditorSyntaxColors = 'disabled' | HighlightingThemeSelection['format']
 
-export type EditorSyntaxHighlightingSource = 'disabled' | 'shiki' | 'tree-sitter'
-
-export type EditorDiffSyntaxConfiguration = {
+export type EditorDiffSyntax = {
   readonly backend: DiffSyntaxBackend
-  readonly enabled: boolean
-  readonly source: EditorSyntaxHighlightingSource
+  /** The palette prepared diff syntax is kept under; null while highlighting is off. */
+  readonly theme: HighlightingThemeSource | null
+}
+
+/** The active palette: an imported theme colors documents, a built-in one leaves it to captures. */
+export const EDITOR_THEME_SOURCE: HighlightingThemeSource = {
+  current: () =>
+    activeEditorThemeUsesShiki()
+      ? { format: 'vscode', id: activeShikiThemeId() }
+      : { format: 'editor' },
+  subscribe: subscribeActiveShikiTheme,
+  importedFallback: activeShikiThemeId,
+}
+
+// Markdown structure and colors share one document parser.
+export const EDITOR_PALETTE_SOURCE: HighlightingThemeSource = {
+  current: () => ({ format: 'editor' }),
 }
 
 /** Markdown structure and colors share one document parser. */
-export function editorSyntaxHighlightingSource(
+export function editorSyntaxColors(
   selectedThemeId?: string,
   languageId?: string | null,
-): EditorSyntaxHighlightingSource {
+): EditorSyntaxColors {
   if (!readSettingsMirror()['editor.syntaxHighlighting.enabled']) return 'disabled'
   if (editorPerformanceFeatureDisabled('syntax')) return 'disabled'
-  if (languageId === 'markdown' || languageId === 'mdx') return 'tree-sitter'
+  if (languageId === 'markdown' || languageId === 'mdx') return 'editor'
 
-  const usesShiki = selectedThemeId
+  const imported = selectedThemeId
     ? !isBuiltinEditorThemeId(selectedThemeId)
     : activeEditorThemeUsesShiki()
-  return usesShiki ? 'shiki' : 'tree-sitter'
+  return imported ? 'vscode' : 'editor'
 }
 
-export function editorDiffSyntaxConfiguration(
-  source: EditorSyntaxHighlightingSource,
-): EditorDiffSyntaxConfiguration {
-  if (source === 'disabled') {
-    return {
-      backend: { kind: 'tree-sitter', provider: null },
-      enabled: false,
-      source,
-    }
-  }
-  if (source === 'shiki') {
-    return {
-      backend: { kind: 'highlighter', provider: editorShikiHighlighterProvider() },
-      enabled: true,
-      source,
-    }
-  }
-
-  return {
-    backend: { kind: 'tree-sitter', provider: editorTreeSitterSyntaxProvider() },
-    enabled: true,
-    source,
-  }
+/** The theme source documents under these colors take their providers from. */
+export function editorSyntaxTheme(colors: EditorSyntaxColors): HighlightingThemeSource | null {
+  if (colors === 'disabled') return null
+  return colors === 'vscode' ? EDITOR_THEME_SOURCE : EDITOR_PALETTE_SOURCE
 }
 
-export function editorShikiHighlighterProvider(): EditorHighlighterProvider {
-  if (shikiHighlighterProvider) return shikiHighlighterProvider
+export function editorDiffSyntax(colors: EditorSyntaxColors): EditorDiffSyntax {
+  const theme = editorSyntaxTheme(colors)
+  if (!theme) return { backend: { kind: 'tree-sitter', provider: null }, theme }
 
-  shikiHighlighterProvider = createShikiHighlighterProvider({
-    languages: EDITOR_SHIKI_LANGUAGE_MAP,
-    preloadLanguages: workspacePreloadLanguages,
-    onThemeChanged: subscribeActiveShikiTheme,
-    resolveLanguage: resolveShikiLanguageRegistrations,
-    resolveTheme: resolveEditorShikiThemeRegistration,
-    theme: resolveShikiThemeForSession,
-    workerOwner: editorShikiWorkerOwner(),
-  })
-  return shikiHighlighterProvider
+  return { backend: highlightingService().documentBackend(theme), theme }
 }
 
-function editorShikiWorkerOwner(): ShikiWorkerOwner {
-  if (shikiWorkerOwner) return shikiWorkerOwner
-
-  shikiWorkerOwner = createShikiWorkerOwner()
-  return shikiWorkerOwner
+export function editorHighlighterProvider(): EditorHighlighterProvider {
+  return highlightingService().highlighterProvider(EDITOR_THEME_SOURCE)
 }
 
-export async function disposeEditorShikiWorkerOwner() {
-  clearPreparedDiffSyntax('shiki')
-  const owner = shikiWorkerOwner
-  shikiHighlighterProvider = null
-  shikiWorkerOwner = null
-  await owner?.dispose?.()
+export function editorSyntaxProvider(): TreeSitterSyntaxProvider {
+  return highlightingService().syntaxProvider()
 }
 
-export function editorTreeSitterSyntaxProvider(): TreeSitterSyntaxProvider {
-  if (treeSitterSyntaxProvider) return treeSitterSyntaxProvider
-
-  const backend = createTreeSitterWorkerBackend()
-  const provider = createTreeSitterSyntaxProvider({
-    backend,
-    warmLanguages: workspaceWarmLanguages,
-  })
-  for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS) {
-    provider.registerLanguage(contribution, { replace: true })
-  }
-
-  treeSitterSyntaxBackend = backend
-  treeSitterSyntaxProvider = provider
-  return provider
+/** Stops the workers along with the diff parses kept on their sessions. */
+export function disposeEditorSyntaxHighlighting(): Promise<void> {
+  return disposeHighlightingService()
 }
 
-export async function disposeEditorTreeSitterSyntaxProvider() {
-  clearPreparedDiffSyntax('tree-sitter')
-  const backend = treeSitterSyntaxBackend
-  treeSitterSyntaxBackend = null
-  treeSitterSyntaxProvider = null
-  await backend?.dispose?.()
+export function awaitEditorSyntaxWorkerIdleFences(): Promise<void> {
+  return highlightingService().awaitIdle()
 }
 
-export async function awaitEditorSyntaxWorkerIdleFences(): Promise<void> {
-  await Promise.all([
-    treeSitterSyntaxBackend?.awaitIdleFence?.() ?? Promise.resolve(),
-    shikiWorkerOwner?.awaitIdleFence() ?? Promise.resolve(),
-  ])
-}
-
-export async function awaitEditorTreeSitterRuntimeSessionIdle(
-  runtimeSessionId: string,
-): Promise<void> {
-  await treeSitterSyntaxBackend?.awaitRuntimeSessionIdle?.(runtimeSessionId)
-}
-
-export async function awaitEditorShikiRuntimeSessionIdle(runtimeSessionId: string): Promise<void> {
-  await shikiWorkerOwner?.awaitRuntimeSessionIdle(runtimeSessionId)
-}
-
-/** Logs the exact theme handed to every shared Shiki session. */
-function resolveShikiThemeForSession(): string {
-  const themeId = activeShikiThemeId()
-  log.debug({
-    action: 'editor.color-theme.shiki_resolved',
-    area: 'editor',
-    contentHash: getResolvedShikiThemeContentHash(themeId),
-    registrationOwner: 'app',
-    themeId,
-  })
-
-  return themeId
+export function awaitEditorSyntaxRuntimeSessionIdle(runtimeSessionId: string): Promise<void> {
+  return highlightingService().awaitRuntimeSessionIdle(runtimeSessionId)
 }

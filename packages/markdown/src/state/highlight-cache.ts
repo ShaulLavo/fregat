@@ -1,4 +1,4 @@
-import type { TokensResult } from 'shiki/core'
+import type { HighlightResult } from '@singapore-editor/highlighting'
 
 import { ByteBoundedLru } from '../utils/byte-bounded-lru'
 
@@ -11,7 +11,7 @@ import { ByteBoundedLru } from '../utils/byte-bounded-lru'
 const MAX_HIGHLIGHT_ENTRIES = 300
 const MAX_HIGHLIGHT_BYTES = 24 * 1024 * 1024
 
-export const highlightCache = new ByteBoundedLru<TokensResult>(
+export const highlightCache = new ByteBoundedLru<HighlightResult>(
   MAX_HIGHLIGHT_ENTRIES,
   MAX_HIGHLIGHT_BYTES,
 )

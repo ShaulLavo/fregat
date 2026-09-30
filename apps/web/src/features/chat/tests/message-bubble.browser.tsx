@@ -541,8 +541,5 @@ function markdownTokenSpans() {
 }
 
 function isTokenSpan(element: Element): element is HTMLElement {
-  return (
-    element instanceof HTMLElement &&
-    element.style.getPropertyValue('--code-token-color').trim().length > 0
-  )
+  return element instanceof HTMLElement && element.style.color.length > 0
 }

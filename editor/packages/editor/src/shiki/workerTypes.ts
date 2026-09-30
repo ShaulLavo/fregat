@@ -28,6 +28,8 @@ export type ShikiWorkerDocumentOptions = {
   readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
   readonly themeRegistration: ShikiWorkerThemeRegistration
   readonly themeRegistrations: readonly ShikiWorkerThemeRegistration[]
+  /** Longest line, in UTF-16 units, that is tokenized; longer lines stay plain. */
+  readonly maxLineLength: number
 }
 
 export type ShikiWorkerOpenRequest = ShikiWorkerDocumentOptions & {
@@ -78,6 +80,18 @@ export type ShikiWorkerThemeRequest = {
   readonly themeRegistrations: readonly ShikiWorkerThemeRegistration[]
 }
 
+// A standalone snippet: tokenized whole and forgotten, so no document state outlives the reply. The
+// theme name is revision-qualified by the caller, so same-name themes with other content never meet.
+export type ShikiWorkerHighlightRequest = {
+  readonly type: 'highlight'
+  readonly text: string
+  readonly lang: string | null
+  readonly theme: string
+  readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
+  readonly themeRegistration: ShikiWorkerThemeRegistration
+  readonly maxLineLength: number
+}
+
 export type ShikiWorkerPreloadRequest = {
   readonly type: 'preload'
   readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
@@ -94,6 +108,7 @@ export type ShikiWorkerRequestPayload =
   | ShikiWorkerDisposeRequest
   | ShikiWorkerPreloadRequest
   | ShikiWorkerThemeRequest
+  | ShikiWorkerHighlightRequest
 
 // An edit answers with the re-tokenized lines only; the client splices them into the full
 // packed tokens it kept from the last open, so a keystroke never ships the whole document back.
@@ -102,6 +117,8 @@ export type ShikiWorkerTransportResult = {
   readonly tokensPacked?: PackedEditorTokens
   readonly patchesPacked?: readonly PackedEditorTokenPatch[]
   readonly theme?: EditorTheme
+  /** Lines of the tokenized text left plain by the tokenization limit. */
+  readonly untokenizedLines?: number
 }
 
 export type ShikiWorkerRequest = {

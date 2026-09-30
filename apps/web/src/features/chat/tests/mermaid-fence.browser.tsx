@@ -213,7 +213,7 @@ describe('mermaid fences', () => {
     await vi.waitFor(() => expect(document.querySelector('.katex')).not.toBeNull())
     await vi.waitFor(() =>
       expect(
-        document.querySelector('[data-language="typescript"] [style*="--shiki-dark"]'),
+        document.querySelector('[data-language="typescript"] span[style*="color"]'),
       ).not.toBeNull(),
     )
   }, 30_000)

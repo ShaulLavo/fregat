@@ -1,3 +1,4 @@
+import { checkoutRoot } from '../paths'
 import { ok } from 'node:assert/strict'
 import {
   orchestrationSessionDetailSnapshotSchema,
@@ -91,9 +92,12 @@ async function platformWorktree(page: Page, base: string) {
   const deadline = Date.now() + 10_000
   for (;;) {
     const snapshot = await readShell(page, base)
-    const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
+    const worktree = snapshot.worktrees.find((item) => item.canonicalPath === checkoutRoot)
     if (worktree) return { snapshot, worktree }
-    ok(Date.now() < deadline, 'Platform worktree must be registered')
+    ok(
+      Date.now() < deadline,
+      `Platform worktree must be registered: expected ${checkoutRoot}, observed ${snapshot.worktrees.map((item) => item.path).join(', ')}`,
+    )
     await page.waitForTimeout(200)
   }
 }
@@ -115,13 +119,14 @@ export async function createSession(
   workspace: Pick<ChatWorkspace, 'base' | 'project' | 'worktree'>,
   sessionId: string,
   title: string,
+  modelSelection = idleModelSelection(workspace.project),
 ) {
   await dispatch(page, workspace.base, {
     type: 'session.create',
     sessionId,
     title,
     worktreeTarget: { kind: 'current', worktreeId: workspace.worktree.id },
-    modelSelection: idleModelSelection(workspace.project),
+    modelSelection,
   })
 }
 

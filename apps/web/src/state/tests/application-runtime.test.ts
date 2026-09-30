@@ -1,6 +1,5 @@
 import { workspacePreloadLanguages } from '@/features/editor/state/language-census'
 import { languageCensusQueryOptions } from '@/features/editor/utils/language-census-query'
-import { EDITOR_SHIKI_PRELOAD_LANGUAGES } from '@/features/editor/utils/shiki-languages'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { activeServerOrigin, setActiveServerOrigin, setClient } from '@/lib/client'
@@ -93,7 +92,7 @@ test('the active editor serves its census without a React tree, and a machine sw
     primaryQueryClient().removeQueries({ queryKey: settingsKeys.document() })
   } finally {
     application.dispose()
-    expect(workspacePreloadLanguages()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+    expect(workspacePreloadLanguages()).toBeNull()
     queryClientFor(originA).clear()
     queryClientFor(originB).clear()
     useEnvironmentsStore.setState(previousState, true)
@@ -173,7 +172,7 @@ test('a machine refused before its first handshake keeps its editor suspended un
     discovery.mockClear()
     openRepo()
     expect(discovery).not.toHaveBeenCalled()
-    expect(workspacePreloadLanguages()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+    expect(workspacePreloadLanguages()).toBeNull()
 
     useEnvironmentsStore.setState((state) => ({
       connectionByOrigin: {

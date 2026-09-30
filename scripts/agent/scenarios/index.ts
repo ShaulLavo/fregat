@@ -57,6 +57,7 @@ import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
 import { backgroundLiveness } from './background-liveness'
 import { spinnerPalette } from './spinner-palette'
+import { sessionBulkFailures } from './session-bulk-failures'
 import { sessionLifecycle } from './session-lifecycle'
 import { sessionUndo } from './session-undo'
 import { asyncQuestions } from './async-questions'
@@ -208,6 +209,7 @@ import { physicalChat } from './physical-chat'
 import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { settingsDependentRow } from './settings-dependent-row'
+import { settingsTokenizationLimit } from './settings-tokenization-limit'
 import { settingsRowDetails } from './settings-row-details'
 import { settingsKeybindings } from './settings-keybindings'
 import { tailFollow } from './tail-follow'
@@ -250,6 +252,7 @@ import { editorExternalEdit } from './editor-external-edit'
 import { editorLinkedPackage } from './editor-linked-package'
 import { editorOfflineResync } from './editor-offline-resync'
 import { editorThemePreview } from './editor-theme-preview'
+import { codeThemeNativePreview } from './code-theme-native-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
 import { bundleWallpapers } from './bundle-wallpapers'
@@ -280,6 +283,7 @@ import { settingsFocus } from './settings-focus'
 import { settingsAppearanceRows } from './settings-appearance-rows'
 import { settingsWallpaperScroll } from './settings-wallpaper-scroll'
 import { settingsAppearanceOpen } from './settings-appearance-open'
+import { editorSettingsPreviewTyping } from './editor-settings-preview-typing'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
 import { sidebarSettingsButton } from './sidebar-settings-button'
@@ -423,6 +427,7 @@ export const scenarios: readonly Scenario[] = [
   sessionSearchEnvironments,
   projectGrouping,
   sessionLifecycle,
+  sessionBulkFailures,
   sessionUndo,
   cachedProtocolStartup,
   primaryIdentityReplacement,
@@ -590,6 +595,7 @@ export const scenarios: readonly Scenario[] = [
   connectionFrame,
   settingsValueGrids,
   settingsDependentRow,
+  settingsTokenizationLimit,
   settingsRowDetails,
   settingsKeybindings,
   tailFollow,
@@ -611,6 +617,7 @@ export const scenarios: readonly Scenario[] = [
   settingsProviderUpdate,
   claudeUsageImport,
   editorThemePreview,
+  codeThemeNativePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),
   editorNativeCoverage('dark'),
@@ -668,6 +675,7 @@ export const scenarios: readonly Scenario[] = [
   settingsFocus,
   settingsAppearanceRows,
   settingsAppearanceOpen,
+  editorSettingsPreviewTyping,
   settingsWallpaperScroll,
   settingsColdLoad,
   settingsOpen,

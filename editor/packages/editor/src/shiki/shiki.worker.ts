@@ -14,6 +14,7 @@ import { editorThemeFromShikiTheme, type ShikiThemeLike } from './theme-extract'
 import type {
   ShikiWorkerDocumentOptions,
   ShikiWorkerEditRequest,
+  ShikiWorkerHighlightRequest,
   ShikiWorkerLanguageRegistration,
   ShikiWorkerOpenRequest,
   ShikiWorkerPreloadRequest,
@@ -94,6 +95,9 @@ const runRequest = (
   if (payload.type === 'preload') {
     return preloadRegistrations(payload)
   }
+  if (payload.type === 'highlight') {
+    return highlightSnippet(payload)
+  }
 
   return Promise.allSettled(Array.from(activeWorkerTasks)).then(() => {
     disposeAll()
@@ -133,6 +137,7 @@ const openDocument = async (
     theme: payload.theme,
     code: payload.text,
     highlighter,
+    maxLineLength: payload.maxLineLength,
   })
 
   const state = {
@@ -168,6 +173,7 @@ const editDocument = async (
       newEndOffset: patch.newEndOffset,
       tokensPacked: packTokenLines(patch.lines, patch.fromOffset),
     })),
+    untokenizedLines: existing.tokenizer.untokenizedLineCount(),
     theme: editorThemeFromHighlighter(
       existing.highlighter,
       existing.theme,
@@ -277,6 +283,38 @@ const loadTheme = async (payload: ShikiWorkerThemeRequest): Promise<ShikiWorkerT
   }
 }
 
+/**
+ * Snippets share one highlighter keyed by no theme set, so a preview of forty themes loads forty
+ * themes into one engine instead of building forty engines.
+ */
+const highlightSnippet = async (
+  payload: ShikiWorkerHighlightRequest,
+): Promise<ShikiWorkerTransportResult> => {
+  const highlighter = await ensureHighlighterFor([], [])
+  if (!highlighter.getLoadedThemes().includes(payload.theme)) {
+    await highlighter.loadTheme({
+      ...payload.themeRegistration,
+      name: payload.theme,
+    } as unknown as ThemeRegistrationAny)
+  }
+  const theme = editorThemeFromHighlighter(highlighter, payload.theme, payload.themeRegistration)
+  if (!payload.lang || payload.text.length === 0) return { theme }
+
+  await ensureLanguages(highlighter, uniqueLanguageRegistrations(payload.languageRegistrations))
+  const { tokenizer } = await createIncrementalTokenizer({
+    lang: payload.lang,
+    theme: payload.theme,
+    code: payload.text,
+    highlighter,
+    maxLineLength: payload.maxLineLength,
+  })
+  return {
+    tokensPacked: snapshotToPackedEditorTokens(tokenizer.getSnapshot()),
+    theme,
+    untokenizedLines: tokenizer.untokenizedLineCount(),
+  }
+}
+
 const preloadRegistrations = async (payload: ShikiWorkerPreloadRequest): Promise<undefined> => {
   const themes = uniqueThemeRegistrations(payload.themeRegistrations)
   const highlighter = await ensureHighlighterFor([], themes)
@@ -290,6 +328,7 @@ const preloadRegistrations = async (payload: ShikiWorkerPreloadRequest): Promise
 const resultFromState = (state: DocumentState): ShikiWorkerTransportResult => ({
   documentId: state.documentId,
   tokensPacked: snapshotToPackedEditorTokens(state.tokenizer.getSnapshot()),
+  untokenizedLines: state.tokenizer.untokenizedLineCount(),
   theme: editorThemeFromHighlighter(state.highlighter, state.theme, state.themeRegistration),
 })
 

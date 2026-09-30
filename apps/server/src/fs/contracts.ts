@@ -50,11 +50,6 @@ export const languageCensusQuerySchema = v.object({
   root: v.optional(pathSchema, ''),
 })
 
-export const appWriteQuerySchema = v.object({
-  path: pathSchema,
-  version: v.pipe(v.string(), v.maxLength(128)),
-})
-
 export const readSessionParamsSchema = v.object({ id: v.pipe(v.string(), v.uuid()) })
 const rangeOffsetSchema = v.pipe(v.string(), v.toNumber(), v.safeInteger(), v.minValue(0))
 export const readRangeQuerySchema = v.object({ start: rangeOffsetSchema, end: rangeOffsetSchema })

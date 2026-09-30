@@ -136,6 +136,12 @@ export function removePending() {
 }
 
 export async function buildWeb(release: Release) {
+  log('web', 'build workspaces')
+  await runOrFail(
+    ['bun', 'run', 'build:workspaces'],
+    checkoutRoot,
+    path.join(release.directory, 'web-workspaces.log'),
+  )
   log('web', 'typecheck')
   await runOrFail(
     ['bunx', 'tsc', '--build'],

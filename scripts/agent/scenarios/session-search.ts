@@ -1,3 +1,4 @@
+import { checkoutRoot } from '../paths'
 import { ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
@@ -7,6 +8,7 @@ import { connectSecondOwner, type SecondOwner } from '../second-owner'
 import { collectOrchestrationBases, dispatch, readShell, typePrompt } from './chat-verification'
 import {
   registerFixtureProject,
+  installConversationProvider,
   withConversationProvider,
   type NativeProvider,
 } from './native-provider-verification'
@@ -14,8 +16,8 @@ import {
 type SearchOwner = { readonly base: string; readonly worktreeId: string }
 
 async function platformWorktree(page: Page, base: string) {
-  const worktree = (await readShell(page, base)).worktrees.find((item) =>
-    item.path.endsWith('/projects/platform'),
+  const worktree = (await readShell(page, base)).worktrees.find(
+    (item) => item.canonicalPath === checkoutRoot,
   )
   ok(worktree, 'The primary owner needs the Platform worktree')
   return worktree.id
@@ -73,9 +75,16 @@ async function searchOn(
   owners: { readonly primary: SearchOwner; readonly searched: SearchOwner },
 ) {
   const crossOwner = owners.primary.base !== owners.searched.base
-  await withConversationProvider(page, owners.searched.base, 'session-search', (native) =>
-    findReply(page, step, { ...owners, crossOwner, native }),
-  )
+  const primaryNative = crossOwner
+    ? await installConversationProvider(page, owners.primary.base, 'search-primary')
+    : null
+  try {
+    await withConversationProvider(page, owners.searched.base, 'session-search', (native) =>
+      findReply(page, step, { ...owners, crossOwner, native, primaryNative }),
+    )
+  } finally {
+    await primaryNative?.remove()
+  }
 }
 
 async function findReply(
@@ -86,9 +95,10 @@ async function findReply(
     readonly searched: SearchOwner
     readonly crossOwner: boolean
     readonly native: NativeProvider
+    readonly primaryNative: NativeProvider | null
   },
 ) {
-  const { primary, searched, crossOwner, native } = input
+  const { primary, searched, crossOwner, native, primaryNative } = input
   const sessionId = crypto.randomUUID()
   const title = `Search verification ${sessionId.slice(0, 8)}`
   const needle = `hiddenneedle${sessionId.replaceAll('-', '')}`
@@ -108,8 +118,7 @@ async function findReply(
         type: 'session.create',
         sessionId,
         title: primaryTitle,
-        // No turn runs here, so any model will do.
-        modelSelection: native.model,
+        modelSelection: primaryNative?.model ?? native.model,
         worktreeTarget: { kind: 'current', worktreeId: primary.worktreeId },
       })
       primaryFixture = true

@@ -164,6 +164,34 @@ describe('auto-closing pairs', () => {
   })
 
   // A closer the editor did not insert must still be typeable.
+  it('revokes outer pair ownership after a foreign edit followed by ordinary typing', () => {
+    const session = createDocumentSession('')
+    editor.attachSession(session, { languageId: 'typescript' })
+    editor.focus()
+    type('(')
+    session.applyEdits([{ from: 1, to: 1, text: 'a' }])
+    editor.setSelection(2, 2)
+
+    type('b', '(', ')', ')')
+
+    expect(editor.materializeFullText()).toBe('(ab()))')
+  })
+
+  it('keeps outer closers tracked while inserting and typing over nested pairs', () => {
+    type('(', '(', 'a', ')', ')')
+
+    expect(editor.materializeFullText()).toBe('((a))')
+    expect(editor.getState().cursor).toMatchObject({ column: 5, row: 0 })
+  })
+
+  it('types a function with nested pairs without leaving extra closing delimiters', () => {
+    const text = 'function burst() { return [1, 2, 3].map((n) => n * 2) }'
+    type(...text)
+
+    expect(editor.materializeFullText()).toBe(text)
+    expect(editor.getState().cursor).toMatchObject({ column: text.length, row: 0 })
+  })
+
   it('inserts a closer that was not auto-inserted', () => {
     editor.setText(')')
     editor.setSelection(0, 0)

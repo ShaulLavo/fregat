@@ -81,7 +81,8 @@
         "@singapore-editor/markdown#build",
         "@singapore-editor/scope-lines#build",
         "@singapore-editor/tree-sitter-languages#build"
-      ]
+      ],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/stress/src/fixtures.ts"]
     },
     "@singapore-editor/react#typecheck": {
       "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]

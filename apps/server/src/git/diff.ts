@@ -227,14 +227,18 @@ function rewriteBlobPatchLine(
 }
 
 function diffGitPath(line: string) {
+  const quoted = / ("b\/(?:[^"\\]|\\.)*")$/.exec(line)
+  if (quoted?.[1]) return unquoteGitPath(quoted[1]).slice(2)
+
   const match = /^diff --git a\/(.+) b\/(.+)$/.exec(line)
-  return unquoteGitPath(match?.[2] ?? '')
+  return match?.[2] ?? ''
 }
 
 function diffPath(rootPath: string, line: string, prefix: 'a/' | 'b/') {
-  const value = line.slice(4)
+  // Git ends a `---`/`+++` name holding a space with a tab, for `patch`.
+  const value = unquoteGitPath(line.slice(4).replace(/\t$/, ''))
   if (value === '/dev/null') return undefined
   if (!value.startsWith(prefix)) return undefined
 
-  return joinPath(rootPath, unquoteGitPath(value.slice(2)))
+  return joinPath(rootPath, value.slice(2))
 }
