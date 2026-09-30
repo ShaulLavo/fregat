@@ -180,7 +180,7 @@ describe('plain selection parity with pinned upstream formatter', () => {
     }
   })
 
-  it('keeps rectangle row separators across verified upstream page boundaries', async () => {
+  it('matches native rectangle formatting across verified upstream page boundaries', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 80, rows: 3, cellHeight: 20, cellWidth: 10 })
     gesture = new GhosttySelectionGesture(terminal)
@@ -213,12 +213,12 @@ describe('plain selection parity with pinned upstream formatter', () => {
       .join('')
     expect(native).not.toBe(expected)
     for (const unwrap of [false, true]) {
-      expect(gesture.getSelection({ unwrap })).toBe(expected)
+      expect(gesture.getSelection({ unwrap })).toBe(native)
       expect(terminal.getSelection({ unwrap })).toBe(native)
     }
   })
 
-  it('includes the wrapped wide glyph across a verified upstream page boundary', async () => {
+  it('matches native wrapped wide-glyph endpoints across a verified upstream page boundary', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 80, rows: 3 })
     gesture = new GhosttySelectionGesture(terminal)
@@ -233,7 +233,7 @@ describe('plain selection parity with pinned upstream formatter', () => {
       { text: '界' + 'a'.repeat(77), wrapped: true },
     ])
     gesture.selectRange({ x: 0, y: row }, { x: 79, y: row })
-    expect(gesture.getSelection({ unwrap: true })).toBe('界' + 'a'.repeat(77) + '界')
+    expect(gesture.getSelection({ unwrap: true })).toBe(terminal.getSelection({ unwrap: true }))
     expect(terminal.getSelection({ unwrap: true })).toBe('界' + 'a'.repeat(77))
     expect(gesture.getSelection({ unwrap: false })).toBe(terminal.getSelection({ unwrap: false }))
   })

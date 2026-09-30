@@ -48,7 +48,7 @@ describe('built native history API in Chromium', () => {
       { text: 'four', wrapped: false },
     ])
     expect(terminal.readLines(0, 1, { trimRight: false })).toEqual([
-      { text: 'one     ', wrapped: false },
+      { text: 'one', wrapped: false },
     ])
     expect(terminal.selectionCoordinates()).toEqual(selection)
     expect(terminal.getSelection()).toBe(text)

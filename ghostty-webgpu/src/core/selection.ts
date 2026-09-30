@@ -12,7 +12,6 @@ import {
 } from './abi.js'
 import type { AbiLayout } from './abi.js'
 import { assertGhosttyResult, createGhosttyError } from './error.js'
-import { readPlainSelection } from './grid-text.js'
 import { requireLayout } from './memory.js'
 import type { GhosttyRuntime } from './runtime.js'
 import type { GhosttyTerminal } from './terminal.js'
@@ -368,12 +367,7 @@ export class GhosttySelectionGesture {
 
   getSelection(options: TerminalSelectionFormatOptions = {}): string | undefined {
     this.ensureActive()
-    if (options.format !== undefined && options.format !== 'plain') {
-      return this.terminal.getSelection(options)
-    }
-    const selection = this.coordinates()
-    if (!selection) return undefined
-    return readPlainSelection(this.terminal, selection, options)
+    return this.terminal.getSelection(options)
   }
 
   coordinates(): SelectionCoordinates | undefined {

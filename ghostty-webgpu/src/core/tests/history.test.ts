@@ -33,7 +33,7 @@ describe('terminal history', () => {
     expect(terminal.readLines(0, 1)).toEqual([{ text: retained[0], wrapped: false }])
   })
 
-  it('trims trailing blanks by default and preserves grid padding on request', async () => {
+  it('trims trailing written spaces by default and preserves them on request', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 8, rows: 3 })
     terminal.write(' a  \r\n\r\n b')
@@ -43,10 +43,45 @@ describe('terminal history', () => {
       { text: ' b', wrapped: false },
     ])
     expect(terminal.readLines(0, 3, { trimRight: false })).toEqual([
-      { text: ' a      ', wrapped: false },
-      { text: '        ', wrapped: false },
-      { text: ' b      ', wrapped: false },
+      { text: ' a  ', wrapped: false },
+      { text: '', wrapped: false },
+      { text: ' b', wrapped: false },
     ])
+  })
+
+  it('keeps leading, interior, and trailing empty row indexes when native formatting omits the tail', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 8, rows: 3 })
+    terminal.write('\r\none\r\n\r\nfour\r\n\r\n')
+    const expected = ['', 'one', '', 'four', '', ''].map((text) => ({ text, wrapped: false }))
+    expect(terminal.readLines(0, Infinity)).toEqual(expected)
+    expect(terminal.readLines(2, Infinity)).toEqual(expected.slice(2))
+    expect(terminal.readLines(4, Infinity, { trimRight: false })).toEqual(expected.slice(4))
+    terminal.selectAll()
+    expect(
+      terminal
+        .readLines(1, 4, { trimRight: false })
+        .map((line) => line.text)
+        .join('\n'),
+    ).toBe(terminal.getSelection({ trim: false, unwrap: false }))
+  })
+
+  it('preserves written spaces and complete combining-space graphemes through native range formatting', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 8, rows: 3 })
+    terminal.write('x ́  \r\n ́y \r\n  　')
+    expect(terminal.readLines(0, 3)).toEqual([
+      { text: 'x ́', wrapped: false },
+      { text: ' ́y', wrapped: false },
+      { text: '  　', wrapped: false },
+    ])
+    terminal.selectAll()
+    expect(
+      terminal
+        .readLines(0, 3, { trimRight: false })
+        .map((line) => line.text)
+        .join('\n'),
+    ).toBe(terminal.getSelection({ trim: false, unwrap: false }))
   })
 
   it('reads wide, combining, ZWJ, and large grapheme clusters without spacer cells', async () => {
@@ -55,13 +90,12 @@ describe('terminal history', () => {
     const text = '界é👩‍💻'
     const large = `a${'́'.repeat(64)}`
     terminal.write(text)
-    const padding = terminal.size.columns - terminal.cursor.x
     terminal.write(`\r\n${large}`)
     expect(terminal.readLines(0, 2)).toEqual([
       { text, wrapped: false },
       { text: large, wrapped: false },
     ])
-    expect(terminal.readLines(0, 1, { trimRight: false })[0]?.text).toBe(text + ' '.repeat(padding))
+    expect(terminal.readLines(0, 1, { trimRight: false })[0]?.text).toBe(text)
   })
 
   it('reports soft wraps and skips the spacer before a wrapped wide character', async () => {
@@ -75,7 +109,7 @@ describe('terminal history', () => {
     ])
     expect(terminal.readLines(0, 2, { trimRight: false })).toEqual([
       { text: 'abc', wrapped: true },
-      { text: '界z ', wrapped: false },
+      { text: '界z', wrapped: false },
     ])
   })
 

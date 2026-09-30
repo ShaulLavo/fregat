@@ -117,7 +117,7 @@ export interface TerminalLine {
 }
 
 export interface ReadLinesOptions {
-  /** Drop trailing blank cells and spaces. Defaults to true. */
+  /** Drop trailing U+0020 spaces. Native text omits empty grid padding. Defaults to true. */
   trimRight?: boolean
 }
 
