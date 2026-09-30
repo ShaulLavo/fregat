@@ -7,7 +7,7 @@ import type { Browser, Page } from 'playwright'
 
 import { createEvidence, type Evidence } from './evidence'
 import { formatLogEvent, readLogs } from './logs'
-import { attachObserver, observedProblems, serializable } from './observe.mjs'
+import { attachObserver, observedProblems, serializable, type Observed } from './observe.mjs'
 import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
 import { settleRunningAnimations, waitForApp } from './selectors'
 import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
@@ -280,7 +280,7 @@ async function look(options: Options) {
     }
     const health = options.site
       ? { ok: ready, reasons: ready ? [] : ['main, fonts or images did not become ready'] }
-      : await doctor(page, options.url, ready)
+      : await doctor(page, options.url, ready, observed)
     const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
     await evidence.json('observed.json', { health, problems, ...serializable(observed) })
     const lines = [
@@ -767,13 +767,30 @@ async function open(page: Page, url: string) {
   }
 }
 
-async function doctor(page: Page, url: string, ready: boolean) {
+async function doctor(page: Page, url: string, ready: boolean, observed: Observed) {
   const reasons: string[] = []
   if (!ready) reasons.push('window toolbar never rendered')
   const release = await page.request.get(`${apiBase(url)}release`).catch(() => null)
   if (!release?.ok()) reasons.push('release route did not answer')
   const errors = await page.locator('[role="alert"]').count()
   if (errors > 0) reasons.push(`${errors} alert(s) on screen`)
+  const frontendTypes = new Set(['document', 'script', 'stylesheet'])
+  for (const error of observed.errors) reasons.push(`page error: ${error}`)
+  for (const response of observed.failedResponses) {
+    if (!frontendTypes.has(response.type)) continue
+    reasons.push(`${response.type} load failed (${response.status}): ${response.url}`)
+  }
+  for (const request of observed.failedRequests) {
+    if (!frontendTypes.has(request.type)) continue
+    if (request.error === 'net::ERR_ABORTED' && request.frameDetached === true) continue
+    reasons.push(
+      `${request.type} load failed (${request.error ?? 'request failed'}): ${request.url}`,
+    )
+  }
+  for (const message of observed.consoleDetails) {
+    if (message.level !== 'error' || !observed.assets.has(message.url)) continue
+    reasons.push(`frontend error (${message.url}): ${message.text}`)
+  }
   return { ok: reasons.length === 0, reasons }
 }
 

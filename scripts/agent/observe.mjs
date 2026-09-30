@@ -28,9 +28,19 @@ export function attachObserver(page, base, { consoleCapture = true } = {}) {
           ...message.location(),
         })
     })
-  page.on('requestfailed', (request) =>
-    observed.failedRequests.push({ url: request.url(), error: request.failure()?.errorText }),
-  )
+  page.on('requestfailed', (request) => {
+    const frame = requestFrame(request)
+    observed.failedRequests.push({
+      url: request.url(),
+      error: request.failure()?.errorText,
+      type: request.resourceType(),
+      frameUrl: frame?.url() ?? null,
+      // Detachment can arrive after requestfailed; read it at verdict and snapshot time.
+      get frameDetached() {
+        return frame?.isDetached() ?? null
+      },
+    })
+  })
   page.on('request', (request) => {
     recordLogUpload(request, observed.logUploads)
     if (/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(request.url()))
@@ -54,6 +64,15 @@ export function attachObserver(page, base, { consoleCapture = true } = {}) {
     socket.on('socketerror', (error) => item.errors.push(error))
   })
   return observed
+}
+
+function requestFrame(request) {
+  try {
+    return request.frame()
+  } catch {
+    // Service-worker and early navigation requests can have no frame.
+    return null
+  }
 }
 
 export function serializable(observed) {
