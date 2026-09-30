@@ -348,6 +348,7 @@
       "name": "@singapore-editor/highlighting",
       "version": "0.1.0",
       "dependencies": {
+        "@singapore-editor/diff": "workspace:*",
         "@singapore-editor/tree-sitter": "workspace:*",
         "@singapore-editor/tree-sitter-languages": "workspace:*",
         "shiki": "^4.4.3",

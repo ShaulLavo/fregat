@@ -21,7 +21,7 @@ import { createHighlightingPlugin } from '@singapore-editor/highlighting'
 import {
   EDITOR_PALETTE_SOURCE,
   EDITOR_THEME_SOURCE,
-  editorSyntaxHighlightingSource,
+  editorSyntaxColors,
 } from '@/features/editor/state/syntax-highlighting'
 import { highlightingService } from '@/lib/highlighting/state/service'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
@@ -189,7 +189,7 @@ function disposeAll(disposables: readonly EditorDisposable[]) {
 function createEditorSyntaxHighlightingPlugins(
   languageId: EditorSyntaxLanguageId | null,
 ): readonly EditorPlugin[] {
-  const source = editorSyntaxHighlightingSource(undefined, languageId)
+  const source = editorSyntaxColors(undefined, languageId)
   if (source === 'disabled') return []
 
   return [

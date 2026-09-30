@@ -12,7 +12,7 @@ import {
   type PointerEvent,
 } from 'react'
 
-import { editorTreeSitterSyntaxProvider } from '@/features/editor/state/syntax-highlighting'
+import { editorSyntaxProvider } from '@/features/editor/state/syntax-highlighting'
 import { createPlatformSearchResultEditorLoggingPlugin } from '@/features/editor/utils/plugins'
 import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
 import { SearchResultFileLineActions } from '@/features/search/components/result-file-line-actions'
@@ -99,9 +99,7 @@ export const SearchResultFileEditor = memo(
     const rangeDecorations = parked
       ? []
       : searchResultFileRangeDecorations(visibleDocument, activeResultId)
-    const syntaxPlugins = [
-      createSearchResultSyntaxHighlightingPlugin(editorTreeSitterSyntaxProvider()),
-    ]
+    const syntaxPlugins = [createSearchResultSyntaxHighlightingPlugin(editorSyntaxProvider())]
     const plugins = createFileResultEditorPlugins(syntaxPlugins)
     const editorStyle = searchResultFileEditorStyle(visibleDocument)
     const controller = useEditor({

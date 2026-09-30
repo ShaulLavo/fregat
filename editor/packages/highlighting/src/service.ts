@@ -1,5 +1,11 @@
+import type { DiffFile, DiffGutterSide } from '@singapore-editor/diff'
+import {
+  createDocumentTextSnapshot,
+  createPieceTableSnapshot,
+} from '@singapore-editor/core/document'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
-import type { EditorToken } from '@singapore-editor/core/syntax'
+import { resolveEditorThemeColor, type EditorTheme } from '@singapore-editor/core/rendering'
+import { toEditorTokenStore, type EditorToken } from '@singapore-editor/core/syntax'
 import {
   createShikiHighlighterProvider,
   createShikiWorkerOwner,
@@ -19,6 +25,9 @@ import {
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 import { TREE_SITTER_LANGUAGE_METADATA } from '@singapore-editor/tree-sitter-languages/metadata'
 
+import { bundledThemes } from 'shiki/themes'
+
+import { DiffSyntaxStore, type DiffSyntaxSnapshot, type HighlightingDiffView } from './diffs'
 import { HIGHLIGHTING_DOCUMENT_LANGUAGES, highlightingGrammar, loadGrammar } from './languages'
 import { resolveHighlightTheme, workerThemeRegistration, type HighlightTheme } from './theme'
 
@@ -74,6 +83,9 @@ export type HighlightingDocumentBackend =
 export type HighlightingServiceSnapshot = {
   readonly disposed: boolean
   readonly pendingHighlights: number
+  /** Tree-sitter sessions opened for snippets and not yet disposed. */
+  readonly snippetSessions: number
+  readonly diffs: DiffSyntaxSnapshot
   readonly shiki: ShikiWorkerOwnerSnapshot | null
 }
 
@@ -88,7 +100,19 @@ export interface HighlightingService {
   highlighterProvider(theme: HighlightingThemeSource): EditorHighlighterProvider
   /** Whether documents under this theme take colors from the highlighter provider. */
   usesHighlighter(theme: HighlightingThemeSource): boolean
+  /** The backend documents and diffs use under this theme; one object per source and engine. */
   documentBackend(theme: HighlightingThemeSource): HighlightingDocumentBackend
+  /** False when the diff is prepared, on screen, or being prepared under this theme's engine. */
+  canPrepareDiff(file: DiffFile, theme: HighlightingThemeSource): boolean
+  /** Parses a diff ahead of its view and keeps the result; resolves true when it kept one. */
+  prepareDiff(file: DiffFile, theme: HighlightingThemeSource): Promise<boolean>
+  /** Shows a diff with any kept or running preparation; disposing hands the view's parse back. */
+  showDiff(
+    view: HighlightingDiffView,
+    file: DiffFile,
+    side: DiffGutterSide,
+    theme: HighlightingThemeSource,
+  ): { dispose(): void }
   awaitIdle(): Promise<void>
   awaitRuntimeSessionIdle(runtimeSessionId: string): Promise<void>
   inspect(): HighlightingServiceSnapshot
@@ -109,6 +133,8 @@ export class HighlightingError extends Error {
 const PLAIN_TEXT = 'text'
 const DEFAULT_FOREGROUND = '#d4d4d4'
 const DEFAULT_BACKGROUND = '#1e1e1e'
+// The palette a plugin-free `highlight` paints with when the caller names none.
+const DEFAULT_THEME_NAME = 'github-dark'
 // Without a workspace census, every grammar a code workspace commonly holds, loaded behind paint.
 const DEFAULT_PRELOAD_GRAMMARS = [
   'css',
@@ -148,6 +174,15 @@ class EditorHighlightingService implements HighlightingService {
     EditorHighlighterProvider
   >()
   private readonly lastImportedTheme = new WeakMap<HighlightingThemeSource, string>()
+  private readonly backends = new WeakMap<
+    HighlightingThemeSource,
+    Partial<Record<HighlightingDocumentBackend['kind'], HighlightingDocumentBackend>>
+  >()
+  private readonly sourceIds = new WeakMap<HighlightingThemeSource, number>()
+  private readonly diffs = new DiffSyntaxStore()
+  private defaultTheme: Promise<HighlightTheme> | null = null
+  private snippetSessions = 0
+  private nextSnippetId = 1
   private readonly grammars = new Map<string, Promise<readonly ShikiWorkerLanguageRegistration[]>>()
   private readonly pending = new Set<Promise<unknown>>()
   private disposeTask: Promise<void> | null = null
@@ -205,10 +240,33 @@ class EditorHighlightingService implements HighlightingService {
   }
 
   public documentBackend(theme: HighlightingThemeSource): HighlightingDocumentBackend {
-    if (this.usesHighlighter(theme)) {
-      return { kind: 'highlighter', provider: this.highlighterProvider(theme) }
-    }
-    return { kind: 'tree-sitter', provider: this.syntaxProvider() }
+    const kind = this.usesHighlighter(theme) ? 'highlighter' : 'tree-sitter'
+    const cached = this.backends.get(theme) ?? {}
+    this.backends.set(theme, cached)
+    // Stable identity keeps diff sessions alive when only their colors change.
+    cached[kind] ??=
+      kind === 'highlighter'
+        ? { kind, provider: this.highlighterProvider(theme) }
+        : { kind, provider: this.syntaxProvider() }
+    return cached[kind]
+  }
+
+  public canPrepareDiff(file: DiffFile, theme: HighlightingThemeSource): boolean {
+    return this.diffs.canPrepare(file, this.diffScope(theme))
+  }
+
+  public prepareDiff(file: DiffFile, theme: HighlightingThemeSource): Promise<boolean> {
+    this.assertLive()
+    return this.diffs.prepare(file, this.diffScope(theme), this.documentBackend(theme))
+  }
+
+  public showDiff(
+    view: HighlightingDiffView,
+    file: DiffFile,
+    side: DiffGutterSide,
+    theme: HighlightingThemeSource,
+  ): { dispose(): void } {
+    return this.diffs.show(view, file, side, this.diffScope(theme))
   }
 
   public async awaitIdle(): Promise<void> {
@@ -230,6 +288,8 @@ class EditorHighlightingService implements HighlightingService {
     return {
       disposed: this.disposeTask !== null,
       pendingHighlights: this.pending.size,
+      snippetSessions: this.snippetSessions,
+      diffs: this.diffs.inspect(),
       shiki: this.shikiOwner?.inspect() ?? null,
     }
   }
@@ -243,6 +303,7 @@ class EditorHighlightingService implements HighlightingService {
     this.treeSitterBackend = null
     this.treeSitterProvider = null
     this.grammars.clear()
+    this.diffs.clear()
     this.disposeTask = Promise.allSettled([shiki?.dispose(), treeSitter?.dispose?.()]).then(
       () => undefined,
     )
@@ -253,7 +314,12 @@ class EditorHighlightingService implements HighlightingService {
     const { signal } = highlight
     this.assertLive()
     throwIfAborted(signal)
-    const theme = resolveHighlightTheme(highlight.theme)
+    const requested = highlight.theme ?? (await abortable(this.loadDefaultTheme(), signal))
+    const structure = requested.format === 'editor' ? structureLanguage(highlight.language) : null
+    if (structure && requested.format === 'editor') {
+      return this.highlightStructure(text, structure, requested, signal)
+    }
+    const theme = resolveHighlightTheme(requested)
     const grammar = highlightingGrammar(highlight.language)
     const languageRegistrations = grammar
       ? await abortable(this.grammar(grammar), signal).catch((error: unknown) => {
@@ -293,6 +359,74 @@ class EditorHighlightingService implements HighlightingService {
       foreground: reply.theme?.foregroundColor ?? theme.registration.fg ?? DEFAULT_FOREGROUND,
       background: reply.theme?.backgroundColor ?? theme.registration.bg ?? DEFAULT_BACKGROUND,
     })
+  }
+
+  /**
+   * A built-in palette colors through Tree-sitter captures, as its documents do: one transient
+   * session, disposed however the request ends, with capture variables resolved against the palette.
+   */
+  private async highlightStructure(
+    text: string,
+    languageId: string,
+    theme: Extract<HighlightTheme, { format: 'editor' }>,
+    signal: AbortSignal | undefined,
+  ): Promise<HighlightResult> {
+    if (typeof Worker === 'undefined') {
+      throw new HighlightingError('unavailable', 'This environment cannot start a syntax worker')
+    }
+    const palette = theme.definition
+    const foreground = palette.foregroundColor ?? DEFAULT_FOREGROUND
+    const snapshot = createPieceTableSnapshot(text)
+    const textSnapshot = createDocumentTextSnapshot(snapshot, text)
+    const session = this.syntaxProvider().createSession({
+      documentId: `highlight-snippet-${this.nextSnippetId++}`,
+      languageId,
+      includeHighlights: true,
+      textSnapshot,
+      snapshot,
+    })
+    if (!session) throw new HighlightingError('failed', `No syntax session for ${languageId}`)
+
+    this.snippetSessions += 1
+    try {
+      const result = await abortable(session.refresh(textSnapshot), signal).catch(
+        (error: unknown) => {
+          if (error instanceof HighlightingError) throw error
+          throw new HighlightingError('failed', 'The syntax worker failed', { cause: error })
+        },
+      )
+      this.assertLive()
+      const tokens = toEditorTokenStore(result.tokens)
+        .toTokens()
+        .map((token) => paletteToken(token, palette, foreground))
+      return Object.freeze({
+        language: languageId,
+        themeRevision: resolveHighlightTheme(theme).revision,
+        tokens: Object.freeze(tokens),
+        foreground,
+        background: palette.backgroundColor ?? DEFAULT_BACKGROUND,
+      })
+    } finally {
+      session.dispose()
+      this.snippetSessions -= 1
+    }
+  }
+
+  private loadDefaultTheme(): Promise<HighlightTheme> {
+    this.defaultTheme ??= bundledThemes[DEFAULT_THEME_NAME]().then((module): HighlightTheme => ({
+      format: 'vscode',
+      definition: module.default as unknown as VscodeThemeRegistration,
+    }))
+    return this.defaultTheme
+  }
+
+  private diffScope(theme: HighlightingThemeSource): string {
+    let id = this.sourceIds.get(theme)
+    if (id === undefined) {
+      id = this.nextSnippetId++
+      this.sourceIds.set(theme, id)
+    }
+    return `${this.documentBackend(theme).kind}:${id}`
   }
 
   private shiki(): ShikiWorkerOwner {
@@ -362,6 +496,26 @@ class EditorHighlightingService implements HighlightingService {
     if (!this.disposeTask) return
     throw new HighlightingError('disposed', 'The highlighting service was disposed')
   }
+}
+
+/** The Tree-sitter language a label or alias names; languages it lacks stay with Shiki. */
+function structureLanguage(language: string): string | null {
+  return TREE_SITTER_ALIASES.get(language.trim().toLowerCase()) ?? null
+}
+
+function paletteToken(
+  token: EditorToken,
+  palette: EditorTheme,
+  foreground: string,
+): Readonly<EditorToken> {
+  const style = { ...token.style }
+  if (style.color) style.color = resolveEditorThemeColor(style.color, palette) ?? foreground
+  if (style.backgroundColor) {
+    const background = resolveEditorThemeColor(style.backgroundColor, palette)
+    if (background) style.backgroundColor = background
+    else delete style.backgroundColor
+  }
+  return Object.freeze({ start: token.start, end: token.end, style: Object.freeze(style) })
 }
 
 function freezeToken(token: EditorToken): Readonly<EditorToken> {

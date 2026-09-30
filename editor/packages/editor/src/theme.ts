@@ -285,6 +285,51 @@ export function mergeEditorThemes(
   return merged
 }
 
+const EDITOR_VARIABLE_REFERENCE = /var\(\s*(--editor-[\w-]+)\s*(?:,[^()]*)?\)/g
+const MAX_REFERENCE_DEPTH = 8
+
+/**
+ * A colour written against editor variables (a capture style's `var(--editor-syntax-keyword)`),
+ * with every variable replaced by what `theme` gives it: its own value, else the registered default
+ * for its type. Null when a variable resolves to nothing, as the stylesheet-only base defaults do.
+ * For surfaces that paint styles without an editor element to carry the variables.
+ */
+export function resolveEditorThemeColor(value: string, theme: EditorTheme): string | null {
+  return resolveEditorVariables(value, theme, 0)
+}
+
+function resolveEditorVariables(value: string, theme: EditorTheme, depth: number): string | null {
+  if (!value.includes('var(')) return value
+  if (depth > MAX_REFERENCE_DEPTH) return null
+
+  let unresolved = false
+  const resolved = value.replace(EDITOR_VARIABLE_REFERENCE, (_, variable: string) => {
+    const next = editorVariableValue(variable, theme)
+    const replaced = next === null ? null : resolveEditorVariables(next, theme, depth + 1)
+    if (replaced === null) unresolved = true
+    return replaced ?? ''
+  })
+  return unresolved ? null : resolved
+}
+
+function editorVariableValue(variable: string, theme: EditorTheme): string | null {
+  for (const { key, id } of EDITOR_THEME_COLORS) {
+    if (editorColorVariable(id) === variable && theme[key]) return theme[key]
+  }
+  for (const { key, id } of EDITOR_SYNTAX_THEME_COLORS) {
+    if (editorColorVariable(id) === variable && theme.syntax?.[key]) return theme.syntax[key]
+  }
+  for (const [id, color] of Object.entries(theme.colors ?? {})) {
+    if (editorColorVariable(id) === variable) return color
+  }
+  for (const registered of registeredEditorColors.values()) {
+    if (registered.variable !== variable) continue
+    const fallback = editorColorDefault(registered.defaults, theme.type ?? 'dark')
+    return fallback === undefined ? null : compileEditorColorValue(fallback)
+  }
+  return null
+}
+
 export function editorThemesEqual(
   left: EditorTheme | null | undefined,
   right: EditorTheme | null | undefined,

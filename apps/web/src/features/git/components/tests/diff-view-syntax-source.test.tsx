@@ -21,8 +21,8 @@ import { saveSettings } from '@/features/settings/utils/api'
 import { blobDiffQueryKey, fetchBlobDiff } from '@/lib/blob-diff-query'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import {
-  editorShikiHighlighterProvider,
-  editorTreeSitterSyntaxProvider,
+  editorHighlighterProvider,
+  editorSyntaxProvider,
 } from '@/features/editor/state/syntax-highlighting'
 import type { Client } from '@/lib/client'
 import { fileResource, filesystemPath } from '@/lib/documents/utils/identity'
@@ -228,7 +228,7 @@ function stubParsers(parsed: string[]) {
     return firstWordTokens(source)
   }
   const treeSitter = vi
-    .spyOn(editorTreeSitterSyntaxProvider(), 'createSession')
+    .spyOn(editorSyntaxProvider(), 'createSession')
     .mockImplementation(
       (options) =>
         firstWordSession(options, record(options.textSnapshot)) as ReturnType<
@@ -236,7 +236,7 @@ function stubParsers(parsed: string[]) {
         >,
     )
   const shiki = vi
-    .spyOn(editorShikiHighlighterProvider(), 'createSession')
+    .spyOn(editorHighlighterProvider(), 'createSession')
     .mockImplementation((options) => {
       const tokens = toEditorTokenStore(record(options.textSnapshot))
       return {

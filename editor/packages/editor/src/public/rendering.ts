@@ -4,6 +4,7 @@ export {
   editorColorReference,
   editorColorValue,
   editorThemesEqual,
+  resolveEditorThemeColor,
   firstEditorColor,
   lightenEditorColor,
   mergeEditorThemes,

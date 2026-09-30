@@ -16,17 +16,17 @@ export type ResolvedHighlightTheme = {
   readonly registration: ShikiWorkerThemeRegistration
 }
 
-const DEFAULT_THEME: HighlightTheme = { format: 'editor', definition: {}, name: 'editor-default' }
 const revisions = new WeakMap<object, ResolvedHighlightTheme>()
 
-export function resolveHighlightTheme(
-  theme: HighlightTheme = DEFAULT_THEME,
-): ResolvedHighlightTheme {
+export function resolveHighlightTheme(theme: HighlightTheme): ResolvedHighlightTheme {
   const cached = revisions.get(theme)
   if (cached) return cached
 
   const registration = themeRegistration(theme)
-  const revision = `${registration.name}@${contentHash(JSON.stringify(registration))}`
+  // A palette's contributed colors never reach the TextMate conversion, so its revision hashes
+  // the palette itself.
+  const content = theme.format === 'editor' ? theme.definition : registration
+  const revision = `${registration.name}@${contentHash(JSON.stringify(content))}`
   const resolved = { revision, registration }
   revisions.set(theme, resolved)
   return resolved
