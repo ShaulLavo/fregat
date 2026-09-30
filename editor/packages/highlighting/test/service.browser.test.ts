@@ -66,6 +66,26 @@ describe('standalone highlighting in the real worker', () => {
     expect(Object.isFrozen(result.tokens[0]?.style)).toBe(true)
   })
 
+  test('snippets leave lines over the configured limit as one plain token', async () => {
+    let limit = 12
+    const highlighting = createHighlightingService({ maxTokenizationLineLength: () => limit })
+    services.push(highlighting)
+    const text = 'const a = 1\nconst longer = 2'
+    const theme = vscodeTheme('#ff0000')
+
+    const capped = await highlighting.highlight(text, { language: 'ts', theme })
+    const secondLine = capped.tokens.filter((token) => token.start >= 12)
+    expect(secondLine).toHaveLength(1)
+    expect(secondLine[0]).toMatchObject({ start: 12, end: text.length })
+    expect(secondLine[0]!.style.color?.toLowerCase()).toBe('#eeeeee')
+    expect(colorOf(capped, text, 'const')?.color?.toLowerCase()).toBe('#ff0000')
+
+    limit = 100
+    const raised = await highlighting.highlight(text, { language: 'ts', theme })
+    expect(colorOf(raised, text, 'longer')?.color?.toLowerCase()).not.toBe('#ff0000')
+    expect(raised.tokens.filter((token) => token.start >= 12).length).toBeGreaterThan(1)
+  })
+
   test('empty text and unknown languages answer plain text with the theme colors', async () => {
     const highlighting = service()
     const empty = await highlighting.highlight('', {

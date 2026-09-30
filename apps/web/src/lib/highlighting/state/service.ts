@@ -5,6 +5,7 @@ import {
 } from '@singapore-editor/highlighting'
 import { themeRegistrationQueryOptions } from '@/lib/code-theme/state/registration-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 
 type LanguageSource = () => readonly HighlightingLanguage[] | null
 
@@ -15,6 +16,7 @@ let service: HighlightingService | null = null
 /** The one highlighting service for editors, diffs, theme previews and rendered code. */
 export function highlightingService(): HighlightingService {
   service ??= createHighlightingService({
+    maxTokenizationLineLength: () => readSettingsMirror()['editor.maxTokenizationLineLength'],
     preloadLanguages: () => languageSource?.() ?? null,
     resolveTheme: async (id) =>
       (await resourceQueryClient.query(themeRegistrationQueryOptions(id))).registration,

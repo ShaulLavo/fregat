@@ -3,6 +3,7 @@ import { createHighlighter } from 'shiki'
 
 import {
   createIncrementalTokenizer,
+  DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
   snapshotToEditorTokens,
   tokenLinesToEditorTokens,
 } from '../../src/shiki'
@@ -163,6 +164,7 @@ describe('shiki-to-editor integration', () => {
     const { tokenizer } = await createIncrementalTokenizer({
       lang: 'typescript',
       theme: 'github-dark',
+      maxLineLength: DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
       code,
       highlighter,
     })

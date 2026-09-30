@@ -137,6 +137,7 @@ const openDocument = async (
     theme: payload.theme,
     code: payload.text,
     highlighter,
+    maxLineLength: payload.maxLineLength,
   })
 
   const state = {
@@ -172,6 +173,7 @@ const editDocument = async (
       newEndOffset: patch.newEndOffset,
       tokensPacked: packTokenLines(patch.lines, patch.fromOffset),
     })),
+    untokenizedLines: existing.tokenizer.untokenizedLineCount(),
     theme: editorThemeFromHighlighter(
       existing.highlighter,
       existing.theme,
@@ -304,8 +306,13 @@ const highlightSnippet = async (
     theme: payload.theme,
     code: payload.text,
     highlighter,
+    maxLineLength: payload.maxLineLength,
   })
-  return { tokensPacked: snapshotToPackedEditorTokens(tokenizer.getSnapshot()), theme }
+  return {
+    tokensPacked: snapshotToPackedEditorTokens(tokenizer.getSnapshot()),
+    theme,
+    untokenizedLines: tokenizer.untokenizedLineCount(),
+  }
 }
 
 const preloadRegistrations = async (payload: ShikiWorkerPreloadRequest): Promise<undefined> => {
@@ -321,6 +328,7 @@ const preloadRegistrations = async (payload: ShikiWorkerPreloadRequest): Promise
 const resultFromState = (state: DocumentState): ShikiWorkerTransportResult => ({
   documentId: state.documentId,
   tokensPacked: snapshotToPackedEditorTokens(state.tokenizer.getSnapshot()),
+  untokenizedLines: state.tokenizer.untokenizedLineCount(),
   theme: editorThemeFromHighlighter(state.highlighter, state.theme, state.themeRegistration),
 })
 

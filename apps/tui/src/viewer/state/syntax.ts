@@ -14,7 +14,12 @@ export function createViewerSyntax() {
   const highlighter = createHighlighter({ themes: ['dark-plus', 'light-plus'], langs: [] })
   let disposed = false
   return {
-    async tokenize(path: string, content: string, appearance: 'dark' | 'light') {
+    async tokenize(
+      path: string,
+      content: string,
+      appearance: 'dark' | 'light',
+      maxLineLength: number,
+    ) {
       const engine = await highlighter
       const language = languageIdForFilePath(path) ?? 'text'
       const registration = Object.entries(bundledLanguages).find(([name]) => name === language)?.[1]
@@ -26,6 +31,7 @@ export function createViewerSyntax() {
         code: content,
         lang: language,
         theme: `${appearance}-plus`,
+        maxLineLength,
       })
       return tokenizer.getTokens()
     },

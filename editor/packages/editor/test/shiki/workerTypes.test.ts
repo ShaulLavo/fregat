@@ -10,6 +10,7 @@ describe('Shiki worker message types', () => {
         documentId: 'doc',
         runtimeSessionId: 'runtime-doc',
         text: 'const value = 1;',
+        maxLineLength: 20_000,
         lang: 'typescript',
         theme: 'github-dark',
         languageRegistrations: [

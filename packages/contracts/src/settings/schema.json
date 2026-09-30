@@ -387,6 +387,13 @@
       "markdownDescription": "Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.\n\nLive preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.",
       "type": "string"
     },
+    "editor.maxTokenizationLineLength": {
+      "default": 20000,
+      "description": "Longest line, in UTF-16 code units, that imported code themes color. Longer lines show as plain text in the theme foreground.",
+      "maximum": 10000000,
+      "minimum": 1,
+      "type": "integer"
+    },
     "editor.minimap.enabled": {
       "default": true,
       "description": "Show the minimap beside the editor.",

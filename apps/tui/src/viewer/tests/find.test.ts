@@ -16,11 +16,23 @@ test('find produces LSP UTF-16 columns and wraps both directions', () => {
   expect(clampPosition(['hi'], { line: 100, character: 100 })).toEqual({ line: 0, character: 2 })
 })
 
+test('the viewer leaves a line over the tokenization limit as plain text', async () => {
+  const syntax = createViewerSyntax()
+  const source = 'const a = 1\nconst longer = 2'
+  try {
+    const [first, second] = await syntax.tokenize('sample.ts', source, 'dark', 11)
+    expect(first!.length).toBeGreaterThan(1)
+    expect(second!.map((token) => token.content)).toEqual(['const longer = 2'])
+  } finally {
+    syntax.dispose()
+  }
+})
+
 test('actual Shiki tokenizer colors TypeScript without changing source text', async () => {
   const syntax = createViewerSyntax()
   const source = 'const answer: number = 42;\n// unicode 😀'
   try {
-    const tokens = await syntax.tokenize('sample.ts', source, 'dark')
+    const tokens = await syntax.tokenize('sample.ts', source, 'dark', 20_000)
     expect(tokens.map((line) => line.map((token) => token.content).join('')).join('\n')).toBe(
       source,
     )

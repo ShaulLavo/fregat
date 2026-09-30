@@ -67,6 +67,8 @@ export type HighlightingServiceOptions = {
   readonly preloadLanguages?: () => readonly HighlightingLanguage[] | null
   readonly shikiWorker?: () => Worker
   readonly treeSitterBackend?: () => TreeSitterBackend
+  /** Read on every Shiki document open and snippet; documents pick up a change on their next request. */
+  readonly maxTokenizationLineLength?: () => number
 }
 
 export type HighlightOptions = {
@@ -477,7 +479,10 @@ class EditorHighlightingService implements HighlightingService {
     this.assertLive()
     if (this.shikiOwner) return this.shikiOwner
 
-    this.shikiOwner = createShikiWorkerOwner({ workerFactory: this.options.shikiWorker })
+    this.shikiOwner = createShikiWorkerOwner({
+      workerFactory: this.options.shikiWorker,
+      maxTokenizationLineLength: this.options.maxTokenizationLineLength,
+    })
     return this.shikiOwner
   }
 

@@ -4,6 +4,8 @@ import { createViewerLsp } from '@/viewer/state/lsp'
 import { createViewerSyntax, type ViewerTokens } from '@/viewer/state/syntax'
 import type { ViewerDiagnostics } from '@/viewer/utils/lsp'
 import type { ViewerDocument } from '@/viewer/state/document'
+import { useStore } from 'zustand'
+import { useSettingValue } from '@/settings/hooks/use-setting-value'
 
 export function useViewerLanguage({
   session,
@@ -39,12 +41,16 @@ export function useViewerLanguage({
       lsp.current = null
     }
   }, [session, rootPath, path, content])
+  const owner = useStore(session.store, (current) =>
+    current.kind === 'ready' ? current.owner : null,
+  )
+  const maxLineLength = useSettingValue(owner, 'editor.maxTokenizationLineLength')
   useEffect(() => {
     if (content === null) return
     let active = true
     const syntax = createViewerSyntax()
     void syntax
-      .tokenize(path, content, appearance)
+      .tokenize(path, content, appearance, maxLineLength)
       .then((result) => {
         if (active) setTokens(result)
       })
@@ -60,6 +66,6 @@ export function useViewerLanguage({
       active = false
       syntax.dispose()
     }
-  }, [session, path, content, appearance])
+  }, [session, path, content, appearance, maxLineLength])
   return { tokens, lsp }
 }
