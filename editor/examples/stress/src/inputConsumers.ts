@@ -69,8 +69,10 @@ export function createInputConsumers(id: string, fixture: string, length: number
       // Edits schedule follow-up syntax requests and re-highlighting after a fence resolves;
       // settle until both owners are quiet and tokens are live again.
       const syntax = configuration.treeSitter || configuration.shiki
+      // A line over Shiki's limit is plain by policy, so live tokens cannot be required for it.
       const tokensLive = () =>
         !syntax ||
+        (shiki ? (shikiSnapshot(shiki).untokenizedLines ?? 0) > 0 : false) ||
         [...CSS.highlights].some(
           ([name, ranges]) => name.startsWith('editor-shared-token-') && ranges.size > 0,
         )
@@ -90,7 +92,7 @@ export function createInputConsumers(id: string, fixture: string, length: number
         configuration,
         settleMs: performance.now() - startedAt,
         tree: tree?.inspect() ?? null,
-        shiki: shiki?.inspect() ?? null,
+        shiki: shiki ? shikiSnapshot(shiki) : null,
         plugins: plugins.map((plugin) => plugin.name ?? 'unnamed'),
         views: editors.map((editor, index) => {
           const host = document.getElementById(`view-${index}`)
@@ -137,4 +139,17 @@ async function minimapRendersAccepted() {
         (worker.latestRender > 0 && worker.acceptedRender === worker.latestRender),
     ),
   )
+}
+
+// Plain-line fields exist only in packages with the tokenization line limit; older sets report null.
+function shikiSnapshot(owner: ReturnType<typeof createShikiWorkerOwner>) {
+  const snapshot: ReturnType<typeof owner.inspect> & {
+    readonly maxTokenizationLineLength?: number
+    readonly untokenizedLines?: number
+  } = owner.inspect()
+  return {
+    ...snapshot,
+    maxTokenizationLineLength: snapshot.maxTokenizationLineLength ?? null,
+    untokenizedLines: snapshot.untokenizedLines ?? null,
+  }
 }

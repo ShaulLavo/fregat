@@ -27,4 +27,3 @@ export function assertConsumerReadiness(
   scenario: string,
   opened: unknown,
 ): void
-export function unsupportedInputFixtures(id: string): readonly string[]

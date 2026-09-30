@@ -315,11 +315,43 @@ async function dispose() {
 }
 
 async function settleConsumers() {
-  const { consumers, editors } = current()
+  const { consumers, editors, buffer } = current()
   if (!consumers) return null
   const readiness = await consumers.settle(editors)
-  const highlights = [...CSS.highlights].map(([name, ranges]) => ({ name, ranges: ranges.size }))
-  return { ...readiness, highlights }
+  const colors = highlightColors()
+  const highlights = [...CSS.highlights].map(([name, ranges]) => ({
+    name,
+    ranges: ranges.size,
+    color: colors.get(name) ?? null,
+  }))
+  const lineLimit = readiness.shiki?.maxTokenizationLineLength ?? null
+  const row = document.querySelector('#view-0 [data-editor-virtual-row]')
+  return {
+    ...readiness,
+    highlights,
+    overLimitLines:
+      lineLimit === null ? null : linesLongerThan(buffer.materializeFullText(), lineLimit),
+    rowColor: row ? getComputedStyle(row).color : null,
+  }
+}
+
+function linesLongerThan(text: string, limit: number): number {
+  let count = 0
+  for (const line of text.split('\n')) if (line.replace(/\r$/, '').length > limit) count++
+  return count
+}
+
+// The colour each `::highlight(name)` rule paints, read from the page's own stylesheets.
+function highlightColors(): Map<string, string> {
+  const colors = new Map<string, string>()
+  for (const sheet of document.styleSheets) {
+    for (const rule of sheet.cssRules) {
+      if (!(rule instanceof CSSStyleRule)) continue
+      const name = /::highlight\(([^)]+)\)/.exec(rule.selectorText)?.[1]
+      if (name && rule.style.color) colors.set(name, rule.style.color)
+    }
+  }
+  return colors
 }
 
 function retention() {

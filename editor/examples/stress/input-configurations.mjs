@@ -42,16 +42,41 @@ export function inputConsumerConfiguration(id, fixture, length) {
   }
 }
 
-// Shiki has no line-length cap: its worker never finishes the 1 MB line (no sample in 400 s),
-// and ShikiWorkerOwner.dispose waits for that busy worker's reply, so disposal stalls and the
-// worker leaks. Shiki configurations record the fixture as unsupported instead of measuring it.
-export function unsupportedInputFixtures(id) {
-  if (!inputConsumerIds.includes(id))
-    throw new TypeError(`Unknown input consumer configuration: ${id}`)
-  return id.includes('shiki') || id === 'all' || id === 'platform' ? ['long-line'] : []
+const syntaxHighlight = /^editor-shared-token-/
+
+// Shiki leaves lines over its limit as one plain token; the owner's count must match the lines the
+// current text actually has over that limit, per live session.
+function plainFallback(readiness, check) {
+  const { maxTokenizationLineLength: limit, untokenizedLines: reported } = readiness.shiki
+  const overLimit = readiness.overLimitLines
+  check(Number.isInteger(limit) && limit > 0, 'Shiki reports no tokenization line limit')
+  check(Number.isInteger(reported) && Number.isInteger(overLimit), 'Plain-line counts are missing')
+  if (overLimit === 0) {
+    check(reported === 0, `Shiki reports ${reported} plain lines with none over the limit`)
+    return false
+  }
+  check(
+    reported > 0 && reported % overLimit === 0,
+    `plain lines ${reported} for ${overLimit} over the limit`,
+  )
+  return true
 }
 
-const syntaxHighlight = /^editor-shared-token-/
+// Every painted token range in a plain document carries one colour, the rendered text colour.
+function uniformPlainOutput(tokens, rowColor, check) {
+  const painted = tokens.filter((entry) => entry.ranges > 0)
+  const colors = new Set(painted.map((entry) => normalizedColor(entry.color)))
+  check(colors.size <= 1, `plain output has ${colors.size} token colours`)
+  if (colors.size === 1)
+    check(colors.has(normalizedColor(rowColor)), `plain token colour differs from the text colour`)
+}
+
+function normalizedColor(color) {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color ?? '')
+  if (!hex) return color
+  const value = Number.parseInt(hex[1], 16)
+  return `rgb(${value >> 16}, ${(value >> 8) & 255}, ${value & 255})`
+}
 
 function owner(snapshot, active, name, check) {
   if (!active) return check(snapshot === null, `${name} owner exists while disabled`)
@@ -110,9 +135,11 @@ export function assertConsumerReadiness(readiness, id, fixture, length, views, s
   if (opened && minimaps.length && scenario !== 'composition-update')
     check(minimapSource(readiness) > minimapSource(opened), 'minimap received no edit')
   const syntax = expected.treeSitter || expected.shiki
+  const plain = expected.shiki ? plainFallback(readiness, check) : false
   const tokens = readiness.highlights.filter((entry) => syntaxHighlight.test(entry.name))
   const tokenRanges = tokens.reduce((sum, entry) => sum + entry.ranges, 0)
-  check(syntax ? tokenRanges > 0 : tokens.length === 0, `syntax token ranges ${tokenRanges}`)
+  if (plain) uniformPlainOutput(tokens, readiness.rowColor, check)
+  else check(syntax ? tokenRanges > 0 : tokens.length === 0, `syntax token ranges ${tokenRanges}`)
   for (const view of readiness.views) {
     check(
       view.initialHighlightStatus === (syntax ? 'painted' : 'plain'),

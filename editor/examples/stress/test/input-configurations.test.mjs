@@ -4,7 +4,6 @@ import {
   assertConsumerReadiness,
   inputConsumerConfiguration,
   minimapLimitCodeUnits,
-  unsupportedInputFixtures,
 } from '../input-configurations.mjs'
 
 const owner = { lifecycle: 'ready', pendingRequests: 0, lastError: null }
@@ -26,7 +25,11 @@ function readiness(id, overrides = {}) {
   return {
     configuration,
     tree: configuration.treeSitter ? owner : null,
-    shiki: configuration.shiki ? owner : null,
+    shiki: configuration.shiki
+      ? { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 0 }
+      : null,
+    overLimitLines: 0,
+    rowColor: 'rgb(225, 228, 232)',
     highlights: syntax ? [{ name: 'editor-shared-token-0', ranges: 4 }] : [],
     views: [
       {
@@ -117,9 +120,42 @@ test('pauses analysis consumers above the Platform analysis limit', () => {
   })
 })
 
-test('records the long-line fixture as unsupported only for Shiki configurations', () => {
-  for (const id of ['shiki', 'tree-sitter-shiki', 'shiki-minimap', 'all', 'platform'])
-    expect(unsupportedInputFixtures(id)).toEqual(['long-line'])
-  for (const id of ['native', 'disabled', 'tree-sitter', 'minimap', 'tree-sitter-minimap'])
-    expect(unsupportedInputFixtures(id)).toEqual([])
+test('accepts uniform plain output when the reported plain lines match the text', () => {
+  const plain = readiness('shiki', {
+    shiki: { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 3 },
+    overLimitLines: 1,
+    highlights: [{ name: 'editor-shared-token-0', ranges: 1, color: '#e1e4e8' }],
+  })
+  expect(() =>
+    assertConsumerReadiness(plain, 'shiki', 'ordinary', 4469, 'single', 'typing', null),
+  ).not.toThrow()
+})
+
+test('rejects plain output with a wrong count, a second colour or a missing limit', () => {
+  const base = { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 1 }
+  const cases = [
+    { shiki: { ...base, untokenizedLines: 0 }, overLimitLines: 1 },
+    { shiki: base, overLimitLines: 0 },
+    {
+      shiki: base,
+      overLimitLines: 1,
+      highlights: [
+        { name: 'editor-shared-token-0', ranges: 1, color: '#e1e4e8' },
+        { name: 'editor-shared-token-1', ranges: 1, color: '#ff0000' },
+      ],
+    },
+    { shiki: { ...base, maxTokenizationLineLength: null }, overLimitLines: 1 },
+  ]
+  for (const overrides of cases)
+    expect(() =>
+      assertConsumerReadiness(
+        readiness('shiki', overrides),
+        'shiki',
+        'ordinary',
+        4469,
+        'single',
+        'typing',
+        null,
+      ),
+    ).toThrow(/Consumer readiness/)
 })
