@@ -24,8 +24,6 @@ const sourceTest = test.extend<{ web: string }>({
     writeFile(root, 'node_modules/ghostty-webgpu/package.json', '{}')
     for (const file of [
       'src/index.ts',
-      'src/xterm/terminal.ts',
-      'src/xterm/css/xterm.css',
       'ghostty-vt.wasm',
       'bridge.wasm',
       'node_modules/@webgpu/types/dist/index.d.ts',
@@ -48,8 +46,8 @@ sourceTest(
     expect(paths['@singapore-editor/core/document']).toEqual([
       path.join(web, 'node_modules/@singapore-editor/core/src/public/document.ts'),
     ])
-    expect(paths['ghostty-webgpu/xterm.css']).toEqual([
-      path.join(web, 'node_modules/ghostty-webgpu/src/xterm/css/xterm.css'),
+    expect(paths['ghostty-webgpu']).toEqual([
+      path.join(web, 'node_modules/ghostty-webgpu/src/index.ts'),
     ])
     expect(paths['ghostty-webgpu/bridge.wasm']).toEqual([
       path.join(web, 'node_modules/ghostty-webgpu/bridge.wasm'),
