@@ -94,7 +94,7 @@ describe('gutter pointer events', () => {
     editor.setText(['<<<<<<< HEAD', 'ours', '=======', 'theirs', '>>>>>>> branch'].join('\n'))
     const action = await lensAction('Accept Incoming Change')
 
-    await click(action)
+    await userEvent.click(action)
 
     expect(editor.materializeFullText()).toBe('theirs\n')
   })
