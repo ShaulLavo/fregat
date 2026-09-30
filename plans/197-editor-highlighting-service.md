@@ -280,6 +280,12 @@ Review round (`review_highlighting` on `c2061eba0`), fixed in `5e4820029`:
 - **Checks:** highlighting node 10, Chromium 28, Firefox/WebKit 34; core 127; markdown 88; affected web node+dom tests 1691; web typecheck clean.
 - **Height CI:** repaired separately in PR #206. The textbuffer workflows install only that package, and the pinned control is vendored. PR #202's height job needs #206 merged first.
 
+Follow-up repairs (`803707fc3`), merged with `main` at `3a0f097d6` (includes #203, #204, #206) in `247bffee4`:
+
+- **Revision race:** each worker theme name now carries the exact registration it was named for. A refresh overtaken by a newer notification for the same id publishes nothing, so a late acquisition cannot put newer content under an older revision. The reviewer's race corpus went from 2 of 4 passing to 4 of 4 (`test/theme-revision-race.browser.test.ts`).
+- **Admission after disposal:** `documentBackend`, `canPrepareDiff` and `showDiff` throw `disposed`, and `prepareDiff` rejects, for both cached and new theme sources. A real view is never admitted. `grammarFor` stays answerable. `test/disposed-admission.browser.test.ts` failed before and passes now.
+- **Merged-tree checks:** workspace build, `bun run gates`, web/highlighting/markdown typechecks and `check-turbo-inputs` pass. Highlighting passes node 10 and Chromium 34, and Firefox/WebKit 34 before the merge. Markdown passes 88. Affected web node+dom tests: 2268 passed, 5 skipped. Web browser tests (preview, Mermaid fence, message bubble, prepared open): 29 passed.
+
 Pre-existing failures (owners assigned by the coordinator):
 
 - `editor-theme-preview` 15 !== 5 recolor requests, also on main: Plan 179 worker.
