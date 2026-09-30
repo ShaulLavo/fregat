@@ -11,6 +11,7 @@ import { attachObserver, observedProblems, serializable } from './observe.mjs'
 import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
 import { settleRunningAnimations, waitForApp } from './selectors'
 import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
+import { summarizeSelectors } from './selector-stats'
 import { captureTraceSources } from './trace-source-maps'
 import { captureSize, type CaptureSize } from './capture-options'
 import {
@@ -53,6 +54,8 @@ Options
   --engine     chromium (default), firefox or webkit; trace needs chromium
   --doctor     exit non-zero when the app is not healthy
   --compare    an earlier trace evidence directory to diff against
+  --style-marks mark stylesheet changes and associate their following recalc
+  --selector-stats collect CSS selector attribution; inflated timings are unsuitable for comparisons
   --site       check a landing page document instead of app readiness (look)
   --static-dir serve built assets through browser routes for look, without a server
   --width      viewport width, 320–4096 CSS pixels (look/scenario)
@@ -82,6 +85,8 @@ type Options = CaptureSize & {
   readonly file: string
   readonly headed: boolean
   readonly selector: string | undefined
+  readonly selectorStats: boolean
+  readonly styleMarks: boolean
   readonly url: string
   readonly workspace: string
   readonly server?: IsolatedServer
@@ -108,11 +113,21 @@ async function main() {
       'shared-dev': { type: 'boolean', default: false },
       'real-providers': { type: 'boolean', default: false },
       selector: { type: 'string' },
+      'selector-stats': { type: 'boolean', default: false },
+      'style-marks': { type: 'boolean', default: false },
       url: { type: 'string', default: DEFAULT_URL },
       workspace: { type: 'string', default: DEFAULT_WORKSPACE },
     },
   })
   const [verb, name] = positionals
+  if (values['style-marks'] && verb !== 'trace')
+    throw createScriptError('--style-marks is only supported by trace.')
+  if (values['selector-stats'] && verb !== 'trace')
+    throw createScriptError('--selector-stats is only supported by trace.')
+  if (values['selector-stats'] && values.compare)
+    throw createScriptError(
+      'Selector attribution inflates timings. Run --compare without --selector-stats.',
+    )
   if (values.site && (verb !== 'look' || values.doctor))
     throw createScriptError('--site is only supported by look without --doctor.')
   if (values['static-dir'] && (verb !== 'look' || values.doctor))
@@ -161,6 +176,8 @@ async function main() {
     file: values.file ?? (name === 'editor-product' ? 'plugins.ts' : DEFAULT_FILE),
     headed: values.headed,
     selector: values.selector,
+    selectorStats: values['selector-stats'],
+    styleMarks: values['style-marks'],
     url: values['static-dir'] ? STATIC_PREVIEW_URL : values.url,
     workspace: values.workspace,
   }
@@ -363,14 +380,19 @@ const TRACE_CATEGORIES = [
 
 async function traceScenario(scenario: Scenario, options: Options) {
   const evidence = await createEvidence('trace', scenario.name)
+  const injected = options.styleMarks ? await bundleInjected('style-marks.ts') : null
   return withPage(options, evidence, async (page, observed, browser) => {
+    if (injected) await page.addInitScript({ content: injected })
     const ready = await open(page, await workspaceUrl(page, options))
     if (!ready) {
       await writeSummary(evidence, [`# trace ${scenario.name}`, '', 'app never became ready'])
       return 1
     }
     const tracePath = evidence.file('trace.json')
-    await browser.startTracing(page, { categories: TRACE_CATEGORIES, path: tracePath })
+    const categories = options.selectorStats
+      ? [...TRACE_CATEGORIES, 'disabled-by-default-blink.debug']
+      : TRACE_CATEGORIES
+    await browser.startTracing(page, { categories, path: tracePath })
     await page.evaluate(() => performance.mark('fregat:scenario:start'))
     let failure: string | null = null
     try {
@@ -390,6 +412,7 @@ async function traceScenario(scenario: Scenario, options: Options) {
       await evidence.json('inspection.json', await scenario.inspect(page)).catch(() => undefined)
     await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
     const raw = await Bun.file(tracePath).text()
+    if (options.selectorStats) await evidence.json('selector-stats.json', summarizeSelectors(raw))
     const generated = summarizeTrace(raw)
     const frames = [...generated.longTasks, ...generated.phaseTasks].flatMap((task) =>
       task.sampledFrames.map((frame) => frame.generated),
@@ -410,6 +433,12 @@ async function traceScenario(scenario: Scenario, options: Options) {
       '',
       ...formatTraceSummary(summary),
     ]
+    if (options.selectorStats)
+      lines.push(
+        '',
+        'Selector attribution inflates timings. Use ordinary traces for performance comparisons.',
+        `selectors: ${evidence.file('selector-stats.json')}`,
+      )
     if (options.compare) {
       const before = summarizeTrace(await Bun.file(`${options.compare}/trace.json`).text())
       lines.push('', `compared with ${options.compare}`, ...compareTraceSummaries(before, summary))

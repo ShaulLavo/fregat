@@ -54,10 +54,66 @@ function mermaidCodeBlock() {
 }
 
 function mermaidDiagram() {
-  return document.querySelector('[data-markdown="mermaid-block"] svg')
+  const host = document.querySelector('[data-markdown="mermaid-block"] [role="img"]')
+  return host?.shadowRoot?.querySelector('svg') ?? host?.querySelector('svg') ?? null
 }
 
 describe('mermaid fences', () => {
+  it('renders namespaced classes across flowchart, state and class diagram grammars', async () => {
+    const charts = [
+      'flowchart TD\n A[Visible]:::flex --> B[End]\n classDef flex fill:#abcdef',
+      'stateDiagram-v2\n [*] --> Idle\n Idle --> [*]\n classDef hidden fill:#abcdef\n class Idle hidden',
+      'classDiagram\n class Animal\n cssClass "Animal" truncate\n classDef truncate fill:#abcdef',
+    ]
+    for (const chart of charts) {
+      const previous = mermaidDiagram()
+      renderDiagram(false, `\`\`\`mermaid\n${chart}\n\`\`\``)
+      await vi.waitFor(
+        () => {
+          expect(
+            document.querySelector('[data-markdown="mermaid-block"] p')?.textContent ?? null,
+          ).toBeNull()
+          expect(mermaidDiagram()).not.toBeNull()
+          expect(mermaidDiagram()).not.toBe(previous)
+        },
+        { timeout: 15_000 },
+      )
+      const shapes = [...(mermaidDiagram()?.querySelectorAll('rect, polygon, path') ?? [])]
+      expect(
+        shapes.map((shape) => getComputedStyle(shape).fill),
+        chart,
+      ).toContain('rgb(171, 205, 239)')
+    }
+  }, 30_000)
+
+  it('isolates custom classes during measurement and display', async () => {
+    renderDiagram(
+      false,
+      '```mermaid\ngraph TD\n A[Visible label]:::hidden --> B[End]\n classDef hidden fill:#abcdef\n```',
+    )
+    await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
+    const svg = mermaidDiagram()
+    const node = svg?.querySelector('.node')
+    expect(node).not.toBeNull()
+    expect(getComputedStyle(node!).display).not.toBe('none')
+    expect(node!.getBoundingClientRect().width).toBeGreaterThan(0)
+    expect(svg?.getRootNode()).toBeInstanceOf(ShadowRoot)
+    expect(document.querySelector('[data-markdown="mermaid-block"] [role="img"] svg')).toBeNull()
+  }, 30_000)
+
+  it('remeasures diagrams after the UI font changes', async () => {
+    renderDiagram(false)
+    await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
+    const original = mermaidDiagram()
+    document.documentElement.style.setProperty('--font-ui', 'monospace')
+    try {
+      await vi.waitFor(() => expect(mermaidDiagram()).not.toBe(original), { timeout: 5000 })
+      expect(mermaidDiagram()).not.toBeNull()
+    } finally {
+      document.documentElement.style.removeProperty('--font-ui')
+    }
+  }, 30_000)
+
   it('renders a diagram, math, raw HTML, and highlighted code together', async () => {
     const text = `${DIAGRAM}\n<kbd>Ctrl</kbd>\n\n$$\nx^2\n$$\n\n\`\`\`typescript\nconst value = 1\n\`\`\`\n`
     renderDiagram(false, text)

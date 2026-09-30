@@ -35,19 +35,27 @@ test('renderer configuration remains owned by its diagram until rendering settle
   })
   setMermaidLoader(async () => ({
     initialize: (config) => {
-      theme = config.theme
+      theme = (config.themeVariables as { darkMode: boolean }).darkMode
     },
     render,
   }))
   const renderer = await resourceQueryClient.query(mermaidQueryOptions)
-  const first = renderer.render('first', 'dark')
+  const first = renderer.render('first', {
+    colorMode: 'dark',
+    fontFamily: 'sans-serif',
+    variables: {},
+  })
   await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1))
-  const second = renderer.render('second', 'light')
+  const second = renderer.render('second', {
+    colorMode: 'light',
+    fontFamily: 'sans-serif',
+    variables: {},
+  })
   await Promise.resolve()
   expect(render).toHaveBeenCalledTimes(1)
   gate.resolve()
-  expect(await first).toBe('first:dark')
-  expect(await second).toBe('second:default')
+  expect(await first).toBe('first:true')
+  expect(await second).toBe('second:false')
 })
 
 test('remounting a diagram does not retry a failed library import', async () => {

@@ -2,9 +2,10 @@
 
 ## Status and authorization
 
-- Status: PARTIALLY DELIVERED, reconciled 2026-09-28. Phases 1, 2 and 4 landed. Remaining
-  wave 2 work: phases 0, 3, 5 and 6. The owner declined an editor shadow root on 2026-09-26;
-  no editor-root decision is pending. Research measurements below describe the historical baseline.
+- Status: IMPLEMENTED AND VERIFIED, 2026-09-30 foundations/closeout wave. Phases 0–6 are complete;
+  coordinated PR review, merge and mesh deployment follow. The owner declined an editor shadow root
+  on 2026-09-26; no editor-root decision is pending. Research measurements below describe the
+  historical baseline.
 - Phase 1 done 2026-09-26 (wave 2, lane E1): [singapore#42](https://github.com/ShaulLavo/singapore/pull/42),
   in `editor-ref` `ec3fc15`. `p179-type-burst` on a production build, two traces each: head
   `<style>` writes 42 → 1, style recalc 358 → 203 ms (1.26 → 0.71 ms per key on a busier machine
@@ -13,17 +14,76 @@
   `c130dd35a`, Editor `74e76be`. Origin: a discussion of the file tree's shadow root.
   [Plan 178](178-tree-in-the-app.md) removes that root; this plan asks where a root earns its place.
 
-## Remaining execution order
+## Current completion evidence
 
-Run phase 0 instrumentation before measuring phases 3 and 5. Then deliver Mermaid isolation,
-CSS cleanup and the phase 6 rule. No dependency on full completion of 099 or 114. Plan 156
-consumes the isolation policy; its PDF/CSV work can proceed independently of Mermaid delivery.
-Reproduce current costs before applying the old research thresholds.
+- [x] Phase 0: separate style/layout buckets; unique recalc counts and element p90/max;
+      ≥100-element costs; opt-in `trace --style-marks` for head/shadow style mutations, constructed-sheet
+      replacements and adopted-sheet assignments; opt-in `--selector-stats` with full/top selector
+      tables and per-step attribution. Inflated selector timings cannot use `--compare`.
+- [x] Phase 3: light-DOM measurement, grammar-safe `mermaid_user_` custom-class names, open shadow
+      roots for SVG display, one adopted display sheet per document, palette-derived Mermaid base
+      theme, UI-font observation and font readiness, and one safe render event per operation.
+- [x] Phase 5: separate zero-specificity single-class spinner selectors and flattened `@supports`.
+      Audited generated Tailwind star variants against the current typing phase; their highest
+      individual attribution remained under 0.5 ms across the burst with selector instrumentation.
+      Their existing behavior stays intact; the spinner universal-bucket rule was the measured target.
+- [x] Phase 6: the Content isolation paragraph in AGENTS.md defines Markdown, Mermaid, DOCX/library
+      output, script-capable HTML, image/SVG and PDF boundaries. Plan 156 consumes this policy.
 
-The 2026-09-28 source audit confirmed the sanitizer prefix and blob headers. Mermaid still
-renders in light DOM without palette/font invalidation, and `trace-summary.ts` still groups
-style recalc under layout. Phase 1's Editor delivery evidence remains below; no new performance
-or browser run was performed for this planning update.
+Browser regression reproduction failed before the change: `classDef hidden` computed
+`display: none`, and replacing `--font-ui` retained the old SVG. Both now pass. Real-render grammar
+coverage includes flowchart, state and class diagrams, preserving labels/comments and default
+styling. The state grammar rejects hyphenated class names, so the shared prefix uses underscores.
+Verification: 23 focused tests passed, workspace package builds completed, web/source and script
+typechecks passed, and repository gates passed. Renderer acquisition/serialization and source
+transformation tests pass; trace tests cover nested
+same-interval events and one following-recalc attribution for simultaneous stylesheet writes.
+
+UI fixture scenario `chat-mermaid` passed and all four screenshots were read in
+`/work/tmp/fregat-evidence/20260930T132820Z-scenario-chat-mermaid/`: visible custom class, remeasured
+UI font, Sage dark palette and Sage light palette. Only fixture providers ran.
+
+Current measured workload: a dedicated 150-line plain-text file, the standard 280-character editor
+burst at 5 ms per character, and 30 offscreen copies of the real rendered chat SVG. The copies
+retain the display boundary; this isolates stylesheet cost from syntax/LSP activity. Compare the
+`opened`→`typed` trace window, excluding chat setup and fixture teardown:
+
+| Workload                       | Style ms | Style ms/character | Recalcs |
+| ------------------------------ | -------- | ------------------ | ------- |
+| Before, 30 light-DOM diagrams  | 88.7     | 0.317              | 925     |
+| After, 30 shadow-root diagrams | 60.1     | 0.215              | 921     |
+| After, no diagrams             | 64.6     | 0.231              | 914     |
+
+Before trace: `/work/tmp/fregat-evidence/20260930T133859Z-trace-editor-mermaid-style/`.
+After `--compare` trace: `/work/tmp/fregat-evidence/20260930T134357Z-trace-editor-mermaid-style/`.
+Control `--compare` trace: `/work/tmp/fregat-evidence/20260930T134559Z-trace-editor-style-baseline/`.
+The after workload matches the control's style cost within this run's variation; this is a bounded
+CSS workload result, not a general editor throughput claim. Phase extraction and full selector
+atlases are retained under `/work/tmp/plan179-wave/`.
+
+Selector attribution traces are separate from timing traces:
+`20260930T134219Z-trace-editor-mermaid-style` before and
+`20260930T134426Z-trace-editor-mermaid-style` after, under `/work/tmp/fregat-evidence/`.
+During typing, spinner palette selectors went from 13,689 attempts with zero matches to zero
+attempts. Head style writes during typing were nine in both runs; this fixture includes input
+focus/initial geometry and does not reopen the already-delivered occurrence-rule work.
+
+The broader full-repository code-file trace was stopped by the wave scope's memory limit:
+`systemd-oomd` reported 6.5 GiB RAM plus 2 GiB swap on 2026-09-30 at 13:35:58 UTC. That incomplete
+run is excluded. Initial baseline fixture teardown produced missing-path requests; the scenario now
+returns to the owning checkout before its fixture is released. Final comparison/control runs have
+no failed requests or page errors. Desktop/no-adapter and screenshot GPU warnings remain recorded.
+
+The independent lane exposed a stale `editor-theme-preview` assertion on clean main: 15 recolors
+were five switches across three retained Shiki readers. Its exact census now lives in
+`theme-worker-requests.json`; the scenario verifies one recolor per reader per switch and stable
+reader identities. The repaired scenario passed at
+`/work/tmp/fregat-evidence/20260930T134457Z-scenario-editor-theme-preview/`.
+
+External-device limits: this wave's measurements are Chromium on Linux. No macOS/iPhone WebKit,
+IME or editor-shadow-root experiment was run. The editor remains in light DOM by owner direction.
+Canonical Editor sources now live in `editor/packages/editor/src/`; the historical `editor-ref`
+name below records the original research checkout only.
 
 ## Outcome
 
@@ -49,7 +109,7 @@ or nothing where the measurement says the boundary costs more than it saves.
 | HTML files, agent HTML output (none planned)          | Sandboxed iframe, opaque origin    | Only a sandbox stops script. `sandbox="allow-scripts"` without `allow-same-origin`, fed by `srcdoc` or a blob; never an app-origin URL.                                                        |
 | `/fs/blob` responses                                  | `nosniff` + `CSP: sandbox` headers | Defense in depth. Today a navigation is refused by the origin guard (below).                                                                                                                   |
 
-## Findings
+## Historical findings, 2026-09-26
 
 ### Instruments (research question 0)
 
@@ -184,11 +244,11 @@ serves as the scroll baseline.
    stylesheet and ids (docx-preview): a shadow root. Anything that may carry script: a sandboxed
    iframe with an opaque origin. Images and SVG files: `<img>`.
 
-## Proposed phases
+## Implementation checklist
 
 Each phase is independent and shippable. Verification runs through `agent:browser` as noted.
 
-0. **Instruments (S, `scripts/agent/`).**
+0. [x] **Instruments (S, `scripts/agent/`).**
    - `trace-summary.ts`: a `style` bucket beside `layout`; `recalcs` with count, element p90 and
      time in recalcs ≥100 elements; `compareTraceSummaries` rows for both. Extend
      `trace-summary.test.ts`.
@@ -197,22 +257,22 @@ Each phase is independent and shippable. Verification runs through `agent:browse
    - An injected `style-marks.ts` that marks each `<style>` text change and `adoptedStyleSheets`
      write; the summary charges the following recalc to it. Port from
      `/work/tmp/research2/179/agent/`.
-1. **Done (singapore#42).** **Editor: stop the occurrence-rule churn (S, Editor `virtualizedTextViewHighlights.ts`).** An
-   empty group keeps its rule (as `renderPaintGroup` already keeps it registered), so only a style
-   change bumps `rangeHighlightRuleVersion`. Gate: `trace editor-type-burst --compare` shows head
-   writes near 0 and style ≤0.35 ms per key. Editor-side test beside `editor.test.ts`'s
-   "updates semantic range highlights in place".
-2. **Done. Sanitizer prefix (S, `packages/markdown`).** `clobberPrefix: ''` into `toHast`, the default
-   `user-content-` prefix back in `sanitize-schema.ts`, in-document `#` hrefs rewritten in
-   `rehypeDecorate`. Tests: `hast.test.ts` footnote case plus `<img name="getSelection">`,
-   `<form name>`, raw `id`. Scenario: commit `p179-clobber` as `markdown-preview-clobber` (no page
-   errors, `typeof document.getSelection === 'function'`).
-   Landed 2026-09-26 (wave 2 lane B): `toHast` leaves ids bare, the sanitizer prefixes every
-   `id`, `name` and aria reference with `user-content-` (`MARKDOWN_ID_PREFIX`), and
-   `rehypeDecorate` prefixes in-document `#` hrefs; chat's fragment-link resolver drops the prefix
-   before matching a heading slug. Scenario `markdown-preview-clobber` fails on the old sanitizer
-   (`typeof document.getSelection === 'object'`) and passes now.
-3. **Mermaid in a root (M, `features/chat`).**
+1. [x] **Done (singapore#42).** **Editor: stop the occurrence-rule churn (S, Editor `virtualizedTextViewHighlights.ts`).** An
+       empty group keeps its rule (as `renderPaintGroup` already keeps it registered), so only a style
+       change bumps `rangeHighlightRuleVersion`. Gate: `trace editor-type-burst --compare` shows head
+       writes near 0 and style ≤0.35 ms per key. Editor-side test beside `editor.test.ts`'s
+       "updates semantic range highlights in place".
+2. [x] **Done. Sanitizer prefix (S, `packages/markdown`).** `clobberPrefix: ''` into `toHast`, the default
+       `user-content-` prefix back in `sanitize-schema.ts`, in-document `#` hrefs rewritten in
+       `rehypeDecorate`. Tests: `hast.test.ts` footnote case plus `<img name="getSelection">`,
+       `<form name>`, raw `id`. Scenario: commit `p179-clobber` as `markdown-preview-clobber` (no page
+       errors, `typeof document.getSelection === 'function'`).
+       Landed 2026-09-26 (wave 2 lane B): `toHast` leaves ids bare, the sanitizer prefixes every
+       `id`, `name` and aria reference with `user-content-` (`MARKDOWN_ID_PREFIX`), and
+       `rehypeDecorate` prefixes in-document `#` hrefs; chat's fragment-link resolver drops the prefix
+       before matching a heading slug. Scenario `markdown-preview-clobber` fails on the old sanitizer
+       (`typeof document.getSelection === 'object'`) and passes now.
+3. [x] **Mermaid in a root (M, `features/chat`).**
    - Render as today (light-DOM measurement), then mount the SVG into an open shadow root on the
      `role="img"` host with one adopted sheet shared by every diagram (`:host` font, colours from
      theme variables).
@@ -224,18 +284,18 @@ Each phase is independent and shippable. Verification runs through `agent:browse
    - Scenario `chat-mermaid` on the native-provider fixture: a `classDef hidden` diagram, a font
      switch, light and dark palettes; `look` on each. Gate: `trace editor-type-burst` with 30
      diagrams mounted matches the no-diagram baseline.
-4. **Done. `/fs/blob` headers (S, `apps/server/src/fs/routes.ts`).** `x-content-type-options: nosniff` on
-   every response; `content-security-policy: sandbox` on HTML, SVG and XML. Route test in
-   `apps/server/src/fs/tests/`.
-   Landed 2026-09-26 (wave 2 lane B), with `application/xhtml+xml` and XML covered too; route test
-   `fs/tests/blob-headers.test.ts`.
-5. **App CSS hygiene (S, `packages/ui/src/styles/globals.css`).** Move the spinner palette off the
-   universal bucket (a class-keyed selector at zero specificity via `:where()` around a single
-   class, the `@supports` block flattened), and audit the Tailwind `:is(… *)` star variants the
-   selector stats name. Gate: selector-stats attempts for those rules drop to near zero.
-6. **Isolation rule in AGENTS.md (S).** One paragraph: sanitized markup renders in light DOM with
-   prefixed ids; library output that ships its own stylesheet or ids gets a shadow root; anything
-   that can run script gets a sandboxed opaque-origin iframe. Plan 156's DOCX viewer follows it.
+4. [x] **Done. `/fs/blob` headers (S, `apps/server/src/fs/routes.ts`).** `x-content-type-options: nosniff` on
+       every response; `content-security-policy: sandbox` on HTML, SVG and XML. Route test in
+       `apps/server/src/fs/tests/`.
+       Landed 2026-09-26 (wave 2 lane B), with `application/xhtml+xml` and XML covered too; route test
+       `fs/tests/blob-headers.test.ts`.
+5. [x] **App CSS hygiene (S, `packages/ui/src/styles/globals.css`).** Move the spinner palette off the
+       universal bucket (a class-keyed selector at zero specificity via `:where()` around a single
+       class, the `@supports` block flattened), and audit the Tailwind `:is(… *)` star variants the
+       selector stats name. Gate: selector-stats attempts for those rules drop to near zero.
+6. [x] **Isolation rule in AGENTS.md (S).** One paragraph: sanitized markup renders in light DOM with
+       prefixed ids; library output that ships its own stylesheet or ids gets a shadow root; anything
+       that can run script gets a sandboxed opaque-origin iframe. Plan 156's DOCX viewer follows it.
 
 Dropped by the owner's no-go decision: the former editor-in-a-shadow-root `/dev` experiment.
 

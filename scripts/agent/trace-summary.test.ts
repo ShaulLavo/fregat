@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest'
 
 import { attributeSamples, decodeMainThreadSamples } from './trace-profile'
 import { sourceResolver } from './trace-source-maps'
-import { formatTraceSummary, summarizeTrace } from './trace-summary'
+import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
+import { summarizeSelectors } from './selector-stats'
 import { readTrace, type GeneratedFrame } from './trace-types'
 
 const main = { pid: 1, tid: 10 }
@@ -150,6 +151,75 @@ describe('sampled application frame attribution', () => {
 })
 
 describe('trace task summaries', () => {
+  test('separates style from layout and attributes each following recalc once', () => {
+    const raw = JSON.stringify([
+      event('RunTask', 0, 10_000),
+      mark('fregat:style-write:head', 100),
+      mark('fregat:style-write:adopted', 200),
+      { ...event('UpdateLayoutTree', 1000, 3000), args: { elementCount: 120 } },
+      { ...event('RecalculateStyles', 1000, 3000), args: { elementCount: 120 } },
+      event('ParseAuthorStyleSheet', 1500, 1000),
+      event('Layout', 5000, 2000),
+      { ...event('UpdateLayoutTree', 8000, 1000), args: { elementCount: 1 } },
+      { ...event('UpdateLayoutTree', 1000, 9000), pid: 2, args: { elementCount: 999 } },
+    ])
+    const summary = summarizeTrace(raw)
+    expect(summary.split.style).toBe(4)
+    expect(summary.split.layout).toBe(2)
+    expect(summary.recalcs).toEqual({
+      count: 2,
+      elementP90: 120,
+      elementMax: 120,
+      largeCount: 1,
+      largeDurationMs: 3,
+      writes: 2,
+      afterWriteCount: 1,
+      afterWriteDurationMs: 3,
+    })
+    expect(compareTraceSummaries(summary, summary).join('\n')).toContain('recalcs ≥100 elements ms')
+  })
+
+  test('reports empty style windows without undefined percentiles', () => {
+    expect(summarizeTrace('[]').recalcs).toEqual({
+      count: 0,
+      elementP90: 0,
+      elementMax: 0,
+      largeCount: 0,
+      largeDurationMs: 0,
+      writes: 0,
+      afterWriteCount: 0,
+      afterWriteDurationMs: 0,
+    })
+  })
+
+  test('aggregates selector attribution on the renderer thread and labels inflated timings', () => {
+    const timings = [
+      { selector: ':where(.spinner-bands)', 'elapsed (us)': 20, match_attempts: 2, match_count: 1 },
+      { selector: ':where(.spinner-bands)', 'elapsed (us)': 10, match_attempts: 3, match_count: 1 },
+      { selector: '*', 'elapsed (us)': 5, match_attempts: 10, match_count: 10 },
+    ]
+    const summary = summarizeSelectors(
+      JSON.stringify([
+        event('RunTask', 0, 1000),
+        { ...event('SelectorStats', 1), args: { selector_stats: { selector_timings: timings } } },
+        {
+          ...event('SelectorStats', 2),
+          pid: 2,
+          args: { selector_stats: { selector_timings: timings } },
+        },
+      ]),
+    )
+    expect(summary.events).toBe(1)
+    expect(summary.byTime[0]).toEqual({
+      selector: ':where(.spinner-bands)',
+      elapsedUs: 30,
+      attempts: 5,
+      matches: 2,
+    })
+    expect(summary.byAttempts[0]?.selector).toBe('*')
+    expect(summary.warning).toContain('inflates timings')
+  })
+
   test('shows the worst task in the pasted phase even when no task exceeds 50ms', () => {
     const raw = JSON.stringify([
       mark('fregat:scenario:start', 100),
