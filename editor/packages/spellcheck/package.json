@@ -24,7 +24,7 @@
     "build:dictionaries": "bun scripts/build-dictionaries.ts",
     "bench:engine": "bun bench/engine.ts",
     "test": "vitest run --project node --project dom --project browser --project engines",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
@@ -38,12 +38,11 @@
     "@singapore-editor/core": "workspace:*",
     "@singapore-editor/tree-sitter-languages": "workspace:*",
     "@types/node": "^26.6.3",
-    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitest/browser-playwright": "^5.0.2",
     "happy-dom": "^20.14.5",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
-    "typescript": "~6.0.3",
+    "typescript": "7.0.2",
     "vitest": "^5.0.2"
   },
   "peerDependencies": {

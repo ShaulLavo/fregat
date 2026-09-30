@@ -20,7 +20,7 @@
 
 import { parseArgs } from 'node:util'
 import { join, resolve } from 'node:path'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import type { PreloadBundle } from './fileProviderWorker'
 
 type Strategy = 'preload' | 'pull-project' | 'pull-open'

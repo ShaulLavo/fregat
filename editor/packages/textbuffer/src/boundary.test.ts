@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   applyBatchToPieceTable,

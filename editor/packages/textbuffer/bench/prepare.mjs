@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { fileHashes, gitBlobHash, pin, upstreamRoot } from './support.mjs'
 
 export async function prepare() {

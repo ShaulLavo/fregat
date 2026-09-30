@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { tsDiagnosticToLspDiagnostic } from '../src/tsDiagnostics'
 
 describe('TypeScript diagnostic conversion', () => {

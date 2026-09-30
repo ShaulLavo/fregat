@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { BUNDLED_LIBRARY_FILES } from './bundledLibraries'
 
 const CDN_ROOT = 'https://playgroundcdn.typescriptlang.org/cdn'

@@ -27,7 +27,7 @@
   "scripts": {
     "build": "bun ../../scripts/build-package.ts",
     "test": "vitest run",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
@@ -62,11 +62,10 @@
   "devDependencies": {
     "@singapore-editor/core": "workspace:*",
     "@types/node": "^26.6.3",
-    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "tree-sitter-cli": "0.27.0",
-    "typescript": "~6.0.3",
+    "typescript": "7.0.2",
     "vitest": "^5.0.2",
     "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0"
   },

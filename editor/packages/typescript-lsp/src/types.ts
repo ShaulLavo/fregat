@@ -18,7 +18,7 @@ import type {
   LanguageServerStatus,
   OnApplyWorkspaceEdit,
 } from '@singapore-editor/lsp-plugin'
-import type ts from 'typescript'
+import type ts from 'typescript-api'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 /**

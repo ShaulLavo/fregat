@@ -22,7 +22,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { performance } from 'node:perf_hooks'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { createRealTypeScriptService } from '../test/realTypeScriptService'
 
 type Sample = {

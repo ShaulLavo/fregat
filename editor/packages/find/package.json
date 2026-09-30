@@ -26,7 +26,7 @@
     "test": "vitest run",
     "bench:search": "bun bench/search.ts",
     "bench:matchers": "bun bench/matchers.ts",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."
@@ -34,12 +34,11 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@singapore-editor/core": "workspace:*",
-    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitest/browser-playwright": "^5.0.2",
     "happy-dom": "^20.14.5",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
-    "typescript": "~6.0.3",
+    "typescript": "7.0.2",
     "vitest": "^5.0.2"
   },
   "peerDependencies": {

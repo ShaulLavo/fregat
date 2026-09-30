@@ -1,4 +1,4 @@
-import type ts from 'typescript'
+import type ts from 'typescript-api'
 import type * as lsp from 'vscode-languageserver-protocol'
 import type { DocumentContext, ServiceContext } from './context'
 import { locationOf } from './context'

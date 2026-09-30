@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { describe, expect, test } from 'vitest'
 
 const root = fileURLToPath(new URL('../../../', import.meta.url))

@@ -21,7 +21,7 @@
   "scripts": {
     "build": "bun ../../scripts/build-package.ts",
     "test": "vitest run",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."
@@ -30,10 +30,9 @@
     "@singapore-editor/core": "workspace:*"
   },
   "devDependencies": {
-    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
-    "typescript": "~6.0.3",
+    "typescript": "7.0.2",
     "vitest": "^5.0.2"
   }
 }

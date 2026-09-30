@@ -1,4 +1,4 @@
-import type ts from 'typescript'
+import type ts from 'typescript-api'
 import type * as lsp from 'vscode-languageserver-protocol'
 import { locationsOf, type DocumentContext } from './context'
 import { isRecord, positionParam } from './protocol'

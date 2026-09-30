@@ -1,6 +1,6 @@
 import { lspPositionToOffset } from '@singapore-editor/lsp'
 import type { PublishDiagnosticsNotificationParams } from '@singapore-editor/lsp/types'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import type * as lsp from 'vscode-languageserver-protocol'
 import {
   documentUriToFileName,

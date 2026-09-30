@@ -3,7 +3,7 @@
  * owns, reading it either from a preloaded map or synchronously from the host, one call at a time.
  */
 
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { heapSize } from 'bun:jsc'
 
 declare const self: Worker

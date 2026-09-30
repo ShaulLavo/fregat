@@ -7,7 +7,7 @@
  */
 
 import { createWorkerLspTransport, LspClient } from '@singapore-editor/lsp'
-import ts from 'typescript'
+import ts from 'typescript-api'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
 import { createTypeScriptLanguageSession } from '../src/worker/session'

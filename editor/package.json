@@ -9,9 +9,9 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
-    "lint": "turbo lint",
-    "format": "turbo format",
-    "format:check": "turbo format:check",
+    "lint": "bun run lint:root && turbo lint",
+    "format": "bun run format:root && turbo format",
+    "format:check": "bun run format:check:root && turbo format:check",
     "health": "bun run check:full-text && bun scripts/command-reference.ts --check && bun scripts/architecture-health.mjs",
     "commands:reference": "bun scripts/command-reference.ts",
     "tree-sitter-x:update": "bun scripts/update-tree-sitter-x.ts",
@@ -22,12 +22,17 @@
     "test": "turbo test",
     "stress:build": "turbo build --filter=@singapore-editor/core --filter=@singapore-editor/decode --filter=@singapore-editor/find --filter=@singapore-editor/lsp --filter=@singapore-editor/markdown --filter=@singapore-editor/minimap --filter=@singapore-editor/scope-lines --filter=@singapore-editor/tree-sitter-languages --filter=@singapore-editor/paged",
     "bench:stress": "bun run stress:build && bun run --cwd examples/stress bench",
-    "bench:input": "bun run stress:build && bun run --cwd examples/stress bench:input"
+    "bench:input": "bun run stress:build && bun run --cwd examples/stress bench:input",
+    "lint:root": "oxlint --disable-nested-config scripts knip.ts",
+    "format:root": "oxfmt --write scripts .github .oxfmtrc.json .oxlintrc.json package.json turbo.json tsconfig.json global.d.ts knip.ts",
+    "format:check:root": "oxfmt --check scripts .github .oxfmtrc.json .oxlintrc.json package.json turbo.json tsconfig.json global.d.ts knip.ts"
   },
   "devDependencies": {
     "knip": "^6.38.0",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
     "turbo": "^2.11.4",
-    "typescript": "~6.0.3",
+    "typescript": "7.0.2",
     "typescript-api": "npm:typescript@~6.0.3",
     "vite": "8.3.1"
   },
