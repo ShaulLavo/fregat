@@ -54,6 +54,7 @@
     "editor.lineHeight",
     "editor.markdownRenderedPane",
     "editor.markdownView",
+    "editor.maxTokenizationLineLength",
     "editor.minimap.enabled",
     "editor.retainedTextBudget",
     "editor.spellcheck",

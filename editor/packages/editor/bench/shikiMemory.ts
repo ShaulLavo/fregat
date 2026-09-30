@@ -1,5 +1,6 @@
 import { createHighlighter } from 'shiki'
 import { createIncrementalTokenizer } from '../src/shiki/tokenizer'
+import { DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH } from '../src/shiki/workerClient'
 
 let retained: Awaited<ReturnType<typeof createIncrementalTokenizer>> | null = null
 const line = 'function value() {\n  return 123\n}\n'
@@ -15,6 +16,7 @@ const run = async (size: number) => {
     highlighter,
     lang: 'typescript',
     theme: 'github-dark',
+    maxLineLength: DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
     code,
   })
   const tokenizeMs = performance.now() - start

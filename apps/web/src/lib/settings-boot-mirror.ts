@@ -51,6 +51,7 @@ const MIRRORED_KEYS = [
   'editor.guides.indentation',
   'editor.minimap.enabled',
   'editor.largeFile.analysisLimitMiCodeUnits',
+  'editor.maxTokenizationLineLength',
   'editor.retainedTextBudget',
   'editor.history.retainedStates',
   'editor.history.persist',

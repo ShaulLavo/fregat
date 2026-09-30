@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createHighlighter } from 'shiki'
 
-import { createIncrementalTokenizer as createCoreIncrementalTokenizer } from '../../src/shiki'
+import {
+  createIncrementalTokenizer as createCoreIncrementalTokenizer,
+  DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
+} from '../../src/shiki'
 
 type TestTokenizerOptions = {
   lang: string
@@ -19,7 +22,11 @@ async function createIncrementalTokenizer(options: TestTokenizerOptions) {
       langs: [options.lang],
     })) as unknown as import('shiki/core').HighlighterGeneric<string, string>)
 
-  return createCoreIncrementalTokenizer({ ...options, highlighter })
+  return createCoreIncrementalTokenizer({
+    maxLineLength: DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
+    ...options,
+    highlighter,
+  })
 }
 
 function flattenTokens(line: readonly { content: string }[]): string {
@@ -540,6 +547,7 @@ describe('grammar state stabilization', () => {
     const { tokenizer } = await createCoreIncrementalTokenizer({
       lang: 'typescript',
       theme: 'github-dark',
+      maxLineLength: DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
       code: 'const a = 1',
       highlighter: real,
     })

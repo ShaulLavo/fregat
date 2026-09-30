@@ -11,7 +11,12 @@ export {
 } from './theme'
 export { editorThemeFromShikiTheme } from './theme-extract'
 export { editorThemeFromVscodeTheme, VSCODE_THEMES } from './vscode-themes'
-export { canUseShikiWorker, createShikiWorkerOwner, ShikiWorkerOwner } from './workerClient'
+export {
+  canUseShikiWorker,
+  createShikiWorkerOwner,
+  DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
+  ShikiWorkerOwner,
+} from './workerClient'
 
 export { snapshotToEditorTokens, tokenLinesToEditorTokens } from './editor-tokens'
 

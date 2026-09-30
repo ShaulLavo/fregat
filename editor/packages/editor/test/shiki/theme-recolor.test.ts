@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { createHighlighter, type ThemedToken, type BundledTheme } from 'shiki'
 import { createIncrementalTokenizer } from '../../src/shiki/tokenizer'
+import { DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH } from '../../src/shiki/workerClient'
 
 function paintedCharacters(lines: readonly (readonly ThemedToken[])[]) {
   return lines.map((line) =>
@@ -36,6 +37,7 @@ async function verifyLanguage(
     '/* comment\n continued */\nconst value = `hello ${42}`;\n<div title="hello">text</div>\n# Heading\n**bold** and *italic*\n```ts\nconst n = 1\n```'
   const { tokenizer } = await createIncrementalTokenizer({
     highlighter,
+    maxLineLength: DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH,
     lang,
     theme: themes[0]!,
     code,

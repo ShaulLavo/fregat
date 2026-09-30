@@ -65,7 +65,7 @@ describe('shiki worker', () => {
     ;(globalThis as { self?: unknown }).self = { postMessage }
     createHighlighterCore.mockResolvedValue({ dispose, ...languageApi() })
     createIncrementalTokenizer.mockResolvedValue({
-      tokenizer: { getSnapshot: () => ({ lines: [] }) },
+      tokenizer: { getSnapshot: () => ({ lines: [] }), untokenizedLineCount: () => 0 },
     })
     await import('../../src/shiki/shiki.worker')
 
@@ -197,6 +197,7 @@ describe('shiki worker', () => {
     createHighlighterCore.mockResolvedValue({ getTheme, ...languageApi() })
     createIncrementalTokenizer.mockResolvedValue({
       tokenizer: {
+        untokenizedLineCount: () => 0,
         getSnapshot: () => ({
           lines: [
             {
@@ -286,6 +287,7 @@ describe('shiki worker', () => {
     createIncrementalTokenizer.mockResolvedValue({
       tokenizer: {
         applyEdits,
+        untokenizedLineCount: () => 0,
         getSnapshot: () => ({
           lines: [
             { text: 'const', tokens: [] },
@@ -566,7 +568,7 @@ describe('shiki worker grammar loading', () => {
     ;(globalThis as { self?: unknown }).self = { postMessage }
     createHighlighterCore.mockResolvedValue({ getTheme, ...api })
     createIncrementalTokenizer.mockResolvedValue({
-      tokenizer: { getSnapshot: () => ({ lines: [] }) },
+      tokenizer: { getSnapshot: () => ({ lines: [] }), untokenizedLineCount: () => 0 },
     })
     await import('../../src/shiki/shiki.worker')
 

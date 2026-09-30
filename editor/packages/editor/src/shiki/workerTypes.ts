@@ -28,6 +28,8 @@ export type ShikiWorkerDocumentOptions = {
   readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
   readonly themeRegistration: ShikiWorkerThemeRegistration
   readonly themeRegistrations: readonly ShikiWorkerThemeRegistration[]
+  /** Longest line, in UTF-16 units, that is tokenized; longer lines stay plain. */
+  readonly maxLineLength: number
 }
 
 export type ShikiWorkerOpenRequest = ShikiWorkerDocumentOptions & {
@@ -87,6 +89,7 @@ export type ShikiWorkerHighlightRequest = {
   readonly theme: string
   readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
   readonly themeRegistration: ShikiWorkerThemeRegistration
+  readonly maxLineLength: number
 }
 
 export type ShikiWorkerPreloadRequest = {
@@ -114,6 +117,8 @@ export type ShikiWorkerTransportResult = {
   readonly tokensPacked?: PackedEditorTokens
   readonly patchesPacked?: readonly PackedEditorTokenPatch[]
   readonly theme?: EditorTheme
+  /** Lines of the tokenized text left plain by the tokenization limit. */
+  readonly untokenizedLines?: number
 }
 
 export type ShikiWorkerRequest = {

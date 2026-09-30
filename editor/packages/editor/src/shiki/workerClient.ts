@@ -78,12 +78,20 @@ export type ShikiWorkerOwnerSnapshot = {
   readonly cache: ShikiWorkerCacheSnapshot
   readonly workerGeneration: number
   readonly lastError: string | null
+  readonly maxTokenizationLineLength: number
+  /** Plain lines across the live sessions' latest tokens. */
+  readonly untokenizedLines: number
 }
 
 export type ShikiWorkerOwnerOptions = {
   readonly workerFactory?: () => Worker
   readonly onError?: (error: Error) => void
+  /** Read on every open and snippet request, so a changed value reaches each document's next request. */
+  readonly maxTokenizationLineLength?: () => number
 }
+
+/** VS Code's `editor.maxTokenizationLineLength` default. */
+export const DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH = 20_000
 
 export const canUseShikiWorker = (): boolean => supportsWorkers()
 
@@ -102,8 +110,16 @@ export class ShikiWorkerOwner {
   private readonly clientTasks = new Set<Promise<unknown>>()
   private readonly runtimeTasks = new Map<string, Set<Promise<unknown>>>()
   private readonly themeRequests = new Map<string, Promise<EditorTheme | null | undefined>>()
+  private readonly sessions = new Set<ShikiHighlighterSession>()
 
   public constructor(private readonly options: ShikiWorkerOwnerOptions = {}) {}
+
+  public maxTokenizationLineLength(): number {
+    const value = this.options.maxTokenizationLineLength?.()
+    if (value === undefined || !Number.isInteger(value) || value < 1)
+      return DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH
+    return value
+  }
 
   public canUseWorker(): boolean {
     if (this.lifecycle === 'disposing' || this.lifecycle === 'disposed') return false
@@ -117,14 +133,24 @@ export class ShikiWorkerOwner {
       cache: { themeRequests: this.themeRequests.size },
       workerGeneration: this.workerGeneration,
       lastError: this.lastError?.message ?? null,
+      maxTokenizationLineLength: this.maxTokenizationLineLength(),
+      untokenizedLines: Array.from(this.sessions).reduce(
+        (sum, session) => sum + session.untokenizedLines,
+        0,
+      ),
     }
   }
 
   public createSession(options: ShikiHighlighterSessionOptions): EditorHighlighterSession | null {
     if (!this.canUseWorker()) return null
-    return new ShikiHighlighterSession(options, this, (runtimeSessionId, task) =>
-      this.trackRuntimeTask(runtimeSessionId, task),
+    const session = new ShikiHighlighterSession(
+      options,
+      this,
+      (runtimeSessionId, task) => this.trackRuntimeTask(runtimeSessionId, task),
+      () => this.sessions.delete(session),
     )
+    this.sessions.add(session)
+    return session
   }
 
   public loadTheme(options: ShikiThemeOptions): Promise<EditorTheme | null | undefined> {
@@ -166,9 +192,14 @@ export class ShikiWorkerOwner {
 
   /** Tokenizes one snippet in the shared worker; the worker keeps no state for it. */
   public highlight(
-    request: Omit<ShikiWorkerHighlightRequest, 'type'>,
+    request: Omit<ShikiWorkerHighlightRequest, 'type' | 'maxLineLength'>,
   ): Promise<ShikiWorkerTransportResult | undefined> {
-    return this.trackClientTask(this.postRequest({ type: 'highlight', ...request }, true))
+    return this.trackClientTask(
+      this.postRequest(
+        { type: 'highlight', ...request, maxLineLength: this.maxTokenizationLineLength() },
+        true,
+      ),
+    )
   }
 
   public preload(registrations: ShikiPreloadRegistrations): Promise<void> {
@@ -370,11 +401,15 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
   private workerGeneration = 0
   private disposed = false
   private task: Promise<void> = Promise.resolve()
+  // The limit the worker document was opened with; a different current limit reopens it.
+  private openedLineLimit = 0
+  public untokenizedLines = 0
 
   public constructor(
     private readonly options: ShikiHighlighterSessionOptions,
     private readonly owner: ShikiWorkerOwner,
     private readonly trackTask: <T>(runtimeSessionId: string, task: Promise<T>) => Promise<T>,
+    private readonly onDisposed: () => void,
   ) {
     this.documentId = options.documentId
     this.runtimeSessionId = options.runtimeSessionId ?? createEditorRuntimeSessionId()
@@ -415,6 +450,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
       this.workerGeneration = this.owner.inspect().workerGeneration
       this.disposed = false
       this.store = result?.tokensPacked ? EditorTokenStore.fromPacked(result.tokensPacked) : null
+      this.untokenizedLines = result?.untokenizedLines ?? 0
       this.currentTheme = result?.theme
       return { tokens: this.currentTokens(), theme: result?.theme }
     })
@@ -450,6 +486,8 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
 
     this.disposed = true
     this.opened = false
+    this.untokenizedLines = 0
+    this.onDisposed()
     const dispose = this.task.then(
       () => this.owner.disposeDocument(this.runtimeSessionId),
       () => this.owner.disposeDocument(this.runtimeSessionId),
@@ -478,6 +516,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
     if (worker.lifecycle !== 'ready' || worker.workerGeneration !== this.workerGeneration) {
       this.opened = false
     }
+    if (this.openedLineLimit !== worker.maxTokenizationLineLength) this.opened = false
     const next = this.options.resolveTheme?.(this.theme)
     if (!next || next.theme === this.theme) return
 
@@ -505,6 +544,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
 
   private adoptEditResult(result: ShikiWorkerTransportResult | undefined): void {
     if (result?.theme !== undefined) this.currentTheme = result.theme
+    if (result?.untokenizedLines !== undefined) this.untokenizedLines = result.untokenizedLines
     if (result?.tokensPacked) {
       this.store = EditorTokenStore.fromPacked(result.tokensPacked)
       return
@@ -551,6 +591,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
 
   private async documentOptions(): Promise<ShikiWorkerDocumentOptions> {
     const registrations = await this.registrations
+    this.openedLineLimit = this.owner.maxTokenizationLineLength()
     return {
       documentId: this.documentId,
       runtimeSessionId: this.runtimeSessionId,
@@ -559,6 +600,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
       languageRegistrations: registrations.languageRegistrations,
       themeRegistration: registrations.themeRegistration,
       themeRegistrations: registrations.themeRegistrations,
+      maxLineLength: this.openedLineLimit,
     }
   }
 
