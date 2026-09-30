@@ -2,7 +2,7 @@
 
 ## Status and outcome
 
-- Status: APPROVED, 2026-09-27. Delivered 2026-09-30: [PR #202](https://github.com/ShaulLavo/fregat/pull/202) was independently reviewed, its repairs were checked, and it merged as `bfabd3cb7`. Web release `20260930T163634Z-bfabd3cb-main` passed its live check and a read-back mesh `look`; the Editor, Ghostty and hotkeys mirrors were green at their exact heads. Remaining limits are listed under "Progress 2026-09-30".
+- Status: APPROVED, 2026-09-27. Delivered 2026-09-30: [PR #202](https://github.com/ShaulLavo/fregat/pull/202) was independently reviewed, its repairs were checked, and it merged as `bfabd3cb7`. Web release `20260930T163634Z-bfabd3cb-main` passed its live check and a read-back mesh `look`; the Editor, Ghostty and hotkeys mirrors were green at their exact heads. [PR #212](https://github.com/ShaulLavo/fregat/pull/212) (`c65b3407e`) added the WebKit Settings and bounded typing harness proofs recorded below. Remaining limits are listed under "Progress 2026-09-30".
 - Inspected: Platform `9c08916bf`, linked Editor `52099144`. Recheck both heads and CI's `editor-ref` before implementation.
 - Outcome: Editor supplies one reusable highlighting service. Plugins, diffs, Settings previews, and rendered code consume it. Platform supplies configuration and theme data without selecting engines or constructing workers.
 - Scope: a facade over existing Editor providers/workers, followed by bounded consumer migrations. Other plugin candidates are assessment only. Wallpaper image loading and Settings layout remain separate work.

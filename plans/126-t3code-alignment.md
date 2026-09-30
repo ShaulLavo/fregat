@@ -16,7 +16,7 @@ The [bounded foundations delivery](126-t3code-alignment/bounded-closeout-2026-09
 fresh two-owner lifecycle proofs, partial bulk failures, a scoped Codex background-terminal
 cleanup guard and actual fixture API restart evidence. It merged in
 [PR #210](https://github.com/ShaulLavo/fregat/pull/210) as `4edb43b18` after independent review;
-it is not yet in a production server release. Whole-row statuses and the remaining desktop,
+it shipped to server and web as `20260930T173217Z-4edb43b1-main`. Whole-row statuses and the remaining desktop,
 state-loss and live-account gates stay open.
 
 LIFE-01/02 shipped on 2026-09-20. Rewind/native permissions/PR lookup have an initial deployment and follow-up validation in [delivery evidence](126-t3code-alignment/rewind-permissions-delivery.md); bounded delivery and MCP approval implementation are recorded in [their delivery evidence](126-t3code-alignment/live-delivery-approvals-delivery.md). The active-list exceptions and automatic unarchive are removed; archive eligibility is separate from settlement. See [archive delivery evidence](126-t3code-alignment/archive-delivery.md). The source-derived archive fixture is the first focused conformance case, not completion of Wave 0 or proof of full upstream parity.

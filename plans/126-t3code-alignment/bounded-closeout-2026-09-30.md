@@ -5,7 +5,8 @@ and a scoped idle-cleanup guard. [PR #210](https://github.com/ShaulLavo/fregat/p
 as `4edb43b18` after independent review, with all PR checks green. On the final PR head
 `614e672fe`, which contains main `3ca862a4b`, a throwaway source server passed `look --doctor`,
 native background liveness, two-owner bulk failure/Undo and the scoped silent-terminal guard.
-Production server deployment is still pending.
+It shipped to server and web as `20260930T173217Z-4edb43b1-main`
+(live check passed, mesh `look` read back); the terminal host kept its earlier build.
 Plan 126 remains open for its other acceptance and owner gates.
 The ledger's row statuses stay in progress because these cases do not certify each whole group.
 

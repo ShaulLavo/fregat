@@ -10,10 +10,13 @@ The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remai
 work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
 snapshot; this file remains the scheduler and each plan remains its scope authority.
 
-1. **Finish the foundations wave.** 132, 179, 197, 099 unit 1 and 198's foundation contracts
-   are delivered; 126's bounded proofs are merged but not yet on the production server. Open:
-   099 unit 0's calibration matrix, the WebKit Settings and typing-trace harness proof, and a
-   verified server release. See [the wave record](docs/next-wave.md#foundations-wave-2026-09-30).
+1. **Finish the foundations wave.** 132, 179, 197, 099 unit 1, 198's foundation contracts and
+   126's bounded proofs are delivered and deployed; #212 merged the WebKit Settings and bounded
+   typing harness proof. Still required: bounded Shiki/Tree-sitter worker disposal, Plan 099's
+   reconciliation of the unsupported long-line consumer cases, 099 unit 0's calibration
+   matrix, the unresolved Undo probe and a final verified release. Marking the long-line
+   fixture unsupported does not close unit 0 or the wave. See
+   [the wave record](docs/next-wave.md#foundations-wave-2026-09-30).
 2. **Continue the owner's closeout queue: 114 → 126 → 156 P0–P2.** This is a default work
    order, not a chain of prerequisites; [the closeout table](#wave-2-closeout-and-dependency-order)
    names the dependencies that matter.
@@ -75,7 +78,7 @@ a chain of prerequisites. Independent work can move earlier. See the
 | [179: content isolation](plans/179-isolating-foreign-content.md)   | Delivered in PR #204. Its isolation policy applies to 156.                                                                                                                     |
 | [099: document contributions](plans/099-document-contributions.md) | Unit 1 publication, with 198's retained-analysis subscriber, is delivered in PR #203. Unit 0's native-input calibration is in progress. Units 2–7 retain their explicit gate.  |
 | [114: desktop shell](plans/114-polaron-shell.md)                   | Preserve mesh-owned servers and terminals. Native host checks precede Electrobun removal.                                                                                      |
-| [126: T3 alignment](plans/126-t3code-alignment.md)                 | Bounded proofs merged in PR #210; the row ledger stays open. Desktop host cases consume 114; independent chat/provider/server proofs can run earlier.                          |
+| [126: T3 alignment](plans/126-t3code-alignment.md)                 | Bounded proofs shipped in PR #210; the row ledger stays open. Desktop host cases consume 114; independent chat/provider/server proofs can run earlier.                         |
 | [156: rich documents](plans/156-documents-in-the-editor.md)        | P0–P2 use existing file/buffer identity and the isolation policy. Binary guards and PDF viewing do not need all of 099 or 126. Later format/editing phases retain their gates. |
 
 This queue does not certify other plans as complete or authorize gated implementation, account

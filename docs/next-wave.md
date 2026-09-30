@@ -46,39 +46,58 @@ is done.
 GitHub PR numbers are not plan numbers. PR #202 delivered Plan 197 and PR #204 delivered Plan
 179; PRs #205–#209 are CI and test repairs unrelated to Plans 205–209.
 
-| PR   | Delivered                                                                                 | Merge       | Shipped in                           | Limits                                                                              |
-| ---- | ----------------------------------------------------------------------------------------- | ----------- | ------------------------------------ | ----------------------------------------------------------------------------------- |
-| #203 | 099 unit 1 captured-frame publication; 198 configuration/range/cancel/retention contracts | `cf4e84419` | web `20260930T153009Z-cf4e8441-main` | 099 unit 0 unfinished; 198 acceptance matrix open                                   |
-| #204 | 179 phases 0, 3, 5 and 6: Mermaid isolation, instruments, CSS, isolation rule             | `3293142d2` | web `20260930T161942Z-7076858b-main` | No physical Mac/iPhone check                                                        |
-| #205 | Paged-session hook tests control index invalidation order (test only)                     | `5c8c7310b` | same batch                           | No product code                                                                     |
-| #206 | Textbuffer CI installs only its package; benchmark control vendored                       | `3a0f097d6` | same batch                           | npm and matplotlib still need the network; no offline install claim                 |
-| #207 | Deploy builds workspace exports before web type checks                                    | `7076858b1` | same batch                           | None recorded                                                                       |
-| #202 | 197 highlighting service; editors, previews, Markdown and prepared diffs migrated         | `bfabd3cb7` | web `20260930T163634Z-bfabd3cb-main` | WebKit Settings and full typing-trace proofs are in the harness lane; no iPhone run |
-| #209 | tree-sitter-x update workflow recovers stranded branches and existing PRs                 | `ef44ea220` | CI only                              | Main run 36748860722 reconciled PR #208, which stays open and unmerged              |
-| #210 | 126 bounded two-owner lifecycle proofs, fixture Settings repair, silent-terminal guard    | `4edb43b18` | not yet                              | Full 126 row ledger, desktop, state-loss and live-account gates stay open           |
+| PR   | Delivered                                                                                          | Merge       | Shipped in                                      | Limits                                                                                                                                                      |
+| ---- | -------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #203 | 099 unit 1 captured-frame publication; 198 configuration/range/cancel/retention contracts          | `cf4e84419` | web `20260930T153009Z-cf4e8441-main`            | 099 unit 0 unfinished; 198 acceptance matrix open                                                                                                           |
+| #204 | 179 phases 0, 3, 5 and 6: Mermaid isolation, instruments, CSS, isolation rule                      | `3293142d2` | web `20260930T161942Z-7076858b-main`            | No physical Mac/iPhone check                                                                                                                                |
+| #205 | Paged-session hook tests control index invalidation order (test only)                              | `5c8c7310b` | same batch                                      | No product code                                                                                                                                             |
+| #206 | Textbuffer CI installs only its package; benchmark control vendored                                | `3a0f097d6` | same batch                                      | npm and matplotlib still need the network; no offline install claim                                                                                         |
+| #207 | Deploy builds workspace exports before web type checks                                             | `7076858b1` | same batch                                      | None recorded                                                                                                                                               |
+| #202 | 197 highlighting service; editors, previews, Markdown and prepared diffs migrated                  | `bfabd3cb7` | web `20260930T163634Z-bfabd3cb-main`            | WebKit Settings and full typing-trace proofs are in the harness lane; no iPhone run                                                                         |
+| #209 | tree-sitter-x update workflow recovers stranded branches and existing PRs                          | `ef44ea220` | CI only                                         | Main run 36748860722 reconciled PR #208, which stays open and unmerged                                                                                      |
+| #210 | 126 bounded two-owner lifecycle proofs, fixture Settings repair, silent-terminal guard             | `4edb43b18` | server and web `20260930T173217Z-4edb43b1-main` | Full 126 row ledger, desktop, state-loss and live-account gates stay open                                                                                   |
+| #212 | Harness: WebKit Settings shortcut driving; bounded 305-character comment-typing scenario and trace | `c65b3407e` | harness only                                    | Request marks share one interval; no proof of worker overlap, queue wait, reply latency or performance. Function-burst Undo and full-checkout OOM stay open |
 
-At 17:26 UTC `/platform/release` reported server and web `20260930T170518Z-3ca862a4-main`
-(live check passed). That release contains every row above except #210. Its terminal host still
-runs build `20260930T153616Z-c47bd174`, deployed by another session from an unmerged branch.
+The wave coordinator deployed #210 to server and web as `20260930T173217Z-4edb43b1-main` (commit `4edb43b18`,
+dirty 0, no pending release, live check passed at 17:32:35Z) and read back a healthy mesh
+`look` (`/work/tmp/fregat-evidence/20260930T173300Z-look-platform-1440x1000/`). The five-minute
+production log window is not empty: it holds restart disconnects and another session's request
+to a wrong release path. The terminal host (pid 2692, build `20260930T153616Z-c47bd174` from
+another session's unmerged branch) predates the release and survived the restart. `/release`
+still reported this state at 17:57 UTC; peers can advance it, so read it before citing it.
 Main `405d70b56` (Git diff paths) and `3ca862a4b` (app-save hot-update skip removed, see 132)
-came from other sessions; they are not wave work.
+came from other sessions and were independently reviewed after landing; they are not wave work.
 
 Remaining before the wave closes:
 
-- [ ] 099 unit 0: the full expanded native-input calibration. Baseline `2ac20743c` is frozen with
-      its complete package source/build set and hashed fixtures. Each configuration needs three
-      unchanged controls, an independent holdout, a delayed negative and the candidate, then
-      independent review and merge. No complete matrix exists yet. The Shiki 1 MB long-line
-      baseline did not settle within 400 s; the author is defining an explicit busy-worker input
-      measurement, which is not a claim that long-line syntax completes. Plan 099 and its proof
-      documents belong to that author (`wave/foundations-input-calibration`).
-- [ ] Harness proof: the WebKit Settings shortcut scenario and the full typing trace
-      (`editor-type-burst`, killed by the 7 GB heavy-slot memory cap). The WebKit desktop/mobile scenario passes
-      locally; traces are still being tightened. No PR yet.
-- [ ] Server release of current main with #210; read the served release, live check, production
-      logs and a mesh `look`.
-- [ ] Main CI and the three package mirrors green on the final head.
-- [ ] Merge this reconciliation after independent review; record the final release here.
+- [ ] 099 unit 0: the full expanded native-input calibration, owned by the Plan 099 author
+      (`wave/foundations-input-calibration`), who also owns that plan and its proof documents.
+      Instrument `dbdaa7ced` runs baseline `2ac20743c` and candidate `3a0f097d6` package sets,
+      both frozen with hashed fixtures. Native passes its three controls and holdout, its real
+      delayed negative fails all 36 dispatch groups, and its candidate passes the frozen
+      108-blocking matrix. The Tree-sitter candidate is running; eight configurations remain.
+- [ ] Bounded worker disposal. Shiki's and Tree-sitter's worker owners await a disposal reply
+      before `terminate()`, so a busy worker stalls disposal and leaks. The Shiki 1 MB-line
+      baseline reproduces it: the worker sat at 100% CPU with no sample in 400 s. A separate
+      author (`wave/worker-cleanup`) reproduces it with busy and unresponsive transports and a
+      real Chromium worker; no PR yet. It needs independent review and merge.
+- [ ] Long-line reconciliation in Plan 099. The five Shiki-bearing configurations (`shiki`,
+      `tree-sitter-shiki`, `shiki-minimap`, `all`, `platform`) record the long-line fixture as
+      unsupported. That record is baseline evidence only. The plan must reconcile each
+      long-line consumer case and keep the original 108-blocking/36-advisory native input
+      acceptance. A matrix that excludes those cases cannot close unit 0 or this wave, and
+      an in-flight measurement is no claim that long-line syntax settles.
+- [x] Harness proof (#212): Playwright WebKit 26.6 opens Settings at 1440×1000 and with touch
+      at 390×844, asserting off-screen, dark-only and light previews. A 305-character comment scenario and trace
+      record two snippet and 29 document requests, bounded as the #212 row says.
+- [ ] The original `editor-type-burst` function typing and Undo probe. An exact restoration
+      check failed, but its later failure screenshot shows the original nine lines, so no
+      product history defect is established. The full-checkout trace's memory cause is unconfirmed.
+      The worker-cleanup author takes this after the disposal fix.
+- [x] Server release with #210: `20260930T173217Z-4edb43b1-main`, live check and mesh `look` read.
+- [ ] Main CI and the three package mirrors green on the final head, then a final release with
+      any remaining wave fixes.
+- [ ] Merge this reconciliation after independent review.
 
 Not delivered by this wave: the tree-sitter-x bump in PR #208, 099 units 2–7, 198's acceptance
 matrix, the rest of 126, and all of 114 and 156. Physical Mac/iPhone and live-account checks are
