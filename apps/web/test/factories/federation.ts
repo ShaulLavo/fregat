@@ -30,6 +30,7 @@ import { installTestClient } from './client-binding'
 import { createInProcessClient } from '../client'
 import { makeTestServer, type TestServer } from '../server'
 import { runGit } from './git'
+import { registerRequestOwner } from '../env/request-lifecycle'
 
 export async function createFederationHarness(serverA: TestServer, remote?: TestServer) {
   const serverB =
@@ -85,6 +86,7 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
         },
       }),
   })
+  registerRequestOwner(connections.stop)
   connections.configureMachines({
     remote: { kind: 'origin', url: originB, label: 'Remote fixture' },
     alias: { kind: 'origin', url: originA, label: 'Local alias' },
