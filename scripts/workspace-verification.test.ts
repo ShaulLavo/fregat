@@ -51,3 +51,11 @@ test('canonical ghostty CI checks the host package when native artifacts are ass
   const host = steps.find((step) => step.run === 'bun run --cwd ghostty-webgpu test:package:host')
   expect(host?.if).toBe("${{ steps.native-state.outputs.state == 'assembled' }}")
 })
+
+test('standalone Editor checks shared runtime identity and Markdown initialization', () => {
+  const steps = readWorkflow('workspace-libraries.yml').jobs.standalone!.steps
+  const runtime = steps.find((step) => step.name === 'Check standalone tree-sitter runtime')
+  expect(runtime?.if).toBe("${{ matrix.family == 'editor' }}")
+  expect(runtime?.['working-directory']).toBe('${{ runner.temp }}/mirror')
+  expect(runtime?.run).toBe('bun run --cwd packages/tree-sitter test:runtime')
+})

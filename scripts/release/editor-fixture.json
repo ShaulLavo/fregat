@@ -105,7 +105,7 @@
         "happy-dom": "^20.14.5",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
-        "tree-sitter-md": "0.1.1",
+        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#db47282b5bf84f90b5f73968e0441c4a26e6f886",
         "typescript": "~6.0.3",
         "vitest": "^5.0.2"
       }
@@ -189,7 +189,7 @@
         "@singapore-editor/core": "workspace:*",
         "micromark-util-decode-string": "2.0.1",
         "micromark-util-normalize-identifier": "2.0.1",
-        "tree-sitter-md": "0.1.1"
+        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#db47282b5bf84f90b5f73968e0441c4a26e6f886"
       },
       "devDependencies": {
         "@types/node": "^26.6.3",
@@ -385,7 +385,7 @@
         "tree-sitter-java": "0.23.5",
         "tree-sitter-javascript": "0.25.0",
         "tree-sitter-json": "0.24.8",
-        "tree-sitter-md": "0.1.1",
+        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#db47282b5bf84f90b5f73968e0441c4a26e6f886",
         "tree-sitter-php": "0.24.2",
         "tree-sitter-python": "0.25.0",
         "tree-sitter-rust": "0.24.0",
@@ -413,7 +413,7 @@
       "version": "0.1.1",
       "dependencies": {
         "@singapore-editor/core": "workspace:*",
-        "tree-sitter-md": "0.1.1",
+        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#db47282b5bf84f90b5f73968e0441c4a26e6f886",
         "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0"
       },
       "devDependencies": {

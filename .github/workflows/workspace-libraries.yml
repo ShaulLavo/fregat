@@ -81,3 +81,7 @@ jobs:
       - name: Install and verify standalone package graph
         working-directory: ${{ runner.temp }}/mirror
         run: bun install && bun run build && bun run typecheck && bun run lint && bun run format:check
+      - name: Check standalone tree-sitter runtime
+        if: ${{ matrix.family == 'editor' }}
+        working-directory: ${{ runner.temp }}/mirror
+        run: bun run --cwd packages/tree-sitter test:runtime
