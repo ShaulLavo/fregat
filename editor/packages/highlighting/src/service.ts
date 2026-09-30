@@ -4,7 +4,11 @@ import {
   createPieceTableSnapshot,
 } from '@singapore-editor/core/document'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
-import { resolveEditorThemeColor, type EditorTheme } from '@singapore-editor/core/rendering'
+import {
+  effectiveEditorTheme,
+  resolveEditorThemeColor,
+  type EditorTheme,
+} from '@singapore-editor/core/rendering'
 import { toEditorTokenStore, type EditorToken } from '@singapore-editor/core/syntax'
 import {
   createShikiHighlighterProvider,
@@ -29,7 +33,12 @@ import { bundledThemes } from 'shiki/themes'
 
 import { DiffSyntaxStore, type DiffSyntaxSnapshot, type HighlightingDiffView } from './diffs'
 import { HIGHLIGHTING_DOCUMENT_LANGUAGES, highlightingGrammar, loadGrammar } from './languages'
-import { resolveHighlightTheme, workerThemeRegistration, type HighlightTheme } from './theme'
+import {
+  resolveHighlightTheme,
+  revisionName,
+  workerThemeRegistration,
+  type HighlightTheme,
+} from './theme'
 
 /** A language a host expects to open, by editor language id and optionally a path for inference. */
 export type HighlightingLanguage = {
@@ -185,6 +194,13 @@ class EditorHighlightingService implements HighlightingService {
   private nextSnippetId = 1
   private readonly grammars = new Map<string, Promise<readonly ShikiWorkerLanguageRegistration[]>>()
   private readonly pending = new Set<Promise<unknown>>()
+  // Callers waiting on shared acquisition settle when the service goes; the acquisition itself
+  // belongs to no single caller.
+  private readonly lifetime = new AbortController()
+  // Imported themes by id: the content revision documents were last given, and the worker name
+  // that carries it, so same-id content changes reach open sessions as a theme change.
+  private readonly documentThemes = new Map<string, { revision: string; name: string }>()
+  private readonly documentThemeIds = new Map<string, string>()
   private disposeTask: Promise<void> | null = null
 
   public constructor(private readonly options: HighlightingServiceOptions) {}
@@ -225,10 +241,10 @@ class EditorHighlightingService implements HighlightingService {
     const provider = createShikiHighlighterProvider({
       languages: HIGHLIGHTING_DOCUMENT_LANGUAGES,
       preloadLanguages: () => this.shikiPreload(),
-      onThemeChanged: theme.subscribe,
+      onThemeChanged: theme.subscribe && ((listener) => this.onDocumentTheme(theme, listener)),
       resolveLanguage: (language) => this.grammar(language),
-      resolveTheme: (id) => this.importedTheme(id),
-      theme: () => this.importedThemeId(theme),
+      resolveTheme: (name) => this.importedTheme(name),
+      theme: () => this.documentThemeName(this.importedThemeId(theme)),
       workerOwner: this.shiki(),
     })
     this.highlighterProviders.set(theme, provider)
@@ -297,16 +313,18 @@ class EditorHighlightingService implements HighlightingService {
   public dispose(): Promise<void> {
     if (this.disposeTask) return this.disposeTask
 
+    this.lifetime.abort()
+    const pending = [...this.pending]
     const shiki = this.shikiOwner
     const treeSitter = this.treeSitterBackend
     this.shikiOwner = null
     this.treeSitterBackend = null
     this.treeSitterProvider = null
     this.grammars.clear()
-    this.diffs.clear()
-    this.disposeTask = Promise.allSettled([shiki?.dispose(), treeSitter?.dispose?.()]).then(
-      () => undefined,
-    )
+    this.diffs.dispose()
+    this.disposeTask = Promise.allSettled(pending)
+      .then(() => Promise.allSettled([shiki?.dispose(), treeSitter?.dispose?.()]))
+      .then(() => undefined)
     return this.disposeTask
   }
 
@@ -314,28 +332,31 @@ class EditorHighlightingService implements HighlightingService {
     const { signal } = highlight
     this.assertLive()
     throwIfAborted(signal)
-    const requested = highlight.theme ?? (await abortable(this.loadDefaultTheme(), signal))
+    const requested = highlight.theme ?? (await this.live(this.loadDefaultTheme(), signal))
     const structure = requested.format === 'editor' ? structureLanguage(highlight.language) : null
     if (structure && requested.format === 'editor') {
       return this.highlightStructure(text, structure, requested, signal)
     }
     const theme = resolveHighlightTheme(requested)
     const grammar = highlightingGrammar(highlight.language)
+    // An unknown language is documented plain text; a known grammar that fails to load is an
+    // outage the caller must not cache as a result.
     const languageRegistrations = grammar
-      ? await abortable(this.grammar(grammar), signal).catch((error: unknown) => {
-          if (isAbort(error)) throw error
-          return null
+      ? await this.live(this.grammar(grammar), signal).catch((error: unknown) => {
+          if (error instanceof HighlightingError) throw error
+          throw new HighlightingError('failed', `The ${grammar} grammar did not load`, {
+            cause: error,
+          })
         })
       : []
-    // A grammar that cannot load renders as documented plain text, not as an error.
-    const lang = languageRegistrations ? grammar : null
+    const lang = grammar
     this.assertLive()
-    const reply = await abortable(
+    const reply = await this.live(
       this.shiki().highlight({
         text,
         lang,
         theme: theme.revision,
-        languageRegistrations: languageRegistrations ?? [],
+        languageRegistrations,
         themeRegistration: theme.registration,
       }),
       signal,
@@ -374,7 +395,7 @@ class EditorHighlightingService implements HighlightingService {
     if (typeof Worker === 'undefined') {
       throw new HighlightingError('unavailable', 'This environment cannot start a syntax worker')
     }
-    const palette = theme.definition
+    const palette = effectiveEditorTheme(theme.definition)
     const foreground = palette.foregroundColor ?? DEFAULT_FOREGROUND
     const snapshot = createPieceTableSnapshot(text)
     const textSnapshot = createDocumentTextSnapshot(snapshot, text)
@@ -389,7 +410,7 @@ class EditorHighlightingService implements HighlightingService {
 
     this.snippetSessions += 1
     try {
-      const result = await abortable(session.refresh(textSnapshot), signal).catch(
+      const result = await this.live(session.refresh(textSnapshot), signal).catch(
         (error: unknown) => {
           if (error instanceof HighlightingError) throw error
           throw new HighlightingError('failed', 'The syntax worker failed', { cause: error })
@@ -410,6 +431,21 @@ class EditorHighlightingService implements HighlightingService {
       session.dispose()
       this.snippetSessions -= 1
     }
+  }
+
+  /** `task` for one caller: rejects when that caller aborts or the service is disposed. */
+  private live<T>(task: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+    const lifetime = this.lifetime.signal
+    if (lifetime.aborted) return Promise.reject(disposedError())
+    return new Promise<T>((resolve, reject) => {
+      const onDispose = () => reject(disposedError())
+      lifetime.addEventListener('abort', onDispose, { once: true })
+      abortable(task, signal)
+        .then(resolve, reject)
+        .finally(() => {
+          lifetime.removeEventListener('abort', onDispose)
+        })
+    })
   }
 
   private loadDefaultTheme(): Promise<HighlightTheme> {
@@ -447,11 +483,51 @@ class EditorHighlightingService implements HighlightingService {
     return pending
   }
 
-  private async importedTheme(id: string) {
+  // `name` is the id, or the id's revision name after its content changed.
+  private async importedTheme(name: string) {
+    const id = this.documentThemeIds.get(name) ?? name
+    const registration = await this.resolveImported(id)
+    if (!this.documentThemes.has(id)) {
+      this.documentThemes.set(id, { revision: revisionName(id, registration), name })
+    }
+    return workerThemeRegistration(registration, name)
+  }
+
+  private async resolveImported(id: string) {
     const resolve = this.options.resolveTheme
     if (!resolve) throw new Error(`No theme resolver configured for ${id}`)
 
     return workerThemeRegistration(await resolve(id), id)
+  }
+
+  private documentThemeName(id: string): string {
+    return this.documentThemes.get(id)?.name ?? id
+  }
+
+  /**
+   * Sessions hear a theme change only after the id's current content has been read, so a
+   * same-id replacement arrives under a new worker name and recolours instead of being skipped.
+   */
+  private onDocumentTheme(theme: HighlightingThemeSource, listener: () => void): () => void {
+    return (
+      theme.subscribe?.(() => {
+        void this.refreshDocumentTheme(theme).then(listener, listener)
+      }) ?? (() => undefined)
+    )
+  }
+
+  private async refreshDocumentTheme(theme: HighlightingThemeSource): Promise<void> {
+    const selection = theme.current()
+    if (selection.format !== 'vscode') return
+
+    const id = selection.id
+    const revision = revisionName(id, await this.resolveImported(id))
+    const known = this.documentThemes.get(id)
+    if (known?.revision === revision) return
+
+    const name = known ? revision : id
+    this.documentThemes.set(id, { revision, name })
+    this.documentThemeIds.set(name, id)
   }
 
   // A document asked for colors in the instant a built-in palette replaced the imported one keeps
@@ -527,8 +603,8 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   throw new HighlightingError('aborted', 'Highlight aborted', { cause: signal.reason })
 }
 
-function isAbort(error: unknown): boolean {
-  return error instanceof HighlightingError && error.code === 'aborted'
+function disposedError(): HighlightingError {
+  return new HighlightingError('disposed', 'The highlighting service was disposed')
 }
 
 // Abort settles the caller now; the shared work it was waiting on runs on for other callers.

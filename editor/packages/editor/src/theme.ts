@@ -312,15 +312,16 @@ function resolveEditorVariables(value: string, theme: EditorTheme, depth: number
   return unresolved ? null : resolved
 }
 
+// Named colours first: `applyEditorTheme` writes them after the named fields, so they win on screen.
 function editorVariableValue(variable: string, theme: EditorTheme): string | null {
+  for (const [id, color] of Object.entries(theme.colors ?? {})) {
+    if (editorColorVariable(id) === variable) return color
+  }
   for (const { key, id } of EDITOR_THEME_COLORS) {
     if (editorColorVariable(id) === variable && theme[key]) return theme[key]
   }
   for (const { key, id } of EDITOR_SYNTAX_THEME_COLORS) {
     if (editorColorVariable(id) === variable && theme.syntax?.[key]) return theme.syntax[key]
-  }
-  for (const [id, color] of Object.entries(theme.colors ?? {})) {
-    if (editorColorVariable(id) === variable) return color
   }
   for (const registered of registeredEditorColors.values()) {
     if (registered.variable !== variable) continue
@@ -328,6 +329,24 @@ function editorVariableValue(variable: string, theme: EditorTheme): string | nul
     return fallback === undefined ? null : compileEditorColorValue(fallback)
   }
   return null
+}
+
+/**
+ * `theme` with every named colour in `colors` that overrides a theme field moved onto that field,
+ * the precedence `applyEditorTheme` gives them, for consumers that read the fields directly.
+ */
+export function effectiveEditorTheme(theme: EditorTheme): EditorTheme {
+  const colors = theme.colors ?? {}
+  const effective: WritableEditorTheme = { ...theme }
+  const syntax: EditorSyntaxTheme = { ...theme.syntax }
+  for (const { key, id } of EDITOR_THEME_COLORS) {
+    if (colors[id]) effective[key] = colors[id]
+  }
+  for (const { key, id } of EDITOR_SYNTAX_THEME_COLORS) {
+    if (colors[id]) syntax[key] = colors[id]
+  }
+  effective.syntax = syntax
+  return effective
 }
 
 export function editorThemesEqual(

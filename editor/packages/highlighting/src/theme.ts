@@ -1,4 +1,4 @@
-import type { EditorTheme } from '@singapore-editor/core/rendering'
+import { effectiveEditorTheme, type EditorTheme } from '@singapore-editor/core/rendering'
 import {
   editorThemeToShikiTheme,
   type ShikiWorkerThemeRegistration,
@@ -16,20 +16,21 @@ export type ResolvedHighlightTheme = {
   readonly registration: ShikiWorkerThemeRegistration
 }
 
-const revisions = new WeakMap<object, ResolvedHighlightTheme>()
-
+/**
+ * Read from the theme's content on every call: a caller may reuse one theme object after changing
+ * it, and a revision remembered by identity would keep the old colours.
+ */
 export function resolveHighlightTheme(theme: HighlightTheme): ResolvedHighlightTheme {
-  const cached = revisions.get(theme)
-  if (cached) return cached
-
   const registration = themeRegistration(theme)
   // A palette's contributed colors never reach the TextMate conversion, so its revision hashes
   // the palette itself.
   const content = theme.format === 'editor' ? theme.definition : registration
-  const revision = `${registration.name}@${contentHash(JSON.stringify(content))}`
-  const resolved = { revision, registration }
-  revisions.set(theme, resolved)
-  return resolved
+  return { revision: revisionName(registration.name, content), registration }
+}
+
+/** A worker theme name that changes whenever `content` does. */
+export function revisionName(name: string, content: unknown): string {
+  return `${name}@${contentHash(JSON.stringify(content))}`
 }
 
 /** A registration Shiki may normalize in place: owned arrays, no undefined colors. */
@@ -53,7 +54,8 @@ function themeRegistration(theme: HighlightTheme): ShikiWorkerThemeRegistration 
 
   const name = theme.name ?? 'editor'
   const type = theme.definition.type === 'light' ? 'light' : 'dark'
-  return workerThemeRegistration(editorThemeToShikiTheme(theme.definition, { name, type }), name)
+  const palette = effectiveEditorTheme(theme.definition)
+  return workerThemeRegistration(editorThemeToShikiTheme(palette, { name, type }), name)
 }
 
 type ThemeSetting = NonNullable<VscodeThemeRegistration['tokenColors']>[number]

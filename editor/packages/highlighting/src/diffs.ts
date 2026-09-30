@@ -33,7 +33,7 @@ export class DiffSyntaxStore {
   private readonly running = new Map<string, Promise<unknown>>()
   private readonly viewed = new Map<string, number>()
   private readonly fingerprints = new WeakMap<DiffFile, Partial<Record<SourceSide, string>>>()
-  private generation = 0
+  private disposed = false
 
   /** False when the diff is prepared, on screen, or already being prepared. */
   public canPrepare(file: DiffFile, scope: string): boolean {
@@ -51,15 +51,14 @@ export class DiffSyntaxStore {
     scope: string,
     backend: DiffSyntaxBackend,
   ): Promise<boolean> {
-    if (!this.canPrepare(file, scope)) return false
+    if (this.disposed || !this.canPrepare(file, scope)) return false
 
     const key = this.fileKey(file, scope)
-    const generation = this.generation
     const task = prepareDiffSyntax(file, { backend })
     this.running.set(key, task)
     try {
       const sources = await task
-      if (generation !== this.generation) {
+      if (this.disposed) {
         for (const source of sources) source.dispose()
         return false
       }
@@ -82,7 +81,7 @@ export class DiffSyntaxStore {
     scope: string,
   ): { dispose(): void } {
     const key = this.fileKey(file, scope)
-    const running = this.running.get(key)
+    const running = this.disposed ? undefined : this.running.get(key)
     let current = true
     const claim: PreparedDiffSyntaxInput = running
       ? running.then(
@@ -105,8 +104,9 @@ export class DiffSyntaxStore {
     }
   }
 
-  public clear(): void {
-    this.generation += 1
+  /** Terminal: kept sides are disposed, and every later preparation or returned parse too. */
+  public dispose(): void {
+    this.disposed = true
     for (const entry of this.prepared.values()) entry.dispose()
     this.prepared.clear()
   }
@@ -118,6 +118,10 @@ export class DiffSyntaxStore {
   // A side already held keeps the older entry.
   private store(file: DiffFile, scope: string, sources: readonly PreparedDiffSyntaxSource[]): void {
     for (const entry of sources) {
+      if (this.disposed) {
+        entry.dispose()
+        continue
+      }
       const key = this.sideKey(file, entry.side, scope)
       if (this.prepared.has(key)) {
         entry.dispose()

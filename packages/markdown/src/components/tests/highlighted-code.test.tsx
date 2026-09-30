@@ -11,7 +11,7 @@ import { HighlightedCode } from '../highlighted-code'
 afterEach(cleanup)
 
 // Answers only when the test says so, like a worker reply.
-function deferredHighlighter() {
+function deferredHighlighter(themeKey = 'test') {
   const pending: (() => void)[] = []
   const highlighter: CodeHighlighter = {
     dispose: () => undefined,
@@ -26,7 +26,7 @@ function deferredHighlighter() {
       pending.push(() => onResult(result))
       return null
     },
-    themeKey: 'test',
+    themeKey,
   }
   return { highlighter, flush: () => pending.splice(0).forEach((reply) => reply()) }
 }
@@ -51,5 +51,40 @@ test('a streamed fence keeps its colours while the longer prefix is being highli
   expect(colouredSpans(container)).toBe(1)
   expect(container.textContent).toBe('const a = 1\nconst b = 2\nx')
   act(flush)
+  expect(colouredSpans(container)).toBe(1)
+})
+
+function render_(highlighter: CodeHighlighter | null, code: string, language: string) {
+  return (
+    <CodeHighlighterContext value={highlighter}>
+      <HighlightedCode code={code} incomplete language={language} />
+    </CodeHighlighterContext>
+  )
+}
+
+test('removing the highlighter removes the colours it painted', () => {
+  const { highlighter, flush } = deferredHighlighter()
+  const { container, rerender } = render(render_(highlighter, 'const a = 1\nx', 'ts'))
+  act(flush)
+  expect(colouredSpans(container)).toBe(1)
+
+  rerender(render_(null, 'const a = 1\nx', 'ts'))
+  expect(colouredSpans(container)).toBe(0)
+  expect(container.textContent).toBe('const a = 1\nx')
+})
+
+test('another language or theme never shows the previous answer for a shared prefix', () => {
+  const first = deferredHighlighter('first')
+  const { container, rerender } = render(render_(first.highlighter, 'const a = 1\nx', 'ts'))
+  act(first.flush)
+  expect(colouredSpans(container)).toBe(1)
+
+  rerender(render_(first.highlighter, 'const a = 1\nconst b\nx', 'python'))
+  expect(colouredSpans(container)).toBe(0)
+
+  const second = deferredHighlighter('second')
+  rerender(render_(second.highlighter, 'const a = 1\nconst b\nx', 'python'))
+  expect(colouredSpans(container)).toBe(0)
+  act(second.flush)
   expect(colouredSpans(container)).toBe(1)
 })
