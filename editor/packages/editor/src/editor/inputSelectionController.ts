@@ -409,9 +409,10 @@ export class InputSelectionController {
     const decided = this.autoCloseChange(session, text)
     if (decided) return decided
 
+    const snapshot = session.getSnapshot()
     const change = session.applyText(text)
     // Plain typing keeps tracked pairs alive; their anchors have already shifted with the edit.
-    this.autoClose.advance(change.snapshot)
+    this.autoClose.advance(snapshot, change.snapshot)
     return change
   }
 
@@ -593,7 +594,7 @@ export class InputSelectionController {
       range: { end: moved + value.length, start: moved },
     })
     this.linkedEditing.advance(change.snapshot)
-    this.autoClose.advance(change.snapshot)
+    this.autoClose.advance(snapshot, change.snapshot)
     this.markSessionSelectionForNextInput()
     return change
   }
@@ -639,7 +640,7 @@ export class InputSelectionController {
       ],
     })
     this.linkedEditing.advance(change.snapshot)
-    this.autoClose.advance(change.snapshot)
+    this.autoClose.advance(snapshot, change.snapshot)
     this.markSessionSelectionForNextInput()
     return change
   }
@@ -798,7 +799,7 @@ export class InputSelectionController {
         ],
       },
     )
-    this.autoClose.track(change.snapshot, caret + opening.open.length, opening.close)
+    this.autoClose.track(snapshot, change.snapshot, caret + opening.open.length, opening.close)
     this.markSessionSelectionForNextInput()
     return change
   }
@@ -830,7 +831,7 @@ export class InputSelectionController {
   ): DocumentSessionChange {
     this.autoClose.forget(snapshot, caret)
     const change = session.setSelection(caret + 1, caret + 1, { affinity: 'before' })
-    this.autoClose.advance(change.snapshot)
+    this.autoClose.advance(snapshot, change.snapshot)
     this.markSessionSelectionForNextInput()
     return change
   }
@@ -861,7 +862,7 @@ export class InputSelectionController {
     const change = session.applyEdits([{ from: caret - 1, text: '', to: caret + 1 }], {
       selections: [selectionOffsetsWithAffinity(source, caret - 1, caret - 1)],
     })
-    this.autoClose.advance(change.snapshot)
+    this.autoClose.advance(snapshot, change.snapshot)
     this.markSessionSelectionForNextInput()
     return change
   }
@@ -953,11 +954,12 @@ export class InputSelectionController {
     if (!this.snippet.active) return false
 
     const affinity = this.primaryResolvedSelection()?.affinity ?? 'after'
-    const range = this.snippet.move(session.getSnapshot(), direction)
+    const snapshot = session.getSnapshot()
+    const range = this.snippet.move(snapshot, direction)
     if (!range) return false
 
     const change = session.setSelection(range.start, range.end, { affinity })
-    this.autoClose.advance(change.snapshot)
+    this.autoClose.advance(snapshot, change.snapshot)
     this.markSessionSelectionForNextInput()
     this.applyChange(change, 'input.snippetStop')
     return true
@@ -1058,7 +1060,7 @@ export class InputSelectionController {
       session.applyEdits([edit], {
         selections: [selectionOffsetsWithAffinity(source, acceptedCaret, acceptedCaret)],
       })
-    if (!mirrored) this.autoClose.advance(change.snapshot)
+    if (!mirrored) this.autoClose.advance(snapshot, change.snapshot)
     // Read back off the batch, which may have moved the whole document under the caret by rewriting
     // a copy that sits above it.
     const caret = this.primarySelectionHeadOffset(change) ?? acceptedCaret
