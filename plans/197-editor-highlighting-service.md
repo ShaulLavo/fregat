@@ -2,7 +2,7 @@
 
 ## Status and outcome
 
-- Status: APPROVED, 2026-09-27. Implementation has not started.
+- Status: APPROVED, 2026-09-27. In progress 2026-09-30 on branch `wave/foundations-highlighting` (commits `d3fb84bbf`, `d1e03d660`, `db5cc643b`): Units 1–3 landed except the prepared-diff-syntax takeover and Tree-sitter-backed standalone snippets; see "Progress 2026-09-30".
 - Inspected: Platform `9c08916bf`, linked Editor `52099144`. Recheck both heads and CI's `editor-ref` before implementation.
 - Outcome: Editor supplies one reusable highlighting service. Plugins, diffs, Settings previews, and rendered code consume it. Platform supplies configuration and theme data without selecting engines or constructing workers.
 - Scope: a facade over existing Editor providers/workers, followed by bounded consumer migrations. Other plugin candidates are assessment only. Wallpaper image loading and Settings layout remain separate work.
@@ -142,12 +142,17 @@ Unsupported syntax may return documented plain text. Operational failures must r
 
 ### 1. Add the Editor service and adapters
 
-- [ ] Recheck source/API drift and package dependency directions.
-- [ ] Add public package exports, build entries, metadata, and built-entry smoke tests. Keep worker assets lazy.
-- [ ] Move engine policy, grammar/alias loading, and registration ownership into Editor; reuse current workers/providers. Do not duplicate Platform tables into another live owner.
-- [ ] Implement standalone highlighting, theme revisions, immutable output, abort behavior, and transient-session cleanup.
-- [ ] Implement optional-service plugin ownership and preserve Tree-sitter structure under Shiki colors.
-- [ ] Adapt prepared documents and diffs without changing packed/incremental or exact-revision behavior.
+- [x] Recheck source/API drift and package dependency directions.
+  - Editor is `editor/packages/` in this repo since Plan 207; no `editor-ref` exists. `highlighting` depends on core (peer), tree-sitter, tree-sitter-languages and `shiki`; nothing below imports it.
+- [x] Add public package exports, build entries, metadata, and built-entry smoke tests. Keep worker assets lazy.
+  - Root workspaces glob, `knip.json`, `.changeset/config.json`; tests import the built core worker asset.
+- [x] Move engine policy, grammar/alias loading, and registration ownership into Editor; reuse current workers/providers. Do not duplicate Platform tables into another live owner.
+  - `languages.ts` uses Shiki's bundled grammar/alias table; Platform `shiki-languages.ts` deleted.
+- [x] Implement standalone highlighting, theme revisions, immutable output, abort behavior, and transient-session cleanup.
+  - A stateless `highlight` worker request on one snippet highlighter; themes load under `name@contentHash`, so no document state is created or left behind.
+- [x] Implement optional-service plugin ownership and preserve Tree-sitter structure under Shiki colors.
+- [x] Adapt prepared documents and diffs without changing packed/incremental or exact-revision behavior.
+  - Prepared opens and diffs take `service.highlighterProvider(EDITOR_THEME_SOURCE)` / `syntaxProvider()`, the same instances the plugin registers; the document path is unchanged.
 - [ ] Take over prepared diff syntax from Platform (Plan 177 Phase 3, added 2026-09-28).
   - Today Platform's `features/editor/state/prepared-diff-syntax.ts` owns a 16-side store of the
     Editor's `PreparedDiffSyntaxSource` objects, each holding a live session. Platform also owns
@@ -164,29 +169,36 @@ Unsupported syntax may return documented plain text. Operational failures must r
   - Keep: a hovered diff and a revisit paint colour with their first rows; a view awaits a running
     preparation instead of parsing twice; no preparation starts for a diff already on screen or a
     read already claimed.
-- [ ] Take over the tree-sitter warm-up. Plan 170 already made it a `warmLanguages` getter on the
-      tree-sitter provider; the service accepts the same getter (its `preloadLanguages`) for both
-      engines.
+- [x] Take over the tree-sitter warm-up. Plan 170 already made it a `warmLanguages` getter on the
+  - Service option `preloadLanguages`, fed by the language census through `bindHighlightingLanguages`.
+    tree-sitter provider; the service accepts the same getter (its `preloadLanguages`) for both
+    engines.
 - [ ] Migrate affected Editor examples/callers, then remove superseded setup paths. Retain low-level engine APIs only where independent consumers still need them.
-- [ ] Document simple-plugin, shared-plugin, standalone, and creator-disposes usage.
+- [x] Document simple-plugin, shared-plugin, standalone, and creator-disposes usage.
+  - `editor/packages/highlighting/README.md`.
 
 ### 2. Migrate Platform editor documents and Settings previews
 
 - [ ] Merge/push/build Editor first; bump Platform's exact `editor-ref` in `.github/actions/setup/action.yml` with the consumer change.
 - [ ] Add the package using existing linked-package symlink/override/CI provisioning conventions. Verify built exports from a clean CI clone.
-- [ ] Create one shared application resource owner. Platform supplies themes, language census, and product enablement.
-- [ ] Replace provider/worker ownership and the custom engine-switch plugin in `features/editor/state/syntax-highlighting.ts` and `utils/plugins.ts`. Preserve settings, diffs, prepared opens, and supported inspection/idle hooks.
-- [ ] Replace `lib/code-theme/state/preview.ts` with a resource query calling the service, keyed by exact theme revision. Retain visibility-triggered work and held-result behavior.
-- [ ] Migrate preview rendering to Editor token styles; delete the private engine and unused conversion path.
-- [ ] Audit direct Shiki imports/dependencies before removal. Markdown still uses them until unit 3.
+- [x] Create one shared application resource owner. Platform supplies themes, language census, and product enablement.
+  - `apps/web/src/lib/highlighting/state/service.ts`.
+- [x] Replace provider/worker ownership and the custom engine-switch plugin in `features/editor/state/syntax-highlighting.ts` and `utils/plugins.ts`. Preserve settings, diffs, prepared opens, and supported inspection/idle hooks.
+- [x] Replace `lib/code-theme/state/preview.ts` with a resource query calling the service, keyed by exact theme revision. Retain visibility-triggered work and held-result behavior.
+  - Keyed by theme id: registrations are immutable for a build (`staleTime: 'static'`), and the service's `themeRevision` separates content inside the worker.
+- [x] Migrate preview rendering to Editor token styles; delete the private engine and unused conversion path.
+- [x] Audit direct Shiki imports/dependencies before removal. Markdown still uses them until unit 3.
+  - No `shiki` imports remain in `apps/web/src` or `packages/markdown/src`; `@shikijs/langs` dropped from apps/web and `shiki` from packages/markdown.
 
 ### 3. Migrate rendered Markdown
 
-- [ ] Replace `packages/markdown/src/utils/shiki-highlighter.ts` and Platform's per-theme engine cache with a thin shared-service adapter.
-- [ ] Change `CodeHighlighter`'s Shiki-specific result seam to renderer-neutral tokens. Preserve exact-content caching, streaming updates, and stale-result suppression.
-- [ ] Keep cold plain-text output followed by highlighted output. A warm cache can answer synchronously; a worker request remains asynchronous.
+- [x] Replace `packages/markdown/src/utils/shiki-highlighter.ts` and Platform's per-theme engine cache with a thin shared-service adapter.
+- [x] Change `CodeHighlighter`'s Shiki-specific result seam to renderer-neutral tokens. Preserve exact-content caching, streaming updates, and stale-result suppression.
+  - Streaming holds the last answer while text only appends (`highlighted-code.test.tsx`, scenario `stream-code-colour`).
+- [x] Keep cold plain-text output followed by highlighted output. A warm cache can answer synchronously; a worker request remains asynchronous.
 - [ ] Verify wide language coverage, both theme modes, and color normalization.
-- [ ] Delete duplicate engine construction, obsolete grammar maps/result types, and dependencies proven unused. No Markdown parser rewrite.
+- [x] Delete duplicate engine construction, obsolete grammar maps/result types, and dependencies proven unused. No Markdown parser rewrite.
+  - The CSS custom-property recolouring was deleted: worker output tokenizes `--accent` and `:` separately, so its regex never matched.
 
 ### 4. Verify and ship completed consumer units
 
@@ -214,3 +226,32 @@ Unsupported syntax may return documented plain text. Operational failures must r
 ## Completion boundary
 
 Finish when editor documents, Settings previews, and Markdown fences consume Editor-owned APIs and Platform no longer constructs their syntax engines/workers. Record intentional color changes and measured scheduling limits. Other plugin refactors and an unproven Wallpaper image fix remain outside this plan.
+
+## Progress 2026-09-30
+
+Branch `wave/foundations-highlighting`, commits `d3fb84bbf` (Editor package, editor documents, Settings previews), `d1e03d660` (Markdown fences), `db5cc643b` (streamed-fence hold, preview abort logging, scenario filter).
+
+Intentional color changes:
+
+- Markdown fences under an imported theme paint with that theme's real registration in both light and dark. The old dual-slot tokens showed the dark slot's colour in both modes, which was synthetic (derived from the `EditorTheme`) in light mode.
+- Fences under built-in palettes stay plain, as before (`useCodeHighlighter` returns null without a registration).
+
+Evidence:
+
+- Editor: `bun run test` in `editor/packages/highlighting` (node 10, real-worker browser 6: Unicode/multiline/italic goldens, empty, unknown language, same-name themes concurrently, abort then reuse, disposal); core `test/shiki` 93/93.
+- Platform targeted vitest 53/53; `syntax-worker`, `message-bubble`, `prepared-open` and `tree-pane` browser tests pass; web typecheck and `bun run gates` pass.
+- `agent:browser trace settings-wallpaper-scroll --compare`: the `highlightPreview` task at wallpaper arrival went from 94.1 ms to 7 ms, and scripting from 767.9 ms to 678.8 ms. That is one run per side, and the baseline was served by main's Vite at `2ac20743c`. Evidence: `/tmp/fregat-evidence/20260930T133619Z-trace-settings-wallpaper-scroll/` (before), `/tmp/fregat-evidence/20260930T133637Z-trace-settings-wallpaper-scroll/` (after).
+- Screenshots read back: palette preview `/tmp/fregat-evidence/20260930T133342Z-scenario-editor-theme-preview/03-preview-1-catppuccin-latte.png`, Settings light/dark previews `/tmp/fregat-evidence/20260930T133454Z-scenario-settings-appearance-open/03-light-row-shown.png`, streamed fence `/tmp/fregat-evidence/20260930T133551Z-scenario-stream-code-colour/01-settled-code-block.png`.
+
+Pre-existing failures found (not caused by this branch):
+
+- `editor-theme-preview` asserts 5 recolor requests but sees 15, on main `2ac20743c` as well (`/tmp/fregat-evidence/20260930T133417Z-scenario-editor-theme-preview/`).
+- The throwaway fixture server answers `/providers/{codex,claude}/update` with 500 and logs them at `error` in every run.
+
+Remaining:
+
+1. Prepared diff syntax takeover (Plan 177 Phase 3): `prepared-diff-syntax.ts`, `claimPreparedDiffSyntax`, `storePreparedDiffSyntax` and `viewDiffSyntax` are still Platform-owned. They now draw providers from the service, and `disposeEditorSyntaxHighlighting` clears them.
+2. Tree-sitter-backed standalone snippets, so built-in palette previews match the editor's capture colors. Today they convert the palette to a Shiki theme, as before.
+3. `editorSyntaxHighlightingSource` still returns engine-named tags that diff-pane and prepared-document key on.
+4. Unit 4 measurements not yet done: WebKit/mobile runs, editor typing while previews run, session retention, and a crashed-worker test.
+5. The default theme for the simple snippet path (`{ format: 'editor', definition: {} }`) paints one foreground color; Editor needs a real default palette.
