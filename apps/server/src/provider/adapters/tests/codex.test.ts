@@ -1,3 +1,8 @@
+import {
+  createOrchestrationFixture,
+  FIXTURE_SESSION_ID,
+} from '../../../../test/factories/orchestration'
+import { ProviderSessionReaper } from '../../provider-session-reaper'
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { Elysia } from 'elysia'
@@ -321,6 +326,18 @@ function handle(message) {
         userAgent: 'Codex Desktop/9.9.9 fake-test',
       },
     });
+    return;
+  }
+  if (message.method === 'thread/backgroundTerminals/list') {
+    record({ event: 'thread/backgroundTerminals/list', params: message.params });
+    if (mode === 'background-unsupported') { fail(message.id, 'unknown method'); return; }
+    if (mode === 'background-malformed') { send({ id: message.id, result: { data: [{}] } }); return; }
+    const cursor = message.params.cursor;
+    const live = mode === 'background-live' || (mode === 'background-paged' && cursor === 'next') || (mode === 'background-lifecycle' && require('node:fs').existsSync(require('node:path').join(process.env.PLATFORM_FAKE_CODEX_PROJECT, 'background-live')));
+    send({ id: message.id, result: {
+      data: live ? [{ itemId: 'shell-item', processId: '42', command: 'sleep 60', cwd: process.cwd(), osPid: null, cpuPercent: null, rssKb: null }] : [],
+      nextCursor: mode === 'background-paged' && !cursor ? 'next' : null,
+    } });
     return;
   }
   if (message.method === 'initialized') {
@@ -925,6 +942,7 @@ type FakeCodexLogEntry = {
     | 'turn/steer'
     | 'turn/interrupt'
     | 'server-response'
+    | 'thread/backgroundTerminals/list'
     | 'thread/list'
     | 'thread/read'
     | 'thread/resume'
@@ -1281,6 +1299,12 @@ describe('CodexProviderAdapter', () => {
         )
 
         await waitForFakeCodexEvent(spawnLogPath, 'turn/start')
+        expect(await adapter.hasBackgroundWork({ sessionId: input.sessionId })).toBe(true)
+        expect(
+          (await readFakeCodexLog(spawnLogPath)).filter(
+            (entry) => entry.event === 'thread/backgroundTerminals/list',
+          ),
+        ).toEqual([])
         expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
         await adapter.stopRuntime({ sessionId: input.sessionId })
 
@@ -3451,6 +3475,132 @@ describe('CodexProviderAdapter', () => {
       { mode: 'unknown-raw-item' },
     )
   })
+
+  it('keeps a ready native process with a silent terminal past the idle deadline and releases it after exit', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const fixture = await createOrchestrationFixture()
+        process.env.PLATFORM_FAKE_CODEX_PROJECT = fixture.checkout
+        const adapter = new CodexProviderAdapter()
+        const registry = new ProviderAdapterRegistry([adapter])
+        const directory = new ProviderSessionDirectory(fixture.database)
+        const service = new ProviderService({
+          adapterRegistry: registry,
+          sessionDirectory: directory,
+        })
+        try {
+          const registration = await fixture.register()
+          assert(registration.result)
+          await fixture.command({
+            type: 'session.create',
+            commandId: 'silent-create',
+            sessionId: FIXTURE_SESSION_ID,
+            title: 'Silent terminal',
+            runtimeMode: 'full-access',
+            modelSelection: providerTurnInput().modelSelection,
+            worktreeTarget: { kind: 'current', worktreeId: registration.result.worktreeId },
+          })
+          await fixture.restart({ adapterRegistry: registry, providerService: service })
+          await fixture.startTurn()
+          await fixture.engine.providerRuntimeIdle()
+          const sessionId = v.parse(sessionIdSchema, FIXTURE_SESSION_ID)
+          expect((await adapter.listActiveRuntimes())[0]?.status).toBe('ready')
+          const pid = (await readFakeCodexLog(spawnLogPath)).find(
+            (entry) => entry.event === 'spawn',
+          )?.pid
+          assert(pid)
+          const marker = path.join(fixture.checkout, 'background-live')
+          await writeFile(marker, '')
+          const reaper = new ProviderSessionReaper({
+            directory,
+            now: () => Date.now() + 35 * 60 * 1000,
+            stopRuntime: (input) => service.stopRuntime(input),
+          })
+          expect(await reaper.sweep()).toEqual([])
+          expect(() => process.kill(pid, 0)).not.toThrow()
+          await rm(marker)
+          expect(await reaper.sweep()).toEqual([sessionId])
+          expect(await adapter.hasRuntime({ sessionId })).toBe(false)
+        } finally {
+          await service.shutdown()
+          await fixture.close()
+        }
+      },
+      { mode: 'background-lifecycle' },
+    )
+  })
+
+  it('preserves pending native child requests after parent completion', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const input = providerTurnInput()
+        try {
+          await adapter.sendTurn(input)
+          await settleRuntimeEvents()
+          expect(await adapter.hasBackgroundWork({ sessionId: input.sessionId })).toBe(true)
+          expect(
+            (await readFakeCodexLog(spawnLogPath)).filter(
+              (entry) => entry.event === 'thread/backgroundTerminals/list',
+            ),
+          ).toEqual([])
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'child-input-response' },
+    )
+  })
+
+  it.each([
+    ['background-live', true, 1],
+    ['background-paged', true, 2],
+    ['background-completed', false, 1],
+  ] as const)('checks scoped silent terminals over native RPC in %s', async (mode, live, pages) => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const input = providerTurnInput()
+        try {
+          await adapter.startRuntime(input)
+          expect(await adapter.hasBackgroundWork({ sessionId: input.sessionId })).toBe(live)
+          const calls = (await readFakeCodexLog(spawnLogPath)).filter(
+            (entry) => entry.event === 'thread/backgroundTerminals/list',
+          )
+          expect(calls).toHaveLength(pages)
+          expect(calls.map((entry) => entry.params?.threadId)).toEqual(
+            Array(pages).fill('provider-thread-1'),
+          )
+          if (pages === 2) expect(calls[1]?.params?.cursor).toBe('next')
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode },
+    )
+  })
+
+  it.each(['background-unsupported', 'background-malformed'])(
+    'rejects an uncertain silent terminal check in %s',
+    async (mode) => {
+      await withFakeCodex(
+        async () => {
+          const adapter = new CodexProviderAdapter()
+          const input = providerTurnInput()
+          try {
+            await adapter.startRuntime(input)
+            await expect(
+              adapter.hasBackgroundWork({ sessionId: input.sessionId }),
+            ).rejects.toThrow()
+            expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+          } finally {
+            await adapter.stopAll()
+          }
+        },
+        { mode },
+      )
+    },
+  )
 
   it('rejects malformed app-server notifications with protocol errors', async () => {
     await withFakeCodex(

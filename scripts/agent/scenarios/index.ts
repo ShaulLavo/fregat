@@ -57,6 +57,7 @@ import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
 import { backgroundLiveness } from './background-liveness'
 import { spinnerPalette } from './spinner-palette'
+import { sessionBulkFailures } from './session-bulk-failures'
 import { sessionLifecycle } from './session-lifecycle'
 import { sessionUndo } from './session-undo'
 import { asyncQuestions } from './async-questions'
@@ -421,6 +422,7 @@ export const scenarios: readonly Scenario[] = [
   sessionSearchEnvironments,
   projectGrouping,
   sessionLifecycle,
+  sessionBulkFailures,
   sessionUndo,
   cachedProtocolStartup,
   primaryIdentityReplacement,

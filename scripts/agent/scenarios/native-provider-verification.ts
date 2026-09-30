@@ -260,6 +260,14 @@ async function withClaudeProvider<T>(
   }
 }
 
+export function installConversationProvider(page: Page, orchestration: string, name: string) {
+  return installNativeProvider(page, orchestration.replace(/\/orchestration$/, ''), {
+    name,
+    fixture: CONVERSATION_FIXTURE,
+    displayLabel: `${name} fixture`,
+  })
+}
+
 /** Runs `body` with a conversation fixture instance on the owner at `orchestration`, then removes it. */
 export async function withConversationProvider<T>(
   page: Page,
@@ -267,11 +275,7 @@ export async function withConversationProvider<T>(
   name: string,
   body: (native: NativeProvider) => Promise<T>,
 ) {
-  const native = await installNativeProvider(page, orchestration.replace(/\/orchestration$/, ''), {
-    name,
-    fixture: CONVERSATION_FIXTURE,
-    displayLabel: `${name} fixture`,
-  })
+  const native = await installConversationProvider(page, orchestration, name)
   try {
     return await body(native)
   } finally {
