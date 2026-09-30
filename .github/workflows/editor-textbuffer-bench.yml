@@ -35,7 +35,10 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.2'
-      - run: bun install --frozen-lockfile
+      # This package's locked dependencies only: the whole monorepo pulls unrelated packages hosted
+      # elsewhere (the TUI's OpenTUI release tarballs), which this benchmark must not depend on.
+      - name: Install the textbuffer's locked dependencies
+        run: bun install --frozen-lockfile --filter '@singapore-editor/textbuffer'
       - name: Check formatting and lint
         run: |
           bun run --cwd editor/packages/textbuffer format:check

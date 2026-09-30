@@ -18,6 +18,7 @@
     "bun.lock",
     "*.tsbuildinfo",
     "*.patch",
-    "references/**"
+    "references/**",
+    "packages/textbuffer/bench/vscode-textbuffer/**"
   ]
 }

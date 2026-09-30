@@ -7,6 +7,8 @@ export const benchRoot = fileURLToPath(new URL('.', import.meta.url))
 export const packageRoot = path.resolve(benchRoot, '..')
 export const pin = JSON.parse(readFileSync(path.join(benchRoot, 'upstream.json'), 'utf8'))
 export const upstreamRoot = path.join(benchRoot, '.cache', pin.commit)
+// Exact bytes of the pinned files, checked against `upstream.json` before every build.
+export const vendorRoot = path.join(benchRoot, 'vscode-textbuffer')
 
 export const sha256 = (value) => createHash('sha256').update(value).digest('hex')
 export const gitBlobHash = (bytes) =>
