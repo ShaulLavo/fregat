@@ -1,6 +1,6 @@
 # Output and input latency attribution
 
-Status: Phase 1 measured on 2026-10-01. The headed Apple M1 matrix covers 1, 8, and 17 terminals, ASCII, SGR, and loopback input echo, with three repetitions and paired trace/control phases. No product fixes were made. Phase 2 remains separate.
+Status: Phase 1 measured and review repairs completed on 2026-10-01. A corrected 17-terminal ASCII CPU rerun supplements the original matrix. The headed Apple M1 matrix covers 1, 8, and 17 terminals, ASCII, SGR, and loopback input echo, with three repetitions and paired trace/control phases. No product fixes were made. Phase 2 remains separate.
 
 ## Conclusions and target reproducibility
 
@@ -8,7 +8,7 @@ The corrected baseline is [benchmarks.md](benchmarks.md), from Fregat PR #235. T
 
 | Target                         |     PR #235 native / xterm | This run native / xterm | Measured conclusion                                                                                                           |
 | ------------------------------ | -------------------------: | ----------------------: | ----------------------------------------------------------------------------------------------------------------------------- |
-| ASCII output CPU, 17 terminals | 100.1% / 89.9% of one core |        109.19% / 88.75% | Native renderer CPU is higher; native GPU-process CPU is lower.                                                               |
+| ASCII output CPU, 17 terminals | 100.1% / 89.9% of one core |        106.77% / 86.72% | Native renderer CPU is higher; native GPU-process CPU is lower.                                                               |
 | Input echo p95, 1 terminal     |             46.2 / 32.1 ms |        28.83 / 39.75 ms | Native disadvantage did not reproduce. Plan 283's target table may change.                                                    |
 | Write p50, 1 terminal          |              14.0 / 8.2 ms |        17.01 / 12.24 ms | Median-of-run gap is 4.77 ms, with overlapping/reversed individual runs. Frame/capture phase dominates the measured endpoint. |
 
@@ -51,33 +51,28 @@ This changes physical compositor area and presentation geometry relative to PR #
 
 ## CPU by Chromium process
 
-CPU is CDP `SystemInfo.getProcessInfo` CPU-time delta divided by elapsed time, expressed as percent of one core. Samples reject process births/exits. Renderer includes renderer-process CPU, not just its main thread. GPU-process CPU is CPU consumption in that process, **not GPU hardware execution time**. Browser/other process deltas are retained in JSON; browser medians are 0.13–0.20% in these controls. Columns are independently aggregated medians and need not sum exactly.
+### Correction after review
 
-### Inactive-wrapper controls
+The original v4 CPU numerator spanned two process snapshots, but its denominator covered only the operation between them. In traced phases, recorder activation sat between the first snapshot and the operation timer. Those intervals differ. **The original v4 CPU percentages and trace/control CPU ratios are unqualified and withdrawn from the conclusions.** The original 17-terminal ASCII controls reported 109.19% native and 88.75% xterm. Their archives contain neither snapshot acquisition timestamps nor matching CDP events; the exact interval cannot be reconstructed. The compact v4 rows now explicitly carry `cpuIntervalQualified: false`. Their independent renderer-main task shares, counters, and captured latency samples remain usable.
 
-| Output | Count | Native total | Native renderer | Native GPU process | xterm total | xterm renderer | xterm GPU process |
-| ------ | ----: | -----------: | --------------: | -----------------: | ----------: | -------------: | ----------------: |
-| ASCII  |     1 |        37.91 |           29.63 |               7.76 |       34.34 |          20.04 |             14.10 |
-| ASCII  |     8 |        63.88 |           47.91 |              16.15 |       73.00 |          42.44 |             30.36 |
-| ASCII  |    17 |       109.19 |           83.26 |              25.97 |       88.75 |          50.50 |             38.11 |
-| SGR    |     1 |        32.96 |           22.84 |               9.92 |       30.03 |          16.34 |             14.20 |
-| SGR    |     8 |        63.53 |           47.40 |              15.99 |       78.05 |          46.05 |             31.68 |
-| SGR    |    17 |       110.03 |           84.70 |              25.68 |       88.81 |          52.16 |             36.49 |
+The replacement is a narrow headed M1 rerun of 17-terminal ASCII, three repetitions with alternating control/trace order, on AC under `caffeinate -d -u -t 1500`. It ran from 12:10:10.926 to 12:13:27.609 UTC. All six cases, twelve phases, and 24 display probes completed without run, page, or phase failures. Six idle medians span 16.6700–16.8725 ms; the largest mounted median is 17.1250 ms. The original on-screen geometry, terminal dimensions, real GPU, browser version, and fixtures are retained. Both replacement screenshots were read back.
 
-At 17 terminals the native excess is renderer-side. At 8 terminals the total-CPU ordering reverses: native uses less total CPU. A blanket claim that native always consumes more CPU is unsupported.
+Recorder activation now precedes the first CPU snapshot. Each snapshot retains its CDP request and response timestamps. CPU is `SystemInfo.getProcessInfo` CPU-time delta divided by the midpoint-to-midpoint interval of those acquisition brackets; operation duration is stored separately. CDP supplies no exact internal acquisition timestamp, so midpoint timing is an estimate with explicit uncertainty: half the combined request/response bracket widths. Across this rerun that uncertainty is 0.371–0.862 ms on intervals of 3062.7–3090.1 ms (less than 0.029%). This bounds clock acquisition uncertainty; it is not a correction for workload or profiling perturbation. Process births/exits still reject a sample.
 
-### Profiler perturbation
+Percentages are percent of one core. Renderer includes all renderer-process CPU. GPU-process CPU is CPU consumption in that process, **not GPU hardware execution time**. Columns are independently aggregated medians and need not sum exactly.
 
-| Output | Count | Native control / traced total | xterm control / traced total |
-| ------ | ----: | ----------------------------: | ---------------------------: |
-| ASCII  |     1 |                 37.91 / 41.49 |                34.34 / 41.37 |
-| ASCII  |     8 |                 63.88 / 70.75 |                73.00 / 66.70 |
-| ASCII  |    17 |               109.19 / 119.86 |               88.75 / 102.45 |
-| SGR    |     1 |                 32.96 / 38.60 |                30.03 / 42.82 |
-| SGR    |     8 |                 63.53 / 72.61 |                78.05 / 65.76 |
-| SGR    |    17 |               110.03 / 122.57 |               88.81 / 107.32 |
+| ASCII, 17 terminals | Native total | Native renderer | Native GPU process | xterm total | xterm renderer | xterm GPU process |
+| ------------------- | -----------: | --------------: | -----------------: | ----------: | -------------: | ----------------: |
+| Controls            |       106.77 |           80.66 |              25.86 |       86.72 |          49.31 |             37.23 |
+| Traced              |       114.90 |           86.09 |              28.45 |       96.29 |          61.40 |             35.01 |
 
-Trace/control order alternates by repetition. Wrappers are installed on `?trace` pages but recording is inactive in controls, so these are not default no-wrapper controls. Chrome tracing, CPU sampling, method wrapping, counters, and span allocation perturb the workload. xterm count-8 traced GPU-process CPU decreases enough to reverse total-CPU ordering. A universal positive overhead subtraction is invalid. Use controls for comparative CPU/latency and traces for attribution; do not multiply a traced stage share by control CPU to predict savings.
+Control totals by repetition are native 106.19, 106.77, 107.14%; xterm 86.72, 97.79, 85.86%. The corrected median gap is 20.05 percentage points. Native excess remains renderer-side, while native GPU-process CPU is lower. This rerun replaces only 17-terminal ASCII CPU; 1/8-terminal and SGR CPU figures have not been remeasured. The differences from v4 include ordinary run-to-run variation as well as the interval repair, so the numerical change cannot be assigned solely to that repair.
+
+### Tracing perturbation
+
+Trace/control order alternates by repetition. Wrappers are installed on `?trace` pages but recording is inactive in controls, so these are not default no-wrapper controls. Chrome tracing, CPU sampling, method wrapping, counters, and span allocation perturb the workload. In this corrected run, total medians rise from 106.77 to 114.90% native and 86.72 to 96.29% xterm, while xterm GPU-process CPU falls from 37.23 to 35.01%. A universal positive overhead subtraction is invalid. Use controls for comparative CPU and traces for attribution; do not multiply a traced stage share by control CPU to predict savings.
+
+The corrected ASCII trace independently confirms the stage ranking: native snapshot 49.14%, instances 27.16%, parsing 1.31%, and residual 5.93% of 7017.70 ms summed renderer-main tasks. The full 1/8/17 stage matrix below is the original v4 task-time evidence, whose denominator does not use process CPU sampling.
 
 ## Exclusive renderer-main task attribution
 
@@ -199,21 +194,24 @@ These are separate marginal medians, not an additive synthetic sample. Traced la
 
 ## Evidence and provenance
 
-[Checked-in evidence](benchmarks/mac-m1/attribution-2026-10-01/) contains `analysis-1.json`, `analysis-8.json`, `analysis-17.json`, repetition-0 ASCII raw Chrome traces for both libraries at each count, repetition-0 one-terminal latency raw traces, and screenshots at all counts. Compact analyses retain CPU process deltas, whole-main attribution, sampled leaves, all sample timelines, per-terminal counts/ownership, exact frame-counter distributions, qualification metadata, and SHA256 of every full trace and `comparison.json`. Raw qualification intervals are represented by their SHA256 in compact files and retained in full archives.
+[Checked-in evidence](benchmarks/mac-m1/attribution-2026-10-01/) contains the corrected rerun in `cpu-corrected-17-ascii/` (compact analysis, both repetition-0 raw Chrome traces, and both screenshots), plus `analysis-1.json`, `analysis-8.json`, `analysis-17.json`, repetition-0 ASCII raw Chrome traces for both libraries at each count, repetition-0 one-terminal latency raw traces, and screenshots at all counts. Compact analyses retain CPU process deltas, whole-main attribution, sampled leaves, all sample timelines, per-terminal counts/ownership, exact frame-counter distributions, qualification metadata, and SHA256 of every full trace and `comparison.json`. Raw qualification intervals are represented by their SHA256 in compact files and retained in full archives.
 
 The measured portable manifest records base commit `d2d01354729989e585ffed681648eedd77b1eb9f` plus dirty tracing-tool changes, source SHA256 `20920b8944e6bcf8f8a02e37cda67d5ace635f5fd3fb7772faa33b04286e228c`, and browser-bundle SHA256 `0aabe0cec8971d67e863c6c8e1ce43357b7f62a2a8981e121603ed2b9fbcd169`. The manifest records versions and fixture hashes. The final postprocessor subsequently added compact output and unique containing-frame assignment; those offline changes did not alter the measured browser bundle. Actual tracing overrides are 180 output writes and 24 samples per latency operation, independent of normal comparison defaults in the manifest.
 
+The corrected portable manifest records clean commit `4b307474e5a6d3919765649a8e5819df9d6d5719`, source SHA256 `99073816515ec1837746f12d8f48db4f16b1ce33394e65662a5bbabc4c6824db`, and browser-bundle SHA256 `2eece08b080a6f89e349609dac823a57f3a1ce348cfb784782dd59a9c7138336`. Its bundle and full run remain on the Mac at `~/tmp/gw-bench/attribution-bundle-v5` and `~/tmp/gw-bench/attribution-mac-17-ascii-v5`.
+
 Full raw archives are outside git at `/work/reports/ghostty-benchmarks/plan-283/`. Their source directories and the measured portable bundle remain on the Mac at `~/tmp/gw-bench/attribution-mac-{1,8,17}-v4` and `~/tmp/gw-bench/attribution-bundle-v4`.
 
-| Archive                        | SHA256                                                             |
-| ------------------------------ | ------------------------------------------------------------------ |
-| `attribution-mac-1-v4.tar.gz`  | `46294c30cc2d0ca7352318b88512375d49b68165956ecd6e5e51bd58d1d46b1e` |
-| `attribution-mac-8-v4.tar.gz`  | `bcbd206e32b8ecb297972b51e504a4a7d62abf7bfa451130505cc001b1de4737` |
-| `attribution-mac-17-v4.tar.gz` | `52b57bad8f8e1d46035a1f1547dbd31d193b0cbc764784854ec174ae361bb87e` |
+| Archive                              | SHA256                                                             |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| `attribution-mac-1-v4.tar.gz`        | `46294c30cc2d0ca7352318b88512375d49b68165956ecd6e5e51bd58d1d46b1e` |
+| `attribution-mac-8-v4.tar.gz`        | `bcbd206e32b8ecb297972b51e504a4a7d62abf7bfa451130505cc001b1de4737` |
+| `attribution-mac-17-v4.tar.gz`       | `52b57bad8f8e1d46035a1f1547dbd31d193b0cbc764784854ec174ae361bb87e` |
+| `attribution-mac-17-ascii-v5.tar.gz` | `a7a5faa48038b7afc2ed28c876f51225a619c3d2521f8c895ca198b371a2f9a7` |
 
 ## Reproduction and verification
 
-Tracing is off by default; only benchmark `?trace` installs wrappers. Consumer/library source is unchanged. Recording activates between `traceBegin` and `traceEnd`; UserTiming serialization occurs after the CPU snapshot. Supported flags are `--trace`, `--trace-count 1|8|17`, `--trace-frames N` (default 180), `--trace-latency-samples N` (default 48), and `--display-awake`. `--smoke --smoke-instrumentation` checks wrappers without producing hardware performance claims.
+Tracing is off by default; only benchmark `?trace` installs wrappers. Consumer/library source is unchanged. Recording activates between `traceBegin` and `traceEnd`; UserTiming serialization occurs after the CPU snapshot. Supported flags are `--trace`, `--trace-count 1|8|17`, `--trace-phase latency|ascii|sgr` (default all three), `--trace-frames N` (default 180), `--trace-latency-samples N` (default 48), and `--display-awake`. `--smoke --smoke-instrumentation` checks wrappers without producing hardware performance claims.
 
 From the package directory on Linux, build the established portable bundle:
 
@@ -234,16 +232,14 @@ caffeinate -d -u -t 1800 node comparison-runner.mjs \
   --output ../attribution-mac-m1-1
 ```
 
-Repeat for counts 8 and 17. Only an idle-display qualification failure discards timing data; mounted workload cadence remains evidence. Recompute full/compact attribution from any full qualified directory:
+Repeat for counts 8 and 17. Reproduce the corrected narrow rerun with `--trace --trace-count 17 --trace-phase ascii --display-awake` in a fresh output directory. Fresh directories are required only for tracing, which owns discard-on-failure. Ordinary comparison reruns reuse their output directory and qualify the idle display at its measured refresh period, including 120/144 Hz. Trace windows on the Mac require idle 60 Hz qualification. Mounted cadence remains workload evidence, but hidden pages, probe errors, and missing/invalid samples reject the window. Expired probes cancel their own rAF callback and cannot append samples or pacing markers to a later probe. Recompute full/compact attribution from any full qualified directory:
 
 ```sh
 export PATH=$HOME/.local/share/mise/shims:$PATH
 nice -n 19 taskset -c 0-7 node scripts/comparison-attribution.mjs \
   /work/tmp/plan-283/attribution-mac-1-v4 /work/tmp/plan-283/analysis-1.json --compact
-nice -n 19 taskset -c 0-7 node --test \
-  scripts/comparison-report.test.mjs scripts/comparison-trace.test.mjs \
-  scripts/comparison-attribution.test.mjs
+nice -n 19 taskset -c 0-7 bun run bench:compare:test
 nice -n 19 taskset -c 0-7 bun run typecheck
 ```
 
-The narrow tests cover display qualification versus workload cadence, diagnostic retention/cleanup, process churn and trace-stream closure, nested-exclusive counters, terminal/frame isolation, ownership identities, clock alignment and main-task union, sampled-profile identity, unique frame aggregation, presentation identity, and compact-evidence preservation. Package/portable builds, typecheck, and Linux native/xterm byte/string smoke also passed. Product deployment, product fixes, optical measurements, and merge are deliberately outside this Phase 1 delivery.
+All 44 narrow tooling tests pass. They cover matched CPU acquisition intervals and asynchronous timing uncertainty, run/page failures and incomplete case/phase evidence, numeric option validation and compact CLI parsing, awaited and bounded trace cleanup, stale refresh cancellation, reusable ordinary outputs, portable temporary roots, and display qualification versus workload cadence, diagnostic retention/cleanup, process churn and trace-stream closure, nested-exclusive counters, terminal/frame isolation, ownership identities, clock alignment and main-task union, sampled-profile identity, unique frame aggregation, presentation identity, and compact-evidence preservation. The analyzer rejects failed or unfinished windows before publishing rows, and verifies the selected case matrix, trace/control pairs, sample counts, and display probes. A case deadline awaits context closure and trace finalization; stalled drain has a ten-second give-up and stops the entire window. Package/portable builds, repository pre-commit gates and typechecks, and Linux native/xterm byte/string smoke also passed. The existing `bench:compare:test` entry now includes tracing, attribution, and option regressions through its test imports; pinned package metadata and native-resolver provenance remain unchanged. Seven existing package lint warnings remain outside the changed files. The first repair push passed Ghostty CI jobs; the repository package job failed in unrelated Raspberry Pi tests because CI checks out shallow history (`fregatCheckout` cannot find `3d86637e8`, followed by two lane-lock child-process failures). Product deployment, product fixes, optical measurements, and merge are deliberately outside this Phase 1 delivery.

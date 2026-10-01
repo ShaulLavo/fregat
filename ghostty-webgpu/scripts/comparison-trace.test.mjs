@@ -3,11 +3,13 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { measureCpu, withDeadline } from './comparison-guards.mjs'
+import { refreshSampler } from '../bench/comparison-refresh.ts'
 import {
   assertDisplay,
   discardTraceWindow,
   displaySummary,
-  prepareTraceOutput,
+  prepareOutput,
   summarizeRecords,
   tracePhase,
 } from './comparison-trace.mjs'
@@ -89,10 +91,10 @@ test('frame counts match each terminal interval and ownership uses object identi
 })
 
 test('failed display qualification discards current and completed cases in a fresh output', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'ghostty-trace-cleanup-'))
+  const root = await mkdtemp(join(tmpdir(), 'trace-cleanup-'))
   try {
     const output = join(root, 'window')
-    await prepareTraceOutput(output)
+    await prepareOutput(output, { tracing: true })
     for (const name of [
       'finished.trace.json.gz',
       'current.trace.json.gz',
@@ -103,7 +105,7 @@ test('failed display qualification discards current and completed cases in a fre
     }
     await writeFile(join(output, 'qualification.json'), 'failed probe retained')
     await writeFile(join(root, 'previous-window.json'), 'retained')
-    await assert.rejects(prepareTraceOutput(output), { code: 'EEXIST' })
+    await assert.rejects(prepareOutput(output, { tracing: true }), { code: 'EEXIST' })
     await discardTraceWindow(output)
     assert.deepEqual(await readdir(output), ['qualification.json'])
     assert.equal(
@@ -151,4 +153,188 @@ test('a CPU qualification failure stops recording and drains the Chrome trace st
   assert(calls.includes('Tracing.end'))
   assert(calls.includes('IO.read'))
   assert(calls.includes('IO.close'))
+})
+
+test('mounted probes reject hidden pages, empty samples and probe errors', () => {
+  for (const probe of [
+    displaySummary([16.67], { visibility: 'hidden' }),
+    displaySummary([], { visibility: 'visible' }),
+    displaySummary(Array(120).fill(33.33), { visibility: 'visible', error: 'timeout' }),
+    { ...displaySummary(Array(120).fill(16.67), { visibility: 'visible' }), periods: [NaN] },
+  ])
+    assert.throws(() => assertDisplay(probe, { idle: false }))
+})
+
+test('ordinary qualification accepts healthy high refresh and keeps mounted stretching', () => {
+  for (const period of [1000 / 120, 1000 / 144]) {
+    const idle = displaySummary(Array(120).fill(period), { visibility: 'visible' })
+    assert.equal(assertDisplay(idle, { expectedPeriod: null }), period)
+    assert.equal(
+      assertDisplay(
+        displaySummary(Array(120).fill(3 * period), {
+          visibility: 'visible',
+        }),
+        { idle: false, expectedPeriod: period },
+      ),
+      3 * period,
+    )
+  }
+})
+
+test('ordinary output permits reruns while trace output owns a fresh directory', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gw-rerun-'))
+  try {
+    const output = join(root, 'ordinary')
+    await prepareOutput(output, { tracing: false })
+    await writeFile(join(output, 'previous'), 'retained')
+    await prepareOutput(output, { tracing: false })
+    assert.equal(await readFile(join(output, 'previous'), 'utf8'), 'retained')
+    await assert.rejects(prepareOutput(output, { tracing: true }), { code: 'EEXIST' })
+  } finally {
+    await rm(root, { recursive: true })
+  }
+})
+
+test('expired refresh callbacks cannot append to or mark a later probe', async () => {
+  const callbacks = new Map()
+  const cancelled = []
+  let id = 0
+  const sampler = refreshSampler(
+    (tick) => {
+      callbacks.set(++id, tick)
+      return id
+    },
+    (value) => cancelled.push(value),
+  )
+  const first = sampler.start(2)
+  callbacks.get(1)(0)
+  const stale = callbacks.get(2)
+  assert.deepEqual(sampler.cancel(), [])
+  assert.deepEqual(await first, [])
+  const second = sampler.start(1)
+  stale(16)
+  callbacks.get(3)(100)
+  callbacks.get(4)(108)
+  assert.deepEqual(await second, [8])
+  assert.deepEqual(cancelled, [2])
+})
+
+test('CPU interval excludes recorder activation and matches snapshot acquisition times', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gw-cpu-'))
+  let time = 0
+  const session = new EventEmitter()
+  session.send = async (name) => {
+    if (name === 'SystemInfo.getProcessInfo')
+      return {
+        processInfo: [{ id: 1, type: 'renderer', cpuTime: time / 1000 }],
+      }
+    if (name === 'Tracing.end') session.emit('Tracing.tracingComplete', { stream: 'trace' })
+    if (name === 'IO.read') return { data: '{"traceEvents":[]}', eof: true }
+    return {}
+  }
+  const page = {
+    evaluate: async (fn) => {
+      if (fn.toString().includes('traceBegin')) time += 100
+      return { spans: [], counters: [], markers: [], ownership: [] }
+    },
+  }
+  try {
+    const result = await tracePhase({
+      page,
+      browserSession: session,
+      output: root,
+      label: 'cpu',
+      traced: true,
+      now: () => time,
+      operation: async () => {
+        time += 100
+        return {}
+      },
+    })
+    assert.equal(result.cpu.percentOfOneCore, 100)
+    assert.equal(result.cpu.milliseconds, 100)
+    assert.equal(result.milliseconds, 100)
+  } finally {
+    await rm(root, { recursive: true })
+  }
+})
+
+test('a deadline awaits delayed browser-wide trace cleanup before rejection', async () => {
+  const calls = []
+  let finish
+  const cleanup = new Promise((resolve) => {
+    finish = resolve
+  })
+  let expire
+  const expired = new Promise((resolve) => {
+    expire = resolve
+  })
+  const running = withDeadline(
+    async () => {
+      await expired
+      calls.push('Tracing.end')
+      await cleanup
+      calls.push('trace drained')
+    },
+    1,
+    async () => {
+      expire()
+    },
+    { drain: true },
+  )
+  let settled = false
+  running.catch(() => {
+    settled = true
+  })
+  await expired
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(settled, false)
+  finish()
+  await assert.rejects(running, /deadline/)
+  assert.deepEqual(calls, ['Tracing.end', 'trace drained'])
+})
+
+test('CPU denominator brackets asynchronous snapshot acquisition rather than operation duration', async () => {
+  let time = 0
+  const session = {
+    async send() {
+      time += 10
+      const processInfo = [{ id: 1, type: 'renderer', cpuTime: time / 1000 }]
+      time += 10
+      return { processInfo }
+    },
+  }
+  const result = await measureCpu(
+    session,
+    async () => {
+      time += 100
+    },
+    { now: () => time },
+  )
+  assert.equal(result.milliseconds, 100)
+  assert.equal(result.cpu.milliseconds, 120)
+  assert.equal(result.cpu.acquisitionUncertaintyMilliseconds, 20)
+  assert.equal(result.cpu.percentOfOneCore, 100)
+  assert.deepEqual(result.cpu.interval, {
+    before: { requested: 0, completed: 20 },
+    after: { requested: 120, completed: 140 },
+  })
+})
+
+test('a stalled trace drain terminates the window deadline instead of hanging', async () => {
+  await assert.rejects(
+    withDeadline(
+      () => new Promise(() => {}),
+      1,
+      () => {},
+      { drain: true, drainMilliseconds: 5 },
+    ),
+    /deadline exceeded/,
+  )
+})
+
+test('mounted probe metadata must match real finite samples', () => {
+  const valid = displaySummary(Array(120).fill(16.67), { visibility: 'visible' })
+  assert.throws(() => assertDisplay({ ...valid, periods: [] }, { idle: false }))
+  assert.throws(() => assertDisplay({ ...valid, median: NaN }, { idle: false }))
 })
