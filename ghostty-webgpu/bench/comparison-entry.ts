@@ -17,6 +17,7 @@ import { TerminalOption } from '../src/core/abi.js'
 import { TerminalSession } from '../src/term/session.js'
 import { createGhosttyWebGpuTerminalFromSession } from '../src/dom/terminal.js'
 import { WebGpuTerminalRenderer } from '../src/render/renderer.js'
+import { ComparisonTracing } from './comparison-tracing.js'
 import {
   corpus,
   fixtureNames,
@@ -37,6 +38,7 @@ interface Driver {
   dispose(): void
 }
 
+const tracing = new ComparisonTracing()
 const mount = document.querySelector('main')!
 let drivers: Driver[] = []
 let native: GhosttyRuntime | undefined
@@ -51,7 +53,12 @@ const encoder = new TextEncoder()
 const nativeFrame = requestAnimationFrame.bind(window)
 
 export function frame(): Promise<number> {
-  return new Promise((resolve) => nativeFrame(resolve))
+  return new Promise((resolve) =>
+    nativeFrame((time) => {
+      tracing.mark('paced-frame', { timestamp: time })
+      resolve(time)
+    }),
+  )
 }
 
 async function settle(): Promise<void> {
@@ -99,6 +106,11 @@ async function createNative(host: HTMLElement): Promise<Driver> {
   const core: unknown = Reflect.get(session, 'terminal')
   if (!(core instanceof GhosttyTerminal)) throw new Error('Native session terminal unavailable')
   configureNativeHistory(core)
+  tracing.native(
+    drivers.length,
+    core,
+    session.renderState as import('../src/core/render-state.js').GhosttyRenderState,
+  )
   session.setTheme({
     ...session.appearance.theme,
     background: { r: 0, g: 0, b: 0 },
@@ -117,13 +129,19 @@ async function createNative(host: HTMLElement): Promise<Driver> {
         fallback: adapter.info.isFallbackAdapter,
       }
       const device = await adapter.requestDevice()
-      return WebGpuTerminalRenderer.create({ ...options, deviceFactory: async () => device })
+      const renderer = await WebGpuTerminalRenderer.create({
+        ...options,
+        deviceFactory: async () => device,
+      })
+      tracing.renderer(drivers.length, renderer)
+      return renderer
     },
   })
   terminal.on('error', (event) => {
     throw event.cause
   })
   await terminal.open(host)
+  tracing.wrap(terminal, 'write', drivers.length, 'js')
   return {
     write: async (data) => {
       terminal.write(data)
@@ -183,7 +201,10 @@ function createXterm(host: HTMLElement): Driver {
   })
   terminal.open(host)
   if (current.variant === 'xterm-webgl') {
-    terminal.loadAddon(new WebglAddon())
+    const addon = new WebglAddon()
+    terminal.loadAddon(addon)
+    tracing.xterm(drivers.length, terminal, addon)
+    tracing.wrap(terminal, 'write', drivers.length, 'js')
   }
   return {
     write: (data) => new Promise((resolve) => terminal.write(data, resolve)),
@@ -523,6 +544,7 @@ async function history(rows: number = settings.scrollback): Promise<unknown> {
 }
 
 async function connectEcho(): Promise<void> {
+  if (socket?.readyState === WebSocket.OPEN) return
   socket = new WebSocket(`ws://${location.host}/echo`)
   await new Promise<void>((resolve, reject) => {
     socket!.onopen = () => resolve()
@@ -530,16 +552,19 @@ async function connectEcho(): Promise<void> {
   })
   socket.binaryType = 'arraybuffer'
   socket.onmessage = (event: MessageEvent<ArrayBuffer>) => {
+    tracing.mark('echo-received')
     const bytes = new Uint8Array(event.data)
     void drivers[0]!.write(current.path === 'bytes' ? bytes : decoder.decode(bytes))
   }
-  drivers[0]!.onData((data) =>
-    socket!.send(typeof data === 'string' ? encoder.encode(data) : Uint8Array.from(data)),
-  )
+  drivers[0]!.onData((data) => {
+    tracing.mark('echo-sent')
+    socket!.send(typeof data === 'string' ? encoder.encode(data) : Uint8Array.from(data))
+  })
   document.addEventListener(
     'keydown',
     () => {
       keyTime = performance.timeOrigin + performance.now()
+      tracing.mark('keydown')
     },
     true,
   )
@@ -555,6 +580,7 @@ async function prepareInput(color: 'red' | 'green'): Promise<void> {
 
 async function writeMarker(color: 'red' | 'green'): Promise<number> {
   const started = performance.timeOrigin + performance.now()
+  tracing.mark('write-marker', { color })
   await drivers[0]!.write(input(marker(color)))
   return started
 }
@@ -606,6 +632,8 @@ window.__compare = {
     texts: drivers.map((driver) => driver.text()),
   }),
   fixtureNames,
+  traceBegin: () => tracing.begin(),
+  traceEnd: () => tracing.end(),
   dispose: () => {
     socket?.close()
     drivers.forEach((driver) => driver.dispose())
@@ -634,6 +662,8 @@ declare global {
       keyTime: () => number
       info: () => unknown
       fixtureNames: typeof fixtureNames
+      traceBegin: () => void
+      traceEnd: () => unknown
       dispose: () => void
     }
   }
