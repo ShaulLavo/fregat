@@ -14,6 +14,22 @@ mesh serve stop /ai
 
 `http://127.0.0.1:8318` is the local Claude dispatcher. `http://127.0.0.1:8317` and `https://omarchy.mesh.shaulavo.dev/ai` expose CLIProxyAPI, authenticated by its generated client key. The dispatcher stays local. CLIProxyAPI management, discovery, and the management panel are disabled.
 
+## Local gateway boundary
+
+Claude Code is the intended caller. The launcher sets `ANTHROPIC_BASE_URL=http://127.0.0.1:8318`; a local Node HTTP client test confirms URL-derived loopback Host and absence of browser Origin/fetch-metadata headers. Every endpoint, including `/health`, rejects `Origin`, `Sec-Fetch-Site`, or `Sec-Fetch-Mode`, and accepts only `127.0.0.1:<port>`, `localhost:<port>`, or `[::1]:<port>` as Host. Same-user local processes remain trusted because they can read the proxy key file.
+
+`mesh serve ls` maps local listener 8318 to gateway backend 18318. Mesh preserves the incoming Host, so a gateway configured on 18318 also allows those three loopback Hosts on 8318. Other configured gateway ports allow their own port. The tailnet `/ai` route fronts the CLIProxyAPI backend on 18317.
+
+The gateway binds immediately. GPT requests await TCP readiness of the configured proxy port for up to 15 seconds; `/health` returns 503 until that probe succeeds. Giving up returns a JSON Messages error with status 503 for GPT; Claude forwarding proceeds independently. Readiness describes initial startup; a later upstream connection failure still uses the gateway's 502 error handler.
+
+Request bodies are capped at 32 MiB, matching Anthropic's [32 MB Messages request limit](https://platform.claude.com/docs/en/api/overview#request-size-limits). The cap is enforced by `Bun.serve` before body parsing. The idle timeout remains disabled so quiet, long-lived SSE operations retain their connection; streams pass through as chunks arrive.
+
+Both directions strip fixed hop-by-hop headers and headers nominated by `Connection`. GPT forwarding allows only `content-type`, `accept`, `anthropic-version`, `anthropic-beta`, `x-claude-code-session-id`, `x-claude-code-agent-id`, and `x-claude-code-parent-agent-id`, then sets the proxy Authorization key. Claude credentials and other client headers are excluded from the GPT path. The Claude path retains end-to-end headers and original body bytes.
+
+The three affinity headers are documented in CLIProxyAPI v8.0.4 source: [session identity extraction](https://github.com/router-for-me/CLIProxyAPI/blob/v8.0.4/sdk/cliproxy/session/info.go) and [Claude execution scope](https://github.com/router-for-me/CLIProxyAPI/blob/v8.0.4/internal/runtime/executor/helps/claude_code_session.go). Body `metadata.user_id` also provides Claude session identity and passes through unchanged. Generic Codex and other-client affinity headers are outside this Claude Code-only interface.
+
+The launcher reads and validates its agent definitions before executing Claude; missing, unreadable, or empty definitions stop startup with a diagnostic.
+
 The install uses CLIProxyAPI v8.0.4, with the published archive SHA256 checked. Source is `gateway.ts` and `run.ts`; `run.ts` is bundled into the install's `gateway.js`.
 
 Both accounts have independently authorized credentials in `/work/cli-proxy-api/auth`, with file permissions `0600`. CLIProxyAPI owns their refresh lifecycle. The gateway has no dependency on the official Codex login or its auth file. Logging out or switching accounts in Codex leaves this pool available.
