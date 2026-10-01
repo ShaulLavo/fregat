@@ -26,8 +26,20 @@ export function isActiveWorkspaceRoot(workspaceRoot: string) {
   return useActiveProjectStore.getState().workspaceRoot === workspaceRoot
 }
 
-export function holdsActiveProject(activation: ActiveProject) {
-  return useActiveProjectStore.getState() === activation
+// An abandoned activation points at the one it replaced, so a later rollback skips past it.
+const abandoned = new WeakMap<ActiveProject, ActiveProject>()
+
+/**
+ * Gives up an activation that never landed. While it still holds the project, the project goes
+ * back to the last activation before it that was not abandoned. False when a later claim holds it.
+ */
+export function releaseActiveProject(activation: ActiveProject, previous: ActiveProject) {
+  abandoned.set(activation, previous)
+  if (useActiveProjectStore.getState() !== activation) return false
+  let target = previous
+  for (let next = abandoned.get(target); next; next = abandoned.get(target)) target = next
+  restoreActiveProject(target)
+  return true
 }
 
 /** Hands the project back to an earlier activation, which then holds it again. */
