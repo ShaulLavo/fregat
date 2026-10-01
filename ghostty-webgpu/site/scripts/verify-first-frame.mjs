@@ -161,7 +161,13 @@ try {
   })
   await noWasmPage.goto(url)
   assert.equal(await noWasmPage.locator('#ghost-first-frame [data-row]').count(), 40)
-  assert.equal(await noWasmPage.locator('#wasm-unavailable').isVisible(), true)
+  assert.equal(await noWasmPage.locator('#caption').isVisible(), true)
+  assert.equal(
+    await noWasmPage.locator('#caption').textContent(),
+    'The live terminal did not start in this browser, so this is a still frame.',
+  )
+  assert.equal(await noWasmPage.locator('#tabs button:disabled').count(), 3)
+  assert.equal(await noWasmPage.locator('#damage').isDisabled(), true)
   await noWasmPage.screenshot({ path: `${directory}/no-webassembly.png`, fullPage: true })
   results.push({ name: 'no-webassembly', rows: 40 })
   await noWasmContext.close()

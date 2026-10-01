@@ -205,7 +205,8 @@ read back. The full frozen hand-off/demo matrix passes again at
 and phone looks are healthy and read back under `/work/tmp/fregat-evidence/p285-review-looks/`
 (`20261001T215604Z-look-ghostty-webgpu-1280x1000/` and
 `20261001T215606Z-look-ghostty-webgpu-390x844/`). The cold trace numbers above predate these
-boot repairs; static HTML/CSS are unchanged, and no updated runtime hand-off timing is claimed.
+boot repairs and the still-frame fallback below; no updated first-paint or runtime hand-off timing
+is claimed.
 
 The original malformed-frame fixture also exposed accepted invalid header dimensions. The
 parser now rejects missing, non-integer and non-positive dimensions before they reach a
@@ -214,6 +215,31 @@ reproduced the validation gap and pass after the guard; with the real-core compa
 eight targeted Node tests pass. All four expanded boot regressions pass at
 `/work/tmp/fregat-evidence/p285-review-asset-header/`, including malformed header failure followed
 by working Shell input. The failure screenshot was read back. Build and site typecheck pass.
+
+### Runtime-start failure follow-up (2026-10-02)
+
+Held `ghostty-vt.wasm` (desktop) and `bridge.wasm` (phone) requests returned 404 after static
+paint. Both reproduced the missing visible failure state at
+`/work/tmp/fregat-evidence/p285-runtime-failure-before/`; the other four boot cases passed.
+
+Create/open failure now retains the static Ghost, resets the selected demo to Ghost, keeps both
+backend labels `html`, and natively disables tabs and Redraws. Disabled controls have no hover
+styling and a default pointer. The caption says: “The live terminal did not start in this browser,
+so this is a still frame.” The no-WebAssembly path uses the same state; its redundant hidden
+paragraph is removed. No fatal/details element is retained.
+
+All six boot regressions pass at `/work/tmp/fregat-evidence/p285-runtime-failure-after/`.
+The runtime faults also select Shell before rejection and check that Ghost labels are restored,
+40 static rows remain, the caption is visible, controls are disabled, and hover/keyboard input
+cannot change the fallback. Desktop and phone full-page fallback screenshots were read back.
+The complete frozen hand-off/demo matrix passes at
+`/work/tmp/fregat-evidence/p285-runtime-failure-handoff/`, including no-WebAssembly and no-JS.
+Site build and typecheck pass. Healthy desktop and phone looks were read back at
+`/work/tmp/fregat-evidence/p285-runtime-failure-looks/20261001T221919Z-look-ghostty-webgpu-1280x1000/`
+and `/work/tmp/fregat-evidence/p285-runtime-failure-looks/20261001T221920Z-look-ghostty-webgpu-390x844/`.
+This repair changes HTML/CSS; earlier cold-trace numbers describe the earlier build. No new
+first-paint or runtime timing claim is made. Software Chromium WebGL2 is confirmed; hardware
+GPU and Firefox/WebKit remain unconfirmed. No deployment or GitHub PR merge is performed.
 
 ## Phase 1: a DOM renderer, in the package
 

@@ -8,18 +8,20 @@ await mkdir(directory, { recursive: true })
 const browser = await chromium.launch({ headless: true })
 const results = []
 
-async function check(name, drive) {
+async function check(name, drive, { domOnly = true, width = 1280, height = 1000 } = {}) {
   const context = await browser.newContext({
-    viewport: { width: 1280, height: 1000 },
+    viewport: { width, height },
     reducedMotion: 'reduce',
   })
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.addInitScript(() => {
-    HTMLCanvasElement.prototype.getContext = () => null
-    Object.defineProperty(navigator, 'gpu', { value: undefined })
-  })
+  if (domOnly) {
+    await page.addInitScript(() => {
+      HTMLCanvasElement.prototype.getContext = () => null
+      Object.defineProperty(navigator, 'gpu', { value: undefined })
+    })
+  }
   try {
     await drive(page)
     assert.deepEqual(errors, [])
@@ -53,7 +55,72 @@ async function shellWorks(page) {
   )
 }
 
+function controlPaint(button) {
+  const style = getComputedStyle(button)
+  return { color: style.color, background: style.backgroundColor, cursor: style.cursor }
+}
+
+async function runtimeFailure(page, asset, name) {
+  let release
+  const waiting = new Promise((resolve) => {
+    release = resolve
+  })
+  await page.route(`**/${asset}`, async (route) => {
+    await waiting
+    await route.fulfill({ status: 404, body: 'unavailable' })
+  })
+  await page.goto(url, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => performance.getEntriesByName('ghost:create-start').length > 0)
+  assert.equal(await page.locator('#ghost-first-frame [data-row]').count(), 40)
+  assert.equal(await page.locator('#damage').isEnabled(), true)
+  await page.screenshot({ path: `${directory}/${name}-before.png`, fullPage: true })
+  await page.locator('#tabs button[data-demo=shell]').click()
+  release()
+  const note = 'The live terminal did not start in this browser, so this is a still frame.'
+  await page.waitForFunction(
+    (text) => document.querySelector('#caption').textContent === text,
+    note,
+    { timeout: 5000 },
+  )
+  assert.equal(await page.locator('#ghost-first-frame [data-row]').count(), 40)
+  assert.equal(await page.locator('#tabs button:disabled').count(), 3)
+  assert.equal(await page.locator('#damage').isDisabled(), true)
+  assert.equal(await page.locator('#backend').textContent(), 'html')
+  assert.equal(await page.locator('#backend-fact').textContent(), 'html')
+  assert.equal(await page.locator('#caption').isVisible(), true)
+  assert.equal(
+    await page.locator('#tabs button[data-demo=ghost]').getAttribute('aria-selected'),
+    'true',
+  )
+  assert.equal(await page.locator('#terminal').getAttribute('aria-label'), 'Ghost demo')
+  for (const selector of ['#tabs button[data-demo=shell]', '#damage']) {
+    const button = page.locator(selector)
+    await page.mouse.move(0, 0)
+    await page.waitForTimeout(200)
+    const before = await button.evaluate(controlPaint)
+    await button.hover()
+    await page.waitForTimeout(200)
+    assert.deepEqual(
+      await button.evaluate(controlPaint),
+      before,
+      'Disabled controls have no hover styling',
+    )
+    assert.equal(before.cursor, 'default')
+  }
+  await page.keyboard.press('ArrowRight')
+  assert.equal(await page.locator('#caption').textContent(), note)
+  await page.screenshot({ path: `${directory}/${name}-fallback.png`, fullPage: true })
+}
+
 try {
+  for (const asset of ['ghostty-vt.wasm', 'bridge.wasm']) {
+    const name = `runtime-${asset}`
+    await check(name, (page) => runtimeFailure(page, asset, name), {
+      domOnly: false,
+      width: asset === 'bridge.wasm' ? 390 : 1280,
+      height: asset === 'bridge.wasm' ? 844 : 1000,
+    })
+  }
   const failures = [
     { name: '404', status: 404, body: 'unavailable' },
     { name: 'invalid-gzip', status: 200, body: Buffer.from([0x1f, 0x8b, 0x08, 0x00]) },

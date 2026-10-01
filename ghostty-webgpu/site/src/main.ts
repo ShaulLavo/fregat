@@ -35,7 +35,6 @@ const ui = {
   caption: required<HTMLElement>('#caption'),
   copy: required<HTMLButtonElement>('#copy-install'),
   firstFrame: required<HTMLElement>('#ghost-first-frame'),
-  wasmUnavailable: required<HTMLElement>('#wasm-unavailable'),
   damage: required<HTMLButtonElement>('#damage'),
   host: required<HTMLElement>('#terminal'),
   screen: required<HTMLElement>('.screen'),
@@ -186,7 +185,7 @@ function syncTabs(): void {
 }
 
 function select(demo: Demo): void {
-  if (demo === active) return
+  if (demo === active || tabButton(demo).disabled) return
   active.stop()
   active = demo
   syncTabs()
@@ -210,7 +209,7 @@ function startActive(waitForPaint = false): void {
 async function boot(): Promise<void> {
   wireControls()
   if (typeof WebAssembly === 'undefined') {
-    ui.wasmUnavailable.hidden = false
+    showStillFrame()
     return
   }
   const fonts = loadFonts().then(() => performance.mark('ghost:fonts-ready'))
@@ -263,6 +262,24 @@ async function boot(): Promise<void> {
   startActive(true)
 }
 
+function showStillFrame(): void {
+  active.stop()
+  active = ghost
+  syncTabs()
+  for (const demo of demos) tabButton(demo).disabled = true
+  overlay.disable()
+  ui.damage.disabled = true
+  ui.damage.setAttribute('aria-pressed', 'false')
+  ui.backend.textContent = 'html'
+  ui.backendFact.textContent = 'html'
+  ui.stat.textContent = ''
+  ui.caption.dataset['still'] = 'true'
+  ui.caption.setAttribute('role', 'status')
+  ui.caption.textContent =
+    'The live terminal did not start in this browser, so this is a still frame.'
+}
+
 boot().catch((cause: unknown) => {
+  showStillFrame()
   console.error('Live ghost animation failed to start', cause)
 })
