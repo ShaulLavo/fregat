@@ -2,6 +2,7 @@ import { fitTerminalFont, Terminal } from '../../dist/index.js'
 import type { TerminalTheme } from '../../dist/index.js'
 import { GhostDemo } from './demos/ghost.js'
 import type { DemoContext } from './demos/types.js'
+import { fittedScreenHeight, roundedFitPadding } from './fit.js'
 import { ink, pale, palette256, spectre } from './theme.js'
 
 const FONT_FAMILY = '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace'
@@ -94,20 +95,23 @@ function fitTo(grid: { readonly cols: number; readonly rows: number } | undefine
     return
   }
   const scrollbarWidth = ui.host.querySelector<HTMLElement>('[role="scrollbar"]')?.offsetWidth ?? 0
-  const width = ui.host.clientWidth - PADDING.left - PADDING.right - scrollbarWidth
+  const ratio = window.devicePixelRatio
+  const padding = roundedFitPadding(PADDING, ratio)
+  const scrollbar = Math.round(scrollbarWidth * ratio) / ratio
+  const width = ui.host.clientWidth - padding.left - padding.right - scrollbar
   const share = window.innerWidth < 480 ? PHONE_SCREEN_VIEWPORT_SHARE : MAX_SCREEN_VIEWPORT_SHARE
-  const maxHeight = window.innerHeight * share - PADDING.top - PADDING.bottom
+  const maxHeight = window.innerHeight * share
   let size = FIT_FONT_SIZE
   let cell = cellSize(size)
   while (
     size > MIN_FONT_SIZE &&
-    (grid.cols * cell.width > width || grid.rows * cell.height > maxHeight)
+    (grid.cols * cell.width > width ||
+      fittedScreenHeight(grid.rows, cell.height, padding) > maxHeight)
   ) {
     size -= 1
     cell = cellSize(size)
   }
-  const rowsHeight = Math.ceil(grid.rows * cell.height)
-  ui.screen.style.height = `${rowsHeight + PADDING.top + PADDING.bottom}px`
+  ui.screen.style.height = `${fittedScreenHeight(grid.rows, cell.height, padding)}px`
   setFont(size, FIT_LINE_HEIGHT)
 }
 

@@ -1624,6 +1624,7 @@ export const ghosttySiteSelectors = {
   sectionHeadings: '.measured h2, .preview h2',
   backend: '#backend',
   canvas: 'canvas',
+  composition: '.ghostty-webgpu-composition',
   pty: '.pty-example',
   preview: '.preview',
   screen: '.screen',
