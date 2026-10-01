@@ -13,6 +13,7 @@ import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import {
   bootSeconds,
+  chargeOf,
   decide,
   decideQuiet,
   drainRequest,
@@ -393,24 +394,27 @@ function attemptAdmission(
 }
 
 /**
- * What each running job is charged. The cgroup tree is what runs: a job slice whose wrapper is
- * gone (no live entry) is an orphan, charged its ceiling while this pass kills and removes it.
- * A job admitted but not yet in its slice is charged through its live entry.
+ * What each running job is charged: the part of its estimate it has not used yet. The cgroup
+ * tree is what runs: a job slice whose wrapper is gone (no live entry) is an orphan, charged
+ * its ceiling less its use, read before this pass kills it; if the kill fails it may still
+ * grow that far. A job admitted but not yet in its slice is charged its whole estimate.
  */
 function reconcile(options: Options) {
   const owners = live(options.stateDir, 'jobs')
   const orphans = liveSlices(options.sliceRoot).filter(
     (slice) => !owners.some((job) => job.id === slice.id),
   )
+  const charges = [
+    ...owners.map((job) =>
+      chargeOf(options.sliceRoot, `${options.sliceRoot}-${job.id}.slice`, job.estimateBytes),
+    ),
+    ...orphans.map((orphan) => chargeOf(options.sliceRoot, orphan.slice, orphan.ceilingBytes)),
+  ]
   for (const orphan of orphans) {
     console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
     reapSlice(options.sliceRoot, orphan.slice)
   }
   clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
-  const charges = [
-    ...owners.map((job) => job.estimateBytes),
-    ...orphans.map((orphan) => orphan.ceilingBytes),
-  ]
   return { charges, owners }
 }
 

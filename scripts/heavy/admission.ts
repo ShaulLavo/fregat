@@ -24,10 +24,10 @@ export type Limits = {
 export type Decision = { readonly admit: boolean; readonly reason: string }
 
 /**
- * Whether a job with this estimate may start beside running jobs charged `charges` bytes each
- * (a job's estimate, or the ceiling of one whose wrapper is gone). MemAvailable is taken as it
- * is: what a running job uses already shows there, so its whole estimate stays reserved. A job
- * always starts when none runs, since waiting would not free anything.
+ * Whether a job with this estimate may start beside running jobs charged `charges` bytes each:
+ * the memory each may still claim (`chargeOf`). What they already use is missing from
+ * MemAvailable, so charging it again would count it twice. A job always starts when none runs,
+ * since waiting would not free anything.
  */
 export function decide(
   estimateBytes: number,
@@ -115,6 +115,21 @@ export function sliceMemory(root: string, slice: string) {
     readFileSync(path.join(sliceRootPath(root), slice, 'memory.current'), 'utf8'),
   )
   return text === null ? null : Number(text)
+}
+
+/**
+ * What a running slice may still claim of `bound` (its estimate, or an orphan's ceiling):
+ * the bound less what it uses outside the page cache. Its page cache counts as free in
+ * MemAvailable, so it is not yet taken. A slice with no cgroup yet is charged the whole bound.
+ */
+export function chargeOf(root: string, slice: string, bound: number) {
+  const dir = path.join(sliceRootPath(root), slice)
+  const current = unlessGone(() => readFileSync(path.join(dir, 'memory.current'), 'utf8'))
+  const stat = unlessGone(() => readFileSync(path.join(dir, 'memory.stat'), 'utf8'))
+  if (current === null || stat === null) return bound
+  const field = (name: string) => Number(new RegExp(`^${name} (\\d+)$`, 'm').exec(stat)?.[1] ?? 0)
+  const used = Number(current) - field('active_file') - field('inactive_file')
+  return Math.max(0, bound - used)
 }
 
 // A cgroup removed under a read reports ENOENT, or ENODEV once the file was already open.

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
@@ -32,7 +32,7 @@ describe('decide', () => {
     expect(decide(8 * GiB, [], swamped, limits).admit).toBe(true)
   })
 
-  test('reserves every running job its whole estimate beside what MemAvailable shows', () => {
+  test('reserves every running job its charge beside what MemAvailable shows', () => {
     expect(decide(8 * GiB, [6 * GiB], calm, limits).admit).toBe(true)
     expect(decide(8.1 * GiB, [6 * GiB], calm, limits).admit).toBe(false)
     expect(decide(7 * GiB, [6 * GiB, 4 * GiB], calm, limits)).toMatchObject({
@@ -79,6 +79,48 @@ describe.skipIf(!userScopes)('admission between real jobs', () => {
     await heavy(box, 'second', ['true'], { jobClass: 'light', machine: true })
     await first.done
     expect(startedAt(recordOf(box, 'second'))).toBeLessThan(endedAt(recordOf(box, 'first')))
+  }, 30_000)
+
+  test('charges a running job only the part of its estimate it has not used yet', async () => {
+    // 768 MiB free: the first job's 512 MiB estimate would leave too little, but 400 MiB of it
+    // is already in use and so already missing from MemAvailable.
+    const box = admissionBox({ availableMiB: 768 })
+    const holding = [
+      'bun',
+      '-e',
+      'const b = Buffer.alloc(400 * 2 ** 20, 1); console.log("started"); await Bun.sleep(4000); b.at(0)',
+    ]
+    const first = start(box, 'first', holding, { jobClass: 'light', machine: true })
+    await expect.poll(first.stdout, { timeout: 10_000 }).toContain('started')
+    const second = await heavy(box, 'second', ['true'], { jobClass: 'light', machine: true })
+    await first.done
+    expect(second.stderr).not.toContain('waiting')
+    expect(startedAt(recordOf(box, 'second'))).toBeLessThan(endedAt(recordOf(box, 'first')))
+  }, 30_000)
+
+  test("charges a running job's page cache as unused, since MemAvailable counts it free", async () => {
+    // A disk directory: on tmpfs the file would be shmem, which is memory in use.
+    const cache = path.join(import.meta.dirname, '..', '..', 'node_modules', '.cache')
+    mkdirSync(cache, { recursive: true })
+    const dir = mkdtempSync(path.join(cache, 'heavy-page-cache-'))
+    try {
+      const box = admissionBox({ availableMiB: 768 })
+      const caching = [
+        'bash',
+        '-c',
+        `dd if=/dev/zero of=${dir}/file bs=1M count=320 status=none && echo started && sleep 3`,
+      ]
+      const first = start(box, 'first', caching, { jobClass: 'light', machine: true })
+      await expect.poll(first.stdout, { timeout: 10_000 }).toContain('started')
+      const second = await heavy(box, 'second', ['true'], { jobClass: 'light', machine: true })
+      await first.done
+      expect(second.stderr).toMatch(/'second' is waiting: memory: \d+ MiB free/)
+      expect(startedAt(recordOf(box, 'second'))).toBeGreaterThanOrEqual(
+        endedAt(recordOf(box, 'first')),
+      )
+    } finally {
+      rmSync(dir, { force: true, recursive: true })
+    }
   }, 30_000)
 
   test('holds a job while memory is short and starts it when the running job ends', async () => {
