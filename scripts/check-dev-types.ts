@@ -7,6 +7,10 @@ const child = Bun.spawn({
   cmd: [
     path.join(webRoot, 'node_modules/.bin/tsc'),
     '--build',
+    '--builders',
+    '1',
+    '--checkers',
+    '1',
     path.join(webRoot, 'tsconfig.json'),
     config,
     ...Bun.argv.slice(2),
