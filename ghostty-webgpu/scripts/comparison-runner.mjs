@@ -340,6 +340,7 @@ async function measure(testCase, repetition, browserSession) {
     run.output = {
       ...outputSample,
       cpu: cpu(beforeOutput, await processCpu(browserSession), outputMs),
+      memory: await memory(page, session, browserSession),
     }
     assert.deepEqual(errors, [])
     return run

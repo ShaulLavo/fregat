@@ -81,13 +81,23 @@ export function summaries(artifact) {
       (retained(memory.history) - retained(memory.initial)) / run.count / 1048576,
       'MiB',
     )
-    for (const state of ['initial', 'history']) {
-      add(run, `memory/${state}/wasm`, memory[state].wasmBytes / 1048576, 'MiB total')
-      if (memory[state].rssBytes != null && memory.empty.rssBytes != null)
+    const states = { initial: memory.initial, history: memory.history }
+    if (run.output?.memory) {
+      states.output = run.output.memory
+      add(
+        run,
+        'memory/output/terminal',
+        (retained(states.output) - retained(memory.empty)) / run.count / 1048576,
+        'MiB',
+      )
+    }
+    for (const [state, snapshot] of Object.entries(states)) {
+      add(run, `memory/${state}/wasm`, snapshot.wasmBytes / 1048576, 'MiB total')
+      if (snapshot.rssBytes != null && memory.empty.rssBytes != null)
         add(
           run,
           `memory/${state}/rss-delta`,
-          (memory[state].rssBytes - memory.empty.rssBytes) / 1048576,
+          (snapshot.rssBytes - memory.empty.rssBytes) / 1048576,
           'MiB total',
         )
     }
@@ -160,6 +170,7 @@ export function markdown(artifact) {
     'CPU is Chromium browser/renderer/GPU process CPU time as a percentage of one core.',
     '',
     'Memory per terminal and per 10k rows is the post-GC CDP used JS heap plus backing storage delta, divided by terminal count.',
+    'Output memory is sampled after the 60-frame ASCII output phase, outside CPU timing. Initial memory is the idle baseline.',
     'This is retained JS/backing storage, not total terminal memory. WASM linear-memory capacity is reported separately.',
     'Renderer/GPU RSS deltas cover all Chromium processes and include browser allocation noise and shared resources.',
     'GPU allocation is not available per terminal. Negative deltas are retained as measurement noise.',
