@@ -4,7 +4,7 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 
 import { drainRequest, legacyHold, liveSlices, readReadings, sliceMemory } from './admission'
-import { DEFAULT_STATE_DIR } from './lock'
+import { DEFAULT_STATE_DIR, sliceRootFor } from './lock'
 import { live, type Entry } from './queue'
 
 const MiB = 2 ** 20
@@ -13,12 +13,12 @@ const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const { values } = parseArgs({
   options: {
     proc: { default: '/proc', type: 'string' },
-    'slice-root': { default: 'heavy', type: 'string' },
+    'slice-root': { type: 'string' },
     'state-dir': { default: DEFAULT_STATE_DIR, type: 'string' },
   },
 })
 const stateDir = values['state-dir']
-const root = values['slice-root']
+const root = values['slice-root'] ?? sliceRootFor(stateDir)
 const readings = readReadings(values.proc)
 console.log(
   `machine: ${Math.round(readings.memAvailableBytes / MiB)} MiB available, memory pressure ${readings.memoryPressure}%, CPU load ${readings.cpuLoad.toFixed(2)} per core`,

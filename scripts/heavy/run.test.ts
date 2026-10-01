@@ -207,6 +207,8 @@ test('a Pi job waits only for the Pi lane, never for this machine', async () => 
       RUN,
       '--state-dir',
       box.state,
+      '--slice-root',
+      box.sliceRoot,
       '--settings-home',
       box.home,
       '--host',
