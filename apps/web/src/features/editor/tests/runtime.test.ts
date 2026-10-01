@@ -1,3 +1,4 @@
+import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { materializeFileSnapshotText, type FileSnapshot } from '@/lib/file-snapshot'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
@@ -51,9 +52,11 @@ test.for([
       workspaceCache: readWorkspaceCache(testScopedStorage),
     })
     const rootPath = filesystemPath('repo')
+    const workspaceAddress = await registerTestWorkspaceAddress(client, rootPath)
 
     try {
       runtime.workspaceStore.getState().switchWorkspace({
+        workspaceAddress,
         birthtimeMs: 0,
         mtimeMs: 0,
         name: 'repo',
