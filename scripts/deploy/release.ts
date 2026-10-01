@@ -64,15 +64,23 @@ const productionEnv = {
   VITE_SERVER_URL: undefined,
 }
 
-export async function readCheckout(): Promise<Checkout> {
-  const commit = await output(['git', 'rev-parse', 'HEAD'], checkoutRoot)
-  if (!commit) throw createScriptError(`${checkoutRoot} is not a git checkout.`)
+export async function readCheckout(root = checkoutRoot): Promise<Checkout> {
+  const commit = await output(['git', 'rev-parse', 'HEAD'], root)
+  if (!commit) throw createScriptError(`${root} is not a git checkout.`)
 
-  const status = await run(['git', 'status', '--porcelain', '-z'], { cwd: checkoutRoot })
-  const editor = path.join(checkoutRoot, 'editor')
+  let branch = await output(['git', 'branch', '--show-current'], root)
+  if (!branch) {
+    const main = await run(['git', 'merge-base', '--is-ancestor', 'HEAD', 'origin/main'], {
+      cwd: root,
+    })
+    branch = main.code === 0 ? 'main' : await output(['git', 'rev-parse', '--short', 'HEAD'], root)
+  }
+
+  const status = await run(['git', 'status', '--porcelain', '-z'], { cwd: root })
+  const editor = path.join(root, 'editor')
   return {
     commit,
-    branch: await output(['git', 'branch', '--show-current'], checkoutRoot),
+    branch,
     dirtyFiles: status.code === 0 ? porcelainPaths(status.stdout) : [],
     editorCommit: existsSync(editor)
       ? (await output(['git', 'rev-parse', 'HEAD'], editor)) || null
