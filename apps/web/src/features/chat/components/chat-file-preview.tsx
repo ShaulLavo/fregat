@@ -53,7 +53,7 @@ export function ChatFilePreview({
             />
           </div>
         )}
-        {previewable && preview.isSuccess && (
+        {previewable && preview.isSuccess && preview.data !== null && (
           <pre
             className='bg-muted max-h-96 overflow-auto overscroll-contain p-3 text-xs whitespace-pre-wrap'
             data-chat-file-preview
@@ -61,7 +61,7 @@ export function ChatFilePreview({
             {preview.data}
           </pre>
         )}
-        {!previewable && (
+        {(!previewable || (preview.isSuccess && preview.data === null)) && (
           <p className='text-muted-foreground text-xs'>Download this file to view its contents.</p>
         )}
         <Button

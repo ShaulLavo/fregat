@@ -26,6 +26,36 @@ import { expect, test as it } from '../../../../test/fixtures'
 import type { WorkspaceEditResult, WorkspaceEditTransitionRequest } from '@workspace/contracts'
 
 describe('FileSyncService', () => {
+  it('does not project a cached binary rename as a decoded text snapshot', async ({
+    server,
+    client,
+  }) => {
+    const from = filesystemPath('binary.txt')
+    const to = filesystemPath('renamed.txt')
+    await writeFile(join(server.root, from), Buffer.from([0, 1, 255, 0, 7]))
+    const ports = createFileSyncPorts(client)
+    const binary = await ports.readFileContent(from, new AbortController().signal)
+    expect(binary.seemsBinary).toBe(true)
+    const store = createEditorDocumentStore()
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(fileSystemKeys.fileSnapshot(from), binary)
+    queryClient.setQueryData(fileSystemKeys.fileSnapshot(to), binary)
+    const committed = workspaceResultWithEntries('binary-rename', 2, 'committed', [
+      { exists: false, path: from },
+      resultEntry(to, binary.content, 20),
+    ])
+    new FileSyncService(store, queryClient, ports).projectWorkspaceMutation(committed, {
+      afterContents: new Map(),
+      beforeContents: new Map(),
+      entries: committed.entries,
+      renames: [{ from, to }],
+      rootPath: filesystemPath(''),
+    })
+    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(to))).toBeUndefined()
+    expect(store.getState().liveDocumentsByKey).toEqual({})
+    expect(store.getState().dirtyDocumentKeys.size).toBe(0)
+  })
+
   it('retains the captured saved snapshot without retaining a joined save string', async ({
     client,
     server,
@@ -614,4 +644,24 @@ it('classifies only canonical write IDs issued by the retained file owner', ({ c
   const second = owner.issueWriteId()
   expect(owner.isOwnWriteEvent(second)).toBe(true)
   expect(owner.isOwnWriteEvent(first)).toBe(true)
+})
+
+it('rejects binary workspace snapshots before a detached edit buffer can be created', async ({
+  server,
+  client,
+}) => {
+  const path = filesystemPath('binary.txt')
+  await writeFile(join(server.root, path), Buffer.from([0, 1, 255, 0, 7]))
+  const store = createEditorDocumentStore()
+  const queryClient = new QueryClient()
+  try {
+    const service = new FileSyncService(store, queryClient, createFileSyncPorts(client))
+    await expect(
+      service.readWorkspaceSnapshot(path, new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'client.BINARY_TEXT_UNAVAILABLE' })
+    expect(store.getState().liveDocumentsByKey).toEqual({})
+    expect(store.getState().dirtyDocumentKeys.size).toBe(0)
+  } finally {
+    queryClient.clear()
+  }
 })

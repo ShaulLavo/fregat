@@ -26,6 +26,35 @@ import {
 } from '@/lib/file-open-intent/state/service'
 
 describe('file open intent service', () => {
+  it('rejects binary preparation before building a buffer or analysis', async () => {
+    const queryClient = new QueryClient()
+    const file = { ...fileResult('/repo/data.txt'), seemsBinary: true }
+    queryClient.setQueryData(fileSnapshotQueryOptions(file.path).queryKey, file)
+    const prepare = vi.fn()
+    const events = recordingEvents()
+    const owner = createTestFileOpenIntentOwner(
+      queryClient,
+      testPreparer(prepare),
+      () => null,
+      () => false,
+      () => false,
+      () => undefined,
+      undefined,
+      events.factory,
+    )
+    try {
+      owner.setRoot(filesystemPath('/repo'))
+      owner.prepare(intent(file.path))
+      await vi.waitFor(() => expect(events.emitted).toHaveLength(1))
+      expect(events.emitted[0]).toMatchObject({ outcome: 'rejected', reason: 'binary-file' })
+      expect(prepare).not.toHaveBeenCalled()
+      expect(owner.claimReadyClean(file.path)).toBeNull()
+    } finally {
+      owner.disposeNow()
+      queryClient.clear()
+    }
+  })
+
   it('records a missing file as an expected prefetch rejection without an error', async ({
     client,
   }) => {
