@@ -1,6 +1,6 @@
 # Implement stateless MCP support
 
-Status: M0 and M1 (scope (b)) built 2026-09-26 (wave 2 lane A); M0's live provider calls are an owner check. M2/M3 moved to Plan 174; M4 remains. Requested 2026-09-11. **M0 approved; M1+ not approved.**
+Status: M0 and M1 (scope (b)) built 2026-09-26 (wave 2 lane A); M0's live provider calls are an owner check. M2/M3 moved to Plan 174; M4 remains. M5 (reveal tools) waits for a layout system that has no plan yet. Requested 2026-09-11. **M0 approved; M1+ not approved.**
 
 Decided 2026-09-25: owner — approve milestone M0 only. The owner wants to discuss M1 onward before
 anything else in this plan starts; M0's exit result is the input to that conversation.
@@ -22,7 +22,7 @@ JSON-RPC `2.0` alone does not identify the MCP revision. The official
 [SDK release documentation](https://ts.sdk.modelcontextprotocol.io/v2/) identify these separately.
 
 This plan promotes MCP management and runtime integration from the unscheduled E7 item in
-[the editor strategy](../docs/editor-parity-implementation-plan.md). Plans 068 and 077 are completed
+[the editor strategy](editor-parity-implementation-plan.md). Plans 068 and 077 are completed
 ownership foundations. Reuse the [verified federation transport](../docs/federated-environments.md).
 Remote acceptance must prove MCP authentication and tool calls over it. Plans 080 and 085 are not
 MCP prerequisites; the web navigation migration is already implemented.
@@ -281,6 +281,23 @@ cancel, permission denial, input continuation, and integration failure remain di
 
 Exit: record the SDK/provider versions, wire traces with secrets removed, focused checks, and live
 provider evidence. Plan 088 remains dependency-blocked until M0–M4 pass.
+
+### M5. Reveal tools (blocked on the layout system)
+
+Added 2026-10-01 by the owner. Agents show the user something: a file at a line, a diff, a commit,
+a preview URL, later an embedded browser and other surfaces.
+
+- Tools live on this server endpoint, alongside the other native tools. The server routes a reveal
+  intent over the client's existing socket, and the client runs the command the keymap runs for it.
+  No frontend MCP: Chrome's in-page tool registration serves browser-resident agents, and ours run
+  on the server, which already holds the state.
+- Blocked on a new layout system (splits anywhere, easy to place content), which is still being
+  ideated and has no plan yet. Where a revealed item lands, and which window receives it (the
+  chat's own window or the last-focused one), are that system's decisions. Design the tool shapes
+  once it has a plan.
+
+Exit: an agent call reveals each supported surface in the intended window, and a call with no
+attached client returns a domain error the agent can read.
 
 ## Verify plausible failures
 

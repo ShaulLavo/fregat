@@ -30,9 +30,9 @@ symbol tools over grep once those tools exist.
   and `features/terminal/hooks/use-menu.ts`. The editor and workbench have none.
 - Those callers are cross-feature imports frozen in `scripts/lint/web-feature-allow.json`
   (the `use-attach-to-composer.ts` entries say "move this shared behavior").
-- Composer inbox text entries carry no environment or root; `docs/diagnostic-ai-fix-plan.md`
+- Composer inbox text entries carry no environment or root; `plans/diagnostic-ai-fix-plan.md`
   step 4 records the cross-workspace risk.
-- "Fix with AI" is fully specified in `docs/diagnostic-ai-fix-plan.md` (proposed, not
+- "Fix with AI" is fully specified in `plans/diagnostic-ai-fix-plan.md` (proposed, not
   implemented): hover, diagnostic popup and Problems (`features/workbench/components/diagnostics-panel.tsx`)
   entry points, one formatter, unsaved-content and stale-range rules.
 - Agents receive no diagnostics from Platform. Plan 087 (`plans/087-stateless-mcp.md`) exposes
@@ -60,7 +60,7 @@ symbol tools over grep once those tools exist.
 1. Move `useAttachToComposer` to a shared home and give inbox entries an environment and root.
 2. Editor: "Add selection to chat" and "Add file to chat" (command, context menu, keybinding).
 3. Active file as an optional context chip in the composer.
-4. "Fix with AI" on diagnostics, delivered as `docs/diagnostic-ai-fix-plan.md` specifies.
+4. "Fix with AI" on diagnostics, delivered as `plans/diagnostic-ai-fix-plan.md` specifies.
 5. Diagnostics fed back to the agent after it edits a file.
 6. Hook-based steering toward Platform's symbol tools, once plan 088's tools exist.
 7. Cross-reference only: quoting assistant text into the next prompt is Plan 126 INTERACTION-09
@@ -125,7 +125,7 @@ agent is `application` or `machine`, never `window`.
    file when nothing is selected) and `workspace.addFileToChat`, both in the editor text menu;
    `chat.activeFileContext` shows the active file as a removable chip and sends it as a mention.
    Scenario `editor-add-to-chat`.
-3. Fix with AI, per `docs/diagnostic-ai-fix-plan.md`.
+3. Fix with AI, per `plans/diagnostic-ai-fix-plan.md`.
    **Done 2026-09-25 (lane L8):** the shared handoff (`lib/diagnostic-ai`: request model,
    bounded excerpt with unsaved text, stale-range refusal `DIAGNOSTIC_CHANGED`, keyed mutation
    `diagnosticAiMutationKeys.fix`; `state/diagnostic-fix.ts` behind `DiagnosticFixProvider`) and

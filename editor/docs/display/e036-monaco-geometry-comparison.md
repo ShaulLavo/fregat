@@ -44,7 +44,7 @@ per font and style.
 
 Proportional fonts still misplace what is estimated from `characterWidth` outside row geometry:
 soft-wrap column counts and the spacers of windowed long rows.
-[E052](../../plans/e052-proportional-font-extents.md) plans the fix.
+[E052](https://github.com/ShaulLavo/fregat/blob/main/plans/e052-proportional-font-extents.md) plans the fix.
 
 ## Re-measuring when the face changes
 

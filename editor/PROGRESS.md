@@ -12,7 +12,7 @@ complete. The old instruction to start Phase 4 Tree-sitter work was stale and
 has been removed.
 
 Cross-project execution order is authoritative in
-[Platform's `PLAN.md`](../platform/PLAN.md). This file records Editor state; it
+[Platform's `PLAN.md`](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md). This file records Editor state; it
 does not define another sequence.
 
 ## Completed Baseline
@@ -51,19 +51,19 @@ does not define another sequence.
 
 ## Active Executable Work
 
-The remaining shared work is scheduled by the [Platform roadmap](../platform/PLAN.md): visible
+The remaining shared work is scheduled by the [Platform roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md): visible
 snapshot persistence, prepared editor opens, the diagnostic-peek composition gate, and the final
 editor-native keymap takeover. Each relevant milestone must verify both repositories in lockstep.
 There is no active standalone Editor plan.
 
-The [Editor backlog](plans/README.md), authored on 2026-09-05, turns all 22 topics from
-[`TODO.md`](TODO.md) into 30 stable entries, including completed implementation references.
+The [Editor backlog](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-backlog.md), authored on 2026-09-05, turns all 22 topics from
+[`TODO.md`](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-wishlist.md) into 30 stable entries, including completed implementation references.
 It records suggested priorities and dependencies; it does not schedule implementation.
 
 ## Superseded Sources
 
 - `docs/parity-plan.md`: deleted after completion; Git history is the archive.
-- [`docs/architecture-recovery-plan.md`](docs/architecture-recovery-plan.md):
+- [`docs/architecture-recovery-plan.md`](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-architecture-recovery-plan.md):
   retained for architectural rationale, superseded as an execution source.
 - Older phase-by-phase validation logs in this file: superseded by the live
   packages, focused tests, and commit history.

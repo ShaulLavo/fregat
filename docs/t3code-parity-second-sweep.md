@@ -1,7 +1,7 @@
 # T3Code Parity — Second Sweep, Whole-Product
 
 > **Measured 2026-08-12 against `b23ee6a`.** The previous document
-> (`docs/t3code-chat-parity-gap-analysis.md`) measured the **chat** dimension and declared N0–N4 complete. This sweep is
+> (`plans/t3code-chat-parity-gap-analysis.md`) measured the **chat** dimension and declared N0–N4 complete. This sweep is
 > wider: providers, git, worktrees, terminal, desktop shell, settings, distribution. Every row below was traced end to
 > end — a capability whose only callers are its own tests is recorded as **absent**, not present. Our files are
 > kebab-case; reference paths are camelCase under `/Users/shaul/Desktop/D/refrences/t3code`.
@@ -322,7 +322,7 @@ not for its rail summary (`plan-implemented-rail-badge`).
 ## 5. Deliberate non-parity
 
 > **Environment decision superseded 2026-09-05.** The rows below record the earlier audit.
-> [The environment strategy](environments-and-remote-plan.md) now selects connected machines
+> [The environment strategy](../plans/environments-and-remote-plan.md) now selects connected machines
 > with separate checkouts. Plan 077 supplies the runtime foundation; Plans 068 and 078 add
 > scoped domain references and federation. Pairing remains deferred.
 

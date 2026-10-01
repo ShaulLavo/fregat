@@ -12,7 +12,7 @@ Singapore work continue. [Plan 202](../../plans/202-tui-ui.md) owns implementati
 - [Semantic Markdown plan](https://github.com/ShaulLavo/tree-sitter-md/blob/main/plans/bubli-semantic-markdown.md):
   M0-M4, shared semantics, CommonMark/GFM/selected Goldmark compatibility, streaming, lifetime
   and packaged grammar/resolver artifacts on tree-sitter-x.
-- [Singapore consumer plan](https://github.com/ShaulLavo/singapore/blob/main/plans/bubli-markdown-consumer.md):
+- [Singapore consumer plan](https://github.com/ShaulLavo/fregat/blob/main/plans/bubli-markdown-consumer.md):
   S0-S4, current browser-editor integration, authoring/source correspondence, worker/session
   lifetime, package checks and performance. The two existing filenames are retained for link
   stability; they do not imply an active bubli dependency.

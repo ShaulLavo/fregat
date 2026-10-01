@@ -36,7 +36,7 @@ and scroll sync both ways. Scenario `markdown-split-view` drives all of it. Phas
 Default mode: live preview, the behaviour before this plan (no recommendation was written;
 Decided 2026-09-25 by keeping the existing behaviour).
 
-The editor already renders markdown as formatted text while the buffer keeps holding markdown source — [`@singapore-editor/markdown`](../../Editor/packages/markdown/src/index.ts) hides fences, drops heading `#`, collapses links to their labels, and restores the source under the caret so it stays editable. That is Obsidian's Live Preview, and it was built as an experiment. It looks right and it is incomplete.
+The editor already renders markdown as formatted text while the buffer keeps holding markdown source — [`@singapore-editor/markdown`](../editor/packages/markdown/src/index.ts) hides fences, drops heading `#`, collapses links to their labels, and restores the source under the caret so it stays editable. That is Obsidian's Live Preview, and it was built as an experiment. It looks right and it is incomplete.
 
 This plan does not delete it. It gives markdown **two modes**: a split view, which a code editor is a natural host for, and a live preview, which is the experiment finished properly. Split view depends only on Plan 107. Live preview depends on [Plan 111](111-editor-decorations.md), because finishing it needs a decoration layer we have not yet compared against the state of the art. [Root PLAN.md](../PLAN.md) owns scheduling.
 

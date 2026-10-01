@@ -18,7 +18,7 @@ Decided 2026-09-25: owner — delete the SAB text transport. After the transport
 same speed as the string path and never got faster; the numbers below predate those fixes.
 
 - E057 deleted it on 2026-09-26, ahead of Platform
-  [Plan 099](../../../platform/plans/099-document-contributions.md): source chunks reach the
+  [Plan 099](https://github.com/ShaulLavo/fregat/blob/main/plans/099-document-contributions.md): source chunks reach the
   worker as strings only, the `useSharedBuffers` option and the transport comparison benchmarks are
   gone, and the atomic cancellation flag stays. `bench:syntax` (Bun, string path both times) was
   unchanged: 100,000-line initial total 1,233 / 1,187 ms before and 1,188 / 1,181 ms after, the
@@ -28,7 +28,7 @@ same speed as the string path and never got faster; the numbers below predate th
   commit.
 - E009 (worker transport costs) is folded into Plan 099 unit 6 and closed in the Editor backlog.
 - E011 (packed piece tree) is parked under Platform
-  [Plan 112](../../../platform/plans/112-large-file-ceiling.md), revived only if 112 shows piece
+  [Plan 112](https://github.com/ShaulLavo/fregat/blob/main/plans/112-large-file-ceiling.md), revived only if 112 shows piece
   memory dominates.
 
 ## Current Tree-sitter path

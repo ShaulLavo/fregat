@@ -5,7 +5,7 @@ continues in [Plan 201](201-cheap-overlay-marks.md). Requested
 2026-09-13. Measurements: [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md).
 
 Decided 2026-09-25: owner — this plan and Editor
-[E015 massive file loading](../../Editor/plans/e015-massive-file-loading.md) run as one lane, 112
+[E015 massive file loading](e015-massive-file-loading.md) run as one lane, 112
 first. The benchmark here (1–200 MiB) sets the ceiling that E015's scope and exit are written
 against.
 
