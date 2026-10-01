@@ -40,6 +40,14 @@ export function builtWorkspaces(root: string) {
     .filter((dist) => existsSync(path.join(root, dist)))
 }
 
+/**
+ * Copies each built dist/ to the same path under `destination`. The `/./` marks where the kept
+ * relative path starts, so the copy works from any directory, as `--host pi` runs it.
+ */
+export function buildsTransfer(root: string, builds: readonly string[], destination: string) {
+  return ['rsync', '-aR', '--delete', ...builds.map((dist) => `${root}/./${dist}`), destination]
+}
+
 export function syncLane(options: SyncOptions) {
   const root = checkoutRoot()
   const builds = builtWorkspaces(root)
@@ -83,16 +91,7 @@ export function syncLane(options: SyncOptions) {
       plan.includes.join('\0'),
     )
   }
-  check(
-    [
-      'rsync',
-      '-aR',
-      '--delete',
-      ...builds.map((dist) => `./${dist}`),
-      `${options.host}:${platform}/`,
-    ],
-    'Copying built workspaces',
-  )
+  check(buildsTransfer(root, builds, `${options.host}:${platform}/`), 'Copying built workspaces')
   // Tree-sitter grammar packages build native bindings with no arm64 prebuild; the editor loads wasm.
   remote(
     options.host,
