@@ -74,3 +74,32 @@ test('qualified parser measurements survive a later rendering failure', () => {
   assert.equal(rows[0].metric, 'parse/ascii')
   assert.equal(rows[0].median, 10)
 })
+
+test('output memory keeps retained storage, WASM capacity, and RSS separate', () => {
+  const snapshot = (usedSize, backingStorageSize, wasmBytes, rssBytes) => ({
+    heap: { usedSize, backingStorageSize },
+    wasmBytes,
+    rssBytes,
+  })
+  const rows = summaries({
+    runs: [
+      {
+        variant: 'ghostty-webgpu',
+        path: 'bytes',
+        count: 8,
+        memory: {
+          empty: snapshot(1_048_576, 0, 0, 10_485_760),
+          initial: snapshot(2_097_152, 0, 1_048_576, 12_582_912),
+          history: snapshot(3_145_728, 0, 2_097_152, 14_680_064),
+        },
+        output: {
+          cpu: { percentOfOneCore: 0 },
+          memory: snapshot(4_194_304, 1_048_576, 2_097_152, 16_777_216),
+        },
+      },
+    ],
+  })
+  assert.equal(rows.find(({ metric }) => metric === 'memory/output/terminal').median, 0.5)
+  assert.equal(rows.find(({ metric }) => metric === 'memory/output/wasm').median, 2)
+  assert.equal(rows.find(({ metric }) => metric === 'memory/output/rss-delta').median, 6)
+})

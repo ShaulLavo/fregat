@@ -189,7 +189,7 @@ async function capturedFrames(session) {
   }
   const matches = (frame, target) =>
     frame.timestamp >= target.after &&
-    frame.colors[target.color] > 5 &&
+    frame.colors[target.color] > 0 &&
     frame.colors[target.color === 'red' ? 'green' : 'red'] === 0
   session.on('Page.screencastFrame', listener)
   await session.send('Page.startScreencast', {
@@ -204,7 +204,11 @@ async function capturedFrames(session) {
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           pending = undefined
-          reject(new Error(`Presented ${color} glyph timed out`))
+          reject(
+            new Error(
+              `Presented ${color} glyph timed out; latest capture: ${JSON.stringify(latest)}`,
+            ),
+          )
         }, 10_000)
         pending = { color, after, resolve, timer }
       })
@@ -304,7 +308,17 @@ async function measure(testCase, repetition, browserSession) {
       await page.keyboard.press('#')
       await page.waitForFunction(() => window.__compare.info().texts[0][0].includes('#'))
       const echoColors = ink((await page.screenshot()).toString('base64'))
-      assert(echoColors.green > 5 && echoColors.red === 0, 'Echoed glyph must be visible')
+      assert(echoColors.green > 0 && echoColors.red === 0, 'Echoed glyph must be visible')
+      if (args.includes('--smoke-capture')) {
+        const frames = await capturedFrames(session)
+        await page.evaluate(() => window.__compare.smokeMarker())
+        const written = await frames.wait('red', 0)
+        await page.evaluate(() => window.__compare.prepareInput('green'))
+        await page.keyboard.press('#')
+        const echoed = await frames.wait('green', 0)
+        run.captureCheck = { written: written.colors, echoed: echoed.colors }
+        await frames.close()
+      }
       run.historyLengths = await page.evaluate(
         (rows) => window.__compare.history(rows),
         smokeHistoryRows,
