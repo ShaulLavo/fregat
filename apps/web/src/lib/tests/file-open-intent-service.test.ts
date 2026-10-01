@@ -4,7 +4,11 @@ import { QueryClient } from '@tanstack/react-query'
 import { describe, vi } from 'vitest'
 import { expect, test as it } from '../../../test/fixtures'
 
-import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
+import {
+  createEditorBufferSession,
+  createEditorTextBuffer,
+  pieceTableDocumentText,
+} from '@singapore-editor/core/document'
 import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
 import {
   createEditorDocumentAnalysis,
@@ -85,6 +89,40 @@ describe('file open intent service', () => {
     })
     expect(claim?.buffer.getSnapshot()).toBe(claim?.snapshot)
     expect(service.claimReadyClean(filesystemPath('/repo/a.ts'))).toBeNull()
+  })
+
+  it('preserves BOM and CRLF when preparing a saved snapshot', async () => {
+    const queryClient = new QueryClient()
+    const diskText = '\uFEFFfirst\r\nsecond\r\n'
+    const buffer = createEditorTextBuffer(diskText)
+    const { content: _content, ...metadata } = fileResult('/repo/a.ts')
+    const file = { ...metadata, textSnapshot: buffer.getTextSnapshot() }
+    queryClient.setQueryData(fileSnapshotQueryOptions(file.path).queryKey, file)
+    const preparedDocument = preparedDocumentLease()
+    const prepare = vi.fn((preparedBuffer) => ({ buffer: preparedBuffer, preparedDocument }))
+    const owner = createTestFileOpenIntentOwner(
+      queryClient,
+      testPreparer(prepare),
+      () => null,
+      () => false,
+      () => false,
+      () => undefined,
+    )
+    try {
+      owner.setRoot(filesystemPath('/repo'))
+      owner.prepare(intent(file.path))
+      await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
+      const claim = owner.claimReadyClean(file.path)!
+      expect(claim.file).toBe(file)
+      expect(claim.buffer).not.toBe(buffer)
+      expect(claim.buffer.materializeFullText()).toBe('first\nsecond\n')
+      expect(pieceTableDocumentText(claim.buffer.getSnapshot())).toBe(diskText)
+      expect(claim.buffer.isDirty()).toBe(false)
+      claim.preparedDocument.dispose()
+    } finally {
+      owner.disposeNow()
+      queryClient.clear()
+    }
   })
 
   it('enforces root boundaries including the filesystem root', async () => {
