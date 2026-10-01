@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import path from 'node:path'
+import { stripVTControlCharacters } from 'node:util'
 import { expect, test } from 'vitest'
 
 import { traceFocus } from '../../../test/focus-trace'
@@ -20,7 +21,8 @@ test('a traced test that times out still prints its trace and restores what it w
     ],
     { cwd: tui, encoding: 'utf8' },
   )
-  const output = `${run.stdout}${run.stderr}`
+  // CI forces colour; the reporter's escape codes sit between the marks and the names.
+  const output = stripVTControlCharacters(`${run.stdout}${run.stderr}`)
   expect(output).toContain('focus trace at')
   expect(output).toMatch(/✓ .*the next test sees the real timers and focus registry/)
   expect(output).toMatch(/× .*times out while traced/)
