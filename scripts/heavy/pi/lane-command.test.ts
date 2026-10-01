@@ -23,16 +23,16 @@ type Lane = {
 }
 
 // The same shell the Pi runs, run here; the lane root's platform/ is this checkout.
-function runLane(name: string, memoryMax: string, command: string) {
+function runLane(name: string, memoryMax: string, command: string, directory?: string) {
   const root = mkdtempSync(path.join(tmpdir(), 'lane-command-'))
   roots.push(root)
   symlinkSync(checkout, path.join(root, 'platform'))
-  const job = { root, name: `${name}-${process.pid}`, memoryMax, command }
+  const job = { root, name: `${name}-${process.pid}`, memoryMax, command, directory }
   const status = spawnSync('bash', ['-c', laneJobCommand(job)], { stdio: 'pipe' }).status
   const lane = JSON.parse(
     readFileSync(path.join(laneRunDirectory(job), 'lane.json'), 'utf8'),
   ) as Lane
-  return { status, lane }
+  return { status, lane, run: laneRunDirectory(job) }
 }
 
 // A bench case: its own scope, joined to the job's slice the way bench.ts joins it.
@@ -62,4 +62,20 @@ describe.skipIf(!userScopes)('a lane job', () => {
       laneJobCommand({ root: "/home/pi/a'b", name: 'n', memoryMax: '1G', command: 'true' }),
     ).toContain(`'/home/pi/a'\\''b/platform'`)
   })
+
+  test('starts the command in the caller directory inside the checkout', () => {
+    const { lane, run } = runLane('directory', '1G', 'pwd > "$LANE_RUN/pwd"', 'scripts/heavy/')
+    expect(lane.exitCode).toBe(0)
+    expect(readFileSync(path.join(run, 'pwd'), 'utf8').trim()).toMatch(
+      /\/platform\/scripts\/heavy$/,
+    )
+  })
+})
+
+test('refuses a job directory that leaves the checkout', () => {
+  const job = { root: '/home/pi/fregat-lane', name: 'n', memoryMax: '1G', command: 'true' }
+  expect(() => laneJobCommand({ ...job, directory: '../..' })).toThrow(/leaves the checkout/)
+  expect(() => laneJobCommand({ ...job, directory: 'scripts/../..' })).toThrow(
+    /leaves the checkout/,
+  )
 })

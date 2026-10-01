@@ -63,6 +63,19 @@ cap and the totals in `lane.json` (exit, wall time, memory peak, CPU time, OOM k
 The run directory is copied to `/work/tmp/fregat-evidence/<time>-<label>-<id>-pi/`; a run whose
 evidence does not arrive exits 74 even when its command succeeded.
 
+## Through the heavy wrapper
+
+```bash
+bun /work/platform-production/heavy/current/run.js --host pi large-file -- \
+  bun scripts/large-file/bench.ts --web-root /home/pi/fregat-lane/web --sizes 1,10
+```
+
+`--host pi` takes the Pi's single lock (`pi.lock` beside the machine slots, recorded as slot 0),
+never a machine slot. Its launcher syncs the caller's checkout, runs the command from the same
+directory inside the lane slice, copies the run directory to `/work/tmp/fregat-evidence/`, and
+hands the slice's totals to the wrapper's record. A signal to the wrapper goes to the slice on the
+Pi. The web build is not synced this way; ship it once with `sync.ts --web`.
+
 ## Reading the numbers
 
 Each large-file result records `host` and `rendering`: Chromium's GPU feature status for page

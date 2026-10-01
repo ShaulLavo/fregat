@@ -1,10 +1,26 @@
 import { shellQuote } from '../../../apps/server/src/utils/shell'
+import { createScriptError } from '../../structured-errors'
 
 export type LaneJob = {
   readonly root: string
   readonly name: string
   readonly memoryMax: string
   readonly command: string
+  /** Where in the checkout the command starts, as `git rev-parse --show-prefix` names it. */
+  readonly directory?: string
+}
+
+// A dash in a slice name nests it under another slice; underscores keep it one level.
+export function laneUnit(name: string) {
+  return `lane_${name.replaceAll('-', '_')}`
+}
+
+function checkoutDirectory(directory = '') {
+  const parts = directory.split('/').filter(Boolean)
+  if (parts.some((part) => part === '..' || part === '.')) {
+    throw createScriptError(`The job directory ${JSON.stringify(directory)} leaves the checkout.`)
+  }
+  return parts.join('/')
 }
 
 export function laneRunDirectory(job: Pick<LaneJob, 'root' | 'name'>) {
@@ -17,11 +33,11 @@ export function laneRunDirectory(job: Pick<LaneJob, 'root' | 'name'>) {
  */
 export function laneJobCommand(job: LaneJob) {
   const platform = `${job.root}/platform`
+  const directory = checkoutDirectory(job.directory)
   const run = laneRunDirectory(job)
-  // A dash in a slice name nests it under another slice; underscores keep it one level.
-  const unit = `lane_${job.name.replaceAll('-', '_')}`
+  const unit = laneUnit(job.name)
   return [
-    `cd ${shellQuote(platform)}`,
+    `cd ${shellQuote(directory ? `${platform}/${directory}` : platform)}`,
     `mkdir -p ${shellQuote(run)}`,
     `export LANE_RUN=${shellQuote(run)} HEAVY_JOB_SLICE=${shellQuote(`${unit}.slice`)}`,
     [

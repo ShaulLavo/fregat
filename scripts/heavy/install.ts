@@ -19,7 +19,7 @@ const USAGE =
   'Usage: bun scripts/heavy/install.ts [--commit <rev>] [--source <checkout>] [--root <dir>]'
 // run.sh and AGENTS.md name `<root>/current/run.js`, so the root is fixed rather than a setting.
 const INSTALL_ROOT = path.join(productionRoot, 'heavy')
-const ENTRIES = ['run.ts', 'report.ts']
+const ENTRIES = ['run.ts', 'report.ts', 'pi/launch.ts']
 
 try {
   install()

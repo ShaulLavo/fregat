@@ -1,22 +1,19 @@
 #!/usr/bin/env bun
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import { HOSTS, isHost, startJob, type Host, type JobOutcome } from './job'
-import { tryLock, unlock } from './lock'
+import { acquireSlot, unlock } from './lock'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/run.js [--host local] [--log-dir <dir>] [--lock-dir <dir>] <label> -- <command…>'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--host local|pi] [--log-dir <dir>] [--lock-dir <dir>] <label> -- <command…>'
 // Shared with tools that take the slot locks directly: holding all three keeps the machine quiet.
 const LEGACY_LOCK_DIR = '/work/tmp/wave-heavy'
-const SLOTS = [1, 2, 3] as const
-const POLL_MS = 5_000
-const WAIT_NOTICE_MS = 60_000
 
 type Options = {
   readonly host: Host
@@ -64,9 +61,8 @@ function parseOptions(argv: readonly string[]): Options {
 
 async function run(options: Options) {
   const queuedAt = performance.now()
-  const { fd, slot } = await acquireSlot(options.lockDir)
+  const { fd, slot, holder } = await acquireSlot(options.lockDir, options.host)
   const queuedMs = Math.round(performance.now() - queuedAt)
-  const holder = path.join(options.lockDir, `slot${slot}.holder`)
   const cwd = process.cwd()
   const since = new Date().toTimeString().slice(0, 8)
   writeFileSync(holder, `${options.label} pid=${process.pid} since=${since} cwd=${cwd}\n`)
@@ -95,27 +91,6 @@ function clearHolder(holder: string) {
   } catch (error) {
     console.error(`[wave-heavy] could not clear ${holder}: ${scriptFailureText(error)}`)
   }
-}
-
-async function acquireSlot(lockDir: string) {
-  mkdirSync(lockDir, { recursive: true })
-  const started = Date.now()
-  let nextNotice = 0
-  for (;;) {
-    for (const slot of SLOTS) {
-      const fd = tryLock(path.join(lockDir, `slot${slot}.lock`))
-      if (fd !== null) return { fd, slot }
-    }
-    if (Date.now() - started >= nextNotice) {
-      console.error(`[wave-heavy] all 3 slots busy, waiting: ${holders(lockDir)}`)
-      nextNotice += WAIT_NOTICE_MS
-    }
-    await Bun.sleep(POLL_MS)
-  }
-}
-
-function holders(lockDir: string) {
-  return SLOTS.map((slot) => readText(path.join(lockDir, `slot${slot}.holder`)).trim()).join(';')
 }
 
 // An installed copy has no checkout around it; install.ts writes its commit beside the bundle.

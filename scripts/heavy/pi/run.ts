@@ -2,12 +2,10 @@
 // Runs one command on the Pi lane through mesh, in its own memory-capped slice, then copies its
 // run directory here. Sync first. The command is joined and run by bash from the lane checkout,
 // as ssh does; $LANE_RUN names its output directory there and $HEAVY_JOB_SLICE its slice.
-import { randomBytes } from 'node:crypto'
 import { parseArgs } from 'node:util'
 import { createScriptError, scriptFailureText } from '../../structured-errors'
-import { collectEvidence, laneExitCode } from './evidence'
-import { laneJobCommand, laneRunDirectory } from './lane-command'
 import { memoryMax } from './lane-root'
+import { laneRunName, runOnLane } from './lane-job'
 import { resolveLane, verifyLane } from './remote'
 
 const USAGE =
@@ -28,35 +26,25 @@ try {
     console.log(USAGE)
     process.exit(0)
   }
-  const [rawLabel, ...command] = positionals
-  if (!rawLabel || command.length === 0) throw createScriptError(USAGE)
-  const label = rawLabel.toLowerCase().replaceAll(/[^a-z0-9-]/g, '-')
+  const [label, ...command] = positionals
+  if (!label || command.length === 0) throw createScriptError(USAGE)
   const root = resolveLane(values.host, values.lane)
   verifyLane(values.host, root)
-  const stamp = new Date().toISOString().replaceAll(/[-:]/g, '').slice(0, 15).toLowerCase()
-  // Two launches of one label in the same second must not share a directory or a slice.
-  const name = `${stamp}-${label}-${randomBytes(3).toString('hex')}`
-  const job = { root, name, memoryMax: memoryMax(values['memory-max']), command: command.join(' ') }
+  const name = laneRunName(label)
   const evidence = values.evidence ?? `/work/tmp/fregat-evidence/${name}-${values.host}`
-
-  const mesh = Bun.spawnSync(['mesh', values.host, '--', 'bash', '-lc', laneJobCommand(job)], {
-    stdin: 'ignore',
-    stdout: 'inherit',
-    stderr: 'inherit',
+  const { exitCode, totals } = await runOnLane({
+    host: values.host,
+    root,
+    name,
+    memoryMax: memoryMax(values['memory-max']),
+    command: command.join(' '),
+    evidence,
   })
-  let arrived = true
-  try {
-    collectEvidence(`${values.host}:${laneRunDirectory(job)}`, evidence)
-    console.log(await Bun.file(`${evidence}/lane.json`).text())
-  } catch (error) {
-    arrived = false
-    console.error(scriptFailureText(error))
-  }
-  const exit = laneExitCode(mesh.exitCode, arrived)
+  if (totals) console.log(JSON.stringify(totals))
   console.error(
-    `[pi-lane] ${label} on ${values.host} exited ${mesh.exitCode}; evidence ${arrived ? evidence : 'missing'}`,
+    `[pi-lane] ${label} on ${values.host} exited ${exitCode}; evidence ${totals ? evidence : 'missing'}`,
   )
-  process.exit(exit)
+  process.exit(exitCode)
 } catch (error) {
   console.error(scriptFailureText(error))
   process.exit(2)

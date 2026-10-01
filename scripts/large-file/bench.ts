@@ -7,7 +7,7 @@ import { releaseFixture } from '../agent/fixture-workspace'
 import { createScriptError } from '../structured-errors'
 import { runCase, type Highlighting } from './run'
 import { comparisonReport } from './report'
-import { caseScopeCommand } from './case-scope'
+import { runCaseScope } from './case-scope'
 import { captureRevision, recordedBuildSource } from './provenance'
 
 const { values } = parseArgs({
@@ -128,49 +128,29 @@ for (const { size, highlighting } of cases) {
   if (values['two-byte']) args.push('--two-byte')
   if (values.profile) args.push('--profile')
   const unit = `platform-large-file-${process.pid}-${size}-${highlighting}.scope`
-  const cmd = caseScopeCommand({
+  const scope = await runCaseScope({
     unit,
     memoryMiB,
     command: args,
+    accountingFile: path.join(caseOutput, 'scope.accounting'),
     slice: process.env.HEAVY_JOB_SLICE || undefined,
-  })
-  const child = Bun.spawn(cmd, {
     cwd: checkoutRoot,
     env: { ...process.env, TMPDIR: caseOutput },
-    stdout: Bun.file(path.join(caseOutput, 'stdout.log')),
-    stderr: Bun.file(path.join(caseOutput, 'stderr.log')),
+    stdout: path.join(caseOutput, 'stdout.log'),
+    stderr: path.join(caseOutput, 'stderr.log'),
+    timeoutMs: 360_000,
   })
-  const timeout = setTimeout(() => {
-    if (process.platform === 'linux') Bun.spawnSync(['systemctl', '--user', 'stop', unit])
-    else child.kill('SIGTERM')
-  }, 360_000)
-  const exitCode = await child.exited
-  clearTimeout(timeout)
-  if (process.platform === 'linux') {
-    const state = Bun.spawnSync([
-      'systemctl',
-      '--user',
-      'show',
-      unit,
-      '-p',
-      'Result',
-      '-p',
-      'MemoryPeak',
-    ])
-    await writeFile(path.join(caseOutput, 'scope.txt'), state.stdout)
-    Bun.spawnSync(['systemctl', '--user', 'stop', unit], { stdout: 'ignore', stderr: 'ignore' })
-    Bun.spawnSync(['systemctl', '--user', 'reset-failed', unit], {
-      stdout: 'ignore',
-      stderr: 'ignore',
-    })
-  }
+  const { exitCode } = scope
   if (exitCode !== 0) failures += 1
   if (existsSync(path.join(caseOutput, 'fixture')))
     await releaseFixture(path.join(caseOutput, 'fixture'))
   const resultFile = path.join(caseOutput, 'result.json')
-  const result: unknown = existsSync(resultFile)
-    ? JSON.parse(await readFile(resultFile, 'utf8'))
-    : { status: 'failed', sizeMiB: size, highlighting, exitCode, output: caseOutput }
+  const result: unknown = {
+    ...(existsSync(resultFile)
+      ? JSON.parse(await readFile(resultFile, 'utf8'))
+      : { status: 'failed', sizeMiB: size, highlighting, exitCode, output: caseOutput }),
+    scope,
+  }
   await appendFile(path.join(output, 'results.jsonl'), `${JSON.stringify(result)}\n`)
   results.push(result)
   await writeFile(path.join(output, 'comparison.md'), comparisonReport(results))
