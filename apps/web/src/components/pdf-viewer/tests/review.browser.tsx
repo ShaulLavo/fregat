@@ -111,3 +111,40 @@ test('Next visits two separated matches on one tall page inside its viewport', a
     view.unmount()
   }
 })
+
+test('navigation waits for a distant page to render before revealing its selected match', async () => {
+  const stream = 'BT /F1 24 Tf 50 120 Td (distant needle) Tj ET'
+  const bytes = makePdf(['first', 'second', 'third', 'fourth', ''], 'Helvetica', 1, [
+    'BT /F1 24 Tf 50 720 Td (first) Tj ET',
+    'BT /F1 24 Tf 50 720 Td (second) Tj ET',
+    'BT /F1 24 Tf 50 720 Td (third) Tj ET',
+    'BT /F1 24 Tf 50 720 Td (fourth) Tj ET',
+    stream,
+  ])
+  const view = renderWithProviders(
+    <div className='flex min-h-0 flex-col overflow-hidden' style={{ height: 300, width: 612 }}>
+      <PdfDocument engine={engine} bytes={bytes} loading={false} />
+    </div>,
+    { command: false },
+  )
+  try {
+    await expect.poll(() => view.queryByLabelText('Search PDF')).not.toBeNull()
+    fireEvent.change(view.getByLabelText('Search PDF'), { target: { value: 'needle' } })
+    await expect.poll(() => view.getByRole('status').textContent).toBe('1 match')
+    const host = view.container.querySelector('[data-pdf-page="5"] [data-pdf-page-content]')!
+    expect(host.shadowRoot).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: /^Next$/ }))
+    const scroller = view.container.querySelector('[data-pdf-pages]')!
+    await expect
+      .poll(() => {
+        const mark = host.shadowRoot?.querySelector('.highlight.selected')
+        if (!mark) return false
+        const target = mark.getBoundingClientRect()
+        const bounds = scroller.getBoundingClientRect()
+        return target.top >= bounds.top && target.bottom <= bounds.bottom
+      })
+      .toBe(true)
+  } finally {
+    view.unmount()
+  }
+})
