@@ -1,5 +1,6 @@
 import type { AtlasKind, GlyphBitmap, GlyphRasterizationInput, GlyphRasterizer } from './types.js'
 import type { TerminalFittedFont } from '../../term/types.js'
+import { glyphKey } from './key.js'
 
 export interface CanvasGlyphRasterizerOptions {
   font: TerminalFittedFont
@@ -29,11 +30,20 @@ function validateInput(input: GlyphRasterizationInput): GlyphRasterizationInput 
   }
   if (typeof input.italic !== 'boolean') throw new TypeError('italic must be a boolean')
   if (typeof input.text !== 'string') throw new TypeError('text must be a string')
+  const foreground = input.foreground
+  if (
+    !foreground ||
+    !validColorChannel(foreground.r) ||
+    !validColorChannel(foreground.g) ||
+    !validColorChannel(foreground.b)
+  ) {
+    throw new RangeError('foreground must contain finite RGB channels from 0 to 255')
+  }
   return input
 }
 
-function bitmapKey(input: GlyphRasterizationInput): string {
-  return JSON.stringify([input.cellSpan, input.weight, input.italic, input.text])
+function validColorChannel(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 255
 }
 
 function bitmapBytes(key: string, bitmap: GlyphBitmap | undefined): number {
@@ -182,7 +192,20 @@ export class CanvasGlyphRasterizer implements GlyphRasterizer {
 
   rasterize(rawInput: GlyphRasterizationInput): GlyphBitmap | undefined {
     const input = validateInput(rawInput)
-    const key = bitmapKey(input)
+    const bitmap = this.rasterizeCached(input, glyphKey(input, 'grayscale'))
+    if (bitmap?.kind !== 'color') return bitmap
+    const { r, g, b } = input.foreground
+    if (r === 255 && g === 255 && b === 255) return bitmap
+    // RGBA glyphs can mix fixed colors with currentColor layers, so their brush is part of the key.
+    return this.rasterizeCached(input, glyphKey(input, 'color'), `rgb(${r}, ${g}, ${b})`, 'color')
+  }
+
+  private rasterizeCached(
+    input: GlyphRasterizationInput,
+    key: string,
+    ink = '#ffffff',
+    kind?: AtlasKind,
+  ): GlyphBitmap | undefined {
     const cached = this.bitmaps.get(key)
     if (cached !== undefined || this.bitmaps.has(key)) {
       // Defer recency bookkeeping until the cache approaches either retention limit.
@@ -195,7 +218,7 @@ export class CanvasGlyphRasterizer implements GlyphRasterizer {
       }
       return cached
     }
-    const bitmap = input.text.length === 0 ? undefined : this.rasterizeUncached(input)
+    const bitmap = input.text.length === 0 ? undefined : this.rasterizeUncached(input, ink, kind)
     this.cacheBitmap(key, bitmap)
     return bitmap
   }
@@ -235,22 +258,28 @@ export class CanvasGlyphRasterizer implements GlyphRasterizer {
     return context.getImageData(0, 0, this.canvas.width, this.canvas.height)
   }
 
-  private rasterizeUncached(input: GlyphRasterizationInput): GlyphBitmap | undefined {
+  private rasterizeUncached(
+    input: GlyphRasterizationInput,
+    ink: string,
+    kind: AtlasKind | undefined,
+  ): GlyphBitmap | undefined {
     let padding = this.initialPadding
     for (let attempt = 0; attempt < maxScratchAttempts; attempt += 1) {
-      const image = this.draw(input, padding)
+      const image = this.draw(input, padding, ink)
       const bounds = alphaBounds(image)
       if (!bounds) return undefined
-      if (!touchesScratchEdge(bounds, image.width, image.height)) {
-        // Intrinsically gray glyphs need RGBA too; the black probe also identifies white color glyphs.
-        const kind =
-          hasIntrinsicColor(image, bounds, 255) ||
-          hasIntrinsicColor(this.draw(input, padding, '#000000'), bounds, 0)
-            ? 'color'
-            : 'grayscale'
-        return this.bitmapFromImage(image, bounds, padding, kind)
+      if (touchesScratchEdge(bounds, image.width, image.height)) {
+        padding *= 2
+        continue
       }
-      padding *= 2
+      // Intrinsically gray glyphs need RGBA too; the black probe also identifies white color glyphs.
+      const bitmapKind =
+        kind ??
+        (hasIntrinsicColor(image, bounds, 255) ||
+        hasIntrinsicColor(this.draw(input, padding, '#000000'), bounds, 0)
+          ? 'color'
+          : 'grayscale')
+      return this.bitmapFromImage(image, bounds, padding, bitmapKind)
     }
     throw new RangeError(`glyph ${JSON.stringify(input.text)} exceeds bounded scratch space`)
   }

@@ -57,7 +57,11 @@ cell text through the browser's font fallback. `CSI ? 2027 l` restores the defau
 
 WebGPU, WebGL2, and Canvas2D follow the same native cell ownership. Emoji appearance depends
 on the available fallback fonts. GPU atlases preserve intrinsic RGB and alpha, including gray
-emoji, while ordinary text uses a foreground-tinted coverage mask.
+emoji. RGBA glyphs use the resolved foreground and a color-keyed cache so mixed COLR
+currentColor layers follow SGR, theme, selection, cursor and minimum-contrast colors.
+Bitmap retention is bounded to 4 MiB and 4,096 entries, and atlas layers have their own
+fixed capacity. Ordinary text and foreground-only COLR glyphs share a one-byte coverage
+mask across foreground colors.
 
 ## Verification
 

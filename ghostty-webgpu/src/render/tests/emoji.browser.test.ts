@@ -40,7 +40,13 @@ it.each([
   const rasterizer = new CanvasGlyphRasterizer({
     font: { ...font, settings: { ...font.settings, family: '"Intrinsic Colors"' } },
   })
-  const bitmap = rasterizer.rasterize({ cellSpan: 2, italic: false, text, weight: 'normal' })!
+  const bitmap = rasterizer.rasterize({
+    cellSpan: 2,
+    foreground,
+    italic: false,
+    text,
+    weight: 'normal',
+  })!
   expect(bitmap.kind).toBe('color')
   const center = Math.floor((bitmap.width * bitmap.height) / 2) * 4
   expect(Array.from(bitmap.pixels.slice(center, center + 4))).toEqual([
@@ -51,6 +57,7 @@ it.each([
   ])
   const ordinary = rasterizer.rasterize({
     cellSpan: 2,
+    foreground,
     italic: false,
     text: 'M',
     weight: 'normal',
@@ -63,7 +70,13 @@ it.each(['⚫', '⚪', '💻', '👩‍💻', '👨‍👩‍👧‍👦', '🧪
   'rasterizes visible fallback glyphs for %s',
   (text) => {
     const rasterizer = new CanvasGlyphRasterizer({ font })
-    const bitmap = rasterizer.rasterize({ cellSpan: 2, italic: false, text, weight: 'normal' })!
+    const bitmap = rasterizer.rasterize({
+      cellSpan: 2,
+      foreground,
+      italic: false,
+      text,
+      weight: 'normal',
+    })!
     expect(bitmap).toBeDefined()
     const bytesPerPixel = bitmap.kind === 'color' ? 4 : 1
     expect(bitmap.pixels).toHaveLength(bitmap.width * bitmap.height * bytesPerPixel)
