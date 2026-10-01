@@ -27,6 +27,8 @@ export const editorViewportSelector = '.editor-virtualized-viewport'
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
 export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
+const chatComposerSelector = '[data-testid="chat-input-editor"]'
+const projectSwitcherSelector = '[aria-label="Switch project"]'
 export const mermaidSelectors = {
   diagram: '[data-markdown="mermaid-block"] [role="img"]',
   svg: 'svg',
@@ -1266,6 +1268,32 @@ export async function pressShortcut(page: Page, chord: string) {
   const platform = await page.evaluate(detectPlatform)
   const modifier = platform === 'mac' ? 'Meta' : 'Control'
   await page.keyboard.press(chord.replace(/\b(?:ControlOrMeta|Mod)\b/g, modifier))
+}
+
+export async function waitForSessionWorkspace(
+  page: Page,
+  sessionId: string,
+  canonicalPath: string,
+  environmentId: string,
+) {
+  await page.waitForFunction(
+    ({ composerSelector, switcherSelector, expectedNamespace, rootPath }) => {
+      const title = document.querySelector(switcherSelector)?.getAttribute('title')
+      const composer = document.querySelector(composerSelector) as
+        | (HTMLElement & { __lexicalEditor?: { _config: { namespace: string } } })
+        | null
+      // Lexical's rendered owner can lag the session URL during a workspace switch.
+      const namespace = composer?.__lexicalEditor?._config.namespace
+      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
+      return workspaceReady && namespace === expectedNamespace
+    },
+    {
+      composerSelector: chatComposerSelector,
+      switcherSelector: projectSwitcherSelector,
+      expectedNamespace: `platform-chat-input:${environmentId}:${canonicalPath.replace(/^\/+/, '')}:${sessionId}`,
+      rootPath: canonicalPath.replace(/^\/+/, ''),
+    },
+  )
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {
