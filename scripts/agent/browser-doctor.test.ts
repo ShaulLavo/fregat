@@ -117,6 +117,7 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
         cwd: checkoutRoot,
         env: {
           ...process.env,
+          DOCTOR_SPAWN_AT: String(Date.now()),
           WEB_PORT: '5173',
           FREGAT_EVIDENCE_ROOT: scratch,
           OBSERVABILITY_DIR: path.join(scratch, 'logs'),
@@ -131,6 +132,7 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
       new Response(child.stdout).text(),
       new Response(child.stderr).text(),
     ])
+    console.log(stderr)
     const [run] = await readdir(scratch)
     if (!run) expect.fail(stdout + stderr)
     const observed = JSON.parse(await readFile(path.join(scratch, run, 'observed.json'), 'utf8'))
