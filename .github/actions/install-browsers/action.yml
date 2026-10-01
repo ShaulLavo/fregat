@@ -21,8 +21,9 @@ runs:
       run: |
         set -euo pipefail
         sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://mirrors.edge.kernel.org/ubuntu|g' /etc/apt/apt-mirrors.txt
-        archives="$HOME/.cache/playwright-apt"
+        archives="$RUNNER_TEMP/playwright-apt"
         mkdir -p "$archives"
+        sudo install -d -o _apt -g root -m 0700 "$archives/partial"
         sudo tee /etc/apt/apt.conf.d/99-playwright-cache > /dev/null <<EOF
         Dir::Cache::archives "$archives";
         APT::Keep-Downloaded-Packages "true";
@@ -30,13 +31,13 @@ runs:
         EOF
         version="$("$PLAYWRIGHT" --version | awk '{print $2}')"
         browsers="$(printf '%s' "$BROWSERS" | sha256sum | cut -d ' ' -f 1)"
-        echo "key=browser-apt-v1-${ImageOS}-${ImageVersion}-${RUNNER_ARCH}-${version}-${browsers}" >> "$GITHUB_OUTPUT"
+        echo "key=browser-apt-v2-${ImageOS}-${ImageVersion}-${RUNNER_ARCH}-${version}-${browsers}" >> "$GITHUB_OUTPUT"
 
     - name: Restore Ubuntu dependency archives
       id: cache
       uses: actions/cache/restore@v4
       with:
-        path: ~/.cache/playwright-apt/*.deb
+        path: ${{ runner.temp }}/playwright-apt/*.deb
         key: ${{ steps.apt.outputs.key }}
 
     - name: Install Playwright browsers and dependencies
@@ -53,5 +54,5 @@ runs:
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       uses: actions/cache/save@v4
       with:
-        path: ~/.cache/playwright-apt/*.deb
+        path: ${{ runner.temp }}/playwright-apt/*.deb
         key: ${{ steps.apt.outputs.key }}
