@@ -28,6 +28,9 @@ export type HeavyJobRecord = {
   readonly admission: string
   /** The local job slice; null for a Pi job. */
   readonly slice: string | null
+  readonly quiet: boolean
+  /** A quiet job stopped because its hold ran out; it has to queue again. */
+  readonly quietHoldExpired: boolean
   readonly unit: string
   readonly queuedMs: number
   readonly wallMs: number

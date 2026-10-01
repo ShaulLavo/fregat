@@ -111,6 +111,8 @@ function job(fields: Partial<HeavyJobRecord>): HeavyJobRecord {
     memoryPeakBytes: 2 ** 30,
     oomKills: 0,
     queuedMs: 0,
+    quiet: false,
+    quietHoldExpired: false,
     repo: '/work/projects/platform',
     requestId: String(sequence),
     source: 'heavy',
