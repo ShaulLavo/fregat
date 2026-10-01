@@ -4,7 +4,7 @@ import {
   type FileSnapshot,
 } from '@/lib/file-snapshot'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { decodedAsText } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -26,6 +26,80 @@ import { expect, test as it } from '../../../../test/fixtures'
 import type { WorkspaceEditResult, WorkspaceEditTransitionRequest } from '@workspace/contracts'
 
 describe('FileSyncService', () => {
+  for (const dirty of [false, true]) {
+    it(`saves after an identical external rewrite while preserving the buffer (dirty: ${dirty})`, async ({
+      client,
+      server,
+    }) => {
+      const path = filesystemPath('rewritten.txt')
+      const absolutePath = join(server.root, path)
+      await writeFile(absolutePath, 'original')
+      const ports = createFileSyncPorts(client)
+      const store = createEditorDocumentStore()
+      const original = await ports.readFileContent(path, new AbortController().signal)
+      const document = store.getState().ensureLiveEditorDocument(original)
+      if (dirty) createEditorBufferSession(document.buffer).applyText('!')
+      const before = store.getState().getLiveEditorDocument(document.key)!
+      const dirtyKeys = store.getState().dirtyDocumentKeys
+
+      await writeFile(absolutePath, 'original')
+      const rewrittenTime = new Date(original.mtimeMs + 10_000)
+      await utimes(absolutePath, rewrittenTime, rewrittenTime)
+      const rewritten = await ports.readFileContent(path, new AbortController().signal)
+      expect(rewritten.version).toBe(original.version)
+      expect(rewritten.mtimeMs - original.mtimeMs).toBeGreaterThan(1)
+      const refreshed = store.getState().ensureLiveEditorDocument(rewritten)
+      expect(refreshed.buffer).toBe(before.buffer)
+      expect(refreshed.analysis).toBe(before.analysis)
+      expect(refreshed.contentRevision).toBe(before.contentRevision)
+      expect(refreshed.localRevision).toBe(before.localRevision)
+      expect(refreshed.buffer.isDirty()).toBe(dirty)
+      expect(store.getState().dirtyDocumentKeys).toBe(dirtyKeys)
+      expect(refreshed.buffer.materializeFullText()).toBe(dirty ? 'original!' : 'original')
+
+      await new FileSyncService(store, new QueryClient(), ports).save(refreshed)
+      expect(refreshed.sync).toMatchObject({ mtimeMs: rewritten.mtimeMs })
+      expect(await readFile(absolutePath, 'utf8')).toBe(dirty ? 'original!' : 'original')
+      expect(store.getState().getLiveEditorDocument(document.key)!.buffer.isDirty()).toBe(false)
+      if (!dirty) return
+      refreshed.buffer.undo()
+      expect(refreshed.buffer.materializeFullText()).toBe('original')
+      refreshed.buffer.redo()
+      expect(refreshed.buffer.materializeFullText()).toBe('original!')
+    })
+  }
+
+  it('keeps a dirty buffer conflicting when an external rewrite changes the bytes', async ({
+    client,
+    server,
+  }) => {
+    const path = filesystemPath('changed.txt')
+    const absolutePath = join(server.root, path)
+    await writeFile(absolutePath, 'original')
+    const ports = createFileSyncPorts(client)
+    const store = createEditorDocumentStore()
+    const original = await ports.readFileContent(path, new AbortController().signal)
+    const document = store.getState().ensureLiveEditorDocument(original)
+    createEditorBufferSession(document.buffer).applyText('!')
+    const before = store.getState().getLiveEditorDocument(document.key)!
+    await writeFile(absolutePath, 'external')
+    const rewrittenTime = new Date(original.mtimeMs + 10_000)
+    await utimes(absolutePath, rewrittenTime, rewrittenTime)
+    const rewritten = await ports.readFileContent(path, new AbortController().signal)
+    expect(rewritten.version).not.toBe(original.version)
+    expect(rewritten.mtimeMs - original.mtimeMs).toBeGreaterThan(1)
+    const retained = store.getState().ensureLiveEditorDocument(rewritten)
+    expect(retained).toBe(before)
+    await expect(
+      new FileSyncService(store, new QueryClient(), ports).save(retained),
+    ).rejects.toMatchObject({
+      status: 409,
+    })
+    expect(await readFile(absolutePath, 'utf8')).toBe('external')
+    expect(retained.buffer.materializeFullText()).toBe('original!')
+    expect(retained.buffer.isDirty()).toBe(true)
+  })
+
   it('retains the captured saved snapshot without retaining a joined save string', async ({
     client,
     server,
