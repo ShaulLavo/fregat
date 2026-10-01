@@ -71,6 +71,8 @@ async function handoff(width, height, deviceScaleFactor) {
   await page.evaluate(() => document.fonts.ready)
   const before = await geometry(page)
   assert.equal(before.rows, 40, 'HTML contains the complete first frame before wasm arrives')
+  assert.equal(before.backend, 'html')
+  assert.equal(await page.locator('#backend-fact').textContent(), 'html')
   const name = `${width}-dpr${deviceScaleFactor}`
   await writeFile(`${directory}/${name}-before.json`, JSON.stringify(before, null, 2))
   await page.waitForTimeout(150)
