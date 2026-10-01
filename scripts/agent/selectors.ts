@@ -64,6 +64,14 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  forgeDiscussion: (page: Page) =>
+    page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
+  forgeComment: (page: Page) => page.getByRole('textbox', { name: 'Comment', exact: true }),
+  forgeCommentText: (page: Page, text: string) =>
+    page
+      .getByRole('dialog', { name: 'Pull request #7 discussion', exact: true })
+      .getByText(text, { exact: true }),
+
   startupFailure: (page: Page) =>
     page.getByRole('status').filter({ hasText: 'App could not start' }),
   reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
