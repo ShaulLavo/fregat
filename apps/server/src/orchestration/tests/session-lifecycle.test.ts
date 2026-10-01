@@ -3,17 +3,25 @@ import archivePolicy from '../../../../../test/parity/t3code/archive.json'
 import { Database } from 'bun:sqlite'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as v from 'valibot'
 import {
   orderKeyBetween,
   orchestrationCommandSchema,
+  sessionIdSchema,
   type OrchestrationCommand,
 } from '@workspace/contracts'
 import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { projectionSessions } from '../../db/schema'
 import { OrchestrationEngine } from '../engine'
+import {
+  createOrchestrationFixture,
+  FIXTURE_SESSION_ID,
+  mockRuntime,
+  sessionFrom,
+} from '../../../test/factories/orchestration'
+import { MockProviderAdapter } from '../../provider/adapters/mock'
 
 const modelSelection = { model: 'gpt-5-codex', providerInstanceId: 'codex' }
 const fixtures: Array<{ close: () => void }> = []
@@ -1378,4 +1386,114 @@ it('requires the durable lifecycle result before writing a new accepted receipt'
   const receipts = new OrchestrationCommandReceipts(database)
   expect(() => receipts.recordAccepted(action, 99, null)).toThrow()
   expect(receipts.find(action.commandId)).toBeNull()
+})
+
+describe('settled provider release ownership', () => {
+  it('re-engagement before queued settlement release is decided emits no obsolete stop', async () => {
+    const adapter = new MockProviderAdapter()
+    const fixture = await createOrchestrationFixture()
+    onTestFinished(() => fixture.close())
+    await fixture.restart(mockRuntime(adapter))
+    const registration = await fixture.register()
+    const worktreeId = registration.result!.worktreeId
+    const blocker = 'a0000000-0000-4000-8000-000000000098'
+    const sessionId = v.parse(sessionIdSchema, FIXTURE_SESSION_ID)
+    await fixture.createSession(worktreeId)
+    await fixture.createSession(worktreeId, blocker)
+    await fixture.startTurn()
+    await fixture.engine.providerRuntimeIdle()
+    await fixture.startTurn(blocker, 'blocked-release')
+    await fixture.engine.providerRuntimeIdle()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const stop = adapter.stopRuntime.bind(adapter)
+    adapter.stopRuntime = async (input) => {
+      if (input.sessionId === blocker) {
+        entered.resolve()
+        await release.promise
+      }
+      await stop(input)
+    }
+    try {
+      await fixture.command({
+        type: 'session.runtime.stop',
+        sessionId: blocker,
+        commandId: 'hold-native-release',
+      })
+      await entered.promise
+      await fixture.command({
+        type: 'session.settle',
+        sessionId,
+        commandId: 'settle-before-decision',
+      })
+      await fixture.command({
+        type: 'session.unsettle',
+        sessionId,
+        reason: 'user',
+        commandId: 'reengage-before-decision',
+      })
+      release.resolve()
+      await fixture.engine.providerRuntimeIdle()
+      const events = (await fixture.engine.replay({ afterSequence: 0 })).events
+      expect(
+        events.filter(
+          (event) =>
+            event.type === 'session.runtime-stop-requested' &&
+            event.payload.sessionId === sessionId,
+        ),
+      ).toEqual([])
+      expect(adapter.interruptedSessions).not.toContain(sessionId)
+      expect(await adapter.hasRuntime({ sessionId })).toBe(true)
+      expect((await sessionFrom(fixture)).settledOverride).toBe('active')
+    } finally {
+      release.resolve()
+      await fixture.engine.providerRuntimeIdle()
+    }
+  })
+
+  it.each([false, true])(
+    'restart replays settled provider release once with persisted stop intent = %s',
+    async (stopIntent) => {
+      const adapter = new MockProviderAdapter()
+      const fixture = await createOrchestrationFixture()
+      onTestFinished(() => fixture.close())
+      await fixture.restart(mockRuntime(adapter))
+      const registration = await fixture.register()
+      await fixture.createSession(registration.result!.worktreeId)
+      await fixture.startTurn()
+      await fixture.engine.providerRuntimeIdle()
+      const sessionId = v.parse(sessionIdSchema, FIXTURE_SESSION_ID)
+      expect(await adapter.hasRuntime({ sessionId })).toBe(true)
+      expect((await sessionFrom(fixture)).runtime?.status).toBe('ready')
+      // Commit during the gap between the old provider subscriber and the next server's subscriber.
+      await fixture.restart(false)
+      const settle = { type: 'session.settle', sessionId, commandId: 'settled-during-restart' }
+      await fixture.command(settle)
+      const settledAt = (await sessionFrom(fixture)).settledAt
+      if (stopIntent) {
+        await fixture.command({
+          type: 'session.runtime.stop',
+          sessionId,
+          onlyIfSettled: true,
+          commandId: 'release-decided-before-restart',
+        })
+        expect((await sessionFrom(fixture)).runtime?.status).toBe('stopped')
+      }
+      expect(await adapter.hasRuntime({ sessionId })).toBe(true)
+      expect(adapter.interruptedSessions).toEqual([])
+      await fixture.restart(mockRuntime(adapter))
+      await fixture.engine.providerRuntimeIdle()
+      expect(await adapter.hasRuntime({ sessionId })).toBe(false)
+      expect(adapter.interruptedSessions).toEqual([sessionId])
+      expect((await sessionFrom(fixture)).settledAt).toBe(settledAt)
+      await fixture.command(settle)
+      await fixture.command({ ...settle, commandId: 'duplicate-settle-after-restart' })
+      await fixture.engine.providerRuntimeIdle()
+      expect(adapter.interruptedSessions).toEqual([sessionId])
+      await fixture.restart(mockRuntime(adapter))
+      await fixture.engine.providerRuntimeIdle()
+      expect(adapter.interruptedSessions).toEqual([sessionId])
+      expect((await sessionFrom(fixture)).settledAt).toBe(settledAt)
+    },
+  )
 })

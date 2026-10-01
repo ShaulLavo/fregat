@@ -972,6 +972,7 @@ export class OrchestrationEngine {
       if (session.deletedAt) continue
       await this.recoverRewind(session)
       await this.recoverRuntime(session)
+      await this.recoverSettledRuntime(session)
     }
     await this.deletionReactor?.recover()
     await this.terminalLeases.recover()
@@ -1040,6 +1041,23 @@ export class OrchestrationEngine {
         internalCommandKey('runtime-recovery', session.id, observedSequence, runtimeEpoch),
       ),
     })
+  }
+
+  private async recoverSettledRuntime(session: OrchestrationProjectedSession) {
+    if (!this.providerService || !session.runtime || session.settledOverride !== 'settled') return
+    // A stopped projection records intent; its provider can remain attached across a restart.
+    if (!(await this.providerService.hasRuntime({ sessionId: session.id }))) return
+    await this.enqueue({
+      type: 'session.runtime.stop',
+      sessionId: session.id,
+      onlyIfSettled: true,
+      commandId: v.parse(
+        commandIdSchema,
+        internalCommandKey('settled-release-recovery', session.id, session.runtime.runtimeEpoch),
+      ),
+    })
+    if (this.readModel.sessions.get(session.id)?.settledOverride !== 'settled') return
+    await this.providerService.stopRuntime({ sessionId: session.id })
   }
 
   private scheduleQueuedStarts() {
