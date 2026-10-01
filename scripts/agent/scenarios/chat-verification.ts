@@ -1,3 +1,4 @@
+import type { ScenarioApi } from '../scenario-cleanup'
 import { checkoutRoot } from '../paths'
 import { ok } from 'node:assert/strict'
 import {
@@ -9,7 +10,7 @@ import type { Page } from 'playwright'
 import { releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
 
-export async function readShell(page: Page, base: string) {
+export async function readShell(page: ScenarioApi, base: string) {
   const response = await page.request.get(`${base}/shell-snapshot`, {
     headers: { Origin: new URL(page.url()).origin },
   })
@@ -27,7 +28,7 @@ export async function readSessionDetail(page: Page, base: string, sessionId: str
   return v.parse(orchestrationSessionDetailSnapshotSchema, await response.json()).session
 }
 
-export async function dispatch(page: Page, base: string, command: Record<string, unknown>) {
+export async function dispatch(page: ScenarioApi, base: string, command: Record<string, unknown>) {
   const response = await page.request.post(`${base}/commands`, {
     headers: { Origin: new URL(page.url()).origin },
     data: { ...command, commandId: `chat-verification-${crypto.randomUUID()}` },

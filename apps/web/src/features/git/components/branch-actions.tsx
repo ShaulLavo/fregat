@@ -1,3 +1,4 @@
+import { PullRequestDiscussion } from '@/features/git/components/pull-request-discussion'
 import { Spinner } from '@workspace/ui/components/spinner'
 import {
   ArrowSquareOutIcon,
@@ -134,6 +135,13 @@ export function BranchActions({
           <span className='font-mono tabular-nums'>#{pullRequestState.pullRequest.number}</span>
           <ArrowSquareOutIcon className='size-(--icon-size-sm) opacity-60' />
         </a>
+      ) : null}
+      {pullRequestState?.pullRequest ? (
+        <PullRequestDiscussion
+          rootPath={rootPath}
+          number={pullRequestState.pullRequest.number}
+          url={pullRequestState.pullRequest.url}
+        />
       ) : null}
       <PullRequestLookupRetry requestLabel={requestLabel} rootPath={rootPath} />
       {canCreatePullRequest(state, pullRequestState) ? (
