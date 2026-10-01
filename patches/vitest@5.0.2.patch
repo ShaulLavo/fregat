@@ -1,8 +1,45 @@
 diff --git a/dist/chunks/index.C-uw7tH9.js b/dist/chunks/index.C-uw7tH9.js
-index cdf7f640a05be5e7fd0b3b1b8905cafc1672fdec..90964fde2ca5c3227d7e0667c25bf234774fbdba 100644
 --- a/dist/chunks/index.C-uw7tH9.js
 +++ b/dist/chunks/index.C-uw7tH9.js
-@@ -21435,6 +21435,8 @@ class Vitest {
+@@ -10350,6 +10350,9 @@
+ // Trigger gc on lower disk (default to 4GB)
+ const chromiumGCDiskThreshold = process.env.VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB ? Number(process.env.VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB) * 1024 ** 3 : 4 * 1024 ** 3;
+ const forceChromiumGC = !!process.env.VITEST_CHROMIUM_GC_FORCE;
++// Chromium retains shared response buffers after iframe disposal. A capped job must release
++// them between files even when the host's temporary filesystem has plenty of free space.
++const cappedChromiumGC = !!process.env.HEAVY_JOB_SLICE;
+ const debugGC = createDebugger("vitest:browser:gc");
+ async function maybeCollectChromiumGarbage(project, sessionId) {
+ 	// trigger only on linux/chromium/playwright
+@@ -10362,6 +10365,7 @@
+ 		cdpSessionMs: void 0,
+ 		cdpSendMs: void 0,
+ 		cdpDetachMs: void 0,
++		cappedJob: cappedChromiumGC,
+ 		forced: forceChromiumGC
+ 	};
+ 	try {
+@@ -10377,8 +10381,8 @@
+ 		diagnostics.availableBytesBefore = available.toString();
+ 		diagnostics.thresholdBytes = chromiumGCDiskThreshold.toString();
+ 		diagnostics.tempDirectory = tempDirectory;
+-		diagnostics.triggered = available < chromiumGCDiskThreshold;
+-		if (available >= chromiumGCDiskThreshold) return;
++		diagnostics.triggered = cappedChromiumGC || available < chromiumGCDiskThreshold;
++		if (!diagnostics.triggered) return;
+ 		operationStart = performance.now();
+ 		// `detach` is available only internally and not on CDPSession type
+ 		const cdp = await provider.getCDPSession(sessionId);
+@@ -10402,7 +10406,7 @@
+ 		}
+ 		const availableGiB = available / 1024 ** 3;
+ 		const thresholdGiB = chromiumGCDiskThreshold / 1024 ** 3;
+-		debugGC?.("[%s] Low disk space detected in %s (%s GiB available, %s GiB threshold). Vitest triggered Chromium garbage collection to prevent browser crashes.", sessionId, tempDirectory, availableGiB.toFixed(1), thresholdGiB.toFixed(1));
++		debugGC?.("[%s] Chromium collected shared buffers after an isolated test file (%s; %s GiB available in %s, %s GiB disk threshold).", sessionId, cappedChromiumGC ? "capped job" : "low disk space", availableGiB.toFixed(1), tempDirectory, thresholdGiB.toFixed(1));
+ 	} catch (error) {
+ 		// don't surface if fs or cdp fails
+ 		debugGC?.("[%s] failed to collect Chromium garbage: %s", sessionId, error);
+@@ -21435,6 +21439,8 @@
  				for (const error of errors) this.logger.error("error during close", error);
  				this._checkUnhandledErrors(errors);
  			});
