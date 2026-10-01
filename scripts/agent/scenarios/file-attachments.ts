@@ -2,6 +2,9 @@ import { ok, strictEqual } from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { selectors } from '../selectors'
 import { isolatedNativeScenario } from './native-provider-verification'
+import type { Scenario } from './index'
+import { openChat } from './chat-verification'
+import { createMockProviderSession } from './mock-provider-session'
 
 export const fileAttachments = isolatedNativeScenario({
   name: 'file-attachments',
@@ -99,6 +102,13 @@ export const fileAttachments = isolatedNativeScenario({
     await step('drop-and-paste-staged')
     for (const name of ['offline.txt', 'dropped.txt', 'pasted.txt'])
       await page.getByRole('button', { name: `Remove ${name}`, exact: true }).click()
+    const binary = Buffer.from([0, 1, 2, 255, 0, 7])
+    await selectors.chatComposerFileInput(page).setInputFiles({
+      name: 'binary.txt',
+      mimeType: 'text/plain',
+      buffer: binary,
+    })
+    await selectors.chatStagedFile(page, 'binary.txt').waitFor()
     await selectors.chatSend(page).click()
     await selectors
       .chatMessages(page)
@@ -115,5 +125,52 @@ export const fileAttachments = isolatedNativeScenario({
     strictEqual(await readFile((await download.path())!, 'utf8'), content)
     await step('general-file-download-verified')
     await page.keyboard.press('Escape')
+    await selectors.chatTranscriptFile(page, 'binary.txt').click()
+    await selectors.chatFileFallback(page).waitFor()
+    strictEqual(await selectors.chatFilePreview(page).count(), 0)
+    await step('binary-file-preview-fallback')
+    const binaryDownloading = page.waitForEvent('download')
+    await selectors.chatFileDownload(page, 'binary.txt').click()
+    const binaryDownload = await binaryDownloading
+    strictEqual(Buffer.compare(await readFile((await binaryDownload.path())!), binary), 0)
+    await step('binary-file-download-exact')
+    await page.keyboard.press('Escape')
   },
 })
+
+export const binaryFileAttachment: Scenario = {
+  name: 'binary-file-attachment',
+  description:
+    'Send text-labelled binary bytes, show the download fallback and download exact owner bytes.',
+  async run(page, { step }) {
+    const session = await createMockProviderSession(page, await openChat(page), {
+      name: 'binary-file-attachment',
+      displayLabel: 'Binary attachment fixture',
+      config: {},
+    })
+    try {
+      const binary = Buffer.from([0, 1, 2, 255, 0, 7])
+      await selectors.chatMessage(page).fill('Preview the attached file.')
+      await selectors.chatComposerFileInput(page).setInputFiles({
+        name: 'binary.txt',
+        mimeType: 'text/plain',
+        buffer: binary,
+      })
+      await selectors.chatStagedFile(page, 'binary.txt').waitFor()
+      await step('binary-upload-ready')
+      await selectors.chatSend(page).click()
+      await selectors.chatTranscriptFile(page, 'binary.txt').click()
+      await selectors.chatFileFallback(page).waitFor()
+      strictEqual(await selectors.chatFilePreview(page).count(), 0)
+      await step('binary-file-preview-fallback')
+      const downloading = page.waitForEvent('download')
+      await selectors.chatFileDownload(page, 'binary.txt').click()
+      const download = await downloading
+      strictEqual(Buffer.compare(await readFile((await download.path())!), binary), 0)
+      await step('binary-file-download-exact')
+      await page.keyboard.press('Escape')
+    } finally {
+      await session.cleanup()
+    }
+  },
+}

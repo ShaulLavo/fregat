@@ -281,7 +281,7 @@
         },
         "browser": {
           "ceilingMiB": 10240,
-          "estimateMiB": 5632
+          "estimateMiB": 8192
         },
         "build": {
           "ceilingMiB": 4096,
@@ -289,11 +289,11 @@
         },
         "light": {
           "ceilingMiB": 2048,
-          "estimateMiB": 512
+          "estimateMiB": 1536
         },
         "suite": {
           "ceilingMiB": 8192,
-          "estimateMiB": 4096
+          "estimateMiB": 6656
         }
       },
       "description": "Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.",

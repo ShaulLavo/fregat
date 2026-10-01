@@ -15,7 +15,7 @@ import { useEditorConflictState } from '@/features/editor/state/conflict-state'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { useWorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
-import { FileEditorBody } from '@/features/workbench/components/file-editor-body'
+import { FileDocumentBody } from '@/features/workbench/components/file-document-body'
 import {
   EditorSurfaceActionsContext,
   type EditorSurfaceActions,
@@ -138,7 +138,7 @@ export function EditorSurfaceTabBody({
   const selectedFile = readyFile(fileState)
 
   useLayoutEffect(() => {
-    if (!selectedFile) return
+    if (!selectedFile || selectedFile.seemsBinary) return
 
     const claim = fileOpenIntent.claimReadyClean(selectedFile.path)
     ensureEditorView(tabId, selectedFile, claim)
@@ -231,7 +231,7 @@ export function EditorSurfaceTabBody({
 
   return (
     <EditorSurfaceActionsContext value={editorSurfaceActions}>
-      <FileEditorBody
+      <FileDocumentBody
         active={active}
         liveDocument={selectedLiveDocument}
         definitionTarget={definitionTarget ?? uiDefinitionTarget}

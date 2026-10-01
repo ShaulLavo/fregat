@@ -1241,6 +1241,9 @@ function handle(message) {
     case 'skills/list':
       result = { data: [] }
       break
+    case 'config/read':
+      result = { config: {}, origins: {}, layers: null }
+      break
     case 'turn/start':
       send({
         id: message.id,

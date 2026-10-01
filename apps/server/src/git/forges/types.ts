@@ -2,6 +2,7 @@ import type {
   GitForge,
   GitForgeKind,
   GitPullRequest,
+  GitPullRequestComment,
   GitPullRequestSupport,
   GitRepositoryVisibility,
 } from '@workspace/contracts'
@@ -32,11 +33,18 @@ type CreatePullRequestInput = {
   readonly draft: boolean
 }
 
-/**
- * One hosting service. Upstream's `SourceControlProvider`, narrowed to what Platform calls; each
- * implementation copies upstream's commands for its CLI or API.
- */
+/** Pull request creation and discussion share the selected remote and authentication. */
 export type ForgeProvider = {
+  readonly discussion:
+    | { kind: 'unsupported'; reason: string }
+    | {
+        kind: 'supported'
+        read: (
+          context: ForgeContext,
+          number: number,
+        ) => Promise<{ comments: readonly GitPullRequestComment[]; truncated: boolean }>
+        post: (context: ForgeContext, number: number, body: string) => Promise<void>
+      }
   readonly kind: GitForgeKind
   support: (context: ForgeContext) => Promise<Exclude<GitPullRequestSupport, 'no-forge'>>
   /**

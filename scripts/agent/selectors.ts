@@ -17,6 +17,7 @@ export const rootSwitchRows = {
 
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
+export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
@@ -26,6 +27,8 @@ export const editorViewportSelector = '.editor-virtualized-viewport'
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
 export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
+const chatComposerSelector = '[data-testid="chat-input-editor"]'
+const projectSwitcherSelector = '[aria-label="Switch project"]'
 export const mermaidSelectors = {
   diagram: '[data-markdown="mermaid-block"] [role="img"]',
   svg: 'svg',
@@ -63,6 +66,20 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  chatFileFallback: (page: Page) =>
+    page.getByText('Download this file to view its contents.', { exact: true }),
+  fileFacts: (page: Page) => page.getByRole('region', { name: 'File facts' }),
+  revealFileFacts: (page: Page) => page.getByRole('button', { name: 'Reveal in files' }),
+  missingFileMessage: (page: Page) =>
+    page.getByText('This file no longer exists.', { exact: true }),
+  forgeDiscussion: (page: Page) =>
+    page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
+  forgeComment: (page: Page) => page.getByRole('textbox', { name: 'Comment', exact: true }),
+  forgeCommentText: (page: Page, text: string) =>
+    page
+      .getByRole('dialog', { name: 'Pull request #7 discussion', exact: true })
+      .getByText(text, { exact: true }),
+
   startupFailure: (page: Page) =>
     page.getByRole('status').filter({ hasText: 'App could not start' }),
   reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
@@ -428,6 +445,10 @@ export const selectors = {
       .getByRole('tree', { name: 'Search results', exact: true })
       .locator('[aria-selected="true"] [data-row-action="replace"]'),
   terminalList: (page: Page) => page.getByRole('tablist', { name: 'Open terminals', exact: true }),
+  terminalById: (page: Page, id: string) =>
+    page
+      .getByRole('tablist', { name: 'Open terminals', exact: true })
+      .locator(`[data-terminal-tab-id=${JSON.stringify(id)}]`),
   terminalRows: (page: Page) =>
     page.getByRole('tablist', { name: 'Open terminals', exact: true }).getByRole('tab'),
   terminalDraggingRow: (page: Page) =>
@@ -1251,6 +1272,32 @@ export async function pressShortcut(page: Page, chord: string) {
   await page.keyboard.press(chord.replace(/\b(?:ControlOrMeta|Mod)\b/g, modifier))
 }
 
+export async function waitForSessionWorkspace(
+  page: Page,
+  sessionId: string,
+  canonicalPath: string,
+  environmentId: string,
+) {
+  await page.waitForFunction(
+    ({ composerSelector, switcherSelector, expectedNamespace, rootPath }) => {
+      const title = document.querySelector(switcherSelector)?.getAttribute('title')
+      const composer = document.querySelector(composerSelector) as
+        | (HTMLElement & { __lexicalEditor?: { _config: { namespace: string } } })
+        | null
+      // Lexical's rendered owner can lag the session URL during a workspace switch.
+      const namespace = composer?.__lexicalEditor?._config.namespace
+      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
+      return workspaceReady && namespace === expectedNamespace
+    },
+    {
+      composerSelector: chatComposerSelector,
+      switcherSelector: projectSwitcherSelector,
+      expectedNamespace: `platform-chat-input:${environmentId}:${canonicalPath.replace(/^\/+/, '')}:${sessionId}`,
+      rootPath: canonicalPath.replace(/^\/+/, ''),
+    },
+  )
+}
+
 export async function waitForApp(page: Page, timeoutMs = 45_000) {
   // The phone shell carries no window toolbar; its stack frame is its first paint.
   await selectors
@@ -1619,3 +1666,17 @@ export function focusedEditorSelectedText(): string {
   if (context) return context.text.slice(context.selectionStart, context.selectionEnd)
   return document.getSelection()?.toString() ?? ''
 }
+
+export const ghosttySiteSelectors = {
+  examples: '.example',
+  factLead: '.facts strong',
+  sectionHeadings: '.measured h2, .preview h2',
+  backend: '#backend',
+  canvas: 'canvas',
+  composition: '.ghostty-webgpu-composition',
+  pty: '.pty-example',
+  preview: '.preview',
+  screen: '.screen',
+  stat: '#stat',
+  window: '#window',
+} as const

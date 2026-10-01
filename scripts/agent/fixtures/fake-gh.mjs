@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -22,6 +22,31 @@ if (args[0] === 'repo' && args[1] === 'create') {
 }
 if (args[0] === 'repo' && args[1] === 'view') {
   out({ owner: { login: 'fregat' }, name: 'fixture' })
+  process.exit(0)
+}
+if (
+  args[0] === 'api' &&
+  args.some((arg) => /^repos\/[^/]+\/[^/]+\/issues\/\d+\/comments/.test(arg))
+) {
+  const data = forge()
+  const comments = data.comments ?? []
+  if (args.includes('POST')) {
+    if (data.failComment) {
+      process.stderr.write('fixture comment refusal\n')
+      process.exit(1)
+    }
+    const { body } = JSON.parse(readFileSync(0, 'utf8'))
+    const id = comments.length + 1
+    comments.push({
+      id,
+      body,
+      user: { login: 'reviewer' },
+      created_at: '2026-10-01T10:00:00Z',
+      html_url: `https://github.com/fregat/fixture/pull/7#issuecomment-${id}`,
+    })
+    writeFileSync(join(root, 'forge.json'), JSON.stringify({ ...data, comments }))
+    out(comments.at(-1))
+  } else out(comments)
   process.exit(0)
 }
 if (args[0] === 'api' && args[1] === 'graphql') {

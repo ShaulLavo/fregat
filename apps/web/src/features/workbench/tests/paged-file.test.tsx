@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises'
+import { truncate, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { waitFor } from '@testing-library/react'
 import { beforeAll } from 'vitest'
@@ -160,4 +160,31 @@ test('a changed source invalidates cached pages and every view', async ({ server
 
 test('completed paged-file tests restore the file client after fixture teardown', () => {
   expect(getClient() === fileClient).toBe(true)
+})
+
+test('oversized binary byte sources fail before publishing indexed text rows', async ({
+  server,
+  client,
+}) => {
+  const binaryPath = path.join(server.root, 'binary.txt')
+  await writeFile(binaryPath, Buffer.from([0, 1, 255, 0, 7]))
+  await truncate(binaryPath, 200 * 1024 * 1024 + 1)
+  const read = await client.fs.read.get({ query: { path: 'binary.txt' } })
+  expect(read.error?.status).toBe(413)
+  const opened = renderHookWithProviders(() => usePagedFile('binary.txt', 0, 0))
+  await waitFor(() => expect(opened.result.current.page.isError).toBe(true))
+  expect(opened.result.current.page.error).toMatchObject({ code: 'client.BINARY_TEXT_UNAVAILABLE' })
+  expect(opened.result.current.page.data).toBeUndefined()
+  const resource = opened.result.current.resource.data!
+  expect(resource.source.byteLength).toBe(200 * 1024 * 1024 + 1)
+  expect(resource.document.stats.utf16Length).toBe(0)
+  expect(resource.document.stats.cachedBytes).toBe(0)
+  opened.unmount()
+  await waitFor(() => expect(resource.document.stats.state).toBe('disposed'))
+  await waitFor(async () => {
+    const closed = await client.fs['read-session']({ id: resource.source.id }).get({
+      query: { start: 0, end: 1 },
+    })
+    expect(closed.error?.status).toBe(410)
+  })
 })
