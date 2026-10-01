@@ -9,7 +9,7 @@ import { createScriptError, scriptFailureText } from '../structured-errors'
 import type { HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/report.js [--since 1d] [--until <time>] [--by command|label] [--sort peak|cpu|wall|jobs] [--top 20] [--log-dir <dir>] [--json]'
+  'Usage: bun /work/platform-production/heavy/current/report.js [--since 1d] [--until <time>] [--by command|label|class] [--sort peak|cpu|wall|jobs] [--top 20] [--log-dir <dir>] [--json]'
 const GiB = 2 ** 30
 
 /** Usage sums and peaks cover measured jobs only; null means no job in the row was measured. */
@@ -38,6 +38,10 @@ const groupings = {
       record.command,
     ]),
   }),
+  class: (record: HeavyJobRecord): Group => {
+    const name = record.class ?? `host ${record.host}`
+    return { display: name, id: name }
+  },
   label: (record: HeavyJobRecord): Group => ({ display: record.label, id: record.label }),
 }
 const orders = {

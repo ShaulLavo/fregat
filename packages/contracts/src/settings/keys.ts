@@ -49,6 +49,14 @@ import { WORKSPACE_SEARCH_LIMIT_MAX } from '../workspace-search'
  */
 /** Percent, as a whole number, for the surface material knobs. */
 const percentSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100))
+const mebibytesSchema = v.pipe(v.number(), v.integer(), v.minValue(16), v.maxValue(262144))
+const heavyJobBudgetSchema = v.pipe(
+  v.object({ ceilingMiB: mebibytesSchema, estimateMiB: mebibytesSchema }),
+  v.check(
+    (budget) => budget.ceilingMiB >= budget.estimateMiB,
+    'The ceiling is at least the estimate.',
+  ),
+)
 
 export const SETTINGS_REGISTRY = {
   'chat.followUpBehavior': defineSetting({
@@ -1293,6 +1301,93 @@ export const SETTINGS_REGISTRY = {
       'Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.',
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'wrapper', 'memory', 'log', 'report'],
+  }),
+  'developer.heavyJobClasses': defineSetting({
+    schema: v.object({
+      bench: heavyJobBudgetSchema,
+      browser: heavyJobBudgetSchema,
+      build: heavyJobBudgetSchema,
+      light: heavyJobBudgetSchema,
+      suite: heavyJobBudgetSchema,
+    }),
+    // Seeded from the heavy-job log (Plan 284): estimate the class's p75 peak rounded up to
+    // 512 MiB, ceiling 1.25x its largest peak rounded up to 1 GiB. Bench covers the large-file
+    // bench's 8 GiB case cap plus its driver.
+    default: {
+      bench: { ceilingMiB: 9216, estimateMiB: 3072 },
+      browser: { ceilingMiB: 10240, estimateMiB: 5632 },
+      build: { ceilingMiB: 4096, estimateMiB: 3072 },
+      light: { ceilingMiB: 2048, estimateMiB: 512 },
+      suite: { ceilingMiB: 8192, estimateMiB: 4096 },
+    },
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'complex',
+    category: 'Developer',
+    title: 'Heavy job classes',
+    details:
+      'The estimate is what admission reserves for a job of the class until the job uses it. The ceiling is the memory limit of the job’s slice: the kernel kills a job that grows past it.',
+    description:
+      'Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'class', 'memory', 'estimate', 'ceiling', 'admission'],
+  }),
+  'developer.heavyJobMemoryReserveMiB': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(65536)),
+    default: 2048,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job memory reserve',
+    description:
+      'MiB of available memory that heavy-job admission leaves free for the desktop, the app and work outside the wrapper.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'memory', 'reserve', 'admission'],
+  }),
+  'developer.heavyJobMemoryPressureLimit': defineSetting({
+    schema: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
+    default: 10,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job memory pressure limit',
+    details:
+      'Memory pressure is the share of the last ten seconds in which some task waited for memory (`/proc/pressure/memory`, `some avg10`). It stays near zero until the machine reclaims or swaps.',
+    description:
+      'Percent of memory pressure at or above which heavy-job admission starts no further job while one runs.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'memory', 'pressure', 'psi', 'admission'],
+  }),
+  'developer.heavyJobStopGraceSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    // Long enough for a test runner to shut its workers down after SIGTERM.
+    default: 10,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job stop grace',
+    description:
+      'Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'stop', 'cancel', 'grace', 'sigterm', 'sigkill'],
+  }),
+  'developer.heavyJobCpuLoadLimit': defineSetting({
+    schema: v.pipe(v.number(), v.minValue(0.1), v.maxValue(16)),
+    default: 1,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job CPU load limit',
+    details:
+      'The one-minute load average divided by the number of cores: 1 means every core has a runnable task. CPU pressure’s `some` share stays high on an idle desktop and its `full` share reads zero for the whole machine, so admission counts runnable tasks.',
+    description:
+      'Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'cpu', 'load', 'cores', 'admission'],
   }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.

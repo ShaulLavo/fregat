@@ -2,44 +2,67 @@ import { dlopen, FFIType } from 'bun:ffi'
 import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
+const LOCK_SH = 1
 const LOCK_EX = 2
 const LOCK_NB = 4
 const libc = dlopen('libc.so.6', {
   flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 },
 })
 
+export type LockMode = 'shared' | 'exclusive'
+
 /**
- * An exclusive flock(2) on the file, or null when another process holds it. It is the
- * lock flock(1) takes, so scripts using either exclude each other. The descriptor is
- * close-on-exec: a job's children never inherit the lock, and it dies with this process.
+ * A flock(2) on the file, or null when a conflicting holder has it. It is the lock flock(1)
+ * takes, so scripts using either exclude each other. The descriptor is close-on-exec: a
+ * job's children never inherit the lock unless it is handed to them, and it dies with this
+ * process.
  */
-export function tryLock(file: string): number | null {
+export function tryLock(file: string, mode: LockMode = 'exclusive'): number | null {
   const fd = openSync(file, 'a')
-  if (libc.symbols.flock(fd, LOCK_EX | LOCK_NB) === 0) return fd
+  if (lockDescriptor(fd, mode)) return fd
   closeSync(fd)
   return null
+}
+
+/** Takes the lock on an open descriptor without waiting; false when another holder has it. */
+export function lockDescriptor(fd: number, mode: LockMode = 'exclusive') {
+  return libc.symbols.flock(fd, operation(mode) | LOCK_NB) === 0
+}
+
+/** Opens a file another process may remove at any moment; null when it is already gone. */
+export function openExisting(file: string): number | null {
+  return unlessMissing(() => openSync(file, 'r'))
+}
+
+/** The value, or null when the path does not exist (yet, or any more); other errors throw. */
+export function unlessMissing<T>(read: () => T): T | null {
+  try {
+    return read()
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw error
+  }
+}
+
+/** Blocks until the lock is free. Only for locks every holder keeps for milliseconds. */
+export function waitLock(file: string): number {
+  const fd = openSync(file, 'a')
+  libc.symbols.flock(fd, LOCK_EX)
+  return fd
 }
 
 export function unlock(fd: number) {
   closeSync(fd)
 }
 
-// Shared with tools that take the slot locks directly: holding all three keeps the machine quiet.
-export const DEFAULT_LOCK_DIR = '/work/tmp/wave-heavy'
-const MACHINE_SLOTS = [1, 2, 3] as const
+function operation(mode: LockMode) {
+  return mode === 'shared' ? LOCK_SH : LOCK_EX
+}
+
+// The wrapper's state lives beside the legacy slot locks other tools still take directly.
+export const DEFAULT_STATE_DIR = '/work/tmp/wave-heavy'
 const POLL_MS = 5_000
 const WAIT_NOTICE_MS = 60_000
-
-type Slot = { readonly slot: number; readonly name: string }
-
-/**
- * The lock files a host's jobs queue on: this machine's three slots, which other tools also take
- * directly, or the Pi's one. A Pi job takes no machine slot; its slot is recorded as 0.
- */
-function slotsFor(host: string): readonly Slot[] {
-  if (host === 'pi') return [{ slot: 0, name: 'pi' }]
-  return MACHINE_SLOTS.map((slot) => ({ slot, name: `slot${slot}` }))
-}
 
 // Holder lines are advisory; a missing or unreadable one must not stop a job from waiting.
 function holderLine(file: string) {
@@ -50,23 +73,20 @@ function holderLine(file: string) {
   }
 }
 
-function holders(lockDir: string, slots: readonly Slot[]) {
-  return slots.map(({ name }) => holderLine(path.join(lockDir, `${name}.holder`))).join(';')
-}
-
-export async function acquireSlot(lockDir: string, host: string, pollMs = POLL_MS) {
-  mkdirSync(lockDir, { recursive: true })
-  const slots = slotsFor(host)
-  const busy = host === 'pi' ? 'the Pi slot is busy' : `all ${slots.length} slots busy`
+/**
+ * The Pi lane's one lock: a `--host pi` job, or a lane sync, waits for it. Pi jobs run on the
+ * Pi under its own ceiling, so they take no part in this machine's admission or slot locks.
+ */
+export async function acquirePiLane(stateDir: string, pollMs = POLL_MS) {
+  mkdirSync(stateDir, { recursive: true })
+  const holder = path.join(stateDir, 'pi.holder')
   const started = Date.now()
   let nextNotice = 0
   for (;;) {
-    for (const { slot, name } of slots) {
-      const fd = tryLock(path.join(lockDir, `${name}.lock`))
-      if (fd !== null) return { fd, slot, holder: path.join(lockDir, `${name}.holder`) }
-    }
+    const fd = tryLock(path.join(stateDir, 'pi.lock'))
+    if (fd !== null) return { fd, holder }
     if (Date.now() - started >= nextNotice) {
-      console.error(`[wave-heavy] ${busy}, waiting: ${holders(lockDir, slots)}`)
+      console.error(`[wave-heavy] the Pi lane is busy, waiting: ${holderLine(holder)}`)
       nextNotice += WAIT_NOTICE_MS
     }
     await Bun.sleep(pollMs)

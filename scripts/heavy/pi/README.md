@@ -47,7 +47,8 @@ bun scripts/heavy/pi/run.ts large-file -- bun scripts/large-file/bench.ts \
 ```
 
 Setup, sync, run and the wrapper's `--host pi` all take one lock, `pi.lock` beside the machine
-slots in `/work/tmp/wave-heavy` (`--lock-dir`), before they reach the Pi: a sync never replaces
+slots in `/work/tmp/wave-heavy` (`--lock-dir` for these tools, `--state-dir` for the wrapper),
+before they reach the Pi: a sync never replaces
 the checkout under a running job, and two jobs never share the Pi. Each refuses a checkout whose
 history lacks Fregat's first commit before it touches the Pi.
 
@@ -92,7 +93,8 @@ bun /work/platform-production/heavy/current/run.js --host pi large-file -- \
   bun scripts/large-file/bench.ts --web-root /home/pi/fregat-lane/web --sizes 1,10
 ```
 
-`--host pi` takes `pi.lock` (recorded as slot 0), never a machine slot, and holds it until its
+`--host pi` takes `pi.lock` and stays out of this machine's admission queue and slot locks, and
+holds it until its
 launcher exits, which is after the Pi confirms the job stopped. The launcher syncs the caller's
 checkout, runs the command from the same directory inside the lane slice under the lease above,
 copies the run directory to `/work/tmp/fregat-evidence/`, and hands the slice's totals to the

@@ -73,10 +73,12 @@ test.skipIf(!userScopes || !checkoutClean)(
     expect(readlinkSync(path.join(root, 'current'))).toBe(head)
     expect(readdirSync(path.join(root, head)).toSorted()).toEqual([
       'commit',
+      'nested-scope.sh',
       'pi',
       'report.js',
       'run.js',
       'scope.sh',
+      'status.js',
     ])
     expect(readdirSync(path.join(root, head, 'pi'))).toEqual(['launch.js'])
 
@@ -90,7 +92,7 @@ test.skipIf(!userScopes || !checkoutClean)(
       'bun',
       [
         runJs,
-        '--lock-dir',
+        '--state-dir',
         path.join(work, 'locks'),
         '--log-dir',
         path.join(work, 'logs'),

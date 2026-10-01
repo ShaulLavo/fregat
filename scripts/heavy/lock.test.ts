@@ -1,10 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 
-import { acquireSlot, tryLock, unlock } from './lock'
+import { legacyHold } from './admission'
+import { acquirePiLane, tryLock, unlock } from './lock'
 
+const SLOTS = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const roots: string[] = []
 const held: number[] = []
 
@@ -13,14 +15,15 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true })
 })
 
-function lockDir() {
+function stateDir() {
   const dir = mkdtempSync(path.join(tmpdir(), 'heavy-lock-'))
   roots.push(dir)
+  for (const slot of SLOTS) writeFileSync(path.join(dir, slot), '')
   return dir
 }
 
 function holdMachineSlots(dir: string) {
-  for (const slot of [1, 2, 3]) held.push(tryLock(path.join(dir, `slot${slot}.lock`))!)
+  for (const slot of SLOTS) held.push(tryLock(path.join(dir, slot))!)
 }
 
 const pending = Symbol('pending')
@@ -28,37 +31,33 @@ const settledWithin = (promise: Promise<unknown>, ms: number) =>
   Promise.race([promise, Bun.sleep(ms).then(() => pending)])
 
 test('a Pi job starts while every machine slot is held', async () => {
-  const dir = lockDir()
+  const dir = stateDir()
   holdMachineSlots(dir)
-  const acquired = await settledWithin(acquireSlot(dir, 'pi', 20), 500)
-  expect(acquired).toMatchObject({ slot: 0, holder: path.join(dir, 'pi.holder') })
+  const acquired = await settledWithin(acquirePiLane(dir, 20), 500)
+  expect(acquired).toMatchObject({ holder: path.join(dir, 'pi.holder') })
   held.push((acquired as { fd: number }).fd)
 })
 
 test('a second Pi job waits for the first', async () => {
-  const dir = lockDir()
-  const first = await acquireSlot(dir, 'pi', 20)
-  const second = acquireSlot(dir, 'pi', 20)
+  const dir = stateDir()
+  const first = await acquirePiLane(dir, 20)
+  const second = acquirePiLane(dir, 20)
   expect(await settledWithin(second, 300)).toBe(pending)
   unlock(first.fd)
-  const next = (await second) as { fd: number; slot: number }
-  held.push(next.fd)
-  expect(next.slot).toBe(0)
+  held.push((await second).fd)
 })
 
-test('a held Pi slot leaves the machine slots free', async () => {
-  const dir = lockDir()
-  held.push((await acquireSlot(dir, 'pi', 20)).fd)
-  const local = await acquireSlot(dir, 'local', 20)
-  held.push(local.fd)
-  expect(local.slot).toBe(1)
+test('a held Pi lane leaves this machine free for local jobs', async () => {
+  const dir = stateDir()
+  held.push((await acquirePiLane(dir, 20)).fd)
+  expect(legacyHold(dir, SLOTS)).toBeNull()
 })
 
-test('keeps waiting when a holder line cannot be read', async () => {
-  const dir = lockDir()
-  holdMachineSlots(dir)
-  mkdirSync(path.join(dir, 'slot1.holder'))
-  const queued = acquireSlot(dir, 'local', 20)
+test('keeps waiting when the Pi holder line cannot be read', async () => {
+  const dir = stateDir()
+  const first = await acquirePiLane(dir, 20)
+  mkdirSync(path.join(dir, 'pi.holder'))
+  const queued = acquirePiLane(dir, 20)
   const outcome = await Promise.race([
     queued.then(
       () => 'acquired',
@@ -67,6 +66,6 @@ test('keeps waiting when a holder line cannot be read', async () => {
     Bun.sleep(300).then(() => 'waiting'),
   ])
   expect(outcome).toBe('waiting')
-  unlock(held.shift()!)
+  unlock(first.fd)
   held.push((await queued).fd)
 })

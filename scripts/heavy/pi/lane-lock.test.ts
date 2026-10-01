@@ -63,7 +63,7 @@ test.each([
     unlock(held)
     const exit = await child.exited
     const stderr = await new Response(child.stderr).text()
-    expect(stderr).toContain('the Pi slot is busy')
+    expect(stderr).toContain('the Pi lane is busy')
     expect(exit).not.toBe(0)
   },
   30_000,
