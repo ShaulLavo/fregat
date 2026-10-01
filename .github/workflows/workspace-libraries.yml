@@ -15,7 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - name: Install browsers
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-chromium-headless-shell-firefox-webkit-${{ hashFiles('bun.lock') }}
+      - name: Install Editor browsers
+        timeout-minutes: 5
         run: editor/packages/editor/node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
       - name: Check generated language catalog
         run: bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check
@@ -35,7 +41,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock') }}
       - name: Install Chromium
+        timeout-minutes: 5
         run: ghostty-webgpu/node_modules/.bin/playwright install --with-deps chromium
       - name: Verify terminal library and browser package
         run: bun run --cwd ghostty-webgpu verify

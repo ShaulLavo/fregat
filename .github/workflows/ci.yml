@@ -305,13 +305,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock') }}
 
       # The workspace's own playwright binary, never `bunx playwright` — bunx
       # resolves a fresh copy from npm and downloads the browser revision *that*
       # version wants, leaving the pinned playwright pointing at a build that
       # was never fetched.
       - name: Install Chromium
+        timeout-minutes: 5
         run: apps/web/node_modules/.bin/playwright install --with-deps chromium
 
       - name: Agent browser doctor

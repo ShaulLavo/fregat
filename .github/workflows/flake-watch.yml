@@ -69,10 +69,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock') }}
 
       - name: Install Chromium
         if: ${{ matrix.suite.browser }}
+        timeout-minutes: 5
         run: apps/web/node_modules/.bin/playwright install --with-deps chromium
 
       # Every run is kept, pass or fail; the summary step turns them into counts.
