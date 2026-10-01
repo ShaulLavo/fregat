@@ -16,7 +16,8 @@ import { recordRecentMutationOptions } from '@/features/workspace/utils/record-r
 import { openWorkspaceRootMutationOptions } from '@/features/workspace/utils/open-root-mutation'
 import {
   activateWorkspaceRoot,
-  isActiveWorkspaceRoot,
+  holdsActiveProject,
+  releaseActiveProject,
   useActiveProjectStore,
 } from '@/features/workspace/state/active-project'
 
@@ -43,16 +44,12 @@ export async function openWorkspaceRootForOwner(
   const reservation = workspaceEdits?.acquireRootSwitchReservation() ?? null
   if (workspaceEdits && !reservation) return 'failed'
   const startedAt = performance.now()
-  const previousRoot = useActiveProjectStore.getState().workspaceRoot
-  activateWorkspaceRoot(workspaceRoot)
+  const previous = useActiveProjectStore.getState()
+  let activation = activateWorkspaceRoot(workspaceRoot)
   // Chat follows the active project at once; an open that never lands must hand it back.
-  const release = () => {
-    const claimed = !isActiveWorkspaceRoot(workspaceRoot)
-    if (!claimed) activateWorkspaceRoot(previousRoot)
-    return claimed
-  }
+  // A later open of this same root holds a newer activation; handing back would strand it.
   const abandon = (endedBy: string) => {
-    const claimed = release()
+    const claimed = !releaseActiveProject(activation, previous)
     log.info({
       action: 'workspace.root_open_superseded',
       area: 'workspace',
@@ -73,10 +70,11 @@ export async function openWorkspaceRootForOwner(
     // A later request already claimed the app; landing now would drag it back.
     if (activity.aborted) return abandon('aborted')
     if (options.isCurrent?.() === false) return abandon('not-current')
-    if (!isActiveWorkspaceRoot(workspaceRoot)) return abandon('claimed')
+    if (!holdsActiveProject(activation)) return abandon('claimed')
     confirmedEnvironmentId(origin)
     const entry = result.entry
-    activateWorkspaceRoot(entry.path)
+    // Still this open's activation: a switch that throws must hand the project back.
+    activation = activateWorkspaceRoot(entry.path)
     const alreadyOpen = workspaceStore.getState().rootFolder?.path === entry.path
     if (alreadyOpen) {
       workspaceStore.setState({
@@ -98,7 +96,7 @@ export async function openWorkspaceRootForOwner(
   } catch (error) {
     if (activity.aborted) return abandon('aborted')
     if (options.isCurrent?.() === false) return abandon('not-current')
-    release()
+    releaseActiveProject(activation, previous)
     log.warn({ action: 'workspace.root_open_rejected', area: 'workspace', path: workspaceRoot })
     reportError(toClientError(error))
     return 'failed'

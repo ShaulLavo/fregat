@@ -31,6 +31,7 @@ import type {
   DiffPanePresentation,
   DiffScrollPosition,
 } from '@/features/editor/state/tab-presentation'
+import { diffSyntaxState } from '@/features/editor/utils/diff-syntax-state'
 
 /**
  * One side of a diff: a real read-only `Editor` holding a synthetic buffer of the projected rows,
@@ -86,7 +87,7 @@ export function DiffPane({
     if (!presentation) return
     return bindDiffPlugin(presentation, plugin)
   }, [plugin, presentation])
-  const { rows, text, tokensRevision } = useDiffRows(
+  const { rows, syntaxReady, text, tokensRevision } = useDiffRows(
     plugin,
     file,
     side,
@@ -209,6 +210,7 @@ export function DiffPane({
   return (
     <div
       className={`editor-diff-pane editor-diff-pane-${side} flex h-full min-h-0 w-full min-w-0 overflow-hidden`}
+      data-syntax={diffSyntaxState(highlight, syntaxReady)}
       ref={file ? focusTarget.ref : undefined}
       onFocusCapture={onFocus ? () => onFocus(side) : undefined}
     >

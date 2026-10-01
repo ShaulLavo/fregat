@@ -1,0 +1,74 @@
+# Plan 282: Fast paired input-latency check
+
+## Status and authorization
+
+- Status: APPROVED 2026-10-01 by the owner, who asked for a faster instrument with the same
+  results after Plan 099 unit 0's calibration ran all night.
+- Replaces the absolute-threshold calibration as the input-latency gate for Plan 099 units 2–7
+  (still gated) and any other change that can slow typing.
+- Starting evidence: PR #224 records the partial calibration (5 of 10 configurations accepted,
+  `tree-sitter-shiki` holdout failed) and keeps its instrument and harness in
+  `editor/examples/stress/`.
+
+## Outcome
+
+One command answers "did this change make typing slower?" in about 10–15 minutes on the default
+matrix, and under 45 minutes on the full matrix. It gives the same verdicts as the old calibration
+on the configurations that calibration accepted: unchanged candidates pass, and a deliberate 20 ms
+input delay fails. It does not need exclusive CPUs or a quiet machine to stay correct.
+
+## Why the old one was slow and fragile
+
+- It froze absolute thresholds per configuration: 3 controls, a holdout and a delayed negative
+  before any candidate could be judged, about 30 minutes per configuration, 10 configurations.
+- Absolute thresholds move with machine state. The `tree-sitter-shiki` holdout failed on ~3 ms
+  gaps from render work and GC between undo inputs, and the matrix was restarted six times.
+
+## Design
+
+1. **Paired and interleaved.** Load baseline and candidate package sets into the same browser
+   session and alternate them per repetition (A B A B …, order randomized per pair). The verdict
+   uses paired differences (candidate − baseline) per measure group, so load that hits both sides
+   cancels out.
+2. **Verdict.** For each blocking group, a regression is a median paired difference above the
+   group's declared budget (reuse the 108 blocking / 36 advisory groups and budgets from the
+   current instrument) with a bootstrap confidence interval that excludes zero. Report every
+   group's difference and interval; advisory groups never fail the run.
+3. **Sensitivity once per instrument version.** A self-check runs the candidate with the injected
+   20 ms delay on one configuration and must fail; it reruns only when the instrument changes, and
+   its result is stored with the instrument hash.
+4. **Matrix.** Default: Platform's real composition plus the configurations the change touches
+   (declared by the caller or derived from changed packages). Full: all 10 configurations, for
+   releases and for validating this instrument.
+5. **Fixtures.** Ordinary code, 500,000 short lines and the one-megabyte line, capped at Platform's
+   supported tier (analysis pauses above `editor.largeFile.analysisLimitMiCodeUnits`). Larger
+   fixtures move to an opt-in stress mode.
+6. **Machine.** Runs through `/work/tmp/wave-heavy/run.sh` like any heavy command. CPU pinning is
+   optional, not required for a correct verdict.
+
+## Steps
+
+1. Build the paired runner on the existing input-latency suite (`run.mjs --suite input-latency`,
+   `input-compare.mjs`), reusing scenarios, measure groups and budgets. One command:
+   `bun run bench:input:paired --baseline <packages> --candidate <packages> [--full]`.
+2. **Validate against the old results** on native, disabled, tree-sitter, shiki and minimap: the
+   unchanged candidate passes, the 20 ms delayed candidate fails in every group the old negative
+   failed, on the same package sets PR #224 used.
+3. **Validate robustness:** repeat step 2 with a background CPU load on the same cores; verdicts must
+   not change.
+4. **Measure the budget:** report wall time for the default and full matrices.
+5. Point Plan 099's unit 2–7 gates and the stress README at the new command; delete the
+   absolute-calibration commands and docs that it replaces.
+
+## How to run it
+
+One worker (Opus or Sol, high) in its own worktree off Fregat main, one independent Sol reviewer.
+Validation runs are measurements: run them when no other heavy work is on the machine.
+
+## Done when
+
+- The paired command exists, with its sensitivity self-check stored per instrument hash.
+- Steps 2 and 3 reproduce the old verdicts on all five accepted configurations, with and without
+  background load.
+- Default matrix ≤ 15 minutes and full matrix ≤ 45 minutes on this machine, measured.
+- Plan 099 and the stress README use it, and the replaced calibration commands are gone.

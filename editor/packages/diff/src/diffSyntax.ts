@@ -1,14 +1,11 @@
-import {
-  createDocumentTextSnapshot,
-  type DocumentTextSnapshot,
-  createPieceTableSnapshot,
-} from '@singapore-editor/core/document'
+import type { DocumentTextSnapshot } from '@singapore-editor/core/document'
 import type {
   EditorHighlighterProvider,
   EditorHighlighterSession,
 } from '@singapore-editor/core/extensions'
 import {
   createEmptySyntaxResult,
+  createSnippetDocument,
   createSyntaxLanguageConfiguration,
   createSyntaxSnapshotTag,
   type EditorSyntaxProvider,
@@ -26,6 +23,7 @@ import type { DiffFile, DiffRenderRow, DiffSyntaxBackend } from './types'
 
 type DiffSyntaxSide = 'old' | 'new' | 'stacked'
 type DiffSyntaxSourceSide = 'old' | 'new'
+type DiffSnippetLines = Parameters<typeof createSnippetDocument>[1]
 
 let nextSyntaxControllerId = 0
 
@@ -367,7 +365,7 @@ async function loadSyntaxSources(
     return null
   }
   const sources: PreparedDiffSyntaxSource[] = []
-  for (const document of syntaxDocumentsForFile(file, side)) {
+  for (const document of syntaxDocumentsForFile(file, side, service.lines)) {
     if (!isCurrent()) return stale()
 
     const session = await service.createSession(document)
@@ -462,10 +460,13 @@ type DiffSyntaxDocument = DiffSyntaxSource & {
   readonly documentId: string
   readonly languageId: string | null
   readonly request: EditorSyntaxServiceRequest
+  readonly snippet: ReturnType<typeof createSnippetDocument>
   readonly textSnapshot: DocumentTextSnapshot
 }
 
 type DiffSyntaxService = {
+  /** The line model its engine parses with; tokens come back as offsets into the source text. */
+  readonly lines: DiffSnippetLines
   createSession(document: DiffSyntaxDocument): Promise<DiffSyntaxServiceSession | null>
 }
 
@@ -486,6 +487,7 @@ function highlighterDiffSyntaxService(
   if (!provider) return null
 
   return {
+    lines: 'as-submitted',
     createSession: async (document) => highlighterDiffSyntaxSession(provider, document),
   }
 }
@@ -506,6 +508,7 @@ function treeSitterDiffSyntaxService(
   if (!provider) return null
 
   return {
+    lines: 'as-document',
     createSession: async (document) => treeSitterDiffSyntaxSession(provider, document),
   }
 }
@@ -519,7 +522,10 @@ function treeSitterDiffSyntaxSession(
 
   return {
     dispose: () => session.dispose(),
-    refresh: () => session.refresh(document.textSnapshot),
+    refresh: async () => {
+      const result = await session.refresh(document.textSnapshot)
+      return { ...result, tokens: document.snippet.submittedTokens(result.tokens) }
+    },
   }
 }
 
@@ -584,8 +590,9 @@ function syntaxResultFromTokens(
 function syntaxDocumentsForFile(
   file: DiffFile,
   side: DiffSyntaxSide,
+  lines: DiffSnippetLines,
 ): readonly DiffSyntaxDocument[] {
-  return syntaxSourcesForSide(file, side).map((source) => syntaxDocument(file, source))
+  return syntaxSourcesForSide(file, side).map((source) => syntaxDocument(file, source, lines))
 }
 
 function syntaxSourcesForSide(file: DiffFile, side: DiffSyntaxSide): readonly DiffSyntaxSource[] {
@@ -605,9 +612,13 @@ function syntaxSource(lines: readonly string[], side: DiffSyntaxSourceSide): Dif
   }
 }
 
-function syntaxDocument(file: DiffFile, source: DiffSyntaxSource): DiffSyntaxDocument {
-  const snapshot = createPieceTableSnapshot(source.text)
-  const textSnapshot = createDocumentTextSnapshot(snapshot, source.text)
+function syntaxDocument(
+  file: DiffFile,
+  source: DiffSyntaxSource,
+  lines: DiffSnippetLines,
+): DiffSyntaxDocument {
+  const snippet = createSnippetDocument(source.text, lines)
+  const { snapshot, textSnapshot } = snippet
   const documentId = `${file.path}#diff-${source.side}`
   const languageId = diffSyntaxLanguageId(file)
   const request: EditorSyntaxServiceRequest = {
@@ -627,7 +638,7 @@ function syntaxDocument(file: DiffFile, source: DiffSyntaxSource): DiffSyntaxDoc
     }),
     textSnapshot,
   }
-  return { ...source, documentId, languageId, request, textSnapshot }
+  return { ...source, documentId, languageId, request, snippet, textSnapshot }
 }
 
 function diffSyntaxLanguageId(file: DiffFile): string | null {

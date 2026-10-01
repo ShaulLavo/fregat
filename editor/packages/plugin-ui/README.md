@@ -1,27 +1,52 @@
 # @singapore-editor/plugin-ui
 
-The floating surfaces editor plugins share: an anchored popup, a hover tooltip, and the Markdown
-renderer the tooltip paints with. Language servers, diff hovers and character warnings all show the
-same tooltip, so it lives here rather than in any one of them.
+the hover and popups that editor plugins share. language servers, diff hovers and character warnings all answer into one hover tooltip, rendered from markdown, so the editor shows one surface per position
 
-```ts
-import { createTooltipController, HOVER_REQUEST_DEBOUNCE_MS } from '@singapore-editor/plugin-ui'
+## try it
 
-const tooltip = createTooltipController({
-  document,
-  themeSource: editorElement,
-  reentryElement: editorElement,
-  classNamespace: 'my-plugin',
-})
-
-tooltip.show({
-  anchor: rect,
-  hoverText: '**Ambiguous character** U+2013',
-  notes: [{ label: 'warning', color: 'var(--editor-warning)', text: 'Looks like a hyphen' }],
-  actions: [{ label: 'Adjust settings', run: openSettings }],
-  theme,
-})
+```sh
+npm install @singapore-editor/core @singapore-editor/plugin-ui
 ```
 
-Every surface placed by `createAnchoredSurface` carries `data-editor-popup`, so a host styles all of
-them with one selector instead of one class per plugin.
+a plugin adds to the hover by registering a participant. this one shows the word under the pointer
+
+```ts
+import type { EditorPlugin } from '@singapore-editor/core/extensions'
+import { EDITOR_HOVER_PARTICIPANT } from '@singapore-editor/plugin-ui/hover-participant'
+
+export const wordHover: EditorPlugin = {
+  name: 'word-hover',
+  activate: (context) =>
+    context.registerViewContribution({
+      createContribution: (view) => {
+        const registration = view.registerProvider(
+          EDITOR_HOVER_PARTICIPANT,
+          { language: '*' },
+          {
+            computeSync: ({ anchor, snapshot }) => {
+              const word = snapshot.textSnapshot.readRange(anchor.range.start, anchor.range.end)
+              return [{ ordinal: 0, range: anchor.range, markdown: `**${word}**` }]
+            },
+          },
+        )
+        return { update: () => undefined, dispose: () => registration.dispose() }
+      },
+    }),
+}
+```
+
+pass it in `plugins` when you create the editor. the hover itself loads the first time a participant registers, so importing the token costs little. slow answers go in `computeAsync`, which can emit parts as they arrive
+
+## other pieces
+
+- `createTooltipController` draws the same tooltip anywhere you have a `DOMRect` to anchor it to
+- `createAnchoredSurface` places any popup next to an anchor. every surface it places carries `data-editor-popup`, so one selector styles them all
+- `renderTooltipMarkdown` is the markdown renderer the tooltip uses
+- `hoverTargetRange` and `identifierRangeAtOffset` find the text a hover is about
+
+each has its own subpath (`/tooltip`, `/anchored-surface`, `/markdown-tooltip`, `/offset-range`) as well as the root export
+
+## more
+
+- [core](../editor/README.md), for the plugin api
+- [lsp-plugin](../lsp-plugin/README.md), the biggest participant

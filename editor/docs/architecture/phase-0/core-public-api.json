@@ -3262,6 +3262,12 @@
         },
         {
           "kind": "unknown",
+          "name": "hasByteOrderMark",
+          "source": "@singapore-editor/textbuffer",
+          "via": "packages/editor/src/public/document.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "insertIntoPieceTable",
           "source": "@singapore-editor/textbuffer",
           "via": "packages/editor/src/public/document.ts"
@@ -3312,6 +3318,12 @@
           "kind": "unknown",
           "name": "nextWordOffset",
           "source": "packages/editor/src/textRanges.ts",
+          "via": "packages/editor/src/public/document.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "normalizeLineEndings",
+          "source": "@singapore-editor/textbuffer",
           "via": "packages/editor/src/public/document.ts"
         },
         {

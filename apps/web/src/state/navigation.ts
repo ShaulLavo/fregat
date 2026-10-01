@@ -32,7 +32,7 @@ import { gitKeys } from '@/lib/query-keys'
 import { emptySearchBuffer, searchHistoryQuerySnapshot } from '@/features/search/state/buffer-state'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import {
-  activateWorkspaceRoot,
+  restoreActiveProject,
   useActiveProjectStore,
 } from '@/features/workspace/state/active-project'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -763,9 +763,9 @@ export function createNavigation(
       if (current?.editor.workspaceStore !== owner || owner.getState().rootFolder?.path !== path)
         return
       coordinator.invalidateWorkspace(owner, path, reason, () => {
-        const activeRoot = useActiveProjectStore.getState().workspaceRoot
+        const active = useActiveProjectStore.getState()
         editorActions(current.editor).clearRootFolder()
-        if (activeRoot !== path) activateWorkspaceRoot(activeRoot)
+        if (active.workspaceRoot !== path) restoreActiveProject(active)
       })
     },
     openFileAtRef({

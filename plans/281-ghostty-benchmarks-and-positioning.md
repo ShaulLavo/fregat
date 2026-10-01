@@ -5,6 +5,10 @@
 - Status: APPROVED 2026-10-01. Carries the unfinished parts 3 and 4 of the retired ghostty-webgpu
   Plan 017, whose parts 1 and 2 shipped as #219 (xterm facade removed, 0.2.0) and #218 (native
   history reads).
+- Owner, 2026-10-01: publish the full report in `docs/benchmarks.md`, losses included, but keep
+  the numbers out of the package's main README. Section 2 states the case for Ghostty without
+  benchmark numbers; revisit putting numbers in the README only if Plan 283 makes ghostty-webgpu
+  beat xterm.js on the measures where it now loses.
 - Part 1 is in progress: a comparison runner is being built, with real measurements on the owner's
   MacBook (Apple M1) over mesh host `mac`, only on AC power.
 
