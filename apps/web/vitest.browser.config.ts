@@ -85,6 +85,7 @@ export default defineConfig({
     api: { host: '127.0.0.1', port: Number(browserTestPort) },
     browser: {
       commands: {
+        delayRequest,
         diffMouseWheel,
         proofContextClick,
         proofKeyDown,
@@ -136,6 +137,22 @@ type ProofKeyCommandContext = {
 
 type ProofKeyPressInput = {
   readonly key: string
+}
+
+type DelayRequestContext = {
+  readonly page: {
+    readonly route: (
+      url: (url: URL) => boolean,
+      handler: (route: { readonly continue: () => Promise<void> }) => Promise<void>,
+      options: { readonly times: number },
+    ) => Promise<void>
+  }
+}
+
+type DelayRequestInput = {
+  readonly ms: number
+  /** Path and query of the one request to hold. */
+  readonly path: string
 }
 
 type ProofContextClickInput = {
@@ -210,6 +227,17 @@ type ProofMouseDragStep =
       readonly kind: 'pause'
       readonly ms?: number
     }
+
+async function delayRequest(context: DelayRequestContext, input: DelayRequestInput) {
+  await context.page.route(
+    (url) => `${url.pathname}${url.search}` === input.path,
+    async (route) => {
+      await delay(input.ms)
+      await route.continue()
+    },
+    { times: 1 },
+  )
+}
 
 async function proofKeyPress(context: ProofKeyCommandContext, input: ProofKeyPressInput) {
   await context.page.keyboard.press(input.key)

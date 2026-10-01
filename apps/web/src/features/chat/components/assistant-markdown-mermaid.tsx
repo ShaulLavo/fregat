@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useDiagramTheme } from '@/features/chat/hooks/use-diagram-theme'
 import type { MermaidRenderer } from '@/features/chat/state/mermaid'
 import { CopyButton } from '@/components/copy-button'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { mountDiagram } from '@/features/chat/state/diagram-display'
 
 type DiagramState = {
@@ -23,27 +24,27 @@ export function AssistantMarkdownMermaid({
   readonly mermaid: MermaidRenderer
 }) {
   const theme = useDiagramTheme()
+  const fontWaitMs = useSettingValue('chat.diagramFontWaitMs')
   const diagram = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<DiagramState | null>(null)
   const current = state?.chart === chart ? state : null
 
   useEffect(() => {
-    let cancelled = false
-    mermaid.render(chart, theme).then(
+    const controller = new AbortController()
+    const { signal } = controller
+    mermaid.render(chart, theme, { fontWaitMs, signal }).then(
       (svg) => {
-        if (!cancelled) setState({ chart, error: null, svg })
+        if (!signal.aborted) setState({ chart, error: null, svg })
       },
       (error: unknown) => {
-        if (cancelled) return
+        if (signal.aborted) return
 
         const message = error instanceof Error ? error.message : String(error)
         setState({ chart, error: message, svg: null })
       },
     )
-    return () => {
-      cancelled = true
-    }
-  }, [chart, theme, mermaid])
+    return () => controller.abort()
+  }, [chart, theme, mermaid, fontWaitMs])
 
   useLayoutEffect(() => {
     if (diagram.current && current?.svg) mountDiagram(diagram.current, current.svg)

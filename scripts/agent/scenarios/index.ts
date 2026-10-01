@@ -90,6 +90,7 @@ import { stoppedTurnReasons } from './stopped-turn-reasons'
 import { streamAmbiguousTail } from './stream-ambiguous-tail'
 import { streamCodeColour } from './stream-code-colour'
 import { chatMermaid } from './chat-mermaid'
+import { chatMermaidFirstPaint } from './chat-mermaid-first-paint'
 import { editorMermaidStyle, editorStyleBaseline } from './editor-mermaid-style'
 import { claudeApprovalRules, codexApprovalRules } from './approval-rules'
 import { checkpointRewind } from './checkpoint-rewind'
@@ -466,6 +467,7 @@ export const scenarios: readonly Scenario[] = [
   streamAmbiguousTail,
   streamCodeColour,
   chatMermaid,
+  chatMermaidFirstPaint,
   editorMermaidStyle,
   editorStyleBaseline,
   claudeApprovalRules,
