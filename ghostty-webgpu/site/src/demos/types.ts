@@ -8,9 +8,10 @@ export interface DemoContext {
   /** Show a short live figure under the window, or clear it with an empty string. */
   stat(text: string): void
   write(data: string): void
+  writeBytes(data: Uint8Array): void
 }
 
-interface Demo {
+export interface Demo {
   readonly id: string
   readonly label: string
   readonly caption: string
