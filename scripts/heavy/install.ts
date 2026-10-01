@@ -19,7 +19,8 @@ const USAGE =
   'Usage: bun scripts/heavy/install.ts [--commit <rev>] [--source <checkout>] [--root <dir>]'
 // run.sh and AGENTS.md name `<root>/current/run.js`, so the root is fixed rather than a setting.
 const INSTALL_ROOT = path.join(productionRoot, 'heavy')
-const ENTRIES = ['run.ts', 'report.ts']
+const ENTRIES = ['run.ts', 'report.ts', 'status.ts']
+const SHELL_SCRIPTS = ['scope.sh', 'nested-scope.sh']
 
 try {
   install()
@@ -80,8 +81,10 @@ function build(source: string, root: string, commit: string) {
     rmSync(staging, { force: true, recursive: true })
     throw scriptErrors.HEAVY_INSTALL_BUILD({ detail: result.stderr.toString().trim(), source })
   }
-  copyFileSync(path.join(heavy, 'scope.sh'), path.join(staging, 'scope.sh'))
-  chmodSync(path.join(staging, 'scope.sh'), 0o755)
+  for (const script of SHELL_SCRIPTS) {
+    copyFileSync(path.join(heavy, script), path.join(staging, script))
+    chmodSync(path.join(staging, script), 0o755)
+  }
   writeFileSync(path.join(staging, 'commit'), `${commit}\n`)
   renameSync(staging, path.join(root, commit))
 }

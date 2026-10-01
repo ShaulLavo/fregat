@@ -1,63 +1,22 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import type { HeavyJobRecord } from './record'
+import {
+  alive,
+  type Box,
+  heavy,
+  MiB,
+  records,
+  removeSandboxes,
+  sandbox,
+  start,
+  unitActive,
+  userScopes,
+} from './sandbox'
 
-const RUN = path.join(import.meta.dirname, 'run.ts')
-const MiB = 2 ** 20
-const userScopes = spawnSync('systemd-run', ['--user', '--scope', '-q', 'true']).status === 0
-const roots: string[] = []
-
-afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true })
-})
-
-function sandbox() {
-  const root = mkdtempSync(path.join(tmpdir(), 'heavy-run-'))
-  roots.push(root)
-  mkdirSync(path.join(root, 'locks'))
-  return { locks: path.join(root, 'locks'), logs: path.join(root, 'logs'), root }
-}
-
-type Box = ReturnType<typeof sandbox>
-
-type StartOptions = {
-  readonly detached?: boolean
-  readonly env?: NodeJS.ProcessEnv
-  readonly logDir?: boolean
-}
-
-function start(box: Box, label: string, command: readonly string[], options: StartOptions = {}) {
-  const logArgs = options.logDir === false ? [] : ['--log-dir', box.logs]
-  const child = spawn('bun', [RUN, '--lock-dir', box.locks, ...logArgs, label, '--', ...command], {
-    cwd: box.root,
-    detached: options.detached ?? false,
-    env: options.env ?? process.env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  let stderr = ''
-  let stdout = ''
-  child.stderr.on('data', (chunk) => (stderr += chunk))
-  child.stdout.on('data', (chunk) => (stdout += chunk))
-  const done = new Promise<{ code: number | null; stderr: string }>((resolve) =>
-    child.on('close', (code) => resolve({ code, stderr })),
-  )
-  return { child, done, stdout: () => stdout }
-}
-
-function heavy(box: Box, label: string, command: readonly string[]) {
-  return start(box, label, command).done
-}
-
-function records(box: Box): HeavyJobRecord[] {
-  return readdirSync(box.logs)
-    .filter((file) => file.endsWith('.jsonl'))
-    .flatMap((file) => readFileSync(path.join(box.logs, file), 'utf8').trim().split('\n'))
-    .map((line) => JSON.parse(line) as HeavyJobRecord)
-}
+afterEach(removeSandboxes)
 
 const allocate = (mib: number) =>
   ['bun', '-e', `const b = Buffer.alloc(${mib} * 2 ** 20, 1); console.log(b.length)`] as const
@@ -137,10 +96,10 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     expect(record).toMatchObject({ exitCode: 143, label: 'stopped' })
     expect(record?.wallMs).toBeLessThan(10_000)
     expect(record?.memoryPeakBytes).toBeGreaterThan(0)
-    expect(holders(box).every((line) => line === '')).toBe(true)
+    expect(runningEntries(box)).toEqual([])
   })
 
-  test('stops processes the command left running before it records and frees the slot', async () => {
+  test('stops processes the command left running before it records and leaves the running set', async () => {
     const box = sandbox()
     const job = start(box, 'forks', ['bash', '-c', 'sleep 30 & echo $!'])
     const result = await job.done
@@ -151,7 +110,7 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     expect(record).toMatchObject({ exitCode: 0, label: 'forks', leftoverProcesses: 1 })
     expect(record?.wallMs).toBeLessThan(10_000)
     expect(unitActive(record!.unit)).toBe(false)
-    expect(holders(box).every((line) => line === '')).toBe(true)
+    expect(runningEntries(box)).toEqual([])
   })
 
   test('counts the memory of a leftover process in the job', async () => {
@@ -188,74 +147,45 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
 
   test('a settings read failure is reported and the command exit status still wins', async () => {
     const box = sandbox()
-    const home = path.join(box.root, 'home')
-    mkdirSync(path.join(home, '.platform', 'settings.json'), { recursive: true })
-    const job = start(box, 'no-settings', ['true'], {
-      env: { ...process.env, HOME: home },
-      logDir: false,
-    })
-    const result = await job.done
+    mkdirSync(path.join(box.home, 'settings.json'))
+    const result = await heavy(box, 'no-settings', ['true'], { logDir: false })
     expect(result.code).toBe(0)
+    expect(result.stderr).toContain('using the default developer.heavyJobClasses')
     expect(result.stderr).toContain('record was not written')
   })
 
   test('waits while another process holds all three slot locks, then runs', async () => {
     const box = sandbox()
-    for (const slot of [1, 2, 3])
-      writeFileSync(path.join(box.locks, `slot${slot}.lock`), '', { flag: 'a' })
-    const hold = spawn(
-      'flock',
-      [
-        path.join(box.locks, 'slot1.lock'),
-        'flock',
-        path.join(box.locks, 'slot2.lock'),
-        'flock',
-        path.join(box.locks, 'slot3.lock'),
-        'sleep',
-        '2',
-      ],
-      { stdio: 'ignore' },
-    )
+    const slot = (n: number) => path.join(box.state, `slot${n}.lock`)
+    for (const n of [1, 2, 3]) writeFileSync(slot(n), '', { flag: 'a' })
+    const hold = spawn('flock', [slot(1), 'flock', slot(2), 'flock', slot(3), 'sleep', '2'], {
+      stdio: 'ignore',
+    })
     await new Promise((resolve) => setTimeout(resolve, 300))
     const result = await heavy(box, 'queued', ['true'])
     hold.kill()
     expect(result.code).toBe(0)
-    expect(result.stderr).toContain('all 3 slots busy')
-    const [record] = records(box)
-    expect(record?.queuedMs).toBeGreaterThanOrEqual(1_500)
-    expect(record?.slot).toBeGreaterThanOrEqual(1)
+    expect(result.stderr).toContain('slot1.lock is held exclusively')
+    expect(records(box)[0]?.queuedMs).toBeGreaterThanOrEqual(1_500)
   }, 20_000)
 
-  test('writes the holder line in the format status.sh reads, and clears it after', async () => {
+  test('status lists a running job with its class and estimate', async () => {
     const box = sandbox()
-    const job = start(box, 'holder', ['sleep', '1'])
-    await expect.poll(() => holders(box).some((line) => line.startsWith('holder '))).toBe(true)
-    const line = holders(box).find((entry) => entry.startsWith('holder '))
-    expect(line).toMatch(new RegExp(`^holder pid=\\d+ since=\\d\\d:\\d\\d:\\d\\d cwd=${box.root}$`))
+    const job = start(box, 'listed', ['bash', '-c', 'echo started; sleep 2'], { jobClass: 'light' })
+    await expect.poll(job.stdout, { timeout: 10_000 }).toContain('started')
+    const status = spawnSync('bun', [
+      path.join(import.meta.dirname, 'status.ts'),
+      '--state-dir',
+      box.state,
+    ])
+    expect(status.stdout.toString()).toMatch(
+      /running: 1\n {2}listed \(light, \d+ MiB\) \d+s pid=\d+/,
+    )
     await job.done
-    expect(holders(box).every((entry) => entry === '')).toBe(true)
   })
 })
 
-function holders(box: Box) {
-  return [1, 2, 3].map((slot) => {
-    try {
-      return readFileSync(path.join(box.locks, `slot${slot}.holder`), 'utf8').trim()
-    } catch {
-      return ''
-    }
-  })
-}
-
-function alive(pid: number) {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function unitActive(unit: string) {
-  return spawnSync('systemctl', ['--user', 'is-active', unit]).stdout.toString().trim() === 'active'
+function runningEntries(box: Box) {
+  const dir = path.join(box.state, 'jobs')
+  return existsSync(dir) ? readdirSync(dir).filter((name) => name.endsWith('.json')) : []
 }

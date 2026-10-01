@@ -63,6 +63,13 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     why: 'The installed wrapper is a self-contained bundle, so every import must resolve in the source checkout.',
     fix: 'Run `bun install --frozen-lockfile` in that checkout and run the install again.',
   },
+  HEAVY_SLICE_FAILED: {
+    status: 502,
+    message: ({ slice, detail }: { slice: string; detail: string }) =>
+      `systemd could not set the memory ceiling of ${slice}: ${detail}`,
+    why: 'Each heavy job runs in its own slice, and the job starts only once the slice has its ceiling.',
+    fix: 'Check the user manager with `systemctl --user status` and run the job again.',
+  },
   RESTART_REQUEST_FAILED: {
     status: 502,
     message: ({ detail }: { detail: string }) => `The restart request failed: ${detail}`,

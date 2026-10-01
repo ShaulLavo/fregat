@@ -20,7 +20,12 @@ export type HeavyJobRecord = {
   readonly subdir: string | null
   readonly command: readonly string[]
   readonly host: string
-  readonly slot: number
+  readonly class: string
+  readonly estimateBytes: number
+  readonly ceilingBytes: number
+  /** Why admission let it start: the free memory it saw, or that nothing else ran. */
+  readonly admission: string
+  readonly slice: string
   readonly unit: string
   readonly queuedMs: number
   readonly wallMs: number

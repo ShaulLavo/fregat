@@ -1,0 +1,134 @@
+import { spawn, spawnSync } from 'node:child_process'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { availableParallelism, tmpdir } from 'node:os'
+import path from 'node:path'
+
+import { processExists } from '../../apps/server/scripts/process-exists'
+import type { HeavyJobRecord } from './record'
+
+export { processExists as alive }
+
+const RUN = path.join(import.meta.dirname, 'run.ts')
+export const MiB = 2 ** 20
+export const userScopes = spawnSync('systemd-run', ['--user', '--scope', '-q', 'true']).status === 0
+const roots: string[] = []
+
+/** Removes every sandbox made since the last call; tests call it in `afterEach`. */
+export function removeSandboxes() {
+  for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true })
+}
+
+/** A private state directory, log directory, settings home and `/proc` stand-in. */
+export function sandbox() {
+  const root = mkdtempSync(path.join(tmpdir(), 'heavy-run-'))
+  roots.push(root)
+  const box = {
+    home: path.join(root, 'home'),
+    logs: path.join(root, 'logs'),
+    proc: path.join(root, 'proc'),
+    root,
+    state: path.join(root, 'state'),
+  }
+  for (const dir of [box.home, box.state, path.join(box.proc, 'pressure')])
+    mkdirSync(dir, { recursive: true })
+  return box
+}
+
+export type Box = ReturnType<typeof sandbox>
+
+/** What admission reads from `/proc`: available memory, memory pressure, load per core. */
+export function writeMachine(
+  box: Box,
+  machine: { availableMiB: number; memoryPressure?: number; loadPerCore?: number },
+) {
+  writeFileSync(
+    path.join(box.proc, 'meminfo'),
+    `MemTotal: 33554432 kB\nMemAvailable: ${machine.availableMiB * 1024} kB\n`,
+  )
+  writeFileSync(
+    path.join(box.proc, 'pressure', 'memory'),
+    `some avg10=${(machine.memoryPressure ?? 0).toFixed(2)} avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n`,
+  )
+  const load = (machine.loadPerCore ?? 0) * availableParallelism()
+  writeFileSync(path.join(box.proc, 'loadavg'), `${load.toFixed(2)} 0.00 0.00 1/100 1\n`)
+}
+
+export function writeSettings(box: Box, values: Record<string, unknown>) {
+  writeFileSync(path.join(box.home, 'settings.json'), JSON.stringify(values))
+}
+
+export type StartOptions = {
+  readonly jobClass?: string
+  readonly detached?: boolean
+  readonly env?: NodeJS.ProcessEnv
+  readonly logDir?: boolean
+  readonly machine?: boolean
+}
+
+export function start(
+  box: Box,
+  label: string,
+  command: readonly string[],
+  options: StartOptions = {},
+) {
+  const args = [RUN, '--state-dir', box.state, '--settings-home', box.home]
+  if (options.logDir !== false) args.push('--log-dir', box.logs)
+  if (options.machine) args.push('--proc', box.proc)
+  if (options.jobClass) args.push('--class', options.jobClass)
+  const child = spawn('bun', [...args, label, '--', ...command], {
+    cwd: box.root,
+    detached: options.detached ?? false,
+    env: options.env ?? process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let stderr = ''
+  let stdout = ''
+  child.stderr.on('data', (chunk) => (stderr += chunk))
+  child.stdout.on('data', (chunk) => (stdout += chunk))
+  const done = new Promise<{ code: number | null; stderr: string }>((resolve) =>
+    child.on('close', (code) => resolve({ code, stderr })),
+  )
+  return { child, done, stderr: () => stderr, stdout: () => stdout }
+}
+
+export function heavy(
+  box: Box,
+  label: string,
+  command: readonly string[],
+  options: StartOptions = {},
+) {
+  return start(box, label, command, options).done
+}
+
+export function records(box: Box): HeavyJobRecord[] {
+  if (!existsSync(box.logs)) return []
+  return readdirSync(box.logs)
+    .filter((file) => file.endsWith('.jsonl'))
+    .flatMap((file) => readFileSync(path.join(box.logs, file), 'utf8').trim().split('\n'))
+    .map((line) => JSON.parse(line) as HeavyJobRecord)
+}
+
+export function recordOf(box: Box, label: string) {
+  return records(box).find((record) => record.label === label)
+}
+
+/** When the job's command started, from its record: the end minus its wall time. */
+export function startedAt(record: HeavyJobRecord | undefined) {
+  return record ? Date.parse(record.timestamp) - record.wallMs : Number.NaN
+}
+
+export function endedAt(record: HeavyJobRecord | undefined) {
+  return record ? Date.parse(record.timestamp) : Number.NaN
+}
+
+export function unitActive(unit: string) {
+  return spawnSync('systemctl', ['--user', 'is-active', unit]).stdout.toString().trim() === 'active'
+}

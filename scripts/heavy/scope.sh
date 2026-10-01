@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Runs inside the job's systemd scope, so the cgroup still exists when the command exits and
-# its totals can be read. Bash, not Bun: this process is counted in the scope's memory peak.
+# Runs inside the job's systemd scope, so the job's slice still exists when the command exits
+# and its totals can be read. Bash, not Bun: this process is counted in the job's memory peak.
 out=$1
 shift
 trap : INT TERM HUP
 "$@"
 rc=$?
 cgroup=/sys/fs/cgroup$(cut -d: -f3- /proc/self/cgroup)
-# Everything under this cgroup is the job; a child cgroup is a nested scope.
-drain_root=$cgroup
+# The job is its slice: this scope and any scope it opened with nested-scope.sh.
+drain_root=${cgroup%/*}
 
 # Counts the job's processes other than this shim into `found`, sending each the signal if
 # one is given. Builtins only, so the scan itself adds no process to the cgroup.

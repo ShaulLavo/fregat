@@ -29,7 +29,14 @@ test.skipIf(!userScopes)(
     const root = mkdtempSync(path.join(tmpdir(), 'heavy-report-'))
     roots.push(root)
     mkdirSync(path.join(root, 'locks'))
-    const dirs = ['--lock-dir', path.join(root, 'locks'), '--log-dir', path.join(root, 'logs')]
+    const dirs = [
+      '--state-dir',
+      path.join(root, 'locks'),
+      '--log-dir',
+      path.join(root, 'logs'),
+      '--settings-home',
+      root,
+    ]
     const alloc = (mib: number) => ['bun', '-e', `Buffer.alloc(${mib} * 2 ** 20, 1)`]
     await bun([path.join(HERE, 'run.ts'), ...dirs, 'small', '--', ...alloc(10)], root)
     await bun([path.join(HERE, 'run.ts'), ...dirs, 'big', '--', ...alloc(150)], root)
@@ -79,11 +86,15 @@ function job(fields: Partial<HeavyJobRecord>): HeavyJobRecord {
   sequence += 1
   return {
     action: 'heavy.job',
+    admission: 'no heavy job is running',
     area: 'heavy-jobs',
+    ceilingBytes: 7 * 2 ** 30,
+    class: 'suite',
     command: ['bun', 'run', 'test'],
     commitHash: 'c'.repeat(40),
     cpuUsageUsec: 1_000_000,
     cwd: '/work/worktrees/platform/lane-a',
+    estimateBytes: 3 * 2 ** 30,
     exitCode: 0,
     host: 'local',
     label: 'suite',
@@ -94,9 +105,9 @@ function job(fields: Partial<HeavyJobRecord>): HeavyJobRecord {
     queuedMs: 0,
     repo: '/work/projects/platform',
     requestId: String(sequence),
-    slot: 1,
     source: 'heavy',
     subdir: '',
+    slice: `heavy-${sequence}.slice`,
     timestamp: new Date(Date.now() - 60_000).toISOString(),
     unit: `heavy-${sequence}.scope`,
     version: 'c'.repeat(9),

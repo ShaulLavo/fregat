@@ -2,27 +2,28 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { constants, tmpdir } from 'node:os'
 import path from 'node:path'
 
+import { scriptErrors } from '../structured-errors'
+
 const SCOPE_SHIM = path.join(import.meta.dirname, 'scope.sh')
-// The per-job budget that kept the 2026-09-25 OOM to one job: a runaway is killed alone.
-const MEMORY_CAPS = ['-p', 'MemoryHigh=6G', '-p', 'MemoryMax=7G', '-p', 'MemorySwapMax=2G']
 // 28 cores would otherwise mean ~24 Vitest workers at ~450 MB each.
 const VITEST_WORKERS = '4'
 
 type Launch = {
   readonly unit: string
+  readonly slice: string
   readonly accountingFile: string
   readonly command: readonly string[]
 }
 
 /** The argv that runs a job on each host, inside a scope whose shim writes the accounting file. */
 const launchers = {
-  local: ({ unit, accountingFile, command }: Launch) => [
+  local: ({ unit, slice, accountingFile, command }: Launch) => [
     'systemd-run',
     '--user',
     '--scope',
     '--quiet',
     `--unit=${unit}`,
-    ...MEMORY_CAPS,
+    `--slice=${slice}`,
     'bash',
     SCOPE_SHIM,
     accountingFile,
@@ -46,6 +47,7 @@ export type JobAccounting = {
 }
 
 export type JobOutcome = JobAccounting & {
+  readonly slice: string
   readonly unit: string
   readonly exitCode: number
   readonly wallMs: number
@@ -56,40 +58,68 @@ export type JobSpec = {
   readonly host: Host
   readonly command: readonly string[]
   readonly cwd: string
+  /** The slice's MemoryMax; nested scopes that join the slice share it. */
+  readonly ceilingBytes: number
 }
 
 /**
- * Launches the job; `stop` signals every process in its scope, and `done` settles once the
- * command and everything it left running have exited.
+ * Launches the job in its own slice, `heavy-<id>.slice`, whose ceiling is set before the
+ * first process starts. `HEAVY_JOB_SLICE` names it, so scopes the job opens through
+ * `nested-scope.sh` share its ceiling and accounting. `stop` signals every process in the
+ * slice, and `done` settles once the command and everything it left running have exited.
  */
 export function startJob(job: JobSpec) {
   const unit = `heavy-${job.id}.scope`
+  const slice = `heavy-${job.id}.slice`
   const accountingFile = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `${unit}.accounting`)
+  limitSlice(slice, job.ceilingBytes)
   const started = performance.now()
   const child = Bun.spawn({
-    cmd: launchers[job.host]({ accountingFile, command: job.command, unit }),
+    cmd: launchers[job.host]({ accountingFile, command: job.command, slice, unit }),
     cwd: job.cwd,
-    env: { ...process.env, VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS },
+    env: {
+      ...process.env,
+      HEAVY_JOB_SLICE: slice,
+      VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
+    },
     stdio: ['inherit', 'inherit', 'inherit'],
   })
 
   const stop = (signal: NodeJS.Signals) => {
     // Before systemd-run has made the scope, the signal ends systemd-run itself.
     child.kill(signal)
-    Bun.spawnSync(['systemctl', '--user', 'kill', `--signal=${signal}`, unit], { stderr: 'ignore' })
+    systemctl(['kill', `--signal=${signal}`, slice])
   }
 
   const done = child.exited.then((): JobOutcome => {
     const signalCode = child.signalCode
     const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
-    return {
-      exitCode,
-      unit,
-      wallMs: Math.round(performance.now() - started),
-      ...readAccounting(accountingFile),
-    }
+    const wallMs = Math.round(performance.now() - started)
+    const accounting = readAccounting(accountingFile)
+    systemctl(['stop', slice])
+    systemctl(['revert', slice])
+    return { exitCode, slice, unit, wallMs, ...accounting }
   })
   return { done, stop }
+}
+
+// No MemoryHigh: above it the kernel throttles a runaway into a crawl instead of killing it
+// at MemoryMax. Swap keeps P1's 2:7 share of the ceiling.
+function limitSlice(slice: string, ceilingBytes: number) {
+  const swap = Math.floor((ceilingBytes * 2) / 7)
+  const result = systemctl([
+    'set-property',
+    '--runtime',
+    slice,
+    `MemoryMax=${ceilingBytes}`,
+    `MemorySwapMax=${swap}`,
+  ])
+  if (result.exitCode === 0) return
+  throw scriptErrors.HEAVY_SLICE_FAILED({ detail: result.stderr.toString().trim(), slice })
+}
+
+function systemctl(args: readonly string[]) {
+  return Bun.spawnSync(['systemctl', '--user', ...args], { stderr: 'pipe', stdout: 'ignore' })
 }
 
 function readAccounting(file: string): JobAccounting {
