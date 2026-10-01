@@ -17,7 +17,7 @@ import {
   type EditorTokenStore,
   toEditorTokenStore,
 } from '@singapore-editor/core/syntax'
-import { EditorSecondaryViewScheduler } from '@singapore-editor/core/secondary-views'
+import { EditorWorkScheduler } from '@singapore-editor/core/scheduling'
 import { languageIdForPath } from './lines'
 import type { DiffFile, DiffRenderRow, DiffSyntaxBackend } from './types'
 
@@ -157,7 +157,7 @@ export async function prepareDiffSyntax(
  * what lets a toggle repaint without an uncoloured frame (§C10).
  */
 export class DiffSyntaxController {
-  private readonly scheduler = new EditorSecondaryViewScheduler()
+  private readonly scheduler = new EditorWorkScheduler()
   private readonly key = `diff.syntax.${nextSyntaxControllerId++}`
   private sources: readonly PreparedDiffSyntaxSource[] = []
   private sourceSubscriptions: (() => void)[] = []

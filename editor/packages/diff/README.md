@@ -48,5 +48,6 @@ for a split view, make two plugins with `side: 'old'` and `side: 'new'` and give
 - [hosting](docs/hosting.md): editor options, split view, row lookup under the pointer, document vs overlay mode
 - [colors](docs/theme.md): theme fields and the `diff.*` color ids
 - `createSplitProjection`, `createStackedProjection` and `createLiveDiffProjection` give you the rows without an editor
+- `/syntax` exports `prepareDiffSyntax`, token projection and prepared sources for headless highlighting
 - `prepareDiffSyntax(file)` parses both sides ahead of time. pass its result as `setFile(file, prepared)` and the first frame is already colored
 - [the editor](../../README.md)

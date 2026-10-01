@@ -16,19 +16,6 @@ import {
   type VirtualizedTextViewOptions,
 } from '../virtualization'
 
-export { EditorWorkScheduler as EditorSecondaryViewScheduler } from '../editor/workScheduler'
-export type {
-  EditorScheduleWorkOptions as EditorSecondaryScheduleWorkOptions,
-  EditorScheduledWorkHandle as EditorSecondaryScheduledWorkHandle,
-  EditorWorkContext as EditorSecondaryWorkContext,
-  EditorWorkEvent as EditorSecondaryWorkEvent,
-  EditorWorkEventType as EditorSecondaryWorkEventType,
-  EditorWorkPriority as EditorSecondaryWorkPriority,
-  EditorWorkSchedulerOptions as EditorSecondaryWorkSchedulerOptions,
-  EditorWorkTags as EditorSecondaryWorkTags,
-  EditorWorkTaskClass as EditorSecondaryWorkTaskClass,
-} from '../editor/workScheduler'
-
 export type EditorSecondaryTextViewOptions = VirtualizedTextViewOptions
 
 /**

@@ -8,8 +8,8 @@ import {
 import {
   createEditorSecondaryTextView,
   createEditorSecondaryViewProjection,
-  EditorSecondaryViewScheduler,
 } from '@singapore-editor/core/secondary-views'
+import { EditorWorkScheduler } from '@singapore-editor/core/scheduling'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 
 describe('secondary view projections', () => {
@@ -76,7 +76,7 @@ describe('secondary view projections', () => {
     expect(scrollElement?.tabIndex).toBe(-1)
     expect(inputElement?.tabIndex).toBe(-1)
     expect(inputElement?.readOnly).toBe(true)
-    expect(EditorSecondaryViewScheduler).toBeTypeOf('function')
+    expect(EditorWorkScheduler).toBeTypeOf('function')
     view.dispose()
     host.remove()
   })

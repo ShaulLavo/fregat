@@ -13,8 +13,8 @@ export {
   prepareDiffSyntax,
   PreparedDiffSyntaxSource,
   projectDiffSyntaxTokens,
-} from './diffSyntax'
-export type { PrepareDiffSyntaxOptions, PreparedDiffSyntaxInput } from './diffSyntax'
+} from './syntax'
+export type { PrepareDiffSyntaxOptions, PreparedDiffSyntaxInput } from './syntax'
 export type { DiffPlugin, DiffPluginMode, DiffPluginOptions, DiffRowHit } from './editorDiffPlugin'
 export type { DiffEditorOptions } from './editorOptions'
 export type { DiffGutterSide } from './gutters'

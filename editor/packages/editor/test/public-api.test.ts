@@ -105,10 +105,8 @@ import {
 import { serializeEditorViewSnapshot } from '@singapore-editor/core/extensions'
 import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import { applyEditorTheme, type EditorTheme } from '@singapore-editor/core/rendering'
-import {
-  createEditorSecondaryTextView,
-  EditorSecondaryViewScheduler,
-} from '@singapore-editor/core/secondary-views'
+import { createEditorSecondaryTextView } from '@singapore-editor/core/secondary-views'
+import { EditorWorkScheduler } from '@singapore-editor/core/scheduling'
 import {
   createEmptySyntaxResult,
   treeSitterCapturesToEditorTokens,
@@ -623,7 +621,7 @@ describe('public API facade', () => {
     expect(debugPieceTable(createPieceTableSnapshot('abc')).length).toBeGreaterThan(0)
     expect(VirtualizedTextView).toBeTypeOf('function')
     expect(createEditorSecondaryTextView).toBeTypeOf('function')
-    expect(EditorSecondaryViewScheduler).toBeTypeOf('function')
+    expect(EditorWorkScheduler).toBeTypeOf('function')
     expect({} as EditorPluginContext).toMatchObject({})
     host.dispose()
   })

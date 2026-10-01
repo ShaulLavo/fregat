@@ -12,7 +12,7 @@ import type {
   EditorViewContributionUpdateKind,
 } from '@singapore-editor/core/extensions'
 import type { VirtualizedTextHighlightStyle } from '@singapore-editor/core/rendering'
-import { EditorSecondaryViewScheduler } from '@singapore-editor/core/secondary-views'
+import { EditorWorkScheduler } from '@singapore-editor/core/scheduling'
 import {
   countMatches,
   escapeRegExpCharacters,
@@ -213,7 +213,7 @@ export class EditorFindController {
     replaceRevealed: false,
     inSelection: false,
   }
-  private readonly scheduler = new EditorSecondaryViewScheduler()
+  private readonly scheduler = new EditorWorkScheduler()
   private matches: readonly FindMatch[] = []
   private highlightsTruncated = false
   // Counted rather than listed, so it is exact past the paint cap.

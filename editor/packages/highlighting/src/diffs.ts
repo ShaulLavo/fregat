@@ -1,11 +1,9 @@
 import {
   prepareDiffSyntax,
-  type DiffFile,
-  type DiffGutterSide,
-  type DiffSyntaxBackend,
   type PreparedDiffSyntaxInput,
   type PreparedDiffSyntaxSource,
-} from '@singapore-editor/diff'
+} from '@singapore-editor/diff/syntax'
+import type { DiffFile, DiffGutterSide, DiffSyntaxBackend } from '@singapore-editor/diff'
 
 type SourceSide = 'old' | 'new'
 

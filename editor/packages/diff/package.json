@@ -20,7 +20,12 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./style.css": "./dist/style.css"
+    "./style.css": "./dist/style.css",
+    "./syntax": {
+      "types": "./dist/syntax.d.ts",
+      "import": "./dist/syntax.js",
+      "default": "./dist/syntax.js"
+    }
   },
   "publishConfig": {
     "access": "public",

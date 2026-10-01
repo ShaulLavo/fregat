@@ -82,6 +82,11 @@
       "types": "./dist/public/keymap.d.ts",
       "import": "./dist/public/keymap.js",
       "default": "./dist/public/keymap.js"
+    },
+    "./scheduling": {
+      "types": "./dist/editor/workScheduler.d.ts",
+      "import": "./dist/editor/workScheduler.js",
+      "default": "./dist/editor/workScheduler.js"
     }
   },
   "publishConfig": {

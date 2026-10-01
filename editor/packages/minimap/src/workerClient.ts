@@ -11,9 +11,9 @@ import type {
 } from '@singapore-editor/core/extensions'
 import {
   createEditorSecondaryViewProjection,
-  EditorSecondaryViewScheduler,
   type EditorSecondaryViewTextProjection,
 } from '@singapore-editor/core/secondary-views'
+import { EditorWorkScheduler } from '@singapore-editor/core/scheduling'
 import { parseCssColor, RGBA_BLACK, RGBA_WHITE, transparent } from './color'
 import type {
   MinimapBaseStyles,
@@ -214,7 +214,7 @@ export class MinimapWorkerClient {
   private readonly options: ResolvedMinimapOptions
   private readonly workerOwner: MinimapWorkerOwner
   private readonly colorResolver: ColorResolver
-  private readonly scheduler = new EditorSecondaryViewScheduler()
+  private readonly scheduler = new EditorWorkScheduler()
   private readonly onLayoutWidth: (width: number) => void
   private readonly reservedLane: () => number
   private externalDecorations: readonly EditorMinimapDecoration[]
