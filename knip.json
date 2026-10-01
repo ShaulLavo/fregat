@@ -277,8 +277,8 @@
       "project": ["src/**/*.{ts,tsx}"]
     },
     "ghostty-webgpu": {
-      "entry": ["src/index.ts", "scripts/**/*.ts", "bench/**/*.ts"],
-      "project": ["src/**/*.ts", "scripts/**/*.ts", "bench/**/*.ts"]
+      "entry": ["src/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
+      "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
     },
     "ghostty-webgpu/demo": {
       "entry": ["src/client.ts"],
