@@ -318,9 +318,12 @@ stays safe to read, share and export.
 
 ## Window
 
-| Setting               | Default        | Scope   | What it does                                                                                                                                                          |
-| --------------------- | -------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `window.transparency` | `"compositor"` | machine | What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame. _(restart)_ |
+| Setting                             | Default        | Scope   | What it does                                                                                                                                                             |
+| ----------------------------------- | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `window.browser`                    | `"auto"`       | machine | The desktop window engine: auto selects an installed Chromium browser, webview selects the system window, and an absolute path selects a browser executable. _(restart)_ |
+| `window.browserStartupIdleSeconds`  | `5`            | machine | Seconds a starting browser may spend without reading its files, using the CPU or answering the launcher before the launcher stops it. _(restart)_                        |
+| `window.browserStartupLimitSeconds` | `60`           | machine | Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it. _(restart)_                                        |
+| `window.transparency`               | `"compositor"` | machine | What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame. _(restart)_    |
 
 ### Details
 

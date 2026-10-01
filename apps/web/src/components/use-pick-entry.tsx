@@ -14,7 +14,7 @@ import {
   isPickedFsEntry,
   type PickedFsEntry,
 } from '@/lib/file-system-types'
-import { getPlatformBridge } from '@/lib/platform/bridge'
+import { getPlatformBridge, type PlatformBridge } from '@/lib/platform/bridge'
 import { basenameFromOsPath, clientPathFromOsPath } from '@/components/utils/picked-path'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import type { WideEventScope } from '@workspace/observability/scope'
@@ -44,13 +44,14 @@ export function usePickEntry({
   const client = clientForQueryClient(useQueryClient())
 
   useEffect(() => {
-    if (!bridge) return
+    const pickEntry = bridge?.pickEntry
+    if (!pickEntry) return
     if (!open) return
 
     let active = true
     const pickPromise = startNativePick({
       accept,
-      bridge,
+      pickEntry,
       mode,
       value,
     })
@@ -67,7 +68,7 @@ export function usePickEntry({
     }
   }, [accept, bridge, client, mode, onOpenChange, onPick, open, value])
 
-  if (bridge || !open) return null
+  if (bridge?.pickEntry || !open) return null
 
   return (
     <DeferredFilePickerDialog
@@ -83,7 +84,7 @@ export function usePickEntry({
 
 type PickNativeEntryOptions = {
   accept?: readonly string[]
-  bridge: NonNullable<ReturnType<typeof getPlatformBridge>>
+  pickEntry: NonNullable<PlatformBridge['pickEntry']>
   mode: FilePickerMode
   value: PickedFsEntry | null
 }
@@ -175,11 +176,11 @@ async function selectedNativePath(
 
 async function pickNativeEntry({
   accept,
-  bridge,
+  pickEntry,
   mode,
   value,
 }: PickNativeEntryOptions): Promise<string | null> {
-  const paths = await bridge.pickEntry({ accept, mode, startingPath: value?.path })
+  const paths = await pickEntry({ accept, mode, startingPath: value?.path })
   const path = paths[0]
   if (!path) return null
 
