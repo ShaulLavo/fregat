@@ -14,6 +14,7 @@ import {
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseIssueComments } from './issue-comments'
+import { parseGithubReviews, parseGithubThreads, parseRestCommits } from './activity'
 
 const PR_FIELDS = 'isDraft,number,state,title,url,closedAt'
 
@@ -40,6 +41,28 @@ const GITHUB_STATES = { OPEN: 'open', CLOSED: 'closed', MERGED: 'merged' } as co
 /** `gh`. A self-hosted host is named on every call so `gh` never falls back to github.com. */
 export const github: ForgeProvider = {
   kind: 'github',
+  async activity(context, number) {
+    const read = async (path: string) =>
+      requireSuccess(
+        context,
+        await gh(context, [
+          'api',
+          ...hostname(context),
+          `repos/${context.repository}/pulls/${number}/${path}?per_page=100`,
+        ]),
+        `activity-${path}`,
+      ).stdout
+    const [reviews, commits, threads] = await Promise.all([
+      read('reviews'),
+      read('commits'),
+      read('comments'),
+    ])
+    return {
+      reviews: parseGithubReviews(context, reviews),
+      commits: parseRestCommits(context, commits),
+      threads: parseGithubThreads(context, threads),
+    }
+  },
   discussion: {
     async read(context, number) {
       const result = requireSuccess(

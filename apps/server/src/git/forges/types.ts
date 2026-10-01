@@ -1,4 +1,5 @@
 import type {
+  GitPullRequestActivity,
   GitForge,
   GitForgeKind,
   GitPullRequest,
@@ -37,6 +38,10 @@ type CreatePullRequestInput = {
 
 /** Pull request creation and discussion share the selected remote and authentication. */
 export type ForgeProvider = {
+  readonly activity: (
+    context: ForgeContext,
+    number: number,
+  ) => Promise<Omit<Extract<GitPullRequestActivity, { kind: 'ready' }>, 'kind' | 'forge'>>
   readonly discussion: {
     read: (
       context: ForgeContext,

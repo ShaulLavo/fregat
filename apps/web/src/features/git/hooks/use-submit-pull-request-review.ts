@@ -16,6 +16,9 @@ export function useSubmitPullRequestReview(rootPath: string, number: number) {
     onSettled: (_data, _error, _input, _result, { client }) =>
       Promise.all([
         client.invalidateQueries({
+          queryKey: pullRequestDiscussionKeys.activity(rootPath, number),
+        }),
+        client.invalidateQueries({
           queryKey: pullRequestDiscussionKeys.comments(rootPath, number),
         }),
         client.invalidateQueries({ queryKey: gitKeys.pullRequestState(rootPath) }),

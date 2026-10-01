@@ -12,6 +12,7 @@ import {
   requireReviewSubmitted,
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
+import { parseGitlabCommits, parseGitlabThreads } from './activity'
 
 const mergeRequestSchema = v.object({
   iid: v.pipe(v.number(), v.integer(), v.minValue(1)),
@@ -33,6 +34,21 @@ const projectSchema = v.object({
 /** `glab`, bound to the selected repository on every request. */
 export const gitlab: ForgeProvider = {
   kind: 'gitlab',
+  async activity(context, number) {
+    const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}`
+    const read = async (path: string) =>
+      requireSuccess(
+        context,
+        await glab(context, ['api', `${endpoint}/${path}?per_page=100`]),
+        `activity-${path}`,
+      ).stdout
+    const [commits, threads] = await Promise.all([read('commits'), read('discussions')])
+    return {
+      reviews: { kind: 'unsupported', reason: 'Open GitLab for approval history.' },
+      commits: parseGitlabCommits(context, commits),
+      threads: parseGitlabThreads(context, threads),
+    }
+  },
   discussion: {
     async read(context, number) {
       const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}/notes`

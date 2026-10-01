@@ -1,4 +1,4 @@
-import type { GitPullRequest } from '@workspace/contracts'
+import type { GitPullRequest, GitPullRequestComment } from '@workspace/contracts'
 import * as v from 'valibot'
 import { gitPullRequestErrors } from '../utils/pull-request-errors'
 import {
@@ -13,6 +13,12 @@ import {
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseIssueComments } from './issue-comments'
+import {
+  groupActivityThreads,
+  parseForgejoInline,
+  parseForgejoReviews,
+  parseRestCommits,
+} from './activity'
 
 /** Recently updated pull requests read per lookup; the branch filter runs on them. */
 const PAGE_SIZE = 50
@@ -39,6 +45,42 @@ const pullSchema = v.object({
  */
 export const forgejo: ForgeProvider = {
   kind: 'forgejo',
+  async activity(context, number) {
+    const login = await requireLogin(context)
+    const read = async (path: string) =>
+      requireSuccess(
+        context,
+        await tea(context, [
+          'api',
+          '--login',
+          login.name,
+          apiUrl(login, context, `pulls/${number}/${path}`),
+        ]),
+        `activity-${path}`,
+      ).stdout
+    const [reviewRows, commitRows] = await Promise.all([
+      read('reviews?limit=100&page=1'),
+      read('commits?limit=100&page=1'),
+    ])
+    const parsed = parseForgejoReviews(context, reviewRows)
+    const comments: GitPullRequestComment[] = []
+    let truncated = parsed.inlineTruncated
+    for (const reviewId of parsed.inlineReviewIds) {
+      const rows = parseForgejoInline(context, await read(`reviews/${reviewId}/comments`))
+      const remaining = 100 - comments.length
+      comments.push(...rows.slice(0, remaining))
+      truncated ||= rows.length > remaining
+      if (comments.length === 100) {
+        truncated = true
+        break
+      }
+    }
+    return {
+      reviews: parsed.reviews,
+      commits: parseRestCommits(context, commitRows),
+      threads: groupActivityThreads(comments, truncated),
+    }
+  },
   discussion: {
     async read(context, number) {
       const login = await requireLogin(context)

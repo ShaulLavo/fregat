@@ -13,8 +13,12 @@ export function createForgeDiscussionBoundary() {
     user: { login: string }
   }[] = []
   const reads: string[] = []
+  const activityReads: string[] = []
   const writes: string[] = []
   const reviews: { body: string; event: string }[] = []
+  const activityReviews: unknown[] = []
+  const activityCommits: unknown[] = []
+  const activityThreads: unknown[] = []
   const azureThreads: unknown[] = []
   const remoteProbes: (readonly string[])[] = []
   const control = {
@@ -22,6 +26,7 @@ export function createForgeDiscussionBoundary() {
     failReview: false,
     beforePost: async () => {},
     beforeRead: async () => {},
+    beforeActivityRead: async () => {},
   }
   const run: NonNullable<ForgeBoundaries['run']> = async ({ argv, input, cwd }) => {
     const ok = (stdout = '') => ({ exitCode: 0, stderr: '', stdout })
@@ -49,6 +54,15 @@ export function createForgeDiscussionBoundary() {
         reviews.push(JSON.parse(input ?? '{}'))
         return ok('{}')
       }
+      if (!argv.includes('POST') && argv.some((arg) => arg.includes('/pulls/7/'))) {
+        activityReads.push('activity')
+        await control.beforeRead()
+        await control.beforeActivityRead()
+        const endpoint = argv.find((arg) => arg.includes('/pulls/7/')) ?? ''
+        if (endpoint.includes('/reviews?')) return ok(JSON.stringify(activityReviews))
+        if (endpoint.includes('/commits?')) return ok(JSON.stringify(activityCommits))
+        if (endpoint.includes('/comments?')) return ok(JSON.stringify(activityThreads))
+      }
       if (!argv.some((arg) => arg.includes('/issues/7/comments')))
         return { exitCode: 1, stderr: 'unexpected endpoint', stdout: '' }
       if (!argv.includes('POST')) {
@@ -72,5 +86,18 @@ export function createForgeDiscussionBoundary() {
     }
     return { exitCode: 1, stderr: 'unexpected forge command', stdout: '' }
   }
-  return { run, comments, reads, writes, reviews, azureThreads, control, remoteProbes }
+  return {
+    run,
+    comments,
+    reads,
+    writes,
+    reviews,
+    activityReads,
+    activityReviews,
+    activityCommits,
+    activityThreads,
+    azureThreads,
+    control,
+    remoteProbes,
+  }
 }
