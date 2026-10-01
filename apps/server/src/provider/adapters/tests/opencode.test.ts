@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises'
+import { access, readFile, rename } from 'node:fs/promises'
 import * as v from 'valibot'
 import { providerInstanceIdSchema, sessionIdSchema, turnIdSchema } from '@workspace/contracts'
 import { afterEach, expect, test } from 'vitest'
@@ -260,6 +260,81 @@ test('failed catalog initialization reports a missing executable without a ready
     auth: { status: 'unknown' },
   })
   await expect(access(fixture.marker)).rejects.toBeDefined()
+})
+
+test('catalog refresh recovers after installing the missing executable', async () => {
+  const fixture = await openCodeProcessFixture()
+  const binaryPath = `${fixture.root}/installed-later`
+  const registry = new ProviderAdapterRegistry({
+    drivers: [opencodeDriver],
+    services: { cwd: fixture.root },
+  })
+  cleanup.push(fixture.close, () => registry.dispose())
+  await registry.reconcile([
+    { driverKind: OPENCODE_DRIVER_KIND, providerInstanceId: instanceId, binaryPath, config: {} },
+  ])
+  expect(await registry.snapshot(instanceId)).toMatchObject({ installed: false, status: 'error' })
+  await expect(access(fixture.marker)).rejects.toBeDefined()
+  await rename(fixture.binaryPath, binaryPath)
+  expect(await registry.refreshSnapshot(instanceId)).toMatchObject({
+    installed: true,
+    status: 'ready',
+    models: [{ slug: 'fixture/text' }],
+  })
+  const calls = (await readFile(fixture.marker, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  expect(calls.filter((call) => call.args)).toHaveLength(1)
+})
+
+test('catalog refresh recovers after the owned process exits with one replacement', async () => {
+  const fixture = await openCodeProcessFixture({ wrapper: 'alive' })
+  const registry = new ProviderAdapterRegistry({
+    drivers: [opencodeDriver],
+    services: { cwd: fixture.root },
+  })
+  cleanup.push(fixture.close, () => registry.dispose())
+  await registry.reconcile([
+    {
+      driverKind: OPENCODE_DRIVER_KIND,
+      providerInstanceId: instanceId,
+      binaryPath: fixture.binaryPath,
+      config: {},
+    },
+  ])
+  expect(await registry.snapshot(instanceId)).toMatchObject({ status: 'ready' })
+  const calls = (await readFile(fixture.marker, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  const original = calls.find((call) => call.wrapperPid)
+  process.kill(original.wrapperPid, 'SIGKILL')
+  await expect
+    .poll(async () =>
+      (await readFile(`/proc/${original.wrapperPid}/cmdline`, 'utf8').catch(() => '')).includes(
+        fixture.root,
+      ),
+    )
+    .toBe(false)
+  const snapshots = await Promise.all([
+    registry.refreshSnapshot(instanceId),
+    registry.refreshSnapshot(instanceId),
+  ])
+  for (const snapshot of snapshots)
+    expect(snapshot).toMatchObject({ status: 'ready', models: [{ slug: 'fixture/text' }] })
+  const refreshedCalls = (await readFile(fixture.marker, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  expect(refreshedCalls.filter((call) => call.args)).toHaveLength(2)
+  await expect
+    .poll(async () =>
+      (await readFile(`/proc/${original.childPid}/cmdline`, 'utf8').catch(() => '')).includes(
+        fixture.root,
+      ),
+    )
+    .toBe(false)
 })
 
 test('catalog disposal cancels owned initialization and reaps the wrapper descendants', async () => {

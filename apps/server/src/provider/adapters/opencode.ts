@@ -77,7 +77,6 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     cwd: string
     server: OpenCodeServer
     controller: AbortController
-    ready: Promise<string>
   } | null = null
 
   private readonly options: Options
@@ -91,10 +90,9 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     if (!this.options.enabled || this.stopped || this.catalog) return
     const server = new OpenCodeServer(this.options)
     const controller = new AbortController()
-    const ready = server.start(cwd, controller.signal)
-    this.catalog = { cwd, server, controller, ready }
-    // Initialization can fail before the registry asks for its first snapshot.
-    void ready.catch(() => undefined)
+    this.catalog = { cwd, server, controller }
+    // Snapshots share pending startup and can retry after failure or an owned process exit.
+    void server.start(cwd, controller.signal).catch(() => undefined)
   }
 
   subscribeEvents(subscriber: (event: ProviderRuntimeEvent) => void) {
@@ -146,7 +144,9 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       }
     }
     try {
-      const url = this.catalog ? await this.catalog.ready : runtimeUrl!
+      const url = this.catalog
+        ? await this.catalog.server.start(this.catalog.cwd, this.catalog.controller.signal)
+        : runtimeUrl!
       const cwd = this.catalog?.cwd ?? ''
       const signal = this.catalog?.controller.signal
       const http = new OpenCodeHttp(url)
