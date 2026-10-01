@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 import { webBase } from './config'
-import { porcelainPaths, verifyCandidateFiles, type Release } from './release'
+import { porcelainPaths, readCheckout, verifyCandidateFiles, type Release } from './release'
 
 test('the first dirty path keeps its first letter', () => {
   expect(porcelainPaths(' M apps/server/src/index.ts\0?? plans/new.md\0')).toEqual([
@@ -43,6 +43,42 @@ test('reads real git status, renames included', () => {
       'new name.txt',
       'untracked.txt',
     ])
+  } finally {
+    rmSync(root, { force: true, recursive: true })
+  }
+})
+
+test.each([
+  ['attached', 'feature'],
+  ['main', 'main'],
+  ['unpushed', null],
+  ['missing remote', null],
+] as const)('reads a release branch for %s HEAD', async (state, branch) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'platform-deploy-checkout-'))
+  try {
+    const git = (...args: string[]) => {
+      const result = Bun.spawnSync(['git', ...args], { cwd: root, stderr: 'pipe' })
+      expect(result.exitCode, result.stderr.toString()).toBe(0)
+      return result.stdout.toString().trim()
+    }
+    git('init', '-qb', 'feature')
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-qm', 'init')
+    const initial = git('rev-parse', 'HEAD')
+    if (state !== 'missing remote') git('update-ref', 'refs/remotes/origin/main', initial)
+    if (state !== 'attached') git('checkout', '--detach', '-q', initial)
+    if (state === 'main') {
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-qm', 'remote')
+      git('update-ref', 'refs/remotes/origin/main', 'HEAD')
+      git('checkout', '--detach', '-q', initial)
+    }
+    if (state === 'unpushed')
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-qm', 'local')
+    const expected = branch ?? git('rev-parse', '--short', 'HEAD')
+
+    const checkout = await readCheckout(root)
+    expect(checkout.branch).toBe(expected)
+    expect(checkout.commit).toBe(git('rev-parse', 'HEAD'))
+    expect(checkout.dirtyFiles).toEqual([])
   } finally {
     rmSync(root, { force: true, recursive: true })
   }
