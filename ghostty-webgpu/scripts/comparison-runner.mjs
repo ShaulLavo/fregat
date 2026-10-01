@@ -6,7 +6,7 @@ import { platform, release, arch, cpus } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
-import { PNG } from 'pngjs'
+import { ink } from './comparison-pixels.mjs'
 import { WebSocketServer } from 'ws'
 import { markdown, order, quantile, summaries } from './comparison-report.mjs'
 
@@ -14,6 +14,7 @@ const root = dirname(fileURLToPath(import.meta.url))
 const manifest = JSON.parse(await readFile(join(root, 'manifest.json'), 'utf8'))
 const args = process.argv.slice(2)
 const smoke = args.includes('--smoke')
+const headless = smoke && !args.includes('--smoke-headed')
 const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback)
 const output = resolve(value('--output', join(root, smoke ? 'smoke' : 'results')))
 const repetitions = Number(value('--repetitions', manifest.settings.repetitions))
@@ -162,25 +163,15 @@ async function memory(page, session, browserSession) {
   return { heap, wasmBytes: info.wasmBytes, rssBytes }
 }
 
-function ink(data) {
-  const png = PNG.sync.read(Buffer.from(data, 'base64'))
-  const colors = { red: 0, green: 0 }
-  for (let y = 0; y < Math.min(32, png.height); y++) {
-    for (let x = 0; x < Math.min(120, png.width); x++) {
-      const offset = (y * png.width + x) * 4
-      const [r, g, b] = png.data.subarray(offset, offset + 3)
-      if (r > 150 && g < 80 && b < 80) colors.red++
-      if (g > 150 && r < 80 && b < 80) colors.green++
-    }
-  }
-  return colors
-}
-
 async function capturedFrames(session) {
   let pending
   let latest
+  let latestData
+  let latestMetadata
   const listener = (event) => {
     void session.send('Page.screencastFrameAck', { sessionId: event.sessionId })
+    latestData = event.data
+    latestMetadata = event.metadata
     latest = { timestamp: event.metadata.timestamp * 1000, colors: ink(event.data) }
     if (!pending || !matches(latest, pending)) return
     clearTimeout(pending.timer)
@@ -204,11 +195,12 @@ async function capturedFrames(session) {
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           pending = undefined
-          reject(
-            new Error(
-              `Presented ${color} glyph timed out; latest capture: ${JSON.stringify(latest)}`,
-            ),
+          const error = new Error(
+            `Presented ${color} glyph timed out; latest capture: ${JSON.stringify(latest)}`,
           )
+          error.captureData = latestData
+          error.captureMetadata = latestMetadata
+          reject(error)
         }, 10_000)
         pending = { color, after, resolve, timer }
       })
@@ -218,6 +210,20 @@ async function capturedFrames(session) {
       await session.send('Page.stopScreencast')
       session.off('Page.screencastFrame', listener)
     },
+  }
+}
+
+async function captureSmoke(page, session) {
+  const frames = await capturedFrames(session)
+  try {
+    await page.evaluate(() => window.__compare.smokeMarker())
+    const written = await frames.wait('red', 0)
+    await page.evaluate(() => window.__compare.prepareInput('green'))
+    await page.keyboard.press('#')
+    const echoed = await frames.wait('green', 0)
+    return { written: written.colors, echoed: echoed.colors }
+  } finally {
+    await frames.close()
   }
 }
 
@@ -309,16 +315,7 @@ async function measure(testCase, repetition, browserSession) {
       await page.waitForFunction(() => window.__compare.info().texts[0][0].includes('#'))
       const echoColors = ink((await page.screenshot()).toString('base64'))
       assert(echoColors.green > 0 && echoColors.red === 0, 'Echoed glyph must be visible')
-      if (args.includes('--smoke-capture')) {
-        const frames = await capturedFrames(session)
-        await page.evaluate(() => window.__compare.smokeMarker())
-        const written = await frames.wait('red', 0)
-        await page.evaluate(() => window.__compare.prepareInput('green'))
-        await page.keyboard.press('#')
-        const echoed = await frames.wait('green', 0)
-        run.captureCheck = { written: written.colors, echoed: echoed.colors }
-        await frames.close()
-      }
+      if (args.includes('--smoke-capture')) run.captureCheck = await captureSmoke(page, session)
       run.historyLengths = await page.evaluate(
         (rows) => window.__compare.history(rows),
         smokeHistoryRows,
@@ -361,6 +358,16 @@ async function measure(testCase, repetition, browserSession) {
   } catch (error) {
     run.error = String(error.stack ?? error)
     run.pageErrors = errors
+    if (error.captureData) {
+      run.captureFailure = error.captureMetadata
+      await writeFile(
+        join(
+          output,
+          `capture-failure-${testCase.variant}-${testCase.path}-${testCase.count}-${repetition}.png`,
+        ),
+        Buffer.from(error.captureData, 'base64'),
+      )
+    }
     run.failureInfo = await page
       .evaluate(() => ({
         info: window.__compare?.info(),
@@ -388,7 +395,7 @@ async function measure(testCase, repetition, browserSession) {
 try {
   browser = await chromium.launch({
     channel: smoke && platform() === 'linux' ? undefined : 'chromium',
-    headless: smoke,
+    headless,
     args: browserArgs,
     env: launchEnv,
   })
@@ -402,7 +409,7 @@ try {
     cpu: cpus()[0]?.model,
     renderer: renderer(gpu),
     gpu,
-    headed: !smoke,
+    headed: !headless,
     launchArguments: browserArgs,
     power:
       platform() === 'darwin'

@@ -1,3 +1,5 @@
+import { PNG } from 'pngjs'
+import { ink } from './comparison-pixels.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { droppedFrames, markdown, order, quantile, summaries } from './comparison-report.mjs'
@@ -102,4 +104,14 @@ test('output memory keeps retained storage, WASM capacity, and RSS separate', ()
   assert.equal(rows.find(({ metric }) => metric === 'memory/output/terminal').median, 0.5)
   assert.equal(rows.find(({ metric }) => metric === 'memory/output/wasm').median, 2)
   assert.equal(rows.find(({ metric }) => metric === 'memory/output/rss-delta').median, 6)
+})
+
+test('thin antialiased glyphs qualify without counting neutral or transparent ink', () => {
+  const png = new PNG({ width: 5, height: 1 })
+  png.data.set([0, 95, 0, 255, 100, 0, 0, 255, 255, 255, 255, 255, 80, 80, 80, 255, 0, 255, 0, 0])
+  const colors = ink(PNG.sync.write(png).toString('base64'))
+  assert.equal(colors.green, 1)
+  assert.equal(colors.red, 1)
+  assert.equal(colors.greenPeak, 95)
+  assert.equal(colors.redPeak, 100)
 })

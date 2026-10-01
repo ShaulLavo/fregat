@@ -47,7 +47,7 @@ for (const [name, path] of Object.entries(assets)) {
   await copyFile(path, join(output, name))
   hashes[name] = hash(await readFile(path))
 }
-for (const name of ['comparison-runner.mjs', 'comparison-report.mjs'])
+for (const name of ['comparison-runner.mjs', 'comparison-report.mjs', 'comparison-pixels.mjs'])
   await copyFile(join(root, 'scripts', name), join(output, name))
 const logs = await readFile(assets['logs.txt'], 'utf8')
 const fixtures = fixtureNames.map((name) => {
