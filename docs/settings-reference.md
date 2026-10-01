@@ -240,10 +240,12 @@ stays safe to read, share and export.
 
 ## Machines
 
-| Setting                      | Default | Scope   | What it does                                                                                                                                                                                   |
-| ---------------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `environments.machines`      | `{}`    | machine | Other machines this app can connect to, over SSH or by address. This machine is always available.                                                                                              |
-| `environments.devicePairing` | `true`  | machine | A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing. |
+| Setting                        | Default | Scope       | What it does                                                                                                                                                                                   |
+| ------------------------------ | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `environments.loadBalancing`   | `false` | application | Choose a connected checkout with available CPU and memory for a new draft. The draft keeps its chosen machine.                                                                                 |
+| `environments.loadPreferences` | `{}`    | application | Weight automatic selection for each connected machine. Manual only requires choosing the machine yourself.                                                                                     |
+| `environments.machines`        | `{}`    | machine     | Other machines this app can connect to, over SSH or by address. This machine is always available.                                                                                              |
+| `environments.devicePairing`   | `true`  | machine     | A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing. |
 
 ## Models
 

@@ -9,6 +9,7 @@ export type DraftDestination = {
   readonly environmentId: EnvironmentId
   readonly projectId: ProjectId
   readonly worktree: { readonly id: WorktreeId; readonly path: string }
+  readonly machineSelection?: 'automatic' | 'pinned'
 }
 
 /**
@@ -42,6 +43,7 @@ export async function moveDraft(
     worktreeTarget: { kind: 'current', worktreeId: destination.worktree.id },
     // Agent definitions are files on one machine; another machine starts from its default.
     ...(sameMachine && draft.identity?.agent ? { agent: draft.identity.agent } : {}),
+    machineSelection: destination.machineSelection ?? 'pinned',
     createdAt: new Date().toISOString(),
   })
   store.restoreContent(to, draft)

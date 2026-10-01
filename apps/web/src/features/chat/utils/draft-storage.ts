@@ -53,6 +53,7 @@ const draftIdentitySchema = v.object({
   worktreeTarget: sessionWorktreeTargetSchema,
   /** The agent definition the new session runs as; null runs the harness default. */
   agent: v.optional(v.nullable(providerAgentSelectionSchema)),
+  machineSelection: v.optional(v.picklist(['automatic', 'pinned', 'required'])),
   createdAt: v.string(),
 })
 export type DraftIdentity = v.InferOutput<typeof draftIdentitySchema>

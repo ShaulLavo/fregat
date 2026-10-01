@@ -318,6 +318,29 @@ export const SETTINGS_REGISTRY = {
     title: 'Project grouping overrides',
     description: 'Grouping mode per scoped project key (environment UUID:project UUID).',
   }),
+  'environments.loadBalancing': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Machines',
+    title: 'Balance new sessions across machines',
+    description:
+      'Choose a connected checkout with available CPU and memory for a new draft. The draft keeps its chosen machine.',
+    keywords: ['capacity', 'automatic', 'load'],
+  }),
+  'environments.loadPreferences': defineSetting({
+    schema: v.record(v.string(), v.picklist(['prefer', 'normal', 'less-often', 'manual-only'])),
+    default: {},
+    scope: 'application',
+    widget: 'complex',
+    merge: 'record',
+    category: 'Machines',
+    title: 'Machine selection preferences',
+    description:
+      'Weight automatic selection for each connected machine. Manual only requires choosing the machine yourself.',
+    keywords: ['capacity', 'automatic', 'load'],
+  }),
   'environments.machines': defineSetting({
     schema: machinesSchema,
     default: {},

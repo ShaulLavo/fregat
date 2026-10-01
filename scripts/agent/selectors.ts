@@ -233,6 +233,8 @@ export const selectors = {
   draftWorkspace: (page: Page) => page.getByRole('button', { name: 'Workspace', exact: true }),
   draftBaseBranch: (page: Page) =>
     page.getByRole('button', { name: 'Start from branch', exact: true }),
+  machinePreferences: (page: Page) => page.getByRole('combobox', { name: /selection preference$/ }),
+  selectOption: (page: Page, name: string) => page.getByRole('option', { name, exact: true }),
   draftMachine: (page: Page) => page.getByRole('button', { name: 'Machine', exact: true }),
   menuRadio: (page: Page, name: string) =>
     page.getByRole('menu').getByRole('menuitemradio', { name, exact: true }),

@@ -90,7 +90,14 @@ export function DraftContextStrip({
   const lockedReason = canChangeMachine ? null : MACHINE_LOCKED
   const startBranch = target.kind === 'new' ? (target.baseBranch ?? base.branch ?? 'HEAD') : null
 
+  function pinMachine() {
+    const store = useChatInputDraftStore.getState()
+    const identity = store.getDraft(draftTarget).identity
+    if (identity) store.setIdentity(draftTarget, { ...identity, machineSelection: 'pinned' })
+  }
+
   function chooseWorktree(worktree: OrchestrationWorktreeShell) {
+    pinMachine()
     if (worktree.id === base.id) {
       onTarget({ kind: 'current', worktreeId: base.id })
       return
@@ -104,6 +111,8 @@ export function DraftContextStrip({
 
   function chooseMachine(machine: DraftMachine) {
     if (!machine.worktree) return
+    pinMachine()
+    if (machine.environmentId === draftTarget.environmentId) return
     move.mutate({
       environmentId: machine.environmentId,
       projectId: machine.projectId,

@@ -1,3 +1,5 @@
+import { Spinner } from '@workspace/ui/components/spinner'
+import { useBalanceDraft } from '@/features/chat/hooks/use-balance-draft'
 import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 import { advanceBackgroundDraft } from '@/features/chat/state/advance-background-draft'
 import {
@@ -79,6 +81,7 @@ export function ChatDraftView({
     [draftId, rootPath, transport.environmentId],
   )
   const draft = useChatInputDraftStore((state) => state.getDraft(draftTarget))
+  const balance = useBalanceDraft(draftTarget, machines)
   const identity = draft.identity
   useEffect(() => {
     if (identity || !project || !worktree) return
@@ -104,7 +107,9 @@ export function ChatDraftView({
     (target?.kind !== 'new' || worktree.worktreeCreationCapability.allowed)
   function chooseTarget(worktreeTarget: SessionWorktreeTarget) {
     if (identity)
-      useChatInputDraftStore.getState().setIdentity(draftTarget, { ...identity, worktreeTarget })
+      useChatInputDraftStore
+        .getState()
+        .setIdentity(draftTarget, { ...identity, worktreeTarget, machineSelection: 'pinned' })
   }
   const providersQuery = useQuery(providerListQueryOptions())
   const modelSelection = resolveChatModelSelection(
@@ -210,6 +215,10 @@ export function ChatDraftView({
     payload: ChatInputSubmitPayload,
     background = false,
   ): Promise<ChatInputSubmitResult> {
+    if (balance.pending || balance.requiresChoice) {
+      setSendError('Choose a machine for this draft in Runs on.')
+      return 'rejected'
+    }
     if (!project || !worktree || !target || !targetReady) {
       setSendError('Workspace chat is still preparing.')
       return 'rejected'
@@ -320,25 +329,38 @@ export function ChatDraftView({
         >
           <ChatInput
             busy={false}
-            disabled={disabled || !project || !targetReady}
+            disabled={
+              disabled || !project || !targetReady || balance.pending || balance.requiresChoice
+            }
             draftKey={draftId}
             footer={
               project && worktree && target ? (
-                <DraftContextStrip
-                  agent={selectedAgent?.name ?? null}
-                  base={worktree}
-                  providerInstanceId={selectedProvider}
-                  onAgent={chooseAgent}
-                  draftTarget={draftTarget}
-                  machines={machines}
-                  project={project}
-                  target={target}
-                  onTarget={chooseTarget}
-                />
+                <>
+                  {balance.pending ? (
+                    <div className='text-muted-foreground flex items-center gap-(--density-control-gap) text-xs'>
+                      <Spinner size='xs' label='Checking machine capacity' />
+                      Checking machine capacity…
+                    </div>
+                  ) : null}
+                  <DraftContextStrip
+                    agent={selectedAgent?.name ?? null}
+                    base={worktree}
+                    providerInstanceId={selectedProvider}
+                    onAgent={chooseAgent}
+                    draftTarget={draftTarget}
+                    machines={machines}
+                    project={project}
+                    target={target}
+                    onTarget={chooseTarget}
+                  />
+                </>
               ) : null
             }
             error={
               sendError ??
+              (balance.requiresChoice
+                ? 'Choose a machine for this draft in Runs on. Capacity could not be confirmed.'
+                : null) ??
               (identity &&
               (!worktree ||
                 identity.baseWorktreeId !== worktree.id ||

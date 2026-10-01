@@ -1,4 +1,9 @@
-import { machineAuthResponseSchema, machineConnectionStateSchema } from '@workspace/contracts'
+import { readHostResources } from './resources'
+import {
+  hostResourcesSchema,
+  machineAuthResponseSchema,
+  machineConnectionStateSchema,
+} from '@workspace/contracts'
 import { Elysia } from 'elysia'
 import * as v from 'valibot'
 import { recordRequestContext } from '../observability'
@@ -16,8 +21,17 @@ export function machineRoutes(
   machines: MachineService,
   sshConfig: SshConfigDirectories,
   tailnetStatusCommand?: TailnetStatusCommand,
+  resources: typeof readHostResources = readHostResources,
 ) {
   return new Elysia({ name: 'machine-routes' })
+    .get(
+      '/machines/resources',
+      () => {
+        recordRequestContext({ area: 'machines', operation: 'resources' })
+        return resources()
+      },
+      { response: hostResourcesSchema },
+    )
     .get(
       '/machines/tailnet-hosts',
       async () => {

@@ -1,3 +1,4 @@
+import { machineBalancing } from './machine-balancing'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
 import { editorSavedSnapshot } from './editor-saved-snapshot'
@@ -430,6 +431,7 @@ export const scenarios: readonly Scenario[] = [
   sessionSearch,
   sessionSearchEnvironments,
   projectGrouping,
+  machineBalancing,
   sessionLifecycle,
   sessionBulkFailures,
   sessionUndo,
