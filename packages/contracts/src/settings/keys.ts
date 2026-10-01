@@ -1310,13 +1310,13 @@ export const SETTINGS_REGISTRY = {
       light: heavyJobBudgetSchema,
       suite: heavyJobBudgetSchema,
     }),
-    // Estimate: p90 peak of the class's completed runs (no OOM kill, peak below the ceiling) in
-    // the 2026-10-01 heavy-job log, rounded up to 512 MiB: browser 4516, build 2968, light 1180,
-    // suite 6155 MiB. Bench keeps 3072 for the large-file bench's 8 GiB case cap. A job past its
-    // estimate is still capped by its ceiling; the reserve and the pressure gate cover overlaps.
+    // Estimate: p90 peak of the class's runs that were not OOM-killed, in the 2026-10-01 heavy-job
+    // log, rounded up to 512 MiB: browser 7722, build 2968, light 1368, suite 6158 MiB. Bench keeps
+    // 3072 for the large-file bench's 8 GiB case cap. A job past its estimate is still capped by
+    // its ceiling; the reserve and the pressure gate cover overlaps.
     default: {
       bench: { ceilingMiB: 9216, estimateMiB: 3072 },
-      browser: { ceilingMiB: 10240, estimateMiB: 4608 },
+      browser: { ceilingMiB: 10240, estimateMiB: 8192 },
       build: { ceilingMiB: 4096, estimateMiB: 3072 },
       light: { ceilingMiB: 2048, estimateMiB: 1536 },
       suite: { ceilingMiB: 8192, estimateMiB: 6656 },
