@@ -19,8 +19,8 @@ import {
   type HighlightingThemeSource,
 } from '../src/index'
 
-// Context, removed and added lines under each separator kind. Git splits lines on LF only, so a
-// CRLF line reaches the diff with its CR, and the editor folds what the host pushes.
+// Context, removed and added lines under each separator kind and byte order mark. Git splits lines
+// on LF only, so a CRLF line reaches the diff with its CR, and the editor folds what the host pushes.
 const DIFFS = {
   crlf: {
     old: 'const a = 1;\r\nconst b = 2;\r\nconst c = 3;\r\n',
@@ -37,6 +37,14 @@ const DIFFS = {
   'cr before crlf': {
     old: 'const a = 1;\r\r\nconst b = 2;\r\n',
     new: 'const a = 1;\r\r\nconst b = 22;\r\n',
+  },
+  'two byte order marks': {
+    old: '\uFEFF\uFEFFconst a = 1;\r\nconst b = 2;\r\n',
+    new: '\uFEFF\uFEFFconst a = 1;\r\nconst b = 22;\r\n',
+  },
+  'a line inserted before a byte-order-marked first line': {
+    old: '\uFEFFconst a = 1;\nconst b = 2;\n',
+    new: 'const top = 0;\n\uFEFFconst a = 1;\nconst b = 22;\n',
   },
 } as const
 

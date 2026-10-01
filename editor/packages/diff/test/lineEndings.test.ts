@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { Editor } from '@singapore-editor/core/editor'
 import { createVisibleEditor } from './support/visibleEditor'
 import { createDiffEditorOptions, createDiffPlugin, createTextDiff, joinRenderLines } from '../src'
-import type { DiffFile, DiffGutterSide } from '../src'
+import type { DiffFile, DiffGutterSide, DiffRenderRow } from '../src'
 import { highlightRegistry, installHighlightPolyfill } from './support/highlightPolyfill'
 
 // The editor folds the text a host pushes the way it ingests a file, so every offset a row
@@ -28,6 +28,18 @@ const CASES = {
     old: '\uFEFFkeep\r\nconst value = 1\r\n',
     new: '\uFEFFkeep\r\nconst value = 2\r\n',
   },
+  'two byte order marks': {
+    old: '\uFEFF\uFEFFkeep\r\nconst value = 1\r\n',
+    new: '\uFEFF\uFEFFkeep\r\nconst value = 2\r\n',
+  },
+  'a line inserted before a byte-order-marked first line': {
+    old: '\uFEFFkeep\nconst value = 1\n',
+    new: 'header\n\uFEFFkeep\nconst value = 2\n',
+  },
+  'a line deleted before a byte-order-marked first line': {
+    old: 'header\n\uFEFFkeep\nconst value = 1\n',
+    new: '\uFEFFkeep\nconst value = 2\n',
+  },
   'lone cr ending the file': {
     old: 'keep\nconst value = 1\r',
     new: 'keep\nconst value = 2\r',
@@ -51,6 +63,31 @@ describe.each(Object.entries(CASES))('%s diff', (_name, texts) => {
     host = null
   })
 
+  it.each(['old', 'new'] as const)('the %s lines are what an opened document holds', (side) => {
+    const file = diffOf(texts)
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = createVisibleEditor(host)
+    editor.setText(texts[side])
+
+    const lines = side === 'old' ? file.oldLines : file.newLines
+    expect(lines.join('\n')).toBe(editor.getTextSnapshot().materializeFullText())
+  })
+
+  it.each(SIDES)('the %s pane draws each row with the text of the line it claims', (side) => {
+    const file = diffOf(texts)
+    const rows = mount(file, side)
+
+    const differing = rows.flatMap((row) => {
+      const claim = claimedLine(row, side)
+      if (!claim) return []
+      const lines = claim.side === 'old' ? file.oldLines : file.newLines
+      const text = lines[claim.lineNumber - 1]
+      return text === row.text ? [] : [{ row: row.text, line: text }]
+    })
+    expect(differing).toEqual([])
+  })
+
   it.each(SIDES)('the %s pane holds each row at the offset its consumers count', (side) => {
     const rows = mount(diffOf(texts), side)
     const buffer = editor!.getTextSnapshot().materializeFullText()
@@ -64,7 +101,7 @@ describe.each(Object.entries(CASES))('%s diff', (_name, texts) => {
       start += row.text.length + 1
     }
     expect(misplaced).toEqual([])
-    expect(buffer.length).toBe(joinRenderLines(rows).length)
+    expect(buffer.length).toBe(rows.map((row) => row.text).join('\n').length)
   })
 
   it('tints exactly the changed word', () => {
@@ -90,6 +127,18 @@ describe.each(Object.entries(CASES))('%s diff', (_name, texts) => {
 // A CR or U+2028/U+2029 left inside a line is a line break to the editor, one unit wide.
 function asEditorText(text: string): string {
   return text.replace(/[\r\u2028\u2029]/g, '\n')
+}
+
+/** The file line a row draws: a pane's own side, and in a stacked pane the new side but for deletions. */
+function claimedLine(row: DiffRenderRow, side: DiffGutterSide) {
+  const lineSide = lineSideOf(row, side)
+  const lineNumber = lineSide === 'old' ? row.oldLineNumber : row.newLineNumber
+  return lineNumber === undefined ? null : { side: lineSide, lineNumber }
+}
+
+function lineSideOf(row: DiffRenderRow, side: DiffGutterSide): 'old' | 'new' {
+  if (side !== 'stacked') return side
+  return row.type === 'deletion' ? 'old' : 'new'
 }
 
 function diffOf(texts: { readonly old: string; readonly new: string }): DiffFile {
