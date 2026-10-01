@@ -1397,6 +1397,22 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'stop', 'cancel', 'grace', 'sigterm', 'sigkill'],
   }),
+  'developer.heavyJobQuietHoldSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(7200)),
+    // Long enough for one quiet measurement; other sessions' jobs queue behind it meanwhile.
+    default: 600,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job quiet hold',
+    details:
+      'A `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.',
+    description:
+      'Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'quiet', 'exclusive', 'hold', 'drain', 'benchmark'],
+  }),
   'developer.heavyJobCpuLoadLimit': defineSetting({
     schema: v.pipe(v.number(), v.minValue(0.1), v.maxValue(16)),
     default: 1,

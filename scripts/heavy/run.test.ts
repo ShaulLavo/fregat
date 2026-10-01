@@ -168,7 +168,7 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     const result = await heavy(box, 'queued', ['true'])
     hold.kill()
     expect(result.code).toBe(0)
-    expect(result.stderr).toContain('slot1.lock is held exclusively')
+    expect(result.stderr).toContain('quiet hold by another tool')
     expect(records(box)[0]?.queuedMs).toBeGreaterThanOrEqual(1_500)
   }, 20_000)
 

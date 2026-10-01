@@ -60,7 +60,9 @@ Work that can start without waiting for another program: 114, 126's server and p
 research and 209's design review. Bounded product lanes continue beside them: Markdown authoring
 in 111/108 before 171's composer swap (parser work in 176/189), measured typing in 201, tree
 slices in 178 and Ghostty's [281](plans/281-ghostty-benchmarks-and-positioning.md) benchmarks and
-positioning plus [283](plans/283-ghostty-output-and-input-latency.md) output CPU and input latency.
+positioning plus [283](plans/283-ghostty-output-and-input-latency.md) output CPU and input latency,
+and its site in [285](plans/285-ghostty-site-first-frame-and-real-shell.md): a DOM renderer, the
+first frame server-rendered into the HTML, a real shell demo (the benchmarks section waits on 283).
 Each keeps its existing evidence and execution gates. Native stays editor-first; 088 follows 087.
 
 ## Package cutover delivered
