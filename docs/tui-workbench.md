@@ -3,7 +3,7 @@
 The workbench connects the existing TUI foundation to the server's filesystem, Git, search,
 logs, workspace-edit, LSP, and terminal routes. Plan 081 completed this slice on 2026-09-07.
 [Agent sessions](tui-agent.md) followed in Plan 082. Worktree parity and distribution remain
-subsequent work in [the strategy](tui-plan.md).
+subsequent work in [the strategy](../plans/tui-plan.md).
 
 ## Implementation
 

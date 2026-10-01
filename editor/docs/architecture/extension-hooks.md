@@ -1,6 +1,6 @@
 # Extension hooks: the contract map
 
-Draft from the [E027](../../plans/e027-extension-hooks.md) research pass on 2026-09-25, read from Editor
+Draft from the [E027](https://github.com/ShaulLavo/fregat/blob/main/plans/e027-extension-hooks.md) research pass on 2026-09-25, read from Editor
 `e2fd299`. It records what the code does today. Rows marked proposed are E027's recommendations and
 are not implemented. Every public type named here is exported from `@singapore-editor/core/extensions`
 unless the row says otherwise.
@@ -21,7 +21,7 @@ Every registry a contribution reaches is per editor: the plugin host
 ([Editor.ts:370](../../packages/editor/src/editor/Editor.ts)), commands, and keymap context keys.
 Two views of one document share an `EditorTextBuffer` (text and undo) through separate
 `createEditorViewSession` sessions, so selections stay per view. There
-is no document-scoped contribution; Platform [Plan 099](../../../platform/plans/099-document-contributions.md)
+is no document-scoped contribution; Platform [Plan 099](https://github.com/ShaulLavo/fregat/blob/main/plans/099-document-contributions.md)
 owns adding one.
 
 Rules the code already implies:
@@ -70,25 +70,25 @@ exported), **host** (the host's API, not a plugin hook), **proposed** (lands exp
 
 ### Commands
 
-| Hook                                               | Scope, phase, rights                                                                    | Order, cancel, dispose                                                                                                                                        | Consumer                        | Status                                       |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | -------------------------------------------- |
-| `EditorCommandContributionContext.registerCommand` | Per editor. IDs are the closed `EditorCommandId` union. Handler gets `{ event? }` only. | One handler per ID; a duplicate throws. A registered handler runs before the built-in and a `false` does not fall through (`closeFind` is the one exception). | find, lsp, hover, bracket match | supported                                    |
-| `Editor.dispatchCommand`                           | Host.                                                                                   | Runs in one editor operation.                                                                                                                                 | Platform command bus            | host                                         |
-| Command metadata, custom IDs, typed arguments      | —                                                                                       | —                                                                                                                                                             | —                               | [E026](../../plans/e026-command-metadata.md) |
+| Hook                                               | Scope, phase, rights                                                                    | Order, cancel, dispose                                                                                                                                        | Consumer                        | Status                                                                               |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------ |
+| `EditorCommandContributionContext.registerCommand` | Per editor. IDs are the closed `EditorCommandId` union. Handler gets `{ event? }` only. | One handler per ID; a duplicate throws. A registered handler runs before the built-in and a `false` does not fall through (`closeFind` is the one exception). | find, lsp, hover, bracket match | supported                                                                            |
+| `Editor.dispatchCommand`                           | Host.                                                                                   | Runs in one editor operation.                                                                                                                                 | Platform command bus            | host                                                                                 |
+| Command metadata, custom IDs, typed arguments      | —                                                                                       | —                                                                                                                                                             | —                               | [E026](https://github.com/ShaulLavo/fregat/blob/main/plans/e026-command-metadata.md) |
 
 ### Input
 
-| Hook                       | Scope, phase, rights                                                                | Order, cancel, dispose                                                    | Consumer                         | Status      |
-| -------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------- | ----------- |
-| `registerPressParticipant` | View context. Asked before a press becomes a caret; `true` claims it (E050 row 5).  | Registration order; first claim wins; the editor prevents the default.    | diff, definition links           | supported   |
-| `registerNonCaretRows`     | View context. Caret moves step over the rows.                                       | Claimed during creation only.                                             | diff                             | supported   |
-| `registerKeymapContextKey` | View context. Read when a key is matched (E050 row 6).                              | Unregistered keys read false.                                             | find, completion, signature help | supported   |
-| `onDidType`                | View context. After the typed edit lands.                                           | Not claimed by the editor; the contribution must dispose it.              | auto-close consumers             | supported   |
-| `EDITOR_PASTE_HANDLER`     | Language feature token. First handler that answers takes the paste.                 | Selector score, then priority, then registration order.                   | built-in paste handlers          | supported   |
-| Keymap bindings            | Host only, through `EditorKeymapOptions.layers`. A plugin cannot add a binding.     | Later layers first; `when` conditions; mutating commands need `writable`. | Platform disables it             | host        |
+| Hook                       | Scope, phase, rights                                                                | Order, cancel, dispose                                                    | Consumer                         | Status       |
+| -------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------- | ------------ |
+| `registerPressParticipant` | View context. Asked before a press becomes a caret; `true` claims it (E050 row 5).  | Registration order; first claim wins; the editor prevents the default.    | diff, definition links           | supported    |
+| `registerNonCaretRows`     | View context. Caret moves step over the rows.                                       | Claimed during creation only.                                             | diff                             | supported    |
+| `registerKeymapContextKey` | View context. Read when a key is matched (E050 row 6).                              | Unregistered keys read false.                                             | find, completion, signature help | supported    |
+| `onDidType`                | View context. After the typed edit lands.                                           | Not claimed by the editor; the contribution must dispose it.              | auto-close consumers             | supported    |
+| `EDITOR_PASTE_HANDLER`     | Language feature token. First handler that answers takes the paste.                 | Selector score, then priority, then registration order.                   | built-in paste handlers          | supported    |
+| Keymap bindings            | Host only, through `EditorKeymapOptions.layers`. A plugin cannot add a binding.     | Later layers first; `when` conditions; mutating commands need `writable`. | Platform disables it             | host         |
 | Key participant            | View context. Consume or delegate a key before the editor keymap and default input. | See the input section below.                                              | E028                             | experimental |
 | Text commit gate           | View context. Allow or reject text from every source before it commits.             | See the input section below.                                              | E028                             | experimental |
-| Replace the input loop     | —                                                                                   | Rejected below.                                                           | —                                | unsupported |
+| Replace the input loop     | —                                                                                   | Rejected below.                                                           | —                                | unsupported  |
 
 ### Syntax and language features
 

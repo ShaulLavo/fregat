@@ -20,7 +20,7 @@ Open the extension manager, browse compatible packages, inspect details, install
 
 Theme catalog queries exist in [apps/web/src/features/settings/hooks/use-bundle-library.ts](../apps/web/src/features/settings/hooks/use-bundle-library.ts) and [apps/web/src/lib/theme-library](../apps/web/src/lib/theme-library). The command table is [apps/web/src/keymap/table.ts](../apps/web/src/keymap/table.ts). Plan 268 adds manifest compatibility and load/unload ownership. There is no general extension manager/catalog in current `apps/web/src/features` or corresponding server package lifecycle.
 
-Editor contribution ownership/disposal is in `editor/packages/editor/src/createPlugin.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/editor/src/createPlugin.ts); the manager delegates attachment to Plan 268.
+Editor contribution ownership/disposal is in `editor/packages/editor/src/createPlugin.ts` after Plan 207, verified in [the current Editor source](../editor/packages/editor/src/createPlugin.ts); the manager delegates attachment to Plan 268.
 
 ## Design
 

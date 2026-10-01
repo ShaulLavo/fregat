@@ -10,7 +10,7 @@ Before any native, packaged, or remote distribution:
 
 - Require native/bootstrap session auth for every `/fs/*` and `/lsp/*` route.
   Origin-only auth is dev-only; the bootstrap credential is milestone M4 in
-  `docs/environments-and-remote-plan.md`.
+  `plans/environments-and-remote-plan.md`.
 - Replace whole-file text reads with metadata-first open, chunked text reads,
   editor chunk loading, and a clear too-large-to-open-as-text state.
 - Lower or remove `FS_DEV_MAX_TEXT_FILE_BYTES`. The current 200 MB default exists

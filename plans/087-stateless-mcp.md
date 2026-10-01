@@ -22,7 +22,7 @@ JSON-RPC `2.0` alone does not identify the MCP revision. The official
 [SDK release documentation](https://ts.sdk.modelcontextprotocol.io/v2/) identify these separately.
 
 This plan promotes MCP management and runtime integration from the unscheduled E7 item in
-[the editor strategy](../docs/editor-parity-implementation-plan.md). Plans 068 and 077 are completed
+[the editor strategy](editor-parity-implementation-plan.md). Plans 068 and 077 are completed
 ownership foundations. Reuse the [verified federation transport](../docs/federated-environments.md).
 Remote acceptance must prove MCP authentication and tool calls over it. Plans 080 and 085 are not
 MCP prerequisites; the web navigation migration is already implemented.

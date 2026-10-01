@@ -2,7 +2,7 @@ import AppKit
 
 /// Minimal windowed shell so `swift run MacApp` shows a real window. The
 /// editor view lands here once EditorCore passes the bench gate — this target
-/// stays a stub until then, per docs/native-plan-of-plans.md.
+/// stays a stub until then, per plans/native-plan-of-plans.md.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private var window: NSWindow?

@@ -3,6 +3,8 @@
 Development happens in the [Fregat monorepo](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
 This repository mirrors its `hotkeys/` folder. Submit changes to Fregat.
 
+[Fregat's roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) schedules work.
+
 keyboard shortcuts for editors and apps. you bind keys to commands, it matches key presses, runs multi-key chords like `Mod+K Mod+C`, and picks the binding that fits whatever has focus, the way zed does
 
 it also formats shortcuts for display and records new ones from the keyboard. the core never touches the dom; small adapters feed it browser or terminal keys. it ships no keymap of its own

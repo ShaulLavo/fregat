@@ -7,7 +7,7 @@ linked checkouts, checks and deployment. [AGENTS.md](../AGENTS.md) is the curren
 
 - [Execution roadmap](../PLAN.md) and [plan index](../plans/README.md)
 - [Wave 2 closeout](next-wave.md)
-- [Native client roadmap](native-plan-of-plans.md)
+- [Native client roadmap](../plans/native-plan-of-plans.md)
 - [Remaining defect-audit questions](defect-audit-follow-ups.md)
 
 The plan files own status and authorization. A dated investigation or delivery record describes
@@ -24,13 +24,13 @@ the revision it inspected; it is not a second implementation queue or proof of t
 | Keyboard                | [Architecture](keymap/architecture.md), [Modes](keymap/modes.md), [matching and dispatch](vscode-keymap-development.md), [delivery evidence](keymap/delivery.md)                                     |
 | Terminals               | [Terminal integration](terminal.md), [terminal host](terminal-host.md), [Ghostty package boundary](ghostty-webgpu-brief.md)                                                                          |
 | Settings and appearance | [Settings reference](settings-reference.md), [theme bundles](theme-bundles.md)                                                                                                                       |
-| Runtime and delivery    | [Boot](boot-and-first-load.md), [deployment](deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                                                              |
+| Runtime and delivery    | [Boot](boot-and-first-load.md), [deployment](../plans/deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                                                     |
 
 ## Clients
 
 - [Web development](development.md)
-- [TUI guide](../apps/tui/README.md) and [TUI design](tui-plan.md)
-- [Native macOS roadmap](native-plan-of-plans.md) and [editor core](native-editor-core-design.md)
+- [TUI guide](../apps/tui/README.md) and [TUI design](../plans/tui-plan.md)
+- [Native macOS roadmap](../plans/native-plan-of-plans.md) and [editor core](native-editor-core-design.md)
 - [Desktop shell work](../plans/114-polaron-shell.md)
 
 ## Research and evidence
