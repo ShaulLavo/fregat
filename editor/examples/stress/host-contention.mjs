@@ -1,7 +1,26 @@
+import { execFileSync } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
 
-// Linux reports both /proc/stat and per-process CPU time in USER_HZ ticks of 10 ms.
-const tickMs = 10
+/*
+ * An ESTIMATE of CPU time on the runner's pinned CPUs that its own process tree did not account
+ * for, read at scenario-group boundaries (Linux only). Its assumptions, recorded with each reading
+ * where they can be observed:
+ * - /proc/stat busy time includes interrupt, softirq and steal time, kept separate here;
+ * - own-tree CPU counts every CPU a process ran on, so it matches the pinned set only while every
+ *   descendant is confined to it (`ownTreeConfined`, checked at the end read);
+ * - /proc is read process by process, so a child exiting or being reaped between reads can be
+ *   missed or counted twice; the residual is therefore signed and never clamped;
+ * - counters move in USER_HZ ticks (`userHz`), so short groups carry tick-sized error.
+ * A residual is correlation evidence about other work on the measurement cores. It identifies no
+ * process and is not an admission criterion.
+ */
+
+let userHz = null
+
+function readUserHz() {
+  userHz ??= Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
+  return userHz
+}
 
 function expandCpuList(list) {
   return list
@@ -13,26 +32,28 @@ function expandCpuList(list) {
     })
 }
 
-async function pinnedCpus() {
-  const status = await readFile('/proc/self/status', 'utf8')
-  return expandCpuList(/^Cpus_allowed_list:\s*(.+)$/m.exec(status)[1])
+async function allowedCpus(pid) {
+  const status = await readFile(`/proc/${pid}/status`, 'utf8').catch(() => null)
+  const match = status && /^Cpus_allowed_list:\s*(.+)$/m.exec(status)
+  return match ? expandCpuList(match[1]) : null
 }
 
-// Busy ticks of the given CPUs: everything except idle and iowait.
-async function cpuBusyTicks(cpus) {
+async function pinnedTicks(cpus) {
   const wanted = new Set(cpus.map((cpu) => `cpu${cpu}`))
-  let busy = 0
+  const ticks = { task: 0, interrupt: 0, steal: 0 }
   for (const line of (await readFile('/proc/stat', 'utf8')).split('\n')) {
     const [name, ...fields] = line.trim().split(/\s+/)
     if (!wanted.has(name)) continue
     const [user, nice, system, , , irq, softirq, steal] = fields.map(Number)
-    busy += user + nice + system + irq + softirq + steal
+    ticks.task += user + nice + system
+    ticks.interrupt += irq + softirq
+    ticks.steal += steal
   }
-  return busy
+  return ticks
 }
 
-// CPU ticks of a process and every descendant, including children they already reaped.
-async function treeTicks(root) {
+// CPU ticks of a process and its descendants, including children they already reaped.
+async function ownTree(root) {
   const processes = new Map()
   for (const entry of await readdir('/proc')) {
     if (!/^\d+$/.test(entry)) continue
@@ -45,37 +66,63 @@ async function treeTicks(root) {
       ticks: utime + stime + cutime + cstime,
     })
   }
-  let ticks = 0
+  const members = []
   const pending = [root]
   while (pending.length) {
     const pid = pending.pop()
-    ticks += processes.get(pid)?.ticks ?? 0
+    members.push(pid)
     for (const [child, info] of processes) if (info.parent === pid) pending.push(child)
   }
-  return ticks
+  const ticks = members.reduce((sum, pid) => sum + (processes.get(pid)?.ticks ?? 0), 0)
+  return { ticks, members }
 }
 
-/**
- * Starts a contention reading for one scenario group. CPU time on the runner's pinned CPUs that its
- * own process tree did not use belongs to other work sharing the measurement cores.
- */
-export async function startContention() {
-  const cpus = await pinnedCpus()
-  const startedAt = Date.now()
-  const busy = await cpuBusyTicks(cpus)
-  const own = await treeTicks(process.pid)
+async function confined(members, cpus) {
+  const pinned = new Set(cpus)
+  for (const pid of members) {
+    const allowed = await allowedCpus(pid)
+    if (allowed && allowed.some((cpu) => !pinned.has(cpu))) return false
+  }
+  return true
+}
+
+async function readCounters(cpus) {
+  const before = performance.now()
+  const pinned = await pinnedTicks(cpus)
+  const own = await ownTree(process.pid)
+  return { at: before, collectionMs: performance.now() - before, pinned, own }
+}
+
+/** Starts one boundary-to-boundary estimate; the returned function ends it. */
+export async function startHostCpuEstimate() {
+  const hz = readUserHz()
+  const cpus = await allowedCpus(process.pid)
+  const startedAt = new Date().toISOString()
+  const start = await readCounters(cpus)
   return async () => {
-    const endedAt = Date.now()
-    const busyMs = ((await cpuBusyTicks(cpus)) - busy) * tickMs
-    const ownMs = ((await treeTicks(process.pid)) - own) * tickMs
+    const end = await readCounters(cpus)
+    const tickMs = 1000 / hz
+    const elapsedMs = end.at - start.at
+    const taskMs = (end.pinned.task - start.pinned.task) * tickMs
+    const interruptMs = (end.pinned.interrupt - start.pinned.interrupt) * tickMs
+    const stealMs = (end.pinned.steal - start.pinned.steal) * tickMs
+    const ownTreeMs = (end.own.ticks - start.own.ticks) * tickMs
+    const residualMs = taskMs + interruptMs + stealMs - ownTreeMs
     return {
-      startedAt: new Date(startedAt).toISOString(),
-      endedAt: new Date(endedAt).toISOString(),
+      startedAt,
+      userHz: hz,
       pinnedCpus: cpus.join(','),
-      pinnedBusyMs: busyMs,
-      ownCpuMs: ownMs,
-      foreignMs: Math.max(0, busyMs - ownMs),
-      foreignShare: Math.max(0, busyMs - ownMs) / (cpus.length * Math.max(1, endedAt - startedAt)),
+      elapsedMs,
+      startCollectionMs: start.collectionMs,
+      endCollectionMs: end.collectionMs,
+      pinnedTaskMs: taskMs,
+      pinnedInterruptMs: interruptMs,
+      pinnedStealMs: stealMs,
+      ownTreeMs,
+      ownTreeProcesses: end.own.members.length,
+      ownTreeConfined: await confined(end.own.members, cpus),
+      residualMs,
+      residualShare: residualMs / (cpus.length * elapsedMs),
     }
   }
 }
