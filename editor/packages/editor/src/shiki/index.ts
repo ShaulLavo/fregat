@@ -28,7 +28,6 @@ export type {
   LineTokens,
   StatesEqualFn,
   TokenizeLineFn,
-  TokenLineEnding,
   TokenLineSnapshot,
   TokenPatch,
 } from './tokenizer'

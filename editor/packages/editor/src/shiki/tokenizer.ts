@@ -3,7 +3,7 @@ import type { HighlighterGeneric, ThemedToken } from 'shiki/core'
 import { createScopedLineTokenizer } from './scopedTokens'
 
 /** What ends a line, split as Shiki splits: LF or CRLF, '' on the last line. A lone CR is text. */
-export type TokenLineEnding = '' | '\n' | '\r\n'
+type TokenLineEnding = '' | '\n' | '\r\n'
 
 export interface TokenLineSnapshot {
   text: string
