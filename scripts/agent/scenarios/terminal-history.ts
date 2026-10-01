@@ -1,3 +1,5 @@
+import { reattachedTerminal } from '../terminal-connections'
+import { captureScenarioApi, cleanupAll } from '../scenario-cleanup'
 import { stageRelease } from './server-update'
 import { processExists } from '../../../apps/server/scripts/process-exists'
 import { committedFixture } from '../fixture-workspace'
@@ -109,19 +111,20 @@ export const terminalHistory: Scenario = {
       await showTerminal(second)
       await until(
         second,
-        () => other.at(-1)?.output.includes(marker) === true,
+        () => other.at(-1)?.ready === true && other.at(-1)?.output.includes(marker) === true,
         'Second viewer must replay shared output',
       )
       strictEqual(
         new URL(first.at(-1)!.socketUrl).searchParams.get('terminalId'),
         new URL(other.at(-1)!.socketUrl).searchParams.get('terminalId'),
       )
+      const beforeReload = first.length
       await page.reload()
       await showTerminal(page)
       await until(
         page,
-        () => first.at(-1)?.output.includes(marker) === true,
-        'Reconnect must replay marker',
+        () => reattachedTerminal(first, beforeReload)?.output.includes(marker) === true,
+        'A fresh ready connection must replay the marker before input',
       )
       await step('history-replayed-with-second-viewer')
       await selectors
@@ -146,10 +149,8 @@ export const terminalHistory: Scenario = {
       await until(
         page,
         () =>
-          first.length > firstCount &&
-          other.length > secondCount &&
-          first.at(-1)?.ready === true &&
-          other.at(-1)?.ready === true,
+          reattachedTerminal(first, firstCount) !== undefined &&
+          reattachedTerminal(other, secondCount) !== undefined,
         'Both viewers reconnect after API restart',
       )
       ok(
@@ -186,7 +187,7 @@ export const terminalHistory: Scenario = {
       await showTerminal(page)
       await until(
         page,
-        () => first.length > count && first.at(-1)?.ready === true,
+        () => reattachedTerminal(first, count) !== undefined,
         'Reconnect after clear must become ready',
       )
       await page.waitForTimeout(300)
@@ -294,14 +295,15 @@ export const terminalIdleShells = isolatedNativeScenario({
     const prefix = `idle-shell-verification-${crypto.randomUUID()}-`
     const owners = new Map<string, URL>()
     const connections = await isolate(page, prefix, owners)
-    await dispatch(page, orchestration, {
-      type: 'session.create',
-      sessionId: otherId,
-      title: otherTitle,
-      worktreeTarget: { kind: 'current', worktreeId },
-      modelSelection: { providerInstanceId, model: 'gpt-5.5' },
-    })
+    const api = captureScenarioApi(page)
     try {
+      await dispatch(page, orchestration, {
+        type: 'session.create',
+        sessionId: otherId,
+        title: otherTitle,
+        worktreeTarget: { kind: 'current', worktreeId },
+        modelSelection: { providerInstanceId, model: 'gpt-5.5' },
+      })
       await page.reload()
       await showTerminal(page)
       await until(page, () => connections.at(-1)?.ready === true, 'Idle shell attaches')
@@ -406,19 +408,21 @@ export const terminalIdleShells = isolatedNativeScenario({
     } finally {
       // A renderer failure must not prevent the capture-owned shells and session from closing.
       await page.goto('about:blank').catch(() => undefined)
-      for (const url of owners.values()) {
-        const base = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}`
-        const response = await page.request.post(`${base}/kill`, {
-          headers: { Origin: new URL(base).origin },
-          data: {
-            worktreeId: url.searchParams.get('worktreeId'),
-            terminalId: url.searchParams.get('terminalId'),
-          },
-        })
-        strictEqual(response.status(), 200, 'Owned shell cleanup succeeds')
-      }
-      await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId: otherId })
-      await dispatch(page, orchestration, { type: 'session.delete', sessionId: otherId })
+      await cleanupAll([
+        ...[...owners.values()].map((url) => async () => {
+          const base = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}`
+          const response = await api.request.post(`${base}/kill`, {
+            headers: { Origin: new URL(api.url()).origin },
+            data: {
+              worktreeId: url.searchParams.get('worktreeId'),
+              terminalId: url.searchParams.get('terminalId'),
+            },
+          })
+          strictEqual(response.status(), 200, 'Owned shell cleanup succeeds')
+        }),
+        () => dispatch(api, orchestration, { type: 'session.runtime.stop', sessionId: otherId }),
+        () => dispatch(api, orchestration, { type: 'session.delete', sessionId: otherId }),
+      ])
     }
   },
 })
