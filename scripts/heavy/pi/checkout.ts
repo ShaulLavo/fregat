@@ -38,6 +38,16 @@ export function fregatCheckout(cwd = process.cwd(), identity = FREGAT) {
   const origin = git(root, ['remote', 'get-url', 'origin'])
   if (origin && identity.origin.test(origin)) return root
   throw createScriptError(
-    `${root} is a shallow clone whose origin (${origin ?? 'none'}) is not Fregat's, so it cannot be shown to be Fregat; the Pi lane only mirrors Fregat.`,
+    `${root} is a shallow clone whose origin (${origin ? withoutCredentials(origin) : 'none'}) is not Fregat's, so it cannot be shown to be Fregat; the Pi lane only mirrors Fregat.`,
   )
+}
+
+/** Where a remote URL points, without the userinfo that can carry a token. */
+function withoutCredentials(url: string) {
+  // scp-style `user@host:path` is not a URL; its user part goes the same way.
+  if (!URL.canParse(url)) return url.replace(/^[^@/:]+@/, '')
+  const parsed = new URL(url)
+  parsed.username = ''
+  parsed.password = ''
+  return parsed.toString()
 }
