@@ -1,9 +1,10 @@
 import { deepStrictEqual, strictEqual } from 'node:assert/strict'
-import { chmod, mkdtemp, open, readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, open, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { scratchPath } from '../paths'
 import { focusEditor, selectors } from '../selectors'
+import type { JSHandle } from 'playwright'
 import type { Scenario } from './index'
 
 export const editorReadRecovery: Scenario = {
@@ -37,12 +38,12 @@ export const editorReadRecovery: Scenario = {
       await selectors.fileReadRetry(page).waitFor()
       await selectors.fileReadErrorHeader(page).waitFor()
       await selectors.editorRows(page).filter({ hasText: 'retained text' }).waitFor()
-      deepStrictEqual(await clean.evaluate(checkRetainedIdentity), retainedChecks)
+      deepStrictEqual((await clean.evaluate(checkReadIdentity))?.retained, retainedChecks)
       await step('clean-refetch-failure-held')
       await chmod(file, 0o600)
       await selectors.fileReadRetry(page).click()
       await selectors.fileReadErrorHeader(page).waitFor({ state: 'detached' })
-      deepStrictEqual(await clean.evaluate(checkRetainedIdentity), retainedChecks)
+      await assertRecoveredRead(clean, file)
       await clean.dispose()
       await step('clean-retry-recovered')
 
@@ -61,13 +62,13 @@ export const editorReadRecovery: Scenario = {
       }
       await selectors.fileReadErrorHeader(page).waitFor()
       await selectors.editorRows(page).filter({ hasText: 'unsaved local edit' }).waitFor()
-      deepStrictEqual(await dirty.evaluate(checkRetainedIdentity), retainedChecks)
+      deepStrictEqual((await dirty.evaluate(checkReadIdentity))?.retained, retainedChecks)
       await step('dirty-refetch-failure-held')
       await chmod(file, 0o600)
       await selectors.fileReadRetry(page).click()
       await selectors.fileReadErrorHeader(page).waitFor({ state: 'detached' })
       await selectors.editorRows(page).filter({ hasText: 'unsaved local edit' }).waitFor()
-      deepStrictEqual(await dirty.evaluate(checkRetainedIdentity), retainedChecks)
+      await assertRecoveredRead(dirty, file)
       strictEqual(await readFile(file, 'utf8'), 'retained text\n')
       await step('dirty-retry-recovered')
       await focusEditor(page)
@@ -94,7 +95,7 @@ type RetainedDocument = {
   buffer: object
   contentRevision: string
   key: string
-  sync: object
+  sync: { fileVersion: string; mtimeMs: number }
 }
 type RetainedView = { documentKey: string; tabId: string; view: object }
 type RetainedStore = {
@@ -112,6 +113,16 @@ const retainedChecks = {
   document: true,
   revision: true,
   sync: true,
+  view: true,
+}
+
+const recoveredChecks = {
+  analysis: true,
+  buffer: true,
+  dirty: true,
+  mtimeAdvanced: true,
+  revision: true,
+  savedVersion: true,
   view: true,
 }
 
@@ -139,18 +150,40 @@ function retainedIdentity(element: Element) {
   return null
 }
 
-function checkRetainedIdentity(identity: ReturnType<typeof retainedIdentity>) {
+function checkReadIdentity(identity: ReturnType<typeof retainedIdentity>) {
   if (!identity) return null
   const state = identity.store.getState()
   const document = state.liveDocumentsByKey[identity.document.key]
   const view = state.viewsByTabId[identity.view.tabId]
-  return {
+  const content = {
     analysis: document.analysis === identity.document.analysis,
     buffer: document.buffer === identity.document.buffer,
     dirty: state.dirtyDocumentKeys.has(document.key) === identity.dirty,
-    document: document === identity.document,
     revision: document.contentRevision === identity.document.contentRevision,
-    sync: document.sync === identity.document.sync,
     view: view.view === identity.view.view,
   }
+  return {
+    retained: {
+      ...content,
+      document: document === identity.document,
+      sync: document.sync === identity.document.sync,
+    },
+    recovered: {
+      ...content,
+      mtimeAdvanced: document.sync.mtimeMs > identity.document.sync.mtimeMs,
+      mtimeMs: document.sync.mtimeMs,
+      savedVersion: document.sync.fileVersion === identity.document.sync.fileVersion,
+    },
+    metadata: { previous: identity.document.sync, adopted: document.sync },
+  }
+}
+
+async function assertRecoveredRead(
+  identity: JSHandle<ReturnType<typeof retainedIdentity>>,
+  file: string,
+) {
+  const mtimeMs = (await stat(file)).mtimeMs
+  const observed = await identity.evaluate(checkReadIdentity)
+  deepStrictEqual(observed?.recovered, { ...recoveredChecks, mtimeMs })
+  console.log(JSON.stringify({ fileReadRecovery: observed?.metadata, diskMtimeMs: mtimeMs }))
 }
