@@ -8,7 +8,12 @@ import {
   openFixtureWorkspace,
   releaseFixture,
 } from '../fixture-workspace'
-import { diffPaneSelector, openGitPanel, selectors } from '../selectors'
+import {
+  diffPaneSelector,
+  diffPaneSyntaxReadySelector,
+  openGitPanel,
+  selectors,
+} from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
 const BEFORE = ['const first = 1;', 'const second = 2;', 'const third = 3;', 'const fourth = 4;']
@@ -36,8 +41,7 @@ export const gitDiffCrlfSyntax: Scenario = {
       await openFixtureWorkspace(page, fixture)
       await openGitPanel(page)
       await selectors.worktreeFiles(page).filter({ hasText: 'crlf.ts' }).first().click()
-      await waitForTokens(page)
-      await page.waitForTimeout(400)
+      await waitForSyntax(page)
 
       const paint = await paintedConsts(page)
       const tint = await inlineTint(page)
@@ -64,12 +68,23 @@ function assertPaint(paint: Paint, tint: readonly string[]): void {
   }
 }
 
-async function waitForTokens(page: Page): Promise<void> {
+// Every pane reports its syntax landed and has painted token ranges; colouring is then final.
+async function waitForSyntax(page: Page): Promise<void> {
   await page.waitForFunction(
-    ({ paneSelector, source }) =>
-      (new Function(`return (${source})`)() as (selector: string) => Paint)(paneSelector).consts >
-      0,
-    { paneSelector: diffPaneSelector, source: PAINTED_CONSTS },
+    ({ paneSelector, readySelector }) => {
+      const panes = [...document.querySelectorAll(paneSelector)]
+      if (panes.length === 0 || panes.some((pane) => !pane.matches(readySelector))) return false
+      const painted = new Set<Element>()
+      for (const [name, highlight] of CSS.highlights) {
+        if (!name.startsWith('editor-shared-token-')) continue
+        for (const range of highlight as unknown as Iterable<AbstractRange>) {
+          const pane = range.startContainer.parentElement?.closest(paneSelector)
+          if (pane) painted.add(pane)
+        }
+      }
+      return panes.every((pane) => painted.has(pane))
+    },
+    { paneSelector: diffPaneSelector, readySelector: diffPaneSyntaxReadySelector },
     { timeout: 15_000 },
   )
 }

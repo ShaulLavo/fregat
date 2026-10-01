@@ -18,6 +18,8 @@ export const rootSwitchRows = {
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+/** A diff pane whose syntax tokens for its current rows have landed. */
+export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
 export const diffContentRowSelector = '.editor-diff-pane [data-editor-virtual-row]'
 export const editorViewportSelector = '.editor-virtualized-viewport'
 /** Rows the markdown live preview has decorated (headings, lists, emphasis). */

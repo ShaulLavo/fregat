@@ -91,10 +91,11 @@ function oldLinesAsDrawn(oldLines: readonly string[], hunks: readonly DiffHunk[]
   for (const line of hunks.flatMap((hunk) => hunk.lines)) {
     const index = (line.oldLineNumber ?? 0) - 1
     if (line.type !== 'context' || oldLines[index] === undefined) continue
-    if (oldLines[index] === line.text) continue
+    const text = line.oldText ?? line.text
+    if (oldLines[index] === text) continue
 
     drawn ??= [...oldLines]
-    drawn[index] = line.text
+    drawn[index] = text
   }
 
   return drawn ?? oldLines

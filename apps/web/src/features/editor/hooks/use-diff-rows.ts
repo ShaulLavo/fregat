@@ -11,6 +11,8 @@ import { highlightingService } from '@/lib/highlighting/state/service'
 
 export type DiffRowsState = {
   readonly rows: readonly DiffRenderRow[]
+  /** The plugin's syntax for these rows has landed, or there is none to wait for. */
+  readonly syntaxReady: boolean
   readonly text: string
   readonly tokensRevision: number
 }
@@ -37,6 +39,7 @@ export function useDiffRows(
 ): DiffRowsState {
   const [rows, setRows] = useState<readonly DiffRenderRow[]>(() => plugin.getRows())
   const [tokensRevision, setTokensRevision] = useState(0)
+  const [syntaxReady, setSyntaxReady] = useState(() => plugin.isSyntaxReady())
   useLayoutEffect(() => {
     if (!file || syntaxTheme === null) {
       plugin.setFile(file)
@@ -47,14 +50,18 @@ export function useDiffRows(
   }, [file, plugin, side, syntaxTheme])
 
   useLayoutEffect(() => {
-    const pull = () => setRows(plugin.getRows())
+    const pull = () => {
+      setRows(plugin.getRows())
+      setSyntaxReady(plugin.isSyntaxReady())
+    }
 
     // The file is pushed by the effect above, which runs first and notifies nobody yet.
     pull()
     const rowsSubscription = plugin.onDidChangeRows(pull)
-    const tokensSubscription = plugin.onDidChangeTokens(() =>
-      setTokensRevision((revision) => revision + 1),
-    )
+    const tokensSubscription = plugin.onDidChangeTokens(() => {
+      setTokensRevision((revision) => revision + 1)
+      setSyntaxReady(plugin.isSyntaxReady())
+    })
 
     return () => {
       rowsSubscription.dispose()
@@ -64,5 +71,5 @@ export function useDiffRows(
 
   const text = joinRenderLines(rows)
 
-  return { rows, text, tokensRevision }
+  return { rows, syntaxReady, text, tokensRevision }
 }
