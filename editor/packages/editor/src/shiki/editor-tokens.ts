@@ -88,12 +88,9 @@ export function tokenLinesToEditorTokens(lines: readonly TokenLineSnapshot[]): E
   const palette = createEditorTokenStylePalette()
   let lineStart = 0
 
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const line = lines[lineIndex]
-    if (!line) continue
-
+  for (const line of lines) {
     appendEditorTokensFromLine(tokens, line, lineStart, palette)
-    lineStart = nextLineStart(lineStart, line.text.length, lineIndex, lines.length)
+    lineStart += line.text.length + line.lineEnding.length
   }
 
   return tokens
@@ -114,15 +111,6 @@ function appendEditorTokensFromLine(
     const start = lineStart + token.offset
     tokens.push({ end: start + token.content.length, start, style: entry.style })
   }
-}
-
-function nextLineStart(
-  lineStart: number,
-  lineLength: number,
-  lineIndex: number,
-  lineCount: number,
-): number {
-  return lineStart + lineLength + (lineIndex < lineCount - 1 ? 1 : 0)
 }
 
 export function snapshotToEditorTokens(
@@ -146,12 +134,9 @@ export function packTokenLines(
   const palette = createEditorTokenStylePalette()
   let lineStart = fromOffset
 
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-    const line = lines[lineIndex]
-    if (!line) continue
-
+  for (const line of lines) {
     writePackedTokenLine(writer, palette, line, lineStart)
-    lineStart = nextLineStart(lineStart, line.text.length, lineIndex, lines.length)
+    lineStart += line.text.length + line.lineEnding.length
   }
 
   return finishPackedEditorTokenWriter(writer, palette.styles)

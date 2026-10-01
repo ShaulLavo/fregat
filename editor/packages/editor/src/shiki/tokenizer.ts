@@ -2,8 +2,12 @@ import type { TextEdit } from '../tokens'
 import type { HighlighterGeneric, ThemedToken } from 'shiki/core'
 import { createScopedLineTokenizer } from './scopedTokens'
 
+/** What ends a line, split as Shiki splits: LF or CRLF, '' on the last line. A lone CR is text. */
+type TokenLineEnding = '' | '\n' | '\r\n'
+
 export interface TokenLineSnapshot {
   text: string
+  lineEnding: TokenLineEnding
   tokens: readonly ThemedToken[]
 }
 
@@ -64,29 +68,56 @@ export interface IncrementalTokenizer {
   untokenizedLineCount(): number
 }
 
-interface LineState {
-  text: string
+interface SourceLine {
+  readonly text: string
+  readonly lineEnding: TokenLineEnding
+}
+
+interface LineState extends SourceLine {
   tokens: readonly ThemedToken[]
   endState: unknown
   untokenized: boolean
 }
 
-function lineState(text: string, result: LineTokens): LineState {
+function lineState(line: SourceLine, result: LineTokens): LineState {
   return {
-    text,
+    text: line.text,
+    lineEnding: line.lineEnding,
     tokens: result.tokens,
     endState: result.state,
     untokenized: result.untokenized === true,
   }
 }
 
-function splitLines(code: string): string[] {
-  return code.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line))
+const CARRIAGE_RETURN = 0x0d
+
+function splitLines(code: string): SourceLine[] {
+  const lines: SourceLine[] = []
+  let start = 0
+  let newline = code.indexOf('\n')
+  while (newline !== -1) {
+    const pair = newline > start && code.charCodeAt(newline - 1) === CARRIAGE_RETURN
+    const text = code.slice(start, pair ? newline - 1 : newline)
+    lines.push({ text, lineEnding: pair ? '\r\n' : '\n' })
+    start = newline + 1
+    newline = code.indexOf('\n', start)
+  }
+  lines.push({ text: code.slice(start), lineEnding: '' })
+  return lines
+}
+
+function rawLength(line: SourceLine): number {
+  return line.text.length + line.lineEnding.length
+}
+
+function sameSource(left: SourceLine | undefined, right: SourceLine | undefined): boolean {
+  return left?.text === right?.text && left?.lineEnding === right?.lineEnding
 }
 
 function cloneSnapshot(lines: readonly LineState[]): TokenLineSnapshot[] {
   return lines.map((line) => ({
     text: line.text,
+    lineEnding: line.lineEnding,
     tokens: line.tokens.slice(),
   }))
 }
@@ -135,10 +166,14 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     const start = this.offsetToLine(from)
     const end = this.offsetToLine(to)
 
-    // Splice the edit into the affected line text
-    const prefixText = this.lines[start.line]?.text.slice(0, start.col) ?? ''
-    const suffixText = this.lines[end.line]?.text.slice(end.col) ?? ''
+    // Splice the edit into the affected lines, separators included: an edit may split a CRLF.
+    const startLine = this.lines[start.line]
+    const endLine = this.lines[end.line]
+    const prefixText = startLine ? (startLine.text + startLine.lineEnding).slice(0, start.col) : ''
+    const suffixText = endLine ? (endLine.text + endLine.lineEnding).slice(end.col) : ''
     const editedLines = splitLines(prefixText + text + suffixText)
+    // A suffix ending in a separator leaves an empty remainder: the start of the next old line.
+    if (end.line < this.lines.length - 1) editedLines.pop()
 
     // Retokenize edited lines using the grammar state before the first affected line
     const initialState = start.line === 0 ? undefined : this.lines[start.line - 1]?.endState
@@ -155,7 +190,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
       if (this.statesEqual(state, this.lines[i - 1]?.endState)) break
 
       const result = this.tokenize(oldLine.text, state)
-      retokenized.push(lineState(oldLine.text, result))
+      retokenized.push(lineState(oldLine, result))
       state = result.state
       stableAt = i + 1
     }
@@ -185,17 +220,18 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     return edits.toSorted(compareEditsDescending).map((edit) => this.applyEdit(edit))
   }
 
+  /** The line holding `offset`, where a column may fall inside that line's separator. */
   private offsetToLine(offset: number): { line: number; col: number } {
     let remaining = offset
+    const last = this.lines.length - 1
 
-    for (let i = 0; i < this.lines.length; i++) {
-      const len = this.lines[i]!.text.length
-      if (remaining <= len) return { line: i, col: remaining }
-      remaining -= len + 1 // +1 for the \n separator
+    for (let i = 0; i < last; i++) {
+      const length = rawLength(this.lines[i]!)
+      if (remaining < length) return { line: i, col: remaining }
+      remaining -= length
     }
 
-    const last = this.lines.length - 1
-    return { line: last, col: this.lines[last]?.text.length ?? 0 }
+    return { line: last, col: Math.min(remaining, this.lines[last]?.text.length ?? 0) }
   }
 
   private append(chunk: string): TokenPatch {
@@ -250,7 +286,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     while (
       prefixLength < previousLength &&
       prefixLength < nextLength &&
-      previousLines[prefixLength]?.text === nextLines[prefixLength]
+      sameSource(previousLines[prefixLength], nextLines[prefixLength])
     ) {
       prefixLength++
     }
@@ -259,8 +295,10 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     while (
       suffixLength < previousLength - prefixLength &&
       suffixLength < nextLength - prefixLength &&
-      previousLines[previousLength - 1 - suffixLength]?.text ===
-        nextLines[nextLength - 1 - suffixLength]
+      sameSource(
+        previousLines[previousLength - 1 - suffixLength],
+        nextLines[nextLength - 1 - suffixLength],
+      )
     ) {
       suffixLength++
     }
@@ -272,8 +310,8 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     const nextTailStart = nextLength - suffixLength
 
     for (let nextIndex = prefixLength; nextIndex < nextLength; nextIndex++) {
-      const line = nextLines[nextIndex] ?? ''
-      const result = this.tokenize(line, previousState)
+      const line = nextLines[nextIndex]!
+      const result = this.tokenize(line.text, previousState)
       const tokenizedLine = lineState(line, result)
       previousState = tokenizedLine.endState
 
@@ -283,7 +321,7 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
         const previousLine = previousLines[previousIndex]
         if (
           previousLine &&
-          previousLine.text === line &&
+          sameSource(previousLine, line) &&
           tokenLinesEqual(tokenizedLine.tokens, previousLine.tokens) &&
           this.statesEqual(tokenizedLine.endState, previousLine.endState)
         ) {
@@ -362,12 +400,12 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
     return this.lines.map((line) => line.tokens.slice())
   }
 
-  private tokenizeLines(lines: readonly string[], initialState?: unknown): LineState[] {
+  private tokenizeLines(lines: readonly SourceLine[], initialState?: unknown): LineState[] {
     const tokenized: LineState[] = []
     let previousState = initialState
 
     for (const line of lines) {
-      const result = this.tokenize(line, previousState)
+      const result = this.tokenize(line.text, previousState)
       tokenized.push(lineState(line, result))
       previousState = result.state
     }
@@ -381,13 +419,12 @@ function emptyPatch(): TokenPatch {
 }
 
 /** Offset of the start of `line`; the document length when `line` is the line count. */
-function lineOffset(lines: readonly { readonly text: string }[], line: number): number {
+function lineOffset(lines: readonly SourceLine[], line: number): number {
   let offset = 0
-  const separators = Math.min(line, Math.max(0, lines.length - 1))
   for (let index = 0; index < line && index < lines.length; index += 1) {
-    offset += lines[index]!.text.length
+    offset += rawLength(lines[index]!)
   }
-  return offset + separators
+  return offset
 }
 
 function compareEditsDescending(left: TextEdit, right: TextEdit): number {

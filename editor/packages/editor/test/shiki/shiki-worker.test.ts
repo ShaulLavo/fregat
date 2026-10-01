@@ -202,6 +202,7 @@ describe('shiki worker', () => {
           lines: [
             {
               text: 'const value',
+              lineEnding: '',
               tokens: [
                 { color: '#f00', content: 'const', fontStyle: 0, offset: 0 },
                 { color: '#f00', content: 'value', fontStyle: 0, offset: 6 },
@@ -279,6 +280,7 @@ describe('shiki worker', () => {
         lines: [
           {
             text: 'changed',
+            lineEnding: '',
             tokens: [{ color: '#0f0', content: 'changed', fontStyle: 0, offset: 0 }],
           },
         ],
@@ -290,8 +292,8 @@ describe('shiki worker', () => {
         untokenizedLineCount: () => 0,
         getSnapshot: () => ({
           lines: [
-            { text: 'const', tokens: [] },
-            { text: 'value', tokens: [] },
+            { text: 'const', lineEnding: '\n', tokens: [] },
+            { text: 'value', lineEnding: '', tokens: [] },
           ],
         }),
       },
