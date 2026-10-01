@@ -1,6 +1,7 @@
 import { fail } from './errors.mjs'
 import { inputConsumerIds, inputConsumerConfiguration } from './input-configurations.mjs'
-import { inputNoiseBudget, assertInputComparable } from './input-results.mjs'
+import { assertInputComparable } from './input-results.mjs'
+import { inputBudget, historicalNegativeKeys } from './input-budgets.mjs'
 
 export function randomGenerator(seed) {
   let state = seed >>> 0
@@ -88,7 +89,7 @@ export function comparePairedInput(baseline, candidate, schedule, seed) {
     }
   }
   const metrics = [...groups].map(([key, group], index) => {
-    const budget = inputNoiseBudget(group.baseline)
+    const budget = inputBudget(baseline.config.consumers ?? 'native', key)
     const differenceMs = median(group.differences)
     const interval = pairedInterval(group.differences, seed + index)
     const regression = differenceMs > budget.noiseMarginMs + 0.000001 && interval.lowMs > 0
@@ -110,8 +111,9 @@ export function comparePairedInput(baseline, candidate, schedule, seed) {
     seed,
     statistic:
       'median of paired repetition p95 differences; repetition-cluster percentile bootstrap',
-    budgetFormula:
-      'max(3 * range(baseline p95), 3 * range(baseline p50), max(baseline max - baseline min))',
+    budgetPolicy:
+      'frozen historical noise margins; declared native inheritance for new compositions',
+    acceptanceExclusions: baseline.config.acceptanceExclusions ?? [],
     baseline: baseline.id,
     candidate: candidate.id,
     passed: metrics.every((metric) => !metric.blocking || metric.passed),
@@ -137,9 +139,10 @@ function sampleKey(sample) {
 }
 
 export function sensitivityPassed(check) {
-  const dispatch = check.metrics.filter((metric) => metric.key.endsWith('/dispatch'))
+  const metrics = new Map(check.metrics.map((metric) => [metric.key, metric]))
   return (
-    check.passed === false && dispatch.length === 36 && dispatch.every((metric) => !metric.passed)
+    check.passed === false &&
+    historicalNegativeKeys('native').every((key) => metrics.get(key)?.passed === false)
   )
 }
 

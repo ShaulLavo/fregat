@@ -301,9 +301,9 @@ Use the complete input suite below for budget comparisons.
 
 ## Input latency budgets
 
-The paired command is implemented. Plan 282 acceptance is blocked by a source-correctness
-failure in both frozen historical minimap products, a historical negative-key disagreement, and
-incomplete timing validation.
+The paired command uses frozen historical group budgets. Plan 282's follow-up validation and
+complete-matrix timing are in progress. Minimap acceptance is temporarily excluded pending its
+separately owned undo source-correctness fix.
 Use it for diagnostics while the [acceptance record](../../../docs/document-contributions/paired-input-latency.md#validation)
 remains incomplete. Plan 099 units 2–7 remain gated.
 
@@ -339,14 +339,16 @@ dependencies available. Each set includes all public packages' `src`, `dist`, an
 runner verifies their receipts and the built runtime graph.
 
 Baseline and candidate alternate within randomized repetition pairs in one Chromium session.
-Each measure reports the median of paired p95 differences, a budget recomputed with the existing noise formula,
-and a 95% bootstrap interval over repetitions. A blocking regression requires both a difference
+Each measure reports the median of paired p95 differences, a fixed declared historical noise budget,
+and a 95% bootstrap interval over repetitions. Native, disabled, Tree-sitter, Shiki, and minimap
+use their exact accepted calibration values; other compositions explicitly inherit native's
+frozen budgets. Each budget carries its artifact hash and instrument provenance. A blocking regression requires both a difference
 above budget and an interval entirely above zero. The 108 blocking and 36 advisory measures,
 native input scenarios, visible and hidden views, correctness, and cleanup checks are retained.
 Advisory screenshot duration never fails acceptance.
 
-A cached sensitivity self-check injects a real 20 ms input delay and requires all 36 dispatch groups
-to fail. The cache includes raw evidence and is keyed by instrument source and dependency bytes.
+A cached sensitivity self-check injects a real 20 ms input delay and requires all 47 historical
+native negative keys to fail, including all 36 dispatch groups and the preedit-frame keys. The cache includes raw evidence and is keyed by instrument source and dependency bytes.
 The first run of a changed instrument pays for the self-check. Later runs recompute its verdict.
 
 Default fixtures fit Platform's 10 Mi UTF-16 analysis tier, including 500,000 short comment lines.
@@ -354,6 +356,11 @@ Default fixtures fit Platform's 10 Mi UTF-16 analysis tier, including 500,000 sh
 hashed fixtures and requires `--stress` if they exceed the tier. CPU pinning is optional.
 `--output` selects the compressed matrix report. `--repetitions` defaults to three measured pairs
 following one warmup pair. More pairs improve resolution near a budget.
+
+`--pending-minimap-source` records the authorized temporary minimap exception. It excludes the
+standalone minimap configuration from aggregate acceptance and relaxes only the final minimap
+source-equality check after short-lines undo. Workers, renders, runtime cost, and all other
+correctness checks remain active. Full minimap acceptance awaits the product fix.
 
 See [paired method and validation](../../../docs/document-contributions/paired-input-latency.md)
 for statistical limits, historical comparison, and measured wall times. The old absolute input

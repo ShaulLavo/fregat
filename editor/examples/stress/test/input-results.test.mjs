@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { inputBudget } from '../input-budgets.mjs'
 import { correlateInputEvents } from '../input-correlation.mjs'
 import {
   comparePairedInput,
@@ -864,7 +865,7 @@ describe('paired input latency', () => {
     const { baseline, candidate, schedule } = pairedResults()
     for (const [run, delay] of [
       [baseline, 0],
-      [candidate, 1],
+      [candidate, 0.01],
     ]) {
       run.samples = [10, 11, 10].flatMap((duration, repetition) =>
         result(run.id, duration + delay)
@@ -875,9 +876,51 @@ describe('paired input latency', () => {
     const check = comparePairedInput(baseline, candidate, schedule, 17)
     expect(check.passed).toBe(true)
     const dispatch = check.metrics.find((metric) => metric.key.endsWith('/dispatch'))
-    expect(dispatch.differenceMs).toBe(1)
-    expect(dispatch.interval.lowMs).toBe(1)
-    expect(dispatch.budgetMs).toBe(3)
+    expect(dispatch.differenceMs).toBeCloseTo(0.01)
+    expect(dispatch.interval.lowMs).toBeCloseTo(0.01)
+    expect(dispatch.budgetMs).toBe(inputBudget('native', dispatch.key).noiseMarginMs)
+  })
+
+  it('keeps frozen budgets when the baseline envelope widens', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    for (const [run, delay] of [
+      [baseline, 0],
+      [candidate, 9],
+    ]) {
+      run.samples = [10, 110, 510].flatMap((duration, repetition) =>
+        result(run.id, duration + delay)
+          .samples.filter((sample) => sample.repetition === 0)
+          .map((sample) => ({ ...sample, repetition })),
+      )
+    }
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    const metric = check.metrics.find(
+      (value) => value.key === 'ordinary/single/composition-update/inputToFrame',
+    )
+    expect(metric.budgetMs).toBe(5.899999998509884)
+    expect(metric.differenceMs).toBe(9)
+    expect(metric.interval.lowMs).toBe(9)
+    expect(metric.passed).toBe(false)
+  })
+
+  it('requires sensitivity to reject the historical preedit-frame keys', () => {
+    const { baseline, candidate, schedule } = pairedResults(30)
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    check.metrics.find(
+      (metric) => metric.key === 'ordinary/single/composition-update/inputToFrame',
+    ).passed = true
+    expect(sensitivityPassed(check)).toBe(false)
+  })
+
+  it('declares native inheritance and rejects unknown budgets', () => {
+    const key = 'ordinary/single/typing/dispatch'
+    expect(inputBudget('platform', key)).toMatchObject({
+      inherited: true,
+      reference: 'native',
+      noiseMarginMs: inputBudget('native', key).noiseMarginMs,
+    })
+    expect(() => inputBudget('unknown', key)).toThrow('Missing frozen input budget')
+    expect(() => inputBudget('native', 'missing')).toThrow('Missing frozen input budget')
   })
 
   it('rejects a pair order that does not run each side exactly once', () => {

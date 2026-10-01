@@ -7,7 +7,11 @@ import { chromium } from '@playwright/test'
 import { fixtureFacts, generateFixture, defaultSeed } from './src/fixtures.ts'
 import { readFrozenManifest } from './fixtures.mjs'
 import { loadPackageSet } from './package-set.mjs'
-import { inputConsumerIds, analysisLimitCodeUnits } from './input-configurations.mjs'
+import {
+  inputConsumerIds,
+  inputConsumerConfiguration,
+  analysisLimitCodeUnits,
+} from './input-configurations.mjs'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
 import { operationsPerSample, runPairedInputSuite } from './input-scenarios.mjs'
 import { comparePairedInput, sensitivityPassed, touchedConfigurations } from './input-paired.mjs'
@@ -35,6 +39,7 @@ const { values } = parseArgs({
     'slowdown-ms': { type: 'string', default: '0' },
     output: { type: 'string', default: '/work/tmp/plan-282/paired.json.gz' },
     'sensitivity-directory': { type: 'string', default: '/work/tmp/plan-282/sensitivity' },
+    'pending-minimap-source': { type: 'boolean', default: false },
   },
 })
 if (!values.baseline || !values.candidate)
@@ -114,7 +119,7 @@ try {
     })
     if (!sensitivityPassed(check.comparison)) {
       await writeInputArtifact(resolve(dirname(values.output), 'sensitivity-failed.json.gz'), check)
-      fail('Injected 20 ms delay did not reject every dispatch group')
+      fail('Injected 20 ms delay did not reject every historical native negative key')
     }
     sensitivity = { schemaVersion: 1, instrumentHash: instrument.hash, passed: true, check }
     await mkdir(dirname(cachePath), { recursive: true })
@@ -155,7 +160,14 @@ try {
       passed: sensitivity.passed,
     },
     wallSeconds: (performance.now() - started) / 1000,
-    passed: results.every((result) => result.comparison.passed),
+    acceptanceExclusions: values['pending-minimap-source']
+      ? ['minimap configuration acceptance', 'short-lines undo final minimap source correctness']
+      : [],
+    passed: results.every(
+      (result) =>
+        (values['pending-minimap-source'] && result.configuration === 'minimap') ||
+        result.comparison.passed,
+    ),
     results,
   }
   await writeInputArtifact(resolve(values.output), report)
@@ -178,6 +190,8 @@ try {
 
 async function collect({ browser, manifest, instrument }, consumers, delay, runtimes) {
   const start = performance.now()
+  const pendingMinimapSource =
+    values['pending-minimap-source'] && inputConsumerConfiguration(consumers, 'ordinary', 1).minimap
   const results = {}
   for (const side of ['baseline', 'candidate']) {
     results[side] = {
@@ -194,6 +208,10 @@ async function collect({ browser, manifest, instrument }, consumers, delay, runt
         operationsPerSample,
         diagnostics: false,
         readiness: 'receipt-poll',
+        pendingMinimapSource,
+        acceptanceExclusions: pendingMinimapSource
+          ? ['short-lines undo final minimap source correctness']
+          : [],
         slowdownMs: side === 'candidate' ? delay : 0,
         consumers,
         fixtures: 'frozen-hashed-files',

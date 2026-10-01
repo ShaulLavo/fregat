@@ -365,20 +365,3 @@ export function assertInputComparable(left, right, allowSlowdown = false) {
   )
   same(left.environment.instrumentHash, right.environment.instrumentHash, 'instrument source')
 }
-
-function range(values) {
-  return Math.max(...values) - Math.min(...values)
-}
-
-export function inputNoiseBudget(distributions) {
-  const controlP50Ms = distributions.map((summary) => summary.p50Ms)
-  const controlP95Ms = distributions.map((summary) => summary.p95Ms)
-  const controlMinMs = distributions.map((summary) => Math.min(...summary.rawSamples))
-  const controlMaxMs = distributions.map((summary) => summary.maxMs)
-  const noiseMarginMs = Math.max(
-    3 * range(controlP95Ms),
-    3 * range(controlP50Ms),
-    ...controlMaxMs.map((value, index) => value - controlMinMs[index]),
-  )
-  return { noiseMarginMs, controlP50Ms, controlP95Ms, controlMinMs, controlMaxMs }
-}

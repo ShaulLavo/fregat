@@ -1,6 +1,6 @@
 # Paired native input latency
 
-Plan 282 implements the paired replacement for Plan 099 units 2–7. Acceptance is blocked by a frozen-product correctness failure and a historical negative-key disagreement. The command is available for diagnostics; those units remain gated and still require owner authorization. The runner compares two frozen Editor package sets in one Chromium session. It alternates the sides within each repetition and records the randomized order of every pair.
+Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses fixed historical budgets and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Validation and complete-matrix timing are in progress; those units remain gated and still require owner authorization. The runner compares two frozen Editor package sets in one Chromium session. It alternates the sides within each repetition and records the randomized order of every pair.
 
 ## Run the comparison
 
@@ -23,13 +23,11 @@ Each configuration has 36 fixture, view, and scenario groups. Each group reports
 
 For each repetition, the statistic is candidate p95 minus baseline p95. The reported difference is the median of these paired differences. A deterministic percentile bootstrap resamples whole repetitions 10,000 times and reports a 95% confidence interval. Input operations within one repetition remain together.
 
-A blocking measure fails when its median paired difference exceeds its budget and the confidence interval is entirely positive. The old instrument derived and froze each group's millisecond budget from three control runs; it had no source-code budget registry. This implementation retains its noise-margin formula:
+A blocking measure fails when its median paired difference exceeds its fixed budget and the confidence interval is entirely positive. `input-budgets.json` declares the exact `noiseMarginMs` values frozen by the accepted historical native, disabled, Tree-sitter, Shiki, and minimap calibrations. Baseline variability cannot widen these budgets. Each metric records its reference configuration, calibration artifact, SHA-256, and historical instrument hash. No controls, holdouts, or recalibration run before a comparison.
 
-```text
-max(3 × range(baseline p95), 3 × range(baseline p50), max(baseline maximum − baseline minimum))
-```
+The five combined and Platform configurations have no accepted historical calibration. They explicitly inherit all 144 frozen native budgets. Their full-matrix results establish new coverage under that declared reference; they cannot establish historical acceptance agreement. Incomplete or unadmitted archived calibrations are not used to fill missing keys. An unknown configuration or measure fails before interpretation.
 
-The baseline repetitions supply a recomputed budget within the paired run. This does not preserve the historical frozen budget values, and the validation below exposes a resulting negative-key disagreement. There are no separate calibration controls or holdout runs. Every report contains the raw baseline and candidate samples, paired differences, budgets, confidence intervals, and schedule. Advisory timing never fails acceptance. Advisory correctness still does.
+Every report contains the raw baseline and candidate samples, paired differences, fixed budgets, confidence intervals, and schedule. Advisory timing never fails acceptance. Correctness checks remain required, subject only to the explicit pending-minimap exception below.
 
 The paired path waits for actual consumer source and render receipts outside the captured input intervals. Undo priming also waits for the seeded worker source before input starts. A fixed 450 ms seed delay left a parse pending on the supported short-lines fixture; both frozen products then exposed a stale source on the final undo. The isolated Tree-sitter probe and its complete quiet comparison pass with seeded-source readiness, with the product bytes unchanged. The inherited absolute runner retains its original fixed waits.
 
@@ -37,7 +35,7 @@ Three measured pairs follow one warmup pair in each group. A three-pair bootstra
 
 ## Sensitivity and fixtures
 
-The first run of an instrument injects a real 20 ms pause into the candidate's native inputs. Both sides use the candidate package set. Every one of the 36 dispatch groups must fail. The full raw self-check is stored under `/work/tmp/plan-282/sensitivity/<instrument-hash>.json.gz`. A later run recomputes its verdict from the saved raw evidence. Changes to instrument source or instrument dependency bytes require a new self-check.
+The first run of an instrument injects a real 20 ms pause into the candidate's native inputs. Both sides use the candidate package set. Every one of the 47 keys rejected by the historical native negative must fail, including all 36 dispatch groups and the preedit-frame keys. Measures whose captured interval ends before the injected pause remain blocking, but this pause does not exercise them. The full raw self-check is stored under `/work/tmp/plan-282/sensitivity/<instrument-hash>.json.gz`. A later run recomputes its verdict from the saved raw evidence. Changes to instrument source or instrument dependency bytes require a new self-check.
 
 Default fixtures are ordinary TypeScript, 500,000 short comment lines, and a one-megabyte line. Each fits Platform's 10 Mi UTF-16 analysis tier. `--stress` restores the original generated 500,000 declaration lines above that tier. Custom frozen fixtures above the tier require `--stress`. CPU affinity is optional. The heavy-job wrapper controls resource admission.
 
@@ -59,9 +57,25 @@ Shiki’s historical long-line and busy-worker-disposal failures led to [#213](h
 
 Headless Chromium frame timing is an observable, not physical display latency. Worker/WASM memory and language-server performance are outside this instrument. The new supported-tier short-lines fixture activates analysis that the old over-tier fixture paused, so verdict agreement is not byte-identical-workload equivalence.
 
-## Validation
+## Follow-up validation
 
-Acceptance is blocked. Results and logs are written under `/work/tmp/plan-282/`.
+The owner directed three corrections after the first draft: freeze historical budgets, exclude minimap acceptance pending its separately owned correctness fix, and finish native/Tree-sitter/Shiki validation and default/full timing. New evidence is under `/work/tmp/plan-282/fixed-budgets/`; the initial draft evidence below is preserved.
+
+### Pending minimap exception
+
+Use `--pending-minimap-source` only while validating the historical products with the known undo bug. All ten configurations still run under `--full`; the standalone minimap configuration is excluded from aggregate acceptance. The sole relaxed consumer assertion is final source equality after `short-lines/{single,multiple}/undo`. Initial and seeded minimap source checks, worker counts, render-after-source receipts, visible output, final editor text, cursor, revisions, hidden-view reveal, and cleanup remain required. The exception and raw false source receipts are stored in the results. Platform and combined configurations retain their real minimap runtime cost. The products are unchanged, and minimap acceptance remains pending the separately owned fix.
+
+### Cost evidence and receipt reuse
+
+An isolated unchanged-product short-lines undo probe measured 3.8–4.4 seconds per sample. Input and paint took approximately 125 ms; opening consumers took 1.2–1.7 seconds, priming and its screenshot approximately 1.5 seconds, and final consumer settlement approximately 956–967 ms. Memory and cleanup took approximately 112–116 ms. The initial evidence is `/work/tmp/plan-282/profile-sample.log`.
+
+The follow-up reuses the accepted final readiness receipt for the correctness assertions, removing a second full-source replay after polling. It retains three measured pairs, one warmup pair, all three supported-tier fixtures, all gating groups, the advisory screenshot timing, and the pixel checks. Per-sample phase durations are saved in raw results to measure its effect. No statistical or fixture coverage reduction has been made at this stage.
+
+Native/disabled fixed-budget runs and the real Platform-plus-native default matrix are running. Their new self-check must reject all 47 historical native negative keys. The default command is `--configurations native --pending-minimap-source`, using the historical Shiki prerequisite products on both sides so Platform's Shiki consumer can run. Remaining acceptance and complete-matrix wall times are not yet confirmed.
+
+## Initial draft validation
+
+The first draft was not accepted. Results and logs are written under `/work/tmp/plan-282/`.
 
 ### Frozen minimap undo blocker
 

@@ -133,6 +133,7 @@ async function runPairedGroup(
             ...pair,
             side,
             dispatchMaxMs: Math.max(...sample.latencyMs.dispatch),
+            wallPhasesMs: sample.wallPhasesMs,
           }),
         )
       }
@@ -157,7 +158,16 @@ export async function runSample(
   readMemory,
   profileInput = (_identity, run) => run(),
 ) {
+  const wallStarted = performance.now()
+  const wallPhasesMs = {}
+  let wallPrevious = wallStarted
+  const phase = (name) => {
+    const now = performance.now()
+    wallPhasesMs[name] = now - wallPrevious
+    wallPrevious = now
+  }
   const beforeMemory = await readMemory(cdp)
+  phase('beforeMemory')
   const config = result.config
   const count = config.operationsPerSample[scenario]
   const consumerId = config.consumers ?? 'native'
@@ -187,6 +197,7 @@ export async function runSample(
     consumerId === 'native'
       ? null
       : await settleConsumers(page, consumerId, fixture, views, scenario)
+  phase('openAndConsumers')
   const target = await page.evaluate(
     ({ scenario, slowdownMs, count }) => {
       const target = __stress.inputLatency.prepare(scenario, slowdownMs)
@@ -204,6 +215,7 @@ export async function runSample(
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
   }
   const before = await page.locator('#view-0').screenshot({ animations: 'disabled' })
+  phase('primeAndScreenshot')
   let completed
   try {
     await page.evaluate(() => __stress.inputLatency.start())
@@ -222,12 +234,29 @@ export async function runSample(
     if (views === 'multiple')
       await expect(page.locator('#view-2 [data-editor-virtual-row]').first()).toBeVisible()
     const rendered = await page.evaluate(() => __stress.inputLatency.verifyRendered())
+    phase('inputAndPaint')
     if (config.readiness !== 'receipt-poll')
       await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
-    if (config.readiness === 'receipt-poll' && opened) await waitForConsumerSource(page)
+    const readiness =
+      config.readiness === 'receipt-poll' && opened
+        ? await waitForConsumerSource(
+            page,
+            config.pendingMinimapSource && fixture.id === 'short-lines' && scenario === 'undo',
+          )
+        : null
     const settled = opened
-      ? await settleConsumers(page, consumerId, fixture, views, scenario, opened)
+      ? await settleConsumers(
+          page,
+          consumerId,
+          fixture,
+          views,
+          scenario,
+          opened,
+          config.pendingMinimapSource,
+          readiness,
+        )
       : null
+    phase('settleConsumers')
     const diagnostic = await page.evaluate(() => {
       const { diagnostics, droppedDiagnostics } = __stress.observe()
       return { diagnostics, droppedDiagnostics }
@@ -294,6 +323,7 @@ export async function runSample(
       await cdp.send('Input.imeSetComposition', { text: '', selectionStart: 0, selectionEnd: 0 })
     await page.evaluate(() => __stress.dispose())
   }
+  phase('disposeAndDiagnostics')
   await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)))
   const afterMemory = await readMemory(cdp)
   const cleanup = {
@@ -309,7 +339,8 @@ export async function runSample(
     (repetition >= 0 && cleanup.afterListeners > cleanup.beforeListeners)
   )
     fail(`Input cleanup failed: ${JSON.stringify(cleanup)}`)
-  return { ...completed, cleanup }
+  phase('cleanupAndMemory')
+  return { ...completed, cleanup, wallPhasesMs, wallMs: performance.now() - wallStarted }
 }
 
 async function sendInput(page, cdp, scenario, count) {
@@ -364,11 +395,17 @@ async function observePaint(page, scenario, before, observation) {
   return { method: 'screenshot-completion-upper-bound', startedAt, completedAt, imageChanged }
 }
 
-async function settleConsumers(page, consumerId, fixture, views, scenario, opened = null) {
-  const readiness = await page.evaluate(async () => ({
-    ...(await __stress.settleConsumers()),
-    workers: globalThis.__inputWorkerProof.map((worker) => ({ ...worker })),
-  }))
+async function settleConsumers(
+  page,
+  consumerId,
+  fixture,
+  views,
+  scenario,
+  opened = null,
+  pendingMinimapSource = false,
+  observed = null,
+) {
+  const readiness = observed ?? (await readConsumerReadiness(page))
   assertConsumerReadiness(
     readiness,
     consumerId,
@@ -377,23 +414,34 @@ async function settleConsumers(page, consumerId, fixture, views, scenario, opene
     views,
     scenario,
     opened,
+    pendingMinimapSource,
   )
   return readiness
 }
 
-export async function waitForConsumerSource(page) {
-  // waitForFunction treats an async predicate's Promise as a successful poll.
+async function readConsumerReadiness(page) {
+  return page.evaluate(async () => ({
+    ...(await __stress.settleConsumers()),
+    workers: globalThis.__inputWorkerProof.map((worker) => ({ ...worker })),
+  }))
+}
+
+export async function waitForConsumerSource(page, pendingMinimapSource = false) {
+  let readiness
+  // Await the browser transport; an async waitForFunction predicate is immediately truthy.
   await expect
     .poll(
-      () =>
-        page.evaluate(async () => {
-          const state = await __stress.settleConsumers()
-          return (
-            state.sessions.every((session) => session.current && session.answered) &&
-            state.minimaps.every((minimap) => minimap.current && minimap.renderedAfterSource)
+      async () => {
+        readiness = await readConsumerReadiness(page)
+        return (
+          readiness.sessions.every((session) => session.current && session.answered) &&
+          readiness.minimaps.every(
+            (minimap) => (minimap.current || pendingMinimapSource) && minimap.renderedAfterSource,
           )
-        }),
+        )
+      },
       { timeout: 30_000, intervals: [50] },
     )
     .toBe(true)
+  return readiness
 }

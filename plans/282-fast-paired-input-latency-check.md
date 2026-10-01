@@ -91,7 +91,26 @@ Validation runs are measurements: run them when no other heavy work is on the ma
 The owner requires this worker to do the implementation and review itself, so the independent
 reviewer step above is skipped. Measurement artifacts are under `/work/tmp/plan-282/`.
 
-## Acceptance blocker
+## Follow-up checklist
+
+The owner directed fixed historical budgets, temporary minimap exclusion, completed native/Tree-sitter/Shiki quiet and loaded checks, and measured default/full matrices. The frozen products stay unchanged.
+
+- [x] Import exact accepted historical budgets with artifact hashes and explicit native inheritance for unaccepted compositions.
+- [x] Require the self-check to reject all 47 historical native negative keys, including preedit-frame keys.
+- [x] Add the explicit, scoped pending-minimap source exception while retaining Platform's runtime composition.
+- [x] Measure per-sample wall phases and remove duplicate final source-receipt reconstruction.
+- [x] Pass 281 stress contracts, including frozen-threshold and narrow-exception regressions.
+- [ ] Complete new-instrument sensitivity and native/disabled quiet positive/negative checks.
+- [ ] Rerun native/disabled with same-core background load and compare all historical keys.
+- [ ] Complete Tree-sitter quiet/loaded positive/negative checks on original frozen products.
+- [ ] Complete Shiki quiet/loaded positive/negative checks on prerequisite frozen products.
+- [ ] Measure Platform plus one explicitly affected configuration; reduce cost if it exceeds 15 minutes.
+- [ ] Measure the ten-configuration full matrix against the 45-minute target.
+- [ ] Update PR #247 with final evidence, commit by path, push, and remove the worktree.
+
+New raw evidence is under `/work/tmp/plan-282/fixed-budgets/`. The first pass is running native/disabled checks followed by Platform plus native; no new timing target is confirmed yet. The initial draft's failed acceptance below remains historical evidence.
+
+## Initial draft acceptance blocker
 
 The supported short-lines fixture exposes a wrong-line-count minimap undo patch in both frozen
 historical products. The worker replaces one summary with four and ends with 500,003 summaries

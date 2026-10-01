@@ -244,3 +244,20 @@ test('rejects a visible view without token ranges while another view has them', 
     assertConsumerReadiness(both, 'tree-sitter', 'ordinary', 4469, 'multiple', 'typing', null),
   ).not.toThrow()
 })
+
+test('scopes the pending minimap exception to final short-lines undo source equality', () => {
+  const stale = readiness('minimap', {
+    minimaps: [{ current: false, renderedAfterSource: true }],
+  })
+  const assert =
+    (fixture, scenario, opened, pending = true) =>
+    () =>
+      assertConsumerReadiness(stale, 'minimap', fixture, 4469, 'single', scenario, opened, pending)
+  expect(assert('short-lines', 'undo', {})).not.toThrow()
+  expect(assert('short-lines', 'undo', {}, false)).toThrow(/holds text that differs/)
+  expect(assert('short-lines', 'undo', null)).toThrow(/holds text that differs/)
+  expect(assert('ordinary', 'undo', {})).toThrow(/holds text that differs/)
+  expect(assert('short-lines', 'typing', {})).toThrow(/holds text that differs/)
+  stale.minimaps[0].renderedAfterSource = false
+  expect(assert('short-lines', 'undo', {})).toThrow(/has no accepted render/)
+})
