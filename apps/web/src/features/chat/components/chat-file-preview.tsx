@@ -1,5 +1,5 @@
 import { isPdfFile } from '@/lib/pdf-viewer/format'
-import { PdfViewer } from '@/components/pdf-viewer/viewer'
+import { PdfPresentation } from '@/components/pdf-viewer/presentation'
 import { useQuery } from '@tanstack/react-query'
 import type { ChatAttachment } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -43,7 +43,7 @@ export function ChatFilePreview({
         </p>
         {pdf && (
           <div className='flex h-[65dvh] min-h-0 flex-col overflow-hidden'>
-            <PdfViewer source={{ kind: 'attachment', origin, attachment }} />
+            <PdfPresentation source={{ kind: 'attachment', origin, attachment }} />
           </div>
         )}
         {previewable && preview.isPending && <Spinner size='lg' label='Loading file preview' />}

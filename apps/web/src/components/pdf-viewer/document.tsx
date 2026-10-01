@@ -34,7 +34,7 @@ export function PdfDocument({
   const pageCount = ready?.pages.length ?? 0
   const pageLabel = pageCount === 1 ? 'page' : 'pages'
   function navigate(direction: number) {
-    if (!matches.length) return
+    if (!matches.length || width <= 0) return
     const next =
       selected < 0 && direction < 0
         ? matches.length - 1
@@ -82,7 +82,7 @@ export function PdfDocument({
             <Button
               size='xs'
               variant='ghost'
-              disabled={!matches.length}
+              disabled={!matches.length || width <= 0}
               onClick={() => navigate(-1)}
             >
               Previous
@@ -90,7 +90,7 @@ export function PdfDocument({
             <Button
               size='xs'
               variant='ghost'
-              disabled={!matches.length}
+              disabled={!matches.length || width <= 0}
               onClick={() => navigate(1)}
             >
               Next

@@ -131,6 +131,9 @@ test('navigation waits for a distant page to render before revealing its selecte
     await expect.poll(() => view.queryByLabelText('Search PDF')).not.toBeNull()
     fireEvent.change(view.getByLabelText('Search PDF'), { target: { value: 'needle' } })
     await expect.poll(() => view.getByRole('status').textContent).toBe('1 match')
+    await expect
+      .poll(() => view.container.querySelector('[data-pdf-page="5"] [data-pdf-page-content]'))
+      .not.toBeNull()
     const host = view.container.querySelector('[data-pdf-page="5"] [data-pdf-page-content]')!
     expect(host.shadowRoot).toBeNull()
     fireEvent.click(view.getByRole('button', { name: /^Next$/ }))
@@ -180,5 +183,47 @@ test('real extracted empty end-of-line items preserve the break and offsets', as
     }
   } finally {
     controller.abort()
+  }
+})
+
+test('navigation stays disabled until measured page placeholders exist', async () => {
+  const pending: { observer: ResizeObserver; target: Element; options?: ResizeObserverOptions }[] =
+    []
+  const observe = ResizeObserver.prototype.observe
+  const pause = vi.spyOn(ResizeObserver.prototype, 'observe').mockImplementation(function (
+    this: ResizeObserver,
+    target,
+    options,
+  ) {
+    pending.push({ observer: this, target, options })
+  })
+  const view = renderWithProviders(
+    <div className='flex min-h-0 flex-col overflow-hidden' style={{ height: 300, width: 612 }}>
+      <PdfDocument engine={engine} bytes={makePdf(['needle'])} loading={false} />
+    </div>,
+    { command: false },
+  )
+  try {
+    await expect.poll(() => view.queryByLabelText('Search PDF')).not.toBeNull()
+    fireEvent.change(view.getByLabelText('Search PDF'), { target: { value: 'needle' } })
+    await expect.poll(() => view.getByRole('status').textContent).toBe('1 match')
+    expect(view.container.querySelector('[data-pdf-page="1"]')).toBeNull()
+    expect(view.getByRole('button', { name: /^Next$/ })).toBeDisabled()
+    expect(view.getByRole('button', { name: /^Previous$/ })).toBeDisabled()
+    fireEvent.keyDown(view.getByLabelText('Search PDF'), { key: 'Enter' })
+    pause.mockRestore()
+    for (const { observer, target, options } of pending) observe.call(observer, target, options)
+    await expect.poll(() => view.container.querySelector('[data-pdf-page="1"]')).not.toBeNull()
+    const host = view.container.querySelector('[data-pdf-page="1"] [data-pdf-page-content]')!
+    await expect.poll(() => host.shadowRoot?.querySelector('.textLayer') ?? null).not.toBeNull()
+    expect(host.shadowRoot!.querySelector('.highlight.selected')).toBeNull()
+    expect(view.getByRole('button', { name: /^Next$/ })).toBeEnabled()
+    fireEvent.click(view.getByRole('button', { name: /^Next$/ }))
+    await expect
+      .poll(() => host.shadowRoot?.querySelector('.highlight.selected') ?? null)
+      .not.toBeNull()
+  } finally {
+    pause.mockRestore()
+    view.unmount()
   }
 })

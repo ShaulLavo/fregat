@@ -17,7 +17,7 @@ const errors = defineErrorCatalog('pdf', {
   ENGINE_UNAVAILABLE: {
     status: 503,
     message: 'The PDF viewer could not be loaded',
-    why: 'The browser could not load the PDF engine or its worker.',
+    why: 'The browser could not load a required PDF viewer file.',
     fix: 'Check your connection and reload the app.',
   },
 })

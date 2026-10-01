@@ -124,6 +124,11 @@ export const pdfEngineUnavailable = unavailablePdfScenario(
   '**/src/lib/pdf-viewer/engine.ts*',
 )
 
+export const pdfPresentationUnavailable = unavailablePdfScenario(
+  'pdf-presentation-unavailable',
+  '**/*presentation-content*',
+)
+
 export const pdfWorkerUnavailable = unavailablePdfScenario(
   'pdf-worker-unavailable',
   '**/*pdf.worker*',
@@ -139,10 +144,15 @@ function unavailablePdfScenario(name: string, route: string): Scenario {
       const { path: fixture } = await committedFixture(name)
       try {
         await writeFile(join(fixture, 'pages.pdf'), makePdf())
-        await page.route(route, (request) => request.abort('failed'))
+        let blocked = 0
+        await page.route(route, (request) => {
+          blocked += 1
+          return request.abort('failed')
+        })
         await openFixtureWorkspace(page, fixture)
         await selectors.treeItem(page, 'pages.pdf').click()
         await selectors.pdfEngineFailure(page).waitFor({ timeout: 30_000 })
+        ok(blocked > 0, 'PDF viewer asset request was blocked')
         await step(`${name}-readable-error`)
       } finally {
         await page.unroute(route)

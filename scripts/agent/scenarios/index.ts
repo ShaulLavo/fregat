@@ -58,6 +58,7 @@ import {
   pdfDocuments,
   pdfAttachment,
   pdfEngineUnavailable,
+  pdfPresentationUnavailable,
   pdfWorkerUnavailable,
   pdfRemoteOwner,
 } from './pdf-documents'
@@ -493,6 +494,7 @@ export const scenarios: readonly Scenario[] = [
   pdfDocuments,
   pdfAttachment,
   pdfEngineUnavailable,
+  pdfPresentationUnavailable,
   pdfWorkerUnavailable,
   pdfRemoteOwner,
   screenshotDrop,

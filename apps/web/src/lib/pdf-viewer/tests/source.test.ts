@@ -1,3 +1,6 @@
+import { chatAttachmentSchema } from '@workspace/contracts'
+import * as v from 'valibot'
+import { directInProcessFetcher } from '../../../../test/client'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { QueryClient } from '@tanstack/react-query'
@@ -53,4 +56,40 @@ test('attachment transport derives an encoded server-owned path', () => {
   } as const
   expect(pdfSourceUrl(source)).toContain('/platform/')
   expect(pdfSourceUrl(source)).toContain('id%2Funsafe.bin')
+})
+
+test('PDF attachments upload and serve exact bytes from their owning machine', async ({
+  server,
+}) => {
+  const bytes = makePdf(['Attachment specification'])
+  const fetcher = directInProcessFetcher(server)
+  const issued = await fetcher(`${server.origin}/attachments/uploads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'file',
+      name: 'spec.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: bytes.length,
+    }),
+  })
+  expect(issued.status).toBe(200)
+  const ticket = await issued.json()
+  const uploaded = await fetcher(`${server.origin}${ticket.uploadPath}`, {
+    method: 'PUT',
+    body: bytes,
+  })
+  expect(uploaded.status).toBe(200)
+  const attachment = v.parse(chatAttachmentSchema, await uploaded.json())
+  if (attachment.type !== 'file') return expect.fail('Expected file attachment')
+  const source = { kind: 'attachment', origin: server.origin, attachment } as const
+  const client = new QueryClient()
+  try {
+    const loaded = await client.query(pdfBytesOptions(source, fetcher))
+    expect(loaded.bytes).toEqual(bytes)
+    expect(loaded.revision).toBe(pdfSourceUrl(source))
+    expect(pdfSourceUrl(source)).toBe(`${server.origin}/attachments/${attachment.id}.bin`)
+  } finally {
+    client.clear()
+  }
 })

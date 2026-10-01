@@ -1,5 +1,5 @@
 import { isPdfFile } from '@/lib/pdf-viewer/format'
-import { PdfFile } from '@/components/pdf-viewer/file'
+import { PdfPresentation } from '@/components/pdf-viewer/presentation'
 import type { ComponentProps } from 'react'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -17,7 +17,7 @@ export function FileDocumentBody(props: ComponentProps<typeof FileEditorBody>) {
     fileVersion,
     target.kind === 'file' && !pdf && fileState.status === 'error',
   )
-  if (target.kind === 'file' && pdf) return <PdfFile path={target.resource.path} />
+  if (target.kind === 'file' && pdf) return <PdfPresentation path={target.resource.path} />
   if (target.kind === 'file' && fileState.status === 'ready' && fileState.data.seemsBinary) {
     return <FileFacts file={fileState.data} />
   }
