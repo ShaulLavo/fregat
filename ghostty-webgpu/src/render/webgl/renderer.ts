@@ -15,6 +15,7 @@ import {
   safeRendererInteger,
 } from '../config.js'
 import { renderCursorState, type InactiveCursorStyle } from '../cursor.js'
+import { copiedFrameRow } from '../frame-row.js'
 import { InstanceRows } from '../instances/rows.js'
 import type {
   CanonicalRendererTheme,
@@ -72,13 +73,6 @@ function cursorEquals(left: RenderCursorSnapshot, right: RenderCursorSnapshot): 
     left.viewport.x === right.viewport.x &&
     left.viewport.y === right.viewport.y
   )
-}
-
-function copiedFrameRow(row: RenderRow): RendererFrameRow {
-  const cells = Object.freeze(row.cells.map((cell) => cell.text.slice()))
-  const continuations = Object.freeze(row.cells.map((cell) => cell.continuation))
-  const text = cells.map((cell, index) => (continuations[index] ? '' : cell || ' ')).join('')
-  return Object.freeze({ cells, continuations, text, y: row.y })
 }
 
 export class WebGlTerminalRenderer {

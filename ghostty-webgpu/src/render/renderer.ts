@@ -6,6 +6,7 @@ import { GlyphAtlas } from './atlas/atlas.js'
 import { CanvasGlyphRasterizer } from './atlas/canvas-rasterizer.js'
 import { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import { renderCursorState, type InactiveCursorStyle } from './cursor.js'
+import { copiedFrameRow } from './frame-row.js'
 import type { GlyphBitmap } from './atlas/types.js'
 import {
   browserRenderClock,
@@ -155,13 +156,6 @@ function cursorEquals(left: RenderCursorSnapshot, right: RenderCursorSnapshot): 
 function copiedCursor(cursor: RenderCursorSnapshot): Readonly<RenderCursorSnapshot> {
   const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
   return Object.freeze({ ...cursor, viewport })
-}
-
-function copiedFrameRow(row: RenderRow): RendererFrameRow {
-  const cells = Object.freeze(row.cells.map((cell) => cell.text.slice()))
-  const continuations = Object.freeze(row.cells.map((cell) => cell.continuation))
-  const text = cells.map((cell, index) => (continuations[index] ? '' : cell || ' ')).join('')
-  return Object.freeze({ cells, continuations, text, y: row.y })
 }
 
 function validateRenderer(options: WebGpuTerminalRendererOptions): ValidatedRenderer {

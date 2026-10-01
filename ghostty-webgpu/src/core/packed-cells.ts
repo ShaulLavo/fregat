@@ -51,7 +51,7 @@ export class PackedCells {
     target.foreground = color(this.words[offset + 1]!, target.foreground)
     target.background = color(this.words[offset + 2]!, target.background)
     target.style = style(flags, target.style)
-    target.text = this.text(offset)
+    target.text = this.textAt(offset)
     return target
   }
 
@@ -69,7 +69,15 @@ export class PackedCells {
     return Array.from({ length: this.length }, (_, index) => this.read(index, emptyRenderCell()))
   }
 
-  private text(offset: number): string {
+  text(index: number): string {
+    return this.textAt(index * PACKED_CELL_WORDS)
+  }
+
+  continuation(index: number): boolean {
+    return (this.words[index * PACKED_CELL_WORDS + 3]! & 3) === 2
+  }
+
+  private textAt(offset: number): string {
     const length = this.words[offset + 5]!
     if (length === 0) {
       const codepoint = this.words[offset]!
