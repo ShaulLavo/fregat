@@ -145,7 +145,7 @@ test('a CPU qualification failure stops recording and drains the Chrome trace st
       traced: true,
       operation: async () => ({}),
       label: 'failure',
-      output: tmpdir(),
+      output: '/work/tmp/plan-283',
     }),
     /process/i,
   )
