@@ -82,6 +82,7 @@ export function writeSettings(box: Box, values: Record<string, unknown>) {
 
 export type StartOptions = {
   readonly jobClass?: string
+  readonly quiet?: boolean
   readonly detached?: boolean
   readonly env?: NodeJS.ProcessEnv
   readonly logDir?: boolean
@@ -106,6 +107,7 @@ export function start(
   if (options.logDir !== false) args.push('--log-dir', box.logs)
   if (options.machine) args.push('--proc', box.proc)
   if (options.jobClass) args.push('--class', options.jobClass)
+  if (options.quiet) args.push('--quiet')
   const child = spawn('bun', [...args, label, '--', ...command], {
     cwd: box.root,
     detached: options.detached ?? false,

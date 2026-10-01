@@ -125,6 +125,132 @@ describe('ProviderService', () => {
     }
   })
 
+  it('holds silent monitor rosters through periodic and launch sweeps, then releases empty rosters', async () => {
+    vi.useFakeTimers()
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const stream = new ProviderRuntimeEventStream()
+    const subscribe = adapter.subscribeEvents.bind(adapter)
+    adapter.subscribeEvents = (subscriber) => {
+      const original = subscribe(subscriber)
+      const off = stream.subscribe(subscriber)
+      return () => {
+        original()
+        off()
+      }
+    }
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    try {
+      const input = await startReadyRuntime(service, fixture.database)
+      const roster: Extract<ProviderRuntimeEvent, { type: 'tasks.roster' }> = {
+        type: 'tasks.roster',
+        eventId: 'monitor-roster',
+        createdAt: new Date().toISOString(),
+        sessionId: input.sessionId,
+        runtimeEpoch: input.runtimeEpoch,
+        payload: { tasks: [{ taskId: 'watch', taskType: 'monitor', description: 'Watch logs' }] },
+      }
+      stream.publish(roster)
+      await service.drainRuntimeEvents()
+      expect(service.backgroundLiveness(input.sessionId)).toBe('monitoring')
+      await vi.advanceTimersByTimeAsync(35 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+      const other = providerTurnInput()
+      await service.ensureRuntime({
+        providerInstanceId: other.providerInstanceId,
+        runtimeMode: other.runtimeMode,
+        runtimeEpoch: other.runtimeEpoch,
+        sessionId: other.sessionId,
+        runtimePayload: providerSessionPayload(other),
+      })
+      await service.drainRuntimeEvents()
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+      expect(service.backgroundLiveness(other.sessionId)).toBeNull()
+      stream.publish({ ...roster, runtimeEpoch: 'stale-epoch', payload: { tasks: [] } })
+      await service.drainRuntimeEvents()
+      expect(service.backgroundLiveness(input.sessionId)).toBe('monitoring')
+      stream.publish({ ...roster, payload: { tasks: [] } })
+      stream.publish({
+        ...roster,
+        type: 'task.started',
+        payload: { taskId: 'watch', taskType: 'monitor' },
+      })
+      await service.drainRuntimeEvents()
+      expect(service.backgroundLiveness(input.sessionId)).toBeNull()
+      await vi.advanceTimersByTimeAsync(35 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(false)
+      expect(service.backgroundLiveness(input.sessionId)).toBeNull()
+    } finally {
+      await service.shutdown()
+      fixture.close()
+      vi.useRealTimers()
+    }
+  })
+
+  it('drops a native roster when a released session identity moves to another provider instance', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const replacementId = v.parse(providerInstanceIdSchema, 'replacement')
+    const replacement = new MockProviderAdapter({ providerInstanceId: replacementId })
+    const stream = new ProviderRuntimeEventStream()
+    const subscribe = adapter.subscribeEvents.bind(adapter)
+    adapter.subscribeEvents = (subscriber) => {
+      const off = subscribe(subscriber)
+      const offTasks = stream.subscribe(subscriber)
+      return () => {
+        off()
+        offTasks()
+      }
+    }
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter, replacement]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    try {
+      const input = await startReadyRuntime(service, fixture.database)
+      const roster: Extract<ProviderRuntimeEvent, { type: 'tasks.roster' }> = {
+        type: 'tasks.roster',
+        eventId: 'old-roster',
+        createdAt: new Date().toISOString(),
+        sessionId: input.sessionId,
+        runtimeEpoch: input.runtimeEpoch,
+        payload: {
+          tasks: [{ taskId: 'old-watch', taskType: 'monitor', description: 'Watch logs' }],
+        },
+      }
+      stream.publish(roster)
+      await service.drainRuntimeEvents()
+      expect(service.backgroundLiveness(input.sessionId)).toBe('monitoring')
+      await service.stopRuntime({ sessionId: input.sessionId })
+      service.deleteBinding(input.sessionId)
+      await service.ensureRuntime({
+        sessionId: input.sessionId,
+        runtimeEpoch: 'replacement-epoch',
+        providerInstanceId: replacementId,
+        runtimeMode: input.runtimeMode,
+        runtimePayload: {
+          ...providerSessionPayload(input),
+          modelSelection: {
+            ...input.modelSelection,
+            providerInstanceId: replacementId,
+          },
+        },
+      })
+      await service.drainRuntimeEvents()
+      expect(service.backgroundLiveness(input.sessionId)).toBeNull()
+      stream.publish(roster)
+      await service.drainRuntimeEvents()
+      expect(service.backgroundLiveness(input.sessionId)).toBeNull()
+      expect(await replacement.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
   it('keeps a silent background runtime during periodic sweeps and reaps it after work ends', async () => {
     vi.useFakeTimers()
     const fixture = createFixture()
