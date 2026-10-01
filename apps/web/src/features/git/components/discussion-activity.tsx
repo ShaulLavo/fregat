@@ -13,7 +13,7 @@ export function DiscussionActivity({
     return (
       <LoadingState label='Loading forge activity'>
         <div className='flex flex-col gap-3'>
-          {['Reviews', 'Commits', 'Threads'].map((section) => (
+          {['Reviews', 'Commits', 'Discussions'].map((section) => (
             <section key={section} className='flex flex-col gap-2'>
               <h3 className='text-sm font-semibold'>{section}</h3>
               <div className='bg-muted p-3'>
@@ -31,7 +31,7 @@ export function DiscussionActivity({
     )
   if (query.data.kind === 'unsupported')
     return <p className='text-muted-foreground text-sm'>{query.data.reason}</p>
-  const { reviews, commits, threads } = query.data
+  const { reviews, commits, discussions } = query.data
   return (
     <div
       className='scroll-fade max-h-48 overflow-y-auto overscroll-contain'
@@ -85,21 +85,25 @@ export function DiscussionActivity({
           ) : null}
         </div>
       )}
-      <h3 className='mt-3 text-sm font-semibold'>Threads</h3>
-      {threads.kind === 'unsupported' ? (
-        <p className='text-muted-foreground text-xs'>{threads.reason}</p>
+      <h3 className='mt-3 text-sm font-semibold'>Discussions</h3>
+      {discussions.kind === 'unsupported' ? (
+        <p className='text-muted-foreground text-xs'>{discussions.reason}</p>
       ) : (
         <div className='flex flex-col gap-2'>
-          {threads.items.length === 0 ? (
-            <p className='text-muted-foreground text-xs'>No threads</p>
+          {discussions.items.length === 0 ? (
+            <p className='text-muted-foreground text-xs'>No discussions</p>
           ) : null}
-          {threads.items.map((thread) => (
-            <section key={thread.id} className='bg-muted p-3' aria-label={`Thread ${thread.id}`}>
+          {discussions.items.map((discussion) => (
+            <section
+              key={discussion.id}
+              className='bg-muted p-3'
+              aria-label={`Discussion ${discussion.id}`}
+            >
               <p className='text-muted-foreground font-mono text-xs break-words'>
-                Thread #{thread.id}
-                {thread.path ? ` · ${thread.path}` : ''}
+                Discussion #{discussion.id}
+                {discussion.path ? ` · ${discussion.path}` : ''}
               </p>
-              {thread.comments.map((comment) => (
+              {discussion.comments.map((comment) => (
                 <article key={comment.id} className='mt-2'>
                   <p className='text-xs font-medium'>{comment.author}</p>
                   <p className='text-sm break-words whitespace-pre-wrap'>{comment.body}</p>
@@ -107,9 +111,9 @@ export function DiscussionActivity({
               ))}
             </section>
           ))}
-          {threads.truncated ? (
+          {discussions.truncated ? (
             <p className='text-muted-foreground text-xs'>
-              Open the Git host for all conversation threads.
+              Open the Git host for all conversation discussions.
             </p>
           ) : null}
         </div>

@@ -18,7 +18,7 @@ export function createForgeDiscussionBoundary() {
   const reviews: { body: string; event: string }[] = []
   const activityReviews: unknown[] = []
   const activityCommits: unknown[] = []
-  const activityThreads: unknown[] = []
+  const activityDiscussions: unknown[] = []
   const azureThreads: unknown[] = []
   const remoteProbes: (readonly string[])[] = []
   const control = {
@@ -61,7 +61,7 @@ export function createForgeDiscussionBoundary() {
         const endpoint = argv.find((arg) => arg.includes('/pulls/7/')) ?? ''
         if (endpoint.includes('/reviews?')) return ok(JSON.stringify(activityReviews))
         if (endpoint.includes('/commits?')) return ok(JSON.stringify(activityCommits))
-        if (endpoint.includes('/comments?')) return ok(JSON.stringify(activityThreads))
+        if (endpoint.includes('/comments?')) return ok(JSON.stringify(activityDiscussions))
       }
       if (!argv.some((arg) => arg.includes('/issues/7/comments')))
         return { exitCode: 1, stderr: 'unexpected endpoint', stdout: '' }
@@ -95,7 +95,7 @@ export function createForgeDiscussionBoundary() {
     activityReads,
     activityReviews,
     activityCommits,
-    activityThreads,
+    activityDiscussions,
     azureThreads,
     control,
     remoteProbes,

@@ -314,7 +314,7 @@ test('the existing discussion surface reads review and commit activity and group
     author: { login: 'bob' },
     commit: { message: 'Activity commit headline', committer: { date: '2026-10-01T09:00:00Z' } },
   })
-  forge.activityThreads.push(
+  forge.activityDiscussions.push(
     {
       id: 9,
       body: 'Inline root feedback',
@@ -340,13 +340,15 @@ test('the existing discussion surface reads review and commit activity and group
   await userEvent.click(await screen.findByRole('tab', { name: 'Activity' }))
   expect(await screen.findByText('Host review summary')).toBeVisible()
   expect(screen.getByText('Activity commit headline')).toBeVisible()
-  expect(screen.getByRole('region', { name: 'Thread 9' })).toHaveTextContent('Inline root feedback')
-  expect(screen.getByRole('region', { name: 'Thread 9' })).toHaveTextContent(
+  expect(screen.getByRole('region', { name: 'Discussion 9' })).toHaveTextContent(
+    'Inline root feedback',
+  )
+  expect(screen.getByRole('region', { name: 'Discussion 9' })).toHaveTextContent(
     'Inline reply feedback',
   )
   expect(view.queryClient.getQueryData(pullRequestDiscussionKeys.activity('', 7))).toMatchObject({
     kind: 'ready',
-    threads: { kind: 'ready', items: [{ id: '9', comments: [{ id: '9' }, { id: '10' }] }] },
+    discussions: { kind: 'ready', items: [{ id: '9', comments: [{ id: '9' }, { id: '10' }] }] },
   })
   forge.activityReviews.push({
     id: 2,
@@ -392,8 +394,12 @@ test('Azure activity presents native grouped conversation and explicit unsupport
   expect(screen.getByText('Open Azure DevOps for pull request commits.')).toBeVisible()
   expect(screen.queryByText('No reviews')).toBeNull()
   expect(screen.queryByText('No commits')).toBeNull()
-  expect(screen.getByRole('region', { name: 'Thread 8' })).toHaveTextContent('Azure root feedback')
-  expect(screen.getByRole('region', { name: 'Thread 8' })).toHaveTextContent('Azure reply feedback')
+  expect(screen.getByRole('region', { name: 'Discussion 8' })).toHaveTextContent(
+    'Azure root feedback',
+  )
+  expect(screen.getByRole('region', { name: 'Discussion 8' })).toHaveTextContent(
+    'Azure reply feedback',
+  )
 })
 
 test('a refused review awaits independently blocked activity settlement before releasing its draft', async ({

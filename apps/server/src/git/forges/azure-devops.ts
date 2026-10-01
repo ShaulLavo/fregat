@@ -12,7 +12,7 @@ import {
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseAzureThreads } from './azure-threads'
-import { groupActivityThreads } from './activity'
+import { groupActivityDiscussions } from './activity'
 
 const JSON_ARGS = ['--only-show-errors', '--output', 'json'] as const
 
@@ -36,7 +36,7 @@ export const azureDevOps: ForgeProvider = {
     return {
       reviews: { kind: 'unsupported', reason: 'Open Azure DevOps for review history.' },
       commits: { kind: 'unsupported', reason: 'Open Azure DevOps for pull request commits.' },
-      threads: groupActivityThreads(conversation.comments, conversation.truncated),
+      discussions: groupActivityDiscussions(conversation.comments, conversation.truncated),
     }
   },
   discussion: {

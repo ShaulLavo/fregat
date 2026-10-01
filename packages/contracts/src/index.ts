@@ -57,7 +57,7 @@ export type {
   GitPullRequestActivitySection,
   GitPullRequestReviewRecord,
   GitPullRequestCommit,
-  GitPullRequestThread,
+  GitPullRequestDiscussion,
   GitPullRequestComment,
   GitPullRequestComments,
   GitPullRequestCommentResult,

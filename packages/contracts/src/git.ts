@@ -455,7 +455,7 @@ export type GitPullRequestCommit = {
   createdAt: string
 }
 
-export type GitPullRequestThread = {
+export type GitPullRequestDiscussion = {
   id: string
   path: string | null
   comments: readonly GitPullRequestComment[]
@@ -467,6 +467,6 @@ export type GitPullRequestActivity =
       forge: GitForge
       reviews: GitPullRequestActivitySection<GitPullRequestReviewRecord>
       commits: GitPullRequestActivitySection<GitPullRequestCommit>
-      threads: GitPullRequestActivitySection<GitPullRequestThread>
+      discussions: GitPullRequestActivitySection<GitPullRequestDiscussion>
     }
   | { kind: 'unsupported'; forge: GitForge | null; reason: string }

@@ -14,7 +14,7 @@ import {
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseIssueComments } from './issue-comments'
-import { parseGithubReviews, parseGithubThreads, parseRestCommits } from './activity'
+import { parseGithubReviews, parseGithubDiscussions, parseRestCommits } from './activity'
 
 const PR_FIELDS = 'isDraft,number,state,title,url,closedAt'
 
@@ -52,7 +52,7 @@ export const github: ForgeProvider = {
         ]),
         `activity-${path}`,
       ).stdout
-    const [reviews, commits, threads] = await Promise.all([
+    const [reviews, commits, discussions] = await Promise.all([
       read('reviews'),
       read('commits'),
       read('comments'),
@@ -60,7 +60,7 @@ export const github: ForgeProvider = {
     return {
       reviews: parseGithubReviews(context, reviews),
       commits: parseRestCommits(context, commits),
-      threads: parseGithubThreads(context, threads),
+      discussions: parseGithubDiscussions(context, discussions),
     }
   },
   discussion: {

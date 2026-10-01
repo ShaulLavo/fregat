@@ -86,7 +86,7 @@ if (args[0] === 'api' && !args.includes('POST')) {
     process.exit(0)
   }
   if (endpoint.includes('/comments?')) {
-    out(data.activityThreads ?? [])
+    out(data.activityDiscussions ?? [])
     process.exit(0)
   }
 }

@@ -3,7 +3,7 @@ import type {
   GitPullRequestComment,
   GitPullRequestCommit,
   GitPullRequestReviewRecord,
-  GitPullRequestThread,
+  GitPullRequestDiscussion,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { parseForgeJson } from './cli'
@@ -21,14 +21,14 @@ function activityPage<T>(
   return { kind: 'ready', items: items.slice(0, 100), truncated: truncated || items.length > 100 }
 }
 
-export function groupActivityThreads(
+export function groupActivityDiscussions(
   comments: readonly GitPullRequestComment[],
   truncated: boolean,
 ) {
-  const groups = new Map<string, GitPullRequestThread>()
+  const groups = new Map<string, GitPullRequestDiscussion>()
   for (const comment of comments) {
     if (!comment.context) continue
-    const key = comment.context.threadId
+    const key = comment.context.discussionId
     const group = groups.get(key)
     groups.set(key, {
       id: key,
@@ -89,7 +89,7 @@ export function parseRestCommits(context: ForgeContext, stdout: string) {
   return activityPage(items, rows.length >= 100)
 }
 
-export function parseGithubThreads(context: ForgeContext, stdout: string) {
+export function parseGithubDiscussions(context: ForgeContext, stdout: string) {
   const rows = parseForgeJson(
     context,
     v.array(
@@ -104,7 +104,7 @@ export function parseGithubThreads(context: ForgeContext, stdout: string) {
       }),
     ),
     stdout,
-    'activity-threads',
+    'activity-discussions',
   )
   const comments: GitPullRequestComment[] = rows.slice(0, 100).map((row) => ({
     id: String(row.id),
@@ -112,9 +112,9 @@ export function parseGithubThreads(context: ForgeContext, stdout: string) {
     author: row.user?.login ?? 'Deleted account',
     createdAt: row.created_at,
     url: row.html_url,
-    context: { threadId: String(row.in_reply_to_id ?? row.id), path: row.path },
+    context: { discussionId: String(row.in_reply_to_id ?? row.id), path: row.path },
   }))
-  return groupActivityThreads(comments, rows.length >= 100)
+  return groupActivityDiscussions(comments, rows.length >= 100)
 }
 
 export function parseGitlabCommits(context: ForgeContext, stdout: string) {
@@ -142,7 +142,7 @@ export function parseGitlabCommits(context: ForgeContext, stdout: string) {
   )
 }
 
-export function parseGitlabThreads(context: ForgeContext, stdout: string) {
+export function parseGitlabDiscussions(context: ForgeContext, stdout: string) {
   const rows = parseForgeJson(
     context,
     v.array(
@@ -169,9 +169,9 @@ export function parseGitlabThreads(context: ForgeContext, stdout: string) {
       }),
     ),
     stdout,
-    'activity-threads',
+    'activity-discussions',
   )
-  const threads: GitPullRequestThread[] = rows
+  const discussions: GitPullRequestDiscussion[] = rows
     .slice(0, 100)
     .filter((row) => !row.individual_note)
     .map((row) => {
@@ -187,12 +187,12 @@ export function parseGitlabThreads(context: ForgeContext, stdout: string) {
           author: note.author.username,
           createdAt: note.created_at,
           url: null,
-          context: { threadId: row.id, path },
+          context: { discussionId: row.id, path },
         })),
       }
     })
-    .filter((thread) => thread.comments.length > 0)
-  return activityPage(threads, rows.length >= 100 || rows.some((row) => row.notes.length > 100))
+    .filter((discussion) => discussion.comments.length > 0)
+  return activityPage(discussions, rows.length >= 100 || rows.some((row) => row.notes.length > 100))
 }
 
 const forgejoReviewsSchema = v.array(
@@ -246,7 +246,7 @@ export function parseForgejoInline(
       }),
     ),
     stdout,
-    'activity-threads',
+    'activity-discussions',
   )
   return rows.map((row) => ({
     id: String(row.id),
@@ -254,7 +254,7 @@ export function parseForgejoInline(
     author: row.user?.login ?? 'Deleted account',
     createdAt: row.created_at,
     url: row.html_url ?? null,
-    context: { threadId: String(row.id), path: row.path },
+    context: { discussionId: String(row.id), path: row.path },
   }))
 }
 
@@ -330,7 +330,7 @@ export const bitbucketCommentFields = {
   links: v.object({ html: v.object({ href: v.pipe(v.string(), v.url()) }) }),
 }
 
-export function parseBitbucketThreads(context: ForgeContext, stdout: string) {
+export function parseBitbucketDiscussions(context: ForgeContext, stdout: string) {
   const page = parseForgeJson(
     context,
     v.object({
@@ -347,7 +347,7 @@ export function parseBitbucketThreads(context: ForgeContext, stdout: string) {
       ),
     }),
     stdout,
-    'activity-threads',
+    'activity-discussions',
   )
   const rows = page.values.slice(0, 100)
   const parents = new Map(rows.map((row) => [row.id, row.parent?.id]))
@@ -363,12 +363,12 @@ export function parseBitbucketThreads(context: ForgeContext, stdout: string) {
         createdAt: row.created_on,
         url: row.links.html.href,
         context: {
-          threadId: String(root),
+          discussionId: String(root),
           path: byId.get(root)?.inline?.path ?? row.inline?.path ?? null,
         },
       }
     })
-  return groupActivityThreads(comments, Boolean(page.next) || page.values.length > 100)
+  return groupActivityDiscussions(comments, Boolean(page.next) || page.values.length > 100)
 }
 
 function activityRootId(id: number, parents: ReadonlyMap<number, number | undefined>) {

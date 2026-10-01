@@ -45,7 +45,7 @@ export const gitForgeDiscussion = isolatedNativeScenario({
         commit: { message: 'Native activity commit', committer: { date: '2026-10-01T09:00:00Z' } },
       },
     ]
-    state.activityThreads = [
+    state.activityDiscussions = [
       {
         id: 9,
         body: 'Native inline root',
@@ -77,7 +77,7 @@ export const gitForgeDiscussion = isolatedNativeScenario({
       await selectors.forgeCommentText(page, 'Native activity review').waitFor()
       await selectors.forgeCommentText(page, 'Native activity commit').waitFor()
       await selectors.forgeCommentText(page, 'Native inline reply').scrollIntoViewIfNeeded()
-      await step('activity-thread-grouped')
+      await step('activity-discussion-grouped')
       await selectors.forgeCommentsTab(page).click()
       await selectors.forgeComment(page).fill('Please add a regression test.')
       await selectors.buttonNamed(page, 'Post comment').click()

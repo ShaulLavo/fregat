@@ -7,7 +7,7 @@ import {
   bitbucketCommentFields,
   parseBitbucketCommits,
   parseBitbucketReviews,
-  parseBitbucketThreads,
+  parseBitbucketDiscussions,
 } from './activity'
 
 const API_BASE = 'https://api.bitbucket.org/2.0'
@@ -41,7 +41,7 @@ export const bitbucket: ForgeProvider = {
         })
       return response.text()
     }
-    const [reviews, commits, threads] = await Promise.all([
+    const [reviews, commits, discussions] = await Promise.all([
       read(''),
       read('/commits?pagelen=100'),
       read('/comments?pagelen=100'),
@@ -49,7 +49,7 @@ export const bitbucket: ForgeProvider = {
     return {
       reviews: parseBitbucketReviews(context, reviews),
       commits: parseBitbucketCommits(context, commits),
-      threads: parseBitbucketThreads(context, threads),
+      discussions: parseBitbucketDiscussions(context, discussions),
     }
   },
   discussion: {

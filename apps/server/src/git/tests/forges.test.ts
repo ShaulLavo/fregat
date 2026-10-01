@@ -1122,7 +1122,7 @@ describe('forge discussion capabilities', () => {
     ['git@ssh.dev.azure.com:v3/org/project/repo', 'https://dev.azure.com/org'],
     ['git@org.visualstudio.com:v3/org/project/repo', 'https://org.visualstudio.com'],
   ])(
-    'Azure reads returned repository threads for %s with native context and unsupported writes',
+    'Azure reads returned repository discussions for %s with native context and unsupported writes',
     async (remote, organization) => {
       const forge = boundary(remote, (argv) => {
         if (argv[1] === 'account') return ok('fixture')
@@ -1444,7 +1444,7 @@ describe('bounded pull request activity', () => {
         items: [{ state: 'APPROVED', body: 'Approved coverage' }],
       },
       commits: { kind: 'ready', items: [{ message: 'Fix edge case' }] },
-      threads: {
+      discussions: {
         kind: 'ready',
         items: [
           {
@@ -1509,7 +1509,7 @@ describe('bounded pull request activity', () => {
       kind: 'ready',
       reviews: { kind: 'unsupported' },
       commits: { kind: 'ready', items: [{ message: 'GitLab commit' }] },
-      threads: {
+      discussions: {
         kind: 'ready',
         truncated: false,
         items: [
@@ -1568,7 +1568,7 @@ describe('bounded pull request activity', () => {
       kind: 'ready',
       reviews: { kind: 'ready', items: [{ state: 'APPROVED' }] },
       commits: { kind: 'ready', items: [{ message: 'Forgejo commit' }] },
-      threads: {
+      discussions: {
         kind: 'ready',
         items: [{ id: '8', path: 'src/fj.ts', comments: [{ body: 'Forgejo inline' }] }],
       },
@@ -1612,7 +1612,7 @@ describe('bounded pull request activity', () => {
       kind: 'ready',
       reviews: { kind: 'unsupported' },
       commits: { kind: 'unsupported' },
-      threads: {
+      discussions: {
         kind: 'ready',
         truncated: false,
         items: [
@@ -1696,7 +1696,7 @@ describe('bounded pull request activity', () => {
       kind: 'ready',
       reviews: { kind: 'ready', items: [{ state: 'approved' }] },
       commits: { kind: 'ready', items: [{ message: 'Bitbucket commit' }] },
-      threads: {
+      discussions: {
         kind: 'ready',
         truncated: true,
         items: [
@@ -1756,7 +1756,7 @@ describe('bounded pull request activity', () => {
       return json([])
     })
     const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
-    expect(result).toMatchObject({ kind: 'ready', threads: { kind: 'ready', truncated: true } })
+    expect(result).toMatchObject({ kind: 'ready', discussions: { kind: 'ready', truncated: true } })
     expect(
       fixture.commands('tea').filter((call) => call.argv.at(-1)?.endsWith('/comments')),
     ).toHaveLength(20)

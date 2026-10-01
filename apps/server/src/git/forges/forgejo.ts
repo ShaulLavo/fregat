@@ -14,7 +14,7 @@ import {
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseIssueComments } from './issue-comments'
 import {
-  groupActivityThreads,
+  groupActivityDiscussions,
   parseForgejoInline,
   parseForgejoReviews,
   parseRestCommits,
@@ -78,7 +78,7 @@ export const forgejo: ForgeProvider = {
     return {
       reviews: parsed.reviews,
       commits: parseRestCommits(context, commitRows),
-      threads: groupActivityThreads(comments, truncated),
+      discussions: groupActivityDiscussions(comments, truncated),
     }
   },
   discussion: {
