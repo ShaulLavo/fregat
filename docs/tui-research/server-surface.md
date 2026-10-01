@@ -48,7 +48,7 @@ Server-owned local state lives under `~/.platform` (`apps/server/src/home.ts:4-1
 - `createAuthConfig` (`auth.ts:36-41`) has one principal, `kind: 'local'` with `filesystem:read|write` — capabilities are never checked per route today.
 - `authGuard` (`auth.ts:43-65`): `origin = request.headers.get('origin')`; `localBrowserOriginError` (`auth.ts:75-79`): no origin → `FsError('UNAUTHORIZED')` (401); origin not in list → `FsError('FORBIDDEN_ORIGIN')` (403). Comparison is exact string `includes` (`auth.ts:82-86`).
 - WS: `originFromWebSocketData(data)` reads `data.headers.origin ?? data.headers.Origin` (`auth.ts:88-94`).
-- The comment at `auth.ts:96-103` and `docs/environments-and-remote-plan.md:175-196` make the design explicit: **there is no token mode and none is planned until a client that cannot SSH exists**. Bearer tokens in `localStorage` are listed as a non-goal (`docs/environments-and-remote-plan.md:281`).
+- The comment at `auth.ts:96-103` and `plans/environments-and-remote-plan.md:175-196` make the design explicit: **there is no token mode and none is planned until a client that cannot SSH exists**. Bearer tokens in `localStorage` are listed as a non-goal (`plans/environments-and-remote-plan.md:281`).
 
 **Consequence for a TUI:** send `Origin: http://localhost:5173` (or whatever the server was started with) on every `fetch` and every WS upgrade. Bun's `fetch` accepts an `Origin` header; Bun's `WebSocket` accepts `{ headers }` in its options bag. The desktop app does exactly this for `fetch` (`apps/desktop/src/bun/index.ts:46, 199-203, 300-304`). Alternatively start the server with `SERVER_ALLOWED_ORIGINS` including a TUI-specific origin string such as `tui://local` — the allowlist is a plain string compare, so any string works.
 
@@ -388,7 +388,7 @@ Server: `apps/server/src/lsp/routes.ts`, `lsp/proxy-session.ts`. Contract: `pack
 - **`Origin` header**: browsers add it automatically; a TUI must add it by hand (§2). Nothing else in auth is browser-specific.
 - **CORS** (`app.ts:178-190`): irrelevant outside a browser, but the GET/POST-only method set is a server fact that shaped the API (no DELETE/PUT).
 - **Eden WS**: `new WebSocket(url)` with no headers and unencoded query strings (§8).
-- **`localStorage`**: `lib/workspace-cache-storage.ts:5-7, 40, 87, 98` persists workbench UI state under `platform.workspace-state.v19.*` — chat drafts, rail order, selection, diff scope etc. (see `docs/environments-and-remote-plan.md:117`). A TUI needs its own per-user cache (e.g. a JSON file under `~/.platform`). Not server state.
+- **`localStorage`**: `lib/workspace-cache-storage.ts:5-7, 40, 87, 98` persists workbench UI state under `platform.workspace-state.v19.*` — chat drafts, rail order, selection, diff scope etc. (see `plans/environments-and-remote-plan.md:117`). A TUI needs its own per-user cache (e.g. a JSON file under `~/.platform`). Not server state.
 - **`window`/`document`/`navigator`**: `lifecycle-flush.ts`, `clipboard.ts`, `default-nerd-font.ts`, `platform/bridge.ts` (Electrobun bridge), `platform/backdrop.ts` — all presentational.
 - **Fonts/wallpaper routes**: browser-only material.
 - **Attachments**: the web builds `<img src>` from `chatAttachmentUrlPath`; a TUI would fetch bytes and either render via a terminal image protocol or show a placeholder.
@@ -411,13 +411,13 @@ Server: `apps/server/src/lsp/routes.ts`, `lsp/proxy-session.ts`. Contract: `pack
 
 ## 11. Risks and open questions
 
-- Auth is origin-only; a TUI that hardcodes `Origin: http://localhost:5173` is spoofing a browser origin. Cleaner: register a dedicated origin string via `SERVER_ALLOWED_ORIGINS` and make the launcher (`scripts/runtime-network.ts:58-67`) include it. Real sessions are explicitly deferred (`docs/environments-and-remote-plan.md:186-188`).
+- Auth is origin-only; a TUI that hardcodes `Origin: http://localhost:5173` is spoofing a browser origin. Cleaner: register a dedicated origin string via `SERVER_ALLOWED_ORIGINS` and make the launcher (`scripts/runtime-network.ts:58-67`) include it. Real sessions are explicitly deferred (`plans/environments-and-remote-plan.md:186-188`).
 - Terminal and LSP sockets close with no code on auth failure; only orchestration uses 1008. A TUI cannot distinguish "unauthorized" from "root invalid" on `/terminal` without reading server logs.
 - Eden's WS query builder does not URL-encode; roots containing `&`, `#`, `%` or spaces break (`chunk-FXT7FC66.mjs` fn `K`). Hand-roll.
 - The shell stream never carries assistant text; the TUI must hold a thread subscription for every thread it renders live (the web caps this with `retainThreadDetail` ref-counting in `thread-detail-subscriptions`).
 - `synchronized` is emitted but unmodelled client-side; the resume/gap decision is server-side and invisible except via logs.
 - `replayEvents` over HTTP has no `limit`; over WS it is capped at 1000 (`orchestration-ws.ts:103-108`).
 - `WatchClientMessage` is dead contract; do not implement subscribe/unsubscribe over the watch stream.
-- The settings document is per environment; the web always reads the primary's (`docs/environments-and-remote-plan.md:170-175`). A TUI must decide which server's `/settings` is "the" settings.
+- The settings document is per environment; the web always reads the primary's (`plans/environments-and-remote-plan.md:170-175`). A TUI must decide which server's `/settings` is "the" settings.
 - Elysia WS frame validation: invalid client frames are rejected by Elysia's schema layer before `message()` runs (`ws-rpc.ts:92`); the exact error frame (if any) Elysia sends was not verified here.
 - Dates: contracts type them as strings but a treaty client receives `Date` objects unless normalized — a subtle source of valibot failures in a TUI that mixes treaty and raw parsing.

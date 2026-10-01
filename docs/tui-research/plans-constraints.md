@@ -85,10 +85,10 @@ refactor). Every claim below is cited to a file and line in `/work/projects/plat
 
 ### A5. Environment identity and scoped refs — every client map is keyed by `(environmentId, id)`
 
-- `docs/environments-and-remote-plan.md:34-38`: "An environment is one running backend server
+- `plans/environments-and-remote-plan.md:34-38`: "An environment is one running backend server
   process, reachable at one origin, owning one SQLite database and one filesystem view of one
   machine." "User-facing copy says **machine**; code says `environmentId`."
-- `docs/environments-and-remote-plan.md:55-63` (and landed in the tree, see D1): singleton
+- `plans/environments-and-remote-plan.md:55-63` (and landed in the tree, see D1): singleton
   `environment_identity` row; `environmentId` in the WS handshake and `/health`; "the client refuses
   a handshake whose `environmentId` differs from the one it recorded for that origin (identity
   drift)." `/health` = `{ ok, environmentId, label, protocolVersion, serverVersion, platform:{os,arch},
@@ -111,7 +111,7 @@ ChatProjectionSlice> }`; "Writers take the `environmentId` of the transport that
   `ChatTransport` per environment, created by a factory, closable, and holding its own RPC client,
   detail-subscription cache, and earlier-page loader"; "Query cache is one `QueryClient` per
   environment"; "Auth refusal on the WS upgrade is an explicit `1008`."
-- `docs/environments-and-remote-plan.md:139-148`: "**Chat is federated.** One `ChatTransport` per
+- `plans/environments-and-remote-plan.md:139-148`: "**Chat is federated.** One `ChatTransport` per
   connected environment … **The workbench is single-homed** … **A running turn never migrates.**"
 - The transport interface (landed, untracked): `apps/web/src/features/chat/transport/chat-transport.ts:16-33`
   — `closed`, `close()`, `retainThreadDetail`, `loadEarlierPage`, `dispatchCommand`,
@@ -119,7 +119,7 @@ ChatProjectionSlice> }`; "Writers take the `environmentId` of the transport that
 - `PLAN.md:88-89`: "Plan 077 overlaps the global client, query, and chat transport seams; serialize it
   with any other work on `apps/web/src/lib/client.ts` or the chat transport."
 - Settings reads stay on the primary environment (`plans/078:131-134`;
-  `docs/environments-and-remote-plan.md:171-177`).
+  `plans/environments-and-remote-plan.md:171-177`).
 
 ### A7. Wire protocol a TUI must speak (server is truth; commands → events → projections)
 
@@ -131,7 +131,7 @@ ChatProjectionSlice> }`; "Writers take the `environmentId` of the transport that
   transcript is not React Query state; sidebar receives shell state, not full detail; active/prewarmed
   threads receive detail state; pending approvals/user input are backend-owned facts; provider
   instance ID is distinct from provider driver kind; all large caches have bounds."
-- `docs/t3code-parity-implementation-plan.md:1966-1972`: "Do not parallelize these before the
+- `plans/t3code-parity-implementation-plan.md:1966-1972`: "Do not parallelize these before the
   contracts settle: decider command/event names, projection table schema, shell/detail snapshot
   shapes, provider session runtime shape." Plan 068 is exactly that contract cutover.
 - Concrete protocol (`packages/contracts/src/orchestration-ws.ts`): `ORCHESTRATION_WS_PROTOCOL_VERSION = 4`
@@ -175,7 +175,7 @@ pong` (`:241-320`). Replay is capped at `ORCHESTRATION_REPLAY_MAX_EVENTS = 1_000
   `packages/contracts/src/settings/keys.ts:~600-608` (`merge: 'record'`). A keyboard-centric TUI
   should bind through this key rather than a second binding store.
 - Per-environment client persistence is scoped by a namespace, not by key rewriting
-  (`docs/environments-and-remote-plan.md:116-126`; `plans/078:207-224`): `environmentScopedStorage
+  (`plans/environments-and-remote-plan.md:116-126`; `plans/078:207-224`): `environmentScopedStorage
 (environmentId)` prefix `env:${environmentId}|`; global chrome stays unscoped; "No migration: the
   developer clears site data once." Plan 078 adds exactly one new localStorage key
   (`platform.environments.connected.v1`, `plans/078:151-155`). The full list of localStorage owners
@@ -209,7 +209,7 @@ pong` (`:241-320`). Replay is capped at `ORCHESTRATION_REPLAY_MAX_EVENTS = 1_000
   refusing anything but `localhost|127.0.0.1|::1`. `PLAN.md:91-92`: "Nothing in this lane binds a
   server off loopback."
 - Pairing/sessions/tokens are explicitly deferred "until a client that cannot SSH exists"
-  (`PLAN.md:84-87`; `docs/environments-and-remote-plan.md:185-188`; refused reference behaviours
+  (`PLAN.md:84-87`; `plans/environments-and-remote-plan.md:185-188`; refused reference behaviours
   `:274-287`).
 - A TUI process (Bun `fetch`/`WebSocket`) sends no browser `Origin`. It must either present an
   allow-listed origin header deliberately or the plan must add a non-browser principal. The
@@ -461,7 +461,7 @@ Not yet done from 077 (so the plan is still open and its files are still hot):
 
 ### D4. Doc/plan edits in the same tree
 
-- `docs/environments-and-remote-plan.md` (+40: §2.2 checkout identity paragraphs, §2.4 unsaved-buffer
+- `plans/environments-and-remote-plan.md` (+40: §2.2 checkout identity paragraphs, §2.4 unsaved-buffer
   ownership, new §5.6 "Git overview across checkouts, unscheduled"), `plans/068` (+11 main-checkout
   and `(environmentId, worktreeId)` rules), `plans/069` (+9), `plans/078` (+21), `plans/README.md`
   (056/057 state rows). A TUI plan must reference the **dirty** wording of these files, and its
@@ -495,9 +495,9 @@ Not yet done from 077 (so the plan is still open and its files are still hot):
 - /work/projects/platform/plans/078-federated-environments.md
 - /work/projects/platform/docs/worktree-lifecycle.md
 - /work/projects/platform/docs/product-vision.md
-- /work/projects/platform/docs/environments-and-remote-plan.md
+- /work/projects/platform/plans/environments-and-remote-plan.md
 - /work/projects/platform/docs/t3code-reference.md
-- /work/projects/platform/docs/t3code-parity-implementation-plan.md
+- /work/projects/platform/plans/t3code-parity-implementation-plan.md
 - /work/projects/platform/AGENTS.md
 - /work/projects/platform/apps/server/src/auth.ts
 - /work/projects/platform/apps/server/src/orchestration/ws-rpc.ts

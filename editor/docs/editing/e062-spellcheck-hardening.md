@@ -1,7 +1,7 @@
 # E062: Spellcheck hardening: bounded tokenization, settled worker failures, cheaper underline masks
 
 Completed 2026-09-27 (Editor `dab87329`, Platform `c1391065a`), from GitHub issue 58. Builds on
-[E058](../../plans/e058-spellcheck.md).
+[E058](https://github.com/ShaulLavo/fregat/blob/main/plans/e058-spellcheck.md).
 
 Scope: retain cspell and the worker/plugin architecture. Fix bounded tokenization and worker
 failure settlement; measure rendering before deciding on changes. Keep file defaults unchanged.

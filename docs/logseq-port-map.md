@@ -1,5 +1,5 @@
 > [!NOTE]
-> **Generated port map — 2026-08-22.** Companion to [logseq-parity-gap-matrix.md](logseq-parity-gap-matrix.md) and [logseq-parity-implementation-plan.md](logseq-parity-implementation-plan.md). This is the per-module decision of what we **transliterate** from Logseq's ClojureScript, what we **rebuild from its design**, and what we **do not take at all** — with the algorithm to preserve, the Clojure→TypeScript notes, and the risks for every module we intend to touch. Open this before starting a module, not after.
+> **Generated port map — 2026-08-22.** Companion to [logseq-parity-gap-matrix.md](logseq-parity-gap-matrix.md) and [logseq-parity-implementation-plan.md](../plans/logseq-parity-implementation-plan.md). This is the per-module decision of what we **transliterate** from Logseq's ClojureScript, what we **rebuild from its design**, and what we **do not take at all** — with the algorithm to preserve, the Clojure→TypeScript notes, and the risks for every module we intend to touch. Open this before starting a module, not after.
 
 # Logseq Port Map
 

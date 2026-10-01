@@ -4,6 +4,15 @@ Updated 2026-10-01. This file owns cross-project ordering. Each [plan](plans/REA
 owns its scope, decisions, status and acceptance checks. [AGENTS.md](AGENTS.md) owns execution
 rules; [docs](docs/README.md) holds architecture, research and delivery evidence.
 
+## Shared planning home
+
+All package and client plans live in the root [plans/](plans/README.md) folder.
+This roadmap schedules Fregat, Editor, Ghostty, hotkeys and native-client work together.
+The [Editor inventory](plans/editor-backlog.md) preserves E-numbered scopes, dependencies,
+completed references and the [original wishlist](plans/editor-wishlist.md).
+The [native work breakdown](plans/native-plan-of-plans.md) retains its editor-first gates.
+Package roadmap files link here. Create and update plans in root `plans/`.
+
 ## Current execution order
 
 The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remaining
@@ -181,9 +190,9 @@ statuses here. In particular:
 - [088 native code intelligence](plans/088-native-code-intelligence.md) follows the required
   [087 native MCP](plans/087-stateless-mcp.md) contracts. External MCP management stays in
   [174](plans/174-external-mcp-servers.md).
-- The [native client roadmap](docs/native-plan-of-plans.md) owns Swift work. The TUI designs its
+- The [native client roadmap](plans/native-plan-of-plans.md) owns Swift work. The TUI designs its
   own terminal UX; web parity items wait where the TUI redesign requires it.
-- Editor keeps a package-local backlog; ghostty-webgpu's work is planned here, in Fregat's `plans/`.
+- Editor's [backlog](plans/editor-backlog.md) and Ghostty's plans share Fregat's root `plans/`.
   Paired changes land with their Platform integration and CI ref. Verify current package gates before scheduling from historical numbers.
 - [183](plans/183-claude-ide-in-terminals.md) remains low priority. DOCX editing retains its
   Markdown/fidelity gate in 156. The `/platform` prefix removal remains deferred on mesh naming.

@@ -22,7 +22,7 @@ Navigate settings sections and scope tabs by keyboard, open a scope's backing JS
 
 Category and scope stores exist in [apps/web/src/features/settings/state/category-store.ts](../apps/web/src/features/settings/state/category-store.ts) and [apps/web/src/features/settings/state/scope-store.ts](../apps/web/src/features/settings/state/scope-store.ts). [apps/web/src/features/settings/components/scope-tabs.tsx](../apps/web/src/features/settings/components/scope-tabs.tsx) exposes User, Workspace and read-only Defaults. Settings JSON document identities exist in [apps/web/src/lib/documents/utils/types.ts](../apps/web/src/lib/documents/utils/types.ts). [packages/contracts/src/settings/keys.ts](../packages/contracts/src/settings/keys.ts) owns scope constraints. No named settings-profile model was found.
 
-The shared JSON editor uses the React Editor adapter, `editor/packages/react/src/index.tsx` after Plan 207, verified in [the current Editor source](../../Editor/packages/react/src/index.tsx).
+The shared JSON editor uses the React Editor adapter, `editor/packages/react/src/index.tsx` after Plan 207, verified in [the current Editor source](../editor/packages/react/src/index.tsx).
 
 ## Design
 

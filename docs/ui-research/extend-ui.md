@@ -278,7 +278,7 @@ Not adopting:
   only once documents are a roadmap item; per the Plan 129 dependency shape it would be
   lazy-imported per document kind. The DOCX, XLSX and PPTX packages are `0.x` from a single vendor.
 - **`@pierre/diffs` is out.** Our docs record the decision to open diffs in our own editor, not
-  embed `@pierre/diffs` (`docs/t3code-chat-parity-gap-analysis.md:421`). The citation and schema
+  embed `@pierre/diffs` (`plans/t3code-chat-parity-gap-analysis.md:421`). The citation and schema
   panels' JSON diff tab would use `editor-diff` instead.
 - **Glide Data Grid** is canvas-rendered and an alpha build (`6.0.4-alpha24`). Truncation
   recovery, tokens and `ListRow` would not apply inside it.

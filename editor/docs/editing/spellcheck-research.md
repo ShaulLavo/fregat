@@ -1,6 +1,6 @@
 # Spellcheck for painted text: research findings
 
-Research for [E058](../../plans/e058-spellcheck.md), 2026-09-26, at Editor `74e76be` and Platform
+Research for [E058](https://github.com/ShaulLavo/fregat/blob/main/plans/e058-spellcheck.md), 2026-09-26, at Editor `74e76be` and Platform
 `97bfbf2ba`. Probe scripts, corpora and raw output are in `/work/tmp/research2/spellcheck/`
 (`bench.mjs <engine>`, `vocab.mjs`, `tok.mjs`, `buildtrie.mjs`). The survey clones are in Platform
 `references/` (`cspell`, `cspell-dicts`, `vscode-spell-checker`, `harper`, `codebook`, `zed`).
@@ -48,16 +48,16 @@ Corpora:
   counts only if the engine accepts the target word and flags the misspelling, about 630 pairs per
   engine.
 
-| Engine (licence)                                          | Code + data, gzip  | Init   | Memory       | Check all 79k words | Suggest median / p95 | Top-1 / top-5 |
-| --------------------------------------------------------- | ------------------ | ------ | ------------ | ------------------- | -------------------- | ------------- |
-| cspell-trie-lib + `@cspell/dict-en_us` (MIT, SCOWL data)  | 34 KB + 298 KB     | 68 ms  | 4 MB heap    | 17–21 ms            | 4.8 / 7.9 ms         | 72.8 / 89.3   |
-| same, SCOWL-60 tier breaks near-ties                      | + tier data        | —      | —            | —                   | 4.2 / 6.6 ms         | 75.8 / 91.1   |
-| same, word frequency breaks near-ties                     | + 630 KB frequency | —      | —            | —                   | 4.1 / 6.2 ms         | 77.6 / 93.5   |
-| nspell + `dictionary-en` (MIT; SCOWL-60 hunspell)         | 4 KB + 192 KB      | 78 ms  | 12 MB heap   | 15 ms               | 1.3 / 39 ms, max 97  | 67.6 / 81.3   |
-| typo-js (BSD-3)                                           | 3 KB + 192 KB      | 127 ms | 17 MB heap   | 20 ms               | 430 / 1,087 ms       | 67.3 / 88.1   |
-| spellchecker-wasm, SymSpell (MIT; 82k-word frequency list) | 79 KB wasm + 628 KB | 560 ms | 105 MB RSS   | 137 ms              | 0.02 / 0.08 ms       | 77.5 / 90.2   |
-| Harper `harper.js` 2.10, spelling rule only (Apache-2.0)  | 8.1 MB wasm        | 486 ms | 284 MB RSS   | 6.1 s (markdown)    | 0.6 / 0.7 ms         | 76.9 / 89.6   |
-| Own: word `Set` + Norvig edits + frequency, no deps       | 1 KB + 512 KB list + 630 KB frequency | 102 ms | 20 MB heap   | 8 ms                | 0.12 / 84 ms, max 161 | 77.6 / 89.3  |
+| Engine (licence)                                           | Code + data, gzip                     | Init   | Memory     | Check all 79k words | Suggest median / p95  | Top-1 / top-5 |
+| ---------------------------------------------------------- | ------------------------------------- | ------ | ---------- | ------------------- | --------------------- | ------------- |
+| cspell-trie-lib + `@cspell/dict-en_us` (MIT, SCOWL data)   | 34 KB + 298 KB                        | 68 ms  | 4 MB heap  | 17–21 ms            | 4.8 / 7.9 ms          | 72.8 / 89.3   |
+| same, SCOWL-60 tier breaks near-ties                       | + tier data                           | —      | —          | —                   | 4.2 / 6.6 ms          | 75.8 / 91.1   |
+| same, word frequency breaks near-ties                      | + 630 KB frequency                    | —      | —          | —                   | 4.1 / 6.2 ms          | 77.6 / 93.5   |
+| nspell + `dictionary-en` (MIT; SCOWL-60 hunspell)          | 4 KB + 192 KB                         | 78 ms  | 12 MB heap | 15 ms               | 1.3 / 39 ms, max 97   | 67.6 / 81.3   |
+| typo-js (BSD-3)                                            | 3 KB + 192 KB                         | 127 ms | 17 MB heap | 20 ms               | 430 / 1,087 ms        | 67.3 / 88.1   |
+| spellchecker-wasm, SymSpell (MIT; 82k-word frequency list) | 79 KB wasm + 628 KB                   | 560 ms | 105 MB RSS | 137 ms              | 0.02 / 0.08 ms        | 77.5 / 90.2   |
+| Harper `harper.js` 2.10, spelling rule only (Apache-2.0)   | 8.1 MB wasm                           | 486 ms | 284 MB RSS | 6.1 s (markdown)    | 0.6 / 0.7 ms          | 76.9 / 89.6   |
+| Own: word `Set` + Norvig edits + frequency, no deps        | 1 KB + 512 KB list + 630 KB frequency | 102 ms | 20 MB heap | 8 ms                | 0.12 / 84 ms, max 161 | 77.6 / 89.3   |
 
 Notes on the table:
 
@@ -80,12 +80,12 @@ Notes on the table:
 On the same 79k words, US English flags 343 distinct words (1,185 occurrences, 1.5%). Most are
 engineering vocabulary (`backend`, `repo`, `worktree`, `config`) or product names.
 
-| Dictionaries                                        | Distinct flagged | Occurrences |
-| --------------------------------------------------- | ---------------- | ----------- |
-| en-US                                               | 343              | 1,185       |
-| en-US + `@cspell/dict-software-terms` (MIT, 3,247 terms) | 182         | 627         |
-| en-GB (SCOWL-60) + software terms                   | 339              | 1,094       |
-| en-US + en-GB + software terms                      | 166              | 553         |
+| Dictionaries                                             | Distinct flagged | Occurrences |
+| -------------------------------------------------------- | ---------------- | ----------- |
+| en-US                                                    | 343              | 1,185       |
+| en-US + `@cspell/dict-software-terms` (MIT, 3,247 terms) | 182              | 627         |
+| en-GB (SCOWL-60) + software terms                        | 339              | 1,094       |
+| en-US + en-GB + software terms                           | 166              | 553         |
 
 The repository writes both spellings: `behavior` 177 times and `behaviour` 94 times in plans and
 web source, and `colour` 105 times. A US-only checker flags `behaviour` 42 times in this corpus
@@ -102,14 +102,14 @@ unclear French provenance, and AGPL Hebrew candidates. It is a sample of the pac
 not an exhaustive or current licensing inventory. Review the exact source, version, license and
 attribution of every dictionary before adding it; an engine's license does not cover its data.
 
-| Language | Permissive source surveyed                                                               | Copyleft source surveyed                                |
-| -------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| English  | SCOWL (en_US, en_GB, en_CA, en_AU): Atkinson's notice plus Ispell BSD and WordNet notices | `@cspell/dict-en-gb` is LGPL-3.0 (another source)       |
-| Dutch    | OpenTaal, BSD-3 or CC-BY-3.0 (`dictionary-nl`)                                           | —                                                       |
-| Russian  | `dictionary-ru`, BSD-3                                                                   | `@cspell/dict-ru_ru` is GPL-3.0                          |
-| French   | `@cspell/dict-fr-fr` says MIT, but its source (Dicollecte) is MPL-2.0                   | `dictionary-fr` is MPL-2.0                              |
-| German, Spanish, Italian, Portuguese | —                                                            | GPL, LGPL or MPL in the surveyed packages                |
-| Hebrew   | —                                                                                        | hspell, AGPL-3.0 (`dictionary-he`, `@cspell/dict-he`)   |
+| Language                             | Permissive source surveyed                                                                | Copyleft source surveyed                              |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| English                              | SCOWL (en_US, en_GB, en_CA, en_AU): Atkinson's notice plus Ispell BSD and WordNet notices | `@cspell/dict-en-gb` is LGPL-3.0 (another source)     |
+| Dutch                                | OpenTaal, BSD-3 or CC-BY-3.0 (`dictionary-nl`)                                            | —                                                     |
+| Russian                              | `dictionary-ru`, BSD-3                                                                    | `@cspell/dict-ru_ru` is GPL-3.0                       |
+| French                               | `@cspell/dict-fr-fr` says MIT, but its source (Dicollecte) is MPL-2.0                     | `dictionary-fr` is MPL-2.0                            |
+| German, Spanish, Italian, Portuguese | —                                                                                         | GPL, LGPL or MPL in the surveyed packages             |
+| Hebrew                               | —                                                                                         | hspell, AGPL-3.0 (`dictionary-he`, `@cspell/dict-he`) |
 
 `@cspell/dict-en_us` declares MIT. Its README says the words "come directly from SCOWL and is thus
 under the same copyright of SCOWL", so a copy we ship carries the SCOWL notice. The VS Code cSpell

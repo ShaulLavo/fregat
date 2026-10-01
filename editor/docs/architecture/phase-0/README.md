@@ -1,6 +1,6 @@
 # Phase 0 Architecture Health
 
-This directory is the Phase 0 baseline for `docs/architecture-recovery-plan.md`.
+This directory is the Phase 0 baseline for [the architecture recovery plan](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-architecture-recovery-plan.md).
 It is intentionally descriptive before it is aspirational: the files here record the current knots so
 future changes can make them smaller deliberately.
 

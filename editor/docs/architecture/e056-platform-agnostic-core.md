@@ -3,7 +3,7 @@
 Status: supporting design for approved E056, researched on 2026-09-20.
 E056 remains parked by the owner; implementation has not started.
 
-Execution entry: [E056](../../plans/e056-platform-agnostic-core.md).
+Execution entry: [E056](https://github.com/ShaulLavo/fregat/blob/main/plans/e056-platform-agnostic-core.md).
 Machine-readable evidence: [source ledger](e056-platform-agnostic-core-sources.json).
 
 **Proposed direction:** make Singapore's editor engine independent of React, DOM and browser worker construction; retain the existing fast DOM renderer; build a Strict DOM host only against capabilities demonstrated on the intended native runtime. Fregat remains the compatibility contract, not collateral damage.

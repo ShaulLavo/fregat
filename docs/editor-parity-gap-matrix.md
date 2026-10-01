@@ -1,5 +1,5 @@
 > [!NOTE]
-> **Generated gap matrix — 2026-08-10.** Companion to [editor-parity-implementation-plan.md](editor-parity-implementation-plan.md), which assigns every non-✅ row below to a wave. Produced by a 12-agent sweep: 2 agents inventoried our editor mode, 9 swept the references per domain (each classification verified against our code), 1 critic cross-checked completeness; 21 critic corrections are applied inline.
+> **Generated gap matrix — 2026-08-10.** Companion to [editor-parity-implementation-plan.md](../plans/editor-parity-implementation-plan.md), which assigns every non-✅ row below to a wave. Produced by a 12-agent sweep: 2 agents inventoried our editor mode, 9 swept the references per domain (each classification verified against our code), 1 critic cross-checked completeness; 21 critic corrections are applied inline.
 
 # Editor Mode Parity Gap Matrix
 
