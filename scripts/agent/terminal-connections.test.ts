@@ -1,19 +1,18 @@
 import { expect, test } from 'vitest'
-import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
-import { startIsolatedServer } from './isolated-server'
+import { createTestTerminalHost } from '../../apps/server/src/terminal-host/testing'
 import { reattachedTerminal } from './terminal-connections'
 
 test('replayed bytes from an old viewer cannot authorize input before a fresh attachment is ready', async () => {
-  const server = await startIsolatedServer(new URL('http://localhost:5251'))
-  const client = new TerminalHostClient({ stateRoot: server.home })
-  const viewer = new TerminalHostClient({ stateRoot: server.home })
+  const host = await createTestTerminalHost()
+  const client = host.client
+  const viewer = host.connect()
   const first = { ready: false, output: '' }
   const connections = [first]
   try {
     const shell = await client.spawn({
       key: 'reload-token',
-      cwd: server.directory,
-      env: { HOME: server.directory, PATH: process.env.PATH },
+      cwd: host.stateRoot,
+      env: { HOME: host.stateRoot, PATH: process.env.PATH },
       command: ['/bin/sh'],
       onData: (bytes) => {
         first.output += Buffer.from(bytes).toString('utf8')
@@ -48,6 +47,6 @@ test('replayed bytes from an old viewer cannot authorize input before a fresh at
   } finally {
     viewer.close()
     client.close()
-    await server.stop()
+    await host.close()
   }
 }, 40_000)
