@@ -275,7 +275,7 @@ async function parse(name: FixtureName, minimumBytes: number): Promise<unknown> 
   try {
     // Conversion and construction stay outside the timed parse-only region.
     const started = performance.now()
-    for (const chunk of chunks) await driver.write(chunk)
+    await Promise.all(chunks.map((chunk) => driver.write(chunk)))
     return { bytes: bytes.length, milliseconds: performance.now() - started }
   } finally {
     driver.dispose()
