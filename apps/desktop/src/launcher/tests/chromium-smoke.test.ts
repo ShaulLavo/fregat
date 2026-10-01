@@ -12,6 +12,10 @@ import type { BrowserCandidate } from '../browser'
 
 const executable =
   Bun.which('chromium') ?? Bun.which('google-chrome') ?? Bun.which('google-chrome-stable')
+const native = Boolean(process.env.WAYLAND_DISPLAY || process.env.DISPLAY)
+const pollCleanupMarginMs = 60_000
+// Lifecycle polls and cleanup need their own budget after bounded browser launches.
+const smokeTimeoutMs = startupBudget().limitMs * (native ? 3 : 1) + pollCleanupMarginMs
 const fixtureHtml =
   '<!doctype html><html><head><title>Platform desktop fixture</title></head><body><h1>Platform desktop fixture</h1><p>Browser bridge and window lifecycle verification</p></body></html>'
 
@@ -72,7 +76,6 @@ test.skipIf(!executable)(
     let first: ChromiumWindow | undefined
     let second: ChromiumWindow | undefined
     let independent: ChromiumWindow | undefined
-    const native = Boolean(process.env.WAYLAND_DISPLAY || process.env.DISPLAY)
     const telemetry: Record<string, unknown>[] = []
     const failures: unknown[] = []
     let step = 'launch'
@@ -291,5 +294,5 @@ test.skipIf(!executable)(
       await rm(scratch, { recursive: true, force: true })
     }
   },
-  30_000,
+  smokeTimeoutMs,
 )
