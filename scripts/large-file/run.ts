@@ -7,6 +7,7 @@ import { openFixtureWorkspace, releaseFixture } from '../agent/fixture-workspace
 import { paintedTokenColors, selectors } from '../agent/selectors'
 import { createScriptError } from '../structured-errors'
 import { expectedEditedHash, fileHash, MARKER, writeFixture } from './fixture'
+import { hostLabel, renderingPath } from './host'
 import { sampleMemory } from './memory'
 import { workerHeaps } from './workers'
 
@@ -52,7 +53,15 @@ async function typeBurst(page: Page, keys: number) {
     await page.keyboard.press('x')
     await page.waitForTimeout(80)
   }
-  await page.waitForTimeout(200)
+  // A fixed pause dropped the last frames on a host that rasterizes in software (~650 ms a frame).
+  // On timeout the assertion below reports how many frames landed.
+  await page
+    .waitForFunction(
+      (expected) => performance.getEntriesByName('large-file-key').length >= expected,
+      keys,
+      { timeout: 30_000 },
+    )
+    .catch(() => {})
   const values = await page.evaluate(() =>
     performance.getEntriesByName('large-file-key').map((entry) => entry.duration),
   )
@@ -244,6 +253,8 @@ export async function runCase(options: CaseOptions) {
     initialBytes,
     corpus: `${options.extension === 'ts' ? 'scoped-functions-v2' : 'folded-functions-v1'}${options.twoByte ? '-unicode-body-v2' : ''}`,
     browser: browser.version(),
+    host: hostLabel(),
+    rendering: await renderingPath(page),
     runtime: Bun.version,
     timestamp: new Date().toISOString(),
   }

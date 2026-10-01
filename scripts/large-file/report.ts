@@ -6,6 +6,11 @@ const workerSchema = v.object({
   heap: v.union([heapSchema, v.object({ unavailable: v.string() })]),
 })
 const resultSchema = v.object({
+  browser: v.optional(v.string()),
+  host: v.optional(
+    v.object({ name: v.string(), arch: v.string(), cpus: v.number(), memoryBytes: v.number() }),
+  ),
+  rendering: v.optional(v.object({ path: v.string() })),
   sizeMiB: v.number(),
   highlighting: v.optional(v.string(), 'default'),
   status: v.string(),
@@ -28,20 +33,31 @@ export function comparisonReport(results: readonly unknown[]) {
   const rows = results.map((value) => {
     const row = v.parse(resultSchema, value)
     const metrics = row.metrics
-    return `| ${row.sizeMiB} | ${row.highlighting} | ${row.status} | ${metrics?.highlighting?.state ?? 'unmeasured'} | ${rounded(metrics?.openToTextMs)} | ${rounded(metrics?.highlighting?.openToHighlightMs)} | ${rounded(metrics?.keyLatencyMs?.p95)} | ${rounded(metrics?.saveMs)} | ${workerMemory(metrics?.workersAfterOpen, 'shiki.worker')} | ${workerMemory(metrics?.workersAfterOpen, 'treeSitter.worker')} |`
+    return `| ${hostCell(row.host)} | ${rendererCell(row)} | ${row.sizeMiB} | ${row.highlighting} | ${row.status} | ${metrics?.highlighting?.state ?? 'unmeasured'} | ${rounded(metrics?.openToTextMs)} | ${rounded(metrics?.highlighting?.openToHighlightMs)} | ${rounded(metrics?.keyLatencyMs?.p95)} | ${rounded(metrics?.saveMs)} | ${workerMemory(metrics?.workersAfterOpen, 'shiki.worker')} | ${workerMemory(metrics?.workersAfterOpen, 'treeSitter.worker')} |`
   })
   return [
     '# Large-file highlighting comparison',
     '',
     'Each row uses a fresh browser and API, the same deterministic corpus and typing/save sequence.',
     'Shiki uses light-plus; Tree-sitter uses tree-sitter-light. Worker columns are JS heap plus external backing storage after opening and GC, in MiB. Unavailable measurements stay explicit.',
+    'Renderer is the WebGL rasterizer headless Chromium used: software (SwiftShader) times include CPU rasterization and are not display latency on that host.',
     'These are requested engines: configured large-file tiers can pause highlighting above their limit. Inspect screenshots and worker measurements before treating such rows as highlighting throughput.',
     '',
-    '| MiB | Theme engine | Result | Syntax | Open ms | Color ms | Key p95 ms | Save ms | Shiki MiB | Tree-sitter MiB |',
-    '| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| Host | Renderer | MiB | Theme engine | Result | Syntax | Open ms | Color ms | Key p95 ms | Save ms | Shiki MiB | Tree-sitter MiB |',
+    '| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...rows,
     '',
   ].join('\n')
+}
+
+function hostCell(host: v.InferOutput<typeof resultSchema>['host']) {
+  if (!host) return '—'
+  return `${host.name} ${host.arch} ${host.cpus} CPU ${rounded(host.memoryBytes / 1024 ** 3)} GiB`
+}
+
+function rendererCell(row: v.InferOutput<typeof resultSchema>) {
+  if (!row.rendering) return '—'
+  return `${row.rendering.path}, Chromium ${row.browser ?? 'unknown'}`
 }
 
 function rounded(value: number | undefined) {
