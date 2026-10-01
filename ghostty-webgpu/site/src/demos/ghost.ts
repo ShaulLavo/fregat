@@ -59,6 +59,10 @@ export class GhostDemo extends AnimatedDemo {
 
     const index = Math.floor(elapsed / FRAME_SECONDS) % frames.frames.length
     const frame = frames.frames[index]!
+    if (performance.getEntriesByName('ghost:first-write').length === 0) {
+      performance.mark('ghost:first-write')
+      requestAnimationFrame(() => performance.mark('ghost:first-frame'))
+    }
     // Drift left and right through whatever room the grid has beyond the frame.
     const amplitude = Math.max(0, (cols - frames.width) / 2 - 1)
     const drift = Math.sin((elapsed / DRIFT_PERIOD_SECONDS) * Math.PI * 2) * amplitude

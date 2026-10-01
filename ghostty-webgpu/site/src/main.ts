@@ -150,7 +150,9 @@ function showFatal(cause: unknown): void {
 async function boot(): Promise<void> {
   wireControls()
   await loadFonts()
+  performance.mark('ghost:fonts-ready')
   const base = document.baseURI
+  performance.mark('ghost:create-start')
   const instance = await Terminal.create({
     appearance: {
       cursor: { blink: true, style: 'block' },
@@ -167,7 +169,9 @@ async function boot(): Promise<void> {
       },
     },
   })
+  performance.mark('ghost:create-resolved')
   await instance.open(ui.host)
+  performance.mark('ghost:open-resolved')
   terminal = instance
 
   const backend = instance.diagnostics.rendererBackend ?? 'unknown'

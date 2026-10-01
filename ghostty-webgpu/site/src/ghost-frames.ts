@@ -53,7 +53,7 @@ function parseLine(line: string): Run[] {
   return runs
 }
 
-function parseFrames(packed: string): GhostFrames {
+export function parseGhostFrames(packed: string): GhostFrames {
   const newline = packed.indexOf('\n')
   const [width = 0, rows = 0] = packed.slice(0, newline).split(' ').map(Number)
   const frames = packed
@@ -77,7 +77,10 @@ export function loadGhostFrames(): Promise<GhostFrames> {
       if (!response.ok) throw new Error(`Frames request failed: ${response.status}`)
       return inflate(await response.arrayBuffer())
     })
-    .then(parseFrames)
+    .then((packed) => {
+      performance.mark('ghost:frames-ready')
+      return parseGhostFrames(packed)
+    })
   return framesPromise
 }
 
