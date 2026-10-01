@@ -150,8 +150,18 @@ async function stopFixtureLauncherProcess(
     import.meta.dirname,
     '../../apps/desktop/src/launcher/chromium.ts',
   )
+  const failurePath = path.resolve(
+    import.meta.dirname,
+    '../../apps/desktop/src/launcher/failure.ts',
+  )
+  const errorFile = path.join(fixture, `launcher-${signal.toLowerCase()}-failure.json`)
+  const phaseFile = path.join(fixture, `launcher-${signal.toLowerCase()}-phase.json`)
   const source = `
+    const phase = async value => await Bun.write(${JSON.stringify(phaseFile)}, JSON.stringify({ phase: value }));
+    await phase('import');
+    try {
     const { launchChromium } = await import(${JSON.stringify(modulePath)});
+    await phase('launch');
     const controller = new AbortController();
     process.once('SIGTERM', () => controller.abort());
     const browser = await launchChromium({
@@ -161,24 +171,39 @@ async function stopFixtureLauncherProcess(
       signal: controller.signal, onOpen: () => {}, onFailure: () => {}
     });
     if (browser.kind !== 'owned') process.exit(2);
+    await phase('process-info');
     try {
       const info = await browser.cdp.request('SystemInfo.getProcessInfo');
       const owner = info.processInfo.find(process => process.type === 'browser');
       await Bun.write(${JSON.stringify(readyFile)}, JSON.stringify({ browserPid: owner.id }));
       await browser.exited;
     } finally { await browser.close(); }
+    } catch (error) {
+      const { launcherFailureFacts } = await import(${JSON.stringify(failurePath)});
+      await Bun.write(${JSON.stringify(errorFile)}, JSON.stringify(launcherFailureFacts(error)));
+      process.exitCode = 1;
+    }
   `
   const child = Bun.spawn([process.execPath, '-e', source], {
     stdio: ['ignore', 'ignore', 'ignore'],
   })
   let browserIdentity: { pid: number; startTime: string } | undefined
   try {
-    const ready = Bun.file(readyFile)
+    // Bun.file caches a missing file; each readiness poll needs a fresh file view.
+    const ready = () => Bun.file(readyFile)
     const deadline = Date.now() + 10_000
-    while (Date.now() < deadline && !(await ready.exists()) && child.exitCode === null)
+    while (Date.now() < deadline && !(await ready().exists()) && child.exitCode === null)
       await Bun.sleep(50)
-    ok(await ready.exists(), 'The production-pipe launcher process must become ready')
-    const info = (await ready.json()) as { browserPid: number }
+    if (!(await ready().exists())) {
+      const failure = Bun.file(errorFile)
+      await evidence.json(`launcher-${signal.toLowerCase()}-startup.json`, {
+        exitCode: child.exitCode,
+        failure: (await failure.exists()) ? await failure.json() : null,
+        phase: (await Bun.file(phaseFile).exists()) ? await Bun.file(phaseFile).json() : null,
+      })
+    }
+    ok(await ready().exists(), 'The production-pipe launcher process must become ready')
+    const info = (await ready().json()) as { browserPid: number }
     ok(
       Number.isSafeInteger(info.browserPid) && info.browserPid > 0,
       'The fixture records its own browser PID',
@@ -210,6 +235,10 @@ async function stopFixtureLauncherProcess(
       strictEqual(exitCode, 0, 'Graceful production launcher cleanup must succeed')
     return automaticExit
   } finally {
+    if (child.exitCode === null) {
+      child.kill('SIGTERM')
+      await Promise.race([child.exited, Bun.sleep(5000)])
+    }
     if (child.exitCode === null) child.kill('SIGKILL')
     await child.exited
     // A killed fixture parent cannot reap its child; this PID came from its own private CDP session.
