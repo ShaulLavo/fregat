@@ -33,29 +33,31 @@ function readFont() {
   return getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim()
 }
 
-// A face that never arrives costs this long, then the diagram measures with what is there.
-const FONT_WAIT_MS = 3_000
+export type DiagramFontOutcome = 'loaded' | 'failed' | 'gave-up'
 
 /**
- * Waits until the faces that set `text` in `fontFamily` have loaded, or gives up.
+ * Waits until the faces that set `text` in `fontFamily` have loaded, failed, or `waitMs` passed.
  * `document.fonts.ready` misses these: a face no text has used yet starts loading only when
  * the measurement asks for it, after the measurement has used the fallback.
  */
 export async function diagramFontLoaded(
   fontFamily: string,
   text: string,
-): Promise<'loaded' | 'gave-up'> {
+  waitMs: number,
+): Promise<DiagramFontOutcome> {
   const fonts = globalThis.document?.fonts
   if (!fonts) return 'loaded'
 
   let timer: ReturnType<typeof setTimeout> | undefined
   const giveUp = new Promise<'gave-up'>((resolve) => {
-    timer = setTimeout(() => resolve('gave-up'), FONT_WAIT_MS)
+    timer = setTimeout(() => resolve('gave-up'), waitMs)
   })
   // Labels are regular; class and entity titles are bold.
   const loads = ['400', '700'].map((weight) => fonts.load(`${weight} 1em ${fontFamily}`, text))
-  const loaded = Promise.allSettled(loads).then(() => 'loaded' as const)
-  const outcome = await Promise.race([loaded, giveUp])
+  const settled = Promise.allSettled(loads).then((results) =>
+    results.every((result) => result.status === 'fulfilled') ? 'loaded' : 'failed',
+  )
+  const outcome = await Promise.race([settled, giveUp])
   clearTimeout(timer)
   return outcome
 }

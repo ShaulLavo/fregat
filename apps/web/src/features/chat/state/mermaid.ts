@@ -6,11 +6,18 @@ import { mermaidQueryKeys } from '@/features/chat/utils/query-keys'
 import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
 import type mermaid from 'mermaid'
 import { withIsolatedDiagramClasses } from '@/features/chat/state/diagram-parser'
-import { diagramFontLoaded } from '@/features/chat/state/diagram-font'
+import { diagramFontLoaded, type DiagramFontOutcome } from '@/features/chat/state/diagram-font'
 import type { MermaidTheme } from '@/features/chat/utils/diagram-theme'
 
+type DiagramRequest = {
+  /** How long to wait for the UI font's faces before measuring with what is there. */
+  readonly fontWaitMs: number
+  /** Aborted when the diagram no longer wants this render. */
+  readonly signal: AbortSignal
+}
+
 export type MermaidRenderer = {
-  readonly render: (chart: string, theme: MermaidTheme) => Promise<string>
+  readonly render: (chart: string, theme: MermaidTheme, request: DiagramRequest) => Promise<string>
 }
 
 type MermaidModule = {
@@ -74,7 +81,11 @@ export function setMermaidLoader(next: MermaidLoader | null): void {
 
 function createRenderer(mermaid: MermaidModule): MermaidRenderer {
   return {
-    render(chart, theme) {
+    async render(chart, theme, { fontWaitMs, signal }) {
+      // Fonts load before the render queue, so diagrams waiting on one face wait together.
+      const font = await resourceQueryClient.query(
+        diagramFontQueryOptions(theme.fontFamily, chart, fontWaitMs),
+      )
       return runMutation(
         resourceQueryClient,
         {
@@ -83,7 +94,11 @@ function createRenderer(mermaid: MermaidModule): MermaidRenderer {
           scope: { id: 'mermaid-render' },
           networkMode: 'always',
           retry: false,
-          mutationFn: () => renderDiagram(mermaid, chart, theme),
+          mutationFn: () => {
+            // A diagram that unmounted or changed while queued gives its turn to the next.
+            signal.throwIfAborted()
+            return renderDiagram(mermaid, chart, theme, font)
+          },
         },
         undefined,
       )
@@ -91,7 +106,24 @@ function createRenderer(mermaid: MermaidModule): MermaidRenderer {
   }
 }
 
-async function renderDiagram(mermaid: MermaidModule, chart: string, theme: MermaidTheme) {
+function diagramFontQueryOptions(fontFamily: string, text: string, waitMs: number) {
+  return queryOptions({
+    queryKey: mermaidQueryKeys.font(fontFamily, text, waitMs),
+    queryFn: () => diagramFontLoaded(fontFamily, text, waitMs),
+    // Shares a wait in flight; a later render asks again, since the face may have arrived.
+    staleTime: 0,
+    gcTime: 0,
+    networkMode: 'always',
+    retry: false,
+  })
+}
+
+async function renderDiagram(
+  mermaid: MermaidModule,
+  chart: string,
+  theme: MermaidTheme,
+  font: DiagramFontOutcome,
+) {
   const startedAt = performance.now()
   const candidate = chart.trim().split(/[\s;]/, 1)[0] ?? ''
   const diagramType =
@@ -100,7 +132,6 @@ async function renderDiagram(mermaid: MermaidModule, chart: string, theme: Merma
     )
       ? candidate
       : 'unknown'
-  const font = await diagramFontLoaded(theme.fontFamily, chart)
   try {
     mermaid.initialize({
       fontFamily: theme.fontFamily,

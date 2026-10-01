@@ -9,6 +9,8 @@ type Mount = {
   readonly id: string
   readonly viewBox: string | null
   readonly nodes: string
+  /** Whether every Inter face the labels need had loaded when this SVG appeared. */
+  readonly faceLoaded: boolean
 }
 
 type Recorded = { readonly mounts: Mount[]; readonly fontEvents: string[] }
@@ -25,7 +27,8 @@ export const chatMermaidFirstPaint = isolatedNativeScenario({
     })
     await selectors.chatStop(page).waitFor({ state: 'hidden' })
     // Cyrillic labels pull Inter's Cyrillic subset, which nothing else on screen sets. Dev's
-    // StrictMode replays the diagram effect and so discards a fallback measurement; production does not.
+    // StrictMode replays the diagram effect and discards a fallback measurement, so this passes on
+    // a renderer without the font wait in dev; it catches that regression only where effects run once.
     await page.route('**/inter-cyrillic-wght-normal*.woff2', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, FONT_DELAY_MS))
       await route.continue()
@@ -44,6 +47,10 @@ export const chatMermaidFirstPaint = isolatedNativeScenario({
     )
     const sizes = new Set(recorded.mounts.map((mount) => `${mount.viewBox} ${mount.nodes}`))
     ok(recorded.mounts.length > 0, 'The diagram painted')
+    ok(
+      recorded.mounts[0]!.faceLoaded,
+      `The first diagram paint had Inter's Cyrillic face: ${JSON.stringify(recorded)}`,
+    )
     ok(sizes.size === 1, `Every diagram paint has the final size: ${JSON.stringify(recorded)}`)
     return recorded
   },
@@ -74,6 +81,7 @@ function recordDiagramPaints(diagram: string) {
         nodes: [...svg.querySelectorAll('.node rect')]
           .map((rect) => rect.getAttribute('width'))
           .join(' '),
+        faceLoaded: document.fonts.check('1em "Inter Variable"', svg.textContent ?? ''),
       })
     }
     requestAnimationFrame(tick)

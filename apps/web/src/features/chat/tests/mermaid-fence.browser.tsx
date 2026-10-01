@@ -136,41 +136,64 @@ describe('mermaid fences', () => {
     }
   }, 30_000)
 
-  it.each([
-    ['measures with the selected face while it downloads', 1000, 'loaded'],
-    ['gives up on a face that is still downloading', 5000, 'loading'],
-  ])(
-    '%s',
-    async (_name, delayMs, status) => {
-      // A face no text has used yet starts loading only when the diagram measures with it.
-      const path = `${delayedFontUrl}?first-paint-${delayMs}`
-      await commands.delayRequest({ ms: delayMs, path })
-      const face = new FontFace('FirstPaintDiagramFace', `url(${JSON.stringify(path)})`)
-      const chart = '```mermaid\nflowchart TD\n A[MMMMMMMMMMMMM] --> B[End]\n```'
-      // Mounting the providers applies the settings' `--font-ui`, so the face is chosen after.
-      renderDiagram(true, chart)
-      await vi.waitFor(() => expect(mermaidCodeBlock()).not.toBeNull())
-      document.fonts.add(face)
-      document.documentElement.style.setProperty('--font-ui', 'FirstPaintDiagramFace, serif')
-      try {
-        renderDiagram(false, chart)
-        await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
-        expect(face.status).toBe(status)
-        if (status !== 'loaded') return
-
-        const first = mermaidDiagram()!.getAttribute('viewBox')
-        await document.fonts.ready
-        await new Promise((resolve) => setTimeout(resolve, 300))
-        expect(mermaidDiagram()!.getAttribute('viewBox')).toBe(first)
-      } finally {
+  /** Picks a face whose download is held for `ms`, once the providers have applied settings. */
+  async function holdDiagramFace(chart: string, ms: number) {
+    // A face no text has used yet starts loading only when the diagram measures with it.
+    const path = `${delayedFontUrl}?first-paint-${ms}`
+    await commands.delayRequest({ ms, path })
+    const face = new FontFace('FirstPaintDiagramFace', `url(${JSON.stringify(path)})`)
+    // Mounting the providers applies the settings' `--font-ui`, so the face is chosen after.
+    renderDiagram(true, chart)
+    await vi.waitFor(() => expect(mermaidCodeBlock()).not.toBeNull())
+    document.fonts.add(face)
+    document.documentElement.style.setProperty('--font-ui', 'FirstPaintDiagramFace, serif')
+    return {
+      face,
+      async [Symbol.asyncDispose]() {
         // A load still in flight would remeasure diagrams in later tests.
         await face.load().catch(() => {})
         document.documentElement.style.removeProperty('--font-ui')
         document.fonts.delete(face)
-      }
-    },
-    30_000,
-  )
+      },
+    }
+  }
+
+  it('measures with the selected face while it downloads', async () => {
+    const chart = '```mermaid\nflowchart TD\n A[MMMMMMMMMMMMM] --> B[End]\n```'
+    await using held = await holdDiagramFace(chart, 1000)
+    renderDiagram(false, chart)
+    await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
+    expect(held.face.status).toBe('loaded')
+    const first = mermaidDiagram()!.getAttribute('viewBox')
+    await document.fonts.ready
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(mermaidDiagram()!.getAttribute('viewBox')).toBe(first)
+  }, 30_000)
+
+  it('paints every diagram within one font wait while the face stalls', async () => {
+    const fontWaitMs = 1000
+    queryClient.setQueryData(
+      settingsKeys.document(),
+      settingsSnapshot({ values: { 'chat.diagramFontWaitMs': fontWaitMs } }),
+    )
+    const chart = ['A', 'B', 'C']
+      .map(
+        (label) =>
+          `\`\`\`mermaid\nflowchart TD\n ${label}[MMMMMMMMMMMMM ${label}] --> E[End]\n\`\`\``,
+      )
+      .join('\n\n')
+    await using held = await holdDiagramFace(chart, 5000)
+    const startedAt = performance.now()
+    renderDiagram(false, chart)
+    const painted = () =>
+      [...document.querySelectorAll('[data-markdown="mermaid-block"] [role="img"]')].filter(
+        (host) => host.shadowRoot?.querySelector('svg'),
+      ).length
+    await vi.waitFor(() => expect(painted()).toBe(3), { timeout: 15_000 })
+    // Waiting in the render queue would cost one give-up per diagram, three in all.
+    expect(performance.now() - startedAt).toBeLessThan(fontWaitMs * 2.5)
+    expect(held.face.status).toBe('loading')
+  }, 30_000)
 
   it('discards pending diagrams after a font revision and after unmount', async () => {
     const first = Promise.withResolvers<{ svg: string }>()

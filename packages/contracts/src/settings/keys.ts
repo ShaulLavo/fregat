@@ -1139,6 +1139,18 @@ export const SETTINGS_REGISTRY = {
       'Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Platform. New chats are imported only when you click Import.',
     keywords: ['chat', 'import', 'sync', 'history', 'claude', 'codex', 'cli', 'app', 'local'],
   }),
+  'chat.diagramFontWaitMs': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(30_000)),
+    default: 3_000,
+    scope: 'application',
+    widget: 'number',
+    category: 'Chat',
+    title: 'Diagram font wait',
+    description:
+      'Milliseconds a chat diagram waits for the interface font to download before it is measured with the faces already loaded. 0 measures at once.',
+    visibility: 'advanced',
+    keywords: ['chat', 'diagram', 'mermaid', 'font', 'wait', 'timeout'],
+  }),
   'chat.defaultRuntimeMode': defineSetting({
     schema: v.picklist(['full-access', 'approval-required', 'auto-accept-edits'] as const),
     default: 'full-access',
