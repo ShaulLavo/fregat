@@ -17,12 +17,15 @@ import type { TestServer } from '../server'
 /** The real catalog and recorder write the database the owner's history route reads. */
 export async function recordUsageFixture(server: TestServer, inputRate: number) {
   const instance = v.parse(providerInstanceIdSchema, 'usage-fixture')
-  const registry = new ProviderAdapterRegistry([
-    new MockProviderAdapter({
-      driverKind: v.parse(providerDriverKindSchema, 'codex'),
-      providerInstanceId: instance,
-    }),
-  ])
+  const registry = new ProviderAdapterRegistry({
+    services: { cwd: process.cwd() },
+    adapters: [
+      new MockProviderAdapter({
+        driverKind: v.parse(providerDriverKindSchema, 'codex'),
+        providerInstanceId: instance,
+      }),
+    ],
+  })
   const prices = new ProviderPriceCatalog(server.database.db, async () =>
     Response.json({
       openai: {

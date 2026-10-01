@@ -34,6 +34,7 @@ import type {
   GitCommitBody,
   GitCreatePullRequestBody,
   GitPullRequestCommentBody,
+  GitPullRequestReviewBody,
   GitCreateBranchBody,
   GitPathsBody,
 } from './contracts'
@@ -44,6 +45,7 @@ import {
   createPullRequest,
   readPullRequestComments,
   postPullRequestComment,
+  submitPullRequestReview,
   readPullRequest,
   resolvePullRequest,
   readPullRequestsByNumber,
@@ -861,6 +863,15 @@ export class GitService {
     recordGitServiceOperation('pull_request_comment', input.path)
     const repository = await this.requiredRepository(input.path)
     return postPullRequestComment(
+      { ...input, cwd: repository.rootAbsolutePath },
+      this.forgeBoundaries,
+    )
+  }
+
+  async submitPullRequestReview(input: GitPullRequestReviewBody) {
+    recordGitServiceOperation('pull_request_review', input.path)
+    const repository = await this.requiredRepository(input.path)
+    return submitPullRequestReview(
       { ...input, cwd: repository.rootAbsolutePath },
       this.forgeBoundaries,
     )

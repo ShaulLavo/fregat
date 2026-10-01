@@ -62,7 +62,10 @@ export async function createAgentTerminalFixture(
     environment: () => [{ name: 'CLAUDE_CONFIG_DIR', value: path.join(root, 'account') }],
     parseConfig: () => null,
   }
-  let registry = new ProviderAdapterRegistry({ drivers: [driver] })
+  let registry = new ProviderAdapterRegistry({
+    services: { cwd: process.cwd() },
+    drivers: [driver],
+  })
   const instanceConfig = [
     {
       driverKind,
@@ -163,7 +166,10 @@ export async function createAgentTerminalFixture(
       adapter = new HistoryProviderAdapter(providerOptions)
       adapter.history = history
       adapter.historyError = historyError
-      registry = new ProviderAdapterRegistry({ drivers: [driver] })
+      registry = new ProviderAdapterRegistry({
+        services: { cwd: process.cwd() },
+        drivers: [driver],
+      })
       await registry.reconcile(instanceConfig)
       app = openApp()
       engine = orchestrationForApp(app)

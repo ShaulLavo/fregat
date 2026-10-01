@@ -1,6 +1,6 @@
 import type { OrchestrationWorktreeShell, WorktreeId } from '@workspace/contracts'
 import type { WorktreeIdsByRootPath } from '@/features/workspace/utils/location'
-import type { PickedFsEntry } from '@/lib/file-system-types'
+import type { WorkspaceRootFolder } from '@/lib/file-system-types'
 import type { ChatModePanels } from '@/features/chat-mode/utils/panels'
 import type { WorkbenchLayout } from '@/features/workbench/utils/layout'
 import type { WorkspaceUiMode } from '@/lib/ui-mode'
@@ -35,7 +35,7 @@ type EditorWorkspaceStoreState = CachedWorkspaceSlice & {
   /** Every project except the open one, by root path. */
   parkedWorkspaces: ReadonlyMap<string, ParkedWorkspace>
   pickerOpen: boolean
-  rootFolder: PickedFsEntry | null
+  rootFolder: WorkspaceRootFolder | null
   selectedTabContent: TabContent | null
   uiMode: WorkspaceUiMode
   workbenchLayout: WorkbenchLayout
@@ -56,7 +56,7 @@ type EditorWorkspaceStoreActions = {
   setWorkbenchLayout: (layout: WorkbenchLayout) => void
   setWorkbenchPanels: (panels: WorkbenchPanels) => void
   /** Parks the open project's tabs and restores the target's. Nothing is discarded. */
-  switchWorkspace: (rootFolder: PickedFsEntry | null) => void
+  switchWorkspace: (rootFolder: WorkspaceRootFolder | null) => void
 }
 
 export type EditorWorkspaceStore = EditorWorkspaceStoreState & EditorWorkspaceStoreActions
@@ -146,7 +146,7 @@ export function createEditorWorkspaceStore(
  */
 function switchedWorkspaceState(
   state: EditorWorkspaceStore,
-  rootFolder: PickedFsEntry | null,
+  rootFolder: WorkspaceRootFolder | null,
 ): Partial<EditorWorkspaceStore> {
   const nextRootPath = rootFolder?.path ?? null
   const currentRootPath = state.rootFolder?.path ?? null

@@ -1,3 +1,4 @@
+import { testWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import {
   groupLeaf,
   groupTree,
@@ -24,7 +25,7 @@ import {
   createDefaultWorkbenchPanels,
   openEditorContentInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
-import type { FileResult, PickedFsEntry } from '@/lib/file-system-types'
+import type { FileResult, WorkspaceRootFolder } from '@/lib/file-system-types'
 import type {
   CachedSearchBufferState,
   CachedWorkspaceSlice,
@@ -46,7 +47,7 @@ type CacheWrite =
     }
   | {
       key: 'rootFolder'
-      rootFolder: PickedFsEntry | null
+      rootFolder: WorkspaceRootFolder | null
     }
   | {
       key: 'searchBuffer'
@@ -336,8 +337,9 @@ function cachedWorkspace(): CachedWorkspaceState {
   }
 }
 
-function pickedDirectory(path: string): PickedFsEntry {
+function pickedDirectory(path: string): WorkspaceRootFolder {
   return {
+    workspaceAddress: testWorkspaceAddress(path),
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').filter(Boolean).at(-1) ?? path,

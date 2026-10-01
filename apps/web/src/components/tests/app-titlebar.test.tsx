@@ -1,3 +1,4 @@
+import { testWorkspaceAddress } from '../../../test/factories/workspace-address'
 import { testTabContent } from '../../../test/factories/document-targets'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
@@ -58,6 +59,7 @@ function createTitlebarStore() {
   return createEditorWorkspaceStore({
     chatModePanels: createDefaultChatModePanels(),
     rootFolder: {
+      workspaceAddress: testWorkspaceAddress('/repo'),
       birthtimeMs: 0,
       mtimeMs: 0,
       name: 'repo',

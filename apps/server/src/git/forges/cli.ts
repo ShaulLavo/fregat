@@ -149,3 +149,10 @@ export function requireCommentPosted(context: Named, result: ForgeCommandResult)
     internal: { forge: context.forge.name, exitCode: result.exitCode },
   })
 }
+
+export function requireReviewSubmitted(context: Named, result: ForgeCommandResult, at: string) {
+  if (result.exitCode === 0) return
+  throw gitPullRequestErrors.PULL_REQUEST_REVIEW_FAILED({
+    internal: { forge: context.forge.name, exitCode: result.exitCode, at },
+  })
+}

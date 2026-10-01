@@ -9,6 +9,7 @@ import {
   perBranch,
   requireSuccess,
   requireCommentPosted,
+  requireReviewSubmitted,
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 
@@ -33,7 +34,6 @@ const projectSchema = v.object({
 export const gitlab: ForgeProvider = {
   kind: 'gitlab',
   discussion: {
-    kind: 'supported',
     async read(context, number) {
       const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}/notes`
       const result = requireSuccess(
@@ -70,25 +70,32 @@ export const gitlab: ForgeProvider = {
         truncated: rows.length === 100,
       }
     },
-    async post(context, number, body) {
-      const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}/notes`
-      requireCommentPosted(
-        context,
-        await glab(
+    write: {
+      kind: 'supported',
+      async post(context, number, body) {
+        const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}/notes`
+        requireCommentPosted(context, await glabPost(context, endpoint, { body }))
+      },
+    },
+  },
+  review: {
+    kind: 'supported',
+    verdicts: ['comment', 'approve'],
+    async submit(context, number, input) {
+      const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}`
+      if (input.body.trim())
+        requireReviewSubmitted(
           context,
-          [
-            'api',
-            '--method',
-            'POST',
-            endpoint,
-            '--input',
-            '-',
-            '--header',
-            'Content-Type: application/json',
-          ],
-          JSON.stringify({ body }),
-        ),
-      )
+          await glabPost(context, `${endpoint}/notes`, { body: input.body }),
+          'summary',
+        )
+      // GitLab has no pending review: a refused summary must prevent approval.
+      if (input.verdict === 'approve')
+        requireReviewSubmitted(
+          context,
+          await glabPost(context, `${endpoint}/approve`, {}),
+          'verdict',
+        )
     },
   },
   async support(context) {
@@ -232,4 +239,21 @@ function mergeRequestState(state: string): GitPullRequest['state'] {
   const normalized = state.toLowerCase()
   if (normalized === 'merged' || normalized === 'closed') return normalized
   return 'open'
+}
+
+function glabPost(context: ForgeContext, endpoint: string, payload: unknown) {
+  return glab(
+    context,
+    [
+      'api',
+      '--method',
+      'POST',
+      endpoint,
+      '--input',
+      '-',
+      '--header',
+      'Content-Type: application/json',
+    ],
+    JSON.stringify(payload),
+  )
 }

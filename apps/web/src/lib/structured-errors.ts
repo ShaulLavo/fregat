@@ -5,6 +5,12 @@ import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import { toClientError } from './client-error-taxonomy'
 
 export const clientErrors = defineErrorCatalog('client', {
+  BINARY_TEXT_UNAVAILABLE: {
+    status: 415,
+    message: 'This file contains binary data.',
+    why: 'Text editing and line viewing require a text file.',
+    fix: 'Open the file tab to view its size and type.',
+  },
   BOOT_FAILED: {
     status: 500,
     message: 'App could not start',
@@ -175,5 +181,16 @@ export function createBootError(cause: unknown) {
     fix: clientErrors.BOOT_FAILED.fix,
     cause,
     internal: { phase: 'startup', causeType: typeof cause },
+  })
+}
+
+export function createBinaryFileError(size: number) {
+  return createClientError({
+    code: clientErrors.BINARY_TEXT_UNAVAILABLE.code,
+    status: clientErrors.BINARY_TEXT_UNAVAILABLE.status,
+    message: clientErrors.BINARY_TEXT_UNAVAILABLE.message,
+    why: clientErrors.BINARY_TEXT_UNAVAILABLE.why,
+    fix: clientErrors.BINARY_TEXT_UNAVAILABLE.fix,
+    internal: { size, seemsBinary: true },
   })
 }

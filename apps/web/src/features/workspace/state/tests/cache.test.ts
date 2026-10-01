@@ -25,7 +25,7 @@ import {
 import { afterEach, beforeEach, describe, vi } from 'vitest'
 import { expect, test as it } from '../../../../../test/fixtures'
 
-import type { PickedFsEntry } from '@/lib/file-system-types'
+import type { WorkspaceRootFolder } from '@/lib/file-system-types'
 import {
   createDefaultWorkbenchPanels,
   openEditorContentInWorkbenchPanels,
@@ -420,6 +420,20 @@ describe('workspace cache', () => {
     expect(readWorkspaceCache(testScopedStorage).rootFolder?.path).toBe('/repo')
   })
 
+  it('drops a persisted root that has no workspace address', () => {
+    const { workspaceAddress: _address, ...folder } = {
+      ...pickedDirectory('/repo'),
+      workspaceAddress: testWorkspaceAddress('/repo'),
+    }
+    testScopedStorage.setItem(
+      WORKSPACE_CACHE_STORAGE_KEYS.rootFolder,
+      JSON.stringify({ folder, location: { kind: 'folder', rootPath: '/repo' } }),
+    )
+
+    expect(readWorkspaceCache(testScopedStorage).rootFolder).toBeNull()
+    expect(testScopedStorage.getItem(WORKSPACE_CACHE_STORAGE_KEYS.rootFolder)).toBeNull()
+  })
+
   it('rejects a cached workspace ID paired with another folder path', () => {
     writeRootFolderCache(testScopedStorage, {
       ...pickedDirectory('/alias'),
@@ -648,8 +662,9 @@ function cachedSlice(rootPath: string): unknown {
   return JSON.parse(testScopedStorage.getItem(workspaceSliceStorageKey(rootPath)) ?? 'null')
 }
 
-function pickedDirectory(path: string): PickedFsEntry {
+function pickedDirectory(path: string): WorkspaceRootFolder {
   return {
+    workspaceAddress: testWorkspaceAddress(path),
     birthtimeMs: 1,
     mtimeMs: 1,
     name: 'repo',

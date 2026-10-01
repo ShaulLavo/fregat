@@ -162,7 +162,12 @@ function testApp(root: string, adapter: MockProviderAdapter) {
   return createTestApp({
     auth: { allowedOrigins: [ORIGIN] },
     metadataDatabase: createTestDatabase(),
-    orchestration: { providerAdapterRegistry: new ProviderAdapterRegistry([adapter]) },
+    orchestration: {
+      providerAdapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
+    },
     settings: testSettingsOptions(root),
     watch: false,
     workspaceRoot: root,

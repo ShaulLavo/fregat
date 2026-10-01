@@ -317,7 +317,10 @@ describe("Platform's MCP endpoint", () => {
     const grants = new McpGrantRegistry()
     const adapter = new MockProviderAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       mcp: { endpoint: ENDPOINT, grants },
       sessionDirectory: new ProviderSessionDirectory(database),
     })

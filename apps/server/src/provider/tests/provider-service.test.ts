@@ -60,7 +60,10 @@ describe('ProviderService', () => {
       }
     }
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const input = providerTurnInput()
@@ -107,7 +110,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     try {
@@ -140,7 +146,10 @@ describe('ProviderService', () => {
       }
     }
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     try {
@@ -206,7 +215,10 @@ describe('ProviderService', () => {
       }
     }
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter, replacement]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter, replacement],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     try {
@@ -257,7 +269,10 @@ describe('ProviderService', () => {
     const hasBackgroundWork = vi.fn(async () => true)
     const adapter = Object.assign(new MockProviderAdapter(), { hasBackgroundWork })
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     try {
@@ -300,7 +315,10 @@ describe('ProviderService', () => {
       }
       const directory = new ProviderSessionDirectory(fixture.database)
       const service = new ProviderService({
-        adapterRegistry: new ProviderAdapterRegistry([adapter]),
+        adapterRegistry: new ProviderAdapterRegistry({
+          adapters: [adapter],
+          services: { cwd: process.cwd() },
+        }),
         sessionDirectory: directory,
       })
       try {
@@ -352,7 +370,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({ wakeupMinutes: 30 })
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const events: ProviderRuntimeEvent[] = []
@@ -405,7 +426,10 @@ describe('ProviderService', () => {
       }
     }
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     try {
@@ -445,7 +469,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const turn = { ...providerTurnInput(), messageText: '/goal Make the suite green' }
@@ -483,7 +510,10 @@ describe('ProviderService', () => {
       }
     }
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     try {
@@ -540,7 +570,10 @@ describe('ProviderService', () => {
       return originalStart(input)
     }
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const turn = providerTurnInput()
@@ -577,7 +610,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const turn = providerTurnInput()
@@ -633,7 +669,10 @@ describe('ProviderService', () => {
       return originalStart(input)
     }
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const turn = providerTurnInput()
@@ -669,7 +708,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const input = providerTurnInput()
@@ -711,7 +753,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const turn = providerTurnInput()
@@ -749,7 +794,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const input = providerTurnInput()
@@ -791,7 +839,10 @@ describe('ProviderService', () => {
     const adapter = new MockProviderAdapter()
     const directory = new ProviderSessionDirectory(fixture.database)
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: directory,
     })
     const input = providerTurnInput()
@@ -837,7 +888,10 @@ describe('ProviderService', () => {
     const adapter = new MockProviderAdapter()
     const directory = new ProviderSessionDirectory(fixture.database)
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: directory,
     })
     const input = providerTurnInput()
@@ -871,7 +925,10 @@ describe('ProviderService', () => {
     const adapter = new MockProviderAdapter()
     const directory = new ProviderSessionDirectory(fixture.database)
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: directory,
     })
     const input = providerTurnInput()
@@ -901,7 +958,10 @@ describe('ProviderService', () => {
     })
     const directory = new ProviderSessionDirectory(fixture.database)
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([codex, other]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [codex, other],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: directory,
     })
     const input = providerTurnInput()
@@ -935,7 +995,10 @@ describe('ProviderService', () => {
     const adapter = new MockProviderAdapter({ responseText: 'Service response' })
     const directory = new ProviderSessionDirectory(fixture.database)
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: directory,
     })
     const input = providerTurnInput()
@@ -996,7 +1059,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new UnresponsiveAdapter({ operationTimeoutMs: 5 })
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const input = providerTurnInput()
@@ -1028,7 +1094,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new StopAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const gate = new WorktreeExecutionGate()
@@ -1074,7 +1143,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new LateFailureAdapter()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const input = providerTurnInput()
@@ -1097,7 +1169,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({ stopError: 'stop failed' })
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const input = providerTurnInput()
@@ -1122,7 +1197,10 @@ describe('ProviderService', () => {
     const adapter = new MockProviderAdapter({ responseText: 'Generated title' })
     const directory = new ProviderSessionDirectory(fixture.database)
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: directory,
     })
     const input = providerTurnInput()
@@ -1170,7 +1248,10 @@ describe('ProviderService', () => {
     const gate = Promise.withResolvers<void>()
     const adapter = new MockProviderAdapter({ beforeComplete: () => gate.promise })
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     const input = providerTurnInput()
@@ -1201,7 +1282,10 @@ describe('ProviderService', () => {
     const fixture = createFixture()
     const gate = Promise.withResolvers<void>()
     const adapter = new MockProviderAdapter({ beforeComplete: () => gate.promise })
-    const registry = new ProviderAdapterRegistry([adapter])
+    const registry = new ProviderAdapterRegistry({
+      adapters: [adapter],
+      services: { cwd: process.cwd() },
+    })
     const service = new ProviderService({
       adapterRegistry: registry,
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
@@ -1373,7 +1457,10 @@ describe('ProviderService reaper give-up', () => {
     const logs = await captureLogs()
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
-    const registry = new ProviderAdapterRegistry([adapter])
+    const registry = new ProviderAdapterRegistry({
+      adapters: [adapter],
+      services: { cwd: process.cwd() },
+    })
     const service = new ProviderService({
       adapterRegistry: registry,
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
@@ -1427,7 +1514,10 @@ describe('ProviderService reaper give-up', () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({ stopError: 'process still alive' })
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     try {
@@ -1462,7 +1552,10 @@ describe('ProviderService reaper give-up', () => {
 
   it('projects a runtime whose instance is gone as stopped, so no later reaper lists it', async () => {
     const fixture = await createOrchestrationFixture()
-    const registry = new ProviderAdapterRegistry([new MockProviderAdapter()])
+    const registry = new ProviderAdapterRegistry({
+      adapters: [new MockProviderAdapter()],
+      services: { cwd: process.cwd() },
+    })
     const service = new ProviderService({
       adapterRegistry: registry,
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
@@ -1501,7 +1594,10 @@ describe('ProviderService reaper give-up', () => {
   it('names steering unsupported when the instance is present but cannot steer', async () => {
     const fixture = createFixture()
     const service = new ProviderService({
-      adapterRegistry: new ProviderAdapterRegistry([new MockProviderAdapter()]),
+      adapterRegistry: new ProviderAdapterRegistry({
+        adapters: [new MockProviderAdapter()],
+        services: { cwd: process.cwd() },
+      }),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
     try {
@@ -1550,7 +1646,10 @@ describe('ProviderService adapter streams', () => {
   it('follows an instance whose adapter is replaced in place', async () => {
     const fixture = createFixture()
     const home = await mkdtemp(path.join(tmpdir(), 'provider-stream-'))
-    const registry = new ProviderAdapterRegistry({ drivers: [mockDriver] })
+    const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
+      drivers: [mockDriver],
+    })
     const service = new ProviderService({
       adapterRegistry: registry,
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
@@ -1593,7 +1692,10 @@ describe('ProviderService adapter streams', () => {
 
 describe('ProviderAdapterRegistry leases', () => {
   it('does not replay deferred desired state after disposal begins', async () => {
-    const registry = new ProviderAdapterRegistry({ drivers: [mockDriver] })
+    const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
+      drivers: [mockDriver],
+    })
     await registry.reconcile([mockInstance({ responseText: 'before' })])
     const lease = registry.acquireInstanceLease(MOCK_INSTANCE)
     await registry.reconcile([mockInstance({ responseText: 'after' })])
