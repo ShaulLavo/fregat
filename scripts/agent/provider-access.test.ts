@@ -128,6 +128,7 @@ describe('a scenario run without --real-providers', () => {
     expect(realDrivers(env).map((driver) => driver.driverKind)).toEqual([
       'codex',
       'claude',
+      'cursor',
       'opencode',
     ])
     const linked = path.join(scratch, 'linked-cli')

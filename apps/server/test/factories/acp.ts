@@ -4,9 +4,13 @@ import path from 'node:path'
 import * as v from 'valibot'
 import { providerInstanceIdSchema, sessionIdSchema, turnIdSchema } from '@workspace/contracts'
 import type { AnyProviderDriver } from '../../src/provider/driver'
+import { resolveProviderInstanceEnvironment } from '../../src/provider/utils/instance-environment'
 import type { ProviderTurnInput } from '../../src/provider/types'
 
-export async function createAcpFixture(driver: AnyProviderDriver) {
+export async function createAcpFixture(
+  driver: AnyProviderDriver,
+  options: { config?: unknown; environment?: NodeJS.ProcessEnv } = {},
+) {
   const root = await mkdtemp(path.join(tmpdir(), `fregat-acp-${driver.driverKind}-`))
   const binaryPath = path.join(root, `${driver.driverKind}-fixture.mjs`)
   const source = await readFile(
@@ -17,10 +21,17 @@ export async function createAcpFixture(driver: AnyProviderDriver) {
   await chmod(binaryPath, 0o755)
   const log = path.join(root, 'rpc.jsonl')
   const providerInstanceId = v.parse(providerInstanceIdSchema, `${driver.driverKind}-fixture`)
-  const env = { PATH: process.env.PATH, HOME: root, FREGAT_ACP_FIXTURE_LOG: log }
+  const config = driver.parseConfig(options.config ?? { configHome: path.join(root, 'profile') })
+  const env = resolveProviderInstanceEnvironment({
+    base: { PATH: process.env.PATH, HOME: root, FREGAT_ACP_FIXTURE_LOG: log },
+    derived: driver.environment(config, providerInstanceId),
+    overrides: Object.entries(options.environment ?? {}).flatMap(([name, value]) =>
+      value === undefined ? [] : [{ name, value }],
+    ),
+  })
   const handle = await driver.create({
     binaryPath,
-    config: driver.parseConfig({ configHome: path.join(root, 'profile') }),
+    config,
     displayLabel: `${driver.displayName} fixture`,
     enabled: true,
     env,
@@ -45,6 +56,7 @@ export async function createAcpFixture(driver: AnyProviderDriver) {
     handle,
     input,
     env,
+    config,
     records: async (): Promise<Array<Record<string, any>>> => {
       try {
         return (await readFile(log, 'utf8'))

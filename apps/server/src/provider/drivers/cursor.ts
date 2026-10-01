@@ -26,10 +26,13 @@ export const cursorDriver: ProviderDriver<CursorDriverConfig> = {
   },
   defaultConfig: () => ({}),
   parseConfig: (config) => v.parse(configSchema, config ?? {}),
-  credentialPaths: ({ config }) =>
-    config.configHome ? [path.join(config.configHome, 'cursor', 'cli-config.json')] : [],
-  environment: (config) =>
-    config.configHome ? [{ name: 'XDG_CONFIG_HOME', value: config.configHome }] : [],
+  credentialPaths: ({ env }) => [path.join(resolvedConfigHome(env), 'cursor', 'cli-config.json')],
+  environment: (config, providerInstanceId) => [
+    {
+      name: 'XDG_CONFIG_HOME',
+      value: config.configHome ?? platformHomePath('providers', 'cursor', providerInstanceId),
+    },
+  ],
   create: async (input) => {
     const operationTimeoutMs = input.services.acpOperationTimeoutMs
     if (!operationTimeoutMs)
@@ -38,12 +41,8 @@ export const cursorDriver: ProviderDriver<CursorDriverConfig> = {
       })
     const binaryPath =
       input.binaryPath || Bun.which('cursor-agent', { PATH: input.env.PATH }) || 'cursor-agent'
-    const env = {
-      ...input.env,
-      XDG_CONFIG_HOME:
-        input.config.configHome ??
-        platformHomePath('providers', 'cursor', input.providerInstanceId),
-    }
+    resolvedConfigHome(input.env)
+    const env = input.env
     const adapter = new CursorProviderAdapter({
       settings: {
         ...DEFAULT_CURSOR_PROVIDER_SETTINGS,
@@ -65,4 +64,13 @@ export const cursorDriver: ProviderDriver<CursorDriverConfig> = {
     })
     return { adapter, dispose: () => adapter.stopAll() }
   },
+}
+
+function resolvedConfigHome(env: NodeJS.ProcessEnv) {
+  const home = env.XDG_CONFIG_HOME
+  if (!home || !path.isAbsolute(home))
+    throw acpErrors.PROFILE_UNAVAILABLE({
+      internal: { driverKind: 'cursor', reason: 'absolute-profile-required' },
+    })
+  return home
 }

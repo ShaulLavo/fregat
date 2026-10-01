@@ -1,3 +1,5 @@
+import path from 'node:path'
+import { platformHomePath } from '../../home'
 import { afterEach, expect, test } from 'vitest'
 import { createAcpFixture } from '../../../test/factories/acp'
 import { cursorDriver } from '../drivers/cursor'
@@ -156,3 +158,53 @@ test('driver discovers native models before a session and applies advertised cho
     },
   ])
 })
+
+for (const profileCase of ['default', 'config', 'override'] as const) {
+  test(`Cursor ${profileCase} profile is shared by catalogue, runtime and credential watcher`, async () => {
+    const configured = path.resolve('/fixture-cursor-config')
+    const overridden = path.resolve('/fixture-cursor-override')
+    const fixture = await createAcpFixture(cursorDriver, {
+      config: profileCase === 'default' ? {} : { configHome: configured },
+      environment: profileCase === 'override' ? { XDG_CONFIG_HOME: overridden } : {},
+    })
+    fixtures.push(fixture)
+    const expected = {
+      default: platformHomePath('providers', 'cursor', fixture.input.providerInstanceId),
+      config: configured,
+      override: overridden,
+    }[profileCase]
+    await fixture.handle.adapter.snapshot()
+    await fixture.handle.adapter.startRuntime(fixture.input)
+    const spawns = (await fixture.records()).filter((entry) => entry.event === 'spawn')
+    expect(spawns).toHaveLength(2)
+    expect(spawns.map((entry) => entry.profile)).toEqual([expected, expected])
+    expect(cursorDriver.credentialPaths({ config: fixture.config, env: fixture.env })).toEqual([
+      path.join(expected, 'cursor', 'cli-config.json'),
+    ])
+    await fixture.handle.adapter.stopAll()
+    for (const spawn of spawns) expect(() => process.kill(spawn.pid, 0)).toThrow()
+  })
+}
+
+for (const profile of [undefined, 'relative-profile']) {
+  test(`Cursor refuses a ${profile === undefined ? 'missing' : 'relative'} resolved profile before spawning`, async () => {
+    const fixture = await createAcpFixture(cursorDriver)
+    fixtures.push(fixture)
+    const env = { ...fixture.env, XDG_CONFIG_HOME: profile }
+    expect(() => cursorDriver.credentialPaths({ config: fixture.config, env })).toThrow(
+      'The agent profile is unavailable.',
+    )
+    await expect(
+      cursorDriver.create({
+        binaryPath: fixture.binaryPath,
+        config: fixture.config,
+        displayLabel: 'Cursor fixture',
+        enabled: true,
+        env,
+        providerInstanceId: fixture.input.providerInstanceId,
+        services: { cwd: fixture.root, acpOperationTimeoutMs: () => 5000 },
+      }),
+    ).rejects.toMatchObject({ code: 'provider-acp.PROFILE_UNAVAILABLE' })
+    expect(await fixture.records()).toEqual([])
+  })
+}

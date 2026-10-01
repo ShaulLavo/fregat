@@ -7,6 +7,12 @@ export const acpErrors = defineErrorCatalog('provider-acp', {
     why: 'The server has no ACP operation timeout service.',
     fix: 'Restart the server with the provider runtime configured.',
   },
+  PROFILE_UNAVAILABLE: {
+    status: 503,
+    message: 'The agent profile is unavailable.',
+    why: 'The resolved provider environment needs an absolute configuration directory.',
+    fix: 'Set the provider configuration directory and reconnect the provider.',
+  },
   CLOSED: {
     status: 503,
     message: 'The agent connection closed.',
