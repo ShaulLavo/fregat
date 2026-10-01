@@ -106,14 +106,19 @@ function touchesScratchEdge(bounds: PixelBounds, width: number, height: number):
   )
 }
 
-function glyphKind(image: ImageData, bounds: PixelBounds): AtlasKind {
+function hasIntrinsicColor(image: ImageData, bounds: PixelBounds, ink: 0 | 255): boolean {
   for (let y = bounds.top; y <= bounds.bottom; y += 1) {
-    if (rowContainsColor(image, bounds, y)) return 'color'
+    if (rowContainsIntrinsicColor(image, bounds, y, ink)) return true
   }
-  return 'grayscale'
+  return false
 }
 
-function rowContainsColor(image: ImageData, bounds: PixelBounds, row: number): boolean {
+function rowContainsIntrinsicColor(
+  image: ImageData,
+  bounds: PixelBounds,
+  row: number,
+  ink: 0 | 255,
+): boolean {
   for (let x = bounds.left; x <= bounds.right; x += 1) {
     const offset = (row * image.width + x) * 4
     const alpha = image.data[offset + 3] ?? 0
@@ -121,8 +126,8 @@ function rowContainsColor(image: ImageData, bounds: PixelBounds, row: number): b
     const red = image.data[offset] ?? 0
     const green = image.data[offset + 1] ?? 0
     const blue = image.data[offset + 2] ?? 0
-    const spread = Math.max(red, green, blue) - Math.min(red, green, blue)
-    if (spread > colorChannelTolerance) return true
+    const difference = Math.max(Math.abs(red - ink), Math.abs(green - ink), Math.abs(blue - ink))
+    if (difference > colorChannelTolerance) return true
   }
   return false
 }
@@ -216,7 +221,7 @@ export class CanvasGlyphRasterizer implements GlyphRasterizer {
     return context
   }
 
-  private draw(input: GlyphRasterizationInput, padding: number): ImageData {
+  private draw(input: GlyphRasterizationInput, padding: number, ink = '#ffffff'): ImageData {
     const cellWidth = this.font.deviceCellWidth * input.cellSpan
     const deviceSpacing = this.font.deviceCellWidth - this.font.deviceCharWidth
     const characterWidth = cellWidth - deviceSpacing
@@ -224,7 +229,7 @@ export class CanvasGlyphRasterizer implements GlyphRasterizer {
     this.canvas.height = Math.ceil(this.font.deviceCellHeight + padding * 2)
     const context = this.configure(input)
     context.clearRect(0, 0, this.canvas.width, this.canvas.height)
-    context.fillStyle = '#ffffff'
+    context.fillStyle = ink
     const drawX = padding + this.font.charLeft + characterWidth / 2
     context.fillText(input.text, drawX, padding + this.font.deviceBaseline)
     return context.getImageData(0, 0, this.canvas.width, this.canvas.height)
@@ -237,15 +242,25 @@ export class CanvasGlyphRasterizer implements GlyphRasterizer {
       const bounds = alphaBounds(image)
       if (!bounds) return undefined
       if (!touchesScratchEdge(bounds, image.width, image.height)) {
-        return this.bitmapFromImage(image, bounds, padding)
+        // Intrinsically gray glyphs need RGBA too; the black probe also identifies white color glyphs.
+        const kind =
+          hasIntrinsicColor(image, bounds, 255) ||
+          hasIntrinsicColor(this.draw(input, padding, '#000000'), bounds, 0)
+            ? 'color'
+            : 'grayscale'
+        return this.bitmapFromImage(image, bounds, padding, kind)
       }
       padding *= 2
     }
     throw new RangeError(`glyph ${JSON.stringify(input.text)} exceeds bounded scratch space`)
   }
 
-  private bitmapFromImage(image: ImageData, bounds: PixelBounds, padding: number): GlyphBitmap {
-    const kind = glyphKind(image, bounds)
+  private bitmapFromImage(
+    image: ImageData,
+    bounds: PixelBounds,
+    padding: number,
+    kind: AtlasKind,
+  ): GlyphBitmap {
     return {
       height: bounds.bottom - bounds.top + 1,
       kind,

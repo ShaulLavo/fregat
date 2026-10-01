@@ -16,8 +16,46 @@ const background = rgb(16, 16, 16)
 const foreground = rgb(0, 255, 255)
 const viewport = { width: window.innerWidth, height: window.innerHeight }
 
-beforeAll(() => page.viewport(800, 600))
-afterAll(() => page.viewport(viewport.width, viewport.height))
+const intrinsicFont = new FontFace(
+  'Intrinsic Colors',
+  `url(${new URL('./fixtures/intrinsic-colors.ttf', import.meta.url).href})`,
+)
+
+beforeAll(async () => {
+  await page.viewport(800, 600)
+  document.fonts.add(await intrinsicFont.load())
+})
+afterAll(() => {
+  document.fonts.delete(intrinsicFont)
+  return page.viewport(viewport.width, viewport.height)
+})
+
+it.each([
+  ['W', 255],
+  ['B', 0],
+  ['G', 128],
+] as const)('preserves intrinsic achromatic RGB for %s', (text, channel) => {
+  const rasterizer = new CanvasGlyphRasterizer({
+    font: { ...font, settings: { ...font.settings, family: '"Intrinsic Colors"' } },
+  })
+  const bitmap = rasterizer.rasterize({ cellSpan: 2, italic: false, text, weight: 'normal' })!
+  expect(bitmap.kind).toBe('color')
+  const center = Math.floor((bitmap.width * bitmap.height) / 2) * 4
+  expect(Array.from(bitmap.pixels.slice(center, center + 4))).toEqual([
+    channel,
+    channel,
+    channel,
+    255,
+  ])
+  const ordinary = rasterizer.rasterize({
+    cellSpan: 2,
+    italic: false,
+    text: 'M',
+    weight: 'normal',
+  })!
+  expect(ordinary.kind).toBe('grayscale')
+  expect(ordinary.pixels).toHaveLength(ordinary.width * ordinary.height)
+})
 
 it.each(['⚫', '⚪', '💻', '👩‍💻', '👨‍👩‍👧‍👦', '🧪'])('retains intrinsic emoji colors for %s', (text) => {
   const rasterizer = new CanvasGlyphRasterizer({ font })

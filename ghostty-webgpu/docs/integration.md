@@ -47,6 +47,18 @@ terminal.focus()
 The terminal fits its grid to the mount automatically. Call `terminal.dispose()` when removing
 the terminal. Close the WebSocket when your application no longer needs the PTY connection.
 
+## ZWJ emoji and grapheme widths
+
+libghostty-vt owns grapheme clustering and terminal cell widths. Mode 2027 is off by default.
+In that mode, `👩‍💻` occupies four cells and `👨‍👩‍👧‍👦` occupies eight cells.
+Applications enable grapheme clustering with `CSI ? 2027 h`, or `\x1b[?2027h` in a string.
+With mode 2027 enabled, each sequence occupies two cells and the renderer shapes its complete
+cell text through the browser's font fallback. `CSI ? 2027 l` restores the default width behavior.
+
+WebGPU, WebGL2, and Canvas2D follow the same native cell ownership. Emoji appearance depends
+on the available fallback fonts. GPU atlases preserve intrinsic RGB and alpha, including gray
+emoji, while ordinary text uses a foreground-tinted coverage mask.
+
 ## Verification
 
 `bun run build` builds the browser distribution without native resolver assembly.
