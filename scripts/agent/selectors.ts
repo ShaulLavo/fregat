@@ -1309,6 +1309,32 @@ export async function waitForApp(page: Page, timeoutMs = 45_000) {
     .waitFor({ timeout: timeoutMs })
 }
 
+export async function waitForInitialContent(page: Page) {
+  const timeoutMs = 1_500
+  const cap = Promise.withResolvers<boolean>()
+  const timer = setTimeout(() => cap.resolve(false), timeoutMs)
+  const ready = page
+    .waitForFunction(initialContentReady, undefined, { timeout: timeoutMs })
+    .then(async () => {
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      )
+      return page.evaluate(initialContentReady)
+    })
+  return Promise.race([ready, cap.promise]).finally(() => clearTimeout(timer))
+}
+
+function initialContentReady() {
+  const shell = document.querySelector('[aria-label="Window toolbar"], [data-phone-shell]')
+  const surface = shell?.closest('[aria-busy]')
+  return (
+    surface?.getAttribute('aria-busy') === 'false' && !document.querySelector('[aria-busy="true"]')
+  )
+}
+
 export async function openGitPanel(page: Page) {
   await pressShortcut(page, chords.commandPalette)
   const input = selectors.paletteInput(page)

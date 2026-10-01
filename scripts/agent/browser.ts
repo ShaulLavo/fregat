@@ -8,7 +8,7 @@ import { createEvidence, type Evidence } from './evidence'
 import { formatLogEvent, readLogs } from './logs'
 import { attachObserver, observedProblems, serializable, type Observed } from './observe.mjs'
 import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
-import { settleRunningAnimations, waitForApp } from './selectors'
+import { settleRunningAnimations, waitForApp, waitForInitialContent } from './selectors'
 import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
 import { summarizeSelectors } from './selector-stats'
 import { captureTraceSources } from './trace-source-maps'
@@ -760,6 +760,7 @@ async function open(page: Page, url: string) {
   await page.goto(url, { waitUntil: 'domcontentloaded' })
   try {
     await waitForApp(page)
+    if (!(await waitForInitialContent(page))) return false
     await settleRunningAnimations(page)
     return true
   } catch {
@@ -769,7 +770,7 @@ async function open(page: Page, url: string) {
 
 async function doctor(page: Page, url: string, ready: boolean, observed: Observed) {
   const reasons: string[] = []
-  if (!ready) reasons.push('window toolbar never rendered')
+  if (!ready) reasons.push('initial content did not become ready')
   const release = await page.request.get(`${apiBase(url)}release`).catch(() => null)
   if (!release?.ok()) reasons.push('release route did not answer')
   const errors = await page.locator('[role="alert"]').count()
