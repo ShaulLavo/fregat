@@ -109,6 +109,12 @@ test('native fixture opens its workspace before reloading its provider snapshot'
       .projectSwitcher(page)
       .and(page.locator(`[title^="${checkoutRoot.slice(1)}"]`))
       .waitFor()
+    const health = await page.request.get(`${server.origin}/health`, {
+      headers: { Origin: webOrigin.origin },
+    })
+    expect(health.ok()).toBe(true)
+    const { environmentId } = (await health.json()) as { environmentId: string }
+    expect(environmentId).toBeTypeOf('string')
     let fixturePath = ''
     let fixtureSessionId = ''
     const scenario = isolatedNativeScenario({
@@ -134,6 +140,7 @@ test('native fixture opens its workspace before reloading its provider snapshot'
     await evidence.json('startup.json', {
       fixturePath,
       fixtureSessionId,
+      environmentId,
       failures,
       navigations,
       rpcFailures,
@@ -150,8 +157,8 @@ test('native fixture opens its workspace before reloading its provider snapshot'
     const reload = reloads[0]!
     expect(reload.workspaceTitle).toContain(fixturePath.slice(1))
     expect(reload.composerNamespace).toBeTypeOf('string')
-    expect(reload.composerNamespace?.endsWith(`:${fixturePath.slice(1)}:${fixtureSessionId}`)).toBe(
-      true,
+    expect(reload.composerNamespace).toBe(
+      `platform-chat-input:${environmentId}:${fixturePath.slice(1)}:${fixtureSessionId}`,
     )
     expect(rpcFailures).toEqual([])
   } finally {

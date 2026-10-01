@@ -1255,9 +1255,10 @@ export async function waitForSessionWorkspace(
   page: Page,
   sessionId: string,
   canonicalPath: string,
+  environmentId: string,
 ) {
   await page.waitForFunction(
-    ({ composerSelector, switcherSelector, sessionId, rootPath }) => {
+    ({ composerSelector, switcherSelector, expectedNamespace, rootPath }) => {
       const title = document.querySelector(switcherSelector)?.getAttribute('title')
       const composer = document.querySelector(composerSelector) as
         | (HTMLElement & { __lexicalEditor?: { _config: { namespace: string } } })
@@ -1265,15 +1266,12 @@ export async function waitForSessionWorkspace(
       // Lexical's rendered owner can lag the session URL during a workspace switch.
       const namespace = composer?.__lexicalEditor?._config.namespace
       const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
-      const environmentId = location.pathname.match(/\/@([^/]+)\//)?.[1]
-      const environmentReady =
-        !environmentId || namespace?.startsWith(`platform-chat-input:${environmentId}:`)
-      return workspaceReady && environmentReady && namespace?.endsWith(`:${rootPath}:${sessionId}`)
+      return workspaceReady && namespace === expectedNamespace
     },
     {
       composerSelector: chatComposerSelector,
       switcherSelector: projectSwitcherSelector,
-      sessionId,
+      expectedNamespace: `platform-chat-input:${environmentId}:${canonicalPath.replace(/^\/+/, '')}:${sessionId}`,
       rootPath: canonicalPath.replace(/^\/+/, ''),
     },
   )

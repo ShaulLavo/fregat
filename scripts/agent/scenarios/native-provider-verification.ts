@@ -9,6 +9,7 @@ import {
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
   providerListResultSchema,
   settingsSnapshotSchema,
+  healthDescriptorSchema,
 } from '../../../packages/contracts/src/index'
 import type { Scenario } from './index'
 import { liveNativeProcesses, reapNativeProcesses } from '../native-processes'
@@ -381,6 +382,11 @@ export function isolatedNativeScenario(options: {
     async run(page, { step }) {
       const orchestration = await openChat(page)
       const base = orchestration.replace(/\/orchestration$/, '')
+      const health = await page.request.get(`${base}/health`, {
+        headers: { Origin: new URL(page.url()).origin },
+      })
+      ok(health.ok(), 'Read the fixture server identity')
+      const { environmentId } = v.parse(healthDescriptorSchema, await health.json())
       await assertFixtureProviders(page, base)
       const sessionId = crypto.randomUUID()
       const title = `${options.name} verification ${sessionId.slice(0, 8)}`
@@ -417,7 +423,7 @@ export function isolatedNativeScenario(options: {
         await selectors.sessionSearch(page).fill(title)
         await selectors.sessionByTitle(page, title).click()
         await page.waitForURL((url) => url.href.includes(sessionId))
-        await waitForSessionWorkspace(page, sessionId, sessionWorktree.canonicalPath)
+        await waitForSessionWorkspace(page, sessionId, sessionWorktree.canonicalPath, environmentId)
         const providerRead = page.waitForResponse(
           (response) => response.url() === `${base}/providers` && response.ok(),
         )
@@ -435,7 +441,7 @@ export function isolatedNativeScenario(options: {
             .every((provider) => provider.providerInstanceId === providerInstanceId),
           'The running registry enables only the scenario fixture',
         )
-        await waitForSessionWorkspace(page, sessionId, sessionWorktree.canonicalPath)
+        await waitForSessionWorkspace(page, sessionId, sessionWorktree.canonicalPath, environmentId)
         driveEvidence = await options.drive(page, {
           step,
           root,
