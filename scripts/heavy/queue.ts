@@ -17,6 +17,8 @@ export type Entry = {
   readonly label: string
   readonly jobClass: string
   readonly estimateBytes: number
+  /** A `--quiet` job: it runs alone, for at most one quiet hold. */
+  readonly quiet: boolean
   readonly cwd: string
   readonly pid: number
   /** When it joined the queue, then when it started. */

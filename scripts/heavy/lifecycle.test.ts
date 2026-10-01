@@ -51,7 +51,14 @@ function dropIns(box: Box) {
   return readdirSync(dir).filter((name) => name.startsWith(`${box.sliceRoot}-`))
 }
 
-const job = { cwd: '/', estimateBytes: 1, jobClass: 'light', label: 'x', pid: process.pid }
+const job = {
+  cwd: '/',
+  estimateBytes: 1,
+  jobClass: 'light',
+  label: 'x',
+  pid: process.pid,
+  quiet: false,
+}
 
 describe('the queue', () => {
   test('keeps arrival order when the clock ties or runs backward', () => {
@@ -75,7 +82,7 @@ describe('the queue', () => {
         `const { enqueue, release } = await import(${JSON.stringify(path.join(import.meta.dirname, 'queue.ts'))})
          const end = Date.now() + 3000
          let n = 0
-         while (Date.now() < end) release(enqueue(${JSON.stringify(box.state)}, { id: 'c' + n++, cwd: '/', estimateBytes: 1, jobClass: 'light', label: 'c', pid: process.pid, since: '' }))`,
+         while (Date.now() < end) release(enqueue(${JSON.stringify(box.state)}, { id: 'c' + n++, cwd: '/', estimateBytes: 1, jobClass: 'light', label: 'c', pid: process.pid, quiet: false, since: '' }))`,
       ],
       { stdio: 'ignore' },
     )

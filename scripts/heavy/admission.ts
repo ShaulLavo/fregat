@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
 import path from 'node:path'
 
@@ -58,6 +58,15 @@ export function decide(
     }
   }
   return { admit: true, reason: `${mib(free)} MiB free covers ${mib(estimateBytes)} MiB` }
+}
+
+/**
+ * Whether a `--quiet` job at the head of the queue may start: only once nothing heavy runs.
+ * Jobs queued behind it wait meanwhile, so the running ones drain.
+ */
+export function decideQuiet(running: number): Decision {
+  if (running === 0) return { admit: true, reason: 'the machine is quiet' }
+  return { admit: false, reason: `quiet: waiting for ${running} running job(s) to finish` }
 }
 
 export function readReadings(procRoot: string): Readings {
@@ -124,24 +133,34 @@ function sliceRootPath(root: string) {
 /**
  * Who asked this machine to drain, or null. An external tool that needs it quiet writes
  * `drain.request` as `pid=<pid> since=<time> holder=<who>`; while that process lives, no
- * new job starts and the running ones finish. A request from a dead process is ignored.
+ * new job starts and the running ones finish. A request from a dead process, or one older
+ * than `maxAgeMs` (one quiet hold), is ignored, so no tool keeps the machine indefinitely.
  */
-export function drainRequest(stateDir: string): string | null {
-  const text = unlessMissing(() => readFileSync(path.join(stateDir, 'drain.request'), 'utf8'))
+export function drainRequest(stateDir: string, maxAgeMs: number): string | null {
+  const file = path.join(stateDir, 'drain.request')
+  const text = unlessMissing(() => readFileSync(file, 'utf8'))
   if (text === null) return null
   const pid = Number(/\bpid=(\d+)/.exec(text)?.[1])
   if (!pid || !processExists(pid)) return null
+  const stated = Date.parse(/\bsince=(\S+)/.exec(text)?.[1] ?? '')
+  const since = Number.isNaN(stated) ? (unlessMissing(() => statSync(file).mtimeMs) ?? 0) : stated
+  if (Date.now() - since > maxAgeMs) return null
   return text.trim()
 }
 
 /**
  * Why the legacy slot locks forbid a start, or null. Running jobs hold all three shared, so
  * a tool that takes them exclusively waits for the running jobs to drain; once it waits
- * (a blocked request in /proc/locks) or holds them, no further job starts.
+ * (a blocked request in /proc/locks) or holds them, no further job starts. All three held
+ * exclusively is another tool's quiet hold, which this wrapper cannot bound.
  */
 export function legacyHold(stateDir: string, slots: readonly string[]): string | null {
+  const quiet = legacyQuietHold(stateDir, slots)
+  if (quiet) {
+    return `quiet hold by another tool (pid ${quiet.pids.join(', ')}), unbounded, for ${quiet.ageSeconds}s`
+  }
   const inodes = new Set(slots.map((slot) => statSync(path.join(stateDir, slot)).ino))
-  if (blockedRequests().some((inode) => inodes.has(inode))) {
+  if (lockRequests().some((request) => request.blocked && inodes.has(request.inode))) {
     return 'another tool is waiting for the slot locks exclusively'
   }
   for (const slot of slots) {
@@ -152,12 +171,45 @@ export function legacyHold(stateDir: string, slots: readonly string[]): string |
   return null
 }
 
-// A blocked request is printed as `N: -> FLOCK ADVISORY WRITE <pid> <maj>:<min>:<inode> 0 EOF`.
-function blockedRequests() {
+/**
+ * Another tool's quiet hold, or null: every slot lock held exclusively, which this wrapper
+ * never does. Its age runs from the first time any wrapper saw it (`legacy-hold.since`).
+ */
+export function legacyQuietHold(stateDir: string, slots: readonly string[]) {
+  const marker = path.join(stateDir, 'legacy-hold.since')
+  const inodes = slots.map((slot) => statSync(path.join(stateDir, slot)).ino)
+  const holders = lockRequests().filter(
+    (request) => !request.blocked && request.write && inodes.includes(request.inode),
+  )
+  if (!inodes.every((inode) => holders.some((request) => request.inode === inode))) {
+    rmSync(marker, { force: true })
+    return null
+  }
+  const seen = Number(unlessMissing(() => readFileSync(marker, 'utf8')))
+  const since = seen || Date.now()
+  if (!seen) writeFileSync(marker, String(since))
+  return {
+    ageSeconds: Math.round((Date.now() - since) / 1000),
+    pids: [...new Set(holders.map((request) => request.pid))],
+  }
+}
+
+// `N: [-> ]FLOCK ADVISORY READ|WRITE <pid> <maj>:<min>:<inode> 0 EOF`; `->` marks a request
+// that is blocked waiting for the lock.
+function lockRequests() {
   return readFileSync('/proc/locks', 'utf8')
     .split('\n')
-    .filter((line) => line.includes('->'))
-    .map((line) => Number(line.trim().split(/\s+/)[6]?.split(':')[2]))
+    .filter((line) => line.includes('FLOCK'))
+    .map((line) => {
+      const fields = line.trim().split(/\s+/)
+      const at = fields[1] === '->' ? 1 : 0
+      return {
+        blocked: at === 1,
+        inode: Number(fields[5 + at]?.split(':')[2]),
+        pid: Number(fields[4 + at]),
+        write: fields[3 + at] === 'WRITE',
+      }
+    })
 }
 
 function mib(bytes: number) {
