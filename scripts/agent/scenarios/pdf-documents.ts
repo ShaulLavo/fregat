@@ -72,6 +72,7 @@ export const pdfDocuments: Scenario = {
         .waitFor()
       await selectors.pdfSearch(page).fill('Updated')
       await selectors.pdfMatchCountValue(page, 1).waitFor()
+      await selectors.pdfNext(page).click()
       strictEqual(
         requests.filter((url) => {
           const parsed = new URL(url)
@@ -203,8 +204,13 @@ export const pdfRemoteOwner: Scenario = {
       await selectors.pdfMatchCountValue(page, 1).waitFor()
       await step('remote-owner-pdf-transport-and-search')
     } finally {
-      await releaseFixture(fixture)
-      await remote?.stop()
+      try {
+        // Unmount remote subscriptions before shutting down their fixture owner.
+        if (!page.isClosed()) await page.goto('about:blank')
+      } finally {
+        await releaseFixture(fixture)
+        await remote?.stop()
+      }
     }
   },
 }
