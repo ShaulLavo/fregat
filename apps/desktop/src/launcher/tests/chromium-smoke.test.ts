@@ -5,6 +5,7 @@ import { chromiumArguments } from '../profile'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
+import { startupBudget } from '../startup'
 import { launchChromium, type ChromiumWindow } from '../chromium'
 import type { CdpClient } from '../cdp'
 import type { BrowserCandidate } from '../browser'
@@ -104,6 +105,7 @@ test.skipIf(!executable)(
         stateHome: scratch,
         home: scratch,
         url,
+        startup: startupBudget(),
         onOpen: (event) => telemetry.push(event),
         onExit: (exit) => exits.push(exit),
         onFailure: (error) => failures.push(error),
@@ -172,6 +174,7 @@ test.skipIf(!executable)(
           stateHome: scratch,
           home: scratch,
           url,
+          startup: startupBudget(),
           onOpen: () => {},
           onExit: (exit) => exits.push({ second: true, ...exit }),
           onFailure: (error) => failures.push(error),
@@ -202,6 +205,7 @@ test.skipIf(!executable)(
           stateHome: path.join(scratch, 'independent'),
           home: scratch,
           url,
+          startup: startupBudget(),
           onOpen: () => {},
           onFailure: (error) => failures.push(error),
         })
@@ -221,6 +225,7 @@ test.skipIf(!executable)(
             stateHome: path.join(scratch, 'rejected'),
             home: scratch,
             url,
+            startup: startupBudget(),
             onOpen: () => {},
             onFailure: () => {},
           }),

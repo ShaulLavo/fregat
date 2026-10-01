@@ -87,8 +87,7 @@ export function browserProcessFacts(
     }
   }
   const stat = observe(() => fs.read(`/proc/${pid}/stat`))
-  const fields = stat?.slice(stat.lastIndexOf(') ') + 2).split(' ') ?? []
-  const state = fields[0]
+  const state = stat?.slice(stat.lastIndexOf(') ') + 2).split(' ')[0]
   const owner = observe(() => fs.link(`/proc/${pid}/exe`))
   const selected = observe(() => fs.real(executable))
   const name = owner ? path.basename(owner) : ''
@@ -114,9 +113,11 @@ export function browserProcessFacts(
     childReadDescriptor: descriptor(`/proc/${pid}/fd/4`),
     parentWriteDescriptor: descriptor(`/proc/self/fd/${descriptors[0]}`),
     parentReadDescriptor: descriptor(`/proc/self/fd/${descriptors[1]}`),
-    majorFaults: counter(fields[9]),
-    cpuTicks: sum(counter(fields[11]), counter(fields[12])),
-    ...ioCounters(observe(() => fs.read(`/proc/${pid}/io`))),
+    ...processCounters(pid, fs.read),
+    ioWriteBytes: ioCounter(
+      observe(() => fs.read(`/proc/${pid}/io`)),
+      'write_bytes',
+    ),
     ...threadWaits(pid, fs, observe),
   }
 }
@@ -124,9 +125,28 @@ export function browserProcessFacts(
 const counter = (value: string | undefined) => (value && /^\d+$/.test(value) ? Number(value) : null)
 const sum = (a: number | null, b: number | null) => (a === null || b === null ? null : a + b)
 
-function ioCounters(io: string | undefined) {
-  const field = (name: string) => counter(new RegExp(`^${name}: (\\d+)$`, 'm').exec(io ?? '')?.[1])
-  return { ioReadBytes: field('read_bytes'), ioWriteBytes: field('write_bytes') }
+const ioCounter = (io: string | undefined, name: string) =>
+  counter(new RegExp(`^${name}: (\\d+)$`, 'm').exec(io ?? '')?.[1])
+
+// Two small reads, cheap enough to sample through startup; null where /proc is absent.
+export function processCounters(
+  pid: number,
+  read: (file: string) => string = (file) => readFileSync(file, 'utf8'),
+) {
+  const attempt = (file: string) => {
+    try {
+      return read(file)
+    } catch {
+      return undefined
+    }
+  }
+  const stat = attempt(`/proc/${pid}/stat`)
+  const fields = stat?.slice(stat.lastIndexOf(') ') + 2).split(' ') ?? []
+  return {
+    majorFaults: counter(fields[9]),
+    cpuTicks: sum(counter(fields[11]), counter(fields[12])),
+    ioReadBytes: ioCounter(attempt(`/proc/${pid}/io`), 'read_bytes'),
+  }
 }
 
 // A blocked thread's kernel wait symbol identifies the wait; syscall -1 means no active syscall.

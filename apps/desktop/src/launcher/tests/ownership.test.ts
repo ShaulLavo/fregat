@@ -3,6 +3,7 @@ import { existsSync, fstatSync } from 'node:fs'
 import { mkdtemp, mkdir, readFile, rm, symlink } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import path from 'node:path'
+import { startupBudget } from '../startup'
 import { launchChromium } from '../chromium'
 import { cdpPipe } from '../cdp'
 import { liveSingletonOwner } from '../singleton'
@@ -57,6 +58,7 @@ test.each(Array.from({ length: 30 }, (_, run) => run))(
         stateHome: f.root,
         home: f.root,
         url: 'http://localhost:123/',
+        startup: startupBudget(),
         onOpen: () => {},
         onFailure: () => {},
       })
@@ -83,16 +85,25 @@ test.each(['old-version', 'exit-failure', 'silent'])(
       fetch: () => new Response('fixture service'),
     })
     try {
-      await expect(
-        launchChromium({
-          candidate: f.candidate,
-          stateHome: f.root,
-          home: f.root,
-          url: 'http://localhost:123/',
-          onOpen: () => {},
-          onFailure: () => {},
-        }),
-      ).rejects.toThrow()
+      const startedAt = performance.now()
+      const launch = launchChromium({
+        candidate: f.candidate,
+        stateHome: f.root,
+        home: f.root,
+        url: 'http://localhost:123/',
+        startup: startupBudget(),
+        onOpen: () => {},
+        onFailure: () => {},
+      })
+      if (mode === 'old-version') {
+        await expect(launch).rejects.toMatchObject({
+          code: 'desktop.launcher.VERSION_UNSUPPORTED',
+          internal: { reportedMajor: 125, requiredMajor: 126 },
+        })
+        expect(performance.now() - startedAt).toBeLessThan(2000)
+      } else {
+        await expect(launch).rejects.toThrow()
+      }
       expect(processExists(Number(await readFile(f.pidFile, 'utf8')))).toBe(false)
       expect(processExists(other.pid)).toBe(true)
       expect(await (await fetch(`http://127.0.0.1:${server.port}/`)).text()).toBe('fixture service')
@@ -114,13 +125,16 @@ test('abort during startup closes only the child that this launcher started', as
       stateHome: f.root,
       home: f.root,
       url: 'http://localhost:123/',
+      startup: startupBudget(),
       signal: controller.signal,
       onOpen: () => {},
       onFailure: () => {},
     })
     while (!existsSync(f.pidFile)) await Bun.sleep(5)
+    const abortedAt = performance.now()
     controller.abort()
     await expect(pending).rejects.toThrow()
+    expect(performance.now() - abortedAt).toBeLessThan(2000)
     expect(processExists(Number(await readFile(f.pidFile, 'utf8')))).toBe(false)
   } finally {
     await rm(f.root, { recursive: true, force: true })
@@ -136,6 +150,7 @@ test('a configured zero-exit executable without a controlled singleton is reject
         stateHome: f.root,
         home: f.root,
         url: 'http://localhost:123/',
+        startup: startupBudget(),
         onOpen: () => {},
         onFailure: () => {},
       }),
@@ -198,6 +213,7 @@ test('/bin/true with an existing valid profile owner is rejected and preserves t
         stateHome: f.root,
         home: f.root,
         url: 'http://localhost:123/',
+        startup: startupBudget(),
         onOpen: () => {},
         onFailure: () => {},
       }),

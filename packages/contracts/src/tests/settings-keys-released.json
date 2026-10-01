@@ -129,6 +129,8 @@
     "window.defaultWidth",
     "window.nativeVibrancy",
     "window.browser",
+    "window.browserStartupIdleSeconds",
+    "window.browserStartupLimitSeconds",
     "window.transparency",
     "workbench.colorTheme",
     "workbench.density",

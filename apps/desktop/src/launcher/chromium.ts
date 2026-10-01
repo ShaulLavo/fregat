@@ -5,7 +5,13 @@ import { isRecord } from '@workspace/utils/objects'
 import { browserProfile, chromiumArguments } from './profile'
 import { liveSingletonOwner } from './singleton'
 import { launcherErrors } from './structured-errors'
-import { browserDiagnostics, browserProcessFacts, drainBrowserDiagnostics } from './diagnostics'
+import {
+  browserDiagnostics,
+  browserProcessFacts,
+  drainBrowserDiagnostics,
+  processCounters,
+} from './diagnostics'
+import { startupSupervisor, type StartupBudget, type StartupCounters } from './startup'
 import type { PlatformBridge } from '../shared/bridge'
 
 type ChromiumOptions = {
@@ -13,6 +19,9 @@ type ChromiumOptions = {
   stateHome: string
   home: string
   url: string
+  startup: StartupBudget
+  // Tests replace the /proc sampler to drive progress deterministically.
+  observe?: (pid: number) => StartupCounters
   signal?: AbortSignal
   onOpen(context: Record<string, unknown>): void
   onFailure(error: unknown): void
@@ -177,8 +186,7 @@ function reportFrames(
 export async function launchChromium(options: ChromiumOptions): Promise<ChromiumWindow> {
   const profile = browserProfile(options.candidate, options.stateHome, options.home)
   mkdirSync(profile, { recursive: true })
-  const startedAt = Date.now()
-  const deadline = startedAt + 5000
+  const supervisor = startupSupervisor(options.startup, () => performance.now())
   const child = Bun.spawn({
     cmd: [
       options.candidate.executable,
@@ -186,7 +194,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     ],
     stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'],
   })
-  const spawnMs = Date.now() - startedAt
+  const spawnMs = Math.round(supervisor.elapsedMs())
   const diagnostics = browserDiagnostics()
   void drainBrowserDiagnostics(child.stderr as ReadableStream<Uint8Array>, diagnostics).catch(
     () => {},
@@ -195,25 +203,48 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
   const cdp = cdpPipe(child.stdio[3] as number, child.stdio[4] as number)
   let closing: Promise<void> | undefined
   let connected = false
-  const startupTimer = setTimeout(
-    () => {
-      cdp.close(
-        launcherErrors.CDP_FAILED({
-          internal: {
-            reason: 'startup-deadline',
-            startupPhase,
-            spawnMs,
-            ...diagnostics.snapshot(),
-            transport: cdp.snapshot(),
-            ...browserProcessFacts(child.pid, options.candidate.executable, [
-              child.stdio[3] as number,
-              child.stdio[4] as number,
-            ]),
-          },
-        }),
-      )
+  let starting = true
+  const startupFailure = (reason: string) =>
+    launcherErrors.CDP_FAILED({
+      internal: {
+        reason,
+        startupPhase,
+        spawnMs,
+        waitedMs: Math.round(supervisor.elapsedMs()),
+        ...diagnostics.snapshot(),
+        transport: cdp.snapshot(),
+        ...browserProcessFacts(child.pid, options.candidate.executable, [
+          child.stdio[3] as number,
+          child.stdio[4] as number,
+        ]),
+      },
+    })
+  // Requests sent while starting time out exactly at the startup cap; later ones keep the client default.
+  const startupCdp: Pick<CdpClient, 'request' | 'on'> = {
+    on: (method, handler) => cdp.on(method, handler),
+    request: (method, params, sessionId) => {
+      if (!starting) return cdp.request(method, params, sessionId)
+      return cdp
+        .request(method, params, sessionId, supervisor.remainingMs())
+        .catch((error: unknown) => {
+          const reason = (error as { internal?: { reason?: unknown } }).internal?.reason
+          throw reason === 'timeout' ? startupFailure('startup-limit') : error
+        })
     },
-    Math.max(0, deadline - Date.now()),
+  }
+  const observe = options.observe ?? ((pid: number) => processCounters(pid))
+  const startupMonitor = setInterval(
+    () => {
+      const verdict = supervisor.check({
+        ...observe(child.pid),
+        cdpReadBytes: cdp.snapshot().readBytes,
+      })
+      if (verdict === 'progressing') return
+      clearInterval(startupMonitor)
+      cdp.close(startupFailure(verdict))
+    },
+    // Sampling resolution, a twentieth of the shorter bound.
+    Math.min(options.startup.idleMs, options.startup.limitMs) / 20,
   )
   const close = () => (closing ??= stopOwnedBrowser(cdp, child))
   const abort = () => {
@@ -226,7 +257,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
   })
   try {
     options.signal?.throwIfAborted()
-    const startup = cdp.request('Browser.getVersion')
+    const startup = startupCdp.request('Browser.getVersion')
     const first = await Promise.race([
       startup.then((version) => ({ kind: 'version' as const, version })),
       child.exited.then((code) => ({ kind: 'exit' as const, code })),
@@ -244,7 +275,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     startupPhase = 'attach'
     assertChromiumVersion(first.version.product)
     await attachChromium(
-      cdp,
+      startupCdp,
       options.url,
       (context) => options.onOpen({ ...context, product: first.version.product }),
       (error) => {
@@ -255,10 +286,14 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     void cdp.done.then(() => close())
     return { kind: 'owned', cdp, exited: child.exited, close }
   } catch (error) {
+    if (connected || options.signal?.aborted) {
+      await close()
+      throw error
+    }
     // Singleton handoff can close the pipe just before the short-lived process exits.
     const code = await Promise.race([
       child.exited,
-      Bun.sleep(Math.max(0, deadline - Date.now())).then(() => undefined),
+      Bun.sleep(supervisor.idleRemainingMs()).then(() => undefined),
     ])
     if (
       !connected &&
@@ -277,7 +312,8 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     }
     throw error
   } finally {
-    clearTimeout(startupTimer)
+    starting = false
+    clearInterval(startupMonitor)
   }
 }
 

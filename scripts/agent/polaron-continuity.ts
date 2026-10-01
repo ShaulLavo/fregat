@@ -5,6 +5,7 @@ import type { Evidence } from './evidence'
 import { installCaptureTerminalNamespace, killCaptureTerminal } from './product-terminal'
 import { selectors } from './selectors'
 import { openPolaronFixtureWindow } from './polaron-window'
+import { startupBudget } from '../../apps/desktop/src/launcher/startup'
 
 export async function observePolaronTerminal(page: Page) {
   const prefix = `polaron-proof-${crypto.randomUUID()}-`
@@ -168,6 +169,7 @@ async function stopFixtureLauncherProcess(
       candidate: { kind: 'chromium', executable: ${JSON.stringify(executable)}, args: ${JSON.stringify(process.env.DISPLAY || process.env.WAYLAND_DISPLAY ? [] : ['--headless', '--no-sandbox'])}, confinement: 'none', source: 'setting', family: 'chromium' },
       stateHome: ${JSON.stringify(stateHome)}, home: ${JSON.stringify(stateHome)},
       url: ${JSON.stringify(new URL('/manifest.webmanifest', page.url()).href)},
+      startup: ${JSON.stringify(startupBudget())},
       signal: controller.signal, onOpen: () => {}, onFailure: () => {}
     });
     if (browser.kind !== 'owned') process.exit(2);

@@ -1417,6 +1417,34 @@ export const SETTINGS_REGISTRY = {
     requiresRestart: true,
     keywords: ['window', 'browser', 'chromium', 'webview', 'desktop'],
   }),
+  'window.browserStartupIdleSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    // A cold start on a slow disk keeps faulting in its files long after this; only a silent browser waits it out.
+    default: 5,
+    // Machine scope: it decides when the launcher stops a browser process on this machine.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Browser startup idle limit',
+    description:
+      'Seconds a starting browser may spend without reading its files, using the CPU or answering the launcher before the launcher stops it.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'startup', 'idle', 'stall', 'desktop'],
+  }),
+  'window.browserStartupLimitSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    default: 60,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Browser startup limit',
+    description:
+      'Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'startup', 'limit', 'desktop'],
+  }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.
     //

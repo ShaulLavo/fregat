@@ -14,6 +14,7 @@ import {
 } from '../bun/observability'
 import { resolveBrowserCandidates } from './browser'
 import { launchChromium, type ChromiumWindow } from './chromium'
+import { startupBudget } from './startup'
 import { isRecord } from '@workspace/utils/objects'
 import { desktopStateHome } from './profile'
 import { launcherErrors } from './structured-errors'
@@ -107,6 +108,7 @@ async function start() {
         stateHome,
         home,
         url: web,
+        startup: settings.startup,
         signal: controller.signal,
         onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
         onExit: (context) => recordDesktopInfo('desktop.window.closed', context),
@@ -147,15 +149,16 @@ async function readSettings(server: string, origin: string) {
     })
     const snapshot: unknown = await response.json()
     if (!response.ok || !isRecord(snapshot) || !isRecord(snapshot.values))
-      return { browser: 'auto', transparency: 'compositor' }
+      return { browser: 'auto', transparency: 'compositor', startup: startupBudget() }
     return {
       browser: snapshot.values['window.browser'] ?? 'auto',
       transparency: snapshot.values['window.transparency'] ?? 'compositor',
+      startup: startupBudget(snapshot.values),
     }
   } catch (error) {
     controller.signal.throwIfAborted()
     recordDesktopInfo('desktop.settings.unreachable', { error: errorMessage(error) })
-    return { browser: 'auto', transparency: 'compositor' }
+    return { browser: 'auto', transparency: 'compositor', startup: startupBudget() }
   }
 }
 

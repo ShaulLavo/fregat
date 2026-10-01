@@ -2,6 +2,7 @@ import { ok } from 'node:assert/strict'
 import path from 'node:path'
 import type { Page } from 'playwright'
 import { launchChromium } from '../../apps/desktop/src/launcher/chromium'
+import { startupBudget } from '../../apps/desktop/src/launcher/startup'
 import type { Evidence } from './evidence'
 import { killCaptureTerminal } from './product-terminal'
 
@@ -27,6 +28,7 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
     stateHome,
     home: stateHome,
     url: new URL('/manifest.webmanifest', page.url()).href,
+    startup: startupBudget(),
     onOpen: () => {},
     onFailure: () => {},
   })
