@@ -1,3 +1,4 @@
+import { ghosttySiteFit } from './ghostty-site-fit'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
 import { editorSavedSnapshot } from './editor-saved-snapshot'
@@ -29,7 +30,7 @@ import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
-import { terminalHistory } from './terminal-history'
+import { terminalHistory, terminalIdleShells } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
 import {
@@ -258,6 +259,7 @@ import { codeThemeNativePreview } from './code-theme-native-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
 import { bundleWallpapers } from './bundle-wallpapers'
+import { coldWallpaperSwitch } from './cold-wallpaper-switch'
 import { colorModePreview } from './color-mode-preview'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorAutoClose } from './editor-auto-close'
@@ -416,6 +418,7 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  ghosttySiteFit,
   devPackageUpdates,
   editorPagedReadonly,
   diffNoFlicker,
@@ -424,6 +427,7 @@ export const scenarios: readonly Scenario[] = [
   editorSavedSnapshot,
   historyComparisonNoFlicker,
   terminalHistory,
+  terminalIdleShells,
   responseDelivery,
   archiveLifecycle,
   sessionUnread,
@@ -633,6 +637,7 @@ export const scenarios: readonly Scenario[] = [
   colorModePreview,
   pageLifecycle,
   bundleWallpapers,
+  coldWallpaperSwitch,
   editorAutoClose,
   editorFormatChord,
   editorLspCompletion,

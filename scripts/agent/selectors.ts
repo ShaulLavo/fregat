@@ -17,6 +17,7 @@ export const rootSwitchRows = {
 
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
+export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
@@ -426,6 +427,10 @@ export const selectors = {
       .getByRole('tree', { name: 'Search results', exact: true })
       .locator('[aria-selected="true"] [data-row-action="replace"]'),
   terminalList: (page: Page) => page.getByRole('tablist', { name: 'Open terminals', exact: true }),
+  terminalById: (page: Page, id: string) =>
+    page
+      .getByRole('tablist', { name: 'Open terminals', exact: true })
+      .locator(`[data-terminal-tab-id=${JSON.stringify(id)}]`),
   terminalRows: (page: Page) =>
     page.getByRole('tablist', { name: 'Open terminals', exact: true }).getByRole('tab'),
   terminalDraggingRow: (page: Page) =>
@@ -1617,3 +1622,17 @@ export function focusedEditorSelectedText(): string {
   if (context) return context.text.slice(context.selectionStart, context.selectionEnd)
   return document.getSelection()?.toString() ?? ''
 }
+
+export const ghosttySiteSelectors = {
+  examples: '.example',
+  factLead: '.facts strong',
+  sectionHeadings: '.measured h2, .preview h2',
+  backend: '#backend',
+  canvas: 'canvas',
+  composition: '.ghostty-webgpu-composition',
+  pty: '.pty-example',
+  preview: '.preview',
+  screen: '.screen',
+  stat: '#stat',
+  window: '#window',
+} as const
