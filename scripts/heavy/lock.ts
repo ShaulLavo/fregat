@@ -1,5 +1,6 @@
 import { dlopen, FFIType } from 'bun:ffi'
-import { closeSync, openSync } from 'node:fs'
+import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 
 const LOCK_EX = 2
 const LOCK_NB = 4
@@ -21,4 +22,53 @@ export function tryLock(file: string): number | null {
 
 export function unlock(fd: number) {
   closeSync(fd)
+}
+
+// Shared with tools that take the slot locks directly: holding all three keeps the machine quiet.
+export const DEFAULT_LOCK_DIR = '/work/tmp/wave-heavy'
+const MACHINE_SLOTS = [1, 2, 3] as const
+const POLL_MS = 5_000
+const WAIT_NOTICE_MS = 60_000
+
+type Slot = { readonly slot: number; readonly name: string }
+
+/**
+ * The lock files a host's jobs queue on: this machine's three slots, which other tools also take
+ * directly, or the Pi's one. A Pi job takes no machine slot; its slot is recorded as 0.
+ */
+function slotsFor(host: string): readonly Slot[] {
+  if (host === 'pi') return [{ slot: 0, name: 'pi' }]
+  return MACHINE_SLOTS.map((slot) => ({ slot, name: `slot${slot}` }))
+}
+
+// Holder lines are advisory; a missing or unreadable one must not stop a job from waiting.
+function holderLine(file: string) {
+  try {
+    return readFileSync(file, 'utf8').trim()
+  } catch {
+    return ''
+  }
+}
+
+function holders(lockDir: string, slots: readonly Slot[]) {
+  return slots.map(({ name }) => holderLine(path.join(lockDir, `${name}.holder`))).join(';')
+}
+
+export async function acquireSlot(lockDir: string, host: string, pollMs = POLL_MS) {
+  mkdirSync(lockDir, { recursive: true })
+  const slots = slotsFor(host)
+  const busy = host === 'pi' ? 'the Pi slot is busy' : `all ${slots.length} slots busy`
+  const started = Date.now()
+  let nextNotice = 0
+  for (;;) {
+    for (const { slot, name } of slots) {
+      const fd = tryLock(path.join(lockDir, `${name}.lock`))
+      if (fd !== null) return { fd, slot, holder: path.join(lockDir, `${name}.holder`) }
+    }
+    if (Date.now() - started >= nextNotice) {
+      console.error(`[wave-heavy] ${busy}, waiting: ${holders(lockDir, slots)}`)
+      nextNotice += WAIT_NOTICE_MS
+    }
+    await Bun.sleep(pollMs)
+  }
 }

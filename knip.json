@@ -61,6 +61,7 @@
         "agent/browser.ts",
         "claude-gpt/run.ts",
         "large-file/bench.ts",
+        "heavy/pi/launch.ts",
         "heavy/pi/run.ts",
         "heavy/pi/setup.ts",
         "heavy/pi/sync.ts",

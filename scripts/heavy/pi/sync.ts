@@ -7,10 +7,12 @@ import { parseArgs } from 'node:util'
 import { shellQuote } from '../../../apps/server/src/utils/shell'
 import { createScriptError, scriptFailureText } from '../../structured-errors'
 import { check, remote, resolveLane, verifyLane } from './remote'
+import { fregatCheckout } from './checkout'
+import { holdLaneLock } from './lane-lock'
 import { shipPlan } from './transfer'
 
 const USAGE =
-  'bun scripts/heavy/pi/sync.ts [--host pi] [--lane fregat-lane] [--web <built web dir>] [--include <untracked file>]… [--max-transfer-mib 64]'
+  'bun scripts/heavy/pi/sync.ts [--host pi] [--lane fregat-lane] [--web <built web dir>] [--include <untracked file>]… [--max-transfer-mib 64] [--lock-dir DIR]'
 const BUILD_PARENTS = ['editor/packages', 'hotkeys/packages']
 
 export type SyncOptions = {
@@ -19,10 +21,6 @@ export type SyncOptions = {
   readonly web?: string
   readonly includes?: readonly string[]
   readonly maxTransferMiB?: number
-}
-
-export function checkoutRoot() {
-  return check(['git', 'rev-parse', '--show-toplevel'], 'Finding this checkout').toString().trim()
 }
 
 /** Workspace packages resolve through dist/, and the Pi builds nothing. */
@@ -40,8 +38,16 @@ export function builtWorkspaces(root: string) {
     .filter((dist) => existsSync(path.join(root, dist)))
 }
 
+/**
+ * Copies each built dist/ to the same path under `destination`. The `/./` marks where the kept
+ * relative path starts, so the copy works from any directory, as `--host pi` runs it.
+ */
+export function buildsTransfer(root: string, builds: readonly string[], destination: string) {
+  return ['rsync', '-aR', '--delete', ...builds.map((dist) => `${root}/./${dist}`), destination]
+}
+
 export function syncLane(options: SyncOptions) {
-  const root = checkoutRoot()
+  const root = fregatCheckout()
   const builds = builtWorkspaces(root)
   const plan = shipPlan(root, options.includes ?? [], (options.maxTransferMiB ?? 64) * 2 ** 20)
   const lane = resolveLane(options.host, options.lane)
@@ -83,16 +89,7 @@ export function syncLane(options: SyncOptions) {
       plan.includes.join('\0'),
     )
   }
-  check(
-    [
-      'rsync',
-      '-aR',
-      '--delete',
-      ...builds.map((dist) => `./${dist}`),
-      `${options.host}:${platform}/`,
-    ],
-    'Copying built workspaces',
-  )
+  check(buildsTransfer(root, builds, `${options.host}:${platform}/`), 'Copying built workspaces')
   // Tree-sitter grammar packages build native bindings with no arm64 prebuild; the editor loads wasm.
   remote(
     options.host,
@@ -127,6 +124,7 @@ if (import.meta.main) {
         web: { type: 'string' },
         include: { type: 'string', multiple: true, default: [] },
         'max-transfer-mib': { type: 'string', default: '64' },
+        'lock-dir': { type: 'string' },
         help: { type: 'boolean' },
       },
     })
@@ -138,6 +136,9 @@ if (import.meta.main) {
     if (!Number.isSafeInteger(maxTransferMiB) || maxTransferMiB <= 0) {
       throw createScriptError(`--max-transfer-mib must be a positive integer. ${USAGE}`)
     }
+    // Local checks first, so a wrong checkout fails without waiting for the lock.
+    builtWorkspaces(fregatCheckout())
+    await holdLaneLock('sync.ts', values['lock-dir'])
     syncLane({
       host: values.host,
       lane: values.lane,

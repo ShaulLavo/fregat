@@ -2,16 +2,26 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { constants, tmpdir } from 'node:os'
 import path from 'node:path'
 
-const SCOPE_SHIM = path.join(import.meta.dirname, 'scope.sh')
+import { DEFAULT_LIMITS } from './pi/lane-command'
+
+export const SCOPE_SHIM = path.join(import.meta.dirname, 'scope.sh')
+// install.ts bundles pi/launch.ts beside run.js as pi/launch.js.
+export const PI_LAUNCHER = path.join(
+  import.meta.dirname,
+  'pi',
+  import.meta.url.endsWith('.ts') ? 'launch.ts' : 'launch.js',
+)
 // The per-job budget that kept the 2026-09-25 OOM to one job: a runaway is killed alone.
 const MEMORY_CAPS = ['-p', 'MemoryHigh=6G', '-p', 'MemoryMax=7G', '-p', 'MemorySwapMax=2G']
 // 28 cores would otherwise mean ~24 Vitest workers at ~450 MB each.
 const VITEST_WORKERS = '4'
 
-type Launch = {
+export type Launch = {
   readonly unit: string
   readonly accountingFile: string
   readonly command: readonly string[]
+  /** The Pi's wall-clock ceiling for the job; local jobs have none. */
+  readonly maxWallSec?: number
 }
 
 /** The argv that runs a job on each host, inside a scope whose shim writes the accounting file. */
@@ -28,6 +38,19 @@ const launchers = {
     accountingFile,
     ...command,
   ],
+  // The job runs on the Pi in its own capped slice; the launcher writes that slice's totals.
+  pi: ({ unit, accountingFile, command, maxWallSec }: Launch) => [
+    process.execPath,
+    PI_LAUNCHER,
+    unit,
+    accountingFile,
+    String(maxWallSec ?? DEFAULT_LIMITS.maxWallSec),
+    ...command,
+  ],
+}
+
+export function launchCommand(host: Host, launch: Launch) {
+  return launchers[host](launch)
 }
 
 export type Host = keyof typeof launchers
@@ -56,6 +79,7 @@ export type JobSpec = {
   readonly host: Host
   readonly command: readonly string[]
   readonly cwd: string
+  readonly maxWallSec?: number
 }
 
 /**
@@ -67,7 +91,12 @@ export function startJob(job: JobSpec) {
   const accountingFile = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `${unit}.accounting`)
   const started = performance.now()
   const child = Bun.spawn({
-    cmd: launchers[job.host]({ accountingFile, command: job.command, unit }),
+    cmd: launchCommand(job.host, {
+      accountingFile,
+      command: job.command,
+      unit,
+      maxWallSec: job.maxWallSec,
+    }),
     cwd: job.cwd,
     env: { ...process.env, VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS },
     stdio: ['inherit', 'inherit', 'inherit'],
@@ -92,7 +121,7 @@ export function startJob(job: JobSpec) {
   return { done, stop }
 }
 
-function readAccounting(file: string): JobAccounting {
+export function readAccounting(file: string): JobAccounting {
   if (!existsSync(file)) {
     return { cpuUsageUsec: null, leftoverProcesses: null, memoryPeakBytes: null, oomKills: null }
   }
