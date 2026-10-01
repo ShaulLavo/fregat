@@ -276,24 +276,24 @@
     "developer.heavyJobClasses": {
       "default": {
         "bench": {
-          "ceilingMiB": 4096,
-          "estimateMiB": 1024
+          "ceilingMiB": 9216,
+          "estimateMiB": 3072
         },
         "browser": {
-          "ceilingMiB": 6144,
-          "estimateMiB": 2048
+          "ceilingMiB": 8192,
+          "estimateMiB": 5632
         },
         "build": {
-          "ceilingMiB": 6144,
-          "estimateMiB": 2048
+          "ceilingMiB": 4096,
+          "estimateMiB": 3072
         },
         "light": {
           "ceilingMiB": 2048,
           "estimateMiB": 512
         },
         "suite": {
-          "ceilingMiB": 7168,
-          "estimateMiB": 3072
+          "ceilingMiB": 8192,
+          "estimateMiB": 4096
         }
       },
       "description": "Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.",

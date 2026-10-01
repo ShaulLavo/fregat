@@ -1310,14 +1310,15 @@ export const SETTINGS_REGISTRY = {
       light: heavyJobBudgetSchema,
       suite: heavyJobBudgetSchema,
     }),
-    // Seeded from the heavy-job log (Plan 284): estimate near the class's p90 peak, ceiling
-    // above its largest peak so only a runaway is killed.
+    // Seeded from the heavy-job log (Plan 284): estimate the class's p75 peak rounded up to
+    // 512 MiB, ceiling 1.25x its largest peak rounded up to 1 GiB. Bench covers the large-file
+    // bench's 8 GiB case cap plus its driver.
     default: {
-      bench: { ceilingMiB: 4096, estimateMiB: 1024 },
-      browser: { ceilingMiB: 6144, estimateMiB: 2048 },
-      build: { ceilingMiB: 6144, estimateMiB: 2048 },
+      bench: { ceilingMiB: 9216, estimateMiB: 3072 },
+      browser: { ceilingMiB: 8192, estimateMiB: 5632 },
+      build: { ceilingMiB: 4096, estimateMiB: 3072 },
       light: { ceilingMiB: 2048, estimateMiB: 512 },
-      suite: { ceilingMiB: 7168, estimateMiB: 3072 },
+      suite: { ceilingMiB: 8192, estimateMiB: 4096 },
     },
     // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
     scope: 'machine',
