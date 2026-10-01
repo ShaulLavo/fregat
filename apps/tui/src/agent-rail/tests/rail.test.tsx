@@ -20,6 +20,7 @@ import {
 } from '../../../test/factories/agent-rail'
 import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { runPaletteCommand } from '../../../test/actions'
+import { traceFocus } from '../../../test/focus-trace'
 
 test('native session rail filters, marks, renames, archives, restores and deletes real sessions', async ({
   server,
@@ -255,6 +256,9 @@ test('native delete skips confirmation when configured and selects the first con
     ).error,
   ).toBeNull()
   const h = await renderAgentStage(server)
+  // This test flaked once with focus on the composer instead of the rail; a failure prints
+  // what moved focus and what was pending, for the next occurrence to name the cause.
+  const trace = traceFocus(h.frame)
   try {
     const first = await createRailSession(h.chat, h.worktreeId, 'First survivor')
     const middle = await createRailSession(h.chat, h.worktreeId, 'Delete middle')
@@ -266,7 +270,11 @@ test('native delete skips confirmation when configured and selects the first con
     await expect.poll(() => h.chat.getSnapshot().projection.sessionById[middle]).toBeUndefined()
     await expect.poll(() => h.chat.getSnapshot().selectedSessionId).toBe(newest)
     expect(h.chat.getSnapshot().projection.sessionById[first]).toBeDefined()
+  } catch (error) {
+    console.error(trace.dump())
+    throw error
   } finally {
+    trace.stop()
     await h.cleanup()
   }
 })
