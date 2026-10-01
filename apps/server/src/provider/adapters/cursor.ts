@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises'
 import * as v from 'valibot'
-import type { ProviderInstanceSettings } from '@workspace/contracts'
+import type { ProviderInstanceSettings, ProviderModel } from '@workspace/contracts'
 import { attachmentFilePath, defaultAttachmentsDir } from '../../attachments/store'
 import { AcpProviderAdapter, type AcpExtensionClient } from '../acp/adapter'
 import type { AcpContent } from '../acp/session'
 import { acpErrors } from '../acp/structured-errors'
 import type { ProviderTurnInput } from '../types'
+import { cursorAuthentication, cursorClientCapabilities } from '../utils/cursor-catalog'
 
 const questionsSchema = v.object({
   toolCallId: v.string(),
@@ -41,6 +42,7 @@ export type CursorAdapterOptions = {
   binaryPath: string
   env: NodeJS.ProcessEnv
   operationTimeoutMs: () => number
+  catalog?: () => Promise<ProviderModel[]>
 }
 
 export class CursorProviderAdapter extends AcpProviderAdapter {
@@ -51,8 +53,8 @@ export class CursorProviderAdapter extends AcpProviderAdapter {
       resumeMethod: 'load',
       defaultModel: 'auto',
       steering: 'parallel',
-      authenticate: (methods) =>
-        methods.find((method) => method.id === 'cursor_login')?.id ?? methods[0]?.id,
+      authenticate: cursorAuthentication,
+      clientCapabilities: cursorClientCapabilities,
       configure: async (session, input, signal) => {
         await session.request('session/set_model', { modelId: input.modelSelection.model }, signal)
         const modes = v.safeParse(

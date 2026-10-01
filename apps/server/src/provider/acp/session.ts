@@ -62,19 +62,7 @@ export class AcpSession {
       },
     })
     try {
-      const initialized = v.parse(
-        initializeSchema,
-        await peer.request(
-          'initialize',
-          {
-            protocolVersion: 1,
-            clientCapabilities: input.clientCapabilities ?? {},
-          },
-          input.signal,
-        ),
-      )
-      const methodId = input.authenticate?.(initialized.authMethods)
-      if (methodId) await peer.request('authenticate', { methodId }, input.signal)
+      const initialized = await initializePeer(peer, input)
       const params = { cwd: input.cwd, mcpServers: input.mcpServers ?? [] }
       if (!input.resume) {
         const session = v.parse(
@@ -171,4 +159,24 @@ export class AcpSession {
   private clearPrompt(prompt: Promise<string>) {
     if (this.activePrompt === prompt) this.activePrompt = null
   }
+}
+
+export async function initializePeer(
+  peer: AcpPeer,
+  input: Pick<AcpSessionInput, 'clientCapabilities' | 'authenticate' | 'signal'>,
+) {
+  const initialized = v.parse(
+    initializeSchema,
+    await peer.request(
+      'initialize',
+      {
+        protocolVersion: 1,
+        clientCapabilities: input.clientCapabilities ?? {},
+      },
+      input.signal,
+    ),
+  )
+  const methodId = input.authenticate?.(initialized.authMethods)
+  if (methodId) await peer.request('authenticate', { methodId }, input.signal)
+  return initialized
 }

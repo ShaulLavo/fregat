@@ -4,9 +4,11 @@ import { constants } from 'node:fs'
 import * as v from 'valibot'
 import {
   approvalRequestIdSchema,
+  jsonEqual,
   type ApprovalRequestId,
   type ProviderApprovalDecision,
   type ProviderInstanceSettings,
+  type ProviderModel,
   type ProviderSnapshot,
   type ProviderUserInputAnswers,
   type SessionId,
@@ -103,6 +105,8 @@ export type AcpAdapterOptions = {
   args: (input: ProviderRuntimeStartInput) => readonly string[]
   resumeMethod: 'load' | 'resume'
   defaultModel: string
+  catalog?: () => Promise<ProviderModel[]>
+  clientCapabilities?: Record<string, unknown>
   authenticate: (methods: readonly { id: string }[]) => string | undefined
   steering: 'parallel' | 'cancel-replace' | 'unsupported'
   configure?: (
@@ -146,6 +150,17 @@ export class AcpProviderAdapter implements ProviderAdapter {
     } catch {
       /* Availability reads never execute the CLI. */
     }
+    const models =
+      installed && this.options.settings.enabled && this.options.catalog
+        ? await this.options.catalog()
+        : [
+            {
+              slug: this.options.defaultModel,
+              name: this.options.defaultModel,
+              isCustom: false,
+              capabilities: null,
+            },
+          ]
     return {
       ...this.options.settings,
       installed,
@@ -154,14 +169,7 @@ export class AcpProviderAdapter implements ProviderAdapter {
       availability: installed ? 'available' : 'unavailable',
       auth: { status: 'unknown' },
       checkedAt: new Date().toISOString(),
-      models: [
-        {
-          slug: this.options.defaultModel,
-          name: this.options.defaultModel,
-          isCustom: false,
-          capabilities: null,
-        },
-      ],
+      models,
       supportsSignIn: false,
       message: installed
         ? 'Live account smoke test pending.'
@@ -189,13 +197,15 @@ export class AcpProviderAdapter implements ProviderAdapter {
         internal: { operation: input.fork ? 'fork' : 'output-schema' },
       })
     const existing = this.sessions.get(input.sessionId)
-    if (existing && existing.input.runtimeEpoch === input.runtimeEpoch)
-      return this.runtime(existing, await existing.native)
+    let resumeCursor = input.providerResumeCursor
+    if (existing && existing.input.runtimeEpoch === input.runtimeEpoch) {
+      if (jsonEqual(this.options.args(existing.input), this.options.args(input)))
+        return this.runtime(existing, await existing.native)
+      if (existing.turn) throw acpErrors.BUSY({ internal: { operation: 'change-launch-options' } })
+      resumeCursor = this.runtime(existing, await existing.native).providerResumeCursor
+    }
     if (existing) await this.stopRuntime({ sessionId: input.sessionId })
-    const resume =
-      input.providerResumeCursor == null
-        ? null
-        : v.safeParse(cursorSchema, input.providerResumeCursor)
+    const resume = resumeCursor == null ? null : v.safeParse(cursorSchema, resumeCursor)
     if (resume && (!resume.success || resume.output.providerInstanceId !== this.adapterKey))
       throw sessionIdentityErrors.SESSION_PROVIDER_CONFLICT({ internal: { operation: 'resume' } })
     const opening = Promise.withResolvers<AcpSession>()
@@ -220,6 +230,7 @@ export class AcpProviderAdapter implements ProviderAdapter {
         env: this.options.env,
         signal,
         authenticate: this.options.authenticate,
+        clientCapabilities: this.options.clientCapabilities,
         ...(resume?.success
           ? { resume: { sessionId: resume.output.sessionId, method: this.options.resumeMethod } }
           : {}),

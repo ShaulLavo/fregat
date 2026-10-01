@@ -22,7 +22,13 @@ const tracePath =
   process.env.FREGAT_ACP_FIXTURE_LOG ??
   (process.argv[1].endsWith('/fake-acp.mjs') ? undefined : new URL('native.jsonl', import.meta.url))
 const trace = (entry) => {
-  if (tracePath) appendFileSync(tracePath, `${JSON.stringify(entry)}\n`)
+  // Audit metadata preserves header names while keeping credentials out of retained evidence.
+  const audited = JSON.stringify(entry, (key, value) =>
+    key === 'headers' && Array.isArray(value)
+      ? value.map((header) => ({ ...header, value: '[redacted]' }))
+      : value,
+  )
+  if (tracePath) appendFileSync(tracePath, `${audited}\n`)
 }
 trace({
   event: 'spawn',
@@ -32,6 +38,7 @@ trace({
 })
 const write = (value) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...value })}\n`)
 let prompt
+let parameterizedModels = false
 const active = new Map()
 let sessionId = `native-${process.pid}`
 for await (const line of lines) {
@@ -39,6 +46,7 @@ for await (const line of lines) {
   trace({ event: 'rpc', ...frame })
   if (frame.method === 'initialize') {
     const params = frame.params
+    parameterizedModels = params?.clientCapabilities?._meta?.parameterizedModelPicker === true
     const implementation = params?.clientInfo
     const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
     const valid =
@@ -70,6 +78,15 @@ for await (const line of lines) {
     continue
   }
   if (frame.method === 'session/new') {
+    if (frame.params.mcpServers?.length)
+      trace({
+        event: 'native-mcp',
+        authorizationReceived: frame.params.mcpServers.some((server) =>
+          server.headers?.some(
+            (header) => header.name === 'Authorization' && header.value.startsWith('Bearer '),
+          ),
+        ),
+      })
     write({
       id: frame.id,
       result: {
@@ -97,6 +114,76 @@ for await (const line of lines) {
       },
     })
     write({ id: frame.id, result: {} })
+    continue
+  }
+  if (frame.method === 'cursor/list_available_models') {
+    if (!parameterizedModels) {
+      write({
+        id: frame.id,
+        error: { code: -32602, message: 'Parameterized model capability required' },
+      })
+      continue
+    }
+    if (args.includes('--catalog-hang')) continue
+    if (args.includes('--catalog-malformed')) {
+      write({
+        id: frame.id,
+        result: {
+          models: [
+            {
+              value: 'broken',
+              name: 'Broken',
+              configOptions: [
+                { type: 'boolean', id: 'fast', name: 'Fast', currentValue: 'invalid' },
+              ],
+            },
+          ],
+        },
+      })
+      continue
+    }
+    write({
+      id: frame.id,
+      result: {
+        models: [
+          { value: 'auto', name: 'Automatic' },
+          {
+            value: 'fixture-cursor-small',
+            name: 'Fixture small',
+            configOptions: [
+              {
+                id: 'reasoning',
+                name: 'Reasoning',
+                type: 'select',
+                currentValue: 'high',
+                options: [
+                  { value: 'low', name: 'Low' },
+                  { value: 'high', name: 'High' },
+                ],
+              },
+              {
+                id: 'context',
+                name: 'Context',
+                description: 'Native context choice',
+                type: 'select',
+                currentValue: 'wide',
+                options: [
+                  {
+                    group: 'sizes',
+                    name: 'Sizes',
+                    options: [
+                      { value: 'small', name: 'Small' },
+                      { value: 'wide', name: 'Wide' },
+                    ],
+                  },
+                ],
+              },
+              { id: 'fast', name: 'Fast', type: 'boolean', currentValue: false },
+            ],
+          },
+        ],
+      },
+    })
     continue
   }
   if (frame.method === 'fixture/error') {

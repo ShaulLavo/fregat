@@ -259,3 +259,60 @@ it('maps the native Cursor todo extension including its camel-case running statu
     .poll(() => events.find((event) => event.type === 'turn.plan.updated')?.payload)
     .toMatchObject({ plan: [{ step: 'Fixture step', status: 'inProgress' }] })
 })
+
+it('reopens the same native identity when access changes the Cursor launch flags', async () => {
+  const fixture = await createAcpFixture(cursorDriver)
+  fixtures.push(fixture)
+  const adapter = fixture.handle.adapter
+  const events: ProviderRuntimeEvent[] = []
+  adapter.subscribeEvents((event) => events.push(event))
+  const fullAccess = { ...fixture.input, runtimeMode: 'full-access' as const }
+  const started = await adapter.startRuntime(fullAccess)
+  await adapter.sendTurn(fullAccess)
+  await expect.poll(() => events.filter((event) => event.type === 'turn.completed').length).toBe(1)
+  await adapter.sendTurn({
+    ...fixture.input,
+    turnId: v.parse(turnIdSchema, 'ask-first-turn'),
+    messageText: 'permission',
+  })
+  await expect
+    .poll(async () => (await fixture.records()).filter((entry) => entry.event === 'spawn').length)
+    .toBe(2)
+  await expect.poll(() => events.find((event) => event.type === 'request.opened')).toBeDefined()
+  const permission = events.find((event) => event.type === 'request.opened')
+  await adapter.respondApproval({
+    sessionId: fixture.input.sessionId,
+    requestId: v.parse(approvalRequestIdSchema, permission?.requestId),
+    decision: 'accept',
+  })
+  await expect.poll(() => events.filter((event) => event.type === 'turn.completed').length).toBe(2)
+  const records = await fixture.records()
+  expect(records.filter((entry) => entry.event === 'spawn').map((entry) => entry.args)).toEqual([
+    ['--force', 'acp'],
+    ['acp'],
+  ])
+  expect(records.filter((entry) => entry.method === 'session/load')).toMatchObject([
+    { params: { sessionId: started.providerConversationMarker } },
+  ])
+  expect(events.filter((event) => event.type === 'assistant.delta')).toHaveLength(1)
+})
+
+it('keeps native MCP header values out of executable audit records', async () => {
+  const fixture = await createAcpFixture(cursorDriver)
+  fixtures.push(fixture)
+  await fixture.handle.adapter.startRuntime({
+    ...fixture.input,
+    platformMcp: { url: 'http://127.0.0.1:1/mcp', token: 'fixture-only-mcp-token' },
+  })
+  const started = (await fixture.records()).find((entry) => entry.method === 'session/new')
+  const server = started?.params.mcpServers[0]
+  expect(server?.type).toBe('http')
+  expect(server?.name).toBe('fregat')
+  expect(server?.url).toBe('http://127.0.0.1:1/mcp')
+  expect(server?.headers[0]?.name).toBe('Authorization')
+  // A failing assertion reports only the redaction result, never the header value.
+  expect(server?.headers[0]?.value === '[redacted]').toBe(true)
+  expect((await fixture.records()).find((entry) => entry.event === 'native-mcp')).toMatchObject({
+    authorizationReceived: true,
+  })
+})
