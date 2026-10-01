@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises'
 import { PullRequestDiscussion } from '@/features/git/components/pull-request-discussion'
 import { usePostPullRequestComment } from '@/features/git/hooks/use-post-pull-request-comment'
 import { pullRequestDiscussionKeys } from '@/features/git/utils/query-keys'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { test as base, expect } from '../../../../../test/fixtures'
 import { makeTestServer } from '../../../../../test/server'
 import {
@@ -43,6 +44,18 @@ test('delegates the checkout-qualified remote probe, posts, settles, and refresh
   const view = renderWithProviders(
     <PullRequestDiscussion rootPath='' number={7} url='https://github.com/fixture/repo/pull/7' />,
   )
+  expect(resourceQueryClient.getQueryState(pullRequestDiscussionKeys.dialogModule)).toMatchObject({
+    status: 'pending',
+    fetchStatus: 'idle',
+  })
+  await userEvent.hover(screen.getByRole('button', { name: 'Discussion' }))
+  await waitFor(() =>
+    expect(resourceQueryClient.getQueryState(pullRequestDiscussionKeys.dialogModule)?.status).toBe(
+      'success',
+    ),
+  )
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(forge.remoteProbes).toEqual([])
   await userEvent.click(screen.getByRole('button', { name: 'Discussion' }))
   expect(await screen.findByText('No comments')).toBeVisible()
   expect(forge.remoteProbes).toContainEqual(['git', '-C', server.root, 'remote', '-v'])
@@ -79,6 +92,10 @@ test('a rejected post keeps the draft and does not claim it was posted', async (
   expect(await screen.findByText('The Git host could not post the comment')).toBeVisible()
   expect(screen.getByRole('textbox', { name: 'Comment' })).toHaveValue('Keep this draft')
   expect(forge.comments).toEqual([])
+  await userEvent.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  await userEvent.click(screen.getByRole('button', { name: 'Discussion' }))
+  expect(await screen.findByRole('textbox', { name: 'Comment' })).toHaveValue('Keep this draft')
 })
 
 test('a failed concurrent write releases the next write and both invalidate the query', async ({

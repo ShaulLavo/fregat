@@ -1,21 +1,18 @@
-import { DiscussionComments } from '@/features/git/components/discussion-comments'
-import { useId, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { Textarea } from '@workspace/ui/components/textarea'
 import { Spinner } from '@workspace/ui/components/spinner'
-import { InlineError } from '@/components/inline-error'
-import { DialogField } from '@/features/git/components/dialog-field'
-import { usePullRequestComments } from '@/features/git/hooks/use-pull-request-comments'
-import { usePostPullRequestComment } from '@/features/git/hooks/use-post-pull-request-comment'
-import { clientErrorMessage } from '@/lib/client-error-taxonomy'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
+import { ModuleLoadError } from '@/components/module-load-error'
+import { discussionDialogQueryOptions } from '@/features/git/utils/discussion-query'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 export function PullRequestDiscussion({
   rootPath,
@@ -29,93 +26,62 @@ export function PullRequestDiscussion({
   const subject = JSON.stringify([rootPath, number])
   const [openSubject, setOpenSubject] = useState<string | null>(null)
   const open = openSubject === subject
-  const [draft, setDraft] = useState({ subject, body: '' })
-  const body = draft.subject === subject ? draft.body : ''
-  const setBody = (body: string) => setDraft({ subject, body })
-  const id = useId()
-  const comments = usePullRequestComments(rootPath, number, open)
-  const post = usePostPullRequestComment(rootPath, number)
-  const ready = comments.data?.kind === 'ready' && body.trim().length > 0 && !post.isPending
+  const onOpenChange = (value: boolean) => setOpenSubject(value ? subject : null)
+  const query = useQuery({ ...discussionDialogQueryOptions, enabled: open }, resourceQueryClient)
 
-  function submit() {
-    if (!ready) return
-    post.mutate(body, {
-      onSuccess: (result) => {
-        if (result.kind !== 'posted') return
-        setDraft((current) =>
-          current.subject === subject && current.body === body ? { subject, body: '' } : current,
-        )
-      },
-    })
+  function prefetch() {
+    // The query owns a failed import; the open dialog offers its retry.
+    void resourceQueryClient.query(discussionDialogQueryOptions).catch(() => {})
   }
 
+  const View = query.data?.DiscussionDialog
   return (
     <>
       <Button
         size='sm'
         variant='ghost'
         className='text-2xs'
-        onClick={() => setOpenSubject(subject)}
+        onPointerEnter={prefetch}
+        onFocus={prefetch}
+        onClick={() => onOpenChange(true)}
       >
         Discussion
       </Button>
-      <Dialog open={open} onOpenChange={(value) => setOpenSubject(value ? subject : null)}>
-        <DialogContent className='max-w-xl'>
-          <DialogHeader>
-            <DialogTitle>Pull request #{number} discussion</DialogTitle>
-            <DialogDescription>Read and post comments on the Git host.</DialogDescription>
-          </DialogHeader>
-          <div className='flex items-center gap-2'>
-            <Button
-              size='sm'
-              variant='ghost'
-              disabled={comments.isFetching}
-              onClick={() => void comments.refetch()}
-            >
-              Refresh discussion
-            </Button>
-            {comments.isFetching ? <Spinner size='xs' label='Refreshing discussion' /> : null}
-            <a
-              href={url}
-              target='_blank'
-              rel='noreferrer'
-              className='text-muted-foreground text-xs underline'
-            >
-              Open on Git host
-            </a>
-          </div>
-          <DiscussionComments query={comments} />
-          {comments.data?.kind === 'ready' ? (
-            <form
-              className='flex flex-col gap-3'
-              onSubmit={(event) => {
-                event.preventDefault()
-                submit()
-              }}
-            >
-              <DialogField id={id} label='Comment'>
-                <Textarea
-                  id={id}
-                  disabled={post.isPending}
-                  value={body}
-                  maxLength={60_000}
-                  onChange={(event) => setBody(event.currentTarget.value)}
-                  placeholder='Write a comment for the pull request'
-                />
-              </DialogField>
-              {post.isError ? <InlineError message={clientErrorMessage(post.error)} /> : null}
-              {post.data?.kind === 'unsupported' ? (
-                <p className='text-muted-foreground text-sm'>{post.data.reason}</p>
-              ) : null}
-              <DialogFooter>
-                <Button type='submit' disabled={!ready}>
-                  {post.isPending ? 'Posting comment…' : 'Post comment'}
-                </Button>
-              </DialogFooter>
-            </form>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      {View ? (
+        <RenderErrorBoundary label='pull request discussion' resetKeys={[subject]}>
+          <View
+            rootPath={rootPath}
+            number={number}
+            url={url}
+            open={open}
+            onOpenChange={onOpenChange}
+          />
+        </RenderErrorBoundary>
+      ) : (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent finalFocus={returnFocusUnlessLoaded}>
+            <DialogHeader>
+              <DialogTitle>Pull request #{number} discussion</DialogTitle>
+              <DialogDescription>Read and post comments on the Git host.</DialogDescription>
+            </DialogHeader>
+            {query.isPending ? (
+              <Spinner size='md' label='Loading discussion' />
+            ) : (
+              <ModuleLoadError
+                label='pull request discussion'
+                onRetry={() => void query.refetch()}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </>
+  )
+}
+
+// The loaded dialog holds focus when the loading shell unmounts.
+function returnFocusUnlessLoaded() {
+  return (
+    resourceQueryClient.getQueryState(discussionDialogQueryOptions.queryKey)?.status !== 'success'
   )
 }
