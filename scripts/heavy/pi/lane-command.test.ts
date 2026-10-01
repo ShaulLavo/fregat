@@ -150,62 +150,85 @@ test('awaits heartbeat flush before ending stdin and awaits end before returning
     flushed.resolve(1)
     ended.resolve(0)
     exited.resolve(0)
-    await running
-    vi.restoreAllMocks()
-    vi.useRealTimers()
+    try {
+      await running
+    } finally {
+      vi.restoreAllMocks()
+      vi.useRealTimers()
+    }
   }
 })
 
 test.for([
-  { sink: 'flush', code: 'EPIPE', closed: true },
-  { sink: 'end', code: 'EPIPE', closed: true },
-  { sink: 'flush', code: 'EPIPE', closed: false },
-  { sink: 'flush', code: 'EIO', closed: true },
-  { sink: 'end', code: 'EIO', closed: true },
-])('owns $sink $code errors with child closed=$closed', async ({ sink, code, closed }) => {
-  vi.useFakeTimers()
-  const exited = Promise.withResolvers<number>()
-  const operation = Promise.withResolvers<number>()
-  const child = {
-    exitCode: null as number | null,
-    exited: exited.promise,
-    stdin: {
-      write: vi.fn(() => 1),
-      flush: vi.fn(() => (sink === 'flush' ? operation.promise : 1)),
-      end: vi.fn(() => (sink === 'end' ? operation.promise : 0)),
-    },
-    stderr: new ReadableStream({ start: (controller) => controller.close() }),
-  }
-  vi.spyOn(Bun, 'spawn').mockReturnValue(child as unknown as ReturnType<typeof Bun.spawn>)
-  let failure: unknown
-  const running = runLane('errors', 'true').catch((error) => {
-    failure = error
-  })
-  const error = { code }
-  try {
-    await vi.advanceTimersByTimeAsync(50)
-    if (closed) {
+  { sink: 'flush', code: 'EPIPE', closed: true, synchronous: false },
+  { sink: 'end', code: 'EPIPE', closed: true, synchronous: false },
+  { sink: 'flush', code: 'EPIPE', closed: false, synchronous: false },
+  { sink: 'flush', code: 'EIO', closed: true, synchronous: false },
+  { sink: 'end', code: 'EIO', closed: true, synchronous: false },
+  { sink: 'write', code: 'EPIPE', closed: false, synchronous: true },
+  { sink: 'flush', code: 'EIO', closed: false, synchronous: true },
+  { sink: 'end', code: 'EIO', closed: true, synchronous: true },
+])(
+  'owns $sink $code errors with child closed=$closed, synchronous=$synchronous',
+  async ({ sink, code, closed, synchronous }) => {
+    vi.useFakeTimers()
+    const exited = Promise.withResolvers<number>()
+    const operation = Promise.withResolvers<number>()
+    const error = { code }
+    const child = {
+      exitCode: null as number | null,
+      exited: exited.promise,
+      stdin: {
+        write: vi.fn(() => {
+          if (sink === 'write') throw error
+          return 1
+        }),
+        flush: vi.fn(() => {
+          if (sink !== 'flush') return 1
+          if (synchronous) throw error
+          return operation.promise
+        }),
+        end: vi.fn(() => {
+          if (sink !== 'end') return 0
+          if (synchronous) throw error
+          return operation.promise
+        }),
+      },
+      stderr: new ReadableStream({ start: (controller) => controller.close() }),
+    }
+    vi.spyOn(Bun, 'spawn').mockReturnValue(child as unknown as ReturnType<typeof Bun.spawn>)
+    let failure: unknown
+    const running = runLane('errors', 'true').catch((error) => {
+      failure = error
+    })
+    try {
+      await vi.advanceTimersByTimeAsync(50)
+      if (closed) {
+        child.exitCode = 0
+        exited.resolve(0)
+        await vi.advanceTimersByTimeAsync(0)
+      }
+      if (!synchronous) operation.reject(error)
+      await vi.advanceTimersByTimeAsync(0)
       child.exitCode = 0
       exited.resolve(0)
-      await vi.advanceTimersByTimeAsync(0)
+      await running
+      expect(failure).toBe(code === 'EPIPE' && closed ? undefined : error)
+      expect(child.stdin.end).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(200)
+      expect(child.stdin.write).toHaveBeenCalledTimes(1)
+    } finally {
+      operation.resolve(0)
+      exited.resolve(0)
+      try {
+        await running
+      } finally {
+        vi.restoreAllMocks()
+        vi.useRealTimers()
+      }
     }
-    operation.reject(error)
-    await vi.advanceTimersByTimeAsync(0)
-    child.exitCode = 0
-    exited.resolve(0)
-    await running
-    expect(failure).toBe(code === 'EPIPE' && closed ? undefined : error)
-    expect(child.stdin.end).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(200)
-    expect(child.stdin.write).toHaveBeenCalledTimes(1)
-  } finally {
-    operation.resolve(0)
-    exited.resolve(0)
-    await running
-    vi.restoreAllMocks()
-    vi.useRealTimers()
-  }
-})
+  },
+)
 
 // list-units, not show: show loads the unit it is asked about.
 function loaded(unit: string) {
