@@ -427,6 +427,10 @@ export const selectors = {
       .getByRole('tree', { name: 'Search results', exact: true })
       .locator('[aria-selected="true"] [data-row-action="replace"]'),
   terminalList: (page: Page) => page.getByRole('tablist', { name: 'Open terminals', exact: true }),
+  terminalById: (page: Page, id: string) =>
+    page
+      .getByRole('tablist', { name: 'Open terminals', exact: true })
+      .locator(`[data-terminal-tab-id=${JSON.stringify(id)}]`),
   terminalRows: (page: Page) =>
     page.getByRole('tablist', { name: 'Open terminals', exact: true }).getByRole('tab'),
   terminalDraggingRow: (page: Page) =>
