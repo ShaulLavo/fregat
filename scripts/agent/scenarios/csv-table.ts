@@ -33,9 +33,13 @@ export const csvTable: Scenario = {
     const delayed = Promise.withResolvers<void>()
     try {
       await fixtureGit(root, ['init', '--quiet'])
+      await fixtureGit(root, ['config', 'user.name', 'Fregat'])
+      await fixtureGit(root, ['config', 'user.email', 'fregat@example.com'])
       await writeFile(file, ORIGINAL)
       await writeFile(path.join(root, 'other.csv'), 'value,count\nother,1\n')
       await writeFile(path.join(root, 'malformed.csv'), 'a,b\n"unclosed,b')
+      await fixtureGit(root, ['add', 'fruit.csv', 'other.csv', 'malformed.csv'])
+      await fixtureGit(root, ['commit', '--quiet', '-m', 'CSV fixture'])
       await openFixtureWorkspace(page, root)
       second = await connectSecondOwner(page, collectOrchestrationBases(page))
       const headers = { Origin: new URL(page.url()).origin }
