@@ -307,10 +307,56 @@ export const csvKeyboardNavigation: Scenario = {
       await openFileFromTree(page, 'wide.csv')
       await csvSelectors.mode(page, 'Table').click()
       await csvSelectors.cell(page, 1, 1).waitFor()
+      const scrollOwners = await csvSelectors.table(page).evaluate((table) =>
+        Array.from(table.querySelectorAll<HTMLElement>('*'))
+          .filter((element) => {
+            const style = getComputedStyle(element)
+            return (
+              ['auto', 'scroll'].includes(style.overflowX) ||
+              ['auto', 'scroll'].includes(style.overflowY)
+            )
+          })
+          .map((element) => ({
+            x: getComputedStyle(element).overflowX,
+            y: getComputedStyle(element).overflowY,
+          })),
+      )
+      strictEqual(scrollOwners.length, 1, 'One CSV scroller owns both axes')
+      strictEqual(scrollOwners[0]?.x, 'auto')
+      strictEqual(scrollOwners[0]?.y, 'auto')
       const heading = csvSelectors.table(page).getByRole('columnheader').last()
       const headerTop = await heading.evaluate((element) => element.getBoundingClientRect().top)
-      await csvSelectors.table(page).evaluate((table) => {
-        table.scrollLeft = table.scrollWidth
+      async function assertVisibleColumn(column: number) {
+        const bounds = await csvSelectors.scroll(page).evaluate((scroller) => ({
+          left: scroller.getBoundingClientRect().left,
+          right: scroller.getBoundingClientRect().left + scroller.clientWidth,
+        }))
+        const cell = await csvSelectors.cell(page, 1, column).evaluate((element) => ({
+          left: element.getBoundingClientRect().left,
+          right: element.getBoundingClientRect().right,
+          focused: element === document.activeElement,
+        }))
+        ok(
+          cell.focused && cell.left >= bounds.left - 1 && cell.right <= bounds.right + 1,
+          `Keyboard column ${column} must be focused and visible: ${JSON.stringify({ cell, bounds })}`,
+        )
+      }
+      await csvSelectors.cell(page, 1, 1).focus()
+      for (let column = 2; column <= 20; column++) await page.keyboard.press('ArrowRight')
+      await assertVisibleColumn(20)
+      await step('keyboard-reveals-offscreen-column')
+      for (let column = 19; column >= 1; column--) await page.keyboard.press('ArrowLeft')
+      await assertVisibleColumn(1)
+      await step('keyboard-reveals-first-column')
+      for (let column = 2; column <= 6; column++) await page.keyboard.press('ArrowRight')
+      await page.keyboard.press('Enter')
+      await csvSelectors.cellEditor(page, 1, 6).fill('edited field')
+      await page.keyboard.press('Tab')
+      await assertVisibleColumn(7)
+      strictEqual(await csvSelectors.cell(page, 1, 6).getAttribute('title'), 'edited field')
+      await step('edited-tab-reveals-next-column')
+      await csvSelectors.scroll(page).evaluate((scroller) => {
+        scroller.scrollLeft = scroller.scrollWidth
       })
       const headerLeft = await heading.evaluate((element) => element.getBoundingClientRect().left)
       const cellLeft = await csvSelectors
@@ -323,6 +369,13 @@ export const csvKeyboardNavigation: Scenario = {
       strictEqual(
         await heading.evaluate((element) => element.getBoundingClientRect().top),
         headerTop,
+      )
+      strictEqual(
+        await csvSelectors
+          .scroll(page)
+          .evaluate((scroller) => getComputedStyle(scroller).maskImage),
+        'none',
+        'The sticky header stays readable at the scroll edge',
       )
       await step('wide-grid-header-alignment')
     } finally {

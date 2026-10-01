@@ -3,6 +3,7 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
+import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import type { EditorTextBuffer, EditorViewSession } from '@singapore-editor/core/document'
 import { CsvCellInput } from '@/features/workbench/components/csv-cell'
 import { useCsvPresentation } from '@/features/workbench/state/csv-presentation'
@@ -34,6 +35,8 @@ export function CsvTable({
   const presentation = engine.parseCsv(snapshot.readRange(0, snapshot.length))
   const [cursor, setCursor] = useState<CsvPosition>({ row: 0, column: 0 })
   const host = useRef<HTMLDivElement>(null)
+  const scroller = useRef<HTMLDivElement>(null)
+  const headerHeight = useRowHeight(host)
   const virtualList = useRef<VirtualListHandle>(null)
   const pendingFocus = useRef(false)
   const header = useCsvPresentation((state) => state.tabs[tabId]?.header ?? false)
@@ -65,6 +68,13 @@ export function CsvTable({
     if (!control) return
     pendingFocus.current = false
     control.focus({ preventScroll: true })
+    const scrollHost = scroller.current
+    if (!scrollHost) return
+    const viewport = scrollHost.getBoundingClientRect()
+    const cell = control.getBoundingClientRect()
+    const right = viewport.left + scrollHost.clientWidth
+    if (cell.left < viewport.left) scrollHost.scrollLeft += cell.left - viewport.left
+    else if (cell.right > right) scrollHost.scrollLeft += cell.right - right
   }, [activeRow, activeColumn, header])
 
   function move(from: CsvPosition, direction: CsvMove) {
@@ -99,67 +109,72 @@ export function CsvTable({
       }
       emptyState={<EmptyState title='No CSV rows' />}
     >
-      <div
-        ref={host}
-        role='table'
-        aria-label='CSV rows'
-        className='flex h-full min-h-0 flex-col overflow-x-auto'
-      >
-        <div
-          className='flex h-full min-h-0 shrink-0 flex-col'
-          style={{ width: widths.reduce((sum, width) => sum + width, 0), minWidth: '100%' }}
-        >
-          <div role='row' className='bg-muted flex w-max min-w-full shrink-0'>
-            {Array.from({ length: columns }, (_, column) => {
-              const label = headings?.[column]?.value ?? `Column ${column + 1}`
-              return (
-                <div
-                  key={column}
-                  role='columnheader'
-                  title={label}
-                  style={{ width: widths[column] }}
-                  className='text-muted-foreground h-(--density-row-height) shrink-0 truncate px-(--density-row-padding-x) text-xs font-medium'
-                >
-                  {label}
-                </div>
-              )
-            })}
-          </div>
-          <VirtualList
-            role='rowgroup'
-            activeIndex={activeRow}
-            handleRef={virtualList}
-            onItemsRendered={focusCursor}
-            items={rows ?? []}
-            getKey={(_, index) => index}
-            className='min-h-0 flex-1'
-            contentClassName='w-max min-w-full'
-            measureItems
-            renderRow={(row, index) => (
-              <ListRow
-                role='row'
-                selected={activeRow === index}
-
-                className='bg-content-well w-max min-w-full gap-0 px-0 has-data-[slot=textarea]:h-auto has-data-[slot=textarea]:items-start'
+      <div ref={host} role='table' aria-label='CSV rows' className='flex h-full min-h-0 flex-col'>
+        <VirtualList
+          activeIndex={activeRow}
+          handleRef={virtualList}
+          scrollRef={scroller}
+          onItemsRendered={focusCursor}
+          items={rows ?? []}
+          getKey={(_, index) => index}
+          scrollMargin={headerHeight}
+          scrollPaddingStart={headerHeight}
+          contentClassName='w-max min-w-full'
+          measureItems
+          fade={false}
+          renderLayout={({ content, scrollRef }) => (
+            <div
+              ref={scrollRef}
+              data-slot='virtual-list'
+              className='scroll-gutter relative min-h-0 flex-1 overflow-auto'
+            >
+              <div
+                style={{ width: widths.reduce((sum, width) => sum + width, 0), minWidth: '100%' }}
               >
-                {row.map((cell, column) => (
-                  <CsvCellInput
-                    key={column}
-                    cell={cell}
-                    row={index + (header ? 1 : 0)}
-                    column={column}
-                    editable={editable}
-                    width={widths[column]!}
-                    active={activeRow === index && activeColumn === column}
-                    onSelect={() => setCursor({ row: index, column })}
-                    onNavigate={(direction) => move({ row: index, column }, direction)}
-                    onEdit={edit}
-                  />
-                ))}
-              </ListRow>
-            )}
-          />
-        </div>
+                <div role='row' className='bg-muted sticky top-0 z-10 flex w-max min-w-full'>
+                  {Array.from({ length: columns }, (_, column) => {
+                    const label = headings?.[column]?.value ?? `Column ${column + 1}`
+                    return (
+                      <div
+                        key={column}
+                        role='columnheader'
+                        title={label}
+                        style={{ width: widths[column] }}
+                        className='text-muted-foreground h-(--density-row-height) shrink-0 truncate px-(--density-row-padding-x) text-xs font-medium'
+                      >
+                        {label}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div role='rowgroup'>{content}</div>
+              </div>
+            </div>
+          )}
+          renderRow={(row, index) => (
+            <ListRow
+              role='row'
+              selected={activeRow === index}
+
+              className='bg-content-well w-max min-w-full gap-0 px-0 has-data-[slot=textarea]:h-auto has-data-[slot=textarea]:items-start'
+            >
+              {row.map((cell, column) => (
+                <CsvCellInput
+                  key={column}
+                  cell={cell}
+                  row={index + (header ? 1 : 0)}
+                  column={column}
+                  editable={editable}
+                  width={widths[column]!}
+                  active={activeRow === index && activeColumn === column}
+                  onSelect={() => setCursor({ row: index, column })}
+                  onNavigate={(direction) => move({ row: index, column }, direction)}
+                  onEdit={edit}
+                />
+              ))}
+            </ListRow>
+          )}
+        />
       </div>
     </ToolPane>
   )

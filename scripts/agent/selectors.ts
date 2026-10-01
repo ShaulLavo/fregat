@@ -5,6 +5,10 @@ import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 export const csvSelectors = {
   engineModule: '**/src/features/workbench/utils/csv.ts*',
   table: (page: Page) => page.getByRole('table', { name: 'CSV rows', exact: true }),
+  scroll: (page: Page) =>
+    page
+      .getByRole('table', { name: 'CSV rows', exact: true })
+      .locator('[data-slot="virtual-list"]'),
   cell: (page: Page, row: number, column: number) =>
     page.getByRole('button', { name: `Row ${row}, column ${column}`, exact: true }),
   cellEditor: (page: Page, row: number, column: number) =>
