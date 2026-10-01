@@ -23,6 +23,42 @@ export const machineBalancing: Scenario = {
   description:
     'Verify visible machine preferences, off-default balancing, one automatic draft decision and explicit branch pins with two fixture owners.',
   capture: { width: 1440, height: 1000 },
+  async inspect(page) {
+    return page.evaluate(() => {
+      if (location.protocol === 'about:') return { address: location.href }
+      const registry = globalThis as typeof globalThis & {
+        __fregatQueryClients?: Map<
+          string,
+          {
+            getQueryCache(): { getAll(): { queryKey: readonly unknown[]; state: unknown }[] }
+            getMutationCache(): {
+              getAll(): { options: { mutationKey?: readonly unknown[] }; state: unknown }[]
+            }
+          }
+        >
+      }
+      return {
+        address: location.href,
+        text: document.body.innerText,
+        drafts: Object.entries(localStorage).filter(([key]) =>
+          key.endsWith('platform.chat-input-drafts.v1'),
+        ),
+        capacity: [...(registry.__fregatQueryClients ?? [])].map(([origin, client]) => ({
+          origin,
+          queries: client
+            .getQueryCache()
+            .getAll()
+            .filter((query) => query.queryKey[1] === 'machine-capacity')
+            .map((query) => ({ key: query.queryKey, state: query.state })),
+          moves: client
+            .getMutationCache()
+            .getAll()
+            .filter((mutation) => mutation.options.mutationKey?.[1] === 'move-draft')
+            .map((mutation) => mutation.state),
+        })),
+      }
+    })
+  },
   async run(page, { step }) {
     const bases = collectOrchestrationBases(page)
     await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
@@ -118,6 +154,9 @@ export const machineBalancing: Scenario = {
       )
       strictEqual(page.url(), selectedAddress)
       await step('draft-intent-survives-preference-refresh')
+    } catch (error) {
+      await step('failure-before-cleanup')
+      throw error
     } finally {
       await restoreUserSettings(page, base, before, keys)
       for (const owner of registered)
@@ -126,6 +165,8 @@ export const machineBalancing: Scenario = {
           projectId: owner.projectId,
           force: true,
         })
+      // Unload the subscriber before stopping the owner of its open event streams.
+      await page.goto('about:blank')
       await releaseFixture(fixture)
       await second.stop()
     }

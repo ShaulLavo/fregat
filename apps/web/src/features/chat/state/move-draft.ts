@@ -2,6 +2,7 @@ import type { EnvironmentId, ProjectId, WorktreeId } from '@workspace/contracts'
 
 import { createClientInvariantError } from '@/lib/structured-errors'
 import type { Navigation } from '@/state/navigation'
+import type { DraftIdentity } from '../utils/draft-storage'
 import { draftCanChangeMachine } from '../utils/draft-workspace'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from './chat-input-draft-store'
 
@@ -9,8 +10,10 @@ export type DraftDestination = {
   readonly environmentId: EnvironmentId
   readonly projectId: ProjectId
   readonly worktree: { readonly id: WorktreeId; readonly path: string }
-  readonly machineSelection?: 'automatic' | 'pinned'
-}
+} & (
+  | { readonly machineSelection: 'automatic'; readonly sourceIdentity: DraftIdentity }
+  | { readonly machineSelection?: 'pinned'; readonly sourceIdentity?: never }
+)
 
 /**
  * Re-homes a draft on another worktree or machine: the text goes with it, and the
@@ -26,6 +29,13 @@ export async function moveDraft(
 ) {
   const store = useChatInputDraftStore.getState()
   const draft = store.getDraft(from)
+  // A queued automatic move loses authority as soon as the source intent changes.
+  if (
+    destination.machineSelection === 'automatic' &&
+    (draft.identity !== destination.sourceIdentity ||
+      draft.identity?.machineSelection !== 'automatic')
+  )
+    return false
   const sameMachine = destination.environmentId === from.environmentId
   if (!sameMachine && !draftCanChangeMachine(draft)) return false
 

@@ -15,10 +15,10 @@ import { chatWorktree, fixtureEnvironmentId, TEST_ENVIRONMENT_ID, TEST_PROJECT_I
 import type { DraftIdentity } from '@/features/chat/utils/draft-storage'
 import type { DraftMachine } from '@/features/chat/utils/draft-workspace'
 
-export function machineDraftFixture() {
+export function machineDraftFixture(environmentId = TEST_ENVIRONMENT_ID) {
   const base = chatWorktree()
   const id = 'd7df5c60-5fa7-4aeb-8028-1aab248a211d'
-  const target = { environmentId: TEST_ENVIRONMENT_ID, draftKey: id, rootPath: base.path }
+  const target = { environmentId, draftKey: id, rootPath: base.path }
   const identity: DraftIdentity = {
     id,
     projectId: TEST_PROJECT_ID,
@@ -29,7 +29,7 @@ export function machineDraftFixture() {
   }
   const machines: readonly DraftMachine[] = [
     {
-      environmentId: TEST_ENVIRONMENT_ID,
+      environmentId,
       projectId: TEST_PROJECT_ID,
       label: 'First',
       phase: 'live',
@@ -44,4 +44,21 @@ export function machineDraftFixture() {
     },
   ]
   return { target, identity, machines }
+}
+
+/** The OS API can materialize CPU counters only when their fields are read. */
+export function lazyCpuSamples() {
+  let clock = 0
+  return () => {
+    clock += 100
+    return [
+      {
+        model: 'Fixture CPU',
+        speed: 1000,
+        get times() {
+          return { user: clock, nice: 0, sys: 0, idle: clock * 3, irq: 0 }
+        },
+      },
+    ]
+  }
 }

@@ -15,11 +15,12 @@ const errors = defineErrorCatalog('machines', {
 })
 
 /** Sample twice so a machine's lifetime average cannot hide its current load. */
-export async function readHostResources(): Promise<HostResources> {
-  const before = cpus()
-  await setTimeout(200)
-  const after = cpus()
+export async function readHostResources(readCpus: typeof cpus = cpus): Promise<HostResources> {
+  const before = readCpus()
+  // Bun materializes OS counters lazily; read them before the sampling wait.
   const first = cpuTimes(before)
+  await setTimeout(200)
+  const after = readCpus()
   const last = cpuTimes(after)
   const elapsed = last.total - first.total
   const idle = last.idle - first.idle

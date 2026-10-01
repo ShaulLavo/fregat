@@ -2,7 +2,8 @@ import { QueryClient } from '@tanstack/react-query'
 import { test, expect } from '../../../../../test/fixtures'
 import { makeTestServer } from '../../../../../test/server'
 import { createInProcessClient } from '../../../../../test/client'
-import { hostResources } from '../../../../../test/factories/host-resources'
+import { readHostResources } from '../../../../../../server/src/machines/resources'
+import { hostResources, lazyCpuSamples } from '../../../../../test/factories/host-resources'
 import { fixtureEnvironmentId } from '../../../../../test/factories/chat'
 import {
   registerEnvironmentQueryClient,
@@ -49,4 +50,9 @@ test('the authenticated resource route returns current capacity', async ({ clien
   expect(result.error).toBeNull()
   expect(result.data!.cpuCount).toBeGreaterThan(0)
   expect(result.data!.totalMemoryBytes).toBeGreaterThan(0)
+})
+
+test('CPU counters are materialized before the sampling wait', async () => {
+  const resources = await readHostResources(lazyCpuSamples())
+  expect(resources.cpuUtilization).toBe(0.25)
 })

@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent } from 'react'
 import { useQueries } from '@tanstack/react-query'
+import { log } from '@/lib/client-logging'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
@@ -49,47 +50,65 @@ export function useBalanceDraft(
   })
   const pending = unresolved && queries.some((query) => query.isFetching)
   const failed = queries.some(
-    (query) => query.isError || (!query.data && query.fetchStatus === 'idle'),
+    (query) => query.fetchStatus === 'paused' || query.isError || !query.data,
   )
-  const chosen =
-    !pending && !failed
-      ? chooseDraftMachine(
-          candidates.map((machine, index) => ({
-            environmentId: machine.environmentId,
-            resources: queries[index]?.data ?? null,
-            receivedAt: queries[index]?.dataUpdatedAt ?? 0,
-            preference: preferences[machine.environmentId],
-          })),
-          // The final receipt is the decision instant; slow reads still expire earlier samples.
-          Math.max(0, ...queries.map((query) => query.dataUpdatedAt)),
-        )
-      : null
   const select = useEffectEvent(() => {
     const store = useChatInputDraftStore.getState()
     const current = store.getDraft(target)
     // A user choice can arrive between the query render and this effect.
     if (!current.identity || current.identity.machineSelection || !draftCanChangeMachine(current))
       return
+    const decisionAt = Date.now()
+    const chosen = failed
+      ? null
+      : chooseDraftMachine(
+          candidates.map((machine, index) => ({
+            environmentId: machine.environmentId,
+            resources: queries[index]?.data ?? null,
+            receivedAt: queries[index]?.dataUpdatedAt ?? 0,
+            preference: preferences[machine.environmentId],
+          })),
+          decisionAt,
+        )
+    log.info({
+      area: 'chat',
+      action: 'chat.draft.capacity_choice',
+      environmentId: target.environmentId,
+      draftId: target.draftKey,
+      outcome: chosen ? 'selected' : 'requires_choice',
+      selectedEnvironmentId: chosen,
+      reads: queries.map((query, index) => ({
+        environmentId: candidates[index]?.environmentId,
+        status: query.status,
+        fetchStatus: query.fetchStatus,
+        receiptAgeMs: decisionAt - query.dataUpdatedAt,
+        cpuUtilization: query.data?.cpuUtilization ?? null,
+        availableMemoryFraction: query.data
+          ? query.data.availableMemoryBytes / query.data.totalMemoryBytes
+          : null,
+      })),
+    })
     if (!chosen) {
       store.setIdentity(target, { ...current.identity, machineSelection: 'required' })
       return
     }
     const machine = candidates.find((candidate) => candidate.environmentId === chosen)
     if (!machine?.worktree) return
-    store.setIdentity(target, { ...current.identity, machineSelection: 'automatic' })
+    const sourceIdentity = { ...current.identity, machineSelection: 'automatic' as const }
+    store.setIdentity(target, sourceIdentity)
     if (machine.environmentId === target.environmentId) return
     move.mutate(
-      { ...machine, worktree: machine.worktree, machineSelection: 'automatic' },
+      { ...machine, worktree: machine.worktree, machineSelection: 'automatic', sourceIdentity },
       {
         onSuccess: (moved) => {
           if (moved) return
           const latest = store.getDraft(target)
-          if (latest.identity?.machineSelection === 'automatic')
+          if (latest.identity === sourceIdentity)
             store.setIdentity(target, { ...latest.identity, machineSelection: 'required' })
         },
         onError: () => {
           const latest = store.getDraft(target)
-          if (latest.identity?.machineSelection === 'automatic')
+          if (latest.identity === sourceIdentity)
             store.setIdentity(target, { ...latest.identity, machineSelection: 'required' })
         },
       },
@@ -97,11 +116,9 @@ export function useBalanceDraft(
   })
   useEffect(() => {
     if (unresolved && !pending && !move.isPending) select()
-  }, [unresolved, pending, chosen, move.isPending])
+  }, [unresolved, pending, failed, move.isPending])
   return {
     pending: pending || move.isPending,
-    requiresChoice:
-      draft.identity?.machineSelection === 'required' ||
-      (unresolved && !pending && chosen === null),
+    requiresChoice: draft.identity?.machineSelection === 'required',
   }
 }
