@@ -1,34 +1,78 @@
-# @fregat/hotkeys
-
-Keyboard shortcuts for editors: key parsing and display, a chord trie, and context resolution
-modelled on Zed. The core never touches the DOM; adapters turn browser and terminal input into
-its key events. The library ships no keymap.
-
-| Package                                           | Contents                                                  |
-| ------------------------------------------------- | --------------------------------------------------------- |
-| [`@fregat/hotkeys`](packages/hotkeys)             | Core: parsing, matching, formatting, recorders, key state |
-| [`@fregat/react-hotkeys`](packages/react-hotkeys) | React hooks over the core                                 |
-
-## Origin
-
-This is a fork of [TanStack Hotkeys](https://github.com/TanStack/hotkeys) (MIT, © 2026 Tanner
-Linsley), imported from upstream commit `536da97c6a91080cdecf13d74103dcd4a3d3529f`
-(`@tanstack/hotkeys` 0.10.1, `@tanstack/react-hotkeys` 0.12.1). The Angular, Lit, Preact,
-Solid, Svelte and Vue adapters and the devtools packages were left behind. Upstream changes are
-not merged; `references/tanstack-hotkeys` in the Fregat checkout tracks upstream for comparison.
-The original licence is in [LICENSE](LICENSE) and in each package.
-
-## Development
+# hotkeys
 
 Development happens in the [Fregat monorepo](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
 This repository mirrors its `hotkeys/` folder. Submit changes to Fregat.
 
-From the standalone mirror:
+keyboard shortcuts for editors and apps. you bind keys to commands, it matches key presses, runs multi-key chords like `Mod+K Mod+C`, and picks the binding that fits whatever has focus, the way zed does
+
+it also formats shortcuts for display and records new ones from the keyboard. the core never touches the dom; small adapters feed it browser or terminal keys. it ships no keymap of its own
+
+## try it
+
+not on npm yet. clone it and `bun link`
+
+register a shortcut. `Mod` is Command on mac and Control everywhere else
+
+```ts
+import { getHotkeyRegistry } from '@fregat/hotkeys'
+
+const hotkeys = getHotkeyRegistry()
+const save = hotkeys.register('Mod+S', () => saveFile())
+hotkeys.register(['Mod+K', 'Mod+C'], () => addComment()) // a chord: Mod+K, then Mod+C
+
+save.unregister()
+```
+
+same key, different job depending on focus. the deepest focused context wins, so `Mod+B` bolds text in the editor and toggles the sidebar everywhere else
+
+```ts
+import { createBrowserDispatcher } from '@fregat/hotkeys'
+
+const keys = createBrowserDispatcher({
+  keymap: [
+    { keys: 'Mod+B', command: 'sidebar.toggle' },
+    { keys: 'Mod+B', command: 'text.bold', context: 'Editor' },
+  ],
+})
+const app = keys.createNode({ commands: { 'sidebar.toggle': () => toggleSidebar() } })
+const editor = keys.createNode({
+  parent: app,
+  context: 'Editor',
+  commands: { 'text.bold': () => bold() },
+})
+keys.attachElement(app, document.body)
+keys.attachElement(editor, editorElement)
+```
+
+show it in a menu or tooltip
+
+```ts
+import { formatForDisplay } from '@fregat/hotkeys'
+
+formatForDisplay('Mod+Shift+S', { platform: 'mac' }) // '⇧ ⌘ S'
+formatForDisplay('Mod+Shift+S', { platform: 'linux' }) // 'Ctrl+Shift+S'
+```
+
+in react, `useHotkey('Mod+S', () => saveFile())` registers for the life of the component
+
+## packages
+
+- [`@fregat/hotkeys`](packages/hotkeys), the core: parsing, matching, chords, contexts, display, recorders, held-key state
+- [`@fregat/react-hotkeys`](packages/react-hotkeys), react hooks over the core
+
+## running the repo
 
 ```sh
 bun install
 bun run verify
-bun packages/hotkeys/bench/lookup.ts
 ```
 
-From Fregat, run `bun run --cwd hotkeys verify`.
+from inside fregat, `bun run --cwd hotkeys verify`
+
+## more
+
+- [core api: focus nodes, chords, terminals, recorders](packages/hotkeys/README.md)
+- [keymap rules: context predicates, ranking, unbinding](packages/hotkeys/docs/keymaps.md)
+- [lookup benchmarks](packages/hotkeys/docs/performance.md)
+
+forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys), MIT. license in [LICENSE](LICENSE)

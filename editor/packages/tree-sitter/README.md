@@ -1,32 +1,53 @@
 # @singapore-editor/tree-sitter
 
-Tree-sitter syntax runtime for `@singapore-editor/core`.
+tree-sitter syntax for `@singapore-editor/core`. parses in a worker and gives the editor highlights, folds, brackets, injected languages and structural selection
 
-This package provides the syntax provider, language registry, worker client, source adapter, and
-structural selection helpers. Pair it with `@singapore-editor/tree-sitter-languages` for bundled language
-contributions.
+it ships no grammars. bring your own, or take the bundled set from [`@singapore-editor/tree-sitter-languages`](../tree-sitter-languages/)
 
-## Install
+## try it
 
 ```sh
-npm install @singapore-editor/core @singapore-editor/tree-sitter
+npm install @singapore-editor/core @singapore-editor/tree-sitter @singapore-editor/tree-sitter-languages
 ```
-
-## Usage
 
 ```ts
-import { createTreeSitterSyntaxProvider } from '@singapore-editor/tree-sitter'
+import { Editor } from '@singapore-editor/core/editor'
+import { createTreeSitterLanguagePlugin } from '@singapore-editor/tree-sitter'
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 
-const syntaxProvider = createTreeSitterSyntaxProvider()
+const editor = new Editor(element, {
+  plugins: [createTreeSitterLanguagePlugin(TREE_SITTER_LANGUAGE_CONTRIBUTIONS)],
+})
 ```
 
-Register the provider with an editor plugin context, or use `createTreeSitterLanguagePlugin` when
-you already have language contributions to install.
+grammars load the first time a document needs them. every editor using this plugin shares one worker
 
-## Exports
+with your own grammar, make a provider and register languages on it
 
-- `createTreeSitterSyntaxProvider` creates a syntax provider backed by a Tree-sitter worker.
-- `createTreeSitterLanguagePlugin` registers language contributions with the default provider.
-- `TreeSitterWorkerClient` and `createTreeSitterWorkerBackend` expose the worker transport.
-- `expandTreeSitterSelection`, `shrinkTreeSitterSelection`, and `selectTreeSitterToken` provide
-  structural selection helpers.
+```ts
+import {
+  createTreeSitterSyntaxPlugin,
+  createTreeSitterSyntaxProvider,
+} from '@singapore-editor/tree-sitter'
+
+const provider = createTreeSitterSyntaxProvider()
+provider.registerLanguage({
+  id: 'lua',
+  extensions: ['.lua'],
+  load: async () => ({
+    wasmUrl: '/grammars/tree-sitter-lua.wasm',
+    highlightQuerySource: await fetch('/grammars/lua-highlights.scm').then((r) => r.text()),
+  }),
+})
+
+const editor = new Editor(element, { plugins: [createTreeSitterSyntaxPlugin(provider)] })
+```
+
+a contribution can also carry `foldQuerySource`, `injectionQuerySource`, `aliases` and `filenames`
+
+## more
+
+- [how the syntax system works](../../docs/syntax/tree-sitter.md): worker ownership, incremental parses, injections
+- `expandTreeSitterSelection`, `shrinkTreeSitterSelection` and `selectTreeSitterToken` drive structural selection commands
+- `bun run bench:syntax` runs the syntax benchmark in `bench/`
+- [`@singapore-editor/highlighting`](../highlighting/) pairs this with shiki for imported vs code themes

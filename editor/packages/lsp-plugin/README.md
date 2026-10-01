@@ -1,96 +1,73 @@
 # @singapore-editor/lsp-plugin
 
-Editor integration layer for LSP-backed Singapore language features.
+connects a language server to the editor. you get diagnostics, completion, hover, signature help, go to definition, references, rename, code actions, formatting and document highlights, whatever the server supports
 
-This package adapts `@singapore-editor/lsp` transports to `@singapore-editor/core` plugins for diagnostics,
-completion, hover, definition navigation, references, and document synchronization.
+it keeps the open document in sync with the server as you type. the protocol client underneath is [`@singapore-editor/lsp`](../lsp/)
 
-## Install
+## try it
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/lsp @singapore-editor/lsp-plugin
 ```
 
-## Usage
+point it at a websocket that speaks lsp json-rpc
 
 ```ts
+import { Editor } from '@singapore-editor/core/editor'
 import { createLanguageServerPlugin } from '@singapore-editor/lsp-plugin'
+import '@singapore-editor/core/style.css'
 
-const plugin = createLanguageServerPlugin({
-  webSocketRoute: 'ws://localhost:3000/lsp',
-})
-```
-
-## Exports
-
-- `createLanguageServerPlugin` connects the editor to a language server or shared document session.
-- `createLanguageServerAdapterPlugin` supports custom transport factories and adapter configuration.
-- `createWebSocketLspTransportFactory` and `createWorkerLspTransportFactory` create transport
-  factories.
-- Diagnostic, path, markdown tooltip, completion, and document-sync helpers are available through
-  subpath exports.
-
-## Keys
-
-The completion list and the signature hint are driven by editor commands, not by listening to
-keys: `editor.action.triggerSuggest` (Ctrl+Space), `selectNextSuggestion`, `selectPrevSuggestion`,
-`selectNextPageSuggestion`, `selectPrevPageSuggestion`, `acceptSelectedSuggestion`,
-`hideSuggestWidget`, `closeParameterHints`, `showNextParameterHint` and `showPrevParameterHint`.
-The core's `suggest` keymap pack binds them under the context keys this plugin registers
-(`suggestWidgetVisible`, `parameterHintsVisible`, `parameterHintsMultipleSignatures`). A host that
-turns the editor's keymap off, or drops that pack, binds these commands itself or the list cannot
-be driven from the keyboard. They are part of `commands`, so `commands: []` registers none of them.
-
-## Document lifetime
-
-The connection-only API owns its document session automatically. Dispose the editor to close it:
-
-```ts
-const plugin = createLanguageServerPlugin({
-  webSocketRoute: 'ws://localhost:3001/lsp',
-})
-```
-
-For tabs or split editors, create a session beside the text buffer and pass it to each view:
-
-```ts
-import {
-  createLanguageServerDocument,
-  createLanguageServerPlugin,
-} from '@singapore-editor/lsp-plugin'
-
-const document = createLanguageServerDocument({
-  buffer,
-  uri: 'file:///project/main.ts',
-  languageId: 'typescript',
-  lanes: [
-    {
-      id: 'typescript',
-      features: { diagnostics: 0, completion: 0, hover: 0, navigation: 0 },
+const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
+  plugins: [
+    createLanguageServerPlugin({
       webSocketRoute: 'ws://localhost:3001/lsp',
-    },
+      rootUri: 'file:///project',
+    }),
   ],
 })
 
-const plugin = createLanguageServerPlugin({ document })
+editor.openDocument({
+  documentId: '/project/main.ts',
+  text: 'const value: number = "one"\n',
+  languageId: 'typescript',
+})
 ```
 
-The session synchronizes buffer changes and receives diagnostics even with no mounted view.
-Each view renders the current diagnostics on attachment. Disposing a view unsubscribes it;
-it does not close the document. The host calls `document.dispose()` when the document closes.
-Multiple views share the session, with independent completion, hover, and selection UI.
+the `documentId` becomes the document's uri, here `file:///project/main.ts`. disposing the editor closes the document on the server
 
-Use `documentId` when the editor uses an opaque identity different from the URI. Connection
-options and an explicit `document` are mutually exclusive plugin inputs. Both forms use the
-same synchronization and diagnostic implementation.
+follow what the server is doing with `onStatusChange` and `onDiagnostics`. jumps to other files go to your `onOpenDefinition` and `onOpenReferences`, and edits that span files go to `onApplyWorkspaceEdit`
 
-For shared sessions, pass `onApplyWorkspaceEdit` to `createLanguageServerDocument`.
-The document uses it both to advertise workspace-edit support during initialization and to
-apply edits requested by its views. It cannot be supplied on a plugin borrowing that document.
-The connection-only plugin still accepts `onApplyWorkspaceEdit` directly.
+## more than one server
 
-### Diagnostic hover actions
+`createLanguageServerSetPlugin({ lanes })` runs several servers on one document. each lane lists the features it serves with a rank. lower ranks go first, and a lane only gets a feature its server supports
 
-`getDiagnosticActions({ documentUri, textVersion, diagnostic })` supplies actions beside each diagnostic note. It is supported by the server, server-set and adapter plugins, including `createTypeScriptLspPlugin`. Return an empty array when no action applies. Each action has a `label` and `run(): void | Promise<void>`.
+```ts
+import {
+  allLanguageServerFeatures,
+  createLanguageServerSetPlugin,
+} from '@singapore-editor/lsp-plugin'
 
-The tooltip prevents repeated invocation while an action is pending, preserves keyboard focus, and shows a rejected action's message beside its button. Progressive hover replies retain pending actions and their errors. An action refuses to run after its document, text version or diagnostic changes; the user can reopen the hover for a fresh action. The host owns application behavior and async operation state.
+const plugin = createLanguageServerSetPlugin({
+  lanes: [
+    {
+      id: 'typescript',
+      features: allLanguageServerFeatures(),
+      webSocketRoute: 'ws://localhost:3001/ts',
+    },
+    {
+      id: 'eslint',
+      features: { diagnostics: 0, codeActions: 1 },
+      webSocketRoute: 'ws://localhost:3001/eslint',
+    },
+  ],
+})
+```
+
+## more
+
+- [shared documents](docs/shared-documents.md), one server session for tabs and split views, and who disposes it
+- [keyboard](docs/keyboard.md), the commands that drive the completion list and signature hints
+- [diagnostic actions](docs/diagnostic-actions.md), buttons beside each diagnostic in the hover
+- `LspConnectionPool` lets editors share one connection per project so switching files skips the handshake
+- subpath exports (`./diagnostics`, `./paths`, `./completion`, `./document-sync`, `./workspace-edit` and more) expose the pieces for hosts that build their own ui
+- [`@singapore-editor/typescript-lsp`](../typescript-lsp/), this plugin wired to typescript in a worker

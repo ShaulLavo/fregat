@@ -1,27 +1,37 @@
 # @singapore-editor/scope-lines
 
-Scope-line view contribution plugin for `@singapore-editor/core`.
+three plugins that show code structure: indent guides down each open block, sticky headers that keep the enclosing function or class pinned at the top while you scroll, and bracket pair colors by nesting depth
 
-## Install
+they read the editor's folds and brackets. indent guides and sticky headers work from indentation when no syntax plugin is loaded. bracket colors need one
+
+## try it
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/scope-lines
 ```
 
-## Usage
-
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
-import { createScopeLinesPlugin } from '@singapore-editor/scope-lines'
+import {
+  createBracketColorsPlugin,
+  createScopeLinesPlugin,
+  createStickyScrollPlugin,
+} from '@singapore-editor/scope-lines'
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/scope-lines/style.css'
 
-const editor = new Editor(document.querySelector('#editor')!, {
-  plugins: [createScopeLinesPlugin()],
+const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
+  plugins: [createScopeLinesPlugin(), createStickyScrollPlugin(), createBracketColorsPlugin()],
 })
 ```
 
-## Exports
+scope lines draw a guide for every visible block and highlight the ones holding the caret. `mode: 'current'` draws only the innermost block around the caret, `showActive: false` drops the highlight, and `minLineSpan` skips short blocks
 
-- `createScopeLinesPlugin` renders vertical guides for visible syntax scopes.
-- `ScopeLinesPluginOptions` controls mode, active-scope rendering, minimum span, and custom classes.
+sticky scroll shows up to five headers. change that with `maxLineCount`
+
+bracket colors stop at `maxLevel` deep and skip files with more than `maxBrackets` brackets
+
+## more
+
+- [`@singapore-editor/tree-sitter`](../tree-sitter/), the syntax plugin that supplies real scopes and brackets
+- [`@singapore-editor/gutters`](../gutters/), fold arrows for the same blocks
