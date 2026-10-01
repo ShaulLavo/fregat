@@ -1,5 +1,5 @@
 import { dlopen, FFIType } from 'bun:ffi'
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs'
+import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const LOCK_EX = 2
@@ -24,6 +24,8 @@ export function unlock(fd: number) {
   closeSync(fd)
 }
 
+// Shared with tools that take the slot locks directly: holding all three keeps the machine quiet.
+export const DEFAULT_LOCK_DIR = '/work/tmp/wave-heavy'
 const MACHINE_SLOTS = [1, 2, 3] as const
 const POLL_MS = 5_000
 const WAIT_NOTICE_MS = 60_000
@@ -39,11 +41,17 @@ function slotsFor(host: string): readonly Slot[] {
   return MACHINE_SLOTS.map((slot) => ({ slot, name: `slot${slot}` }))
 }
 
+// Holder lines are advisory; a missing or unreadable one must not stop a job from waiting.
+function holderLine(file: string) {
+  try {
+    return readFileSync(file, 'utf8').trim()
+  } catch {
+    return ''
+  }
+}
+
 function holders(lockDir: string, slots: readonly Slot[]) {
-  return slots
-    .map(({ name }) => path.join(lockDir, `${name}.holder`))
-    .map((file) => (existsSync(file) ? readFileSync(file, 'utf8').trim() : ''))
-    .join(';')
+  return slots.map(({ name }) => holderLine(path.join(lockDir, `${name}.holder`))).join(';')
 }
 
 export async function acquireSlot(lockDir: string, host: string, pollMs = POLL_MS) {

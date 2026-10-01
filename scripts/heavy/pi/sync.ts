@@ -7,10 +7,12 @@ import { parseArgs } from 'node:util'
 import { shellQuote } from '../../../apps/server/src/utils/shell'
 import { createScriptError, scriptFailureText } from '../../structured-errors'
 import { check, remote, resolveLane, verifyLane } from './remote'
+import { fregatCheckout } from './checkout'
+import { holdLaneLock } from './lane-lock'
 import { shipPlan } from './transfer'
 
 const USAGE =
-  'bun scripts/heavy/pi/sync.ts [--host pi] [--lane fregat-lane] [--web <built web dir>] [--include <untracked file>]… [--max-transfer-mib 64]'
+  'bun scripts/heavy/pi/sync.ts [--host pi] [--lane fregat-lane] [--web <built web dir>] [--include <untracked file>]… [--max-transfer-mib 64] [--lock-dir DIR]'
 const BUILD_PARENTS = ['editor/packages', 'hotkeys/packages']
 
 export type SyncOptions = {
@@ -19,10 +21,6 @@ export type SyncOptions = {
   readonly web?: string
   readonly includes?: readonly string[]
   readonly maxTransferMiB?: number
-}
-
-export function checkoutRoot() {
-  return check(['git', 'rev-parse', '--show-toplevel'], 'Finding this checkout').toString().trim()
 }
 
 /** Workspace packages resolve through dist/, and the Pi builds nothing. */
@@ -49,7 +47,7 @@ export function buildsTransfer(root: string, builds: readonly string[], destinat
 }
 
 export function syncLane(options: SyncOptions) {
-  const root = checkoutRoot()
+  const root = fregatCheckout()
   const builds = builtWorkspaces(root)
   const plan = shipPlan(root, options.includes ?? [], (options.maxTransferMiB ?? 64) * 2 ** 20)
   const lane = resolveLane(options.host, options.lane)
@@ -126,6 +124,7 @@ if (import.meta.main) {
         web: { type: 'string' },
         include: { type: 'string', multiple: true, default: [] },
         'max-transfer-mib': { type: 'string', default: '64' },
+        'lock-dir': { type: 'string' },
         help: { type: 'boolean' },
       },
     })
@@ -137,6 +136,9 @@ if (import.meta.main) {
     if (!Number.isSafeInteger(maxTransferMiB) || maxTransferMiB <= 0) {
       throw createScriptError(`--max-transfer-mib must be a positive integer. ${USAGE}`)
     }
+    // Local checks first, so a wrong checkout fails without waiting for the lock.
+    builtWorkspaces(fregatCheckout())
+    await holdLaneLock('sync.ts', values['lock-dir'])
     syncLane({
       host: values.host,
       lane: values.lane,

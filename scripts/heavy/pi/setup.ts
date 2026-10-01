@@ -8,9 +8,12 @@ import { createScriptError, scriptFailureText } from '../../structured-errors'
 import { cmdlineWriteScript, repairCmdline } from './cmdline'
 import { prerequisitesScript } from './prerequisites'
 import { check, LANE_MARKER, remote, remoteOk, resolveLane, run } from './remote'
-import { builtWorkspaces, checkoutRoot, syncLane } from './sync'
+import { fregatCheckout } from './checkout'
+import { holdLaneLock } from './lane-lock'
+import { builtWorkspaces, syncLane } from './sync'
 
-const USAGE = 'bun scripts/heavy/pi/setup.ts [--host pi] [--lane fregat-lane] [--enable-cgroups]'
+const USAGE =
+  'bun scripts/heavy/pi/setup.ts [--host pi] [--lane fregat-lane] [--enable-cgroups] [--lock-dir DIR]'
 const CMDLINE = '/boot/firmware/cmdline.txt'
 const CMDLINE_BACKUP = `${CMDLINE}.before-lane`
 const KERNEL_READY =
@@ -100,6 +103,7 @@ try {
       host: { type: 'string', default: 'pi' },
       lane: { type: 'string', default: 'fregat-lane' },
       'enable-cgroups': { type: 'boolean', default: false },
+      'lock-dir': { type: 'string' },
       help: { type: 'boolean' },
     },
   })
@@ -108,7 +112,7 @@ try {
     process.exit(0)
   }
   const host = values.host
-  const root = checkoutRoot()
+  const root = fregatCheckout()
   // Setup ends with a sync, which needs these; failing now beats failing after a reboot.
   builtWorkspaces(root)
   const bunVersion =
@@ -124,6 +128,8 @@ try {
   if (!ORIGIN.test(origin))
     throw createScriptError(`origin ${origin} is not a public GitHub https URL the Pi can clone.`)
 
+  // Setup reboots the Pi and replaces its checkout; no lane job may run meanwhile.
+  await holdLaneLock('setup.ts', values['lock-dir'])
   if (!reachable(host)) {
     throw createScriptError(
       `ssh ${host} failed. Add a \`Host ${host}\` block with the Pi's tailnet address, \`User pi\` and the key the Pi authorizes (README.md).`,

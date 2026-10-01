@@ -7,13 +7,11 @@ import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import { HOSTS, isHost, startJob, type Host, type JobOutcome } from './job'
-import { acquireSlot, unlock } from './lock'
+import { acquireSlot, DEFAULT_LOCK_DIR, unlock } from './lock'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/run.js [--host local|pi] [--log-dir <dir>] [--lock-dir <dir>] <label> -- <command…>'
-// Shared with tools that take the slot locks directly: holding all three keeps the machine quiet.
-const LEGACY_LOCK_DIR = '/work/tmp/wave-heavy'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--host local|pi] [--max-wall <seconds, pi only>] [--log-dir <dir>] [--lock-dir <dir>] <label> -- <command…>'
 
 type Options = {
   readonly host: Host
@@ -21,6 +19,7 @@ type Options = {
   readonly command: readonly string[]
   readonly logDir: string | null
   readonly lockDir: string
+  readonly maxWallSec?: number
 }
 
 try {
@@ -36,7 +35,10 @@ function parseOptions(argv: readonly string[]): Options {
   while (argv[index]?.startsWith('--') && argv[index] !== '--') {
     const flag = argv[index]!
     const value = argv[index + 1]
-    if (!['--host', '--log-dir', '--lock-dir'].includes(flag) || value === undefined) {
+    if (
+      !['--host', '--log-dir', '--lock-dir', '--max-wall'].includes(flag) ||
+      value === undefined
+    ) {
       throw createScriptError(`Unknown or incomplete option ${flag}. ${USAGE}`)
     }
     flags.set(flag, value)
@@ -50,11 +52,22 @@ function parseOptions(argv: readonly string[]): Options {
   if (!isHost(host)) {
     throw createScriptError(`Unknown host ${host}. Hosts: ${HOSTS.join(', ')}.`)
   }
+  const maxWall = flags.get('--max-wall')
+  if (maxWall !== undefined && host !== 'pi') {
+    throw createScriptError(
+      `--max-wall applies to --host pi, which enforces it on the Pi. ${USAGE}`,
+    )
+  }
+  const maxWallSec = maxWall === undefined ? undefined : Number(maxWall)
+  if (maxWallSec !== undefined && (!Number.isSafeInteger(maxWallSec) || maxWallSec <= 0)) {
+    throw createScriptError(`--max-wall must be a positive whole number of seconds. ${USAGE}`)
+  }
   return {
     command,
     host,
     label,
-    lockDir: flags.get('--lock-dir') ?? LEGACY_LOCK_DIR,
+    maxWallSec,
+    lockDir: flags.get('--lock-dir') ?? DEFAULT_LOCK_DIR,
     logDir: flags.get('--log-dir') ?? null,
   }
 }
@@ -71,7 +84,13 @@ async function run(options: Options) {
   )
 
   const id = randomBytes(6).toString('hex')
-  const job = startJob({ command: options.command, cwd, host: options.host, id })
+  const job = startJob({
+    command: options.command,
+    cwd,
+    host: options.host,
+    id,
+    maxWallSec: options.maxWallSec,
+  })
   // A signal to this PID alone reaches the job only through its scope. A terminal's Ctrl-C
   // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {

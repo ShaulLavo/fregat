@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
@@ -52,4 +52,21 @@ test('a held Pi slot leaves the machine slots free', async () => {
   const local = await acquireSlot(dir, 'local', 20)
   held.push(local.fd)
   expect(local.slot).toBe(1)
+})
+
+test('keeps waiting when a holder line cannot be read', async () => {
+  const dir = lockDir()
+  holdMachineSlots(dir)
+  mkdirSync(path.join(dir, 'slot1.holder'))
+  const queued = acquireSlot(dir, 'local', 20)
+  const outcome = await Promise.race([
+    queued.then(
+      () => 'acquired',
+      (error: unknown) => `rejected: ${String(error)}`,
+    ),
+    Bun.sleep(300).then(() => 'waiting'),
+  ])
+  expect(outcome).toBe('waiting')
+  unlock(held.shift()!)
+  held.push((await queued).fd)
 })

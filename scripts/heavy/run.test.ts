@@ -259,3 +259,15 @@ function alive(pid: number) {
 function unitActive(unit: string) {
   return spawnSync('systemctl', ['--user', 'is-active', unit]).stdout.toString().trim() === 'active'
 }
+
+test('refuses --max-wall without --host pi, and a ceiling that is not whole seconds', () => {
+  const label = 'ceiling-check'
+  const wrapper = (flags: readonly string[]) =>
+    spawnSync(process.execPath, [RUN, ...flags, label, '--', 'true'], { encoding: 'utf8' })
+  const local = wrapper(['--max-wall', '60'])
+  expect(local.status).toBe(2)
+  expect(local.stderr).toContain('--max-wall applies to --host pi')
+  const fraction = wrapper(['--host', 'pi', '--max-wall', '1.5'])
+  expect(fraction.status).toBe(2)
+  expect(fraction.stderr).toContain('positive whole number of seconds')
+})
