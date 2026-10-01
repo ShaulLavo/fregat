@@ -186,6 +186,25 @@ and `/work/tmp/fregat-evidence/p285-overlay-looks/20261001T213839Z-look-ghostty-
 Chromium software WebGL2 is confirmed; hardware GPU and Firefox/WebKit geometry remain
 unconfirmed. No deployment or GitHub PR merge is performed by this lane.
 
+### Independent-review follow-up (2026-10-02)
+
+The built site reproduced both reviewed boot bugs: a frames 404 kept the terminal unopened
+behind the HTML Ghost, and selecting Shell while wasm was held started Shell with no
+accessibility mirror/live region or terminal focus. Before evidence and read-back screenshots
+are at `/work/tmp/fregat-evidence/p285-review-boot-before/`.
+
+Ghost now owns its parallel asset promise and paints load failures locally, including while
+paused. Terminal opening awaits core and fonts independently of Ghost assets. A shared
+`startActive` path applies accessibility, fitting, pause policy and input focus during both boot
+and tab selection. The browser regression covers 404, truncated gzip, and Shell selected before
+wasm is released; it checks live hand-off, failure output, accessibility, focus and actual typed
+Shell arithmetic. All three boot regressions pass at
+`/work/tmp/fregat-evidence/p285-review-boot-after/`; failure and working-Shell screenshots were
+read back. The full frozen hand-off/demo matrix passes again at
+`/work/tmp/fregat-evidence/p285-review-handoff/`. Site build and typecheck pass. Formal desktop
+and phone looks are queued. The cold trace numbers above predate these boot repairs; static
+HTML/CSS are unchanged, and no updated runtime hand-off timing is claimed.
+
 ## Phase 1: a DOM renderer, in the package
 
 `src/render/dom/renderer.ts`: a fourth backend that draws `RendererFrameSnapshot` rows as one

@@ -193,12 +193,18 @@ function select(demo: Demo): void {
   ui.stat.textContent = ''
   if (!terminal) return
   terminal.reset()
-  fitTo(demo.fit)
+  startActive()
+}
+
+function startActive(waitForPaint = false): void {
+  if (!terminal) return
+  fitTo(active.fit)
   // Only the shell takes input; the animations would announce every frame.
-  terminal.setAccessibilityEnabled(demo.input !== undefined)
-  demo.start(createContext(terminal))
-  demo.setPaused(demo.animated && (paused || document.hidden))
-  if (demo.input) terminal.focus()
+  terminal.setAccessibilityEnabled(active.input !== undefined)
+  active.setPaused(true)
+  active.start(createContext(terminal))
+  if (!waitForPaint) active.setPaused(active.animated && (paused || document.hidden))
+  if (active.input) terminal.focus()
 }
 
 async function boot(): Promise<void> {
@@ -208,7 +214,7 @@ async function boot(): Promise<void> {
     return
   }
   const fonts = loadFonts().then(() => performance.mark('ghost:fonts-ready'))
-  const frames = loadGhostFrames()
+  ghost.prepare(loadGhostFrames())
   const frame = ui.firstFrame.querySelector('.ghostty-webgpu-frame')!
   const firstFontSize = Number.parseFloat(getComputedStyle(frame).fontSize)
   const base = document.baseURI
@@ -233,7 +239,7 @@ async function boot(): Promise<void> {
     performance.mark('ghost:create-resolved')
     return instance
   })
-  const [instance, , loadedFrames] = await Promise.all([created, fonts, frames])
+  const [instance] = await Promise.all([created, fonts])
   await instance.open(ui.host)
   performance.mark('ghost:open-resolved')
   terminal = instance
@@ -245,12 +251,7 @@ async function boot(): Promise<void> {
 
   instance.onResize(() => active.resize())
   instance.onData((bytes) => active.input?.(bytes))
-  // Avoid announcing every frame of the decorative animation.
-  instance.setAccessibilityEnabled(false)
   syncTabs()
-  fitTo(active.fit)
-  ghost.prepare(loadedFrames)
-  active.setPaused(true)
   const firstPaint = instance.onFrame(() => {
     firstPaint.dispose()
     requestAnimationFrame(() => {
@@ -259,7 +260,7 @@ async function boot(): Promise<void> {
       active.setPaused(active.animated && (paused || document.hidden))
     })
   })
-  active.start(createContext(instance))
+  startActive(true)
 }
 
 boot().catch((cause: unknown) => {

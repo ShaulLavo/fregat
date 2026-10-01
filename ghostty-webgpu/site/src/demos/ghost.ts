@@ -1,6 +1,6 @@
 import { clearScreen, fg, hideCursor } from '../ansi.js'
 import { CellBuffer } from '../cells.js'
-import { loadGhostFrames, type GhostFrames } from '../ghost-frames.js'
+import type { GhostFrames } from '../ghost-frames.js'
 import { drawGhostFrame, GHOST_GRID } from '../ghost-drawing.js'
 import { dusk } from '../theme.js'
 import { AnimatedDemo } from './types.js'
@@ -22,8 +22,16 @@ export class GhostDemo extends AnimatedDemo {
   private redrawSum = 0
   private redrawFrames = 0
 
-  prepare(frames: GhostFrames): void {
-    this.frames = frames
+  prepare(frames: Promise<GhostFrames>): void {
+    frames
+      .then((loaded) => {
+        this.frames = loaded
+        this.paintStill()
+      })
+      .catch((cause: unknown) => {
+        this.failure = cause instanceof Error ? cause.message : String(cause)
+        this.paintStill()
+      })
   }
 
   protected layout(): void {
@@ -32,19 +40,7 @@ export class GhostDemo extends AnimatedDemo {
     this.redrawSampleIn = 0
     this.redrawSum = 0
     this.redrawFrames = 0
-    if (this.frames) {
-      this.frame(0, 0)
-      return
-    }
-    if (this.failure) return
-    loadGhostFrames()
-      .then((frames) => {
-        this.frames = frames
-        this.paintStill()
-      })
-      .catch((cause: unknown) => {
-        this.failure = cause instanceof Error ? cause.message : String(cause)
-      })
+    this.frame(0, 0)
   }
 
   protected frame(delta: number, elapsed: number): void {
