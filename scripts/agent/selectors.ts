@@ -66,6 +66,8 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  fileReadRetry: (page: Page) => page.getByRole('button', { name: 'Retry', exact: true }),
+  fileReadErrorHeader: (page: Page) => page.locator('header[aria-label="File read error"]'),
   chatFileFallback: (page: Page) =>
     page.getByText('Download this file to view its contents.', { exact: true }),
   fileFacts: (page: Page) => page.getByRole('region', { name: 'File facts' }),

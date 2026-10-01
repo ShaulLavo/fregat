@@ -266,6 +266,7 @@ import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorAutoClose } from './editor-auto-close'
 import { editorFormatChord } from './editor-format-chord'
 import { editorLspCompletion } from './editor-lsp-completion'
+import { editorReadRecovery } from './editor-read-recovery'
 import { editorExternalDeletion } from './editor-external-deletion'
 import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
@@ -657,6 +658,7 @@ export const scenarios: readonly Scenario[] = [
   editorDecodeReveal,
   editorDefinitionCrlf,
   editorExternalDeletion,
+  editorReadRecovery,
   fileTreeUndo,
   editorLspRenameKey,
   editorLspSignatureHelp,

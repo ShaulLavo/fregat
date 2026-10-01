@@ -48,7 +48,7 @@ export function EditorSurfaceTabBody({
   const selectedConflict = target?.kind === 'conflict' ? target : null
   const selectedReference = target?.kind === 'git-ref' ? target : null
   const resource = filesystemResource(target)
-  const { fileState, fileVersion } = useSelectedFile(resource?.path ?? null)
+  const { fileState, fileVersion, readError } = useSelectedFile(resource?.path ?? null)
   const { service: fileOpenIntent } = useFileOpenIntent()
   const selectedViewDocumentKey = useEditorDocumentState(
     (state) => state.viewsByTabId[tabId]?.documentKey ?? null,
@@ -237,6 +237,7 @@ export function EditorSurfaceTabBody({
         definitionTarget={definitionTarget ?? uiDefinitionTarget}
         fileState={fileState}
         fileVersion={fileVersion}
+        readError={readError}
         languageServerReferences={languageServerReferences}
         target={content.document}
         rootPath={rootPath}
