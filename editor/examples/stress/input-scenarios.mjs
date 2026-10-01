@@ -3,6 +3,7 @@ import { fail } from './errors.mjs'
 import { correlateInputEvents } from './input-correlation.mjs'
 import { startHostCpuEstimate } from './host-contention.mjs'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
+import { randomGenerator } from './input-paired.mjs'
 import { assertConsumerReadiness } from './input-configurations.mjs'
 
 export const operationsPerSample = {
@@ -82,6 +83,70 @@ async function runScenarioGroup(session, fixture, views, scenario, result, helpe
   return samples
 }
 
+export async function runPairedInputSuite(browser, results, helpers, seed) {
+  const random = randomGenerator(seed)
+  const schedule = []
+  for (const fixture of results.baseline.manifest.fixtures)
+    for (const views of inputViewModes)
+      for (const scenario of inputScenarios)
+        await runPairedGroup(browser, results, helpers, fixture, views, scenario, random, schedule)
+  return schedule
+}
+
+async function runPairedGroup(
+  browser,
+  results,
+  helpers,
+  fixture,
+  views,
+  scenario,
+  random,
+  schedule,
+) {
+  const sessions = {}
+  const samples = { baseline: [], candidate: [] }
+  const errors = []
+  try {
+    for (const side of ['baseline', 'candidate']) {
+      sessions[side] = await helpers.newPage(browser, side)
+      sessions[side].page.on('pageerror', (error) => errors.push(error.message))
+      await sessions[side].context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    }
+    const config = results.baseline.config
+    for (let repetition = -config.warmups; repetition < config.repetitions; repetition++) {
+      const order = random() < 0.5 ? ['baseline', 'candidate'] : ['candidate', 'baseline']
+      const pair = { group: `${fixture.id}/${views}/${scenario}`, repetition, order }
+      for (const side of order) {
+        const sample = await runSample(
+          sessions[side],
+          fixture,
+          views,
+          scenario,
+          repetition,
+          results[side],
+          helpers.readMemory,
+        )
+        if (repetition >= 0) samples[side].push(sample)
+        console.log(
+          JSON.stringify({
+            event: 'input.paired.sample',
+            ...pair,
+            side,
+            dispatchMaxMs: Math.max(...sample.latencyMs.dispatch),
+          }),
+        )
+      }
+      if (repetition >= 0) schedule.push(pair)
+    }
+    if (errors.length) fail(`Browser errors: ${errors.join('; ')}`)
+  } finally {
+    await Promise.all(Object.values(sessions).map((session) => session.context.close()))
+  }
+  for (const side of ['baseline', 'candidate'])
+    for (const sample of samples[side])
+      results[side].samples.push({ ...sample, cleanup: { ...sample.cleanup, contextClosed: true } })
+}
+
 export async function runSample(
   { page, cdp },
   fixture,
@@ -132,7 +197,12 @@ export async function runSample(
   )
   if (scenario === 'paste')
     await page.evaluate((text) => navigator.clipboard.writeText(text), pasteText)
-  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
+  if (config.readiness === 'receipt-poll' && scenario === 'undo' && opened) {
+    // Undo starts from the seeded worker source; a fixed delay can leave its parse pending.
+    await waitForConsumerSource(page)
+  } else if (config.readiness !== 'receipt-poll' || scenario === 'undo') {
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
+  }
   const before = await page.locator('#view-0').screenshot({ animations: 'disabled' })
   let completed
   try {
@@ -152,7 +222,9 @@ export async function runSample(
     if (views === 'multiple')
       await expect(page.locator('#view-2 [data-editor-virtual-row]').first()).toBeVisible()
     const rendered = await page.evaluate(() => __stress.inputLatency.verifyRendered())
-    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
+    if (config.readiness !== 'receipt-poll')
+      await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
+    if (config.readiness === 'receipt-poll' && opened) await waitForConsumerSource(page)
     const settled = opened
       ? await settleConsumers(page, consumerId, fixture, views, scenario, opened)
       : null
@@ -213,7 +285,9 @@ export async function runSample(
         }),
       }),
     )
-    await page.screenshot({ path: '/work/tmp/editor-e002/failure.png' }).catch(() => {})
+    await page
+      .screenshot({ path: `${config.failureDirectory ?? '/work/tmp/editor-e002'}/failure.png` })
+      .catch(() => {})
     throw error
   } finally {
     if (scenario.startsWith('composition-'))
@@ -305,4 +379,21 @@ async function settleConsumers(page, consumerId, fixture, views, scenario, opene
     opened,
   )
   return readiness
+}
+
+export async function waitForConsumerSource(page) {
+  // waitForFunction treats an async predicate's Promise as a successful poll.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const state = await __stress.settleConsumers()
+          return (
+            state.sessions.every((session) => session.current && session.answered) &&
+            state.minimaps.every((minimap) => minimap.current && minimap.renderedAfterSource)
+          )
+        }),
+      { timeout: 30_000, intervals: [50] },
+    )
+    .toBe(true)
 }

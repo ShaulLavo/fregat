@@ -121,9 +121,9 @@ independent holdout, delayed-negative admission and candidate blocking checks.
 
 The owner ended the remaining absolute-threshold matrix and planned phase sweep.
 [282](../plans/282-fast-paired-input-latency-check.md) owns the paired replacement instrument
-and replaces that input-latency gate; it does not authorize 099 units 2–7. Historical invalid
+and implements that input-latency gate; its acceptance remains blocked. It does not authorize 099 units 2–7. Historical invalid
 and superseded runs remain evidence in the
-[calibration record](document-contributions/native-input-calibration.md). The merged harness
+[historical reference](document-contributions/paired-input-latency.md#historical-reference). The merged harness
 repairs have a new instrument identity; the five accepted historical configurations were not
 rerun or revalidated with it. Its earlier receipt-coverage and unbounded-readiness limits stay
 explicit. There is no full-matrix, combined-consumer/Platform latency or measured improvement

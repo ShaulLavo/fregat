@@ -1,14 +1,12 @@
-import { spawnSync } from 'node:child_process'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { correlateInputEvents } from '../input-correlation.mjs'
-import { compareInputProof } from '../input-proof.mjs'
 import {
-  calibrateInput,
-  compareInput,
+  comparePairedInput,
+  pairedInterval,
+  sensitivityPassed,
+  touchedConfigurations,
+} from '../input-paired.mjs'
+import {
   inputScenarios,
   inputViewModes,
   summarizeInputResult,
@@ -155,38 +153,12 @@ function eventSemantics(scenario) {
   return { eventType: 'keydown', inputType: 'keydown' }
 }
 
-function resultWithTimingRange(id) {
-  const run = result(id, 3)
-  for (const sample of run.samples) {
-    if (sample.repetition !== 0) continue
-    const first = event(sample.scenario, 0, 1)
-    sample.observation.events[0] = first
-    sample.latencyMs.inputToApplied[0] = first.appliedAt - first.at
-    sample.latencyMs.dispatch[0] = first.completedAt - first.dispatchAt
-    sample.latencyMs.inputToFrame[0] = first.frameAt - first.at
-  }
-  return run
-}
-
-function controls() {
-  return [result(), result('control-2', 11), result('control-3', 9)]
-}
-
 function delayScreenshots(run, delayMs) {
   for (const sample of run.samples) {
     sample.observation.paint.completedAt += delayMs
     sample.latencyMs.burstToPaintUpperBound[0] += delayMs
   }
   return run
-}
-
-function delayFrames(run, delayMs) {
-  for (const sample of run.samples) {
-    for (const event of sample.observation.events) event.frameAt += delayMs
-    sample.latencyMs.inputToFrame = sample.latencyMs.inputToFrame.map((value) => value + delayMs)
-    sample.observation.paint.startedAt += delayMs
-  }
-  return delayScreenshots(run, delayMs)
 }
 
 function enableDiagnostics(run) {
@@ -777,388 +749,219 @@ describe('input latency result contract', () => {
   })
 })
 
-describe('input latency calibration', () => {
-  it('uses the full observed control range when the median and p95 hide faster observations', () => {
-    const runs = [1, 2, 3].map((id) => resultWithTimingRange(`control-${id}`))
-    const calibration = calibrateInput(runs)
-    const comparison = compareInput(runs[0], result('holdout', 4), calibration)
-    expect(comparison.passed).toBe(true)
-    expect(calibration.limits['ordinary/single/typing/dispatch']).toEqual({
-      p95Ms: 5,
-      noiseMarginMs: 2,
-      controlP50Ms: [3, 3, 3],
-      controlP95Ms: [3, 3, 3],
-      controlMinMs: [1, 1, 1],
-      controlMaxMs: [3, 3, 3],
+function pairedResults(duration = 10) {
+  const baseline = result('baseline')
+  const candidate = result('candidate', duration)
+  for (const run of [baseline, candidate]) {
+    Object.assign(run.environment, {
+      instrumentHash: 'b'.repeat(64),
+      instrumentExternal: 'c'.repeat(64),
+      packageSet: {
+        sourceHash: 'd'.repeat(64),
+        buildHash: 'e'.repeat(64),
+        externalHash: 'a'.repeat(64),
+      },
     })
-    expect(
-      comparison.metrics.find((metric) => metric.key === 'ordinary/single/typing/dispatch').baseline
-        .rawSamples,
-    ).toEqual([1, 3, 3, 3])
-    expect(compareInput(runs[0], result('boundary', 5), calibration).passed).toBe(true)
-    expect(compareInput(runs[0], result('regression', 5.1), calibration).passed).toBe(false)
-  })
-
-  it('rejects every 20 ms delayed dispatch group after calibrating observed ranges', () => {
-    const runs = [1, 2, 3].map((id) => resultWithTimingRange(`control-${id}`))
-    const delayed = result('delayed', 23)
-    delayed.config.slowdownMs = 20
-    const comparison = compareInput(runs[0], delayed, calibrateInput(runs), { allowSlowdown: true })
-    const dispatch = comparison.metrics.filter((metric) => metric.key.endsWith('/dispatch'))
-    expect(comparison.passed).toBe(false)
-    expect(dispatch).toHaveLength(36)
-    expect(dispatch.every((metric) => metric.blocking && !metric.passed)).toBe(true)
-  })
-
-  it.each(['controlMinMs', 'controlMaxMs'])('rejects tampered %s evidence', (field) => {
-    const runs = [1, 2, 3].map((id) => resultWithTimingRange(`control-${id}`))
-    const calibration = calibrateInput(runs)
-    calibration.limits['ordinary/single/typing/dispatch'][field][0] += 0.25
-    expect(() => compareInput(runs[0], result('candidate'), calibration)).toThrow(
-      /calibration derived from raw controls/,
+    run.config.repetitions = 3
+    run.samples.push(
+      ...run.samples
+        .filter((sample) => sample.repetition === 0)
+        .map((sample) => ({ ...structuredClone(sample), repetition: 2 })),
     )
-  })
+  }
+  const schedule = baseline.samples.map((sample) => ({
+    group: `${sample.fixture}/${sample.views}/${sample.scenario}`,
+    repetition: sample.repetition,
+    order: ['baseline', 'candidate'],
+  }))
+  return { baseline, candidate, schedule }
+}
 
-  it('reports screenshot-only timing excesses as advisory without changing their limits or samples', () => {
-    const runs = controls()
-    const calibration = calibrateInput(runs)
-    const originalCalibration = JSON.stringify(calibration)
-    const candidate = delayScreenshots(result('candidate'), 50)
-    const comparison = compareInput(runs[0], candidate, calibration)
-    const advisory = comparison.metrics.filter((metric) => !metric.blocking)
-    const blocking = comparison.metrics.filter((metric) => metric.blocking)
-    expect(comparison.passed).toBe(true)
-    expect(advisory).toHaveLength(36)
+describe('paired input latency', () => {
+  it('passes identical products and reports all 108 blocking and 36 advisory groups', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    const check = comparePairedInput(baseline, candidate, schedule, 60061)
+    expect(check.passed).toBe(true)
+    expect(check.metrics.filter((metric) => metric.blocking)).toHaveLength(108)
+    expect(check.metrics.filter((metric) => !metric.blocking)).toHaveLength(36)
     expect(
-      advisory.every((metric) => metric.key.endsWith('/burstToPaintUpperBound') && !metric.passed),
+      check.metrics.every((metric) => metric.differenceMs === 0 && metric.interval.lowMs === 0),
     ).toBe(true)
-    expect(blocking).toHaveLength(108)
-    expect(blocking.every((metric) => metric.passed)).toBe(true)
-    expect(advisory[0].rawSamples).toEqual([1063, 1063])
-    expect(JSON.stringify(calibration)).toBe(originalCalibration)
   })
 
-  it('rejects incorrect screenshots even when screenshot timing is advisory', () => {
-    const runs = controls()
-    const candidate = delayScreenshots(result('candidate'), 50)
-    candidate.samples[0].observation.paint.imageChanged = false
-    expect(() => compareInput(runs[0], candidate, calibrateInput(runs))).toThrow(
-      /missing or unchanged pixels/,
-    )
+  it('detects injected delay and accepts changed product bytes', () => {
+    const { baseline, candidate, schedule } = pairedResults(30)
+    candidate.config.slowdownMs = 20
+    candidate.environment.sourceHash = 'f'.repeat(64)
+    const check = comparePairedInput(baseline, candidate, schedule, 60061)
+    expect(check.passed).toBe(false)
+    expect(sensitivityPassed(check)).toBe(true)
+    expect(
+      check.metrics.every((metric) => metric.differenceMs === 20 && metric.interval.lowMs === 20),
+    ).toBe(true)
   })
 
-  it('keeps slow frame observations blocking even when screenshot timing is advisory', () => {
-    const runs = controls()
-    const candidate = delayFrames(result('candidate'), 50)
-    const comparison = compareInput(runs[0], candidate, calibrateInput(runs))
-    const failures = comparison.metrics.filter((metric) => metric.blocking && !metric.passed)
-    expect(comparison.passed).toBe(false)
-    expect(failures).toHaveLength(36)
-    expect(failures.every((metric) => metric.key.endsWith('/inputToFrame'))).toBe(true)
+  it('resamples repetitions, not correlated operations, and includes zero for mixed pairs', () => {
+    expect(pairedInterval([-3, 4, 20], 17)).toEqual({
+      confidence: 0.95,
+      lowMs: -3,
+      highMs: 20,
+      draws: 10000,
+    })
+    expect(pairedInterval([20, 20, 20], 17).lowMs).toBe(20)
+    expect(() => pairedInterval([20, 20], 17)).toThrow(/three/)
   })
 
-  it('keeps the 20 ms delayed dispatch control blocking', () => {
-    const runs = controls()
-    const delayed = result('delayed', 30)
-    delayed.config.slowdownMs = 20
-    const comparison = compareInput(runs[0], delayed, calibrateInput(runs), { allowSlowdown: true })
-    const dispatch = comparison.metrics.filter((metric) => metric.key.endsWith('/dispatch'))
-    expect(comparison.passed).toBe(false)
-    expect(dispatch).toHaveLength(36)
-    expect(dispatch.every((metric) => metric.blocking && !metric.passed)).toBe(true)
+  it('never lets advisory timing fail the run', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    delayScreenshots(candidate, 100)
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    expect(check.passed).toBe(true)
+    expect(
+      check.metrics.filter((metric) => !metric.blocking).every((metric) => !metric.passed),
+    ).toBe(true)
   })
 
-  it.each([
-    [0.2000000011175871, 0.20000000298023224],
-    [1.900000000372529, 1.9000000022351742],
-  ])(
-    'accepts timestamp rounding at the %s ms limit without changing it',
-    (limitMs, candidateMs) => {
-      const runs = [1, 2, 3].map((id) => result(`control-${id}`, limitMs))
-      const calibration = calibrateInput(runs)
-      const originalCalibration = JSON.stringify(calibration)
-      const comparison = compareInput(runs[0], result('candidate', candidateMs), calibration)
-      const dispatch = comparison.metrics.find(
-        (metric) => metric.key === 'ordinary/single/typing/dispatch',
+  it('rejects a missing or duplicated pair and malformed evidence', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    expect(() => comparePairedInput(baseline, candidate, schedule.slice(1), 17)).toThrow(/schedule/)
+    schedule[0] = schedule[1]
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/duplicate/)
+    candidate.samples.pop()
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/Missing samples/)
+  })
+
+  it('cancels load shared by each pair without treating operations as independent pairs', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    for (const run of [baseline, candidate]) {
+      run.samples = [10, 110, 510].flatMap((duration, repetition) =>
+        result(run.id, duration)
+          .samples.filter((sample) => sample.repetition === 0)
+          .map((sample) => ({ ...sample, repetition })),
       )
-      expect(dispatch.limit.p95Ms).toBe(limitMs)
-      expect(dispatch.p95Ms).toBe(candidateMs)
-      expect(dispatch.rawSamples).toEqual([candidateMs, candidateMs, candidateMs, candidateMs])
-      expect(comparison.passed).toBe(true)
-      expect(comparison.comparisonEpsilonMs).toBe(0.000001)
-      expect(JSON.stringify(calibration)).toBe(originalCalibration)
+    }
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    expect(check.passed).toBe(true)
+    expect(
+      check.metrics.every((metric) => metric.differences.length === 3 && metric.differenceMs === 0),
+    ).toBe(true)
+  })
+
+  it('requires the budget and confidence conditions together', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    candidate.samples = [11, 11, 9].flatMap((duration, repetition) =>
+      result(candidate.id, duration)
+        .samples.filter((sample) => sample.repetition === 0)
+        .map((sample) => ({ ...sample, repetition })),
+    )
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    expect(check.passed).toBe(true)
+    expect(check.metrics.find((metric) => metric.key.endsWith('/dispatch')).differenceMs).toBe(1)
+    expect(check.metrics.find((metric) => metric.key.endsWith('/dispatch')).interval.lowMs).toBe(-1)
+  })
+
+  it('keeps a significant difference within its existing noise budget advisory to acceptance', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    for (const [run, delay] of [
+      [baseline, 0],
+      [candidate, 1],
+    ]) {
+      run.samples = [10, 11, 10].flatMap((duration, repetition) =>
+        result(run.id, duration + delay)
+          .samples.filter((sample) => sample.repetition === 0)
+          .map((sample) => ({ ...sample, repetition })),
+      )
+    }
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    expect(check.passed).toBe(true)
+    const dispatch = check.metrics.find((metric) => metric.key.endsWith('/dispatch'))
+    expect(dispatch.differenceMs).toBe(1)
+    expect(dispatch.interval.lowMs).toBe(1)
+    expect(dispatch.budgetMs).toBe(3)
+  })
+
+  it('rejects a pair order that does not run each side exactly once', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    schedule[0].order = ['baseline', 'baseline']
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/pair order/)
+  })
+
+  it.each(['instrumentHash', 'instrumentExternal', 'packageSet'])(
+    'requires a complete %s receipt on both sides',
+    (field) => {
+      const { baseline, candidate, schedule } = pairedResults()
+      delete baseline.environment[field]
+      delete candidate.environment[field]
+      expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/receipt/)
     },
   )
 
-  it.each([0.000002, 0.1])('rejects a %s ms excess beyond timestamp tolerance', (excessMs) => {
-    const limitMs = 0.2000000011175871
-    const runs = [1, 2, 3].map((id) => result(`control-${id}`, limitMs))
-    const comparison = compareInput(
-      runs[0],
-      result('candidate', limitMs + excessMs),
-      calibrateInput(runs),
-    )
-    expect(comparison.passed).toBe(false)
-    expect(
-      comparison.metrics
-        .filter((metric) => metric.key.endsWith('/dispatch'))
-        .every((metric) => !metric.passed),
-    ).toBe(true)
+  it('rejects differing external bytes in valid frozen-product receipts', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    candidate.environment.packageSet.externalHash = 'f'.repeat(64)
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/external/)
   })
 
-  it('derives a local p95 noise envelope and detects a real-delay workload variant', () => {
-    const runs = controls()
-    const calibration = calibrateInput(runs)
-    expect(calibration.limits['ordinary/single/typing/dispatch']).toEqual({
-      p95Ms: 17,
-      noiseMarginMs: 6,
-      controlP50Ms: [10, 11, 9],
-      controlP95Ms: [10, 11, 9],
-      controlMinMs: [10, 11, 9],
-      controlMaxMs: [10, 11, 9],
-    })
-    expect(calibration.controlRuns).toBe(runs)
-    expect(compareInput(runs[0], result('rerun'), calibration).passed).toBe(true)
-    const delayed = result('delayed', 100)
-    delayed.config.slowdownMs = 90
-    expect(() => compareInput(runs[0], delayed, calibration)).toThrow(/workload/)
-    const regression = compareInput(runs[0], delayed, calibration, { allowSlowdown: true })
-    expect(regression.passed).toBe(false)
-    expect(regression.kind).toBe('delayed-control')
-    expect(regression.metrics.every((metric) => !metric.passed)).toBe(true)
-    expect(regression.metrics[0].limitToControlP95Ratio).toBeCloseTo(17 / 11)
+  it('requires identical instrument, fixture and external bytes', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    candidate.environment.instrumentHash = 'f'.repeat(64)
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/instrument source/)
   })
 
+  it('derives the default composition from changed package identities', () => {
+    const packages = ['core', 'tree-sitter', 'minimap'].map((name) => ({
+      name: `@singapore-editor/${name}`,
+      sourceHash: 'a',
+      buildHash: 'a',
+    }))
+    const baseline = { manifest: { packages } }
+    expect(touchedConfigurations(baseline, baseline)).toEqual(['platform'])
+    const candidate = {
+      manifest: { packages: packages.map((entry) => ({ ...entry, sourceHash: 'b' })) },
+    }
+    expect(touchedConfigurations(baseline, candidate)).toEqual([
+      'platform',
+      'native',
+      'disabled',
+      'tree-sitter',
+      'shiki',
+      'minimap',
+      'tree-sitter-shiki',
+      'tree-sitter-minimap',
+      'shiki-minimap',
+      'all',
+    ])
+  })
   it.each([
     [
-      'browser',
-      (run) => {
-        run.environment.browser.version = '2'
-      },
-      /browser/,
+      'textbuffer',
+      [
+        'platform',
+        'native',
+        'disabled',
+        'tree-sitter',
+        'shiki',
+        'minimap',
+        'tree-sitter-shiki',
+        'tree-sitter-minimap',
+        'shiki-minimap',
+        'all',
+      ],
     ],
     [
-      'hardware',
-      (run) => {
-        run.environment.hardware.cpu = 'other'
-      },
-      /hardware/,
+      'tree-sitter-languages',
+      ['platform', 'native', 'tree-sitter', 'tree-sitter-shiki', 'tree-sitter-minimap', 'all'],
     ],
-    [
-      'runtime',
-      (run) => {
-        run.environment.runtime = 'v25.0.0'
-      },
-      /runtime/,
-    ],
-    [
-      'manifest',
-      (run) => {
-        run.manifest.seed = 2
-      },
-      /fixture manifests/,
-    ],
-    [
-      'diagnostics',
-      (run) => {
-        enableDiagnostics(run)
-      },
-      /workload/,
-    ],
-    [
-      'warmup count',
-      (run) => {
-        run.config.warmups = 2
-      },
-      /workload/,
-    ],
-    [
-      'new workload option',
-      (run) => {
-        run.config.pasteText = 'different'
-      },
-      /workload/,
-    ],
-  ])('rejects incomparable %s even for delay controls', (_label, mutate, error) => {
-    const runs = controls()
-    const candidate = result('candidate')
-    candidate.config.slowdownMs = 1
-    mutate(candidate)
-    expect(() =>
-      compareInput(runs[0], candidate, calibrateInput(runs), { allowSlowdown: true }),
-    ).toThrow(error)
-  })
-
-  it('allows a changed candidate source while controls must share the same source', () => {
-    const runs = controls()
-    const candidate = result('candidate')
-    candidate.environment.commit = 'c'.repeat(40)
-    candidate.environment.sourceHash = 'd'.repeat(64)
-    expect(compareInput(runs[0], candidate, calibrateInput(runs)).passed).toBe(true)
-    runs[1].environment.sourceHash = candidate.environment.sourceHash
-    expect(() => calibrateInput(runs)).toThrow(/control source trees/)
-  })
-
-  it('rejects reused, insufficient, changed-commit and delayed controls', () => {
-    expect(() => calibrateInput([result()])).toThrow(/three independent/)
-    expect(() => calibrateInput([result(), result(), result()])).toThrow(/distinct/)
-    const changed = controls()
-    changed[1].environment.commit = 'different'
-    expect(() => calibrateInput(changed)).toThrow(/control commits/)
-    const delayed = controls()
-    for (const run of delayed) run.config.slowdownMs = 1
-    expect(() => calibrateInput(delayed)).toThrow(/clean controls/)
-  })
-
-  it('recomputes calibration from raw controls and rejects altered limits and baseline data', () => {
-    const runs = controls()
-    const calibration = calibrateInput(runs)
-    calibration.limits['ordinary/single/typing/dispatch'].p95Ms = 1000
-    expect(() => compareInput(runs[0], result('candidate'), calibration)).toThrow(
-      /derived from raw controls/,
-    )
-    const missing = calibrateInput(runs)
-    delete missing.limits['ordinary/single/typing/dispatch']
-    expect(() => compareInput(runs[0], result('candidate'), missing)).toThrow(
-      /derived from raw controls/,
-    )
-    expect(() =>
-      compareInput(result('unknown'), result('candidate'), calibrateInput(runs)),
-    ).toThrow(/identify this baseline/)
-    expect(() =>
-      compareInput(result('control-1', 12), result('candidate'), calibrateInput(runs)),
-    ).toThrow(/baseline observations/)
-  })
-
-  it('requires a held-out run and an actual configured delay for the positive control', () => {
-    const runs = controls()
-    const calibration = calibrateInput(runs)
-    expect(() => compareInput(runs[0], runs[1], calibration)).toThrow(/independent run/)
-    expect(() =>
-      compareInput(runs[0], result('candidate'), calibration, { allowSlowdown: true }),
-    ).toThrow(/injected delay/)
-  })
-})
-
-it('CLI writes a reproducible calibration and returns nonzero for the delayed candidate', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'editor-input-gate-test-'))
-  try {
-    await checkCli(directory)
-  } finally {
-    await rm(directory, { recursive: true, force: true })
-  }
-})
-
-async function checkCli(directory) {
-  const runs = controls()
-  const delayed = result('delayed', 100)
-  delayed.config.slowdownMs = 90
-  const all = [...runs, result('rerun'), delayed]
-  await Promise.all(
-    all.map((run) => writeFile(join(directory, `${run.id}.json`), JSON.stringify(run))),
+    ['minimap', ['platform', 'minimap', 'tree-sitter-minimap', 'shiki-minimap', 'all']],
+    ['find', ['platform', 'native']],
+  ])(
+    'includes every consuming composition for changed %s bytes and removed packages',
+    (name, expected) => {
+      const entry = { name: `@singapore-editor/${name}`, sourceHash: 'a', buildHash: 'a' }
+      const baseline = { manifest: { packages: [entry] } }
+      const candidate = { manifest: { packages: [{ ...entry, buildHash: 'b' }] } }
+      expect(touchedConfigurations(baseline, candidate)).toEqual(expected)
+      expect(touchedConfigurations(baseline, { manifest: { packages: [] } })).toEqual(expected)
+    },
   )
-  const script = fileURLToPath(new URL('../input-compare.mjs', import.meta.url))
-  const invoke = (...args) =>
-    spawnSync(process.execPath, [script, ...args], {
-      cwd: directory,
-      encoding: 'utf8',
-      maxBuffer: 4_000_000,
-    })
-  const calibrationPath = join(directory, 'calibration.json')
-  expect(invoke('calibrate', calibrationPath, ...runs.map((run) => `${run.id}.json`)).status).toBe(
-    0,
-  )
-  expect(JSON.parse(await readFile(calibrationPath, 'utf8'))).toEqual(calibrateInput(runs))
-  const rerun = invoke('check', 'control-1.json', 'rerun.json', calibrationPath)
-  expect(rerun.status).toBe(0)
-  expect(JSON.parse(rerun.stdout).passed).toBe(true)
-  const regression = invoke(
-    'check',
-    'control-1.json',
-    'delayed.json',
-    calibrationPath,
-    '--allow-slowdown',
-  )
-  expect(regression.status).toBe(1)
-  expect(JSON.parse(regression.stdout).passed).toBe(false)
-  expect(invoke('check', 'control-1.json', 'delayed.json', calibrationPath).status).not.toBe(0)
-  expect(invoke('calibrate', calibrationPath, 'control-1.json').status).not.toBe(0)
-}
-
-describe('instrument and package pairing', () => {
-  const identity = (run, { instrument = 'i', source = 's', build = 'b', external = 'e' } = {}) => {
-    run.environment.instrumentHash = instrument.repeat(64)
-    run.environment.packageSet = {
-      sourceHash: source.repeat(64),
-      buildHash: build.repeat(64),
-      externalHash: external.repeat(64),
-    }
-    return run
-  }
-  const paired = () => controls().map((run) => identity(run))
-
-  it('the proof caller accepts changed candidate bytes with baseline holdout and delayed bytes', () => {
-    const runs = paired()
-    const holdout = identity(result('holdout'))
-    const candidate = identity(result('candidate'), { source: 't', build: 'c' })
-    candidate.environment.sourceHash = 'c'.repeat(64)
-    const delayed = identity(result('delayed', 30))
-    delayed.config.slowdownMs = 20
-    const proof = compareInputProof(runs, holdout, candidate, delayed)
-    expect(proof.holdout.passed).toBe(true)
-    expect(proof.candidateResult.passed).toBe(true)
-    expect(proof.positive.passed).toBe(false)
-  })
-
-  it('the proof caller rejects a changed holdout build even when its source is unchanged', () => {
-    const runs = paired()
-    const holdout = identity(result('holdout'), { build: 'c' })
-    const candidate = identity(result('candidate'))
-    const delayed = identity(result('delayed', 30))
-    delayed.config.slowdownMs = 20
-    expect(() => compareInputProof(runs, holdout, candidate, delayed)).toThrow(
-      /holdout or delayed control package identity/,
-    )
-  })
-
-  it('the proof caller rejects candidate-build delayed bytes and mismatched delayed source', () => {
-    const runs = paired()
-    const holdout = identity(result('holdout'))
-    const candidate = identity(result('candidate'), { source: 't', build: 'c' })
-    const delayed = identity(result('delayed', 30), { source: 't', build: 'c' })
-    delayed.config.slowdownMs = 20
-    expect(() => compareInputProof(runs, holdout, candidate, delayed)).toThrow(
-      /holdout or delayed control package identity/,
-    )
-    identity(delayed)
-    delayed.environment.sourceHash = 'd'.repeat(64)
-    expect(() => compareInputProof(runs, holdout, candidate, delayed)).toThrow(
-      /Delayed control source differs from baseline/,
-    )
-  })
-
-  it('rejects controls from different instruments or baseline builds', () => {
-    const mixedInstrument = paired()
-    identity(mixedInstrument[2], { instrument: 'j' })
-    expect(() => calibrateInput(mixedInstrument)).toThrow(/instrument source/)
-    const mixedBuild = paired()
-    identity(mixedBuild[1], { build: 'c' })
-    expect(() => calibrateInput(mixedBuild)).toThrow(/control package builds/)
-  })
-
-  it('requires the calibrated build for a holdout and lets only a candidate change the product', () => {
-    const runs = paired()
-    const calibration = calibrateInput(runs)
-    const otherBuild = identity(result('other-build', 10), { source: 't', build: 'c' })
-    expect(() => compareInput(runs[0], otherBuild, calibration, { sameBuild: true })).toThrow(
-      /holdout or delayed control package identity/,
-    )
-    expect(compareInput(runs[0], otherBuild, calibration).passed).toBe(true)
-    const otherExternal = identity(result('other-external', 10), { build: 'c', external: 'f' })
-    expect(() => compareInput(runs[0], otherExternal, calibration)).toThrow(
-      /external dependency bytes/,
-    )
-    const otherInstrument = identity(result('other-instrument', 10), { instrument: 'j' })
-    expect(() => compareInput(runs[0], otherInstrument, calibration)).toThrow(/instrument source/)
-  })
 })

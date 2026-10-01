@@ -216,12 +216,7 @@ The review corrections passed these focused checks:
   metrics, and rendering transitions. Editor and stress typechecks, focused lint, and repository
   formatting passed.
 
-Replay the saved benchmark acceptance proof from the repository root:
-
-```sh
-bun run --cwd examples/stress input:proof
-```
-
-The [runner instructions](../../examples/stress/README.md#input-latency-budgets) explain how to
-collect new controls and a candidate. The [result reference](../../examples/stress/results/input-latency/README.md)
+The saved results retain the historical absolute-calibration acceptance proof.
+The [runner instructions](../../examples/stress/README.md#input-latency-budgets) now use
+`bench:input:paired` to compare fresh baseline and candidate package sets. The [result reference](../../examples/stress/results/input-latency/README.md)
 records the measured source hash and retains all raw distributions.

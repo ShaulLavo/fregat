@@ -10,7 +10,7 @@ Closeout, 2026-10-01: unit 0 is partial, **5/10 configurations calibrated** at i
 The harness is delivered; `native`, `disabled`, `tree-sitter`, `shiki` and `minimap` are accepted.
 `tree-sitter-shiki` failed its holdout; four other configurations never ran. The remaining
 absolute-threshold matrix is superseded by **Plan 282's paired A/B instrument**. Units 2–7 remain
-gated. See [the calibration closeout](native-input-calibration.md) for results and evidence.
+gated. See [the historical reference](paired-input-latency.md#historical-reference) for results and evidence.
 
 Probe scripts and raw output live in `/work/tmp/research/099/`: `scan.ts` (inventory scan) and
 `inventory.tsv` (its 296 rows), `publication.ts` and `publication.json`, `head-read.ts`, and
@@ -270,7 +270,7 @@ Generic source bookkeeping each consumer owns today, which the runtime replaces:
 ## Not done
 
 Historical limits of the 2026-09-25 research pass. The harness and partial calibration were delivered
-later; their current status is [recorded separately](native-input-calibration.md).
+later; their current status is [recorded separately](paired-input-latency.md).
 
 - **Harness extension.** The plan puts consumer configurations, readiness assertions and frozen
   fixture files into `examples/stress` before any baseline. That is Editor code, which this research

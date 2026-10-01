@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: APPROVED 2026-10-01 by the owner, who asked for a faster instrument with the same
+- Status: Approved; acceptance blocked. Authorized 2026-10-01 by the owner, who asked for a faster instrument with the same
   results after Plan 099 unit 0's calibration ran all night.
 - Replaces the absolute-threshold calibration as the input-latency gate for Plan 099 units 2–7
   (still gated) and any other change that can slow typing.
@@ -48,8 +48,8 @@ input delay fails. It does not need exclusive CPUs or a quiet machine to stay co
 
 ## Steps
 
-1. Build the paired runner on the existing input-latency suite (`run.mjs --suite input-latency`,
-   `input-compare.mjs`), reusing scenarios, measure groups and budgets. One command:
+1. Build the paired runner on the existing input-latency suite (`run.mjs --suite input-latency`),
+   reusing scenarios, measure groups and budgets. One command:
    `bun run bench:input:paired --baseline <packages> --candidate <packages> [--full]`.
 2. **Validate against the old results** on native, disabled, tree-sitter, shiki and minimap: the
    unchanged candidate passes, the 20 ms delayed candidate fails in every group the old negative
@@ -72,3 +72,43 @@ Validation runs are measurements: run them when no other heavy work is on the ma
   background load.
 - Default matrix ≤ 15 minutes and full matrix ≤ 45 minutes on this machine, measured.
 - Plan 099 and the stress README use it, and the replaced calibration commands are gone.
+
+## Execution checklist
+
+- [x] Implement paired sampling, raw receipts, bootstrap comparison, and sensitivity caching.
+- [x] Restore matching frozen products without changing historical evidence.
+- [x] Replace the gate instructions and obsolete calibration commands.
+- [x] Pass the real 20 ms sensitivity self-check for the final instrument.
+- [x] Reproduce the frozen minimap undo failure on both products and check replay against its worker.
+- [x] Include every affected consumer composition and package removal in matrix inference.
+- [ ] Compare all five historical positive and negative verdicts without load.
+- [ ] Repeat with background load on CPUs 8–15.
+- [ ] Measure the default and full matrices.
+- [x] Record completed native/disabled diagnostics and the blocked acceptance evidence.
+- [x] Run final repository gates, typecheck, formatting, stress tests, and lint.
+- [ ] Commit by path, push, and open the draft PR.
+
+The owner requires this worker to do the implementation and review itself, so the independent
+reviewer step above is skipped. Measurement artifacts are under `/work/tmp/plan-282/`.
+
+## Acceptance blocker
+
+The supported short-lines fixture exposes a wrong-line-count minimap undo patch in both frozen
+historical products. The worker replaces one summary with four and ends with 500,003 summaries
+for a 500,000-line document. The final text length and accepted render are correct, so neither
+proves source correctness. Raw isolated captures and the aborted quiet matrix are under
+`/work/tmp/plan-282/`; [the validation record](../docs/document-contributions/paired-input-latency.md#validation)
+records the exact patch, prior passes, and timing limits.
+
+The final quiet native negative also misses one historical preedit-frame key: a 9.5 ms positive
+effect passes a recomputed 14.1 ms budget, where the historical budget was 5.9 ms. Disabled matches
+all 47 historical negative keys. Reusing the formula does not preserve every declared historical
+budget or verdict. This remains an acceptance failure.
+
+The required historical products stay frozen, and correctness checks stay strict. Native and
+disabled quiet/loaded diagnostics are complete: both unchanged candidates pass, and both delayed
+candidates reject all 36 dispatch keys. Native matches 46/47 historical negative keys without
+load and 45/47 with load; disabled matches 47/47 in both cases. Both frozen minimap products
+also reproduce the source failure under the same-core load. The remaining five-configuration
+acceptance sequence and completed default/full timing measurements remain blocked. This plan
+has not delivered an accepted gate. The implementation is published as a draft PR for follow-up.

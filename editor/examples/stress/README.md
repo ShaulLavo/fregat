@@ -301,111 +301,60 @@ Use the complete input suite below for budget comparisons.
 
 ## Input latency budgets
 
-The absolute-threshold workflow below is the delivered historical instrument. Plan 282 replaces
-its verdict with a paired A/B instrument. PR #224 closed the existing matrix as partial; these
-commands document reusable collection and are not a request to repeat that matrix.
+The paired command is implemented. Plan 282 acceptance is blocked by a source-correctness
+failure in both frozen historical minimap products, a historical negative-key disagreement, and
+incomplete timing validation.
+Use it for diagnostics while the [acceptance record](../../../docs/document-contributions/paired-input-latency.md#validation)
+remains incomplete. Plan 099 units 2–7 remain gated.
 
-Run the following in Bash from the Editor workspace (`editor/` in Platform). Input runs require
-all built public packages, their external-dependency receipt and a frozen fixture manifest. A
-core-only directory cannot supply that identity. Before building or freezing, verify that `/work`
-is mounted and has free space. Use a new, empty run directory for each collection:
+Compare complete frozen package sets with one command from the Platform or Editor root:
+
+```sh
+export PATH=$HOME/.local/share/mise/shims:$PATH
+bash /work/tmp/wave-heavy/run.sh p282-candidate -- env PATH="$PATH" \
+  bun run bench:input:paired --baseline /work/tmp/plan-282/baseline \
+  --candidate /work/tmp/plan-282/candidate
+```
+
+The default matrix runs Platform's composition plus configurations inferred from changed package
+hashes, including combined consumers. Core and text-buffer changes select all ten configurations.
+Declare affected configurations with `--configurations tree-sitter,minimap`. Use `--full`
+for all ten configurations. A focused `--only native,disabled` run is diagnostic.
+
+Before freezing either package set, verify `/work` is mounted and has free space. Build the public
+packages through the heavy-job wrapper. From the Editor root, freeze each product revision:
 
 ```sh
 findmnt --target /work
 df -h /work
-run_root=$(mktemp -d /work/tmp/editor-input-XXXXXX)
-bun run build
-node examples/stress/fixtures.mjs "$run_root/fixtures"
-
-freeze_input_packages() {
-  node examples/stress/package-set.mjs "$PWD/packages" "$run_root/$1" \
-    "$(git rev-parse HEAD)" \
-    "$(git diff HEAD --binary -- packages | sha256sum | cut -d ' ' -f 1)" \
-    "$(sha256sum ../bun.lock | cut -d ' ' -f 1)"
-}
-freeze_input_packages baseline
-
-run_input() {
-  local packages=$1
-  shift
-  node examples/stress/run.mjs --suite input-latency \
-    --packages-directory "$run_root/$packages" --fixture-directory "$run_root/fixtures" \
-    --consumers native "$@"
-}
-run_input baseline --repetitions 1 --output "$run_root/before.json.gz"
-run_input baseline --repetitions 3 --output "$run_root/control-1.json.gz"
-run_input baseline --repetitions 3 --output "$run_root/control-2.json.gz"
-run_input baseline --repetitions 3 --output "$run_root/control-3.json.gz"
-run_input baseline --repetitions 3 --output "$run_root/rerun.json.gz"
+bash /work/tmp/wave-heavy/run.sh p282-build -- env PATH="$PATH" bun run build
+node examples/stress/package-set.mjs "$PWD/packages" /work/tmp/plan-282/baseline \
+  "$(git rev-parse HEAD)" \
+  "$(git diff HEAD --binary -- packages | sha256sum | cut -d ' ' -f 1)" \
+  "$(sha256sum ../bun.lock | cut -d ' ' -f 1)"
 ```
 
-The freeze command takes the source package directory, destination, product commit, dirty package
-diff SHA-256 and workspace lock SHA-256. It copies every public package's matching `src`, `dist`
-and `package.json`, and records the resolved external dependency bytes. Keep the frozen directories
-and dependencies available. The runner validates the receipt before collection.
+Freeze the candidate in a separate directory after building it. Keep both sets and their external
+dependencies available. Each set includes all public packages' `src`, `dist`, and manifests. The
+runner verifies their receipts and the built runtime graph.
 
-Keep the browser, hardware, instrument source, fixtures and consumer selection fixed. Run without
-other benchmarks or builds competing for the CPU. All controls and the independent reference
-holdout use the baseline package set. Calibrate and check that same-build holdout:
+Baseline and candidate alternate within randomized repetition pairs in one Chromium session.
+Each measure reports the median of paired p95 differences, a budget recomputed with the existing noise formula,
+and a 95% bootstrap interval over repetitions. A blocking regression requires both a difference
+above budget and an interval entirely above zero. The 108 blocking and 36 advisory measures,
+native input scenarios, visible and hidden views, correctness, and cleanup checks are retained.
+Advisory screenshot duration never fails acceptance.
 
-```sh
-node examples/stress/input-compare.mjs calibrate "$run_root/calibration.json.gz" "$run_root/control-1.json.gz" "$run_root/control-2.json.gz" "$run_root/control-3.json.gz"
-node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/rerun.json.gz" "$run_root/calibration.json.gz" --same-build
-```
+A cached sensitivity self-check injects a real 20 ms input delay and requires all 36 dispatch groups
+to fail. The cache includes raw evidence and is keyed by instrument source and dependency bytes.
+The first run of a changed instrument pays for the self-check. Later runs recompute its verdict.
 
-Each input limit is the largest control p95 plus the largest of three times the between-run p95
-spread, three times the between-run median spread, or the widest observed within-run range
-(maximum minus minimum). Calibration records each control's median, p95, minimum, and maximum.
-This local envelope includes the observed timing variation across the full sample, including
-arrival at different points in a frame. It is not a statistical confidence bound. Establish the
-rule before collecting its independent unchanged holdout, and require the real delayed control
-to fail before accepting the calibration.
+Default fixtures fit Platform's 10 Mi UTF-16 analysis tier, including 500,000 short comment lines.
+`--stress` enables the larger original declaration fixture. `--fixture-directory` accepts frozen
+hashed fixtures and requires `--stress` if they exceed the tier. CPU pinning is optional.
+`--output` selects the compressed matrix report. `--repetitions` defaults to three measured pairs
+following one warmup pair. More pairs improve resolution near a budget.
 
-The input comparison has **108 blocking groups**: input-to-applied, synchronous dispatch, and
-input-to-next-frame for every fixture, view configuration, and scenario. Its **36 screenshot
-groups are advisory**. Their burst-to-screenshot-completion upper bounds include input delivery,
-Playwright transport, and capture overhead. Raw screenshot distributions and calibrated limits
-remain in the report, but exceeding those timing limits alone does not fail acceptance.
-Screenshot evidence, changed pixels, rendered text, and revision correctness remain mandatory.
-
-Prove the gate catches a real 20 ms pause inside each measured input operation on the **baseline
-build**, before changing the product:
-
-```sh
-run_input baseline --repetitions 3 --slowdown-ms 20 --output "$run_root/delayed.json.gz"
-node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/delayed.json.gz" "$run_root/calibration.json.gz" --allow-slowdown > "$run_root/delayed-check.json"
-node examples/stress/input-admission.mjs "$run_root/delayed-check.json" "$run_root/delayed.json.gz"
-```
-
-The delayed comparison must exit with status 1 and fail all 36 dispatch groups. Run admission after
-that expected nonzero comparison; admission must exit with status 0 and report `admitted: true` and
-`full: true`. `--allow-slowdown` permits the explicit delay while requiring baseline package identity.
-
-After implementing the product change, rebuild the public packages and freeze a separate candidate
-set. Keep the instrument and external dependencies unchanged. Check the candidate against the
-preserved controls, then collect its diagnostic phase correlations separately:
-
-```sh
-bun run build
-freeze_input_packages candidate
-run_input candidate --repetitions 3 --output "$run_root/candidate.json.gz"
-node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/candidate.json.gz" "$run_root/calibration.json.gz"
-run_input candidate --repetitions 1 --diagnostics --output "$run_root/diagnostic.json.gz"
-node examples/stress/test/verify-input-results.mjs "$run_root"
-```
-
-The delayed run stays on the baseline source and build; the diagnostic run stays on the candidate
-source and build. The proof command checks saved before measurements, controls, same-build holdout,
-candidate, full delayed admission and diagnostic records. It writes `verification.json` and
-`calibration.json.gz`. It fails on missing or incomparable samples, incorrect text/revisions/paint,
-malformed index ranges, listener growth, incomplete context closure, reused run identities, or a
-candidate exceeding the established blocking limits. A valid run that exceeds blocking timing
-limits still writes `verification.json` with `passed: false` and `candidateFailures`, then exits
-with status 1. Screenshot timing excesses appear separately in `candidateAdvisories`. Malformed
-evidence fails before the report is written. `.json.gz` stores the same raw records as `.json`
-using gzip.
-
-For a quick probe, add `--input-smoke`. That runs ordinary/single-view cases and marks the artifact
-`smokeOnly`; the acceptance gate rejects it. Use the full suite to accept a change.
-See [measurement boundaries and diagnostic fields](../../docs/performance/input-latency.md)
-for what each duration proves and the CDP composition-commit limitation.
+See [paired method and validation](../../../docs/document-contributions/paired-input-latency.md)
+for statistical limits, historical comparison, and measured wall times. The old absolute input
+calibration and proof commands have been removed. Historical evidence stays unchanged.

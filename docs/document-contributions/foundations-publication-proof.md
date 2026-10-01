@@ -109,7 +109,7 @@ Unit 0 remains partial: **5/10 configurations calibrated** at instrument `56c8e7
 `disabled`, `tree-sitter`, `shiki`, `minimap`). `tree-sitter-shiki` failed its holdout; its candidate
 and the four remaining configurations never ran. The remaining absolute-threshold matrix is
 superseded by **Plan 282's paired A/B instrument**. See
-[the calibration closeout](native-input-calibration.md) for the accepted results and saved diagnosis.
+[the paired method and historical reference](paired-input-latency.md#historical-reference) for the accepted results and archive locations.
 Units 2–7 remain gated. Chat/workbench pixel-level comparison of every visible token,
 retained parser/WASM byte accounting, an independent inactive
 analysis budget and full memory-pressure/first-frame matrix remain Plan 198 acceptance work. No

@@ -569,8 +569,8 @@ failed its holdout; the driver stopped at `2026-10-01T04:39:01Z`, without runnin
 ended the absolute-threshold work rather than spending approximately three more hours on it;
 the remaining matrix and planned phase sweep are superseded by **Plan 282's paired A/B instrument**.
 Unit 0 is not complete, and units 2–7 remain gated. See
-[the calibration closeout and evidence](../docs/document-contributions/native-input-calibration.md)
-for the accepted results, holdout diagnosis, product findings and limits. The original protocol below
+[the paired method and historical reference](../docs/document-contributions/paired-input-latency.md)
+for the accepted results, archive locations, product prerequisites and limits. The original protocol below
 records what the delivered instrument was built to test; it does not schedule another matrix run.
 
 Record both revisions, dirty diffs, built exports, link resolution, package versions, browser,
@@ -582,14 +582,14 @@ worker document messages, source materialization, and private core imports acros
 packages and Platform consumers. Classify every occurrence as core mutation, document contribution,
 view presentation, domain adapter, or host transaction policy. Resolve every unclassified caller.
 
-Run the unchanged controls and instrument calibration described below. Save raw samples and a
-fixed comparison policy before implementing the runtime. This unit produces the deletion list
+Run `bun run bench:input:paired --baseline <packages> --candidate <packages>` on unchanged
+frozen products before implementing units 2–7. Save raw paired samples and the instrument hash. This unit produces the deletion list
 and confirms each observable on a known-good control.
 
 First extend the benchmark harness to make the expanded consumer matrix executable. The current
 stress input fixture enables Tree-sitter directly. Add explicit consumer configurations to workload
 identity, controls that actually instantiate them, and readiness/output assertions for each.
-Calibrate the new configurations independently while preserving the existing input matrix.
+Compare the affected configurations with the paired instrument while preserving its input matrix.
 Freeze benchmark source fixtures as files with hashes. Platform's default live `editor.tsx` fixture
 must not change between baseline and candidate merely because the refactor edits that component.
 
@@ -753,8 +753,15 @@ does not prove that a patch-backed session view uses the correct source coordina
 
 ### Measurement matrix
 
+Plan 282 implements the paired command below. Its acceptance remains blocked by the historical
+minimap products' supported-tier undo source failure and a historical native negative-key
+disagreement; five-configuration verdict agreement and
+default/full wall-time targets are incomplete. Treat paired runs as diagnostic evidence until
+[Plan 282's validation](../docs/document-contributions/paired-input-latency.md#validation) passes.
+Units 2–7 remain gated.
+
 Use the existing [input latency instrument](../editor/docs/performance/input-latency.md) and
-its calibrated ordinary-code, 500,000-short-line, and one-megabyte-line fixtures. Preserve the
+its supported-tier ordinary-code, 500,000-short-line, and one-megabyte-line fixtures. Preserve the
 single-view and two-visible-plus-one-hidden configurations and the six native input scenarios.
 
 Add contribution configurations: disabled, each supported consumer individually, the actual
@@ -762,13 +769,13 @@ Platform configuration, and supported multiple-consumer combinations. Include co
 typing bursts, large paste, sparse multi-cursor edits, undo/redo, replacement, prepared adoption,
 worker restart, delayed consumers, and long retention/disposal runs.
 
-1. Run at least three unchanged controls, an independent unchanged holdout, and a real delayed
-   negative control. Confirm that the holdout passes and the negative control fails.
-2. Freeze comparison rules and raw baseline samples before candidate measurements. Record
-   separate source/build identities for baseline and candidate.
-3. Require all existing blocking input comparisons to pass without relaxing their limits. The
-   inspected E002 instrument has 108 blocking comparisons and 36 advisory screenshot-duration
-   comparisons. Reconcile instrument changes explicitly; do not gate on the count alone.
+1. Run `bun run bench:input:paired --baseline <packages> --candidate <packages>`. The default
+   matrix includes Platform's composition and affected configurations. Use `--full` for releases.
+2. Keep the instrument and external dependencies fixed. The command records randomized,
+   interleaved pairs and checks its cached 20 ms sensitivity evidence per instrument hash.
+3. Require the paired verdict to pass for every blocking input measure. A regression is a median
+   paired repetition difference above the existing group noise budget with a 95% bootstrap interval
+   excluding zero. The matrix retains 108 blocking and 36 advisory measures per configuration.
 4. Prove exact text, accepted revisions, mounted coverage, visible changed pixels, and cleanup.
    Screenshot completion time is not a substitute for native input-to-frame measurements.
 5. Compare publication overhead, time to visible syntax, open/scroll latency, total source reads,
@@ -802,9 +809,8 @@ bun run --cwd packages/lsp-plugin test -- test/documentSync.test.ts
 bun run --cwd packages/tree-sitter bench:syntax
 bun run --cwd packages/editor bench:transforms
 bun run --cwd packages/editor bench:virtualization
-bun run bench:input --repetitions 3 --output /work/tmp/plan099/candidate.json.gz
+bun run bench:input:paired --baseline /work/tmp/plan099/baseline --candidate /work/tmp/plan099/candidate
 bun run --cwd examples/stress bench:first-paint --output /work/tmp/plan099/first-paint.json
-node examples/stress/input-compare.mjs check /work/tmp/plan099/control-1.json.gz /work/tmp/plan099/candidate.json.gz /work/tmp/plan099/calibration.json.gz
 ```
 
 Run minimap's real browser/unit checks when migrating its renderer boundary. Its `test` script
@@ -871,7 +877,7 @@ and complete validation. Writing the plan does not schedule production execution
 - [ ] Queues, mirrors, pinned snapshots, and disposal have measured bounded lifetimes.
 - [ ] Old source publishers, duplicate generic sync state, unused APIs, and compatibility paths are deleted.
 - [ ] Built exports and all affected framework/Platform consumers use the new contract.
-- [ ] Calibrated browser gates pass, and the declared multiple-consumer improvement is measured.
+- [ ] Paired input browser gates pass, and the declared multiple-consumer improvement is measured.
 - [ ] SAB text transport is removed; separate workers, atomic cancellation, and packed-result transfers are preserved.
 - [ ] Permanent architecture/performance references and all overlapping plan links are reconciled.
 

@@ -11,10 +11,8 @@ export const inputScenarios = Object.freeze([
 ])
 export const inputViewModes = Object.freeze(['single', 'multiple'])
 const fixtureIds = ['ordinary', 'short-lines', 'long-line']
-const metrics = ['inputToApplied', 'dispatch', 'inputToFrame', 'burstToPaintUpperBound']
 const timingEpsilonMs = 0.000001
-const formula =
-  'max(control p95) + max(3 * range(control p95), 3 * range(control p50), max(control max - control min))'
+const metrics = ['inputToApplied', 'dispatch', 'inputToFrame', 'burstToPaintUpperBound']
 
 function record(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`Missing ${label}`)
@@ -349,7 +347,7 @@ export function summarizeInputResult(result) {
   return Object.fromEntries([...groups(result)].map(([key, values]) => [key, distribution(values)]))
 }
 
-function comparable(left, right, allowSlowdown = false) {
+export function assertInputComparable(left, right, allowSlowdown = false) {
   validateInputResult(left)
   validateInputResult(right)
   same(left.manifest, right.manifest, 'fixture manifests/hashes')
@@ -368,131 +366,19 @@ function comparable(left, right, allowSlowdown = false) {
   same(left.environment.instrumentHash, right.environment.instrumentHash, 'instrument source')
 }
 
-// Product source, build and external dependency bytes of the frozen set a run measured.
-function packageIdentity(run) {
-  const set = run.environment.packageSet
-  return set
-    ? { sourceHash: set.sourceHash, buildHash: set.buildHash, externalHash: set.externalHash }
-    : null
-}
-
 function range(values) {
   return Math.max(...values) - Math.min(...values)
 }
 
-function controlLimit(summaries, key) {
-  const controlP50Ms = summaries.map((summary) => summary[key].p50Ms)
-  const controlP95Ms = summaries.map((summary) => summary[key].p95Ms)
-  const controlMinMs = summaries.map((summary) => Math.min(...summary[key].rawSamples))
-  const controlMaxMs = summaries.map((summary) => summary[key].maxMs)
+export function inputNoiseBudget(distributions) {
+  const controlP50Ms = distributions.map((summary) => summary.p50Ms)
+  const controlP95Ms = distributions.map((summary) => summary.p95Ms)
+  const controlMinMs = distributions.map((summary) => Math.min(...summary.rawSamples))
+  const controlMaxMs = distributions.map((summary) => summary.maxMs)
   const noiseMarginMs = Math.max(
     3 * range(controlP95Ms),
     3 * range(controlP50Ms),
     ...controlMaxMs.map((value, index) => value - controlMinMs[index]),
   )
-  return {
-    p95Ms: Math.max(...controlP95Ms) + noiseMarginMs,
-    noiseMarginMs,
-    controlP50Ms,
-    controlP95Ms,
-    controlMinMs,
-    controlMaxMs,
-  }
-}
-
-export function calibrateInput(controls) {
-  if (!Array.isArray(controls) || controls.length < 3)
-    fail('Calibration requires three independent unchanged control runs')
-  if (new Set(controls.map((control) => control?.id)).size !== controls.length)
-    fail('Calibration requires distinct control runs')
-  const first = controls[0]
-  for (const control of controls) {
-    comparable(first, control)
-    if (control.config.slowdownMs !== 0)
-      fail('Calibration requires clean controls without injected delay')
-    same(first.environment.commit, control.environment.commit, 'control commits')
-    same(first.environment.sourceHash, control.environment.sourceHash, 'control source trees')
-    same(
-      packageIdentity(first),
-      packageIdentity(control),
-      'control package builds and external bytes',
-    )
-  }
-  const summaries = controls.map(summarizeInputResult)
-  return {
-    schemaVersion: 1,
-    suite: 'input-latency',
-    kind: 'local-control-envelope',
-    scope:
-      'Matching browser, hardware and workload only; requires an independent rerun and delayed control.',
-    formula,
-    controls: controls.map((control) => control.id),
-    controlRuns: controls,
-    limits: Object.fromEntries(
-      Object.keys(summaries[0]).map((key) => [key, controlLimit(summaries, key)]),
-    ),
-  }
-}
-
-function validateCalibration(baseline, calibration) {
-  if (
-    calibration?.schemaVersion !== 1 ||
-    calibration.suite !== 'input-latency' ||
-    !Array.isArray(calibration.controlRuns)
-  )
-    fail('Unsupported input-latency calibration schema')
-  same(
-    calibration,
-    calibrateInput(calibration.controlRuns),
-    'calibration derived from raw controls',
-  )
-  const storedBaseline = calibration.controlRuns.find((control) => control.id === baseline.id)
-  if (!storedBaseline) fail('Calibration does not identify this baseline')
-  same(baseline, storedBaseline, 'calibration baseline observations')
-}
-
-export function compareInput(
-  baseline,
-  candidate,
-  calibration,
-  { allowSlowdown = false, sameBuild = false } = {},
-) {
-  comparable(baseline, candidate, allowSlowdown)
-  // A holdout or delayed control measures the calibrated build; a candidate differs only in product.
-  const expected = packageIdentity(baseline)
-  const actual = packageIdentity(candidate)
-  if (sameBuild || allowSlowdown)
-    same(expected, actual, 'holdout or delayed control package identity')
-  else same(expected?.externalHash, actual?.externalHash, 'candidate external dependency bytes')
-  validateCalibration(baseline, calibration)
-  if (calibration.controls.includes(candidate.id)) fail('Candidate must be an independent run')
-  if (allowSlowdown && candidate.config.slowdownMs <= 0)
-    fail('Slowdown control requires an injected delay')
-  const reference = summarizeInputResult(baseline)
-  const proposed = summarizeInputResult(candidate)
-  const results = Object.entries(proposed).map(([key, value]) => {
-    const limit = calibration.limits[key]
-    return {
-      key,
-      blocking: !key.endsWith('/burstToPaintUpperBound'),
-      ...value,
-      baseline: reference[key],
-      limit,
-      limitToControlP95Ratio:
-        Math.max(...limit.controlP95Ms) === 0
-          ? null
-          : limit.p95Ms / Math.max(...limit.controlP95Ms),
-      passed: value.p95Ms - limit.p95Ms <= timingEpsilonMs,
-    }
-  })
-  return {
-    schemaVersion: 1,
-    suite: 'input-latency',
-    baseline: baseline.id,
-    candidate: candidate.id,
-    kind: allowSlowdown ? 'delayed-control' : 'candidate',
-    comparisonEpsilonMs: timingEpsilonMs,
-    passed: results.every((metric) => !metric.blocking || metric.passed),
-    metrics: results,
-  }
+  return { noiseMarginMs, controlP50Ms, controlP95Ms, controlMinMs, controlMaxMs }
 }

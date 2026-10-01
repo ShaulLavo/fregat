@@ -91,6 +91,37 @@ test('replays minimap line summaries and patches, matching truncated prefixes by
   expect(minimapMatches(replayMinimapLines([open]), 'abc\ndzf')).toBe(false)
 })
 
+// A coalesced sequential undo can restore text length while publishing excess summaries.
+test('rejects excess minimap summaries even when final text length and render receipts match', () => {
+  const line = { text: '//', length: 2 }
+  const open = { type: 'openDocument', document: { textLength: 23, lines: Array(8).fill(line) } }
+  const seed = {
+    type: 'applyEdits',
+    document: {
+      summaryPatch: {
+        textLength: 35,
+        startLine: 2,
+        deleteCount: 1,
+        lines: [{ text: 'xxxxxxxxxxxx//', length: 14 }],
+      },
+    },
+  }
+  const undo = {
+    type: 'applyEdits',
+    document: {
+      summaryPatch: { textLength: 23, startLine: 2, deleteCount: 1, lines: Array(4).fill(line) },
+    },
+  }
+  expect(minimapMatches(replayMinimapLines([open]), Array(8).fill('//').join('\n'))).toBe(true)
+  expect(
+    minimapMatches(replayMinimapLines([open, seed]), '//\n//\nxxxxxxxxxxxx//\n//\n//\n//\n//\n//'),
+  ).toBe(true)
+  const restored = replayMinimapLines([open, seed, undo])
+  expect(restored.textLength).toBe(23)
+  expect(restored.lines).toHaveLength(11)
+  expect(minimapMatches(restored, Array(8).fill('//').join('\n'))).toBe(false)
+})
+
 function proofPage() {
   const page = {
     Worker: class {
