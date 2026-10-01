@@ -9,8 +9,10 @@ import {
   requireCreated,
   requireRepositoryCreated,
   requireSuccess,
+  requireCommentPosted,
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
+import { parseIssueComments } from './issue-comments'
 
 const PR_FIELDS = 'isDraft,number,state,title,url,closedAt'
 
@@ -37,6 +39,37 @@ const GITHUB_STATES = { OPEN: 'open', CLOSED: 'closed', MERGED: 'merged' } as co
 /** `gh`. A self-hosted host is named on every call so `gh` never falls back to github.com. */
 export const github: ForgeProvider = {
   kind: 'github',
+  discussion: {
+    kind: 'supported',
+    async read(context, number) {
+      const result = requireSuccess(
+        context,
+        await gh(context, [
+          'api',
+          ...hostname(context),
+          `repos/${context.repository}/issues/${number}/comments?per_page=100`,
+        ]),
+        'comments',
+      )
+      return parseIssueComments(context, result.stdout, 'page')
+    },
+    async post(context, number, body) {
+      const result = await gh(
+        context,
+        [
+          'api',
+          ...hostname(context),
+          '--method',
+          'POST',
+          `repos/${context.repository}/issues/${number}/comments`,
+          '--input',
+          '-',
+        ],
+        JSON.stringify({ body }),
+      )
+      requireCommentPosted(context, result)
+    },
+  },
   async support(context) {
     return cliSupport(await gh(context, ['auth', 'status', ...hostname(context)]))
   },
@@ -249,9 +282,12 @@ function ownerAndName(context: ForgeContext) {
   })
 }
 
-function gh(context: ForgeContext, args: readonly string[]) {
+function gh(context: ForgeContext, args: readonly string[], input?: string) {
   const env = context.forge.host === 'github.com' ? undefined : { GH_HOST: context.forge.host }
-  return forgeCommand(context, ['gh', ...args], env ? { env } : {})
+  return forgeCommand(context, ['gh', ...args], {
+    ...(env ? { env } : {}),
+    ...(input === undefined ? {} : { input }),
+  })
 }
 
 function hostname(context: ForgeContext) {

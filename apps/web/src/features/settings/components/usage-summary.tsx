@@ -1,11 +1,13 @@
 import type { ProviderUsageHistory } from '@workspace/contracts'
 import { formatContextTokens } from '@workspace/client-core/chat/context-usage'
 
-import { formatModelCost } from '@/features/settings/utils/usage'
+import { formatModelCost, usageCacheSavingsTotal } from '@/features/settings/utils/usage'
+import { UsageCacheSavings } from '@/features/settings/components/usage-cache-savings'
 
 /** The headline, and how much usage it leaves out, so a total is never silently low. */
 export function UsageSummary({ history }: { readonly history: ProviderUsageHistory }) {
   const { totals } = history
+  const savings = usageCacheSavingsTotal(history.models)
 
   return (
     <div className='flex flex-col gap-1' data-usage-summary>
@@ -20,6 +22,21 @@ export function UsageSummary({ history }: { readonly history: ProviderUsageHisto
       <p className='text-muted-foreground text-2xs'>
         Claude's own estimate, or standard API rates for models Platform prices.
       </p>
+      <p className='text-xs'>
+        <UsageCacheSavings costUsd={savings.costUsd} />
+      </p>
+      <p className='text-muted-foreground text-2xs'>
+        Savings compare recorded full-input and cache-read prices.
+      </p>
+      {savings.excludedCachedTokens > 0 ? (
+        <p className='text-muted-foreground text-2xs'>
+          Excludes{' '}
+          <span className='font-mono tabular-nums'>
+            {formatContextTokens(savings.excludedCachedTokens)}
+          </span>{' '}
+          cached tokens with unavailable or varying recorded prices.
+        </p>
+      ) : null}
       {totals.unpricedTokens > 0 ? (
         <p className='text-muted-foreground text-2xs tabular-nums'>
           Excludes {formatContextTokens(totals.unpricedTokens)} tokens from models without a price.

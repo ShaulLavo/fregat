@@ -13,6 +13,7 @@ import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import {
   bootSeconds,
+  chargeOf,
   decide,
   decideQuiet,
   drainRequest,
@@ -365,10 +366,10 @@ function attemptAdmission(
     const quiet = running.owners.find((job) => job.quiet && (job.quietUntil ?? Infinity) > now)
     if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}` }
     const decision = waiting.entry.quiet
-      ? decideQuiet(running.charges.length)
+      ? decideQuiet(running.owners.length + running.orphanCharges.length)
       : decide(
           waiting.entry.estimateBytes,
-          running.charges,
+          [...running.orphanCharges, ...ownerCharges(options, running.owners)],
           readReadings(options.procRoot),
           config.limits,
         )
@@ -393,25 +394,31 @@ function attemptAdmission(
 }
 
 /**
- * What each running job is charged. The cgroup tree is what runs: a job slice whose wrapper is
- * gone (no live entry) is an orphan, charged its ceiling while this pass kills and removes it.
- * A job admitted but not yet in its slice is charged through its live entry.
+ * Reaps orphans: job slices whose wrapper is gone (no live entry). Each is charged its ceiling
+ * less its use, read before the kill; if the kill fails it may still grow that far.
  */
 function reconcile(options: Options) {
   const owners = live(options.stateDir, 'jobs')
   const orphans = liveSlices(options.sliceRoot).filter(
     (slice) => !owners.some((job) => job.id === slice.id),
   )
+  const orphanCharges = orphans.map((orphan) =>
+    chargeOf(options.sliceRoot, orphan.slice, orphan.ceilingBytes),
+  )
   for (const orphan of orphans) {
     console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
     reapSlice(options.sliceRoot, orphan.slice)
   }
   clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
-  const charges = [
-    ...owners.map((job) => job.estimateBytes),
-    ...orphans.map((orphan) => orphan.ceilingBytes),
-  ]
-  return { charges, owners }
+  return { orphanCharges, owners }
+}
+
+// The part of each live job's estimate it may still claim; a job admitted but not yet in its
+// slice is charged its whole estimate. Read beside MemAvailable: both move while jobs run.
+function ownerCharges(options: Options, owners: readonly Entry[]) {
+  return owners.map((job) =>
+    chargeOf(options.sliceRoot, `${options.sliceRoot}-${job.id}.slice`, job.estimateBytes),
+  )
 }
 
 // The holder line names its job; it is cleared only when that job qualifies, so clearing a
