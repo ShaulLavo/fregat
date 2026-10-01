@@ -3,6 +3,130 @@ import { createGateway, waitForProxy } from './gateway'
 import { configSchema, startGateway } from './run'
 import * as v from 'valibot'
 
+const fullRegistry = { data: [{ id: 'gpt-6.1-sol' }] }
+
+test('cold registry health waits for models while the proxy TCP port already accepts', async () => {
+  let registryReads = 0
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      expect(new URL(request.url).pathname).toBe('/v1/models')
+      expect(request.headers.get('authorization')).toBe('Bearer proxy-key')
+      registryReads++
+      return Response.json(registryReads === 1 ? { data: [] } : fullRegistry)
+    },
+  })
+  const server = startGateway({
+    gatewayPort: 0,
+    anthropicUrl: 'http://127.0.0.1:1',
+    proxyUrl: upstream.url.toString(),
+    apiKey: 'proxy-key',
+  })
+  try {
+    const response = await fetch(new URL('/health', server.url))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ status: 'ready' })
+    expect(registryReads).toBeGreaterThanOrEqual(2)
+  } finally {
+    server.stop(true)
+    upstream.stop(true)
+  }
+})
+
+test('cold registry GPT request waits for models before forwarding', async () => {
+  let registryReads = 0
+  let modelRequests = 0
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname === '/v1/models') {
+        registryReads++
+        return Response.json(registryReads === 1 ? { data: [] } : fullRegistry)
+      }
+      modelRequests++
+      if (registryReads < 2) {
+        return Response.json(
+          { error: { message: 'unknown provider for model gpt-6.1-sol' } },
+          { status: 400 },
+        )
+      }
+      return Response.json({ ok: true })
+    },
+  })
+  const server = startGateway({
+    gatewayPort: 0,
+    anthropicUrl: 'http://127.0.0.1:1',
+    proxyUrl: upstream.url.toString(),
+    apiKey: 'proxy-key',
+  })
+  try {
+    const response = await fetch(new URL('/v1/messages', server.url), {
+      method: 'POST',
+      headers: { authorization: 'test' },
+      body: '{"model":"gpt-6.1-sol"}',
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true })
+    expect(modelRequests).toBe(1)
+  } finally {
+    server.stop(true)
+    upstream.stop(true)
+  }
+})
+
+test('cold registry restart waits and replays unknown provider only once with the same bytes', async () => {
+  let warming = false
+  let registryReads = 0
+  const bodies: string[] = []
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    async fetch(request) {
+      if (new URL(request.url).pathname === '/v1/models') {
+        if (!warming) return Response.json(fullRegistry)
+        registryReads++
+        return Response.json(registryReads === 1 ? { data: [] } : fullRegistry)
+      }
+      bodies.push(await request.text())
+      if (bodies.length === 1) {
+        return Response.json(
+          { error: { message: 'unknown provider for model gpt-6.1-sol' } },
+          { status: 400 },
+        )
+      }
+      return new Response('event: message_stop\ndata: {"type":"message_stop"}\n\n', {
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    },
+  })
+  const server = startGateway({
+    gatewayPort: 0,
+    anthropicUrl: 'http://127.0.0.1:1',
+    proxyUrl: upstream.url.toString(),
+    apiKey: 'proxy-key',
+  })
+  const body = '{ "model": "gpt-6.1-sol", "stream": true, "messages": [] }'
+  try {
+    expect((await fetch(new URL('/health', server.url))).status).toBe(200)
+    warming = true
+    const response = await fetch(new URL('/v1/messages', server.url), {
+      method: 'POST',
+      headers: { authorization: 'test' },
+      body,
+    })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('text/event-stream')
+    expect(await response.text()).toContain('message_stop')
+    expect(registryReads).toBeGreaterThanOrEqual(2)
+    expect(bodies).toEqual([body, body])
+  } finally {
+    server.stop(true)
+    upstream.stop(true)
+  }
+})
+
 test('preserves Claude OAuth, beta headers, request bytes and streaming tool events', async () => {
   const body = '{ "model": "claude-opus-5-5", "stream": true, "messages": [] }'
   const events =
