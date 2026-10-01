@@ -55,6 +55,76 @@ describe('FileSyncService', () => {
     expect(store.getState().liveDocumentsByKey).toEqual({})
     expect(store.getState().dirtyDocumentKeys.size).toBe(0)
   })
+  for (const { name, diskText } of [
+    { name: 'UTF-8 BOM and CRLF', diskText: '\uFEFFfirst\r\nsecond\r\n' },
+    { name: 'LF without a BOM', diskText: 'first\nsecond\n' },
+  ]) {
+    it(`preserves ${name} on disk while saving normalized buffer identity`, async ({
+      client,
+      server,
+    }) => {
+      const path = filesystemPath('ordinary.txt')
+      await writeFile(join(server.root, path), diskText)
+      const ports = createFileSyncPorts(client)
+      const store = createEditorDocumentStore()
+      const queryClient = new QueryClient()
+      const original = await ports.readFileContent(path, new AbortController().signal)
+      const document = store.getState().ensureLiveEditorDocument(original)
+      expect(document.buffer.materializeFullText()).toBe('first\nsecond\n')
+      createEditorBufferSession(document.buffer).applyText('tail')
+      const snapshot = document.buffer.getTextSnapshot()
+      expect(store.getState().dirtyDocumentKeys.has(document.key)).toBe(true)
+
+      await new FileSyncService(store, queryClient, ports).save(
+        store.getState().getLiveEditorDocument(document.key)!,
+      )
+
+      expect(await readFile(join(server.root, path))).toEqual(Buffer.from(`${diskText}tail`))
+      const disk = await ports.readFileContent(path, new AbortController().signal)
+      const cached = queryClient.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(path))!
+      expect(cached).toHaveProperty('textSnapshot', snapshot)
+      expect(materializeFileSnapshotText(cached)).toBe('first\nsecond\ntail')
+      expect(cached).toMatchObject({
+        size: Buffer.byteLength(`${diskText}tail`),
+        version: disk.version,
+        mtimeMs: disk.mtimeMs,
+      })
+      const saved = store.getState().getLiveEditorDocument(document.key)!
+      expect(saved.buffer).toBe(document.buffer)
+      expect(saved.buffer.isDirty()).toBe(false)
+      expect(store.getState().dirtyDocumentKeys.has(document.key)).toBe(false)
+      expect(saved.sync).toMatchObject({ fileVersion: disk.version, mtimeMs: disk.mtimeMs })
+      expect(store.getState().ensureLiveEditorDocument(cached).buffer).toBe(document.buffer)
+      expect(document.buffer.materializeFullText()).toBe('first\nsecond\ntail')
+      expect(document.buffer.isDirty()).toBe(false)
+      createEditorBufferSession(document.buffer).applyText('?')
+      expect(materializeFileSnapshotText(cached)).toBe('first\nsecond\ntail')
+      expect(document.buffer.isDirty()).toBe(true)
+      await new FileSyncService(store, queryClient, ports).save(
+        store.getState().getLiveEditorDocument(document.key)!,
+      )
+      expect(await readFile(join(server.root, path))).toEqual(Buffer.from(`${diskText}tail?`))
+      expect(document.buffer.isDirty()).toBe(false)
+
+      const freshStore = createEditorDocumentStore()
+      const freshDocument = freshStore
+        .getState()
+        .ensureLiveEditorDocument(
+          queryClient.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(path))!,
+        )
+      expect(freshDocument.buffer).not.toBe(document.buffer)
+      expect(freshDocument.buffer.materializeFullText()).toBe('first\nsecond\ntail?')
+      createEditorBufferSession(freshDocument.buffer).applyText('reopened')
+      await new FileSyncService(freshStore, new QueryClient(), ports).save(
+        freshStore.getState().getLiveEditorDocument(freshDocument.key)!,
+      )
+      expect(await readFile(join(server.root, path))).toEqual(
+        Buffer.from(`${diskText}tail?reopened`),
+      )
+      expect(freshDocument.buffer.isDirty()).toBe(false)
+      expect(freshStore.getState().dirtyDocumentKeys.has(freshDocument.key)).toBe(false)
+    })
+  }
 
   it('retains the captured saved snapshot without retaining a joined save string', async ({
     client,
