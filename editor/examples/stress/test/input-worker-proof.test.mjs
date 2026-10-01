@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest'
+import { runInNewContext } from 'node:vm'
 import {
+  installInputWorkerProof,
   minimapMatches,
   replayMinimapLines,
   replayShikiSource,
@@ -87,4 +89,53 @@ test('replays minimap line summaries and patches, matching truncated prefixes by
   expect(minimapMatches(replayMinimapLines([open]), 'abcx\ndef')).toBe(false)
   expect(minimapMatches(replayMinimapLines([open]), 'abc\ndef')).toBe(true)
   expect(minimapMatches(replayMinimapLines([open]), 'abc\ndzf')).toBe(false)
+})
+
+function proofPage() {
+  const page = {
+    Worker: class {
+      addEventListener() {}
+      postMessage() {}
+      terminate() {}
+    },
+  }
+  runInNewContext(`(${installInputWorkerProof.toString()})()`, page)
+  return page
+}
+
+test('disposal releases syntax payloads and pending requests while keeping cleanup counters', () => {
+  const page = proofPage()
+  const worker = new page.Worker('shiki.worker.js')
+  worker.postMessage({
+    id: 1,
+    payload: { type: 'open', runtimeSessionId: 'a', text: 'large source' },
+  })
+  const session = page.__inputWorkerSources.get('a')
+  worker.postMessage({ id: 2, payload: { type: 'disposeDocument', runtimeSessionId: 'a' } })
+  expect(session.log).toHaveLength(0)
+  expect(worker.proof.requests.size).toBe(0)
+  expect(page.__inputWorkerSources.size).toBe(0)
+  expect(worker.proof.disposedSessions).toBe(1)
+})
+
+test('termination releases syntax and minimap histories between repetitions', () => {
+  const page = proofPage()
+  const syntax = new page.Worker('treeSitter.worker.js')
+  syntax.postMessage({
+    id: 1,
+    payload: { type: 'parse', runtimeSessionId: 'a', source: { chunks: [{ text: 'source' }] } },
+  })
+  const session = page.__inputWorkerSources.get('a')
+  const minimap = new page.Worker('minimap.worker.js')
+  minimap.postMessage({
+    type: 'openDocument',
+    document: { lines: [{ text: 'summary', length: 7 }] },
+  })
+  syntax.terminate()
+  minimap.terminate()
+  expect(session.log).toHaveLength(0)
+  expect(syntax.proof.requests.size).toBe(0)
+  expect(minimap.proof.minimapLog).toHaveLength(0)
+  expect(page.__inputWorkerSources.size).toBe(0)
+  expect(page.__inputWorkerProof.every((proof) => proof.terminated)).toBe(true)
 })

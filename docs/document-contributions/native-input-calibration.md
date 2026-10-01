@@ -8,6 +8,15 @@ The remaining matrix is superseded by **Plan 282's paired A/B instrument**. Unit
 units 2–7 remain gated. PR [#224](https://github.com/ShaulLavo/fregat/pull/224) delivers the instrument,
 harness and recorded partial result, without full-matrix acceptance.
 
+The post-collection review repairs the reusable harness: readiness and cleanup deadlines, proof
+payload release, hash-covered runtime paths, Platform analysis tiers, baseline delayed-control
+pairing, optional host diagnostics and compressed admission reads. Those source edits create a
+new instrument identity. The five accepted configurations below belong only to `56c8e77fb`;
+they were not rerun or revalidated with the repaired harness. The archived graph check admitted
+broader paths than its receipts hashed, and its readiness loop did not bound every awaited stage.
+The preserved receipts record what the historical instrument checked, with those limits.
+No calibration, matrix, browser diagnostic or timing measurement was run for the review repairs.
+
 Evidence is preserved in the following locations:
 
 - [Exclusive results at `56c8e77fb`](/work/tmp/fregat-evidence/foundations-documents/native-input/runs-exclusive-56c8e77fb/).

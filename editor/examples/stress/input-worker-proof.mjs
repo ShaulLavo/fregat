@@ -1,7 +1,5 @@
-// Installed into the page before the app loads. On the capture path it only keeps references to the
-// message fragments and ids the page already posted; readiness replays them after the measured
-// interval. It changes nothing, except for the probe-only readiness negatives, which a measured run
-// never sets.
+// Capture keeps existing message fragments; readiness replays them outside measured intervals.
+// Only probe-only negatives alter messages; measured runs never enable them.
 export function installInputWorkerProof(negative = null) {
   const NativeWorker = globalThis.Worker
   globalThis.__inputWorkerProof = []
@@ -36,6 +34,15 @@ export function installInputWorkerProof(negative = null) {
     return sessions.get(id)
   }
 
+  const releaseSession = (proof, id, session) => {
+    session.disposed = true
+    session.log.length = 0
+    for (const [request, owner] of proof.requests)
+      if (owner === session) proof.requests.delete(request)
+    globalThis.__inputWorkerSources.delete(id)
+    proof.disposedSessions++
+  }
+
   const observeSource = (proof, message) => {
     const payload = message?.payload
     if (!payload || typeof payload !== 'object' || typeof message.id !== 'number') return
@@ -43,7 +50,7 @@ export function installInputWorkerProof(negative = null) {
     if (typeof id !== 'string') return
     const session = sessionOf(proof, id)
     if (payload.type === 'disposeDocument') {
-      session.disposed = true
+      releaseSession(proof, id, session)
       return
     }
     const shiki = proof.kind === 'shiki' && (payload.type === 'open' || payload.type === 'edit')
@@ -122,6 +129,7 @@ export function installInputWorkerProof(negative = null) {
         kind,
         minimap: kind === 'minimap',
         terminated: false,
+        disposedSessions: 0,
         sourceUpdates: 0,
         latestRender: 0,
         acceptedRender: 0,
@@ -149,6 +157,10 @@ export function installInputWorkerProof(negative = null) {
 
     terminate() {
       this.proof.terminated = true
+      for (const [id, session] of globalThis.__inputWorkerSources)
+        if (session.worker === this.proof) releaseSession(this.proof, id, session)
+      this.proof.requests.clear()
+      this.proof.minimapLog.length = 0
       return super.terminate()
     }
   }

@@ -41,10 +41,7 @@ const sha256 = async (path) =>
     .update(await readFile(path))
     .digest('hex')
 
-/**
- * Every parsed module and every emitted binary asset must come from the instrument source, the
- * frozen package set or a package root covered by one of the external receipts.
- */
+// Modules and copied assets must resolve to the bytes covered by their source receipts.
 export async function verifyRuntimeGraph({
   ids,
   outDir,
@@ -55,10 +52,25 @@ export async function verifyRuntimeGraph({
   const instrument = await realpath(instrumentRoot)
   const frozen = await realpath(packageSetDirectory)
   const roots = await Promise.all(receiptRoots.map((root) => realpath(root)))
+  const manifest = JSON.parse(await readFile(resolve(frozen, 'package-set.json'), 'utf8'))
+  const folders = new Set(manifest.packages.map((entry) => entry.folder))
+  const receiptRoot = (path) =>
+    roots.find(
+      (root) => inside(root, path) && !relative(root, path).split(sep).includes('node_modules'),
+    )
+  const frozenFile = (path) => {
+    if (!inside(frozen, path)) return false
+    const [folder, section, ...rest] = relative(frozen, path).split(sep)
+    return (
+      folders.has(folder) &&
+      ((section === 'package.json' && rest.length === 0) ||
+        (['src', 'dist'].includes(section) && rest.length > 0))
+    )
+  }
   const allowed = (path) =>
     (inside(instrument, path) && !relative(instrument, path).split(sep).includes('node_modules')) ||
-    inside(frozen, path) ||
-    roots.some((root) => inside(root, path))
+    frozenFile(path) ||
+    Boolean(receiptRoot(path))
   const escaped = []
   const usedRoots = new Set()
   let modules = 0
@@ -77,7 +89,7 @@ export async function verifyRuntimeGraph({
     const real = await realpath(path).catch(() => path)
     modules++
     if (!allowed(real)) escaped.push(real)
-    const root = roots.find((candidate) => inside(candidate, real))
+    const root = receiptRoot(real)
     if (root) usedRoots.add(root)
   }
   const assets = []
@@ -96,6 +108,8 @@ export async function verifyRuntimeGraph({
     for (const path of emitted) sizes.set((await stat(path)).size, [])
     for (const root of [frozen, ...roots]) {
       for (const path of await files(root)) {
+        const real = await realpath(path)
+        if (!allowed(real)) continue
         const size = (await stat(path)).size
         if (sizes.has(size)) sizes.get(size).push(path)
       }

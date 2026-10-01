@@ -82,36 +82,60 @@ async function readCounters(cpus) {
   return { at: before, collectionMs: performance.now() - before, pinned, own }
 }
 
-/** Starts one boundary-to-boundary estimate; the returned function ends it. */
-export async function startHostCpuEstimate() {
-  const hz = readUserHz()
-  const cpus = await allowedCpus(process.pid)
+function unsupported(platform, startedAt, reason) {
+  return { supported: false, platform, startedAt, reason }
+}
+
+/** Starts one boundary-to-boundary estimate; unsupported hosts return a diagnostic receipt. */
+export async function startHostCpuEstimate({ platform = process.platform } = {}) {
   const startedAt = new Date().toISOString()
-  const start = await readCounters(cpus)
+  if (platform !== 'linux')
+    return async () =>
+      unsupported(platform, startedAt, 'Linux CPU counters are unavailable on this host')
+  let hz, cpus, start
+  try {
+    hz = readUserHz()
+    cpus = await allowedCpus(process.pid)
+    if (!Number.isFinite(hz) || hz <= 0 || !cpus?.length)
+      return async () =>
+        unsupported(platform, startedAt, 'Linux CPU affinity or clock ticks are unavailable')
+    start = await readCounters(cpus)
+  } catch {
+    return async () => unsupported(platform, startedAt, 'Linux CPU counters are unavailable')
+  }
   return async () => {
-    const end = await readCounters(cpus)
-    const tickMs = 1000 / hz
-    const elapsedMs = end.at - start.at
-    const taskMs = (end.pinned.task - start.pinned.task) * tickMs
-    const interruptMs = (end.pinned.interrupt - start.pinned.interrupt) * tickMs
-    const stealMs = (end.pinned.steal - start.pinned.steal) * tickMs
-    const ownTreeMs = (end.own.ticks - start.own.ticks) * tickMs
-    const residualMs = taskMs + interruptMs + stealMs - ownTreeMs
-    return {
-      startedAt,
-      userHz: hz,
-      pinnedCpus: cpus.join(','),
-      elapsedMs,
-      startCollectionMs: start.collectionMs,
-      endCollectionMs: end.collectionMs,
-      pinnedTaskMs: taskMs,
-      pinnedInterruptMs: interruptMs,
-      pinnedStealMs: stealMs,
-      ownTreeMs,
-      ownTreeProcesses: end.own.members.length,
-      ownTreeConfined: await confined(end.own.members, cpus),
-      residualMs,
-      residualShare: residualMs / (cpus.length * elapsedMs),
+    try {
+      return await finishEstimate(startedAt, start, cpus, hz)
+    } catch {
+      return unsupported(platform, startedAt, 'Linux CPU counters became unavailable')
     }
+  }
+}
+
+async function finishEstimate(startedAt, start, cpus, hz) {
+  const end = await readCounters(cpus)
+  const tickMs = 1000 / hz
+  const elapsedMs = end.at - start.at
+  const taskMs = (end.pinned.task - start.pinned.task) * tickMs
+  const interruptMs = (end.pinned.interrupt - start.pinned.interrupt) * tickMs
+  const stealMs = (end.pinned.steal - start.pinned.steal) * tickMs
+  const ownTreeMs = (end.own.ticks - start.own.ticks) * tickMs
+  const residualMs = taskMs + interruptMs + stealMs - ownTreeMs
+  return {
+    supported: true,
+    startedAt,
+    userHz: hz,
+    pinnedCpus: cpus.join(','),
+    elapsedMs,
+    startCollectionMs: start.collectionMs,
+    endCollectionMs: end.collectionMs,
+    pinnedTaskMs: taskMs,
+    pinnedInterruptMs: interruptMs,
+    pinnedStealMs: stealMs,
+    ownTreeMs,
+    ownTreeProcesses: end.own.members.length,
+    ownTreeConfined: await confined(end.own.members, cpus),
+    residualMs,
+    residualShare: residualMs / (cpus.length * elapsedMs),
   }
 }

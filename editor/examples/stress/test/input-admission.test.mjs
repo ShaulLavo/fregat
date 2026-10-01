@@ -1,4 +1,9 @@
 import { expect, test } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { writeInputArtifact } from '../input-artifacts.mjs'
 import { admitDelayedControl, workloadGroups } from '../input-admission.mjs'
 
 const fullRun = { config: {} }
@@ -58,4 +63,24 @@ test('a legacy run without long-line is admitted only as partial', () => {
     blocking: 72,
     advisory: 24,
   })
+})
+
+test('the admission CLI reads compressed comparison and workload artifacts', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'input-admission-'))
+  try {
+    const check = join(root, 'check.json.gz')
+    const run = join(root, 'run.json.gz')
+    await writeInputArtifact(check, delayedCheck())
+    await writeInputArtifact(run, fullRun)
+    const result = spawnSync(
+      process.execPath,
+      [new URL('../input-admission.mjs', import.meta.url).pathname, check, run],
+      { encoding: 'utf8' },
+    )
+    expect(result.stderr).toBe('')
+    expect(result.status).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({ admitted: true, full: true })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })

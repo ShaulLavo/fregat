@@ -1,13 +1,9 @@
 import { writeFile } from 'node:fs/promises'
 import { readInputArtifact, writeInputArtifact } from '../input-artifacts.mjs'
 import { resolve } from 'node:path'
-import {
-  calibrateInput,
-  compareInput,
-  summarizeInputResult,
-  validateInputResult,
-} from '../input-results.mjs'
+import { summarizeInputResult, validateInputResult } from '../input-results.mjs'
 import { fail } from '../errors.mjs'
+import { compareInputProof } from '../input-proof.mjs'
 import { verifyRangeIndexes } from '../input-range-indexes.mjs'
 
 const directory = resolve(process.argv[2] ?? 'examples/stress/results/input-latency')
@@ -21,12 +17,12 @@ if (new Set(runs.map((run) => run.id)).size !== runs.length)
   fail('Input proof requires distinct control, holdout, candidate, delayed and diagnostic runs')
 if (rerun.environment.sourceHash !== controls[0].environment.sourceHash)
   fail('Reference holdout must use the unchanged control source')
-if (delayed.environment.sourceHash !== candidate.environment.sourceHash)
-  fail('Delayed control source differs from candidate')
-const calibration = calibrateInput(controls)
-const holdout = compareInput(controls[0], rerun, calibration)
-const candidateResult = compareInput(controls[0], candidate, calibration)
-const positive = compareInput(controls[0], delayed, calibration, { allowSlowdown: true })
+const { calibration, holdout, candidateResult, positive } = compareInputProof(
+  controls,
+  rerun,
+  candidate,
+  delayed,
+)
 if (candidate.config.diagnostics || candidate.config.slowdownMs !== 0)
   fail('Invalid production candidate')
 validateInputResult(diagnostic)
@@ -57,11 +53,6 @@ if (
   fail('Diagnostic workload or runtime differs')
 if (!diagnostic.config.diagnostics || diagnostic.config.slowdownMs !== 0)
   fail('Invalid diagnostic control')
-if (!holdout.passed) fail('Independent unchanged rerun exceeded the calibrated budget')
-if (positive.passed) fail('Real delayed input control escaped the calibrated budget')
-const delayedDispatch = positive.metrics.filter((metric) => metric.key.endsWith('/dispatch'))
-if (delayedDispatch.length !== 36 || delayedDispatch.some((metric) => metric.passed))
-  fail('Delayed control must fail every synchronous input group')
 const measured = summarizeInputResult(candidate)
 const before = await read('before')
 validateInputResult(before)

@@ -1,17 +1,8 @@
 import type { Editor } from '@singapore-editor/core/editor'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
-import {
-  createBracketMatchPlugin,
-  createDocumentLinkPlugin,
-  createMergeConflictPlugin,
-  createOccurrenceHighlightPlugin,
-} from '@singapore-editor/core'
 import { createShikiHighlighterPlugin, createShikiWorkerOwner } from '@singapore-editor/core/shiki'
 import { createEditorFindPlugin } from '@singapore-editor/find'
-import { createLineGutterPlugin } from '@singapore-editor/gutters/line-gutter'
-import { createFoldGutterPlugin } from '@singapore-editor/gutters/fold-gutter'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
-import { createScopeLinesPlugin } from '@singapore-editor/scope-lines'
 import {
   createTreeSitterSyntaxProvider,
   createTreeSitterSyntaxPlugin,
@@ -24,6 +15,8 @@ import {
 import typescript from '@shikijs/langs/typescript'
 import githubDark from '@shikijs/themes/github-dark'
 import { inputConsumerConfiguration } from '../input-configurations.mjs'
+import { inputPlatformPlugins } from './inputPlatformPlugins.ts'
+import { awaitInputStage, inputReadyDelay, waitForInputReady } from './inputReadiness.ts'
 
 export function createInputConsumers(id: string, fixture: string, length: number) {
   const configuration = inputConsumerConfiguration(id, fixture, length)
@@ -47,27 +40,13 @@ export function createInputConsumers(id: string, fixture: string, length: number
     )
   if (configuration.minimap) plugins.push(createMinimapPlugin())
   if (configuration.find) plugins.push(createEditorFindPlugin())
-  if (configuration.platform)
-    plugins.push(
-      createLineGutterPlugin(),
-      createMergeConflictPlugin(),
-      createBracketMatchPlugin(),
-      createOccurrenceHighlightPlugin(),
-      createDocumentLinkPlugin(),
-    )
-  // Platform pauses folding and scope guides with the other analysis consumers.
-  if (configuration.platform && configuration.analysis)
-    plugins.push(createFoldGutterPlugin(), createScopeLinesPlugin())
+  if (configuration.platform) plugins.push(...inputPlatformPlugins(configuration.analysis))
   return {
     configuration,
     plugins,
     async settle(editors: readonly Editor[]) {
-      // Syntax sessions start lazily; a fence taken before they start resolves with nothing done.
-      await until(() =>
-        editors.every((editor) => editor.getState().initialHighlightStatus !== 'loading'),
-      )
-      // Edits schedule follow-up syntax requests and re-highlighting after a fence resolves;
-      // settle until both owners are quiet and tokens are live again.
+      const startedAt = performance.now()
+      const deadline = startedAt + 30_000
       const syntax = configuration.treeSitter || configuration.shiki
       // A line over Shiki's limit is plain by policy, so live tokens cannot be required for it.
       const tokensLive = () =>
@@ -76,21 +55,43 @@ export function createInputConsumers(id: string, fixture: string, length: number
         [...CSS.highlights].some(
           ([name, ranges]) => name.startsWith('editor-shared-token-') && ranges.size > 0,
         )
+      const observe = () => ({
+        treePending: tree?.inspect().pendingRequests ?? 0,
+        shikiPending: shiki?.inspect().pendingRequests ?? 0,
+        initialHighlights: editors.map((editor) => editor.getState().initialHighlightStatus),
+        minimapReady: minimapRendersAccepted(),
+        tokensLive: tokensLive(),
+      })
       const quiet = () =>
         (tree?.inspect().pendingRequests ?? 0) === 0 &&
         (shiki?.inspect().pendingRequests ?? 0) === 0 &&
         tokensLive()
-      const startedAt = performance.now()
-      const deadline = startedAt + 30_000
+      // Syntax sessions start lazily; a fence taken before they start resolves with nothing done.
+      await waitForInputReady(
+        'initial highlights',
+        deadline,
+        () => editors.every((editor) => editor.getState().initialHighlightStatus !== 'loading'),
+        observe,
+      )
       do {
-        await tree?.awaitIdleFence()
-        await shiki?.awaitIdleFence()
-        if (configuration.minimap) await minimapRendersAccepted()
-        // @justification Harness readiness only, outside every measured input interval: the idle
-        // fences resolve before edits schedule their follow-up syntax requests, so readiness waits
-        // and checks again, bounded by the 30 s settle deadline.
-        await new Promise((resolve) => setTimeout(resolve, 50))
-      } while (!quiet() && performance.now() < deadline)
+        if (tree)
+          await awaitInputStage('Tree-sitter idle fence', deadline, observe, () =>
+            tree.awaitIdleFence(),
+          )
+        if (shiki)
+          await awaitInputStage('Shiki idle fence', deadline, observe, () => shiki.awaitIdleFence())
+        if (configuration.minimap)
+          await waitForInputReady(
+            'minimap render acceptance',
+            deadline,
+            minimapRendersAccepted,
+            observe,
+          )
+        // Fences resolve before follow-up syntax requests start; readiness yields and checks again.
+        await awaitInputStage('follow-up syntax readiness', deadline, observe, () =>
+          inputReadyDelay(50),
+        )
+      } while (!quiet())
       return {
         configuration,
         settleMs: performance.now() - startedAt,
@@ -112,7 +113,15 @@ export function createInputConsumers(id: string, fixture: string, length: number
       }
     },
     async dispose() {
-      await Promise.all([tree?.dispose(), shiki?.dispose()])
+      const deadline = performance.now() + 30_000
+      const observe = () => ({
+        treePending: tree?.inspect().pendingRequests ?? 0,
+        shikiPending: shiki?.inspect().pendingRequests ?? 0,
+      })
+      await Promise.all([
+        tree && awaitInputStage('Tree-sitter disposal', deadline, observe, () => tree.dispose()),
+        shiki && awaitInputStage('Shiki disposal', deadline, observe, () => shiki.dispose()),
+      ])
     },
   }
 }
@@ -124,26 +133,15 @@ type WorkerProof = {
   readonly acceptedRender: number
 }
 
-async function until(settled: () => boolean, timeoutMs = 30_000) {
-  const deadline = performance.now() + timeoutMs
-  while (!settled() && performance.now() < deadline)
-    // @justification Harness readiness only, outside every measured input interval: highlight
-    // status and minimap render acceptance publish no completion event to await, so this checks
-    // once per frame-length wait until the bounded deadline.
-    await new Promise((resolve) => setTimeout(resolve, 16))
-}
-
-// Minimap renders arrive after the syntax fences; readiness waits for the latest requested frame.
-async function minimapRendersAccepted() {
-  await until(() =>
-    (
-      (globalThis as { __inputWorkerProof?: readonly WorkerProof[] }).__inputWorkerProof ?? []
-    ).every(
-      (worker) =>
-        worker.terminated ||
-        !worker.minimap ||
-        (worker.latestRender > 0 && worker.acceptedRender === worker.latestRender),
-    ),
+// Minimap renders arrive after the syntax fences; readiness checks the latest requested frame.
+function minimapRendersAccepted() {
+  return (
+    (globalThis as { __inputWorkerProof?: readonly WorkerProof[] }).__inputWorkerProof ?? []
+  ).every(
+    (worker) =>
+      worker.terminated ||
+      !worker.minimap ||
+      (worker.latestRender > 0 && worker.acceptedRender === worker.latestRender),
   )
 }
 

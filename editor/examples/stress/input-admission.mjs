@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readInputArtifact } from './input-artifacts.mjs'
 import { pathToFileURL } from 'node:url'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
 
@@ -17,11 +17,8 @@ export function workloadGroups(run) {
   )
 }
 
-/**
- * A real delayed control is admitted only when its check covers exactly the expected groups with
- * three blocking and one advisory metric each, and every synchronous dispatch group failed. The
- * full unit 0 matrix is 36 groups (108 blocking, 36 advisory); any other shape is partial.
- */
+// Admission requires the exact metric shape and every dispatch group to fail.
+// The full matrix has 36 groups (108 blocking, 36 advisory); smaller shapes remain partial.
 export function admitDelayedControl(check, groups) {
   const reject = (reason) => ({ admitted: false, full: false, reason })
   if (check?.kind !== 'delayed-control') return reject('not a delayed-control check')
@@ -65,8 +62,8 @@ export function admitDelayedControl(check, groups) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [checkPath, runPath] = process.argv.slice(2)
-  const check = JSON.parse(await readFile(checkPath, 'utf8'))
-  const run = JSON.parse(await readFile(runPath, 'utf8'))
+  const check = await readInputArtifact(checkPath)
+  const run = await readInputArtifact(runPath)
   const verdict = admitDelayedControl(check, workloadGroups(run))
   console.log(JSON.stringify(verdict))
   if (!verdict.admitted || !verdict.full) process.exitCode = 1

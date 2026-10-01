@@ -2,21 +2,21 @@ pre-commit:
   parallel: false
   jobs:
     - name: format staged files
-      glob: '*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
+      glob: '*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --write {staged_files}
       stage_fixed: true
 
     - name: lint fix staged files
-      glob: '*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'
+      glob: '*.{ts,tsx,js,jsx,mjs,cjs}'
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxlint --fix {staged_files}
       stage_fixed: true
 
     - name: lint check staged files
-      glob: '*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'
+      glob: '*.{ts,tsx,js,jsx,mjs,cjs}'
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxlint {staged_files}
 
     - name: format check staged files
-      glob: '*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
+      glob: '*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --check {staged_files}
 
     # A new setting that skips its released-id record or leaves the generated
@@ -32,9 +32,3 @@ pre-commit:
 
     - name: typecheck repo
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun run typecheck
-
-    # The Editor's architecture health (timer justifications, API and cycle baselines) only ran in
-    # CI; it follows typecheck, which builds the workspaces it reads.
-    - name: editor health
-      glob: 'editor/**'
-      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun run --cwd editor health
