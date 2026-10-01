@@ -22,6 +22,8 @@ import {
   sessionFrom,
 } from '../../../test/factories/orchestration'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
+import { createInternalError } from '../../observability/structured-errors'
+import { internalCommandKey } from '../utils/repository-ids'
 
 const modelSelection = { model: 'gpt-5-codex', providerInstanceId: 'codex' }
 const fixtures: Array<{ close: () => void }> = []
@@ -1389,6 +1391,95 @@ it('requires the durable lifecycle result before writing a new accepted receipt'
 })
 
 describe('settled provider release ownership', () => {
+  it.each(['hasRuntime', 'stopRuntime', 'retainedOwner'] as const)(
+    'contains %s recovery failure and releases the retained owner on the next restart',
+    async (failure) => {
+      const adapter = new MockProviderAdapter()
+      const fixture = await createOrchestrationFixture()
+      onTestFinished(() => fixture.close())
+      await fixture.restart(mockRuntime(adapter))
+      const registration = await fixture.register()
+      const worktreeId = registration.result!.worktreeId
+      const sessionId = v.parse(sessionIdSchema, FIXTURE_SESSION_ID)
+      const other = 'a0000000-0000-4000-8000-000000000097'
+      await fixture.createSession(worktreeId)
+      await fixture.createSession(worktreeId, other)
+      await fixture.startTurn()
+      await fixture.engine.providerRuntimeIdle()
+      const runtimeEpoch = (await sessionFrom(fixture)).runtime!.runtimeEpoch
+      await fixture.restart(false)
+      const settle = {
+        type: 'session.settle',
+        sessionId,
+        commandId: 'settled-before-failed-recovery',
+      }
+      await fixture.command(settle)
+      const hasRuntime = adapter.hasRuntime.bind(adapter)
+      const stopRuntime = adapter.stopRuntime.bind(adapter)
+      adapter.hasRuntime = async (input) => {
+        if (failure === 'hasRuntime' && input.sessionId === sessionId) {
+          throw createInternalError('Fixture ownership query failed.')
+        }
+        return hasRuntime(input)
+      }
+      adapter.stopRuntime = async (input) => {
+        if (input.sessionId !== sessionId) return stopRuntime(input)
+        if (failure === 'stopRuntime') throw createInternalError('Fixture runtime stop failed.')
+        if (failure === 'retainedOwner') return
+        return stopRuntime(input)
+      }
+      await fixture.restart(mockRuntime(adapter))
+      await expect(fixture.engine.ready).resolves.toBeUndefined()
+      expect(await hasRuntime({ sessionId })).toBe(true)
+      expect(adapter.interruptedSessions).toEqual([])
+      const detail = await fixture.engine.sessionDetailSnapshot(sessionId)
+      expect(detail.session.activities).toContainEqual(
+        expect.objectContaining({
+          kind: 'provider.runtime.stop.failed',
+          payload: expect.objectContaining({
+            operation: failure === 'hasRuntime' ? 'hasRuntime' : 'stopRuntime',
+            code: expect.any(String),
+            why: expect.any(String),
+            fix: expect.any(String),
+          }),
+        }),
+      )
+      await fixture.startTurn(other, 'unrelated-after-recovery-failure')
+      await fixture.engine.providerRuntimeIdle()
+      expect((await sessionFrom(fixture, other)).runtime?.status).toBe('ready')
+      await fixture.restart(mockRuntime(adapter))
+      await expect(fixture.engine.ready).resolves.toBeUndefined()
+      expect(await hasRuntime({ sessionId })).toBe(true)
+      const repeatedFailure = await fixture.engine.sessionDetailSnapshot(sessionId)
+      expect(
+        repeatedFailure.session.activities.filter(
+          (activity) => activity.kind === 'provider.runtime.stop.failed',
+        ),
+      ).toHaveLength(1)
+      adapter.hasRuntime = hasRuntime
+      adapter.stopRuntime = stopRuntime
+      await fixture.restart(mockRuntime(adapter))
+      await fixture.engine.providerRuntimeIdle()
+      expect(await hasRuntime({ sessionId })).toBe(false)
+      expect(adapter.interruptedSessions).toEqual([sessionId])
+      const events = (await fixture.engine.replay({ afterSequence: 0 })).events
+      const releases = events.filter(
+        (event) =>
+          event.type === 'session.runtime-stop-requested' && event.payload.sessionId === sessionId,
+      )
+      expect(releases).toHaveLength(1)
+      expect(releases[0]?.commandId).toBe(
+        internalCommandKey('settled-release-recovery', sessionId, runtimeEpoch),
+      )
+      await fixture.command(settle)
+      await fixture.command({ ...settle, commandId: 'fresh-settle-after-failed-recovery' })
+      await fixture.engine.providerRuntimeIdle()
+      await fixture.restart(mockRuntime(adapter))
+      await fixture.engine.providerRuntimeIdle()
+      expect(adapter.interruptedSessions).toEqual([sessionId])
+    },
+  )
+
   it('re-engagement before queued settlement release is decided emits no obsolete stop', async () => {
     const adapter = new MockProviderAdapter()
     const fixture = await createOrchestrationFixture()

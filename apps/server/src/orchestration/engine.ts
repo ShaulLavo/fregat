@@ -1046,7 +1046,12 @@ export class OrchestrationEngine {
   private async recoverSettledRuntime(session: OrchestrationProjectedSession) {
     if (!this.providerService || !session.runtime || session.settledOverride !== 'settled') return
     // A stopped projection records intent; its provider can remain attached across a restart.
-    if (!(await this.providerService.hasRuntime({ sessionId: session.id }))) return
+    try {
+      if (!(await this.providerService.hasRuntime({ sessionId: session.id }))) return
+    } catch (error) {
+      await this.recordSettledReleaseFailure(session, 'hasRuntime', error)
+      return
+    }
     await this.enqueue({
       type: 'session.runtime.stop',
       sessionId: session.id,
@@ -1057,7 +1062,66 @@ export class OrchestrationEngine {
       ),
     })
     if (this.readModel.sessions.get(session.id)?.settledOverride !== 'settled') return
-    await this.providerService.stopRuntime({ sessionId: session.id })
+    try {
+      await this.providerService.stopRuntime({ sessionId: session.id })
+    } catch (error) {
+      await this.recordSettledReleaseFailure(session, 'stopRuntime', error)
+    }
+  }
+
+  private async recordSettledReleaseFailure(
+    session: OrchestrationProjectedSession,
+    operation: 'hasRuntime' | 'stopRuntime',
+    error: unknown,
+  ) {
+    const runtimeEpoch = session.runtime?.runtimeEpoch
+    if (!runtimeEpoch) return
+    const code = errorStringField(error, 'code') ?? 'provider.SETTLED_RELEASE_FAILED'
+    const key = internalCommandKey(
+      'settled-release-failed',
+      session.id,
+      runtimeEpoch,
+      operation,
+      code,
+    )
+    const createdAt = session.settledAt ?? session.createdAt
+    let evidenceError: unknown
+    try {
+      await this.enqueue({
+        type: 'session.activity.append',
+        commandId: v.parse(commandIdSchema, key),
+        sessionId: session.id,
+        createdAt,
+        activity: {
+          id: v.parse(eventIdSchema, key),
+          sessionId: session.id,
+          createdAt,
+          turnId: null,
+          tone: 'error',
+          kind: 'provider.runtime.stop.failed',
+          summary: 'Settled session provider cleanup needs a retry',
+          payload: {
+            operation,
+            runtimeEpoch,
+            code,
+            why: 'The provider cleanup operation failed and its runtime may still be attached.',
+            fix: 'Stop this session’s runtime again, or restart the server to retry cleanup.',
+          },
+        },
+      })
+    } catch (failure) {
+      // Failure evidence must not prevent other sessions and reactors from recovering.
+      evidenceError = failure
+    }
+    recordChatPipelineWarning('chat.pipeline.settled_release.recovery.failed', {
+      sessionId: session.id,
+      runtimeEpoch,
+      operation,
+      outcome: 'failed',
+      retry: 'explicit-stop-or-next-restart',
+      error,
+      evidenceError,
+    })
   }
 
   private scheduleQueuedStarts() {
