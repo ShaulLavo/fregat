@@ -142,7 +142,7 @@ preserves packed GPU/WebGL row reads; immutable styled cells decode only when se
 requests them. Verification after integration: 11 Node serializer/snapshot tests, 39 DOM/Canvas/
 fallback browser tests, 25 GPU/WebGL tests with two existing Linux SwiftShader skips; build,
 typecheck, lint, formatting and full commit gates pass. The static compaction and fitting checks
-add 12 passing Node tests. Phase 2 publication awaits the damage-overlay integration.
+add 12 passing Node tests. Phase 2 includes the merged damage-overlay integration.
 
 After merging demo PR #278, paired FCP was 504 → 364, 480 → 368, and 488 → 364 ms
 (medians 488 → 364). Evidence is `/work/tmp/fregat-evidence/p285-final-before-{1,2,3}/`
@@ -157,6 +157,31 @@ break the real-core prerender. Fifteen targeted Node tests and the full commit g
 Desktop and phone looks were healthy and read back at `/work/tmp/fregat-evidence/p285-final-looks/`
 (`20261001T211929Z-look-ghostty-webgpu-1280x1000/` and
 `20261001T211931Z-look-ghostty-webgpu-390x844/`).
+
+### Final overlay integration (2026-10-02)
+
+The static chrome retains #302's Redraws toggle, initially off, alongside the three demo tabs
+and lowercase `html` backend. Mobile chrome hides the decorative dots. Canvas2D capability
+is checked for the optional overlay: unsupported browsers retain their DOM terminal and get a
+disabled Redraws control. Build and site typecheck pass. The complete frozen hand-off matrix
+passes at `/work/tmp/fregat-evidence/p285-overlay-handoff/`, including overlay on/off in every
+GPU viewport, DOM-only disabled overlay, real Shell arithmetic/loop, no WebAssembly and no
+JavaScript. The no-JavaScript screenshot was read back.
+
+Three final cold alternating traces yielded FCP 520 → 388, 484 → 368, and 484 → 388 ms:
+medians 484 → 388 ms. Median first visible Ghost is 5,950.1 → 388 ms. The final document
+transfers 6,597 bytes (6,297 compressed body; 29,954 decoded). Every run recorded zero page
+errors. Evidence is `/work/tmp/fregat-evidence/p285-overlay-before-{1,2,3}/` and
+`/work/tmp/fregat-evidence/p285-overlay-after-{1,2,3}/`. First-content frame 0001 and pre/live
+handoff frames 0006/0007/0008 from after-2 were read back; the live swap marks 5,930.2 ms.
+The final trace build preceded only a null-safe overlay transform-call adjustment; static HTML,
+CSS and boot scheduling were unchanged. Runtime transfer remains around six seconds.
+
+Final desktop and phone looks are healthy and read back at
+`/work/tmp/fregat-evidence/p285-overlay-looks/20261001T213838Z-look-ghostty-webgpu-1280x1000/`
+and `/work/tmp/fregat-evidence/p285-overlay-looks/20261001T213839Z-look-ghostty-webgpu-390x844/`.
+Chromium software WebGL2 is confirmed; hardware GPU and Firefox/WebKit geometry remain
+unconfirmed. No deployment or GitHub PR merge is performed by this lane.
 
 ## Phase 1: a DOM renderer, in the package
 

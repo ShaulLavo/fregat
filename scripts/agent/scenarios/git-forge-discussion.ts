@@ -11,7 +11,7 @@ let forge: Awaited<ReturnType<typeof createFakeForge>> | null = null
 export const gitForgeDiscussion = isolatedNativeScenario({
   name: 'git-forge-discussion',
   description:
-    'Open forge discussion from the session branch header, post a comment, refresh an external comment, and preserve a refused draft.',
+    'Open forge discussion from the session branch header, post a comment, refresh an external comment, preserve a refused draft, submit approval, and keep a refused review summary.',
   fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
   async prepareWorktree() {
     const fixture = await committedFixture('forge-discussion')
@@ -53,9 +53,59 @@ export const gitForgeDiscussion = isolatedNativeScenario({
       await selectors.buttonNamed(page, 'Post comment').click()
       await selectors.forgeCommentText(page, 'The Git host could not post the comment').waitFor()
       ok((await selectors.forgeComment(page).inputValue()) === 'Keep this draft')
-      const calls = await forge.calls()
-      ok(calls.filter((call) => call.includes('POST')).length === 2)
       await step('refused-draft-kept')
+      await selectors.forgeReviewSummary(page).fill('Reviewed the regression coverage.')
+      await selectors.buttonNamed(page, 'Approve pull request').click()
+      await selectors.forgeCommentText(page, 'Review submitted').waitFor()
+      const reviewed = JSON.parse(await readFile(statePath, 'utf8'))
+      ok(reviewed.reviews.length === 1 && reviewed.reviews[0].event === 'APPROVE')
+      ok(reviewed.reviews[0].body === 'Reviewed the regression coverage.')
+      await step('review-approved')
+      reviewed.failReview = true
+      await writeFile(statePath, JSON.stringify(reviewed))
+      await selectors.forgeReviewSummary(page).fill('Please revise the edge case.')
+      await selectors.buttonNamed(page, 'Request changes').click()
+      await selectors.forgeCommentText(page, 'The Git host could not submit the review').waitFor()
+      ok((await selectors.forgeReviewSummary(page).inputValue()) === 'Please revise the edge case.')
+      await step('refused-review-kept')
+      await page.keyboard.press('Escape')
+      await selectors.forgeDiscussion(page).waitFor({ state: 'hidden' })
+      await selectors.buttonNamed(page, 'Discussion').click()
+      await selectors.forgeReviewSummary(page).waitFor()
+      ok((await selectors.forgeReviewSummary(page).inputValue()) === 'Please revise the edge case.')
+      ok((await selectors.forgeComment(page).inputValue()) === 'Keep this draft')
+      await step('review-draft-reopened')
+      const final = JSON.parse(await readFile(statePath, 'utf8'))
+      ok(final.reviews.length === 1)
+      const previewBody = 'Full viewport context '.repeat(300).trim()
+      final.comments.push({ ...final.comments[0], id: 3, body: previewBody })
+      await writeFile(statePath, JSON.stringify(final))
+      await selectors.buttonNamed(page, 'Refresh discussion').click()
+      await selectors.forgeCommentText(page, previewBody).waitFor()
+      await page.setViewportSize({ width: 1024, height: 768 })
+      await step('short-viewport-review-actions')
+      const bounds = await selectors.forgeDiscussion(page).boundingBox()
+      ok(
+        bounds && bounds.y >= 0 && bounds.y + bounds.height <= 768,
+        'discussion popup stays inside the short viewport',
+      )
+      await selectors.buttonNamed(page, 'Request changes').scrollIntoViewIfNeeded()
+      for (const name of [
+        'Post comment',
+        'Submit review',
+        'Approve pull request',
+        'Request changes',
+      ]) {
+        const action = await selectors.buttonNamed(page, name).boundingBox()
+        ok(
+          action && action.y >= 0 && action.y + action.height <= 768,
+          `${name} is reachable inside the short viewport`,
+        )
+        await selectors.buttonNamed(page, name).click({ trial: true })
+      }
+      await step('short-viewport-actions-reachable')
+      const calls = await forge.calls()
+      ok(calls.filter((call) => call.includes('POST')).length === 4)
     } finally {
       await forge.release()
       forge = null

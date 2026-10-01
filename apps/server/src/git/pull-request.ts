@@ -5,6 +5,8 @@ import type {
   GitPullRequest,
   GitPullRequestComments,
   GitPullRequestCommentResult,
+  GitPullRequestReviewInput,
+  GitPullRequestReviewResult,
   GitPullRequestCreateResult,
   GitPullRequestSupport,
 } from '@workspace/contracts'
@@ -261,12 +263,15 @@ export async function readPullRequestComments(
 ): Promise<GitPullRequestComments> {
   const supported = await supportedContext(input.cwd, boundaries)
   if (!supported.context) throw forgeNotReady(supported)
-  const discussion = forgeProvider(supported.forge.kind).discussion
-  if (discussion.kind === 'unsupported') return { ...discussion, forge: supported.forge }
+  const provider = forgeProvider(supported.forge.kind)
+  const comment = provider.discussion.write
+  const review = provider.review
   return {
     kind: 'ready',
     forge: supported.forge,
-    ...(await discussion.read(supported.context, input.number)),
+    ...(await provider.discussion.read(supported.context, input.number)),
+    comment: comment.kind === 'supported' ? { kind: 'supported' } : comment,
+    review: review.kind === 'supported' ? { kind: 'supported', verdicts: review.verdicts } : review,
   }
 }
 
@@ -276,8 +281,26 @@ export async function postPullRequestComment(
 ): Promise<GitPullRequestCommentResult> {
   const supported = await supportedContext(input.cwd, boundaries)
   if (!supported.context) throw forgeNotReady(supported)
-  const discussion = forgeProvider(supported.forge.kind).discussion
+  const discussion = forgeProvider(supported.forge.kind).discussion.write
   if (discussion.kind === 'unsupported') return { ...discussion, forge: supported.forge }
   await discussion.post(supported.context, input.number, input.body)
   return { kind: 'posted' }
+}
+
+export async function submitPullRequestReview(
+  input: { cwd: string; number: number } & GitPullRequestReviewInput,
+  boundaries: Boundaries = {},
+): Promise<GitPullRequestReviewResult> {
+  const supported = await supportedContext(input.cwd, boundaries)
+  if (!supported.context) throw forgeNotReady(supported)
+  const review = forgeProvider(supported.forge.kind).review
+  if (review.kind === 'unsupported') return { ...review, forge: supported.forge }
+  if (!review.verdicts.includes(input.verdict))
+    return {
+      kind: 'unsupported',
+      forge: supported.forge,
+      reason: 'Choose a review verdict available for this Git host.',
+    }
+  await review.submit(supported.context, input.number, input)
+  return { kind: 'submitted', verdict: input.verdict }
 }

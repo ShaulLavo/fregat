@@ -47,8 +47,9 @@ type ProviderDriverCapabilities = ProviderAdapter['capabilities'] & {
   multiInstance: boolean
 }
 
-/** App services a driver may hand its adapter; absent in tests and harnesses. */
+/** Execution context and app services handed to every driver instance. */
 export type ProviderDriverServices = {
+  readonly cwd: string
   readonly agentDiagnostics?: AgentDiagnosticsSource
 }
 

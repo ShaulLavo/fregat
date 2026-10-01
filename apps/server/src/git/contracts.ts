@@ -229,3 +229,17 @@ export const gitPullRequestCommentBodySchema = v.object({
   body: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60_000)),
 })
 export type GitPullRequestCommentBody = v.InferOutput<typeof gitPullRequestCommentBodySchema>
+
+export const gitPullRequestReviewBodySchema = v.pipe(
+  v.object({
+    path: v.optional(pathSchema, ''),
+    number: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+    verdict: v.picklist(['comment', 'approve', 'request-changes']),
+    body: v.pipe(v.string(), v.maxLength(60_000)),
+  }),
+  v.check(
+    (input) => input.verdict === 'approve' || input.body.trim().length > 0,
+    'Write a review summary.',
+  ),
+)
+export type GitPullRequestReviewBody = v.InferOutput<typeof gitPullRequestReviewBodySchema>

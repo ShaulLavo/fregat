@@ -9,6 +9,7 @@ import {
   requireRepositoryCreated,
   requireSuccess,
   requireCommentPosted,
+  requireReviewSubmitted,
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseIssueComments } from './issue-comments'
@@ -39,7 +40,6 @@ const pullSchema = v.object({
 export const forgejo: ForgeProvider = {
   kind: 'forgejo',
   discussion: {
-    kind: 'supported',
     async read(context, number) {
       const login = await requireLogin(context)
       const result = requireSuccess(
@@ -54,24 +54,53 @@ export const forgejo: ForgeProvider = {
       )
       return parseIssueComments(context, result.stdout, 'unpaginated')
     },
-    async post(context, number, body) {
-      const login = await requireLogin(context)
-      requireCommentPosted(
-        context,
-        await tea(
+    write: {
+      kind: 'supported',
+      async post(context, number, body) {
+        const login = await requireLogin(context)
+        requireCommentPosted(
           context,
-          [
-            'api',
-            '--login',
-            login.name,
-            '--method',
-            'POST',
-            '--data',
-            '@-',
-            apiUrl(login, context, `issues/${number}/comments`),
-          ],
-          JSON.stringify({ body }),
-        ),
+          await teaPost(context, login, `issues/${number}/comments`, { body }),
+        )
+      },
+    },
+  },
+  review: {
+    kind: 'supported',
+    verdicts: ['comment', 'approve', 'request-changes'],
+    async submit(context, number, input) {
+      const login = await requireLogin(context)
+      const result = requireSuccess(
+        context,
+        await tea(context, [
+          'api',
+          '--login',
+          login.name,
+          apiUrl(login, context, `pulls/${number}`),
+        ]),
+        'review-head',
+      )
+      const pull = parseForgeJson(
+        context,
+        v.object({
+          head: v.object({ sha: v.pipe(v.string(), v.regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i)) }),
+        }),
+        result.stdout,
+        'review-head',
+      )
+      const events = {
+        comment: 'COMMENT',
+        approve: 'APPROVED',
+        'request-changes': 'REQUEST_CHANGES',
+      }
+      requireReviewSubmitted(
+        context,
+        await teaPost(context, login, `pulls/${number}/reviews`, {
+          body: input.body,
+          event: events[input.verdict],
+          commit_id: pull.head.sha,
+        }),
+        'review',
       )
     },
   },
@@ -262,4 +291,26 @@ function pullState(pull: v.InferOutput<typeof pullSchema>): GitPullRequest['stat
   if (pull.merged === true) return 'merged'
   if (pull.state === 'closed') return 'closed'
   return 'open'
+}
+
+function teaPost(
+  context: ForgeContext,
+  login: Awaited<ReturnType<typeof requireLogin>>,
+  path: string,
+  payload: unknown,
+) {
+  return tea(
+    context,
+    [
+      'api',
+      '--login',
+      login.name,
+      '--method',
+      'POST',
+      '--data',
+      '@-',
+      apiUrl(login, context, path),
+    ],
+    JSON.stringify(payload),
+  )
 }

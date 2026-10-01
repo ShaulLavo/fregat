@@ -9,6 +9,8 @@ export const gitMutationScope = (rootPath: string) => ['git', 'mutation', rootPa
 export const cloneMutationKey = ['git', 'clone'] as const
 
 export const mutationKeys = {
+  pullRequestReview: (path: string, number: number) =>
+    ['git', 'mutation', path, 'pull-request-review', number] as const,
   pullRequestComment: (path: string, number: number) =>
     ['git', 'mutation', path, 'pull-request-comment', number] as const,
   checkout: (rootPath: string) => ['git', 'mutation', rootPath, 'checkout'] as const,

@@ -176,7 +176,9 @@ export class ProviderService {
   private unsubscribeRegistry: (() => void) | null = null
 
   constructor(options: ProviderServiceOptions = {}) {
-    this.adapterRegistry = options.adapterRegistry ?? createDefaultProviderAdapterRegistry()
+    this.adapterRegistry =
+      options.adapterRegistry ??
+      createDefaultProviderAdapterRegistry([], { services: { cwd: process.cwd() } })
     this.sessionDirectory = options.sessionDirectory ?? new ProviderSessionDirectory()
     this.mcp = options.mcp ?? null
     this.reaper = new ProviderSessionReaper({
