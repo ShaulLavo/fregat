@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { dirname, relative, resolve } from 'node:path'
 
 export function quantile(values, percentile) {
   assert(values.length > 0 && values.every(Number.isFinite), 'Finite samples required')
@@ -43,9 +44,10 @@ export function summaries(artifact) {
     groups.get(key).values.push(value)
   }
   for (const run of artifact.runs) {
-    if (run.error && !run.parseQualified) continue
-    for (const [name, sample] of Object.entries(run.parse ?? {}))
+    for (const [name, sample] of Object.entries(run.parse ?? {})) {
+      if (sample.validation?.qualified !== true) continue
       add(run, `parse/${name}`, sample.bytes / sample.milliseconds / 1000, 'MB/s')
+    }
     if (run.error) continue
     for (const name of ['write', 'input']) {
       if (!run.latency?.[name]?.length) continue
@@ -111,7 +113,8 @@ export function summaries(artifact) {
 
 const number = (value) => value.toFixed(2)
 
-export function markdown(artifact, review = {}) {
+export function markdown(artifact, review = {}, artifactDirectory = '.') {
+  const link = (path) => (artifactDirectory === '.' ? path : `${artifactDirectory}/${path}`)
   assert(
     !artifact.smoke && artifact.hardware,
     'Correctness smoke cannot generate performance claims',
@@ -142,7 +145,7 @@ export function markdown(artifact, review = {}) {
     `- Font size: ${artifact.manifest.settings.fontSize}px. DPR: ${artifact.manifest.settings.dpr}. Grid: ${artifact.manifest.settings.columns} × ${artifact.manifest.settings.rows}.`,
     `- Libraries: ghostty-webgpu ${artifact.manifest.versions['ghostty-webgpu']}; xterm ${artifact.manifest.versions['@xterm/xterm']} with WebGL addon ${artifact.manifest.versions['@xterm/addon-webgl']}; ghostty-web ${artifact.manifest.versions['ghostty-web']}.`,
     `- Repetitions: ${artifact.repetitions}. Each table cell is the median of the per-run result, including per-run p50/p95.`,
-    `- Artifact: [comparison.json](benchmarks/${artifact.artifactName ?? 'mac-m1'}/comparison.json).`,
+    `- Artifact: [comparison.json](${link('comparison.json')}).`,
     '',
     '## Method',
     '',
@@ -152,7 +155,13 @@ export function markdown(artifact, review = {}) {
     'Chromium launches with a device scale of 2 so resize-observer backing pixels agree with DPR.',
     'Its WebGL context limit is 32 for every case, allowing all 17 xterm WebGL terminals to remain live.',
     'Parse throughput uses unopened parsers and complete UTF-8 corpora in 4 KiB chunks.',
-    'All prebuilt chunks are queued before awaiting completion, so xterm can batch its asynchronous writes.',
+    'Parser-only contexts run before any rendered terminal is created. Timing covers synchronous input decoding/encoding, VT parsing, and buffer writes.',
+    'xterm uses its pinned 6.0.0 input-handler parse boundary, bypassing WriteBuffer timers; both Ghostty libraries use synchronous core writes.',
+    'A parser returning asynchronous work is rejected. No callback, microtask, or timer wait is included in isolated-parser timing.',
+    'After timing, the same instance must match independent expected viewport text, cursor, and SGR color/style probes. Unqualified samples are excluded.',
+    'Qualification covers the final viewport and cursor; the alternate screen keeps no offscreen history. Separate one-byte smoke diagnostics are retained even when 4 KiB results qualify.',
+    'Text comparison permits NFC composition and trailing blank cells only; ZWJ characters must be retained. Smoke checks exercise both 4 KiB and one-byte chunks.',
+    'Empty decoded chunks and an empty final decoder flush are omitted; a nonempty final flush remains part of the input.',
     'Each parse-only fixture owns a fresh WASM runtime. Runtime construction is outside timing for both Ghostty libraries.',
     'Every parse-only terminal enters the alternate screen before timing, so history allocation does not affect parser throughput.',
     'The string chunks are decoded before timing. String-to-WASM encoding remains inside the timed library call.',
@@ -166,9 +175,13 @@ export function markdown(artifact, review = {}) {
     'Screencasting is stopped for burst, CPU, and memory measurements.',
     '',
     'Burst output writes at least 4 KiB per terminal per animation frame for each corpus.',
+    'Every library uses exactly one shared animation-frame pacing wait per iteration. The synchronous ghostty-web public write receives no presentation callback.',
     'Frame intervals come from requestAnimationFrame timestamps. Dropped frames are inferred from the measured idle refresh period,',
     'rounded to the nearest number of display intervals. They are missed animation-frame opportunities, not GPU presentation counters.',
-    'CPU sums Chromium process CPU time, including browser, renderer, and GPU, as a percentage of one core.',
+    'CPU sums Chromium process CPU time, including browser, renderer, and GPU, as a percentage of one core. Samples reject any process birth or exit.',
+    'Every case has a 120-second deadline capped by the remaining 30-minute window; timeout closes its contexts and retains the failure.',
+    'Bundle and asset hashes are verified before serving; both font weights are loaded and checked before rendered phases.',
+    'The artifact retains metadata and colored-glyph classification for every screencast frame, including frames that did not qualify a latency sample.',
     '',
     'Memory per terminal and per 10k rows is the post-GC CDP used JS heap plus backing storage delta, divided by terminal count.',
     'Output memory is sampled after the 60-frame ASCII output phase, outside CPU timing. Initial memory is the idle baseline.',
@@ -255,7 +268,7 @@ export function markdown(artifact, review = {}) {
     'Firefox and Safari were not measured. This run qualifies headed Chromium on the recorded hardware only.',
     'The corpus and font hashes, raw latency samples, raw frame intervals, process CPU snapshots, memory buckets,',
     'actual execution order, and failed cases are retained in JSON.',
-    'Completed isolated parser samples remain valid when a later rendered case fails. Other metrics from failed cases are excluded. A metric appears in the tables only after all three repetitions complete.',
+    'Each validated isolated-parser corpus remains eligible independently of other parser or rendered failures. Other metrics from failed rendered cases are excluded. A metric appears only after three qualified repetitions.',
     '',
   )
   const failures = new Map()
@@ -270,6 +283,12 @@ export function markdown(artifact, review = {}) {
     lines.push(
       `- ${failure.label}, repetitions ${failure.repetitions.join(', ')}: ${failure.message}`,
     )
+  for (const run of artifact.runs) {
+    for (const failure of run.parserErrors ?? [])
+      lines.push(
+        `- ${run.variant}/${run.path}/${run.count}, parser ${failure.name}, repetition ${run.repetition + 1}: ${failure.error.split('\n')[0]}`,
+      )
+  }
   if (review.coverage) {
     lines.push('', '## Screenshot review', '', review.coverage, '')
     for (const observation of review.observations ?? []) lines.push(`- ${observation}`)
@@ -277,7 +296,9 @@ export function markdown(artifact, review = {}) {
     for (const limit of review.limits ?? []) lines.push(`- ${limit}`)
     lines.push('', '### Evidence', '')
     for (const link of review.links ?? [])
-      lines.push(`- [${link.label}](benchmarks/mac-m1/${link.path})`)
+      lines.push(
+        `- [${link.label}](${artifactDirectory === '.' ? link.path : `${artifactDirectory}/${link.path}`})`,
+      )
   }
   return lines.join('\n')
 }
@@ -285,5 +306,10 @@ export function markdown(artifact, review = {}) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const artifact = JSON.parse(await readFile(process.argv[2], 'utf8'))
   const review = process.argv[4] ? JSON.parse(await readFile(process.argv[4], 'utf8')) : {}
-  await writeFile(process.argv[3], markdown(artifact, review))
+  const directory =
+    relative(dirname(resolve(process.argv[3])), dirname(resolve(process.argv[2]))).replaceAll(
+      '\\',
+      '/',
+    ) || '.'
+  await writeFile(process.argv[3], markdown(artifact, review, directory))
 }

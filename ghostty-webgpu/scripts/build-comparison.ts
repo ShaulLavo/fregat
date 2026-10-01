@@ -47,8 +47,15 @@ for (const [name, path] of Object.entries(assets)) {
   await copyFile(path, join(output, name))
   hashes[name] = hash(await readFile(path))
 }
-for (const name of ['comparison-runner.mjs', 'comparison-report.mjs', 'comparison-pixels.mjs'])
+for (const name of [
+  'comparison-runner.mjs',
+  'comparison-report.mjs',
+  'comparison-pixels.mjs',
+  'comparison-guards.mjs',
+]) {
   await copyFile(join(root, 'scripts', name), join(output, name))
+  hashes[name] = hash(await readFile(join(output, name)))
+}
 const logs = await readFile(assets['logs.txt'], 'utf8')
 const fixtures = fixtureNames.map((name) => {
   const text = corpus(fixtureText(name, logs), settings.corpusBytes)
@@ -123,7 +130,6 @@ const manifest = {
     entries: 256,
   },
 }
-await writeFile(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 await writeFile(
   join(output, 'package.json'),
   JSON.stringify(
@@ -150,4 +156,6 @@ await writeFile(
 body{margin:0;background:#000;color:#fff}main{display:grid;grid-template-columns:repeat(4,380px);gap:8px}section{width:380px;height:260px;overflow:hidden}
 </style><main></main><script type="module" src="/browser.js"></script>`,
 )
+hashes['index.html'] = hash(await readFile(join(output, 'index.html')))
+await writeFile(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 console.log(`Portable comparison bundle: ${output}`)

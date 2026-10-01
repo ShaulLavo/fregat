@@ -1,3 +1,13 @@
+import {
+  expectedScreen,
+  inputChunks,
+  pacedBurst,
+  parseChunks,
+  qualifyScreen,
+  synchronousWrite,
+  type InputChunk,
+  type ParserScreen,
+} from './comparison-protocol.js'
 import { Terminal as Xterm } from '@xterm/xterm'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Ghostty, Terminal as GhosttyWeb } from 'ghostty-web'
@@ -142,7 +152,7 @@ async function createLegacy(host: HTMLElement): Promise<Driver> {
   })
   terminal.open(host)
   return {
-    write: (data) => new Promise((resolve) => terminal.write(data, resolve)),
+    write: synchronousWrite((data) => terminal.write(data)),
     text: () =>
       Array.from(
         { length: settings.rows },
@@ -195,12 +205,14 @@ function createXterm(host: HTMLElement): Driver {
 }
 
 async function prepare(testCase: ComparisonCase): Promise<void> {
-  current = testCase
-  await document.fonts.load(`${settings.fontSize}px "${settings.fontFamily}"`)
+  await initialize(testCase)
+  const faces = [400, 700].map(
+    (weight) => `${weight} ${settings.fontSize}px "${settings.fontFamily}"`,
+  )
+  await Promise.all(faces.map((face) => document.fonts.load(face)))
   await document.fonts.ready
-  if (!document.fonts.check(`${settings.fontSize}px "${settings.fontFamily}"`))
-    throw new Error('Benchmark font failed to load')
-  logs = await (await fetch('/logs.txt')).text()
+  if (faces.some((face) => !document.fonts.check(face)))
+    throw new Error('Benchmark regular or bold font failed to load')
   for (let index = 0; index < current.count; index++) {
     const host = document.createElement('section')
     mount.append(host)
@@ -232,20 +244,13 @@ async function correctness(): Promise<unknown> {
   return output
 }
 
-async function smokeParse(name: FixtureName): Promise<void> {
-  const driver = await parser()
-  await driver.write(input('\x1b[?1049h'))
-  try {
-    const text =
-      name === 'logs' ? logs.split('\n').slice(0, 2).join('\r\n') : fixtureText(name, logs)
-    const data = input(text)
-    if (typeof data === 'string') await driver.write(data)
-    else
-      for (let index = 0; index < data.length; index++)
-        await driver.write(data.subarray(index, index + 1))
-  } finally {
-    driver.dispose()
-  }
+async function initialize(testCase: ComparisonCase): Promise<void> {
+  current = testCase
+  logs = await (await fetch('/logs.txt')).text()
+}
+
+async function smokeParse(name: FixtureName, size: number = settings.chunkBytes): Promise<unknown> {
+  return parseFixture(name, size === 1 ? 128 : 8192, false, size)
 }
 
 async function smokeMarker(): Promise<void> {
@@ -256,41 +261,91 @@ async function smokeMarker(): Promise<void> {
 }
 
 async function parse(name: FixtureName, minimumBytes: number): Promise<unknown> {
-  const text = corpus(fixtureText(name, logs), minimumBytes)
+  return parseFixture(name, minimumBytes, true, settings.chunkBytes)
+}
+
+interface ParserDriver {
+  write(data: InputChunk): unknown
+  screen(): ParserScreen
+  dispose(): void
+}
+
+async function parseFixture(
+  name: FixtureName,
+  minimumBytes: number,
+  timed: boolean,
+  size: number,
+): Promise<unknown> {
+  const unit = fixtureText(name, logs)
+  const text = corpus(unit, minimumBytes)
   const bytes = encoder.encode(text)
-  const chunks: (string | Uint8Array)[] = []
-  if (current.path === 'bytes') {
-    for (let offset = 0; offset < bytes.length; offset += settings.chunkBytes)
-      chunks.push(bytes.subarray(offset, offset + settings.chunkBytes))
-  } else {
-    const stream = new TextDecoder()
-    for (let offset = 0; offset < bytes.length; offset += settings.chunkBytes)
-      chunks.push(
-        stream.decode(bytes.subarray(offset, offset + settings.chunkBytes), { stream: true }),
-      )
-    chunks.push(stream.decode())
-  }
+  const chunks = inputChunks(bytes, current.path, size)
+  const expected = expectedScreen(
+    name,
+    unit,
+    text.length / unit.length,
+    settings.columns,
+    settings.rows,
+  )
   const driver = await parser()
-  await driver.write(input('\x1b[?1049h'))
   try {
-    // Conversion and construction stay outside the timed parse-only region.
-    const started = performance.now()
-    await Promise.all(chunks.map((chunk) => driver.write(chunk)))
-    return { bytes: bytes.length, milliseconds: performance.now() - started }
+    driver.write(input('\x1b[?1049h'))
+    const started = timed ? performance.now() : 0
+    parseChunks((chunk) => driver.write(chunk), chunks)
+    const milliseconds = timed ? performance.now() - started : undefined
+    let screen: ParserScreen
+    try {
+      screen = driver.screen()
+    } catch (cause) {
+      throw new Error(`${name} parser snapshot failed: ${String(cause)}`, { cause })
+    }
+    const validation = qualifyScreen(screen, expected)
+    return { bytes: bytes.length, milliseconds, chunkCount: chunks.length, validation }
   } finally {
     driver.dispose()
   }
 }
 
-async function parser(): Promise<Pick<Driver, 'write' | 'dispose'>> {
+async function parser(): Promise<ParserDriver> {
   if (current.variant.startsWith('xterm-')) {
-    const terminal = new Xterm({
-      cols: settings.columns,
-      rows: settings.rows,
-      scrollback: settings.scrollback,
-    })
+    const terminal = new Xterm({ cols: settings.columns, rows: settings.rows, scrollback: 0 })
+    // Pinned 6.0.0 boundary includes decoding, VT parsing and buffer writes; excludes WriteBuffer timers.
+    const handler = Reflect.get(Reflect.get(terminal, '_core'), '_inputHandler') as {
+      parse(data: InputChunk): unknown
+    }
+    if (typeof handler?.parse !== 'function')
+      throw new Error('Pinned xterm input handler unavailable')
     return {
-      write: (data) => new Promise((resolve) => terminal.write(data, resolve)),
+      write: (data) => handler.parse(data),
+      screen: () => {
+        const buffer = terminal.buffer.active
+        const cells = Array.from({ length: settings.rows }, (_, y) =>
+          Array.from({ length: settings.columns }, (_, x) => {
+            const cell = buffer.getLine(y + buffer.baseY)!.getCell(x)!
+            const value = cell.getFgColor()
+            let rgb: [number, number, number] | undefined
+            if (cell.isFgRGB()) rgb = [(value >> 16) & 255, (value >> 8) & 255, value & 255]
+            if (cell.isFgPalette() && value === 1) rgb = [255, 0, 0]
+            if (cell.isFgPalette() && value === 2) rgb = [0, 255, 0]
+            return {
+              text: cell.getWidth() === 0 ? '' : cell.getChars() || ' ',
+              bold: Boolean(cell.isBold()),
+              underline: Boolean(cell.isUnderline()),
+              rgb,
+            }
+          }),
+        )
+        return {
+          cells,
+          lines: cells.map((row) =>
+            row
+              .map((cell) => cell.text)
+              .join('')
+              .trimEnd(),
+          ),
+          cursor: { x: buffer.cursorX, y: buffer.cursorY },
+        }
+      },
       dispose: () => terminal.dispose(),
     }
   }
@@ -300,8 +355,35 @@ async function parser(): Promise<Pick<Driver, 'write' | 'dispose'>> {
       scrollbackLimit: settings.scrollback,
     })
     return {
-      write: async (data) => {
-        terminal.write(data)
+      write: (data) => terminal.write(data),
+      screen: () => {
+        terminal.update()
+        const viewport = terminal.getViewport()
+        const cells = Array.from({ length: settings.rows }, (_, y) =>
+          Array.from({ length: settings.columns }, (_, x) => {
+            const cell = viewport[y * settings.columns + x]!
+            let text = ' '
+            if (cell.width === 0) text = ''
+            else if (cell.codepoint !== 0) text = terminal.getGraphemeString(y, x)
+            return {
+              text,
+              bold: Boolean(cell.flags & 1),
+              underline: Boolean(cell.flags & 4),
+              rgb: [cell.fg_r, cell.fg_g, cell.fg_b] as const,
+            }
+          }),
+        )
+        const cursor = terminal.getCursor()
+        return {
+          cells,
+          lines: cells.map((row) =>
+            row
+              .map((cell) => cell.text)
+              .join('')
+              .trimEnd(),
+          ),
+          cursor: { x: cursor.x, y: cursor.y },
+        }
       },
       dispose: () => terminal.free(),
     }
@@ -310,11 +392,108 @@ async function parser(): Promise<Pick<Driver, 'write' | 'dispose'>> {
   const terminal = runtime.createTerminal({ columns: settings.columns, rows: settings.rows })
   terminal.setScrollbackLimit(settings.scrollback)
   configureNativeHistory(terminal)
+  const render = runtime.createRenderState(terminal)
   return {
-    write: async (data) => {
-      terminal.write(data)
+    write: (data) => terminal.write(data),
+    screen: () => {
+      const snapshot = render.snapshot()
+      const cells = snapshot.rows.map((row) =>
+        row.cells.map((cell) => ({
+          text: cell.continuation ? '' : cell.text || ' ',
+          bold: cell.style?.bold ?? false,
+          underline: Boolean(cell.style?.underline),
+          rgb: cell.foreground
+            ? ([cell.foreground.r, cell.foreground.g, cell.foreground.b] as const)
+            : undefined,
+        })),
+      )
+      const cursor = terminal.cursor
+      return {
+        cells,
+        lines: cells.map((row) =>
+          row
+            .map((cell) => cell.text)
+            .join('')
+            .trimEnd(),
+        ),
+        cursor: { x: cursor.x, y: cursor.y },
+      }
     },
     dispose: () => runtime.dispose(),
+  }
+}
+
+async function legacyEmptyWrite(): Promise<unknown> {
+  if (current.variant !== 'ghostty-web') return undefined
+  const runtime = await Ghostty.load('/legacy.wasm')
+  const terminal = runtime.createTerminal(settings.columns, settings.rows)
+  const probe = (write: () => void) => {
+    try {
+      write()
+      return { accepted: true }
+    } catch (cause) {
+      return { accepted: false, error: String(cause) }
+    }
+  }
+  try {
+    terminal.write('ASCII\r\n')
+    return {
+      coreApi: probe(() => terminal.write('')),
+      documentedTerminalApi: await drivers[0]!.write('').then(
+        () => ({ accepted: true }),
+        (cause) => ({ accepted: false, error: String(cause) }),
+      ),
+    }
+  } finally {
+    terminal.free()
+  }
+}
+
+async function legacyOriginalUnicode(): Promise<unknown> {
+  if (current.variant !== 'ghostty-web') return undefined
+  const unit = '日本語 中文 é café 👩‍💻 👨‍👩‍👧‍👦 🧪\r\n'
+  const text = corpus(unit, settings.chunkBytes)
+  const data = current.path === 'bytes' ? encoder.encode(text) : text
+  const runtime = await Ghostty.load('/legacy.wasm')
+  const terminal = runtime.createTerminal(settings.columns, settings.rows)
+  const probe = async (api: string, write: (data: InputChunk) => unknown) => {
+    let calls = 0
+    try {
+      await write('\x1b[3J\x1b[2J\x1b[H')
+      for (; calls < 35; calls++) {
+        console.info(
+          'legacy-original-unicode',
+          JSON.stringify({ api, call: calls + 1, phase: 'before-write' }),
+        )
+        await write(data)
+        console.info(
+          'legacy-original-unicode',
+          JSON.stringify({ api, call: calls + 1, phase: 'after-write' }),
+        )
+        await settle()
+        console.info(
+          'legacy-original-unicode',
+          JSON.stringify({ api, call: calls + 1, phase: 'after-frame' }),
+        )
+      }
+      return { accepted: true, calls, bytesPerCall: encoder.encode(text).length }
+    } catch (cause) {
+      return {
+        accepted: false,
+        calls,
+        bytesPerCall: encoder.encode(text).length,
+        error: String(cause),
+      }
+    }
+  }
+  try {
+    return {
+      fixture: unit,
+      documentedTerminalApi: await probe('documentedTerminalApi', drivers[0]!.write),
+      coreApi: await probe('coreApi', (data) => terminal.write(data)),
+    }
+  } finally {
+    terminal.free()
   }
 }
 
@@ -322,15 +501,8 @@ async function burst(name: FixtureName, steps: number): Promise<unknown> {
   const text = corpus(fixtureText(name, logs), settings.chunkBytes)
   await writeAll('\x1b[3J\x1b[2J\x1b[H')
   await settle()
-  const intervals: number[] = []
-  let previous = await frame()
   const started = performance.now()
-  for (let index = 0; index < steps; index++) {
-    await writeAll(text)
-    const time = await frame()
-    intervals.push(time - previous)
-    previous = time
-  }
+  const intervals = await pacedBurst(() => writeAll(text), frame, steps)
   await settle()
   return {
     intervals,
@@ -407,6 +579,9 @@ function legacyMemoryBytes(): number {
 }
 
 window.__compare = {
+  initialize,
+  legacyEmptyWrite,
+  legacyOriginalUnicode,
   prepare,
   correctness,
   parse,
@@ -442,6 +617,9 @@ window.__compare = {
 declare global {
   interface Window {
     __compare: {
+      initialize: typeof initialize
+      legacyEmptyWrite: typeof legacyEmptyWrite
+      legacyOriginalUnicode: typeof legacyOriginalUnicode
       prepare: typeof prepare
       correctness: typeof correctness
       parse: typeof parse

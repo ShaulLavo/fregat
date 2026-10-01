@@ -6,6 +6,7 @@ import { platform, release, arch, cpus } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { cpuSample, verifyHash, withDeadline } from './comparison-guards.mjs'
 import { ink } from './comparison-pixels.mjs'
 import { WebSocketServer } from 'ws'
 import { markdown, order, quantile, summaries } from './comparison-report.mjs'
@@ -53,8 +54,11 @@ const contentTypes = {
   '.html': 'text/html',
 }
 const files = new Map()
-for (const name of ['index.html', 'browser.js', ...Object.keys(manifest.assets)])
-  files.set(`/${name}`, await readFile(join(root, name)))
+for (const name of ['index.html', 'browser.js', ...Object.keys(manifest.assets)]) {
+  const bytes = await readFile(join(root, name))
+  verifyHash(bytes, name === 'browser.js' ? manifest.bundleSha256 : manifest.assets[name], name)
+  files.set(`/${name}`, bytes)
+}
 const server = createServer((request, response) => {
   const pathname = new URL(request.url, 'http://localhost').pathname
   if (!files.has(pathname) && pathname !== '/' && pathname !== '/favicon.ico')
@@ -124,25 +128,6 @@ async function processCpu(session) {
   return processInfo
 }
 
-function cpu(before, after, milliseconds) {
-  const prior = new Map(before.map((entry) => [entry.id, entry]))
-  const secondsByType = {}
-  for (const entry of after) {
-    const delta = Math.max(0, entry.cpuTime - (prior.get(entry.id)?.cpuTime ?? entry.cpuTime))
-    secondsByType[entry.type] = (secondsByType[entry.type] ?? 0) + delta
-  }
-  const ids = new Set(after.map((entry) => entry.id))
-  return {
-    before,
-    after,
-    secondsByType,
-    percentOfOneCore:
-      (Object.values(secondsByType).reduce((a, b) => a + b, 0) / milliseconds) * 100_000,
-    processChurn:
-      before.some((entry) => !ids.has(entry.id)) || after.some((entry) => !prior.has(entry.id)),
-  }
-}
-
 async function memory(page, session, browserSession) {
   await session.send('HeapProfiler.collectGarbage')
   const heap = await session.send('Runtime.getHeapUsage')
@@ -165,6 +150,7 @@ async function memory(page, session, browserSession) {
 
 async function capturedFrames(session) {
   let pending
+  const events = []
   let latest
   let latestData
   let latestMetadata
@@ -173,6 +159,7 @@ async function capturedFrames(session) {
     latestData = event.data
     latestMetadata = event.metadata
     latest = { timestamp: event.metadata.timestamp * 1000, colors: ink(event.data) }
+    events.push({ ...latest, metadata: event.metadata, encodedBytes: event.data.length })
     if (!pending || !matches(latest, pending)) return
     clearTimeout(pending.timer)
     pending.resolve(latest)
@@ -190,6 +177,7 @@ async function capturedFrames(session) {
     everyNthFrame: 1,
   })
   return {
+    events,
     wait(color, after) {
       if (latest && matches(latest, { color, after })) return Promise.resolve(latest)
       return new Promise((resolve, reject) => {
@@ -231,7 +219,7 @@ async function latency(page, session) {
   await page.evaluate(() => window.__compare.smokeMarker())
   await page.evaluate(() => window.__compare.connectEcho())
   const frames = await capturedFrames(session)
-  const samples = { write: [], input: [], captures: [] }
+  const samples = { write: [], input: [], captures: [], captureStream: frames.events }
   try {
     for (let index = -2; index < s.latencySamples; index++) {
       const color = index % 2 ? 'red' : 'green'
@@ -260,15 +248,101 @@ async function latency(page, session) {
   }
 }
 
-async function measure(testCase, repetition, browserSession) {
+async function parserCheck(page, name, size) {
+  try {
+    return {
+      size,
+      ...(await page.evaluate(({ name, size }) => window.__compare.smokeParse(name, size), {
+        name,
+        size,
+      })),
+    }
+  } catch (error) {
+    return { size, error: String(error.stack ?? error) }
+  }
+}
+
+async function parserFixture(page, name, bytes) {
+  try {
+    if (smoke) {
+      const checks = []
+      for (const size of [s.chunkBytes, 1]) checks.push(await parserCheck(page, name, size))
+      return { checks }
+    }
+    await page.evaluate((name) => window.__compare.parse(name, 8192), name)
+    const sample = await page.evaluate(({ name, bytes }) => window.__compare.parse(name, bytes), {
+      name,
+      bytes,
+    })
+    assert.equal(sample.validation.qualified, true)
+    return sample
+  } catch (error) {
+    return { error: String(error.stack ?? error) }
+  }
+}
+
+async function parserOnly(testCase, run, contexts) {
   const context = await browser.newContext({ viewport: s.viewport, deviceScaleFactor: s.dpr })
+  contexts.add(context)
+  try {
+    const page = await context.newPage()
+    const errors = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await page.goto(origin)
+    await page.waitForFunction(() => Boolean(window.__compare))
+    await page.evaluate((testCase) => window.__compare.initialize(testCase), testCase)
+    run.parse = {}
+    run.parserErrors = []
+    for (const { name, bytes } of manifest.fixtures) {
+      run.phase = `parser/${name}`
+      const sample = await parserFixture(page, name, bytes)
+      run.parse[name] = sample
+      if (sample.error) run.parserErrors.push({ name, error: sample.error })
+      for (const check of sample.checks ?? []) {
+        if (check.error) run.parserErrors.push({ name, ...check })
+      }
+    }
+    assert.deepEqual(errors, [])
+    run.parseQualified = run.parserErrors.length === 0
+  } finally {
+    await context.close()
+    contexts.delete(context)
+  }
+}
+
+async function measure(testCase, repetition, browserSession) {
+  const run = { ...testCase, repetition, executionOrder: artifact.runs.length }
+  const contexts = new Set()
+  const remaining = smoke ? 120_000 : 30 * 60_000 - (Date.now() - Date.parse(artifact.startedAt))
+  try {
+    return await withDeadline(
+      () => measureBody(testCase, repetition, browserSession, run, contexts),
+      Math.min(120_000, remaining),
+      () => {
+        for (const context of contexts) void context.close().catch(() => {})
+      },
+    )
+  } catch (error) {
+    run.error = String(error.stack ?? error)
+    return run
+  }
+}
+
+async function measureBody(testCase, repetition, browserSession, run, contexts) {
+  if (testCase.count === 1 || smoke) await parserOnly(testCase, run, contexts)
+  run.phase = 'rendered/prepare'
+  const context = await browser.newContext({ viewport: s.viewport, deviceScaleFactor: s.dpr })
+  contexts.add(context)
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
+  run.originalUnicodeTrace = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
+    const prefix = 'legacy-original-unicode '
+    if (message.text().startsWith(prefix))
+      run.originalUnicodeTrace.push(JSON.parse(message.text().slice(prefix.length)))
   })
-  const run = { ...testCase, repetition, executionOrder: artifact.runs.length }
   try {
     await page.goto(origin)
     await page.waitForFunction(() => Boolean(window.__compare))
@@ -281,17 +355,6 @@ async function measure(testCase, repetition, browserSession) {
     if (!smoke && testCase.variant === 'ghostty-webgpu')
       assert(info.adapter?.fallback === false, 'Software WebGPU adapter rejected')
     run.info = info
-    if (!smoke && testCase.count === 1) {
-      run.parse = {}
-      for (const { name, bytes } of manifest.fixtures) {
-        await page.evaluate((name) => window.__compare.parse(name, 8192), name)
-        run.parse[name] = await page.evaluate(
-          ({ name, bytes }) => window.__compare.parse(name, bytes),
-          { name, bytes },
-        )
-      }
-      run.parseQualified = true
-    }
     if (!smoke) {
       const initial = await memory(page, session, browserSession)
       run.historyLengths = await page.evaluate(() => window.__compare.history())
@@ -320,9 +383,13 @@ async function measure(testCase, repetition, browserSession) {
         (rows) => window.__compare.history(rows),
         smokeHistoryRows,
       )
-      for (const name of manifest.fixtures.map(({ name }) => name))
-        await page.evaluate((name) => window.__compare.smokeParse(name), name)
+      run.phase = 'diagnostic/legacy-empty-write'
+      run.emptyWriteProbe = await page.evaluate(() => window.__compare.legacyEmptyWrite())
       assert.deepEqual(errors, [])
+      run.phase = 'diagnostic/legacy-original-unicode'
+      run.originalUnicodeProbe = await page
+        .evaluate(() => window.__compare.legacyOriginalUnicode())
+        .catch((error) => ({ error: String(error.stack ?? error) }))
       run.status = 'correctness-only'
       return run
     }
@@ -331,16 +398,23 @@ async function measure(testCase, repetition, browserSession) {
     const idleStarted = performance.now()
     await page.waitForTimeout(s.idleMilliseconds)
     const idleMs = performance.now() - idleStarted
-    run.idle = { milliseconds: idleMs, cpu: cpu(before, await processCpu(browserSession), idleMs) }
+    run.idle = {
+      milliseconds: idleMs,
+      cpu: cpuSample(before, await processCpu(browserSession), idleMs),
+    }
+    run.phase = 'captured-frame latency'
     run.latency = await latency(page, session)
     run.burst = {}
     for (const { name } of manifest.fixtures) {
+      run.phase = `burst/${name}/warmup`
       await page.evaluate((name) => window.__compare.burst(name, 3), name)
+      run.phase = `burst/${name}/measured`
       run.burst[name] = await page.evaluate(
         ({ name, frames }) => window.__compare.burst(name, frames),
         { name, frames: s.burstFrames },
       )
     }
+    run.phase = 'output/ascii'
     const beforeOutput = await processCpu(browserSession)
     const outputStarted = performance.now()
     const outputSample = await page.evaluate(
@@ -350,7 +424,7 @@ async function measure(testCase, repetition, browserSession) {
     const outputMs = performance.now() - outputStarted
     run.output = {
       ...outputSample,
-      cpu: cpu(beforeOutput, await processCpu(browserSession), outputMs),
+      cpu: cpuSample(beforeOutput, await processCpu(browserSession), outputMs),
       memory: await memory(page, session, browserSession),
     }
     assert.deepEqual(errors, [])
@@ -389,6 +463,7 @@ async function measure(testCase, repetition, browserSession) {
     return run
   } finally {
     await context.close()
+    contexts.delete(context)
   }
 }
 
@@ -456,4 +531,4 @@ try {
   await new Promise((resolve) => server.close(resolve))
 }
 console.log(`Artifact: ${artifactPath}`)
-if (artifact.runs.some((run) => run.error)) process.exitCode = 1
+if (artifact.runs.some((run) => run.error || run.parserErrors?.length)) process.exitCode = 1
