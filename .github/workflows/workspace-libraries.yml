@@ -22,7 +22,9 @@ jobs:
           key: ${{ runner.os }}-playwright-chromium-chromium-headless-shell-firefox-webkit-${{ hashFiles('bun.lock') }}
       - name: Install Editor browsers
         timeout-minutes: 5
-        run: editor/packages/editor/node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          editor/packages/editor/node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
       - name: Check generated language catalog
         run: bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check
       - name: Check task inputs
@@ -48,7 +50,9 @@ jobs:
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock') }}
       - name: Install Chromium
         timeout-minutes: 5
-        run: ghostty-webgpu/node_modules/.bin/playwright install --with-deps chromium
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          ghostty-webgpu/node_modules/.bin/playwright install --with-deps chromium
       - name: Verify terminal library and browser package
         run: bun run --cwd ghostty-webgpu verify
       - name: Verify browser package with production npm settings
