@@ -1,3 +1,7 @@
+export const csvPresentationQueryKeys = {
+  presentation: () => ['workbench', 'csv-presentation'] as const,
+}
+
 export const csvEngineQueryKeys = {
   engine: () => ['workbench', 'csv-engine'] as const,
 }

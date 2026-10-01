@@ -1,6 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import { chmod, mkdtemp, open, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import type { ElementHandle, Page } from 'playwright'
 import {
   fixtureGit,
   openFixtureWorkspace,
@@ -176,13 +177,7 @@ export const csvQueryFailure: Scenario = {
       await csvSelectors.cell(page, 2, 1).waitFor()
       await step('csv-query-retry-loads-table')
 
-      const writer = await open(file, 'r+')
-      try {
-        await chmod(file, 0)
-        await writer.writeFile(EDITED)
-      } finally {
-        await writer.close()
-      }
+      await denyCsvRead(file)
       await csvSelectors.queryRetry(page).waitFor()
       strictEqual(await csvSelectors.preparing(page).count(), 0)
       await selectors.editorRows(page).filter({ hasText: 'pear' }).waitFor()
@@ -393,4 +388,116 @@ export const csvKeyboardNavigation: Scenario = {
       await releaseFixture(root)
     }
   },
+}
+
+export const csvPresentationReadiness: Scenario = {
+  name: 'csv-presentation-readiness',
+  description: 'Retain the same source while the CSV table chunk loads and a file read fails.',
+  requiresIsolatedServer: true,
+  async run(page, { step }) {
+    const root = await mkdtemp(scratchPath('fregat-csv-presentation-'))
+    const file = path.join(root, 'fruit.csv')
+    const delayed = Promise.withResolvers<void>()
+    try {
+      await writeFile(file, ORIGINAL)
+      await openFixtureWorkspace(page, root)
+      await openFileFromTree(page, 'fruit.csv')
+      const source = await selectors.editorInput(page).first().elementHandle()
+      ok(source, 'The original source must be mounted')
+      await page.route(csvSelectors.presentationModule, async (route) => {
+        await delayed.promise
+        await route.continue()
+      })
+      await csvSelectors.mode(page, 'Table').click()
+      await csvSelectors.preparing(page).waitFor()
+      await selectors.editorRows(page).filter({ hasText: 'pear' }).waitFor()
+      strictEqual(await csvSelectors.mode(page, 'Text').getAttribute('aria-pressed'), 'true')
+      await assertCsvSourceIdentity(page, source)
+      await step('presentation-import-retains-same-source')
+
+      await denyCsvRead(file)
+      await csvSelectors.queryRetry(page).waitFor()
+      strictEqual(await csvSelectors.preparing(page).count(), 0)
+      await selectors.editorRows(page).filter({ hasText: 'pear' }).waitFor()
+      await assertCsvSourceIdentity(page, source)
+      await step('pending-presentation-retains-source-and-retry')
+      const loaded = page.waitForResponse((response) =>
+        response.url().includes('/utils/csv-presentation.ts'),
+      )
+      delayed.resolve()
+      await (await loaded).finished()
+      await csvSelectors.queryRetry(page).waitFor()
+      strictEqual(await source.evaluate((node) => node.isConnected), true)
+      await chmod(file, 0o600)
+      await csvSelectors.queryRetry(page).click()
+      await csvSelectors.cell(page, 2, 1).waitFor()
+      strictEqual(await csvSelectors.cell(page, 2, 1).getAttribute('title'), 'peach')
+      await step('loaded-presentation-retry-restores-table')
+    } finally {
+      delayed.resolve()
+      await chmod(file, 0o600)
+      await page.unroute(csvSelectors.presentationModule)
+      await page.goto('about:blank')
+      await releaseFixture(root)
+    }
+  },
+}
+
+export const csvPresentationFailure: Scenario = {
+  name: 'csv-presentation-failure',
+  description:
+    'Contain a failed CSV table chunk while retaining source and recover through Reload app.',
+  requiresIsolatedServer: true,
+  async run(page, { step }) {
+    const root = await mkdtemp(scratchPath('fregat-csv-chunk-failure-'))
+    try {
+      await writeFile(path.join(root, 'fruit.csv'), ORIGINAL)
+      await openFixtureWorkspace(page, root)
+      await openFileFromTree(page, 'fruit.csv')
+      const source = await selectors.editorInput(page).first().elementHandle()
+      ok(source, 'The original source must be mounted')
+      await page.route(csvSelectors.presentationModule, (route) => route.abort('failed'))
+      await csvSelectors.mode(page, 'Table').click()
+      await csvSelectors.presentationError(page).waitFor()
+      strictEqual(await csvSelectors.preparing(page).count(), 0)
+      await selectors.editorRows(page).filter({ hasText: 'pear' }).waitFor()
+      await assertCsvSourceIdentity(page, source)
+      strictEqual(await source.evaluate((node) => node.isConnected), true)
+      await step('failed-presentation-retains-same-source')
+      await page.unroute(csvSelectors.presentationModule)
+      await selectors.reloadApp(page).click()
+      await waitForApp(page)
+      await csvSelectors.mode(page, 'Table').click()
+      await csvSelectors.cell(page, 2, 1).waitFor()
+      strictEqual(await csvSelectors.cell(page, 2, 1).getAttribute('title'), 'pear')
+      await step('presentation-recovers-after-reload')
+    } finally {
+      await page.unroute(csvSelectors.presentationModule)
+      await page.goto('about:blank')
+      await releaseFixture(root)
+    }
+  },
+}
+
+async function denyCsvRead(file: string) {
+  const writer = await open(file, 'r+')
+  try {
+    await chmod(file, 0)
+    await writer.writeFile(EDITED)
+  } finally {
+    await writer.close()
+  }
+}
+
+async function assertCsvSourceIdentity(
+  page: Page,
+  source: ElementHandle<HTMLElement | SVGElement>,
+) {
+  strictEqual(
+    await selectors
+      .editorInput(page)
+      .first()
+      .evaluate((node, held) => node === held, source),
+    true,
+  )
 }

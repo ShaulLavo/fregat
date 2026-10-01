@@ -213,6 +213,8 @@ import {
   csvQueryFailure,
   csvTextSave,
   csvKeyboardNavigation,
+  csvPresentationReadiness,
+  csvPresentationFailure,
 } from './csv-table'
 import { markdownSplitView } from './markdown-split-view'
 import { markdownAuthoring } from './markdown-authoring'
@@ -626,6 +628,8 @@ export const scenarios: readonly Scenario[] = [
   csvKeyboardNavigation,
   csvEngineFailure,
   csvQueryFailure,
+  csvPresentationReadiness,
+  csvPresentationFailure,
   markdownSplitView,
   markdownAuthoring,
   markdownPreviewClobber,

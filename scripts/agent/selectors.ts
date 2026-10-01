@@ -4,6 +4,9 @@ import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
 export const csvSelectors = {
   engineModule: '**/src/features/workbench/utils/csv.ts*',
+  presentationModule: '**/src/features/workbench/utils/csv-presentation.ts*',
+  presentationError: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'CSV table could not load' }),
   table: (page: Page) => page.getByRole('table', { name: 'CSV rows', exact: true }),
   scroll: (page: Page) =>
     page

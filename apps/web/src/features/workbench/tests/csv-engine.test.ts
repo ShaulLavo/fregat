@@ -1,7 +1,8 @@
 import { QueryClient } from '@tanstack/react-query'
 import { expect, test } from '../../../../test/fixtures'
 import { loadCsvEngineMutationOptions } from '@/features/workbench/utils/csv-engine'
-import { csvEngineQueryKeys } from '@/features/workbench/utils/query-keys'
+import { loadCsvPresentationMutationOptions } from '@/features/workbench/utils/csv-presentation-loader'
+import { csvEngineQueryKeys, csvPresentationQueryKeys } from '@/features/workbench/utils/query-keys'
 import { runMutation } from '@/lib/mutations/run'
 import { useCsvPresentation } from '@/features/workbench/state/csv-presentation'
 import { tabId } from '@/lib/documents/utils/identity'
@@ -36,5 +37,21 @@ test('table, text and header choices belong to each tab', () => {
     expect(useCsvPresentation.getState().tabs[first]?.header).toBe(true)
   } finally {
     useCsvPresentation.setState(saved, true)
+  }
+})
+
+test('presentation imports settle one serialized module cache before resolving', async () => {
+  const client = new QueryClient()
+  try {
+    const options = loadCsvPresentationMutationOptions(client)
+    const first = runMutation(client, options, undefined)
+    const second = runMutation(client, options, undefined)
+    const loaded = await first
+    expect(client.getQueryData(csvPresentationQueryKeys.presentation())).toBe(loaded)
+    expect(await second).toBe(loaded)
+    expect(typeof loaded.Table).toBe('function')
+    expect(typeof loaded.Actions).toBe('function')
+  } finally {
+    client.clear()
   }
 })
