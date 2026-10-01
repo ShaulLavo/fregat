@@ -274,6 +274,60 @@ describe('a fixture whose stdin closes mid-approval', () => {
   }, 30_000)
 })
 
+describe('the scenario Codex fixture config/read contract', () => {
+  it.each(['file-attachments', 'mcp-approval', 'background-liveness'])(
+    'returns the consumed empty config shape in %s mode',
+    async (scenario) => {
+      const { root, file, repo } = fixtureRoot(scenario, 'native-codex.mjs', 'codex.mjs')
+      writeFileSync(path.join(root, 'scenario'), scenario)
+      const fixture = new FixtureProcess(file, [], { cwd: repo, env: { CODEX_HOME: root } })
+      try {
+        fixture.send({ id: 1, method: 'config/read', params: { cwd: repo } })
+        expect(await fixture.next((message) => message.id === 1)).toEqual({
+          id: 1,
+          result: { config: {}, origins: {}, layers: null },
+        })
+        fixture.send({ id: 2, method: 'config/unsupported', params: {} })
+        expect(await fixture.next((message) => message.id === 2)).toEqual({
+          id: 2,
+          error: { code: -32601, message: 'Unsupported verification method config/unsupported' },
+        })
+      } finally {
+        fixture.child.kill()
+        await fixture.exited
+      }
+    },
+  )
+
+  it('retains MCP scenario configuration origins and requested layers', async () => {
+    const { root, file, repo } = fixtureRoot('mcp-config', 'native-codex.mjs', 'codex.mjs')
+    writeFileSync(path.join(root, 'scenario'), 'mcp-management')
+    const fixture = new FixtureProcess(file, [], { cwd: repo, env: { CODEX_HOME: root } })
+    try {
+      fixture.send({ id: 1, method: 'config/read', params: { cwd: repo, includeLayers: true } })
+      const response = await fixture.next((message) => message.id === 1)
+      expect(response.error).toBeUndefined()
+      expect(Object.keys(response.result.config.mcp_servers).sort()).toEqual([
+        'broken',
+        'linear',
+        'sentry',
+      ])
+      expect(Object.keys(response.result.origins).sort()).toEqual([
+        'mcp_servers.broken.command',
+        'mcp_servers.linear.url',
+        'mcp_servers.sentry.url',
+      ])
+      expect(response.result.layers.map((layer: Message) => layer.name.type)).toEqual([
+        'user',
+        'project',
+      ])
+    } finally {
+      fixture.child.stdin.end()
+      await fixture.exited
+    }
+  })
+})
+
 describe('the harness reaping native fixture processes', () => {
   it('kills a recorded child still running in its checkout, and nothing it cannot identify', async () => {
     const checkout = mkdtempSync(path.join(scratch, 'reap-'))
