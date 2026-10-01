@@ -61,6 +61,9 @@
         "agent/browser.ts",
         "claude-gpt/run.ts",
         "large-file/bench.ts",
+        "heavy/pi/run.ts",
+        "heavy/pi/setup.ts",
+        "heavy/pi/sync.ts",
         "agent/injected/renders.ts",
         "agent/injected/style-marks.ts",
         "agent/fixtures/fake-*.mjs",
@@ -98,7 +101,7 @@
         "parity/snooze.ts",
         "parity/wake.ts"
       ],
-      "ignoreBinaries": ["ssh-keygen"]
+      "ignoreBinaries": ["flock", "ssh-keygen", "systemd-run"]
     },
     ".": {
       "ignoreDependencies": ["typescript-api"]

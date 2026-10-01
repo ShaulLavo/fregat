@@ -5,19 +5,21 @@ Raspberry Pi from this machine. Measurements that need a quiet fast machine stay
 
 ## The host
 
-|         |                                                                                      |
-| ------- | ------------------------------------------------------------------------------------ |
-| Model   | Raspberry Pi 4 Model B Rev 1.2                                                       |
-| CPU     | 4 × Cortex-A72, aarch64                                                              |
-| Memory  | 3.7 GiB, 2 GiB zram swap (off inside lane scopes)                                    |
-| OS      | Debian 13 (trixie), kernel `6.18.39+rpt-rpi-v8`                                      |
-| Disk    | 29 GB SD card                                                                        |
-| Tailnet | `pi`, 100.94.222.118                                                                 |
-| Runtime | mesh (user service with linger), Bun from `packageManager`, git, Playwright Chromium |
+|         |                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------- |
+| Model   | Raspberry Pi 4 Model B Rev 1.2                                                              |
+| CPU     | 4 × Cortex-A72, aarch64                                                                     |
+| Memory  | 3.7 GiB, 2 GiB zram swap (off inside lane slices)                                           |
+| OS      | Debian 13 (trixie), kernel `6.18.39+rpt-rpi-v8`, systemd 257                                |
+| Disk    | 29 GB SD card                                                                               |
+| Tailnet | `pi`, 100.94.222.118                                                                        |
+| Runtime | mesh (user service with linger), Bun from `packageManager`, git, rsync, Playwright Chromium |
 
-The kernel boots with `cgroup_disable=memory` and no PSI. `setup.sh --enable-cgroups` appends
-`cgroup_enable=memory psi=1` to `/boot/firmware/cmdline.txt` (backup beside it as
-`cmdline.txt.before-lane`) and reboots; without it a `MemoryMax` cap is silently ignored.
+The kernel boots with `cgroup_disable=memory` and no PSI, so `MemoryMax` is silently ignored.
+`setup.ts --enable-cgroups` reads `/boot/firmware/cmdline.txt` and refuses anything but one line
+holding `root=` without `psi=0` or `cgroup_disable=memory`. It adds whichever of
+`cgroup_enable=memory` and `psi=1` is missing, keeps the first backup as `cmdline.txt.before-lane`,
+rereads the file, and reboots only after the write checks out.
 
 ## Access
 
@@ -36,25 +38,35 @@ Files move over ssh; commands run through `mesh pi --`, so a run survives a drop
 ## Use
 
 ```bash
-scripts/heavy/pi/setup.sh                 # once, and after a Bun or Playwright bump
-bun run build:workspaces                  # through the heavy wrapper; the Pi builds nothing
-scripts/heavy/pi/sync.sh --web <built-web-dir>
-scripts/heavy/pi/run.sh large-file -- bun scripts/large-file/bench.ts \
-  --web-root \$HOME/fregat-lane/web --sizes 1,10 --memory-mib 2560 --out \$LANE_RUN
+bun run build:workspaces                   # through the heavy wrapper; the Pi builds nothing
+bun scripts/heavy/pi/setup.ts              # once, and after a Bun or Playwright bump
+bun scripts/heavy/pi/sync.ts --web <built-web-dir> [--include <untracked file>]…
+bun scripts/heavy/pi/run.ts large-file -- bun scripts/large-file/bench.ts \
+  --web-root \$HOME/fregat-lane/web --sizes 1,10 --out \$LANE_RUN
 ```
 
-`sync.sh` checks out this tree's commit on the Pi (`~/fregat-lane/platform`), applies its
-uncommitted changes and untracked files, copies the built workspaces and runs
-`bun install --frozen-lockfile --ignore-scripts`. Tree-sitter grammar packages have no arm64
-prebuilds and the editor loads their wasm, so their native install scripts are skipped.
+The lane is one directory under the Pi user's home (`--lane`, default `fregat-lane`, lowercase
+letters, digits and dashes). Setup marks it with `.fregat-lane`; sync and run refuse a lane that
+is missing the marker, is a symlink, or resolves elsewhere.
 
-`run.sh` runs the command from the Pi's checkout inside a `MemoryMax=3G`, swap-off scope
-(`--memory-max`), writes `lane.json` (host, exit, wall time, memory peak, CPU time, OOM kills) and
-copies the run directory to `/work/tmp/fregat-evidence/<time>-<label>-pi/`.
+`sync.ts` checks out this tree's commit in `<lane>/platform`, applies the tracked changes against
+HEAD and copies the built workspace `dist/` directories, then runs
+`bun install --frozen-lockfile --ignore-scripts` (tree-sitter grammar packages have no arm64
+prebuilds; the editor loads their wasm). Untracked files stay here unless named with `--include`;
+gitignored, tracked and secret-looking paths (`.env*`, `*.pem`, `*key*`, `*credential*`) are
+refused, and changes plus includes are capped at `--max-transfer-mib` (64). Sync lists the
+untracked files it left, and the bench's `source.json` on the Pi shows the same gap.
+
+`run.ts` runs the command from the lane checkout in its own slice, capped at `--memory-max` (3G)
+with swap off. `$HEAVY_JOB_SLICE` names that slice, and bench cases join it with `--slice=`, so the
+cap and the totals in `lane.json` (exit, wall time, memory peak, CPU time, OOM kills) cover them.
+The run directory is copied to `/work/tmp/fregat-evidence/<time>-<label>-<id>-pi/`; a run whose
+evidence does not arrive exits 74 even when its command succeeded.
 
 ## Reading the numbers
 
-Headless Chromium rasterizes with SwiftShader on the Pi and on this machine alike; the Pi's GPU is
-unused. Each large-file result records `host` and `rendering` (the WebGL renderer string), and
-`comparison.md` shows both. Software-rendered key latency includes CPU rasterization, so it is a
-CPU-bound stress number, not what a display attached to the Pi would show.
+Each large-file result records `host` and `rendering`: Chromium's GPU feature status for page
+`rasterization` and `gpu_compositing` (the values chrome://gpu shows), read over CDP. Headless
+Chromium reports `disabled_software` for both on the Pi and on this machine, and the Pi's GPU is
+unused. Key latency there includes CPU rasterization: a CPU-bound stress number, not what a
+display attached to the Pi would show. The samples are keydown to `requestAnimationFrame` callback.

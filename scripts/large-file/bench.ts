@@ -7,6 +7,7 @@ import { releaseFixture } from '../agent/fixture-workspace'
 import { createScriptError } from '../structured-errors'
 import { runCase, type Highlighting } from './run'
 import { comparisonReport } from './report'
+import { caseScopeCommand } from './case-scope'
 import { captureRevision, recordedBuildSource } from './provenance'
 
 const { values } = parseArgs({
@@ -127,21 +128,12 @@ for (const { size, highlighting } of cases) {
   if (values['two-byte']) args.push('--two-byte')
   if (values.profile) args.push('--profile')
   const unit = `platform-large-file-${process.pid}-${size}-${highlighting}.scope`
-  const cmd =
-    process.platform === 'linux'
-      ? [
-          'systemd-run',
-          '--user',
-          '--scope',
-          '--quiet',
-          `--unit=${unit}`,
-          '-p',
-          `MemoryMax=${memoryMiB}M`,
-          '-p',
-          'MemorySwapMax=0',
-          ...args,
-        ]
-      : args
+  const cmd = caseScopeCommand({
+    unit,
+    memoryMiB,
+    command: args,
+    slice: process.env.HEAVY_JOB_SLICE || undefined,
+  })
   const child = Bun.spawn(cmd, {
     cwd: checkoutRoot,
     env: { ...process.env, TMPDIR: caseOutput },

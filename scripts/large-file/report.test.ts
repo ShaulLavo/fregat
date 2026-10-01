@@ -13,7 +13,9 @@ test('labels each row with its host and rendering path', () => {
       browser: '153.0.8010.12',
       host: { name: 'pi', arch: 'arm64', cpus: 4, memoryBytes: 3_976_200_192 },
       rendering: {
-        renderer: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))',
+        rasterization: 'disabled_software',
+        compositing: 'disabled_software',
+        glRenderer: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))',
         path: 'software',
       },
     },
