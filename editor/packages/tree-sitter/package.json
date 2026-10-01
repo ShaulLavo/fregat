@@ -27,7 +27,7 @@
     "build": "bun ../../scripts/build-package.ts",
     "bench:syntax": "bun bench/treeSitter-syntax.ts",
     "test": "vitest run --exclude '**/*.browser.test.ts' && bun run test:browser",
-    "test:browser": "vitest run --browser.enabled --browser.headless test/treeSitter-workerClient.browser.test.ts test/native-coverage.browser.test.ts test/markdown.browser.test.ts",
+    "test:browser": "vitest run --browser.enabled --browser.headless test/treeSitter-workerClient.browser.test.ts test/native-coverage.browser.test.ts test/markdown.browser.test.ts test/capture-address.browser.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
@@ -36,8 +36,8 @@
   },
   "dependencies": {
     "@singapore-editor/core": "workspace:*",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#4505683e843b71ef2d0cb3938eb0c9a503c28147",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#f73fbfd866b94a33791afff08a7278546b1771a2"
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#9ca896688749f4043f6ddf7ffc00993cd781e434",
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#059451d3c167443643630d471c2c2d61c13b10ff"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
