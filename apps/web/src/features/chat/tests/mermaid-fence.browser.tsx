@@ -1,4 +1,4 @@
-import { page } from 'vitest/browser'
+import { commands, page } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import '@workspace/ui/globals.css'
@@ -13,6 +13,13 @@ import { AssistantMarkdown } from '../components/assistant-markdown'
 import { ChatWorkspaceRootContext } from '../providers/workspace-root-context'
 import { loadedMermaid, setMermaidLoader } from '../state/mermaid'
 import delayedFontUrl from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url'
+
+// Registered in `vitest.browser.config.ts` under `browser.commands`, which carries no types.
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    delayRequest: (input: { readonly ms: number; readonly path: string }) => Promise<void>
+  }
+}
 
 const DIAGRAM = 'A graph:\n\n```mermaid\ngraph TD\n  A[Start] --> B[End]\n```\n'
 
@@ -128,6 +135,42 @@ describe('mermaid fences', () => {
       document.fonts.delete(face)
     }
   }, 30_000)
+
+  it.each([
+    ['measures with the selected face while it downloads', 1000, 'loaded'],
+    ['gives up on a face that is still downloading', 5000, 'loading'],
+  ])(
+    '%s',
+    async (_name, delayMs, status) => {
+      // A face no text has used yet starts loading only when the diagram measures with it.
+      const path = `${delayedFontUrl}?first-paint-${delayMs}`
+      await commands.delayRequest({ ms: delayMs, path })
+      const face = new FontFace('FirstPaintDiagramFace', `url(${JSON.stringify(path)})`)
+      const chart = '```mermaid\nflowchart TD\n A[MMMMMMMMMMMMM] --> B[End]\n```'
+      // Mounting the providers applies the settings' `--font-ui`, so the face is chosen after.
+      renderDiagram(true, chart)
+      await vi.waitFor(() => expect(mermaidCodeBlock()).not.toBeNull())
+      document.fonts.add(face)
+      document.documentElement.style.setProperty('--font-ui', 'FirstPaintDiagramFace, serif')
+      try {
+        renderDiagram(false, chart)
+        await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
+        expect(face.status).toBe(status)
+        if (status !== 'loaded') return
+
+        const first = mermaidDiagram()!.getAttribute('viewBox')
+        await document.fonts.ready
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        expect(mermaidDiagram()!.getAttribute('viewBox')).toBe(first)
+      } finally {
+        // A load still in flight would remeasure diagrams in later tests.
+        await face.load().catch(() => {})
+        document.documentElement.style.removeProperty('--font-ui')
+        document.fonts.delete(face)
+      }
+    },
+    30_000,
+  )
 
   it('discards pending diagrams after a font revision and after unmount', async () => {
     const first = Promise.withResolvers<{ svg: string }>()

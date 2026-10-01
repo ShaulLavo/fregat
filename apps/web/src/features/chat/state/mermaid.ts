@@ -6,6 +6,7 @@ import { mermaidQueryKeys } from '@/features/chat/utils/query-keys'
 import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
 import type mermaid from 'mermaid'
 import { withIsolatedDiagramClasses } from '@/features/chat/state/diagram-parser'
+import { diagramFontLoaded } from '@/features/chat/state/diagram-font'
 import type { MermaidTheme } from '@/features/chat/utils/diagram-theme'
 
 export type MermaidRenderer = {
@@ -99,8 +100,8 @@ async function renderDiagram(mermaid: MermaidModule, chart: string, theme: Merma
     )
       ? candidate
       : 'unknown'
+  const font = await diagramFontLoaded(theme.fontFamily, chart)
   try {
-    await globalThis.document?.fonts?.ready
     mermaid.initialize({
       fontFamily: theme.fontFamily,
       securityLevel: 'strict',
@@ -119,6 +120,7 @@ async function renderDiagram(mermaid: MermaidModule, chart: string, theme: Merma
       area: 'chat',
       durationMs: Math.round(performance.now() - startedAt),
       diagramType,
+      font,
       outcome: 'rendered',
     })
     return svg
@@ -128,6 +130,7 @@ async function renderDiagram(mermaid: MermaidModule, chart: string, theme: Merma
       area: 'chat',
       durationMs: Math.round(performance.now() - startedAt),
       diagramType,
+      font,
       outcome: 'failed',
       failure: error instanceof Error ? 'renderer-error' : 'unknown-error',
     })
