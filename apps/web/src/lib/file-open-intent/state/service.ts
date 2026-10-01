@@ -1,3 +1,4 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { materializeFileSnapshotDocumentText } from '@/lib/file-snapshot'
 import { isRecord } from '@workspace/utils/objects'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
@@ -677,6 +678,7 @@ class FileOpenIntentServiceState {
     if (!this.isEnabled()) return
     if (canonicalRoot !== this.rootPath) return
     if (!this.pathBelongsToRoot(canonical)) return
+    if (isPdfFile(canonical)) return
     if (intent.knownSize !== undefined && intent.knownSize > MAX_PREPARED_FILE_BYTES) {
       this.finishImmediateIntent(intent, canonicalRoot, canonical, 'rejected', {
         reason: 'size-gated',

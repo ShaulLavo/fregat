@@ -1,3 +1,5 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { pdfError } from '@/lib/pdf-viewer/structured-errors'
 import {
   materializeFileSnapshotDocumentText,
   materializeFileSnapshotText,
@@ -1636,9 +1638,11 @@ function recordFromMap<T>(
 }
 
 export function supportsTextFile(file: FileSnapshot): boolean {
-  return !file.seemsBinary
+  return !file.seemsBinary && !isPdfFile(file.path)
 }
 
 function assertTextFile(file: FileSnapshot): void {
-  if (!supportsTextFile(file)) throw createBinaryFileError(file.size)
+  if (supportsTextFile(file)) return
+  if (isPdfFile(file.path)) throw pdfError('TEXT_UNAVAILABLE', file.size, 'registration')
+  throw createBinaryFileError(file.size)
 }

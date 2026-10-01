@@ -1,3 +1,4 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { decodeText } from '@workspace/contracts/text-encoding'
 import { chatAttachmentUrlPath, type ChatAttachment } from '@workspace/contracts'
 import { queryOptions } from '@tanstack/react-query'
@@ -9,6 +10,7 @@ export function attachmentFileUrl(attachment: ChatAttachment, origin: string) {
 }
 
 export function canPreviewAttachmentText(attachment: ChatAttachment) {
+  if (isPdfFile(attachment.name, attachment.mimeType)) return false
   return (
     attachment.sizeBytes <= 256 * 1024 &&
     (attachment.mimeType.startsWith('text/') ||

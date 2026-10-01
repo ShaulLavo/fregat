@@ -1,3 +1,5 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { PdfPresentation } from '@/components/pdf-viewer/presentation'
 import type { ComponentProps } from 'react'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -9,11 +11,13 @@ import { FileFacts } from '@/features/workbench/components/file-facts'
 
 export function FileDocumentBody(props: ComponentProps<typeof FileEditorBody>) {
   const { fileState, fileVersion, target } = props
+  const pdf = target.kind === 'file' && isPdfFile(target.resource.path)
   const oversized = useOversizedFileFacts(
     target.kind === 'file' ? target.resource.path : filesystemPath(''),
     fileVersion,
-    target.kind === 'file' && fileState.status === 'error',
+    target.kind === 'file' && !pdf && fileState.status === 'error',
   )
+  if (target.kind === 'file' && pdf) return <PdfPresentation path={target.resource.path} />
   if (target.kind === 'file' && fileState.status === 'ready' && fileState.data.seemsBinary) {
     return <FileFacts file={fileState.data} />
   }

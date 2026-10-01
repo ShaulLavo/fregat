@@ -40,9 +40,9 @@ test('previews text literally and downloads from its owner', async () => {
 test('binary files stay outside the image lightbox and show a download fallback', async () => {
   const attachment = v.parse(chatAttachmentSchema, {
     type: 'file',
-    id: 'pdf',
-    name: 'report.pdf',
-    mimeType: 'application/pdf',
+    id: 'archive',
+    name: 'report.zip',
+    mimeType: 'application/zip',
     sizeBytes: 100,
   })
   if (attachment.type !== 'file') return expect.fail('Expected file attachment')
