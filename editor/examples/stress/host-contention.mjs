@@ -1,19 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
 
-/*
- * An ESTIMATE of CPU time on the runner's pinned CPUs that its own process tree did not account
- * for, read at scenario-group boundaries (Linux only). Its assumptions, recorded with each reading
- * where they can be observed:
- * - /proc/stat busy time includes interrupt, softirq and steal time, kept separate here;
- * - own-tree CPU counts every CPU a process ran on, so it matches the pinned set only while every
- *   descendant is confined to it (`ownTreeConfined`, checked at the end read);
- * - /proc is read process by process, so a child exiting or being reaped between reads can be
- *   missed or counted twice; the residual is therefore signed and never clamped;
- * - counters move in USER_HZ ticks (`userHz`), so short groups carry tick-sized error.
- * A residual is correlation evidence about other work on the measurement cores. It identifies no
- * process and is not an admission criterion.
- */
+// Linux-only signed estimate of CPU time on the pinned cores outside the runner's own process tree.
+// It cannot attribute that time to processes and must not admit, reject or retry runs.
 
 let userHz = null
 
