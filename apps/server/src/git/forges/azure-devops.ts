@@ -29,6 +29,10 @@ const pullRequestSchema = v.object({
  */
 export const azureDevOps: ForgeProvider = {
   kind: 'azure-devops',
+  discussion: {
+    kind: 'unsupported',
+    reason: 'Open Azure DevOps to read and post pull request discussion.',
+  },
   async support(context) {
     return cliSupport(
       await az(context, ['account', 'show', '--query', 'user.name', '--output', 'tsv']),

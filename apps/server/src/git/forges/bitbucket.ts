@@ -24,6 +24,65 @@ const pullRequestSchema = v.object({
  */
 export const bitbucket: ForgeProvider = {
   kind: 'bitbucket',
+  discussion: {
+    kind: 'supported',
+    async read(context, number) {
+      const authorization = await requireCredentials(context)
+      const response = await request(
+        context,
+        authorization,
+        `pullrequests/${number}/comments?pagelen=100`,
+      )
+      if (!response.ok)
+        throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({
+          forge: context.forge.name,
+          internal: { at: 'comments', status: response.status },
+        })
+      const page = parseForgeJson(
+        context,
+        v.object({
+          next: v.optional(v.string()),
+          values: v.array(
+            v.object({
+              id: v.number(),
+              created_on: v.string(),
+              deleted: v.optional(v.boolean()),
+              inline: v.optional(v.unknown()),
+              parent: v.optional(v.unknown()),
+              content: v.object({ raw: v.string() }),
+              user: v.nullable(v.object({ display_name: v.string() })),
+              links: v.object({ html: v.object({ href: v.pipe(v.string(), v.url()) }) }),
+            }),
+          ),
+        }),
+        await response.text(),
+        'comments',
+      )
+      return {
+        comments: page.values
+          .filter((row) => !row.deleted && !row.inline && !row.parent)
+          .map((row) => ({
+            id: String(row.id),
+            body: row.content.raw,
+            author: row.user?.display_name ?? 'Deleted account',
+            createdAt: row.created_on,
+            url: row.links.html.href,
+          })),
+        truncated: Boolean(page.next),
+      }
+    },
+    async post(context, number, body) {
+      const authorization = await requireCredentials(context)
+      const response = await request(context, authorization, `pullrequests/${number}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ content: { raw: body } }),
+      })
+      if (!response.ok)
+        throw gitPullRequestErrors.PULL_REQUEST_COMMENT_FAILED({
+          internal: { status: response.status },
+        })
+    },
+  },
   async support(context) {
     return (await credentials(context)) ? 'ready' : 'unauthenticated'
   },

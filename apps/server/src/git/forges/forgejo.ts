@@ -8,8 +8,10 @@ import {
   requireCreated,
   requireRepositoryCreated,
   requireSuccess,
+  requireCommentPosted,
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
+import { parseIssueComments } from './issue-comments'
 
 /** Recently updated pull requests read per lookup; the branch filter runs on them. */
 const PAGE_SIZE = 50
@@ -36,6 +38,43 @@ const pullSchema = v.object({
  */
 export const forgejo: ForgeProvider = {
   kind: 'forgejo',
+  discussion: {
+    kind: 'supported',
+    async read(context, number) {
+      const login = await requireLogin(context)
+      const result = requireSuccess(
+        context,
+        await tea(context, [
+          'api',
+          '--login',
+          login.name,
+          apiUrl(login, context, `issues/${number}/comments?limit=100`),
+        ]),
+        'comments',
+      )
+      return parseIssueComments(context, result.stdout)
+    },
+    async post(context, number, body) {
+      const login = await requireLogin(context)
+      requireCommentPosted(
+        context,
+        await tea(
+          context,
+          [
+            'api',
+            '--login',
+            login.name,
+            '--method',
+            'POST',
+            '--data',
+            '@-',
+            apiUrl(login, context, `issues/${number}/comments`),
+          ],
+          JSON.stringify({ body }),
+        ),
+      )
+    },
+  },
   async support(context) {
     const result = await forgeCommand(context, ['tea', 'login', 'list', '--output', 'json'])
     if (result.exitCode !== 0 && !result.stderr && !result.stdout) return 'cli-missing'

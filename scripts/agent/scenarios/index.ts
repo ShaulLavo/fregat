@@ -386,6 +386,7 @@ import { worktreeCleanupOnDelete } from './worktree-cleanup-on-delete'
 import { sessionPullRequestSync } from './session-pull-request-sync'
 import { sessionPullRequestBadge } from './session-pull-request-badge'
 import { sessionAutoSettle } from './session-auto-settle'
+import { gitForgeDiscussion } from './git-forge-discussion'
 import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
 import { worktreeSetupImport } from './worktree-setup-import'
@@ -785,6 +786,7 @@ export const scenarios: readonly Scenario[] = [
   sessionPullRequestBadge,
   sessionAutoSettle,
   gitMergeRequest,
+  gitForgeDiscussion,
   gitClonePublish,
   worktreeSetupImport,
   editorCaretBurst,

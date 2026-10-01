@@ -7,3 +7,8 @@ export const historyKeys = {
 }
 
 export const disabledDiffQueryKey = ['git', 'diffs', 'disabled'] as const
+
+export const pullRequestDiscussionKeys = {
+  comments: (path: string, number: number) =>
+    [...gitKeys.all, 'pull-request-comments', path, number] as const,
+}
