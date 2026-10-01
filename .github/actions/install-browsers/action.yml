@@ -32,8 +32,9 @@ runs:
         browsers="$(printf '%s' "$BROWSERS" | sha256sum | cut -d ' ' -f 1)"
         echo "key=browser-apt-v1-${ImageOS}-${ImageVersion}-${RUNNER_ARCH}-${version}-${browsers}" >> "$GITHUB_OUTPUT"
 
-    - name: Cache Ubuntu dependency archives
-      uses: actions/cache@v4
+    - name: Restore Ubuntu dependency archives
+      id: cache
+      uses: actions/cache/restore@v4
       with:
         path: ~/.cache/playwright-apt/*.deb
         key: ${{ steps.apt.outputs.key }}
@@ -47,3 +48,10 @@ runs:
         set -euo pipefail
         read -r -a browsers <<< "$BROWSERS"
         "$PLAYWRIGHT" install --with-deps "${browsers[@]}"
+
+    - name: Save Ubuntu dependency archives
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.cache/playwright-apt/*.deb
+        key: ${{ steps.apt.outputs.key }}
