@@ -110,6 +110,14 @@ export function laneRunName(label: string) {
   return `${stamp}-${safe}-${randomBytes(3).toString('hex')}`
 }
 
+/**
+ * Lets queued signal handlers run. A signal that lands during synchronous work (a sync, an ssh
+ * spawnSync) is handled only once the event loop turns, so a cancel check must wait for that.
+ */
+export function signalsDelivered() {
+  return new Promise<void>((resolve) => setImmediate(resolve))
+}
+
 export function signalExit(reason: unknown) {
   const signal = typeof reason === 'string' ? (reason as NodeJS.Signals) : 'SIGTERM'
   return 128 + (constants.signals[signal] ?? constants.signals.SIGTERM)
@@ -168,6 +176,7 @@ function readTotals(job: LaneRun, transport: LaneTransport) {
  */
 export async function runOnLane(job: LaneRun, options: LaneOptions): Promise<LaneOutcome> {
   const { signal, transport } = options
+  await signalsDelivered()
   if (signal?.aborted) {
     return { exitCode: signalExit(signal.reason), totals: null, started: false, abandoned: false }
   }

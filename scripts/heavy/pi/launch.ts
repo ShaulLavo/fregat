@@ -9,7 +9,14 @@ import { shellQuote } from '../../../apps/server/src/utils/shell'
 import { createScriptError, scriptFailureText } from '../../structured-errors'
 import { fregatCheckout } from './checkout'
 import { DEFAULT_LIMITS } from './lane-command'
-import { accountingText, laneRunName, runOnLane, signalExit, sshTransport } from './lane-job'
+import {
+  accountingText,
+  laneRunName,
+  runOnLane,
+  signalExit,
+  signalsDelivered,
+  sshTransport,
+} from './lane-job'
 import { check, resolveLane } from './remote'
 import { syncLane } from './sync'
 
@@ -37,7 +44,9 @@ try {
   const directory = check(['git', 'rev-parse', '--show-prefix'], 'Finding the job directory')
     .toString()
     .trim()
+  await signalsDelivered()
   if (!cancel.signal.aborted) syncLane({ host: HOST, lane: LANE })
+  await signalsDelivered()
   if (cancel.signal.aborted) {
     console.error('[pi-lane] cancelled before the Pi job started')
     const exitCode = signalExit(cancel.signal.reason)

@@ -153,6 +153,28 @@ describe.skipIf(!userScopes)('a lane run', () => {
     expect(existsSync(laneRunDirectory(job))).toBe(false)
   })
 
+  // The signal lands while the process is busy in synchronous work, as during syncLane; its
+  // handler only runs once the event loop turns, which must happen before the job starts.
+  test('never starts a job whose cancel signal arrived during synchronous work', () => {
+    const job = laneRun('queued', 'touch "$LANE_RUN/ran"')
+    const program = `
+      import { runOnLane } from ${JSON.stringify(path.join(import.meta.dirname, 'lane-job.ts'))}
+      const cancel = new AbortController()
+      process.on('SIGUSR2', () => cancel.abort('SIGTERM'))
+      Bun.spawnSync(['kill', '-USR2', String(process.pid)])
+      Bun.spawnSync(['sleep', '0.2'])
+      const transport = { shell: (s) => ['bash', '-c', s], path: (f) => f }
+      const outcome = await runOnLane(${JSON.stringify(job)}, { transport, signal: cancel.signal, heartbeatMs: 200 })
+      console.log(JSON.stringify(outcome))
+    `
+    const child = spawnSync('bun', ['-e', program], { encoding: 'utf8' })
+    expect(JSON.parse(child.stdout.trim().split('\n').at(-1)!)).toMatchObject({
+      started: false,
+      exitCode: 143,
+    })
+    expect(existsSync(laneRunDirectory(job))).toBe(false)
+  }, 40_000)
+
   test('stops a job cancelled while it starts up', async () => {
     const job = laneRun('starting', 'sleep 30')
     const cancel = new AbortController()
