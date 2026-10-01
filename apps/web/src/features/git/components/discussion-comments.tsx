@@ -34,7 +34,7 @@ export function DiscussionComments({
           <p className='text-xs font-medium'>{comment.author}</p>
           {comment.context ? (
             <p className='text-muted-foreground font-mono text-xs break-words'>
-              Thread #{comment.context.threadId}
+              Thread #{comment.context.discussionId}
               {comment.context.path ? ` · ${comment.context.path}` : ''}
             </p>
           ) : null}

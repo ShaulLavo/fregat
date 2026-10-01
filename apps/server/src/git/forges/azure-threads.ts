@@ -47,7 +47,7 @@ export function parseAzureThreads(context: ForgeContext, stdout: string) {
         createdAt: comment.publishedDate ?? '',
         url: null,
         context: {
-          threadId: String(thread.id),
+          discussionId: String(thread.id),
           path: thread.threadContext?.filePath?.trim() || null,
         },
       })

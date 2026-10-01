@@ -1164,8 +1164,12 @@ describe('forge discussion capabilities', () => {
         comment: { kind: 'unsupported' },
         review: { kind: 'unsupported' },
         comments: [
-          { id: '3:1', body: 'Inline comment', context: { threadId: '3', path: '/src/main.ts' } },
-          { id: '3:2', body: 'Reply', context: { threadId: '3', path: '/src/main.ts' } },
+          {
+            id: '3:1',
+            body: 'Inline comment',
+            context: { discussionId: '3', path: '/src/main.ts' },
+          },
+          { id: '3:2', body: 'Reply', context: { discussionId: '3', path: '/src/main.ts' } },
         ],
       })
       expect(forge.commands('az').at(-1)?.argv).toEqual(

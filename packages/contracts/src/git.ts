@@ -398,7 +398,7 @@ export type GitPullRequestComment = {
   body: string
   createdAt: string
   url: string | null
-  context?: { threadId: string; path: string | null }
+  context?: { discussionId: string; path: string | null }
 }
 
 export type GitPullRequestComments =
