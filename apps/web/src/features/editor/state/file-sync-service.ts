@@ -1,5 +1,5 @@
 import { materializeFileSnapshotText, type FileSnapshot } from '@/lib/file-snapshot'
-import { createClientInvariantError } from '@/lib/structured-errors'
+import { createBinaryFileError, createClientInvariantError } from '@/lib/structured-errors'
 import { decodedAsText } from '@workspace/contracts'
 import { pieceTableDocumentText } from '@singapore-editor/core/document'
 
@@ -197,6 +197,7 @@ export class FileSyncService {
   ): Promise<WorkspaceFileSnapshot> {
     signal.throwIfAborted()
     const file = await this.ports.readFileContent(path, signal)
+    if (file.seemsBinary) throw createBinaryFileError(file.size)
     signal.throwIfAborted()
     return {
       byteLength: file.size,
@@ -582,7 +583,7 @@ export class FileSyncService {
       const cached = this.queryClient.getQueryData<FileSnapshot>(
         fileSystemKeys.fileSnapshot(rename.from),
       )
-      if (cached && !candidates.has(rename.to))
+      if (cached && !cached.seemsBinary && !candidates.has(rename.to))
         candidates.set(rename.to, materializeFileSnapshotText(cached))
       candidates.delete(rename.from)
     }

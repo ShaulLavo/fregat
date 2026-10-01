@@ -54,3 +54,34 @@ test('missing attachment rejects the preview query instead of showing empty cont
     queryClient.clear()
   }
 })
+
+test('binary bytes with a text MIME type return the download fallback from the owning server', async ({
+  server,
+}) => {
+  const fetcher = directInProcessFetcher(server)
+  const bytes = new Uint8Array([0, 1, 2, 255, 0, 7])
+  const issued = await fetcher(`${server.origin}/attachments/uploads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'file',
+      name: 'data.txt',
+      mimeType: 'text/plain',
+      sizeBytes: bytes.length,
+    }),
+  })
+  const ticket = await issued.json()
+  const uploaded = await fetcher(`${server.origin}${ticket.uploadPath}`, {
+    method: 'PUT',
+    body: bytes,
+  })
+  const attachment = v.parse(chatAttachmentSchema, await uploaded.json())
+  const url = attachmentFileUrl(attachment, server.origin)
+  const queryClient = new QueryClient()
+  try {
+    expect(await queryClient.query(attachmentTextOptions(url, fetcher))).toBeNull()
+    expect(new Uint8Array(await (await fetcher(url)).arrayBuffer())).toEqual(bytes)
+  } finally {
+    queryClient.clear()
+  }
+})

@@ -10,6 +10,8 @@ export const projectMenuQueryKeys = {
 }
 
 export const pagedFileQueryKeys = {
+  facts: (path: string, version: string | null) =>
+    ['workbench', 'file-facts', path, version] as const,
   limits: (path: string) => ['workbench', 'file-limit', path] as const,
   instance: (instance: string, path: string, generation: number) =>
     ['workbench', 'paged-file', instance, path, generation] as const,

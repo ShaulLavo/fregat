@@ -1482,6 +1482,7 @@ class FileOpenIntentServiceState {
   ): string | null {
     if (abortSignal.aborted || !this.generationIsCurrent(lifecycleGeneration)) return 'aborted'
     if (file.path !== path) return 'path-mismatch'
+    if (file.seemsBinary) return 'binary-file'
     if (file.size > MAX_PREPARED_FILE_BYTES) return 'size-gated'
     if (!this.pathBelongsToRoot(path)) return 'root-mismatch'
     if (this.isActive(path) || this.isMounted(path)) return 'already-active'

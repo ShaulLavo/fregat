@@ -1,3 +1,4 @@
+import { binaryFileOpen, binaryFileRemote } from './binary-file-open'
 import { ghosttySiteFit } from './ghostty-site-fit'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
@@ -52,7 +53,7 @@ import { chatQueueAway } from './chat-queue-away'
 import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
 import { screenshotDrop } from './screenshot-drop'
-import { fileAttachments } from './file-attachments'
+import { binaryFileAttachment, fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
@@ -420,6 +421,8 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  binaryFileOpen,
+  binaryFileRemote,
   ghosttySiteFit,
   devPackageUpdates,
   editorPagedReadonly,
@@ -479,6 +482,7 @@ export const scenarios: readonly Scenario[] = [
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
+  binaryFileAttachment,
   screenshotDrop,
   chatStashContext,
   chatDraftSentLeftover,

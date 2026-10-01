@@ -66,6 +66,12 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 export const selectors = {
   fileReadRetry: (page: Page) => page.getByRole('button', { name: 'Retry', exact: true }),
   fileReadErrorHeader: (page: Page) => page.locator('header[aria-label="File read error"]'),
+  chatFileFallback: (page: Page) =>
+    page.getByText('Download this file to view its contents.', { exact: true }),
+  fileFacts: (page: Page) => page.getByRole('region', { name: 'File facts' }),
+  revealFileFacts: (page: Page) => page.getByRole('button', { name: 'Reveal in files' }),
+  missingFileMessage: (page: Page) =>
+    page.getByText('This file no longer exists.', { exact: true }),
   forgeDiscussion: (page: Page) =>
     page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
   forgeComment: (page: Page) => page.getByRole('textbox', { name: 'Comment', exact: true }),

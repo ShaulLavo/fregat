@@ -3,7 +3,12 @@ import { formatContextTokens } from '@workspace/client-core/chat/context-usage'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { formatModelCost, usageCostArithmetic } from '@/features/settings/utils/usage'
+import {
+  formatModelCost,
+  usageCacheSavings,
+  usageCostArithmetic,
+} from '@/features/settings/utils/usage'
+import { UsageCacheSavings } from '@/features/settings/components/usage-cache-savings'
 import { chartFill } from '@/lib/chart-fills'
 
 /**
@@ -60,6 +65,9 @@ export function UsageModelRow({
         >
           {formatModelCost(row)}
         </span>
+      </span>
+      <span className='text-muted-foreground text-2xs text-left'>
+        <UsageCacheSavings costUsd={usageCacheSavings(row)} />
       </span>
       <span
         aria-hidden='true'
