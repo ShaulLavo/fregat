@@ -1,11 +1,13 @@
 import { page } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import '@workspace/ui/globals.css'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
+import { settingsSnapshot } from '../../../../test/factories/settings'
 import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
 import { AssistantMarkdown } from '../components/assistant-markdown'
 import { ChatWorkspaceRootContext } from '../providers/workspace-root-context'
@@ -19,6 +21,9 @@ let queryClient: QueryClient
 
 beforeEach(() => {
   queryClient = createTestQueryClient()
+  // A settings document fetched mid-test makes AppearanceProvider rewrite the `--font-ui` these
+  // tests set, so the diagram reverts to the default face.
+  queryClient.setQueryData(settingsKeys.document(), settingsSnapshot())
   seedBootMirrorTheme('dark')
   const container = document.createElement('main')
   container.style.width = '720px'
