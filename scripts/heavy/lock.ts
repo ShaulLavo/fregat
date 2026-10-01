@@ -14,13 +14,34 @@ export type LockMode = 'shared' | 'exclusive'
 /**
  * A flock(2) on the file, or null when a conflicting holder has it. It is the lock flock(1)
  * takes, so scripts using either exclude each other. The descriptor is close-on-exec: a
- * job's children never inherit the lock, and it dies with this process.
+ * job's children never inherit the lock unless it is handed to them, and it dies with this
+ * process.
  */
 export function tryLock(file: string, mode: LockMode = 'exclusive'): number | null {
   const fd = openSync(file, 'a')
-  if (libc.symbols.flock(fd, operation(mode) | LOCK_NB) === 0) return fd
+  if (lockDescriptor(fd, mode)) return fd
   closeSync(fd)
   return null
+}
+
+/** Takes the lock on an open descriptor without waiting; false when another holder has it. */
+export function lockDescriptor(fd: number, mode: LockMode = 'exclusive') {
+  return libc.symbols.flock(fd, operation(mode) | LOCK_NB) === 0
+}
+
+/** Opens a file another process may remove at any moment; null when it is already gone. */
+export function openExisting(file: string): number | null {
+  return unlessMissing(() => openSync(file, 'r'))
+}
+
+/** The value, or null when the path does not exist (yet, or any more); other errors throw. */
+export function unlessMissing<T>(read: () => T): T | null {
+  try {
+    return read()
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw error
+  }
 }
 
 /** Blocks until the lock is free. Only for locks every holder keeps for milliseconds. */

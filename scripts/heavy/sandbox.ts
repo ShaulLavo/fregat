@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import {
   existsSync,
   mkdirSync,
@@ -19,30 +20,44 @@ export { processExists as alive }
 const RUN = path.join(import.meta.dirname, 'run.ts')
 export const MiB = 2 ** 20
 export const userScopes = spawnSync('systemd-run', ['--user', '--scope', '-q', 'true']).status === 0
-const roots: string[] = []
+const boxes: Box[] = []
 
 /** Removes every sandbox made since the last call; tests call it in `afterEach`. */
 export function removeSandboxes() {
-  for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true })
+  for (const box of boxes.splice(0)) {
+    spawnSync('systemctl', ['--user', 'stop', `${box.sliceRoot}.slice`])
+    rmSync(box.root, { force: true, recursive: true })
+  }
 }
 
-/** A private state directory, log directory, settings home and `/proc` stand-in. */
+/**
+ * A private state directory, log directory, settings home, `/proc` stand-in and slice root:
+ * slices are machine-wide, so a sandbox's jobs never see, count or reap anyone else's.
+ */
 export function sandbox() {
   const root = mkdtempSync(path.join(tmpdir(), 'heavy-run-'))
-  roots.push(root)
   const box = {
     home: path.join(root, 'home'),
     logs: path.join(root, 'logs'),
     proc: path.join(root, 'proc'),
     root,
+    sliceRoot: `heavyt${randomBytes(4).toString('hex')}`,
     state: path.join(root, 'state'),
   }
+  boxes.push(box)
   for (const dir of [box.home, box.state, path.join(box.proc, 'pressure')])
     mkdirSync(dir, { recursive: true })
   return box
 }
 
-export type Box = ReturnType<typeof sandbox>
+export type Box = {
+  readonly home: string
+  readonly logs: string
+  readonly proc: string
+  readonly root: string
+  readonly sliceRoot: string
+  readonly state: string
+}
 
 /** What admission reads from `/proc`: available memory, memory pressure, load per core. */
 export function writeMachine(
@@ -79,7 +94,15 @@ export function start(
   command: readonly string[],
   options: StartOptions = {},
 ) {
-  const args = [RUN, '--state-dir', box.state, '--settings-home', box.home]
+  const args = [
+    RUN,
+    '--state-dir',
+    box.state,
+    '--settings-home',
+    box.home,
+    '--slice-root',
+    box.sliceRoot,
+  ]
   if (options.logDir !== false) args.push('--log-dir', box.logs)
   if (options.machine) args.push('--proc', box.proc)
   if (options.jobClass) args.push('--class', options.jobClass)

@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
 # Runs inside a systemd scope, so the cgroup still exists when the command exits and its totals
 # can be read. Bash, not Bun: this process is counted in the memory peak.
-# Usage: scope.sh [--slice] <accounting file> <command…>
+# Usage: scope.sh [--slice] [--grace <seconds>] <accounting file> <command…>
 # --slice: the job is the scope's parent slice (this scope and the scopes nested-scope.sh opened
 # beside it). Without it the job is this scope alone, as for a bench case inside a job.
+# --grace: seconds the job's leftover processes get between TERM and KILL (default 10).
+# Slot locks the wrapper hands over on fds 3–5 stay with this shim, which outlives the job's
+# processes, and are closed for the command so nothing it starts can keep them.
 whole_slice=
-if [ "$1" = --slice ]; then
-  whole_slice=1
-  shift
-fi
+grace=10
+while [ "${1:-}" = --slice ] || [ "${1:-}" = --grace ]; do
+  if [ "$1" = --slice ]; then
+    whole_slice=1
+    shift
+    continue
+  fi
+  grace=$2
+  shift 2
+done
 out=$1
 shift
 trap : INT TERM HUP
-"$@"
+"$@" 3<&- 4<&- 5<&-
 rc=$?
 cgroup=/sys/fs/cgroup$(cut -d: -f3- /proc/self/cgroup)
 drain_root=$cgroup
@@ -46,10 +55,9 @@ settle() {
 
 # What the command left running is stopped before the totals are read: it would otherwise
 # keep using the machine after the slot is released, and its usage would go unrecorded.
-# TERM gets ten seconds, as a test runner needs to shut its workers down; then KILL.
 scan TERM
 left=$found
-settle 100
+settle $((grace * 10))
 if [ "$found" -gt 0 ]; then
   scan KILL
   settle 20

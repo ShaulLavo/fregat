@@ -1,8 +1,9 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
 import path from 'node:path'
 
-import { tryLock, unlock } from './lock'
+import { processExists } from '../../apps/server/scripts/process-exists'
+import { tryLock, unlessMissing, unlock } from './lock'
 
 const MiB = 2 ** 20
 
@@ -21,37 +22,27 @@ export type Limits = {
   readonly cpuLoadLimit: number
 }
 
-export type Charge = {
-  readonly estimateBytes: number
-  /** The job's slice `memory.current`, or null before the slice exists. */
-  readonly currentBytes: number | null
-}
-
-export type Decision =
-  | { readonly admit: true; readonly reason: string }
-  | { readonly admit: false; readonly reason: string }
+export type Decision = { readonly admit: boolean; readonly reason: string }
 
 /**
- * Whether a job with this estimate may start beside the running jobs. A running job is
- * charged what it has not used yet of its estimate: what it already uses is gone from
- * MemAvailable. A job always starts when none runs, since waiting would not free anything.
+ * Whether a job with this estimate may start beside running jobs charged `charges` bytes each
+ * (a job's estimate, or the ceiling of one whose wrapper is gone). MemAvailable is taken as it
+ * is: what a running job uses already shows there, so its whole estimate stays reserved. A job
+ * always starts when none runs, since waiting would not free anything.
  */
 export function decide(
   estimateBytes: number,
-  running: readonly Charge[],
+  charges: readonly number[],
   readings: Readings,
   limits: Limits,
 ): Decision {
-  if (running.length === 0) return { admit: true, reason: 'no heavy job is running' }
-  const committed = running.reduce(
-    (total, job) => total + Math.max(0, job.estimateBytes - (job.currentBytes ?? 0)),
-    0,
-  )
+  if (charges.length === 0) return { admit: true, reason: 'no heavy job is running' }
+  const committed = charges.reduce((total, charge) => total + charge, 0)
   const free = readings.memAvailableBytes - committed - limits.reserveBytes
   if (free < estimateBytes) {
     return {
       admit: false,
-      reason: `memory: ${mib(free)} MiB free after ${running.length} running job(s) and the reserve, ${mib(estimateBytes)} MiB needed`,
+      reason: `memory: ${mib(free)} MiB free after ${charges.length} running job(s) and the reserve, ${mib(estimateBytes)} MiB needed`,
     }
   }
   if (readings.memoryPressure >= limits.memoryPressureLimit) {
@@ -82,6 +73,67 @@ export function readReadings(procRoot: string): Readings {
   }
 }
 
+/** A job slice under the slice root, as the cgroup tree shows it. */
+export type LiveSlice = {
+  readonly id: string
+  readonly slice: string
+  readonly ceilingBytes: number
+}
+
+/**
+ * Every `<root>-<id>.slice` the user manager has under `<root>.slice`: the cgroup tree is what
+ * runs, whatever happened to the wrappers. A slice removed during the scan is gone.
+ */
+export function liveSlices(root: string): LiveSlice[] {
+  const dir = sliceRootPath(root)
+  const prefix = `${root}-`
+  return (unlessGone(() => readdirSync(dir)) ?? [])
+    .filter((name) => name.startsWith(prefix) && name.endsWith('.slice'))
+    .flatMap((slice) => {
+      const max = unlessGone(() => readFileSync(path.join(dir, slice, 'memory.max'), 'utf8'))
+      if (max === null) return []
+      const id = slice.slice(prefix.length, -'.slice'.length)
+      return [{ ceilingBytes: Number(max.trim()) || 0, id, slice }]
+    })
+}
+
+/** The slice's `memory.current`, or null once it is gone. */
+export function sliceMemory(root: string, slice: string) {
+  const text = unlessGone(() =>
+    readFileSync(path.join(sliceRootPath(root), slice, 'memory.current'), 'utf8'),
+  )
+  return text === null ? null : Number(text)
+}
+
+// A cgroup removed under a read reports ENOENT, or ENODEV once the file was already open.
+function unlessGone<T>(read: () => T): T | null {
+  try {
+    return read()
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENODEV') return null
+    throw error
+  }
+}
+
+function sliceRootPath(root: string) {
+  const uid = process.getuid?.() ?? 0
+  return `/sys/fs/cgroup/user.slice/user-${uid}.slice/user@${uid}.service/${root}.slice`
+}
+
+/**
+ * Who asked this machine to drain, or null. An external tool that needs it quiet writes
+ * `drain.request` as `pid=<pid> since=<time> holder=<who>`; while that process lives, no
+ * new job starts and the running ones finish. A request from a dead process is ignored.
+ */
+export function drainRequest(stateDir: string): string | null {
+  const text = unlessMissing(() => readFileSync(path.join(stateDir, 'drain.request'), 'utf8'))
+  if (text === null) return null
+  const pid = Number(/\bpid=(\d+)/.exec(text)?.[1])
+  if (!pid || !processExists(pid)) return null
+  return text.trim()
+}
+
 /**
  * Why the legacy slot locks forbid a start, or null. Running jobs hold all three shared, so
  * a tool that takes them exclusively waits for the running jobs to drain; once it waits
@@ -106,14 +158,6 @@ function blockedRequests() {
     .split('\n')
     .filter((line) => line.includes('->'))
     .map((line) => Number(line.trim().split(/\s+/)[6]?.split(':')[2]))
-}
-
-/** The job slice's `memory.current`; systemd's user manager nests it under `heavy.slice`. */
-export function sliceMemory(id: string) {
-  const uid = process.getuid?.() ?? 0
-  const file = `/sys/fs/cgroup/user.slice/user-${uid}.slice/user@${uid}.service/heavy.slice/heavy-${id}.slice/memory.current`
-  if (!existsSync(file)) return null
-  return Number(readFileSync(file, 'utf8')) || null
 }
 
 function mib(bytes: number) {

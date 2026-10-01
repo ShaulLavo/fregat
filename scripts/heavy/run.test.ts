@@ -46,7 +46,7 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
       oomKills: 0,
       source: 'heavy',
     })
-    expect(record?.unit).toMatch(/^heavy-[0-9a-f]+\.scope$/)
+    expect(record?.unit).toMatch(new RegExp(`^${box.sliceRoot}-[0-9a-f]+\\.scope$`))
     expect(record?.commitHash).toMatch(/^[0-9a-f]{40}$/)
   })
 
@@ -180,9 +180,11 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
       path.join(import.meta.dirname, 'status.ts'),
       '--state-dir',
       box.state,
+      '--slice-root',
+      box.sliceRoot,
     ])
     expect(status.stdout.toString()).toMatch(
-      /running: 1\n {2}listed \(light, \d+ MiB\) \d+s pid=\d+/,
+      /running: 1\n {2}listed \(light, \d+ MiB\) \d+s pid=\d+ cwd=\S+ using \d+ MiB/,
     )
     await job.done
   })

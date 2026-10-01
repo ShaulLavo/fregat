@@ -21,7 +21,7 @@ test('a pi job runs through the Pi launcher with its unit, accounting file and c
 })
 
 test('a local job runs in its slice, and the shim accounts for the whole slice', () => {
-  expect(localCommand({ ...launch, slice: 'heavy-1.slice' })).toEqual([
+  expect(localCommand({ ...launch, graceSeconds: 7, slice: 'heavy-1.slice' })).toEqual([
     'systemd-run',
     '--user',
     '--scope',
@@ -34,6 +34,8 @@ test('a local job runs in its slice, and the shim accounts for the whole slice',
     'bash',
     SCOPE_SHIM,
     '--slice',
+    '--grace',
+    '7',
     '/run/a',
     'bun',
     'x y',

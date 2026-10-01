@@ -1360,6 +1360,20 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'memory', 'pressure', 'psi', 'admission'],
   }),
+  'developer.heavyJobStopGraceSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    // Long enough for a test runner to shut its workers down after SIGTERM.
+    default: 10,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job stop grace',
+    description:
+      'Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'stop', 'cancel', 'grace', 'sigterm', 'sigkill'],
+  }),
   'developer.heavyJobCpuLoadLimit': defineSetting({
     schema: v.pipe(v.number(), v.minValue(0.1), v.maxValue(16)),
     default: 1,

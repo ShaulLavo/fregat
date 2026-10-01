@@ -1,5 +1,5 @@
 import {
-  existsSync,
+  closeSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -9,7 +9,7 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 
-import { tryLock, unlock } from './lock'
+import { lockDescriptor, openExisting, tryLock, unlessMissing, unlock, waitLock } from './lock'
 
 /** A job in the state directory: waiting in `queue/`, or running in `jobs/`. */
 export type Entry = {
@@ -28,10 +28,22 @@ export type Held = { readonly entry: Entry; readonly file: string; readonly fd: 
 
 type Place = 'queue' | 'jobs'
 
-// Names sort in arrival order, so the queue is first-in first-out.
+/**
+ * Joins the queue with the next ticket of a counter kept under its own lock, so arrival order
+ * holds across processes whatever their clocks say. The entry is published under that lock.
+ */
 export function enqueue(stateDir: string, entry: Entry): Held {
-  const ticket = `${String(Date.now()).padStart(15, '0')}-${String(process.pid).padStart(8, '0')}-${entry.id}`
-  return write(stateDir, 'queue', ticket, entry)
+  const dir = path.join(stateDir, 'queue')
+  mkdirSync(dir, { recursive: true })
+  const lock = waitLock(path.join(dir, 'sequence.lock'))
+  try {
+    const counter = path.join(dir, 'sequence')
+    const ticket = Number(readCounter(counter)) + 1
+    writeFileSync(counter, String(ticket))
+    return write(stateDir, 'queue', `${String(ticket).padStart(12, '0')}-${entry.id}`, entry)
+  } finally {
+    unlock(lock)
+  }
 }
 
 /** Moves a waiting entry to `jobs/`; the new file is locked before the old one is dropped. */
@@ -49,21 +61,32 @@ export function release(held: Held) {
   unlock(held.fd)
 }
 
-/** Live entries in arrival order. An unlocked file belongs to a dead wrapper and is removed. */
+/**
+ * Live entries in arrival order. An unlocked file belongs to a dead wrapper and is removed; a
+ * file that disappears during the scan belongs to a wrapper that just finished, and is gone.
+ */
 export function live(stateDir: string, place: Place): Entry[] {
   const dir = path.join(stateDir, place)
-  if (!existsSync(dir)) return []
-  return readdirSync(dir)
+  return (unlessMissing(() => readdirSync(dir)) ?? [])
     .filter((name) => name.endsWith('.json'))
     .toSorted()
     .flatMap((name) => {
-      const file = path.join(dir, name)
-      const fd = tryLock(file)
-      if (fd === null) return [readEntry(file)]
-      rmSync(file, { force: true })
-      unlock(fd)
-      return []
+      const entry = liveEntry(path.join(dir, name))
+      return entry ? [entry] : []
     })
+}
+
+// Read through the descriptor that saw the lock: the owner may unlink the path meanwhile.
+function liveEntry(file: string): Entry | null {
+  const fd = openExisting(file)
+  if (fd === null) return null
+  try {
+    if (!lockDescriptor(fd)) return JSON.parse(readFileSync(fd, 'utf8')) as Entry
+    rmSync(file, { force: true })
+    return null
+  } finally {
+    closeSync(fd)
+  }
 }
 
 function write(stateDir: string, place: Place, name: string, entry: Entry): Held {
@@ -77,6 +100,6 @@ function write(stateDir: string, place: Place, name: string, entry: Entry): Held
   return { entry, fd, file }
 }
 
-function readEntry(file: string): Entry {
-  return JSON.parse(readFileSync(file, 'utf8')) as Entry
+function readCounter(file: string) {
+  return unlessMissing(() => readFileSync(file, 'utf8').trim()) || '0'
 }

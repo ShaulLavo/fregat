@@ -412,6 +412,13 @@
       "minimum": 0,
       "type": "integer"
     },
+    "developer.heavyJobStopGraceSeconds": {
+      "default": 10,
+      "description": "Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.",
+      "maximum": 600,
+      "minimum": 1,
+      "type": "integer"
+    },
     "developer.simulatedLatencyMs": {
       "default": 0,
       "description": "Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.",

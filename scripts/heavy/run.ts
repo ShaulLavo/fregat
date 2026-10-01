@@ -11,14 +11,21 @@ import {
 import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
-import { decide, legacyHold, readReadings, sliceMemory, type Limits } from './admission'
-import { HOSTS, isHost, startJob, type Host, type JobOutcome, type JobSpec } from './job'
+import {
+  decide,
+  drainRequest,
+  legacyHold,
+  liveSlices,
+  readReadings,
+  type Limits,
+} from './admission'
+import { HOSTS, isHost, reapSlice, startJob, type Host, type JobOutcome, type JobSpec } from './job'
 import { acquirePiLane, DEFAULT_STATE_DIR, tryLock, unlock, waitLock } from './lock'
 import { enqueue, live, promote, release, type Entry, type Held } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
@@ -28,6 +35,7 @@ const FLAGS = [
   '--host',
   '--max-wall',
   '--state-dir',
+  '--slice-root',
   '--log-dir',
   '--settings-home',
   '--proc',
@@ -43,13 +51,15 @@ type Options = {
   readonly label: string
   readonly command: readonly string[]
   readonly stateDir: string
+  /** Job slices are `<root>-<id>.slice` under `<root>.slice`; tests keep their own root. */
+  readonly sliceRoot: string
   readonly logDir: string | null
   readonly settingsHome: string
   readonly procRoot: string
   readonly maxWallSec?: number
 }
 
-type Config = { readonly classes: Classes; readonly limits: Limits }
+type Config = { readonly classes: Classes; readonly limits: Limits; readonly graceSeconds: number }
 
 try {
   process.exit(await run(parseOptions(Bun.argv.slice(2))))
@@ -101,6 +111,7 @@ function parseOptions(argv: readonly string[]): Options {
     maxWallSec,
     procRoot: flags.get('--proc') ?? '/proc',
     settingsHome: flags.get('--settings-home') ?? productionStateHome,
+    sliceRoot: flags.get('--slice-root') ?? 'heavy',
     stateDir: flags.get('--state-dir') ?? DEFAULT_STATE_DIR,
   }
 }
@@ -108,24 +119,30 @@ function parseOptions(argv: readonly string[]): Options {
 async function run(options: Options) {
   const cwd = process.cwd()
   const id = randomBytes(6).toString('hex')
+  const config = readConfig(options.settingsHome)
   const queuedAt = performance.now()
   const placed =
-    options.host === 'pi' ? await admitPi(options, cwd, id) : await admitLocal(options, cwd, id)
+    options.host === 'pi'
+      ? await admitPi(options, config, cwd, id)
+      : await admitLocal(options, config, cwd, id)
   const queuedMs = Math.round(performance.now() - queuedAt)
   console.error(
     `[wave-heavy] started '${options.label}' on ${options.host} after ${Math.round(queuedMs / 1000)}s: ${placed.reason}`,
   )
-
-  const job = startJob(placed.spec)
-  // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
-  // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
-  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
-    process.on(signal, () => job.stop(signal))
+  // Released however the launch or the job ends, so a failed launch leaves no admission held.
+  try {
+    const job = startJob(placed.spec)
+    // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
+    // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+      process.on(signal, () => job.stop(signal))
+    }
+    const outcome = await job.done
+    record(options, { admission: placed.reason, budget: placed.budget, cwd, id, outcome, queuedMs })
+    return outcome.exitCode
+  } finally {
+    placed.release()
   }
-  const outcome = await job.done
-  record(options, { admission: placed.reason, budget: placed.budget, cwd, id, outcome, queuedMs })
-  placed.release()
-  return outcome.exitCode
 }
 
 /** Where a job was admitted, and how to give its place back once it has exited. */
@@ -136,8 +153,12 @@ type Placed = {
   readonly release: () => void
 }
 
-async function admitLocal(options: Options, cwd: string, id: string): Promise<Placed> {
-  const config = readConfig(options.settingsHome)
+async function admitLocal(
+  options: Options,
+  config: Config,
+  cwd: string,
+  id: string,
+): Promise<Placed> {
   const budget = config.classes[options.jobClass]
   const entry: Entry = {
     cwd,
@@ -160,14 +181,17 @@ async function admitLocal(options: Options, cwd: string, id: string): Promise<Pl
       ceilingBytes: budget.ceilingMiB * MiB,
       command: options.command,
       cwd,
+      graceSeconds: config.graceSeconds,
       host: 'local',
       id,
+      sliceRoot: options.sliceRoot,
+      slotLocks: admitted.slots,
     },
   }
 }
 
 // The Pi runs one job at a time under its own ceiling, so this machine's memory is not asked.
-async function admitPi(options: Options, cwd: string, id: string): Promise<Placed> {
+async function admitPi(options: Options, config: Config, cwd: string, id: string): Promise<Placed> {
   const { fd, holder } = await acquirePiLane(options.stateDir)
   const since = new Date().toTimeString().slice(0, 8)
   writeFileSync(holder, `${options.label} pid=${process.pid} since=${since} cwd=${cwd}\n`)
@@ -178,7 +202,14 @@ async function admitPi(options: Options, cwd: string, id: string): Promise<Place
       clearHolder(holder)
       unlock(fd)
     },
-    spec: { command: options.command, cwd, host: 'pi', id, maxWallSec: options.maxWallSec },
+    spec: {
+      command: options.command,
+      cwd,
+      graceSeconds: config.graceSeconds,
+      host: 'pi',
+      id,
+      maxWallSec: options.maxWallSec,
+    },
   }
 }
 
@@ -223,15 +254,14 @@ function attemptAdmission(
       (entry) => entry.id === waiting.entry.id,
     )
     if (ahead > 0) return { reason: `${ahead} job(s) ahead in the queue` }
+    const drain = drainRequest(options.stateDir)
+    if (drain) return { reason: `draining for ${drain}` }
     const hold = legacyHold(options.stateDir, SLOT_FILES)
     if (hold) return { reason: hold }
-    const running = live(options.stateDir, 'jobs').map((job) => ({
-      currentBytes: sliceMemory(job.id),
-      estimateBytes: job.estimateBytes,
-    }))
+    const charges = runningCharges(options)
     const decision = decide(
       waiting.entry.estimateBytes,
-      running,
+      charges,
       readReadings(options.procRoot),
       config.limits,
     )
@@ -248,9 +278,25 @@ function attemptAdmission(
   }
 }
 
+/**
+ * What each running job is charged. The cgroup tree is what runs: a job slice whose wrapper is
+ * gone (no live entry) is an orphan, charged its ceiling while this pass kills and removes it.
+ * A job admitted but not yet in its slice is charged through its live entry.
+ */
+function runningCharges(options: Options) {
+  const owned = new Map(live(options.stateDir, 'jobs').map((job) => [job.id, job.estimateBytes]))
+  const orphans = liveSlices(options.sliceRoot).filter((slice) => !owned.has(slice.id))
+  for (const orphan of orphans) {
+    console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
+    reapSlice(orphan.slice)
+  }
+  return [...owned.values(), ...orphans.map((orphan) => orphan.ceilingBytes)]
+}
+
 function readConfig(home: string): Config {
   return {
     classes: setting(home, 'developer.heavyJobClasses'),
+    graceSeconds: setting(home, 'developer.heavyJobStopGraceSeconds'),
     limits: {
       cpuLoadLimit: setting(home, 'developer.heavyJobCpuLoadLimit'),
       memoryPressureLimit: setting(home, 'developer.heavyJobMemoryPressureLimit'),

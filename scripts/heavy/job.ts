@@ -28,13 +28,17 @@ type Launch = {
   readonly command: readonly string[]
 }
 
-/** A local job's scope joins its slice; the shim drains and reads the whole slice. */
+/**
+ * A local job's scope joins its slice; the shim drains and reads the whole slice, and holds the
+ * slot locks it inherits on fds 3–5 for as long as the job's processes run.
+ */
 export function localCommand({
   unit,
   accountingFile,
   command,
   slice,
-}: Launch & { readonly slice: string }) {
+  graceSeconds,
+}: Launch & { readonly slice: string; readonly graceSeconds: number }) {
   return [
     'systemd-run',
     '--user',
@@ -51,6 +55,8 @@ export function localCommand({
     'bash',
     SCOPE_SHIM,
     '--slice',
+    '--grace',
+    String(graceSeconds),
     accountingFile,
     ...command,
   ]
@@ -89,63 +95,104 @@ export type JobOutcome = JobAccounting & {
   readonly wallMs: number
 }
 
-type JobBase = { readonly id: string; readonly command: readonly string[]; readonly cwd: string }
+type JobBase = {
+  readonly id: string
+  readonly command: readonly string[]
+  readonly cwd: string
+  /** Seconds between a stop signal and SIGKILL to everything the job runs. */
+  readonly graceSeconds: number
+}
 
-/** A local job carries its slice ceiling; a Pi job runs under the Pi's ceiling and wall limit. */
+/**
+ * A local job carries its slice root, ceiling and the shared slot-lock descriptors its scope
+ * keeps; a Pi job runs under the Pi's ceiling and wall limit.
+ */
 export type JobSpec =
-  | (JobBase & { readonly host: 'local'; readonly ceilingBytes: number })
+  | (JobBase & {
+      readonly host: 'local'
+      readonly sliceRoot: string
+      readonly ceilingBytes: number
+      readonly slotLocks: readonly number[]
+    })
   | (JobBase & { readonly host: 'pi'; readonly maxWallSec?: number })
 
 /**
- * Launches the job. A local job runs in its own slice, `heavy-<id>.slice`, whose ceiling is set
+ * Launches the job. A local job runs in its own slice, `<root>-<id>.slice`, whose ceiling is set
  * before the first process starts; `HEAVY_JOB_SLICE` names it, so scopes the job opens through
- * `nested-scope.sh` share its ceiling and accounting. `stop` signals every process of the job,
- * and `done` settles once the command and everything it left running have exited.
+ * `nested-scope.sh` share its ceiling and accounting. `stop` signals every process of the job
+ * and, if they are still running after the grace, kills them. `done` settles once they have all
+ * exited; the slice and its ceiling are removed however the launch or the job ends.
  */
 export function startJob(job: JobSpec) {
-  const unit = `heavy-${job.id}.scope`
+  const unit = `${job.host === 'local' ? job.sliceRoot : 'heavy'}-${job.id}.scope`
   const accountingFile = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `${unit}.accounting`)
-  const { cmd, slice } = placement(job, unit, accountingFile)
+  const slice = job.host === 'local' ? jobSlice(job) : null
   const started = performance.now()
-  const child = Bun.spawn({
-    cmd,
-    cwd: job.cwd,
-    env: {
-      ...process.env,
-      ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
-      VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
-    },
-    stdio: ['inherit', 'inherit', 'inherit'],
-  })
+  let child: ReturnType<typeof Bun.spawn>
+  try {
+    child = Bun.spawn({
+      cmd: launchCommand(job, unit, accountingFile),
+      cwd: job.cwd,
+      env: {
+        ...process.env,
+        ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
+        VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
+      },
+      stdio: ['inherit', 'inherit', 'inherit', ...(job.host === 'local' ? job.slotLocks : [])],
+    })
+  } catch (error) {
+    if (slice) removeSlice(slice)
+    throw error
+  }
 
   // Before systemd-run has made the scope, the signal ends systemd-run itself; the Pi
   // launcher forwards it to the Pi.
-  const stop = (signal: NodeJS.Signals) => {
+  const signalJob = (signal: NodeJS.Signals) => {
     child.kill(signal)
     if (slice) systemctl(['kill', `--signal=${signal}`, slice])
   }
+  let escalation: ReturnType<typeof setTimeout> | undefined
+  const stop = (signal: NodeJS.Signals) => {
+    signalJob(signal)
+    escalation ??= setTimeout(() => signalJob('SIGKILL'), job.graceSeconds * 1000)
+  }
 
-  const done = child.exited.then((): JobOutcome => {
-    const signalCode = child.signalCode
-    const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
-    const wallMs = Math.round(performance.now() - started)
-    const accounting = readAccounting(accountingFile)
-    if (slice) {
-      systemctl(['stop', slice])
-      systemctl(['revert', slice])
-    }
-    return { exitCode, slice, unit, wallMs, ...accounting }
-  })
+  const done = child.exited
+    .then((): JobOutcome => {
+      const signalCode = child.signalCode
+      const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
+      const wallMs = Math.round(performance.now() - started)
+      return { exitCode, slice, unit, wallMs, ...readAccounting(accountingFile) }
+    })
+    .finally(() => {
+      clearTimeout(escalation)
+      if (slice) removeSlice(slice)
+    })
   return { done, stop }
 }
 
-function placement(job: JobSpec, unit: string, accountingFile: string) {
+type LocalJob = Extract<JobSpec, { readonly host: 'local' }>
+
+function jobSlice(job: LocalJob) {
+  return `${job.sliceRoot}-${job.id}.slice`
+}
+
+function launchCommand(job: JobSpec, unit: string, accountingFile: string) {
   const launch = { accountingFile, command: job.command, unit }
-  if (job.host === 'pi')
-    return { cmd: piCommand({ ...launch, maxWallSec: job.maxWallSec }), slice: null }
-  const slice = `heavy-${job.id}.slice`
-  limitSlice(slice, job.ceilingBytes)
-  return { cmd: localCommand({ ...launch, slice }), slice }
+  if (job.host === 'pi') return piCommand({ ...launch, maxWallSec: job.maxWallSec })
+  limitSlice(jobSlice(job), job.ceilingBytes)
+  return localCommand({ ...launch, graceSeconds: job.graceSeconds, slice: jobSlice(job) })
+}
+
+/** Kills whatever still runs in a slice whose wrapper is gone, then removes it. */
+export function reapSlice(slice: string) {
+  systemctl(['kill', '--signal=SIGKILL', slice])
+  removeSlice(slice)
+}
+
+function removeSlice(slice: string) {
+  systemctl(['stop', slice])
+  systemctl(['revert', slice])
 }
 
 // No MemoryHigh: above it the kernel throttles a runaway into a crawl instead of killing it

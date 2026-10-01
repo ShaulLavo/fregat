@@ -32,29 +32,22 @@ describe('decide', () => {
     expect(decide(8 * GiB, [], swamped, limits).admit).toBe(true)
   })
 
-  test('charges a running job only the part of its estimate it has not used yet', () => {
-    const half = [{ currentBytes: 3 * GiB, estimateBytes: 6 * GiB }]
-    expect(decide(11 * GiB, half, calm, limits).admit).toBe(true)
-    expect(decide(11.5 * GiB, half, calm, limits).admit).toBe(false)
-    const over = [{ currentBytes: 9 * GiB, estimateBytes: 6 * GiB }]
-    expect(decide(14 * GiB, over, calm, limits).admit).toBe(true)
-  })
-
-  test('charges a job whose slice is not up yet its whole estimate', () => {
-    const fresh = [{ currentBytes: null, estimateBytes: 6 * GiB }]
-    expect(decide(8 * GiB, fresh, calm, limits)).toMatchObject({ admit: true })
-    expect(decide(8.1 * GiB, fresh, calm, limits)).toMatchObject({ admit: false })
+  test('reserves every running job its whole estimate beside what MemAvailable shows', () => {
+    expect(decide(8 * GiB, [6 * GiB], calm, limits).admit).toBe(true)
+    expect(decide(8.1 * GiB, [6 * GiB], calm, limits).admit).toBe(false)
+    expect(decide(7 * GiB, [6 * GiB, 4 * GiB], calm, limits)).toMatchObject({
+      admit: false,
+      reason: expect.stringContaining('after 2 running job(s)'),
+    })
   })
 
   test('holds a job while memory pressure or CPU load is at its limit', () => {
-    const running = [{ currentBytes: 0, estimateBytes: GiB }]
-    expect(decide(GiB, running, { ...calm, memoryPressure: 10 }, limits).reason).toContain(
+    expect(decide(GiB, [GiB], { ...calm, memoryPressure: 10 }, limits).reason).toContain(
       'memory pressure',
     )
-    expect(decide(GiB, running, { ...calm, cpuLoad: 1 }, limits).reason).toContain('CPU load')
-    expect(
-      decide(GiB, running, { ...calm, cpuLoad: 0.99, memoryPressure: 9.9 }, limits).admit,
-    ).toBe(true)
+    expect(decide(GiB, [GiB], { ...calm, cpuLoad: 1 }, limits).reason).toContain('CPU load')
+    const under = { ...calm, cpuLoad: 0.99, memoryPressure: 9.9 }
+    expect(decide(GiB, [GiB], under, limits).admit).toBe(true)
   })
 })
 
@@ -187,7 +180,7 @@ describe.skipIf(!userScopes)('the job slice', () => {
     expect(result.code).toBe(0)
     const record = recordOf(box, 'nested')
     expect(record?.memoryPeakBytes).toBeGreaterThanOrEqual(200 * MiB)
-    expect(record?.slice).toMatch(/^heavy-[0-9a-f]+\.slice$/)
+    expect(record?.slice).toMatch(new RegExp(`^${box.sliceRoot}-[0-9a-f]+\\.slice$`))
     expect(record).toMatchObject({
       ceilingBytes: 2048 * MiB,
       class: 'build',
