@@ -12,6 +12,29 @@ export const sessionNavigation: Scenario = {
   description:
     'Archive the current session into its project draft, preserve a background archive route, and delete into the first surviving session. Uses three sessions in a disposable project.',
   async run(page, { step }) {
+    let failedArchiveId: string | null = null
+    let interruptions = 0
+    await page.routeWebSocket(
+      (url) => url.pathname.endsWith('/orchestration/rpc'),
+      (socket) => {
+        const server = socket.connectToServer()
+        socket.onMessage((message) => {
+          const text = message.toString()
+          if (
+            failedArchiveId &&
+            text.includes('session.archive') &&
+            text.includes(failedArchiveId)
+          ) {
+            failedArchiveId = null
+            interruptions++
+            void socket.close({ code: 1001, reason: 'Fixture archive transport interrupted' })
+            void server.close({ code: 1001, reason: 'Fixture archive transport interrupted' })
+            return
+          }
+          server.send(message)
+        })
+      },
+    )
     const bases = collectOrchestrationBases(page)
     const base = await openChat(page)
     const remote = await connectSecondOwner(page, bases)
@@ -78,6 +101,20 @@ export const sessionNavigation: Scenario = {
         strictEqual(await page.evaluate(() => navigator.clipboard.readText()), worktree.branch)
       }
       await selectors.sessionByTitle(page, titles[1]!).click()
+      await page.waitForURL((url) => url.href.includes(ids[1]!) && !url.pathname.includes('/@'))
+      const beforeFailedArchive = new URL(page.url()).pathname
+      failedArchiveId = ids[1]!
+      await selectors.sessionByTitle(page, titles[1]!).click({ button: 'right' })
+      await selectors.archiveSession(page).click()
+      await selectors.toast(page, 'Session command failed').waitFor()
+      strictEqual(interruptions, 1)
+      strictEqual(new URL(page.url()).pathname, beforeFailedArchive)
+      strictEqual(
+        (await readShell(page, base)).sessions.find((session) => session.id === ids[1])?.archivedAt,
+        null,
+      )
+      await selectors.sessionByTitle(page, titles[1]!).waitFor()
+      await step('failed-current-archive-keeps-route-and-row')
       await selectors.sessionByTitle(page, titles[1]!).click({ button: 'right' })
       await selectors.archiveSession(page).click()
       await page.waitForURL(isDraftChatUrl)

@@ -406,6 +406,54 @@ describe('settings operation reducer', () => {
     expect(empty.raw).toEqual({})
   })
 
+  it('edits title models and scoped grouping without replacing other projects', () => {
+    const title = {
+      ...modelRef('codex', 'fixture-model'),
+      options: { reasoningEffort: 'low' },
+    }
+    const set = applyIdempotently(
+      { 'chat.projectTextGenerationModels': { other: title } },
+      {
+        kind: 'project.set',
+        key: 'chat.projectTextGenerationModels',
+        projectId: 'project-a',
+        value: title,
+      },
+    )
+    expect(set.raw['chat.projectTextGenerationModels']).toEqual({
+      other: title,
+      'project-a': title,
+    })
+    const removed = applyIdempotently(set.raw, {
+      kind: 'project.set',
+      key: 'chat.projectTextGenerationModels',
+      projectId: 'project-a',
+      value: null,
+    })
+    expect(removed.raw['chat.projectTextGenerationModels']).toEqual({ other: title })
+    expect(
+      v.safeParse(settingsOperationSchema, {
+        kind: 'project.set',
+        key: 'chat.projectTextGenerationModels',
+        projectId: 'project-a',
+        value: { model: '' },
+      }).success,
+    ).toBe(false)
+    const grouped = applyIdempotently(
+      { 'chat.projectGroupingOverrides': { 'owner-a:project-a': 'repository' } },
+      {
+        kind: 'project.set',
+        key: 'chat.projectGroupingOverrides',
+        projectId: 'owner-b:project-a',
+        value: 'separate',
+      },
+    )
+    expect(grouped.raw['chat.projectGroupingOverrides']).toEqual({
+      'owner-a:project-a': 'repository',
+      'owner-b:project-a': 'separate',
+    })
+  })
+
   it('refuses a project override that the record would not parse', () => {
     const parse = (value: unknown) =>
       v.safeParse(settingsOperationSchema, {

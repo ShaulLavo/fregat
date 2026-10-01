@@ -13,7 +13,16 @@ import {
   createFederationHarness,
   registerFederatedProject,
 } from '../../../test/factories/federation'
-import { transportFor } from '@/features/chat/state/active-transports'
+import {
+  closeChatTransports,
+  dispatchCommandForEnvironment,
+  transportFor,
+} from '@/features/chat/state/active-transports'
+import { readCachedEnvironmentBindings } from '@/lib/environments/state/binding-cache'
+import { selectServerConnection } from '@workspace/client-core/environments/state/store'
+import { createSessionLifecycleCommand } from '@workspace/client-core/chat/commands'
+import { createObservedInProcessClient } from '../../../test/client'
+import { installTestClient } from '../../../test/factories/client-binding'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { clientForQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
 import {
@@ -203,4 +212,88 @@ test('a missing boot mirror keeps desired names pending until a configured setti
     ),
   ).toBe(false)
   expect(transportFor(h.descriptorB.environmentId)?.closed).toBe(true)
+})
+
+test('cached primary reload stays connecting until fresh health replaces its closed transport and commands reach the owner', async ({
+  server,
+}) => {
+  const h = await createFederationHarness(server)
+  const project = await registerFederatedProject(h.serverA, h.clientA, 'reload-primary')
+  await waitFor(() =>
+    expect(useEnvironmentsStore.getState().entries[h.originA]?.phase).toBe('live'),
+  )
+  expect(
+    readCachedEnvironmentBindings(['local']).map((binding) => binding.descriptor.environmentId),
+  ).toContain(h.descriptorA.environmentId)
+  h.connections.stop()
+  h.application.dispose()
+  closeChatTransports()
+  useEnvironmentsStore.getState().forgetIdentity(h.originA)
+  const health = Promise.withResolvers<void>()
+  let healthReached = false
+  const observed = createObservedInProcessClient(h.serverA, async (request) => {
+    if (!new URL(request.url).pathname.endsWith('/health')) return
+    healthReached = true
+    await health.promise
+  })
+  const restoreClient = installTestClient(observed)
+  onTestFinished(restoreClient)
+  writeBootMirror(DEFAULT_SETTING_VALUES)
+  const restored = createEnvironmentConnections({
+    createTransport: (origin) =>
+      createChatTransport(origin, {
+        createSocket: inProcessOrchestrationSocketFactory({
+          app: h.serverA.app,
+          clientOrigin: h.serverA.origin,
+        }),
+      }),
+  })
+  onTestFinished(() => restored.stop())
+  const placeholder = transportFor(h.descriptorA.environmentId)
+  expect(placeholder?.closed).toBe(true)
+  expect(useEnvironmentsStore.getState().entries[h.originA]?.phase).toBe('connecting')
+  let liveWithClosedTransport = false
+  const unsubscribe = useEnvironmentsStore.subscribe((state) => {
+    if (state.entries[h.originA]?.phase !== 'live') return
+    if (transportFor(h.descriptorA.environmentId)?.closed !== false) liveWithClosedTransport = true
+  })
+  onTestFinished(unsubscribe)
+  const pin = createSessionLifecycleCommand(project.sessionId, { type: 'pin' })
+  try {
+    restored.start()
+    await waitFor(() => expect(healthReached).toBe(true))
+    expect(transportFor(h.descriptorA.environmentId)).toBe(placeholder)
+    expect(useEnvironmentsStore.getState().entries[h.originA]?.phase).toBe('connecting')
+    expect(selectServerConnection(useEnvironmentsStore.getState(), h.originA).phase).not.toBe(
+      'connected',
+    )
+    await expect(
+      dispatchCommandForEnvironment(h.descriptorA.environmentId, pin),
+    ).rejects.toMatchObject({ code: 'ORCHESTRATION_RPC_CLOSED' })
+    expect(
+      (await h.clientA.orchestration['shell-snapshot'].get()).data!.sessions[0]!.pinnedAt,
+    ).toBeNull()
+    health.resolve()
+    await waitFor(() =>
+      expect(useEnvironmentsStore.getState().entries[h.originA]?.phase).toBe('live'),
+    )
+    expect(transportFor(h.descriptorA.environmentId)?.closed).toBe(false)
+    expect(transportFor(h.descriptorA.environmentId)).not.toBe(placeholder)
+    await dispatchCommandForEnvironment(h.descriptorA.environmentId, pin)
+    expect(
+      (await h.clientA.orchestration['shell-snapshot'].get()).data!.sessions[0]!.pinnedAt,
+    ).not.toBeNull()
+    await waitFor(() =>
+      expect(
+        currentRailEnvironments().find(
+          (environment) => environment.environmentId === h.descriptorA.environmentId,
+        )?.phase,
+      ).toBe('live'),
+    )
+    expect(liveWithClosedTransport).toBe(false)
+  } finally {
+    health.resolve()
+    unsubscribe()
+    restored.stop()
+  }
 })
