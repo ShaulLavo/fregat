@@ -280,7 +280,7 @@
           "estimateMiB": 3072
         },
         "browser": {
-          "ceilingMiB": 8192,
+          "ceilingMiB": 10240,
           "estimateMiB": 5632
         },
         "build": {

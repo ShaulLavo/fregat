@@ -1315,7 +1315,7 @@ export const SETTINGS_REGISTRY = {
     // bench's 8 GiB case cap plus its driver.
     default: {
       bench: { ceilingMiB: 9216, estimateMiB: 3072 },
-      browser: { ceilingMiB: 8192, estimateMiB: 5632 },
+      browser: { ceilingMiB: 10240, estimateMiB: 5632 },
       build: { ceilingMiB: 4096, estimateMiB: 3072 },
       light: { ceilingMiB: 2048, estimateMiB: 512 },
       suite: { ceilingMiB: 8192, estimateMiB: 4096 },
