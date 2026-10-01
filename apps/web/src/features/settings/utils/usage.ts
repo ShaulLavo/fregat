@@ -135,3 +135,24 @@ export function usageCostArithmetic(row: ProviderUsageModelRow) {
 function formatRate(rate: number) {
   return `$${Number(rate.toPrecision(3))}`
 }
+type CacheSavingsRow = Pick<ProviderUsageModelRow, 'cacheReadTokens' | 'rates'>
+
+/** Savings use the rates recorded with these turns; a mixed range has no shared rate. */
+export function usageCacheSavings(row: CacheSavingsRow): number | null {
+  if (!row.rates || row.rates.cacheRead === null) return null
+  return (row.cacheReadTokens * (row.rates.input - row.rates.cacheRead)) / 1_000_000
+}
+
+export function usageCacheSavingsTotal(rows: readonly CacheSavingsRow[]) {
+  let costUsd: number | null = null
+  let excludedCachedTokens = 0
+  for (const row of rows) {
+    const savings = usageCacheSavings(row)
+    if (savings === null) {
+      excludedCachedTokens += row.cacheReadTokens
+      continue
+    }
+    costUsd = (costUsd ?? 0) + savings
+  }
+  return { costUsd, excludedCachedTokens }
+}

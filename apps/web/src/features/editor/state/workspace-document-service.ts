@@ -1,8 +1,11 @@
-import { materializeFileSnapshotText } from '@/lib/file-snapshot'
+import {
+  materializeFileSnapshotDocumentText,
+  materializeFileSnapshotText,
+} from '@/lib/file-snapshot'
 import { scrollPositionsEqual } from '@/lib/scroll-positions'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
-import { createClientInvariantError } from '@/lib/structured-errors'
+import { createBinaryFileError, createClientInvariantError } from '@/lib/structured-errors'
 
 import { contentRevisionForText, fileContentRevision } from '@/features/editor/utils/text-snapshot'
 import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
@@ -367,6 +370,7 @@ export class WorkspaceDocumentService {
     file: FileSnapshot,
     claim: PreparedFileOpenClaim | null = null,
   ): LiveEditorDocument {
+    assertTextFile(file)
     this.assertPathsAvailable([file.path])
     const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
     const cleanClaim = cleanClaimForFile(claim, file)
@@ -482,6 +486,7 @@ export class WorkspaceDocumentService {
   }
 
   forceReplaceLiveDocument(file: FileSnapshot): { changed: boolean; wasDirty: boolean } {
+    assertTextFile(file)
     this.assertPathsAvailable([file.path])
     const wasDirty = this.isDirtyDocument(fileDocumentKey(file.path))
     const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
@@ -1181,7 +1186,7 @@ export class WorkspaceDocumentService {
     claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
   ): LiveEditorDocument {
     if (!claim) markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-    const buffer = claim?.buffer ?? createHistoryBuffer(materializeFileSnapshotText(file))
+    const buffer = claim?.buffer ?? createHistoryBuffer(materializeFileSnapshotDocumentText(file))
     const target = fileDocument({ path: file.path })
     buffer.markClean()
 
@@ -1621,4 +1626,12 @@ function recordFromMap<T>(
   }
   if (unchanged && previous) return previous
   return next
+}
+
+export function supportsTextFile(file: FileSnapshot): boolean {
+  return !file.seemsBinary
+}
+
+function assertTextFile(file: FileSnapshot): void {
+  if (!supportsTextFile(file)) throw createBinaryFileError(file.size)
 }

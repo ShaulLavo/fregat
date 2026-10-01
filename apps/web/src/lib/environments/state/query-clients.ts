@@ -10,6 +10,7 @@ import {
 import { installGitBudgetInvalidation } from '@/lib/environments/state/git-budget-invalidation'
 import { installFileSnapshotQueryCachePolicy } from '@/lib/file-snapshot-query-cache'
 import { retryUnlessClientError } from '@/lib/environments/utils/query-retry'
+import { startPageSubscription } from '@/lib/state/page-subscription'
 
 type QueryClientOwner = {
   readonly client: Client
@@ -43,6 +44,14 @@ export function queryClientFor(origin: string): QueryClient {
   installGitBudgetInvalidation(queryClient)
   installServerRestartInvalidation(queryClient, origin)
   queryClients.set(origin, queryClient)
+  if (typeof window !== 'undefined') {
+    startPageSubscription(() => {
+      void queryClient.refetchQueries({ type: 'active' })
+      return () => {
+        void queryClient.cancelQueries()
+      }
+    })
+  }
   return queryClient
 }
 
