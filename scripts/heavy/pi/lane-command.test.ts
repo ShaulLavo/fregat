@@ -134,6 +134,24 @@ describe.skipIf(!userScopes)('a lane job', () => {
     expect(readFileSync(path.join(run, 'evidence-root'), 'utf8')).toBe(run)
   })
 
+  test('hands the command to bash as written, with no expansion by systemd-run', async () => {
+    const { lane, run, unit } = await runLane(
+      'verbatim',
+      'printf %s "${HEAVY_JOB_SLICE%.slice} $((6 * 7))" > "$LANE_RUN/verbatim"',
+    )
+    expect(lane?.exitCode).toBe(0)
+    expect(readFileSync(path.join(run, 'verbatim'), 'utf8')).toBe(`${unit} 42`)
+  })
+
+  test('runs the job scope under OOMPolicy=continue, so job.sh outlives an OOM', async () => {
+    const { lane, run } = await runLane(
+      'oom-policy',
+      'systemctl --user show -p OOMPolicy --value "${HEAVY_JOB_SLICE%.slice}.scope" > "$LANE_RUN/oom-policy"',
+    )
+    expect(lane?.exitCode).toBe(0)
+    expect(readFileSync(path.join(run, 'oom-policy'), 'utf8').trim()).toBe('continue')
+  })
+
   test('stops the job when its controlling connection closes', async () => {
     const { status, ms, unit, stderr } = await runLane('closed', 'sleep 30', { stdin: 'closed' })
     expect(ms).toBeLessThan(10_000)

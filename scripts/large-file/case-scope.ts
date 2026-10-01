@@ -18,12 +18,18 @@ export function caseScopeCommand(scope: CaseScope) {
     '--user',
     '--scope',
     '--quiet',
+    // systemd-run would expand $VAR in the case's arguments; they are paths and must stay as given.
+    '--expand-environment=no',
     `--unit=${scope.unit}`,
     ...(scope.slice ? [`--slice=${scope.slice}`] : []),
     '-p',
     `MemoryMax=${scope.memoryMiB}M`,
     '-p',
     'MemorySwapMax=0',
+    // On OOM the kernel kills the offender alone; systemd's default reaction would stop the
+    // scope and, on a second OOM event, SIGKILL the shim before it writes the case's totals.
+    '-p',
+    'OOMPolicy=continue',
     'bash',
     SCOPE_SHIM,
     scope.accountingFile,

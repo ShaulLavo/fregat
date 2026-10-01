@@ -1,35 +1,82 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 
-import { fregatCheckout } from './checkout'
+import { FREGAT, fregatCheckout } from './checkout'
 
-const checkout = path.resolve(import.meta.dirname, '../../..')
+const FREGAT_URL = 'https://github.com/ShaulLavo/fregat.git'
 const roots: string[] = []
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true })
 })
 
-test('accepts this checkout from a subdirectory', () => {
-  expect(fregatCheckout(import.meta.dirname)).toBe(checkout)
+function scratch(prefix: string) {
+  const dir = realpathSync(mkdtempSync(path.join(tmpdir(), prefix)))
+  roots.push(dir)
+  return dir
+}
+
+function git(cwd: string, ...args: string[]) {
+  return execFileSync('git', ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+    encoding: 'utf8',
+  }).trim()
+}
+
+/** A two-commit repository with a subdirectory; its root commit stands in for Fregat's. */
+function fullRepository() {
+  const root = scratch('fregat-full-')
+  git(root, 'init', '-q')
+  mkdirSync(path.join(root, 'scripts'))
+  writeFileSync(path.join(root, 'scripts/a'), '1')
+  git(root, 'add', '.')
+  git(root, 'commit', '-qm', 'first')
+  writeFileSync(path.join(root, 'scripts/a'), '2')
+  git(root, 'commit', '-qam', 'second')
+  return { root, rootCommit: git(root, 'rev-list', '--max-parents=0', 'HEAD') }
+}
+
+/** A depth-1 clone, as CI checks out: the root commit is not in its history. */
+function shallowClone(source: string, origin: string | null) {
+  const clone = path.join(scratch('fregat-shallow-'), 'clone')
+  execFileSync('git', ['clone', '-q', '--depth', '1', `file://${source}`, clone])
+  if (origin) git(clone, 'remote', 'set-url', 'origin', origin)
+  else git(clone, 'remote', 'remove', 'origin')
+  expect(git(clone, 'rev-parse', '--is-shallow-repository')).toBe('true')
+  return clone
+}
+
+test('a full clone is Fregat when its history holds the root commit', () => {
+  const { root, rootCommit } = fullRepository()
+  const identity = { ...FREGAT, rootCommit }
+  expect(fregatCheckout(path.join(root, 'scripts'), identity)).toBe(root)
 })
 
-test('refuses another repository shaped like Fregat', () => {
-  const root = mkdtempSync(path.join(tmpdir(), 'not-fregat-'))
-  roots.push(root)
-  mkdirSync(path.join(root, 'editor/packages/editor/dist'), { recursive: true })
-  writeFileSync(path.join(root, 'editor/packages/editor/dist/index.js'), '')
-  const git = (...args: string[]) => execFileSync('git', ['-C', root, ...args], { stdio: 'pipe' })
-  git('init', '-q')
-  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'other')
-  expect(() => fregatCheckout(path.join(root, 'editor'))).toThrow(/not a Fregat checkout/)
+test('a full clone without the root commit is refused, whatever its origin says', () => {
+  const { root } = fullRepository()
+  git(root, 'remote', 'add', 'origin', FREGAT_URL)
+  expect(() => fregatCheckout(root, FREGAT)).toThrow(/not a Fregat checkout/)
 })
 
-test('refuses a directory outside git', () => {
-  const root = mkdtempSync(path.join(tmpdir(), 'no-git-'))
-  roots.push(root)
-  expect(() => fregatCheckout(root)).toThrow(/not inside a git checkout/)
+test('a shallow clone is Fregat when its origin is the Fregat repository', () => {
+  const { root, rootCommit } = fullRepository()
+  const clone = shallowClone(root, FREGAT_URL)
+  expect(fregatCheckout(path.join(clone, 'scripts'), { ...FREGAT, rootCommit })).toBe(clone)
+  const ssh = shallowClone(root, 'git@github.com:ShaulLavo/fregat.git')
+  expect(fregatCheckout(ssh, { ...FREGAT, rootCommit })).toBe(ssh)
+})
+
+test('a shallow clone with another origin, or none, is refused', () => {
+  const { root, rootCommit } = fullRepository()
+  const identity = { ...FREGAT, rootCommit }
+  expect(() =>
+    fregatCheckout(shallowClone(root, 'https://github.com/someone/fregat.git'), identity),
+  ).toThrow(/shallow clone/)
+  expect(() => fregatCheckout(shallowClone(root, null), identity)).toThrow(/shallow clone/)
+})
+
+test('a directory outside git is refused', () => {
+  expect(() => fregatCheckout(scratch('no-git-'))).toThrow(/not inside a git checkout/)
 })
