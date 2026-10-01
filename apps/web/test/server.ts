@@ -95,7 +95,10 @@ export async function makeTestServer({
         // Never the default registry: its Codex and Claude adapters shell out to
         // real CLIs, so any route that touches a provider would spawn a binary,
         // read the developer's own machine, and answer differently per checkout.
-        providerAdapterRegistry: new ProviderAdapterRegistry([providerAdapter]),
+        providerAdapterRegistry: new ProviderAdapterRegistry({
+          adapters: [providerAdapter],
+          services: { cwd: process.cwd() },
+        }),
       },
       // The defaults reach registry.npmjs.org and models.dev for real CLI versions
       // and prices; every origin here is the in-process happy-dom window, whose

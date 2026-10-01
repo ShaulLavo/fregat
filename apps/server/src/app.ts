@@ -217,6 +217,7 @@ export function requestBodyLimit(maxTextFileBytes: number) {
 }
 
 export function createApp(options: AppOptions) {
+  const cwd = process.cwd()
   const fs = new FileSystemService(options)
   const git = new GitService(fs.paths, {
     autoPullPolicy: (root) =>
@@ -342,7 +343,7 @@ export function createApp(options: AppOptions) {
         // the deferral would never resolve.
         hasLiveSessions: (providerInstanceId) =>
           providerService.hasActiveRuntimeForInstance(providerInstanceId),
-        services: { agentDiagnostics },
+        services: { cwd, agentDiagnostics },
       },
     )
   // A saved provider list is inert unless something re-runs the registry when

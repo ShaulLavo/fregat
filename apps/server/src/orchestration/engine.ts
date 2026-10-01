@@ -1704,7 +1704,8 @@ export class OrchestrationEngine {
     const providerRuntimeOptions =
       typeof options.providerRuntime === 'object' ? options.providerRuntime : null
     const adapterRegistry =
-      providerRuntimeOptions?.adapterRegistry ?? createDefaultProviderAdapterRegistry()
+      providerRuntimeOptions?.adapterRegistry ??
+      createDefaultProviderAdapterRegistry([], { services: { cwd: process.cwd() } })
     const providerService = providerRuntimeOptions?.providerService
       ? providerRuntimeOptions.providerService
       : new ProviderService({
