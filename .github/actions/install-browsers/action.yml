@@ -1,0 +1,49 @@
+name: Install browsers
+description: Installs workspace Playwright browsers with cached Ubuntu dependency archives.
+
+inputs:
+  playwright:
+    description: Workspace Playwright executable.
+    required: true
+  browsers:
+    description: Space-separated Playwright browser names.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Configure Ubuntu package downloads
+      id: apt
+      shell: bash
+      env:
+        PLAYWRIGHT: ${{ inputs.playwright }}
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://mirrors.edge.kernel.org/ubuntu|g' /etc/apt/apt-mirrors.txt
+        archives="$HOME/.cache/playwright-apt"
+        mkdir -p "$archives"
+        sudo tee /etc/apt/apt.conf.d/99-playwright-cache > /dev/null <<EOF
+        Dir::Cache::archives "$archives";
+        APT::Keep-Downloaded-Packages "true";
+        Binary::apt-get::APT::Keep-Downloaded-Packages "true";
+        EOF
+        version="$("$PLAYWRIGHT" --version | awk '{print $2}')"
+        browsers="$(printf '%s' "$BROWSERS" | sha256sum | cut -d ' ' -f 1)"
+        echo "key=browser-apt-v1-${ImageOS}-${ImageVersion}-${RUNNER_ARCH}-${version}-${browsers}" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Ubuntu dependency archives
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/playwright-apt/*.deb
+        key: ${{ steps.apt.outputs.key }}
+
+    - name: Install Playwright browsers and dependencies
+      shell: bash
+      env:
+        PLAYWRIGHT: ${{ inputs.playwright }}
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        read -r -a browsers <<< "$BROWSERS"
+        "$PLAYWRIGHT" install --with-deps "${browsers[@]}"
