@@ -74,7 +74,10 @@ async function testHarness(createQuery?: ClaudeCreateQuery) {
   const app = createTestApp({
     auth: { allowedOrigins: [TRUSTED_ORIGIN] },
     orchestration: {
-      providerAdapterRegistry: new ProviderAdapterRegistry([claude, new MockProviderAdapter()]),
+      providerAdapterRegistry: new ProviderAdapterRegistry({
+        adapters: [claude, new MockProviderAdapter()],
+        services: { cwd: process.cwd() },
+      }),
     },
     settings: testSettingsOptions(root),
     watch: false,

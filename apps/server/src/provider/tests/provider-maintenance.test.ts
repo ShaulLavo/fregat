@@ -40,9 +40,12 @@ async function fakeInstall(installDir: string, version = '0.150.0') {
   await chmod(binary, 0o755)
   await writeFile(path.join(bin, 'version'), `${version}\n`)
 
-  const registry = new ProviderAdapterRegistry([
-    new CodexProviderAdapter({ env: { ...process.env, PLATFORM_CODEX_BINARY: binary } }),
-  ])
+  const registry = new ProviderAdapterRegistry({
+    adapters: [
+      new CodexProviderAdapter({ env: { ...process.env, PLATFORM_CODEX_BINARY: binary } }),
+    ],
+    services: { cwd: process.cwd() },
+  })
   const fetched: string[] = []
   const maintenance = new ProviderMaintenance(registry, {
     fetcher: async (url) => {

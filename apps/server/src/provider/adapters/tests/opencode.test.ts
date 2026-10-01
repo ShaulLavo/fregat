@@ -234,7 +234,10 @@ test('two enabled driver instances keep native cursors, model catalogs, and abor
   const first = startOpenCodeHttpFixture()
   const second = startOpenCodeHttpFixture()
   const otherId = v.parse(providerInstanceIdSchema, 'opencode-second')
-  const registry = new ProviderAdapterRegistry({ drivers: [opencodeDriver] })
+  const registry = new ProviderAdapterRegistry({
+    drivers: [opencodeDriver],
+    services: { cwd: process.cwd() },
+  })
   cleanup.push(
     () => first.close(),
     () => second.close(),

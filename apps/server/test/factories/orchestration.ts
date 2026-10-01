@@ -92,7 +92,12 @@ export async function createOrchestrationFixture(
 }
 
 export function mockRuntime(adapter = new MockProviderAdapter()) {
-  return { adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }) }
+  return {
+    adapterRegistry: new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
+      adapters: [adapter],
+    }),
+  }
 }
 
 export async function sessionFrom(

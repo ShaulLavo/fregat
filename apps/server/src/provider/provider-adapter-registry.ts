@@ -57,7 +57,7 @@ export type ProviderAdapterRegistryOptions = {
   adapters?: readonly ProviderAdapter[]
   drivers?: readonly AnyProviderDriver[]
   /** Handed to every driver's `create`. */
-  services?: ProviderDriverServices
+  services: ProviderDriverServices
   statusCache?: ProviderStatusCache
   /**
    * Whether an instance is still serving a session.
@@ -103,14 +103,10 @@ export class ProviderAdapterRegistry {
   private readonly statusCache: ProviderStatusCache
   private readonly unavailable = new Map<ProviderInstanceId, ProviderSnapshot>()
 
-  /** An array is shorthand for `{ adapters }` — the shape tests and harnesses use. */
-  constructor(options: ProviderAdapterRegistryOptions | readonly ProviderAdapter[] = {}) {
-    const resolved = Array.isArray(options)
-      ? { adapters: options as readonly ProviderAdapter[] }
-      : (options as ProviderAdapterRegistryOptions)
+  constructor(resolved: ProviderAdapterRegistryOptions) {
     this.statusCache = resolved.statusCache ?? new ProviderStatusCache()
     this.hasLiveSessions = resolved.hasLiveSessions ?? (() => false)
-    this.services = resolved.services ?? {}
+    this.services = resolved.services
     for (const driver of resolved.drivers ?? []) {
       this.registerDriver(driver)
     }
@@ -655,11 +651,11 @@ export class ProviderAdapterRegistry {
  * disk so a cold start renders providers without waiting on a CLI probe.
  */
 export function createDefaultProviderAdapterRegistry(
-  savedInstances: readonly ProviderInstanceConfig[] = [],
+  savedInstances: readonly ProviderInstanceConfig[],
   options: {
     hasLiveSessions?: (providerInstanceId: ProviderInstanceId) => boolean | Promise<boolean>
-    services?: ProviderDriverServices
-  } = {},
+    services: ProviderDriverServices
+  },
 ) {
   const registry = new ProviderAdapterRegistry({
     drivers: productProviderDrivers(),
