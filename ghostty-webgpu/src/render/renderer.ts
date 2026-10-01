@@ -1,4 +1,3 @@
-import { copiedFrameRow } from './frame.js'
 import { RenderStateDirty } from '../core/abi.js'
 import type { GhosttyRenderState } from '../core/render-state.js'
 import {
@@ -14,6 +13,7 @@ import { GlyphAtlas } from './atlas/atlas.js'
 import { CanvasGlyphRasterizer } from './atlas/canvas-rasterizer.js'
 import { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import { renderCursorState, type InactiveCursorStyle } from './cursor.js'
+import { copiedFrameRow } from './frame-row.js'
 import type { GlyphBitmap } from './atlas/types.js'
 import {
   browserRenderClock,
@@ -645,10 +645,11 @@ export class WebGpuTerminalRenderer {
   }
 
   private rowsToRebuild(damage: RenderStateDirty): readonly RenderRow[] {
-    if (this.needsFullRebuild) return this.renderState.readRows()
+    if (this.needsFullRebuild) return this.renderState.readRows({ packed: true })
     const rows = new Map<number, RenderRow>()
     if (damage !== RenderStateDirty.False) {
-      for (const row of this.renderState.readRows({ dirtyOnly: true })) rows.set(row.y, row)
+      for (const row of this.renderState.readRows({ packed: true, dirtyOnly: true }))
+        rows.set(row.y, row)
     }
     if (this.overlayRows.size === 0) return [...rows.values()]
     const missingRows = new Set<number>()
@@ -656,7 +657,7 @@ export class WebGpuTerminalRenderer {
       if (!rows.has(row)) missingRows.add(row)
     }
     if (missingRows.size === 0) return [...rows.values()]
-    for (const row of this.renderState.readRows({ rows: missingRows })) {
+    for (const row of this.renderState.readRows({ packed: true, rows: missingRows })) {
       if (missingRows.has(row.y)) rows.set(row.y, row)
     }
     return [...rows.values()].sort((left, right) => left.y - right.y)

@@ -1,4 +1,4 @@
-import { copiedFrameRow } from '../render/frame.js'
+import { copiedFrameRow } from '../render/frame-row.js'
 import { encodeTerminalViewport } from './viewport.js'
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
 import type {

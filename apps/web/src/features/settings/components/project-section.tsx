@@ -1,4 +1,5 @@
 import { StatusMessage } from '@/components/status-message'
+import { ProjectGroupingRow } from '@/features/settings/components/project-grouping-row'
 import { ProjectRows } from '@/features/settings/components/project-rows'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -18,9 +19,10 @@ export function ProjectSection({ project }: { readonly project: SettingsProject 
     <section className='mb-6' aria-label={`${project.title} settings`}>
       <h2 className='text-foreground mb-1 text-sm font-semibold'>{project.title}</h2>
       <p className='text-muted-foreground text-xs'>
-        Settings for this project only, saved on the machine that has it. Default uses that
-        machine's own setting.
+        Session and Git settings are saved on the machine that owns this project. Default uses that
+        machine's setting.
       </p>
+      <ProjectGroupingRow project={project.ref} />
       {origin ? (
         <SettingsOwnerProvider queryClient={queryClientFor(origin)}>
           <ProjectRows projectId={project.ref.projectId} />

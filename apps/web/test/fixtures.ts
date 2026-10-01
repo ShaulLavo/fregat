@@ -1,13 +1,7 @@
-import { TEST_ENVIRONMENT_ID } from './factories/chat'
 import { test as base } from 'vitest'
 
-import {
-  createControlledInProcessClient,
-  createInProcessClient,
-  installInProcessSocketBridge,
-} from './client'
-import { installTestClient } from './factories/client-binding'
-import { makeTestServer, type TestServer } from './server'
+import type { createControlledInProcessClient, createInProcessClient } from './client'
+import type { TestServer } from './server'
 
 type TestClient = ReturnType<typeof createInProcessClient>
 type ControlledTestClient = ReturnType<typeof createControlledInProcessClient>
@@ -26,11 +20,16 @@ type Fixtures = {
 export const test = base.extend<Fixtures>({
   // eslint-disable-next-line no-empty-pattern -- Vitest fixture callbacks must destructure the context object.
   server: async ({}, provide) => {
+    // Pure-logic tests use this entry point too; load the server only when its fixture is requested.
+    const { TEST_ENVIRONMENT_ID } = await import('./factories/chat')
+    const { makeTestServer } = await import('./server')
     const server = await makeTestServer({ environmentId: TEST_ENVIRONMENT_ID })
     await provide(server)
     await server.cleanup()
   },
   client: async ({ server }, provide) => {
+    const { createInProcessClient, installInProcessSocketBridge } = await import('./client')
+    const { installTestClient } = await import('./factories/client-binding')
     const client = createInProcessClient(server)
     const restore = installTestClient(client)
     const restoreSocketBridge = installInProcessSocketBridge(server)
@@ -42,6 +41,9 @@ export const test = base.extend<Fixtures>({
     }
   },
   controlledClient: async ({ server }, provide) => {
+    const { createControlledInProcessClient, installInProcessSocketBridge } =
+      await import('./client')
+    const { installTestClient } = await import('./factories/client-binding')
     const controlled = createControlledInProcessClient(server)
     const restore = installTestClient(controlled.client)
     const restoreSocketBridge = installInProcessSocketBridge(server)
