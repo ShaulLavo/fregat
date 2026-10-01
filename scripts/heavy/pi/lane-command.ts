@@ -36,12 +36,13 @@ export function laneJobCommand(job: LaneJob) {
   const directory = checkoutDirectory(job.directory)
   const run = laneRunDirectory(job)
   const unit = laneUnit(job.name)
-  return [
+  const slice = shellQuote(`${unit}.slice`)
+  const steps = [
     `cd ${shellQuote(directory ? `${platform}/${directory}` : platform)}`,
     `mkdir -p ${shellQuote(run)}`,
-    `export LANE_RUN=${shellQuote(run)} HEAVY_JOB_SLICE=${shellQuote(`${unit}.slice`)}`,
+    `export LANE_RUN=${shellQuote(run)} HEAVY_JOB_SLICE=${slice}`,
     [
-      'exec systemd-run --user --scope --quiet',
+      'systemd-run --user --scope --quiet',
       `--unit=${shellQuote(`${unit}.scope`)}`,
       `--slice=${shellQuote(`${unit}.slice`)}`,
       'bash',
@@ -51,4 +52,11 @@ export function laneJobCommand(job: LaneJob) {
       shellQuote(job.command),
     ].join(' '),
   ].join(' && ')
+  // The job cannot stop the slice it runs in, and systemd keeps a stopped slice loaded while a
+  // member scope sits failed (a bench case killed by the cap), so its members are reset too.
+  const cleanup = [
+    `systemctl --user stop ${slice} >/dev/null 2>&1`,
+    `for unit in $(systemctl --user show -p RequiredBy --value ${slice}); do systemctl --user reset-failed "$unit" >/dev/null 2>&1; done`,
+  ].join('; ')
+  return `${steps}; status=$?; ${cleanup}; exit "$status"`
 }

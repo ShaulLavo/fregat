@@ -35,6 +35,19 @@ function runLane(name: string, memoryMax: string, command: string, directory?: s
   return { status, lane, run: laneRunDirectory(job) }
 }
 
+// list-units, not show: show loads the unit it is asked about.
+function loaded(unit: string) {
+  const list = spawnSync('systemctl', [
+    '--user',
+    'list-units',
+    '--all',
+    '--no-legend',
+    '--plain',
+    unit,
+  ])
+  return list.stdout.toString().trim() !== ''
+}
+
 // A bench case: its own scope, joined to the job's slice the way bench.ts joins it.
 const caseScope = (mib: number) =>
   `systemd-run --user --scope --quiet --slice="$HEAVY_JOB_SLICE" bun -e 'Buffer.alloc(${mib} * 2 ** 20, 1)'`
@@ -46,12 +59,14 @@ describe.skipIf(!userScopes)('a lane job', () => {
     expect(lane.exitCode).toBe(0)
     expect(lane.memoryPeakBytes).toBeGreaterThanOrEqual(300 * MiB)
     expect(lane.slice).toMatch(/^lane_counts_\d+\.slice$/)
+    expect(loaded(lane.slice)).toBe(false)
   })
 
   test('caps case scopes that join its slice', () => {
     const { status, lane } = runLane('caps', '200M', caseScope(400))
     expect(status).not.toBe(0)
     expect(lane.oomKills).toBeGreaterThanOrEqual(1)
+    expect(loaded(lane.slice)).toBe(false)
     expect(lane.memoryPeakBytes).toBeLessThanOrEqual(200 * MiB)
   })
 
