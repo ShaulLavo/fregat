@@ -20,7 +20,15 @@ import {
   type Limits,
 } from './admission'
 import { HOSTS, isHost, reapSlice, startJob, type Host, type JobOutcome, type JobSpec } from './job'
-import { acquirePiLane, DEFAULT_STATE_DIR, tryLock, unlock, waitLock } from './lock'
+import {
+  acquirePiLane,
+  DEFAULT_STATE_DIR,
+  PRODUCTION_SLICE_ROOT,
+  sliceRootFor,
+  tryLock,
+  unlock,
+  waitLock,
+} from './lock'
 import { enqueue, live, promote, release, type Entry, type Held } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
@@ -102,6 +110,7 @@ function parseOptions(argv: readonly string[]): Options {
   if (!Object.hasOwn(SETTINGS_REGISTRY['developer.heavyJobClasses'].default, jobClass)) {
     throw createScriptError(`Unknown class ${jobClass}. ${USAGE}`)
   }
+  const stateDir = flags.get('--state-dir') ?? DEFAULT_STATE_DIR
   return {
     command,
     host,
@@ -111,9 +120,26 @@ function parseOptions(argv: readonly string[]): Options {
     maxWallSec,
     procRoot: flags.get('--proc') ?? '/proc',
     settingsHome: flags.get('--settings-home') ?? productionStateHome,
-    sliceRoot: flags.get('--slice-root') ?? 'heavy',
-    stateDir: flags.get('--state-dir') ?? DEFAULT_STATE_DIR,
+    sliceRoot: sliceRootOption(flags.get('--slice-root'), stateDir),
+    stateDir,
   }
+}
+
+// Production's root pairs only with production's state directory: a wrapper with any other
+// state directory would find no owner for production's slices and stop them.
+function sliceRootOption(given: string | undefined, stateDir: string) {
+  const root = given ?? sliceRootFor(stateDir)
+  if (!/^[a-z0-9]+$/.test(root)) {
+    throw createScriptError(
+      `--slice-root takes lowercase letters and digits; got ${root}. ${USAGE}`,
+    )
+  }
+  if (root === PRODUCTION_SLICE_ROOT && path.resolve(stateDir) !== DEFAULT_STATE_DIR) {
+    throw createScriptError(
+      `--slice-root ${PRODUCTION_SLICE_ROOT} belongs to the state directory ${DEFAULT_STATE_DIR}; another state directory gets its own root. ${USAGE}`,
+    )
+  }
+  return root
 }
 
 async function run(options: Options) {
@@ -288,7 +314,7 @@ function runningCharges(options: Options) {
   const orphans = liveSlices(options.sliceRoot).filter((slice) => !owned.has(slice.id))
   for (const orphan of orphans) {
     console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
-    reapSlice(orphan.slice)
+    reapSlice(options.sliceRoot, orphan.slice)
   }
   return [...owned.values(), ...orphans.map((orphan) => orphan.ceilingBytes)]
 }
