@@ -2,7 +2,7 @@
 
 ## Status and outcome
 
-- Status: APPROVED, 2026-09-27. Delivered 2026-09-30: [PR #202](https://github.com/ShaulLavo/fregat/pull/202) was independently reviewed, its repairs were checked, and it merged as `bfabd3cb7`. Web release `20260930T163634Z-bfabd3cb-main` passed its live check and a read-back mesh `look`; the Editor, Ghostty and hotkeys mirrors were green at their exact heads. [PR #212](https://github.com/ShaulLavo/fregat/pull/212) (`c65b3407e`) added the WebKit Settings and bounded typing harness proofs recorded below. Remaining limits are listed under "Progress 2026-09-30".
+- Status: APPROVED, 2026-09-27. Delivered 2026-09-30: [PR #202](https://github.com/ShaulLavo/fregat/pull/202) was independently reviewed, its repairs were checked, and it merged as `bfabd3cb7`. Web release `20260930T163634Z-bfabd3cb-main` passed its live check and a read-back mesh `look`; the Editor, Ghostty and hotkeys mirrors were green at their exact heads. [PR #212](https://github.com/ShaulLavo/fregat/pull/212) (`c65b3407e`) added the WebKit Settings and bounded typing harness proofs recorded below. Current follow-ups and remaining limits are listed below.
 - Inspected: Platform `9c08916bf`, linked Editor `52099144`. Recheck both heads and CI's `editor-ref` before implementation.
 - Outcome: Editor supplies one reusable highlighting service. Plugins, diffs, Settings previews, and rendered code consume it. Platform supplies configuration and theme data without selecting engines or constructing workers.
 - Scope: a facade over existing Editor providers/workers, followed by bounded consumer migrations. Other plugin candidates are assessment only. Wallpaper image loading and Settings layout remain separate work.
@@ -13,6 +13,44 @@ Planning checklist:
 - [x] Compare two API shapes and reconcile independent architecture reviews.
 - [x] Define ownership, semantics, implementation units, and checks.
 - [x] Check document formatting, index registration, and required repository gates/types.
+
+## Delivered follow-ups, 2026-10-01
+
+- [PR #213](https://github.com/ShaulLavo/fregat/pull/213) delivered bounded owning-worker
+  disposal and guards against late source-cache recreation. Borrowed callers preserve their
+  shared service; cancellation alone cannot pre-empt active tokenization.
+- [PR #214](https://github.com/ShaulLavo/fregat/pull/214) repaired nested-pair ownership across
+  edits. The real typing scenario now checks exact full-text restoration after Undo. Earlier
+  failed Undo captures below remain historical evidence; the full-checkout trace memory cause
+  is still unconfirmed.
+- [PR #215](https://github.com/ShaulLavo/fregat/pull/215) gives Shiki a configurable UTF-16
+  line limit, default 20,000. Longer lines produce one plain token; exact-limit lines tokenize.
+  Server and web release `20260930T205544Z-7f0dfc9e-main` delivered the setting and consumer.
+  099 unit 0 later closed out as partial; 282 replaces its unfinished calibration.
+- [PR #216](https://github.com/ShaulLavo/fregat/pull/216) strengthens browser doctor script
+  checks and cancellation provenance. Fixture provider-update 500s and physical iPhone
+  coverage remain unconfirmed.
+- [PR #220](https://github.com/ShaulLavo/fregat/pull/220) delivered the cold Vite dependency
+  repair through native optimization of `@singapore-editor/highlighting > shiki/themes`.
+  Fresh cold/warm and normal-click proofs passed; web release
+  `20260930T221007Z-32035902-main` reuses the `205544` server release.
+
+[PR #227](https://github.com/ShaulLavo/fregat/pull/227) preserves CRLF separator widths in
+Shiki offsets. [PR #228](https://github.com/ShaulLavo/fregat/pull/228) maps snippet tokens back
+to the submitted text, and [PR #231](https://github.com/ShaulLavo/fregat/pull/231) keeps diff
+lines aligned with the editor's CRLF text.
+
+[PR #224](https://github.com/ShaulLavo/fregat/pull/224) merged on 2026-10-01. 099 unit 0 is
+partial: 5/10 configurations calibrated at historical instrument `56c8e77fb`. The reusable
+harness repairs changed its instrument identity; the accepted configurations were not rerun
+or revalidated with those repairs. [282](282-fast-paired-input-latency-check.md) supersedes
+the unfinished absolute-threshold calibration. Units 2–7 remain gated. CPU telemetry is a
+signed estimate, and the original host-contention cause remains unproven. The Tree-sitter
+capture-decoding repair in [PR #234](https://github.com/ShaulLavo/fregat/pull/234) remains open.
+
+The [wave record](../docs/next-wave.md#foundations-wave-2026-09-30) owns combined deployment
+facts, the closed wave and remaining follow-ups. The older progress and failed captures below describe their
+original runs. The bounded request trace establishes no scheduling performance improvement.
 
 ## Grounding
 
