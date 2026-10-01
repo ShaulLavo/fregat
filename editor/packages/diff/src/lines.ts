@@ -1,6 +1,26 @@
+const CARRIAGE_RETURN = 0x0d
+const BYTE_ORDER_MARK = 0xfeff
+
+/**
+ * A text's lines as git splits them, holding what the editor keeps of each: a host pushes rows into
+ * an editor that drops a leading byte order mark and folds a CR ending a line into its break.
+ */
 export function splitTextLines(text: string): readonly string[] {
   if (text.length === 0) return []
-  return text.split('\n')
+  const lines = text.includes('\r') ? text.split('\n').map(lineText) : text.split('\n')
+  lines[0] = firstLineText(lines[0]!)
+  return lines
+}
+
+/** A line without the CRs that end it, the CR of a CRLF among them. */
+export function lineText(line: string): string {
+  let end = line.length
+  while (end > 0 && line.charCodeAt(end - 1) === CARRIAGE_RETURN) end -= 1
+  return end === line.length ? line : line.slice(0, end)
+}
+
+export function firstLineText(line: string): string {
+  return line.charCodeAt(0) === BYTE_ORDER_MARK ? line.slice(1) : line
 }
 
 export function joinRenderLines(rows: readonly { readonly text: string }[]): string {

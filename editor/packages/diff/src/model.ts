@@ -1,7 +1,9 @@
 import { parsePatch, structuredPatch } from 'diff'
 import { annotateInlineChanges } from './inline'
 import {
+  firstLineText,
   languageIdForPath,
+  lineText,
   normalizeContextLines,
   splitTextLines,
   stripDiffPathPrefix,
@@ -186,7 +188,10 @@ function convertPatchLine(
   if (isRawHunkHeader(rawLine)) return null
 
   const marker = rawLine[0] ?? ' '
-  const text = rawLine.slice(1)
+  const firstLine =
+    (marker !== '+' && oldLineNumber === 1) || (marker !== '-' && newLineNumber === 1)
+  const content = lineText(rawLine.slice(1))
+  const text = firstLine ? firstLineText(content) : content
   if (isRawHunkHeader(text)) return null
 
   if (marker === '-') {

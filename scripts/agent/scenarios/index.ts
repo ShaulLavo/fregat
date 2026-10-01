@@ -364,6 +364,7 @@ import { editorStorageMaintenance } from './editor-storage-maintenance'
 import { editorReloadPaint, editorReloadPaintSlowFont } from './editor-reload-paint'
 import { gitCommitHookColors } from './git-commit-hook-colors'
 import { gitDiffHoverTokens } from './git-diff-hover-tokens'
+import { gitDiffCrlfSyntax } from './git-diff-crlf-syntax'
 import { gitDiffInlineTint } from './git-diff-inline-tint'
 import { gitDiffExpandTokens } from './git-diff-expand-tokens'
 import { editorPressParticipants } from './editor-press-participants'
@@ -720,6 +721,7 @@ export const scenarios: readonly Scenario[] = [
   editorUndoBranch,
   editorTitleDiffToggle,
   gitDiffHoverTokens,
+  gitDiffCrlfSyntax,
   gitDiffInlineTint,
   gitDiffExpandTokens,
   editorPressParticipants,

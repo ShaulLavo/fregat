@@ -45,6 +45,7 @@ export type DiffFile = {
   readonly newObjectId?: string
   readonly oldMode?: string
   readonly newMode?: string
+  /** Git's lines as `splitTextLines` keeps them; a hunk line's `text` follows the same rule. */
   readonly oldLines: readonly string[]
   readonly newLines: readonly string[]
   readonly hunks: readonly DiffHunk[]

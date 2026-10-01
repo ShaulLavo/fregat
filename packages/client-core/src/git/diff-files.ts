@@ -1,5 +1,11 @@
 import type { GitFileDiff } from '@workspace/contracts'
-import { createTextDiff, parseGitPatch, type DiffFile, type DiffHunk } from '@singapore-editor/diff'
+import {
+  createTextDiff,
+  parseGitPatch,
+  splitTextLines,
+  type DiffFile,
+  type DiffHunk,
+} from '@singapore-editor/diff'
 
 type LanguageResolver = (path: string) => string | null
 
@@ -57,8 +63,9 @@ function hasCompleteSources(diff: GitFileDiff) {
 }
 
 function patchOverSources(diff: GitFileDiff, language?: LanguageResolver): DiffFile[] {
-  const newLines = sourceLines(diff.newFileMissing ? '' : diff.newText)
-  const oldSource = sourceLines(diff.oldFileMissing ? '' : diff.oldText)
+  // The split `createTextDiff` uses, so both hunk sources index the same line arrays.
+  const newLines = splitTextLines((diff.newFileMissing ? '' : diff.newText) ?? '')
+  const oldSource = splitTextLines((diff.oldFileMissing ? '' : diff.oldText) ?? '')
 
   return parseGitPatch(diff.patch, { cacheKey: diffCacheKey(diff) }).map((file) => ({
     ...file,
@@ -91,13 +98,6 @@ function oldLinesAsDrawn(oldLines: readonly string[], hunks: readonly DiffHunk[]
   }
 
   return drawn ?? oldLines
-}
-
-/** The split `createTextDiff` uses, so both hunk sources index the same line arrays. */
-function sourceLines(text: string | undefined): readonly string[] {
-  if (!text) return []
-
-  return text.split('\n')
 }
 
 function oldSide(diff: GitFileDiff, language?: LanguageResolver) {
