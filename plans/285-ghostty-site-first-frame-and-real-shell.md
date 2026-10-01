@@ -142,7 +142,21 @@ preserves packed GPU/WebGL row reads; immutable styled cells decode only when se
 requests them. Verification after integration: 11 Node serializer/snapshot tests, 39 DOM/Canvas/
 fallback browser tests, 25 GPU/WebGL tests with two existing Linux SwiftShader skips; build,
 typecheck, lint, formatting and full commit gates pass. The static compaction and fitting checks
-add 12 passing Node tests. Phase 2 publication remains pending the demo integration.
+add 12 passing Node tests. Phase 2 publication awaits the damage-overlay integration.
+
+After merging demo PR #278, paired FCP was 504 → 364, 480 → 368, and 488 → 364 ms
+(medians 488 → 364). Evidence is `/work/tmp/fregat-evidence/p285-final-before-{1,2,3}/`
+and `/work/tmp/fregat-evidence/p285-final-after-{1,2,3}/`; the document transfers 6,462 bytes
+(6,162 compressed body; 29,204 decoded). First-paint and swap frames were read back.
+The final demo hand-off matrix `/work/tmp/fregat-evidence/p285-final-demo-handoff/` also checks
+static tabs, runs real Shell arithmetic (42) and a three-iteration loop, and returns to the Ghost
+under reduced motion. That return exposed a retained redraw-sampling countdown; resetting the
+sample on layout restores the paused stat. Matrix and Shell screen screenshots were read back.
+Build-time Node gzip is preserved with a browser-only zlib resolver; a global browser stub would
+break the real-core prerender. Fifteen targeted Node tests and the full commit gates pass.
+Desktop and phone looks were healthy and read back at `/work/tmp/fregat-evidence/p285-final-looks/`
+(`20261001T211929Z-look-ghostty-webgpu-1280x1000/` and
+`20261001T211931Z-look-ghostty-webgpu-390x844/`).
 
 ## Phase 1: a DOM renderer, in the package
 
