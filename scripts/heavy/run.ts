@@ -12,6 +12,7 @@ import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import {
+  bootSeconds,
   decide,
   decideQuiet,
   drainRequest,
@@ -20,7 +21,16 @@ import {
   readReadings,
   type Limits,
 } from './admission'
-import { HOSTS, isHost, reapSlice, startJob, type Host, type JobOutcome, type JobSpec } from './job'
+import {
+  HOSTS,
+  isHost,
+  reapSlice,
+  startJob,
+  stopTimeoutSeconds,
+  type Host,
+  type JobOutcome,
+  type JobSpec,
+} from './job'
 import { acquirePiLane, DEFAULT_STATE_DIR, tryLock, unlock, waitLock } from './lock'
 import { enqueue, live, promote, release, type Entry, type Held } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
@@ -159,18 +169,23 @@ async function run(options: Options) {
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
       process.on(signal, () => job.stop(signal))
     }
-    let holdExpired = false
+    const holdMs = config.quietHoldSeconds * 1000
+    let stoppedAtHold = false
     const hold = options.quiet
       ? setTimeout(() => {
-          holdExpired = true
-          console.error(
-            `[wave-heavy] quiet hold for '${options.label}' reached its ${config.quietHoldSeconds} s limit (developer.heavyJobQuietHoldSeconds), so the job was stopped. Run it again to queue for another hold.`,
-          )
+          stoppedAtHold = true
           job.stop('SIGTERM')
-        }, config.quietHoldSeconds * 1000)
+        }, holdMs)
       : undefined
     const outcome = await job.done
     clearTimeout(hold)
+    // systemd ends the scope at the hold too, so a run this process slept through counts.
+    const holdExpired = options.quiet && (stoppedAtHold || outcome.wallMs >= holdMs)
+    if (holdExpired) {
+      console.error(
+        `[wave-heavy] quiet hold for '${options.label}' reached its ${config.quietHoldSeconds} s limit (developer.heavyJobQuietHoldSeconds), so the job was stopped. Run it again to queue for another hold.`,
+      )
+    }
     record(options, {
       admission: placed.reason,
       budget: placed.budget,
@@ -212,18 +227,17 @@ async function admitLocal(
     since: new Date().toISOString(),
   }
   const admitted = await admit(options, config, entry)
-  const holder = path.join(options.stateDir, 'quiet.holder')
   if (options.quiet) {
     writeFileSync(
-      holder,
-      `${options.label} pid=${process.pid} since=${new Date().toISOString()} cwd=${cwd}\n`,
+      path.join(options.stateDir, 'quiet.holder'),
+      `${options.label} id=${id} pid=${process.pid} since=${new Date().toISOString()} cwd=${cwd}\n`,
     )
   }
   return {
     budget,
     reason: admitted.reason,
     release: () => {
-      if (options.quiet) clearHolder(holder)
+      if (options.quiet) clearQuietHolder(options.stateDir, (holder) => holder === id)
       release(admitted.held)
       for (const fd of admitted.slots) unlock(fd)
     },
@@ -235,6 +249,7 @@ async function admitLocal(
       host: 'local',
       id,
       sliceRoot: options.sliceRoot,
+      runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
       slotLocks: admitted.slots,
     },
   }
@@ -300,6 +315,8 @@ function attemptAdmission(
 ): Admitted | { reason: string } {
   const lock = waitLock(path.join(options.stateDir, 'admission.lock'))
   try {
+    // Every waiting wrapper reclaims what dead wrappers left, before any rule can stop it.
+    const running = reconcile(options)
     const ahead = live(options.stateDir, 'queue').findIndex(
       (entry) => entry.id === waiting.entry.id,
     )
@@ -308,8 +325,8 @@ function attemptAdmission(
     if (drain) return { reason: `draining for ${drain}` }
     const hold = legacyHold(options.stateDir, SLOT_FILES)
     if (hold) return { reason: hold }
-    const running = runningJobs(options)
-    const quiet = running.owners.find((job) => job.quiet)
+    const now = bootSeconds()
+    const quiet = running.owners.find((job) => job.quiet && (job.quietUntil ?? Infinity) > now)
     if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}` }
     const decision = waiting.entry.quiet
       ? decideQuiet(running.charges.length)
@@ -326,7 +343,14 @@ function attemptAdmission(
       for (const fd of taken) unlock(fd)
       return { reason: 'a slot lock was taken exclusively' }
     }
-    return { held: promote(options.stateDir, waiting), reason: decision.reason, slots: taken }
+    const lease = waiting.entry.quiet
+      ? { quietUntil: now + config.quietHoldSeconds + stopTimeoutSeconds(config.graceSeconds) }
+      : {}
+    return {
+      held: promote(options.stateDir, waiting, lease),
+      reason: decision.reason,
+      slots: taken,
+    }
   } finally {
     unlock(lock)
   }
@@ -337,7 +361,7 @@ function attemptAdmission(
  * gone (no live entry) is an orphan, charged its ceiling while this pass kills and removes it.
  * A job admitted but not yet in its slice is charged through its live entry.
  */
-function runningJobs(options: Options) {
+function reconcile(options: Options) {
   const owners = live(options.stateDir, 'jobs')
   const orphans = liveSlices(options.sliceRoot).filter(
     (slice) => !owners.some((job) => job.id === slice.id),
@@ -346,11 +370,20 @@ function runningJobs(options: Options) {
     console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
     reapSlice(orphan.slice)
   }
+  clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
   const charges = [
     ...owners.map((job) => job.estimateBytes),
     ...orphans.map((orphan) => orphan.ceilingBytes),
   ]
   return { charges, owners }
+}
+
+// The holder line names its job; it is cleared only when that job qualifies, so clearing a
+// stale line cannot erase a newer holder's.
+function clearQuietHolder(stateDir: string, stale: (id: string) => boolean) {
+  const file = path.join(stateDir, 'quiet.holder')
+  const named = /\bid=(\S+)/.exec(readText(file))?.[1]
+  if (named && stale(named)) clearHolder(file)
 }
 
 function readConfig(home: string): Config {

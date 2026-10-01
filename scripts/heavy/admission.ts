@@ -2,7 +2,6 @@ import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node
 import { availableParallelism } from 'node:os'
 import path from 'node:path'
 
-import { processExists } from '../../apps/server/scripts/process-exists'
 import { tryLock, unlessMissing, unlock } from './lock'
 
 const MiB = 2 ** 20
@@ -137,19 +136,44 @@ function sliceRootPath(root: string) {
 /**
  * Who asked this machine to drain, or null. An external tool that needs it quiet writes
  * `drain.request` as `pid=<pid> since=<time> holder=<who>`; while that process lives, no
- * new job starts and the running ones finish. A request from a dead process, or one older
- * than `maxAgeMs` (one quiet hold), is ignored, so no tool keeps the machine indefinitely.
+ * new job starts and the running ones finish, for at most `maxAgeMs` (one quiet hold).
+ * The age runs on the boot clock from the first time a wrapper saw the request, so no clock
+ * in the file, set forward or rolled back, can stretch it. A request is its process (PID and
+ * start time) and its file; one whose process has exited, or whose PID now belongs to a
+ * different process, is ignored. Writing a new file starts a new hold.
  */
 export function drainRequest(stateDir: string, maxAgeMs: number): string | null {
   const file = path.join(stateDir, 'drain.request')
+  const seenFile = path.join(stateDir, 'drain.seen')
   const text = unlessMissing(() => readFileSync(file, 'utf8'))
-  if (text === null) return null
-  const pid = Number(/\bpid=(\d+)/.exec(text)?.[1])
-  if (!pid || !processExists(pid)) return null
-  const stated = Date.parse(/\bsince=(\S+)/.exec(text)?.[1] ?? '')
-  const since = Number.isNaN(stated) ? (unlessMissing(() => statSync(file).mtimeMs) ?? 0) : stated
-  if (Date.now() - since > maxAgeMs) return null
+  const inode = unlessMissing(() => statSync(file).ino)
+  const pid = Number(/\bpid=(\d+)/.exec(text ?? '')?.[1])
+  const started = pid ? processStart(pid) : null
+  if (text === null || inode === null || started === null) return null
+  const [seenPid, seenStart, seenInode, seenAt] = (
+    unlessMissing(() => readFileSync(seenFile, 'utf8')) ?? ''
+  )
+    .trim()
+    .split(' ')
+  const sameRequest = seenPid === String(pid) && seenInode === String(inode)
+  if (sameRequest && seenStart !== started) return null
+  const now = bootSeconds()
+  const since = sameRequest ? Number(seenAt) : now
+  if (!sameRequest) writeFileSync(seenFile, `${pid} ${started} ${inode} ${now}`)
+  if ((now - since) * 1000 > maxAgeMs) return null
   return text.trim()
+}
+
+// Field 22 of /proc/<pid>/stat: when the process started, in clock ticks since boot.
+function processStart(pid: number) {
+  const stat = unlessMissing(() => readFileSync(`/proc/${pid}/stat`, 'utf8'))
+  if (stat === null) return null
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19] ?? null
+}
+
+/** Seconds since boot: a clock no wall-clock change can move. */
+export function bootSeconds() {
+  return Number(readFileSync('/proc/uptime', 'utf8').split(' ')[0])
 }
 
 /**
