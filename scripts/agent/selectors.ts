@@ -76,6 +76,8 @@ export const selectors = {
     page.getByText('This file no longer exists.', { exact: true }),
   forgeDiscussion: (page: Page) =>
     page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
+  forgeReviewSummary: (page: Page) =>
+    page.getByRole('textbox', { name: 'Review summary', exact: true }),
   forgeComment: (page: Page) => page.getByRole('textbox', { name: 'Comment', exact: true }),
   forgeCommentText: (page: Page, text: string) =>
     page
