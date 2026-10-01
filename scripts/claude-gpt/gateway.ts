@@ -60,7 +60,10 @@ async function readProxyModels(options: ProxyOptions, timeoutMs: number, signal?
       redirect: 'manual',
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => {})
+      return null
+    }
     const parsed = v.safeParse(registrySchema, await response.json())
     return parsed.success ? parsed.output.data.map((model) => model.id) : null
   } catch {
@@ -68,23 +71,64 @@ async function readProxyModels(options: ProxyOptions, timeoutMs: number, signal?
   }
 }
 
+function hasModel(models: readonly string[], model: string) {
+  const lastOpen = model.lastIndexOf('(')
+  const base = lastOpen >= 0 && model.endsWith(')') ? model.slice(0, lastOpen) : model
+  // CLIProxyAPI looks up the trimmed base, then falls back to a full suffixed registration.
+  return models.includes(base.trim()) || models.includes(model)
+}
+
 export async function waitForProxy(
   options: ProxyOptions,
   timeoutMs = startupWindowMs,
   signal?: AbortSignal,
+  model?: string,
 ) {
   const deadline = performance.now() + timeoutMs
+  let observed: readonly string[] | null = null
   while (!signal?.aborted && performance.now() < deadline) {
-    const models = await readProxyModels(
+    const next = await readProxyModels(
       options,
-      Math.min(250, deadline - performance.now()),
+      Math.min(1_000, deadline - performance.now()),
       signal,
     )
-    if (hasGptModels(models)) return models
+    if (next !== null || performance.now() < deadline) observed = next
+    if (!signal?.aborted && hasGptModels(next) && (model === undefined || hasModel(next, model)))
+      return next
     const remaining = deadline - performance.now()
     if (remaining > 0 && !signal?.aborted) await Bun.sleep(Math.min(100, remaining))
   }
-  return null
+  // The final shortened probe can time out after a healthy catalog established model absence.
+  return !signal?.aborted && model !== undefined && hasGptModels(observed) ? observed : null
+}
+
+async function inspectProxyError(response: Response, signal: AbortSignal) {
+  if (response.body === null) return ''
+  const reader = response.body.getReader()
+  const bytes = new Uint8Array(64 * 1024)
+  let length = 0
+  const expired = Promise.withResolvers<null>()
+  const stop = () => expired.resolve(null)
+  const timer = setTimeout(stop, 1_000)
+  signal.addEventListener('abort', stop, { once: true })
+  try {
+    while (!signal.aborted) {
+      const chunk = await Promise.race([reader.read(), expired.promise])
+      if (chunk === null) return null
+      if (chunk.done) return new TextDecoder().decode(bytes.subarray(0, length))
+      if (length + chunk.value.byteLength > bytes.byteLength) return null
+      bytes.set(chunk.value, length)
+      length += chunk.value.byteLength
+    }
+    return null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+    signal.removeEventListener('abort', stop)
+    void reader.cancel().catch(() => {})
+    reader.releaseLock()
+  }
 }
 
 function isUnknownProvider(text: string) {
@@ -151,10 +195,11 @@ export function createGateway(options: GatewayOptions) {
     if (failedWaits === 1) reportReadiness('warn', 'unavailable', failedWaits)
   }
 
-  async function isReady(timeoutMs: number, signal?: AbortSignal) {
-    const next = await waitForProxy(options, timeoutMs, signal)
+  async function isReady(timeoutMs: number, signal?: AbortSignal, model?: string) {
+    const next = await waitForProxy(options, timeoutMs, signal, model)
     if (next === null) {
       unavailable()
+      if (model !== undefined && !signal?.aborted) reportReadiness('warn', 'gave-up', failedWaits)
       return false
     }
     if (failedWaits > 0) reportReadiness('info', 'reachable', failedWaits)
@@ -164,18 +209,15 @@ export function createGateway(options: GatewayOptions) {
   }
 
   async function recoverModel(model: string, signal: AbortSignal) {
-    const observed = await readProxyModels(options, 250, signal)
-    if (hasGptModels(observed)) {
+    const observed = await readProxyModels(options, 1_000, signal)
+    if (hasGptModels(observed) && hasModel(observed, model)) {
       models = observed
-      if (!observed.includes(model)) return missingModel()
       return performance.now() < startupUntil ? 'retry' : 'forward'
     }
     unavailable()
-    if (!(await isReady(Math.max(1, startupUntil - performance.now()), signal))) {
-      reportReadiness('warn', 'gave-up', failedWaits)
+    if (!(await isReady(Math.max(1, startupUntil - performance.now()), signal, model)))
       return proxyUnavailable()
-    }
-    return models?.includes(model) ? 'retry' : missingModel()
+    return models !== null && hasModel(models, model) ? 'retry' : missingModel()
   }
 
   return async (request: Request) => {
@@ -226,8 +268,11 @@ export function createGateway(options: GatewayOptions) {
     const headers = new Headers(request.headers)
     stripHopHeaders(headers)
     if (isGpt) {
-      if (models === null && !(await isReady(startupWindowMs, request.signal)))
-        return proxyUnavailable()
+      if (models === null) {
+        if (!(await isReady(startupWindowMs, request.signal, input.model)))
+          return proxyUnavailable()
+        if (models !== null && !hasModel(models, input.model)) return missingModel()
+      }
       for (const name of Array.from(headers.keys())) {
         if (!proxyHeaders.includes(name)) headers.delete(name)
       }
@@ -246,7 +291,13 @@ export function createGateway(options: GatewayOptions) {
     } as const
     let response = await fetch(upstream, init)
     if (isGpt && response.status === 400) {
-      const text = await response.text()
+      const text = await inspectProxyError(response, request.signal)
+      if (text === null)
+        return failure(
+          502,
+          'api_error',
+          'The GPT proxy error response exceeded the inspection limit. Check the proxy and retry.',
+        )
       response = new Response(text, { status: response.status, headers: response.headers })
       if (isUnknownProvider(text)) {
         const recovered = await recoverModel(input.model, request.signal)

@@ -171,42 +171,49 @@ test.each([
     expected: 'unknown provider for model gpt-6.1-sol',
     old: true,
   },
-])('registry recovery preserves $name with bounded attempts', async (scenario) => {
-  let attempts = 0
-  const upstream = Bun.serve({
-    hostname: '127.0.0.1',
-    port: 0,
-    fetch(request) {
-      if (new URL(request.url).pathname === '/v1/models') return Response.json(fullRegistry)
-      attempts++
-      return Response.json({ error: { message: scenario.message } }, { status: 400 })
-    },
-  })
-  const server = startGateway({
-    gatewayPort: 0,
-    anthropicUrl: 'http://127.0.0.1:1',
-    proxyUrl: upstream.url.toString(),
-    apiKey: 'test',
-  })
-  const now = performance.now.bind(performance)
-  let clock: ReturnType<typeof vi.spyOn> | undefined
-  try {
-    expect((await fetch(new URL('/health', server.url))).status).toBe(200)
-    if (scenario.old) clock = vi.spyOn(performance, 'now').mockImplementation(() => now() + 16_000)
-    const response = await fetch(new URL('/v1/messages', server.url), {
-      method: 'POST',
-      headers: { authorization: 'test' },
-      body: JSON.stringify({ model: scenario.model }),
+])(
+  'registry recovery preserves $name with bounded attempts',
+  async (scenario) => {
+    let attempts = 0
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        if (new URL(request.url).pathname === '/v1/models') return Response.json(fullRegistry)
+        attempts++
+        return Response.json({ error: { message: scenario.message } }, { status: 400 })
+      },
     })
-    expect(response.status).toBe(400)
-    expect(await response.text()).toContain(scenario.expected)
-    expect(attempts).toBe(scenario.attempts)
-  } finally {
-    clock?.mockRestore()
-    server.stop(true)
-    upstream.stop(true)
-  }
-})
+    const server = startGateway({
+      gatewayPort: 0,
+      anthropicUrl: 'http://127.0.0.1:1',
+      proxyUrl: upstream.url.toString(),
+      apiKey: 'test',
+    })
+    const now = performance.now.bind(performance)
+    let clock: ReturnType<typeof vi.spyOn> | undefined
+    try {
+      expect((await fetch(new URL('/health', server.url))).status).toBe(200)
+      if (scenario.old)
+        clock = vi.spyOn(performance, 'now').mockImplementation(() => now() + 16_000)
+      const started = now()
+      const response = await fetch(new URL('/v1/messages', server.url), {
+        method: 'POST',
+        headers: { authorization: 'test' },
+        body: JSON.stringify({ model: scenario.model }),
+      })
+      expect(response.status).toBe(400)
+      expect(await response.text()).toContain(scenario.expected)
+      expect(attempts).toBe(scenario.attempts)
+      if (scenario.model === 'gpt-missing') expect(now() - started).toBeGreaterThanOrEqual(14_000)
+    } finally {
+      clock?.mockRestore()
+      server.stop(true)
+      upstream.stop(true)
+    }
+  },
+  20_000,
+)
 
 test.each(['empty', 'Claude only', 'malformed', 'invalid JSON', 'unauthorized', 'hung body'])(
   'registry readiness gives up within its deadline for %s',
@@ -459,6 +466,14 @@ globalThis.fetch = (input, init) => {
           body: '{"model":"gpt-6.1-sol"}',
         })
         expect(gpt.status).toBe(503)
+        expect(child.exitCode).toBeNull()
+        const stillClaude = await fetch(endpoint.replace('/health', '/v1/messages'), {
+          method: 'POST',
+          headers: { authorization: 'test' },
+          body: '{"model":"claude-opus-5-5"}',
+        })
+        expect(stillClaude.status).toBe(200)
+        expect(await stillClaude.text()).toBe('Claude fixture')
         const stderr = new Response(child.stderr).text()
         child.kill('SIGTERM')
         await child.exited
@@ -1163,7 +1178,7 @@ test('review startup accepts a healthy 300 ms catalog within the overall budget'
   }
 })
 
-test.each(['initial', 'recovery'])(
+test.each(['initial', 'recovery', 'long-running', 'slow-recovery'])(
   'review %s waits through a partially loaded GPT catalog',
   async (phase) => {
     let warming = phase === 'initial'
@@ -1175,6 +1190,7 @@ test.each(['initial', 'recovery'])(
       async fetch(request) {
         if (new URL(request.url).pathname === '/v1/models') {
           if (!warming) return Response.json(fullRegistry)
+          if (phase === 'slow-recovery') await Bun.sleep(300)
           reads++
           return Response.json(reads < 3 ? { data: [{ id: 'gpt-older' }] } : fullRegistry)
         }
@@ -1194,11 +1210,15 @@ test.each(['initial', 'recovery'])(
       apiKey: 'test',
     })
     const body = '{ "model": "gpt-6.1-sol", "messages": [] }'
+    const now = performance.now.bind(performance)
+    let clock: ReturnType<typeof vi.spyOn> | undefined
     try {
-      if (phase === 'recovery') {
+      if (phase !== 'initial') {
         expect((await fetch(new URL('/health', server.url))).status).toBe(200)
         warming = true
       }
+      if (phase === 'long-running')
+        clock = vi.spyOn(performance, 'now').mockImplementation(() => now() + 60_000)
       const response = await fetch(new URL('/v1/messages', server.url), {
         method: 'POST',
         headers: { authorization: 'test' },
@@ -1209,6 +1229,7 @@ test.each(['initial', 'recovery'])(
       expect(reads).toBe(3)
       expect(bodies).toEqual(phase === 'initial' ? [body] : [body, body])
     } finally {
+      clock?.mockRestore()
       server.stop(true)
       upstream.stop(true)
     }
@@ -1333,3 +1354,35 @@ test('review README places the no-active-request prerequisite beside both stop e
       'wait until no agents are mid-request',
     )
 })
+
+test.each(['missing', 'unavailable'])(
+  'catalog deadline distinguishes slow model absence from %s readiness',
+  async (state) => {
+    let reads = 0
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch() {
+        reads++
+        if (state === 'unavailable' && reads > 1) return new Response('denied', { status: 401 })
+        await Bun.sleep(300)
+        return Response.json(fullRegistry)
+      },
+    })
+    const started = performance.now()
+    try {
+      const models = await waitForProxy(
+        { proxyUrl: upstream.url.toString(), apiKey: 'test' },
+        1_000,
+        undefined,
+        'gpt-missing',
+      )
+      expect(models).toEqual(state === 'missing' ? ['gpt-6.1-sol'] : null)
+      expect(reads).toBeGreaterThan(1)
+      expect(performance.now() - started).toBeGreaterThanOrEqual(900)
+      expect(performance.now() - started).toBeLessThan(1_500)
+    } finally {
+      upstream.stop(true)
+    }
+  },
+)

@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { createGateway, waitForProxy, type GatewayOptions } from './gateway'
+import { createGateway, type GatewayOptions } from './gateway'
 
 const portSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65535))
 export const configSchema = v.pipe(
@@ -17,7 +17,7 @@ export const configSchema = v.pipe(
 )
 if (import.meta.main) {
   try {
-    await run()
+    process.exit(await run())
   } catch (error) {
     reportFailure('startup', error)
     process.exit(1)
@@ -34,41 +34,51 @@ function reportFailure(operation: string, error: unknown) {
       operation,
       errorType: error instanceof Error ? error.name : typeof error,
       why:
-        operation === 'proxy-readiness'
-          ? 'The proxy GPT model registry did not load within 15 seconds.'
+        operation === 'proxy-shutdown'
+          ? 'The owned proxy process stayed alive after SIGKILL.'
           : undefined,
       fix: 'Check the runtime configuration, proxy login and mesh route.',
     })}\n`,
   )
 }
 
+async function stopProxy(proxy: Bun.Subprocess) {
+  if (proxy.exitCode !== null) return true
+  for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
+    proxy.kill(signal)
+    const exited = await Promise.race([
+      proxy.exited.then(() => true),
+      Bun.sleep(1_000).then(() => false),
+    ])
+    if (exited) return true
+  }
+  reportFailure('proxy-shutdown', null)
+  return false
+}
+
 async function run() {
   const config = v.parse(configSchema, await Bun.file(Bun.argv[2] ?? '').json())
-  const options = gatewayOptions(config)
   const proxy = Bun.spawn([config.binary, '-config', config.proxyConfig], {
     stdout: 'inherit',
     stderr: 'inherit',
   })
-  const startup = new AbortController()
+  const stopping = Promise.withResolvers<number>()
+  const stop = () => stopping.resolve(0)
   let server: ReturnType<typeof startGateway> | undefined
-  function stop() {
-    startup.abort()
-    server?.stop(true)
-    proxy.kill('SIGTERM')
-  }
+  let exitCode = 1
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)
-  void proxy.exited.then(() => startup.abort())
-  // Mesh checks TCP acceptance, so binding this port must follow registry readiness.
-  if (!(await waitForProxy(options, undefined, startup.signal))) {
-    if (!startup.signal.aborted) reportFailure('proxy-readiness', null)
-    stop()
-    process.exit((await proxy.exited) || 1)
+  try {
+    // Claude forwarding can start while the GPT registry loads or remains unavailable.
+    server = startGateway(gatewayOptions(config))
+    exitCode = await Promise.race([proxy.exited, stopping.promise])
+  } finally {
+    process.off('SIGTERM', stop)
+    process.off('SIGINT', stop)
+    server?.stop(true)
+    if (!(await stopProxy(proxy))) exitCode = 1
   }
-  server = startGateway(options)
-  const exitCode = await proxy.exited
-  server.stop(true)
-  process.exit(exitCode)
+  return exitCode
 }
 
 export function startGateway(options: GatewayOptions) {
