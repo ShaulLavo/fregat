@@ -49,6 +49,22 @@ if (
   } else out(comments)
   process.exit(0)
 }
+if (
+  args[0] === 'api' &&
+  args.includes('POST') &&
+  args.some((arg) => /^repos\/[^/]+\/[^/]+\/pulls\/\d+\/reviews$/.test(arg))
+) {
+  const data = forge()
+  if (data.failReview) {
+    process.stderr.write('fixture review refusal\n')
+    process.exit(1)
+  }
+  const review = JSON.parse(readFileSync(0, 'utf8'))
+  const reviews = [...(data.reviews ?? []), review]
+  writeFileSync(join(root, 'forge.json'), JSON.stringify({ ...data, reviews }))
+  out({ id: reviews.length, ...review })
+  process.exit(0)
+}
 if (args[0] === 'api' && args[1] === 'graphql') {
   const branches = forge().branches ?? {}
   const repository = {}

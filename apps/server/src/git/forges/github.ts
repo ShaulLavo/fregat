@@ -10,6 +10,7 @@ import {
   requireRepositoryCreated,
   requireSuccess,
   requireCommentPosted,
+  requireReviewSubmitted,
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseIssueComments } from './issue-comments'
@@ -40,7 +41,6 @@ const GITHUB_STATES = { OPEN: 'open', CLOSED: 'closed', MERGED: 'merged' } as co
 export const github: ForgeProvider = {
   kind: 'github',
   discussion: {
-    kind: 'supported',
     async read(context, number) {
       const result = requireSuccess(
         context,
@@ -53,21 +53,31 @@ export const github: ForgeProvider = {
       )
       return parseIssueComments(context, result.stdout, 'page')
     },
-    async post(context, number, body) {
-      const result = await gh(
+    write: {
+      kind: 'supported',
+      async post(context, number, body) {
+        const result = await ghPost(context, `issues/${number}/comments`, { body })
+        requireCommentPosted(context, result)
+      },
+    },
+  },
+  review: {
+    kind: 'supported',
+    verdicts: ['comment', 'approve', 'request-changes'],
+    async submit(context, number, input) {
+      const events = {
+        comment: 'COMMENT',
+        approve: 'APPROVE',
+        'request-changes': 'REQUEST_CHANGES',
+      }
+      requireReviewSubmitted(
         context,
-        [
-          'api',
-          ...hostname(context),
-          '--method',
-          'POST',
-          `repos/${context.repository}/issues/${number}/comments`,
-          '--input',
-          '-',
-        ],
-        JSON.stringify({ body }),
+        await ghPost(context, `pulls/${number}/reviews`, {
+          body: input.body,
+          event: events[input.verdict],
+        }),
+        'review',
       )
-      requireCommentPosted(context, result)
     },
   },
   async support(context) {
@@ -303,4 +313,20 @@ function toPullRequest(node: v.InferOutput<typeof pullRequestSchema>): GitPullRe
     title: node.title,
     url: node.url,
   }
+}
+
+function ghPost(context: ForgeContext, path: string, payload: unknown) {
+  return gh(
+    context,
+    [
+      'api',
+      ...hostname(context),
+      '--method',
+      'POST',
+      `repos/${context.repository}/${path}`,
+      '--input',
+      '-',
+    ],
+    JSON.stringify(payload),
+  )
 }

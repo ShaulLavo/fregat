@@ -398,6 +398,7 @@ export type GitPullRequestComment = {
   body: string
   createdAt: string
   url: string | null
+  context?: { threadId: string; path: string | null }
 }
 
 export type GitPullRequestComments =
@@ -406,9 +407,30 @@ export type GitPullRequestComments =
       forge: GitForge
       comments: readonly GitPullRequestComment[]
       truncated: boolean
+      comment: GitPullRequestCommentCapability
+      review: GitPullRequestReviewCapability
     }
   | { kind: 'unsupported'; forge: GitForge | null; reason: string }
 
 export type GitPullRequestCommentResult =
   | { kind: 'posted' }
+  | { kind: 'unsupported'; forge: GitForge | null; reason: string }
+
+export type GitPullRequestCommentCapability =
+  | { kind: 'supported' }
+  | { kind: 'unsupported'; reason: string }
+
+export type GitPullRequestReviewVerdict = 'comment' | 'approve' | 'request-changes'
+
+export type GitPullRequestReviewCapability =
+  | { kind: 'supported'; verdicts: readonly GitPullRequestReviewVerdict[] }
+  | { kind: 'unsupported'; reason: string }
+
+export type GitPullRequestReviewInput = {
+  readonly verdict: GitPullRequestReviewVerdict
+  readonly body: string
+}
+
+export type GitPullRequestReviewResult =
+  | { kind: 'submitted'; verdict: GitPullRequestReviewVerdict }
   | { kind: 'unsupported'; forge: GitForge | null; reason: string }

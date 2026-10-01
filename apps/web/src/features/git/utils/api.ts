@@ -1,4 +1,9 @@
-import type { GitPullRequestComments, GitPullRequestCommentResult } from '@workspace/contracts'
+import type {
+  GitPullRequestComments,
+  GitPullRequestCommentResult,
+  GitPullRequestReviewInput,
+  GitPullRequestReviewResult,
+} from '@workspace/contracts'
 import type { GitStatusResult } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type {
@@ -472,4 +477,12 @@ export async function postPullRequestComment(
 ) {
   const response = await client.git['pull-request'].comment.post(input)
   return unwrapGit<GitPullRequestCommentResult>(response)
+}
+
+export async function submitPullRequestReview(
+  input: { path: string; number: number } & GitPullRequestReviewInput,
+  client: Client,
+) {
+  const response = await client.git['pull-request'].review.post(input)
+  return unwrapGit<GitPullRequestReviewResult>(response)
 }

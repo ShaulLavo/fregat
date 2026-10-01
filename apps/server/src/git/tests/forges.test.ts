@@ -10,6 +10,7 @@ import {
   createForgeRepository,
   readPullRequestComments,
   postPullRequestComment,
+  submitPullRequestReview,
   createPullRequest,
   readBranchPullRequests,
   readPullRequest,
@@ -1115,19 +1116,95 @@ describe('forge discussion capabilities', () => {
     })
   })
 
-  it('Azure discussion is explicitly unsupported without reading or writing a fake universal API', async () => {
-    const forge = boundary('https://dev.azure.com/org/project/_git/repo', (argv) =>
-      argv[1] === 'account' ? ok('fixture') : undefined,
-    )
+  it('Azure reads returned repository threads, preserves inline and reply context, and refuses writes', async () => {
+    const forge = boundary('https://dev.azure.com/org/project/_git/repo', (argv) => {
+      if (argv[1] === 'account') return ok('fixture')
+      if (argv.includes('show'))
+        return json({
+          repository: { name: 'returned-repo', project: { name: 'returned-project' } },
+        })
+      if (argv.includes('invoke'))
+        return json({
+          value: [
+            {
+              id: 3,
+              threadContext: { filePath: '/src/main.ts' },
+              comments: [
+                {
+                  id: 1,
+                  content: 'Inline comment',
+                  publishedDate: 'today',
+                  author: { displayName: 'Reader' },
+                },
+                { id: 2, content: 'Reply', publishedDate: 'today' },
+                { id: 3, content: 'System event', publishedDate: 'today', commentType: 'system' },
+                { id: 4, content: 'Deleted', publishedDate: 'today', isDeleted: true },
+              ],
+            },
+            {
+              id: 4,
+              isDeleted: true,
+              comments: [{ id: 1, content: 'Deleted thread', publishedDate: 'today' }],
+            },
+          ],
+        })
+      return undefined
+    })
     const cwd = await checkout()
     expect(await readPullRequestComments({ cwd, number: 7 }, forge)).toMatchObject({
-      kind: 'unsupported',
+      kind: 'ready',
       forge: { kind: 'azure-devops' },
+      truncated: false,
+      comment: { kind: 'unsupported' },
+      review: { kind: 'unsupported' },
+      comments: [
+        { id: '3:1', body: 'Inline comment', context: { threadId: '3', path: '/src/main.ts' } },
+        { id: '3:2', body: 'Reply', context: { threadId: '3', path: '/src/main.ts' } },
+      ],
     })
+    expect(forge.commands('az').at(-1)?.argv).toEqual(
+      expect.arrayContaining([
+        '--org',
+        'https://dev.azure.com/org',
+        'project=returned-project',
+        'repositoryId=returned-repo',
+        'pullRequestId=7',
+      ]),
+    )
     expect(await postPullRequestComment({ cwd, number: 7, body: 'Thanks' }, forge)).toMatchObject({
       kind: 'unsupported',
     })
-    expect(forge.commands('az')).toHaveLength(1)
+    expect(
+      await submitPullRequestReview({ cwd, number: 7, body: '', verdict: 'approve' }, forge),
+    ).toMatchObject({ kind: 'unsupported' })
+    expect(forge.commands('az')).toHaveLength(3)
+  })
+
+  it.each([99, 100, 101])('Azure caps its unpaginated preview of %i comments', async (count) => {
+    const forge = boundary('https://dev.azure.com/org/project/_git/repo', (argv) => {
+      if (argv[1] === 'account') return ok('fixture')
+      if (argv.includes('show'))
+        return json({ repository: { name: 'repo', project: { name: 'project' } } })
+      if (argv.includes('invoke'))
+        return json({
+          value: [
+            {
+              id: 1,
+              comments: Array.from({ length: count }, (_, index) => ({
+                id: index + 1,
+                content: 'Comment',
+                publishedDate: 'today',
+              })),
+            },
+          ],
+        })
+      return undefined
+    })
+    const result = await readPullRequestComments({ cwd: await checkout(), number: 7 }, forge)
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.comments).toHaveLength(Math.min(count, 100))
+    expect(result.truncated).toBe(count > 100)
   })
 
   it('a refused comment exposes no forge stderr or comment body', async () => {
@@ -1141,4 +1218,157 @@ describe('forge discussion capabilities', () => {
       message: 'The Git host could not post the comment',
     })
   })
+})
+
+describe('forge review submission', () => {
+  it.each([
+    ['comment', 'COMMENT'],
+    ['approve', 'APPROVE'],
+    ['request-changes', 'REQUEST_CHANGES'],
+  ] as const)(
+    'GitHub submits %s atomically with JSON stdin on the selected host',
+    async (verdict, event) => {
+      const forge = boundary('https://github.internal/acme/repo.git', (argv) =>
+        argv[1] === 'auth' || argv.includes('POST') ? ok('{}') : undefined,
+      )
+      const body = 'A "quoted" summary\nwith unicode α'
+      expect(
+        await submitPullRequestReview({ cwd: await checkout(), number: 7, verdict, body }, forge),
+      ).toEqual({ kind: 'submitted', verdict })
+      const writes = forge.commands('gh').filter((call) => call.argv.includes('POST'))
+      expect(writes).toHaveLength(1)
+      expect(writes[0]?.argv).toEqual(
+        expect.arrayContaining([
+          '--hostname',
+          'github.internal',
+          'repos/acme/repo/pulls/7/reviews',
+          '--input',
+          '-',
+        ]),
+      )
+      expect(JSON.parse(writes[0]?.input ?? '{}')).toEqual({ body, event })
+      expect(writes[0]?.argv).not.toContain(body)
+    },
+  )
+
+  it.each([false, true])(
+    'GitLab approval waits for its summary (summary refusal: %s)',
+    async (refused) => {
+      const forge = boundary('https://gitlab.internal/group/sub/repo.git', (argv) => {
+        if (argv[1] === 'auth') return ok()
+        if (argv.some((arg) => arg.endsWith('/notes')))
+          return refused ? { exitCode: 1, stdout: '', stderr: 'private summary' } : ok('{}')
+        if (argv.some((arg) => arg.endsWith('/approve'))) return ok('{}')
+        return undefined
+      })
+      const body = 'Summary before approval'
+      const submitted = submitPullRequestReview(
+        { cwd: await checkout(), number: 7, verdict: 'approve', body },
+        forge,
+      )
+      if (refused)
+        await expect(submitted).rejects.toMatchObject({
+          code: 'git.PULL_REQUEST_REVIEW_FAILED',
+          internal: { at: 'summary' },
+        })
+      if (!refused)
+        await expect(submitted).resolves.toEqual({ kind: 'submitted', verdict: 'approve' })
+      const posts = forge.commands('glab').filter((call) => call.argv.includes('POST'))
+      expect(posts).toHaveLength(refused ? 1 : 2)
+      expect(posts[0]?.argv).toEqual(
+        expect.arrayContaining([
+          'projects/group%2Fsub%2Frepo/merge_requests/7/notes',
+          '--header',
+          'Content-Type: application/json',
+        ]),
+      )
+      expect(JSON.parse(posts[0]?.input ?? '{}')).toEqual({ body })
+      expect(posts[0]?.argv).toEqual(expect.arrayContaining(['--hostname', 'gitlab.internal']))
+      if (!refused)
+        expect(posts[1]?.argv).toContain('projects/group%2Fsub%2Frepo/merge_requests/7/approve')
+    },
+  )
+
+  it('GitLab request changes returns unsupported before writing a summary', async () => {
+    const forge = boundary('https://gitlab.com/acme/repo.git', (argv) =>
+      argv[1] === 'auth' ? ok() : undefined,
+    )
+    expect(
+      await submitPullRequestReview(
+        { cwd: await checkout(), number: 7, verdict: 'request-changes', body: 'Changes' },
+        forge,
+      ),
+    ).toMatchObject({ kind: 'unsupported' })
+    expect(forge.commands('glab')).toHaveLength(1)
+  })
+
+  it.each([
+    ['comment', 'COMMENT'],
+    ['approve', 'APPROVED'],
+    ['request-changes', 'REQUEST_CHANGES'],
+  ] as const)('Forgejo binds %s to the fetched head', async (verdict, event) => {
+    const head = 'a'.repeat(40)
+    const forge = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+      if (argv.includes('login')) return json([{ name: 'fixture', url: 'https://codeberg.org' }])
+      if (argv.includes('POST')) return ok('{}')
+      if (argv.at(-1)?.endsWith('/pulls/7')) return json({ head: { sha: head } })
+      return undefined
+    })
+    expect(
+      await submitPullRequestReview(
+        { cwd: await checkout(), number: 7, verdict, body: 'Review' },
+        forge,
+      ),
+    ).toEqual({ kind: 'submitted', verdict })
+    const post = forge.commands('tea').find((call) => call.argv.includes('POST'))
+    expect(post?.argv).toContain('https://codeberg.org/api/v1/repos/acme/repo/pulls/7/reviews')
+    expect(JSON.parse(post?.input ?? '{}')).toEqual({ body: 'Review', event, commit_id: head })
+    expect(post?.argv).toEqual(expect.arrayContaining(['--data', '@-']))
+  })
+
+  it('Forgejo does not post a review after an unreadable head', async () => {
+    const forge = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+      if (argv.includes('login')) return json([{ name: 'fixture', url: 'https://codeberg.org' }])
+      return json({ head: { sha: 'invalid' } })
+    })
+    await expect(
+      submitPullRequestReview(
+        { cwd: await checkout(), number: 7, verdict: 'approve', body: '' },
+        forge,
+      ),
+    ).rejects.toMatchObject({ code: 'git.PULL_REQUEST_RESPONSE_INVALID' })
+    expect(forge.commands('tea').some((call) => call.argv.includes('POST'))).toBe(false)
+  })
+
+  it.each([false, true])(
+    'Bitbucket verdict follows the summary (summary refusal: %s)',
+    async (refused) => {
+      const forge = boundary('https://bitbucket.org/acme/repo.git', (argv) =>
+        argv.includes('credential') ? ok('username=fixture\npassword=fixture\n') : undefined,
+      )
+      const posts: { url: string; body: unknown }[] = []
+      const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
+        posts.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : null })
+        return Response.json({}, { status: refused ? 403 : 200 })
+      }) as typeof fetch
+      const result = submitPullRequestReview(
+        { cwd: await checkout(), number: 7, verdict: 'request-changes', body: 'Changes required' },
+        { ...forge, fetch: fetcher },
+      )
+      if (refused)
+        await expect(result).rejects.toMatchObject({
+          code: 'git.PULL_REQUEST_REVIEW_FAILED',
+          internal: { at: 'summary', status: 403 },
+        })
+      if (!refused)
+        await expect(result).resolves.toMatchObject({
+          kind: 'submitted',
+          verdict: 'request-changes',
+        })
+      expect(posts).toHaveLength(refused ? 1 : 2)
+      expect(posts[0]?.body).toEqual({ content: { raw: 'Changes required' } })
+      expect(posts[0]?.url).toMatch(/\/comments$/)
+      if (!refused) expect(posts[1]?.url).toMatch(/\/request-changes$/)
+    },
+  )
 })

@@ -66,6 +66,8 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 export const selectors = {
   forgeDiscussion: (page: Page) =>
     page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
+  forgeReviewSummary: (page: Page) =>
+    page.getByRole('textbox', { name: 'Review summary', exact: true }),
   forgeComment: (page: Page) => page.getByRole('textbox', { name: 'Comment', exact: true }),
   forgeCommentText: (page: Page, text: string) =>
     page
