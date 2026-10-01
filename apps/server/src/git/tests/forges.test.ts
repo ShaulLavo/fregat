@@ -1411,7 +1411,11 @@ describe('bounded pull request activity', () => {
           {
             sha: 'a'.repeat(40),
             author: { login: 'bob' },
-            commit: { message: 'Fix edge case', committer: { date: '2026-10-01T09:00:00Z' } },
+            commit: {
+              message: 'Fix edge case',
+              author: { name: 'Git author' },
+              committer: { date: '2026-10-01T09:00:00Z' },
+            },
           },
         ])
       if (endpoint.includes('/comments?'))
@@ -1548,7 +1552,11 @@ describe('bounded pull request activity', () => {
           {
             sha: 'c'.repeat(40),
             author: null,
-            commit: { message: 'Forgejo commit', committer: { date: '2026-10-01T09:00:00Z' } },
+            commit: {
+              message: 'Forgejo commit',
+              author: { name: 'Git author' },
+              committer: { date: '2026-10-01T09:00:00Z' },
+            },
           },
         ])
       if (endpoint.endsWith('/reviews/12/comments'))
@@ -1561,6 +1569,7 @@ describe('bounded pull request activity', () => {
             created_at: '2026-10-01T11:00:00Z',
           },
         ])
+      return json([])
     })
     expect(
       await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture),
@@ -1761,6 +1770,165 @@ describe('bounded pull request activity', () => {
       fixture.commands('tea').filter((call) => call.argv.at(-1)?.endsWith('/comments')),
     ).toHaveLength(20)
   })
+
+  it('walks capped Forgejo pages and includes a later inline review', async () => {
+    const fixture = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+      if (argv.includes('login')) return json([{ name: 'selected', url: 'https://codeberg.org' }])
+      const endpoint = new URL(argv.at(-1)!)
+      const page = Number(endpoint.searchParams.get('page') ?? 1)
+      if (endpoint.pathname.endsWith('/reviews/75/comments'))
+        return json([
+          {
+            id: 81,
+            body: 'Later inline',
+            user: null,
+            path: 'later.ts',
+            created_at: '2026-10-01T11:00:00Z',
+          },
+        ])
+      const indexes = Array.from(
+        { length: Math.max(0, Math.min(50, 75 - (page - 1) * 50)) },
+        (_, index) => (page - 1) * 50 + index + 1,
+      )
+      if (endpoint.pathname.endsWith('/reviews'))
+        return json(
+          indexes.map((id) => ({
+            id,
+            body: '',
+            user: null,
+            state: 'COMMENT',
+            submitted_at: '2026-10-01T10:00:00Z',
+            comments_count: id === 75 ? 1 : 0,
+          })),
+        )
+      if (endpoint.pathname.endsWith('/commits'))
+        return json(
+          indexes.map((id) => ({
+            sha: id.toString(16).padStart(40, '0'),
+            author: null,
+            commit: {
+              message: `Commit ${id}`,
+              author: { name: 'Git author' },
+              committer: { date: '2026-10-01T09:00:00Z' },
+            },
+          })),
+        )
+    })
+    const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
+    expect(result).toMatchObject({
+      kind: 'ready',
+      reviews: { truncated: false },
+      commits: { truncated: false },
+      discussions: { items: [{ comments: [{ body: 'Later inline' }] }] },
+    })
+    if (
+      result.kind !== 'ready' ||
+      result.reviews.kind !== 'ready' ||
+      result.commits.kind !== 'ready'
+    )
+      return
+    expect(result.reviews.items.map((row) => row.id)).toEqual(
+      Array.from({ length: 75 }, (_, index) => String(index + 1)),
+    )
+    expect(result.commits.items.map((row) => row.message)).toEqual(
+      Array.from({ length: 75 }, (_, index) => `Commit ${index + 1}`),
+    )
+    expect(
+      fixture.commands('tea').filter((call) => call.argv.at(-1)?.includes('page=3')),
+    ).toHaveLength(2)
+  })
+
+  it.each([
+    [50, 125, 100, 2],
+    [10, 100, 50, 5],
+  ])(
+    'bounds Forgejo capped pages at %i rows per page and marks unknown exhaustion as truncated',
+    async (pageSize, total, kept, lastPage) => {
+      const fixture = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+        if (argv.includes('login')) return json([{ name: 'selected', url: 'https://codeberg.org' }])
+        const endpoint = new URL(argv.at(-1)!)
+        const page = Number(endpoint.searchParams.get('page') ?? 1)
+        const indexes = Array.from(
+          { length: Math.max(0, Math.min(pageSize, total - (page - 1) * pageSize)) },
+          (_, index) => (page - 1) * pageSize + index + 1,
+        )
+        if (endpoint.pathname.endsWith('/reviews'))
+          return json(
+            indexes.map((id) => ({
+              id,
+              body: '',
+              user: null,
+              state: 'COMMENT',
+              submitted_at: '2026-10-01T10:00:00Z',
+              comments_count: 0,
+            })),
+          )
+        if (endpoint.pathname.endsWith('/commits'))
+          return json(
+            indexes.map((id) => ({
+              sha: id.toString(16).padStart(40, '0'),
+              author: null,
+              commit: {
+                message: `Commit ${id}`,
+                author: { name: 'Git author' },
+                committer: { date: '2026-10-01T09:00:00Z' },
+              },
+            })),
+          )
+      })
+      const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
+      expect(result).toMatchObject({
+        kind: 'ready',
+        reviews: { truncated: true },
+        commits: { truncated: true },
+        discussions: { truncated: true },
+      })
+      if (
+        result.kind !== 'ready' ||
+        result.reviews.kind !== 'ready' ||
+        result.commits.kind !== 'ready'
+      )
+        return
+      expect(result.reviews.items.map((row) => row.id)).toEqual(
+        Array.from({ length: kept }, (_, index) => String(index + 1)),
+      )
+      expect(result.commits.items.map((row) => row.message)).toEqual(
+        Array.from({ length: kept }, (_, index) => `Commit ${index + 1}`),
+      )
+      expect(
+        fixture.commands('tea').filter((call) => call.argv.at(-1)?.includes('?')),
+      ).toHaveLength(lastPage * 2)
+      expect(
+        fixture.commands('tea').some((call) => call.argv.at(-1)?.includes(`page=${lastPage + 1}`)),
+      ).toBe(false)
+    },
+  )
+
+  it.each(['https://github.com/acme/repo.git', 'https://codeberg.org/acme/repo.git'])(
+    'preserves unlinked Git commit author on %s',
+    async (remote) => {
+      const fixture = boundary(remote, (argv) => {
+        if (argv[1] === 'auth') return ok()
+        if (argv.includes('login')) return json([{ name: 'selected', url: 'https://codeberg.org' }])
+        if (argv.at(-1)?.includes('/commits?') && !argv.at(-1)?.includes('page=2'))
+          return json([
+            {
+              sha: 'd'.repeat(40),
+              author: null,
+              commit: {
+                message: 'Unlinked commit',
+                author: { name: 'Unlinked Git author' },
+                committer: { date: '2026-10-01T09:00:00Z' },
+              },
+            },
+          ])
+        return json([])
+      })
+      expect(
+        await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture),
+      ).toMatchObject({ commits: { kind: 'ready', items: [{ author: 'Unlinked Git author' }] } })
+    },
+  )
 
   it('rejects unreadable activity without fabricating an empty supported section', async () => {
     const fixture = boundary('https://github.com/acme/repo.git', (argv) =>

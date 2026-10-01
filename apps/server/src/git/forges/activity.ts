@@ -67,26 +67,27 @@ export function parseGithubReviews(context: ForgeContext, stdout: string) {
   return activityPage(items, rows.length >= 100)
 }
 
-export function parseRestCommits(context: ForgeContext, stdout: string) {
-  const rows = parseForgeJson(
-    context,
-    v.array(
-      v.object({
-        sha,
-        author: actor,
-        commit: v.object({ message: v.string(), committer: v.object({ date: timestamp }) }),
-      }),
-    ),
-    stdout,
-    'activity-commits',
-  )
+export const restCommitsSchema = v.array(
+  v.object({
+    sha,
+    author: actor,
+    commit: v.object({
+      message: v.string(),
+      author: v.object({ name: v.string() }),
+      committer: v.object({ date: timestamp }),
+    }),
+  }),
+)
+
+export function parseRestCommits(context: ForgeContext, stdout: string, truncated = false) {
+  const rows = parseForgeJson(context, restCommitsSchema, stdout, 'activity-commits')
   const items: GitPullRequestCommit[] = rows.map((row) => ({
     oid: row.sha,
     message: row.commit.message,
-    author: row.author?.login ?? 'Unknown author',
+    author: row.author?.login ?? row.commit.author.name,
     createdAt: row.commit.committer.date,
   }))
-  return activityPage(items, rows.length >= 100)
+  return activityPage(items, truncated || rows.length >= 100)
 }
 
 export function parseGithubDiscussions(context: ForgeContext, stdout: string) {
@@ -195,7 +196,7 @@ export function parseGitlabDiscussions(context: ForgeContext, stdout: string) {
   return activityPage(discussions, rows.length >= 100 || rows.some((row) => row.notes.length > 100))
 }
 
-const forgejoReviewsSchema = v.array(
+export const forgejoReviewsSchema = v.array(
   v.object({
     id,
     body: v.string(),
@@ -206,7 +207,7 @@ const forgejoReviewsSchema = v.array(
   }),
 )
 
-export function parseForgejoReviews(context: ForgeContext, stdout: string) {
+export function parseForgejoReviews(context: ForgeContext, stdout: string, truncated = false) {
   const rows = parseForgeJson(context, forgejoReviewsSchema, stdout, 'activity-reviews')
   const visible = rows.filter((row) => row.state !== 'PENDING' && row.state !== 'REQUEST_REVIEW')
   return {
@@ -218,14 +219,16 @@ export function parseForgejoReviews(context: ForgeContext, stdout: string) {
         state: row.state,
         createdAt: row.submitted_at,
       })),
-      rows.length >= 100,
+      truncated || rows.length >= 100,
     ),
     inlineReviewIds: visible
       .filter((row) => row.comments_count > 0)
       .slice(0, 20)
       .map((row) => row.id),
     inlineTruncated:
-      rows.length >= 100 || visible.filter((row) => row.comments_count > 0).length > 20,
+      truncated ||
+      rows.length >= 100 ||
+      visible.filter((row) => row.comments_count > 0).length > 20,
   }
 }
 

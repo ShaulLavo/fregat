@@ -42,7 +42,11 @@ export const gitForgeDiscussion = isolatedNativeScenario({
       {
         sha: 'a'.repeat(40),
         author: { login: 'bob' },
-        commit: { message: 'Native activity commit', committer: { date: '2026-10-01T09:00:00Z' } },
+        commit: {
+          message: 'Native activity commit',
+          author: { name: 'Git author' },
+          committer: { date: '2026-10-01T09:00:00Z' },
+        },
       },
     ]
     state.activityDiscussions = [

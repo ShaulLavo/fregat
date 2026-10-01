@@ -312,7 +312,11 @@ test('the existing discussion surface reads review and commit activity and group
   forge.activityCommits.push({
     sha: 'a'.repeat(40),
     author: { login: 'bob' },
-    commit: { message: 'Activity commit headline', committer: { date: '2026-10-01T09:00:00Z' } },
+    commit: {
+      message: 'Activity commit headline',
+      author: { name: 'Git author' },
+      committer: { date: '2026-10-01T09:00:00Z' },
+    },
   })
   forge.activityDiscussions.push(
     {
