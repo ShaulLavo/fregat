@@ -29,7 +29,7 @@ import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
-import { terminalHistory } from './terminal-history'
+import { terminalHistory, terminalIdleShells } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
 import {
@@ -424,6 +424,7 @@ export const scenarios: readonly Scenario[] = [
   editorSavedSnapshot,
   historyComparisonNoFlicker,
   terminalHistory,
+  terminalIdleShells,
   responseDelivery,
   archiveLifecycle,
   sessionUnread,
