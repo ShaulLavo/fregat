@@ -1310,15 +1310,16 @@ export const SETTINGS_REGISTRY = {
       light: heavyJobBudgetSchema,
       suite: heavyJobBudgetSchema,
     }),
-    // Estimate: the class's largest peak in the heavy-job log, rounded up to 512 MiB. A running
-    // job is charged only what it may still claim, so the estimate bounds its growth; runs killed
-    // at the ceiling record the ceiling. Bench covers the large-file bench's 8 GiB case cap.
+    // Estimate: p90 peak of the class's completed runs (no OOM kill, peak below the ceiling) in
+    // the 2026-10-01 heavy-job log, rounded up to 512 MiB: browser 4516, build 2968, light 1180,
+    // suite 6155 MiB. Bench keeps 3072 for the large-file bench's 8 GiB case cap. A job past its
+    // estimate is still capped by its ceiling; the reserve and the pressure gate cover overlaps.
     default: {
       bench: { ceilingMiB: 9216, estimateMiB: 3072 },
-      browser: { ceilingMiB: 10240, estimateMiB: 10240 },
-      build: { ceilingMiB: 4096, estimateMiB: 4096 },
-      light: { ceilingMiB: 2048, estimateMiB: 2048 },
-      suite: { ceilingMiB: 8192, estimateMiB: 7168 },
+      browser: { ceilingMiB: 10240, estimateMiB: 4608 },
+      build: { ceilingMiB: 4096, estimateMiB: 3072 },
+      light: { ceilingMiB: 2048, estimateMiB: 1536 },
+      suite: { ceilingMiB: 8192, estimateMiB: 6656 },
     },
     // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
     scope: 'machine',
