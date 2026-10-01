@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test'
 import { fail } from './errors.mjs'
 import { correlateInputEvents } from './input-correlation.mjs'
+import { startContention } from './host-contention.mjs'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
 import { assertConsumerReadiness } from './input-configurations.mjs'
 
@@ -30,6 +31,7 @@ async function runGroup(browser, fixture, views, result, helpers) {
 }
 
 async function runIsolatedScenario(browser, fixture, views, scenario, result, helpers) {
+  const contention = await startContention()
   const session = await helpers.newPage(browser)
   const errors = []
   session.page.on('pageerror', (error) => errors.push(error.message))
@@ -43,6 +45,13 @@ async function runIsolatedScenario(browser, fixture, views, scenario, result, he
   }
   for (const sample of samples)
     result.samples.push({ ...sample, cleanup: { ...sample.cleanup, contextClosed: true } })
+  // Read at group boundaries only, outside every captured input interval.
+  ;(result.hostContention ??= []).push({
+    fixture: fixture.id,
+    views,
+    scenario,
+    ...(await contention()),
+  })
 }
 
 async function runScenarioGroup(session, fixture, views, scenario, result, helpers) {
