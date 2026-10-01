@@ -46,7 +46,9 @@ export function useSelectedFile(filePath: FilesystemPath | null) {
     })
   }
 
-  return { fileState, fileVersion, resetFileLoad }
+  const readError = fileState.status === 'ready' && isError ? clientErrorMessage(error) : null
+
+  return { fileState, fileVersion, readError, resetFileLoad }
 }
 
 function selectedFileVersion(

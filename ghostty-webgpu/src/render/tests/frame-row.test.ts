@@ -47,7 +47,6 @@ it.each([
     terminal.write('changed')
     state.update()
     state.readRows({ packed: true })
-    runtime.dispose()
     expect(projection(actual)).toEqual(expected)
     expect(projection(packed.map(copiedFrameRow))).toEqual(expected)
     expect(actual.map((row) => row.renderCells)).toEqual(styledExpected)

@@ -29,6 +29,9 @@ export class GhostDemo extends AnimatedDemo {
   protected layout(): void {
     this.context!.write(clearScreen + hideCursor)
     this.buffer.forget()
+    this.redrawSampleIn = 0
+    this.redrawSum = 0
+    this.redrawFrames = 0
     if (this.frames) {
       this.frame(0, 0)
       return
@@ -37,6 +40,7 @@ export class GhostDemo extends AnimatedDemo {
     loadGhostFrames()
       .then((frames) => {
         this.frames = frames
+        this.paintStill()
       })
       .catch((cause: unknown) => {
         this.failure = cause instanceof Error ? cause.message : String(cause)

@@ -72,6 +72,7 @@ async function handoff(width, height, deviceScaleFactor) {
   const before = await geometry(page)
   assert.equal(before.rows, 40, 'HTML contains the complete first frame before wasm arrives')
   assert.equal(before.backend, 'html')
+  assert.equal(await page.locator('#tabs button[role=tab]').count(), 3)
   assert.equal(await page.locator('#backend-fact').textContent(), 'html')
   const name = `${width}-dpr${deviceScaleFactor}`
   await writeFile(`${directory}/${name}-before.json`, JSON.stringify(before, null, 2))
@@ -117,6 +118,34 @@ try {
   assert.equal((await page.locator('#terminal .ghostty-webgpu-frame [data-row]').count()) > 0, true)
   await page.screenshot({ path: `${directory}/no-canvas-dom.png`, fullPage: true })
   results.push({ name: 'no-canvas-dom', ...(await geometry(page)) })
+  await page.locator('#tabs button[data-demo=matrix]').click()
+  await page.waitForFunction(() =>
+    document.querySelector('#stat').textContent.includes('cells redrawn'),
+  )
+  await page.locator('.screen').screenshot({ path: `${directory}/matrix-dom.png` })
+  await page.locator('#tabs button[data-demo=shell]').click()
+  await page.waitForFunction(() =>
+    document.querySelector('#terminal').textContent.includes('bash in your browser tab'),
+  )
+  await page.keyboard.type('echo $((6*7))')
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => /42/.test(document.querySelector('#terminal').textContent))
+  await page.keyboard.type('for i in 1 2 3; do echo demo-$i; done')
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() =>
+    document.querySelector('#terminal').textContent.includes('demo-3'),
+  )
+  await page.locator('.screen').screenshot({ path: `${directory}/shell-dom.png` })
+  await page.locator('#tabs button[data-demo=ghost]').click()
+  await page.waitForFunction(() =>
+    document.querySelector('#stat').textContent.includes('cells redrawn'),
+  )
+  assert.equal(await page.locator('#ghost-first-frame').count(), 0)
+  results.push({
+    name: 'integrated-demo-tabs',
+    arithmetic: 42,
+    loop: ['demo-1', 'demo-2', 'demo-3'],
+  })
   await context.close()
   const noWasmContext = await browser.newContext({ viewport: { width: 1280, height: 1000 } })
   const noWasmPage = await noWasmContext.newPage()
@@ -136,6 +165,8 @@ try {
   const staticPage = await staticContext.newPage()
   await staticPage.goto(url)
   assert.equal(await staticPage.locator('#ghost-first-frame [data-row]').count(), 40)
+  assert.equal(await staticPage.locator('#tabs button[role=tab]').count(), 3)
+  assert.equal(await staticPage.locator('#backend').textContent(), 'html')
   await staticPage.screenshot({ path: `${directory}/no-javascript.png`, fullPage: true })
   await staticContext.close()
 } finally {

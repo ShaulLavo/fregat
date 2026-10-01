@@ -13,6 +13,7 @@ import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import {
   bootSeconds,
+  chargeOf,
   decide,
   decideQuiet,
   drainRequest,
@@ -50,6 +51,9 @@ const USAGE =
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
+// rev-parse answers in about a millisecond; a git still running after this is stuck, and the
+// wrapper holds its admission while it waits.
+const GIT_TIMEOUT_MS = 250
 const MiB = 2 ** 20
 // EX_TEMPFAIL: a quiet job whose hold ran out did not fail; it has to queue again.
 const RETRY_EXIT = 75
@@ -199,6 +203,8 @@ async function run(options: Options) {
   )
   // Released however the launch or the job ends, so a failed launch leaves no admission held.
   try {
+    // Read before launch: the job, or another session, may commit while it runs.
+    const checkout = repositoryOf(cwd)
     const job = startJob(placed.spec)
     // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
     // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
@@ -225,6 +231,7 @@ async function run(options: Options) {
     record(options, {
       admission: placed.reason,
       budget: placed.budget,
+      checkout,
       cwd,
       holdExpired,
       id,
@@ -365,10 +372,10 @@ function attemptAdmission(
     const quiet = running.owners.find((job) => job.quiet && (job.quietUntil ?? Infinity) > now)
     if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}` }
     const decision = waiting.entry.quiet
-      ? decideQuiet(running.charges.length)
+      ? decideQuiet(running.owners.length + running.orphanCharges.length)
       : decide(
           waiting.entry.estimateBytes,
-          running.charges,
+          [...running.orphanCharges, ...ownerCharges(options, running.owners)],
           readReadings(options.procRoot),
           config.limits,
         )
@@ -393,25 +400,31 @@ function attemptAdmission(
 }
 
 /**
- * What each running job is charged. The cgroup tree is what runs: a job slice whose wrapper is
- * gone (no live entry) is an orphan, charged its ceiling while this pass kills and removes it.
- * A job admitted but not yet in its slice is charged through its live entry.
+ * Reaps orphans: job slices whose wrapper is gone (no live entry). Each is charged its ceiling
+ * less its use, read before the kill; if the kill fails it may still grow that far.
  */
 function reconcile(options: Options) {
   const owners = live(options.stateDir, 'jobs')
   const orphans = liveSlices(options.sliceRoot).filter(
     (slice) => !owners.some((job) => job.id === slice.id),
   )
+  const orphanCharges = orphans.map((orphan) =>
+    chargeOf(options.sliceRoot, orphan.slice, orphan.ceilingBytes),
+  )
   for (const orphan of orphans) {
     console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
     reapSlice(options.sliceRoot, orphan.slice)
   }
   clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
-  const charges = [
-    ...owners.map((job) => job.estimateBytes),
-    ...orphans.map((orphan) => orphan.ceilingBytes),
-  ]
-  return { charges, owners }
+  return { orphanCharges, owners }
+}
+
+// The part of each live job's estimate it may still claim; a job admitted but not yet in its
+// slice is charged its whole estimate. Read beside MemAvailable: both move while jobs run.
+function ownerCharges(options: Options, owners: readonly Entry[]) {
+  return owners.map((job) =>
+    chargeOf(options.sliceRoot, `${options.sliceRoot}-${job.id}.slice`, job.estimateBytes),
+  )
 }
 
 // The holder line names its job; it is cleared only when that job qualifies, so clearing a
@@ -449,9 +462,7 @@ function setting<K extends SettingId>(home: string, id: K): SettingValue<K> {
 function wrapperCommit() {
   const installed = readText(path.join(import.meta.dirname, 'commit')).trim()
   if (installed) return installed
-  return Bun.spawnSync(['git', '-C', import.meta.dirname, 'rev-parse', 'HEAD'])
-    .stdout.toString()
-    .trim()
+  return gitOutput(['-C', import.meta.dirname, 'rev-parse', 'HEAD'])?.trim() ?? ''
 }
 
 function readText(file: string) {
@@ -465,6 +476,7 @@ function readText(file: string) {
 type Finished = {
   readonly admission: string
   readonly budget: Budget | null
+  readonly checkout: ReturnType<typeof repositoryOf>
   readonly cwd: string
   readonly holdExpired: boolean
   readonly id: string
@@ -472,7 +484,7 @@ type Finished = {
   readonly queuedMs: number
 }
 
-// Logging is best effort: a settings, git or disk failure is reported, and the job's exit
+// Logging is best effort: a settings or disk failure is reported, and the job's exit
 // status still becomes the wrapper's.
 function record(options: Options, finished: Finished) {
   try {
@@ -487,9 +499,9 @@ function record(options: Options, finished: Finished) {
 
 function jobRecord(
   options: Options,
-  { admission, budget, cwd, holdExpired, id, outcome, queuedMs }: Finished,
+  { admission, budget, checkout, cwd, holdExpired, id, outcome, queuedMs }: Finished,
 ): HeavyJobRecord {
-  const commitHash = wrapperCommit()
+  const wrapper = wrapperCommit()
   return {
     action: 'heavy.job',
     admission,
@@ -497,7 +509,6 @@ function jobRecord(
     ceilingBytes: budget ? budget.ceilingMiB * MiB : null,
     class: budget ? options.jobClass : null,
     command: redactCommand(options.command),
-    commitHash,
     cpuUsageUsec: outcome.cpuUsageUsec,
     cwd,
     estimateBytes: budget ? budget.estimateMiB * MiB : null,
@@ -516,19 +527,45 @@ function jobRecord(
     source: 'heavy',
     timestamp: new Date().toISOString(),
     unit: outcome.unit,
-    version: commitHash.slice(0, 9),
+    version: wrapper.slice(0, 9),
     wallMs: outcome.wallMs,
-    ...repositoryOf(cwd),
+    ...checkout,
   }
 }
 
-// Worktrees of one repository share its common git directory, so lanes group together.
+// Worktrees of one repository share its common git directory, so lanes group together; each
+// worktree has its own HEAD, which is the commit the job runs.
 function repositoryOf(cwd: string) {
-  const result = Bun.spawnSync(
-    ['git', '-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir', '--show-prefix'],
-    { stderr: 'ignore', stdout: 'pipe' },
-  )
-  if (result.exitCode !== 0) return { repo: null, subdir: null }
-  const [commonDir = '', prefix = ''] = result.stdout.toString().split('\n')
-  return { repo: commonDir.replace(/\/\.git\/?$/, ''), subdir: prefix.replace(/\/$/, '') }
+  const output = gitOutput([
+    '-C',
+    cwd,
+    'rev-parse',
+    '--path-format=absolute',
+    '--git-common-dir',
+    '--show-prefix',
+    'HEAD',
+  ])
+  if (output === null) return { commitHash: null, repo: null, subdir: null }
+  const [commonDir = '', prefix = '', head = ''] = output.split('\n')
+  return {
+    commitHash: head,
+    repo: commonDir.replace(/\/\.git\/?$/, ''),
+    subdir: prefix.replace(/\/$/, ''),
+  }
+}
+
+// Git's output, or null when git fails, is not installed, or outlives GIT_TIMEOUT_MS. Only the
+// launch sits in the try, so a bug here still surfaces.
+function gitOutput(args: readonly string[]) {
+  const options = { stderr: 'ignore', stdout: 'pipe', timeout: GIT_TIMEOUT_MS } as const
+  const result = unlessLaunchFails(() => Bun.spawnSync(['git', ...args], options))
+  return result?.success ? result.stdout.toString() : null
+}
+
+function unlessLaunchFails<T>(launch: () => T): T | null {
+  try {
+    return launch()
+  } catch {
+    return null
+  }
 }

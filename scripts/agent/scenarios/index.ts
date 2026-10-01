@@ -1,3 +1,4 @@
+import { binaryFileOpen, binaryFileRemote } from './binary-file-open'
 import { ghosttySiteFit } from './ghostty-site-fit'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
@@ -30,7 +31,7 @@ import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
-import { terminalHistory } from './terminal-history'
+import { terminalHistory, terminalIdleShells } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
 import {
@@ -52,7 +53,7 @@ import { chatQueueAway } from './chat-queue-away'
 import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
 import { screenshotDrop } from './screenshot-drop'
-import { fileAttachments } from './file-attachments'
+import { binaryFileAttachment, fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
@@ -265,6 +266,7 @@ import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorAutoClose } from './editor-auto-close'
 import { editorFormatChord } from './editor-format-chord'
 import { editorLspCompletion } from './editor-lsp-completion'
+import { editorReadRecovery } from './editor-read-recovery'
 import { editorExternalDeletion } from './editor-external-deletion'
 import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
@@ -388,6 +390,7 @@ import { worktreeCleanupOnDelete } from './worktree-cleanup-on-delete'
 import { sessionPullRequestSync } from './session-pull-request-sync'
 import { sessionPullRequestBadge } from './session-pull-request-badge'
 import { sessionAutoSettle } from './session-auto-settle'
+import { gitForgeDiscussion } from './git-forge-discussion'
 import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
 import { worktreeSetupImport } from './worktree-setup-import'
@@ -418,6 +421,8 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  binaryFileOpen,
+  binaryFileRemote,
   ghosttySiteFit,
   devPackageUpdates,
   editorPagedReadonly,
@@ -427,6 +432,7 @@ export const scenarios: readonly Scenario[] = [
   editorSavedSnapshot,
   historyComparisonNoFlicker,
   terminalHistory,
+  terminalIdleShells,
   responseDelivery,
   archiveLifecycle,
   sessionUnread,
@@ -476,6 +482,7 @@ export const scenarios: readonly Scenario[] = [
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
+  binaryFileAttachment,
   screenshotDrop,
   chatStashContext,
   chatDraftSentLeftover,
@@ -651,6 +658,7 @@ export const scenarios: readonly Scenario[] = [
   editorDecodeReveal,
   editorDefinitionCrlf,
   editorExternalDeletion,
+  editorReadRecovery,
   fileTreeUndo,
   editorLspRenameKey,
   editorLspSignatureHelp,
@@ -790,6 +798,7 @@ export const scenarios: readonly Scenario[] = [
   sessionPullRequestBadge,
   sessionAutoSettle,
   gitMergeRequest,
+  gitForgeDiscussion,
   gitClonePublish,
   worktreeSetupImport,
   editorCaretBurst,

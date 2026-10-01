@@ -3,6 +3,7 @@ import { formatSize } from '@/lib/path-formatters'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
 import { WarningCircleIcon } from '@phosphor-icons/react'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Button } from '@workspace/ui/components/button'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
@@ -16,11 +17,13 @@ export function FileLoadError({
   path,
   message,
   hasContent,
+  retained = false,
   onOpenReadOnly,
 }: {
   path: FilesystemPath
   message: string
   hasContent: boolean
+  retained?: boolean
   onOpenReadOnly: () => void
 }) {
   const queryClient = useQueryClient()
@@ -44,9 +47,11 @@ export function FileLoadError({
   if (create.error) description = clientErrorMessage(create.error)
 
   return (
-    <div
+    <PaneBar
+      as={retained ? 'header' : 'div'}
+      aria-label={retained ? 'File read error' : undefined}
       role='status'
-      className='bg-background text-muted-foreground flex shrink-0 items-center gap-2 px-3 py-2 text-xs'
+      className='bg-background text-muted-foreground text-xs'
     >
       <WarningCircleIcon className='size-(--icon-size) shrink-0' />
       <span className='min-w-0 flex-1'>{description}</span>
@@ -75,6 +80,6 @@ export function FileLoadError({
         {query.isFetching ? <Spinner /> : null}
         Retry
       </Button>
-    </div>
+    </PaneBar>
   )
 }

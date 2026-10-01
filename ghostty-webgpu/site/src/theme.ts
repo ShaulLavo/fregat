@@ -1,11 +1,11 @@
 import { rgb, type Rgb } from './ansi.js'
 
-const ink = rgb('#15131F')
+export const ink = rgb('#15131F')
 const mist = rgb('#ECEAF3')
 const fog = rgb('#8F8AAE')
 export const dusk = rgb('#5F5B7A')
-const spectre = rgb('#7EE6CE')
-const pale = rgb('#E6E2F7')
+export const spectre = rgb('#7EE6CE')
+export const pale = rgb('#E6E2F7')
 
 /** The 16 ANSI colors, tuned to sit on the ink background. */
 const ansiColors: readonly Rgb[] = [

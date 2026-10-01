@@ -1,3 +1,4 @@
+import type { FileResult } from '@/lib/file-system-types'
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 
@@ -11,11 +12,9 @@ export type FilesystemConflict = {
   id: string
   localPath: FilesystemPath
   localText: string
-  remoteMtimeMs: number | null
+  remoteFile: FileResult | null
   remotePath: FilesystemPath
-  remoteSize: number | null
   remoteText: string | null
-  remoteVersion: string | null
   toastId?: string | number
 }
 

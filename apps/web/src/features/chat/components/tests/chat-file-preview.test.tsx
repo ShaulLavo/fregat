@@ -65,3 +65,25 @@ test('binary files stay outside the image lightbox and show a download fallback'
   await userEvent.keyboard('{Escape}')
   expect(closed).toBe(true)
 })
+
+test('text-labelled binary bytes show the download fallback without decoded content', () => {
+  const attachment = v.parse(chatAttachmentSchema, {
+    type: 'file',
+    id: 'binary-text',
+    name: 'data.txt',
+    mimeType: 'text/plain',
+    sizeBytes: 6,
+  })
+  if (attachment.type !== 'file') return expect.fail('Expected file attachment')
+  const origin = 'http://attachment-owner'
+  const url = attachmentFileUrl(attachment, origin)
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(attachmentTextOptions(url).queryKey, null)
+  renderWithProviders(
+    <ChatFilePreview attachment={attachment} origin={origin} onClose={() => {}} />,
+    { queryClient },
+  )
+  expect(document.querySelector('[data-chat-file-preview]')).toBeNull()
+  expect(screen.getByText('Download this file to view its contents.')).toBeVisible()
+  expect(screen.getByRole('link', { name: 'Download data.txt' })).toHaveAttribute('href', url)
+})

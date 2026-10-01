@@ -61,6 +61,10 @@
       ],
       "cache": false
     },
+    "@singapore-editor/highlighting#test": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
+    },
     "@singapore-editor/react#test": {
       "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
     },
