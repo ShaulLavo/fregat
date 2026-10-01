@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { verifyCleanSource, verifyRevision } from './ghostty-source.js'
+
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 
 class BridgeBuildError extends Error {
@@ -45,6 +47,8 @@ async function main(): Promise<void> {
     const zig = argument('--zig') ?? 'zig'
     const source = argument('--source')
     if (!source) throw new BridgeBuildError('--source requires the pinned Ghostty checkout')
+    await verifyRevision(source)
+    await verifyCleanSource(source)
     await run(
       [
         zig,
