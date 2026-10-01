@@ -34,8 +34,9 @@ const test = base.extend<{
   },
 })
 
-test('posts a forge comment, settles the query, and reads external comments on refresh', async ({
+test('delegates the checkout-qualified remote probe, posts, settles, and refreshes discussion', async ({
   client,
+  server,
   forge,
 }) => {
   void client
@@ -44,6 +45,7 @@ test('posts a forge comment, settles the query, and reads external comments on r
   )
   await userEvent.click(screen.getByRole('button', { name: 'Discussion' }))
   expect(await screen.findByText('No comments')).toBeVisible()
+  expect(forge.remoteProbes).toContainEqual(['git', '-C', server.root, 'remote', '-v'])
   await userEvent.type(
     screen.getByRole('textbox', { name: 'Comment' }),
     'Please explain this change',
@@ -101,6 +103,7 @@ test('a failed concurrent write releases the next write and both invalidate the 
   act(() => {
     first = a.result.current.mutateAsync('First').catch((error) => error)
     second = b.result.current.mutateAsync('Second')
+    void second.catch(() => {})
   })
   try {
     await waitFor(() => expect(forge.writes).toEqual(['First']))

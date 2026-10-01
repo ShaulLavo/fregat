@@ -915,7 +915,7 @@ describe('forge discussion capabilities', () => {
     expect(forge.calls.at(-1)?.argv.join(' ')).not.toContain(body)
   })
 
-  it('GitLab encodes a nested project and filters system notes', async () => {
+  it('GitLab encodes a nested project and excludes system, diff, and threaded notes', async () => {
     const forge = boundary('https://gitlab.example.com/group/sub/repo.git', (argv) => {
       if (argv[1] === 'auth') return ok()
       if (argv.includes('POST')) return ok('{}')
@@ -926,6 +926,7 @@ describe('forge discussion capabilities', () => {
             body: 'pushed',
             created_at: 'today',
             system: true,
+            type: null,
             author: { username: 'author' },
           },
           {
@@ -933,6 +934,33 @@ describe('forge discussion capabilities', () => {
             body: 'review',
             created_at: 'today',
             system: false,
+            type: null,
+            author: { username: 'reviewer' },
+          },
+          {
+            id: 3,
+            body: 'replace this expression',
+            created_at: 'today',
+            system: false,
+            type: 'DiffNote',
+            position: { position_type: 'text', new_path: 'src/file.ts', new_line: 12 },
+            author: { username: 'reviewer' },
+          },
+          {
+            id: 4,
+            body: 'threaded reply',
+            created_at: 'today',
+            system: false,
+            type: 'DiscussionNote',
+            author: { username: 'reviewer' },
+          },
+          {
+            id: 5,
+            body: 'positioned note',
+            created_at: 'today',
+            system: false,
+            type: null,
+            position: { position_type: 'text', new_path: 'src/file.ts', new_line: 13 },
             author: { username: 'reviewer' },
           },
         ])
@@ -994,6 +1022,58 @@ describe('forge discussion capabilities', () => {
         'https://codeberg.org/api/v1/repos/acme/repo/issues/7/comments',
       ]),
     )
+  })
+
+  it.each([99, 100, 101])(
+    'Forgejo bounds %i unpaginated comments and reports only omitted rows',
+    async (count) => {
+      const forge = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+        if (argv[1] === 'login') return json([{ name: 'fixture', url: 'https://codeberg.org' }])
+        if (argv[1] === 'api')
+          return json(
+            Array.from({ length: count }, (_, index) => ({
+              id: index + 1,
+              body: `Comment ${index + 1}`,
+              created_at: '2026-10-01T10:00:00Z',
+              html_url: `https://codeberg.org/acme/repo/pulls/7#issuecomment-${index + 1}`,
+              user: { login: 'reviewer' },
+            })),
+          )
+        return undefined
+      })
+      const result = await readPullRequestComments({ cwd: await checkout(), number: 7 }, forge)
+      expect(result.kind).toBe('ready')
+      if (result.kind !== 'ready') return
+      expect(result.comments).toHaveLength(Math.min(count, 100))
+      expect(result.comments.at(-1)?.id).toBe(String(Math.min(count, 100)))
+      expect(result.truncated).toBe(count > 100)
+      expect(forge.calls.at(-1)?.argv.at(-1)).toBe(
+        'https://codeberg.org/api/v1/repos/acme/repo/issues/7/comments',
+      )
+    },
+  )
+
+  it.each([99, 100])('GitHub keeps the page-bound preview for %i comments', async (count) => {
+    const forge = boundary('https://github.com/acme/repo.git', (argv) => {
+      if (argv[1] === 'auth') return ok()
+      if (argv[1] === 'api')
+        return json(
+          Array.from({ length: count }, (_, index) => ({
+            id: index + 1,
+            body: `Comment ${index + 1}`,
+            created_at: '2026-10-01T10:00:00Z',
+            html_url: `https://github.com/acme/repo/pull/7#issuecomment-${index + 1}`,
+            user: { login: 'reviewer' },
+          })),
+        )
+      return undefined
+    })
+    const result = await readPullRequestComments({ cwd: await checkout(), number: 7 }, forge)
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.comments).toHaveLength(count)
+    expect(result.truncated).toBe(count === 100)
+    expect(forge.calls.at(-1)?.argv).toContain('repos/acme/repo/issues/7/comments?per_page=100')
   })
 
   it('Bitbucket filters inline/reply/deleted comments and explicitly reports a bounded page', async () => {

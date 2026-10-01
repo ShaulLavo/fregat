@@ -13,14 +13,24 @@ export function createForgeDiscussionBoundary() {
     user: { login: string }
   }[] = []
   const writes: string[] = []
+  const remoteProbes: (readonly string[])[] = []
   const control = {
     failPost: false,
     beforePost: async () => {},
   }
   const run: NonNullable<ForgeBoundaries['run']> = async ({ argv, input, cwd }) => {
     const ok = (stdout = '') => ({ exitCode: 0, stderr: '', stdout })
-    if (argv[0] === 'git' && argv[1] === 'remote')
-      return runGit(cwd, argv.slice(1), { allowFailure: true })
+    if (
+      argv.length === 5 &&
+      argv[0] === 'git' &&
+      argv[1] === '-C' &&
+      argv[2] === cwd &&
+      argv[3] === 'remote' &&
+      argv[4] === '-v'
+    ) {
+      remoteProbes.push(argv)
+      return runGit(cwd, argv.slice(3), { allowFailure: true })
+    }
     if (argv[0] === 'az' && argv[1] === 'account') return ok('fixture')
     if (argv[0] === 'gh' && argv[1] === 'auth') return ok()
     if (argv[0] === 'gh' && argv[1] === 'api') {
@@ -43,5 +53,5 @@ export function createForgeDiscussionBoundary() {
     }
     return { exitCode: 1, stderr: 'unexpected forge command', stdout: '' }
   }
-  return { run, comments, writes, control }
+  return { run, comments, writes, control, remoteProbes }
 }

@@ -48,11 +48,11 @@ export const forgejo: ForgeProvider = {
           'api',
           '--login',
           login.name,
-          apiUrl(login, context, `issues/${number}/comments?limit=100`),
+          apiUrl(login, context, `issues/${number}/comments`),
         ]),
         'comments',
       )
-      return parseIssueComments(context, result.stdout)
+      return parseIssueComments(context, result.stdout, 'unpaginated')
     },
     async post(context, number, body) {
       const login = await requireLogin(context)

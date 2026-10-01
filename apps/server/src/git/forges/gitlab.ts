@@ -49,6 +49,8 @@ export const gitlab: ForgeProvider = {
             body: v.string(),
             created_at: v.string(),
             system: v.boolean(),
+            type: v.nullable(v.string()),
+            position: v.optional(v.nullable(v.object({ position_type: v.string() }))),
             author: v.object({ username: v.string() }),
           }),
         ),
@@ -57,7 +59,7 @@ export const gitlab: ForgeProvider = {
       )
       return {
         comments: rows
-          .filter((row) => !row.system)
+          .filter((row) => !row.system && row.type === null && row.position == null)
           .map((row) => ({
             id: String(row.id),
             body: row.body,

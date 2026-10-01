@@ -51,7 +51,7 @@ export const github: ForgeProvider = {
         ]),
         'comments',
       )
-      return parseIssueComments(context, result.stdout)
+      return parseIssueComments(context, result.stdout, 'page')
     },
     async post(context, number, body) {
       const result = await gh(
