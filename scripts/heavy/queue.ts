@@ -17,6 +17,13 @@ export type Entry = {
   readonly label: string
   readonly jobClass: string
   readonly estimateBytes: number
+  /** A `--quiet` job: it runs alone, for at most one quiet hold. */
+  readonly quiet: boolean
+  /**
+   * A running quiet job's lease, in boot seconds: by then systemd has ended its scope, so its
+   * claim on the machine lapses even if its wrapper is suspended and cannot release it.
+   */
+  readonly quietUntil?: number
   readonly cwd: string
   readonly pid: number
   /** When it joined the queue, then when it started. */
@@ -47,9 +54,10 @@ export function enqueue(stateDir: string, entry: Entry): Held {
 }
 
 /** Moves a waiting entry to `jobs/`; the new file is locked before the old one is dropped. */
-export function promote(stateDir: string, held: Held): Held {
+export function promote(stateDir: string, held: Held, extra: Partial<Entry> = {}): Held {
   const running = write(stateDir, 'jobs', held.entry.id, {
     ...held.entry,
+    ...extra,
     since: new Date().toISOString(),
   })
   release(held)

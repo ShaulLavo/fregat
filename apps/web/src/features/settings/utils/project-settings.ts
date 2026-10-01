@@ -1,5 +1,6 @@
 import {
   WORKTREE_SUBMODULE_MODES,
+  type ModelSelection,
   descriptorFor,
   type ProjectOverrideSettingId,
   type ScalarSettingId,
@@ -199,4 +200,8 @@ function setOptional<Key extends keyof AutoSettleOverride>(
     return
   }
   target[key] = value
+}
+
+export function projectModelLabel(selection: ModelSelection) {
+  return `${selection.providerInstanceId} · ${selection.model}`
 }

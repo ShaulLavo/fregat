@@ -272,11 +272,14 @@ export class WallpaperLibrary {
 
   async #installBundled(wallpaper: BundledWallpaper) {
     const { bytes, file } = await readBundledWallpaper(wallpaper)
-    return this.#install(bytes, `${wallpaper.theme} · ${wallpaper.file}`, {
-      kind: 'omarchy',
-      theme: wallpaper.theme,
-      path: file,
-    })
+    // The pinned hash verifies packaged artwork; its renditions wait for their first request.
+    const header = await readWallpaperHeader(bytes)
+    return this.#install(
+      bytes,
+      `${wallpaper.theme} · ${wallpaper.file}`,
+      { kind: 'omarchy', theme: wallpaper.theme, path: file },
+      header,
+    )
   }
 
   // One bad file in a seed directory must not cost the rest of the import.

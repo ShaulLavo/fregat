@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { BUNDLED_THEMES, BUNDLED_WALLPAPERS } from '@workspace/contracts'
@@ -58,8 +58,14 @@ describe('bundled wallpapers', () => {
     }
   })
 
+  it.each(entries)('fully decodes bundled artwork for $theme · $file', async (wallpaper) => {
+    const { bytes } = await readBundledWallpaper(wallpaper)
+    const decoded = await new Bun.Image(bytes).png().bytes()
+    expect(decoded.byteLength).toBeGreaterThan(0)
+  })
+
   it('exports every built-in theme from a clean library without an Omarchy installation', async () => {
-    const { library, bundles } = await harness()
+    const { library, bundles, directory } = await harness()
     expect(await library.list()).toEqual([])
     for (const theme of BUNDLED_THEMES) {
       const archive = await bundles.exportArchive(theme.id)
@@ -72,10 +78,13 @@ describe('bundled wallpapers', () => {
       }
     }
     expect(await library.list()).toHaveLength(entries.length)
+    expect(
+      (await readdir(directory)).filter((name) => /\.(thumb|display)\.webp$/u.test(name)),
+    ).toEqual([])
   })
 
   it('saves New from current variants and exports the new theme from a clean library', async () => {
-    const { directory, bundles } = await harness()
+    const { directory, library, bundles } = await harness()
     const graphite = BUNDLED_THEMES.find((theme) => theme.id === 'graphite')!
     const created = await bundles.create({
       schemaVersion: 1,
@@ -85,10 +94,17 @@ describe('bundled wallpapers', () => {
     })
     expect(created.variants).toEqual(graphite.variants)
     expect((await bundles.exportArchive(created.id)).wallpapers).toHaveLength(2)
+    expect(
+      (await readdir(directory)).filter((name) => /\.(thumb|display)\.webp$/u.test(name)),
+    ).toEqual([])
     for (const wallpaper of [BUNDLED_WALLPAPERS.graphiteLight, BUNDLED_WALLPAPERS.graphiteDark]) {
-      for (const suffix of ['thumb.webp', 'display.webp']) {
-        const bytes = await readFile(path.join(directory, `${wallpaper.asset}.${suffix}`))
+      for (const kind of ['thumbnail', 'display'] as const) {
+        const file = await library.rendition(wallpaper.asset, kind)
+        const bytes = await readFile(file)
         expect(bytes.subarray(8, 12).toString()).toBe('WEBP')
+        const { mtimeMs } = await stat(file)
+        expect(await library.rendition(wallpaper.asset, kind)).toBe(file)
+        expect((await stat(file)).mtimeMs).toBe(mtimeMs)
       }
     }
   })
@@ -102,9 +118,9 @@ describe('bundled wallpapers', () => {
     expect((await pending).seeded).toHaveLength(entries.length)
     expect(await listing).toHaveLength(entries.length)
     expect((await library.seed()).seeded).toEqual([])
-    expect((await readdir(directory)).filter((name) => name.endsWith('.json'))).toHaveLength(
-      entries.length,
-    )
+    const files = await readdir(directory)
+    expect(files.filter((name) => name.endsWith('.json'))).toHaveLength(entries.length)
+    expect(files.filter((name) => /\.(thumb|display)\.webp$/u.test(name))).toEqual([])
     await expect(library.delete(wallpaper.asset)).rejects.toMatchObject({
       data: { code: 'wallpapers.BUNDLED' },
     })

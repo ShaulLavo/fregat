@@ -16,6 +16,8 @@ import { createEnvironmentConnections } from '@/state/environment-connections'
 import { createApplicationRuntime } from '@/state/application-runtime'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
+import { forgetCachedEnvironment } from '@/lib/environments/state/binding-cache'
+import type { EnvironmentId } from '@workspace/contracts'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import {
   primaryServerOrigin,
@@ -25,6 +27,7 @@ import {
   setActiveServerOrigin,
 } from '@/lib/client'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
+import { activeTransports } from '@/features/chat/state/active-transports'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { installTestClient } from './client-binding'
 import { createInProcessClient } from '../client'
@@ -32,11 +35,31 @@ import { makeTestServer, type TestServer } from '../server'
 import { runGit } from './git'
 import { registerRequestOwner } from '../env/request-lifecycle'
 
+function preserveEnvironmentCache(environmentId: EnvironmentId) {
+  const storage = environmentScopedStorage(environmentId)
+  const entries = storage.keys('').map((key) => [key, storage.getItem(key)] as const)
+  const prefix = `env:${environmentId}|`
+  const windowEntries = Object.keys(sessionStorage)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => [key, sessionStorage.getItem(key)] as const)
+  return () => {
+    // Disposal retains cached bindings; the next fixture reuses the local environment identity.
+    forgetCachedEnvironment(environmentId)
+    for (const [key, value] of entries) {
+      if (value !== null) storage.setItem(key, value)
+    }
+    for (const [key, value] of windowEntries) {
+      if (value !== null) sessionStorage.setItem(key, value)
+    }
+  }
+}
+
 export async function createFederationHarness(serverA: TestServer, remote?: TestServer) {
   const serverB =
     remote ?? (await makeTestServer({ filesystemWatch: false, persistentDatabase: true }))
   const previousState = useEnvironmentsStore.getState()
   const previousProjection = useChatProjectionStore.getState()
+  const previousTransports = activeTransports.getState()
   const previousOrigin = activeServerOrigin()
   const previousClient = getClient()
   const originA = primaryServerOrigin()
@@ -49,6 +72,8 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
   const restoreClientA = installTestClient(clientA)
   const descriptorA = v.parse(healthDescriptorSchema, (await clientA.health.get()).data)
   const descriptorB = v.parse(healthDescriptorSchema, (await clientB.health.get()).data)
+  const restoreCacheA = preserveEnvironmentCache(descriptorA.environmentId)
+  const restoreCacheB = preserveEnvironmentCache(descriptorB.environmentId)
   useEnvironmentsStore.setState({
     activeOrigin: originA,
     entries: { [originA]: createEnvironmentEntry(originA, originA) },
@@ -96,10 +121,14 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
   onTestFinished(async () => {
     connections.stop()
     application.dispose()
+    restoreCacheB()
+    restoreCacheA()
     restoreClientB()
     restoreClientA()
     useEnvironmentsStore.setState(previousState, true)
     useChatProjectionStore.setState(previousProjection, true)
+    // Closed fixture transports reuse the next test server's environment identity.
+    activeTransports.setState(previousTransports, true)
     setActiveServerOrigin(previousOrigin)
     setClient(previousClient)
     localStorage.removeItem('platform.environments.connected.v1')

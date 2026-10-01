@@ -281,7 +281,7 @@
         },
         "browser": {
           "ceilingMiB": 10240,
-          "estimateMiB": 5632
+          "estimateMiB": 8192
         },
         "build": {
           "ceilingMiB": 4096,
@@ -289,11 +289,11 @@
         },
         "light": {
           "ceilingMiB": 2048,
-          "estimateMiB": 512
+          "estimateMiB": 1536
         },
         "suite": {
           "ceilingMiB": 8192,
-          "estimateMiB": 4096
+          "estimateMiB": 6656
         }
       },
       "description": "Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.",
@@ -410,6 +410,14 @@
       "description": "MiB of available memory that heavy-job admission leaves free for the desktop, the app and work outside the wrapper.",
       "maximum": 65536,
       "minimum": 0,
+      "type": "integer"
+    },
+    "developer.heavyJobQuietHoldSeconds": {
+      "default": 600,
+      "description": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.",
+      "markdownDescription": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.\n\nA `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.",
+      "maximum": 7200,
+      "minimum": 1,
       "type": "integer"
     },
     "developer.heavyJobStopGraceSeconds": {

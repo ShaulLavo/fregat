@@ -1,3 +1,4 @@
+import { captureScenarioApi, cleanupAll, type ScenarioApi } from '../scenario-cleanup'
 import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -25,7 +26,7 @@ const nativeEntrySchema = v.looseObject({
 })
 
 /** Fail before a scenario proceeds if settings could launch an unowned account. */
-export async function assertFixtureProviders(page: Page, base: string, binaryPath?: string) {
+export async function assertFixtureProviders(page: ScenarioApi, base: string, binaryPath?: string) {
   const snapshot = await settingsSnapshot(page, base)
   const instances = snapshot.values['providers.instances']
   for (const defaults of [DEFAULT_CODEX_PROVIDER_SETTINGS, DEFAULT_CLAUDE_PROVIDER_SETTINGS])
@@ -47,7 +48,7 @@ export async function assertFixtureProviders(page: Page, base: string, binaryPat
   )
 }
 
-export async function settingsSnapshot(page: Page, base: string) {
+export async function settingsSnapshot(page: ScenarioApi, base: string) {
   const response = await page.request.get(`${base}/settings`, {
     headers: { Origin: new URL(page.url()).origin },
   })
@@ -75,7 +76,12 @@ export async function restoreUserSettings(
 }
 
 /** Sets one key in the user's settings document, the path a map setting without its own operation takes. */
-export async function writeRawSetting(page: Page, base: string, key: string, value: unknown) {
+export async function writeRawSetting(
+  page: ScenarioApi,
+  base: string,
+  key: string,
+  value: unknown,
+) {
   const headers = { Origin: new URL(page.url()).origin }
   const layer = await page.request.get(`${base}/settings/raw?target=user`, { headers })
   ok(layer.ok(), `Read the user settings document returned ${layer.status()}`)
@@ -94,7 +100,11 @@ export async function writeRawSetting(page: Page, base: string, key: string, val
   ok(response.ok(), `Write the user settings document returned ${response.status()}`)
 }
 
-export async function writeSettings(page: Page, base: string, operations: readonly unknown[]) {
+export async function writeSettings(
+  page: ScenarioApi,
+  base: string,
+  operations: readonly unknown[],
+) {
   const response = await page.request.post(`${base}/settings/write`, {
     headers: { Origin: new URL(page.url()).origin },
     data: { target: 'user', mutationId: crypto.randomUUID(), operations },
@@ -178,7 +188,7 @@ export type NativeProvider = Awaited<ReturnType<typeof installNativeProvider>>
  * folder and returns what the fixture recorded.
  */
 export async function installNativeProvider(
-  page: Page,
+  page: ScenarioApi,
   base: string,
   input: {
     readonly name: string
@@ -187,6 +197,7 @@ export async function installNativeProvider(
     readonly kind?: FixtureProviderKind
   },
 ) {
+  const api = captureScenarioApi(page)
   const kind = input.kind ?? 'codex'
   const root = await mkdtemp(scratchPath(`fregat-${input.name}-native-`))
   // Claude's SDK runs a path without a script extension directly, as it runs the real CLI.
@@ -212,17 +223,23 @@ export async function installNativeProvider(
   ])
   await assertFixtureProviders(page, base, binary)
   const remove = async () => {
-    const current = await settingsSnapshot(page, base)
-    const remaining = current.values['providers.instances'].filter(
-      (item) => item.providerInstanceId !== providerInstanceId,
-    )
-    await writeRawSetting(page, base, 'providers.instances', remaining)
-    try {
-      return await waitForNativeExit(root)
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    let entries: Awaited<ReturnType<typeof nativeLog>> = []
+    await cleanupAll([
+      async () => {
+        const current = await settingsSnapshot(api, base)
+        const remaining = current.values['providers.instances'].filter(
+          (item) => item.providerInstanceId !== providerInstanceId,
+        )
+        await writeRawSetting(api, base, 'providers.instances', remaining)
+      },
+      async () => {
+        entries = await waitForNativeExit(root)
+      },
+      () => rm(root, { recursive: true, force: true }),
+    ])
+    return entries
   }
+
   return {
     binary,
     /** Claude's config folder; Codex keeps its home in `root`. */
@@ -380,6 +397,7 @@ export function isolatedNativeScenario(options: {
     inspect: async (page) => evidence.get(page) ?? null,
     async run(page, { step }) {
       const orchestration = await openChat(page)
+      const api = captureScenarioApi(page)
       const base = orchestration.replace(/\/orchestration$/, '')
       await assertFixtureProviders(page, base)
       const sessionId = crypto.randomUUID()
@@ -392,15 +410,17 @@ export function isolatedNativeScenario(options: {
       const { binary, providerInstanceId, root } = native
       let created = false
       let driveEvidence: unknown
-      const prepared = await options.prepareWorktree?.()
+      let prepared: PreparedWorktree | undefined
       let fixtureProjectId: string | null = null
       const newWorktreeId = options.newWorktree ? crypto.randomUUID() : null
       try {
+        prepared = await options.prepareWorktree?.()
         const worktree = prepared
           ? await registerFixtureProject(page, orchestration, prepared.path)
           : await firstWorktree(page, orchestration)
         ok(worktree, 'A worktree exists')
         if (prepared) fixtureProjectId = worktree.projectId
+        created = true
         await dispatch(page, orchestration, {
           type: 'session.create',
           sessionId,
@@ -410,7 +430,6 @@ export function isolatedNativeScenario(options: {
             : { kind: 'current', worktreeId: worktree.id },
           modelSelection: { providerInstanceId, model: 'gpt-5.5' },
         })
-        created = true
         const sessionWorktree = newWorktreeId
           ? await readyWorktree(page, orchestration, newWorktreeId)
           : worktree
@@ -451,46 +470,55 @@ export function isolatedNativeScenario(options: {
         await step('failed-before-cleanup')
         throw error
       } finally {
-        await assertFixtureProviders(page, base, binary)
-        // A drive may have deleted the session and removed its worktree itself.
-        const shell = created ? await readShell(page, orchestration) : null
-        if (shell?.sessions.some((session) => session.id === sessionId)) {
-          await dispatch(page, orchestration, {
-            type: 'session.runtime.stop',
-            sessionId,
-          })
-          await dispatch(page, orchestration, {
-            type: 'session.delete',
-            sessionId,
-          })
-        }
-        // The fixture directory goes with the project; the project goes only once nothing owns a checkout.
-        const leftWorktree = shell?.worktrees.find((worktree) => worktree.id === newWorktreeId)
-        if (newWorktreeId && leftWorktree && leftWorktree.lifecycle.state !== 'removed')
-          await dispatch(page, orchestration, {
-            type: 'worktree.release',
-            worktreeId: newWorktreeId,
-          })
-        if (fixtureProjectId)
-          await dispatch(page, orchestration, {
-            type: 'project.delete',
-            projectId: fixtureProjectId,
-            force: true,
-          })
-        const entries = await native.remove()
-        evidence.set(page, {
-          driveEvidence,
-          nativeReplies: entries.filter(
-            (entry) => entry.event !== 'spawn' && entry.event !== 'exit',
-          ),
-          removedSession: sessionId,
-          removedProject: fixtureProjectId,
-          removedProvider: providerInstanceId,
-          processEvents: entries.filter(
-            (entry) => entry.event === 'spawn' || entry.event === 'exit',
-          ),
-        })
-        await prepared?.release()
+        let shell: Awaited<ReturnType<typeof readShell>> | null = null
+        await cleanupAll([
+          () => assertFixtureProviders(api, base, binary),
+          async () => {
+            if (created) shell = await readShell(api, orchestration)
+          },
+          async () => {
+            if (created && (!shell || shell.sessions.some((session) => session.id === sessionId)))
+              await dispatch(api, orchestration, { type: 'session.runtime.stop', sessionId })
+          },
+          async () => {
+            if (created && (!shell || shell.sessions.some((session) => session.id === sessionId)))
+              await dispatch(api, orchestration, { type: 'session.delete', sessionId })
+          },
+          async () => {
+            const left = shell?.worktrees.find((worktree) => worktree.id === newWorktreeId)
+            if (newWorktreeId && (!shell || (left && left.lifecycle.state !== 'removed')))
+              await dispatch(api, orchestration, {
+                type: 'worktree.release',
+                worktreeId: newWorktreeId,
+              })
+          },
+          async () => {
+            if (fixtureProjectId)
+              await dispatch(api, orchestration, {
+                type: 'project.delete',
+                projectId: fixtureProjectId,
+                force: true,
+              })
+          },
+          async () => {
+            const entries = await native.remove()
+            evidence.set(page, {
+              driveEvidence,
+              nativeReplies: entries.filter(
+                (entry) => entry.event !== 'spawn' && entry.event !== 'exit',
+              ),
+              removedSession: sessionId,
+              removedProject: fixtureProjectId,
+              removedProvider: providerInstanceId,
+              processEvents: entries.filter(
+                (entry) => entry.event === 'spawn' || entry.event === 'exit',
+              ),
+            })
+          },
+          async () => {
+            await prepared?.release()
+          },
+        ])
       }
     },
   }

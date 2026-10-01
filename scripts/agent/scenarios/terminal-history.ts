@@ -1,4 +1,10 @@
+import { reattachedTerminal } from '../terminal-connections'
+import { captureScenarioApi, cleanupAll } from '../scenario-cleanup'
 import { stageRelease } from './server-update'
+import { processExists } from '../../../apps/server/scripts/process-exists'
+import { committedFixture } from '../fixture-workspace'
+import { dispatch, readShell, waitForCompletedTurn } from './chat-verification'
+import { isolatedNativeScenario, sendPrompt } from './native-provider-verification'
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import { installCaptureTerminalNamespace } from '../product-terminal'
@@ -105,19 +111,20 @@ export const terminalHistory: Scenario = {
       await showTerminal(second)
       await until(
         second,
-        () => other.at(-1)?.output.includes(marker) === true,
+        () => other.at(-1)?.ready === true && other.at(-1)?.output.includes(marker) === true,
         'Second viewer must replay shared output',
       )
       strictEqual(
         new URL(first.at(-1)!.socketUrl).searchParams.get('terminalId'),
         new URL(other.at(-1)!.socketUrl).searchParams.get('terminalId'),
       )
+      const beforeReload = first.length
       await page.reload()
       await showTerminal(page)
       await until(
         page,
-        () => first.at(-1)?.output.includes(marker) === true,
-        'Reconnect must replay marker',
+        () => reattachedTerminal(first, beforeReload)?.output.includes(marker) === true,
+        'A fresh ready connection must replay the marker before input',
       )
       await step('history-replayed-with-second-viewer')
       await selectors
@@ -142,10 +149,8 @@ export const terminalHistory: Scenario = {
       await until(
         page,
         () =>
-          first.length > firstCount &&
-          other.length > secondCount &&
-          first.at(-1)?.ready === true &&
-          other.at(-1)?.ready === true,
+          reattachedTerminal(first, firstCount) !== undefined &&
+          reattachedTerminal(other, secondCount) !== undefined,
         'Both viewers reconnect after API restart',
       )
       ok(
@@ -182,7 +187,7 @@ export const terminalHistory: Scenario = {
       await showTerminal(page)
       await until(
         page,
-        () => first.length > count && first.at(-1)?.ready === true,
+        () => reattachedTerminal(first, count) !== undefined,
         'Reconnect after clear must become ready',
       )
       await page.waitForTimeout(300)
@@ -251,3 +256,173 @@ export const terminalHistory: Scenario = {
     }
   },
 }
+
+async function typeShellCommand(page: Page, command: string) {
+  await selectors
+    .terminalSurface(page)
+    .first()
+    .click({ position: { x: 100, y: 60 } })
+  await page.keyboard.type(command)
+  await page.keyboard.press('Enter')
+}
+
+async function shellPid(page: Page, connection: ObservedTerminal, label: string) {
+  await typeShellCommand(page, `printf '\\n${label}_%s\\n' "$$"`)
+  const match = () => new RegExp(`(?:^|[\r\n])${label}_(\\d+)[\r\n]`).exec(connection.output)
+  await until(page, () => match() !== null, 'The native shell reports its process id')
+  return Number(match()![1])
+}
+
+export const terminalIdleShells = isolatedNativeScenario({
+  name: 'terminal-idle-shells',
+  description:
+    'Settle native fixture sessions on a disposable worktree: another live owner keeps shells, the last owner closes only idle shells, and reconnect replays retained output.',
+  fixture: new URL('../fixtures/native-conversation.mjs', import.meta.url),
+  prepareWorktree: () => committedFixture('terminal-idle-shells'),
+  async drive(page, { step, orchestration, sessionId, worktreeId, providerInstanceId }) {
+    await sendPrompt(page, 'Reply with exactly IDLE_SHELL_NATIVE_VERIFIED.')
+    await selectors
+      .chatMessages(page)
+      .getByText('IDLE_SHELL_NATIVE_VERIFIED', { exact: true })
+      .waitFor()
+    await waitForCompletedTurn(page, orchestration, sessionId)
+    const session = (await readShell(page, orchestration)).sessions.find(
+      (item) => item.id === sessionId,
+    )
+    ok(session, 'The native fixture session exists')
+    const otherId = crypto.randomUUID()
+    const otherTitle = `Idle-shell second owner ${otherId.slice(0, 8)}`
+    const prefix = `idle-shell-verification-${crypto.randomUUID()}-`
+    const owners = new Map<string, URL>()
+    const connections = await isolate(page, prefix, owners)
+    const api = captureScenarioApi(page)
+    try {
+      await dispatch(page, orchestration, {
+        type: 'session.create',
+        sessionId: otherId,
+        title: otherTitle,
+        worktreeTarget: { kind: 'current', worktreeId },
+        modelSelection: { providerInstanceId, model: 'gpt-5.5' },
+      })
+      await page.reload()
+      await showTerminal(page)
+      await until(page, () => connections.at(-1)?.ready === true, 'Idle shell attaches')
+      const idle = connections.at(-1)!
+      const idlePid = await shellPid(page, idle, 'IDLE_PID')
+      await step('native-shell-at-idle-prompt')
+      await selectors.newTerminal(page).click()
+      await until(
+        page,
+        () => connections.length >= 2 && connections.at(-1)?.ready === true,
+        'Busy shell attaches',
+      )
+      const idleTabId = await selectors
+        .terminalRows(page)
+        .first()
+        .getAttribute('data-terminal-tab-id')
+      ok(idleTabId, 'The idle terminal has a tab identity')
+      const busy = connections.at(-1)!
+      const busyPid = await shellPid(page, busy, 'BUSY_PID')
+      await typeShellCommand(
+        page,
+        `printf '\\nBUSY_RUNNING\\n'; sleep 120; printf '\\nBUSY_FINISHED\\n'`,
+      )
+      await until(
+        page,
+        () => /[\r\n]BUSY_RUNNING[\r\n]/.test(busy.output),
+        'Native foreground command starts',
+      )
+      ok(
+        processExists(idlePid) && processExists(busyPid),
+        'Both native shell processes exist before settlement',
+      )
+      for (const url of owners.values())
+        strictEqual(
+          url.searchParams.get('worktreeId'),
+          worktreeId,
+          'Only the disposable worktree owns these shells',
+        )
+      await step('native-idle-prompt-and-busy-command')
+      await selectors.workspaceMode(page, 'Chat').click()
+      await selectors.terminalTool(page).click()
+      await selectors.sessionSearch(page).fill('')
+      await selectors.sessionByTitle(page, session.title).click({ button: 'right' })
+      await selectors.sessionLifecycleAction(page, 'Mark as settled').click()
+      await selectors.sessionInShelf(page, session.title, 'Settled').waitFor()
+      await page.waitForTimeout(500)
+      ok(
+        processExists(idlePid) && processExists(busyPid),
+        'Another live session retains both shells',
+      )
+      await step('another-live-owner-keeps-both-shells')
+      await selectors.sessionByTitle(page, otherTitle).click({ button: 'right' })
+      await selectors.sessionLifecycleAction(page, 'Mark as settled').click()
+      await selectors.sessionInShelf(page, otherTitle, 'Settled').waitFor()
+      await until(
+        page,
+        () => !processExists(idlePid),
+        'The last live owner closes the idle prompt shell',
+      )
+      ok(
+        processExists(busyPid),
+        'The shell running a foreground command survives last-owner settlement',
+      )
+      strictEqual(/[\r\n]BUSY_FINISHED[\r\n]/.test(busy.output), false)
+      await step('last-owner-closes-idle-and-keeps-busy')
+      await selectors.workspaceMode(page, 'Workbench').click()
+      await selectors.terminalById(page, idleTabId).click()
+      const previousConnections = connections.length
+      const replayConnection = () =>
+        connections
+          .slice(previousConnections)
+          .find((connection) => connection.socketUrl === idle.socketUrl)
+      await page.reload()
+      await showTerminal(page)
+      // Reattachment starts a fresh shell and replays the closed prompt's retained bytes.
+      await until(page, () => replayConnection()?.ready === true, 'Closed shell reattaches')
+      const replay = replayConnection()!
+      await until(
+        page,
+        () => new RegExp(`[\r\n]IDLE_PID_${idlePid}[\r\n]`).test(replay.output),
+        'Closed shell history replays',
+      )
+      const replacementPid = await shellPid(page, replay, 'REPLACEMENT_PID')
+      ok(
+        replacementPid !== idlePid && processExists(replacementPid),
+        'Reattachment starts a replacement process',
+      )
+      await step('closed-idle-output-replayed-in-replacement-shell')
+      return {
+        idlePid,
+        busyPid,
+        replacementPid,
+        otherLiveOwnerRetainedShells: true,
+        lastOwnerClosedIdle: !processExists(idlePid),
+        busySurvived: processExists(busyPid),
+        replayedIdleOutput: replay.output,
+        ownedTerminals: [...owners.values()].map((url) => ({
+          worktreeId: url.searchParams.get('worktreeId'),
+          terminalId: url.searchParams.get('terminalId'),
+        })),
+      }
+    } finally {
+      // A renderer failure must not prevent the capture-owned shells and session from closing.
+      await page.goto('about:blank').catch(() => undefined)
+      await cleanupAll([
+        ...[...owners.values()].map((url) => async () => {
+          const base = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}`
+          const response = await api.request.post(`${base}/kill`, {
+            headers: { Origin: new URL(api.url()).origin },
+            data: {
+              worktreeId: url.searchParams.get('worktreeId'),
+              terminalId: url.searchParams.get('terminalId'),
+            },
+          })
+          strictEqual(response.status(), 200, 'Owned shell cleanup succeeds')
+        }),
+        () => dispatch(api, orchestration, { type: 'session.runtime.stop', sessionId: otherId }),
+        () => dispatch(api, orchestration, { type: 'session.delete', sessionId: otherId }),
+      ])
+    }
+  },
+})

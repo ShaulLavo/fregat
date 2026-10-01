@@ -1310,15 +1310,16 @@ export const SETTINGS_REGISTRY = {
       light: heavyJobBudgetSchema,
       suite: heavyJobBudgetSchema,
     }),
-    // Seeded from the heavy-job log (Plan 284): estimate the class's p75 peak rounded up to
-    // 512 MiB, ceiling 1.25x its largest peak rounded up to 1 GiB. Bench covers the large-file
-    // bench's 8 GiB case cap plus its driver.
+    // Estimate: p90 peak of the class's runs that were not OOM-killed, in the 2026-10-01 heavy-job
+    // log, rounded up to 512 MiB: browser 7722, build 2968, light 1368, suite 6158 MiB. Bench keeps
+    // 3072 for the large-file bench's 8 GiB case cap. A job past its estimate is still capped by
+    // its ceiling; the reserve and the pressure gate cover overlaps.
     default: {
       bench: { ceilingMiB: 9216, estimateMiB: 3072 },
-      browser: { ceilingMiB: 10240, estimateMiB: 5632 },
+      browser: { ceilingMiB: 10240, estimateMiB: 8192 },
       build: { ceilingMiB: 4096, estimateMiB: 3072 },
-      light: { ceilingMiB: 2048, estimateMiB: 512 },
-      suite: { ceilingMiB: 8192, estimateMiB: 4096 },
+      light: { ceilingMiB: 2048, estimateMiB: 1536 },
+      suite: { ceilingMiB: 8192, estimateMiB: 6656 },
     },
     // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
     scope: 'machine',
@@ -1373,6 +1374,22 @@ export const SETTINGS_REGISTRY = {
       'Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.',
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'stop', 'cancel', 'grace', 'sigterm', 'sigkill'],
+  }),
+  'developer.heavyJobQuietHoldSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(7200)),
+    // Long enough for one quiet measurement; other sessions' jobs queue behind it meanwhile.
+    default: 600,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job quiet hold',
+    details:
+      'A `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.',
+    description:
+      'Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'quiet', 'exclusive', 'hold', 'drain', 'benchmark'],
   }),
   'developer.heavyJobCpuLoadLimit': defineSetting({
     schema: v.pipe(v.number(), v.minValue(0.1), v.maxValue(16)),
