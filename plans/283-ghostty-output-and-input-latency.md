@@ -3,8 +3,7 @@
 ## Status and authorization
 
 - Status: APPROVED 2026-10-01 by the owner after the comparison benchmark (PR #235): "it's probably a sign we're doing something too much."
-- Gate and evidence: the private first run in `/work/reports/ghostty-benchmarks/2026-10-01-mac-m1/`
-  (not published until this plan lands), and `bun run bench:compare` from Plan 281, run on the owner's MacBook (Apple M1,
+- Gate and evidence: `ghostty-webgpu/docs/benchmarks.md` (PR #235) and `bun run bench:compare` from Plan 281, run on the owner's MacBook (Apple M1,
   headed Chromium, hardware GPU) over mesh host `mac`, on AC power only.
 
 ## Outcome
@@ -73,4 +72,5 @@ the Mac heavily; keep each measurement window under 30 minutes.
 - `docs/perf-attribution.md` explains where output CPU and the input p95 tail go, with traces.
 - The targets in the table are met on the Mac, or the remaining gap is documented and accepted by
   the owner.
-- A fresh Mac run shows no lost wins; publishing the numbers (Plan 281 section 2) can follow.
+- `docs/benchmarks.md` is regenerated from a fresh run, with no lost wins. If ghostty-webgpu now
+  beats xterm.js on these measures, raise putting numbers in the main README with the owner.
