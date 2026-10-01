@@ -81,6 +81,7 @@ export function writeSettings(box: Box, values: Record<string, unknown>) {
 }
 
 export type StartOptions = {
+  readonly cwd?: string
   readonly jobClass?: string
   readonly quiet?: boolean
   readonly detached?: boolean
@@ -109,7 +110,7 @@ export function start(
   if (options.jobClass) args.push('--class', options.jobClass)
   if (options.quiet) args.push('--quiet')
   const child = spawn('bun', [...args, label, '--', ...command], {
-    cwd: box.root,
+    cwd: options.cwd ?? box.root,
     detached: options.detached ?? false,
     env: options.env ?? process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
