@@ -50,6 +50,8 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 
 `scenario git-diff-inline-tint` opens a diff where one line becomes several and reads `CSS.highlights`: the word tint must be present on open, unchanged after a hide/unhide of unmodified lines, and never cover a whole added line.
 
+`scenario git-diff-crlf-syntax` commits a CRLF TypeScript file, edits it, and opens its diff from the git panel. It fails unless every `const` in both panes is one whole `editor-shared-token-*` range and the word tint covers exactly the changed digits; the step label counts consts and misaligned ones.
+
 `scenario git-diff-line-comment` presses the changed line of a diff and reads the selection bar: it must name that line, and still name it after unhiding the unmodified lines above has shifted every row.
 
 `scenario git-diff-fold` focuses a diff whose change sits in an indented block and presses Fold all (Ctrl+K Ctrl+0). The deleted and added rows must stay visible: the diff editor is built with `folding: false`, so the app keymap's fold commands find nothing to fold.

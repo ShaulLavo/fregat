@@ -1,10 +1,41 @@
+import { hasByteOrderMark, normalizeLineEndings } from '@singapore-editor/core/document'
+
+const CARRIAGE_RETURN = 0x0d
+
+/**
+ * A side's lines as git splits them, each held the way the editor ingests that file: its byte order
+ * mark goes, and a line keeps its other terminators as the LF the editor reads them as.
+ */
 export function splitTextLines(text: string): readonly string[] {
   if (text.length === 0) return []
-  return text.split('\n')
+  const body = hasByteOrderMark(text) ? text.slice(1) : text
+  const lines = body.split('\n')
+  if (normalizeLineEndings(body) === body) return lines
+  return lines.map((line, index) => editorLineText(line, index < lines.length - 1))
 }
 
+/**
+ * One git line as an opened document holds it. With `terminated`, an LF followed it, and ingestion
+ * folds a CR just before that LF into it as a CRLF; any other CR, U+2028 or U+2029 is a break.
+ */
+export function editorLineText(line: string, terminated: boolean): string {
+  const crlf = terminated && line.charCodeAt(line.length - 1) === CARRIAGE_RETURN
+  return normalizeLineEndings(crlf ? line.slice(0, -1) : line)
+}
+
+/** A side's first line: the editor drops one byte order mark from the start of a file. */
+export function firstLineText(line: string): string {
+  return hasByteOrderMark(line) ? line.slice(1) : line
+}
+
+/**
+ * The text a host pushes into a diff editor so that it holds exactly the rows joined by LF. The
+ * editor drops one leading byte order mark as it ingests, so a first row starting with one gets
+ * another in front to spend.
+ */
 export function joinRenderLines(rows: readonly { readonly text: string }[]): string {
-  return rows.map((row) => row.text).join('\n')
+  const text = rows.map((row) => row.text).join('\n')
+  return hasByteOrderMark(text) ? `\uFEFF${text}` : text
 }
 
 export function normalizeContextLines(value: number | undefined): number {
