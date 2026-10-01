@@ -1,6 +1,9 @@
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { pdfError } from '@/lib/pdf-viewer/structured-errors'
-import { materializeFileSnapshotText } from '@/lib/file-snapshot'
+import {
+  materializeFileSnapshotDocumentText,
+  materializeFileSnapshotText,
+} from '@/lib/file-snapshot'
 import { scrollPositionsEqual } from '@/lib/scroll-positions'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
@@ -1185,7 +1188,7 @@ export class WorkspaceDocumentService {
     claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
   ): LiveEditorDocument {
     if (!claim) markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-    const buffer = claim?.buffer ?? createHistoryBuffer(materializeFileSnapshotText(file))
+    const buffer = claim?.buffer ?? createHistoryBuffer(materializeFileSnapshotDocumentText(file))
     const target = fileDocument({ path: file.path })
     buffer.markClean()
 

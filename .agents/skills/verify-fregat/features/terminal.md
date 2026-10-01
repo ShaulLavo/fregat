@@ -20,8 +20,10 @@ The bottom panel's Terminal tab. `address` parameter `bottom=terminal` opens it.
 
 Registration is a query keyed by root path; the first tab per root pays it. Terminal input is binary WebSocket frames, not JSON.
 
-- `terminal-history`: capture-owned shell IDs only; real output, second viewer replay, reconnect, shared Clear, empty replay afterward, and Restart shell replacing process state while both viewers stay connected. Explicitly clears and kills only its own terminals. Server-restart restoration remains a separate integration check.
+- `terminal-history`: capture-owned shell IDs only; real output, second viewer replay, reconnect, shared Clear, empty replay afterward, and Restart shell replacing process state while both viewers stay connected. Explicitly clears and kills only its own terminals. The same scenario restarts its throwaway API and checks both viewers retain the live shell token and history.
 
 `scenario bottom-panel-persistence` counts `/terminal` socket opens and closes across every ordinary way of hiding a terminal: the Problems tab, Mod+J, another chat-mode tool, closing the chat tool pane, and Workbench → Chat → Workbench. None may close a socket, entering chat mode may not open one, and the workbench terminal must measure the same when it comes back. Terminals are kept by `lib/keep-alive`, so a parked one is still in the DOM under a `hidden` element; select the visible one.
 
 - `terminal-offline-host`: a disposable committed repository, an interrupted orchestration socket and an offline browser. Checks the unavailable notice and that the host DOM node survives disconnection and reconnect. Runtime reconstruction remains owned by the existing terminal mount lifecycle.
+
+- `terminal-idle-shells`: a native conversation fixture and disposable committed checkout. UI settlement of the first owner retains prompt and busy shells; settlement of the last owner closes the prompt shell while `sleep` runs. Actual shell PIDs and replayed output confirm cleanup and retained history after reattachment. The run kills its capture-owned shells and removes its fixture sessions, project and provider.

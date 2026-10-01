@@ -1,7 +1,9 @@
 import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { verifyCleanSource, verifyRevision } from './ghostty-source.js'
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -43,6 +45,11 @@ async function main(): Promise<void> {
   try {
     const output = join(workspace, 'bridge.wasm')
     const zig = argument('--zig') ?? 'zig'
+    const sourceArgument = argument('--source')
+    if (!sourceArgument) throw new BridgeBuildError('--source requires the pinned Ghostty checkout')
+    const source = resolve(sourceArgument)
+    await verifyRevision(source)
+    await verifyCleanSource(source)
     await run(
       [
         zig,
@@ -52,6 +59,12 @@ async function main(): Promise<void> {
         'wasm32-freestanding',
         '-fno-entry',
         '-rdynamic',
+        '--import-memory',
+        '--export=__stack_pointer',
+        '--stack',
+        '65536',
+        '-I',
+        join(source, 'include'),
         '-O',
         'ReleaseSmall',
         `-femit-bin=${output}`,

@@ -42,6 +42,7 @@ export function FileEditorBody({
 
   fileState,
   fileVersion,
+  readError,
   languageServerReferences,
   target,
   rootPath,
@@ -53,6 +54,7 @@ export function FileEditorBody({
 
   fileState: LoadState<FileSnapshot>
   fileVersion: string | null
+  readError: string | null
   languageServerReferences: LanguageServerReferencesResult | null
   target: StandaloneDocumentRef
   rootPath: FilesystemPath
@@ -146,6 +148,15 @@ export function FileEditorBody({
   return (
     <div className={fileBodyGridClass(splitMarkdown, currentReferences !== null)}>
       <div className='relative flex min-h-0 min-w-0 flex-col overflow-hidden'>
+        {readError && resource ? (
+          <FileLoadError
+            path={resource.path}
+            message={readError}
+            hasContent
+            retained
+            onOpenReadOnly={() => setPagedKey(key)}
+          />
+        ) : null}
         <Editor
           active={active && currentActions !== null}
           additionalPlugins={editorPlugins}

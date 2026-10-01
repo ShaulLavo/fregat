@@ -584,6 +584,56 @@ async function compact(prompt, uuid) {
   result('')
 }
 
+function startMonitorFixture() {
+  const scenario = join(root, 'scenario')
+  if (!existsSync(scenario) || readFileSync(scenario, 'utf8') !== 'background-monitor-liveness')
+    return
+  const agent = spawn('sleep', ['600'], { cwd, stdio: 'ignore' })
+  const watch = spawn('sleep', ['700'], { cwd, stdio: 'ignore' })
+  tasks.set('fixture-agent', { child: agent, description: 'Fixture agent' })
+  tasks.set('fixture-watch', { child: watch, description: 'Fixture monitor' })
+  recordChild('agent', agent)
+  recordChild('monitor', watch)
+  const agentTask = {
+    task_id: 'fixture-agent',
+    task_type: 'local_agent',
+    description: 'Fixture agent',
+  }
+  const monitorTask = {
+    task_id: 'fixture-watch',
+    task_type: 'monitor',
+    description: 'Fixture monitor',
+  }
+  system('background_tasks_changed', { tasks: [agentTask, monitorTask] })
+  let lastStep = ''
+  setInterval(() => {
+    const marker = join(root, 'background-step')
+    if (!existsSync(marker)) return
+    const step = readFileSync(marker, 'utf8')
+    if (step === lastStep) return
+    lastStep = step
+    if (step === 'monitor') {
+      agent.kill()
+      tasks.delete('fixture-agent')
+      system('background_tasks_changed', { tasks: [monitorTask] })
+    }
+    if (step === 'ready') {
+      watch.kill()
+      tasks.delete('fixture-watch')
+      system('background_tasks_changed', { tasks: [] })
+    }
+    if (step === 'late') {
+      system('task_started', { ...monitorTask, description: 'Delayed bookend' })
+      system('task_progress', {
+        task_id: monitorTask.task_id,
+        description: 'Delayed progress',
+        usage: { duration_ms: 1, tool_uses: 0, total_tokens: 0 },
+      })
+    }
+    record({ event: `background-${step}` })
+  }, 50).unref()
+}
+
 async function turn(message) {
   const content = message.message.content
   const prompt =
@@ -622,6 +672,7 @@ async function turn(message) {
     hook_event_name: 'Stop',
     stop_hook_active: false,
   })
+  startMonitorFixture()
   result(text, jsonSchema ? { structured_output: structured(jsonSchema) } : {})
 }
 

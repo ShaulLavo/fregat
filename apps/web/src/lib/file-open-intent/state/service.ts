@@ -1,5 +1,5 @@
 import { isPdfFile } from '@/lib/pdf-viewer/format'
-import { materializeFileSnapshotText } from '@/lib/file-snapshot'
+import { materializeFileSnapshotDocumentText } from '@/lib/file-snapshot'
 import { isRecord } from '@workspace/utils/objects'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
@@ -2048,7 +2048,7 @@ function createCleanBuffer(
   createBuffer: (text: string) => EditorTextBuffer,
 ): EditorTextBuffer {
   markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-  const buffer = createBuffer(materializeFileSnapshotText(file))
+  const buffer = createBuffer(materializeFileSnapshotDocumentText(file))
   buffer.markClean()
   return buffer
 }

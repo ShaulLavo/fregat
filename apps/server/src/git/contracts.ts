@@ -218,3 +218,14 @@ export type GitCreatePullRequestBody = v.InferOutput<typeof gitCreatePullRequest
 
 export type GitWorktreePrepareBody = v.InferOutput<typeof gitWorktreePrepareBodySchema>
 export type GitWorktreeTarget = v.InferOutput<typeof gitWorktreeTargetSchema>
+
+export const gitPullRequestCommentsQuerySchema = v.object({
+  path: v.optional(pathSchema, ''),
+  number: v.pipe(v.string(), v.regex(/^[1-9][0-9]*$/), v.transform(Number), v.safeInteger()),
+})
+export const gitPullRequestCommentBodySchema = v.object({
+  path: v.optional(pathSchema, ''),
+  number: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  body: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60_000)),
+})
+export type GitPullRequestCommentBody = v.InferOutput<typeof gitPullRequestCommentBodySchema>
