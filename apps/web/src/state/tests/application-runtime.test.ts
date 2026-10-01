@@ -1,3 +1,5 @@
+import { registerTestWorkspaceAddress } from '../../../test/factories/workspace-address'
+import { ensureFolderPath } from '@/lib/file-server'
 import { workspacePreloadLanguages } from '@/features/editor/state/language-census'
 import { languageCensusQueryOptions } from '@/features/editor/utils/language-census-query'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
@@ -28,10 +30,17 @@ test('the active editor serves its census without a React tree, and a machine sw
   const previousOrigin = activeServerOrigin()
   const previousState = useEnvironmentsStore.getState()
   const second = await makeTestServer({ filesystemWatch: false })
+  const secondClient = createInProcessClient(second)
+  await ensureFolderPath(root, client)
+  await ensureFolderPath(root, secondClient)
+  const addresses = new Map([
+    [originA, await registerTestWorkspaceAddress(client, root)],
+    [originB, await registerTestWorkspaceAddress(secondClient, root)],
+  ])
   setActiveServerOrigin(originA)
   setClient(client)
   setActiveServerOrigin(originB)
-  setClient(createInProcessClient(second))
+  setClient(secondClient)
   useEnvironmentsStore.getState().activate(originA)
   await readEnvironmentDescriptor(originA, new AbortController().signal)
   await readEnvironmentDescriptor(originB, new AbortController().signal)
@@ -49,15 +58,19 @@ test('the active editor serves its census without a React tree, and a machine sw
   application.start()
   const census = languageCensusQueryOptions(root).queryKey
   const openRepo = () =>
-    application.getSnapshot().editor.workspaceStore.getState().switchWorkspace({
-      birthtimeMs: 0,
-      mtimeMs: 0,
-      name: 'repo',
-      path: root,
-      size: 0,
-      type: 'directory',
-      version: '',
-    })
+    application
+      .getSnapshot()
+      .editor.workspaceStore.getState()
+      .switchWorkspace({
+        workspaceAddress: addresses.get(application.getSnapshot().origin)!,
+        birthtimeMs: 0,
+        mtimeMs: 0,
+        name: 'repo',
+        path: root,
+        size: 0,
+        type: 'directory',
+        version: '',
+      })
 
   try {
     queryClientFor(originA).setQueryData(census, {
@@ -107,10 +120,17 @@ test('a machine refused before its first handshake keeps its editor suspended un
   const previousOrigin = activeServerOrigin()
   const previousState = useEnvironmentsStore.getState()
   const second = await makeTestServer({ filesystemWatch: false })
+  const secondClient = createInProcessClient(second)
+  await ensureFolderPath(root, client)
+  await ensureFolderPath(root, secondClient)
+  const addresses = new Map([
+    [originA, await registerTestWorkspaceAddress(client, root)],
+    [originB, await registerTestWorkspaceAddress(secondClient, root)],
+  ])
   setActiveServerOrigin(originA)
   setClient(client)
   setActiveServerOrigin(originB)
-  setClient(createInProcessClient(second))
+  setClient(secondClient)
   useEnvironmentsStore.getState().activate(originA)
   await readEnvironmentDescriptor(originA, new AbortController().signal)
   await readEnvironmentDescriptor(originB, new AbortController().signal)
@@ -149,15 +169,19 @@ test('a machine refused before its first handshake keeps its editor suspended un
         },
       }))
     const openRepo = () =>
-      application.getSnapshot().editor.workspaceStore.getState().switchWorkspace({
-        birthtimeMs: 0,
-        mtimeMs: 0,
-        name: 'repo',
-        path: root,
-        size: 0,
-        type: 'directory',
-        version: '',
-      })
+      application
+        .getSnapshot()
+        .editor.workspaceStore.getState()
+        .switchWorkspace({
+          workspaceAddress: addresses.get(application.getSnapshot().origin)!,
+          birthtimeMs: 0,
+          mtimeMs: 0,
+          name: 'repo',
+          path: root,
+          size: 0,
+          type: 'directory',
+          version: '',
+        })
     refuse()
     expect(() => application.activateEnvironment(originB)).toThrow(
       'is a different installation than before',

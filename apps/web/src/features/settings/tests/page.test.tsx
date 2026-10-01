@@ -1,3 +1,5 @@
+import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
+import { ensureFolderPath } from '@/lib/file-server'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
 import {
@@ -218,15 +220,18 @@ test(
   'refuses an application-scoped key from the workspace tab, and says why',
   async ({ client }) => {
     expect(client).toBeDefined()
+    await ensureFolderPath(filesystemPath('repo'), client)
+    const workspaceAddress = await registerTestWorkspaceAddress(client, 'repo')
     // The Workspace tab is gated on a folder being open, so the page needs a
     // workspace store with a root for the tab to be reachable at all.
     const store = createEditorWorkspaceStore({
       ...emptyWorkspaceState(),
       rootFolder: {
+        workspaceAddress,
         birthtimeMs: 0,
         mtimeMs: 0,
         name: 'repo',
-        path: filesystemPath('/repo'),
+        path: filesystemPath('repo'),
         size: 0,
         type: 'directory',
         version: '',
