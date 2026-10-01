@@ -1,3 +1,5 @@
+import { detectTextEncoding } from '@workspace/contracts/text-encoding'
+import { createBinaryFileError } from '@/lib/structured-errors'
 import {
   PagedDocument,
   PagedSourceInvalidatedError,
@@ -54,7 +56,11 @@ function pagedSource(source: PagedResource['source']) {
     ...source,
     async readBytes(start: number, end: number, signal: AbortSignal) {
       try {
-        return await source.readBytes(start, end, signal)
+        const chunk = await source.readBytes(start, end, signal)
+        if (start === 0 && detectTextEncoding(chunk.bytes).seemsBinary) {
+          throw createBinaryFileError(source.byteLength)
+        }
+        return chunk
       } catch (error) {
         const code = errorStringField(error, 'code')
         if (

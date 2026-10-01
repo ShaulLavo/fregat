@@ -45,6 +45,7 @@ type FsErrorCode =
   | 'GIT_COMMAND_FAILED'
   | 'GIT_REPOSITORY_NOT_FOUND'
   | 'NOT_FOUND'
+  | 'WORKSPACE_ADDRESS_NOT_FOUND'
   | 'ALREADY_EXISTS'
   | 'FILE_CHANGED'
   | 'INVALID_PATH'
@@ -58,6 +59,7 @@ type FsErrorCode =
 
 const categoryByFsErrorCode: Record<FsErrorCode, ErrorCategory> = {
   NOT_FOUND: 'not_found',
+  WORKSPACE_ADDRESS_NOT_FOUND: 'not_found',
   PATH_OUTSIDE_WORKSPACE: 'permission_denied',
   UNAUTHORIZED: 'permission_denied',
   FORBIDDEN_ORIGIN: 'permission_denied',

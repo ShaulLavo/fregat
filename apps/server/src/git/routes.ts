@@ -15,6 +15,7 @@ import {
   gitCreatePullRequestBodySchema,
   gitPullRequestCommentsQuerySchema,
   gitPullRequestCommentBodySchema,
+  gitPullRequestReviewBodySchema,
   gitPathBodySchema,
   gitPathQuerySchema,
   gitStatusQuerySchema,
@@ -197,6 +198,9 @@ export function gitRoutes(
       })
       .post('/pull-request/comment', ({ body }) => git.postPullRequestComment(body), {
         body: gitPullRequestCommentBodySchema,
+      })
+      .post('/pull-request/review', ({ body }) => git.submitPullRequestReview(body), {
+        body: gitPullRequestReviewBodySchema,
       })
       .post('/pull-request', ({ body }) => git.createPullRequest(body), {
         body: gitCreatePullRequestBodySchema,

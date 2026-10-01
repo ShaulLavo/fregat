@@ -86,10 +86,26 @@ socket.addEventListener(
           <div class="window-dots" aria-hidden="true">
             <span></span><span></span><span></span>
           </div>
-          <span class="backend" id="backend" title="Renderer in use on this device">loading</span>
+          <div class="tabs" id="tabs" role="tablist" aria-label="Demos">
+            <button type="button" role="tab" data-demo="ghost" aria-selected="true">Ghost</button>
+            <button type="button" role="tab" data-demo="matrix" aria-selected="false">Matrix</button>
+            <button type="button" role="tab" data-demo="shell" aria-selected="false">Shell</button>
+          </div>
+          <div class="chrome-end">
+            <button
+              type="button"
+              class="toggle"
+              id="damage"
+              aria-pressed="false"
+              title="Tint each row the renderer repaints"
+            >
+              Redraws
+            </button>
+            <span class="backend" id="backend" title="Renderer in use on this device">loading</span>
+          </div>
         </div>
         <div class="screen">
-          <div id="terminal" role="img" aria-label="Animated Ghostty ghost"></div>
+          <div id="terminal" role="tabpanel" aria-label="Animated Ghostty ghost"></div>
           <div class="fatal" id="fatal" role="alert" hidden>
             <p>The terminal could not start in this browser.</p>
             <pre id="fatal-message"></pre>
@@ -97,6 +113,7 @@ socket.addEventListener(
           </div>
         </div>
       </section>
+      <p class="caption" id="caption"></p>
       <p class="stat" id="stat" aria-live="polite"></p>
 
       <section class="facts" aria-label="What makes it different">

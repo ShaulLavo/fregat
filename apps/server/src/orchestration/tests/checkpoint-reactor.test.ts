@@ -492,7 +492,10 @@ function checkpointEngine(
 ) {
   return new OrchestrationEngine(fixture.database, {
     providerRuntime: {
-      adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }),
+      adapterRegistry: new ProviderAdapterRegistry({
+        services: { cwd: process.cwd() },
+        adapters: [adapter],
+      }),
       checkpointGit: new GitService(createWorkspacePaths(root)),
     },
   })

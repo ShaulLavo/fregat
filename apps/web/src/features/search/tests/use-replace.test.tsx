@@ -1,3 +1,4 @@
+import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { statPath } from '@/lib/file-server'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { makeTestServer } from '../../../../test/server'
@@ -44,6 +45,7 @@ test('keeps replacement reads on the original machine when the selection changes
     }),
   )
   const root = await statPath(filesystemPath(''), new AbortController().signal, client)
+  const workspaceAddress = await registerTestWorkspaceAddress(client, '')
   const paths = ['first.ts', 'second.ts']
   await Promise.all(paths.map((path) => writeFile(join(server.root, path), 'needle')))
   await Promise.all(paths.map((path) => writeFile(join(otherServer.root, path), 'other needle')))
@@ -66,7 +68,9 @@ test('keeps replacement reads on the original machine when the selection changes
   try {
     const button = await view.findByRole('button', { name: 'Replace all' })
     act(() => {
-      editor.workspaceStore.getState().switchWorkspace({ ...root, name: 'Root', type: 'directory' })
+      editor.workspaceStore
+        .getState()
+        .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
       const search = editor.searchBufferStore.getState()
       search.prepareBuffer('')
       search.setReplaceText('', 'pin')

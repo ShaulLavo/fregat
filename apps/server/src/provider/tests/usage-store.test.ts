@@ -107,7 +107,10 @@ describe('provider usage store', () => {
 })
 
 async function usageFixture() {
-  const registry = new ProviderAdapterRegistry({ drivers: [mockDriver] })
+  const registry = new ProviderAdapterRegistry({
+    services: { cwd: process.cwd() },
+    drivers: [mockDriver],
+  })
   registries.push(registry)
   await registry.reconcile([
     instance(WORK, 'work.json'),

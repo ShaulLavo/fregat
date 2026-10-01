@@ -4,6 +4,7 @@ export type TerminalRendererBackend = GhosttyWebGpuTerminalDiagnostics['renderer
 
 const BACKEND_NAMES = {
   canvas2d: 'Canvas',
+  dom: 'DOM',
   webgl2: 'WebGL2',
   webgpu: 'WebGPU',
 } as const satisfies Record<NonNullable<TerminalRendererBackend>, string>

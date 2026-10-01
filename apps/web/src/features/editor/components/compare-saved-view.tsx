@@ -44,7 +44,9 @@ export function CompareSavedView({
   const languageServer = useDiffLanguageContext(path, rootPath, true, languageHost)
 
   const savedText =
-    fileState.status === 'ready' ? materializeFileSnapshotText(fileState.data) : null
+    fileState.status === 'ready' && !fileState.data.seemsBinary
+      ? materializeFileSnapshotText(fileState.data)
+      : null
   // Keep the text tied to the revision that materialized it. The mutable buffer object does not
   // change identity as edits arrive.
   const snapshot = { revision, text: buffer?.materializeFullText() ?? null }
@@ -60,6 +62,15 @@ export function CompareSavedView({
   }
   if (fileState.status === 'loading') {
     return <CompareSavedLoading />
+  }
+  if (fileState.status === 'ready' && fileState.data.seemsBinary) {
+    return (
+      <EmptyState
+        className='h-full'
+        title='Binary file'
+        description='Open the file to view its details.'
+      />
+    )
   }
   if (!file) {
     if (buffer) return <DiffEditor file={null} mode={mode} tabId={tabId} />

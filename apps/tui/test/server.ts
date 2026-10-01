@@ -86,7 +86,10 @@ function createServerWithDatabase(
       orchestration: {
         attachmentsDir: path.join(root, '.platform-test', 'attachments'),
         database: database.db,
-        providerAdapterRegistry: new ProviderAdapterRegistry([providerAdapter]),
+        providerAdapterRegistry: new ProviderAdapterRegistry({
+          adapters: [providerAdapter],
+          services: { cwd: process.cwd() },
+        }),
         providerRuntime,
         // The default lookup runs the real forge CLI; tests record pull requests themselves.
         pullRequestLookup: null,

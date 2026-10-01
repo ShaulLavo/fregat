@@ -55,7 +55,10 @@ export async function createPushSessionFixture(options: {
       ...(database ? { database: database.db } : {}),
       attachmentsDir: path.join(root, 'attachments'),
       providerRuntime: true,
-      providerAdapterRegistry: new ProviderAdapterRegistry([adapter]),
+      providerAdapterRegistry: new ProviderAdapterRegistry({
+        adapters: [adapter],
+        services: { cwd: process.cwd() },
+      }),
     },
   })
   const engine = orchestrationForApp(app)

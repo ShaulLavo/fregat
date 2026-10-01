@@ -1,3 +1,4 @@
+import { testWorkspaceAddress } from '../../../../../test/factories/workspace-address'
 import { allEditorTabs, selectEditorGroupTab } from '@/lib/documents/utils/groups'
 import { groupBranch, groupLeaf, groupTree } from '../../../../../test/factories/editor-groups'
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
@@ -365,6 +366,7 @@ function workspaceWithInertTab() {
 
 function rootFolder() {
   return {
+    workspaceAddress: testWorkspaceAddress('/repo'),
     birthtimeMs: 0,
     mtimeMs: 0,
     name: 'repo',

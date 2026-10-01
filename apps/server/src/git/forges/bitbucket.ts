@@ -25,7 +25,6 @@ const pullRequestSchema = v.object({
 export const bitbucket: ForgeProvider = {
   kind: 'bitbucket',
   discussion: {
-    kind: 'supported',
     async read(context, number) {
       const authorization = await requireCredentials(context)
       const response = await request(
@@ -71,16 +70,44 @@ export const bitbucket: ForgeProvider = {
         truncated: Boolean(page.next),
       }
     },
-    async post(context, number, body) {
-      const authorization = await requireCredentials(context)
-      const response = await request(context, authorization, `pullrequests/${number}/comments`, {
-        method: 'POST',
-        body: JSON.stringify({ content: { raw: body } }),
-      })
-      if (!response.ok)
-        throw gitPullRequestErrors.PULL_REQUEST_COMMENT_FAILED({
-          internal: { status: response.status },
+    write: {
+      kind: 'supported',
+      async post(context, number, body) {
+        const authorization = await requireCredentials(context)
+        const response = await request(context, authorization, `pullrequests/${number}/comments`, {
+          method: 'POST',
+          body: JSON.stringify({ content: { raw: body } }),
         })
+        if (!response.ok)
+          throw gitPullRequestErrors.PULL_REQUEST_COMMENT_FAILED({
+            internal: { status: response.status },
+          })
+      },
+    },
+  },
+  review: {
+    kind: 'supported',
+    verdicts: ['comment', 'approve', 'request-changes'],
+    async submit(context, number, input) {
+      const authorization = await requireCredentials(context)
+      const endpoint = `pullrequests/${number}`
+      if (input.body.trim())
+        await postReview(
+          context,
+          authorization,
+          `${endpoint}/comments`,
+          { content: { raw: input.body } },
+          'summary',
+        )
+      // Bitbucket records the summary separately; write the verdict only after it succeeds.
+      if (input.verdict !== 'comment')
+        await postReview(
+          context,
+          authorization,
+          `${endpoint}/${input.verdict}`,
+          undefined,
+          'verdict',
+        )
     },
   },
   async support(context) {
@@ -288,4 +315,21 @@ function pullRequestState(state: string): GitPullRequest['state'] {
 function repositoryUrl(context: ForgeContext, path: string) {
   const base = `${API_BASE}/repositories/${context.repository ?? ''}`
   return path ? `${base}/${path}` : base
+}
+
+async function postReview(
+  context: ForgeContext,
+  authorization: string,
+  path: string,
+  payload: unknown,
+  at: string,
+) {
+  const response = await request(context, authorization, path, {
+    method: 'POST',
+    ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+  })
+  if (response.ok) return
+  throw gitPullRequestErrors.PULL_REQUEST_REVIEW_FAILED({
+    internal: { forge: context.forge.name, at, status: response.status },
+  })
 }

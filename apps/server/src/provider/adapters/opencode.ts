@@ -152,7 +152,8 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
         installed: true,
         status: 'ready',
         version: health.version,
-        auth: { status: connected.size ? 'authenticated' : 'unauthenticated' },
+        // Connected providers include anonymous free models; catalog availability proves no account state.
+        auth: { status: 'unknown' },
       }
     } catch {
       return {

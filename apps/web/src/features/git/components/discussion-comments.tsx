@@ -32,6 +32,12 @@ export function DiscussionComments({
       {query.data.comments.map((comment) => (
         <article key={comment.id} className='bg-muted mb-3 p-3'>
           <p className='text-xs font-medium'>{comment.author}</p>
+          {comment.context ? (
+            <p className='text-muted-foreground font-mono text-xs break-words'>
+              Thread #{comment.context.discussionId}
+              {comment.context.path ? ` · ${comment.context.path}` : ''}
+            </p>
+          ) : null}
           <p className='text-sm break-words whitespace-pre-wrap'>{comment.body}</p>
         </article>
       ))}

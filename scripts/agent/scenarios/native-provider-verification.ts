@@ -10,10 +10,11 @@ import {
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
   providerListResultSchema,
   settingsSnapshotSchema,
+  healthDescriptorSchema,
 } from '../../../packages/contracts/src/index'
 import type { Scenario } from './index'
 import { liveNativeProcesses, reapNativeProcesses } from '../native-processes'
-import { selectors } from '../selectors'
+import { selectors, waitForSessionWorkspace } from '../selectors'
 import { dispatch, openChat, readShell } from './chat-verification'
 
 const nativeEntrySchema = v.looseObject({
@@ -355,7 +356,7 @@ async function readyWorktree(page: Page, orchestration: string, worktreeId: stri
   ok(false, `The new worktree ${worktreeId} must become ready`)
 }
 
-/** A cold server can reject the page's first workspace open; the page retries it. */
+/** Waits for the initial page to register its workspace in the orchestration shell. */
 async function firstWorktree(page: Page, orchestration: string) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const worktree = (await readShell(page, orchestration)).worktrees[0]
@@ -399,6 +400,11 @@ export function isolatedNativeScenario(options: {
       const orchestration = await openChat(page)
       const api = captureScenarioApi(page)
       const base = orchestration.replace(/\/orchestration$/, '')
+      const health = await page.request.get(`${base}/health`, {
+        headers: { Origin: new URL(page.url()).origin },
+      })
+      ok(health.ok(), 'Read the fixture server identity')
+      const { environmentId } = v.parse(healthDescriptorSchema, await health.json())
       await assertFixtureProviders(page, base)
       const sessionId = crypto.randomUUID()
       const title = `${options.name} verification ${sessionId.slice(0, 8)}`
@@ -436,6 +442,7 @@ export function isolatedNativeScenario(options: {
         await selectors.sessionSearch(page).fill(title)
         await selectors.sessionByTitle(page, title).click()
         await page.waitForURL((url) => url.href.includes(sessionId))
+        await waitForSessionWorkspace(page, sessionId, sessionWorktree.canonicalPath, environmentId)
         const providerRead = page.waitForResponse(
           (response) => response.url() === `${base}/providers` && response.ok(),
         )
@@ -453,7 +460,7 @@ export function isolatedNativeScenario(options: {
             .every((provider) => provider.providerInstanceId === providerInstanceId),
           'The running registry enables only the scenario fixture',
         )
-        await selectors.chatMessage(page).waitFor()
+        await waitForSessionWorkspace(page, sessionId, sessionWorktree.canonicalPath, environmentId)
         driveEvidence = await options.drive(page, {
           step,
           root,
