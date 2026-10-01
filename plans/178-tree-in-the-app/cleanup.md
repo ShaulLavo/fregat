@@ -20,7 +20,7 @@
    - `AGENTS.md` truncation section: `features/git/components/file-row.tsx` no longer exists; the
      reference is `components/file-label.tsx` and `components/git-file-row.tsx`.
    - `docs/pattern-layer.md:61`, `docs/web-design-language.md:43`: remove the tree's exemption.
-   - `docs/pane-zoom-plan.md`: drop the shadow-root sizing contract.
+   - `plans/pane-zoom-plan.md`: drop the shadow-root sizing contract.
    - `packages/tree/UPSTREAM.md`: Pierre's render code is no longer ported; the model and path
      store stay comparable.
    - `.agents/skills/verify-fregat/features/file-tree.md`: selectors and the harness command.

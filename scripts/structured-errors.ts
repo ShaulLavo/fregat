@@ -63,6 +63,13 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     why: 'The installed wrapper is a self-contained bundle, so every import must resolve in the source checkout.',
     fix: 'Run `bun install --frozen-lockfile` in that checkout and run the install again.',
   },
+  HEAVY_SLICE_OUTSIDE_ROOT: {
+    status: 500,
+    message: ({ root, slice }: { root: string; slice: string }) =>
+      `${slice} is outside the slice root ${root}, so it was left running.`,
+    why: 'A wrapper stops only ownerless slices under its own root; slices under another root belong to another state directory.',
+    fix: 'Report this as a bug in scripts/heavy: the reaper was handed a slice it does not own.',
+  },
   HEAVY_SLICE_FAILED: {
     status: 502,
     message: ({ slice, detail }: { slice: string; detail: string }) =>

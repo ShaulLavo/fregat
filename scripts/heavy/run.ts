@@ -12,30 +12,55 @@ import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import {
+  bootSeconds,
   decide,
+  decideQuiet,
   drainRequest,
   legacyHold,
   liveSlices,
   readReadings,
   type Limits,
 } from './admission'
-import { HOSTS, isHost, reapSlice, startJob, type Host, type JobOutcome, type JobSpec } from './job'
-import { acquirePiLane, DEFAULT_STATE_DIR, tryLock, unlock, waitLock } from './lock'
+import {
+  HOSTS,
+  isHost,
+  reapSlice,
+  startJob,
+  stopTimeoutSeconds,
+  type Host,
+  type JobOutcome,
+  type JobSpec,
+} from './job'
+import {
+  acquirePiLane,
+  DEFAULT_STATE_DIR,
+  isProductionState,
+  PRODUCTION,
+  sliceRootFor,
+  type Production,
+  tryLock,
+  unlock,
+  waitLock,
+} from './lock'
 import { enqueue, live, promote, release, type Entry, type Held } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--quiet] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
 const MiB = 2 ** 20
+// EX_TEMPFAIL: a quiet job whose hold ran out did not fail; it has to queue again.
+const RETRY_EXIT = 75
 const FLAGS = [
   '--class',
   '--host',
   '--max-wall',
   '--state-dir',
   '--slice-root',
+  '--production-state-dir',
+  '--production-slice-root',
   '--log-dir',
   '--settings-home',
   '--proc',
@@ -51,6 +76,8 @@ type Options = {
   readonly label: string
   readonly command: readonly string[]
   readonly stateDir: string
+  /** Runs alone, after running jobs drain, for at most one quiet hold. */
+  readonly quiet: boolean
   /** Job slices are `<root>-<id>.slice` under `<root>.slice`; tests keep their own root. */
   readonly sliceRoot: string
   readonly logDir: string | null
@@ -59,7 +86,12 @@ type Options = {
   readonly maxWallSec?: number
 }
 
-type Config = { readonly classes: Classes; readonly limits: Limits; readonly graceSeconds: number }
+type Config = {
+  readonly classes: Classes
+  readonly limits: Limits
+  readonly graceSeconds: number
+  readonly quietHoldSeconds: number
+}
 
 try {
   process.exit(await run(parseOptions(Bun.argv.slice(2))))
@@ -73,6 +105,11 @@ function parseOptions(argv: readonly string[]): Options {
   let index = 0
   while (argv[index]?.startsWith('--') && argv[index] !== '--') {
     const flag = argv[index]!
+    if (flag === '--quiet') {
+      flags.set(flag, '')
+      index += 1
+      continue
+    }
     const value = argv[index + 1]
     if (!FLAGS.includes(flag) || value === undefined) {
       throw createScriptError(`Unknown or incomplete option ${flag}. ${USAGE}`)
@@ -98,10 +135,17 @@ function parseOptions(argv: readonly string[]): Options {
   if (maxWallSec !== undefined && (!Number.isSafeInteger(maxWallSec) || maxWallSec <= 0)) {
     throw createScriptError(`--max-wall must be a positive whole number of seconds. ${USAGE}`)
   }
+  const quiet = flags.has('--quiet')
+  if (quiet && host === 'pi') {
+    throw createScriptError(
+      `--quiet applies to this machine; the Pi lane already runs one job at a time. ${USAGE}`,
+    )
+  }
   const jobClass = flags.get('--class') ?? 'suite'
   if (!Object.hasOwn(SETTINGS_REGISTRY['developer.heavyJobClasses'].default, jobClass)) {
     throw createScriptError(`Unknown class ${jobClass}. ${USAGE}`)
   }
+  const stateDir = flags.get('--state-dir') ?? DEFAULT_STATE_DIR
   return {
     command,
     host,
@@ -110,10 +154,34 @@ function parseOptions(argv: readonly string[]): Options {
     logDir: flags.get('--log-dir') ?? null,
     maxWallSec,
     procRoot: flags.get('--proc') ?? '/proc',
+    quiet,
     settingsHome: flags.get('--settings-home') ?? productionStateHome,
-    sliceRoot: flags.get('--slice-root') ?? 'heavy',
-    stateDir: flags.get('--state-dir') ?? DEFAULT_STATE_DIR,
+    sliceRoot: sliceRootOption(flags.get('--slice-root'), stateDir, {
+      root: flags.get('--production-slice-root') ?? PRODUCTION.root,
+      stateDir: flags.get('--production-state-dir') ?? PRODUCTION.stateDir,
+    }),
+    stateDir,
   }
+}
+
+// Production's root pairs only with production's state directory: a wrapper with any other
+// state directory would find no owner for production's slices and stop them. Tests name a
+// private stand-in as production, so a broken guard can only reach the stand-in.
+function sliceRootOption(given: string | undefined, stateDir: string, production: Production) {
+  // The directory must exist for its identity to decide its root.
+  mkdirSync(stateDir, { recursive: true })
+  const root = given ?? sliceRootFor(stateDir, production)
+  if (!/^[a-z0-9]+$/.test(root)) {
+    throw createScriptError(
+      `--slice-root takes lowercase letters and digits; got ${root}. ${USAGE}`,
+    )
+  }
+  if (root === production.root && !isProductionState(stateDir, production)) {
+    throw createScriptError(
+      `--slice-root ${production.root} belongs to the state directory ${production.stateDir}; another state directory gets its own root. ${USAGE}`,
+    )
+  }
+  return root
 }
 
 async function run(options: Options) {
@@ -137,9 +205,33 @@ async function run(options: Options) {
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
       process.on(signal, () => job.stop(signal))
     }
+    const holdMs = config.quietHoldSeconds * 1000
+    let stoppedAtHold = false
+    const hold = options.quiet
+      ? setTimeout(() => {
+          stoppedAtHold = true
+          job.stop('SIGTERM')
+        }, holdMs)
+      : undefined
     const outcome = await job.done
-    record(options, { admission: placed.reason, budget: placed.budget, cwd, id, outcome, queuedMs })
-    return outcome.exitCode
+    clearTimeout(hold)
+    // systemd ends the scope at the hold too, so a run this process slept through counts.
+    const holdExpired = options.quiet && (stoppedAtHold || outcome.wallMs >= holdMs)
+    if (holdExpired) {
+      console.error(
+        `[wave-heavy] quiet hold for '${options.label}' reached its ${config.quietHoldSeconds} s limit (developer.heavyJobQuietHoldSeconds), so the job was stopped. Run it again to queue for another hold.`,
+      )
+    }
+    record(options, {
+      admission: placed.reason,
+      budget: placed.budget,
+      cwd,
+      holdExpired,
+      id,
+      outcome,
+      queuedMs,
+    })
+    return holdExpired ? RETRY_EXIT : outcome.exitCode
   } finally {
     placed.release()
   }
@@ -167,13 +259,21 @@ async function admitLocal(
     jobClass: options.jobClass,
     label: options.label,
     pid: process.pid,
+    quiet: options.quiet,
     since: new Date().toISOString(),
   }
   const admitted = await admit(options, config, entry)
+  if (options.quiet) {
+    writeFileSync(
+      path.join(options.stateDir, 'quiet.holder'),
+      `${options.label} id=${id} pid=${process.pid} since=${new Date().toISOString()} cwd=${cwd}\n`,
+    )
+  }
   return {
     budget,
     reason: admitted.reason,
     release: () => {
+      if (options.quiet) clearQuietHolder(options.stateDir, (holder) => holder === id)
       release(admitted.held)
       for (const fd of admitted.slots) unlock(fd)
     },
@@ -185,6 +285,7 @@ async function admitLocal(
       host: 'local',
       id,
       sliceRoot: options.sliceRoot,
+      runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
       slotLocks: admitted.slots,
     },
   }
@@ -250,21 +351,27 @@ function attemptAdmission(
 ): Admitted | { reason: string } {
   const lock = waitLock(path.join(options.stateDir, 'admission.lock'))
   try {
+    // Every waiting wrapper reclaims what dead wrappers left, before any rule can stop it.
+    const running = reconcile(options)
     const ahead = live(options.stateDir, 'queue').findIndex(
       (entry) => entry.id === waiting.entry.id,
     )
     if (ahead > 0) return { reason: `${ahead} job(s) ahead in the queue` }
-    const drain = drainRequest(options.stateDir)
+    const drain = drainRequest(options.stateDir, config.quietHoldSeconds * 1000)
     if (drain) return { reason: `draining for ${drain}` }
     const hold = legacyHold(options.stateDir, SLOT_FILES)
     if (hold) return { reason: hold }
-    const charges = runningCharges(options)
-    const decision = decide(
-      waiting.entry.estimateBytes,
-      charges,
-      readReadings(options.procRoot),
-      config.limits,
-    )
+    const now = bootSeconds()
+    const quiet = running.owners.find((job) => job.quiet && (job.quietUntil ?? Infinity) > now)
+    if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}` }
+    const decision = waiting.entry.quiet
+      ? decideQuiet(running.charges.length)
+      : decide(
+          waiting.entry.estimateBytes,
+          running.charges,
+          readReadings(options.procRoot),
+          config.limits,
+        )
     if (!decision.admit) return { reason: decision.reason }
     const slots = SLOT_FILES.map((slot) => tryLock(path.join(options.stateDir, slot), 'shared'))
     const taken = slots.filter((fd): fd is number => fd !== null)
@@ -272,7 +379,14 @@ function attemptAdmission(
       for (const fd of taken) unlock(fd)
       return { reason: 'a slot lock was taken exclusively' }
     }
-    return { held: promote(options.stateDir, waiting), reason: decision.reason, slots: taken }
+    const lease = waiting.entry.quiet
+      ? { quietUntil: now + config.quietHoldSeconds + stopTimeoutSeconds(config.graceSeconds) }
+      : {}
+    return {
+      held: promote(options.stateDir, waiting, lease),
+      reason: decision.reason,
+      slots: taken,
+    }
   } finally {
     unlock(lock)
   }
@@ -283,20 +397,36 @@ function attemptAdmission(
  * gone (no live entry) is an orphan, charged its ceiling while this pass kills and removes it.
  * A job admitted but not yet in its slice is charged through its live entry.
  */
-function runningCharges(options: Options) {
-  const owned = new Map(live(options.stateDir, 'jobs').map((job) => [job.id, job.estimateBytes]))
-  const orphans = liveSlices(options.sliceRoot).filter((slice) => !owned.has(slice.id))
+function reconcile(options: Options) {
+  const owners = live(options.stateDir, 'jobs')
+  const orphans = liveSlices(options.sliceRoot).filter(
+    (slice) => !owners.some((job) => job.id === slice.id),
+  )
   for (const orphan of orphans) {
     console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
-    reapSlice(orphan.slice)
+    reapSlice(options.sliceRoot, orphan.slice)
   }
-  return [...owned.values(), ...orphans.map((orphan) => orphan.ceilingBytes)]
+  clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
+  const charges = [
+    ...owners.map((job) => job.estimateBytes),
+    ...orphans.map((orphan) => orphan.ceilingBytes),
+  ]
+  return { charges, owners }
+}
+
+// The holder line names its job; it is cleared only when that job qualifies, so clearing a
+// stale line cannot erase a newer holder's.
+function clearQuietHolder(stateDir: string, stale: (id: string) => boolean) {
+  const file = path.join(stateDir, 'quiet.holder')
+  const named = /\bid=(\S+)/.exec(readText(file))?.[1]
+  if (named && stale(named)) clearHolder(file)
 }
 
 function readConfig(home: string): Config {
   return {
     classes: setting(home, 'developer.heavyJobClasses'),
     graceSeconds: setting(home, 'developer.heavyJobStopGraceSeconds'),
+    quietHoldSeconds: setting(home, 'developer.heavyJobQuietHoldSeconds'),
     limits: {
       cpuLoadLimit: setting(home, 'developer.heavyJobCpuLoadLimit'),
       memoryPressureLimit: setting(home, 'developer.heavyJobMemoryPressureLimit'),
@@ -336,6 +466,7 @@ type Finished = {
   readonly admission: string
   readonly budget: Budget | null
   readonly cwd: string
+  readonly holdExpired: boolean
   readonly id: string
   readonly outcome: JobOutcome
   readonly queuedMs: number
@@ -356,7 +487,7 @@ function record(options: Options, finished: Finished) {
 
 function jobRecord(
   options: Options,
-  { admission, budget, cwd, id, outcome, queuedMs }: Finished,
+  { admission, budget, cwd, holdExpired, id, outcome, queuedMs }: Finished,
 ): HeavyJobRecord {
   const commitHash = wrapperCommit()
   return {
@@ -378,6 +509,8 @@ function jobRecord(
     memoryPeakBytes: outcome.memoryPeakBytes,
     oomKills: outcome.oomKills,
     queuedMs,
+    quiet: options.quiet,
+    quietHoldExpired: holdExpired,
     requestId: id,
     slice: outcome.slice,
     source: 'heavy',

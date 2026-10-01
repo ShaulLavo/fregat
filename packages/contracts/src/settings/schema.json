@@ -412,6 +412,14 @@
       "minimum": 0,
       "type": "integer"
     },
+    "developer.heavyJobQuietHoldSeconds": {
+      "default": 600,
+      "description": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.",
+      "markdownDescription": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.\n\nA `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.",
+      "maximum": 7200,
+      "minimum": 1,
+      "type": "integer"
+    },
     "developer.heavyJobStopGraceSeconds": {
       "default": 10,
       "description": "Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.",

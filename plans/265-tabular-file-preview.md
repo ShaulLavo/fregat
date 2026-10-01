@@ -20,7 +20,7 @@ Inspect CSV, TSV, SSV, PSV, JSONL and NDJSON as a table in the current pane or b
 
 Text preview queries/components exist in [apps/web/src/lib/file-preview/utils/preview-query.ts](../apps/web/src/lib/file-preview/utils/preview-query.ts) and [apps/web/src/lib/file-preview/components/text-preview.tsx](../apps/web/src/lib/file-preview/components/text-preview.tsx). Document text ownership is in [apps/web/src/lib/documents/utils/types.ts](../apps/web/src/lib/documents/utils/types.ts). [packages/ui/src/patterns/virtual-list.tsx](../packages/ui/src/patterns/virtual-list.tsx) supplies shared row virtualization. No tabular document/viewer/parser owner was found in the current web/packages source.
 
-The source snapshot/anchor APIs already exist in `editor/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/editor/src/documentSession.ts).
+The source snapshot/anchor APIs already exist in `editor/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../editor/packages/editor/src/documentSession.ts).
 
 ## Design
 

@@ -20,7 +20,7 @@ Open rendered Markdown in the current pane or beside source, scroll by small ste
 
 ## Existing Fregat and Editor support
 
-[apps/web/src/features/workbench/components/markdown-preview-pane.tsx](../apps/web/src/features/workbench/components/markdown-preview-pane.tsx) renders the live buffer and synchronizes source lines through [apps/web/src/features/workbench/utils/markdown-scroll-positions.ts](../apps/web/src/features/workbench/utils/markdown-scroll-positions.ts). [apps/web/src/lib/markdown-mode/state/overrides.ts](../apps/web/src/lib/markdown-mode/state/overrides.ts) stores per-document view choices. Editor inline Markdown preview exists in `editor/packages/markdown/src/index.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/markdown/src/index.ts). The rendered split pane currently lacks this complete command set and a reusable current-pane preview identity.
+[apps/web/src/features/workbench/components/markdown-preview-pane.tsx](../apps/web/src/features/workbench/components/markdown-preview-pane.tsx) renders the live buffer and synchronizes source lines through [apps/web/src/features/workbench/utils/markdown-scroll-positions.ts](../apps/web/src/features/workbench/utils/markdown-scroll-positions.ts). [apps/web/src/lib/markdown-mode/state/overrides.ts](../apps/web/src/lib/markdown-mode/state/overrides.ts) stores per-document view choices. Editor inline Markdown preview exists in `editor/packages/markdown/src/index.ts` after Plan 207, verified in [the current Editor source](../editor/packages/markdown/src/index.ts). The rendered split pane currently lacks this complete command set and a reusable current-pane preview identity.
 
 ## Design
 

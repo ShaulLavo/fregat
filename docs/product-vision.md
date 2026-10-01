@@ -102,17 +102,17 @@ be able to carry worktree/diff status later without redesign.
 
 - `features/chat` is already substantially the T3Code-style agent UI; backend
   `orchestration/`/`persistence/` implement the event-log/projection spine per
-  [t3code-parity-implementation-plan.md](t3code-parity-implementation-plan.md).
+  [t3code-parity-implementation-plan.md](../plans/t3code-parity-implementation-plan.md).
 - The tiling workbench, editor, diff package, terminal (ghostty), git, and search are IDE mode.
 - The biggest genuinely new UI surface is **terminal sessions inside the agent view**.
 
 ## Amendments to existing docs
 
-- [t3code-parity-implementation-plan.md](t3code-parity-implementation-plan.md): its product shape
+- [t3code-parity-implementation-plan.md](../plans/t3code-parity-implementation-plan.md): its product shape
   ("V1 side-panel chat, V2 standalone agent app later") is **inverted** — the standalone agent view
   is now the face and the priority. Its architecture spine (events, projections, receipts,
   recovery) remains authoritative.
-- [logseq-parity-implementation-plan.md](logseq-parity-implementation-plan.md) and companions:
+- [logseq-parity-implementation-plan.md](../plans/logseq-parity-implementation-plan.md) and companions:
   **deferred until further notice** (banner applied 2026-08-27).
 - Editor/terminal executable plans 055–067 live inside IDE mode and are unaffected.
 

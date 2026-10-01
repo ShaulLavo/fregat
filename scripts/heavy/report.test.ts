@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -9,8 +10,11 @@ import type { HeavyJobRecord } from './record'
 const HERE = import.meta.dirname
 const userScopes = spawnSync('systemd-run', ['--user', '--scope', '-q', 'true']).status === 0
 const roots: string[] = []
+const sliceRoots: string[] = []
 
 afterEach(() => {
+  for (const root of sliceRoots.splice(0))
+    spawnSync('systemctl', ['--user', 'stop', `${root}.slice`])
   for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true })
 })
 
@@ -29,7 +33,11 @@ test.skipIf(!userScopes)(
     const root = mkdtempSync(path.join(tmpdir(), 'heavy-report-'))
     roots.push(root)
     mkdirSync(path.join(root, 'locks'))
+    const sliceRoot = `heavyt${randomBytes(4).toString('hex')}`
+    sliceRoots.push(sliceRoot)
     const dirs = [
+      '--slice-root',
+      sliceRoot,
       '--state-dir',
       path.join(root, 'locks'),
       '--log-dir',
@@ -103,6 +111,8 @@ function job(fields: Partial<HeavyJobRecord>): HeavyJobRecord {
     memoryPeakBytes: 2 ** 30,
     oomKills: 0,
     queuedMs: 0,
+    quiet: false,
+    quietHoldExpired: false,
     repo: '/work/projects/platform',
     requestId: String(sequence),
     source: 'heavy',

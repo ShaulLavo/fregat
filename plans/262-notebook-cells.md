@@ -18,7 +18,7 @@ Open and save an .ipynb document, edit code and Markdown cells, reorder or delet
 
 ## Existing Fregat and Editor support
 
-The current document/tab/save unions are in [apps/web/src/lib/documents/utils/types.ts](../apps/web/src/lib/documents/utils/types.ts) and contain no notebook variant. Markdown rendering already exists in [packages/markdown/src/components/markdown.tsx](../packages/markdown/src/components/markdown.tsx). Cell text/history foundations are `editor/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/editor/src/documentSession.ts), with view contributions in `editor/packages/editor/src/createPlugin.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/editor/src/createPlugin.ts). Reuse Plan 234 file lifecycle and Plan 261 kernel ownership.
+The current document/tab/save unions are in [apps/web/src/lib/documents/utils/types.ts](../apps/web/src/lib/documents/utils/types.ts) and contain no notebook variant. Markdown rendering already exists in [packages/markdown/src/components/markdown.tsx](../packages/markdown/src/components/markdown.tsx). Cell text/history foundations are `editor/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../editor/packages/editor/src/documentSession.ts), with view contributions in `editor/packages/editor/src/createPlugin.ts` after Plan 207, verified in [the current Editor source](../editor/packages/editor/src/createPlugin.ts). Reuse Plan 234 file lifecycle and Plan 261 kernel ownership.
 
 ## Design
 

@@ -4,7 +4,7 @@
 
 - Status: AUTHORING COMMANDS IMPLEMENTED; VISUAL EDITING AND COMPOSER NEXT, refreshed 2026-09-28.
   Phase 1 landed 2026-09-26. Word-boundary and proportional-font wrap landed in
-  [E052](../../Editor/plans/e052-proportional-font-extents.md#as-landed-2026-09-26).
+  [E052](e052-proportional-font-extents.md#as-landed-2026-09-26).
   Spellcheck exists in the Editor and Platform file editor; composer wiring remains.
   List continuation also exists. The historical inventory below predates these changes.
   Authoring acceptance now precedes the composer swap.
@@ -12,7 +12,7 @@
 - Planned at: Platform `9f343825`, Editor `e2fd299`, 2026-09-25. Origin: Plan 126
   [INTERACTION-11](126-t3code-alignment/interaction.md) owner ruling.
 - Depends on: [Plan 111](111-editor-decorations.md) (decorations, question 7) first, and the Editor
-  spellcheck, [Editor E058](../../Editor/plans/e058-spellcheck.md) (owner, 2026-09-26).
+  spellcheck, [Editor E058](e058-spellcheck.md) (owner, 2026-09-26).
 
 ## Outcome
 

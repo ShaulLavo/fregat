@@ -1,5 +1,6 @@
 import { dlopen, FFIType } from 'bun:ffi'
-import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { closeSync, mkdirSync, openSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 const LOCK_SH = 1
@@ -61,6 +62,35 @@ function operation(mode: LockMode) {
 
 // The wrapper's state lives beside the legacy slot locks other tools still take directly.
 export const DEFAULT_STATE_DIR = '/work/tmp/wave-heavy'
+const PRODUCTION_SLICE_ROOT = 'heavy'
+
+/** The state directory whose wrappers own the production slice root, and that root. */
+export type Production = { readonly stateDir: string; readonly root: string }
+export const PRODUCTION: Production = { root: PRODUCTION_SLICE_ROOT, stateDir: DEFAULT_STATE_DIR }
+
+/**
+ * The slice root a state directory owns. A wrapper reaps every slice under its root that its
+ * state directory has no owner for, so only the production state directory may use
+ * production's root; any other directory gets a private root derived from its identity.
+ */
+export function sliceRootFor(stateDir: string, production: Production = PRODUCTION) {
+  if (isProductionState(stateDir, production)) return production.root
+  const identity = directoryIdentity(stateDir) ?? path.resolve(stateDir)
+  return `heavys${createHash('sha256').update(identity).digest('hex').slice(0, 10)}`
+}
+
+/** Whether the directory is production's state directory, by any path that reaches it. */
+export function isProductionState(stateDir: string, production: Production = PRODUCTION) {
+  const identity = directoryIdentity(stateDir)
+  return identity !== null && identity === directoryIdentity(production.stateDir)
+}
+
+// Device and inode name a directory however it is reached: a symlink or a bind mount gives
+// one directory several paths, and every one of them must own the same slices.
+function directoryIdentity(dir: string) {
+  const stat = unlessMissing(() => statSync(dir))
+  return stat ? `${stat.dev}:${stat.ino}` : null
+}
 const POLL_MS = 5_000
 const WAIT_NOTICE_MS = 60_000
 

@@ -40,7 +40,7 @@ unimaginable. This plan does not design screens.
   setting `chat.notificationMode`.
 - Plan 126 tracks this as EXT-09 (`plans/126-t3code-alignment/adjacent.md:182`), P3, and says a
   mobile app needs its own delivery plan.
-- `composer-mobile-enter-newline` was rejected in `docs/t3code-chat-parity-gap-analysis.md:423`
+- `composer-mobile-enter-newline` was rejected in `plans/t3code-chat-parity-gap-analysis.md:423`
   because "there is no mobile target". That reason is stale once this plan picks a target.
 - `docs/product-vision.md` does not mention phones.
 
@@ -129,7 +129,7 @@ Questions:
    T3 `apps/mobile/src/features` and summarise navigation, not visuals.
 3. Which server contracts would a native app need that the web app reaches in-process or through
    browser-only APIs? Start from `packages/contracts` and the WebSocket surfaces listed in
-   `docs/native-plan-of-plans.md` plan 3.
+   `plans/native-plan-of-plans.md` plan 3.
 4. Which interactions are hover- or keyboard-only (tooltips, context menus, chords) and need a
    touch path?
 5. **The pairing URL (Q4).** How does T3 Code authorize a new device? Read
@@ -292,7 +292,7 @@ Gaps, roughly in the order a native app would hit them:
    (`apps/server/src/auth.ts:108-116`). Any non-browser client can send an allowed `Origin`. The
    TUI does so in production with a fixed value (`apps/tui/src/main.tsx:33`). On the mesh, the
    tailnet is the real gate. A native app on the tailnet would work the same way today, but
-   there are no sessions to revoke. This is milestone M4 in `docs/environments-and-remote-plan.md` §4.
+   there are no sessions to revoke. This is milestone M4 in `plans/environments-and-remote-plan.md` §4.
 2. **Push.** Notices are computed and shown only in an open tab
    (`chat-mode/state/notification-host.ts`, `client-core/chat/notifications.ts`). Plan 142 adds
    Web Push. A native app needs APNs (and FCM for Android) plus device-token registration. Plan
@@ -300,7 +300,7 @@ Gaps, roughly in the order a native app would hit them:
    table.
 3. **Schemas outside orchestration.** REST is typed only through Eden's TypeScript `App` type.
    Terminal, watch events and search are hand-parsed TypeScript unions
-   (`docs/native-plan-of-plans.md`, plan 3 row). A TypeScript client imports them as they are. A
+   (`plans/native-plan-of-plans.md`, plan 3 row). A TypeScript client imports them as they are. A
    Swift client needs plan 3's OpenAPI and JSON Schema emission first; plan 3 is not started.
 4. **Highlighting.** The web client highlights with tree-sitter WASM and Shiki in the browser.
    Hermes (React Native) has no WebAssembly, so a native diff view needs Shiki's JavaScript engine
@@ -361,12 +361,12 @@ What we would copy:
 - A QR code and link shown only in the desktop UI (Settings → Machines), with a paired-devices
   list, last-seen times and revoke.
 
-What we would not copy, per `docs/environments-and-remote-plan.md` §7: the pairing URL in a
+What we would not copy, per `plans/environments-and-remote-plan.md` §7: the pairing URL in a
 startup log, plaintext LAN pairing, bearer tokens in `localStorage`, and accounts or relays. DPoP
 can wait.
 
 The prerequisite is the M4 session model (§4; the earlier design is at
-`docs/environments-and-remote-plan.md@1325b003`). Once sessions exist, the origin check stops being
+`plans/environments-and-remote-plan.md@1325b003`). Once sessions exist, the origin check stops being
 the whole guard.
 
 Decided (Owner answer 3): pairing is required and is part of the phone work, after the M4
@@ -434,7 +434,7 @@ SwiftUI is back in: native feel, next to `apps/mac`, at the cost of rewriting th
    shell shows the same PTY the desk has open. Still open: read-only or interactive. The touch
    keyboard lacks Ctrl, Esc and arrows, so interactive needs an accessory key row (Orca has one).
 3. **Pairing: required.** It becomes part of the phone work, and the M4 session model
-   (`docs/environments-and-remote-plan.md` §4) becomes its prerequisite. A phone on the tailnet
+   (`plans/environments-and-remote-plan.md` §4) becomes its prerequisite. A phone on the tailnet
    still pairs once. That is what makes a device revocable, independent of Tailscale.
 4. **Phones (corrected 2026-09-25):** the phone **web app** supports both iPhone and Android. The later
    **native app is iOS only**, so SwiftUI is a candidate again, alongside a WebKit wrapper around the phone web
@@ -606,7 +606,7 @@ Carried in from other plans. They wait for the phone shell and join its split pl
 ## Dependencies
 
 - Plan 142 (Web Push) needs a minimal web app manifest and must not wait on this plan.
-- A companion app would consume the same contracts as `docs/native-plan-of-plans.md` plan 3.
+- A companion app would consume the same contracts as `plans/native-plan-of-plans.md` plan 3.
 
 ## Out of scope and not copied
 
