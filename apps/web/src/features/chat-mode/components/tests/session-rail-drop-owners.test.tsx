@@ -73,3 +73,65 @@ test('a later owner rejection preserves the first canonical key and withdraws ev
     socket.deliver = deliver
   }
 })
+
+test('a middle-owner transport failure keeps the confirmed key and rolls back only unconfirmed previews', async ({
+  server,
+}) => {
+  const h = await createFederationHarness(server)
+  const local = await registerFederatedProject(h.serverA, h.clientA, 'local-transport-drop')
+  const remote = await registerFederatedProject(
+    h.serverB,
+    h.clientB,
+    'remote-transport-drop',
+    local.sessionId,
+  )
+  await h.clientA.orchestration.commands.post(
+    createSessionLifecycleCommand(local.sessionId, { type: 'pin' }),
+  )
+  await h.clientB.orchestration.commands.post(
+    createSessionLifecycleCommand(remote.sessionId, { type: 'pin' }),
+  )
+  await waitFor(() =>
+    expect(
+      sessionRailModel({ environments: currentRailEnvironments() }).sessions.filter(
+        (row) => row.placement === 'pinned',
+      ),
+    ).toHaveLength(2),
+  )
+  const localKey = scopedSessionKey({
+    environmentId: h.descriptorA.environmentId,
+    sessionId: local.sessionId,
+  })
+  const remoteKey = scopedSessionKey({
+    environmentId: h.descriptorB.environmentId,
+    sessionId: remote.sessionId,
+  })
+  expect(sessionRailModel({ environments: currentRailEnvironments() }).sessions[1]?.key).toBe(
+    localKey,
+  )
+  const socket = h.sockets.get(h.originB)!.at(-1)!
+  const send = socket.send.bind(socket)
+  let interrupted = 0
+  socket.send = (raw) => {
+    if (raw.includes('session.pin.reorder') && raw.includes(remote.sessionId)) {
+      interrupted++
+      h.cutConnection(h.originB)
+      return
+    }
+    send(raw)
+  }
+  try {
+    expect((await reorderRailSession({ activeId: localKey, overId: remoteKey }))?.ok).toBe(false)
+    expect(interrupted).toBe(1)
+    const localSession = (await h.clientA.orchestration['shell-snapshot'].get()).data!.sessions[0]!
+    const remoteSession = (await h.clientB.orchestration['shell-snapshot'].get()).data!.sessions[0]!
+    expect(localSession.pinOrderKey).not.toBeNull()
+    expect(remoteSession.pinOrderKey).toBeNull()
+    expect(localSession.pinnedAt).not.toBeNull()
+    expect(remoteSession.pinnedAt).not.toBeNull()
+    expect(railOrderOverrides().sessionLifecycleByKey).toEqual({})
+  } finally {
+    socket.send = send
+    h.restoreConnection(h.originB)
+  }
+})

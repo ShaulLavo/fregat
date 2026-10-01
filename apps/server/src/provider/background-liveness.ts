@@ -22,8 +22,10 @@ type TaskTransition = {
 
 export class BackgroundTaskRegistry {
   private readonly sessions = new Map<string, Map<string, Exclude<BackgroundLiveness, null>>>()
+  private readonly rosters = new Map<string, BackgroundLiveness>()
 
   get(sessionId: string): BackgroundLiveness {
+    if (this.rosters.has(sessionId)) return this.rosters.get(sessionId) ?? null
     const tasks = this.sessions.get(sessionId)
     if (!tasks?.size) return null
     return [...tasks.values()].includes('working') ? 'working' : 'monitoring'
@@ -31,9 +33,12 @@ export class BackgroundTaskRegistry {
 
   clear(sessionId: string) {
     this.sessions.delete(sessionId)
+    this.rosters.delete(sessionId)
   }
 
   record(input: TaskTransition) {
+    // Native rosters replace membership; bookends for the same change can arrive later.
+    if (this.rosters.has(input.sessionId)) return
     const previous = this.sessions.get(input.sessionId)?.has(input.taskId) ?? false
     this.drop(input.sessionId, input.taskId)
     if (input.taskType && inertTypes.has(input.taskType)) return
@@ -58,6 +63,20 @@ export class BackgroundTaskRegistry {
       (event.type === 'runtime.state.changed' && event.payload.state === 'stopped')
     ) {
       this.clear(event.sessionId)
+      return
+    }
+    if (event.type === 'tasks.roster') {
+      let liveness: BackgroundLiveness = null
+      for (const task of event.payload.tasks) {
+        if (inertTypes.has(task.taskType)) continue
+        if (!monitorTypes.has(task.taskType)) {
+          liveness = 'working'
+          break
+        }
+        liveness = 'monitoring'
+      }
+      this.sessions.delete(event.sessionId)
+      this.rosters.set(event.sessionId, liveness)
       return
     }
     if (
