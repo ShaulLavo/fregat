@@ -320,6 +320,10 @@ jobs:
       - name: Agent browser doctor
         run: bun --bun vitest run scripts/agent/browser-doctor.test.ts --environment node
 
+      - name: Agent browser shared memory
+        if: ${{ !cancelled() }}
+        run: bun --bun vitest run scripts/agent/browser-launch.test.ts --environment node
+
       - name: Cold dev startup
         if: ${{ !cancelled() }}
         run: bun --bun vitest run scripts/agent/vite-cold-start.test.ts --environment node
