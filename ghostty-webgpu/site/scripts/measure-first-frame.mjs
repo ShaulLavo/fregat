@@ -53,6 +53,14 @@ await page.waitForFunction(() => performance.getEntriesByName('ghost:first-frame
 await page.waitForTimeout(250)
 await page.screenshot({ path: `${directory}/loaded.png`, fullPage: true })
 const timeline = await page.evaluate(() => ({
+  document: performance
+    .getEntriesByType('navigation')
+    .map(({ responseEnd, transferSize, encodedBodySize, decodedBodySize }) => ({
+      responseEnd,
+      transferSize,
+      encodedBodySize,
+      decodedBodySize,
+    })),
   paint: performance.getEntriesByType('paint').map(({ name, startTime }) => ({ name, startTime })),
   milestones: performance
     .getEntriesByType('mark')

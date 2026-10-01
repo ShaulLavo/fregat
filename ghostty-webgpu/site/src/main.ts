@@ -1,8 +1,8 @@
 import { fitTerminalFont, Terminal } from '../../dist/index.js'
-import type { TerminalTheme } from '../../dist/index.js'
 import { GhostDemo } from './demos/ghost.js'
 import type { DemoContext } from './demos/types.js'
-import { ink, pale, palette256, spectre } from './theme.js'
+import { terminalTheme } from './theme.js'
+import { loadGhostFrames } from './ghost-frames.js'
 
 const FONT_FAMILY = '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace'
 const BASE_FONT_SIZE = 14
@@ -26,8 +26,8 @@ const ui = {
   backend: required<HTMLElement>('#backend'),
   backendFact: required<HTMLElement>('#backend-fact'),
   copy: required<HTMLButtonElement>('#copy-install'),
-  fatal: required<HTMLElement>('#fatal'),
-  fatalMessage: required<HTMLElement>('#fatal-message'),
+  firstFrame: required<HTMLElement>('#ghost-first-frame'),
+  wasmUnavailable: required<HTMLElement>('#wasm-unavailable'),
   host: required<HTMLElement>('#terminal'),
   screen: required<HTMLElement>('.screen'),
   stat: required<HTMLElement>('#stat'),
@@ -37,19 +37,6 @@ const ui = {
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 let terminal: Terminal | undefined
 const paused = reducedMotion.matches
-
-function buildTheme(): TerminalTheme {
-  return {
-    background: ink,
-    cursor: spectre,
-    cursorText: ink,
-    foreground: pale,
-    minimumContrast: 1,
-    palette: palette256(),
-    selectionBackground: { r: 62, g: 58, b: 92 },
-    selectionForeground: pale,
-  }
-}
 
 async function loadFonts(): Promise<void> {
   if (!('fonts' in document)) return
@@ -141,24 +128,24 @@ function wireControls(): void {
   })
 }
 
-function showFatal(cause: unknown): void {
-  const message = cause instanceof Error ? cause.message : String(cause)
-  ui.fatalMessage.textContent = message
-  ui.fatal.hidden = false
-}
-
 async function boot(): Promise<void> {
   wireControls()
-  await loadFonts()
-  performance.mark('ghost:fonts-ready')
+  if (typeof WebAssembly === 'undefined') {
+    ui.wasmUnavailable.hidden = false
+    return
+  }
+  const fonts = loadFonts().then(() => performance.mark('ghost:fonts-ready'))
+  const frames = loadGhostFrames()
+  const frame = ui.firstFrame.querySelector('.ghostty-webgpu-frame')!
+  const firstFontSize = Number.parseFloat(getComputedStyle(frame).fontSize)
   const base = document.baseURI
   performance.mark('ghost:create-start')
-  const instance = await Terminal.create({
+  const creating = Terminal.create({
     appearance: {
       cursor: { blink: true, style: 'block' },
-      font: { family: FONT_FAMILY, lineHeight: BASE_LINE_HEIGHT, size: BASE_FONT_SIZE },
+      font: { family: FONT_FAMILY, lineHeight: FIT_LINE_HEIGHT, size: firstFontSize },
       scrollbackLimit: 2000,
-      theme: buildTheme(),
+      theme: terminalTheme(),
     },
     padding: PADDING,
     runtime: {
@@ -169,7 +156,11 @@ async function boot(): Promise<void> {
       },
     },
   })
-  performance.mark('ghost:create-resolved')
+  const created = creating.then((instance) => {
+    performance.mark('ghost:create-resolved')
+    return instance
+  })
+  const [instance, , loadedFrames] = await Promise.all([created, fonts, frames])
   await instance.open(ui.host)
   performance.mark('ghost:open-resolved')
   terminal = instance
@@ -183,8 +174,19 @@ async function boot(): Promise<void> {
   // Avoid announcing every frame of the decorative animation.
   instance.setAccessibilityEnabled(false)
   fitTo(ghost.fit)
+  ghost.prepare(loadedFrames)
+  ghost.setPaused(true)
+  const firstPaint = instance.onFrame(() => {
+    firstPaint.dispose()
+    requestAnimationFrame(() => {
+      ui.firstFrame.remove()
+      performance.mark('ghost:first-frame')
+      ghost.setPaused(paused || document.hidden)
+    })
+  })
   ghost.start(createContext(instance))
-  ghost.setPaused(paused || document.hidden)
 }
 
-boot().catch(showFatal)
+boot().catch((cause: unknown) => {
+  console.error('Live ghost animation failed to start', cause)
+})

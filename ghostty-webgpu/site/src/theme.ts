@@ -1,11 +1,11 @@
 import { rgb, type Rgb } from './ansi.js'
 
-export const ink = rgb('#15131F')
+const ink = rgb('#15131F')
 const mist = rgb('#ECEAF3')
 const fog = rgb('#8F8AAE')
 export const dusk = rgb('#5F5B7A')
-export const spectre = rgb('#7EE6CE')
-export const pale = rgb('#E6E2F7')
+const spectre = rgb('#7EE6CE')
+const pale = rgb('#E6E2F7')
 
 /** The 16 ANSI colors, tuned to sit on the ink background. */
 const ansiColors: readonly Rgb[] = [
@@ -28,7 +28,7 @@ const ansiColors: readonly Rgb[] = [
 ]
 
 /** The xterm 256-color table with our 16 named colors in front. */
-export function palette256(): Rgb[] {
+function palette256(): Rgb[] {
   const levels = [0, 95, 135, 175, 215, 255]
   const colors = [...ansiColors]
   for (let i = 0; i < 216; i += 1) {
@@ -43,4 +43,17 @@ export function palette256(): Rgb[] {
     colors.push({ r: level, g: level, b: level })
   }
   return colors
+}
+
+export function terminalTheme() {
+  return {
+    background: ink,
+    cursor: spectre,
+    cursorText: ink,
+    foreground: pale,
+    minimumContrast: 1,
+    palette: palette256(),
+    selectionBackground: { r: 62, g: 58, b: 92 },
+    selectionForeground: pale,
+  }
 }

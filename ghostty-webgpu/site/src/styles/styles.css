@@ -244,26 +244,6 @@ h1 {
   touch-action: pan-y;
 }
 
-.fatal {
-  position: absolute;
-  inset: 0;
-  padding: 24px;
-  color: var(--pale);
-  background: var(--ink);
-}
-
-.fatal p {
-  margin: 0 0 12px;
-}
-
-.fatal pre {
-  margin: 0 0 12px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  white-space: pre-wrap;
-  color: #f07c8c;
-}
-
 .stat {
   margin: 12px 0 0;
   min-height: 1.4em;
