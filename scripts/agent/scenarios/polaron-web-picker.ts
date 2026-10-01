@@ -1,16 +1,20 @@
 import { strictEqual } from 'node:assert/strict'
 import { chromiumBridge } from '../../../apps/desktop/src/launcher/chromium'
-import { createGitFixture, releaseFixture } from '../fixture-workspace'
+import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
 import { selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
+import { observePolaronTerminal } from '../polaron-continuity'
 
 export const polaronWebPicker: Scenario = {
   name: 'polaron-web-picker',
   description: 'Open a fixture folder through the web picker with the Chromium desktop bridge.',
   requiresIsolatedServer: true,
-  async run(page, { step }) {
+  async run(page, { step, evidence }) {
     const fixture = await createGitFixture('polaron-picker')
+    let continuity: Awaited<ReturnType<typeof observePolaronTerminal>> | undefined
     try {
+      continuity = await observePolaronTerminal(page)
+      await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixture'])
       await page.exposeBinding('platformShellCall', () => {})
       const script = chromiumBridge(page.url())
       await page.addInitScript({ content: script })
@@ -42,9 +46,14 @@ export const polaronWebPicker: Scenario = {
         'undefined',
       )
       await step('fixture-folder-open')
+      await continuity.prove(fixture, evidence, step)
     } finally {
-      await page.goto('about:blank')
-      await releaseFixture(fixture)
+      try {
+        await page.goto('about:blank')
+        await continuity?.dispose()
+      } finally {
+        await releaseFixture(fixture)
+      }
     }
   },
 }

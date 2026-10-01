@@ -5,6 +5,7 @@ import { isRecord } from '@workspace/utils/objects'
 import { browserProfile, chromiumArguments } from './profile'
 import { liveSingletonOwner } from './singleton'
 import { launcherErrors } from './structured-errors'
+import { browserDiagnostics, drainBrowserDiagnostics } from './diagnostics'
 import type { PlatformBridge } from '../shared/bridge'
 
 type ChromiumOptions = {
@@ -182,14 +183,23 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
       options.candidate.executable,
       ...chromiumArguments(options.candidate, profile, options.url),
     ],
-    stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'],
   })
+  const diagnostics = browserDiagnostics()
+  void drainBrowserDiagnostics(child.stderr as ReadableStream<Uint8Array>, diagnostics).catch(
+    () => {},
+  )
+  let startupPhase = 'version'
   const cdp = cdpPipe(child.stdio[3] as number, child.stdio[4] as number)
   let closing: Promise<void> | undefined
   let connected = false
   const startupTimer = setTimeout(
     () => {
-      cdp.close(launcherErrors.CDP_FAILED({ internal: { reason: 'startup-deadline' } }))
+      cdp.close(
+        launcherErrors.CDP_FAILED({
+          internal: { reason: 'startup-deadline', startupPhase, ...diagnostics.snapshot() },
+        }),
+      )
     },
     Math.max(0, deadline - Date.now()),
   )
@@ -214,9 +224,12 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
       options.signal?.throwIfAborted()
       if (first.code === 0 && liveSingletonOwner(profile, options.candidate.executable))
         return { kind: 'handoff' }
-      throw launcherErrors.LAUNCH_FAILED({ internal: { exitCode: first.code } })
+      throw launcherErrors.LAUNCH_FAILED({
+        internal: { exitCode: first.code, startupPhase, ...diagnostics.snapshot() },
+      })
     }
     connected = true
+    startupPhase = 'attach'
     assertChromiumVersion(first.version.product)
     await attachChromium(
       cdp,
