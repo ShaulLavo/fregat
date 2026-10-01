@@ -131,7 +131,7 @@ export function CsvTable({
               <div
                 style={{ width: widths.reduce((sum, width) => sum + width, 0), minWidth: '100%' }}
               >
-                <div role='row' className='bg-muted sticky top-0 z-10 flex w-max min-w-full'>
+                <div role='row' className='bg-muted-solid sticky top-0 z-10 flex w-max min-w-full'>
                   {Array.from({ length: columns }, (_, column) => {
                     const label = headings?.[column]?.value ?? `Column ${column + 1}`
                     return (
