@@ -267,6 +267,7 @@ import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
 import { editorDiagnosticHoverFix } from './editor-diagnostic-hover-fix'
 import { editorLspHover } from './editor-lsp-hover'
+import { editorLspHoverCrlf } from './editor-lsp-hover-crlf'
 import { editorLspDeprecated } from './editor-lsp-deprecated'
 import { editorLspUnnecessary } from './editor-lsp-unnecessary'
 import { editorLspRenameKey } from './editor-lsp-rename-key'
@@ -632,6 +633,7 @@ export const scenarios: readonly Scenario[] = [
   editorFormatChord,
   editorLspCompletion,
   editorLspHover,
+  editorLspHoverCrlf,
   editorDiagnosticHoverFix,
   editorLspDeprecated,
   editorLspUnnecessary,
