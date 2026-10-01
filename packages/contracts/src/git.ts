@@ -390,3 +390,25 @@ export type GitShipResult = {
   /** Null when the push failed and nothing was asked of the forge. */
   pullRequest: GitPullRequestCreateResult | { kind: 'failed'; message: string } | null
 }
+
+/** General discussion on the forge, separate from local diff notes sent to an agent. */
+export type GitPullRequestComment = {
+  id: string
+  author: string
+  body: string
+  createdAt: string
+  url: string | null
+}
+
+export type GitPullRequestComments =
+  | {
+      kind: 'ready'
+      forge: GitForge
+      comments: readonly GitPullRequestComment[]
+      truncated: boolean
+    }
+  | { kind: 'unsupported'; forge: GitForge | null; reason: string }
+
+export type GitPullRequestCommentResult =
+  | { kind: 'posted' }
+  | { kind: 'unsupported'; forge: GitForge | null; reason: string }

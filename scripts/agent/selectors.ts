@@ -17,6 +17,7 @@ export const rootSwitchRows = {
 
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
+export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
@@ -65,6 +66,14 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 export const selectors = {
   fileReadRetry: (page: Page) => page.getByRole('button', { name: 'Retry', exact: true }),
   fileReadErrorHeader: (page: Page) => page.locator('header[aria-label="File read error"]'),
+  forgeDiscussion: (page: Page) =>
+    page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
+  forgeComment: (page: Page) => page.getByRole('textbox', { name: 'Comment', exact: true }),
+  forgeCommentText: (page: Page, text: string) =>
+    page
+      .getByRole('dialog', { name: 'Pull request #7 discussion', exact: true })
+      .getByText(text, { exact: true }),
+
   startupFailure: (page: Page) =>
     page.getByRole('status').filter({ hasText: 'App could not start' }),
   reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
@@ -428,6 +437,10 @@ export const selectors = {
       .getByRole('tree', { name: 'Search results', exact: true })
       .locator('[aria-selected="true"] [data-row-action="replace"]'),
   terminalList: (page: Page) => page.getByRole('tablist', { name: 'Open terminals', exact: true }),
+  terminalById: (page: Page, id: string) =>
+    page
+      .getByRole('tablist', { name: 'Open terminals', exact: true })
+      .locator(`[data-terminal-tab-id=${JSON.stringify(id)}]`),
   terminalRows: (page: Page) =>
     page.getByRole('tablist', { name: 'Open terminals', exact: true }).getByRole('tab'),
   terminalDraggingRow: (page: Page) =>
@@ -1619,3 +1632,17 @@ export function focusedEditorSelectedText(): string {
   if (context) return context.text.slice(context.selectionStart, context.selectionEnd)
   return document.getSelection()?.toString() ?? ''
 }
+
+export const ghosttySiteSelectors = {
+  examples: '.example',
+  factLead: '.facts strong',
+  sectionHeadings: '.measured h2, .preview h2',
+  backend: '#backend',
+  canvas: 'canvas',
+  composition: '.ghostty-webgpu-composition',
+  pty: '.pty-example',
+  preview: '.preview',
+  screen: '.screen',
+  stat: '#stat',
+  window: '#window',
+} as const
