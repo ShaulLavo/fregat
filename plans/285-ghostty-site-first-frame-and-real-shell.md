@@ -66,12 +66,42 @@ a real bash.
 
 ## Phase 0: measure the first frame
 
+Execution checklist (DOM/first-frame lane):
+
+- [x] Capture the instrumented serial boot on the built site, cold Fast 4G / 4× CPU.
+- [ ] Implement and test the DOM backend and pure HTML output; bump the package minor.
+- [ ] Inline the real-core first frame, self-host fonts, parallelize boot, paint-gated hand-off.
+- [ ] Repeat the timeline and read desktop, phone and hand-off screenshots.
+- [ ] Commit by path, push and open the lane PR.
+
 Before touching the boot path, record when the ghost first appears, on a cold cache, throttled to
 "Fast 4G" and to a slow desktop CPU, in Chromium: HTML paint, font ready, wasm fetched, `create`
 resolved, `open` resolved, frames fetched, first ghost frame. `bun run agent:browser trace` against
 the built site (`astro preview`) gives the timeline; save it to
 `/work/tmp/fregat-evidence/<run>/` and copy the numbers into this plan. Every later phase cites
 this baseline.
+
+Measured locally on the built Astro preview at 1280 × 1000, Chromium headless (WebGL2),
+cold cache, 1.6 Mbps download / 750 Kbps upload / 150 ms RTT, 4× CPU slowdown. Milestones
+are milliseconds from navigation start; raw CDP traces and every emitted screencast frame are retained.
+The baseline retains the serial boot and the unfixed sizing; the compatible-renderer package is already
+present because that lane ran in parallel. This isolates the site boot change, not package bundle size.
+
+| Milestone                      | Serial boot | First-frame boot |
+| ------------------------------ | ----------: | ---------------: |
+| HTML first contentful paint    |       580.0 |          Pending |
+| Terminal fonts ready           |     1,274.9 |          Pending |
+| Wasm response complete         |     5,359.7 |          Pending |
+| `Terminal.create` resolved     |     5,395.4 |          Pending |
+| `open` resolved                |     5,579.5 |          Pending |
+| Ghost frames response complete |     6,042.3 |          Pending |
+| Ghost frames decoded           |     6,064.0 |          Pending |
+| First ghost frame              |     6,115.5 |          Pending |
+
+Baseline evidence: `/work/tmp/fregat-evidence/p285-before/` (`trace.json`, `timeline.json`,
+`loaded.png`, `frame-0000.jpg` onward). The screenshot was read back: the initial ghost waits for
+wasm and frames, and the old font sizing places it toward the right side of the window. The current
+checked-in wasm transfers 773,277 bytes in this preview, larger than the older estimate above.
 
 ## Phase 1: a DOM renderer, in the package
 
