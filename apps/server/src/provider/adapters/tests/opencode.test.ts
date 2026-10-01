@@ -310,13 +310,26 @@ test('catalog refresh recovers after the owned process exits with one replacemen
     .map((line) => JSON.parse(line))
   const original = calls.find((call) => call.wrapperPid)
   process.kill(original.wrapperPid, 'SIGKILL')
+  const ownedGroupCleanupGraceMs = 1_000
+  const fixtureRespawnAllowanceMs = 1_000
+  // OpenCodeServer.closeProcess waits out its group grace before fixture respawn can begin.
+  const replacementLaunchTimeoutMs = ownedGroupCleanupGraceMs + fixtureRespawnAllowanceMs
   await expect
-    .poll(async () =>
-      (await readFile(`/proc/${original.wrapperPid}/cmdline`, 'utf8').catch(() => '')).includes(
-        fixture.root,
-      ),
+    .poll(
+      async () => {
+        await Promise.all([
+          registry.refreshSnapshot(instanceId),
+          registry.refreshSnapshot(instanceId),
+        ])
+        const launches = (await readFile(fixture.marker, 'utf8'))
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+        return launches.filter((call) => call.args).length
+      },
+      { timeout: replacementLaunchTimeoutMs },
     )
-    .toBe(false)
+    .toBe(2)
   const snapshots = await Promise.all([
     registry.refreshSnapshot(instanceId),
     registry.refreshSnapshot(instanceId),
