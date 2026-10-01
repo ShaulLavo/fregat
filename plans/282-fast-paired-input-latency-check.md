@@ -127,7 +127,8 @@ The first reduced-cost default attempt was interrupted at 17:09:36 on 2026-10-01
 
 The owner approved two warm package pages, public Editor resets, retained fixture attachment,
 120-second readiness-only bounds and separate input/frame controls. All budgets and 108 blocking
-measures stay fixed. Current evidence is `/work/tmp/plan-282/run-20261001T153544Z-sol/floor-controls/`.
+measures stay fixed. Archived pre-split evidence is `/work/tmp/plan-282/run-20261001T153544Z-sol/floor-controls/`;
+current split-identity evidence is its sibling `split-controls/`.
 
 - [x] Retain Editors and consumer owners across bursts and fixture changes; restore text/history/cursor/hidden view.
 - [x] Preserve native's ordinary-only Tree-sitter policy at fixture transitions.
@@ -140,8 +141,11 @@ measures stay fixed. Current evidence is `/work/tmp/plan-282/run-20261001T153544
 - [x] Prove all 72 input keys and 35 native frame keys reject their real 20 ms controls; record the single native repeat key’s bounded 25/30 ms detection floor. Final source rejected 72/72 and 36/36 at 20 ms; the separate floor rejected at 25 ms, so 30 ms was skipped. Raw controls took 424.655 seconds once.
 - [x] Separate measurement and validation identities, with conservative default measurement coverage and assertion-only cache-reuse tests.
 - [x] Correct plain-output validation for virtual chunks; prove complete/missing/partial/per-view coverage in Chromium and retain colour/range-accounting negatives.
-- [ ] Record the byte-identical transfer audit refusal and collect fresh controls under the final split identity.
-- [ ] Complete current-instrument quiet/loaded candidates and stage-specific historical negatives; keep minimap acceptance excluded pending correctness.
+- [x] Record the byte-identical transfer audit refusal and collect fresh controls under the final split identity. Seven of 81 measurement files differ; old evidence stays archived. Fresh input/frame controls reject 72/72 and 36/36; the named floor rejects at 25 ms and skips 30 ms. One-off collection is 436.559 seconds.
+- [x] Pass native unchanged under the split identity: 108 blocking measures, 75.055 configuration seconds; first CLI 519.116 seconds includes controls/setup.
+- [x] Complete Shiki quiet under the split identity: unchanged passes; 20 ms input/frame negatives reject 72/72 and 36/36, including all exact 47 historical keys. CLI times are 142.050 / 211.194 / 209.647 seconds.
+- [x] Complete loaded native under the split identity: unchanged passes; input/frame negatives reject 72/72 and 36/36, including all exact 47 historical keys directly at 20 ms. CLI times are 92.291 / 158.865 / 157.731 seconds. Nineteen receipts show eight live same-core workers; all are stopped and awaited.
+- [ ] Complete remaining current-instrument quiet/loaded candidates and stage-specific historical negatives; keep minimap acceptance excluded pending correctness.
 - [ ] Measure actual warm default/full wall times against 15/45 minutes.
 - [ ] Pass final root gates/typecheck/format checks; update PR #247 and push reviewed path-scoped commits.
 
@@ -186,8 +190,12 @@ change. The 15-minute default and 45-minute full targets remain unconfirmed.
 - [x] Smallest safe decomposition: one worker, source/contract unit first, then stage controls, Shiki quiet, one loaded configuration per heavy job, and actual matrices.
 
 Architect and independent-review agents are skipped under the explicit single-worker instruction.
-The initial split changes mixed-purpose files; its byte-identical transfer audit must refuse the
-old schema-3 cache. Fresh controls use schema 4. Existing native/disabled/Tree-sitter quiet receipts
-remain archived under `5929738e…`. The first Shiki quiet run failed the one-range-per-line output
-assertion before any Shiki verdict; the approved rendered-chunk correction is validated in an
-isolated real Chromium probe. Complete Shiki quiet, loaded agreement and matrix timing remain pending.
+The initial split changes mixed-purpose files; its byte-identical transfer audit refused the
+old schema-3 cache. Fresh schema-4 controls pass under measurement `70f4f46f…` and validation
+`9f0b9093…`. Existing native/disabled/Tree-sitter quiet historical-negative receipts remain archived
+under `5929738e…`; the native unchanged candidate also passes under the split identity. The first
+Shiki quiet run failed the one-range-per-line assertion before any timing verdict. The approved
+rendered-chunk correction passes Chromium coverage contracts and complete Shiki quiet acceptance,
+including all exact historical negative keys. Loaded agreement and actual matrix timing remain pending.
+Final source contracts pass 328 stress tests, stress typecheck/lint and root gates; staged commit
+hooks also pass repository typechecks. The inherited probe-only spread lint warning is retained.

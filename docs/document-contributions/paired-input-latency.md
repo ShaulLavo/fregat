@@ -83,19 +83,37 @@ An input-handler delay reaches warm frame timing only partially because of refre
 
 `--slowdown-ms 20` selects an input-stage diagnostic. `--frame-slowdown-ms 20` selects a frame-stage diagnostic. The controls cannot be mixed in one comparison. Neither changes a budget or a measure's blocking status.
 
+### Split-identity controls
+
+The transfer audit recomputed the original instrument exactly and listed both hashes for all 81 current measurement files. Seven changed files caused transfer refusal; external bytes matched. The old controls and quiet receipts remain untouched. The refused receipt is `../split-controls/identity-transfer-refused.json`.
+
+Fresh controls use measurement `70f4f46ffdbbcf8519dfc0c46b636d9c998ee4a639f0277d47528a8f4c35ada6` and validation `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`, combined instrument `59bd3d69ba35d40c610614887e841580ae2fe6293f35af18a977d0014ecdb101`.
+
+| Fresh split run             | Verdict                                   |                                  Raw collection / CLI seconds |
+| --------------------------- | ----------------------------------------- | ------------------------------------------------------------: |
+| Input-stage 20 ms           | 72/72 synchronous keys reject             |                                                       143.650 |
+| Frame-stage 20 ms           | 36/36 frame keys reject                   |                                                       140.254 |
+| Named native floor at 25 ms | Rejects; 30 ms skipped                    |                                                       152.655 |
+| One-off controls total      | Schema-4 cache verified from raw controls |                                                       436.559 |
+| Native unchanged            | All 108 blocking measures pass            | 519.116 including controls/setup; 75.055 inside configuration |
+
+The named repeat-frame key measured a 68.4 ms median with `[48.1, 69.0]` ms interval in the fresh 20 ms frame control. Its 25 ms floor attempt measured 113.2 ms, interval `[64.4, 114.3]` ms. The exact fixed budget remains `15.200000002980232` ms. Together with the archived 12.4 ms missed-key run and later 128.6 ms run, these observations show phase/batching variability; they do not establish a stable or monotonic pause-to-p95 effect. These are focused runs, not default/full matrix wall times.
+
 ### Warm quiet and same-core loaded agreement
 
 The current validation checks each historical key with the control for its stage, plus all 72 input keys and the 35 native 20 ms frame requirements. The remaining native frame key uses the separately cached detection-floor proof; other configurations still require every frame key at 20 ms. Minimap remains excluded while its historical source-correctness defect is admitted. Previous cold verdicts below apply only to their recorded instrument hashes.
 
-| Configuration | Historical candidate / negative | Warm quiet candidate | Quiet input / frame controls                        | Warm loaded candidate | Loaded input / frame controls |
-| ------------- | ------------------------------- | -------------------- | --------------------------------------------------- | --------------------- | ----------------------------- |
-| native        | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                       |
-| disabled      | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                       |
-| tree-sitter   | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                       |
-| shiki         | Pass / 47 keys                  | Pending              | Pending                                             | Pending               | Pending                       |
-| minimap       | Pass / 47 keys                  | Excluded             | Diagnostic pending                                  | Excluded              | Diagnostic pending            |
+| Configuration | Historical candidate / negative | Warm quiet candidate | Quiet input / frame controls                        | Warm loaded candidate | Loaded input / frame controls                       |
+| ------------- | ------------------------------- | -------------------- | --------------------------------------------------- | --------------------- | --------------------------------------------------- |
+| native        | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pass                  | 72/72 input; 36/36 frame; 47/47 historical at 20 ms |
+| disabled      | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                                             |
+| tree-sitter   | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                                             |
+| shiki         | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                                             |
+| minimap       | Pass / 47 keys                  | Excluded             | Diagnostic pending                                  | Excluded              | Diagnostic pending                                  |
 
-The native, disabled and Tree-sitter quiet receipts in this table belong to pre-split instrument `5929738e…`. They remain archived with their original identity; the transfer audit requires byte-identical measurement files, and the initial split changes those files. New controls and remaining acceptance use the split identity.
+The native, disabled and Tree-sitter quiet historical-negative receipts in this table belong to pre-split instrument `5929738e…`. They remain archived with their original identity; the transfer audit requires byte-identical measurement files, and the initial split changes those files. Native's unchanged candidate also passes under the split identity. Shiki's complete quiet acceptance uses the split identity: unchanged passes in 142.050 CLI seconds (135.273 configuration seconds); the input negative takes 211.194 seconds and rejects 72/72 input keys plus all exact 42 historical synchronous keys; the frame negative takes 209.647 seconds and rejects 36/36 frame keys plus all exact five historical frame keys. Every historical key rejects directly at 20 ms. The raw receipt is `../split-controls/validation-quiet-shiki.json`. Loaded jobs pin the CLI/browser and eight owned workers to the same CPUs 8–15, record periodic worker liveness/CPU receipts and await worker termination in cleanup.
+
+Loaded native preserves the unchanged verdict and all exact historical negative keys under the split identity. CLI times are 92.291 seconds unchanged, 158.865 seconds input-negative and 157.731 seconds frame-negative. All 72 input and 36 frame keys reject directly at 20 ms; its named floor was unused. Nineteen start/periodic/end receipts show all eight owned workers live throughout. Final `workersStopped` is true, and a post-run PID check found no remaining owned worker. Evidence is `../split-controls/validation-loaded-native.json`.
 
 Actual default and full warm matrix wall times remain pending. The default still includes Platform plus declared/inferred affected configurations; full still executes all ten configurations.
 
@@ -105,7 +123,7 @@ The quiet Tree-sitter unchanged comparison passed in 746.498 seconds, including 
 
 The first Shiki quiet positive stopped at `long-line/single/paste` before producing a timing verdict. Its one logical plain line had two mounted token ranges of the correct text colour, with current/answered worker source and no worker error. The old assertion equated plain lines with DOM ranges. Plain output now requires complete rendered-text coverage in each visible view, uniform text colour and aggregate range accounting. Plain-line counts and source receipts remain strict.
 
-Real Chromium probes accept two fully covered chunks and reject a missing chunk, partial text coverage and ranges belonging only to another view. Contract tests also reject wrong colours and range-accounting mismatches. Frozen Shiki long-line paste passes strict opening/final checks in both single and multiple views; this isolated probe is separate from the pending complete quiet acceptance. Raw evidence is `../shiki-coverage-proof.json`. Measurement identity remains conservative: only the two extracted output modules are validation-only. Assertion-only changes keep future schema-4 controls valid; changed Shiki-bearing predicates require fresh acceptance.
+Real Chromium probes accept two fully covered chunks and reject a missing chunk, partial text coverage and ranges belonging only to another view. Contract tests also reject wrong colours and range-accounting mismatches. Frozen Shiki long-line paste passes strict opening/final checks in both single and multiple views; this isolated probe is separate from the subsequently completed quiet acceptance. Raw evidence is `../shiki-coverage-proof.json`. Measurement identity remains conservative: only the two extracted output modules are validation-only. Assertion-only changes keep future schema-4 controls valid; changed Shiki-bearing predicates require fresh acceptance.
 
 ### Readiness and the pending minimap reset
 

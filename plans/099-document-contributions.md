@@ -756,8 +756,11 @@ does not prove that a patch-backed session view uses the correct source coordina
 Plan 282 implements the paired command below with frozen historical budgets. Minimap acceptance
 is temporarily excluded pending its separately owned source-correctness fix; the frozen products
 and Platform's runtime composition stay unchanged. Native/disabled fixed-budget quiet negatives
-reject every historical negative key in their archived cold instrument. Current warm stage-control quiet/loaded agreement and default/full
-wall-time targets remain in progress. Treat paired runs as diagnostic evidence until
+reject every historical negative key in their archived cold instrument. Fresh split-identity
+controls reject all 72 input and 36 frame keys; the native bounded floor rejects at 25 ms.
+Complete Shiki quiet and native same-core loaded acceptance preserve every exact historical
+negative key. Remaining loaded agreement and actual default/full wall times are in progress.
+Treat paired runs as diagnostic evidence until
 [Plan 282's follow-up validation](../docs/document-contributions/paired-input-latency.md#follow-up-validation) passes.
 Units 2–7 remain gated.
 
@@ -781,7 +784,13 @@ worker restart, delayed consumers, and long retention/disposal runs.
    detection-floor proof tests 25 ms, then 30 ms only if needed, stopping at first rejection.
    The initial 20 ms pause measured a 12.4 ms paired effect by shifting input/frame phase.
    All other keys keep the 20 ms requirement. Raw controls and floor attempts are keyed by
-   instrument/dependency hash and recomputed on reuse.
+   measurement/dependency hash and recomputed on reuse. That hash covers capture, marks,
+   injection, sampling, pairing/statistics, budgets, workload, readiness and browser/runner launch.
+   A separate validation hash covers output/source predicates and post-interval receipt readers;
+   caches record the validation identity used by their raw controls. Validation-only changes keep
+   controls valid and require affected configurations to rerun acceptance. Unknown files belong
+   to measurement. The initial split's byte-identical transfer audit refused the old cache; fresh
+   controls pass under the split identity, and original evidence stays archived.
 3. Require the paired verdict to pass for every blocking input measure. A regression is a median
    paired repetition difference above the fixed declared historical group noise budget with a
    nominal 95% bootstrap interval excluding zero. The default two-or-three pair stopping has

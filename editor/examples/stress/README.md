@@ -355,8 +355,12 @@ budget and has a separate detection-floor proof: test 25 ms, then 30 ms only if 
 at its first rejection. The initial 20 ms pause measured a 12.4 ms paired effect because it
 shifted input/frame phase. The current instrument records: rejects frame-stage delays ≥25 ms;
 a 20 ms frame-callback pause measured ~12.4 ms in that initial run because it shifted phase.
-The separate 25 ms attempt rejected, so 30 ms was skipped. The final-source 20 ms repeat
-measurement was amplified to 128.6 ms by callback batching; both raw outcomes are preserved.
+The separate 25 ms attempt rejected, so 30 ms was skipped. The archived final-source 20 ms
+repeat measurement was amplified to 128.6 ms by callback batching. Fresh split-identity controls
+reject 72/72 input keys and 36/36 frame keys at 20 ms, and the named floor at 25 ms, with 30 ms
+skipped. They take 436.559 seconds once. The fresh repeat-frame medians are 68.4 ms at 20 ms
+and 113.2 ms at 25 ms; phase/batching variability remains recorded, with every budget unchanged.
+All raw outcomes are preserved under `/work/tmp/plan-282/run-20261001T153544Z-sol/`.
 A failure at 30 ms blocks sensitivity. Both controls and all floor
 attempts are keyed by the measurement hash; reuse recomputes their verdicts. Schema-4 caches
 record the validation hash their controls used. Measurement covers all sources except
