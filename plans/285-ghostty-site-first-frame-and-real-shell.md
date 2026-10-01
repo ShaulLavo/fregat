@@ -202,8 +202,18 @@ Shell arithmetic. All three boot regressions pass at
 `/work/tmp/fregat-evidence/p285-review-boot-after/`; failure and working-Shell screenshots were
 read back. The full frozen hand-off/demo matrix passes again at
 `/work/tmp/fregat-evidence/p285-review-handoff/`. Site build and typecheck pass. Formal desktop
-and phone looks are queued. The cold trace numbers above predate these boot repairs; static
-HTML/CSS are unchanged, and no updated runtime hand-off timing is claimed.
+and phone looks are healthy and read back under `/work/tmp/fregat-evidence/p285-review-looks/`
+(`20261001T215604Z-look-ghostty-webgpu-1280x1000/` and
+`20261001T215606Z-look-ghostty-webgpu-390x844/`). The cold trace numbers above predate these
+boot repairs; static HTML/CSS are unchanged, and no updated runtime hand-off timing is claimed.
+
+The original malformed-frame fixture also exposed accepted invalid header dimensions. The
+parser now rejects missing, non-integer and non-positive dimensions before they reach a
+renderer, so that failure stays in Ghost too. A valid frame test and six invalid-header tests
+reproduced the validation gap and pass after the guard; with the real-core compaction test,
+eight targeted Node tests pass. All four expanded boot regressions pass at
+`/work/tmp/fregat-evidence/p285-review-asset-header/`, including malformed header failure followed
+by working Shell input. The failure screenshot was read back. Build and site typecheck pass.
 
 ## Phase 1: a DOM renderer, in the package
 

@@ -54,13 +54,15 @@ async function shellWorks(page) {
 }
 
 try {
-  for (const asset of ['404', 'invalid-gzip']) {
-    await check(`frames-${asset}`, async (page) => {
+  const failures = [
+    { name: '404', status: 404, body: 'unavailable' },
+    { name: 'invalid-gzip', status: 200, body: Buffer.from([0x1f, 0x8b, 0x08, 0x00]) },
+    { name: 'invalid-header', status: 200, body: 'unavailable' },
+  ]
+  for (const asset of failures) {
+    await check(`frames-${asset.name}`, async (page) => {
       await page.route('**/ghost-frames.txt.gz', (route) =>
-        route.fulfill({
-          status: asset === '404' ? 404 : 200,
-          body: asset === '404' ? 'unavailable' : Buffer.from([0x1f, 0x8b, 0x08, 0x00]),
-        }),
+        route.fulfill({ status: asset.status, body: asset.body }),
       )
       await page.goto(url, { waitUntil: 'domcontentloaded' })
       await page.waitForFunction(
@@ -72,7 +74,9 @@ try {
       await page.waitForFunction(() =>
         document.querySelector('#terminal').textContent.includes('The ghost did not load.'),
       )
-      await page.locator('.screen').screenshot({ path: `${directory}/frames-${asset}-ghost.png` })
+      await page
+        .locator('.screen')
+        .screenshot({ path: `${directory}/frames-${asset.name}-ghost.png` })
       await page.locator('#tabs button[data-demo=shell]').click()
       await shellWorks(page)
     })

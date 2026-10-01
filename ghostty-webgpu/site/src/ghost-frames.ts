@@ -56,6 +56,15 @@ function parseLine(line: string): Run[] {
 export function parseGhostFrames(packed: string): GhostFrames {
   const newline = packed.indexOf('\n')
   const [width = 0, rows = 0] = packed.slice(0, newline).split(' ').map(Number)
+  if (
+    newline < 0 ||
+    !Number.isSafeInteger(width) ||
+    width <= 0 ||
+    !Number.isSafeInteger(rows) ||
+    rows <= 0
+  ) {
+    throw new TypeError('Ghost frame dimensions must be positive integers.')
+  }
   const frames = packed
     .slice(newline + 1)
     .split(FRAME_SEPARATOR)
