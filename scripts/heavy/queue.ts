@@ -17,6 +17,8 @@ export type Entry = {
   readonly label: string
   readonly jobClass: string
   readonly estimateBytes: number
+  /** Where its slice runs: `<sliceRoot>-<id>.slice`. Wrappers sharing a state directory may differ. */
+  readonly sliceRoot: string
   /** A `--quiet` job: it runs alone, for at most one quiet hold. */
   readonly quiet: boolean
   /**
@@ -70,28 +72,42 @@ export function release(held: Held) {
 }
 
 /**
- * Live entries in arrival order. An unlocked file belongs to a dead wrapper and is removed; a
- * file that disappears during the scan belongs to a wrapper that just finished, and is gone.
+ * Live entries in arrival order. A waiting entry whose file is unlocked belongs to a dead
+ * wrapper and is removed; a dead job's entry stays for `deadJobs`, since it names the slice
+ * left running. A file that disappears during the scan belongs to a wrapper that just finished.
  */
 export function live(stateDir: string, place: Place): Entry[] {
+  return scan(stateDir, place).flatMap(({ entry, file, owned }) => {
+    if (owned) return [entry]
+    if (place === 'queue') rmSync(file, { force: true })
+    return []
+  })
+}
+
+/** Running entries whose wrapper is gone; the caller removes each file once its slice is stopped. */
+export function deadJobs(stateDir: string) {
+  return scan(stateDir, 'jobs').filter(({ owned }) => !owned)
+}
+
+function scan(stateDir: string, place: Place) {
   const dir = path.join(stateDir, place)
   return (unlessMissing(() => readdirSync(dir)) ?? [])
     .filter((name) => name.endsWith('.json'))
     .toSorted()
     .flatMap((name) => {
-      const entry = liveEntry(path.join(dir, name))
-      return entry ? [entry] : []
+      const file = path.join(dir, name)
+      const read = readEntry(file)
+      return read ? [{ file, ...read }] : []
     })
 }
 
 // Read through the descriptor that saw the lock: the owner may unlink the path meanwhile.
-function liveEntry(file: string): Entry | null {
+function readEntry(file: string) {
   const fd = openExisting(file)
   if (fd === null) return null
   try {
-    if (!lockDescriptor(fd)) return JSON.parse(readFileSync(fd, 'utf8')) as Entry
-    rmSync(file, { force: true })
-    return null
+    const owned = !lockDescriptor(fd)
+    return { entry: JSON.parse(readFileSync(fd, 'utf8')) as Entry, owned }
   } finally {
     closeSync(fd)
   }

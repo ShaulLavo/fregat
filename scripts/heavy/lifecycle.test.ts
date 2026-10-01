@@ -11,12 +11,14 @@ import { enqueue, live, release } from './queue'
 import {
   alive,
   type Box,
+  firstDecision,
   heavy,
   recordOf,
   removeSandboxes,
   sandbox,
   start,
   unitActive,
+  until,
   userScopes,
   writeMachine,
   writeSettings,
@@ -60,6 +62,7 @@ const job = {
   label: 'x',
   pid: process.pid,
   quiet: false,
+  sliceRoot: 'heavyt-queue',
 }
 
 describe('the queue', () => {
@@ -396,4 +399,61 @@ describe.skipIf(!userScopes)('job lifecycle', () => {
     expect(result.stderr).not.toContain('draining')
     expect(existsSync(path.join(box.state, 'drain.request'))).toBe(true)
   }, 30_000)
+})
+
+describe.skipIf(!userScopes)('two slice roots sharing one state directory', () => {
+  test('charges a running job by its own slice root', async () => {
+    // 768 MiB free: the other root's job holds 400 MiB of its 512 MiB estimate.
+    const box = lifecycleBox(768)
+    const other = sandbox().sliceRoot
+    const release = path.join(box.root, 'release')
+    const holding = `bun -e 'const b = Buffer.alloc(400 * 2 ** 20, 1); setInterval(() => b.at(0), 1000)'`
+    const first = start(
+      box,
+      'first',
+      ['bash', '-c', `${holding} & echo started; ${until(release)}; kill $!`],
+      { jobClass: 'light', machine: true, sliceRoot: other },
+    )
+    await expect.poll(first.stdout, { timeout: 10_000 }).toContain('started')
+    await expect
+      .poll(() => liveSlices(other).map((slice) => sliceMemory(other, slice.slice) ?? 0)[0] ?? 0, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(400 * 2 ** 20)
+    const second = start(box, 'second', ['true'], { jobClass: 'light', machine: true })
+    expect(await firstDecision(second)).toBe('started')
+    writeFileSync(release, '')
+    await Promise.all([first.done, second.done])
+  }, 30_000)
+
+  test("reaps an orphan its state directory names on another root, and no other root's slice", async () => {
+    const box = lifecycleBox(65536)
+    const other = sandbox().sliceRoot
+    // Another state directory with its own root: nothing in `box` attributes its slices.
+    const stranger = sandbox()
+    const orphan = async (owner: Box, label: string, sliceRoot?: string) => {
+      const wrapper = start(owner, label, ['bash', '-c', 'echo $$; exec sleep 60'], {
+        jobClass: 'light',
+        sliceRoot,
+      })
+      await expect.poll(wrapper.stdout, { timeout: 10_000 }).toMatch(/^\d+\n/)
+      // The job keeps the wrapper's stdout open, so its exit is what to wait for.
+      const killed = new Promise((resolve) => wrapper.child.on('exit', resolve))
+      wrapper.child.kill('SIGKILL')
+      await killed
+      return Number(wrapper.stdout().trim())
+    }
+    const named = await orphan(box, 'named', other)
+    const unnamed = await orphan(stranger, 'unnamed')
+
+    const next = await heavy(box, 'next', ['true'], { jobClass: 'light' })
+    expect(next.code).toBe(0)
+    expect(next.stderr).toMatch(
+      new RegExp(`stopping ${other}-[0-9a-f]+\\.slice: its wrapper is gone`),
+    )
+    expect(alive(named)).toBe(false)
+    expect(alive(unnamed)).toBe(true)
+    expect(liveSlices(other)).toEqual([])
+    expect(liveSlices(stranger.sliceRoot)).toHaveLength(1)
+  }, 40_000)
 })

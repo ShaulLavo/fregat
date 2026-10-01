@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -18,7 +18,7 @@ import {
   decideQuiet,
   drainRequest,
   legacyHold,
-  liveSlices,
+  orphanSlices,
   readReadings,
   type Limits,
 } from './admission'
@@ -43,7 +43,7 @@ import {
   unlock,
   waitLock,
 } from './lock'
-import { enqueue, live, promote, release, type Entry, type Held } from './queue'
+import { deadJobs, enqueue, live, promote, release, type Entry, type Held } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
@@ -268,6 +268,7 @@ async function admitLocal(
     pid: process.pid,
     quiet: options.quiet,
     since: new Date().toISOString(),
+    sliceRoot: options.sliceRoot,
   }
   const admitted = await admit(options, config, entry)
   if (options.quiet) {
@@ -375,7 +376,7 @@ function attemptAdmission(
       ? decideQuiet(running.owners.length + running.orphanCharges.length)
       : decide(
           waiting.entry.estimateBytes,
-          [...running.orphanCharges, ...ownerCharges(options, running.owners)],
+          [...running.orphanCharges, ...ownerCharges(running.owners)],
           readReadings(options.procRoot),
           config.limits,
         )
@@ -400,30 +401,32 @@ function attemptAdmission(
 }
 
 /**
- * Reaps orphans: job slices whose wrapper is gone (no live entry). Each is charged its ceiling
- * less its use, read before the kill; if the kill fails it may still grow that far.
+ * Reaps orphans: job slices whose wrapper is gone (`orphanSlices`). Each is charged its
+ * ceiling less its use, read before the kill; if the kill fails it may still grow that far.
+ * A dead entry is dropped only once its slice is stopped.
  */
 function reconcile(options: Options) {
   const owners = live(options.stateDir, 'jobs')
-  const orphans = liveSlices(options.sliceRoot).filter(
-    (slice) => !owners.some((job) => job.id === slice.id),
-  )
+  const dead = deadJobs(options.stateDir)
+  const orphans = orphanSlices(options.sliceRoot, owners, dead)
   const orphanCharges = orphans.map((orphan) =>
-    chargeOf(options.sliceRoot, orphan.slice, orphan.ceilingBytes),
+    chargeOf(orphan.root, orphan.slice, orphan.ceilingBytes),
   )
   for (const orphan of orphans) {
     console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
-    reapSlice(options.sliceRoot, orphan.slice)
+    reapSlice(orphan.root, orphan.slice)
   }
+  for (const { file } of dead) rmSync(file, { force: true })
   clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
   return { orphanCharges, owners }
 }
 
-// The part of each live job's estimate it may still claim; a job admitted but not yet in its
-// slice is charged its whole estimate. Read beside MemAvailable: both move while jobs run.
-function ownerCharges(options: Options, owners: readonly Entry[]) {
+// The part of each live job's estimate it may still claim, by the slice root it runs under; a
+// job admitted but not yet in its slice is charged its whole estimate. Read beside
+// MemAvailable: both move while jobs run.
+function ownerCharges(owners: readonly Entry[]) {
   return owners.map((job) =>
-    chargeOf(options.sliceRoot, `${options.sliceRoot}-${job.id}.slice`, job.estimateBytes),
+    chargeOf(job.sliceRoot, `${job.sliceRoot}-${job.id}.slice`, job.estimateBytes),
   )
 }
 
