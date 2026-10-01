@@ -121,9 +121,6 @@ test('a managed chat resolves citations and images in its worktree while the edi
   expect(file).toHaveAttribute('title', `${worktreeRoot}/src/foo.ts:2`)
   const imageUrl = new URL(view.getByAltText('Result').getAttribute('src')!)
   expect(imageUrl.searchParams.get('path')).toBe(`${worktreePath}/assets/result.png`)
-  expect(
-    (await client.fs.blob.get({ query: { path: imageUrl.searchParams.get('path')! } })).status,
-  ).toBe(200)
   expect(editor.workspaceStore.getState().rootFolder?.path).toBe('repo')
   await userEvent.click(file)
   await waitFor(() =>

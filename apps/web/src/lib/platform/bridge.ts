@@ -13,5 +13,6 @@ export function isDesktop() {
 
 /** Only macOS puts window controls over our titlebar; everywhere else the bar owns its left edge. */
 export function isMacDesktop() {
-  return getPlatformBridge()?.platform === 'darwin'
+  const bridge = getPlatformBridge()
+  return bridge?.platform === 'darwin' && bridge.titlebar === 'overlay'
 }
