@@ -314,8 +314,11 @@ jobs:
       - name: Install Chromium
         run: apps/web/node_modules/.bin/playwright install --with-deps chromium
 
-      - name: Agent browser and cold dev startup
-        run: bun --bun vitest run scripts/agent/browser-doctor.test.ts scripts/agent/vite-cold-start.test.ts --environment node
+      - name: Agent browser doctor
+        run: bun --bun vitest run scripts/agent/browser-doctor.test.ts --environment node
+
+      - name: Cold dev startup
+        run: bun --bun vitest run scripts/agent/vite-cold-start.test.ts --environment node
 
       # Plain Node, not `--bun`: Vitest browser orchestration breaks under Bun.
       # Each run takes about a minute; a stuck one fails its step here, and the tree step
