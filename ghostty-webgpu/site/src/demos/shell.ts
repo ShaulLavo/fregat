@@ -12,6 +12,12 @@ const decoder = new TextDecoder()
 const encoder = new TextEncoder()
 const numberFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 
+function isFinalByte(char: string, length: number): boolean {
+  if (length < 3) return false
+  const code = char.charCodeAt(0)
+  return code >= 0x40 && code <= 0x7e
+}
+
 function crlf(text: string): string {
   return text.replace(/\r?\n/g, '\r\n')
 }
@@ -38,14 +44,18 @@ export class ShellDemo implements Demo {
   private history: string[] = []
   private historyIndex = 0
   private busy = false
+  /** Typed or pasted text not yet handled; drained one command at a time. */
+  private pending = ''
 
   start(context: DemoContext): void {
     this.context = context
     this.line = ''
     this.escape = ''
+    this.pending = ''
     context.stat('')
     context.write(clearScreen + showCursor)
     if (this.bash) {
+      this.busy = false
       this.greet()
       return
     }
@@ -53,6 +63,7 @@ export class ShellDemo implements Demo {
     context.write(`${fg(dusk)}Loading bash…${reset}`)
     this.load()
       .then(() => {
+        // A later start() greets for itself once bash is here.
         if (this.context !== context) return
         this.busy = false
         context.write(`\r${CSI}K`)
@@ -73,8 +84,16 @@ export class ShellDemo implements Demo {
   setPaused(): void {}
 
   input(bytes: Uint8Array): void {
-    if (this.busy) return
-    for (const char of decoder.decode(bytes)) this.key(char)
+    this.pending += decoder.decode(bytes, { stream: true })
+    this.drain()
+  }
+
+  private drain(): void {
+    while (this.pending !== '' && !this.busy) {
+      const [char = ''] = this.pending
+      this.pending = this.pending.slice(char.length)
+      this.key(char)
+    }
   }
 
   private load(): Promise<Bash> {
@@ -160,9 +179,13 @@ export class ShellDemo implements Demo {
     this.print(char)
   }
 
+  /** Waits for the whole sequence so a key like Delete (ESC [ 3 ~) leaves nothing behind. */
   private finishEscape(): void {
     const sequence = this.escape
-    if (sequence.length < 3) return
+    if (sequence.length < 2) return
+    const kind = sequence[1]
+    if (kind === '[' && !isFinalByte(sequence.at(-1)!, sequence.length)) return
+    if (kind === 'O' && sequence.length < 3) return
     this.escape = ''
     if (sequence === `${CSI}A`) this.recall(-1)
     if (sequence === `${CSI}B`) this.recall(1)
@@ -201,10 +224,11 @@ export class ShellDemo implements Demo {
     }
     this.busy = true
     const result = await this.run(input)
-    this.busy = false
     this.print(crlf(result.stdout))
     if (result.stderr !== '') this.print(`${fg(dusk)}${crlf(result.stderr)}${reset}`)
     this.prompt()
+    this.busy = false
+    this.drain()
   }
 
   private async run(input: string): Promise<{ stderr: string; stdout: string }> {
