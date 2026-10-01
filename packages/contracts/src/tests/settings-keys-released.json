@@ -36,6 +36,7 @@
     "developer.clientUpdateCheckSeconds",
     "developer.deployRestartWaitMinutes",
     "developer.devServerIdleMinutes",
+    "developer.heavyJobLogDirectory",
     "developer.simulatedLatencyMs",
     "editor.codeTheme.dark",
     "editor.codeTheme.light",

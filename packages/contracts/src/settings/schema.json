@@ -273,6 +273,12 @@
       "minimum": 1,
       "type": "integer"
     },
+    "developer.heavyJobLogDirectory": {
+      "default": "/work/platform-production/heavy-jobs",
+      "description": "Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.",
+      "minLength": 1,
+      "type": "string"
+    },
     "developer.simulatedLatencyMs": {
       "default": 0,
       "description": "Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.",

@@ -97,12 +97,13 @@ stays safe to read, share and export.
 
 ## Developer
 
-| Setting                              | Default | Scope       | What it does                                                                                                                                                                                      |
-| ------------------------------------ | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `developer.simulatedLatencyMs`       | `0`     | application | Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.                                                                               |
-| `developer.devServerIdleMinutes`     | `15`    | machine     | Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs. |
-| `developer.clientUpdateCheckSeconds` | `60`    | application | Seconds between checks for an available web update while the app is visible. Refresh applies the update when you choose.                                                                          |
-| `developer.deployRestartWaitMinutes` | `30`    | machine     | Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.                                                  |
+| Setting                              | Default                                  | Scope       | What it does                                                                                                                                                                                      |
+| ------------------------------------ | ---------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `developer.simulatedLatencyMs`       | `0`                                      | application | Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.                                                                               |
+| `developer.devServerIdleMinutes`     | `15`                                     | machine     | Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs. |
+| `developer.clientUpdateCheckSeconds` | `60`                                     | application | Seconds between checks for an available web update while the app is visible. Refresh applies the update when you choose.                                                                          |
+| `developer.deployRestartWaitMinutes` | `30`                                     | machine     | Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.                                                  |
+| `developer.heavyJobLogDirectory`     | `"/work/platform-production/heavy-jobs"` | machine     | Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.                                |
 
 ### Details
 
