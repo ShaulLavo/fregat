@@ -86,7 +86,7 @@ Validation runs are measurements: run them when no other heavy work is on the ma
 - [ ] Measure the default and full matrices.
 - [x] Record completed native/disabled diagnostics and the blocked acceptance evidence.
 - [x] Run final repository gates, typecheck, formatting, stress tests, and lint.
-- [ ] Commit by path, push, and open the draft PR.
+- [x] Commit by path, push, and open linked draft [PR #247](https://github.com/ShaulLavo/fregat/pull/247).
 
 The owner requires this worker to do the implementation and review itself, so the independent
 reviewer step above is skipped. Measurement artifacts are under `/work/tmp/plan-282/`.
@@ -112,3 +112,10 @@ load and 45/47 with load; disabled matches 47/47 in both cases. Both frozen mini
 also reproduce the source failure under the same-core load. The remaining five-configuration
 acceptance sequence and completed default/full timing measurements remain blocked. This plan
 has not delivered an accepted gate. The implementation is published as a draft PR for follow-up.
+
+## Delivery
+
+Draft [PR #247](https://github.com/ShaulLavo/fregat/pull/247) contains the implementation and
+blocked acceptance evidence. It remains unmerged. Final repository checks and 276 stress
+contract tests pass. No deployment or app UI verification was needed for this benchmark/docs
+change. The 15-minute default and 45-minute full targets remain unconfirmed.
