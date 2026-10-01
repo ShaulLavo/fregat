@@ -13,7 +13,7 @@ import {
   readReadings,
   sliceMemory,
 } from './admission'
-import { DEFAULT_STATE_DIR } from './lock'
+import { DEFAULT_STATE_DIR, sliceRootFor } from './lock'
 import { live, type Entry } from './queue'
 
 const MiB = 2 ** 20
@@ -23,12 +23,12 @@ const { values } = parseArgs({
   options: {
     proc: { default: '/proc', type: 'string' },
     'settings-home': { default: productionStateHome, type: 'string' },
-    'slice-root': { default: 'heavy', type: 'string' },
+    'slice-root': { type: 'string' },
     'state-dir': { default: DEFAULT_STATE_DIR, type: 'string' },
   },
 })
 const stateDir = values['state-dir']
-const root = values['slice-root']
+const root = values['slice-root'] ?? sliceRootFor(stateDir)
 const holdSeconds = readHomeSetting(values['settings-home'], 'developer.heavyJobQuietHoldSeconds')
 const readings = readReadings(values.proc)
 console.log(

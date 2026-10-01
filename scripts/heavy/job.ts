@@ -211,8 +211,14 @@ function launchCommand(job: JobSpec, unit: string, accountingFile: string) {
   })
 }
 
-/** Kills whatever still runs in a slice whose wrapper is gone, then removes it. */
-export function reapSlice(slice: string) {
+/**
+ * Kills whatever still runs in a slice whose wrapper is gone, then removes it. Only a slice
+ * under `root` qualifies: a wrapper never stops a slice another state directory owns.
+ */
+export function reapSlice(root: string, slice: string) {
+  if (!slice.startsWith(`${root}-`) || !slice.endsWith('.slice')) {
+    throw scriptErrors.HEAVY_SLICE_OUTSIDE_ROOT({ root, slice })
+  }
   systemctl(['kill', '--signal=SIGKILL', slice])
   removeSlice(slice)
 }

@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import {
   mkdirSync,
   mkdtempSync,
@@ -19,7 +20,11 @@ const checkoutClean =
   spawnSync('git', ['-C', CHECKOUT, 'status', '--porcelain']).stdout.toString() === ''
 const roots: string[] = []
 
+const sliceRoots: string[] = []
+
 afterEach(() => {
+  for (const root of sliceRoots.splice(0))
+    spawnSync('systemctl', ['--user', 'stop', `${root}.slice`])
   for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true })
 })
 
@@ -86,12 +91,16 @@ test.skipIf(!userScopes || !checkoutClean)(
     expect(again.stdout).toContain('Already installed')
 
     const work = temp('heavy-install-work-')
+    const sliceRoot = `heavyt${randomBytes(4).toString('hex')}`
+    sliceRoots.push(sliceRoot)
     mkdirSync(path.join(work, 'locks'))
     const runJs = path.join(root, 'current', 'run.js')
     const job = run(
       'bun',
       [
         runJs,
+        '--slice-root',
+        sliceRoot,
         '--state-dir',
         path.join(work, 'locks'),
         '--log-dir',

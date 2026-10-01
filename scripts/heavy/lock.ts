@@ -1,4 +1,5 @@
 import { dlopen, FFIType } from 'bun:ffi'
+import { createHash } from 'node:crypto'
 import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -61,6 +62,18 @@ function operation(mode: LockMode) {
 
 // The wrapper's state lives beside the legacy slot locks other tools still take directly.
 export const DEFAULT_STATE_DIR = '/work/tmp/wave-heavy'
+export const PRODUCTION_SLICE_ROOT = 'heavy'
+
+/**
+ * The slice root a state directory owns. A wrapper reaps every slice under its root that its
+ * state directory has no owner for, so only the production state directory may use
+ * production's root; any other directory gets a private root derived from its path.
+ */
+export function sliceRootFor(stateDir: string) {
+  const resolved = path.resolve(stateDir)
+  if (resolved === DEFAULT_STATE_DIR) return PRODUCTION_SLICE_ROOT
+  return `heavys${createHash('sha256').update(resolved).digest('hex').slice(0, 10)}`
+}
 const POLL_MS = 5_000
 const WAIT_NOTICE_MS = 60_000
 
