@@ -793,8 +793,13 @@ worker restart, delayed consumers, and long retention/disposal runs.
    controls pass under the split identity, and original evidence stays archived.
 3. Require the paired verdict to pass for every blocking input measure. A regression is a median
    paired repetition difference above the fixed declared historical group noise budget with a
-   nominal 95% bootstrap interval excluding zero. The default two-or-three pair stopping has
-   no sequential coverage guarantee; use `--fixed-repetitions` for fixed sampling. The matrix retains 108 blocking and 36 advisory measures per configuration.
+   nominal 95% bootstrap interval excluding zero. The default completes key-local randomized
+   AB/BA blocks: two pairs under the unchanged strict stopping guard, otherwise four. Earlier
+   adaptive groups cannot change a key's order. Conditional stopping has no sequential coverage
+   guarantee; `--fixed-repetitions` uses complete even-sized blocks of at least four pairs. The
+   matrix retains 108 blocking and 36 advisory measures per configuration. The new measurement
+   identity requires fresh controls, acceptance, matrix timings and zero selected loaded A/A
+   rejects across ten runs per key; units remain gated until those results are complete.
 4. Prove exact text, accepted revisions, mounted coverage, visible changed pixels, and cleanup.
    Screenshot completion time is not a substitute for native input-to-frame measurements.
 5. Compare publication overhead, time to visible syntax, open/scroll latency, total source reads,
@@ -1016,3 +1021,12 @@ changes what views and the language client receive, which is a unit 2 question.
    small, unit 0 is already approved, and a separate plan would add a scheduling step without a new
    decision.
    Decided 2026-09-26: recommendation (coordinator) — (a).
+
+### Declared loaded input gate
+
+The paired gate records `--loaded` when the caller supplies CPU contention. Loaded standalone
+Tree-sitter is full-matrix coverage, with every blocking margin `max(frozen, 5 ms)` and frozen/applied
+provenance per key. Quiet Tree-sitter keeps its fine margins; all other configurations keep their
+frozen margins under load. Every exact historical 20 ms negative remains required. Plan 282 owns
+the 61-key floor inventory and current-identity validation. Units 2–7 remain gated while that
+validation and actual matrix wall times are incomplete.

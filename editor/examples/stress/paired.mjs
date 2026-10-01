@@ -14,7 +14,11 @@ import {
 } from './input-configurations.mjs'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
 import { operationsPerSample, runPairedInputSuite } from './input-scenarios.mjs'
-import { comparePairedInput, sensitivityPassed, touchedConfigurations } from './input-paired.mjs'
+import {
+  comparePairedInput,
+  sensitivityPassed,
+  inputMatrixConfigurations,
+} from './input-paired.mjs'
 import {
   buildInputRuntime,
   inputEnvironment,
@@ -32,11 +36,12 @@ const { values } = parseArgs({
     baseline: { type: 'string' },
     candidate: { type: 'string' },
     full: { type: 'boolean', default: false },
+    loaded: { type: 'boolean', default: false },
     stress: { type: 'boolean', default: false },
     configurations: { type: 'string' },
     only: { type: 'string' },
     'fixture-directory': { type: 'string' },
-    repetitions: { type: 'string', default: '3' },
+    repetitions: { type: 'string', default: '4' },
     seed: { type: 'string', default: '60061' },
     'slowdown-ms': { type: 'string', default: '0' },
     'frame-slowdown-ms': { type: 'string', default: '0' },
@@ -54,7 +59,8 @@ const slowdownMs = Number(values['slowdown-ms'])
 const frameSlowdownMs = Number(values['frame-slowdown-ms'])
 if (
   !Number.isSafeInteger(repetitions) ||
-  repetitions < 3 ||
+  repetitions < 4 ||
+  repetitions % 2 !== 0 ||
   !Number.isSafeInteger(seed) ||
   seed < 0 ||
   !Number.isFinite(slowdownMs) ||
@@ -72,13 +78,13 @@ if (baseline.externalHash !== candidate.externalHash)
 if (values.only && (values.full || values.configurations)) fail('--only requires a focused matrix')
 const declared = (values.only ?? values.configurations)?.split(',')
 if (declared?.some((id) => !inputConsumerIds.includes(id))) fail('Unknown input configuration')
-const configurations = selectConfigurations()
-
-function selectConfigurations() {
-  if (values.only) return [...new Set(declared)]
-  if (values.full) return [...inputConsumerIds]
-  return [...new Set(['platform', ...(declared ?? touchedConfigurations(baseline, candidate))])]
-}
+const loadProfile = values.loaded ? 'loaded' : 'quiet'
+const configurations = inputMatrixConfigurations(baseline, candidate, {
+  only: values.only,
+  full: values.full,
+  declared,
+  loadProfile,
+})
 await mkdir('/work/tmp/plan-282', { recursive: true })
 const temporary = await mkdtemp('/work/tmp/plan-282/runtime-')
 let browser
@@ -202,6 +208,7 @@ try {
     repetitions,
     seed,
     stress: values.stress,
+    loadProfile,
     sensitivity: {
       instrumentHash: sensitivity.instrumentHash,
       measurementHash: sensitivity.measurementHash,
@@ -253,7 +260,7 @@ async function collect(
   const start = performance.now()
   const pendingMinimapSource =
     values['pending-minimap-source'] && inputConsumerConfiguration(consumers, 'ordinary', 1).minimap
-  const adaptivePairs = !values['fixed-repetitions'] && repetitions === 3
+  const adaptivePairs = !values['fixed-repetitions'] && repetitions === 4
   const results = {}
   for (const side of ['baseline', 'candidate']) {
     results[side] = {
@@ -264,7 +271,8 @@ async function collect(
       manifest,
       config: {
         repetitions,
-        adaptivePairs: adaptivePairs ? 'tight-within-budget' : false,
+        loadProfile,
+        adaptivePairs: adaptivePairs ? 'counterbalanced-tight-within-budget' : false,
         ...(adaptivePairs ? { groupRepetitions: {} } : {}),
         warmups: 1,
         warmupFixture: 'measured',

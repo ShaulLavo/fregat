@@ -1,13 +1,28 @@
 import declared from './input-budgets.json' with { type: 'json' }
 import { fail } from './errors.mjs'
 
-export function inputBudget(configuration, key) {
+export function inputBudget(configuration, key, loadProfile = 'quiet') {
+  if (!['quiet', 'loaded'].includes(loadProfile)) fail('Unknown input load profile')
   const reference = declared.inherited[configuration] ?? configuration
   const budget = declared.configurations[reference]
-  const noiseMarginMs = budget?.groups[key]
-  if (!Number.isFinite(noiseMarginMs) || noiseMarginMs < 0)
+  const frozenNoiseMarginMs = budget?.groups[key]
+  if (!Number.isFinite(frozenNoiseMarginMs) || frozenNoiseMarginMs < 0)
     fail(`Missing frozen input budget for ${configuration}/${key}`)
-  return { noiseMarginMs, reference, inherited: reference !== configuration, ...budget.provenance }
+  const loadedFloor =
+    configuration === 'tree-sitter' &&
+    loadProfile === 'loaded' &&
+    !key.endsWith('/burstToPaintUpperBound') &&
+    frozenNoiseMarginMs < 5
+  return {
+    frozenNoiseMarginMs,
+    noiseMarginMs: loadedFloor ? 5 : frozenNoiseMarginMs,
+    reason: loadedFloor
+      ? 'Declared loaded Tree-sitter contention floor: 5 ms'
+      : 'Frozen historical margin',
+    reference,
+    inherited: reference !== configuration,
+    ...budget.provenance,
+  }
 }
 
 export function historicalNegativeKeys(configuration) {

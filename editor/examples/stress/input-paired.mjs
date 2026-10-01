@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { fail } from './errors.mjs'
 import { inputConsumerIds, inputConsumerConfiguration } from './input-configurations.mjs'
 import { assertInputComparable, inputScenarios, inputViewModes } from './input-results.mjs'
@@ -10,6 +11,13 @@ export function randomGenerator(seed) {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0
     return state / 0x100000000
   }
+}
+
+export function inputPairOrder(seed, group, repetition) {
+  const block = Math.floor(repetition / 2)
+  const firstBaseline = createHash('sha256').update(`${seed}\0${group}\0${block}`).digest()[0] < 128
+  const baselineFirst = firstBaseline !== (repetition % 2 !== 0)
+  return baselineFirst ? ['baseline', 'candidate'] : ['candidate', 'baseline']
 }
 
 function quantile(sorted, fraction) {
@@ -44,13 +52,16 @@ export function pairedInterval(differences, seed, draws = 10_000) {
 
 export function comparePairedInput(baseline, candidate, schedule, seed, draws) {
   assertInputComparable(baseline, candidate, true)
+  if (!['quiet', 'loaded'].includes(baseline.config.loadProfile))
+    fail('Missing paired input load profile')
   for (const run of [baseline, candidate]) assertPairedReceipt(run.environment)
   if (baseline.config.unsupportedFixtures?.length)
     fail('Paired input requires every fixture to be supported')
   if (baseline.id === candidate.id) fail('Paired sides require distinct run identities')
   if (baseline.config.slowdownMs !== 0 || (baseline.config.frameSlowdownMs ?? 0) !== 0)
     fail('Paired baseline must have no injected delay')
-  if (baseline.config.repetitions < 3) fail('Paired input requires at least three repetitions')
+  if (baseline.config.repetitions < 4 || baseline.config.repetitions % 2 !== 0)
+    fail('Paired input requires at least four repetitions in complete two-pair blocks')
   if (
     baseline.environment.packageSet?.externalHash !== candidate.environment.packageSet?.externalHash
   )
@@ -65,6 +76,8 @@ export function comparePairedInput(baseline, candidate, schedule, seed, draws) {
       pair.order.some((side) => !['baseline', 'candidate'].includes(side))
     )
       fail('Invalid pair order')
+    if (pair.order.join(',') !== inputPairOrder(seed, pair.group, pair.repetition).join(','))
+      fail('Unexpected key-local pair order')
   }
   const candidateSamples = new Map(candidate.samples.map((sample) => [sampleKey(sample), sample]))
   const groups = new Map()
@@ -100,11 +113,15 @@ export function comparePairedInput(baseline, candidate, schedule, seed, draws) {
     for (const [key, pair] of pairedGroups)
       if (
         pair.baseline.length === 2 &&
-        !canStopInputPairs(pair, baseline.config.consumers ?? 'native')
+        !canStopInputPairs(pair, baseline.config.consumers ?? 'native', baseline.config.loadProfile)
       )
         fail(`Unjustified adaptive early stop for ${key}`)
   const metrics = [...groups].map(([key, group], index) => {
-    const budget = inputBudget(baseline.config.consumers ?? 'native', key)
+    const budget = inputBudget(
+      baseline.config.consumers ?? 'native',
+      key,
+      baseline.config.loadProfile,
+    )
     const differenceMs = median(group.differences)
     const interval = pairedInterval(group.differences, seed + index, draws)
     const regression = differenceMs > budget.noiseMarginMs + 0.000001 && interval.lowMs > 0
@@ -113,6 +130,7 @@ export function comparePairedInput(baseline, candidate, schedule, seed, draws) {
       blocking: !key.endsWith('/burstToPaintUpperBound'),
       ...group,
       differenceMs,
+      frozenBudgetMs: budget.frozenNoiseMarginMs,
       budgetMs: budget.noiseMarginMs,
       budget,
       interval,
@@ -127,7 +145,7 @@ export function comparePairedInput(baseline, candidate, schedule, seed, draws) {
     statistic:
       'median of paired repetition p95 differences; repetition-cluster percentile bootstrap',
     budgetPolicy:
-      'frozen historical noise margins; declared native inheritance for new compositions',
+      'frozen historical noise margins; declared native inheritance for new compositions; loaded standalone Tree-sitter blocking margins have a 5 ms floor',
     stoppingPolicy: baseline.config.adaptivePairs || 'fixed-repetitions',
     confidenceInterpretation: baseline.config.adaptivePairs
       ? 'nominal descriptive bootstrap; conditional early stopping has no sequential coverage guarantee'
@@ -218,4 +236,15 @@ export function touchedConfigurations(baseline, candidate) {
     return changed.has('find') && consumers.find
   })
   return ['platform', ...affected.filter((id) => id !== 'platform')]
+}
+
+export function inputMatrixConfigurations(baseline, candidate, options = {}) {
+  if (options.only) return [...new Set(options.declared)]
+  if (options.full) return [...inputConsumerIds]
+  const configurations = [
+    ...new Set(['platform', ...(options.declared ?? touchedConfigurations(baseline, candidate))]),
+  ]
+  return configurations.filter(
+    (configuration) => options.loadProfile !== 'loaded' || configuration !== 'tree-sitter',
+  )
 }

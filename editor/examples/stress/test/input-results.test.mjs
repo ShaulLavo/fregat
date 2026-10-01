@@ -7,9 +7,11 @@ import { correlateInputEvents } from '../input-correlation.mjs'
 import {
   comparePairedInput,
   frameDetectionFloorKey,
+  inputPairOrder,
   pairedInterval,
   sensitivityPassed,
   touchedConfigurations,
+  inputMatrixConfigurations,
 } from '../input-paired.mjs'
 import {
   inputScenarios,
@@ -755,7 +757,7 @@ describe('input latency result contract', () => {
   })
 })
 
-function pairedResults(duration = 10) {
+function pairedResults(duration = 10, seed = 17) {
   const baseline = result('baseline')
   const candidate = result('candidate', duration)
   for (const run of [baseline, candidate]) {
@@ -770,17 +772,24 @@ function pairedResults(duration = 10) {
         externalHash: 'a'.repeat(64),
       },
     })
-    run.config.repetitions = 3
+    run.config.loadProfile = 'quiet'
+    run.config.repetitions = 4
     run.samples.push(
       ...run.samples
         .filter((sample) => sample.repetition === 0)
-        .map((sample) => ({ ...structuredClone(sample), repetition: 2 })),
+        .flatMap((sample) =>
+          [2, 3].map((repetition) => ({ ...structuredClone(sample), repetition })),
+        ),
     )
   }
   const schedule = baseline.samples.map((sample) => ({
     group: `${sample.fixture}/${sample.views}/${sample.scenario}`,
     repetition: sample.repetition,
-    order: ['baseline', 'candidate'],
+    order: inputPairOrder(
+      seed,
+      `${sample.fixture}/${sample.views}/${sample.scenario}`,
+      sample.repetition,
+    ),
   }))
   return { baseline, candidate, schedule }
 }
@@ -810,8 +819,118 @@ function sensitivityCache() {
 }
 
 describe('paired input latency', () => {
-  it('passes identical products and reports all 108 blocking and 36 advisory groups', () => {
+  it('balances every complete block independently of other keys and adaptive counts', () => {
+    const keys = ['ordinary/single/undo', 'ordinary/multiple/undo', 'short-lines/multiple/paste']
+    const orders = (key, count, seed = 17) =>
+      Array.from({ length: count }, (_, repetition) => inputPairOrder(seed, key, repetition))
+    const expected = new Map(keys.map((key) => [key, orders(key, 4)]))
+    for (const key of keys.toReversed()) {
+      orders('earlier/adaptive/group', 2)
+      expect(orders(key, 4)).toEqual(expected.get(key))
+      orders('earlier/adaptive/group', 8)
+      expect(orders(key, 2)).toEqual(expected.get(key).slice(0, 2))
+      for (let block = 0; block < 4; block += 2)
+        expect(expected.get(key)[block]).toEqual(expected.get(key)[block + 1].toReversed())
+    }
+    const firstSides = Array.from({ length: 32 }, (_, seed) => orders(keys[0], 2, seed)[0][0])
+    expect(new Set(firstSides)).toEqual(new Set(['baseline', 'candidate']))
+  })
+
+  it('rejects unbalanced blocks and balanced schedules from a different key seed', () => {
     const { baseline, candidate, schedule } = pairedResults()
+    const first = schedule[0]
+    const second = schedule.find((pair) => pair.group === first.group && pair.repetition === 1)
+    second.order = first.order
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/pair order/)
+    for (const pair of schedule)
+      pair.order = inputPairOrder(17, pair.group, pair.repetition).toReversed()
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/pair order/)
+  })
+
+  it('accepts larger even fixed samples without changing the statistic', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    for (const run of [baseline, candidate]) {
+      run.config.repetitions = 6
+      run.samples.push(
+        ...run.samples
+          .filter((sample) => sample.repetition === 0)
+          .flatMap((sample) =>
+            [4, 5].map((repetition) => ({ ...structuredClone(sample), repetition })),
+          ),
+      )
+    }
+    const pairs = baseline.samples.map((sample) => {
+      const group = `${sample.fixture}/${sample.views}/${sample.scenario}`
+      return {
+        group,
+        repetition: sample.repetition,
+        order: inputPairOrder(17, group, sample.repetition),
+      }
+    })
+    expect(pairs).toHaveLength(schedule.length + 72)
+    const check = comparePairedInput(baseline, candidate, pairs, 17, 200)
+    expect(check.passed).toBe(true)
+    expect(check.metrics.every((metric) => metric.differences.length === 6)).toBe(true)
+    expect(check.stoppingPolicy).toBe('fixed-repetitions')
+  })
+
+  it('rejects odd fixed samples and incomplete adaptive blocks', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    for (const run of [baseline, candidate]) {
+      run.config.repetitions = 3
+      run.samples = run.samples.filter((sample) => sample.repetition < 3)
+    }
+    const pairs = schedule.filter((pair) => pair.repetition < 3)
+    expect(() => comparePairedInput(baseline, candidate, pairs, 17)).toThrow(/two-pair blocks/)
+    for (const run of [baseline, candidate]) {
+      run.config.repetitions = 4
+      run.config.adaptivePairs = 'counterbalanced-tight-within-budget'
+      run.config.groupRepetitions = Object.fromEntries(
+        run.samples.map((sample) => [`${sample.fixture}/${sample.views}/${sample.scenario}`, 3]),
+      )
+    }
+    expect(() => comparePairedInput(baseline, candidate, pairs, 17)).toThrow(
+      /incomplete two-pair block/,
+    )
+  })
+
+  it('preserves the strict span guard even when the two-pair accept predicate passes', () => {
+    const { baseline, candidate } = pairedResults()
+    const select = (run) =>
+      run.samples.filter(
+        (sample) =>
+          sample.fixture === 'ordinary' &&
+          sample.views === 'single' &&
+          sample.scenario === 'typing' &&
+          sample.repetition < 2,
+      )
+    const samples = { baseline: select(baseline), candidate: select(candidate) }
+    const budget = inputBudget('native', 'ordinary/single/typing/inputToApplied').noiseMarginMs
+    for (const [index, sample] of samples.candidate.entries())
+      sample.latencyMs.inputToApplied = sample.latencyMs.inputToApplied.map(
+        (value) => value + (index === 0 ? budget * 0.75 : -budget * 0.75),
+      )
+    expect(canStopInputPairs(samples, 'native')).toBe(false)
+  })
+
+  it('ignores advisory delays when deciding to complete the first block', () => {
+    const { baseline, candidate } = pairedResults()
+    delayScreenshots(candidate, 100)
+    const select = (run) =>
+      run.samples.filter(
+        (sample) =>
+          sample.fixture === 'ordinary' &&
+          sample.views === 'single' &&
+          sample.scenario === 'typing' &&
+          sample.repetition < 2,
+      )
+    expect(
+      canStopInputPairs({ baseline: select(baseline), candidate: select(candidate) }, 'native'),
+    ).toBe(true)
+  })
+
+  it('passes identical products and reports all 108 blocking and 36 advisory groups', () => {
+    const { baseline, candidate, schedule } = pairedResults(10, 60061)
     const check = comparePairedInput(baseline, candidate, schedule, 60061)
     expect(check.passed).toBe(true)
     expect(check.metrics[0].interval.draws).toBe(10_000)
@@ -823,7 +942,7 @@ describe('paired input latency', () => {
   })
 
   it('detects injected delay and accepts changed product bytes', () => {
-    const { baseline, candidate, schedule } = pairedResults(30)
+    const { baseline, candidate, schedule } = pairedResults(30, 60061)
     candidate.config.slowdownMs = 20
     candidate.environment.sourceHash = 'f'.repeat(64)
     const check = comparePairedInput(baseline, candidate, schedule, 60061)
@@ -868,7 +987,7 @@ describe('paired input latency', () => {
   it('cancels load shared by each pair without treating operations as independent pairs', () => {
     const { baseline, candidate, schedule } = pairedResults()
     for (const run of [baseline, candidate]) {
-      run.samples = [10, 110, 510].flatMap((duration, repetition) =>
+      run.samples = [10, 110, 510, 1010].flatMap((duration, repetition) =>
         result(run.id, duration)
           .samples.filter((sample) => sample.repetition === 0)
           .map((sample) => ({ ...sample, repetition })),
@@ -877,13 +996,13 @@ describe('paired input latency', () => {
     const check = comparePairedInput(baseline, candidate, schedule, 17)
     expect(check.passed).toBe(true)
     expect(
-      check.metrics.every((metric) => metric.differences.length === 3 && metric.differenceMs === 0),
+      check.metrics.every((metric) => metric.differences.length === 4 && metric.differenceMs === 0),
     ).toBe(true)
   })
 
   it('requires the budget and confidence conditions together', () => {
     const { baseline, candidate, schedule } = pairedResults()
-    candidate.samples = [11, 11, 9].flatMap((duration, repetition) =>
+    candidate.samples = [11, 11, 11, 9].flatMap((duration, repetition) =>
       result(candidate.id, duration)
         .samples.filter((sample) => sample.repetition === 0)
         .map((sample) => ({ ...sample, repetition })),
@@ -900,7 +1019,7 @@ describe('paired input latency', () => {
       [baseline, 0],
       [candidate, 0.01],
     ]) {
-      run.samples = [10, 11, 10].flatMap((duration, repetition) =>
+      run.samples = [10, 11, 10, 11].flatMap((duration, repetition) =>
         result(run.id, duration + delay)
           .samples.filter((sample) => sample.repetition === 0)
           .map((sample) => ({ ...sample, repetition })),
@@ -920,7 +1039,7 @@ describe('paired input latency', () => {
       [baseline, 0],
       [candidate, 9],
     ]) {
-      run.samples = [10, 110, 510].flatMap((duration, repetition) =>
+      run.samples = [10, 110, 510, 1010].flatMap((duration, repetition) =>
         result(run.id, duration + delay)
           .samples.filter((sample) => sample.repetition === 0)
           .map((sample) => ({ ...sample, repetition })),
@@ -1133,7 +1252,7 @@ describe('paired input latency', () => {
     const { baseline, candidate, schedule } = pairedResults()
     for (const run of [baseline, candidate]) {
       run.samples = run.samples.filter((sample) => sample.repetition < 2)
-      run.config.adaptivePairs = 'tight-within-budget'
+      run.config.adaptivePairs = 'counterbalanced-tight-within-budget'
       run.config.groupRepetitions = Object.fromEntries(
         run.samples.map((sample) => [`${sample.fixture}/${sample.views}/${sample.scenario}`, 2]),
       )
@@ -1150,20 +1269,20 @@ describe('paired input latency', () => {
     const { baseline } = pairedResults()
     const sample = baseline.samples[0]
     const key = `${sample.fixture}/${sample.views}/${sample.scenario}`
-    baseline.config.groupRepetitions = { [key]: 4 }
-    sample.repetition = 3
+    baseline.config.groupRepetitions = { [key]: 6 }
+    sample.repetition = 4
     expect(() => validateInputResult(baseline)).toThrow(/Invalid sample repetition/)
   })
 
   it('rejects missing or invalid adaptive group declarations', () => {
     const { baseline, candidate, schedule } = pairedResults()
-    baseline.config.adaptivePairs = 'tight-within-budget'
+    baseline.config.adaptivePairs = 'counterbalanced-tight-within-budget'
     baseline.config.groupRepetitions = {}
     expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(
       /adaptive group counts/,
     )
     for (const run of [baseline, candidate]) {
-      run.config.adaptivePairs = 'tight-within-budget'
+      run.config.adaptivePairs = 'counterbalanced-tight-within-budget'
       run.config.groupRepetitions = Object.fromEntries(
         run.samples.map((sample) => [`${sample.fixture}/${sample.views}/${sample.scenario}`, 1]),
       )
@@ -1369,5 +1488,146 @@ describe('warm configuration lifecycle', () => {
     expect(validateInputResult(run)).toBeTruthy()
     run.samples[0].reset.documentReloaded = true
     expect(() => validateInputResult(run)).toThrow(/Unadmitted/)
+  })
+})
+
+describe('declared loaded Tree-sitter policy', () => {
+  it('raises exactly 61 blocking margins and preserves every other margin', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    for (const run of [baseline, candidate]) {
+      run.config.consumers = 'tree-sitter'
+      run.config.loadProfile = 'loaded'
+    }
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    expect(check.metrics.filter((metric) => metric.blocking)).toHaveLength(108)
+    expect(
+      check.metrics.filter((metric) => metric.blocking && metric.frozenBudgetMs < 5),
+    ).toHaveLength(61)
+    expect(
+      check.metrics.filter((metric) => metric.blocking && metric.frozenBudgetMs < 1),
+    ).toHaveLength(20)
+    for (const metric of check.metrics) {
+      expect(metric.frozenBudgetMs).toBe(inputBudget('tree-sitter', metric.key).noiseMarginMs)
+      expect(metric.budgetMs).toBe(
+        metric.blocking ? Math.max(metric.frozenBudgetMs, 5) : metric.frozenBudgetMs,
+      )
+      expect(metric.budget.reason).toBe(
+        metric.blocking && metric.frozenBudgetMs < 5
+          ? 'Declared loaded Tree-sitter contention floor: 5 ms'
+          : 'Frozen historical margin',
+      )
+      for (const configuration of [
+        'native',
+        'disabled',
+        'shiki',
+        'minimap',
+        'platform',
+        'tree-sitter-shiki',
+        'tree-sitter-minimap',
+        'shiki-minimap',
+        'all',
+      ])
+        expect(inputBudget(configuration, metric.key, 'loaded').noiseMarginMs).toBe(
+          inputBudget(configuration, metric.key).noiseMarginMs,
+        )
+    }
+  })
+
+  it('retains quiet sub-ms rejection and reports the declared applied floor', () => {
+    const { baseline, candidate, schedule } = pairedResults(11)
+    for (const run of [baseline, candidate]) run.config.consumers = 'tree-sitter'
+    const key = 'short-lines/single/undo/dispatch'
+    const quiet = comparePairedInput(baseline, candidate, schedule, 17).metrics.find(
+      (metric) => metric.key === key,
+    )
+    expect(quiet.blocking).toBe(true)
+    expect(quiet.passed).toBe(false)
+    expect(quiet.budgetMs).toBe(inputBudget('tree-sitter', key).noiseMarginMs)
+    for (const run of [baseline, candidate]) run.config.loadProfile = 'loaded'
+    const loaded = comparePairedInput(baseline, candidate, schedule, 17).metrics.find(
+      (metric) => metric.key === key,
+    )
+    expect(loaded.blocking).toBe(true)
+    expect(loaded.passed).toBe(true)
+    expect(loaded.frozenBudgetMs).toBe(quiet.budgetMs)
+    expect(loaded.budgetMs).toBe(5)
+    expect(loaded.budget.sha256).toBe(quiet.budget.sha256)
+  })
+
+  it('keeps actual-stage twenty-millisecond synthetic regressions rejecting', () => {
+    const { baseline, candidate, schedule } = pairedResults(30)
+    for (const run of [baseline, candidate]) {
+      run.config.consumers = 'tree-sitter'
+      run.config.loadProfile = 'loaded'
+    }
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    expect(sensitivityPassed(check, 'input')).toBe(true)
+    expect(sensitivityPassed(check, 'frame')).toBe(true)
+  })
+
+  it('uses the declared applied margins for the unchanged first-block guard', () => {
+    const { baseline, candidate } = pairedResults()
+    const select = (run) =>
+      run.samples.filter(
+        (sample) =>
+          sample.fixture === 'short-lines' &&
+          sample.views === 'single' &&
+          sample.scenario === 'undo' &&
+          sample.repetition < 2,
+      )
+    const samples = { baseline: select(baseline), candidate: select(candidate) }
+    for (const [index, sample] of samples.candidate.entries())
+      for (const metric of ['inputToApplied', 'dispatch', 'inputToFrame'])
+        sample.latencyMs[metric] = sample.latencyMs[metric].map((value) => value + 2 + index)
+    expect(canStopInputPairs(samples, 'tree-sitter', 'quiet')).toBe(false)
+    expect(canStopInputPairs(samples, 'tree-sitter', 'loaded')).toBe(true)
+  })
+
+  it('rejects missing, unknown or mismatched declared profiles', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    delete baseline.config.loadProfile
+    delete candidate.config.loadProfile
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(
+      /Missing paired input load profile/,
+    )
+    baseline.config.loadProfile = candidate.config.loadProfile = 'unknown'
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(
+      /Unknown input load profile/,
+    )
+    baseline.config.loadProfile = 'quiet'
+    candidate.config.loadProfile = 'loaded'
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/workload options/)
+    expect(() => inputBudget('tree-sitter', 'short-lines/single/undo/dispatch', 'unknown')).toThrow(
+      /Unknown input load profile/,
+    )
+  })
+
+  it('includes loaded Tree-sitter only in full or focused verification', () => {
+    const baseline = {
+      manifest: { packages: [{ name: '@singapore-editor/core', sourceHash: 'a', buildHash: 'a' }] },
+    }
+    const candidate = {
+      manifest: { packages: [{ name: '@singapore-editor/core', sourceHash: 'b', buildHash: 'b' }] },
+    }
+    const quiet = inputMatrixConfigurations(baseline, candidate)
+    const loaded = inputMatrixConfigurations(baseline, candidate, { loadProfile: 'loaded' })
+    expect(quiet).toContain('tree-sitter')
+    expect(loaded).toEqual(quiet.filter((configuration) => configuration !== 'tree-sitter'))
+    expect(
+      inputMatrixConfigurations(baseline, candidate, { loadProfile: 'loaded', full: true }),
+    ).toEqual(quiet.filter((configuration) => configuration !== 'platform').concat('platform'))
+    expect(
+      inputMatrixConfigurations(baseline, candidate, {
+        loadProfile: 'loaded',
+        declared: ['tree-sitter', 'native'],
+      }),
+    ).toEqual(['platform', 'native'])
+    expect(
+      inputMatrixConfigurations(baseline, candidate, {
+        loadProfile: 'loaded',
+        only: true,
+        declared: ['tree-sitter'],
+      }),
+    ).toEqual(['tree-sitter'])
   })
 })

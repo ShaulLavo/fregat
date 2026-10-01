@@ -1,6 +1,6 @@
 # Paired native input latency
 
-Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses fixed historical budgets and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Validation and complete-matrix timing are in progress; those units remain gated and still require owner authorization. The runner compares two frozen Editor package sets in one Chromium session. It alternates the sides within each repetition and records the randomized order of every pair.
+Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses fixed historical budgets and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Validation and complete-matrix timing are in progress; those units remain gated and still require owner authorization. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
 
 ## Run the comparison
 
@@ -23,7 +23,7 @@ Each configuration has 36 fixture, view, and scenario groups. Each group reports
 
 For each repetition, the statistic is candidate p95 minus baseline p95. The reported difference is the median of these paired differences. A deterministic percentile bootstrap resamples whole repetitions 10,000 times and reports a 95% confidence interval. Input operations within one repetition remain together.
 
-A blocking measure fails when its median paired difference exceeds its fixed budget and the confidence interval is entirely positive. `input-budgets.json` declares the exact `noiseMarginMs` values frozen by the accepted historical native, disabled, Tree-sitter, Shiki, and minimap calibrations. Baseline variability cannot widen these budgets. Each metric records its reference configuration, calibration artifact, SHA-256, and historical instrument hash. No controls, holdouts, or recalibration run before a comparison.
+A blocking measure fails when its median paired difference exceeds its fixed budget and the confidence interval is entirely positive. `input-budgets.json` declares the exact `noiseMarginMs` values frozen by the accepted historical native, disabled, Tree-sitter, Shiki, and minimap calibrations. Baseline variability cannot widen these budgets. Each metric records its reference configuration, calibration artifact, SHA-256, and historical instrument hash. These fixed budgets require no new calibration or holdout runs.
 
 The five combined and Platform configurations have no accepted historical calibration. They explicitly inherit all 144 frozen native budgets. Their full-matrix results establish new coverage under that declared reference; they cannot establish historical acceptance agreement. Incomplete or unadmitted archived calibrations are not used to fill missing keys. An unknown configuration or measure fails before interpretation.
 
@@ -31,9 +31,9 @@ Every report contains the raw baseline and candidate samples, paired differences
 
 The paired path waits for actual consumer source and render receipts outside the captured input intervals. Undo priming also waits for the seeded worker source before input starts. A fixed 450 ms seed delay left a parse pending on the supported short-lines fixture; both frozen products then exposed a stale source on the final undo. The isolated Tree-sitter probe and its complete quiet comparison pass with seeded-source readiness, with the product bytes unchanged. The inherited absolute runner retains its original fixed waits.
 
-The default maximum is three measured pairs after one warmup pair. After two measured pairs, a group stops only when both paired p95 differences for every blocking measure lie within ± its frozen budget, and their two-point interval span is no larger than that budget. Otherwise it collects the third pair. Advisory screenshot timing does not affect stopping. The comparator revalidates every declared two-pair stop against the raw samples. Sensitivity and delayed candidates use this same rule.
+The default maximum is four measured pairs after one warmup pair. Each group has its own deterministic order, derived from its seed, fixture/view/scenario key and block index. Every consecutive two-pair block runs each side first once. Earlier groups' adaptive counts cannot change a later group's order. After the first complete block, a group stops only when both paired p95 differences for every blocking measure lie within ± its frozen budget, and their two-point interval span is no larger than that budget. This strict guard also ensures the unchanged acceptance predicate passes on those two pairs. Otherwise the group completes a second block. Advisory screenshot timing does not affect stopping. The comparator revalidates every declared two-pair stop and every key-local order against the raw samples. Sensitivity and delayed candidates use this same rule.
 
-Two- and three-pair bootstraps are coarse. The reported 95% intervals are nominal descriptive repetition-cluster intervals. Conditional early stopping has no adjusted sequential 95% coverage guarantee, and passing does not establish statistical equivalence. `--fixed-repetitions` disables stopping; requesting more than three repetitions also uses fixed sampling. More independent pairs improve resolution near a budget.
+Two- and four-pair bootstraps are coarse. The reported 95% intervals are nominal descriptive repetition-cluster intervals. Conditional early stopping has no adjusted sequential 95% coverage guarantee, and passing does not establish statistical equivalence. `--fixed-repetitions` disables stopping; requesting more than four repetitions also uses fixed sampling. Fixed sampling requires at least four pairs and complete even-sized blocks. More independent pairs improve resolution near a budget.
 
 Each configuration retains two warm package pages in one Chromium browser. Every group runs one unrecorded warmup on its actual measured fixture. Between bursts, the Editor's public operations restore exact text, cursor, history and hidden-view state. `attachSession` swaps fixture buffers while retaining Editors and consumer owners. Native Tree-sitter remains enabled only on ordinary code. Initial setup, subsequent fixture attachment, reset and settlement durations are recorded outside the input intervals. Final configuration cleanup checks all released buffers and retained Editors; page contexts close after the configuration.
 
@@ -71,6 +71,35 @@ Headless Chromium frame timing is an observable, not physical display latency. W
 
 Archived warm evidence for instrument `5929738e…` is under `/work/tmp/plan-282/run-20261001T153544Z-sol/floor-controls/`. New split-identity runs use `../split-controls/`. The frozen products and all budgets are unchanged. The owner selected separate controls for the input and frame stages on 2026-10-01. All 108 measures remain blocking.
 
+### Counterbalanced controls and reliability
+
+Current measurement identity is `022dcd886d279cba935eeaa2178c918738ec8859aa978ee77cf8186f84ba33f2`; validation remains `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`. Combined instrument is `dc37728b0a8ee28472b8a811439e1d0a98f2c6b6e90cc107fcf19fd04edb34b0`. The fresh raw cache is `../counterbalanced/sensitivity/022dcd886d279cba935eeaa2178c918738ec8859aa978ee77cf8186f84ba33f2.json.gz`. Earlier controls keep their original identities.
+
+| Wall-time receipt                                         |      Previous split policy (s) | Counterbalanced policy (s) |
+| --------------------------------------------------------- | -----------------------------: | -------------------------: |
+| Real 20 ms input control, 72/72 required keys             |                        143.650 |                    175.876 |
+| Real 20 ms frame control, 36/36 frame keys                |                        140.254 |                    175.005 |
+| Named 25 ms floor, first rejection; 30 ms skipped         |                        152.655 |                    190.975 |
+| One-off control collection total                          |                        436.559 |                    541.856 |
+| Native unchanged configuration, 108 passing blocking keys |                         75.055 |                     73.157 |
+| First native CLI including controls/setup                 |                        519.116 |                    624.382 |
+| Actual default matrix                                     | Unmeasured for the warm policy |                    Pending |
+| Actual full matrix                                        |                     Unmeasured |                    Pending |
+
+The one-off control cost rises by 105.297 seconds (24.1%). This is a measured collection-cost change. It is not a default/full matrix measurement. All 36 groups in every fresh stage control complete four pairs. The unchanged native run stops 35 groups at two pairs and completes four pairs for one group. Advisory timing remains excluded. All 334 stress tests, stress typecheck/lint and root gates pass; lint retains one inherited spread warning. Loaded reliability passes its zero-rejection gate. All nine selected keys reject zero times out of ten. All 21 blocking keys collected also have zero rejects. Forty restricted CLI runs total 666.212 seconds; 21 groups stop at two pairs and 49 complete four. The separately hashed diagnostic is `43577589069e62ee572ca9d73751df25dba50a0027e01f88b34fa444908f7e73`, with the current production identity recorded in every run. It collects or reuses no sensitivity controls and earns no full-matrix acceptance credit. All 103 load receipts show eight live same-core workers, which are stopped and awaited; the final PID check is empty. Evidence is `../counterbalanced/reliability/final-summary.json`. Ten runs per key are an empirical gate, without a family-wise error guarantee across all 108 keys. Full loaded Tree-sitter and its two 20 ms negative stages have resumed; matrix timings remain pending.
+
+| Loaded A/A selected key                          | Rejects / runs |
+| ------------------------------------------------ | -------------: |
+| Native ordinary/single/undo/dispatch             |         0 / 10 |
+| Disabled short-lines/multiple/undo/dispatch      |         0 / 10 |
+| Shiki ordinary/multiple/repeat/inputToApplied    |         0 / 10 |
+| Shiki ordinary/multiple/repeat/dispatch          |         0 / 10 |
+| Tree-sitter ordinary/single/undo/inputToApplied  |         0 / 10 |
+| Tree-sitter ordinary/single/undo/dispatch        |         0 / 10 |
+| Tree-sitter ordinary/multiple/undo/dispatch      |         0 / 10 |
+| Tree-sitter long-line/single/undo/inputToApplied |         0 / 10 |
+| Tree-sitter long-line/multiple/undo/dispatch     |         0 / 10 |
+
 ### Stage sensitivity
 
 The input control pauses once for 20 ms in native event capture, before Editor handling. Every `inputToApplied` and `dispatch` key must reject it, 72 keys in total. The separate frame control pauses once for 20 ms inside each existing rAF callback before its frame mark. Every frame key except native `ordinary/multiple/repeat/inputToFrame` must reject it. That key retains its frozen 15.2 ms budget and must reject a separate 25 ms control, or 30 ms if 25 ms does not reject. Both attempts are preserved when needed; the first rejecting delay is recorded as its measured detection floor. Both controls and the detection-floor attempts compare the same candidate bytes against themselves. Their raw samples are cached together under the measurement/dependency hash; every reuse recomputes both verdicts and verifies the stage's delay values and matching product bytes.
@@ -83,7 +112,7 @@ An input-handler delay reaches warm frame timing only partially because of refre
 
 `--slowdown-ms 20` selects an input-stage diagnostic. `--frame-slowdown-ms 20` selects a frame-stage diagnostic. The controls cannot be mixed in one comparison. Neither changes a budget or a measure's blocking status.
 
-### Split-identity controls
+### Archived split-identity controls
 
 The transfer audit recomputed the original instrument exactly and listed both hashes for all 81 current measurement files. Seven changed files caused transfer refusal; external bytes matched. The old controls and quiet receipts remain untouched. The refused receipt is `../split-controls/identity-transfer-refused.json`.
 
@@ -99,23 +128,41 @@ Fresh controls use measurement `70f4f46ffdbbcf8519dfc0c46b636d9c998ee4a639f0277d
 
 The named repeat-frame key measured a 68.4 ms median with `[48.1, 69.0]` ms interval in the fresh 20 ms frame control. Its 25 ms floor attempt measured 113.2 ms, interval `[64.4, 114.3]` ms. The exact fixed budget remains `15.200000002980232` ms. Together with the archived 12.4 ms missed-key run and later 128.6 ms run, these observations show phase/batching variability; they do not establish a stable or monotonic pause-to-p95 effect. These are focused runs, not default/full matrix wall times.
 
-### Warm quiet and same-core loaded agreement
+### Archived warm quiet and same-core loaded agreement
 
 The current validation checks each historical key with the control for its stage, plus all 72 input keys and the 35 native 20 ms frame requirements. The remaining native frame key uses the separately cached detection-floor proof; other configurations still require every frame key at 20 ms. Minimap remains excluded while its historical source-correctness defect is admitted. Previous cold verdicts below apply only to their recorded instrument hashes.
 
-| Configuration | Historical candidate / negative | Warm quiet candidate | Quiet input / frame controls                        | Warm loaded candidate | Loaded input / frame controls                       |
-| ------------- | ------------------------------- | -------------------- | --------------------------------------------------- | --------------------- | --------------------------------------------------- |
-| native        | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pass                  | 72/72 input; 36/36 frame; 47/47 historical at 20 ms |
-| disabled      | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                                             |
-| tree-sitter   | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                                             |
-| shiki         | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                                             |
-| minimap       | Pass / 47 keys                  | Excluded             | Diagnostic pending                                  | Excluded              | Diagnostic pending                                  |
+| Configuration | Historical candidate / negative | Warm quiet candidate | Quiet input / frame controls                        | Warm loaded candidate                    | Loaded input / frame controls                       |
+| ------------- | ------------------------------- | -------------------- | --------------------------------------------------- | ---------------------------------------- | --------------------------------------------------- |
+| native        | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pass                                     | 72/72 input; 36/36 frame; 47/47 historical at 20 ms |
+| disabled      | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pass                                     | 72/72 input; 36/36 frame; 47/47 historical at 20 ms |
+| tree-sitter   | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Three undo rejections; diagnosis pending | Held while diagnosing                               |
+| shiki         | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending                                  | Pending                                             |
+| minimap       | Pass / 47 keys                  | Excluded             | Diagnostic pending                                  | Excluded                                 | Diagnostic pending                                  |
 
 The native, disabled and Tree-sitter quiet historical-negative receipts in this table belong to pre-split instrument `5929738e…`. They remain archived with their original identity; the transfer audit requires byte-identical measurement files, and the initial split changes those files. Native's unchanged candidate also passes under the split identity. Shiki's complete quiet acceptance uses the split identity: unchanged passes in 142.050 CLI seconds (135.273 configuration seconds); the input negative takes 211.194 seconds and rejects 72/72 input keys plus all exact 42 historical synchronous keys; the frame negative takes 209.647 seconds and rejects 36/36 frame keys plus all exact five historical frame keys. Every historical key rejects directly at 20 ms. The raw receipt is `../split-controls/validation-quiet-shiki.json`. Loaded jobs pin the CLI/browser and eight owned workers to the same CPUs 8–15, record periodic worker liveness/CPU receipts and await worker termination in cleanup.
 
 Loaded native preserves the unchanged verdict and all exact historical negative keys under the split identity. CLI times are 92.291 seconds unchanged, 158.865 seconds input-negative and 157.731 seconds frame-negative. All 72 input and 36 frame keys reject directly at 20 ms; its named floor was unused. Nineteen start/periodic/end receipts show all eight owned workers live throughout. Final `workersStopped` is true, and a post-run PID check found no remaining owned worker. Evidence is `../split-controls/validation-loaded-native.json`.
 
-Actual default and full warm matrix wall times remain pending. The default still includes Platform plus declared/inferred affected configurations; full still executes all ten configurations.
+Loaded disabled also passes unchanged and rejects all 72 input, 36 frame and exact 47 historical keys directly at 20 ms. CLI times are 105.490 / 168.375 / 169.533 seconds. Twenty-one receipts retain eight live workers; cleanup stops and awaits every worker, and a direct PID check finds none remaining. Evidence is `../split-controls/validation-loaded-disabled.json`.
+
+Loaded Tree-sitter rejects three blocking undo measures after 1,126.549 CLI seconds: ordinary/single applied median +1.3 ms against 0.7 ms, interval `[1.2, 1.5]`; ordinary/single dispatch +1.3 ms against 0.8 ms, interval `[0.000000015, 1.4]`; ordinary/multiple dispatch +1.3 ms against 0.8 ms, interval `[0.3, 1.4]`. Four advisory rejections do not gate. Thirty-nine receipts show eight live workers, all stopped and awaited. The positive artifact is preserved in `../split-controls/tree-sitter-warm-loaded.json.gz`; negatives and remaining configurations are held while diagnosing it. Historical quiet accepts do not establish a verdict on this same-core loaded configuration.
+
+The failed run's measured single/undo order is candidate-first in all three pairs; multiple/undo is baseline-first, candidate-first, baseline-first. A shared RNG also makes a later key's order depend on how many pairs earlier adaptive groups collected. The owner requested a candidate-first page-creation swap, followed by baseline/baseline undo-only replay of the failed order. Both diagnostics have separate identities and explicitly exclude acceptance; they collect or reuse no sensitivity controls.
+
+The full page-creation swap passes all 108 blocking measures in 1,149.188 CLI seconds. The three affected medians become +0.9 ms applied with `[0, 1.0]`, +0.1 ms single-view dispatch with `[-0.1, 0.3]`, and -0.4 ms multiple-view dispatch with `[-3.4, 0.7]`. Its actual single-view undo order changes to baseline-first, baseline-first, candidate-first because preceding adaptive groups consume different RNG counts. The result does not isolate creation order from pair order. Forty receipts retain eight live workers; cleanup stops and awaits every worker, and the direct PID check finds none. Measurement identity is `b1b6170bbbacaffbaa188a2a763b174fbeaa2bcb32b290767c5ffaee4129096e`. Raw comparison is `../swap-diagnostic/swap-comparison.json`.
+
+The restricted baseline/baseline replay passes all three selected keys in 17.019 CLI seconds. With the original failed orders and three fixed pairs, its medians are +0.7 ms applied with `[-1.1, 1.3]`, +0.2 ms single-view dispatch with `[-0.1, 1.4]`, and -0.2 ms multiple-view dispatch with `[-0.4, 1.1]`. Worker cleanup is complete. Its measurement identity is `752858f9953e1aaff78c3fdbde7dfc7eeeba27abbc823a2c059d715dabec82d2`; evidence is `../aa-diagnostic/validation-loaded-aa.json`.
+
+The alternating five-A/B, five-A/A cohort completed in 165.893 CLI seconds. It retained the failed orders, fixed budgets, three pairs and same-core load. All three A/B median ranges overlap their A/A ranges. The single-view applied medians are A/B `[-0.1, -0.6, -0.3, 0.1, -0.1]` and A/A `[-0.3, 1.2, -0.2, 0, -2.4]` ms. Single-view dispatch gives A/B `[-0.1, 0.1, -0.2, 0, -0.3]` and A/A `[-0.1, 0, -0.1, -0.1, -0.4]`; multiple-view dispatch gives A/B `[0, 1.9, 0.2, -0.3, -0.1]` and A/A `[-0.3, 0, -0.8, 0.7, -0.2]`. One A/B multiple-view dispatch run rejects at +1.9 ms with `[1.5, 2.2]`; every A/A passes. This does not demonstrate a consistent product cost. The owner classified the evidence as noise/order conditioning and approved the key-local balanced-block sampler. All owned workers stopped; the final PID check is empty. Cohort evidence is `../undo-cohort/summary.json`.
+
+The counterbalanced measurement change invalidates the earlier controls and acceptance receipts. Fresh native controls pass under the new identity, with the costs recorded above. The additional reliability gate runs loaded A/A ten times per selected configuration, retaining the production two-or-four policy. Selection includes the three failed undo keys and every saved positive blocking difference at least 75% of its budget. The eight audited quiet/loaded receipts select nine keys across native, disabled, Tree-sitter and Shiki. Selection and per-file diagnostic source identities are preserved under `../counterbalanced/`. Zero rejects out of ten per selected key is required. Any rejection requires a measured or explicitly estimated pair-count/statistic cost report before another sampling change. Default/full matrix wall-time effects remain unmeasured.
+
+A direct product audit confirms that the required historical baseline/candidate are different products: 46 source/build files differ, including ten executable JavaScript files. Core `Editor.js`, `documentSession.js`, `documentAnalysis.js`, `editChain.js` and `syntaxController.js` differ. “Unchanged candidate” means the historical candidate without injected delay. It does not mean baseline and candidate bytes are identical. Per-file hashes are in `../swap-diagnostic/frozen-product-byte-comparison.json`.
+
+The 1,126.549 seconds includes 240 bursts, comprising 168 measured and 72 warmup samples. Opening readiness consumes 517.270 seconds, final consumer/source settlement 417.573 seconds, priming/source readiness/screenshots 102.904 seconds, and input/paint 36.821 seconds. Fixture attachment is 35.684 seconds, bootstrap 1.632, memory/release 3.464, other configuration overhead 1.688, and outer CLI setup 9.512. Short-lines/multiple alone contributes 463.848 seconds opening and 328.065 seconds final settlement; its undo group totals 280.451 seconds. Measured reset calls themselves total 1.970 seconds. These are repeated readiness fences, with no terminal readiness timeout or CLI retry. The accounting includes warmups and is saved in `../split-controls/tree-sitter-loaded-wall-accounting.json`.
+
+Actual default and full warm matrix wall times remain pending. The default still includes Platform plus declared/inferred affected configurations; full still executes all ten configurations. The owner requested measured default-composition options after the diagnosis because loaded Tree-sitter alone exceeds 15 minutes. No smaller gating matrix has been adopted.
 
 The quiet Tree-sitter unchanged comparison passed in 746.498 seconds, including 741.339 seconds inside the configuration. Its measured short-lines/multiple samples spent 425.123 seconds across both sides. Opening readiness consumed 225.517 seconds and final settlement 160.973 seconds; captured input and paint consumed 4.797 seconds. Reset itself took 0.441 seconds. These sums exclude warmups and fixture attachment. Frozen `syncText` already applies the minimal replacement, and source epochs remain fixed during these bursts. Three retained view sessions perform the supported-tier syntax work. Retaining owners removes construction cost, but it cannot remove source-current settlement or change the frozen syntax products.
 
@@ -123,7 +170,7 @@ The quiet Tree-sitter unchanged comparison passed in 746.498 seconds, including 
 
 The first Shiki quiet positive stopped at `long-line/single/paste` before producing a timing verdict. Its one logical plain line had two mounted token ranges of the correct text colour, with current/answered worker source and no worker error. The old assertion equated plain lines with DOM ranges. Plain output now requires complete rendered-text coverage in each visible view, uniform text colour and aggregate range accounting. Plain-line counts and source receipts remain strict.
 
-Real Chromium probes accept two fully covered chunks and reject a missing chunk, partial text coverage and ranges belonging only to another view. Contract tests also reject wrong colours and range-accounting mismatches. Frozen Shiki long-line paste passes strict opening/final checks in both single and multiple views; this isolated probe is separate from the subsequently completed quiet acceptance. Raw evidence is `../shiki-coverage-proof.json`. Measurement identity remains conservative: only the two extracted output modules are validation-only. Assertion-only changes keep future schema-4 controls valid; changed Shiki-bearing predicates require fresh acceptance.
+Real Chromium probes accept two fully covered chunks and reject a missing chunk, partial text coverage and ranges belonging only to another view. Contract tests also reject wrong colours and range-accounting mismatches. Frozen Shiki long-line paste passes strict opening/final checks in both single and multiple views; this isolated probe is separate from the subsequently completed quiet acceptance. Raw evidence is `../shiki-coverage-proof.json`. The complete quiet run additionally contains sixteen opening/final receipts with multiple mounted chunks. Actual long-line/single/paste output from both products has one logical plain line, one highlight with two ranges, complete `2/2` chunk coverage, uniform colour and strict correct source. The old predicate rejects that saved output; the corrected predicate accepts it. These receipts and predicate replay are `../split-controls/shiki-actual-multiple-chunk-coverage.json` and `../split-controls/shiki-old-new-predicate-proof.json`. Measurement identity remains conservative: only the two extracted output modules are validation-only. Assertion-only changes keep future schema-4 controls valid; changed Shiki-bearing predicates require fresh acceptance.
 
 ### Readiness and the pending minimap reset
 
@@ -278,3 +325,29 @@ load and with load on the benchmark's CPUs. Default and full wall times include 
 and builds. Plan 099 units 2–7 remain gated. This implementation is delivered as a draft PR and is
 not an accepted replacement gate. No app UI or server code changed; deployment and app `look`
 verification were skipped.
+
+### Declared loaded Tree-sitter policy, 2026-10-02
+
+The new `--loaded` declaration records external CPU contention. Loaded default selection omits
+standalone Tree-sitter; full and focused verification include it. Its blocking budgets become
+`max(frozen budget, 5 ms)`, with frozen/applied values, reason and original provenance on every
+metric. This raises 61 margins, including 20 sub-ms margins. Every key remains blocking. Quiet
+Tree-sitter and every other loaded configuration retain their frozen budgets. The strict two-pair
+stopping guard uses the applied margins, with the same complete AB/BA blocks and statistic.
+
+The previous counterbalanced identity is now archived. Its full loaded Tree-sitter run rejected
+short-lines/single undo applied (+0.95 ms versus 0.70 ms, interval [0.40, 1.40]) and dispatch
+(+0.90 ms versus 0.60 ms, interval [0.30, 1.50]). CLI wall time was 1,062.096 seconds. All eight
+workers remained live through 37 receipts, then were stopped and awaited; a direct PID check found
+none remaining. The original ordinary undo failures passed in this run. This and the earlier
+A/A spread motivate a separately declared 5 ms contention gate. They do not establish a product
+undo regression. The historical instrument never measured loaded configurations.
+
+The nine-key 0/10 reliability table remains valid for its listed keys and archived measurement
+identity. It excludes these newly rejected short-lines/single keys. The all-undo 20-run cohort
+was prepared but never launched after its estimated 110–170-minute cost was rejected. An advisory
+rule was rejected because its 20 demotions included 17 historical negatives. All 47 historical
+negative keys remain blocking and must reject their real 20 ms stage delay under the new floor.
+
+Plan 282 lists all 61 affected margins and the evidence. Fresh controls, current-identity agreement
+and default/full matrix wall times remain pending; earlier receipts earn no current-identity credit.

@@ -3,7 +3,7 @@ import { fail } from './errors.mjs'
 import { correlateInputEvents } from './input-correlation.mjs'
 import { startHostCpuEstimate } from './host-contention.mjs'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
-import { randomGenerator } from './input-paired.mjs'
+import { inputPairOrder } from './input-paired.mjs'
 import { canStopInputPairs } from './input-pair-stopping.mjs'
 import { assertConsumerReadiness } from './input-output.mjs'
 import { inputReadinessTimeoutMs } from './src/inputReadiness.ts'
@@ -86,7 +86,6 @@ async function runScenarioGroup(session, fixture, views, scenario, result, helpe
 }
 
 export async function runPairedInputSuite(browser, results, helpers, seed) {
-  const random = randomGenerator(seed)
   const schedule = []
   const sessions = {}
   const errors = []
@@ -101,7 +100,7 @@ export async function runPairedInputSuite(browser, results, helpers, seed) {
       results[side].startup = []
     }
     for (const views of inputViewModes)
-      await runWarmView(results, helpers, sessions, views, random, schedule)
+      await runWarmView(results, helpers, sessions, views, seed, schedule)
     if (errors.length) fail(`Browser errors: ${errors.join('; ')}`)
   } finally {
     for (const [side, session] of Object.entries(sessions)) {
@@ -130,7 +129,7 @@ async function initializeInputSession(session, result, readMemory) {
   )
 }
 
-async function runWarmView(results, helpers, sessions, views, random, schedule) {
+async function runWarmView(results, helpers, sessions, views, seed, schedule) {
   for (const fixture of results.baseline.manifest.fixtures) {
     for (const side of ['baseline', 'candidate']) {
       const session = sessions[side]
@@ -172,7 +171,7 @@ async function runWarmView(results, helpers, sessions, views, random, schedule) 
       })
     }
     for (const scenario of inputScenarios)
-      await runPairedGroup(results, helpers, sessions, fixture, views, scenario, random, schedule)
+      await runPairedGroup(results, helpers, sessions, fixture, views, scenario, seed, schedule)
   }
 }
 
@@ -183,14 +182,15 @@ async function runPairedGroup(
   fixture,
   views,
   scenario,
-  random,
+  seed,
   schedule,
 ) {
   const samples = { baseline: [], candidate: [] }
   const config = results.baseline.config
   for (let repetition = -config.warmups; repetition < config.repetitions; repetition++) {
-    const order = random() < 0.5 ? ['baseline', 'candidate'] : ['candidate', 'baseline']
-    const pair = { group: `${fixture.id}/${views}/${scenario}`, repetition, order }
+    const group = `${fixture.id}/${views}/${scenario}`
+    const order = inputPairOrder(seed, group, repetition)
+    const pair = { group, repetition, order }
     for (const side of order) {
       const sample = await runSample(
         sessions[side],
@@ -214,7 +214,11 @@ async function runPairedGroup(
       )
     }
     if (repetition >= 0) schedule.push(pair)
-    if (config.adaptivePairs && repetition === 1 && canStopInputPairs(samples, config.consumers))
+    if (
+      config.adaptivePairs &&
+      repetition === 1 &&
+      canStopInputPairs(samples, config.consumers, config.loadProfile)
+    )
       break
   }
   for (const side of ['baseline', 'candidate']) {

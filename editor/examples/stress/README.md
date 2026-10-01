@@ -379,11 +379,15 @@ diagnostics. They cannot be combined in one comparison. All 108 measures remain 
 Default fixtures fit Platform's 10 Mi UTF-16 analysis tier, including 500,000 short comment lines.
 `--stress` enables the larger original declaration fixture. `--fixture-directory` accepts frozen
 hashed fixtures and requires `--stress` if they exceed the tier. CPU pinning is optional.
-`--output` selects the compressed matrix report. The default maximum is three measured pairs.
-After two pairs, a group stops only if all three blocking measures have both paired p95
-differences within ± their fixed budget and a two-point interval span no larger than that budget.
-The raw comparator checks every early stop. Delayed candidates and sensitivity use the same rule.
-`--fixed-repetitions` disables stopping; requesting more than three pairs uses fixed sampling.
+`--output` selects the compressed matrix report. The default maximum is four measured pairs.
+Each key/block gets a deterministic seeded AB/BA order; each complete two-pair block runs both
+sides first once. A key's order is independent of earlier groups' adaptive counts. After the first
+block, a group stops only if all three blocking measures have both paired p95 differences within
+± their fixed budget and a two-point interval span no larger than that budget. This preserves the
+acceptance predicate. Otherwise it completes the second block. The raw comparator checks every
+early stop and key-local order. Delayed candidates and sensitivity use the same rule.
+`--fixed-repetitions` disables stopping; requesting more than four pairs uses fixed sampling.
+Fixed sampling requires at least four pairs and complete even-sized blocks.
 Conditional stopping has no sequential 95% coverage guarantee. Small-sample bootstrap intervals
 are nominal descriptive intervals, and passing does not establish equivalence.
 
@@ -412,3 +416,17 @@ minimap acceptance awaits the product fix.
 See [paired method and validation](../../../docs/document-contributions/paired-input-latency.md)
 for statistical limits, historical comparison, and measured wall times. The old absolute input
 calibration and proof commands have been removed. Historical evidence stays unchanged.
+
+### Declared loaded comparisons
+
+`--loaded` records externally applied CPU contention. Supply and retain the load-worker evidence
+alongside the report; the runner starts no CPU workers. Loaded default matrices omit standalone
+Tree-sitter. `--full --loaded` includes it, and `--only tree-sitter --loaded` is focused verification.
+Its blocking margins are `max(frozen margin, 5 ms)`; per-key output records both margins and the
+reason. All keys remain blocking. Quiet Tree-sitter and every other loaded configuration use their
+frozen margins. Real 20 ms input and frame negatives must still reject every required key.
+
+The two-pair stopping guard uses the applied blocking margins and preserves its strict span check.
+A load declaration changes the workload receipt and cannot be mixed between paired sides.
+See root [Plan 282](../../../plans/282-fast-paired-input-latency-check.md) for the evidence and
+61 affected Tree-sitter margins.

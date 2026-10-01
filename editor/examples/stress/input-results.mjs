@@ -89,6 +89,8 @@ function validateFixture(fixture) {
 
 function validateConfig(config) {
   record(config, 'workload configuration')
+  if (config.loadProfile !== undefined && !['quiet', 'loaded'].includes(config.loadProfile))
+    fail('Unknown input load profile')
   integer(config.repetitions, 'repetitions', 1)
   integer(config.warmups, 'warmups', 1)
   same(config.scenarios, inputScenarios, 'scenario coverage')
@@ -117,8 +119,8 @@ function validateConfig(config) {
   )
     fail('Unknown warmup fixture policy')
   if (config.adaptivePairs) {
-    same(config.adaptivePairs, 'tight-within-budget', 'adaptive pair policy')
-    same(config.repetitions, 3, 'adaptive maximum repetitions')
+    same(config.adaptivePairs, 'counterbalanced-tight-within-budget', 'adaptive pair policy')
+    same(config.repetitions, 4, 'adaptive maximum repetitions')
     keys(
       config.groupRepetitions,
       fixtureIds.flatMap((fixture) =>
@@ -130,6 +132,7 @@ function validateConfig(config) {
     )
     for (const count of Object.values(config.groupRepetitions)) {
       integer(count, 'adaptive repetition count', 2)
+      if (count % 2 !== 0) fail('Invalid adaptive repetition count: incomplete two-pair block')
       if (count > config.repetitions) fail('Adaptive count exceeds maximum repetitions')
     }
   }

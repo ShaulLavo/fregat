@@ -1,11 +1,11 @@
 import { inputBudget } from './input-budgets.mjs'
 
-export function canStopInputPairs(samples, configuration) {
+export function canStopInputPairs(samples, configuration, loadProfile = 'quiet') {
   if (samples.baseline.length !== 2 || samples.candidate.length !== 2) return false
   const first = samples.baseline[0]
   for (const metric of ['inputToApplied', 'dispatch', 'inputToFrame']) {
     const key = `${first.fixture}/${first.views}/${first.scenario}/${metric}`
-    const budget = inputBudget(configuration, key).noiseMarginMs
+    const budget = inputBudget(configuration, key, loadProfile).noiseMarginMs
     const differences = samples.baseline.map(
       (sample, index) =>
         p95(samples.candidate[index].latencyMs[metric]) - p95(sample.latencyMs[metric]),
