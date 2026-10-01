@@ -1313,6 +1313,32 @@ export async function waitForApp(page: Page, timeoutMs = 45_000) {
     .waitFor({ timeout: timeoutMs })
 }
 
+export async function waitForInitialContent(page: Page) {
+  const timeoutMs = 1_500
+  const cap = Promise.withResolvers<boolean>()
+  const timer = setTimeout(() => cap.resolve(false), timeoutMs)
+  const ready = page
+    .waitForFunction(initialContentReady, undefined, { timeout: timeoutMs })
+    .then(async () => {
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      )
+      return page.evaluate(initialContentReady)
+    })
+  return Promise.race([ready, cap.promise]).finally(() => clearTimeout(timer))
+}
+
+function initialContentReady() {
+  const shell = document.querySelector('[aria-label="Window toolbar"], [data-phone-shell]')
+  const surface = shell?.closest('[aria-busy]')
+  return (
+    surface?.getAttribute('aria-busy') === 'false' && !document.querySelector('[aria-busy="true"]')
+  )
+}
+
 export async function openGitPanel(page: Page) {
   await pressShortcut(page, chords.commandPalette)
   const input = selectors.paletteInput(page)
@@ -1428,6 +1454,8 @@ export async function chooseColorMode(page: Page, value: 'light' | 'dark' | 'sys
  * capped at a second. Looping spinners and paused animations are left alone.
  */
 export async function settleRunningAnimations(page: Page, capMs = 1_000) {
+  const cap = Promise.withResolvers<void>()
+  const timer = setTimeout(cap.resolve, capMs)
   await Promise.race([
     page.evaluate(async () => {
       const finite = document
@@ -1439,8 +1467,8 @@ export async function settleRunningAnimations(page: Page, capMs = 1_000) {
         )
       await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)))
     }),
-    new Promise((resolve) => setTimeout(resolve, capMs)),
-  ])
+    cap.promise,
+  ]).finally(() => clearTimeout(timer))
 }
 
 /** Two frames, then every running animation under the target. Collapsed panels animate open. */
