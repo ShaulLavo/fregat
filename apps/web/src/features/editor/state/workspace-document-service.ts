@@ -377,10 +377,17 @@ export class WorkspaceDocumentService {
     const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
     const cleanClaim = cleanClaimForFile(claim, file)
     if (existing?.sync.kind === 'recovery-conflict') return existing
-    if (existing?.buffer.isDirty()) return existing
-    if (existing && fileSyncVersion(existing) === file.version) {
-      return existing
+    if (existing?.sync.kind === 'file' && existing.sync.fileVersion === file.version) {
+      if (existing.sync.mtimeMs === file.mtimeMs) return existing
+      // Save checks the timestamp too; identical disk bytes can advance it while edits stay dirty.
+      const refreshed = {
+        ...existing,
+        sync: { ...existing.sync, mtimeMs: file.mtimeMs },
+      }
+      this.setLiveDocument(refreshed)
+      return refreshed
     }
+    if (existing?.buffer.isDirty()) return existing
 
     // A touched file with the same bytes keeps its buffer, so the undo history survives.
     const record = existing

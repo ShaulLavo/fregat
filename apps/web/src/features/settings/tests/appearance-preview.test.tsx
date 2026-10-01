@@ -1,9 +1,14 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 
 import { expect, test } from '../../../../test/fixtures'
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import {
+  AppProviders,
+  createTestQueryClient,
+  renderWithProviders,
+  seedBootMirrorTheme,
+} from '../../../../test/render'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { useSettingsIntentStore } from '@/features/settings/state/intent-store'
 import { resetSettingsIntentStore } from '@workspace/client-core/settings/intent-store'
@@ -77,6 +82,20 @@ test('before confirmed settings arrive, the provider keeps the seeded boot theme
   theme.unmount()
   resetSettingsSnapshotAdmission(queryClient)
   queryClient.clear()
+})
+
+test('appearance stays busy until confirmed settings and fonts settle', async ({ client }) => {
+  expect(client).toBeDefined()
+  const rendered = renderWithProviders(<div aria-label='Appearance readiness probe' />)
+  const appearance = rendered
+    .getByLabelText('Appearance readiness probe')
+    .closest('[data-color-mode]')
+  expect(appearance?.getAttribute('aria-busy')).toBe('true')
+
+  await waitFor(() => expect(appearance?.getAttribute('aria-busy')).toBe('false'))
+  rendered.unmount()
+  resetSettingsSnapshotAdmission(rendered.queryClient)
+  rendered.queryClient.clear()
 })
 
 function wrapper(queryClient: ReturnType<typeof createTestQueryClient>) {

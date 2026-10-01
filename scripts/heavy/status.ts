@@ -9,12 +9,12 @@ import {
   drainRequest,
   legacyHold,
   legacyQuietHold,
-  liveSlices,
+  orphanSlices,
   readReadings,
   sliceMemory,
 } from './admission'
 import { DEFAULT_STATE_DIR, sliceRootFor } from './lock'
-import { live, type Entry } from './queue'
+import { deadJobs, live, type Entry } from './queue'
 
 const MiB = 2 ** 20
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
@@ -42,7 +42,7 @@ console.log(
   `slot locks: ${(slots ? legacyHold(stateDir, SLOT_FILES) : null) ?? 'free for heavy jobs'}`,
 )
 printEntries('running', running)
-const orphans = liveSlices(root).filter((slice) => !running.some((job) => job.id === slice.id))
+const orphans = orphanSlices(root, running, deadJobs(stateDir))
 for (const orphan of orphans)
   console.log(`  ${orphan.slice} has no wrapper; the next admission stops it`)
 printEntries('waiting', live(stateDir, 'queue'))
@@ -52,7 +52,7 @@ function printEntries(title: string, entries: readonly Entry[]) {
   for (const entry of entries) {
     const age = Math.round((Date.now() - Date.parse(entry.since)) / 1000)
     const estimate = Math.round(entry.estimateBytes / MiB)
-    const used = sliceMemory(root, `${root}-${entry.id}.slice`)
+    const used = sliceMemory(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`)
     const usage = used === null ? '' : ` using ${Math.round(used / MiB)} MiB`
     console.log(
       `  ${entry.label} (${entry.jobClass}, ${estimate} MiB) ${age}s pid=${entry.pid} cwd=${entry.cwd}${usage}`,

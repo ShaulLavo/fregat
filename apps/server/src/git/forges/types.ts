@@ -1,8 +1,11 @@
 import type {
+  GitPullRequestActivity,
   GitForge,
   GitForgeKind,
   GitPullRequest,
   GitPullRequestComment,
+  GitPullRequestReviewInput,
+  GitPullRequestReviewVerdict,
   GitPullRequestSupport,
   GitRepositoryVisibility,
 } from '@workspace/contracts'
@@ -35,15 +38,32 @@ type CreatePullRequestInput = {
 
 /** Pull request creation and discussion share the selected remote and authentication. */
 export type ForgeProvider = {
-  readonly discussion:
+  readonly activity: (
+    context: ForgeContext,
+    number: number,
+  ) => Promise<Omit<Extract<GitPullRequestActivity, { kind: 'ready' }>, 'kind' | 'forge'>>
+  readonly discussion: {
+    read: (
+      context: ForgeContext,
+      number: number,
+    ) => Promise<{ comments: readonly GitPullRequestComment[]; truncated: boolean }>
+    write:
+      | { kind: 'unsupported'; reason: string }
+      | {
+          kind: 'supported'
+          post: (context: ForgeContext, number: number, body: string) => Promise<void>
+        }
+  }
+  readonly review:
     | { kind: 'unsupported'; reason: string }
     | {
         kind: 'supported'
-        read: (
+        verdicts: readonly GitPullRequestReviewVerdict[]
+        submit: (
           context: ForgeContext,
           number: number,
-        ) => Promise<{ comments: readonly GitPullRequestComment[]; truncated: boolean }>
-        post: (context: ForgeContext, number: number, body: string) => Promise<void>
+          input: GitPullRequestReviewInput,
+        ) => Promise<void>
       }
   readonly kind: GitForgeKind
   support: (context: ForgeContext) => Promise<Exclude<GitPullRequestSupport, 'no-forge'>>

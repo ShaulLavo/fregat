@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -18,14 +18,17 @@ import {
   decideQuiet,
   drainRequest,
   legacyHold,
-  liveSlices,
+  orphanSlices,
   readReadings,
+  sliceState,
   type Limits,
+  type LiveSlice,
 } from './admission'
 import {
   HOSTS,
   isHost,
   reapSlice,
+  removeSlice,
   startJob,
   stopTimeoutSeconds,
   type Host,
@@ -37,13 +40,24 @@ import {
   DEFAULT_STATE_DIR,
   isProductionState,
   PRODUCTION,
+  isSliceRoot,
   sliceRootFor,
   type Production,
   tryLock,
+  unlessMissing,
   unlock,
   waitLock,
 } from './lock'
-import { enqueue, live, promote, release, type Entry, type Held } from './queue'
+import {
+  deadJobs,
+  enqueue,
+  live,
+  promote,
+  release,
+  type DeadJob,
+  type Entry,
+  type Held,
+} from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
@@ -175,7 +189,7 @@ function sliceRootOption(given: string | undefined, stateDir: string, production
   // The directory must exist for its identity to decide its root.
   mkdirSync(stateDir, { recursive: true })
   const root = given ?? sliceRootFor(stateDir, production)
-  if (!/^[a-z0-9]+$/.test(root)) {
+  if (!isSliceRoot(root)) {
     throw createScriptError(
       `--slice-root takes lowercase letters and digits; got ${root}. ${USAGE}`,
     )
@@ -268,6 +282,7 @@ async function admitLocal(
     pid: process.pid,
     quiet: options.quiet,
     since: new Date().toISOString(),
+    sliceRoot: options.sliceRoot,
   }
   const admitted = await admit(options, config, entry)
   if (options.quiet) {
@@ -293,6 +308,7 @@ async function admitLocal(
       id,
       sliceRoot: options.sliceRoot,
       runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
+      entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
   }
@@ -359,7 +375,7 @@ function attemptAdmission(
   const lock = waitLock(path.join(options.stateDir, 'admission.lock'))
   try {
     // Every waiting wrapper reclaims what dead wrappers left, before any rule can stop it.
-    const running = reconcile(options)
+    const running = reconcile(options, config.graceSeconds)
     const ahead = live(options.stateDir, 'queue').findIndex(
       (entry) => entry.id === waiting.entry.id,
     )
@@ -375,7 +391,7 @@ function attemptAdmission(
       ? decideQuiet(running.owners.length + running.orphanCharges.length)
       : decide(
           waiting.entry.estimateBytes,
-          [...running.orphanCharges, ...ownerCharges(options, running.owners)],
+          [...running.orphanCharges, ...ownerCharges(running.owners)],
           readReadings(options.procRoot),
           config.limits,
         )
@@ -400,30 +416,80 @@ function attemptAdmission(
 }
 
 /**
- * Reaps orphans: job slices whose wrapper is gone (no live entry). Each is charged its ceiling
- * less its use, read before the kill; if the kill fails it may still grow that far.
+ * Reaps orphans: job slices whose wrapper is gone (`orphanSlices`). Each is charged its
+ * ceiling less its use, read before the kill; if the kill fails it may still grow that far.
  */
-function reconcile(options: Options) {
+function reconcile(options: Options, graceSeconds: number) {
   const owners = live(options.stateDir, 'jobs')
-  const orphans = liveSlices(options.sliceRoot).filter(
-    (slice) => !owners.some((job) => job.id === slice.id),
-  )
+  const dead = deadJobs(options.stateDir)
+  const orphans = orphanSlices(options.sliceRoot, owners, dead)
   const orphanCharges = orphans.map((orphan) =>
-    chargeOf(options.sliceRoot, orphan.slice, orphan.ceilingBytes),
+    chargeOf(orphan.root, orphan.slice, orphan.ceilingBytes),
   )
-  for (const orphan of orphans) {
-    console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
-    reapSlice(options.sliceRoot, orphan.slice)
-  }
+  for (const orphan of orphans) reapOrphan(options.stateDir, orphan, graceSeconds)
+  forgetStoppedFailures(options.stateDir)
+  for (const job of dead) settleDeadEntry(job)
   clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
   return { orphanCharges, owners }
 }
 
-// The part of each live job's estimate it may still claim; a job admitted but not yet in its
-// slice is charged its whole estimate. Read beside MemAvailable: both move while jobs run.
-function ownerCharges(options: Options, owners: readonly Entry[]) {
+// A slice that outlives its stop stays charged and is retried quietly on each later pass. A
+// marker under `reaping/` keeps the series across wrappers: one warning when it starts, one
+// error once the stop timeout has passed, each naming the slice and how to stop it by hand.
+function reapOrphan(stateDir: string, orphan: LiveSlice, graceSeconds: number) {
+  const marker = path.join(stateDir, 'reaping', orphan.slice)
+  const failing = readText(marker).trim()
+  if (!failing) console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
+  reapSlice(orphan.root, orphan.slice)
+  if (sliceState(orphan.root, orphan.slice) !== 'running') return rmSync(marker, { force: true })
+  const now = bootSeconds()
+  if (!failing) {
+    mkdirSync(path.dirname(marker), { recursive: true })
+    writeFileSync(marker, `${now} warned`)
+    console.error(
+      `[wave-heavy] warn: ${orphan.slice} is still running after a stop; later admissions retry it and count its memory`,
+    )
+    return
+  }
+  const [since = '0', reported] = failing.split(' ')
+  if (reported === 'error' || now - Number(since) < stopTimeoutSeconds(graceSeconds)) return
+  writeFileSync(marker, `${since} error`)
+  console.error(
+    `[wave-heavy] error: ${orphan.slice} is still running ${Math.round(now - Number(since))} s after its first stop; stop it with: systemctl --user stop ${orphan.slice}`,
+  )
+}
+
+// A slice that stopped some other way ends its failure series.
+function forgetStoppedFailures(stateDir: string) {
+  const dir = path.join(stateDir, 'reaping')
+  for (const slice of unlessMissing(() => readdirSync(dir)) ?? []) {
+    const root = slice.slice(0, slice.lastIndexOf('-'))
+    if (isSliceRoot(root) && sliceState(root, slice) === 'running') continue
+    rmSync(path.join(dir, slice), { force: true })
+  }
+}
+
+// A dead entry is the only record of a slice on another root, so it stays until that slice is
+// gone, or empty and stopped; a stop that failed is retried, and charged, on the next pass. An
+// entry this wrapper did not write names nothing and is dropped.
+function settleDeadEntry(job: DeadJob) {
+  if (!job.attributable) {
+    console.error(`[wave-heavy] dropped ${job.file}: not a job entry a wrapper wrote`)
+    return rmSync(job.file, { force: true })
+  }
+  const slice = `${job.entry.sliceRoot}-${job.entry.id}.slice`
+  const state = sliceState(job.entry.sliceRoot, slice)
+  if (state === 'running') return
+  if (state === 'empty' && !removeSlice(slice)) return
+  rmSync(job.file, { force: true })
+}
+
+// The part of each live job's estimate it may still claim, by the slice root it runs under; a
+// job admitted but not yet in its slice is charged its whole estimate. Read beside
+// MemAvailable: both move while jobs run.
+function ownerCharges(owners: readonly Entry[]) {
   return owners.map((job) =>
-    chargeOf(options.sliceRoot, `${options.sliceRoot}-${job.id}.slice`, job.estimateBytes),
+    chargeOf(job.sliceRoot, `${job.sliceRoot}-${job.id}.slice`, job.estimateBytes),
   )
 }
 

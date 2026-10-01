@@ -34,6 +34,7 @@ import type {
   GitCommitBody,
   GitCreatePullRequestBody,
   GitPullRequestCommentBody,
+  GitPullRequestReviewBody,
   GitCreateBranchBody,
   GitPathsBody,
 } from './contracts'
@@ -42,8 +43,10 @@ import { forgetForgeContext } from './forges/registry'
 import {
   createForgeRepository,
   createPullRequest,
+  readPullRequestActivity,
   readPullRequestComments,
   postPullRequestComment,
+  submitPullRequestReview,
   readPullRequest,
   resolvePullRequest,
   readPullRequestsByNumber,
@@ -848,6 +851,15 @@ export class GitService {
     }
   }
 
+  async pullRequestActivity(input: { path: string; number: number }) {
+    recordGitServiceOperation('pull_request_activity', input.path)
+    const repository = await this.requiredRepository(input.path)
+    return readPullRequestActivity(
+      { cwd: repository.rootAbsolutePath, number: input.number },
+      this.forgeBoundaries,
+    )
+  }
+
   async pullRequestComments(input: { path: string; number: number }) {
     recordGitServiceOperation('pull_request_comments', input.path)
     const repository = await this.requiredRepository(input.path)
@@ -861,6 +873,15 @@ export class GitService {
     recordGitServiceOperation('pull_request_comment', input.path)
     const repository = await this.requiredRepository(input.path)
     return postPullRequestComment(
+      { ...input, cwd: repository.rootAbsolutePath },
+      this.forgeBoundaries,
+    )
+  }
+
+  async submitPullRequestReview(input: GitPullRequestReviewBody) {
+    recordGitServiceOperation('pull_request_review', input.path)
+    const repository = await this.requiredRepository(input.path)
+    return submitPullRequestReview(
       { ...input, cwd: repository.rootAbsolutePath },
       this.forgeBoundaries,
     )

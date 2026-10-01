@@ -49,6 +49,47 @@ if (
   } else out(comments)
   process.exit(0)
 }
+if (
+  args[0] === 'api' &&
+  args.includes('POST') &&
+  args.some((arg) => /^repos\/[^/]+\/[^/]+\/pulls\/\d+\/reviews$/.test(arg))
+) {
+  const data = forge()
+  if (data.failReview) {
+    process.stderr.write('fixture review refusal\n')
+    process.exit(1)
+  }
+  const review = JSON.parse(readFileSync(0, 'utf8'))
+  const reviews = [...(data.reviews ?? []), review]
+  writeFileSync(join(root, 'forge.json'), JSON.stringify({ ...data, reviews }))
+  out({ id: reviews.length, ...review })
+  process.exit(0)
+}
+if (args[0] === 'api' && !args.includes('POST')) {
+  const endpoint = args.find((arg) => /^repos\/[^/]+\/[^/]+\/pulls\/\d+\//.test(arg)) ?? ''
+  const data = forge()
+  if (endpoint.includes('/reviews?')) {
+    out([
+      ...(data.activityReviews ?? []),
+      ...(data.reviews ?? []).map((review, index) => ({
+        id: index + 100,
+        body: review.body,
+        state: review.event === 'APPROVE' ? 'APPROVED' : review.event,
+        user: { login: 'reviewer' },
+        submitted_at: '2026-10-01T11:00:00Z',
+      })),
+    ])
+    process.exit(0)
+  }
+  if (endpoint.includes('/commits?')) {
+    out(data.activityCommits ?? [])
+    process.exit(0)
+  }
+  if (endpoint.includes('/comments?')) {
+    out(data.activityDiscussions ?? [])
+    process.exit(0)
+  }
+}
 if (args[0] === 'api' && args[1] === 'graphql') {
   const branches = forge().branches ?? {}
   const repository = {}

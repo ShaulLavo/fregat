@@ -12,11 +12,21 @@ export function createForgeDiscussionBoundary() {
     html_url: string
     user: { login: string }
   }[] = []
+  const reads: string[] = []
+  const activityReads: string[] = []
   const writes: string[] = []
+  const reviews: { body: string; event: string }[] = []
+  const activityReviews: unknown[] = []
+  const activityCommits: unknown[] = []
+  const activityDiscussions: unknown[] = []
+  const azureThreads: unknown[] = []
   const remoteProbes: (readonly string[])[] = []
   const control = {
     failPost: false,
+    failReview: false,
     beforePost: async () => {},
+    beforeRead: async () => {},
+    beforeActivityRead: async () => {},
   }
   const run: NonNullable<ForgeBoundaries['run']> = async ({ argv, input, cwd }) => {
     const ok = (stdout = '') => ({ exitCode: 0, stderr: '', stdout })
@@ -31,12 +41,35 @@ export function createForgeDiscussionBoundary() {
       remoteProbes.push(argv)
       return runGit(cwd, argv.slice(3), { allowFailure: true })
     }
-    if (argv[0] === 'az' && argv[1] === 'account') return ok('fixture')
+    if (argv[0] === 'az') {
+      if (argv[1] === 'account') return ok('fixture')
+      if (argv.includes('show'))
+        return ok(JSON.stringify({ repository: { name: 'repo', project: { name: 'project' } } }))
+      if (argv.includes('invoke')) return ok(JSON.stringify({ value: azureThreads }))
+    }
     if (argv[0] === 'gh' && argv[1] === 'auth') return ok()
     if (argv[0] === 'gh' && argv[1] === 'api') {
+      if (argv.some((arg) => arg.endsWith('/pulls/7/reviews')) && argv.includes('POST')) {
+        if (control.failReview) return { exitCode: 1, stderr: 'fixture review refusal', stdout: '' }
+        reviews.push(JSON.parse(input ?? '{}'))
+        return ok('{}')
+      }
+      if (!argv.includes('POST') && argv.some((arg) => arg.includes('/pulls/7/'))) {
+        activityReads.push('activity')
+        await control.beforeRead()
+        await control.beforeActivityRead()
+        const endpoint = argv.find((arg) => arg.includes('/pulls/7/')) ?? ''
+        if (endpoint.includes('/reviews?')) return ok(JSON.stringify(activityReviews))
+        if (endpoint.includes('/commits?')) return ok(JSON.stringify(activityCommits))
+        if (endpoint.includes('/comments?')) return ok(JSON.stringify(activityDiscussions))
+      }
       if (!argv.some((arg) => arg.includes('/issues/7/comments')))
         return { exitCode: 1, stderr: 'unexpected endpoint', stdout: '' }
-      if (!argv.includes('POST')) return ok(JSON.stringify(comments))
+      if (!argv.includes('POST')) {
+        reads.push('comments')
+        await control.beforeRead()
+        return ok(JSON.stringify(comments))
+      }
       const { body } = JSON.parse(input ?? '{}') as { body: string }
       writes.push(body)
       await control.beforePost()
@@ -53,5 +86,18 @@ export function createForgeDiscussionBoundary() {
     }
     return { exitCode: 1, stderr: 'unexpected forge command', stdout: '' }
   }
-  return { run, comments, writes, control, remoteProbes }
+  return {
+    run,
+    comments,
+    reads,
+    writes,
+    reviews,
+    activityReads,
+    activityReviews,
+    activityCommits,
+    activityDiscussions,
+    azureThreads,
+    control,
+    remoteProbes,
+  }
 }

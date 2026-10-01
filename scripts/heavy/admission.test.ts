@@ -7,6 +7,7 @@ import { decide, liveSlices, sliceStat, type Limits, type Readings } from './adm
 import {
   type Box,
   endedAt,
+  firstDecision,
   heavy,
   MiB,
   recordOf,
@@ -15,6 +16,7 @@ import {
   start,
   startedAt,
   unitActive,
+  until,
   userScopes,
   writeMachine,
   writeSettings,
@@ -75,8 +77,6 @@ const SYSTEMCTL = spawnSync('sh', ['-c', 'command -v systemctl'], {
   encoding: 'utf8',
 }).stdout.trim()
 
-// A shell loop that holds until the test creates `file`.
-const until = (file: string) => `until [ -e ${file} ]; do sleep 0.02; done`
 const anon = (mib: number) =>
   `bun -e 'const b = Buffer.alloc(${mib} * 2 ** 20, 1); setInterval(() => b.at(0), 1000)'`
 const holdingAnon = (mib: number, release: string) => [
@@ -94,17 +94,6 @@ function onlySlice(box: Box) {
 
 function counter({ root, slice }: { root: string; slice: string }, name: string) {
   return sliceStat(root, slice)?.[name] ?? 0
-}
-
-// Whether a job started at once or reported a wait first; either way it is left to finish.
-async function firstDecision(job: ReturnType<typeof start>) {
-  let ended = false
-  void job.done.then(() => (ended = true))
-  for (;;) {
-    if (job.stderr().includes('is waiting:')) return 'waiting'
-    if (ended) return 'started'
-    await new Promise((resolve) => setTimeout(resolve, 20))
-  }
 }
 
 // A directory on disk: on tmpfs a file is shmem, which is memory in use.

@@ -29,8 +29,31 @@ afterEach(async () => {
 })
 
 describe('provider driver registry', () => {
+  it('hands the explicit execution cwd unchanged to each driver instance', async () => {
+    const cwd = await fixtureRoot()
+    const received: string[] = []
+    const registry = new ProviderAdapterRegistry({
+      services: { cwd },
+      drivers: [
+        {
+          ...mockDriver,
+          create: async (input) => {
+            received.push(input.services.cwd)
+            return mockDriver.create(input)
+          },
+        },
+      ],
+    })
+    registries.push(registry)
+
+    await registry.reconcile([instance(WORK, {}), instance(PERSONAL, {})])
+
+    expect(received).toEqual([cwd, cwd])
+  })
+
   it('lists import-capable instances with default or explicit enablement and excludes disabled instances', async () => {
     const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
       drivers: [
         {
           ...mockDriver,
@@ -291,6 +314,7 @@ describe('provider registry change stream', () => {
 
 function createRegistry(statusCache?: ProviderStatusCache) {
   const registry = new ProviderAdapterRegistry({
+    services: { cwd: process.cwd() },
     drivers: [mockDriver],
     ...(statusCache ? { statusCache } : {}),
   })

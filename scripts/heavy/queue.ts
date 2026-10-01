@@ -9,7 +9,15 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 
-import { lockDescriptor, openExisting, tryLock, unlessMissing, unlock, waitLock } from './lock'
+import {
+  isSliceRoot,
+  lockDescriptor,
+  openExisting,
+  tryLock,
+  unlessMissing,
+  unlock,
+  waitLock,
+} from './lock'
 
 /** A job in the state directory: waiting in `queue/`, or running in `jobs/`. */
 export type Entry = {
@@ -17,6 +25,8 @@ export type Entry = {
   readonly label: string
   readonly jobClass: string
   readonly estimateBytes: number
+  /** Where its slice runs: `<sliceRoot>-<id>.slice`. Wrappers sharing a state directory may differ. */
+  readonly sliceRoot: string
   /** A `--quiet` job: it runs alone, for at most one quiet hold. */
   readonly quiet: boolean
   /**
@@ -70,30 +80,74 @@ export function release(held: Held) {
 }
 
 /**
- * Live entries in arrival order. An unlocked file belongs to a dead wrapper and is removed; a
- * file that disappears during the scan belongs to a wrapper that just finished, and is gone.
+ * Live entries in arrival order. A waiting entry whose file is unlocked belongs to a dead
+ * wrapper and is removed; a dead job's entry stays for `deadJobs`, since it names the slice
+ * left running. A file that disappears during the scan belongs to a wrapper that just finished.
  */
 export function live(stateDir: string, place: Place): Entry[] {
+  return scan(stateDir, place).flatMap(({ entry, file, owned }) => {
+    if (owned) return entry ? [entry] : []
+    if (place === 'queue') rmSync(file, { force: true })
+    return []
+  })
+}
+
+/**
+ * Running entries whose wrapper is gone. Only an `attributable` one may name a slice to stop:
+ * its file is `<id>.json`, it parses, its id has the wrapper's shape and its root the CLI's
+ * grammar. The caller removes each file once its slice has stopped.
+ */
+export function deadJobs(stateDir: string): DeadJob[] {
+  return scan(stateDir, 'jobs')
+    .filter(({ owned }) => !owned)
+    .map(({ entry, file }) =>
+      entry && path.basename(file) === `${entry.id}.json` && isSliceRoot(entry.sliceRoot)
+        ? { attributable: true, entry, file }
+        : { attributable: false, file },
+    )
+}
+
+export type DeadJob =
+  | { readonly attributable: true; readonly entry: Entry; readonly file: string }
+  | { readonly attributable: false; readonly file: string }
+
+// File names as `enqueue` and `promote` write them; nothing else in these directories is read.
+const NAMES: Record<Place, RegExp> = {
+  jobs: /^[0-9a-f]{12}\.json$/,
+  queue: /^\d{12}-[0-9a-f]{12}\.json$/,
+}
+
+// Every entry file with its lock state; `entry` is null when the file is not one this wrapper
+// writes, by name or content.
+function scan(stateDir: string, place: Place) {
   const dir = path.join(stateDir, place)
   return (unlessMissing(() => readdirSync(dir)) ?? [])
     .filter((name) => name.endsWith('.json'))
     .toSorted()
     .flatMap((name) => {
-      const entry = liveEntry(path.join(dir, name))
-      return entry ? [entry] : []
+      const file = path.join(dir, name)
+      const read = readEntry(file, NAMES[place].test(name))
+      return read ? [{ file, ...read }] : []
     })
 }
 
 // Read through the descriptor that saw the lock: the owner may unlink the path meanwhile.
-function liveEntry(file: string): Entry | null {
+function readEntry(file: string, named: boolean) {
   const fd = openExisting(file)
   if (fd === null) return null
   try {
-    if (!lockDescriptor(fd)) return JSON.parse(readFileSync(fd, 'utf8')) as Entry
-    rmSync(file, { force: true })
-    return null
+    const owned = !lockDescriptor(fd)
+    return { entry: named ? parseEntry(readFileSync(fd, 'utf8')) : null, owned }
   } finally {
     closeSync(fd)
+  }
+}
+
+function parseEntry(text: string): Entry | null {
+  try {
+    return JSON.parse(text) as Entry
+  } catch {
+    return null
   }
 }
 

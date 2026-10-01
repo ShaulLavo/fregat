@@ -14,9 +14,11 @@ import { DraftAgentList } from './draft-agent-list'
 export function DraftAgentMenu({
   cwd,
   onSelect,
+  pending,
   providerInstanceId,
   value,
 }: {
+  readonly pending: boolean
   readonly cwd: string
   readonly onSelect: (agent: string | null) => void
   readonly providerInstanceId: ProviderInstanceId | null
@@ -30,6 +32,7 @@ export function DraftAgentMenu({
           <Button
             aria-label='Run the session as an agent'
             className='text-muted-foreground min-w-0 gap-1 text-xs font-normal'
+            disabled={pending}
             size='sm'
             title={value ? `Runs as the ${value} agent` : 'Runs as the default agent'}
             type='button'
