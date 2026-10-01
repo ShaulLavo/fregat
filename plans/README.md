@@ -129,6 +129,7 @@ not a second live status register.
 | [278](278-vim-visual-multicursor.md)               | Vim visual and multi-cursor modes                                             |
 | [279](279-vim-registers-marks-repeat.md)           | Vim registers, marks, macros and repeat                                       |
 | [280](280-vim-insert-entry-control.md)             | Vim insert entry and control keys                                             |
+| [284](284-resource-aware-heavy-jobs.md)            | Resource-aware heavy jobs and a weak-machine (Raspberry Pi) lane              |
 | [208](208-all-text-in-json.md)                     | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
