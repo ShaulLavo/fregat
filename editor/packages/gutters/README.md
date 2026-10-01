@@ -1,14 +1,14 @@
 # @singapore-editor/gutters
 
-Line-number and fold-gutter plugins for `@singapore-editor/core`.
+line numbers and fold arrows for the editor's left edge
 
-## Install
+folds come from the syntax plugin when one is loaded and from indentation otherwise, so the fold gutter works on plain text too
+
+## try it
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/gutters
 ```
-
-## Usage
 
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
@@ -16,13 +16,14 @@ import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapore-edito
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/gutters/style.css'
 
-const editor = new Editor(document.querySelector('#editor')!, {
+const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
   plugins: [createLineGutterPlugin(), createFoldGutterPlugin()],
 })
 ```
 
-Fold icons accept strings, DOM factories, or a `FoldGutterSvgIcon` descriptor through `icon`,
-`expandedIcon`, and `collapsedIcon`:
+line numbers take `startLine`, `minDigits`, a css `counterStyle`, or `labelForRow` to print your own label per row
+
+fold arrows take a string, an svg path, or a function that returns a dom node, through `icon`, `expandedIcon` and `collapsedIcon`
 
 ```ts
 createFoldGutterPlugin({
@@ -31,18 +32,9 @@ createFoldGutterPlugin({
 })
 ```
 
-SVG icons use `currentColor` and fill their wrapper. Set its dimensions through `iconClassName`;
-the parent button's `data-editor-fold-state` is `expanded` or `collapsed` for state styling.
-Strings and SVG descriptors support provisional paint snapshots. DOM factories disable fold-gutter
-snapshots because restoring them would require the source fold marker.
+svg icons use `currentColor` and fill their wrapper, so size them through `iconClassName`. the button's `data-editor-fold-state` is `expanded` or `collapsed` for styling. strings and svg icons can be painted from a snapshot before the editor is ready. a dom-node function turns that snapshot off
 
-## Exports
+## more
 
-- `createLineGutterPlugin` adds a line-number gutter.
-- `createFoldGutterPlugin` adds fold controls for syntax fold markers.
-- `createLineGutterContribution` and `createFoldGutterContribution` expose the lower-level gutter
-  contributions.
-- The gutter passes presses through to the text. A contribution whose cell handles them sets
-  `interactive: true`, as the fold gutter does; its cell then takes pointer events, and a press it
-  does not claim still places the caret.
-- `@singapore-editor/gutters/style.css` imports both gutter styles.
+- `@singapore-editor/gutters/line-gutter` and `/fold-gutter` import one gutter alone, with `line-gutter.css` and `fold-gutter.css` beside them
+- `createLineGutterContribution` and `createFoldGutterContribution` return the raw gutter contribution, for hosts that register gutters themselves. gutter cells let clicks through to the text unless the contribution sets `interactive: true`, as the fold gutter does

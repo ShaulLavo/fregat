@@ -1,60 +1,44 @@
 # @singapore-editor/typescript-lsp
 
-TypeScript language-service plugin for Singapore.
+typescript and javascript language features for the editor, all in the browser. the real typescript language service runs in a web worker and talks lsp to [`@singapore-editor/lsp-plugin`](../lsp-plugin/)
 
-This package wires the generic LSP adapter to a browser worker backed by TypeScript and
-`@typescript/vfs`.
+you get diagnostics, completion, hover, signature help, go to definition, references, rename, code actions and formatting. the standard library `.d.ts` files ship with the package
 
-## Install
+## try it
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/typescript-lsp
 ```
 
-## Usage
-
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
 import { createTypeScriptLspPlugin } from '@singapore-editor/typescript-lsp'
+import '@singapore-editor/core/style.css'
 
-const editor = new Editor(document.querySelector('#editor')!, {
-  plugins: [createTypeScriptLspPlugin()],
+const typescript = createTypeScriptLspPlugin()
+const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
+  plugins: [typescript],
+})
+
+typescript.setWorkspaceFiles([
+  { path: '/src/math.ts', text: 'export const add = (a: number, b: number) => a + b\n' },
+])
+
+editor.openDocument({
+  documentId: '/src/main.ts',
+  text: "import { add } from './math'\n\nadd(1, '2')\n",
+  languageId: 'typescript',
 })
 ```
 
-## Exports
+the worker sees the open document plus whatever you hand `setWorkspaceFiles`, so imports resolve and `'2'` gets a red squiggle. update files with `upsertWorkspaceFiles` and `deleteWorkspaceFiles`
 
-- `createTypeScriptLspPlugin` registers completion, diagnostics, hover, definition, and reference
-  behavior for TypeScript documents.
-- `createTypeScriptLspWorkerOwner` exposes the worker owner for custom wiring.
-- `summarizeDiagnostics` and `diagnosticHighlightGroups` expose diagnostic helpers.
-- `fileNameToDocumentUri`, `documentUriToFileName`, and related path helpers are re-exported.
+`compilerOptions` sets the compiler options. `onDiagnostics`, `onOpenDefinition` and `onApplyWorkspaceEdit` hand counts, cross-file jumps and multi-file edits to your app
 
-## Sharing one project across editors
+## more
 
-Create one `TypeScriptLspWorkspace` for the project's source files and one
-`LspConnectionPool` provider for its root, configuration and compiler options. Pass the same
-`workspace` and `connectionProvider` to each document's `createTypeScriptLspPlugin` call.
-Each plugin keeps its own navigation and diagnostic callbacks while borrowing the worker.
-
-```ts
-import { LspConnectionPool } from '@singapore-editor/lsp-plugin'
-import { createTypeScriptLspPlugin, TypeScriptLspWorkspace } from '@singapore-editor/typescript-lsp'
-
-const pool = new LspConnectionPool()
-const workspace = new TypeScriptLspWorkspace()
-workspace.setWorkspaceFiles(projectFiles)
-const connectionProvider = pool.provider(projectIdentity)
-const plugin = createTypeScriptLspPlugin({
-  workspace,
-  connectionProvider,
-  rootUri,
-  compilerOptions,
-})
-```
-
-Apply disk changes through the workspace's `upsertWorkspaceFiles` and `deleteWorkspaceFiles`.
-A shared connection receives one initial file set, retains updates while any document borrows it,
-and receives the current set after reconnecting. Release editor registrations normally and call
-`pool.dispose()` when the project's owner ends. Use a new provider identity when compiler options
-or canonical paths change so the initialized worker matches its project.
+- [one project, many editors](docs/shared-project.md), sharing one worker and file set across tabs
+- `@singapore-editor/typescript-lsp/server`, `createTypeScriptLspServerSession({ send })` runs the same worker behind your own socket
+- `@singapore-editor/typescript-lsp/ts-diagnostics`, converts typescript diagnostics to lsp ones
+- `createTypeScriptLspWorkerOwner` for hosts that start and watch the worker themselves
+- [`@singapore-editor/lsp-plugin`](../lsp-plugin/), the generic plugin this one configures

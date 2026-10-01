@@ -1,14 +1,12 @@
 # @singapore-editor/react
 
-React bindings for `@singapore-editor/core`.
+react bindings for [`@singapore-editor/core`](../editor/README.md). `useEditor` builds a controller from props, `EditorHost` mounts it, and the editor follows your props as they change
 
-## Install
+## try it
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/react react react-dom
 ```
-
-## Usage
 
 ```tsx
 import { EditorHost, useEditor } from '@singapore-editor/react'
@@ -23,12 +21,23 @@ export function EditorPanel() {
     },
   })
 
-  return <EditorHost controller={controller} />
+  return <EditorHost controller={controller} style={{ height: '32rem' }} />
 }
 ```
 
-## Exports
+the editor reopens the document when `documentId`, `documentMode`, `languageId` or `revision` changes. bump `revision` to load new text under the same id, or set `textSyncMode: 'incremental'` to sync each new `text` into the open document
 
-- `useEditor` creates and synchronizes an editor controller with React state.
-- `EditorHost` mounts the editor into the DOM.
-- `useEditorSelector` subscribes to selected editor store values.
+options like `theme`, `tabSize`, `wordWrap`, `selection` and `plugins` are props too, and update the live editor
+
+## reading state
+
+```tsx
+const isDirty = useEditorSelector(controller, (store) => store.state?.isDirty ?? false)
+```
+
+`useEditorSelector` re-renders only when its slice changes. `controller.commands` has `focus`, `setText`, `edit`, `setSelection`, `dispatchCommand` and the find commands. `controller.getEditor()` gives you the `Editor` itself
+
+## more
+
+- [core](../editor/README.md), for what the editor and its options do
+- [solid bindings](../solid/README.md)

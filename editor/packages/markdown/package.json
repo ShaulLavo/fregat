@@ -1,6 +1,11 @@
 {
   "name": "@singapore-editor/markdown",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShaulLavo/fregat.git",
+    "directory": "editor/packages/markdown"
+  },
   "files": [
     "README.md",
     "dist"

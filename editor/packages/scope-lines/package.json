@@ -1,6 +1,11 @@
 {
   "name": "@singapore-editor/scope-lines",
   "version": "0.1.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShaulLavo/fregat.git",
+    "directory": "editor/packages/scope-lines"
+  },
   "files": [
     "README.md",
     "dist"
