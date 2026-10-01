@@ -72,7 +72,7 @@ Execution checklist (DOM/first-frame lane):
 - [x] Implement and test the DOM backend and pure HTML output; bump the package minor.
 - [x] Inline the real-core first frame, self-host fonts, parallelize boot, paint-gated hand-off.
 - [x] Repeat the timeline and read desktop, phone and hand-off screenshots.
-- [ ] Commit by path, push and open the lane PR.
+- [x] Commit by path, push and open the lane PR.
 
 Before touching the boot path, record when the ghost first appears, on a cold cache, throttled to
 "Fast 4G" and to a slow desktop CPU, in Chromium: HTML paint, font ready, wasm fetched, `create`
@@ -159,6 +159,9 @@ Desktop and phone looks were healthy and read back at `/work/tmp/fregat-evidence
 `20261001T211931Z-look-ghostty-webgpu-390x844/`).
 
 ### Final overlay integration (2026-10-02)
+
+Phase 2 PR: <https://github.com/ShaulLavo/fregat/pull/304>. Committed by path and pushed;
+full commit gates and repository typecheck pass. Phase 1 is merged in #285.
 
 The static chrome retains #302's Redraws toggle, initially off, alongside the three demo tabs
 and lowercase `html` backend. Mobile chrome hides the decorative dots. Canvas2D capability
