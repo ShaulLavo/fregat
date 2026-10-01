@@ -187,12 +187,16 @@ describe.skipIf(!userScopes)('a lane run', () => {
   }, 40_000)
 
   test('kills a cancelled job that ignores TERM, within the grace period', async () => {
-    const job = laneRun('stubborn', 'trap "" TERM; sleep 30', 1)
+    const job = laneRun('stubborn', 'trap "" TERM; touch "$LANE_RUN/ready"; sleep 30', 1)
     const cancel = new AbortController()
-    setTimeout(() => cancel.abort('SIGTERM'), 1_000)
+    // Cancel only once the trap is set: a TERM before it would end the job unaided.
+    const ready = setInterval(() => {
+      if (existsSync(path.join(laneRunDirectory(job), 'ready'))) cancel.abort('SIGTERM')
+    }, 50)
     const started = performance.now()
     const outcome = await runOnLane(job, { ...options, signal: cancel.signal })
-    expect(performance.now() - started).toBeLessThan(10_000)
+    clearInterval(ready)
+    expect(performance.now() - started).toBeLessThan(15_000)
     expect(outcome).toMatchObject({ exitCode: 143, abandoned: false })
     expect(loaded(`${laneUnit(job.name)}.slice`)).toBe(false)
   }, 40_000)

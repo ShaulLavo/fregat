@@ -22,7 +22,8 @@ type Lane = {
   oomKills: number | null
   slice: string
 }
-type Stdin = 'heartbeat' | 'closed' | 'silent'
+// `ready`: heartbeats until the job writes $LANE_RUN/ready, then closed.
+type Stdin = 'heartbeat' | 'closed' | 'silent' | 'ready'
 
 // The same shell the Pi runs, run here; the lane root's platform/ is this checkout. stdin plays
 // the lane's controlling connection: heartbeat lines, closed at once, or open and quiet.
@@ -55,19 +56,27 @@ async function runLane(
     stderr: 'pipe',
   })
   const stdin = options.stdin ?? 'heartbeat'
+  const run = laneRunDirectory(job)
+  let open = stdin !== 'closed'
+  const close = () => {
+    if (!open) return
+    open = false
+    void child.stdin.end()
+  }
   const beat =
-    stdin === 'heartbeat'
+    stdin === 'heartbeat' || stdin === 'ready'
       ? setInterval(() => {
+          if (stdin === 'ready' && existsSync(path.join(run, 'ready'))) return close()
+          if (!open) return
           child.stdin.write('\n')
           void child.stdin.flush()
-        }, 200)
+        }, 50)
       : undefined
   if (stdin === 'closed') void child.stdin.end()
   const status = await child.exited
   const ms = performance.now() - started
   clearInterval(beat)
-  if (stdin !== 'closed') void child.stdin.end()
-  const run = laneRunDirectory(job)
+  close()
   const file = path.join(run, 'lane.json')
   const lane = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as Lane) : null
   const unit = laneUnit(job.name)
@@ -134,6 +143,24 @@ describe.skipIf(!userScopes)('a lane job', () => {
     expect(readFileSync(path.join(run, 'evidence-root'), 'utf8')).toBe(run)
   })
 
+  test('hands the command to bash as written, with no expansion by systemd-run', async () => {
+    const { lane, run, unit } = await runLane(
+      'verbatim',
+      'printf %s "${HEAVY_JOB_SLICE%.slice} $((6 * 7))" > "$LANE_RUN/verbatim"',
+    )
+    expect(lane?.exitCode).toBe(0)
+    expect(readFileSync(path.join(run, 'verbatim'), 'utf8')).toBe(`${unit} 42`)
+  })
+
+  test('runs the job scope under OOMPolicy=continue, so job.sh outlives an OOM', async () => {
+    const { lane, run } = await runLane(
+      'oom-policy',
+      'systemctl --user show -p OOMPolicy --value "${HEAVY_JOB_SLICE%.slice}.scope" > "$LANE_RUN/oom-policy"',
+    )
+    expect(lane?.exitCode).toBe(0)
+    expect(readFileSync(path.join(run, 'oom-policy'), 'utf8').trim()).toBe('continue')
+  })
+
   test('stops the job when its controlling connection closes', async () => {
     const { status, ms, unit, stderr } = await runLane('closed', 'sleep 30', { stdin: 'closed' })
     expect(ms).toBeLessThan(10_000)
@@ -159,8 +186,10 @@ describe.skipIf(!userScopes)('a lane job', () => {
   }, 40_000)
 
   test('kills a job that ignores TERM once the grace period ends', async () => {
-    const { ms, unit, stderr } = await runLane('stubborn', 'trap "" TERM; sleep 30', {
-      stdin: 'closed',
+    // The lease closes only once the trap is set: a TERM before it would end the job unaided.
+    const command = 'trap "" TERM; touch "$LANE_RUN/ready"; sleep 30'
+    const { ms, unit, stderr } = await runLane('stubborn', command, {
+      stdin: 'ready',
       limits: { graceSec: 1 },
     })
     expect(stderr).toContain('sending KILL')
