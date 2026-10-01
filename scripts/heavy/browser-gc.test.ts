@@ -26,7 +26,7 @@ test.skipIf(!process.env.HEAVY_JOB_SLICE)(
 export default {
   test: {
     include: ['spec-*.test.ts'],
-    api: { host: '127.0.0.1', port: 0, strictPort: true },
+    api: { host: '127.0.0.1', strictPort: false },
     browser: { enabled: true, headless: true, screenshotFailures: false,
       provider: playwright(), instances: [{ browser: 'chromium' }] }
   }
