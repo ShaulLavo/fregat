@@ -137,6 +137,23 @@ describe.skipIf(!userScopes)('quiet holds', () => {
   }, 30_000)
 })
 
+describe.skipIf(!userScopes)('slices that run nothing', () => {
+  test('an empty slice left behind counts as nothing running and is left alone', async () => {
+    const box = quietBox(30)
+    const empty = `${box.sliceRoot}-leftover.slice`
+    spawnSync('systemd-run', ['--user', '--scope', '--quiet', `--slice=${empty}`, 'true'])
+    expect(spawnSync('systemctl', ['--user', 'is-active', empty]).stdout.toString().trim()).toBe(
+      'active',
+    )
+    const quiet = await heavy(box, 'quiet-now', ['true'], { jobClass: 'light', quiet: true })
+    expect(quiet.code).toBe(0)
+    expect(quiet.stderr).toContain('the machine is quiet')
+    const next = await heavy(box, 'alone', ['true'], { jobClass: 'light' })
+    expect(next.stderr).toContain('no heavy job is running')
+    expect(`${quiet.stderr}${next.stderr}`).not.toContain('its wrapper is gone')
+  }, 30_000)
+})
+
 test('--quiet applies to this machine only', () => {
   const result = spawnSync(process.execPath, [RUN, '--quiet', '--host', 'pi', 'q', '--', 'true'], {
     encoding: 'utf8',

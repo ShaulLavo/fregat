@@ -90,7 +90,7 @@ export type LiveSlice = {
 }
 
 /**
- * Every `<root>-<id>.slice` the user manager has under `<root>.slice`: the cgroup tree is what
+ * Every `<root>-<id>.slice` under `<root>.slice` with a process in it: the cgroup tree is what
  * runs, whatever happened to the wrappers. A slice removed during the scan is gone.
  */
 export function liveSlices(root: string): LiveSlice[] {
@@ -99,6 +99,10 @@ export function liveSlices(root: string): LiveSlice[] {
   return (unlessGone(() => readdirSync(dir)) ?? [])
     .filter((name) => name.startsWith(prefix) && name.endsWith('.slice'))
     .flatMap((slice) => {
+      // A slice whose processes have all exited runs nothing; systemd may keep it, or even
+      // its cgroup, after that.
+      const events = unlessGone(() => readFileSync(path.join(dir, slice, 'cgroup.events'), 'utf8'))
+      if (!events?.includes('populated 1')) return []
       const max = unlessGone(() => readFileSync(path.join(dir, slice, 'memory.max'), 'utf8'))
       if (max === null) return []
       const id = slice.slice(prefix.length, -'.slice'.length)
