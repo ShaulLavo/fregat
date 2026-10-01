@@ -1,7 +1,13 @@
 type NativeFixtureSession = { id: string; directory: string }
 
 export function startOpenCodeHttpFixture(
-  options: { port?: number; beforeAbortResponse?: () => Promise<void> } = {},
+  options: {
+    port?: number
+    beforeAbortResponse?: () => Promise<void>
+    beforePromptResponse?: () => Promise<Response | null>
+    beforeReplyResponse?: () => Promise<Response | null>
+    beforeEventHeaders?: () => Promise<void>
+  } = {},
 ) {
   const sessions = new Map<string, NativeFixtureSession>()
   const streams = new Set<ReadableStreamDefaultController<Uint8Array>>()
@@ -15,7 +21,7 @@ export function startOpenCodeHttpFixture(
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: options.port ?? 0,
-    async fetch(request) {
+    async fetch(request): Promise<Response> {
       const url = new URL(request.url)
       const directory = url.searchParams.get('directory') ?? ''
       const body = request.method === 'GET' ? undefined : await request.json()
@@ -29,6 +35,7 @@ export function startOpenCodeHttpFixture(
           all: [{ id: 'fixture', models: { text: { name: 'Fixture text' } } }],
         })
       if (url.pathname === '/event') {
+        await options.beforeEventHeaders?.()
         let controller: ReadableStreamDefaultController<Uint8Array>
         const stream = new ReadableStream<Uint8Array>({
           start(next) {
@@ -43,7 +50,7 @@ export function startOpenCodeHttpFixture(
         return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } })
       }
       if (url.pathname === '/session' && request.method === 'POST') {
-        const session = { id: `native-${++count}`, directory }
+        const session = { id: `native-${server.port}-${++count}`, directory }
         sessions.set(session.id, session)
         return Response.json(session)
       }
@@ -55,12 +62,17 @@ export function startOpenCodeHttpFixture(
       }
       if (url.pathname.endsWith('/prompt_async')) {
         emit('session.status', { sessionID: id, status: { type: 'busy' } })
-        return new Response(null, { status: 204 })
+        const response = await options.beforePromptResponse?.()
+        return response ?? new Response(null, { status: 204 })
       }
       if (url.pathname.endsWith('/abort') && options.beforeAbortResponse) {
         emit('session.status', { sessionID: id, status: { type: 'idle' } })
         await options.beforeAbortResponse()
         return Response.json(true)
+      }
+      if (url.pathname.endsWith('/reply') || url.pathname.endsWith('/reject')) {
+        const response = await options.beforeReplyResponse?.()
+        return response ?? Response.json(true)
       }
       if (
         url.pathname.endsWith('/abort') ||

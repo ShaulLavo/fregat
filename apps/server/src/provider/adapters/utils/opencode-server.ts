@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
+import { setTimeout as delay } from 'node:timers/promises'
 import { ProviderProcessLifetime } from '../process-lifetime'
 import { openCodeErrors } from './opencode-errors'
 
@@ -7,6 +8,8 @@ export class OpenCodeServer {
   private lifetime: ProviderProcessLifetime | null = null
   private starting: Promise<string> | null = null
   private url: string | null = null
+  private groupId: number | null = null
+  private readonly controller = new AbortController()
 
   private readonly options: { binaryPath?: string; env: NodeJS.ProcessEnv; serverUrl?: string }
 
@@ -18,11 +21,14 @@ export class OpenCodeServer {
     return this.options.serverUrl ?? this.url
   }
 
-  async start(cwd: string) {
+  async start(cwd: string, signal?: AbortSignal) {
     if (this.options.serverUrl) return this.options.serverUrl
     if (this.url && this.lifetime?.isAlive()) return this.url
     if (this.starting) return this.starting
-    this.starting = this.spawnServer(cwd)
+    const startupSignal = signal
+      ? AbortSignal.any([signal, this.controller.signal])
+      : this.controller.signal
+    this.starting = this.spawnServer(cwd, startupSignal)
     try {
       return await this.starting
     } finally {
@@ -31,15 +37,18 @@ export class OpenCodeServer {
   }
 
   async close() {
+    this.controller.abort()
     await this.starting?.catch(() => undefined)
-    await this.lifetime?.close()
+    await this.closeProcess()
     this.lifetime = null
     this.url = null
   }
 
-  private async spawnServer(cwd: string): Promise<string> {
+  private async spawnServer(cwd: string, signal: AbortSignal): Promise<string> {
     // Native port zero prefers 4096. A discovery/spawn race fails this owned launch.
     const port = await freeLoopbackPort()
+    if (signal.aborted)
+      throw openCodeErrors.OPENCODE_REQUEST_FAILED({ internal: { operation: 'startup-cancelled' } })
     const expectedUrl = `http://127.0.0.1:${port}`
     const child = spawn(
       this.options.binaryPath ?? 'opencode',
@@ -48,12 +57,20 @@ export class OpenCodeServer {
         cwd,
         env: this.options.env,
         stdio: ['ignore', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32',
       },
     )
     const lifetime = new ProviderProcessLifetime(child)
     this.lifetime = lifetime
+    this.groupId = process.platform === 'win32' ? null : (child.pid ?? null)
     let output = ''
     const ready = Promise.withResolvers<string>()
+    const cancel = () =>
+      ready.reject(
+        openCodeErrors.OPENCODE_REQUEST_FAILED({ internal: { operation: 'startup-cancelled' } }),
+      )
+    signal.addEventListener('abort', cancel, { once: true })
+    if (signal.aborted) cancel()
     const observe = (chunk: Buffer) => {
       output = (output + chunk.toString()).slice(-65_536)
       // SDKv2 releases changed the prefix, but kept the loopback listening URL.
@@ -97,13 +114,36 @@ export class OpenCodeServer {
       this.url = url
       return url
     } catch (error) {
-      await lifetime.close()
+      await this.closeProcess()
       throw error
     } finally {
       clearTimeout(timeout)
       child.stdout.off('data', observe)
       child.stderr.off('data', observe)
+      signal.removeEventListener('abort', cancel)
     }
+  }
+
+  private async closeProcess() {
+    const groupId = this.groupId
+    this.groupId = null
+    if (groupId && signalOwnedGroup(groupId, 'SIGTERM')) {
+      await delay(1_000)
+      signalOwnedGroup(groupId, 'SIGKILL')
+    }
+    await this.lifetime?.close()
+  }
+}
+
+function signalOwnedGroup(groupId: number, signal: NodeJS.Signals) {
+  try {
+    process.kill(-groupId, signal)
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false
+    throw openCodeErrors.OPENCODE_REQUEST_FAILED({
+      internal: { operation: 'group-signal', signal },
+    })
   }
 }
 

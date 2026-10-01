@@ -61,7 +61,14 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
   readonly adapterKey: ProviderInstanceId
   private readonly events = new ProviderRuntimeEventStream()
   private readonly sessions = new Map<SessionId, NativeSession>()
-  private readonly starting = new Map<SessionId, Promise<ProviderAdapterRuntime>>()
+  private readonly starting = new Map<
+    SessionId,
+    {
+      promise: Promise<ProviderAdapterRuntime>
+      controller: AbortController
+    }
+  >()
+  private readonly nativeOwners = new Map<string, SessionId>()
   private stopped = false
 
   private readonly options: Options
@@ -79,6 +86,15 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
   }
 
   async snapshot(): Promise<ProviderSnapshot> {
+    const traits = {
+      supportsApprovals: true,
+      supportsFullAccess: true,
+      supportsInterrupt: true,
+      supportsSessionStop: true,
+      supportsSteering: false,
+      supportsStreaming: true,
+      supportsUserInput: false,
+    }
     const base = {
       providerInstanceId: this.adapterKey,
       driverKind: this.driverKind,
@@ -90,14 +106,7 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       runtimeModes: ['full-access', 'approval-required', 'auto-accept-edits'],
       supportsSignIn: false,
       showInteractionModeToggle: false,
-      traits: {
-        supportsApprovals: true,
-        supportsFullAccess: true,
-        supportsInterrupt: true,
-        supportsSessionStop: true,
-        supportsStreaming: true,
-        supportsUserInput: false,
-      },
+      traits,
     } satisfies Partial<ProviderSnapshot>
     if (!this.options.enabled)
       return { ...base, installed: false, status: 'disabled', auth: { status: 'unknown' } }
@@ -177,8 +186,9 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       throw openCodeErrors.OPENCODE_SESSION_CONFLICT({
         internal: { operation: 'start-in-progress' },
       })
-    const start = this.openSession(input)
-    this.starting.set(input.sessionId, start)
+    const controller = new AbortController()
+    const start = this.openSession(input, controller)
+    this.starting.set(input.sessionId, { promise: start, controller })
     try {
       return await start
     } finally {
@@ -220,7 +230,7 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
         },
       )
     } catch (error) {
-      this.finish(session, 'failed')
+      if (session.turn === input) this.finish(session, 'failed')
       throw error
     }
   }
@@ -245,7 +255,9 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
   }
 
   async stopRuntime(input: { sessionId: SessionId }) {
-    await this.starting.get(input.sessionId)?.catch(() => undefined)
+    const pending = this.starting.get(input.sessionId)
+    pending?.controller.abort()
+    await pending?.promise.catch(() => undefined)
     const session = this.sessions.get(input.sessionId)
     if (!session) return
     try {
@@ -254,14 +266,19 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       session.controller.abort()
       await session.stream
       this.sessions.delete(input.sessionId)
-      await session.server.close()
-      this.emit(session, { type: 'runtime.exited', payload: { exitKind: 'graceful' } })
+      try {
+        await session.server.close()
+      } finally {
+        this.releaseNativeOwner(input.sessionId)
+        this.emit(session, { type: 'runtime.exited', payload: { exitKind: 'graceful' } })
+      }
     }
   }
 
   async stopAll() {
     this.stopped = true
-    await Promise.allSettled(this.starting.values())
+    for (const pending of this.starting.values()) pending.controller.abort()
+    await Promise.allSettled(Array.from(this.starting.values(), (pending) => pending.promise))
     await Promise.allSettled(
       [...this.sessions.keys()].map((sessionId) => this.stopRuntime({ sessionId })),
     )
@@ -317,18 +334,20 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       throw openCodeErrors.OPENCODE_UNSUPPORTED({ internal: { operation: 'runtime-options' } })
   }
 
-  private async openSession(input: ProviderRuntimeStartInput) {
+  private async openSession(input: ProviderRuntimeStartInput, controller: AbortController) {
     const cursor = input.providerResumeCursor == null ? null : asRecord(input.providerResumeCursor)
     if (
       cursor &&
       (!stringField(cursor, 'sessionId') || cursor.providerInstanceId !== this.adapterKey)
     )
       throw openCodeErrors.OPENCODE_SESSION_CONFLICT({ internal: { operation: 'resume-owner' } })
+    if (cursor) this.claimNativeOwner(cursor.sessionId as string, input.sessionId)
     const server = new OpenCodeServer(this.options)
     try {
-      return await this.connectSession(input, cursor, server)
+      return await this.connectSession(input, cursor, server, controller)
     } catch (error) {
       await server.close().catch(() => undefined)
+      this.releaseNativeOwner(input.sessionId)
       throw error
     }
   }
@@ -337,16 +356,32 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     input: ProviderRuntimeStartInput,
     cursor: { sessionId?: unknown; providerInstanceId?: unknown } | null,
     server: OpenCodeServer,
+    controller: AbortController,
   ) {
-    const http = new OpenCodeHttp(await server.start(input.cwd))
+    const http = new OpenCodeHttp(
+      await server.start(input.cwd, controller.signal),
+      this.operationTimeoutMs,
+    )
     const native = cursor
       ? await http.request<{ id: string; directory: string }>(
           `/session/${encodeURIComponent(cursor.sessionId as string)}`,
           input.cwd,
+          undefined,
+          'GET',
+          controller.signal,
         )
-      : await http.request<{ id: string; directory: string }>('/session', input.cwd, {
-          permission: permissions(input.runtimeMode),
-        })
+      : await http.request<{ id: string; directory: string }>(
+          '/session',
+          input.cwd,
+          {
+            permission: permissions(input.runtimeMode),
+          },
+          'POST',
+          controller.signal,
+        )
+    if (typeof native.id !== 'string' || !native.id || (cursor && native.id !== cursor.sessionId))
+      throw openCodeErrors.OPENCODE_REQUEST_FAILED({ internal: { operation: 'session-response' } })
+    if (!cursor) this.claimNativeOwner(native.id, input.sessionId)
     if (native.directory !== input.cwd)
       throw openCodeErrors.OPENCODE_UNSUPPORTED({ internal: { operation: 'resume-directory' } })
     if (cursor)
@@ -355,9 +390,11 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
         input.cwd,
         { permission: permissions(input.runtimeMode) },
         'PATCH',
+        controller.signal,
       )
-    const controller = new AbortController()
     const stream = await http.events(input.cwd, controller.signal)
+    if (controller.signal.aborted)
+      throw openCodeErrors.OPENCODE_REQUEST_FAILED({ internal: { operation: 'startup-cancelled' } })
     const session: NativeSession = {
       input,
       id: native.id,
@@ -396,6 +433,7 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       this.finish(session, 'failed')
       this.sessions.delete(session.input.sessionId)
       await session.server.close().catch(() => undefined)
+      this.releaseNativeOwner(session.input.sessionId)
     }
   }
 
@@ -448,9 +486,10 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     if (native.type === 'permission.asked') this.permissionAsked(session, p)
     const requestId = stringField(p, 'id')
     if (native.type === 'question.asked' && requestId) {
+      const turn = session.turn
       void session.http
         .request(`/question/${encodeURIComponent(requestId)}/reject`, session.input.cwd, {})
-        .catch(() => this.finish(session, 'failed'))
+        .catch(() => this.replyFailed(session, turn, 'question'))
       this.emit(session, {
         type: 'runtime.warning',
         payload: {
@@ -503,11 +542,12 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     const requestId = stringField(permission, 'id')
     if (!requestId) return
     if (session.input.runtimeMode === 'full-access') {
+      const turn = session.turn
       void session.http
         .request(`/permission/${encodeURIComponent(requestId)}/reply`, session.input.cwd, {
           reply: 'once',
         })
-        .catch(() => this.finish(session, 'failed'))
+        .catch(() => this.replyFailed(session, turn, 'permission'))
       return
     }
     session.permissions.add(requestId)
@@ -526,6 +566,33 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
         ],
       },
     })
+  }
+
+  private claimNativeOwner(nativeId: string, sessionId: SessionId) {
+    const key = JSON.stringify([this.options.serverUrl ?? this.adapterKey, nativeId])
+    if (this.nativeOwners.has(key))
+      throw openCodeErrors.OPENCODE_SESSION_CONFLICT({ internal: { operation: 'native-owner' } })
+    this.nativeOwners.set(key, sessionId)
+  }
+
+  private releaseNativeOwner(sessionId: SessionId) {
+    for (const [key, owner] of this.nativeOwners) {
+      if (owner === sessionId) this.nativeOwners.delete(key)
+    }
+  }
+
+  private replyFailed(
+    session: NativeSession,
+    turn: ProviderTurnInput | null,
+    kind: 'question' | 'permission',
+  ) {
+    if (!turn) return
+    this.emit(session, {
+      type: 'runtime.warning',
+      turnId: turn.turnId,
+      payload: { message: `OpenCode ${kind} response failed.` },
+    })
+    if (session.turn === turn) this.finish(session, 'failed')
   }
 
   private finish(session: NativeSession, state: 'completed' | 'failed' | 'interrupted') {
