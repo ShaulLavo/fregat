@@ -12,12 +12,7 @@ import '@singapore-editor/core/style.css'
 import '@singapore-editor/find/style.css'
 import { createInputLatencyProbe } from './inputLatency.ts'
 import { createInputConsumers } from './inputConsumers.ts'
-import {
-  minimapMatches,
-  replayMinimapLines,
-  replayShikiSource,
-  replayTreeSitterSource,
-} from '../input-worker-proof.mjs'
+import { readInputOutput } from './input-output.ts'
 import { fixtureFacts, generateFixture, normalizedText, type FixtureId } from './fixtures.ts'
 
 type Diagnostic = {
@@ -45,8 +40,6 @@ declare global {
   var __stress: typeof bridge
   var __EDITOR_PERFORMANCE_DIAGNOSTICS__: ((event: Diagnostic) => void) | null
   var __inputWorkerProof: readonly { readonly terminated: boolean }[] | undefined
-  var __inputWorkerSources: Map<string, ConsumerSession> | undefined
-  var __inputReadinessNegative: string | null | undefined
 }
 
 let active: Active | null = null
@@ -408,132 +401,7 @@ async function settleConsumers() {
   const { consumers, editors, buffer } = current()
   if (!consumers) return null
   const readiness = await consumers.settle(editors)
-  if (globalThis.__inputReadinessNegative === 'drop-view-ranges') dropLastVisibleViewRanges()
-  const text = buffer.materializeFullText()
-  const colors = highlightColors()
-  const highlights = [...CSS.highlights].map(([name, ranges]) => ({
-    name,
-    ranges: ranges.size,
-    color: colors.get(name) ?? null,
-  }))
-  const lineLimit = readiness.shiki?.maxTokenizationLineLength ?? null
-  const row = document.querySelector('#view-0 [data-editor-virtual-row]')
-  return {
-    ...readiness,
-    views: readiness.views.map((view, index) => ({ ...view, tokenRanges: viewTokenRanges(index) })),
-    sessions: consumerSessions(text),
-    minimaps: minimapReceipts(text),
-    highlights,
-    lineCount: text.split('\n').length,
-    overLimitLines: lineLimit === null ? null : linesLongerThan(text, lineLimit),
-    rowColor: row ? getComputedStyle(row).color : null,
-  }
-}
-
-type ConsumerSession = {
-  readonly kind: string
-  readonly worker: { readonly terminated: boolean }
-  readonly log: readonly unknown[]
-  readonly requested: number
-  readonly answered: number
-  readonly failed: number
-  readonly requestedVersion: number | null
-  readonly answeredVersion: number | null
-  readonly disposed: boolean
-}
-
-type MinimapProof = {
-  readonly terminated: boolean
-  readonly minimap: boolean
-  readonly minimapLog: readonly unknown[]
-  readonly latestRender: number
-  readonly acceptedRender: number
-  readonly renderAfterSource: number
-}
-
-// Each live consumer session's receipt, replayed after the measured interval: the source its
-// worker last received equals the current text, and that request was answered.
-function consumerSessions(text: string) {
-  const sessions: Iterable<ConsumerSession> = globalThis.__inputWorkerSources?.values() ?? []
-  return [...sessions]
-    .filter(
-      (session) =>
-        !session.disposed &&
-        !session.worker.terminated &&
-        (session.kind === 'shiki' || session.kind === 'treeSitter'),
-    )
-    .map((session) => {
-      const source =
-        session.kind === 'shiki'
-          ? replayShikiSource(session.log)
-          : replayTreeSitterSource(session.log)
-      return {
-        kind: session.kind,
-        current: source === text,
-        answered: session.requested > 0 && session.answered === session.requested,
-        failed: session.failed === session.requested && session.requested > 0,
-        requestedVersion: session.requestedVersion,
-        answeredVersion: session.answeredVersion,
-      }
-    })
-}
-
-// Each live minimap worker, one per view: its replayed line summaries match the current text, and
-// its accepted render was requested after its last source update.
-function minimapReceipts(text: string) {
-  const workers = (globalThis.__inputWorkerProof ?? []) as readonly MinimapProof[]
-  return workers
-    .filter((worker) => worker.minimap && !worker.terminated)
-    .map((worker) => ({
-      current: minimapMatches(replayMinimapLines(worker.minimapLog), text),
-      renderedAfterSource:
-        worker.renderAfterSource === worker.minimapLog.length &&
-        worker.latestRender > 0 &&
-        worker.acceptedRender === worker.latestRender,
-    }))
-}
-
-function tokenHighlights() {
-  return [...CSS.highlights].filter(([name]) => name.startsWith('editor-shared-token-'))
-}
-
-function viewTokenRanges(index: number): number {
-  const host = document.getElementById(`view-${index}`)
-  if (!host) return 0
-  let count = 0
-  for (const [, ranges] of tokenHighlights())
-    for (const range of ranges) if (host.contains(range.startContainer)) count++
-  return count
-}
-
-// Probe-only negative: the last visible view loses its token ranges while the others keep theirs.
-function dropLastVisibleViewRanges() {
-  const visible = current()
-    .editors.map((_, index) => document.getElementById(`view-${index}`))
-    .filter((host): host is HTMLElement => Boolean(host?.checkVisibility()))
-  const host = visible.at(-1)
-  if (!host || visible.length < 2) return
-  for (const [, ranges] of tokenHighlights())
-    for (const range of [...ranges]) if (host.contains(range.startContainer)) ranges.delete(range)
-}
-
-function linesLongerThan(text: string, limit: number): number {
-  let count = 0
-  for (const line of text.split('\n')) if (line.replace(/\r$/, '').length > limit) count++
-  return count
-}
-
-// The colour each `::highlight(name)` rule paints, read from the page's own stylesheets.
-function highlightColors(): Map<string, string> {
-  const colors = new Map<string, string>()
-  for (const sheet of document.styleSheets) {
-    for (const rule of sheet.cssRules) {
-      if (!(rule instanceof CSSStyleRule)) continue
-      const name = /::highlight\(([^)]+)\)/.exec(rule.selectorText)?.[1]
-      if (name && rule.style.color) colors.set(name, rule.style.color)
-    }
-  }
-  return colors
+  return readInputOutput(readiness, buffer.materializeFullText())
 }
 
 function retention() {

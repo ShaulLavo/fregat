@@ -5,7 +5,7 @@ import { startHostCpuEstimate } from './host-contention.mjs'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
 import { randomGenerator } from './input-paired.mjs'
 import { canStopInputPairs } from './input-pair-stopping.mjs'
-import { assertConsumerReadiness } from './input-configurations.mjs'
+import { assertConsumerReadiness } from './input-output.mjs'
 import { inputReadinessTimeoutMs } from './src/inputReadiness.ts'
 
 export const operationsPerSample = {

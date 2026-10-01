@@ -41,7 +41,7 @@ input delay fails. It does not need exclusive CPUs or a quiet machine to stay co
    measures its detection floor at 25 ms, then 30 ms only if needed, stopping at first rejection.
    The initial 20 ms pause measured 12.4 ms because it shifted input/frame phase; failure at
    30 ms blocks sensitivity. All other keys keep the 20 ms sensitivity requirement. Their raw results are cached together
-   by instrument/dependency hash and both verdicts are recomputed on reuse. Input-handler delay
+   by measurement/dependency hash, recording their validation hash, and both verdicts are recomputed on reuse. Output-only predicate changes preserve controls and rerun acceptance for affected configurations. Input-handler delay
    is only partially visible in quantized warm frame timing; each stage tests delay in that stage.
 4. **Matrix.** Default: Platform's real composition plus the configurations the change touches
    (declared by the caller or derived from changed packages). Full: all 10 configurations, for
@@ -138,6 +138,9 @@ measures stay fixed. Current evidence is `/work/tmp/plan-282/run-20261001T153544
 - [x] Preserve the failed three-pair and successful fixed-five old-control probes; choose stage controls rather than extra pairs or cold backlog.
 - [x] Implement separate native-capture and rAF controls; pass 309 stress tests, typecheck and lint.
 - [x] Prove all 72 input keys and 35 native frame keys reject their real 20 ms controls; record the single native repeat key’s bounded 25/30 ms detection floor. Final source rejected 72/72 and 36/36 at 20 ms; the separate floor rejected at 25 ms, so 30 ms was skipped. Raw controls took 424.655 seconds once.
+- [x] Separate measurement and validation identities, with conservative default measurement coverage and assertion-only cache-reuse tests.
+- [x] Correct plain-output validation for virtual chunks; prove complete/missing/partial/per-view coverage in Chromium and retain colour/range-accounting negatives.
+- [ ] Record the byte-identical transfer audit refusal and collect fresh controls under the final split identity.
 - [ ] Complete current-instrument quiet/loaded candidates and stage-specific historical negatives; keep minimap acceptance excluded pending correctness.
 - [ ] Measure actual warm default/full wall times against 15/45 minutes.
 - [ ] Pass final root gates/typecheck/format checks; update PR #247 and push reviewed path-scoped commits.
@@ -174,3 +177,17 @@ Draft [PR #247](https://github.com/ShaulLavo/fregat/pull/247) contains the imple
 blocked acceptance evidence. It remains unmerged. Final repository checks and 276 stress
 contract tests pass. No deployment or app UI verification was needed for this benchmark/docs
 change. The 15-minute default and 45-minute full targets remain unconfirmed.
+
+## Split-identity checkpoint
+
+- [x] Blocking first steps: output/cache contract tests, real Chromium coverage and frozen Shiki long-line paste proof before acceptance.
+- [x] Independent workstreams: n/a; the owner requires one worker, and hashing, cache metadata and output receipts share contracts.
+- [x] Shared mutable state: separate output predicates/readers from the conservative measurement source set; keep original evidence immutable.
+- [x] Smallest safe decomposition: one worker, source/contract unit first, then stage controls, Shiki quiet, one loaded configuration per heavy job, and actual matrices.
+
+Architect and independent-review agents are skipped under the explicit single-worker instruction.
+The initial split changes mixed-purpose files; its byte-identical transfer audit must refuse the
+old schema-3 cache. Fresh controls use schema 4. Existing native/disabled/Tree-sitter quiet receipts
+remain archived under `5929738e…`. The first Shiki quiet run failed the one-range-per-line output
+assertion before any Shiki verdict; the approved rendered-chunk correction is validated in an
+isolated real Chromium probe. Complete Shiki quiet, loaded agreement and matrix timing remain pending.

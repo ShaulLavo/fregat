@@ -358,8 +358,16 @@ a 20 ms frame-callback pause measured ~12.4 ms in that initial run because it sh
 The separate 25 ms attempt rejected, so 30 ms was skipped. The final-source 20 ms repeat
 measurement was amplified to 128.6 ms by callback batching; both raw outcomes are preserved.
 A failure at 30 ms blocks sensitivity. Both controls and all floor
-attempts are keyed by instrument source and dependency bytes; reuse recomputes their verdicts.
-The first run of a changed instrument pays for both controls and its floor proof. An input-handler pause is only
+attempts are keyed by the measurement hash; reuse recomputes their verdicts. Schema-4 caches
+record the validation hash their controls used. Measurement covers all sources except
+`input-output.mjs` and `src/input-output.ts`, plus external bytes and browser/runner versions.
+Those two modules hold output predicates and post-interval receipt readers. Unknown files,
+readiness fences, worker interception, marks/delays, pairing/statistics, budgets and launch all
+belong to measurement. A validation-only change keeps controls valid and requires new
+acceptance for each configuration whose predicate changed. Tests prove assertion-only reuse
+and timing-path invalidation. The initial split changes measurement-file bytes, so its strict
+transfer audit refuses the old cache; that evidence stays archived.
+The first run of a changed measurement instrument pays for both controls and its floor proof. An input-handler pause is only
 partially visible in warm frame timing because of refresh quantization, so each stage is tested
 with a delay in that stage. `--slowdown-ms 20` and `--frame-slowdown-ms 20` select their respective
 diagnostics. They cannot be combined in one comparison. All 108 measures remain blocking.

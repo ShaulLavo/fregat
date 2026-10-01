@@ -1,11 +1,17 @@
 import { comparePairedInput, frameDetectionFloorKey, sensitivityPassed } from './input-paired.mjs'
 import { fail } from './errors.mjs'
 
-export function verifyInputSensitivity(stored, instrumentHash, draws) {
-  if (stored.instrumentHash !== instrumentHash || stored.schemaVersion !== 3 || !stored.passed)
+export function verifyInputSensitivity(stored, measurementHash, draws) {
+  if (
+    stored.measurementHash !== measurementHash ||
+    !/^[a-f0-9]{64}$/.test(stored.measurementHash ?? '') ||
+    !/^[a-f0-9]{64}$/.test(stored.validationHash ?? '') ||
+    stored.schemaVersion !== 4 ||
+    !stored.passed
+  )
     fail('Invalid stored input sensitivity check')
-  const input = verifyControl(stored.controls?.input, instrumentHash, 20, 0, draws)
-  const frame = verifyControl(stored.controls?.frame, instrumentHash, 0, 20, draws)
+  const input = verifyControl(stored.controls?.input, stored, 20, 0, draws)
+  const frame = verifyControl(stored.controls?.frame, stored, 0, 20, draws)
   const floor = stored.frameDetectionFloor
   if (
     floor?.key !== frameDetectionFloorKey ||
@@ -14,7 +20,7 @@ export function verifyInputSensitivity(stored, instrumentHash, draws) {
   )
     fail('Invalid stored frame detection floor')
   const attempts = floor.attempts.map((check, index) => {
-    const comparison = verifyControl(check, instrumentHash, 0, 25 + index * 5, draws)
+    const comparison = verifyControl(check, stored, 0, 25 + index * 5, draws)
     assertSameProducts(stored.controls.frame, check)
     return comparison
   })
@@ -36,12 +42,16 @@ export function frameFloorRejected(comparison) {
   )
 }
 
-function verifyControl(check, instrumentHash, inputDelay, frameDelay, draws) {
+function verifyControl(check, identity, inputDelay, frameDelay, draws) {
   if (
     !check ||
     check.configuration !== 'native' ||
-    check.baseline.environment.instrumentHash !== instrumentHash ||
-    check.candidate.environment.instrumentHash !== instrumentHash ||
+    check.baseline.environment.instrumentHash !== identity.instrumentHash ||
+    check.candidate.environment.instrumentHash !== identity.instrumentHash ||
+    check.baseline.environment.measurementHash !== identity.measurementHash ||
+    check.candidate.environment.measurementHash !== identity.measurementHash ||
+    check.baseline.environment.validationHash !== identity.validationHash ||
+    check.candidate.environment.validationHash !== identity.validationHash ||
     check.candidate.config.slowdownMs !== inputDelay ||
     check.candidate.config.frameSlowdownMs !== frameDelay
   )

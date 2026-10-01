@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { canStopInputPairs } from '../input-pair-stopping.mjs'
 import { inputBudget } from '../input-budgets.mjs'
 import { verifyInputSensitivity } from '../input-sensitivity.mjs'
+import { inputSourceIdentity } from '../input-identity.mjs'
 import { correlateInputEvents } from '../input-correlation.mjs'
 import {
   comparePairedInput,
@@ -760,6 +761,8 @@ function pairedResults(duration = 10) {
   for (const run of [baseline, candidate]) {
     Object.assign(run.environment, {
       instrumentHash: 'b'.repeat(64),
+      measurementHash: 'b'.repeat(64),
+      validationHash: 'c'.repeat(64),
       instrumentExternal: 'c'.repeat(64),
       packageSet: {
         sourceHash: 'd'.repeat(64),
@@ -796,8 +799,10 @@ function sensitivityCache() {
     }
   }
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     instrumentHash: 'b'.repeat(64),
+    measurementHash: 'b'.repeat(64),
+    validationHash: 'c'.repeat(64),
     passed: true,
     controls: { input: control(20, 0), frame: control(0, 20) },
     frameDetectionFloor: { key: frameDetectionFloorKey, delayMs: 25, attempts: [control(0, 25)] },
@@ -1011,6 +1016,55 @@ describe('paired input latency', () => {
       attempts: [...stored.frameDetectionFloor.attempts, next],
     }
     expect(verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toBe(stored)
+  })
+
+  it('reuses controls after assertion-only edits and invalidates them after timing-path edits', () => {
+    const sources = [
+      { path: 'examples/stress/src/inputLatency.ts', bytes: 'native capture and frame marks' },
+      { path: 'examples/stress/input-output.mjs', bytes: 'assert rendered output' },
+      { path: 'examples/stress/src/input-output.ts', bytes: 'read rendered output' },
+    ]
+    const original = inputSourceIdentity(sources, 'a'.repeat(64))
+    const stored = sensitivityCache()
+    stored.measurementHash = original.measurementHash
+    stored.validationHash = original.validationHash
+    for (const control of [
+      stored.controls.input,
+      stored.controls.frame,
+      ...stored.frameDetectionFloor.attempts,
+    ]) {
+      for (const run of [control.baseline, control.candidate]) {
+        run.environment.measurementHash = original.measurementHash
+        run.environment.validationHash = original.validationHash
+      }
+    }
+    for (const path of [
+      'examples/stress/input-output.mjs',
+      'examples/stress/src/input-output.ts',
+    ]) {
+      const changed = inputSourceIdentity(
+        sources.map((source) =>
+          source.path === path ? { ...source, bytes: source.bytes + ' changed predicate' } : source,
+        ),
+        'a'.repeat(64),
+      )
+      expect(changed.validationHash).not.toBe(original.validationHash)
+      expect(changed.measurementHash).toBe(original.measurementHash)
+      expect(verifyInputSensitivity(stored, changed.measurementHash, 200)).toBe(stored)
+      expect(stored.validationHash).toBe(original.validationHash)
+    }
+    const timing = inputSourceIdentity(
+      sources.map((source) =>
+        source.path.endsWith('inputLatency.ts')
+          ? { ...source, bytes: source.bytes + ' changed delay' }
+          : source,
+      ),
+      'a'.repeat(64),
+    )
+    expect(timing.measurementHash).not.toBe(original.measurementHash)
+    expect(() => verifyInputSensitivity(stored, timing.measurementHash, 200)).toThrow(
+      /Invalid stored/,
+    )
   })
 
   it('recomputes raw stage controls and validates the first rejected floor', () => {

@@ -105,7 +105,11 @@ try {
     manifest.fixtures.some((fixture) => fixture.utf16Length > analysisLimitCodeUnits)
   )
     fail('Fixtures exceed Platform analysis tier; use --stress for larger fixtures')
-  const instrument = await inputInstrument()
+  browser = await chromium.launch({ headless: true, env: { ...process.env, TMPDIR: temporary } })
+  const instrument = await inputInstrument({
+    runner: process.version,
+    browser: { engine: 'chromium', version: browser.version(), headless: true },
+  })
   const runtimes = {}
   for (const [side, set] of Object.entries({ baseline, candidate }))
     runtimes[side] = await buildInputRuntime(
@@ -116,10 +120,12 @@ try {
       instrument,
     )
   if (interrupted) fail('Paired input collection cancelled')
-  browser = await chromium.launch({ headless: true, env: { ...process.env, TMPDIR: temporary } })
-  const cachePath = resolve(values['sensitivity-directory'], `${instrument.hash}.json.gz`)
+  const cachePath = resolve(
+    values['sensitivity-directory'],
+    `${instrument.measurementHash}.json.gz`,
+  )
   await mkdir(dirname(resolve(values.output)), { recursive: true })
-  let sensitivity = await readSensitivity(cachePath, instrument.hash)
+  let sensitivity = await readSensitivity(cachePath, instrument.measurementHash)
   if (!sensitivity) {
     const controls = {}
     for (const stage of ['input', 'frame']) {
@@ -147,13 +153,15 @@ try {
     )
     sensitivity = verifyInputSensitivity(
       {
-        schemaVersion: 3,
+        schemaVersion: 4,
         instrumentHash: instrument.hash,
+        measurementHash: instrument.measurementHash,
+        validationHash: instrument.validationHash,
         passed: true,
         controls,
         frameDetectionFloor,
       },
-      instrument.hash,
+      instrument.measurementHash,
     )
     await mkdir(dirname(cachePath), { recursive: true })
     await writeInputArtifact(cachePath, sensitivity)
@@ -183,6 +191,12 @@ try {
     schemaVersion: 1,
     kind: 'paired-input-matrix',
     instrumentHash: instrument.hash,
+    measurementHash: instrument.measurementHash,
+    validationHash: instrument.validationHash,
+    identitySources: {
+      measurement: instrument.measurementFiles,
+      validation: instrument.validationFiles,
+    },
     createdAt: new Date().toISOString(),
     configurations,
     repetitions,
@@ -190,6 +204,8 @@ try {
     stress: values.stress,
     sensitivity: {
       instrumentHash: sensitivity.instrumentHash,
+      measurementHash: sensitivity.measurementHash,
+      validationHash: sensitivity.validationHash,
       path: cachePath,
       passed: sensitivity.passed,
       stages: ['input', 'frame'],
@@ -314,14 +330,14 @@ async function collectFrameDetectionFloor(context, runtime) {
   fail('Native repeat frame detection floor exceeds 30 ms')
 }
 
-async function readSensitivity(path, instrumentHash) {
+async function readSensitivity(path, measurementHash) {
   const { readInputArtifact } = await import('./input-artifacts.mjs')
   const stored = await readInputArtifact(path).catch((error) => {
     if (error.code === 'ENOENT') return null
     throw error
   })
   if (!stored) return null
-  return verifyInputSensitivity(stored, instrumentHash)
+  return verifyInputSensitivity(stored, measurementHash)
 }
 
 async function freezeFixtures(directory, stress) {

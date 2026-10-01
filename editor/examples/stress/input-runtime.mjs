@@ -10,12 +10,13 @@ import { externalReceipt } from './package-set.mjs'
 import { recordModules, verifyRuntimeGraph } from './runtime-graph.mjs'
 import { installInputWorkerProof } from './input-worker-proof.mjs'
 import { fail } from './errors.mjs'
+import { inputSourceIdentity } from './input-identity.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const repository = resolve(root, '../..')
 const git = (...args) => execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim()
 
-export async function inputInstrument() {
+export async function inputInstrument(launch = { runner: process.version }) {
   const receipt = await externalReceipt(
     dirname(root),
     [basename(root)],
@@ -34,9 +35,10 @@ export async function inputInstrument() {
         /\.(ts|mjs|css|html|json)$/.test(file),
     )
     .sort()
-  const hash = createHash('sha256').update(receipt.sha256)
-  for (const file of files) hash.update(file).update(await readFile(resolve(repository, file)))
-  return { hash: hash.digest('hex'), receipt, files }
+  const sources = await Promise.all(
+    files.map(async (path) => ({ path, bytes: await readFile(resolve(repository, path)) })),
+  )
+  return { ...inputSourceIdentity(sources, receipt.sha256, launch), receipt, files, launch }
 }
 
 export async function buildInputRuntime(packageSet, directory, fixtures, manifest, instrument) {
@@ -76,6 +78,8 @@ export function inputEnvironment(browser, runtime, instrument) {
     commit: git('rev-parse', 'HEAD'),
     dirty: Boolean(git('status', '--porcelain')),
     instrumentHash: instrument.hash,
+    measurementHash: instrument.measurementHash,
+    validationHash: instrument.validationHash,
     instrumentExternal: instrument.receipt.sha256,
     sourceHash: createHash('sha256').update(instrument.hash).update(set.sourceHash).digest('hex'),
     packageSet: {
