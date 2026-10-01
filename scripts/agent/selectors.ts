@@ -1618,3 +1618,17 @@ export function focusedEditorSelectedText(): string {
   if (context) return context.text.slice(context.selectionStart, context.selectionEnd)
   return document.getSelection()?.toString() ?? ''
 }
+
+export const ghosttySiteSelectors = {
+  examples: '.example',
+  factLead: '.facts strong',
+  sectionHeadings: '.measured h2, .preview h2',
+  backend: '#backend',
+  canvas: 'canvas',
+  composition: '.ghostty-webgpu-composition',
+  pty: '.pty-example',
+  preview: '.preview',
+  screen: '.screen',
+  stat: '#stat',
+  window: '#window',
+} as const

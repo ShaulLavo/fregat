@@ -1,3 +1,4 @@
+import { ghosttySiteFit } from './ghostty-site-fit'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
 import { editorSavedSnapshot } from './editor-saved-snapshot'
@@ -417,6 +418,7 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  ghosttySiteFit,
   devPackageUpdates,
   editorPagedReadonly,
   diffNoFlicker,
