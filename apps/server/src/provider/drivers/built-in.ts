@@ -2,6 +2,7 @@ import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import {
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
+  DEFAULT_CURSOR_PROVIDER_SETTINGS,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
 } from '@workspace/contracts'
 import type { AnyProviderDriver, ProviderInstanceConfig } from '../driver'
@@ -9,6 +10,7 @@ import { sessionIdentityErrors } from '../structured-errors'
 import { claudeDriver } from './claude'
 import { codexDriver } from './codex'
 import { mockDriver } from './mock'
+import { cursorDriver } from './cursor'
 
 /**
  * Every driver this build knows how to instantiate. A settings entry naming a
@@ -18,7 +20,11 @@ import { mockDriver } from './mock'
  * The mock driver is deliberately absent: it is registered explicitly by tests
  * and by the deterministic harness, never by the product default.
  */
-const BUILT_IN_PROVIDER_DRIVERS: readonly AnyProviderDriver[] = [codexDriver, claudeDriver]
+const BUILT_IN_PROVIDER_DRIVERS: readonly AnyProviderDriver[] = [
+  codexDriver,
+  claudeDriver,
+  cursorDriver,
+]
 
 /** The agent browser harness sets this on its throwaway server to reach the mock driver. */
 const HARNESS_ENV = 'PLATFORM_AGENT_HARNESS'
@@ -97,4 +103,5 @@ export const DEFAULT_PROVIDER_INSTANCES: readonly ProviderInstanceConfig[] = [
     enabled: DEFAULT_CLAUDE_PROVIDER_SETTINGS.enabled,
     providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId,
   },
+  { ...DEFAULT_CURSOR_PROVIDER_SETTINGS },
 ]

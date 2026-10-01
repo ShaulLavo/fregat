@@ -1,3 +1,4 @@
+import { cursorProvider } from './cursor-provider'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
 import { editorSavedSnapshot } from './editor-saved-snapshot'
@@ -492,6 +493,7 @@ export const scenarios: readonly Scenario[] = [
   chatQueue,
   chatQueueAway,
   chatQueueStopUpload,
+  cursorProvider,
   providerModelOptions,
   draftRecovery,
   asyncQuestions,

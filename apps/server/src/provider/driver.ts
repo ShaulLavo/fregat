@@ -50,6 +50,7 @@ type ProviderDriverCapabilities = ProviderAdapter['capabilities'] & {
 /** App services a driver may hand its adapter; absent in tests and harnesses. */
 export type ProviderDriverServices = {
   readonly agentDiagnostics?: AgentDiagnosticsSource
+  readonly acpOperationTimeoutMs?: () => number
 }
 
 type ProviderDriverCreateInput<Config> = {

@@ -162,6 +162,7 @@ export function seedProviders() {
         supportsFullAccess: true,
         supportsInterrupt: true,
         supportsSessionStop: true,
+        supportsSteering: false,
         supportsStreaming: true,
         supportsUserInput: false,
       },

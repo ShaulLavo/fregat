@@ -342,7 +342,11 @@ export function createApp(options: AppOptions) {
         // the deferral would never resolve.
         hasLiveSessions: (providerInstanceId) =>
           providerService.hasActiveRuntimeForInstance(providerInstanceId),
-        services: { agentDiagnostics },
+        services: {
+          agentDiagnostics,
+          acpOperationTimeoutMs: () =>
+            settings.snapshot().values['providers.acpOperationTimeoutMs'],
+        },
       },
     )
   // A saved provider list is inert unless something re-runs the registry when

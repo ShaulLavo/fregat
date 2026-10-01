@@ -111,6 +111,7 @@
     "prefetch.diffs",
     "prefetch.enabled",
     "prefetch.files",
+    "providers.acpOperationTimeoutMs",
     "providers.instances",
     "search.caseSensitive",
     "search.defaultMatchMode",

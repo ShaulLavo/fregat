@@ -1,6 +1,12 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const acpErrors = defineErrorCatalog('provider-acp', {
+  SERVICE_UNAVAILABLE: {
+    status: 503,
+    message: 'The agent runtime is unavailable.',
+    why: 'The server has no ACP operation timeout service.',
+    fix: 'Restart the server with the provider runtime configured.',
+  },
   CLOSED: {
     status: 503,
     message: 'The agent connection closed.',

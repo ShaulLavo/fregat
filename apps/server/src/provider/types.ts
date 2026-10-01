@@ -144,6 +144,8 @@ type RuntimeEventRawSource =
   | 'codex.sdk.thread-event'
   | 'claude.sdk.message'
   | 'claude.sdk.permission'
+  | 'acp.notification'
+  | 'acp.request'
 
 type RuntimeEventRaw = {
   messageType?: string

@@ -1170,6 +1170,13 @@
       "markdownDescription": "Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.\n\nApplies while `prefetch.enabled` is on.",
       "type": "boolean"
     },
+    "providers.acpOperationTimeoutMs": {
+      "default": 30000,
+      "description": "Milliseconds an ACP agent has to initialize, change configuration or drain a cancelled turn. Active answers wait until they finish or you stop them.",
+      "maximum": 1800000,
+      "minimum": 1,
+      "type": "integer"
+    },
     "providers.instances": {
       "default": [],
       "description": "Your agent providers, such as Codex and Claude, in the order the model picker shows them.",

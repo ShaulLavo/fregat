@@ -103,7 +103,7 @@ export function useSessionComposer({
   const pendingRequest = Boolean(session?.pendingApprovalCount || session?.pendingUserInputCount)
   const correctionBlocked =
     busy &&
-    Boolean(session && (correctionUnavailableReason(session) || provider?.driverKind !== 'codex'))
+    Boolean(session && (correctionUnavailableReason(session) || !provider?.traits.supportsSteering))
   const sendBlocked =
     blocked ||
     !settingsReady ||

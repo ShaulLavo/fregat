@@ -267,9 +267,10 @@ stays safe to read, share and export.
 
 ## Providers
 
-| Setting               | Default | Scope       | What it does                                                                              |
-| --------------------- | ------- | ----------- | ----------------------------------------------------------------------------------------- |
-| `providers.instances` | `[]`    | application | Your agent providers, such as Codex and Claude, in the order the model picker shows them. |
+| Setting                           | Default | Scope       | What it does                                                                                                                                         |
+| --------------------------------- | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `providers.acpOperationTimeoutMs` | `30000` | machine     | Milliseconds an ACP agent has to initialize, change configuration or drain a cancelled turn. Active answers wait until they finish or you stop them. |
+| `providers.instances`             | `[]`    | application | Your agent providers, such as Codex and Claude, in the order the model picker shows them.                                                            |
 
 ## Search
 

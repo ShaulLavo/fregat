@@ -96,6 +96,7 @@ export const selectors = {
     page.getByRole('button', { name: `Discard draft: ${label}`, exact: true }),
   composerAccess: (page: Page) => page.getByRole('menuitemradio', { name: /^Full access/ }),
   chatExactText: (page: Page, text: string) => page.getByText(text, { exact: true }),
+  chatContainingText: (page: Page, text: string) => page.getByText(text, { exact: false }),
   composerModes: (page: Page) =>
     page.getByRole('button', { name: 'Agent access and mode', exact: true }),
   composerPlan: (page: Page) => page.getByRole('menuitemradio', { name: /^Plan/ }),

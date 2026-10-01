@@ -250,6 +250,7 @@ export {
 } from './orchestration-runtime'
 export {
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
+  DEFAULT_CURSOR_PROVIDER_SETTINGS,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
   providerAuthResultSchema,
   providerAgentSchema,

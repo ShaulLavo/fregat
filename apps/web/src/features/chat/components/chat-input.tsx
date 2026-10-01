@@ -173,7 +173,7 @@ export function ChatInput({
   const sessionProvider = useProvider(sessionProviderInstanceId ?? undefined)
   const steerDisabledReason = busy
     ? (correctionDisabledReason ??
-      (sessionProvider?.driverKind === 'codex'
+      (sessionProvider?.traits.supportsSteering
         ? null
         : 'Wait for the current turn to finish before sending'))
     : null

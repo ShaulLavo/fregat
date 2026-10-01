@@ -739,6 +739,7 @@ function unavailableSnapshot(entry: ProviderInstanceConfig, reason: string): Pro
       supportsFullAccess: false,
       supportsInterrupt: false,
       supportsSessionStop: false,
+      supportsSteering: false,
       supportsStreaming: false,
       supportsUserInput: false,
     },

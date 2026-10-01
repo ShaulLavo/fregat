@@ -285,6 +285,7 @@ export function providerSnapshot(overrides: Partial<ProviderSnapshot> = {}): Pro
       supportsFullAccess: true,
       supportsInterrupt: true,
       supportsSessionStop: true,
+      supportsSteering: false,
       supportsStreaming: true,
       supportsUserInput: false,
     },

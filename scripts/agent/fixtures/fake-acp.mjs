@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline'
-import { closeSync } from 'node:fs'
+import { appendFileSync, closeSync } from 'node:fs'
 // Independent consumed-shape checks follow ACP v0.11.3 schema.unstable.json
 // at e87bde7322ceb8d52d9e81718f5783beb66f9f6d, not the peer implementation.
 const args = process.argv.slice(2)
@@ -16,12 +16,27 @@ if (args.includes('--no-read')) {
   setInterval(() => undefined, 1000)
   await new Promise(() => undefined)
 }
+
 const lines = createInterface({ input: process.stdin })
+const tracePath =
+  process.env.FREGAT_ACP_FIXTURE_LOG ??
+  (process.argv[1].endsWith('/fake-acp.mjs') ? undefined : new URL('native.jsonl', import.meta.url))
+const trace = (entry) => {
+  if (tracePath) appendFileSync(tracePath, `${JSON.stringify(entry)}\n`)
+}
+trace({
+  event: 'spawn',
+  pid: process.pid,
+  args: process.argv.slice(2),
+  profile: process.env.XDG_CONFIG_HOME,
+})
 const write = (value) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...value })}\n`)
 let prompt
+const active = new Map()
 let sessionId = `native-${process.pid}`
 for await (const line of lines) {
   const frame = JSON.parse(line)
+  trace({ event: 'rpc', ...frame })
   if (frame.method === 'initialize') {
     const params = frame.params
     const implementation = params?.clientInfo
@@ -55,7 +70,19 @@ for await (const line of lines) {
     continue
   }
   if (frame.method === 'session/new') {
-    write({ id: frame.id, result: { sessionId } })
+    write({
+      id: frame.id,
+      result: {
+        sessionId,
+        modes: {
+          currentModeId: 'agent',
+          availableModes: [
+            { id: 'agent', name: 'Agent' },
+            { id: 'plan', name: 'Plan' },
+          ],
+        },
+      },
+    })
     continue
   }
   if (frame.method === 'session/load' || frame.method === 'session/resume') {
@@ -107,23 +134,72 @@ for await (const line of lines) {
       const pending = prompt
       setTimeout(() => {
         write({ id: pending.id, result: { stopReason: 'cancelled' } })
+        active.delete(pending.id)
         if (prompt === pending) prompt = undefined
       }, 100)
       continue
     }
-    write({ id: prompt.id, result: { stopReason: 'cancelled' } })
+    for (const pending of active.values())
+      write({ id: pending.id, result: { stopReason: 'cancelled' } })
+    active.clear()
+
     prompt = undefined
     continue
   }
   if (frame.method === 'session/prompt') {
-    if (prompt) {
+    if (prompt && !args.includes('acp')) {
       write({ id: frame.id, error: { code: -32000, message: 'Native prompt still active' } })
       continue
     }
+    const previous = prompt
     prompt = frame
+    active.set(frame.id, frame)
     if (args.includes('--audit-native')) write({ method: 'fixture/prompt-started', params: {} })
+
     const text = frame.params.prompt[0].text
+    if (text === 'exit-native') process.exit(19)
+    if (text === 'fail') {
+      write({ id: frame.id, error: { code: -32000, message: 'fixture turn failed' } })
+      active.delete(frame.id)
+      prompt = undefined
+      continue
+    }
     if (text === 'hold') continue
+    if (text === 'todos')
+      write({
+        method: 'cursor/update_todos',
+        params: {
+          toolCallId: 'todo-tool',
+          merge: false,
+          todos: [{ id: 'todo-1', content: 'Fixture step', status: 'inProgress' }],
+        },
+      })
+    if (text === 'question') {
+      write({
+        id: 'question-1',
+        method: 'cursor/ask_question',
+        params: {
+          sessionId,
+          toolCallId: 'q-tool',
+          questions: [
+            {
+              id: 'choice',
+              prompt: 'Pick a fixture choice',
+              options: [{ id: 'one', label: 'One' }],
+            },
+          ],
+        },
+      })
+      continue
+    }
+    if (text === 'plan') {
+      write({
+        id: 'plan-1',
+        method: 'cursor/create_plan',
+        params: { sessionId, toolCallId: 'plan-tool', plan: '# Fixture plan', todos: [] },
+      })
+      continue
+    }
     if (text === 'permission') {
       write({
         id: 'permission-1',
@@ -149,11 +225,25 @@ for await (const line of lines) {
         },
       },
     })
+    if (previous) {
+      write({ id: previous.id, result: { stopReason: 'end_turn' } })
+      active.delete(previous.id)
+    }
     write({ id: frame.id, result: { stopReason: 'end_turn' } })
+    active.delete(frame.id)
+    prompt = undefined
+    continue
+  }
+  if (frame.id === 'question-1' || frame.id === 'plan-1') {
+    if (!prompt) continue
+    active.delete(prompt.id)
+    write({ id: prompt.id, result: { stopReason: 'end_turn' } })
     prompt = undefined
     continue
   }
   if (frame.id === 'permission-1') {
+    if (!prompt) continue
+    active.delete(prompt.id)
     write({
       id: prompt.id,
       result: {

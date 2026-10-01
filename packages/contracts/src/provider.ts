@@ -104,6 +104,7 @@ const providerTraitsSchema = v.object({
   supportsFullAccess: v.boolean(),
   supportsInterrupt: v.boolean(),
   supportsSessionStop: v.boolean(),
+  supportsSteering: v.boolean(),
   supportsStreaming: v.boolean(),
   supportsUserInput: v.boolean(),
 })
@@ -437,6 +438,7 @@ export const DEFAULT_CODEX_PROVIDER_SETTINGS = {
     supportsFullAccess: true,
     supportsInterrupt: true,
     supportsSessionStop: true,
+    supportsSteering: true,
     supportsStreaming: true,
     supportsUserInput: true,
   },
@@ -453,8 +455,26 @@ export const DEFAULT_CLAUDE_PROVIDER_SETTINGS = {
     supportsFullAccess: true,
     supportsInterrupt: true,
     supportsSessionStop: true,
+    supportsSteering: false,
     supportsStreaming: true,
     // The agent SDK has no analog of codex's `item/tool/requestUserInput`.
     supportsUserInput: false,
+  },
+} satisfies ProviderInstanceSettings
+
+export const DEFAULT_CURSOR_PROVIDER_SETTINGS = {
+  displayLabel: 'Cursor',
+  driverKind: 'cursor' as ProviderDriverKind,
+  enabled: false,
+  providerInstanceId: 'cursor' as ProviderInstanceId,
+  runtimeModes: ['full-access', 'approval-required', 'auto-accept-edits'],
+  traits: {
+    supportsApprovals: true,
+    supportsFullAccess: true,
+    supportsInterrupt: true,
+    supportsSessionStop: true,
+    supportsSteering: true,
+    supportsStreaming: true,
+    supportsUserInput: true,
   },
 } satisfies ProviderInstanceSettings

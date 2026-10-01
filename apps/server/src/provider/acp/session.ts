@@ -23,7 +23,7 @@ const initializeSchema = v.object({
   ),
   authMethods: v.optional(v.array(v.object({ id: v.string(), name: v.string() })), []),
 })
-const newSessionSchema = v.object({ sessionId: v.pipe(v.string(), v.minLength(1)) })
+const newSessionSchema = v.looseObject({ sessionId: v.pipe(v.string(), v.minLength(1)) })
 const promptResponseSchema = v.object({ stopReason: v.string() })
 
 export type AcpContent =
@@ -43,11 +43,13 @@ export type AcpSessionInput = AcpPeerInput & {
 export class AcpSession {
   readonly peer: AcpPeer
   readonly sessionId: string
+  readonly configuration: Record<string, unknown>
   private activePrompt: Promise<string> | null = null
 
-  private constructor(peer: AcpPeer, sessionId: string) {
+  private constructor(peer: AcpPeer, sessionId: string, configuration: Record<string, unknown>) {
     this.peer = peer
     this.sessionId = sessionId
+    this.configuration = configuration
   }
 
   static async open(input: AcpSessionInput): Promise<AcpSession> {
@@ -79,7 +81,7 @@ export class AcpSession {
           newSessionSchema,
           await peer.request('session/new', params, input.signal),
         )
-        return new AcpSession(peer, session.sessionId)
+        return new AcpSession(peer, session.sessionId, session)
       }
       const capabilities = initialized.agentCapabilities
       const supported =
@@ -88,7 +90,7 @@ export class AcpSession {
           : capabilities.sessionCapabilities?.resume != null
       if (!supported)
         throw acpErrors.RESUME_UNSUPPORTED({ internal: { operation: input.resume.method } })
-      await peer.request(
+      const configuration = await peer.request(
         `session/${input.resume.method}`,
         {
           ...params,
@@ -97,7 +99,11 @@ export class AcpSession {
         input.signal,
       )
       replaying = false
-      return new AcpSession(peer, input.resume.sessionId)
+      return new AcpSession(
+        peer,
+        input.resume.sessionId,
+        v.parse(v.record(v.string(), v.unknown()), configuration),
+      )
     } catch (error) {
       await peer.dispose()
       if (v.isValiError(error))
@@ -146,11 +152,12 @@ export class AcpSession {
   }
 
   /** ACP cancellation is a notification; the original prompt response is the drain barrier. */
-  async cancel() {
+  async cancel(): Promise<boolean> {
     const prompt = this.activePrompt
-    if (!prompt) return
+    if (!prompt) return false
     this.peer.notify('session/cancel', { sessionId: this.sessionId })
     await prompt.catch(() => undefined)
+    return true
   }
 
   request(method: string, params: Record<string, unknown>, signal: AbortSignal) {
