@@ -16,6 +16,7 @@ describe('editor token adapters', () => {
     const tokens = tokenLinesToEditorTokens([
       {
         text: 'const answer = 42',
+        lineEnding: '\n',
         tokens: [
           { color: '#f00', content: 'const', fontStyle: 0, offset: 0 },
           { color: '#0f0', content: 'answer', fontStyle: 0, offset: 6 },
@@ -23,6 +24,7 @@ describe('editor token adapters', () => {
       },
       {
         text: 'return answer',
+        lineEnding: '',
         tokens: [{ color: '#00f', content: 'return', fontStyle: 0, offset: 0 }],
       },
     ])
@@ -43,6 +45,7 @@ describe('editor token adapters', () => {
       lines: [
         {
           text: 'value',
+          lineEnding: '',
           tokens: [
             {
               color: '#fff',
@@ -73,6 +76,7 @@ describe('editor token adapters', () => {
     const tokens = tokenLinesToEditorTokens([
       {
         text: 'left right',
+        lineEnding: '',
         tokens: [
           { color: '#f00', content: 'left', fontStyle: 0, offset: 0 },
           { color: '#f00', content: 'right', fontStyle: 0, offset: 5 },
@@ -88,6 +92,7 @@ describe('editor token adapters', () => {
       lines: [
         {
           text: 'red blue',
+          lineEnding: '\n',
           tokens: [
             { color: '#f00', content: 'red', fontStyle: 0, offset: 0 },
             { color: '#f00', content: 'blue', fontStyle: 0, offset: 4 },
@@ -95,6 +100,7 @@ describe('editor token adapters', () => {
         },
         {
           text: 'green',
+          lineEnding: '',
           tokens: [
             {
               bgColor: '#020',
