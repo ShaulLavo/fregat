@@ -16,7 +16,9 @@ import { recordRecentMutationOptions } from '@/features/workspace/utils/record-r
 import { openWorkspaceRootMutationOptions } from '@/features/workspace/utils/open-root-mutation'
 import {
   activateWorkspaceRoot,
+  holdsActiveProject,
   isActiveWorkspaceRoot,
+  restoreActiveProject,
   useActiveProjectStore,
 } from '@/features/workspace/state/active-project'
 
@@ -43,12 +45,13 @@ export async function openWorkspaceRootForOwner(
   const reservation = workspaceEdits?.acquireRootSwitchReservation() ?? null
   if (workspaceEdits && !reservation) return 'failed'
   const startedAt = performance.now()
-  const previousRoot = useActiveProjectStore.getState().workspaceRoot
-  activateWorkspaceRoot(workspaceRoot)
+  const previous = useActiveProjectStore.getState()
+  const activation = activateWorkspaceRoot(workspaceRoot)
   // Chat follows the active project at once; an open that never lands must hand it back.
+  // A later open of this same root holds a newer activation; handing back would strand it.
   const release = () => {
-    const claimed = !isActiveWorkspaceRoot(workspaceRoot)
-    if (!claimed) activateWorkspaceRoot(previousRoot)
+    const claimed = !holdsActiveProject(activation)
+    if (!claimed) restoreActiveProject(previous)
     return claimed
   }
   const abandon = (endedBy: string) => {

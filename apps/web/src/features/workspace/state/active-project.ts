@@ -11,21 +11,26 @@ import { create } from 'zustand'
  *
  * Null means "wherever the editor is": on a cold start nothing has been activated yet.
  */
-type ActiveProjectStore = {
-  readonly workspaceRoot: string | null
-  readonly activate: (workspaceRoot: string | null) => void
-}
+type ActiveProject = { readonly workspaceRoot: string | null }
 
-export const useActiveProjectStore = create<ActiveProjectStore>()((set) => ({
-  workspaceRoot: null,
-  activate: (workspaceRoot) => set({ workspaceRoot }),
-}))
+export const useActiveProjectStore = create<ActiveProject>()(() => ({ workspaceRoot: null }))
 
-export function activateWorkspaceRoot(workspaceRoot: string | null) {
-  useActiveProjectStore.getState().activate(workspaceRoot)
+/** Each activation is a new state object, so a holder can tell a later claim on the same root from its own. */
+export function activateWorkspaceRoot(workspaceRoot: string | null): ActiveProject {
+  useActiveProjectStore.setState({ workspaceRoot }, true)
+  return useActiveProjectStore.getState()
 }
 
 /** False once a later activation has superseded this one. */
 export function isActiveWorkspaceRoot(workspaceRoot: string) {
   return useActiveProjectStore.getState().workspaceRoot === workspaceRoot
+}
+
+export function holdsActiveProject(activation: ActiveProject) {
+  return useActiveProjectStore.getState() === activation
+}
+
+/** Hands the project back to an earlier activation, which then holds it again. */
+export function restoreActiveProject(activation: ActiveProject) {
+  useActiveProjectStore.setState(activation, true)
 }
