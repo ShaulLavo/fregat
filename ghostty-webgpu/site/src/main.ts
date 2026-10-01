@@ -139,6 +139,8 @@ function toggleOverlay(): void {
   if (wasOn) overlay.disable()
   if (!wasOn) overlay.enable(terminal)
   ui.damage.setAttribute('aria-pressed', String(overlay.enabled))
+  // Typing right after toggling belongs to the shell, and Space would flip the toggle back.
+  if (active.input) terminal.focus()
 }
 
 function wireControls(): void {

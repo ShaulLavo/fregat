@@ -3,6 +3,7 @@ import type { Terminal } from '../../dist/index.js'
 const FADE_SECONDS = 0.35
 const PEAK_ALPHA = 0.16
 const TINT = '126, 230, 206'
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
 /** Tints each row the renderer repainted, fading so a steady redraw reads as a steady glow. */
 export class DamageOverlay {
@@ -40,7 +41,10 @@ export class DamageOverlay {
 
   private mark(terminal: Terminal, rows: readonly number[]): void {
     const count = terminal.appearance.grid.rows
-    if (this.heat.length !== count) this.heat = new Array<number>(count).fill(0)
+    // Reduced motion shows only the latest frame's rows, held still.
+    if (this.heat.length !== count || reducedMotion.matches) {
+      this.heat = new Array<number>(count).fill(0)
+    }
     for (const row of rows) {
       if (row >= 0 && row < count) this.heat[row] = 1
     }
@@ -54,14 +58,18 @@ export class DamageOverlay {
 
   private paint(now: number): void {
     this.handle = 0
-    const delta = this.lastAt === 0 ? 0 : (now - this.lastAt) / 1000
+    const still = reducedMotion.matches
+    const delta = this.lastAt === 0 || still ? 0 : (now - this.lastAt) / 1000
     this.lastAt = now
-    // The terminal's canvas spans exactly its cell grid, so rows divide its height evenly.
     const target = this.host.querySelector<HTMLCanvasElement>('canvas:not(.damage-overlay)')
     if (!target) return
-    const width = target.clientWidth
-    const height = target.clientHeight
-    this.place(target, width, height)
+    // The grid fills the canvas content box; its inline padding sits outside the rows.
+    const style = getComputedStyle(target)
+    const left = Number.parseFloat(style.paddingLeft)
+    const top = Number.parseFloat(style.paddingTop)
+    const width = target.clientWidth - left - Number.parseFloat(style.paddingRight)
+    const height = target.clientHeight - top - Number.parseFloat(style.paddingBottom)
+    this.place(target, left, top, width, height)
     this.context.clearRect(0, 0, width, height)
     const rowHeight = height / Math.max(1, this.heat.length)
     let warm = false
@@ -73,15 +81,21 @@ export class DamageOverlay {
       this.context.fillStyle = `rgba(${TINT}, ${(heat * PEAK_ALPHA).toFixed(3)})`
       this.context.fillRect(0, row * rowHeight, width, rowHeight)
     }
-    if (warm) this.schedule()
-    if (!warm) this.lastAt = 0
+    if (warm && !still) this.schedule()
+    if (!warm || still) this.lastAt = 0
   }
 
-  private place(target: HTMLCanvasElement, width: number, height: number): void {
+  private place(
+    target: HTMLCanvasElement,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+  ): void {
     const hostRect = this.host.getBoundingClientRect()
     const targetRect = target.getBoundingClientRect()
-    this.canvas.style.left = `${targetRect.left - hostRect.left}px`
-    this.canvas.style.top = `${targetRect.top - hostRect.top}px`
+    this.canvas.style.left = `${targetRect.left - hostRect.left + target.clientLeft + left}px`
+    this.canvas.style.top = `${targetRect.top - hostRect.top + target.clientTop + top}px`
     const ratio = window.devicePixelRatio || 1
     const pixelWidth = Math.round(width * ratio)
     const pixelHeight = Math.round(height * ratio)
