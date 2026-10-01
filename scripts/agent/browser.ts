@@ -93,12 +93,7 @@ type Options = CaptureSize & {
   readonly notifications?: boolean
 }
 
-const began = Number(process.env.DOCTOR_SPAWN_AT ?? Date.now())
-function mark(label: string) {
-  console.error(`DOCTOR_TIMING ${label} ${Math.round(Date.now() - began)}`)
-}
 async function main() {
-  mark('main')
   const { positionals, values } = parseArgs({
     allowPositionals: true,
     options: {
@@ -277,7 +272,6 @@ async function look(options: Options) {
       : await open(page, options.url)
     if (options.site) await evidence.json('layout.json', await staticPreviewLayout(page))
     await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
-    mark('screenshot')
     if (options.selector) {
       await page
         .locator(options.selector)
@@ -417,7 +411,6 @@ async function traceScenario(scenario: Scenario, options: Options) {
     if (scenario.inspect)
       await evidence.json('inspection.json', await scenario.inspect(page)).catch(() => undefined)
     await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
-    mark('screenshot')
     const raw = await Bun.file(tracePath).text()
     if (options.selectorStats) await evidence.json('selector-stats.json', summarizeSelectors(raw))
     const generated = summarizeTrace(raw)
@@ -511,7 +504,6 @@ async function countRenders(scenario: Scenario, options: Options) {
         'No component updates were captured. Check render instrumentation and page reloads.'
     }
     await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
-    mark('screenshot')
     rows.sort(
       (a, b) =>
         b.noDomChange - a.noDomChange || b.parentDriven - a.parentDriven || b.renders - a.renders,
@@ -681,9 +673,7 @@ async function withPage(
     browser: Browser,
   ) => Promise<number>,
 ) {
-  mark('launch-start')
   const browser = await launchBrowser(options.engine, options.headed, options.notifications)
-  mark('launch-end')
   const context = await browser.newContext({
     // Only Chromium knows these permission names; Firefox and WebKit reject the context.
     permissions: options.engine === 'chromium' ? chromiumPermissions(options) : [],
@@ -697,16 +687,13 @@ async function withPage(
       `window.platformDevServerUrl = ${JSON.stringify(options.server.origin)}`,
     )
   const page = await context.newPage()
-  mark('page-created')
   const observed = attachObserver(page, apiBase(options.url), {
     consoleCapture: options.consoleCapture,
   })
   let saveWallpaper: (() => Promise<string>) | undefined
   let disposeTerminals: (() => Promise<string>) | undefined
   try {
-    mark('gpu-start')
     await captureBrowserRenderer(browser, evidence, options.headed)
-    mark('gpu-end')
     if (options.productCapture) disposeTerminals = await isolateProductTerminals(page, evidence)
     const staticDirectory = options.staticDir
       ? await routeStaticPreview(page, options.staticDir)
@@ -733,7 +720,6 @@ async function withPage(
     return code
   } finally {
     await closeCapture(page, browser, saveWallpaper, disposeTerminals)
-    mark('closed')
   }
 }
 
@@ -771,14 +757,10 @@ async function workspaceUrl(page: Page, options: Options) {
 }
 
 async function open(page: Page, url: string) {
-  mark('navigate-start')
   await page.goto(url, { waitUntil: 'domcontentloaded' })
-  mark('navigate-end')
   try {
     await waitForApp(page)
-    mark('ready')
     await settleRunningAnimations(page)
-    mark('settled')
     return true
   } catch {
     return false
@@ -788,10 +770,8 @@ async function open(page: Page, url: string) {
 async function doctor(page: Page, url: string, ready: boolean, observed: Observed) {
   const reasons: string[] = []
   if (!ready) reasons.push('window toolbar never rendered')
-  mark('release-start')
   const release = await page.request.get(`${apiBase(url)}release`).catch(() => null)
   if (!release?.ok()) reasons.push('release route did not answer')
-  mark('release-end')
   const errors = await page.locator('[role="alert"]').count()
   if (errors > 0) reasons.push(`${errors} alert(s) on screen`)
   const frontendTypes = new Set(['document', 'script', 'stylesheet'])
