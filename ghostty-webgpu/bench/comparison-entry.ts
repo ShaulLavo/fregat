@@ -167,7 +167,7 @@ function createXterm(host: HTMLElement): Driver {
     fontFamily: settings.fontFamily,
     fontSize: settings.fontSize,
     lineHeight: settings.lineHeight,
-    scrollback: settings.ghosttyScrollbackBytes,
+    scrollback: settings.scrollback,
     cursorBlink: false,
     theme: { foreground: '#ffffff', background: '#000000' },
   })
