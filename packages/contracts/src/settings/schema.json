@@ -53,6 +53,13 @@
       "markdownDescription": "What the agent in a new session may do without asking you first.\n\nFull access suits a machine with one owner who trusts agents with its checkouts: Codex starts with approval policy never and sandbox danger-full-access, and Claude pre-approves every tool. This is an application setting, so a workspace file in a cloned repository cannot change it.",
       "type": "string"
     },
+    "chat.diagramFontWaitMs": {
+      "default": 3000,
+      "description": "Milliseconds a chat diagram waits for the interface font to download before it is measured with the faces already loaded. 0 measures at once.",
+      "maximum": 30000,
+      "minimum": 0,
+      "type": "integer"
+    },
     "chat.followUpBehavior": {
       "default": "queue",
       "description": "What happens to a message you send while the agent is still working: it waits until the turn ends, or reaches the agent at once to correct it. The other send key (Ctrl/Cmd+Enter, or Shift+Ctrl/Cmd+Enter where Ctrl/Cmd+Enter sends) does the other one.",

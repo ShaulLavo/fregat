@@ -219,7 +219,7 @@ function renderRowFromLine(
 ): DiffRenderRow {
   return {
     type,
-    text: renderLineText(line.text),
+    text: renderLineText(side === 'old' ? (line.oldText ?? line.text) : line.text),
     oldLineNumber: side !== 'new' ? line.oldLineNumber : undefined,
     newLineNumber: side !== 'old' ? line.newLineNumber : undefined,
     hunkIndex,

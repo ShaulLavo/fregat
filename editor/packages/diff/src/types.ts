@@ -20,7 +20,10 @@ export type DiffInlineRange = {
 
 export type DiffHunkLine = {
   readonly type: DiffLineType
+  /** The line's text; for a context line, its new side's. */
   readonly text: string
+  /** A context line's old-side text, when the byte order mark only one side drops makes it differ. */
+  readonly oldText?: string
   readonly oldLineNumber?: number
   readonly newLineNumber?: number
   readonly oldInlineRanges?: readonly DiffInlineRange[]
@@ -45,6 +48,7 @@ export type DiffFile = {
   readonly newObjectId?: string
   readonly oldMode?: string
   readonly newMode?: string
+  /** Git's lines as `splitTextLines` holds them; hunk line text follows the same rule per side. */
   readonly oldLines: readonly string[]
   readonly newLines: readonly string[]
   readonly hunks: readonly DiffHunk[]

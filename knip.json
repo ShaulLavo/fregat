@@ -97,7 +97,8 @@
         "parity/response-delivery.ts",
         "parity/snooze.ts",
         "parity/wake.ts"
-      ]
+      ],
+      "ignoreBinaries": ["ssh-keygen"]
     },
     ".": {
       "ignoreDependencies": ["typescript-api"]

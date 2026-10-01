@@ -1,6 +1,11 @@
 {
   "name": "@singapore-editor/plugin-ui",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShaulLavo/fregat.git",
+    "directory": "editor/packages/plugin-ui"
+  },
   "files": [
     "README.md",
     "dist"

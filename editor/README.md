@@ -15,13 +15,15 @@ still moving. package boundaries change between commits
 
 [demo](https://shaullavo.github.io/singapore/), browses this repo off the github api
 
-not on npm under this name yet. clone it and `bun link`
+```sh
+npm install @singapore-editor/core
+```
 
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
 import '@singapore-editor/core/style.css'
 
-const editor = new Editor(document.querySelector('#editor')!)
+const editor = new Editor(document.querySelector<HTMLElement>('#editor')!)
 editor.openDocument({
   documentId: 'example.ts',
   text: 'const value = 1;\n',
@@ -33,11 +35,11 @@ gutters, find, minimap, syntax and language servers are separate packages. nothi
 
 ## packages
 
-`core` (the `editor` folder), `gutters`, `find`, `markdown`, `minimap`, `scope-lines`, `diff`, `panes`, `tree-sitter`, `tree-sitter-languages`, `lsp`, `plugin-ui`, `lsp-plugin`, `typescript-lsp`, `decode`, `spellcheck`, `react`, `solid`. all under `@singapore-editor/`, one folder each in `packages/`
+`core` (the `editor` folder), `textbuffer`, `gutters`, `find`, `markdown`, `minimap`, `scope-lines`, `diff`, `panes`, `tree-sitter`, `tree-sitter-languages`, `lsp`, `plugin-ui`, `lsp-plugin`, `typescript-lsp`, `decode`, `spellcheck`, `highlighting`, `paged`, `react`, `solid`. all under `@singapore-editor/`, one folder each in `packages/`
 
 ## running the repo
 
-bun 1.3.10 or newer. browser tests need playwright
+bun 1.4.2 or newer. browser tests need playwright
 
 ```sh
 bun install
@@ -53,7 +55,7 @@ bun run lint
 bun run build
 ```
 
-`bench:*` scripts live in `packages/editor` and `packages/tree-sitter`
+`bench:stress` and `bench:input` run from the root. most packages with hot paths (`editor`, `textbuffer`, `find`, `tree-sitter`, …) have their own `bench:*` scripts
 
 ## more
 

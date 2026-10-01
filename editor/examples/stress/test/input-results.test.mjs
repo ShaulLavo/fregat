@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { correlateInputEvents } from '../input-correlation.mjs'
+import { compareInputProof } from '../input-proof.mjs'
 import {
   calibrateInput,
   compareInput,
@@ -1083,3 +1084,81 @@ async function checkCli(directory) {
   expect(invoke('check', 'control-1.json', 'delayed.json', calibrationPath).status).not.toBe(0)
   expect(invoke('calibrate', calibrationPath, 'control-1.json').status).not.toBe(0)
 }
+
+describe('instrument and package pairing', () => {
+  const identity = (run, { instrument = 'i', source = 's', build = 'b', external = 'e' } = {}) => {
+    run.environment.instrumentHash = instrument.repeat(64)
+    run.environment.packageSet = {
+      sourceHash: source.repeat(64),
+      buildHash: build.repeat(64),
+      externalHash: external.repeat(64),
+    }
+    return run
+  }
+  const paired = () => controls().map((run) => identity(run))
+
+  it('the proof caller accepts changed candidate bytes with baseline holdout and delayed bytes', () => {
+    const runs = paired()
+    const holdout = identity(result('holdout'))
+    const candidate = identity(result('candidate'), { source: 't', build: 'c' })
+    candidate.environment.sourceHash = 'c'.repeat(64)
+    const delayed = identity(result('delayed', 30))
+    delayed.config.slowdownMs = 20
+    const proof = compareInputProof(runs, holdout, candidate, delayed)
+    expect(proof.holdout.passed).toBe(true)
+    expect(proof.candidateResult.passed).toBe(true)
+    expect(proof.positive.passed).toBe(false)
+  })
+
+  it('the proof caller rejects a changed holdout build even when its source is unchanged', () => {
+    const runs = paired()
+    const holdout = identity(result('holdout'), { build: 'c' })
+    const candidate = identity(result('candidate'))
+    const delayed = identity(result('delayed', 30))
+    delayed.config.slowdownMs = 20
+    expect(() => compareInputProof(runs, holdout, candidate, delayed)).toThrow(
+      /holdout or delayed control package identity/,
+    )
+  })
+
+  it('the proof caller rejects candidate-build delayed bytes and mismatched delayed source', () => {
+    const runs = paired()
+    const holdout = identity(result('holdout'))
+    const candidate = identity(result('candidate'), { source: 't', build: 'c' })
+    const delayed = identity(result('delayed', 30), { source: 't', build: 'c' })
+    delayed.config.slowdownMs = 20
+    expect(() => compareInputProof(runs, holdout, candidate, delayed)).toThrow(
+      /holdout or delayed control package identity/,
+    )
+    identity(delayed)
+    delayed.environment.sourceHash = 'd'.repeat(64)
+    expect(() => compareInputProof(runs, holdout, candidate, delayed)).toThrow(
+      /Delayed control source differs from baseline/,
+    )
+  })
+
+  it('rejects controls from different instruments or baseline builds', () => {
+    const mixedInstrument = paired()
+    identity(mixedInstrument[2], { instrument: 'j' })
+    expect(() => calibrateInput(mixedInstrument)).toThrow(/instrument source/)
+    const mixedBuild = paired()
+    identity(mixedBuild[1], { build: 'c' })
+    expect(() => calibrateInput(mixedBuild)).toThrow(/control package builds/)
+  })
+
+  it('requires the calibrated build for a holdout and lets only a candidate change the product', () => {
+    const runs = paired()
+    const calibration = calibrateInput(runs)
+    const otherBuild = identity(result('other-build', 10), { source: 't', build: 'c' })
+    expect(() => compareInput(runs[0], otherBuild, calibration, { sameBuild: true })).toThrow(
+      /holdout or delayed control package identity/,
+    )
+    expect(compareInput(runs[0], otherBuild, calibration).passed).toBe(true)
+    const otherExternal = identity(result('other-external', 10), { build: 'c', external: 'f' })
+    expect(() => compareInput(runs[0], otherExternal, calibration)).toThrow(
+      /external dependency bytes/,
+    )
+    const otherInstrument = identity(result('other-instrument', 10), { instrument: 'j' })
+    expect(() => compareInput(runs[0], otherInstrument, calibration)).toThrow(/instrument source/)
+  })
+})

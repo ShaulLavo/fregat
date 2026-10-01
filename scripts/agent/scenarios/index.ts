@@ -90,6 +90,7 @@ import { stoppedTurnReasons } from './stopped-turn-reasons'
 import { streamAmbiguousTail } from './stream-ambiguous-tail'
 import { streamCodeColour } from './stream-code-colour'
 import { chatMermaid } from './chat-mermaid'
+import { chatMermaidFirstPaint } from './chat-mermaid-first-paint'
 import { editorMermaidStyle, editorStyleBaseline } from './editor-mermaid-style'
 import { claudeApprovalRules, codexApprovalRules } from './approval-rules'
 import { checkpointRewind } from './checkpoint-rewind'
@@ -364,6 +365,7 @@ import { editorStorageMaintenance } from './editor-storage-maintenance'
 import { editorReloadPaint, editorReloadPaintSlowFont } from './editor-reload-paint'
 import { gitCommitHookColors } from './git-commit-hook-colors'
 import { gitDiffHoverTokens } from './git-diff-hover-tokens'
+import { gitDiffCrlfSyntax } from './git-diff-crlf-syntax'
 import { gitDiffInlineTint } from './git-diff-inline-tint'
 import { gitDiffExpandTokens } from './git-diff-expand-tokens'
 import { editorPressParticipants } from './editor-press-participants'
@@ -465,6 +467,7 @@ export const scenarios: readonly Scenario[] = [
   streamAmbiguousTail,
   streamCodeColour,
   chatMermaid,
+  chatMermaidFirstPaint,
   editorMermaidStyle,
   editorStyleBaseline,
   claudeApprovalRules,
@@ -720,6 +723,7 @@ export const scenarios: readonly Scenario[] = [
   editorUndoBranch,
   editorTitleDiffToggle,
   gitDiffHoverTokens,
+  gitDiffCrlfSyntax,
   gitDiffInlineTint,
   gitDiffExpandTokens,
   editorPressParticipants,

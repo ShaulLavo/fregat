@@ -44,6 +44,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@shikijs/langs": "4.4.3",
+    "@shikijs/themes": "4.4.3",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2",

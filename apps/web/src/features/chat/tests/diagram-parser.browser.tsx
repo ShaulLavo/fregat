@@ -8,6 +8,7 @@ import { createDiagramFontSource } from '../state/diagram-font'
 import { mountDiagram } from '../state/diagram-display'
 
 const theme = { colorMode: 'dark', fontFamily: 'sans-serif', variables: {} } as const
+const request = { fontWaitMs: 3_000, signal: new AbortController().signal }
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -18,7 +19,7 @@ async function render(chart: string) {
   const renderer = await resourceQueryClient.query(mermaidQueryOptions)
   const host = document.createElement('div')
   document.body.append(host)
-  mountDiagram(host, await renderer.render(chart, theme))
+  mountDiagram(host, await renderer.render(chart, theme, request))
   const svg = host.shadowRoot!.querySelector('svg')!
   return svg
 }
@@ -130,7 +131,7 @@ test('restores parser after renderer failure and permits the next request', asyn
   const renderer = await resourceQueryClient.query(mermaidQueryOptions)
   diagram.renderer.draw = () => Promise.reject(new Error('fixture renderer failed'))
   try {
-    await expect(renderer.render(chart, theme)).rejects.toThrow('fixture renderer failed')
+    await expect(renderer.render(chart, theme, request)).rejects.toThrow('fixture renderer failed')
     expect(diagram.parser.parse).toBe(parse)
   } finally {
     diagram.renderer.draw = draw

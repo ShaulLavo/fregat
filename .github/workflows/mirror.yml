@@ -30,6 +30,12 @@ jobs:
             repository: ShaulLavo/hotkeys
             deploy_key: MIRROR_HOTKEYS_SSH_KEY
     steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Configure repository deploy key
         env:
           MIRROR_SSH_KEY: ${{ secrets[matrix.deploy_key] }}
@@ -46,14 +52,8 @@ jobs:
           chmod 700 "$key_dir"
           printf '%s\n' "$MIRROR_SSH_KEY" > "$key_dir/id_ed25519"
           chmod 600 "$key_dir/id_ed25519"
-          curl -fsSL https://api.github.com/meta | jq -r '.ssh_keys[] | "github.com " + .' > "$key_dir/known_hosts"
+          cp "$GITHUB_WORKSPACE/.github/github_known_hosts" "$key_dir/known_hosts"
           echo "GIT_SSH_COMMAND=ssh -i '$key_dir/id_ed25519' -o IdentitiesOnly=yes -o UserKnownHostsFile='$key_dir/known_hosts' -o StrictHostKeyChecking=yes" >> "$GITHUB_ENV"
-
-      - name: Checkout full history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
 
       - name: Split and push family
         env:

@@ -1,16 +1,26 @@
-import { page } from 'vitest/browser'
+import { commands, page } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import '@workspace/ui/globals.css'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
+import { settingsSnapshot } from '../../../../test/factories/settings'
 import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
 import { AssistantMarkdown } from '../components/assistant-markdown'
 import { ChatWorkspaceRootContext } from '../providers/workspace-root-context'
 import { loadedMermaid, setMermaidLoader } from '../state/mermaid'
 import delayedFontUrl from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url'
+import cyrillicFontUrl from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-cyrillic-wght-normal.woff2?url'
+
+// Registered in `vitest.browser.config.ts` under `browser.commands`, which carries no types.
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    delayRequest: (input: { readonly ms: number; readonly path: string }) => Promise<void>
+  }
+}
 
 const DIAGRAM = 'A graph:\n\n```mermaid\ngraph TD\n  A[Start] --> B[End]\n```\n'
 
@@ -19,6 +29,9 @@ let queryClient: QueryClient
 
 beforeEach(() => {
   queryClient = createTestQueryClient()
+  // A settings document fetched mid-test makes AppearanceProvider rewrite the `--font-ui` these
+  // tests set, so the diagram reverts to the default face.
+  queryClient.setQueryData(settingsKeys.document(), settingsSnapshot())
   seedBootMirrorTheme('dark')
   const container = document.createElement('main')
   container.style.width = '720px'
@@ -122,6 +135,85 @@ describe('mermaid fences', () => {
       document.documentElement.style.removeProperty('--font-ui')
       document.fonts.delete(face)
     }
+  }, 30_000)
+
+  /** Picks a face whose download is held for `ms`, once the providers have applied settings. */
+  async function holdDiagramFace(
+    chart: string,
+    ms: number,
+    url = delayedFontUrl,
+    descriptors?: FontFaceDescriptors,
+  ) {
+    // A face no text has used yet starts loading only when the diagram measures with it.
+    const path = `${url}?first-paint-${ms}`
+    await commands.delayRequest({ ms, path })
+    const face = new FontFace('FirstPaintDiagramFace', `url(${JSON.stringify(path)})`, descriptors)
+    // Mounting the providers applies the settings' `--font-ui`, so the face is chosen after.
+    renderDiagram(true, chart)
+    await vi.waitFor(() => expect(mermaidCodeBlock()).not.toBeNull())
+    document.fonts.add(face)
+    document.documentElement.style.setProperty('--font-ui', 'FirstPaintDiagramFace, serif')
+    return {
+      face,
+      async [Symbol.asyncDispose]() {
+        // A load still in flight would remeasure diagrams in later tests.
+        await face.load().catch(() => {})
+        document.documentElement.style.removeProperty('--font-ui')
+        document.fonts.delete(face)
+      },
+    }
+  }
+
+  it('measures with the selected face while it downloads', async () => {
+    const chart = '```mermaid\nflowchart TD\n A[MMMMMMMMMMMMM] --> B[End]\n```'
+    await using held = await holdDiagramFace(chart, 1000)
+    renderDiagram(false, chart)
+    await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
+    expect(held.face.status).toBe('loaded')
+    const first = mermaidDiagram()!.getAttribute('viewBox')
+    await document.fonts.ready
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(mermaidDiagram()!.getAttribute('viewBox')).toBe(first)
+  }, 30_000)
+
+  it('loads the subset for characters Mermaid decodes from entities', async () => {
+    // `#1044;` is Mermaid's spelling of Д; only the decoded label needs the Cyrillic subset.
+    const label = [1044, 1086, 1089, 1090, 1086, 1087, 1088, 1080, 1084, 1077, 1095, 1072, 1090]
+      .map((code) => `#${code};`)
+      .join('')
+    const chart = `\`\`\`mermaid\nflowchart TD\n A["${label}"] --> B[End]\n\`\`\``
+    await using held = await holdDiagramFace(chart, 1000, cyrillicFontUrl, {
+      unicodeRange: 'U+0400-045F',
+    })
+    renderDiagram(false, chart)
+    await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
+    expect(mermaidDiagram()!.textContent).toContain('Достопримечат')
+    expect(held.face.status).toBe('loaded')
+  }, 30_000)
+
+  it('paints every diagram within one font wait while the face stalls', async () => {
+    const fontWaitMs = 1000
+    queryClient.setQueryData(
+      settingsKeys.document(),
+      settingsSnapshot({ values: { 'chat.diagramFontWaitMs': fontWaitMs } }),
+    )
+    const chart = ['A', 'B', 'C']
+      .map(
+        (label) =>
+          `\`\`\`mermaid\nflowchart TD\n ${label}[MMMMMMMMMMMMM ${label}] --> E[End]\n\`\`\``,
+      )
+      .join('\n\n')
+    await using held = await holdDiagramFace(chart, 5000)
+    const startedAt = performance.now()
+    renderDiagram(false, chart)
+    const painted = () =>
+      [...document.querySelectorAll('[data-markdown="mermaid-block"] [role="img"]')].filter(
+        (host) => host.shadowRoot?.querySelector('svg'),
+      ).length
+    await vi.waitFor(() => expect(painted()).toBe(3), { timeout: 15_000 })
+    // Waiting in the render queue would cost one give-up per diagram, three in all.
+    expect(performance.now() - startedAt).toBeLessThan(fontWaitMs * 2.5)
+    expect(held.face.status).toBe('loading')
   }, 30_000)
 
   it('discards pending diagrams after a font revision and after unmount', async () => {

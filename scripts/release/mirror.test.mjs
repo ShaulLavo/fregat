@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { chmod, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { YAML } from 'bun'
 import { withWorkspace } from './fixture.mjs'
@@ -12,8 +13,40 @@ const script = workflow.jobs.mirror.steps.find((step) => step.name === 'Split an
 const keyScript = workflow.jobs.mirror.steps.find(
   (step) => step.name === 'Configure repository deploy key',
 ).run
+const workspace = fileURLToPath(new URL('../../', import.meta.url))
+const knownHosts = join(workspace, '.github/github_known_hosts')
 
-test('missing mirror credentials fail visibly before the checkout', async () => {
+test('every mirror checks out the pinned host keys before configuring SSH', () => {
+  const steps = workflow.jobs.mirror.steps
+  const checkout = steps.findIndex((step) => step.name === 'Checkout full history')
+  const configure = steps.findIndex((step) => step.name === 'Configure repository deploy key')
+  expect(checkout).toBeGreaterThanOrEqual(0)
+  expect(checkout).toBeLessThan(configure)
+  expect(steps[checkout].with['persist-credentials']).toBe(false)
+  expect(workflow.jobs.mirror.strategy.matrix.include.map((entry) => entry.folder)).toEqual([
+    'editor',
+    'ghostty-webgpu',
+    'hotkeys',
+  ])
+})
+
+test('pinned GitHub host keys match all three published SHA256 fingerprints', () => {
+  const found = spawnSync('ssh-keygen', ['-F', 'github.com', '-f', knownHosts], {
+    encoding: 'utf8',
+  })
+  expect(found.status, found.stderr).toBe(0)
+  const fingerprints = spawnSync('ssh-keygen', ['-lf', knownHosts, '-E', 'sha256'], {
+    encoding: 'utf8',
+  })
+  expect(fingerprints.status, fingerprints.stderr).toBe(0)
+  expect(fingerprints.stdout.trim().split('\n')).toEqual([
+    '256 SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU github.com (ED25519)',
+    '256 SHA256:p2QAMXNIC1TJYWeIOttrVc98/R1BUFWu3/LiyKgUfQM github.com (ECDSA)',
+    '3072 SHA256:uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMczCvj3tD2s github.com (RSA)',
+  ])
+})
+
+test('missing mirror credentials fail visibly before the push', async () => {
   await withWorkspace(async ({ root }) => {
     const result = spawnSync('bash', ['-c', keyScript], {
       encoding: 'utf8',
@@ -29,14 +62,14 @@ test('missing mirror credentials fail visibly before the checkout', async () => 
   })
 })
 
-test('mirror credentials stay private and SSH requires GitHub host verification', async () => {
+test('mirror SSH setup succeeds offline with private credentials and strict host verification', async () => {
   await withWorkspace(async ({ root }) => {
     const bin = join(root, 'bin')
     await mkdir(bin)
     const curl = join(bin, 'curl')
     await writeFile(
       curl,
-      '#!/bin/sh\nprintf \'{"ssh_keys":["ssh-ed25519 fixture-host-key"]}\\n\'\n',
+      '#!/bin/sh\ntouch "$RUNNER_TEMP/curl-called"\nprintf "curl: (22) The requested URL returned error: 403\\n" >&2\nexit 22\n',
     )
     await chmod(curl, 0o700)
     const env = {
@@ -46,16 +79,20 @@ test('mirror credentials stay private and SSH requires GitHub host verification'
       MIRROR_KEY_SECRET: 'FIXTURE_KEY',
       RUNNER_TEMP: root,
       GITHUB_ENV: join(root, 'github-env'),
+      GITHUB_WORKSPACE: workspace,
     }
     const result = spawnSync('bash', ['-c', keyScript], { encoding: 'utf8', env })
     expect(result.status, result.stderr).toBe(0)
     expect(`${result.stdout}${result.stderr}`).not.toContain('fixture-private-key')
     const key = join(root, 'mirror-ssh/id_ed25519')
     expect((await stat(key)).mode & 0o777).toBe(0o600)
-    expect(await readFile(join(root, 'mirror-ssh/known_hosts'), 'utf8')).toContain(
-      'github.com ssh-ed25519 fixture-host-key',
+    await expect(stat(join(root, 'curl-called'))).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(await readFile(join(root, 'mirror-ssh/known_hosts'), 'utf8')).toBe(
+      await readFile(knownHosts, 'utf8'),
     )
-    expect(await readFile(env.GITHUB_ENV, 'utf8')).toContain('StrictHostKeyChecking=yes')
+    const sshCommand = await readFile(env.GITHUB_ENV, 'utf8')
+    expect(sshCommand).toContain(`UserKnownHostsFile='${join(root, 'mirror-ssh/known_hosts')}'`)
+    expect(sshCommand).toContain('StrictHostKeyChecking=yes')
     const cleanup = workflow.jobs.mirror.steps.find((step) => step.name === 'Remove deploy key').run
     expect(spawnSync('bash', ['-c', cleanup], { env }).status).toBe(0)
     await expect(stat(key)).rejects.toMatchObject({ code: 'ENOENT' })
@@ -142,6 +179,27 @@ async function commitFamily(root, content) {
   )
   git(root, 'push', 'origin', 'main')
 }
+
+test('mirror push reports SSH host verification failures', async () => {
+  await withWorkspace(async ({ root }) => {
+    const origin = join(root, 'origin.git')
+    const source = join(root, 'source')
+    const ssh = join(root, 'ssh')
+    git(root, 'init', '--bare', '--initial-branch=main', origin)
+    git(root, 'clone', origin, source)
+    await mkdir(join(source, 'hotkeys'))
+    await commitFamily(source, 'first')
+    await writeFile(ssh, '#!/bin/sh\nprintf "Host key verification failed.\\n" >&2\nexit 255\n')
+    await chmod(ssh, 0o700)
+    git(source, 'config', 'core.sshCommand', `'${ssh}'`)
+    git(source, 'config', 'ssh.variant', 'ssh')
+    const result = mirror(source)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Host key verification failed.')
+    expect(result.stdout).toContain('::error::Mirror push rejected or failed for fixture/mirror.')
+    expect(result.stdout).not.toContain('Mirror skipped:')
+  })
+})
 
 test('mirrors current snapshots and skips an older replay while preserving the newer head', async () => {
   await withWorkspace(async ({ root }) => {

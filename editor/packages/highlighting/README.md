@@ -1,56 +1,42 @@
 # @singapore-editor/highlighting
 
-One highlighting service for editors, diffs and standalone snippets. It owns engine policy, grammar
-and alias loading, theme registration and worker lifetime. Callers supply theme data and, optionally,
-the languages they expect.
+syntax colors for editors, diffs and standalone snippets, from one service
 
-## Simple editor
+tree-sitter gives the structure (folds, brackets, injections, selection) and the editor palette's colors. pick an imported vs code theme and shiki paints its textmate colors over the same structure. both engines run in workers
+
+## try it
+
+not on npm yet. use it from this workspace
 
 ```ts
+import { Editor } from '@singapore-editor/core/editor'
 import { createHighlightingPlugin } from '@singapore-editor/highlighting'
 
-new Editor(element, { plugins: [createHighlightingPlugin()] })
+const editor = new Editor(element, { plugins: [createHighlightingPlugin()] })
 ```
 
-Each activation creates its own service and disposes it when the editor lets go of the plugin.
-Tree-sitter supplies structure (folds, brackets, injections, selection) and the editor palette's
-colors.
+the plugin makes its own service and disposes it when the editor drops the plugin
 
-## Shared service
+highlight a snippet with no editor at all
 
 ```ts
-const highlighting = createHighlightingService({
-  resolveTheme: (id) => themes.load(id), // imported VS Code theme data by id
-  preloadLanguages: () => workspaceLanguages, // null prepares the default grammar set
-})
+import { createHighlightingService, highlightLines } from '@singapore-editor/highlighting'
 
-const syntax = createHighlightingPlugin({
-  service: highlighting,
-  theme: { current: () => ({ format: 'vscode', id: 'dracula' }), subscribe },
-})
+const highlighting = createHighlightingService()
+const code = 'const value = 1\n'
+const result = await highlighting.highlight(code, { language: 'typescript' })
+
+for (const line of highlightLines(code, result.tokens)) {
+  for (const segment of line) console.log(segment.text, segment.style?.color ?? result.foreground)
+}
+
+await highlighting.dispose()
 ```
 
-A borrowed service is never disposed by a plugin. Under an imported theme, TextMate colors paint over
-the same Tree-sitter structure; switching back to the editor palette removes only the colors. Diffs
-and prepared documents take the same providers through `service.documentBackend(theme)`.
+tokens are utf-16 offsets into exactly the text you passed. a language with no grammar comes back as `language: 'text'` with no tokens
 
-## Standalone snippet
+## more
 
-```ts
-const result = await highlighting.highlight(sample, {
-  language: 'typescript',
-  theme: { format: 'vscode', definition: registration },
-  signal,
-})
-```
-
-No DOM, editor or document is needed. Tokens are UTF-16 offsets into exactly the submitted text and
-are frozen. `themeRevision` changes with the theme's content, so two same-name themes never share
-colors. Unknown languages answer with `language: 'text'` and no tokens. Abort rejects the caller with
-an `AbortError`; the shared worker keeps serving. Without a worker the call rejects with code
-`unavailable`; it never tokenizes on the main thread.
-
-## Disposal
-
-The creator disposes: `await highlighting.dispose()` stops both workers and rejects work still in
-flight. Disposing twice is safe.
+- [sharing one service across editors, diffs and previews](docs/service.md), themes, aborts, errors, disposal
+- [`@singapore-editor/tree-sitter`](../tree-sitter/), the structure side
+- [`@singapore-editor/tree-sitter-languages`](../tree-sitter-languages/), the grammars it loads

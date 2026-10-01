@@ -1,6 +1,8 @@
 import { parsePatch, structuredPatch } from 'diff'
 import { annotateInlineChanges } from './inline'
 import {
+  editorLineText,
+  firstLineText,
   languageIdForPath,
   normalizeContextLines,
   splitTextLines,
@@ -165,8 +167,10 @@ function convertPatchLines(hunk: ParsedPatchHunk): readonly DiffHunkLine[] {
   let oldLineNumber = hunk.oldStart
   let newLineNumber = hunk.newStart
 
-  for (const rawLine of hunk.lines) {
-    const result = convertPatchLine(rawLine, oldLineNumber, newLineNumber)
+  for (const [index, rawLine] of hunk.lines.entries()) {
+    // Git marks a line no LF ended with a `\ No newline at end of file` line after it.
+    const terminated = hunk.lines[index + 1]?.startsWith('\\') !== true
+    const result = convertPatchLine(rawLine, terminated, oldLineNumber, newLineNumber)
     if (!result) continue
 
     lines.push(result.line)
@@ -179,6 +183,7 @@ function convertPatchLines(hunk: ParsedPatchHunk): readonly DiffHunkLine[] {
 
 function convertPatchLine(
   rawLine: string,
+  terminated: boolean,
   oldLineNumber: number,
   newLineNumber: number,
 ): { readonly line: DiffHunkLine; readonly oldDelta: number; readonly newDelta: number } | null {
@@ -186,26 +191,30 @@ function convertPatchLine(
   if (isRawHunkHeader(rawLine)) return null
 
   const marker = rawLine[0] ?? ' '
-  const text = rawLine.slice(1)
-  if (isRawHunkHeader(text)) return null
+  const content = editorLineText(rawLine.slice(1), terminated)
+  // Each side drops a byte order mark from its own first line only.
+  const oldText = oldLineNumber === 1 ? firstLineText(content) : content
+  const newText = newLineNumber === 1 ? firstLineText(content) : content
+  if (isRawHunkHeader(content)) return null
 
   if (marker === '-') {
     return {
-      line: { type: 'deletion', text, oldLineNumber },
+      line: { type: 'deletion', text: oldText, oldLineNumber },
       oldDelta: 1,
       newDelta: 0,
     }
   }
   if (marker === '+') {
     return {
-      line: { type: 'addition', text, newLineNumber },
+      line: { type: 'addition', text: newText, newLineNumber },
       oldDelta: 0,
       newDelta: 1,
     }
   }
 
+  const sides = oldText === newText ? {} : { oldText }
   return {
-    line: { type: 'context', text, oldLineNumber, newLineNumber },
+    line: { type: 'context', text: newText, ...sides, oldLineNumber, newLineNumber },
     oldDelta: 1,
     newDelta: 1,
   }
@@ -229,7 +238,7 @@ function appendPatchLines(lines: string[], hunk: DiffHunk, side: 'old' | 'new'):
   for (const line of hunk.lines) {
     if (side === 'old' && line.type === 'addition') continue
     if (side === 'new' && line.type === 'deletion') continue
-    lines.push(line.text)
+    lines.push(side === 'old' ? (line.oldText ?? line.text) : line.text)
   }
 }
 

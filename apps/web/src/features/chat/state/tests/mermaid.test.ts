@@ -6,6 +6,7 @@ import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 afterEach(() => setMermaidLoader(null))
 
+const request = () => ({ fontWaitMs: 0, signal: new AbortController().signal })
 const mermaidAPI = { getDiagramFromText: async () => ({ parser: { parse() {} } }) }
 
 test('concurrent fences share acquisition and a failed library can be requested again', async () => {
@@ -43,22 +44,44 @@ test('renderer configuration remains owned by its diagram until rendering settle
     render,
   }))
   const renderer = await resourceQueryClient.query(mermaidQueryOptions)
-  const first = renderer.render('first', {
-    colorMode: 'dark',
-    fontFamily: 'sans-serif',
-    variables: {},
-  })
+  const first = renderer.render(
+    'first',
+    { colorMode: 'dark', fontFamily: 'sans-serif', variables: {} },
+    request(),
+  )
   await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1))
-  const second = renderer.render('second', {
-    colorMode: 'light',
-    fontFamily: 'sans-serif',
-    variables: {},
-  })
+  const second = renderer.render(
+    'second',
+    { colorMode: 'light', fontFamily: 'sans-serif', variables: {} },
+    request(),
+  )
   await Promise.resolve()
   expect(render).toHaveBeenCalledTimes(1)
   gate.resolve()
   expect(await first).toBe('first:true')
   expect(await second).toBe('second:false')
+})
+
+test('a diagram abandoned while queued never reaches Mermaid', async () => {
+  const gate = Promise.withResolvers<void>()
+  const render = vi.fn(async (_id: string, text: string) => {
+    if (text === 'first') await gate.promise
+    return { svg: text }
+  })
+  setMermaidLoader(async () => ({ mermaidAPI, initialize() {}, render }))
+  const renderer = await resourceQueryClient.query(mermaidQueryOptions)
+  const theme = { colorMode: 'dark', fontFamily: 'sans-serif', variables: {} } as const
+  const first = renderer.render('first', theme, request())
+  await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1))
+  const abandoned = new AbortController()
+  const second = renderer.render('abandoned', theme, { fontWaitMs: 0, signal: abandoned.signal })
+  const third = renderer.render('third', theme, request())
+  abandoned.abort()
+  gate.resolve()
+  expect(await first).toBe('first')
+  expect(await third).toBe('third')
+  await expect(second).rejects.toThrow()
+  expect(render.mock.calls.map(([, text]) => text)).toEqual(['first', 'third'])
 })
 
 test('remounting a diagram does not retry a failed library import', async () => {

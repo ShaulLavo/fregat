@@ -9,8 +9,11 @@ export {
   deleteFromPieceTable,
   diffPieceTableSnapshots,
   getPieceTableLength,
+  // Ingestion's own rules, for a host that must show text exactly as an opened document holds it.
+  hasByteOrderMark,
   insertIntoPieceTable,
   materializePieceTableFullText,
+  normalizeLineEndings,
   offsetToPoint,
   // A host that must not silently rewrite a file needs to know the ingestion folded U+2028/U+2029
   // into real line breaks, because the folded text no longer carries the evidence.

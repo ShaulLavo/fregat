@@ -894,6 +894,16 @@ function handle(message) {
     streamAnswer(turn, `${turn}-answer`, CODE_COLOUR_CHUNKS, 250)
     return
   }
+  if (scenario === 'chat-mermaid-first-paint' && message.method === 'turn/start') {
+    const turn = startOwnTurn(message)
+    agentMessage(
+      turn,
+      `${turn}-answer`,
+      ['```mermaid', 'flowchart LR', ' A[Достопримечательность] --> B[Конец]', '```'].join('\n'),
+    )
+    endTurn(turn, 'completed')
+    return
+  }
   if (
     ['chat-mermaid', 'editor-mermaid-style', 'editor-style-baseline'].includes(scenario) &&
     message.method === 'turn/start'

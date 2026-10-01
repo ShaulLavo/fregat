@@ -31,7 +31,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:requestAnimationFrame:dffa87e548",
       "justification": "Benchmark observation of the first animation frame after an applied key; it records a timestamp only, tracks the frame handle, and cancels pending frames on disposal.",
-      "line": 151,
+      "line": 169,
       "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
@@ -39,7 +39,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:setTimeout:e5c148c176",
       "justification": "The bounded churn benchmark yields to the browser every ten iterations so cancellation and rendering can run. The timer only resolves the awaited promise; the next iteration checks cancellation before editing.",
-      "line": 220,
+      "line": 238,
       "snippet": "if (index % 10 === 0) await new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -105,6 +105,22 @@
       "justification": "Benchmark observation of the next animation frame after input dispatch. It records a timestamp only, tracks each frame handle, and cancels pending frames when the probe is disposed.",
       "line": 88,
       "snippet": "const frame = requestAnimationFrame(() => {"
+    },
+    {
+      "api": "setTimeout",
+      "file": "examples/stress/src/inputReadiness.ts",
+      "id": "examples/stress/src/inputReadiness.ts:setTimeout:1fa46d1e38",
+      "justification": "Harness readiness and cleanup only: the shared deadline bounds worker awaits outside captured input; the timer is cleared when the stage settles.",
+      "line": 29,
+      "snippet": "timer = setTimeout(() => reject(timeoutError(stage, observe)), remaining)"
+    },
+    {
+      "api": "setTimeout",
+      "file": "examples/stress/src/inputReadiness.ts",
+      "id": "examples/stress/src/inputReadiness.ts:setTimeout:3e3c273e6a",
+      "justification": "Harness readiness only: polling yields for states without a completion event, outside captured input and within the caller's absolute deadline.",
+      "line": 37,
+      "snippet": "return new Promise((resolve) => setTimeout(resolve, ms))"
     },
     {
       "api": "setTimeout",
@@ -399,7 +415,7 @@
       "file": "packages/react/src/index.tsx",
       "id": "packages/react/src/index.tsx:queueMicrotask:021fec5f8c",
       "justification": "Defers the callback past StrictMode's synchronous replay; the incarnation, document and state guards drop it when the editor moved on, and no editor work is scheduled.",
-      "line": 538,
+      "line": 550,
       "snippet": "queueMicrotask(() => {"
     },
     {
@@ -407,7 +423,7 @@
       "file": "packages/react/src/index.tsx",
       "id": "packages/react/src/index.tsx:queueMicrotask:0b4181030c",
       "justification": "Waits out React's synchronous StrictMode unmount and remount; the generation guard drops the disposal when the component came straight back.",
-      "line": 304,
+      "line": 316,
       "snippet": "queueMicrotask(() => {"
     },
     {
@@ -415,7 +431,7 @@
       "file": "packages/react/src/index.tsx",
       "id": "packages/react/src/index.tsx:queueMicrotask:95e4ae90ae",
       "justification": "Defers delivery until the mount survives React's synchronous StrictMode replay; the incarnation guard cancels disposed mounts, and no editor work is scheduled.",
-      "line": 495,
+      "line": 507,
       "snippet": "queueMicrotask(() => {"
     },
     {

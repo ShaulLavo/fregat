@@ -62,3 +62,173 @@ test('an abandoned open hands the active project back and records no recent', as
     restore()
   }
 })
+
+test('an abandoned open leaves a newer open of the same folder in charge', async ({
+  client,
+  server,
+}) => {
+  await mkdir(path.join(server.root, 'next'))
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  const reached = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  let opens = 0
+  const observed = createObservedInProcessClient(server, async (request) => {
+    if (request.method !== 'POST' || new URL(request.url).pathname !== '/fs/workspace-root') return
+    const index = opens++
+    reached[index]?.resolve()
+    await gates[index]?.promise
+  })
+  const restore = scopeAddressEnvironment(ORIGIN, descriptor.environmentId, observed)
+  activateWorkspaceRoot('previous')
+  const switched: string[] = []
+  const owner = {
+    queryClient: queryClientFor(ORIGIN),
+    switchRootFolder: (entry: { readonly path: string }) => switched.push(entry.path),
+    workspaceStore: createEditorWorkspaceStore(),
+    workspaceEdits: null,
+  }
+  const abort = new AbortController()
+  try {
+    const first = openWorkspaceRootForOwner(owner, 'next', { signal: abort.signal })
+    await reached[0]?.promise
+    abort.abort()
+    const second = openWorkspaceRootForOwner(owner, 'next')
+    await reached[1]?.promise
+    gates[0]?.resolve()
+    expect(await first).toBe('superseded')
+    expect(useActiveProjectStore.getState().workspaceRoot).toBe('next')
+
+    gates[1]?.resolve()
+    expect(await second).toBe('opened')
+    expect(switched).toEqual(['next'])
+    expect(useActiveProjectStore.getState().workspaceRoot).toBe('next')
+  } finally {
+    for (const gate of gates) gate.resolve()
+    activateWorkspaceRoot(null)
+    restore()
+  }
+})
+
+test('when every open of a folder is abandoned, the project goes back to the last one that landed', async ({
+  client,
+  server,
+}) => {
+  await mkdir(path.join(server.root, 'next'))
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  const reached = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  let opens = 0
+  const observed = createObservedInProcessClient(server, async (request) => {
+    if (request.method !== 'POST' || new URL(request.url).pathname !== '/fs/workspace-root') return
+    const index = opens++
+    reached[index]?.resolve()
+    await gates[index]?.promise
+  })
+  const restore = scopeAddressEnvironment(ORIGIN, descriptor.environmentId, observed)
+  activateWorkspaceRoot('previous')
+  const switched: string[] = []
+  const owner = {
+    queryClient: queryClientFor(ORIGIN),
+    switchRootFolder: (entry: { readonly path: string }) => switched.push(entry.path),
+    workspaceStore: createEditorWorkspaceStore(),
+    workspaceEdits: null,
+  }
+  const aborts = [new AbortController(), new AbortController()]
+  try {
+    const first = openWorkspaceRootForOwner(owner, 'next', { signal: aborts[0]?.signal })
+    await reached[0]?.promise
+    aborts[0]?.abort()
+    const second = openWorkspaceRootForOwner(owner, 'next', { signal: aborts[1]?.signal })
+    await reached[1]?.promise
+    gates[0]?.resolve()
+    expect(await first).toBe('superseded')
+
+    aborts[1]?.abort()
+    gates[1]?.resolve()
+    expect(await second).toBe('superseded')
+    expect(switched).toEqual([])
+    expect(useActiveProjectStore.getState().workspaceRoot).toBe('previous')
+  } finally {
+    for (const gate of gates) gate.resolve()
+    activateWorkspaceRoot(null)
+    restore()
+  }
+})
+
+test('a switch that throws hands the active project back', async ({ client, server }) => {
+  await mkdir(path.join(server.root, 'next'))
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const restore = scopeAddressEnvironment(ORIGIN, descriptor.environmentId, client)
+  activateWorkspaceRoot('previous')
+  try {
+    const result = await openWorkspaceRootForOwner(
+      {
+        queryClient: queryClientFor(ORIGIN),
+        switchRootFolder: () => {
+          throw new TypeError('switch failed')
+        },
+        workspaceStore: createEditorWorkspaceStore(),
+        workspaceEdits: null,
+      },
+      'next',
+    )
+
+    expect(result).toBe('failed')
+    expect(useActiveProjectStore.getState().workspaceRoot).toBe('previous')
+  } finally {
+    activateWorkspaceRoot(null)
+    restore()
+  }
+})
+
+test('an older response cannot take the folder from a newer open of it', async ({
+  client,
+  server,
+}) => {
+  await mkdir(path.join(server.root, 'next'))
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  const reached = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  let opens = 0
+  const observed = createObservedInProcessClient(server, async (request) => {
+    if (request.method !== 'POST' || new URL(request.url).pathname !== '/fs/workspace-root') return
+    const index = opens++
+    reached[index]?.resolve()
+    await gates[index]?.promise
+  })
+  const restore = scopeAddressEnvironment(ORIGIN, descriptor.environmentId, observed)
+  activateWorkspaceRoot('previous')
+  const workspaceStore = createEditorWorkspaceStore()
+  const switched: string[] = []
+  const owner = (switchRootFolder: (entry: { readonly path: string }) => void) => ({
+    queryClient: queryClientFor(ORIGIN),
+    switchRootFolder,
+    workspaceStore,
+    workspaceEdits: null,
+  })
+  try {
+    const older = openWorkspaceRootForOwner(
+      owner(() => {
+        throw new TypeError('switch failed')
+      }),
+      'next',
+    )
+    await reached[0]?.promise
+    const newer = openWorkspaceRootForOwner(
+      owner((entry) => switched.push(entry.path)),
+      'next',
+    )
+    await reached[1]?.promise
+    gates[0]?.resolve()
+    expect(await older).toBe('superseded')
+
+    gates[1]?.resolve()
+    expect(await newer).toBe('opened')
+    expect(switched).toEqual(['next'])
+    expect(useActiveProjectStore.getState().workspaceRoot).toBe('next')
+  } finally {
+    for (const gate of gates) gate.resolve()
+    activateWorkspaceRoot(null)
+    restore()
+  }
+})
