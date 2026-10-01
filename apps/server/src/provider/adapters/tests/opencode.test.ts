@@ -51,6 +51,47 @@ function setup(options?: Parameters<typeof startOpenCodeHttpFixture>[0]) {
   return { http, adapter, events }
 }
 
+test('anonymous connected free models are usable without claiming account authentication', async () => {
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname === '/global/health')
+        return Response.json({ healthy: true, version: 'anonymous-fixture' })
+      return Response.json({
+        connected: ['opencode'],
+        all: [
+          {
+            id: 'opencode',
+            source: 'custom',
+            options: { apiKey: 'public' },
+            models: { 'free-text': { name: 'Free text', cost: { input: 0, output: 0 } } },
+          },
+        ],
+      })
+    },
+  })
+  const adapter = new OpenCodeProviderAdapter({
+    serverUrl: server.url.toString(),
+    env: {},
+    displayLabel: 'Anonymous OpenCode',
+    enabled: true,
+    providerInstanceId: instanceId,
+  })
+  cleanup.push(
+    () => server.stop(true),
+    () => adapter.stopAll(),
+  )
+
+  expect(await adapter.snapshot()).toMatchObject({
+    installed: true,
+    status: 'ready',
+    supportsSignIn: false,
+    auth: { status: 'unknown' },
+    models: [{ slug: 'opencode/free-text', name: 'Free text' }],
+  })
+})
+
 test('SDKv2 fixture streams one answer, filters user/foreign events, and completes one turn', async () => {
   const { http, adapter, events } = setup()
   await adapter.sendTurn(input)
