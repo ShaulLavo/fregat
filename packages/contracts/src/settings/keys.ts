@@ -1280,6 +1280,20 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'deploy', 'restart', 'update', 'busy', 'wait'],
   }),
+  'developer.heavyJobLogDirectory': defineSetting({
+    schema: v.pipe(v.string(), v.minLength(1)),
+    // Beside production's logs, so every checkout's wrapper writes one machine-wide record.
+    default: '/work/platform-production/heavy-jobs',
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'string',
+    category: 'Developer',
+    title: 'Heavy job log directory',
+    description:
+      'Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'wrapper', 'memory', 'log', 'report'],
+  }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.
     //
