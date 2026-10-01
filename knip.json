@@ -72,6 +72,7 @@
         "dev.ts",
         "dev-serve.ts",
         "flake-summary.ts",
+        "heavy/install.ts",
         "heavy/report.ts",
         "heavy/run.ts",
         "generate-settings-reference.ts",

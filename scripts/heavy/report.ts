@@ -9,7 +9,7 @@ import { createScriptError, scriptFailureText } from '../structured-errors'
 import type { HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun scripts/heavy/report.ts [--since 1d] [--until <time>] [--by command|label] [--sort peak|cpu|wall|jobs] [--top 20] [--log-dir <dir>] [--json]'
+  'Usage: bun /work/platform-production/heavy/current/report.js [--since 1d] [--until <time>] [--by command|label] [--sort peak|cpu|wall|jobs] [--top 20] [--log-dir <dir>] [--json]'
 const GiB = 2 ** 30
 
 type Row = {

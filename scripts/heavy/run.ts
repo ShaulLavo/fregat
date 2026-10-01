@@ -11,7 +11,7 @@ import { tryLock, unlock } from './lock'
 import { appendRecord, redactCommand } from './record'
 
 const USAGE =
-  'Usage: bun scripts/heavy/run.ts [--host local] [--log-dir <dir>] [--lock-dir <dir>] <label> -- <command…>'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--host local] [--log-dir <dir>] [--lock-dir <dir>] <label> -- <command…>'
 // Shared with tools that take the slot locks directly: holding all three keeps the machine quiet.
 const LEGACY_LOCK_DIR = '/work/tmp/wave-heavy'
 const SLOTS = [1, 2, 3] as const
@@ -111,6 +111,15 @@ function holders(lockDir: string) {
   return SLOTS.map((slot) => readText(path.join(lockDir, `slot${slot}.holder`)).trim()).join(';')
 }
 
+// An installed copy has no checkout around it; install.ts writes its commit beside the bundle.
+function wrapperCommit() {
+  const installed = readText(path.join(import.meta.dirname, 'commit')).trim()
+  if (installed) return installed
+  return Bun.spawnSync(['git', '-C', import.meta.dirname, 'rev-parse', 'HEAD'])
+    .stdout.toString()
+    .trim()
+}
+
 function readText(file: string) {
   try {
     return readFileSync(file, 'utf8')
@@ -130,9 +139,7 @@ type Finished = {
 function record(options: Options, { cwd, id, outcome, queuedMs, slot }: Finished) {
   const logDir =
     options.logDir ?? readHomeSetting(productionStateHome, 'developer.heavyJobLogDirectory')
-  const commitHash = Bun.spawnSync(['git', '-C', import.meta.dirname, 'rev-parse', 'HEAD'])
-    .stdout.toString()
-    .trim()
+  const commitHash = wrapperCommit()
   try {
     appendRecord(logDir, {
       action: 'heavy.job',
