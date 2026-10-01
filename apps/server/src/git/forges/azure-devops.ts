@@ -238,6 +238,10 @@ function pullRequestState(status: string): GitPullRequest['state'] {
 }
 
 function organizationUrl(context: ForgeContext) {
+  if (context.forge.host === 'ssh.dev.azure.com') {
+    const [, organization] = (context.repository ?? '').split('/')
+    return `https://dev.azure.com/${organization ?? ''}`
+  }
   if (context.forge.host !== 'dev.azure.com') return `https://${context.forge.host}`
   const [organization] = (context.repository ?? '').split('/')
   return `https://dev.azure.com/${organization ?? ''}`

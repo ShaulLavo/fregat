@@ -1116,69 +1116,81 @@ describe('forge discussion capabilities', () => {
     })
   })
 
-  it('Azure reads returned repository threads, preserves inline and reply context, and refuses writes', async () => {
-    const forge = boundary('https://dev.azure.com/org/project/_git/repo', (argv) => {
-      if (argv[1] === 'account') return ok('fixture')
-      if (argv.includes('show'))
-        return json({
-          repository: { name: 'returned-repo', project: { name: 'returned-project' } },
-        })
-      if (argv.includes('invoke'))
-        return json({
-          value: [
-            {
-              id: 3,
-              threadContext: { filePath: '/src/main.ts' },
-              comments: [
-                {
-                  id: 1,
-                  content: 'Inline comment',
-                  publishedDate: 'today',
-                  author: { displayName: 'Reader' },
-                },
-                { id: 2, content: 'Reply', publishedDate: 'today' },
-                { id: 3, content: 'System event', publishedDate: 'today', commentType: 'system' },
-                { id: 4, content: 'Deleted', publishedDate: 'today', isDeleted: true },
-              ],
-            },
-            {
-              id: 4,
-              isDeleted: true,
-              comments: [{ id: 1, content: 'Deleted thread', publishedDate: 'today' }],
-            },
-          ],
-        })
-      return undefined
-    })
-    const cwd = await checkout()
-    expect(await readPullRequestComments({ cwd, number: 7 }, forge)).toMatchObject({
-      kind: 'ready',
-      forge: { kind: 'azure-devops' },
-      truncated: false,
-      comment: { kind: 'unsupported' },
-      review: { kind: 'unsupported' },
-      comments: [
-        { id: '3:1', body: 'Inline comment', context: { threadId: '3', path: '/src/main.ts' } },
-        { id: '3:2', body: 'Reply', context: { threadId: '3', path: '/src/main.ts' } },
-      ],
-    })
-    expect(forge.commands('az').at(-1)?.argv).toEqual(
-      expect.arrayContaining([
-        '--org',
-        'https://dev.azure.com/org',
-        'project=returned-project',
-        'repositoryId=returned-repo',
-        'pullRequestId=7',
-      ]),
-    )
-    expect(await postPullRequestComment({ cwd, number: 7, body: 'Thanks' }, forge)).toMatchObject({
-      kind: 'unsupported',
-    })
-    expect(
-      await submitPullRequestReview({ cwd, number: 7, body: '', verdict: 'approve' }, forge),
-    ).toMatchObject({ kind: 'unsupported' })
-    expect(forge.commands('az')).toHaveLength(3)
-  })
+  it.each([
+    ['https://dev.azure.com/org/project/_git/repo', 'https://dev.azure.com/org'],
+    ['git@ssh.dev.azure.com:v3/org/project/repo', 'https://dev.azure.com/org'],
+    ['git@org.visualstudio.com:v3/org/project/repo', 'https://org.visualstudio.com'],
+  ])(
+    'Azure reads returned repository threads for %s with native context and unsupported writes',
+    async (remote, organization) => {
+      const forge = boundary(remote, (argv) => {
+        if (argv[1] === 'account') return ok('fixture')
+        if (argv.includes('show'))
+          return json({
+            repository: { name: 'returned-repo', project: { name: 'returned-project' } },
+          })
+        if (argv.includes('invoke'))
+          return json({
+            value: [
+              {
+                id: 3,
+                threadContext: { filePath: '/src/main.ts' },
+                comments: [
+                  {
+                    id: 1,
+                    content: 'Inline comment',
+                    publishedDate: 'today',
+                    author: { displayName: 'Reader' },
+                  },
+                  { id: 2, content: 'Reply', publishedDate: 'today' },
+                  { id: 3, content: 'System event', publishedDate: 'today', commentType: 'system' },
+                  { id: 4, content: 'Deleted', publishedDate: 'today', isDeleted: true },
+                ],
+              },
+              {
+                id: 4,
+                isDeleted: true,
+                comments: [{ id: 1, content: 'Deleted thread', publishedDate: 'today' }],
+              },
+            ],
+          })
+        return undefined
+      })
+      const cwd = await checkout()
+      expect(await readPullRequestComments({ cwd, number: 7 }, forge)).toMatchObject({
+        kind: 'ready',
+        forge: { kind: 'azure-devops' },
+        truncated: false,
+        comment: { kind: 'unsupported' },
+        review: { kind: 'unsupported' },
+        comments: [
+          { id: '3:1', body: 'Inline comment', context: { threadId: '3', path: '/src/main.ts' } },
+          { id: '3:2', body: 'Reply', context: { threadId: '3', path: '/src/main.ts' } },
+        ],
+      })
+      expect(forge.commands('az').at(-1)?.argv).toEqual(
+        expect.arrayContaining([
+          '--org',
+          organization,
+          'project=returned-project',
+          'repositoryId=returned-repo',
+          'pullRequestId=7',
+        ]),
+      )
+      expect(await postPullRequestComment({ cwd, number: 7, body: 'Thanks' }, forge)).toMatchObject(
+        {
+          kind: 'unsupported',
+        },
+      )
+      expect(
+        await submitPullRequestReview({ cwd, number: 7, body: '', verdict: 'approve' }, forge),
+      ).toMatchObject({ kind: 'unsupported' })
+      expect(forge.commands('az')).toHaveLength(3)
+      for (const call of forge.commands('az').slice(1)) {
+        expect(call.argv[call.argv.indexOf('--org') + 1]).toBe(organization)
+      }
+    },
+  )
 
   it.each([99, 100, 101])('Azure caps its unpaginated preview of %i comments', async (count) => {
     const forge = boundary('https://dev.azure.com/org/project/_git/repo', (argv) => {

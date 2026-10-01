@@ -87,7 +87,7 @@ export function DiscussionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-xl'>
+      <DialogContent className='scroll-fade scroll-gutter max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto overscroll-contain'>
         <DialogHeader>
           <DialogTitle>Pull request #{number} discussion</DialogTitle>
           <DialogDescription>
