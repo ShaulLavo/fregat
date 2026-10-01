@@ -111,7 +111,7 @@ export function summaries(artifact) {
 
 const number = (value) => value.toFixed(2)
 
-export function markdown(artifact) {
+export function markdown(artifact, review = {}) {
   assert(
     !artifact.smoke && artifact.hardware,
     'Correctness smoke cannot generate performance claims',
@@ -131,7 +131,7 @@ export function markdown(artifact) {
     '`npx playwright install chromium`, then `node comparison-runner.mjs --smoke`.',
     'Run `node comparison-runner.mjs --output results` on AC power for measurements.',
     'Headed Chromium windows open during the run. Set aside up to 30 minutes.',
-    'Regenerate this document with `node comparison-report.mjs results/comparison.json docs/benchmarks.md`.',
+    'Regenerate the checked-in report with `node scripts/comparison-report.mjs docs/benchmarks/mac-m1/comparison.json docs/benchmarks.md docs/benchmarks/mac-m1/review.json`.',
     '',
     '## Environment',
     '',
@@ -168,7 +168,7 @@ export function markdown(artifact) {
     'Burst output writes at least 4 KiB per terminal per animation frame for each corpus.',
     'Frame intervals come from requestAnimationFrame timestamps. Dropped frames are inferred from the measured idle refresh period,',
     'rounded to the nearest number of display intervals. They are missed animation-frame opportunities, not GPU presentation counters.',
-    'CPU is Chromium browser/renderer/GPU process CPU time as a percentage of one core.',
+    'CPU sums Chromium process CPU time, including browser, renderer, and GPU, as a percentage of one core.',
     '',
     'Memory per terminal and per 10k rows is the post-GC CDP used JS heap plus backing storage delta, divided by terminal count.',
     'Output memory is sampled after the 60-frame ASCII output phase, outside CPU timing. Initial memory is the idle baseline.',
@@ -212,6 +212,7 @@ export function markdown(artifact) {
     '## Wins and losses',
     '',
     'These comparisons use one terminal and the byte path. They report every measured metric against both other libraries.',
+    'Win/loss labels describe the observed medians; they carry no statistical-significance claim. Tail latency uses 12 samples per run.',
     '',
     '| Measure | Against xterm WebGL | Against xterm DOM | Against ghostty-web |',
     '| --- | --- | --- | --- |',
@@ -249,7 +250,7 @@ export function markdown(artifact) {
     '## Correctness and limits',
     '',
     'The runner asserts ASCII, SGR, wide text, cursor overwrite, byte echo, glyph presentation, and exact history length.',
-    'The artifact retains Unicode/ZWJ text plus a screenshot for each library/path/count in the first repetition.',
+    'Successful first-repetition correctness checks retain Unicode/ZWJ text and a screenshot.',
     'Review those screenshots for glyph layout differences; parser acceptance alone cannot prove Unicode shaping parity.',
     'Firefox and Safari were not measured. This run qualifies headed Chromium on the recorded hardware only.',
     'The corpus and font hashes, raw latency samples, raw frame intervals, process CPU snapshots, memory buckets,',
@@ -257,14 +258,32 @@ export function markdown(artifact) {
     'Completed isolated parser samples remain valid when a later rendered case fails. Other metrics from failed cases are excluded. A metric appears in the tables only after all three repetitions complete.',
     '',
   )
-  for (const run of artifact.runs.filter((run) => run.error))
+  const failures = new Map()
+  for (const run of artifact.runs.filter((run) => run.error)) {
+    const label = `${run.variant}/${run.path}/${run.count}`
+    const message = run.error.split('\n')[0]
+    const key = `${label}/${message}`
+    if (!failures.has(key)) failures.set(key, { label, message, repetitions: [] })
+    failures.get(key).repetitions.push(run.repetition + 1)
+  }
+  for (const failure of failures.values())
     lines.push(
-      `- Failed ${run.variant}/${run.path}/${run.count}, repetition ${run.repetition}: ${run.error}`,
+      `- ${failure.label}, repetitions ${failure.repetitions.join(', ')}: ${failure.message}`,
     )
+  if (review.coverage) {
+    lines.push('', '## Screenshot review', '', review.coverage, '')
+    for (const observation of review.observations ?? []) lines.push(`- ${observation}`)
+    lines.push('', '### Qualification notes', '')
+    for (const limit of review.limits ?? []) lines.push(`- ${limit}`)
+    lines.push('', '### Evidence', '')
+    for (const link of review.links ?? [])
+      lines.push(`- [${link.label}](benchmarks/mac-m1/${link.path})`)
+  }
   return lines.join('\n')
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const artifact = JSON.parse(await readFile(process.argv[2], 'utf8'))
-  await writeFile(process.argv[3], markdown(artifact))
+  const review = process.argv[4] ? JSON.parse(await readFile(process.argv[4], 'utf8')) : {}
+  await writeFile(process.argv[3], markdown(artifact, review))
 }
