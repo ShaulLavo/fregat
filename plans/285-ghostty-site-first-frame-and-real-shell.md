@@ -69,9 +69,9 @@ a real bash.
 Execution checklist (DOM/first-frame lane):
 
 - [x] Capture the instrumented serial boot on the built site, cold Fast 4G / 4× CPU.
-- [ ] Implement and test the DOM backend and pure HTML output; bump the package minor.
-- [ ] Inline the real-core first frame, self-host fonts, parallelize boot, paint-gated hand-off.
-- [ ] Repeat the timeline and read desktop, phone and hand-off screenshots.
+- [x] Implement and test the DOM backend and pure HTML output; bump the package minor.
+- [x] Inline the real-core first frame, self-host fonts, parallelize boot, paint-gated hand-off.
+- [x] Repeat the timeline and read desktop, phone and hand-off screenshots.
 - [ ] Commit by path, push and open the lane PR.
 
 Before touching the boot path, record when the ghost first appears, on a cold cache, throttled to
@@ -89,19 +89,60 @@ present because that lane ran in parallel. This isolates the site boot change, n
 
 | Milestone                      | Serial boot | First-frame boot |
 | ------------------------------ | ----------: | ---------------: |
-| HTML first contentful paint    |       580.0 |          Pending |
-| Terminal fonts ready           |     1,274.9 |          Pending |
-| Wasm response complete         |     5,359.7 |          Pending |
-| `Terminal.create` resolved     |     5,395.4 |          Pending |
-| `open` resolved                |     5,579.5 |          Pending |
-| Ghost frames response complete |     6,042.3 |          Pending |
-| Ghost frames decoded           |     6,064.0 |          Pending |
-| First ghost frame              |     6,115.5 |          Pending |
+| HTML first contentful paint    |       580.0 |            368.0 |
+| Terminal fonts ready           |     1,274.9 |          2,411.3 |
+| Wasm response complete         |     5,359.7 |          5,681.8 |
+| `Terminal.create` resolved     |     5,395.4 |          5,714.7 |
+| `open` resolved                |     5,579.5 |          5,747.0 |
+| Ghost frames response complete |     6,042.3 |          1,751.9 |
+| Ghost frames decoded           |     6,064.0 |          2,418.5 |
+| First ghost frame              |     6,115.5 |     368.0 (HTML) |
 
 Baseline evidence: `/work/tmp/fregat-evidence/p285-before/` (`trace.json`, `timeline.json`,
 `loaded.png`, `frame-0000.jpg` onward). The screenshot was read back: the initial ghost waits for
 wasm and frames, and the old font sizing places it toward the right side of the window. The current
 checked-in wasm transfers 773,277 bytes in this preview, larger than the older estimate above.
+
+### Verified first-frame implementation (2026-10-01)
+
+The after column is `/work/tmp/fregat-evidence/p285-main-after-2/`, built after the content and
+fractional-DPR fitting integration. `ghost:first-frame` marks the live swap at 5,935.9 ms;
+first visible ghost is now the HTML paint, 368.0 ms. Three cold alternating pairs under the same
+throttle yielded FCP 588 → 364, 508 → 368, and 492 → 360 ms: medians 508 → 364 ms.
+The serial median first visible ghost was 5,938.2 ms, compared with 364 ms for HTML.
+Evidence is `/work/tmp/fregat-evidence/p285-main-before-{1,2,3}/` and
+`/work/tmp/fregat-evidence/p285-main-after-{1,2,3}/`; every run recorded zero page errors.
+
+The initial div-per-row static frame regressed FCP and was replaced with one preformatted grid.
+Shared serializer runs retain only paint classes; geometry lives on the parent. Typed inherited
+cell properties prevent repeated CSS expression expansion, and first-paint CSS is inline.
+The final content-integrated document transfers 6,264 bytes (5,964 compressed body, 28,213 decoded),
+versus 1,778 / 1,478 / 3,733 for the serial baseline. The baseline is the older page, so the total
+includes content added by Phase 3. Earlier unchanged-content paired runs also improved median FCP
+484 → 352 ms after compaction and CSS inlining. Self-hosted fonts add bandwidth contention: wasm
+and live hand-off remain around six seconds under this throttle; this is an HTML-paint improvement,
+not a claim that the runtime download became faster.
+
+Read-back screencast frames `p285-main-after-2/frame-0001.jpg` (first content), `frame-0006.jpg`
+(before hand-off), and `frame-0007.jpg` / `frame-0008.jpg` (live hand-off) show the retained ghost.
+The frozen suite `/work/tmp/fregat-evidence/p285-main-handoff/` checks desktop and phone at DPR 1
+and 2 plus phone DPR 1.3: static 40 rows, live exactly 40 rows and at least 78 columns, identical
+screen coordinates and dimensions, retained HTML until paint, and no page errors. It also passes
+DOM-only, no-WebAssembly, and JavaScript-disabled cases. Desktop and fractional-phone static/live
+screen screenshots were read back. DOM/GPU antialiasing differs; late font loading changes page
+text layout before the live swap. No all-page pixel identity is claimed.
+
+Formal looks were healthy and read back in `/work/tmp/fregat-evidence/p285-main-looks/`:
+`20261001T194511Z-look-ghostty-webgpu-1280x1000/` and
+`20261001T194513Z-look-ghostty-webgpu-390x844/`. These use Chromium WebGL2/SwiftShader, not a
+hardware GPU; Firefox and WebKit first-frame geometry remain unconfirmed.
+
+Phase 1 PR: <https://github.com/ShaulLavo/fregat/pull/285>, package 0.3.0. The merge resolution
+preserves packed GPU/WebGL row reads; immutable styled cells decode only when serialization
+requests them. Verification after integration: 11 Node serializer/snapshot tests, 39 DOM/Canvas/
+fallback browser tests, 25 GPU/WebGL tests with two existing Linux SwiftShader skips; build,
+typecheck, lint, formatting and full commit gates pass. The static compaction and fitting checks
+add 12 passing Node tests. Phase 2 publication remains pending the demo integration.
 
 ## Phase 1: a DOM renderer, in the package
 
