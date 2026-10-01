@@ -66,12 +66,180 @@ a real bash.
 
 ## Phase 0: measure the first frame
 
+Execution checklist (DOM/first-frame lane):
+
+- [x] Capture the instrumented serial boot on the built site, cold Fast 4G / 4× CPU.
+- [x] Implement and test the DOM backend and pure HTML output; bump the package minor.
+- [x] Inline the real-core first frame, self-host fonts, parallelize boot, paint-gated hand-off.
+- [x] Repeat the timeline and read desktop, phone and hand-off screenshots.
+- [x] Commit by path, push and open the lane PR.
+
 Before touching the boot path, record when the ghost first appears, on a cold cache, throttled to
 "Fast 4G" and to a slow desktop CPU, in Chromium: HTML paint, font ready, wasm fetched, `create`
 resolved, `open` resolved, frames fetched, first ghost frame. `bun run agent:browser trace` against
 the built site (`astro preview`) gives the timeline; save it to
 `/work/tmp/fregat-evidence/<run>/` and copy the numbers into this plan. Every later phase cites
 this baseline.
+
+Measured locally on the built Astro preview at 1280 × 1000, Chromium headless (WebGL2),
+cold cache, 1.6 Mbps download / 750 Kbps upload / 150 ms RTT, 4× CPU slowdown. Milestones
+are milliseconds from navigation start; raw CDP traces and every emitted screencast frame are retained.
+The baseline retains the serial boot and the unfixed sizing; the compatible-renderer package is already
+present because that lane ran in parallel. This isolates the site boot change, not package bundle size.
+
+| Milestone                      | Serial boot | First-frame boot |
+| ------------------------------ | ----------: | ---------------: |
+| HTML first contentful paint    |       580.0 |            368.0 |
+| Terminal fonts ready           |     1,274.9 |          2,411.3 |
+| Wasm response complete         |     5,359.7 |          5,681.8 |
+| `Terminal.create` resolved     |     5,395.4 |          5,714.7 |
+| `open` resolved                |     5,579.5 |          5,747.0 |
+| Ghost frames response complete |     6,042.3 |          1,751.9 |
+| Ghost frames decoded           |     6,064.0 |          2,418.5 |
+| First ghost frame              |     6,115.5 |     368.0 (HTML) |
+
+Baseline evidence: `/work/tmp/fregat-evidence/p285-before/` (`trace.json`, `timeline.json`,
+`loaded.png`, `frame-0000.jpg` onward). The screenshot was read back: the initial ghost waits for
+wasm and frames, and the old font sizing places it toward the right side of the window. The current
+checked-in wasm transfers 773,277 bytes in this preview, larger than the older estimate above.
+
+### Verified first-frame implementation (2026-10-01)
+
+The after column is `/work/tmp/fregat-evidence/p285-main-after-2/`, built after the content and
+fractional-DPR fitting integration. `ghost:first-frame` marks the live swap at 5,935.9 ms;
+first visible ghost is now the HTML paint, 368.0 ms. Three cold alternating pairs under the same
+throttle yielded FCP 588 → 364, 508 → 368, and 492 → 360 ms: medians 508 → 364 ms.
+The serial median first visible ghost was 5,938.2 ms, compared with 364 ms for HTML.
+Evidence is `/work/tmp/fregat-evidence/p285-main-before-{1,2,3}/` and
+`/work/tmp/fregat-evidence/p285-main-after-{1,2,3}/`; every run recorded zero page errors.
+
+The initial div-per-row static frame regressed FCP and was replaced with one preformatted grid.
+Shared serializer runs retain only paint classes; geometry lives on the parent. Typed inherited
+cell properties prevent repeated CSS expression expansion, and first-paint CSS is inline.
+The final content-integrated document transfers 6,264 bytes (5,964 compressed body, 28,213 decoded),
+versus 1,778 / 1,478 / 3,733 for the serial baseline. The baseline is the older page, so the total
+includes content added by Phase 3. Earlier unchanged-content paired runs also improved median FCP
+484 → 352 ms after compaction and CSS inlining. Self-hosted fonts add bandwidth contention: wasm
+and live hand-off remain around six seconds under this throttle; this is an HTML-paint improvement,
+not a claim that the runtime download became faster.
+
+Read-back screencast frames `p285-main-after-2/frame-0001.jpg` (first content), `frame-0006.jpg`
+(before hand-off), and `frame-0007.jpg` / `frame-0008.jpg` (live hand-off) show the retained ghost.
+The frozen suite `/work/tmp/fregat-evidence/p285-main-handoff/` checks desktop and phone at DPR 1
+and 2 plus phone DPR 1.3: static 40 rows, live exactly 40 rows and at least 78 columns, identical
+screen coordinates and dimensions, retained HTML until paint, and no page errors. It also passes
+DOM-only, no-WebAssembly, and JavaScript-disabled cases. Desktop and fractional-phone static/live
+screen screenshots were read back. DOM/GPU antialiasing differs; late font loading changes page
+text layout before the live swap. No all-page pixel identity is claimed.
+
+Formal looks were healthy and read back in `/work/tmp/fregat-evidence/p285-main-looks/`:
+`20261001T194511Z-look-ghostty-webgpu-1280x1000/` and
+`20261001T194513Z-look-ghostty-webgpu-390x844/`. These use Chromium WebGL2/SwiftShader, not a
+hardware GPU; Firefox and WebKit first-frame geometry remain unconfirmed.
+
+Phase 1 PR: <https://github.com/ShaulLavo/fregat/pull/285>, package 0.3.0. The merge resolution
+preserves packed GPU/WebGL row reads; immutable styled cells decode only when serialization
+requests them. Verification after integration: 11 Node serializer/snapshot tests, 39 DOM/Canvas/
+fallback browser tests, 25 GPU/WebGL tests with two existing Linux SwiftShader skips; build,
+typecheck, lint, formatting and full commit gates pass. The static compaction and fitting checks
+add 12 passing Node tests. Phase 2 includes the merged damage-overlay integration.
+
+After merging demo PR #278, paired FCP was 504 → 364, 480 → 368, and 488 → 364 ms
+(medians 488 → 364). Evidence is `/work/tmp/fregat-evidence/p285-final-before-{1,2,3}/`
+and `/work/tmp/fregat-evidence/p285-final-after-{1,2,3}/`; the document transfers 6,462 bytes
+(6,162 compressed body; 29,204 decoded). First-paint and swap frames were read back.
+The final demo hand-off matrix `/work/tmp/fregat-evidence/p285-final-demo-handoff/` also checks
+static tabs, runs real Shell arithmetic (42) and a three-iteration loop, and returns to the Ghost
+under reduced motion. That return exposed a retained redraw-sampling countdown; resetting the
+sample on layout restores the paused stat. Matrix and Shell screen screenshots were read back.
+Build-time Node gzip is preserved with a browser-only zlib resolver; a global browser stub would
+break the real-core prerender. Fifteen targeted Node tests and the full commit gates pass.
+Desktop and phone looks were healthy and read back at `/work/tmp/fregat-evidence/p285-final-looks/`
+(`20261001T211929Z-look-ghostty-webgpu-1280x1000/` and
+`20261001T211931Z-look-ghostty-webgpu-390x844/`).
+
+### Final overlay integration (2026-10-02)
+
+Phase 2 PR: <https://github.com/ShaulLavo/fregat/pull/304>. Committed by path and pushed;
+full commit gates and repository typecheck pass. Phase 1 is merged in #285.
+
+The static chrome retains #302's Redraws toggle, initially off, alongside the three demo tabs
+and lowercase `html` backend. Mobile chrome hides the decorative dots. Canvas2D capability
+is checked for the optional overlay: unsupported browsers retain their DOM terminal and get a
+disabled Redraws control. Build and site typecheck pass. The complete frozen hand-off matrix
+passes at `/work/tmp/fregat-evidence/p285-overlay-handoff/`, including overlay on/off in every
+GPU viewport, DOM-only disabled overlay, real Shell arithmetic/loop, no WebAssembly and no
+JavaScript. The no-JavaScript screenshot was read back.
+
+Three final cold alternating traces yielded FCP 520 → 388, 484 → 368, and 484 → 388 ms:
+medians 484 → 388 ms. Median first visible Ghost is 5,950.1 → 388 ms. The final document
+transfers 6,597 bytes (6,297 compressed body; 29,954 decoded). Every run recorded zero page
+errors. Evidence is `/work/tmp/fregat-evidence/p285-overlay-before-{1,2,3}/` and
+`/work/tmp/fregat-evidence/p285-overlay-after-{1,2,3}/`. First-content frame 0001 and pre/live
+handoff frames 0006/0007/0008 from after-2 were read back; the live swap marks 5,930.2 ms.
+The final trace build preceded only a null-safe overlay transform-call adjustment; static HTML,
+CSS and boot scheduling were unchanged. Runtime transfer remains around six seconds.
+
+Final desktop and phone looks are healthy and read back at
+`/work/tmp/fregat-evidence/p285-overlay-looks/20261001T213838Z-look-ghostty-webgpu-1280x1000/`
+and `/work/tmp/fregat-evidence/p285-overlay-looks/20261001T213839Z-look-ghostty-webgpu-390x844/`.
+Chromium software WebGL2 is confirmed; hardware GPU and Firefox/WebKit geometry remain
+unconfirmed. No deployment or GitHub PR merge is performed by this lane.
+
+### Independent-review follow-up (2026-10-02)
+
+The built site reproduced both reviewed boot bugs: a frames 404 kept the terminal unopened
+behind the HTML Ghost, and selecting Shell while wasm was held started Shell with no
+accessibility mirror/live region or terminal focus. Before evidence and read-back screenshots
+are at `/work/tmp/fregat-evidence/p285-review-boot-before/`.
+
+Ghost now owns its parallel asset promise and paints load failures locally, including while
+paused. Terminal opening awaits core and fonts independently of Ghost assets. A shared
+`startActive` path applies accessibility, fitting, pause policy and input focus during both boot
+and tab selection. The browser regression covers 404, truncated gzip, and Shell selected before
+wasm is released; it checks live hand-off, failure output, accessibility, focus and actual typed
+Shell arithmetic. All three boot regressions pass at
+`/work/tmp/fregat-evidence/p285-review-boot-after/`; failure and working-Shell screenshots were
+read back. The full frozen hand-off/demo matrix passes again at
+`/work/tmp/fregat-evidence/p285-review-handoff/`. Site build and typecheck pass. Formal desktop
+and phone looks are healthy and read back under `/work/tmp/fregat-evidence/p285-review-looks/`
+(`20261001T215604Z-look-ghostty-webgpu-1280x1000/` and
+`20261001T215606Z-look-ghostty-webgpu-390x844/`). The cold trace numbers above predate these
+boot repairs and the still-frame fallback below; no updated first-paint or runtime hand-off timing
+is claimed.
+
+The original malformed-frame fixture also exposed accepted invalid header dimensions. The
+parser now rejects missing, non-integer and non-positive dimensions before they reach a
+renderer, so that failure stays in Ghost too. A valid frame test and six invalid-header tests
+reproduced the validation gap and pass after the guard; with the real-core compaction test,
+eight targeted Node tests pass. All four expanded boot regressions pass at
+`/work/tmp/fregat-evidence/p285-review-asset-header/`, including malformed header failure followed
+by working Shell input. The failure screenshot was read back. Build and site typecheck pass.
+
+### Runtime-start failure follow-up (2026-10-02)
+
+Held `ghostty-vt.wasm` (desktop) and `bridge.wasm` (phone) requests returned 404 after static
+paint. Both reproduced the missing visible failure state at
+`/work/tmp/fregat-evidence/p285-runtime-failure-before/`; the other four boot cases passed.
+
+Create/open failure now retains the static Ghost, resets the selected demo to Ghost, keeps both
+backend labels `html`, and natively disables tabs and Redraws. Disabled controls have no hover
+styling and a default pointer. The caption says: “The live terminal did not start in this browser,
+so this is a still frame.” The no-WebAssembly path uses the same state; its redundant hidden
+paragraph is removed. No fatal/details element is retained.
+
+All six boot regressions pass at `/work/tmp/fregat-evidence/p285-runtime-failure-after/`.
+The runtime faults also select Shell before rejection and check that Ghost labels are restored,
+40 static rows remain, the caption is visible, controls are disabled, and hover/keyboard input
+cannot change the fallback. Desktop and phone full-page fallback screenshots were read back.
+The complete frozen hand-off/demo matrix passes at
+`/work/tmp/fregat-evidence/p285-runtime-failure-handoff/`, including no-WebAssembly and no-JS.
+Site build and typecheck pass. Healthy desktop and phone looks were read back at
+`/work/tmp/fregat-evidence/p285-runtime-failure-looks/20261001T221919Z-look-ghostty-webgpu-1280x1000/`
+and `/work/tmp/fregat-evidence/p285-runtime-failure-looks/20261001T221920Z-look-ghostty-webgpu-390x844/`.
+This repair changes HTML/CSS; earlier cold-trace numbers describe the earlier build. No new
+first-paint or runtime timing claim is made. Software Chromium WebGL2 is confirmed; hardware
+GPU and Firefox/WebKit remain unconfirmed. No deployment or GitHub PR merge is performed.
 
 ## Phase 1: a DOM renderer, in the package
 
