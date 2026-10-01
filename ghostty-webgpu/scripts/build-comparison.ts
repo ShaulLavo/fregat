@@ -28,6 +28,10 @@ const assets = {
     require.resolve('@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2'),
   'font-bold.woff2':
     require.resolve('@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2'),
+  'font-license.txt': join(
+    dirname(require.resolve('@fontsource/jetbrains-mono/package.json')),
+    'LICENSE',
+  ),
   'xterm.css': require.resolve('@xterm/xterm/css/xterm.css'),
   'xterm.mjs': join(dirname(require.resolve('@xterm/xterm')), 'xterm.mjs'),
   'addon-webgl.mjs': join(dirname(require.resolve('@xterm/addon-webgl')), 'addon-webgl.mjs'),

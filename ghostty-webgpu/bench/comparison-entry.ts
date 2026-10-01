@@ -2,6 +2,8 @@ import { Terminal as Xterm } from '@xterm/xterm'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Ghostty, Terminal as GhosttyWeb } from 'ghostty-web'
 import { GhosttyRuntime } from '../src/core/runtime.js'
+import { GhosttyTerminal } from '../src/core/terminal.js'
+import { TerminalOption } from '../src/core/abi.js'
 import { TerminalSession } from '../src/term/session.js'
 import { createGhosttyWebGpuTerminalFromSession } from '../src/dom/terminal.js'
 import { WebGpuTerminalRenderer } from '../src/render/renderer.js'
@@ -51,6 +53,23 @@ function input(data: string): string | Uint8Array {
   return current.path === 'bytes' ? encoder.encode(data) : data
 }
 
+function configureNativeHistory(terminal: GhosttyTerminal): void {
+  const { runtime } = terminal
+  const pointer = runtime.memory.allocate(4)
+  try {
+    runtime.memory.view.setUint32(pointer, settings.ghosttyScrollbackBytes, true)
+    const result = runtime.exports.ghostty_terminal_set(
+      terminal.handle,
+      TerminalOption.ScrollbackMaxBytes,
+      pointer,
+    )
+    if (result !== 0)
+      throw new Error(`Native scrollback byte-budget configuration failed: ${result}`)
+  } finally {
+    runtime.memory.free(pointer, 4)
+  }
+}
+
 async function createNative(host: HTMLElement): Promise<Driver> {
   native ??= await GhosttyRuntime.create({ wasm: '/native.wasm', bridge: '/bridge.wasm' })
   const session = await TerminalSession.create<Event>({
@@ -66,6 +85,10 @@ async function createNative(host: HTMLElement): Promise<Driver> {
       cursor: { blink: false },
     },
   })
+  // The session exposes a line limit; upstream's independent byte budget needs its ABI option.
+  const core: unknown = Reflect.get(session, 'terminal')
+  if (!(core instanceof GhosttyTerminal)) throw new Error('Native session terminal unavailable')
+  configureNativeHistory(core)
   session.setTheme({
     ...session.appearance.theme,
     background: { r: 0, g: 0, b: 0 },
@@ -113,7 +136,7 @@ async function createLegacy(host: HTMLElement): Promise<Driver> {
     rows: settings.rows,
     fontFamily: settings.fontFamily,
     fontSize: settings.fontSize,
-    scrollback: settings.scrollback,
+    scrollback: settings.ghosttyScrollbackBytes,
     cursorBlink: false,
     theme: { foreground: '#ffffff', background: '#000000' },
   })
@@ -144,7 +167,7 @@ function createXterm(host: HTMLElement): Driver {
     fontFamily: settings.fontFamily,
     fontSize: settings.fontSize,
     lineHeight: settings.lineHeight,
-    scrollback: settings.scrollback,
+    scrollback: settings.ghosttyScrollbackBytes,
     cursorBlink: false,
     theme: { foreground: '#ffffff', background: '#000000' },
   })
@@ -211,6 +234,7 @@ async function correctness(): Promise<unknown> {
 
 async function smokeParse(name: FixtureName): Promise<void> {
   const driver = await parser()
+  await driver.write(input('\x1b[?1049h'))
   try {
     const text =
       name === 'logs' ? logs.split('\n').slice(0, 2).join('\r\n') : fixtureText(name, logs)
@@ -247,6 +271,7 @@ async function parse(name: FixtureName, minimumBytes: number): Promise<unknown> 
     chunks.push(stream.decode())
   }
   const driver = await parser()
+  await driver.write(input('\x1b[?1049h'))
   try {
     // Conversion and construction stay outside the timed parse-only region.
     const started = performance.now()
@@ -284,6 +309,7 @@ async function parser(): Promise<Pick<Driver, 'write' | 'dispose'>> {
   const runtime = await GhosttyRuntime.create({ wasm: '/native.wasm', bridge: '/bridge.wasm' })
   const terminal = runtime.createTerminal({ columns: settings.columns, rows: settings.rows })
   terminal.setScrollbackLimit(settings.scrollback)
+  configureNativeHistory(terminal)
   return {
     write: async (data) => {
       terminal.write(data)
@@ -294,6 +320,8 @@ async function parser(): Promise<Pick<Driver, 'write' | 'dispose'>> {
 
 async function burst(name: FixtureName, steps: number): Promise<unknown> {
   const text = corpus(fixtureText(name, logs), settings.chunkBytes)
+  await writeAll('\x1b[3J\x1b[2J\x1b[H')
+  await settle()
   const intervals: number[] = []
   let previous = await frame()
   const started = performance.now()

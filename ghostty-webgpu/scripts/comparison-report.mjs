@@ -105,7 +105,7 @@ export function markdown(artifact) {
     !artifact.smoke && artifact.hardware,
     'Correctness smoke cannot generate performance claims',
   )
-  const rows = summaries(artifact)
+  const rows = summaries(artifact).filter((row) => row.repetitions === artifact.repetitions)
   const lines = [
     '# Terminal comparison benchmarks',
     '',
@@ -142,6 +142,7 @@ export function markdown(artifact) {
     'Its WebGL context limit is 32 for every case, allowing all 17 xterm WebGL terminals to remain live.',
     'Parse throughput uses unopened parsers, complete UTF-8 corpora in 4 KiB chunks, and awaits parser completion.',
     'Each parse-only fixture owns a fresh WASM runtime. Runtime construction is outside timing for both Ghostty libraries.',
+    'Every parse-only terminal enters the alternate screen before timing, so history allocation does not affect parser throughput.',
     'The string chunks are decoded before timing. String-to-WASM encoding remains inside the timed library call.',
     'MB means 1,000,000 bytes. The real-log fixture is an archived 256-entry public Git history log, repeated to at least 1 MiB.',
     'xterm DOM and WebGL share a parser; their parse results are independent repetitions of that same parser.',
@@ -163,6 +164,12 @@ export function markdown(artifact) {
     'GPU allocation is not available per terminal. Negative deltas are retained as measurement noise.',
     'Each Ghostty library shares one WASM runtime per context, matching its supported multi-terminal use.',
     'The 10k fixture contains exactly 10,000 retained 40-column ASCII history rows per terminal.',
+    'The native adapter sets upstream SCROLLBACK_MAX_BYTES to 64 MiB through the runtime ABI, in addition to the 10k line limit.',
+    'The session API exposes the line limit only; the adapter checks its pinned internal terminal before applying the byte option.',
+    'The default byte budget retained only 2,014 rows in the initial attempt. The final run asserts all 10k rows.',
+    'ghostty-web also receives a 64 MiB budget: its 0.4.0 scrollback option is passed to the upstream max_scrollback byte field.',
+    'At scrollback: 10000, it retained only 1,852 rows. Its pinned [patch](https://github.com/coder/ghostty-web/blob/9e4e126d/patches/ghostty-wasm-api.patch) documents that option as lines.',
+    'xterm has a 10k row limit. Burst phases clear history first; legacy retention is byte-budget-only.',
     '',
     '## Results',
     '',
@@ -234,6 +241,7 @@ export function markdown(artifact) {
     'Firefox and Safari were not measured. This run qualifies headed Chromium on the recorded hardware only.',
     'The corpus and font hashes, raw latency samples, raw frame intervals, process CPU snapshots, memory buckets,',
     'actual execution order, and failed cases are retained in JSON.',
+    'A failed case is excluded from timing summaries. A metric appears in the tables only after all three repetitions complete.',
     '',
   )
   for (const run of artifact.runs.filter((run) => run.error))

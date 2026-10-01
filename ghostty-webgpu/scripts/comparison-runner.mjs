@@ -21,6 +21,13 @@ assert(
   Number.isInteger(repetitions) && repetitions >= 3,
   'Measurements require at least three repetitions',
 )
+const smokeHistoryRows = Number(value('--smoke-history-rows', 64))
+assert(
+  Number.isInteger(smokeHistoryRows) &&
+    smokeHistoryRows > 0 &&
+    smokeHistoryRows <= manifest.settings.scrollback,
+  'Smoke history rows must be within the scrollback limit',
+)
 const counts = smoke ? [Number(value('--smoke-count', 1))] : manifest.settings.counts
 assert(
   counts.every((count) => manifest.settings.counts.includes(count)),
@@ -287,7 +294,10 @@ async function measure(testCase, repetition, browserSession) {
       await page.waitForFunction(() => window.__compare.info().texts[0][0].includes('#'))
       const echoColors = ink((await page.screenshot()).toString('base64'))
       assert(echoColors.green > 5 && echoColors.red === 0, 'Echoed glyph must be visible')
-      run.historyLengths = await page.evaluate(() => window.__compare.history(64))
+      run.historyLengths = await page.evaluate(
+        (rows) => window.__compare.history(rows),
+        smokeHistoryRows,
+      )
       for (const name of manifest.fixtures.map(({ name }) => name))
         await page.evaluate((name) => window.__compare.smokeParse(name), name)
       assert.deepEqual(errors, [])
@@ -398,7 +408,10 @@ try {
       )
       artifact.runs.push(await measure(testCase, repetition, browserSession))
       await writeFile(artifactPath, JSON.stringify(artifact, null, 2) + '\n')
-      assert(!artifact.runs.at(-1).error, artifact.runs.at(-1).error)
+      if (artifact.runs.at(-1).error)
+        console.error(
+          `Failed case retained: ${testCase.variant}/${testCase.path}/${testCase.count}`,
+        )
     }
   }
   artifact.finishedAt = new Date().toISOString()
@@ -413,3 +426,4 @@ try {
   await new Promise((resolve) => server.close(resolve))
 }
 console.log(`Artifact: ${artifactPath}`)
+if (artifact.runs.some((run) => run.error)) process.exitCode = 1
