@@ -7,7 +7,7 @@ export type AgentTerminalReservation = Omit<AgentTerminalProcess, 'command'> & {
 }
 import { sessionIdentityErrors } from './structured-errors'
 import { claudeTerminalResumeArgv } from './utils/claude-terminal-resume'
-import { createInternalError } from '../observability/structured-errors'
+import { createInternalError, providerErrors } from '../observability/structured-errors'
 
 import {
   jsonEqual,
@@ -99,6 +99,7 @@ export class ProviderAdapterRegistry {
   private readonly leaseDeferredInstances = new Set<ProviderInstanceId>()
   private desiredEntries: readonly ProviderInstanceConfig[] | null = null
   private disposed = false
+  private hasReconciled = false
   private reconcileChain: Promise<void> = Promise.resolve()
   private readonly statusCache: ProviderStatusCache
   private readonly unavailable = new Map<ProviderInstanceId, ProviderSnapshot>()
@@ -189,6 +190,7 @@ export class ProviderAdapterRegistry {
       this.unavailable.set(providerInstanceId, snapshot)
     }
     this.reorderInstances(entries)
+    this.hasReconciled = true
 
     recordChatPipelineInfo('chat.pipeline.provider_registry.reconcile', {
       instanceCount: this.instances.size,
@@ -301,7 +303,7 @@ export class ProviderAdapterRegistry {
   /** The instance's adapter with the environment its CLI runs in, for maintenance. */
   updateTarget(providerInstanceId: ProviderInstanceId) {
     const instance = this.instances.get(providerInstanceId)
-    if (!instance) throw createInternalError(`Provider instance not found: ${providerInstanceId}`)
+    if (!instance) throw providerErrors.INSTANCE_NOT_FOUND({ providerInstanceId })
 
     return { adapter: instance.adapter, env: instance.env }
   }
@@ -464,10 +466,14 @@ export class ProviderAdapterRegistry {
       await disposeInstance(entry.providerInstanceId, existing)
     }
 
+    // Disk seeds belong to process boot; live additions and replacements need their own probe.
+    this.statusCache.forget(entry.providerInstanceId)
+    if (existing || this.hasReconciled) this.statusCache.invalidate(entry.providerInstanceId)
     try {
       await this.create(driver, entry)
       return null
     } catch (error) {
+      this.statusCache.forget(entry.providerInstanceId)
       recordChatPipelineWarning('chat.pipeline.provider_registry.instance_failed', {
         driverKind: entry.driverKind,
         error,
@@ -500,8 +506,6 @@ export class ProviderAdapterRegistry {
       credentialPaths: driver.credentialPaths({ config, env }),
       dispose: handle.dispose,
     })
-    // A recycled id must not inherit the previous account's auth state.
-    this.statusCache.forget(entry.providerInstanceId)
   }
 
   private async refreshInstances(providerInstanceIds: readonly ProviderInstanceId[]) {

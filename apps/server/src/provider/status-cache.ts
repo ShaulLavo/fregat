@@ -15,7 +15,7 @@ const DEFAULT_PROVIDER_STATUS_TTL_MS = 60_000
 
 type CacheEntry = {
   checkedAtMs: number
-  snapshot: ProviderSnapshot
+  snapshot: ProviderSnapshot | null
 }
 
 export type ProviderStatusCacheOptions = {
@@ -76,7 +76,8 @@ export class ProviderStatusCache {
 
   /** Last known snapshot regardless of TTL. Used to diff availability. */
   last(instanceId: ProviderInstanceId, driverKind: ProviderDriverKind) {
-    const remembered = this.entries.get(instanceId)?.snapshot ?? this.readFromDisk(instanceId)
+    const entry = this.entries.get(instanceId)
+    const remembered = entry ? entry.snapshot : this.readFromDisk(instanceId)
 
     return correlated(remembered, instanceId, driverKind)
   }
@@ -87,6 +88,11 @@ export class ProviderStatusCache {
       snapshot,
     })
     this.writeToDisk(snapshot)
+  }
+
+  /** A live replacement must finish its own probe before any disk seed can be adopted. */
+  invalidate(instanceId: ProviderInstanceId) {
+    this.entries.set(instanceId, { checkedAtMs: 0, snapshot: null })
   }
 
   forget(instanceId: ProviderInstanceId) {

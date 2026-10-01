@@ -77,6 +77,13 @@ async function create(
 }
 
 describe('a scenario run without --real-providers', () => {
+  it('registers OpenCode with discovery disabled by default', () => {
+    expect(productProviderDrivers({}).some((driver) => driver.driverKind === 'opencode')).toBe(true)
+    expect(
+      DEFAULT_PROVIDER_INSTANCES.find((instance) => instance.driverKind === 'opencode'),
+    ).toMatchObject({ enabled: false })
+  })
+
   it('refuses every scenario declared realProviders and nothing else on its own server', () => {
     for (const scenario of scenarios) {
       const refusal = providerAccessRefusal({
@@ -116,9 +123,13 @@ describe('a scenario run without --real-providers', () => {
     }
   })
 
-  it('refuses to create a Codex or Claude instance that would run the installed CLI', async () => {
+  it('refuses to create a native instance that would run the installed CLI', async () => {
     const env = serverEnv(false)
-    expect(realDrivers(env).map((driver) => driver.driverKind)).toEqual(['codex', 'claude'])
+    expect(realDrivers(env).map((driver) => driver.driverKind)).toEqual([
+      'codex',
+      'claude',
+      'opencode',
+    ])
     const linked = path.join(scratch, 'linked-cli')
     symlinkSync(script(outside, 'cli'), linked)
     for (const provider of DEFAULT_PROVIDER_INSTANCES) {
@@ -143,17 +154,33 @@ describe('a scenario run without --real-providers', () => {
     ).rejects.toThrow('fixture providers only')
   })
 
-  it('creates Codex and Claude instances that run a fixture binary', async () => {
+  it('creates native instances that run a fixture binary', async () => {
     const env = serverEnv(false)
     await create(env, 'codex', { binaryPath: script(scratch, 'codex.mjs') })
     await create(env, 'claude', { binaryPath: script(scratch, 'claude.mjs') })
+    await create(env, 'opencode', { binaryPath: script(scratch, 'opencode') })
+  })
+
+  it('refuses external OpenCode servers even with an authorized fixture binary', async () => {
+    const driver = realDrivers(serverEnv(false)).find((entry) => entry.driverKind === 'opencode')!
+    await expect(
+      driver.create({
+        binaryPath: script(scratch, 'opencode-external'),
+        config: driver.parseConfig({ serverUrl: 'http://127.0.0.1:1' }),
+        displayLabel: 'External',
+        enabled: true,
+        env: serverEnv(false),
+        providerInstanceId: v.parse(providerInstanceIdSchema, 'opencode-external'),
+        services: { cwd: process.cwd() },
+      }),
+    ).rejects.toThrow('fixture providers only')
   })
 
   it('spawns no provider CLI, even for a built-in instance a scenario enables', async () => {
     // Stand-ins shadow the installed CLIs on PATH and record any call, so a regression shows here.
     const bin = mkdtempSync(path.join(outside, 'bin-'))
     const calls = path.join(outside, 'calls.log')
-    for (const name of ['codex', 'claude'])
+    for (const name of ['codex', 'claude', 'opencode'])
       writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} $*" >> ${calls}\nexit 1\n`, {
         mode: 0o755,
       })

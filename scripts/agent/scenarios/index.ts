@@ -188,6 +188,7 @@ import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
+import { opencodeModelCatalog } from './opencode-model-catalog'
 import { chatUsageMeter } from './chat-usage-meter'
 import { chatComposerNarrow } from './chat-composer-narrow'
 import { settingsUsage } from './settings-usage'
@@ -535,6 +536,7 @@ export const scenarios: readonly Scenario[] = [
   iconHints,
   chatIconHints,
   chatModelPicker,
+  opencodeModelCatalog,
   chatUsageMeter,
   chatComposerNarrow,
   restNoFlicker,

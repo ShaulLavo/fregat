@@ -6,8 +6,6 @@ import { join } from 'node:path'
 import type { Page } from 'playwright'
 import * as v from 'valibot'
 import {
-  DEFAULT_CODEX_PROVIDER_SETTINGS,
-  DEFAULT_CLAUDE_PROVIDER_SETTINGS,
   providerListResultSchema,
   settingsSnapshotSchema,
   healthDescriptorSchema,
@@ -16,6 +14,7 @@ import type { Scenario } from './index'
 import { liveNativeProcesses, reapNativeProcesses } from '../native-processes'
 import { selectors, waitForSessionWorkspace } from '../selectors'
 import { dispatch, openChat, readShell } from './chat-verification'
+import { DEFAULT_PROVIDER_INSTANCES } from '../../../apps/server/src/provider/drivers/built-in'
 
 const nativeEntrySchema = v.looseObject({
   event: v.string(),
@@ -30,7 +29,7 @@ const nativeEntrySchema = v.looseObject({
 export async function assertFixtureProviders(page: ScenarioApi, base: string, binaryPath?: string) {
   const snapshot = await settingsSnapshot(page, base)
   const instances = snapshot.values['providers.instances']
-  for (const defaults of [DEFAULT_CODEX_PROVIDER_SETTINGS, DEFAULT_CLAUDE_PROVIDER_SETTINGS])
+  for (const defaults of DEFAULT_PROVIDER_INSTANCES)
     ok(
       instances.some(
         (provider) =>

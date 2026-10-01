@@ -45,6 +45,10 @@ export class OpenCodeServer {
   }
 
   private async spawnServer(cwd: string, signal: AbortSignal): Promise<string> {
+    // An exited wrapper can leave descendants serving its old URL.
+    await this.closeProcess()
+    this.url = null
+    this.lifetime = null
     // Native port zero prefers 4096. A discovery/spawn race fails this owned launch.
     const port = await freeLoopbackPort()
     if (signal.aborted)

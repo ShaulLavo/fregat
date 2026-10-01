@@ -49,6 +49,7 @@ export const opencodeDriver: ProviderDriver<OpenCodeDriverConfig> = {
       displayLabel: input.displayLabel,
       enabled: input.enabled,
     })
+    adapter.initialize(input.services.cwd)
     return { adapter, dispose: () => adapter.stopAll() }
   },
 }
