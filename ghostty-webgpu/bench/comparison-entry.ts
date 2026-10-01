@@ -18,6 +18,7 @@ import { TerminalSession } from '../src/term/session.js'
 import { createGhosttyWebGpuTerminalFromSession } from '../src/dom/terminal.js'
 import { WebGpuTerminalRenderer } from '../src/render/renderer.js'
 import { ComparisonTracing } from './comparison-tracing.js'
+import { refreshSampler } from './comparison-refresh.js'
 import {
   corpus,
   fixtureNames,
@@ -585,17 +586,13 @@ async function writeMarker(color: 'red' | 'green'): Promise<number> {
   return started
 }
 
-const refreshSamples: number[] = []
+const refresh = refreshSampler(
+  (tick) => requestAnimationFrame(tick),
+  (id) => cancelAnimationFrame(id),
+)
 
-async function refreshPeriod(count = 20): Promise<number[]> {
-  refreshSamples.length = 0
-  let previous = await frame()
-  for (let index = 0; index < count; index++) {
-    const time = await frame()
-    refreshSamples.push(time - previous)
-    previous = time
-  }
-  return refreshSamples
+function refreshPeriod(count = 20): Promise<number[]> {
+  return refresh.start(count)
 }
 
 function legacyMemoryBytes(): number {
@@ -634,7 +631,7 @@ window.__compare = {
     texts: drivers.map((driver) => driver.text()),
   }),
   fixtureNames,
-  refreshSnapshot: () => refreshSamples,
+  cancelRefresh: refresh.cancel,
   traceBegin: () => tracing.begin(),
   traceEnd: () => tracing.end(),
   dispose: () => {
@@ -662,7 +659,7 @@ declare global {
       prepareInput: typeof prepareInput
       writeMarker: typeof writeMarker
       refreshPeriod: typeof refreshPeriod
-      refreshSnapshot: () => number[]
+      cancelRefresh: () => number[]
       keyTime: () => number
       info: () => unknown
       fixtureNames: typeof fixtureNames

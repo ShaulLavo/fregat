@@ -5,6 +5,8 @@ import { gunzipSync } from 'node:zlib'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { quantile } from './comparison-report.mjs'
+import { assertDisplay } from './comparison-trace.mjs'
+import { analysisArguments, positiveInteger } from './comparison-options.mjs'
 
 export function unionMilliseconds(intervals) {
   const sorted = intervals
@@ -190,14 +192,139 @@ export function frameCadence(records, clock) {
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 
+function cpuIntervalQualified(cpu) {
+  if (!cpu?.interval) return false
+  const { before, after } = cpu.interval
+  const times = [before?.requested, before?.completed, after?.requested, after?.completed]
+  assert(
+    times.every(Number.isFinite) &&
+      times.every((time, index) => index === 0 || time >= times[index - 1]),
+    'Incomplete CPU acquisition brackets',
+  )
+  const interval = (after.requested + after.completed - before.requested - before.completed) / 2
+  assert(
+    interval > 0 && Math.abs(interval - cpu.milliseconds) < 1e-6,
+    'Mismatched CPU sampling interval',
+  )
+  return true
+}
+
+function validatePhase(phase, name, artifact) {
+  assert(!phase.error, 'Failed phase cannot qualify as attribution evidence')
+  assert(Number.isFinite(phase.milliseconds) && phase.milliseconds > 0, 'Incomplete phase timing')
+  assert(Number.isFinite(phase.cpu?.percentOfOneCore), 'Incomplete CPU evidence')
+  cpuIntervalQualified(phase.cpu)
+  if (phase.traced)
+    assert(phase.records && phase.summary && phase.trace, 'Incomplete trace evidence')
+  const args = artifact.environment?.arguments ?? []
+  if (name !== 'latency') {
+    const frames = artifact.traceFrames ?? positiveInteger(args, '--trace-frames', 180)
+    assert(phase.sample?.intervals?.length === frames, 'Incomplete output samples')
+    return
+  }
+  const samples =
+    artifact.traceLatencySamples ?? positiveInteger(args, '--trace-latency-samples', 48)
+  assert(
+    phase.sample?.write?.length === samples && phase.sample?.input?.length === samples,
+    'Incomplete latency samples',
+  )
+  assert(phase.sample.captures?.length === samples * 2, 'Incomplete captured-frame evidence')
+}
+
+function validateRun(run, artifact, phases) {
+  assert(
+    !run.error &&
+      !run.pageErrors?.length &&
+      !run.parserErrors?.length &&
+      (run.status === undefined || run.status === 'complete'),
+    'Failed run cannot qualify as attribution evidence',
+  )
+  assert(run.phases?.length === phases.length * 2, 'Incomplete phase pairs')
+  for (const name of phases) {
+    for (const traced of [false, true]) {
+      const label = `${run.variant}-${run.count}-${run.repetition}-${name}-${traced ? 'trace' : 'control'}`
+      const matches = run.phases.filter((phase) => phase.label === label && phase.traced === traced)
+      assert(matches.length === 1, 'Incomplete or duplicate phase pair')
+      validatePhase(matches[0], name, artifact)
+    }
+  }
+  const probes = artifact.qualifications.filter(
+    (probe) =>
+      probe.variant === run.variant &&
+      probe.count === run.count &&
+      probe.repetition === run.repetition,
+  )
+  assert(
+    probes.length === 2 + phases.length * 2 &&
+      probes.filter((probe) => probe.kind === 'idle-display').length === 1,
+    'Incomplete display evidence',
+  )
+  for (const probe of probes)
+    assertDisplay(probe, {
+      idle: probe.kind === 'idle-display',
+      expectedPeriod: artifact.environment?.os?.startsWith('darwin') ? 16.67 : null,
+    })
+}
+
+export function validateArtifact(artifact) {
+  assert(
+    artifact.hardware && artifact.tracing && !artifact.invalid && !artifact.error,
+    'Failed or unqualified hardware trace artifact',
+  )
+  assert(
+    Number.isFinite(Date.parse(artifact.startedAt)) &&
+      Date.parse(artifact.finishedAt) > Date.parse(artifact.startedAt),
+    'Incomplete measurement window',
+  )
+  assert(
+    Number.isSafeInteger(artifact.repetitions) && artifact.repetitions >= 3,
+    'Incomplete repetitions',
+  )
+  const args = artifact.environment?.arguments ?? []
+  const counts =
+    artifact.traceCounts ??
+    (args.includes('--trace-count') ? [positiveInteger(args, '--trace-count', 1)] : [1, 8, 17])
+  const phases = artifact.tracePhases ?? ['latency', 'ascii', 'sgr']
+  assert(
+    counts.length &&
+      new Set(counts).size === counts.length &&
+      counts.every((count) => [1, 8, 17].includes(count)),
+    'Incomplete terminal-count matrix',
+  )
+  assert(
+    phases.length &&
+      new Set(phases).size === phases.length &&
+      phases.every((name) => ['latency', 'ascii', 'sgr'].includes(name)),
+    'Incomplete phase matrix',
+  )
+  assert(Array.isArray(artifact.qualifications), 'Incomplete display evidence')
+  assert(
+    artifact.runs?.length === counts.length * artifact.repetitions * 2,
+    'Incomplete case matrix',
+  )
+  const slots = new Set()
+  for (const run of artifact.runs) {
+    assert(
+      ['ghostty-webgpu', 'xterm-webgl'].includes(run.variant) &&
+        counts.includes(run.count) &&
+        run.path === 'bytes' &&
+        Number.isInteger(run.repetition) &&
+        run.repetition >= 0 &&
+        run.repetition < artifact.repetitions,
+      'Incomplete or unexpected case',
+    )
+    const slot = `${run.variant}/${run.count}/${run.repetition}`
+    assert(!slots.has(slot), 'Incomplete or duplicate case matrix')
+    slots.add(slot)
+    validateRun(run, artifact, phases)
+  }
+}
+
 export async function analyze(directory) {
   const contents = await readFile(join(directory, 'comparison.json'))
   const artifact = JSON.parse(contents)
   const fileHashes = { 'comparison.json': sha256(contents) }
-  assert(
-    artifact.hardware && artifact.tracing && !artifact.invalid,
-    'Qualified hardware trace artifact required',
-  )
+  validateArtifact(artifact)
   const rows = []
   for (const run of artifact.runs) {
     for (const phase of run.phases ?? []) {
@@ -209,6 +336,7 @@ export async function analyze(directory) {
         traced: phase.traced,
         error: phase.error,
         cpu: phase.cpu,
+        cpuIntervalQualified: cpuIntervalQualified(phase.cpu),
         milliseconds: phase.milliseconds,
         grid: run.grid,
         window: run.window,
@@ -289,10 +417,9 @@ export function compactAnalysis(analysis) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const result = await analyze(resolve(process.argv[2]))
-  const text =
-    JSON.stringify(process.argv.includes('--compact') ? compactAnalysis(result) : result, null, 2) +
-    '\n'
-  if (process.argv[3]) await writeFile(resolve(process.argv[3]), text)
+  const options = analysisArguments(process.argv.slice(2))
+  const result = await analyze(resolve(options.input))
+  const text = JSON.stringify(options.compact ? compactAnalysis(result) : result, null, 2) + '\n'
+  if (options.output) await writeFile(resolve(options.output), text)
   else process.stdout.write(text)
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { gzipSync } from 'node:zlib'
 import { mkdir, readdir, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { cpuSample, withDeadline } from './comparison-guards.mjs'
+import { measureCpu, withDeadline } from './comparison-guards.mjs'
 import { quantile } from './comparison-report.mjs'
 
 export function displaySummary(periods, metadata = {}) {
@@ -16,19 +16,19 @@ export function displaySummary(periods, metadata = {}) {
   }
 }
 
-export function assertDisplay(probe, { idle = true } = {}) {
-  // Mounted-terminal cadence is workload evidence; only an empty page qualifies the display.
-  if (!idle) return probe.median
+export function assertDisplay(probe, { idle = true, expectedPeriod = 16.67 } = {}) {
   assert(
-    probe.frameCount >= 20 &&
+    !probe.error &&
+      probe.visibility === 'visible' &&
+      probe.frameCount >= 20 &&
       probe.periods.every((period) => Number.isFinite(period) && period > 0),
     'Mac display unavailable',
   )
-  assert(
-    probe.visibility === 'visible' && probe.median >= 16.67 * 0.9 && probe.median <= 16.67 * 1.1,
-    'Mac display unavailable',
-  )
-  assert(!probe.error, 'Mac display unavailable')
+  // Mounted cadence is workload evidence; availability and sample integrity still apply.
+  if (!idle) return probe.median
+  const period = expectedPeriod ?? probe.median
+  assert(Number.isFinite(period) && period > 0 && period < 1000, 'Mac display unavailable')
+  assert(probe.median >= period * 0.9 && probe.median <= period * 1.1, 'Mac display unavailable')
   return probe.median
 }
 
@@ -97,16 +97,21 @@ export async function displayProbe({ page, session, browserSession, metadata }) 
   await page.bringToFront()
   await page.waitForTimeout(1000)
   let periods = []
+  let expiredPeriods
   let error
   try {
     periods = await withDeadline(
       () => page.evaluate(() => window.__compare.refreshPeriod(120)),
       8000,
-      () => {},
+      async () => {
+        expiredPeriods = await page.evaluate(() => window.__compare.cancelRefresh()).catch(() => [])
+      },
     )
   } catch (failure) {
     error = String(failure)
-    periods = await page.evaluate(() => window.__compare.refreshSnapshot()).catch(() => [])
+    periods =
+      expiredPeriods ??
+      (await page.evaluate(() => window.__compare.cancelRefresh()).catch(() => []))
   }
   const state = await page
     .evaluate(() => ({
@@ -139,10 +144,10 @@ export async function displayProbe({ page, session, browserSession, metadata }) 
   })
 }
 
-export async function prepareTraceOutput(output) {
+export async function prepareOutput(output, { tracing = false } = {}) {
   await mkdir(dirname(output), { recursive: true })
-  // A fresh directory lets failed qualification discard the entire owned window.
-  await mkdir(output)
+  // Only a trace window needs exclusive ownership for discard-on-failure.
+  await mkdir(output, { recursive: !tracing })
 }
 
 export async function discardTraceWindow(output) {
@@ -203,7 +208,7 @@ async function collectTrace(browserSession, completed) {
   return Buffer.concat(chunks)
 }
 
-export async function tracePhase({ page, browserSession, output, label, operation, traced }) {
+export async function tracePhase({ page, browserSession, output, label, operation, traced, now }) {
   if (traced)
     await browserSession.send('Tracing.start', {
       categories:
@@ -217,32 +222,26 @@ export async function tracePhase({ page, browserSession, output, label, operatio
   let trace
   let recording = false
   try {
-    const before = (await browserSession.send('SystemInfo.getProcessInfo')).processInfo
     if (traced) {
       await page.evaluate(() => window.__compare.traceBegin())
       recording = true
     }
-    const started = performance.now()
-    let sample
     let failure
-    try {
-      sample = await operation()
-    } catch (error) {
-      sample = error.partialLatency
-      failure = String(error.stack ?? error)
-    }
-    const milliseconds = performance.now() - started
-    const after = (await browserSession.send('SystemInfo.getProcessInfo')).processInfo
+    const measurement = await measureCpu(
+      browserSession,
+      async () => {
+        try {
+          return await operation()
+        } catch (error) {
+          failure = String(error.stack ?? error)
+          return error.partialLatency
+        }
+      },
+      { now },
+    )
     const records = traced ? await page.evaluate(() => window.__compare.traceEnd()) : undefined
     recording = false
-    result = {
-      label,
-      traced,
-      milliseconds,
-      cpu: cpuSample(before, after, milliseconds),
-      sample,
-      error: failure,
-    }
+    result = { label, traced, ...measurement, error: failure }
     if (records) {
       result.records = records
       result.summary = summarizeRecords(records)

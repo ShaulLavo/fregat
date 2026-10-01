@@ -54,6 +54,7 @@ for (const name of [
   'comparison-guards.mjs',
   'comparison-trace.mjs',
   'comparison-attribution.mjs',
+  'comparison-options.mjs',
 ]) {
   await copyFile(join(root, 'scripts', name), join(output, name))
   hashes[name] = hash(await readFile(join(output, name)))

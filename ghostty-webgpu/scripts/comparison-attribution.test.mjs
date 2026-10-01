@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   compactAnalysis,
+  validateArtifact,
   frameCadence,
   mainThread,
   sampledProfile,
@@ -158,4 +159,76 @@ test('presentation joins the containing animation frame identity, not a nearby g
   assert.equal(result.latency, 40)
   assert.equal(result.terminalWork, 6)
   assert.deepEqual(result.boundariesBeforeFrame, [19])
+})
+
+function completeArtifact() {
+  const phases = ['ascii']
+  const runs = [0, 1, 2].flatMap((repetition) =>
+    ['ghostty-webgpu', 'xterm-webgl'].map((variant) => ({
+      variant,
+      count: 17,
+      path: 'bytes',
+      repetition,
+      status: 'complete',
+      phases: [false, true].map((traced) => ({
+        label: `${variant}-17-${repetition}-ascii-${traced ? 'trace' : 'control'}`,
+        traced,
+        milliseconds: 100,
+        cpu: { percentOfOneCore: 100 },
+        records: traced ? {} : undefined,
+        summary: traced ? {} : undefined,
+        sample: { intervals: Array(180).fill(16.67) },
+        trace: traced ? 'trace.json.gz' : undefined,
+      })),
+    })),
+  )
+  return {
+    hardware: true,
+    tracing: true,
+    repetitions: 3,
+    traceCounts: [17],
+    tracePhases: phases,
+    startedAt: '2026-10-01T00:00:00Z',
+    finishedAt: '2026-10-01T00:01:00Z',
+    environment: { os: 'darwin' },
+    runs,
+    qualifications: runs.flatMap((run) =>
+      ['idle-display', 'mounted-workload', 'mounted-workload', 'mounted-workload'].map((kind) => ({
+        variant: run.variant,
+        count: run.count,
+        repetition: run.repetition,
+        kind,
+        visibility: 'visible',
+        frameCount: 120,
+        periods: Array(120).fill(16.67),
+        median: 16.67,
+      })),
+    ),
+  }
+}
+
+test('qualified analysis rejects post-phase page errors and unfinished deadline evidence', () => {
+  const valid = completeArtifact()
+  assert.doesNotThrow(() => validateArtifact(valid))
+  const failed = completeArtifact()
+  failed.runs[0].error = 'late page error'
+  failed.runs[0].pageErrors = ['page error']
+  assert.throws(() => validateArtifact(failed), /Failed/)
+  const partial = completeArtifact()
+  delete partial.finishedAt
+  partial.runs[0].status = 'running'
+  partial.runs[0].phases.pop()
+  assert.throws(() => validateArtifact(partial), /Incomplete/)
+})
+
+test('qualified analysis rejects a missing case or phase even with finishedAt', () => {
+  const missing = completeArtifact()
+  missing.runs.pop()
+  assert.throws(() => validateArtifact(missing), /Incomplete/)
+  const missingPhase = completeArtifact()
+  missingPhase.runs[0].phases.pop()
+  assert.throws(() => validateArtifact(missingPhase), /Incomplete/)
+  const hidden = completeArtifact()
+  hidden.qualifications[1].visibility = 'hidden'
+  assert.throws(() => validateArtifact(hidden), /display unavailable/)
 })

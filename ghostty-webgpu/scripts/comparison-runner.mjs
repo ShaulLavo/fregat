@@ -6,7 +6,13 @@ import { platform, release, arch, cpus } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
-import { cpuSample, verifyHash, withDeadline } from './comparison-guards.mjs'
+import {
+  ComparisonDeadlineError,
+  measureCpu,
+  verifyHash,
+  withDeadline,
+} from './comparison-guards.mjs'
+import { positiveInteger } from './comparison-options.mjs'
 import { ink } from './comparison-pixels.mjs'
 import {
   assertDisplay,
@@ -14,7 +20,7 @@ import {
   displayProbe,
   fitGrid,
   fitWindow,
-  prepareTraceOutput,
+  prepareOutput,
   tracePhase,
 } from './comparison-trace.mjs'
 import { WebSocketServer } from 'ws'
@@ -29,7 +35,7 @@ assert(!(smoke && tracing), 'Trace measurements require headed hardware Chromium
 const headless = smoke && !args.includes('--smoke-headed')
 const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback)
 const output = resolve(value('--output', join(root, smoke ? 'smoke' : 'results')))
-const repetitions = Number(value('--repetitions', manifest.settings.repetitions))
+const repetitions = positiveInteger(args, '--repetitions', manifest.settings.repetitions)
 assert(
   Number.isInteger(repetitions) && repetitions >= 3,
   'Measurements require at least three repetitions',
@@ -61,8 +67,20 @@ if (!smoke && platform() === 'darwin') {
     'Mac measurements require caffeinate -d -u -t 1800 and --display-awake',
   )
 }
-if (smoke) await mkdir(output, { recursive: true })
-else await prepareTraceOutput(output)
+const latencySamples = positiveInteger(
+  args,
+  '--trace-latency-samples',
+  tracing ? 48 : s.latencySamples,
+)
+const traceFrames = positiveInteger(args, '--trace-frames', 180)
+const tracePhases = args.includes('--trace-phase')
+  ? [value('--trace-phase')]
+  : ['latency', 'ascii', 'sgr']
+assert(
+  tracePhases.every((name) => ['latency', 'ascii', 'sgr'].includes(name)),
+  'Trace phase must be latency, ascii, or sgr',
+)
+await prepareOutput(output, { tracing })
 const temporary = join(root, 'tmp')
 await mkdir(temporary, { recursive: true })
 process.env.TMPDIR = temporary
@@ -139,6 +157,10 @@ const artifact = {
   environment: {},
   runs: [],
   qualifications: [],
+  tracePhases: tracing ? tracePhases : undefined,
+  traceCounts: tracing ? counts : undefined,
+  traceLatencySamples: tracing ? latencySamples : undefined,
+  traceFrames: tracing ? traceFrames : undefined,
 }
 const artifactPath = join(output, 'comparison.json')
 
@@ -244,11 +266,7 @@ async function latency(page, session) {
   const frames = await capturedFrames(session)
   const samples = { write: [], input: [], captures: [], captureStream: frames.events }
   try {
-    for (
-      let index = -2;
-      index < Number(value('--trace-latency-samples', tracing ? 48 : s.latencySamples));
-      index++
-    ) {
+    for (let index = -2; index < latencySamples; index++) {
       const color = index % 2 ? 'red' : 'green'
       const started = await page.evaluate((color) => window.__compare.writeMarker(color), color)
       const shown = await frames.wait(color, started)
@@ -257,11 +275,7 @@ async function latency(page, session) {
         samples.captures.push({ operation: 'write', started, ...shown })
       }
     }
-    for (
-      let index = -2;
-      index < Number(value('--trace-latency-samples', tracing ? 48 : s.latencySamples));
-      index++
-    ) {
+    for (let index = -2; index < latencySamples; index++) {
       const color = index % 2 ? 'red' : 'green'
       await page.evaluate((color) => window.__compare.prepareInput(color), color)
       await page.keyboard.press('#')
@@ -347,20 +361,27 @@ async function parserOnly(testCase, run, contexts) {
 }
 
 async function measure(testCase, repetition, browserSession) {
-  const run = { ...testCase, repetition, executionOrder: artifact.runs.length }
+  const run = { ...testCase, repetition, executionOrder: artifact.runs.length, status: 'running' }
   const contexts = new Set()
   const remaining = smoke ? 120_000 : 30 * 60_000 - (Date.now() - Date.parse(artifact.startedAt))
   try {
-    return await withDeadline(
+    const result = await withDeadline(
       () => measureBody(testCase, repetition, browserSession, run, contexts),
       Math.min(120_000, remaining),
-      () => {
-        for (const context of contexts) void context.close().catch(() => {})
-      },
+      () => Promise.all([...contexts].map((context) => context.close().catch(() => {}))),
+      { drain: true },
     )
+    result.status =
+      result.error || result.phases?.some((phase) => phase.error) ? 'failed' : 'complete'
+    return result
   } catch (error) {
     if (String(error).includes('Mac display unavailable')) throw error
     run.error = String(error.stack ?? error)
+    run.status = 'failed'
+    if (error instanceof ComparisonDeadlineError) {
+      error.run = run
+      throw error
+    }
     return run
   }
 }
@@ -396,7 +417,7 @@ async function qualifyDisplay(page, session, browserSession, run, idle = true) {
       2,
     ) + '\n',
   )
-  assertDisplay(probe, { idle })
+  assertDisplay(probe, { idle, expectedPeriod: tracing && platform() === 'darwin' ? 16.67 : null })
   return probe
 }
 
@@ -429,7 +450,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
     const session = await context.newCDPSession(page)
     if (tracing && platform() === 'darwin')
       run.window = await fitWindow(page, browserSession, session)
-    if (tracing && !smoke) {
+    if (!smoke) {
       run.phase = 'idle-display/qualification'
       run.idleDisplay = await qualifyDisplay(page, session, browserSession, run)
     }
@@ -499,9 +520,10 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       run.status = 'correctness-only'
       return run
     }
-    const initialProbe = await qualifyDisplay(page, session, browserSession, run, !tracing)
-    run.refreshPeriods = initialProbe.periods
-    run.refreshPeriod = initialProbe.median
+    const initialProbe = await qualifyDisplay(page, session, browserSession, run, false)
+    run.refreshPeriods = run.idleDisplay.periods
+    run.refreshPeriod = run.idleDisplay.median
+    run.mountedDisplay = initialProbe
     if (run.grid)
       assert.deepEqual(
         initialProbe.canvases,
@@ -517,11 +539,12 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
           operation: () =>
             page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
               name,
-              frames: Number(value('--trace-frames', 180)),
+              frames: traceFrames,
             }),
         })),
       ]
       for (const { name, operation } of configurations) {
+        if (!tracePhases.includes(name)) continue
         run.phase = `trace/${name}`
         if (name !== 'latency') await page.evaluate((name) => window.__compare.burst(name, 8), name)
         for (const traced of repetition % 2 ? [true, false] : [false, true]) {
@@ -540,14 +563,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       assert.deepEqual(errors, [])
       return run
     }
-    const before = await processCpu(browserSession)
-    const idleStarted = performance.now()
-    await page.waitForTimeout(s.idleMilliseconds)
-    const idleMs = performance.now() - idleStarted
-    run.idle = {
-      milliseconds: idleMs,
-      cpu: cpuSample(before, await processCpu(browserSession), idleMs),
-    }
+    run.idle = await measureCpu(browserSession, () => page.waitForTimeout(s.idleMilliseconds))
     run.phase = 'captured-frame latency'
     run.latency = await latency(page, session)
     run.burst = {}
@@ -561,16 +577,12 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       )
     }
     run.phase = 'output/ascii'
-    const beforeOutput = await processCpu(browserSession)
-    const outputStarted = performance.now()
-    const outputSample = await page.evaluate(
-      (frames) => window.__compare.burst('ascii', frames),
-      s.outputFrames,
+    const outputMeasurement = await measureCpu(browserSession, () =>
+      page.evaluate((frames) => window.__compare.burst('ascii', frames), s.outputFrames),
     )
-    const outputMs = performance.now() - outputStarted
     run.output = {
-      ...outputSample,
-      cpu: cpuSample(beforeOutput, await processCpu(browserSession), outputMs),
+      ...outputMeasurement.sample,
+      cpu: outputMeasurement.cpu,
       memory: await memory(page, session, browserSession),
     }
     assert.deepEqual(errors, [])
@@ -611,6 +623,8 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
   } finally {
     await context.close()
     contexts.delete(context)
+    run.pageErrors = errors
+    if (errors.length && !run.error) run.error = 'Page errors during case completion'
   }
 }
 
@@ -674,8 +688,10 @@ try {
     await writeFile(join(output, 'benchmarks.md'), markdown(artifact))
   }
 } catch (error) {
+  artifact.error = String(error.stack ?? error)
+  if (error.run) artifact.runs.push(error.run)
   if (String(error).includes('Mac display unavailable')) {
-    await discardTraceWindow(output)
+    if (tracing) await discardTraceWindow(output)
     artifact.runs = []
     artifact.invalid = 'Mac display unavailable'
   }
