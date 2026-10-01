@@ -105,8 +105,13 @@ run against private ports 5219/33319 and cover query-ready first-frame attachmen
 promotion without duplicate requests, dirty retained text before a delayed read and independent
 Shiki/Tree-sitter readiness. Canonical workspace builds and affected typechecks are required too.
 
-Unit 0 remains partial. The full expanded consumer-matrix native-input calibration has not run. Chat/workbench pixel-level
-comparison of every visible token, retained parser/WASM byte accounting, an independent inactive
+Unit 0 remains partial: **5/10 configurations calibrated** at instrument `56c8e77fb` (`native`,
+`disabled`, `tree-sitter`, `shiki`, `minimap`). `tree-sitter-shiki` failed its holdout; its candidate
+and the four remaining configurations never ran. The remaining absolute-threshold matrix is
+superseded by **Plan 282's paired A/B instrument**. See
+[the calibration closeout](native-input-calibration.md) for the accepted results and saved diagnosis.
+Units 2–7 remain gated. Chat/workbench pixel-level comparison of every visible token,
+retained parser/WASM byte accounting, an independent inactive
 analysis budget and full memory-pressure/first-frame matrix remain Plan 198 acceptance work. No
 budget was invented from document text size alone. These limitations do not expand authorization
 into Plan 099 units 2–7 or Plan 200's editor-service migration.

@@ -100,6 +100,11 @@ function validateConfig(config) {
   if (typeof config.diagnostics !== 'boolean') fail('Missing diagnostics mode')
   finite(config.slowdownMs, 'slowdown duration')
   keys(config.operationsPerSample, inputScenarios, 'operation counts')
+  if (config.unsupportedFixtures !== undefined) {
+    if (!Array.isArray(config.unsupportedFixtures)) fail('Invalid unsupported fixture list')
+    for (const id of config.unsupportedFixtures)
+      if (!fixtureIds.includes(id)) fail('Unknown unsupported fixture')
+  }
   for (const scenario of inputScenarios)
     integer(config.operationsPerSample[scenario], `${scenario} operation count`, 1)
 }
@@ -120,7 +125,10 @@ export function validateInputResult(result) {
   const seen = new Set()
   for (const sample of result.samples) validateSample(sample, result, seen)
   const expected =
-    fixtureIds.length * inputViewModes.length * inputScenarios.length * result.config.repetitions
+    (fixtureIds.length - (result.config.unsupportedFixtures?.length ?? 0)) *
+    inputViewModes.length *
+    inputScenarios.length *
+    result.config.repetitions
   if (seen.size !== expected) fail(`Missing samples: expected ${expected}, got ${seen.size}`)
   return result
 }
@@ -130,6 +138,7 @@ function validateSample(sample, result, seen) {
   const fixture = result.manifest.fixtures.find((entry) => entry.id === sample.fixture)
   if (
     !fixture ||
+    result.config.unsupportedFixtures?.includes(fixture.id) ||
     !inputViewModes.includes(sample.views) ||
     !inputScenarios.includes(sample.scenario) ||
     sample.state !== 'warm'
@@ -154,6 +163,7 @@ function validateCleanup(sample, key) {
     cleanup.active !== false ||
     cleanup.hosts !== 0 ||
     cleanup.pendingFrames !== 0 ||
+    (cleanup.liveWorkers !== undefined && cleanup.liveWorkers !== 0) ||
     cleanup.contextClosed !== true ||
     cleanup.trackedObjects !== trackedObjects
   )
@@ -350,6 +360,20 @@ function comparable(left, right, allowSlowdown = false) {
   same(left.environment.browser, right.environment.browser, 'browser')
   same(left.environment.hardware, right.environment.hardware, 'hardware')
   same(left.environment.runtime, right.environment.runtime, 'runner runtime')
+  same(
+    left.environment.instrumentExternal,
+    right.environment.instrumentExternal,
+    'instrument external dependencies',
+  )
+  same(left.environment.instrumentHash, right.environment.instrumentHash, 'instrument source')
+}
+
+// Product source, build and external dependency bytes of the frozen set a run measured.
+function packageIdentity(run) {
+  const set = run.environment.packageSet
+  return set
+    ? { sourceHash: set.sourceHash, buildHash: set.buildHash, externalHash: set.externalHash }
+    : null
 }
 
 function range(values) {
@@ -388,6 +412,11 @@ export function calibrateInput(controls) {
       fail('Calibration requires clean controls without injected delay')
     same(first.environment.commit, control.environment.commit, 'control commits')
     same(first.environment.sourceHash, control.environment.sourceHash, 'control source trees')
+    same(
+      packageIdentity(first),
+      packageIdentity(control),
+      'control package builds and external bytes',
+    )
   }
   const summaries = controls.map(summarizeInputResult)
   return {
@@ -422,8 +451,19 @@ function validateCalibration(baseline, calibration) {
   same(baseline, storedBaseline, 'calibration baseline observations')
 }
 
-export function compareInput(baseline, candidate, calibration, { allowSlowdown = false } = {}) {
+export function compareInput(
+  baseline,
+  candidate,
+  calibration,
+  { allowSlowdown = false, sameBuild = false } = {},
+) {
   comparable(baseline, candidate, allowSlowdown)
+  // A holdout or delayed control measures the calibrated build; a candidate differs only in product.
+  const expected = packageIdentity(baseline)
+  const actual = packageIdentity(candidate)
+  if (sameBuild || allowSlowdown)
+    same(expected, actual, 'holdout or delayed control package identity')
+  else same(expected?.externalHash, actual?.externalHash, 'candidate external dependency bytes')
   validateCalibration(baseline, calibration)
   if (calibration.controls.includes(candidate.id)) fail('Candidate must be an independent run')
   if (allowSlowdown && candidate.config.slowdownMs <= 0)

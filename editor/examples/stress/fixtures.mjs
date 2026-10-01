@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
@@ -22,7 +22,23 @@ export function createManifest(seed = defaultSeed) {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+export async function readFrozenManifest(directory) {
+  const manifest = JSON.parse(await readFile(resolve(directory, 'manifest.json'), 'utf8'))
+  for (const fixture of manifest.fixtures) {
+    if (!fixtureIds.includes(fixture.id)) throw new TypeError('Unknown frozen fixture')
+    const text = await readFile(resolve(directory, `${fixture.id}.txt`), 'utf8')
+    const actual = {
+      id: fixture.id,
+      ...fixtureFacts(text),
+      sha256: createHash('sha256').update(text).digest('hex'),
+    }
+    if (JSON.stringify(actual) !== JSON.stringify(fixture))
+      throw new TypeError('Frozen fixture content changed')
+  }
+  return manifest
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const directory = process.argv[2]
   const manifest = createManifest()
   if (directory) {
