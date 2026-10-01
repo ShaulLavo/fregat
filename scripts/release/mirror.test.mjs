@@ -180,6 +180,27 @@ async function commitFamily(root, content) {
   git(root, 'push', 'origin', 'main')
 }
 
+test('mirror push reports SSH host verification failures', async () => {
+  await withWorkspace(async ({ root }) => {
+    const origin = join(root, 'origin.git')
+    const source = join(root, 'source')
+    const ssh = join(root, 'ssh')
+    git(root, 'init', '--bare', '--initial-branch=main', origin)
+    git(root, 'clone', origin, source)
+    await mkdir(join(source, 'hotkeys'))
+    await commitFamily(source, 'first')
+    await writeFile(ssh, '#!/bin/sh\nprintf "Host key verification failed.\\n" >&2\nexit 255\n')
+    await chmod(ssh, 0o700)
+    git(source, 'config', 'core.sshCommand', `'${ssh}'`)
+    git(source, 'config', 'ssh.variant', 'ssh')
+    const result = mirror(source)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Host key verification failed.')
+    expect(result.stdout).toContain('::error::Mirror push rejected or failed for fixture/mirror.')
+    expect(result.stdout).not.toContain('Mirror skipped:')
+  })
+})
+
 test('mirrors current snapshots and skips an older replay while preserving the newer head', async () => {
   await withWorkspace(async ({ root }) => {
     const origin = join(root, 'origin.git')
