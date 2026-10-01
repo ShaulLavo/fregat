@@ -5,6 +5,7 @@ export {
   createEmptySyntaxSession,
   createSyntaxLanguageConfiguration,
   createSyntaxProjectionTag,
+  createSnippetDocument,
   createSyntaxSnapshotTag,
   EditorTokenStore,
   isEditorSyntaxLanguage,

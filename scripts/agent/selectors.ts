@@ -1486,6 +1486,21 @@ export async function hoverTokenColor(page: Page, word: string): Promise<boolean
   return /(^|;)\s*color:/.test(style ?? '')
 }
 
+/**
+ * The fenced block in the shared hover whose text includes `text`, once painted: whether its code
+ * holds a CR, and the text of each span that carries a colour.
+ */
+export async function hoverCodePaint(page: Page, text: string) {
+  const code = selectors.editorHover(page).locator('pre > code[data-language]', { hasText: text })
+  await code.locator('span[style]').first().waitFor({ timeout: 8000 })
+  return code.evaluate((element) => ({
+    carriageReturn: (element.textContent ?? '').includes('\r'),
+    coloured: [...element.querySelectorAll('span[style]')]
+      .filter((span) => /(^|;)\s*color:/.test(span.getAttribute('style') ?? ''))
+      .map((span) => span.textContent ?? ''),
+  }))
+}
+
 /** Rests the pointer on the first on-screen occurrence of the word, under `within`, until the hover shows. */
 /**
  * The centre of `part` where it first appears inside `context` on screen, under `within`. The

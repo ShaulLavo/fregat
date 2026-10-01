@@ -6879,6 +6879,12 @@
         },
         {
           "kind": "unknown",
+          "name": "createSnippetDocument",
+          "source": "packages/editor/src/syntax/index.ts",
+          "via": "packages/editor/src/public/syntax.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "createSyntaxLanguageConfiguration",
           "source": "packages/editor/src/syntax/index.ts",
           "via": "packages/editor/src/public/syntax.ts"

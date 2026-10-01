@@ -31,6 +31,7 @@ export {
 export { styleForTreeSitterCapture, treeSitterCapturesToEditorTokens } from './captures'
 export { packEditorTokens, packedEditorTokenTransfers, unpackEditorTokens } from './packedTokens'
 export type { PackedEditorTokenPatch, PackedEditorTokens } from './packedTokens'
+export { createSnippetDocument } from './snippetDocument'
 export { EditorTokenStore, toEditorTokenStore } from './tokenStore'
 export type { EditorTokenInput, EditorTokenStoreOrigin } from './tokenStore'
 export { createSemanticTokenStyles } from './semanticTokens'

@@ -1,15 +1,11 @@
 import type { DiffFile, DiffGutterSide } from '@singapore-editor/diff'
-import {
-  createDocumentTextSnapshot,
-  createPieceTableSnapshot,
-} from '@singapore-editor/core/document'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import {
   effectiveEditorTheme,
   resolveEditorThemeColor,
   type EditorTheme,
 } from '@singapore-editor/core/rendering'
-import { toEditorTokenStore, type EditorToken } from '@singapore-editor/core/syntax'
+import { createSnippetDocument, type EditorToken } from '@singapore-editor/core/syntax'
 import {
   createShikiHighlighterProvider,
   createShikiWorkerOwner,
@@ -407,28 +403,27 @@ class EditorHighlightingService implements HighlightingService {
     }
     const palette = effectiveEditorTheme(theme.definition)
     const foreground = palette.foregroundColor ?? DEFAULT_FOREGROUND
-    const snapshot = createPieceTableSnapshot(text)
-    const textSnapshot = createDocumentTextSnapshot(snapshot, text)
+    const snippet = createSnippetDocument(text, 'as-document')
     const session = this.syntaxProvider().createSession({
       documentId: `highlight-snippet-${this.nextSnippetId++}`,
       languageId,
       includeHighlights: true,
-      textSnapshot,
-      snapshot,
+      textSnapshot: snippet.textSnapshot,
+      snapshot: snippet.snapshot,
     })
     if (!session) throw new HighlightingError('failed', `No syntax session for ${languageId}`)
 
     this.snippetSessions += 1
     try {
-      const result = await this.live(session.refresh(textSnapshot), signal).catch(
+      const result = await this.live(session.refresh(snippet.textSnapshot), signal).catch(
         (error: unknown) => {
           if (error instanceof HighlightingError) throw error
           throw new HighlightingError('failed', 'The syntax worker failed', { cause: error })
         },
       )
       this.assertLive()
-      const tokens = toEditorTokenStore(result.tokens)
-        .toTokens()
+      const tokens = snippet
+        .submittedTokens(result.tokens)
         .map((token) => paletteToken(token, palette, foreground))
       return Object.freeze({
         language: languageId,

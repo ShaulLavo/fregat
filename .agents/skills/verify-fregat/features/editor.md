@@ -75,6 +75,8 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-lsp-hover --file main.tsx` inserts a `const`, hovers its name, checks the language server tooltip names it, then inserts a name with a Cyrillic letter and checks that its diagnostic and its character warning share one tooltip. Undoes both edits.
 
+`scenario editor-lsp-hover-crlf` hovers a call into a CRLF file the editor never opened, so the language server reads its doc with CRLF line ends. It fails unless a CR reaches the hover code and each `const` in the doc's fenced example is one whole coloured span. Its step label `cr-yes-misaligned-N` records both.
+
 `scenario editor-lsp-deprecated` opens its own temp workspace with a `tags.ts` that calls `.substr()`, and checks the strike overlay covers exactly `substr` in an explicit syntax colour. `scenario editor-lsp-unnecessary` does the same for the fade on an unused `const`. Both ignore `--file`.
 
 `scenario editor-diagnostic-hover-fix` hovers a diagnostic, takes its Fix with AI action, and checks the draft carries the exact problem and the unsaved source excerpt. It needs the diagnostic-ai provider (`useDiagnosticFix`).
