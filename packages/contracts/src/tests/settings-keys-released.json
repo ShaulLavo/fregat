@@ -41,6 +41,7 @@
     "developer.heavyJobLogDirectory",
     "developer.heavyJobMemoryPressureLimit",
     "developer.heavyJobMemoryReserveMiB",
+    "developer.heavyJobQuietHoldSeconds",
     "developer.heavyJobStopGraceSeconds",
     "developer.simulatedLatencyMs",
     "editor.codeTheme.dark",

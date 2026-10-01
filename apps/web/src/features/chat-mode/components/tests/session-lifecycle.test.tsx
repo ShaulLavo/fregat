@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import { useSessionSnoozeRequestStore } from '@/features/chat-mode/state/session-snooze-request-store'
@@ -97,4 +97,35 @@ test('unknown owning capabilities hide lifecycle actions', async ({ client, serv
   expect(screen.queryByRole('menuitem', { name: 'Snooze…' })).toBeNull()
   expect(screen.queryByRole('menuitem', { name: 'Pin' })).toBeNull()
   expect(screen.queryByRole('menuitem', { name: 'Mark as settled' })).toBeNull()
+})
+
+test('an open row menu follows descriptor arrival and removal without remounting the rail', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server)
+  const entries = useEnvironmentsStore.getState().entries
+  const unknown = Object.fromEntries(
+    Object.entries(entries).map(([key, entry]) => [key, { ...entry, descriptor: null }]),
+  )
+  useEnvironmentsStore.setState({ entries: unknown })
+  renderRailHarness(h)
+  await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTitle('First') })
+  const actions = ['Pin', 'Mark as settled', 'Snooze…']
+  for (const name of actions) expect(screen.queryByRole('menuitem', { name })).toBeNull()
+  act(() => useEnvironmentsStore.setState({ entries }))
+  for (const name of actions)
+    expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument()
+  act(() => useEnvironmentsStore.setState({ entries: unknown }))
+  await waitFor(() => {
+    for (const name of actions) expect(screen.queryByRole('menuitem', { name })).toBeNull()
+  })
+  expect(
+    (await h.refresh()).sessions.every(
+      (session) =>
+        session.pinnedAt === null &&
+        session.settledOverride === null &&
+        session.snoozedUntil === null,
+    ),
+  ).toBe(true)
 })
