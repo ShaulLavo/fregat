@@ -1,17 +1,19 @@
 import { createRequire } from 'node:module'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { chromium } from 'playwright'
 import { expect, test } from 'vitest'
 
 const checkoutRoot = path.resolve(import.meta.dirname, '../..')
 const webRequire = createRequire(path.join(checkoutRoot, 'apps/web/package.json'))
 
-// The installed wrapper supplies the real capped cgroup; CI runs without that local scheduler.
-test.skipIf(!process.env.HEAVY_JOB_SLICE)(
-  'capped Chromium runs collect at file boundaries while standalone runs keep disk-based GC',
+// Script-only CI jobs have no browser installation; browser-equipped Linux hosts run the proof.
+test.skipIf(process.platform !== 'linux' || !existsSync(chromium.executablePath()))(
+  'isolated Chromium files collect with abundant temporary disk space',
   async () => {
-    const slice = process.env.HEAVY_JOB_SLICE!
-    expect(await readFile('/proc/self/cgroup', 'utf8')).toContain(`/${slice}/`)
+    const slice = process.env.HEAVY_JOB_SLICE
+    if (slice) expect(await readFile('/proc/self/cgroup', 'utf8')).toContain(`/${slice}/`)
     const cache = path.join(checkoutRoot, 'node_modules/.cache')
     await mkdir(cache, { recursive: true })
     const root = await mkdtemp(path.join(cache, 'browser-gc-'))
@@ -45,8 +47,9 @@ export default {
       expect(capped, capped).not.toContain('failed to collect Chromium garbage')
 
       const standalone = await runBrowser(root, undefined)
-      expect(standalone.match(/triggered: false/g), standalone).toHaveLength(2)
-      expect(standalone, standalone).not.toContain('triggered: true')
+      expect(standalone.match(/triggered: true/g), standalone).toHaveLength(2)
+      expect(standalone, standalone).toMatch(/cdpSendMs: \d/)
+      expect(standalone, standalone).not.toContain('failed to collect Chromium garbage')
     } finally {
       await rm(root, { recursive: true, force: true })
     }
