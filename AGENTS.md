@@ -7,6 +7,16 @@
 - Long runs keep their checklist in a file (the plan file, or the scratchpad) and tick items as they land.
 - End a run with what you need from the owner first, then what changed, then what you found. Mark what you could not confirm and where you looked.
 
+## Planning ownership
+
+- Root `PLAN.md` schedules work across every package and client. All plan documents,
+  backlogs and wishlists live in root `plans/`; package `PLAN.md` or `ROADMAP.md` files link
+  to Fregat's root roadmap.
+- Keep package instructions and READMEs pointed at that roadmap. Add plans to
+  `plans/README.md` and run `bun run plans:check` when editing the Editor inventory.
+- `docs/` holds architecture, research and delivery evidence. Put execution checklists
+  and work ordering in the owning root plan and roadmap.
+
 ## Reference Clones
 
 - Upstream code we compare against (vscode, t3code, opencode, codex, …) lives in `references/` at the repo root, gitignored. Check there before cloning; add new clones there, not in `/work/projects/references/`. Tests and `scripts/parity` resolve `references/t3code` by relative path; CI does not fetch it, so those checks skip there and run locally.

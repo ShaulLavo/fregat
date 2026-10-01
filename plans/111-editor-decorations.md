@@ -12,7 +12,7 @@ Plan 171's, phases 4–5 wave 3. Research done 2026-09-25. Requested 2026-09-13.
 Decided 2026-09-25: owner — the research is authorized, with the chat composer as its first consumer
 (question 7; Plan 126 INTERACTION-11 deletes Lexical). The owner wants it done before the next wave.
 
-The editor already has a decoration primitive. `@singapore-editor/core` exposes `registerInlineReplacementProvider` and `InlineReplacementSpec`, and [`@singapore-editor/markdown`](../../Editor/packages/markdown/src/index.ts) uses it to hide fences, drop heading markers and collapse links while the buffer keeps holding source. That is the right shape. It is also inline-only, driven by generically-named Tree-sitter captures, and has never been compared against the two systems that solved this problem thoroughly.
+The editor already has a decoration primitive. `@singapore-editor/core` exposes `registerInlineReplacementProvider` and `InlineReplacementSpec`, and [`@singapore-editor/markdown`](../editor/packages/markdown/src/index.ts) uses it to hide fences, drop heading markers and collapse links while the buffer keeps holding source. That is the right shape. It is also inline-only, driven by generically-named Tree-sitter captures, and has never been compared against the two systems that solved this problem thoroughly.
 
 This plan does that comparison and then improves our layer. It is the gate for [Plan 108](108-markdown-modes.md) Phase 2, for an eventual Obsidian mode, and — less obviously but more valuably — for removing Lexical from the chat composer. [Root PLAN.md](../PLAN.md) owns scheduling.
 

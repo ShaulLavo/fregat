@@ -58,6 +58,7 @@
     },
     "scripts": {
       "entry": [
+        "check-editor-backlog.mjs",
         "agent/browser.ts",
         "claude-gpt/run.ts",
         "large-file/bench.ts",

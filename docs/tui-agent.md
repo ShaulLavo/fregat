@@ -100,4 +100,4 @@ server builds, TUI lint and formatting, and client-core, server, and web typeche
 The live check rebuilt and restarted the existing server on port 3301, wrote a native Agent frame,
 and launched the desktop terminal. Structured TUI logs confirm the interactive connection is live.
 Worktree creation and cleanup are covered by the [TUI worktree record](tui-worktrees.md).
-Distribution with machine selection (084) remains a separate slice in the [strategy](tui-plan.md).
+Distribution with machine selection (084) remains a separate slice in the [strategy](../plans/tui-plan.md).

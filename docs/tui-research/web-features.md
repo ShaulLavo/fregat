@@ -368,4 +368,4 @@ Read sites: grep results in `features/settings/utils/apply-appearance.ts:46-80`,
 - Git server has branch/checkout/worktree/apply-patch routes without UI (`apps/server/src/git/routes.ts:47-104`).
 - `workspace.newIsolatedSession` sets a one-shot flag; the worktree is created server-side at first send.
 - Search replace and workspace edits run through a transactional multi-file pipeline that a TUI must reuse (server routes) rather than reimplement.
-- Multi-environment work is mid-flight and uncommitted; `docs/environments-and-remote-plan.md` (rewritten 2026-09-05) says chat federates every connected machine while files/terminal/LSP follow one. The TUI plan should key everything by `(environmentId, id)` from day one.
+- Multi-environment work is mid-flight and uncommitted; `plans/environments-and-remote-plan.md` (rewritten 2026-09-05) says chat federates every connected machine while files/terminal/LSP follow one. The TUI plan should key everything by `(environmentId, id)` from day one.

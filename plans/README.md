@@ -134,12 +134,63 @@ not a second live status register.
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
 
+## Package and client plans
+
+[PLAN.md](../PLAN.md) schedules all of these plans. Editor IDs and recorded statuses stay
+in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json) supports
+`bun run plans:check`. Source and delivery references remain with their packages.
+
+| Plan                                                                                           | Topic                                                                                  |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [e011-packed-piece-tree.md](e011-packed-piece-tree.md)                                         | E011: Evaluate a packed representation of persistent piece trees                       |
+| [e014-parallel-search.md](e014-parallel-search.md)                                             | E014: Search immutable snapshots across workers and stream results                     |
+| [e015-massive-file-loading.md](e015-massive-file-loading.md)                                   | E015: Design bounded loading for massive files                                         |
+| [e016-bounded-structural-parsing.md](e016-bounded-structural-parsing.md)                       | E016: Evaluate bounded structural parsing                                              |
+| [e021-styled-clipboard.md](e021-styled-clipboard.md)                                           | E021: Complete styled copy for multiple selections and portable colors                 |
+| [e023-instrumentation-panel.md](e023-instrumentation-panel.md)                                 | E023: Inspect editor timing and retained memory                                        |
+| [e024-syntax-tree-inspector.md](e024-syntax-tree-inspector.md)                                 | E024: Inspect the live syntax tree                                                     |
+| [e025-runtime-plugins.md](e025-runtime-plugins.md)                                             | E025: Design and prove reloadable user plugins                                         |
+| [e026-command-metadata.md](e026-command-metadata.md)                                           | E026: Declare Editor command metadata once                                             |
+| [e027-extension-hooks.md](e027-extension-hooks.md)                                             | E027: Define and verify the extension hook contract                                    |
+| [e029-runtime-and-serialized-data.md](e029-runtime-and-serialized-data.md)                     | E029: Document runtime and serialized data boundaries                                  |
+| [e052-proportional-font-extents.md](e052-proportional-font-extents.md)                         | E052: Wrap and horizontal extent from measured advances when the font is not monospace |
+| [e056-platform-agnostic-core.md](e056-platform-agnostic-core.md)                               | E056: Extract a platform-agnostic core and prove a Strict DOM host                     |
+| [e058-spellcheck.md](e058-spellcheck.md)                                                       | E058: Spellcheck for text the editor paints itself                                     |
+| [e063-tree-sitter-queries.md](e063-tree-sitter-queries.md)                                     | E063: More editor features from tree-sitter queries                                    |
+| [e064-one-highlight-pipeline.md](e064-one-highlight-pipeline.md)                               | E064: One highlight pipeline for tokens and range highlights                           |
+| [editor-authoring.md](editor-authoring.md)                                                     | Editor backlog plan contract                                                           |
+| [editor-backlog.md](editor-backlog.md)                                                         | Editor backlog                                                                         |
+| [bubli-markdown-consumer.md](bubli-markdown-consumer.md)                                       | Shared Markdown semantics for Editor and Fregat TUI                                    |
+| [editor-wishlist.md](editor-wishlist.md)                                                       | TODO                                                                                   |
+| [editor-performance-trace-plan.md](editor-performance-trace-plan.md)                           | Performance Trace Report And Plan                                                      |
+| [editor-architecture-recovery-plan.md](editor-architecture-recovery-plan.md)                   | Architecture Recovery Plan                                                             |
+| [command-palette-vscode-parity-backlog.md](command-palette-vscode-parity-backlog.md)           | > [!IMPORTANT]                                                                         |
+| [delta-db-implementation-plan.md](delta-db-implementation-plan.md)                             | Delta DB — Implementation Plan                                                         |
+| [deployment-design.md](deployment-design.md)                                                   | Desktop and one-command web deployment                                                 |
+| [diagnostic-ai-fix-plan.md](diagnostic-ai-fix-plan.md)                                         | Fix diagnostics with AI                                                                |
+| [editor-1000-parity-plan.md](editor-1000-parity-plan.md)                                       | > [!IMPORTANT]                                                                         |
+| [editor-parity-implementation-plan.md](editor-parity-implementation-plan.md)                   | > [!IMPORTANT]                                                                         |
+| [environments-and-remote-plan.md](environments-and-remote-plan.md)                             | Environments strategy                                                                  |
+| [git-panel-implementation-plan.md](git-panel-implementation-plan.md)                           | Git panel and commit graph                                                             |
+| [logseq-parity-implementation-plan.md](logseq-parity-implementation-plan.md)                   | > [!IMPORTANT]                                                                         |
+| [native-plan-of-plans.md](native-plan-of-plans.md)                                             | Native Mac Client — Plan of Plans                                                      |
+| [native-plan-prompts.md](native-plan-prompts.md)                                               | Native Plan Prompts                                                                    |
+| [native-syntax-coverage-plan.md](native-syntax-coverage-plan.md)                               | Expand native syntax coverage and improve queries                                      |
+| [pane-zoom-plan.md](pane-zoom-plan.md)                                                         | Independent pane zoom implementation plan                                              |
+| [structured-semantic-search-evaluation-plan.md](structured-semantic-search-evaluation-plan.md) | Structured And Semantic Search Evaluation Plan                                         |
+| [t3code-chat-parity-gap-analysis.md](t3code-chat-parity-gap-analysis.md)                       | T3Code Chat Parity — Verified Gap Analysis and Roadmap                                 |
+| [t3code-parity-implementation-plan.md](t3code-parity-implementation-plan.md)                   | > [!IMPORTANT]                                                                         |
+| [tui-plan.md](tui-plan.md)                                                                     | TUI — Strategy                                                                         |
+| [workspace-content-engine-evaluation-plan.md](workspace-content-engine-evaluation-plan.md)     | Workspace Content Engine Evaluation Plan                                               |
+| [workspace-search-next-steps.md](workspace-search-next-steps.md)                               | > [!IMPORTANT]                                                                         |
+
 ## Supporting work
 
 - [Tree implementation sub-plans](178-tree-in-the-app.md) and [T3 alignment records](126-t3code-alignment.md)
-  stay with their owning plans.
-- [Editor backlog](../../Editor/plans/README.md) and [native client roadmap](../docs/native-plan-of-plans.md)
-  own package/client work outside this index.
+  stay with their owning plans. The [September 20 execution record](126-t3code-alignment/execution-2026-09-20.md)
+  retains its original wrap-up boundary.
+- [Editor backlog](editor-backlog.md) and [native client roadmap](native-plan-of-plans.md)
+  preserve package/client scopes under the shared roadmap.
 - [Research, architecture and delivery records](../docs/README.md) are reference material.
 - [Unresolved September 12 audit questions](../docs/defect-audit-follow-ups.md) need current
   reproduction before they become implementation work.

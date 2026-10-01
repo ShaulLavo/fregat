@@ -20,7 +20,7 @@ Toggle light/dark mode and increase, decrease or reset editor and UI text sizes,
 
 [packages/contracts/src/settings/keys.ts](../packages/contracts/src/settings/keys.ts) registers `workbench.colorTheme`, theme bundles and `editor.fontSize` with bounds 8–40 and default 13. [apps/web/src/features/settings/utils/apply-appearance.ts](../apps/web/src/features/settings/utils/apply-appearance.ts) resolves system appearance and applies typography families. [apps/web/src/features/editor/components/editor.tsx](../apps/web/src/features/editor/components/editor.tsx) consumes Editor options. A workbench UI-font-size setting and shared temporary font-size owner are absent from this baseline.
 
-Editor already exposes `setFontSize` and font-metric publication in `editor/packages/editor/src/editor/Editor.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/editor/src/editor/Editor.ts).
+Editor already exposes `setFontSize` and font-metric publication in `editor/packages/editor/src/editor/Editor.ts` after Plan 207, verified in [the current Editor source](../editor/packages/editor/src/editor/Editor.ts).
 
 ## Design
 

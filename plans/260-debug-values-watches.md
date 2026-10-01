@@ -22,7 +22,7 @@ Inspect the selected stack frame, expand values, copy names and values, edit sup
 
 Plan 258 supplies the DAP session owner. Current source has terminal lifecycle and LSP navigation in [apps/web/src/features/terminal/utils/commands.ts](../apps/web/src/features/terminal/utils/commands.ts) and [apps/web/src/features/editor/utils/language-server-plugin.ts](../apps/web/src/features/editor/utils/language-server-plugin.ts). The current `DocumentRef` union in [apps/web/src/lib/documents/utils/types.ts](../apps/web/src/lib/documents/utils/types.ts) has no debug document. No DAP values/watch owner was found in `apps/server/src`, `apps/web/src`, or `packages/contracts/src`.
 
-Reusable scoped Editor commands and view contributions already exist in `editor/packages/editor/src/createPlugin.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/editor/src/createPlugin.ts).
+Reusable scoped Editor commands and view contributions already exist in `editor/packages/editor/src/createPlugin.ts` after Plan 207, verified in [the current Editor source](../editor/packages/editor/src/createPlugin.ts).
 
 ## Design
 
