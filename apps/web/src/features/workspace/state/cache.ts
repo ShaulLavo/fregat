@@ -11,7 +11,7 @@ import {
 } from '@/features/workspace/utils/location'
 import { type ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { createDefaultGitHistoryView, gitHistoryViewSchema } from '@/lib/git-history-view'
-import type { PickedFsEntry } from '@/lib/file-system-types'
+import type { WorkspaceRootFolder } from '@/lib/file-system-types'
 import {
   createDefaultChatModePanels,
   isChatModeToolTab,
@@ -134,7 +134,7 @@ export type CachedSearchBufferState = {
 }
 
 const pickedEntryFields = {
-  workspaceAddress: v.optional(workspaceAddressSchema),
+  workspaceAddress: workspaceAddressSchema,
   birthtimeMs: v.number(),
   mtimeMs: v.number(),
   name: v.string(),
@@ -154,7 +154,7 @@ const pickedSymlinkDirectorySchema = v.object({
 const rootFolderSchema = v.nullable(
   v.pipe(
     v.union([pickedDirectorySchema, pickedSymlinkDirectorySchema]),
-    v.check((folder) => !folder.workspaceAddress || folder.workspaceAddress.path === folder.path),
+    v.check((folder) => folder.workspaceAddress.path === folder.path),
   ),
 )
 const cachedRootSchema = v.pipe(
@@ -380,7 +380,7 @@ export type CachedWorkspaceSlice = {
 export type CachedWorkspaceState = {
   worktreeIdByRootPath: WorktreeIdsByRootPath
   chatModePanels: ChatModePanels
-  rootFolder: PickedFsEntry | null
+  rootFolder: WorkspaceRootFolder | null
   /** Restored search results, by the root path they belong to. */
   searchBuffers: Record<string, CachedSearchBufferState>
   uiMode: WorkspaceUiMode
@@ -427,7 +427,7 @@ export function writeSessionSelectionCache(storage: ScopedStorage, selection: Ch
 
 export function writeRootFolderCache(
   storage: ScopedStorage,
-  rootFolder: PickedFsEntry | null,
+  rootFolder: WorkspaceRootFolder | null,
   worktreeId: WorktreeId | null = null,
 ) {
   writeCacheEntry(
@@ -507,7 +507,7 @@ export function writeWorkspaceIndexCache(
 
 function workspaceStateFromCache(storage: ScopedStorage): CachedWorkspaceState {
   const cachedRoot = readCacheEntry<{
-    folder: PickedFsEntry | null
+    folder: WorkspaceRootFolder | null
     location: WorkspaceLocation | null
   }>(
     WORKSPACE_CACHE_STORAGE_KEYS.rootFolder,

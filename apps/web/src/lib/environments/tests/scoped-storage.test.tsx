@@ -1,3 +1,4 @@
+import { testWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { stashMessage } from '@/features/chat/utils/stash-message'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testTabContents } from '../../../../test/factories/document-targets'
@@ -55,6 +56,7 @@ beforeEach(() => {
 
 test('matching root paths retain independent tabs and workspace indexes', () => {
   const root = {
+    workspaceAddress: testWorkspaceAddress('/repo'),
     name: 'repo',
     path: filesystemPath('/repo'),
     type: 'directory',
@@ -202,6 +204,7 @@ test('cold machine discovery keeps aliases with their confirmed identity and pre
 
 test('registered checkout cache keys use WorktreeId and cold root selection restores that owner', () => {
   const root = {
+    workspaceAddress: testWorkspaceAddress('/repo'),
     name: 'repo',
     path: filesystemPath('/repo'),
     type: 'directory',
