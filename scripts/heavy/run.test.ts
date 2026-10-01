@@ -47,7 +47,39 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
       source: 'heavy',
     })
     expect(record?.unit).toMatch(new RegExp(`^${box.sliceRoot}-[0-9a-f]+\\.scope$`))
-    expect(record?.commitHash).toMatch(/^[0-9a-f]{40}$/)
+    expect(record?.version).toMatch(/^[0-9a-f]{9}$/)
+  })
+
+  test('stamps the commit checked out where the job ran, null outside git', async () => {
+    const box = sandbox()
+    const git = (cwd: string, ...args: string[]) =>
+      spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+        cwd,
+        encoding: 'utf8',
+      }).stdout.trim()
+    const repository = (dir: string) => {
+      mkdirSync(dir, { recursive: true })
+      git(dir, 'init', '-q')
+      git(dir, 'commit', '-q', '--allow-empty', '-m', path.basename(dir))
+      return git(dir, 'rev-parse', 'HEAD')
+    }
+    const main = path.join(box.root, 'platform')
+    const mainHead = repository(main)
+    const lane = path.join(box.root, 'lane')
+    git(main, 'worktree', 'add', '-q', '-b', 'lane', lane)
+    git(lane, 'commit', '-q', '--allow-empty', '-m', 'lane')
+    const laneHead = git(lane, 'rev-parse', 'HEAD')
+    mkdirSync(path.join(lane, 'apps', 'tui'), { recursive: true })
+    const otherHead = repository(path.join(box.root, 'mesh'))
+    const outside = path.join(box.root, 'outside')
+    mkdirSync(outside)
+
+    for (const cwd of [main, path.join(lane, 'apps', 'tui'), path.join(box.root, 'mesh'), outside])
+      expect((await heavy(box, path.basename(cwd), ['true'], { cwd })).code).toBe(0)
+
+    const commits = Object.fromEntries(records(box).map((r) => [r.label, r.commitHash]))
+    expect(new Set([mainHead, laneHead, otherHead]).size).toBe(3)
+    expect(commits).toEqual({ mesh: otherHead, outside: null, platform: mainHead, tui: laneHead })
   })
 
   test('counts CPU time across the whole job and wall time from launch to exit', async () => {

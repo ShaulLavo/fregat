@@ -10,8 +10,10 @@ export type HeavyJobRecord = {
   readonly action: 'heavy.job'
   /** The job id; also names its scope unit. */
   readonly requestId: string
+  /** The wrapper build that ran the job. */
   readonly version: string
-  readonly commitHash: string
+  /** HEAD of the checkout holding `cwd`; null outside git. */
+  readonly commitHash: string | null
   readonly label: string
   readonly cwd: string
   /** The repository's main checkout (shared by its worktrees); null outside git. */

@@ -496,7 +496,7 @@ function jobRecord(
   options: Options,
   { admission, budget, cwd, holdExpired, id, outcome, queuedMs }: Finished,
 ): HeavyJobRecord {
-  const commitHash = wrapperCommit()
+  const wrapper = wrapperCommit()
   return {
     action: 'heavy.job',
     admission,
@@ -504,7 +504,6 @@ function jobRecord(
     ceilingBytes: budget ? budget.ceilingMiB * MiB : null,
     class: budget ? options.jobClass : null,
     command: redactCommand(options.command),
-    commitHash,
     cpuUsageUsec: outcome.cpuUsageUsec,
     cwd,
     estimateBytes: budget ? budget.estimateMiB * MiB : null,
@@ -523,19 +522,33 @@ function jobRecord(
     source: 'heavy',
     timestamp: new Date().toISOString(),
     unit: outcome.unit,
-    version: commitHash.slice(0, 9),
+    version: wrapper.slice(0, 9),
     wallMs: outcome.wallMs,
     ...repositoryOf(cwd),
   }
 }
 
-// Worktrees of one repository share its common git directory, so lanes group together.
+// Worktrees of one repository share its common git directory, so lanes group together; each
+// worktree has its own HEAD, which is the commit the job ran.
 function repositoryOf(cwd: string) {
   const result = Bun.spawnSync(
-    ['git', '-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir', '--show-prefix'],
+    [
+      'git',
+      '-C',
+      cwd,
+      'rev-parse',
+      '--path-format=absolute',
+      '--git-common-dir',
+      '--show-prefix',
+      'HEAD',
+    ],
     { stderr: 'ignore', stdout: 'pipe' },
   )
-  if (result.exitCode !== 0) return { repo: null, subdir: null }
-  const [commonDir = '', prefix = ''] = result.stdout.toString().split('\n')
-  return { repo: commonDir.replace(/\/\.git\/?$/, ''), subdir: prefix.replace(/\/$/, '') }
+  if (result.exitCode !== 0) return { commitHash: null, repo: null, subdir: null }
+  const [commonDir = '', prefix = '', head = ''] = result.stdout.toString().split('\n')
+  return {
+    commitHash: head,
+    repo: commonDir.replace(/\/\.git\/?$/, ''),
+    subdir: prefix.replace(/\/$/, ''),
+  }
 }
