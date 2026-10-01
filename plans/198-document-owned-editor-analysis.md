@@ -23,9 +23,9 @@ them. Run the first-frame/dirty-buffer/multiple-view/memory proofs against today
 Each sequence item is now “verify landed behavior, implement the missing part,” not permission
 to create a second analysis resource.
 
-099 still owns the missing canonical revision-tagged publication contract. Its unit 1 must
-include the retained-analysis subscriber; 198 consumes that event contract rather than building
-another journal. Baseline/attachment investigation can proceed alongside 099. Full minimap/LSP
+099 unit 1 delivered the canonical revision-tagged publication contract and retained-analysis
+subscriber in PR #203. 198 consumes that event contract. The remaining attachment and memory
+acceptance checks exercise this landed owner. Full minimap/LSP
 migration, Polaron and binary viewers are independent. Plan 197 owns standalone/diff highlighting;
 200 consumes the relevant retained-source and attachment guarantees as they become proven.
 
