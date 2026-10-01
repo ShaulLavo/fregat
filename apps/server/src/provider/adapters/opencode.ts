@@ -29,7 +29,10 @@ export const OPENCODE_ADAPTER_CAPABILITIES = {
   listCommands: false,
 } satisfies ProviderAdapter['capabilities']
 
+type NativeLease = { key: string; sessionId: SessionId }
+
 type NativeSession = {
+  lease: NativeLease
   input: ProviderRuntimeStartInput
   id: string
   http: OpenCodeHttp
@@ -68,7 +71,7 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       controller: AbortController
     }
   >()
-  private readonly nativeOwners = new Map<string, SessionId>()
+  private readonly nativeOwners = new Map<string, NativeLease>()
   private stopped = false
 
   private readonly options: Options
@@ -265,11 +268,11 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     } finally {
       session.controller.abort()
       await session.stream
-      this.sessions.delete(input.sessionId)
+      if (this.sessions.get(input.sessionId) === session) this.sessions.delete(input.sessionId)
       try {
         await session.server.close()
       } finally {
-        this.releaseNativeOwner(input.sessionId)
+        this.releaseNativeOwner(session.lease)
         this.emit(session, { type: 'runtime.exited', payload: { exitKind: 'graceful' } })
       }
     }
@@ -341,13 +344,15 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       (!stringField(cursor, 'sessionId') || cursor.providerInstanceId !== this.adapterKey)
     )
       throw openCodeErrors.OPENCODE_SESSION_CONFLICT({ internal: { operation: 'resume-owner' } })
-    if (cursor) this.claimNativeOwner(cursor.sessionId as string, input.sessionId)
+    const ownership = {
+      lease: cursor ? this.claimNativeOwner(cursor.sessionId as string, input.sessionId) : null,
+    }
     const server = new OpenCodeServer(this.options)
     try {
-      return await this.connectSession(input, cursor, server, controller)
+      return await this.connectSession(input, cursor, server, controller, ownership)
     } catch (error) {
       await server.close().catch(() => undefined)
-      this.releaseNativeOwner(input.sessionId)
+      this.releaseNativeOwner(ownership.lease)
       throw error
     }
   }
@@ -357,6 +362,7 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     cursor: { sessionId?: unknown; providerInstanceId?: unknown } | null,
     server: OpenCodeServer,
     controller: AbortController,
+    ownership: { lease: NativeLease | null },
   ) {
     const http = new OpenCodeHttp(
       await server.start(input.cwd, controller.signal),
@@ -381,7 +387,8 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
         )
     if (typeof native.id !== 'string' || !native.id || (cursor && native.id !== cursor.sessionId))
       throw openCodeErrors.OPENCODE_REQUEST_FAILED({ internal: { operation: 'session-response' } })
-    if (!cursor) this.claimNativeOwner(native.id, input.sessionId)
+    const lease = ownership.lease ?? this.claimNativeOwner(native.id, input.sessionId)
+    ownership.lease = lease
     if (native.directory !== input.cwd)
       throw openCodeErrors.OPENCODE_UNSUPPORTED({ internal: { operation: 'resume-directory' } })
     if (cursor)
@@ -396,6 +403,7 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     if (controller.signal.aborted)
       throw openCodeErrors.OPENCODE_REQUEST_FAILED({ internal: { operation: 'startup-cancelled' } })
     const session: NativeSession = {
+      lease,
       input,
       id: native.id,
       http,
@@ -431,9 +439,11 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
         payload: { message: 'OpenCode event stream closed.' },
       })
       this.finish(session, 'failed')
-      this.sessions.delete(session.input.sessionId)
+      if (this.sessions.get(session.input.sessionId) === session)
+        this.sessions.delete(session.input.sessionId)
       await session.server.close().catch(() => undefined)
-      this.releaseNativeOwner(session.input.sessionId)
+      this.releaseNativeOwner(session.lease)
+      this.emit(session, { type: 'runtime.exited', payload: { exitKind: 'error' } })
     }
   }
 
@@ -572,13 +582,13 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     const key = JSON.stringify([this.options.serverUrl ?? this.adapterKey, nativeId])
     if (this.nativeOwners.has(key))
       throw openCodeErrors.OPENCODE_SESSION_CONFLICT({ internal: { operation: 'native-owner' } })
-    this.nativeOwners.set(key, sessionId)
+    const lease = { key, sessionId }
+    this.nativeOwners.set(key, lease)
+    return lease
   }
 
-  private releaseNativeOwner(sessionId: SessionId) {
-    for (const [key, owner] of this.nativeOwners) {
-      if (owner === sessionId) this.nativeOwners.delete(key)
-    }
+  private releaseNativeOwner(lease: NativeLease | null) {
+    if (lease && this.nativeOwners.get(lease.key) === lease) this.nativeOwners.delete(lease.key)
   }
 
   private replyFailed(

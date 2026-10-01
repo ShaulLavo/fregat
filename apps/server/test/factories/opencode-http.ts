@@ -1,15 +1,22 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+
 type NativeFixtureSession = { id: string; directory: string }
 
 export function startOpenCodeHttpFixture(
   options: {
     port?: number
+    sessionFile?: string
     beforeAbortResponse?: () => Promise<void>
     beforePromptResponse?: () => Promise<Response | null>
     beforeReplyResponse?: () => Promise<Response | null>
     beforeEventHeaders?: () => Promise<void>
   } = {},
 ) {
-  const sessions = new Map<string, NativeFixtureSession>()
+  const saved: NativeFixtureSession[] =
+    options.sessionFile && existsSync(options.sessionFile)
+      ? JSON.parse(readFileSync(options.sessionFile, 'utf8'))
+      : []
+  const sessions = new Map(saved.map((session) => [session.id, session]))
   const streams = new Set<ReadableStreamDefaultController<Uint8Array>>()
   const requests: { path: string; method: string; directory: string; body: any }[] = []
   const encoder = new TextEncoder()
@@ -27,6 +34,11 @@ export function startOpenCodeHttpFixture(
       const body = request.method === 'GET' ? undefined : await request.json()
       requests.push({ path: url.pathname, method: request.method, directory, body })
       if (url.pathname === '/fixture/requests') return Response.json(requests)
+      if (url.pathname === '/fixture/disconnect') {
+        for (const stream of streams) stream.close()
+        streams.clear()
+        return Response.json(true)
+      }
       if (url.pathname === '/global/health')
         return Response.json({ healthy: true, version: 'fixture-v2' })
       if (url.pathname === '/provider')
@@ -52,6 +64,8 @@ export function startOpenCodeHttpFixture(
       if (url.pathname === '/session' && request.method === 'POST') {
         const session = { id: `native-${server.port}-${++count}`, directory }
         sessions.set(session.id, session)
+        if (options.sessionFile)
+          writeFileSync(options.sessionFile, JSON.stringify([...sessions.values()]))
         return Response.json(session)
       }
       const id = url.pathname.split('/')[2]!

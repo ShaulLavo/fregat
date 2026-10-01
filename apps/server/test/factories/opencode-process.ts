@@ -8,6 +8,8 @@ export async function openCodeProcessFixture(
     announcedUrl?: string
     occupyRequestedPort?: boolean
     wrapper?: 'alive' | 'exit'
+    persistentSessions?: boolean
+    holdAbortResponse?: boolean
   } = {},
 ) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-opencode-process-'))
@@ -16,7 +18,7 @@ export async function openCodeProcessFixture(
   const factory = pathToFileURL(path.join(import.meta.dirname, 'opencode-http.ts')).href
   await writeFile(
     binaryPath,
-    `#!${process.execPath}\nimport { startOpenCodeHttpFixture } from ${JSON.stringify(factory)}\nimport { appendFileSync } from 'node:fs'\nappendFileSync(${JSON.stringify(marker)}, JSON.stringify({ args: process.argv.slice(2), dataHome: process.env.XDG_DATA_HOME }) + '\\n')\nif (process.argv[2] !== 'serve') process.exit(2)\nif (${JSON.stringify(options.wrapper === 'exit')}) await Bun.sleep(100)\nconst port = Number(process.argv.find(arg => arg.startsWith('--port='))?.split('=')[1])\nif (${JSON.stringify(options.occupyRequestedPort ?? false)}) startOpenCodeHttpFixture({ port })\nlet fixture\nif (port === 0) {\n  try { fixture = startOpenCodeHttpFixture({ port: 4096 }) } catch { fixture = startOpenCodeHttpFixture() }\n} else { fixture = startOpenCodeHttpFixture({ port }) }\nappendFileSync(${JSON.stringify(marker)}, JSON.stringify({ url: fixture.url, pid: process.pid }) + '\\n')\nconsole.log('OpenCode v2 server listening on ' + (${JSON.stringify(options.announcedUrl ?? null)} ?? fixture.url))\n`,
+    `#!${process.execPath}\nimport { startOpenCodeHttpFixture } from ${JSON.stringify(factory)}\nimport { appendFileSync } from 'node:fs'\nappendFileSync(${JSON.stringify(marker)}, JSON.stringify({ args: process.argv.slice(2), dataHome: process.env.XDG_DATA_HOME }) + '\\n')\nif (process.argv[2] !== 'serve') process.exit(2)\nif (${JSON.stringify(options.wrapper === 'exit')}) await Bun.sleep(100)\nconst serverOptions = ${JSON.stringify(options.persistentSessions ? { sessionFile: path.join(root, 'native-sessions.json') } : {})}\nif (${JSON.stringify(options.holdAbortResponse ?? false)}) serverOptions.beforeAbortResponse = () => new Promise(() => {})\nconst port = Number(process.argv.find(arg => arg.startsWith('--port='))?.split('=')[1])\nif (${JSON.stringify(options.occupyRequestedPort ?? false)}) startOpenCodeHttpFixture({ ...serverOptions, port })\nlet fixture\nif (port === 0) {\n  try { fixture = startOpenCodeHttpFixture({ ...serverOptions, port: 4096 }) } catch { fixture = startOpenCodeHttpFixture(serverOptions) }\n} else { fixture = startOpenCodeHttpFixture({ ...serverOptions, port }) }\nappendFileSync(${JSON.stringify(marker)}, JSON.stringify({ url: fixture.url, pid: process.pid }) + '\\n')\nconsole.log('OpenCode v2 server listening on ' + (${JSON.stringify(options.announcedUrl ?? null)} ?? fixture.url))\n`,
     { mode: 0o755 },
   )
   const wrapperPath = path.join(root, 'opencode-wrapper')

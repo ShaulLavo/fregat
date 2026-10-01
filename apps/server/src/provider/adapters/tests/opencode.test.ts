@@ -723,3 +723,64 @@ test('review: failed adoption and stream EOF release native ownership', async ()
     })
     .toBe(true)
 })
+
+test.each(['stop', 'eof', 'stop-eof'] as const)(
+  'ABA: old %s cleanup preserves a replacement runtime and its exact native lease',
+  async (mode) => {
+    const fixture = await openCodeProcessFixture({
+      persistentSessions: true,
+      holdAbortResponse: mode === 'stop-eof',
+    })
+    const adapter = new OpenCodeProviderAdapter({
+      binaryPath: fixture.binaryPath,
+      env: { PATH: '', XDG_DATA_HOME: fixture.root },
+      displayLabel: 'Persistent fixture',
+      enabled: true,
+      providerInstanceId: instanceId,
+    })
+    cleanup.push(fixture.close, () => adapter.stopAll())
+    const exited = Promise.withResolvers<void>()
+    adapter.subscribeEvents((event) => {
+      if (event.type === 'runtime.exited' && event.runtimeEpoch === input.runtimeEpoch)
+        exited.resolve()
+    })
+    await adapter.startRuntime({ ...input, cwd: fixture.root })
+    if (mode === 'stop-eof') await adapter.sendTurn({ ...input, cwd: fixture.root })
+    const calls = (await readFile(fixture.marker, 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    const first = calls.find((row) => row.url)
+    let stopped: Promise<unknown> = Promise.resolve()
+    if (mode !== 'eof') stopped = adapter.stopRuntime({ sessionId }).catch((error) => error)
+    if (mode === 'stop-eof')
+      await expect
+        .poll(async () => {
+          const requests = (await (await fetch(`${first.url}/fixture/requests`)).json()) as {
+            path: string
+          }[]
+          return requests.some((request) => request.path.endsWith('/abort'))
+        })
+        .toBe(true)
+    if (mode !== 'stop') await fetch(`${first.url}/fixture/disconnect`).catch(() => undefined)
+    await expect.poll(() => adapter.hasRuntime({ sessionId })).toBe(false)
+    const replacement = await adapter.startRuntime({
+      ...input,
+      cwd: fixture.root,
+      runtimeEpoch: 'replacement-epoch',
+    })
+    await exited.promise
+    await stopped
+    expect(await adapter.hasRuntime({ sessionId })).toBe(true)
+    const other = v.parse(sessionIdSchema, '974a8f3c-3bc1-44d1-bc82-da59e3dc6cff')
+    await expect(
+      adapter.startRuntime({
+        ...input,
+        cwd: fixture.root,
+        sessionId: other,
+        providerResumeCursor: replacement.providerResumeCursor,
+      }),
+    ).rejects.toMatchObject({ code: 'provider.OPENCODE_SESSION_CONFLICT' })
+    expect(await adapter.hasRuntime({ sessionId })).toBe(true)
+  },
+)
