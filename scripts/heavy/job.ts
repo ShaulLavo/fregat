@@ -128,6 +128,12 @@ export type JobSpec =
       readonly sliceRoot: string
       readonly ceilingBytes: number
       readonly slotLocks: readonly number[]
+      /**
+       * The job entry's lock, handed to the launcher on fd 6: the entry stays live until the
+       * shim, already inside the job's slice, closes it, so no wrapper drops an entry whose
+       * launcher may still start the job.
+       */
+      readonly entryLock: number
       /** Wall-clock limit systemd enforces on the job's scope; null for none. */
       readonly runtimeLimitSeconds: number | null
     })
@@ -155,7 +161,12 @@ export function startJob(job: JobSpec) {
         ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
         VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
       },
-      stdio: ['inherit', 'inherit', 'inherit', ...(job.host === 'local' ? job.slotLocks : [])],
+      stdio: [
+        'inherit',
+        'inherit',
+        'inherit',
+        ...(job.host === 'local' ? [...job.slotLocks, job.entryLock] : []),
+      ],
     })
   } catch (error) {
     if (slice) removeSlice(slice)
@@ -223,7 +234,7 @@ export function reapSlice(root: string, slice: string) {
   removeSlice(slice)
 }
 
-function removeSlice(slice: string) {
+export function removeSlice(slice: string) {
   systemctl(['stop', slice])
   systemctl(['revert', slice])
 }

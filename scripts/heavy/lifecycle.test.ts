@@ -1,6 +1,15 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
@@ -456,4 +465,140 @@ describe.skipIf(!userScopes)('two slice roots sharing one state directory', () =
     expect(liveSlices(other)).toEqual([])
     expect(liveSlices(stranger.sliceRoot)).toHaveLength(1)
   }, 40_000)
+})
+
+describe.skipIf(!userScopes)('reaping a dead entry on another root', () => {
+  const SYSTEMCTL = spawnSync('sh', ['-c', 'command -v systemctl'], {
+    encoding: 'utf8',
+  }).stdout.trim()
+  const SYSTEMD_RUN = spawnSync('sh', ['-c', 'command -v systemd-run'], {
+    encoding: 'utf8',
+  }).stdout.trim()
+  const sleeper = (pidFile: string) => ['bash', '-c', `echo $$ > ${pidFile}; exec sleep 60`]
+  const pidIn = (file: string) => Number(readFileSync(file, 'utf8').trim())
+  const shim = (box: Box, name: string, body: string) => {
+    const bin = path.join(box.root, `bin-${name}`)
+    mkdirSync(bin)
+    writeFileSync(path.join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 })
+    return { ...process.env, PATH: `${bin}:${process.env.PATH}` }
+  }
+  // Kills a wrapper; its job keeps the wrapper's stdout open, so its exit is what to wait for.
+  const killWrapper = async (wrapper: ReturnType<typeof start>) => {
+    const exited = new Promise((resolve) => wrapper.child.on('exit', resolve))
+    wrapper.child.kill('SIGKILL')
+    await exited
+  }
+
+  test('never stops a slice a live entry owns, whatever a stale copy of that entry says', async () => {
+    const box = lifecycleBox(65536)
+    const other = sandbox().sliceRoot
+    const pidFile = path.join(box.root, 'pid')
+    const owner = start(box, 'owner', sleeper(pidFile), { jobClass: 'light', sliceRoot: other })
+    await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true)
+    const [entry] = readdirSync(path.join(box.state, 'jobs')).filter((name) =>
+      name.endsWith('.json'),
+    )
+    copyFileSync(
+      path.join(box.state, 'jobs', entry!),
+      path.join(box.state, 'jobs', 'stale-renamed.json'),
+    )
+
+    const next = await heavy(box, 'next', ['true'], { jobClass: 'light' })
+    expect(next.stderr).not.toContain('stopping')
+    expect(alive(pidIn(pidFile))).toBe(true)
+    owner.child.kill('SIGTERM')
+    await owner.done
+  }, 40_000)
+
+  test('never stops a slice a dead entry names outside the slice-root grammar', async () => {
+    const box = lifecycleBox(65536)
+    const root = `HeavyT${randomBytes(4).toString('hex')}`
+    const id = randomBytes(6).toString('hex')
+    const canary = spawn(
+      SYSTEMD_RUN,
+      ['--user', '--scope', '--quiet', `--slice=${root}-${id}.slice`, 'sleep', '60'],
+      {
+        stdio: 'ignore',
+      },
+    )
+    try {
+      await expect.poll(() => liveSlices(root).length, { timeout: 10_000 }).toBe(1)
+      mkdirSync(path.join(box.state, 'jobs'), { recursive: true })
+      writeFileSync(
+        path.join(box.state, 'jobs', `${id}.json`),
+        JSON.stringify({ ...job, id, sliceRoot: root }),
+      )
+
+      const next = await heavy(box, 'next', ['true'], { jobClass: 'light' })
+      expect(next.stderr).not.toContain('stopping')
+      expect(alive(canary.pid!)).toBe(true)
+      expect(existsSync(path.join(box.state, 'jobs', `${id}.json`))).toBe(false)
+    } finally {
+      canary.kill('SIGKILL')
+      spawnSync(SYSTEMCTL, ['--user', 'stop', `${root}.slice`])
+    }
+  }, 40_000)
+
+  test('keeps a dead entry, and its charge, until its slice has really stopped', async () => {
+    const box = lifecycleBox(65536)
+    const other = sandbox().sliceRoot
+    const pidFile = path.join(box.root, 'pid')
+    const orphaned = start(box, 'orphaned', sleeper(pidFile), {
+      jobClass: 'light',
+      sliceRoot: other,
+    })
+    await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true)
+    await killWrapper(orphaned)
+    const entries = () =>
+      readdirSync(path.join(box.state, 'jobs')).filter((n) => n.endsWith('.json'))
+    expect(entries()).toHaveLength(1)
+
+    // A systemctl that fails every stop of the orphan's slice.
+    const failing = shim(
+      box,
+      'systemctl',
+      `case "$2 $*" in kill*${other}-*|stop*${other}-*|revert*${other}-*) exit 1;; esac\nexec ${SYSTEMCTL} "$@"`,
+    )
+    const first = await heavy(box, 'first', ['true'], { env: failing, jobClass: 'light' })
+    expect(first.stderr).toContain(`stopping ${other}-`)
+    expect(alive(pidIn(pidFile))).toBe(true)
+    expect(entries()).toHaveLength(1)
+
+    const second = await heavy(box, 'second', ['true'], { jobClass: 'light' })
+    expect(second.stderr).toContain(`stopping ${other}-`)
+    expect(alive(pidIn(pidFile))).toBe(false)
+    expect(entries()).toEqual([])
+  }, 60_000)
+
+  test('treats a job whose launcher has not reached its slice yet as running', async () => {
+    const box = lifecycleBox(65536)
+    const other = sandbox().sliceRoot
+    const blocked = path.join(box.root, 'blocked')
+    const go = path.join(box.root, 'go')
+    const pidFile = path.join(box.root, 'pid')
+    // A systemd-run that pauses before it makes the scope.
+    const paused = shim(
+      box,
+      'systemd-run',
+      `: > ${blocked}\n${until(go)}\nexec ${SYSTEMD_RUN} "$@"`,
+    )
+    const launching = start(box, 'launching', sleeper(pidFile), {
+      env: paused,
+      jobClass: 'light',
+      sliceRoot: other,
+    })
+    await expect.poll(() => existsSync(blocked), { timeout: 10_000 }).toBe(true)
+    await killWrapper(launching)
+
+    const during = await heavy(box, 'during', ['true'], { jobClass: 'light' })
+    expect(during.code).toBe(0)
+    writeFileSync(go, '')
+    await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true)
+    await expect.poll(() => liveSlices(other).length, { timeout: 10_000 }).toBe(1)
+
+    const after = await heavy(box, 'after', ['true'], { jobClass: 'light' })
+    expect(after.stderr).toContain(`stopping ${other}-`)
+    expect(alive(pidIn(pidFile))).toBe(false)
+    expect(liveSlices(other)).toEqual([])
+  }, 60_000)
 })

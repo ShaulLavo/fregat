@@ -102,33 +102,49 @@ export function liveSlices(root: string): LiveSlice[] {
 
 /** The slice if a process runs in it. */
 function liveSlice(root: string, slice: string): LiveSlice | null {
-  const dir = path.join(sliceRootPath(root), slice)
-  // A slice whose processes have all exited runs nothing; systemd may keep it, or even its
-  // cgroup, after that.
-  const events = unlessGone(() => readFileSync(path.join(dir, 'cgroup.events'), 'utf8'))
-  if (!events?.includes('populated 1')) return null
-  const max = unlessGone(() => readFileSync(path.join(dir, 'memory.max'), 'utf8'))
+  if (sliceState(root, slice) !== 'running') return null
+  const max = unlessGone(() =>
+    readFileSync(path.join(sliceRootPath(root), slice, 'memory.max'), 'utf8'),
+  )
   if (max === null) return null
   const id = slice.slice(`${root}-`.length, -'.slice'.length)
   return { ceilingBytes: Number(max.trim()) || 0, id, root, slice }
 }
 
 /**
+ * Whether a process runs in the slice, it is empty, or its cgroup is gone. A slice whose
+ * processes have all exited runs nothing; systemd may keep it, or even its cgroup, after that.
+ */
+export function sliceState(root: string, slice: string): 'running' | 'empty' | 'gone' {
+  const events = unlessGone(() =>
+    readFileSync(path.join(sliceRootPath(root), slice, 'cgroup.events'), 'utf8'),
+  )
+  if (events === null) return 'gone'
+  return events.includes('populated 1') ? 'running' : 'empty'
+}
+
+/**
  * Slices left running by dead wrappers that this state directory can attribute: the one each
- * dead entry names, on whatever root it ran, and any slice under `root` no live entry owns.
- * No other root is scanned, so another state directory's slices are never taken for orphans.
+ * attributable dead entry names, on whatever root it ran, unless a live entry owns that id;
+ * and any slice under `root` no live entry owns. No other root is scanned, so another state
+ * directory's slices are never taken for orphans.
  */
 export function orphanSlices(
   root: string,
   owners: readonly { readonly id: string }[],
-  dead: readonly { readonly entry: { readonly id: string; readonly sliceRoot: string } }[],
+  dead: readonly {
+    readonly attributable: boolean
+    readonly entry: { readonly id: string; readonly sliceRoot: string }
+  }[],
 ): LiveSlice[] {
-  const named = dead.flatMap(
-    ({ entry }) => liveSlice(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`) ?? [],
-  )
+  const owned = (id: string) => owners.some((job) => job.id === id)
+  const named = dead
+    .filter(({ attributable, entry }) => attributable && !owned(entry.id))
+    .flatMap(
+      ({ entry }) => liveSlice(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`) ?? [],
+    )
   const unowned = liveSlices(root).filter(
-    (slice) =>
-      !owners.some((job) => job.id === slice.id) && !named.some((n) => n.slice === slice.slice),
+    (slice) => !owned(slice.id) && !named.some((n) => n.slice === slice.slice),
   )
   return [...named, ...unowned]
 }

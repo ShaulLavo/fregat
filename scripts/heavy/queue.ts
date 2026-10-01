@@ -9,7 +9,15 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 
-import { lockDescriptor, openExisting, tryLock, unlessMissing, unlock, waitLock } from './lock'
+import {
+  isSliceRoot,
+  lockDescriptor,
+  openExisting,
+  tryLock,
+  unlessMissing,
+  unlock,
+  waitLock,
+} from './lock'
 
 /** A job in the state directory: waiting in `queue/`, or running in `jobs/`. */
 export type Entry = {
@@ -84,9 +92,27 @@ export function live(stateDir: string, place: Place): Entry[] {
   })
 }
 
-/** Running entries whose wrapper is gone; the caller removes each file once its slice is stopped. */
+/**
+ * Running entries whose wrapper is gone. Only an `attributable` one may name a slice to stop:
+ * its file is `<id>.json`, the id has the wrapper's shape and the root the CLI's grammar.
+ * The caller removes each file once its slice has stopped.
+ */
 export function deadJobs(stateDir: string) {
-  return scan(stateDir, 'jobs').filter(({ owned }) => !owned)
+  return scan(stateDir, 'jobs')
+    .filter(({ owned }) => !owned)
+    .map(({ entry, file }) => ({
+      attributable:
+        isJobId(entry.id) &&
+        path.basename(file) === `${entry.id}.json` &&
+        isSliceRoot(entry.sliceRoot),
+      entry,
+      file,
+    }))
+}
+
+/** A job id as the wrapper makes one: six random bytes in hex. */
+function isJobId(id: unknown): id is string {
+  return typeof id === 'string' && /^[0-9a-f]{12}$/.test(id)
 }
 
 function scan(stateDir: string, place: Place) {

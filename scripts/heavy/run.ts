@@ -20,12 +20,14 @@ import {
   legacyHold,
   orphanSlices,
   readReadings,
+  sliceState,
   type Limits,
 } from './admission'
 import {
   HOSTS,
   isHost,
   reapSlice,
+  removeSlice,
   startJob,
   stopTimeoutSeconds,
   type Host,
@@ -37,6 +39,7 @@ import {
   DEFAULT_STATE_DIR,
   isProductionState,
   PRODUCTION,
+  isSliceRoot,
   sliceRootFor,
   type Production,
   tryLock,
@@ -175,7 +178,7 @@ function sliceRootOption(given: string | undefined, stateDir: string, production
   // The directory must exist for its identity to decide its root.
   mkdirSync(stateDir, { recursive: true })
   const root = given ?? sliceRootFor(stateDir, production)
-  if (!/^[a-z0-9]+$/.test(root)) {
+  if (!isSliceRoot(root)) {
     throw createScriptError(
       `--slice-root takes lowercase letters and digits; got ${root}. ${USAGE}`,
     )
@@ -294,6 +297,7 @@ async function admitLocal(
       id,
       sliceRoot: options.sliceRoot,
       runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
+      entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
   }
@@ -403,7 +407,6 @@ function attemptAdmission(
 /**
  * Reaps orphans: job slices whose wrapper is gone (`orphanSlices`). Each is charged its
  * ceiling less its use, read before the kill; if the kill fails it may still grow that far.
- * A dead entry is dropped only once its slice is stopped.
  */
 function reconcile(options: Options) {
   const owners = live(options.stateDir, 'jobs')
@@ -416,9 +419,21 @@ function reconcile(options: Options) {
     console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
     reapSlice(orphan.root, orphan.slice)
   }
-  for (const { file } of dead) rmSync(file, { force: true })
+  for (const entry of dead) settleDeadEntry(entry)
   clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
   return { orphanCharges, owners }
+}
+
+// A dead entry is the only record of a slice on another root, so it stays until that slice is
+// gone, or empty and stopped; a stop that failed is retried, and charged, on the next pass. An
+// entry that cannot name a slice authorizes nothing and is dropped.
+function settleDeadEntry({ attributable, entry, file }: ReturnType<typeof deadJobs>[number]) {
+  if (!attributable) return rmSync(file, { force: true })
+  const slice = `${entry.sliceRoot}-${entry.id}.slice`
+  const state = sliceState(entry.sliceRoot, slice)
+  if (state === 'running') return
+  if (state === 'empty') removeSlice(slice)
+  rmSync(file, { force: true })
 }
 
 // The part of each live job's estimate it may still claim, by the slice root it runs under; a
