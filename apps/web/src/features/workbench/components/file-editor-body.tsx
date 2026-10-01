@@ -9,6 +9,8 @@ import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { FilesystemPath, StandaloneDocumentRef, TabId } from '@/lib/documents/utils/types'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { FileLoadError } from '@/features/workbench/components/file-load-error'
+import { CsvFileBody } from '@/features/workbench/components/csv-file-body'
+import { isCsvPath } from '@/features/workbench/utils/csv-path'
 
 import { CompareSavedView } from '@/features/editor/components/compare-saved-view'
 import { HistoryView } from '@/features/editor/components/history-view'
@@ -143,7 +145,7 @@ export function FileEditorBody({
       </Suspense>
     )
 
-  return (
+  const textBody = (
     <div className={fileBodyGridClass(splitMarkdown, currentReferences !== null)}>
       <div className='relative flex min-h-0 min-w-0 flex-col overflow-hidden'>
         <Editor
@@ -205,5 +207,17 @@ export function FileEditorBody({
         />
       ) : null}
     </div>
+  )
+  if (!resource || !isCsvPath(resource.path)) return textBody
+  return (
+    <CsvFileBody
+      buffer={editorDocument?.buffer ?? null}
+      view={editorDocument?.view ?? null}
+      editable={editorDocument?.editability === 'editable'}
+      readFailed={fileState.status === 'error'}
+      tabId={tabId}
+    >
+      {textBody}
+    </CsvFileBody>
   )
 }

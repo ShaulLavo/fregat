@@ -196,6 +196,13 @@ import { itemNavigation } from './item-navigation'
 import { shortcutHints } from './shortcut-hints'
 import { editorAddToChat } from './editor-add-to-chat'
 import { editorSpellcheck } from './editor-spellcheck'
+import {
+  csvTable,
+  csvEngineFailure,
+  csvQueryFailure,
+  csvTextSave,
+  csvKeyboardNavigation,
+} from './csv-table'
 import { markdownSplitView } from './markdown-split-view'
 import { markdownAuthoring } from './markdown-authoring'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
@@ -586,6 +593,11 @@ export const scenarios: readonly Scenario[] = [
   shortcutHints,
   editorAddToChat,
   editorSpellcheck,
+  csvTable,
+  csvTextSave,
+  csvKeyboardNavigation,
+  csvEngineFailure,
+  csvQueryFailure,
   markdownSplitView,
   markdownAuthoring,
   markdownPreviewClobber,

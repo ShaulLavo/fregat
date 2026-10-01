@@ -2,6 +2,25 @@ import type { Locator, Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const csvSelectors = {
+  engineModule: '**/src/features/workbench/utils/csv.ts*',
+  table: (page: Page) => page.getByRole('table', { name: 'CSV rows', exact: true }),
+  cell: (page: Page, row: number, column: number) =>
+    page.getByRole('button', { name: `Row ${row}, column ${column}`, exact: true }),
+  cellEditor: (page: Page, row: number, column: number) =>
+    page.getByRole('textbox', { name: `Row ${row}, column ${column}`, exact: true }),
+  mode: (page: Page, mode: 'Text' | 'Table') =>
+    page.getByRole('button', { name: mode, exact: true }),
+  header: (page: Page) => page.getByRole('button', { name: 'First row is header', exact: true }),
+  undo: (page: Page) => page.getByRole('button', { name: 'Undo', exact: true }),
+  redo: (page: Page) => page.getByRole('button', { name: 'Redo', exact: true }),
+  parseError: (page: Page) => page.getByText('CSV could not be read', { exact: true }),
+  engineError: (page: Page) => page.getByText('CSV engine could not load', { exact: true }),
+  preparing: (page: Page) => page.getByRole('status', { name: 'Preparing CSV table' }),
+  queryRetry: (page: Page) =>
+    page.getByRole('status').getByRole('button', { name: 'Retry', exact: true }),
+}
+
 export const treeScrollSelectors = {
   scroll: '[data-file-tree-virtualized-scroll]',
   flow: '[data-file-tree-virtualized-sticky]',
