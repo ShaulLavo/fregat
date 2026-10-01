@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { canStopInputPairs } from '../input-pair-stopping.mjs'
 import { inputBudget } from '../input-budgets.mjs'
+import { verifyInputSensitivity } from '../input-sensitivity.mjs'
 import { correlateInputEvents } from '../input-correlation.mjs'
 import {
   comparePairedInput,
+  frameDetectionFloorKey,
   pairedInterval,
   sensitivityPassed,
   touchedConfigurations,
@@ -54,6 +57,7 @@ function result(id = 'control-1', duration = 10) {
       isolation: 'closed-browser-context-per-fixture-view-scenario',
       diagnostics: false,
       slowdownMs: 0,
+      frameSlowdownMs: 0,
       operationsPerSample: Object.fromEntries(inputScenarios.map((scenario) => [scenario, 2])),
     },
     samples: fixtures.flatMap((fixture) => fixtureSamples(fixture, duration)),
@@ -778,11 +782,34 @@ function pairedResults(duration = 10) {
   return { baseline, candidate, schedule }
 }
 
+function sensitivityCache() {
+  const control = (input, frame) => {
+    const { baseline, candidate, schedule } = pairedResults(30)
+    candidate.config.slowdownMs = input
+    candidate.config.frameSlowdownMs = frame
+    return {
+      configuration: 'native',
+      baseline,
+      candidate,
+      schedule,
+      comparison: comparePairedInput(baseline, candidate, schedule, 17, 200),
+    }
+  }
+  return {
+    schemaVersion: 3,
+    instrumentHash: 'b'.repeat(64),
+    passed: true,
+    controls: { input: control(20, 0), frame: control(0, 20) },
+    frameDetectionFloor: { key: frameDetectionFloorKey, delayMs: 25, attempts: [control(0, 25)] },
+  }
+}
+
 describe('paired input latency', () => {
   it('passes identical products and reports all 108 blocking and 36 advisory groups', () => {
     const { baseline, candidate, schedule } = pairedResults()
     const check = comparePairedInput(baseline, candidate, schedule, 60061)
     expect(check.passed).toBe(true)
+    expect(check.metrics[0].interval.draws).toBe(10_000)
     expect(check.metrics.filter((metric) => metric.blocking)).toHaveLength(108)
     expect(check.metrics.filter((metric) => !metric.blocking)).toHaveLength(36)
     expect(
@@ -810,7 +837,8 @@ describe('paired input latency', () => {
       draws: 10000,
     })
     expect(pairedInterval([20, 20, 20], 17).lowMs).toBe(20)
-    expect(() => pairedInterval([20, 20], 17)).toThrow(/three/)
+    expect(pairedInterval([20, 20], 17).lowMs).toBe(20)
+    expect(() => pairedInterval([20], 17)).toThrow(/two/)
   })
 
   it('never lets advisory timing fail the run', () => {
@@ -903,13 +931,192 @@ describe('paired input latency', () => {
     expect(metric.passed).toBe(false)
   })
 
-  it('requires sensitivity to reject the historical preedit-frame keys', () => {
+  it('requires frame sensitivity to reject every frame key', () => {
     const { baseline, candidate, schedule } = pairedResults(30)
     const check = comparePairedInput(baseline, candidate, schedule, 17)
+    expect(sensitivityPassed(check, 'frame')).toBe(true)
     check.metrics.find(
       (metric) => metric.key === 'ordinary/single/composition-update/inputToFrame',
     ).passed = true
-    expect(sensitivityPassed(check)).toBe(false)
+    expect(sensitivityPassed(check, 'input')).toBe(true)
+    expect(sensitivityPassed(check, 'frame')).toBe(false)
+  })
+  it.each(['inputToApplied', 'dispatch'])('requires every %s input sensitivity key', (measure) => {
+    const { baseline, candidate, schedule } = pairedResults(30)
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    check.metrics.find((metric) => metric.key === `long-line/multiple/paste/${measure}`).passed =
+      true
+    expect(sensitivityPassed(check, 'input')).toBe(false)
+    expect(sensitivityPassed(check, 'frame')).toBe(true)
+  })
+  it('rejects absent sensitivity keys and unknown stages', () => {
+    const { baseline, candidate, schedule } = pairedResults(30)
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    check.metrics = check.metrics.filter(
+      (metric) => metric.key !== 'ordinary/single/typing/inputToFrame',
+    )
+    expect(sensitivityPassed(check, 'frame')).toBe(false)
+    expect(() => sensitivityPassed(check, 'unknown')).toThrow(/Unknown input sensitivity stage/)
+  })
+  it('admits only the named native frame key with a separately rejected floor', () => {
+    const { baseline, candidate, schedule } = pairedResults(30)
+    const check = comparePairedInput(baseline, candidate, schedule, 17)
+    const floor = structuredClone(check)
+    const metric = check.metrics.find((metric) => metric.key === frameDetectionFloorKey)
+    metric.passed = true
+    expect(sensitivityPassed(check, 'frame')).toBe(false)
+    expect(sensitivityPassed(check, 'frame', floor)).toBe(true)
+    expect(metric.blocking).toBe(true)
+    expect(metric.budgetMs).toBe(inputBudget('native', frameDetectionFloorKey).noiseMarginMs)
+    metric.budget.reference = 'disabled'
+    expect(sensitivityPassed(check, 'frame', floor)).toBe(false)
+    metric.budget.reference = 'native'
+    check.metrics.find((metric) => metric.key === 'ordinary/single/typing/inputToFrame').passed =
+      true
+    expect(sensitivityPassed(check, 'frame', floor)).toBe(false)
+    check.metrics = check.metrics.filter((metric) => metric.key !== frameDetectionFloorKey)
+    expect(sensitivityPassed(check, 'frame', floor)).toBe(false)
+  })
+
+  it('keeps a missed 20 ms key blocking and requires raw 25 or 30 ms rejection', () => {
+    const stored = sensitivityCache()
+    const weaken = (check) => {
+      for (const sample of check.candidate.samples) {
+        if (
+          sample.fixture !== 'ordinary' ||
+          sample.views !== 'multiple' ||
+          sample.scenario !== 'repeat'
+        )
+          continue
+        Object.assign(sample, observations(sample.scenario, 22, sample.views))
+      }
+    }
+    weaken(stored.controls.frame)
+    const before = comparePairedInput(
+      stored.controls.frame.baseline,
+      stored.controls.frame.candidate,
+      stored.controls.frame.schedule,
+      17,
+      200,
+    )
+    expect(before.metrics.find((metric) => metric.key === frameDetectionFloorKey).passed).toBe(true)
+    expect(verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toBe(stored)
+    weaken(stored.frameDetectionFloor.attempts[0])
+    expect(() => verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toThrow(/stage sensitivity/)
+    const next = structuredClone(sensitivityCache().frameDetectionFloor.attempts[0])
+    next.candidate.config.frameSlowdownMs = 30
+    stored.frameDetectionFloor = {
+      key: frameDetectionFloorKey,
+      delayMs: 30,
+      attempts: [...stored.frameDetectionFloor.attempts, next],
+    }
+    expect(verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toBe(stored)
+  })
+
+  it('recomputes raw stage controls and validates the first rejected floor', () => {
+    const stored = sensitivityCache()
+    expect(verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toBe(stored)
+    stored.controls.frame.comparison.passed = true
+    stored.frameDetectionFloor.attempts[0].comparison.passed = true
+    expect(verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toBe(stored)
+    stored.frameDetectionFloor.delayMs = 30
+    expect(() => verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toThrow(/detection floor/)
+  })
+
+  it.each([
+    'wrong-key',
+    'wrong-delay',
+    'different-products',
+    'different-instrument',
+    'missing-control',
+    'missing-floor',
+  ])('rejects %s cached control evidence', (fault) => {
+    const stored = sensitivityCache()
+    if (fault === 'wrong-key')
+      stored.frameDetectionFloor.key = 'ordinary/single/typing/inputToFrame'
+    if (fault === 'wrong-delay') stored.controls.frame.candidate.config.frameSlowdownMs = 25
+    if (fault === 'different-products')
+      stored.frameDetectionFloor.attempts[0].candidate.environment.packageSet.buildHash =
+        'f'.repeat(64)
+    if (fault === 'different-instrument')
+      stored.controls.frame.candidate.environment.instrumentHash = 'f'.repeat(64)
+    if (fault === 'missing-control') delete stored.controls.frame
+    if (fault === 'missing-floor') delete stored.frameDetectionFloor
+    expect(() => verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toThrow(/stored|Stored/)
+  })
+
+  it('normalizes only injected stage controls while checking comparability', () => {
+    const { baseline, candidate, schedule } = pairedResults(30)
+    candidate.config.frameSlowdownMs = 20
+    expect(comparePairedInput(baseline, candidate, schedule, 17).passed).toBe(false)
+    baseline.config.frameSlowdownMs = 1
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(
+      /baseline must have no injected delay/,
+    )
+  })
+
+  it('stops only complete tight pairs within every frozen gating budget', () => {
+    const { baseline, candidate } = pairedResults()
+    for (const group of baseline.samples.filter((sample) => sample.repetition === 0)) {
+      const select = (run) =>
+        run.samples.filter(
+          (sample) =>
+            sample.fixture === group.fixture &&
+            sample.views === group.views &&
+            sample.scenario === group.scenario &&
+            sample.repetition < 2,
+        )
+      const samples = { baseline: select(baseline), candidate: select(candidate) }
+      expect(canStopInputPairs(samples, 'native')).toBe(true)
+      for (const sample of samples.candidate)
+        sample.latencyMs.dispatch = sample.latencyMs.dispatch.map((value) => value + 20)
+      expect(canStopInputPairs(samples, 'native')).toBe(false)
+    }
+    expect(canStopInputPairs({ baseline: [], candidate: [] }, 'native')).toBe(false)
+  })
+
+  it('admits declared complete two-pair groups and rejects unjustified stopping', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    for (const run of [baseline, candidate]) {
+      run.samples = run.samples.filter((sample) => sample.repetition < 2)
+      run.config.adaptivePairs = 'tight-within-budget'
+      run.config.groupRepetitions = Object.fromEntries(
+        run.samples.map((sample) => [`${sample.fixture}/${sample.views}/${sample.scenario}`, 2]),
+      )
+    }
+    const pairs = schedule.filter((pair) => pair.repetition < 2)
+    const check = comparePairedInput(baseline, candidate, pairs, 17)
+    expect(check.passed).toBe(true)
+    expect(check.metrics.every((metric) => metric.differences.length === 2)).toBe(true)
+    candidate.samples[0] = result(candidate.id, 30).samples[0]
+    expect(() => comparePairedInput(baseline, candidate, pairs, 17)).toThrow(/adaptive early stop/)
+  })
+
+  it('keeps fixed repetition bounds even with undeclared group counts', () => {
+    const { baseline } = pairedResults()
+    const sample = baseline.samples[0]
+    const key = `${sample.fixture}/${sample.views}/${sample.scenario}`
+    baseline.config.groupRepetitions = { [key]: 4 }
+    sample.repetition = 3
+    expect(() => validateInputResult(baseline)).toThrow(/Invalid sample repetition/)
+  })
+
+  it('rejects missing or invalid adaptive group declarations', () => {
+    const { baseline, candidate, schedule } = pairedResults()
+    baseline.config.adaptivePairs = 'tight-within-budget'
+    baseline.config.groupRepetitions = {}
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(
+      /adaptive group counts/,
+    )
+    for (const run of [baseline, candidate]) {
+      run.config.adaptivePairs = 'tight-within-budget'
+      run.config.groupRepetitions = Object.fromEntries(
+        run.samples.map((sample) => [`${sample.fixture}/${sample.views}/${sample.scenario}`, 1]),
+      )
+    }
+    expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(
+      /adaptive repetition count/,
+    )
   })
 
   it('declares native inheritance and rejects unknown budgets', () => {
@@ -1007,4 +1214,106 @@ describe('paired input latency', () => {
       expect(touchedConfigurations(baseline, { manifest: { packages: [] } })).toEqual(expected)
     },
   )
+})
+
+function warmResult() {
+  const run = result()
+  run.config.isolation = 'closed-browser-context-per-configuration'
+  run.config.warmupFixture = 'measured'
+  run.bootstrap = structuredClone(run.samples[0])
+  run.bootstrap.repetition = -1
+  run.bootstrap.wallMs = 100
+  run.bootstrap.cleanup.afterListeners = 10
+  run.cleanup = {
+    ...run.samples[0].cleanup,
+    scope: 'configuration',
+    ownerIdentity: 'warm-owner',
+    trackedObjects: 9,
+  }
+  run.startup = inputViewModes.flatMap((views) =>
+    run.manifest.fixtures.map((fixture) => ({
+      fixture: fixture.id,
+      views,
+      ownerIdentity: 'warm-owner',
+      retained: views !== 'single' || fixture.id !== 'ordinary',
+      milliseconds: 100,
+    })),
+  )
+  for (const sample of run.samples) {
+    sample.cleanup = null
+    sample.reset = {
+      ownerIdentity: 'warm-owner',
+      fixtureHash: sample.fixtureHash,
+      length: 10,
+      views: sample.views === 'multiple' ? 3 : 1,
+      hiddenViews: sample.views === 'multiple' ? 1 : 0,
+      cursor: { row: 0, column: 0 },
+      historyEmpty: true,
+      sourceCurrent: true,
+      milliseconds: 1,
+      documentReloaded: false,
+      rejectedSource: null,
+    }
+  }
+  return run
+}
+
+describe('warm configuration lifecycle', () => {
+  it('requires complete startup, reset and final disposal receipts', () => {
+    expect(validateInputResult(warmResult())).toBeTruthy()
+  })
+  it('rejects a missing initialization receipt', () => {
+    const run = warmResult()
+    delete run.bootstrap
+    expect(() => validateInputResult(run)).toThrow(/bootstrap/)
+  })
+  it('binds lifetime counts to the disposed initialization receipt', () => {
+    const run = warmResult()
+    run.cleanup.beforeListeners += 1
+    expect(() => validateInputResult(run)).toThrow(/initialized listener baseline/)
+  })
+  it('rejects a retained initialization owner', () => {
+    const run = warmResult()
+    run.bootstrap.cleanup.retainedObjects = 1
+    expect(() => validateInputResult(run)).toThrow(/bootstrap cleanup retainedObjects/)
+  })
+  it('rejects an owner replaced between bursts', () => {
+    const run = warmResult()
+    run.samples[0].reset.ownerIdentity = 'replacement'
+    expect(() => validateInputResult(run)).toThrow(/retained input owner/)
+  })
+  it.each(['historyEmpty', 'sourceCurrent'])('rejects an incomplete reset %s', (field) => {
+    const run = warmResult()
+    run.samples[0].reset[field] = false
+    expect(() => validateInputResult(run)).toThrow(/reset/)
+  })
+  it('rejects skipped subject startup proof', () => {
+    const run = warmResult()
+    run.startup.pop()
+    expect(() => validateInputResult(run)).toThrow(/startup coverage/)
+  })
+  it('rejects configuration listener growth', () => {
+    const run = warmResult()
+    run.cleanup.afterListeners = run.cleanup.beforeListeners + 1
+    expect(() => validateInputResult(run)).toThrow(/cleanup counts/)
+  })
+  it('admits a reload only for the observed pending minimap source exception', () => {
+    const run = warmResult()
+    run.config.pendingMinimapSource = true
+    const sample = run.samples.find(
+      (entry) => entry.fixture === 'short-lines' && entry.scenario === 'undo',
+    )
+    sample.reset.documentReloaded = true
+    sample.reset.rejectedSource = [{ current: false, renderedAfterSource: true }]
+    expect(validateInputResult(run)).toBeTruthy()
+    sample.reset.rejectedSource[0].current = true
+    expect(() => validateInputResult(run)).toThrow(/rejected source receipt/)
+  })
+  it('keeps an already current source warm without a document reload', () => {
+    const run = warmResult()
+    run.config.pendingMinimapSource = true
+    expect(validateInputResult(run)).toBeTruthy()
+    run.samples[0].reset.documentReloaded = true
+    expect(() => validateInputResult(run)).toThrow(/Unadmitted/)
+  })
 })

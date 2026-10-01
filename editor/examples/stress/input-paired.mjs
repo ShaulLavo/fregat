@@ -1,7 +1,8 @@
 import { fail } from './errors.mjs'
 import { inputConsumerIds, inputConsumerConfiguration } from './input-configurations.mjs'
-import { assertInputComparable } from './input-results.mjs'
-import { inputBudget, historicalNegativeKeys } from './input-budgets.mjs'
+import { assertInputComparable, inputScenarios, inputViewModes } from './input-results.mjs'
+import { canStopInputPairs } from './input-pair-stopping.mjs'
+import { inputBudget } from './input-budgets.mjs'
 
 export function randomGenerator(seed) {
   let state = seed >>> 0
@@ -22,8 +23,8 @@ export function median(values) {
 }
 
 export function pairedInterval(differences, seed, draws = 10_000) {
-  if (differences.length < 3 || differences.some((value) => !Number.isFinite(value)))
-    fail('A paired interval requires at least three finite repetition differences')
+  if (differences.length < 2 || differences.some((value) => !Number.isFinite(value)))
+    fail('A paired interval requires at least two finite repetition differences')
   const random = randomGenerator(seed)
   const estimates = Array.from({ length: draws }, () =>
     median(
@@ -41,13 +42,14 @@ export function pairedInterval(differences, seed, draws = 10_000) {
   }
 }
 
-export function comparePairedInput(baseline, candidate, schedule, seed) {
+export function comparePairedInput(baseline, candidate, schedule, seed, draws) {
   assertInputComparable(baseline, candidate, true)
   for (const run of [baseline, candidate]) assertPairedReceipt(run.environment)
   if (baseline.config.unsupportedFixtures?.length)
     fail('Paired input requires every fixture to be supported')
   if (baseline.id === candidate.id) fail('Paired sides require distinct run identities')
-  if (baseline.config.slowdownMs !== 0) fail('Paired baseline must have no injected delay')
+  if (baseline.config.slowdownMs !== 0 || (baseline.config.frameSlowdownMs ?? 0) !== 0)
+    fail('Paired baseline must have no injected delay')
   if (baseline.config.repetitions < 3) fail('Paired input requires at least three repetitions')
   if (
     baseline.environment.packageSet?.externalHash !== candidate.environment.packageSet?.externalHash
@@ -66,8 +68,14 @@ export function comparePairedInput(baseline, candidate, schedule, seed) {
   }
   const candidateSamples = new Map(candidate.samples.map((sample) => [sampleKey(sample), sample]))
   const groups = new Map()
+  const pairedGroups = new Map()
   for (const sample of baseline.samples) {
     const other = candidateSamples.get(sampleKey(sample))
+    const groupKey = `${sample.fixture}/${sample.views}/${sample.scenario}`
+    const pair = pairedGroups.get(groupKey) ?? { baseline: [], candidate: [] }
+    pair.baseline.push(sample)
+    pair.candidate.push(other)
+    pairedGroups.set(groupKey, pair)
     for (const [metric, values] of Object.entries(sample.latencyMs)) {
       const key = `${sample.fixture}/${sample.views}/${sample.scenario}/${metric}`
       const group = groups.get(key) ?? { baseline: [], candidate: [], differences: [] }
@@ -88,10 +96,17 @@ export function comparePairedInput(baseline, candidate, schedule, seed) {
       groups.set(key, group)
     }
   }
+  if (baseline.config.adaptivePairs)
+    for (const [key, pair] of pairedGroups)
+      if (
+        pair.baseline.length === 2 &&
+        !canStopInputPairs(pair, baseline.config.consumers ?? 'native')
+      )
+        fail(`Unjustified adaptive early stop for ${key}`)
   const metrics = [...groups].map(([key, group], index) => {
     const budget = inputBudget(baseline.config.consumers ?? 'native', key)
     const differenceMs = median(group.differences)
-    const interval = pairedInterval(group.differences, seed + index)
+    const interval = pairedInterval(group.differences, seed + index, draws)
     const regression = differenceMs > budget.noiseMarginMs + 0.000001 && interval.lowMs > 0
     return {
       key,
@@ -113,6 +128,10 @@ export function comparePairedInput(baseline, candidate, schedule, seed) {
       'median of paired repetition p95 differences; repetition-cluster percentile bootstrap',
     budgetPolicy:
       'frozen historical noise margins; declared native inheritance for new compositions',
+    stoppingPolicy: baseline.config.adaptivePairs || 'fixed-repetitions',
+    confidenceInterpretation: baseline.config.adaptivePairs
+      ? 'nominal descriptive bootstrap; conditional early stopping has no sequential coverage guarantee'
+      : 'nominal repetition-cluster percentile bootstrap',
     acceptanceExclusions: baseline.config.acceptanceExclusions ?? [],
     baseline: baseline.id,
     candidate: candidate.id,
@@ -138,11 +157,34 @@ function sampleKey(sample) {
   return `${sample.fixture}/${sample.views}/${sample.scenario}/${sample.repetition}`
 }
 
-export function sensitivityPassed(check) {
+export const frameDetectionFloorKey = 'ordinary/multiple/repeat/inputToFrame'
+
+export function sensitivityPassed(check, stage = 'input', frameFloor) {
+  if (!['input', 'frame'].includes(stage)) fail('Unknown input sensitivity stage')
+  const measures = stage === 'input' ? ['inputToApplied', 'dispatch'] : ['inputToFrame']
   const metrics = new Map(check.metrics.map((metric) => [metric.key, metric]))
+  const required = ['ordinary', 'short-lines', 'long-line'].flatMap((fixture) =>
+    inputViewModes.flatMap((views) =>
+      inputScenarios.flatMap((scenario) =>
+        measures.map((measure) => `${fixture}/${views}/${scenario}/${measure}`),
+      ),
+    ),
+  )
+  const floor = frameFloor?.metrics.find((metric) => metric.key === frameDetectionFloorKey)
+  const admittedFloor =
+    stage === 'frame' &&
+    floor?.passed === false &&
+    floor.budget.reference === 'native' &&
+    !floor.budget.inherited &&
+    metrics.get(frameDetectionFloorKey)?.budget.reference === 'native' &&
+    !metrics.get(frameDetectionFloorKey)?.budget.inherited
   return (
     check.passed === false &&
-    historicalNegativeKeys('native').every((key) => metrics.get(key)?.passed === false)
+    required.every(
+      (key) =>
+        metrics.get(key)?.passed === false ||
+        (key === frameDetectionFloorKey && admittedFloor && metrics.has(key)),
+    )
   )
 }
 

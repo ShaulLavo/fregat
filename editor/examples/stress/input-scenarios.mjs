@@ -4,7 +4,9 @@ import { correlateInputEvents } from './input-correlation.mjs'
 import { startHostCpuEstimate } from './host-contention.mjs'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
 import { randomGenerator } from './input-paired.mjs'
+import { canStopInputPairs } from './input-pair-stopping.mjs'
 import { assertConsumerReadiness } from './input-configurations.mjs'
+import { inputReadinessTimeoutMs } from './src/inputReadiness.ts'
 
 export const operationsPerSample = {
   typing: 24,
@@ -86,91 +88,165 @@ async function runScenarioGroup(session, fixture, views, scenario, result, helpe
 export async function runPairedInputSuite(browser, results, helpers, seed) {
   const random = randomGenerator(seed)
   const schedule = []
-  for (const fixture of results.baseline.manifest.fixtures)
+  const sessions = {}
+  const errors = []
+  try {
+    for (const side of ['baseline', 'candidate']) {
+      const session = await helpers.newPage(browser, side)
+      sessions[side] = session
+      session.page.on('pageerror', (error) => errors.push(error.message))
+      await session.context.grantPermissions(['clipboard-read', 'clipboard-write'])
+      await initializeInputSession(session, results[side], helpers.readMemory)
+      session.retainedInput = { beforeMemory: await helpers.readMemory(session.cdp) }
+      results[side].startup = []
+    }
     for (const views of inputViewModes)
-      for (const scenario of inputScenarios)
-        await runPairedGroup(browser, results, helpers, fixture, views, scenario, random, schedule)
+      await runWarmView(results, helpers, sessions, views, random, schedule)
+    if (errors.length) fail(`Browser errors: ${errors.join('; ')}`)
+  } finally {
+    for (const [side, session] of Object.entries(sessions)) {
+      results[side].cleanup = await closeInputSession(session, helpers.readMemory)
+      if (results[side].bootstrap)
+        results[side].bootstrap.cleanup.contextClosed = session.page.isClosed()
+    }
+  }
   return schedule
 }
 
+async function initializeInputSession(session, result, readMemory) {
+  const fixture = result.manifest.fixtures.find((entry) => entry.id === 'ordinary')
+  // Initialize both Playwright worlds and page-scoped worker owners before lifetime accounting.
+  result.bootstrap = await runSample(
+    session,
+    fixture,
+    'single',
+    'typing',
+    -1,
+    {
+      ...result,
+      config: { ...result.config, isolation: 'closed-browser-context-per-fixture-view-scenario' },
+    },
+    readMemory,
+  )
+}
+
+async function runWarmView(results, helpers, sessions, views, random, schedule) {
+  for (const fixture of results.baseline.manifest.fixtures) {
+    for (const side of ['baseline', 'candidate']) {
+      const session = sessions[side]
+      const started = performance.now()
+      const facts = await session.page.evaluate(
+        ({ fixture, seed, diagnostics, frozen, multiple, consumerId }) =>
+          __stress.warmInputSubject(fixture, seed, diagnostics, frozen, multiple, consumerId),
+        {
+          fixture: fixture.id,
+          seed: results[side].manifest.seed,
+          diagnostics: results[side].config.diagnostics,
+          frozen: true,
+          multiple: views === 'multiple',
+          consumerId: results[side].config.consumers,
+        },
+      )
+      if (facts.sha256 !== fixture.sha256) fail('Warm subject fixture hash mismatch')
+      session.retainedInput.facts = facts
+      session.retainedInput.needsReload = false
+      session.retainedInput.reloadSource = null
+      if (results[side].config.consumers !== 'native')
+        await settleConsumers(
+          session.page,
+          results[side].config.consumers,
+          fixture,
+          views,
+          'typing',
+        )
+      else if (fixture.id === 'ordinary')
+        await session.page.waitForFunction(
+          () => __stress.observe().state.initialHighlightStatus === 'painted',
+        )
+      results[side].startup.push({
+        fixture: fixture.id,
+        views,
+        retained: facts.retained,
+        milliseconds: performance.now() - started,
+        ownerIdentity: facts.ownerIdentity,
+      })
+    }
+    for (const scenario of inputScenarios)
+      await runPairedGroup(results, helpers, sessions, fixture, views, scenario, random, schedule)
+  }
+}
+
 async function runPairedGroup(
-  browser,
   results,
   helpers,
+  sessions,
   fixture,
   views,
   scenario,
   random,
   schedule,
 ) {
-  const sessions = {}
   const samples = { baseline: [], candidate: [] }
-  const errors = []
-  try {
-    for (const side of ['baseline', 'candidate']) {
-      sessions[side] = await helpers.newPage(browser, side)
-      sessions[side].page.on('pageerror', (error) => errors.push(error.message))
-      await sessions[side].context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const config = results.baseline.config
+  for (let repetition = -config.warmups; repetition < config.repetitions; repetition++) {
+    const order = random() < 0.5 ? ['baseline', 'candidate'] : ['candidate', 'baseline']
+    const pair = { group: `${fixture.id}/${views}/${scenario}`, repetition, order }
+    for (const side of order) {
+      const sample = await runSample(
+        sessions[side],
+        fixture,
+        views,
+        scenario,
+        repetition,
+        results[side],
+        helpers.readMemory,
+      )
+      if (repetition >= 0) samples[side].push(sample)
+      console.log(
+        JSON.stringify({
+          event: 'input.paired.sample',
+          ...pair,
+          sampleFixture: sample.fixture,
+          side,
+          dispatchMaxMs: Math.max(...sample.latencyMs.dispatch),
+          wallPhasesMs: sample.wallPhasesMs,
+        }),
+      )
     }
-    const config = results.baseline.config
-    for (let repetition = -config.warmups; repetition < config.repetitions; repetition++) {
-      const order = random() < 0.5 ? ['baseline', 'candidate'] : ['candidate', 'baseline']
-      const pair = { group: `${fixture.id}/${views}/${scenario}`, repetition, order }
-      for (const side of order) {
-        const sample = await runSample(
-          sessions[side],
-          fixture,
-          views,
-          scenario,
-          repetition,
-          results[side],
-          helpers.readMemory,
-        )
-        if (repetition >= 0) samples[side].push(sample)
-        console.log(
-          JSON.stringify({
-            event: 'input.paired.sample',
-            ...pair,
-            side,
-            dispatchMaxMs: Math.max(...sample.latencyMs.dispatch),
-            wallPhasesMs: sample.wallPhasesMs,
-          }),
-        )
-      }
-      if (repetition >= 0) schedule.push(pair)
-    }
-    if (errors.length) fail(`Browser errors: ${errors.join('; ')}`)
-  } finally {
-    await Promise.all(Object.values(sessions).map((session) => session.context.close()))
+    if (repetition >= 0) schedule.push(pair)
+    if (config.adaptivePairs && repetition === 1 && canStopInputPairs(samples, config.consumers))
+      break
   }
-  for (const side of ['baseline', 'candidate'])
-    for (const sample of samples[side])
-      results[side].samples.push({ ...sample, cleanup: { ...sample.cleanup, contextClosed: true } })
+  for (const side of ['baseline', 'candidate']) {
+    if (results[side].config.adaptivePairs)
+      results[side].config.groupRepetitions[`${fixture.id}/${views}/${scenario}`] =
+        samples[side].length
+    results[side].samples.push(...samples[side])
+  }
 }
 
-export async function runSample(
-  { page, cdp },
-  fixture,
-  views,
-  scenario,
-  repetition,
-  result,
-  readMemory,
-  profileInput = (_identity, run) => run(),
-) {
-  const wallStarted = performance.now()
-  const wallPhasesMs = {}
-  let wallPrevious = wallStarted
-  const phase = (name) => {
-    const now = performance.now()
-    wallPhasesMs[name] = now - wallPrevious
-    wallPrevious = now
+async function openInputSample(session, fixture, views, result, retained) {
+  const { page } = session
+  if (retained) {
+    if (session.retainedInput.facts.sha256 !== fixture.sha256)
+      fail('Retained input fixture changed')
+    const started = performance.now()
+    let reset = await page.evaluate(() => __stress.resetInput())
+    const documentReloaded = session.retainedInput.needsReload === true
+    if (documentReloaded) reset = await page.evaluate(() => __stress.reloadInputDocument())
+    const rejectedSource = documentReloaded ? session.retainedInput.reloadSource : null
+    session.retainedInput.needsReload = false
+    session.retainedInput.reloadSource = null
+    return {
+      facts: session.retainedInput.facts,
+      reset: {
+        ...reset,
+        documentReloaded,
+        rejectedSource,
+        milliseconds: performance.now() - started,
+      },
+    }
   }
-  const beforeMemory = await readMemory(cdp)
-  phase('beforeMemory')
-  const config = result.config
-  const count = config.operationsPerSample[scenario]
-  const consumerId = config.consumers ?? 'native'
   const facts = await page.evaluate(
     async ({ fixture, seed, diagnostics, multiple, frozen, consumerId }) => {
       const facts = await __stress.prepare(fixture, seed, diagnostics, frozen)
@@ -184,12 +260,69 @@ export async function runSample(
     {
       fixture: fixture.id,
       seed: result.manifest.seed,
-      diagnostics: config.diagnostics,
+      diagnostics: result.config.diagnostics,
       multiple: views === 'multiple',
-      frozen: config.fixtures === 'frozen-hashed-files',
-      consumerId,
+      frozen: result.config.fixtures === 'frozen-hashed-files',
+      consumerId: result.config.consumers ?? 'native',
     },
   )
+  return { facts, reset: null }
+}
+
+async function closeInputSession(session, readMemory) {
+  try {
+    if (!session.retainedInput) return null
+    await session.page.evaluate(() => __stress.dispose())
+    await session.page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)))
+    const afterMemory = await readMemory(session.cdp)
+    const cleanup = {
+      ...(await session.page.evaluate(() => __stress.retention())),
+      beforeListeners: session.retainedInput.beforeMemory.jsEventListeners,
+      afterListeners: afterMemory.jsEventListeners,
+      scope: 'configuration',
+      ownerIdentity: session.retainedInput.facts.ownerIdentity,
+      contextClosed: true,
+    }
+    if (
+      cleanup.active ||
+      cleanup.hosts ||
+      cleanup.pendingFrames ||
+      cleanup.liveWorkers ||
+      cleanup.afterListeners > cleanup.beforeListeners
+    )
+      fail(`Input lifetime cleanup failed: ${JSON.stringify(cleanup)}`)
+    return cleanup
+  } finally {
+    await session.context.close()
+  }
+}
+
+export async function runSample(
+  session,
+  fixture,
+  views,
+  scenario,
+  repetition,
+  result,
+  readMemory,
+  profileInput = (_identity, run) => run(),
+) {
+  const { page, cdp } = session
+  const wallStarted = performance.now()
+  const wallPhasesMs = {}
+  let wallPrevious = wallStarted
+  const phase = (name) => {
+    const now = performance.now()
+    wallPhasesMs[name] = now - wallPrevious
+    wallPrevious = now
+  }
+  const beforeMemory = await readMemory(cdp)
+  phase('beforeMemory')
+  const config = result.config
+  const count = config.operationsPerSample[scenario]
+  const consumerId = config.consumers ?? 'native'
+  const retained = config.isolation === 'closed-browser-context-per-configuration'
+  const { facts, reset } = await openInputSample(session, fixture, views, result, retained)
   if (facts.sha256 !== fixture.sha256) fail('Input fixture hash mismatch')
   if (consumerId === 'native' && fixture.id === 'ordinary')
     await page.waitForFunction(() => __stress.observe().state.initialHighlightStatus === 'painted')
@@ -199,12 +332,17 @@ export async function runSample(
       : await settleConsumers(page, consumerId, fixture, views, scenario)
   phase('openAndConsumers')
   const target = await page.evaluate(
-    ({ scenario, slowdownMs, count }) => {
-      const target = __stress.inputLatency.prepare(scenario, slowdownMs)
+    ({ scenario, slowdownMs, frameSlowdownMs, count }) => {
+      const target = __stress.inputLatency.prepare(scenario, slowdownMs, frameSlowdownMs)
       if (scenario === 'undo') __stress.inputLatency.seedUndo(count)
       return target
     },
-    { scenario, slowdownMs: config.slowdownMs, count },
+    {
+      scenario,
+      slowdownMs: config.slowdownMs,
+      frameSlowdownMs: config.frameSlowdownMs ?? 0,
+      count,
+    },
   )
   if (scenario === 'paste')
     await page.evaluate((text) => navigator.clipboard.writeText(text), pasteText)
@@ -256,6 +394,12 @@ export async function runSample(
           readiness,
         )
       : null
+    if (retained && settled?.minimaps.some((minimap) => !minimap.current)) {
+      if (!config.pendingMinimapSource || fixture.id !== 'short-lines' || scenario !== 'undo')
+        fail('Unexpected retained minimap source mismatch')
+      session.retainedInput.needsReload = true
+      session.retainedInput.reloadSource = settled.minimaps
+    }
     phase('settleConsumers')
     const diagnostic = await page.evaluate(() => {
       const { diagnostics, droppedDiagnostics } = __stress.observe()
@@ -299,6 +443,18 @@ export async function runSample(
         ...(opened ? { consumers: { opened, settled } } : {}),
       },
       correct: true,
+      ...(retained
+        ? {
+            reset: {
+              ...reset,
+              fixtureHash: facts.sha256,
+              sourceCurrent:
+                !opened ||
+                (opened.sessions.every((source) => source.current && source.answered) &&
+                  opened.minimaps.every((source) => source.current)),
+            },
+          }
+        : {}),
     }
   } catch (error) {
     console.error(
@@ -321,9 +477,14 @@ export async function runSample(
   } finally {
     if (scenario.startsWith('composition-'))
       await cdp.send('Input.imeSetComposition', { text: '', selectionStart: 0, selectionEnd: 0 })
-    await page.evaluate(() => __stress.dispose())
+    await page.evaluate((retained) => {
+      if (retained) return __stress.inputLatency.dispose()
+      return __stress.dispose()
+    }, retained)
   }
-  phase('disposeAndDiagnostics')
+  phase(retained ? 'releaseInput' : 'disposeAndDiagnostics')
+  if (retained)
+    return { ...completed, cleanup: null, wallPhasesMs, wallMs: performance.now() - wallStarted }
   await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)))
   const afterMemory = await readMemory(cdp)
   const cleanup = {
@@ -440,7 +601,7 @@ export async function waitForConsumerSource(page, pendingMinimapSource = false) 
           )
         )
       },
-      { timeout: 30_000, intervals: [50] },
+      { timeout: inputReadinessTimeoutMs, intervals: [50] },
     )
     .toBe(true)
   return readiness

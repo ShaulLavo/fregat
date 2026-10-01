@@ -34,9 +34,15 @@ input delay fails. It does not need exclusive CPUs or a quiet machine to stay co
    group's declared budget (reuse the 108 blocking / 36 advisory groups and budgets from the
    current instrument) with a bootstrap confidence interval that excludes zero. Report every
    group's difference and interval; advisory groups never fail the run.
-3. **Sensitivity once per instrument version.** A self-check runs the candidate with the injected
-   20 ms delay on one configuration and must fail; it reruns only when the instrument changes, and
-   its result is stored with the instrument hash.
+3. **Sensitivity once per instrument version.** Two native candidate/candidate controls test a
+   real 20 ms pause in separate stages. Before Editor handling, it must reject all 72 input keys;
+   inside the rAF callback, it must reject 35 native frame keys. Native
+   `ordinary/multiple/repeat/inputToFrame` retains its frozen 15.2 ms budget and separately
+   measures its detection floor at 25 ms, then 30 ms only if needed, stopping at first rejection.
+   The initial 20 ms pause measured 12.4 ms because it shifted input/frame phase; failure at
+   30 ms blocks sensitivity. All other keys keep the 20 ms sensitivity requirement. Their raw results are cached together
+   by instrument/dependency hash and both verdicts are recomputed on reuse. Input-handler delay
+   is only partially visible in quantized warm frame timing; each stage tests delay in that stage.
 4. **Matrix.** Default: Platform's real composition plus the configurations the change touches
    (declared by the caller or derived from changed packages). Full: all 10 configurations, for
    releases and for validating this instrument.
@@ -99,16 +105,46 @@ The owner directed fixed historical budgets, temporary minimap exclusion, comple
 - [x] Require the self-check to reject all 47 historical native negative keys, including preedit-frame keys.
 - [x] Add the explicit, scoped pending-minimap source exception while retaining Platform's runtime composition.
 - [x] Measure per-sample wall phases and remove duplicate final source-receipt reconstruction.
-- [x] Pass 281 stress contracts, including frozen-threshold and narrow-exception regressions.
-- [ ] Complete new-instrument sensitivity and native/disabled quiet positive/negative checks.
+- [x] Pass 285 stress contracts, including frozen thresholds, scoped source exceptions, adaptive stopping, and fixed-repetition completeness.
+- [x] Pass the reduced-cost instrument's real self-check against all 47 historical native negative keys.
+- [x] Pass native/disabled quiet positives with raw adaptive stopping counts.
+- [x] Complete reduced-cost native/disabled quiet negatives against all 47 historical keys.
 - [ ] Rerun native/disabled with same-core background load and compare all historical keys.
 - [ ] Complete Tree-sitter quiet/loaded positive/negative checks on original frozen products.
 - [ ] Complete Shiki quiet/loaded positive/negative checks on prerequisite frozen products.
-- [ ] Measure Platform plus one explicitly affected configuration; reduce cost if it exceeds 15 minutes.
+- [x] Measure the fixed-three-pair Platform-plus-native default at 1,659.575 seconds; the 15-minute target fails.
+- [x] Add raw-validated two-or-three pair stopping and ordinary-fixture warmups; keep every measured gating group and fixture.
+- [x] Measure the reduced-cost Platform-plus-native default at 1,053.647 seconds, a 36.5% reduction; the 15-minute target still fails.
 - [ ] Measure the ten-configuration full matrix against the 45-minute target.
+- [ ] Run final adaptive-source repository gates, typecheck/build, formatting, stress tests, and lint.
 - [ ] Update PR #247 with final evidence, commit by path, push, and remove the worktree.
 
-New raw evidence is under `/work/tmp/plan-282/fixed-budgets/`. The first pass is running native/disabled checks followed by Platform plus native; no new timing target is confirmed yet. The initial draft's failed acceptance below remains historical evidence.
+New raw evidence is under `/work/tmp/plan-282/fixed-budgets/`. Fixed-budget native/disabled quiet positives pass and both negatives reject 47/47 historical keys. The real default passed but exceeded the timing target. Reduced-cost validation uses conditional stopping with nominal descriptive intervals and no sequential coverage guarantee, plus ordinary-fixture warmups that leave large-fixture allocation and analysis cold. Its real self-check rejects all 47 keys; delayed groups all collect three pairs. The reduced-cost matrices and loaded verdicts remain in progress. The initial draft's failed acceptance below remains historical evidence.
+
+The first reduced-cost default attempt was interrupted at 17:09:36 on 2026-10-01. The system journal records a client-requested SIGKILL on its heavy-job slice, with a 6.1 GiB memory peak under an 8 GiB ceiling. The exact caller is unconfirmed. That attempt has no complete matrix or verdict; its logs are preserved in `/work/tmp/plan-282/fixed-budgets/adaptive-interrupted/`, with the journal receipt in `interrupted-journal.txt`. Completed native/disabled artifacts from the same job remain valid. Remaining quiet checks were restarted through the same admission wrapper with its supported `--slice-root heavyp282` option; loaded checks wait for quiet completion.
+
+## Warm execution checklist
+
+The owner approved two warm package pages, public Editor resets, retained fixture attachment,
+120-second readiness-only bounds and separate input/frame controls. All budgets and 108 blocking
+measures stay fixed. Current evidence is `/work/tmp/plan-282/run-20261001T153544Z-sol/floor-controls/`.
+
+- [x] Retain Editors and consumer owners across bursts and fixture changes; restore text/history/cursor/hidden view.
+- [x] Preserve native's ordinary-only Tree-sitter policy at fixture transitions.
+- [x] Record setup, attachment, reset, settlement, stable owner identities and final configuration cleanup.
+- [x] Prove locator initialization adds 13 page listeners and one native worker adds two once; retain a disposed bootstrap receipt and strict final listener comparison.
+- [x] Admit minimap reload only after an observed rejected short-lines undo receipt, outside captured input; current receipts automatically skip it.
+- [x] Prove unchanged loaded Shiki starts can exceed 30 seconds; use a 120-second readiness-only deadline, leaving disposal at 30 seconds.
+- [x] Preserve the failed three-pair and successful fixed-five old-control probes; choose stage controls rather than extra pairs or cold backlog.
+- [x] Implement separate native-capture and rAF controls; pass 309 stress tests, typecheck and lint.
+- [x] Prove all 72 input keys and 35 native frame keys reject their real 20 ms controls; record the single native repeat key’s bounded 25/30 ms detection floor. Final source rejected 72/72 and 36/36 at 20 ms; the separate floor rejected at 25 ms, so 30 ms was skipped. Raw controls took 424.655 seconds once.
+- [ ] Complete current-instrument quiet/loaded candidates and stage-specific historical negatives; keep minimap acceptance excluded pending correctness.
+- [ ] Measure actual warm default/full wall times against 15/45 minutes.
+- [ ] Pass final root gates/typecheck/format checks; update PR #247 and push reviewed path-scoped commits.
+
+Archived cold checklist results above are retained for their own instrument hashes. They do not
+establish the warm instrument's acceptance. The original product bytes and historical artifacts
+remain unchanged.
 
 ## Initial draft acceptance blocker
 
@@ -116,7 +152,7 @@ The supported short-lines fixture exposes a wrong-line-count minimap undo patch 
 historical products. The worker replaces one summary with four and ends with 500,003 summaries
 for a 500,000-line document. The final text length and accepted render are correct, so neither
 proves source correctness. Raw isolated captures and the aborted quiet matrix are under
-`/work/tmp/plan-282/`; [the validation record](../docs/document-contributions/paired-input-latency.md#validation)
+`/work/tmp/plan-282/`; [the validation record](../docs/document-contributions/paired-input-latency.md#initial-draft-validation)
 records the exact patch, prior passes, and timing limits.
 
 The final quiet native negative also misses one historical preedit-frame key: a 9.5 ms positive

@@ -753,11 +753,12 @@ does not prove that a patch-backed session view uses the correct source coordina
 
 ### Measurement matrix
 
-Plan 282 implements the paired command below. Its acceptance remains blocked by the historical
-minimap products' supported-tier undo source failure and a historical native negative-key
-disagreement; five-configuration verdict agreement and
-default/full wall-time targets are incomplete. Treat paired runs as diagnostic evidence until
-[Plan 282's validation](../docs/document-contributions/paired-input-latency.md#validation) passes.
+Plan 282 implements the paired command below with frozen historical budgets. Minimap acceptance
+is temporarily excluded pending its separately owned source-correctness fix; the frozen products
+and Platform's runtime composition stay unchanged. Native/disabled fixed-budget quiet negatives
+reject every historical negative key in their archived cold instrument. Current warm stage-control quiet/loaded agreement and default/full
+wall-time targets remain in progress. Treat paired runs as diagnostic evidence until
+[Plan 282's follow-up validation](../docs/document-contributions/paired-input-latency.md#follow-up-validation) passes.
 Units 2–7 remain gated.
 
 Use the existing [input latency instrument](../editor/docs/performance/input-latency.md) and
@@ -772,10 +773,19 @@ worker restart, delayed consumers, and long retention/disposal runs.
 1. Run `bun run bench:input:paired --baseline <packages> --candidate <packages>`. The default
    matrix includes Platform's composition and affected configurations. Use `--full` for releases.
 2. Keep the instrument and external dependencies fixed. The command records randomized,
-   interleaved pairs and checks its cached 20 ms sensitivity evidence per instrument hash.
+   interleaved pairs on two warm package pages. Text, cursor, history and hidden-view state reset
+   between bursts; fixture buffers attach to retained Editors and consumer owners. Setup/reset
+   time is recorded separately. Cached raw controls prove all 72 input-stage keys against a 20 ms
+   pause before Editor handling and 35 native frame keys against a separate 20 ms rAF-stage pause.
+   Native `ordinary/multiple/repeat/inputToFrame` retains its frozen 15.2 ms budget; its cached
+   detection-floor proof tests 25 ms, then 30 ms only if needed, stopping at first rejection.
+   The initial 20 ms pause measured a 12.4 ms paired effect by shifting input/frame phase.
+   All other keys keep the 20 ms requirement. Raw controls and floor attempts are keyed by
+   instrument/dependency hash and recomputed on reuse.
 3. Require the paired verdict to pass for every blocking input measure. A regression is a median
-   paired repetition difference above the existing group noise budget with a 95% bootstrap interval
-   excluding zero. The matrix retains 108 blocking and 36 advisory measures per configuration.
+   paired repetition difference above the fixed declared historical group noise budget with a
+   nominal 95% bootstrap interval excluding zero. The default two-or-three pair stopping has
+   no sequential coverage guarantee; use `--fixed-repetitions` for fixed sampling. The matrix retains 108 blocking and 36 advisory measures per configuration.
 4. Prove exact text, accepted revisions, mounted coverage, visible changed pixels, and cleanup.
    Screenshot completion time is not a substitute for native input-to-frame measurements.
 5. Compare publication overhead, time to visible syntax, open/scroll latency, total source reads,

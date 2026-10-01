@@ -34,6 +34,7 @@ type KeySample = {
 }
 type Paint = EditorInitialPaintEvent & { readonly at: number }
 type Active = {
+  readonly ownerIdentity: string
   readonly buffer: EditorTextBuffer
   readonly editors: readonly Editor[]
   readonly inputAbort: AbortController
@@ -79,8 +80,18 @@ function current(): Active {
   return active
 }
 
-async function prepare(id: FixtureId, seed: number, instrumented: boolean, frozen = false) {
-  await dispose()
+async function prepare(
+  id: FixtureId,
+  seed: number,
+  instrumented: boolean,
+  frozen = false,
+  retained = false,
+) {
+  if (retained) inputLatency.dispose()
+  else {
+    await dispose()
+    released = []
+  }
   fixture = id
   if (frozen) {
     const response = await fetch(`/frozen-fixtures/${id}.txt`)
@@ -106,6 +117,33 @@ async function prepare(id: FixtureId, seed: number, instrumented: boolean, froze
   return { ...fixtureFacts(source), sha256 }
 }
 
+function resetInput() {
+  inputLatency.dispose()
+  const { editors, buffer } = current()
+  keys = []
+  editors[0]!.syncText(expected, {
+    languageId: current().consumers || fixture === 'ordinary' ? 'typescript' : null,
+  })
+  buffer.clearHistory()
+  check(!buffer.canUndo() && !buffer.canRedo(), 'Input reset retained undo history')
+  check(frames.size === 0, 'Input reset retained pending key frames')
+  for (const [index, editor] of editors.entries()) {
+    const host = document.querySelector<HTMLElement>(`#view-${index}`)!
+    host.hidden = index === 2
+    if (index !== 2) host.style.display = 'flex'
+    editor.setSelection(0, 0, { reveal: true })
+  }
+  paints = []
+  diagnostics = []
+  droppedDiagnostics = 0
+  return {
+    ...verifyText(),
+    ownerIdentity: current().ownerIdentity,
+    historyEmpty: true,
+    hiddenViews: editors.length === 3 ? 1 : 0,
+  }
+}
+
 function createHost(index: number): HTMLElement {
   const host = document.createElement('section')
   host.id = `view-${index}`
@@ -125,30 +163,74 @@ function open(multiple: boolean, highlight: boolean, consumerId?: string) {
   const editors: Editor[] = []
   const inputAbort = new AbortController()
   const consumers = consumerId ? createInputConsumers(consumerId, fixture, source.length) : null
-  active = { buffer, editors, inputAbort, consumers }
-  for (let index = 0; index < (multiple ? 3 : 1); index++) {
-    const editor = new Editor(createHost(index), {
-      lineHeight: 20,
-      plugins:
-        consumers?.plugins ??
-        (highlight ? [typeScript(), createEditorFindPlugin()] : [createEditorFindPlugin()]),
-      onInitialPaint: (event) => paints.push({ ...event, at: performance.now() }),
-      onChange: (_state, change) => {
-        if (change?.kind === 'edit') recordAppliedKey()
-        if (index === 0 && change && change.kind !== 'selection' && change.kind !== 'none')
-          inputLatency.applied()
-      },
-    })
-    editors.push(editor)
-    editor.attachSession(createEditorBufferSession(buffer), {
-      documentId: fixture,
-      languageId: consumers || highlight ? 'typescript' : null,
-    })
-  }
+  active = { buffer, editors, inputAbort, consumers, ownerIdentity: crypto.randomUUID() }
+  for (let index = 0; index < (multiple ? 3 : 1); index++)
+    editors.push(createInputEditor(index, highlight))
   editors[0]!
     .getInputElement()
     .addEventListener('keydown', recordKey, { signal: inputAbort.signal, capture: true })
   return { start, attachedAt: performance.now() }
+}
+
+function createInputEditor(index: number, highlight: boolean) {
+  const { consumers, buffer } = current()
+  const editor = new Editor(createHost(index), {
+    lineHeight: 20,
+    plugins:
+      consumers?.plugins ??
+      (highlight ? [typeScript(), createEditorFindPlugin()] : [createEditorFindPlugin()]),
+    onInitialPaint: (event) => paints.push({ ...event, at: performance.now() }),
+    onChange: (_state, change) => {
+      if (change?.kind === 'edit') recordAppliedKey()
+      if (index === 0 && change && change.kind !== 'selection' && change.kind !== 'none')
+        inputLatency.applied()
+    },
+  })
+  editor.attachSession(createEditorBufferSession(buffer), {
+    documentId: fixture,
+    languageId: consumers || highlight ? 'typescript' : null,
+  })
+  return editor
+}
+
+function reloadInputDocument(multiple = current().editors.length === 3) {
+  inputLatency.dispose()
+  const previous = current()
+  released.push(new WeakRef(previous.buffer))
+  const buffer = createEditorTextBuffer(expected)
+  const editors = [...previous.editors]
+  check(editors.length <= (multiple ? 3 : 1), 'Warm view count must grow once')
+  active = { ...previous, buffer, editors }
+  for (const editor of editors) {
+    if (!previous.consumers)
+      editor.setPlugins(
+        fixture === 'ordinary'
+          ? [typeScript(), createEditorFindPlugin()]
+          : [createEditorFindPlugin()],
+      )
+    editor.attachSession(createEditorBufferSession(buffer), {
+      documentId: fixture,
+      languageId: previous.consumers || fixture === 'ordinary' ? 'typescript' : null,
+    })
+  }
+  while (editors.length < (multiple ? 3 : 1))
+    editors.push(createInputEditor(editors.length, fixture === 'ordinary'))
+  return resetInput()
+}
+
+async function warmInputSubject(
+  id: FixtureId,
+  seed: number,
+  instrumented: boolean,
+  frozen: boolean,
+  multiple: boolean,
+  consumerId: string,
+) {
+  const retained = active !== null
+  const facts = await prepare(id, seed, instrumented, frozen, retained)
+  if (retained) reloadInputDocument(multiple)
+  else open(multiple, id === 'ordinary', consumerId === 'native' ? undefined : consumerId)
+  return { ...facts, retained, ownerIdentity: current().ownerIdentity }
 }
 
 function recordKey(event: KeyboardEvent) {
@@ -305,7 +387,7 @@ async function dispose() {
   const consumers = active?.consumers
   if (active) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    released = [active.buffer, ...active.editors].map((value) => new WeakRef(value))
+    released.push(...[active.buffer, ...active.editors].map((value) => new WeakRef(value)))
     active.inputAbort.abort()
     for (const editor of active.editors) editor.dispose()
   }
@@ -470,6 +552,9 @@ const inputLatency = createInputLatencyProbe({ current, expected: () => expected
 const bridge = {
   inputLatency,
   prepare,
+  resetInput,
+  warmInputSubject,
+  reloadInputDocument,
   open,
   observe,
   verifyRows,

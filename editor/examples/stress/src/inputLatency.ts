@@ -39,6 +39,7 @@ export function createInputLatencyProbe(options: Options) {
   const frames = new Set<number>()
   let scenario: InputScenario = 'typing'
   let slowdownMs = 0
+  let frameSlowdownMs = 0
   let offset = 0
   let enabled = false
   let initialRevision = 0
@@ -78,6 +79,7 @@ export function createInputLatencyProbe(options: Options) {
     }
     active = sample
     samples.push(sample)
+    delayControl(slowdownMs)
   }
 
   function finishDispatch(sample: Sample) {
@@ -86,6 +88,7 @@ export function createInputLatencyProbe(options: Options) {
     sample.revisionAfter = options.current().buffer.getRevision()
     if (scenario === 'composition-update') sample.appliedAt = sample.completedAt
     const frame = requestAnimationFrame(() => {
+      delayControl(frameSlowdownMs)
       sample.frameAt = performance.now()
       frames.delete(frame)
     })
@@ -98,26 +101,25 @@ export function createInputLatencyProbe(options: Options) {
     active.appliedAt = performance.now()
     const sample = active
     queueMicrotask(() => finishDispatch(sample))
-    delayControl()
   }
 
-  function delayControl() {
-    const until = performance.now() + slowdownMs
+  function delayControl(delayMs: number) {
+    const until = performance.now() + delayMs
     while (performance.now() < until) {
-      /* Delayed control runs after the applied-edit mark. */
+      /* Each control pauses once in the stage it measures. */
     }
   }
 
   function finishPreedit(event: Event) {
     if (scenario !== 'composition-update' || !matches(event) || !active) return
-    delayControl()
     finishDispatch(active)
   }
 
-  function prepare(input: InputScenario, delayMs: number) {
+  function prepare(input: InputScenario, delayMs: number, frameDelayMs = 0) {
     dispose()
     scenario = input
     slowdownMs = delayMs
+    frameSlowdownMs = frameDelayMs
     const { editors, buffer } = options.current()
     const row = Math.min(8, options.expected().split('\n').length - 1)
     offset = pointToOffset(buffer.getSnapshot(), { row, column: 0 })

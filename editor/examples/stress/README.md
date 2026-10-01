@@ -304,7 +304,7 @@ Use the complete input suite below for budget comparisons.
 The paired command uses frozen historical group budgets. Plan 282's follow-up validation and
 complete-matrix timing are in progress. Minimap acceptance is temporarily excluded pending its
 separately owned undo source-correctness fix.
-Use it for diagnostics while the [acceptance record](../../../docs/document-contributions/paired-input-latency.md#validation)
+Use it for diagnostics while the [acceptance record](../../../docs/document-contributions/paired-input-latency.md#follow-up-validation)
 remains incomplete. Plan 099 units 2–7 remain gated.
 
 Compare complete frozen package sets with one command from the Platform or Editor root:
@@ -347,20 +347,55 @@ above budget and an interval entirely above zero. The 108 blocking and 36 adviso
 native input scenarios, visible and hidden views, correctness, and cleanup checks are retained.
 Advisory screenshot duration never fails acceptance.
 
-A cached sensitivity self-check injects a real 20 ms input delay and requires all 47 historical
-native negative keys to fail, including all 36 dispatch groups and the preedit-frame keys. The cache includes raw evidence and is keyed by instrument source and dependency bytes.
-The first run of a changed instrument pays for the self-check. Later runs recompute its verdict.
+Two cached native candidate/candidate controls prove each blocking stage. A real 20 ms pause in
+native event capture before Editor handling must reject all 72 `inputToApplied`/`dispatch` keys.
+A separate 20 ms pause inside each rAF callback must reject 35 native `inputToFrame` keys.
+The remaining native key, `ordinary/multiple/repeat/inputToFrame`, keeps its frozen 15.2 ms
+budget and has a separate detection-floor proof: test 25 ms, then 30 ms only if needed, stopping
+at its first rejection. The initial 20 ms pause measured a 12.4 ms paired effect because it
+shifted input/frame phase. The current instrument records: rejects frame-stage delays ≥25 ms;
+a 20 ms frame-callback pause measured ~12.4 ms in that initial run because it shifted phase.
+The separate 25 ms attempt rejected, so 30 ms was skipped. The final-source 20 ms repeat
+measurement was amplified to 128.6 ms by callback batching; both raw outcomes are preserved.
+A failure at 30 ms blocks sensitivity. Both controls and all floor
+attempts are keyed by instrument source and dependency bytes; reuse recomputes their verdicts.
+The first run of a changed instrument pays for both controls and its floor proof. An input-handler pause is only
+partially visible in warm frame timing because of refresh quantization, so each stage is tested
+with a delay in that stage. `--slowdown-ms 20` and `--frame-slowdown-ms 20` select their respective
+diagnostics. They cannot be combined in one comparison. All 108 measures remain blocking.
 
 Default fixtures fit Platform's 10 Mi UTF-16 analysis tier, including 500,000 short comment lines.
 `--stress` enables the larger original declaration fixture. `--fixture-directory` accepts frozen
 hashed fixtures and requires `--stress` if they exceed the tier. CPU pinning is optional.
-`--output` selects the compressed matrix report. `--repetitions` defaults to three measured pairs
-following one warmup pair. More pairs improve resolution near a budget.
+`--output` selects the compressed matrix report. The default maximum is three measured pairs.
+After two pairs, a group stops only if all three blocking measures have both paired p95
+differences within ± their fixed budget and a two-point interval span no larger than that budget.
+The raw comparator checks every early stop. Delayed candidates and sensitivity use the same rule.
+`--fixed-repetitions` disables stopping; requesting more than three pairs uses fixed sampling.
+Conditional stopping has no sequential 95% coverage guarantee. Small-sample bootstrap intervals
+are nominal descriptive intervals, and passing does not establish equivalence.
+
+Per configuration, baseline and candidate keep two pages warm in one Chromium browser. Each
+group's warmup uses its measured fixture. Editor operations restore text, selection, undo history
+and the hidden view between bursts. Fixture swaps attach fresh shared buffers while retaining
+Editors and consumer owners. Native's Tree-sitter policy still enables only ordinary code.
+Setup, fixture attachment, reset and settlement are recorded outside input intervals. Final
+cleanup verifies all released buffers/Editors, hosts, frames, workers and listener counts before
+closing the configuration's contexts. More independent measured pairs improve near-budget resolution.
+
+One disposed ordinary-code bootstrap initializes Playwright worlds and page-scoped workers. Its
+raw receipt must show zero retained Editors/buffers; final listeners cannot exceed that receipt's
+count. The old cold runner also initialized these globals in its first unrecorded warmup. There
+is no listener allowance. Consumer/source readiness has a bounded 120-second deadline; disposal
+keeps its separate 30-second deadline. Frozen latency budgets are unchanged.
 
 `--pending-minimap-source` records the authorized temporary minimap exception. It excludes the
 standalone minimap configuration from aggregate acceptance and relaxes only the final minimap
 source-equality check after short-lines undo. Workers, renders, runtime cost, and all other
-correctness checks remain active. Full minimap acceptance awaits the product fix.
+correctness checks remain active. An observed admitted final source mismatch reloads only the
+document session before the next burst, outside captured input. Raw reset evidence saves the
+rejected receipt and reload duration. Correct receipts automatically skip that reload. Full
+minimap acceptance awaits the product fix.
 
 See [paired method and validation](../../../docs/document-contributions/paired-input-latency.md)
 for statistical limits, historical comparison, and measured wall times. The old absolute input

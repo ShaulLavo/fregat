@@ -23,6 +23,8 @@ import {
   inputPage,
 } from './input-runtime.mjs'
 import { writeInputArtifact } from './input-artifacts.mjs'
+import { frameDetectionFloorKey } from './input-paired.mjs'
+import { frameFloorRejected, verifyInputSensitivity } from './input-sensitivity.mjs'
 import { fail } from './errors.mjs'
 
 const { values } = parseArgs({
@@ -37,9 +39,11 @@ const { values } = parseArgs({
     repetitions: { type: 'string', default: '3' },
     seed: { type: 'string', default: '60061' },
     'slowdown-ms': { type: 'string', default: '0' },
+    'frame-slowdown-ms': { type: 'string', default: '0' },
     output: { type: 'string', default: '/work/tmp/plan-282/paired.json.gz' },
     'sensitivity-directory': { type: 'string', default: '/work/tmp/plan-282/sensitivity' },
     'pending-minimap-source': { type: 'boolean', default: false },
+    'fixed-repetitions': { type: 'boolean', default: false },
   },
 })
 if (!values.baseline || !values.candidate)
@@ -47,15 +51,19 @@ if (!values.baseline || !values.candidate)
 const repetitions = Number(values.repetitions)
 const seed = Number(values.seed)
 const slowdownMs = Number(values['slowdown-ms'])
+const frameSlowdownMs = Number(values['frame-slowdown-ms'])
 if (
   !Number.isSafeInteger(repetitions) ||
   repetitions < 3 ||
   !Number.isSafeInteger(seed) ||
   seed < 0 ||
   !Number.isFinite(slowdownMs) ||
-  slowdownMs < 0
+  slowdownMs < 0 ||
+  !Number.isFinite(frameSlowdownMs) ||
+  frameSlowdownMs < 0
 )
   fail('Invalid repetitions, seed or delay')
+if (slowdownMs && frameSlowdownMs) fail('Use one delayed input stage per comparison')
 const started = performance.now()
 const baseline = await loadPackageSet(values.baseline)
 const candidate = await loadPackageSet(values.candidate)
@@ -113,15 +121,40 @@ try {
   await mkdir(dirname(resolve(values.output)), { recursive: true })
   let sensitivity = await readSensitivity(cachePath, instrument.hash)
   if (!sensitivity) {
-    const check = await collect({ browser, manifest, instrument }, 'native', 20, {
-      baseline: runtimes.candidate,
-      candidate: runtimes.candidate,
-    })
-    if (!sensitivityPassed(check.comparison)) {
-      await writeInputArtifact(resolve(dirname(values.output), 'sensitivity-failed.json.gz'), check)
-      fail('Injected 20 ms delay did not reject every historical native negative key')
+    const controls = {}
+    for (const stage of ['input', 'frame']) {
+      const check = await collect(
+        { browser, manifest, instrument },
+        'native',
+        stage === 'input' ? 20 : 0,
+        {
+          baseline: runtimes.candidate,
+          candidate: runtimes.candidate,
+        },
+        stage === 'frame' ? 20 : 0,
+      )
+      await writeInputArtifact(
+        resolve(dirname(values.output), `sensitivity-${stage}.json.gz`),
+        check,
+      )
+      if (stage === 'input' && !sensitivityPassed(check.comparison, stage))
+        fail(`Injected 20 ms ${stage}-stage delay did not reject every blocking key in that stage`)
+      controls[stage] = check
     }
-    sensitivity = { schemaVersion: 1, instrumentHash: instrument.hash, passed: true, check }
+    const frameDetectionFloor = await collectFrameDetectionFloor(
+      { browser, manifest, instrument },
+      runtimes.candidate,
+    )
+    sensitivity = verifyInputSensitivity(
+      {
+        schemaVersion: 3,
+        instrumentHash: instrument.hash,
+        passed: true,
+        controls,
+        frameDetectionFloor,
+      },
+      instrument.hash,
+    )
     await mkdir(dirname(cachePath), { recursive: true })
     await writeInputArtifact(cachePath, sensitivity)
   }
@@ -132,6 +165,7 @@ try {
       configuration,
       slowdownMs,
       runtimes,
+      frameSlowdownMs,
     )
     results.push(result)
     await writeInputArtifact(`${resolve(values.output)}.${configuration}.json.gz`, result)
@@ -158,6 +192,11 @@ try {
       instrumentHash: sensitivity.instrumentHash,
       path: cachePath,
       passed: sensitivity.passed,
+      stages: ['input', 'frame'],
+      frameDetectionFloor: {
+        key: sensitivity.frameDetectionFloor.key,
+        delayMs: sensitivity.frameDetectionFloor.delayMs,
+      },
     },
     wallSeconds: (performance.now() - started) / 1000,
     acceptanceExclusions: values['pending-minimap-source']
@@ -188,10 +227,17 @@ try {
   await rm(temporary, { recursive: true, force: true })
 }
 
-async function collect({ browser, manifest, instrument }, consumers, delay, runtimes) {
+async function collect(
+  { browser, manifest, instrument },
+  consumers,
+  delay,
+  runtimes,
+  frameDelay = 0,
+) {
   const start = performance.now()
   const pendingMinimapSource =
     values['pending-minimap-source'] && inputConsumerConfiguration(consumers, 'ordinary', 1).minimap
+  const adaptivePairs = !values['fixed-repetitions'] && repetitions === 3
   const results = {}
   for (const side of ['baseline', 'candidate']) {
     results[side] = {
@@ -202,7 +248,10 @@ async function collect({ browser, manifest, instrument }, consumers, delay, runt
       manifest,
       config: {
         repetitions,
+        adaptivePairs: adaptivePairs ? 'tight-within-budget' : false,
+        ...(adaptivePairs ? { groupRepetitions: {} } : {}),
         warmups: 1,
+        warmupFixture: 'measured',
         scenarios: inputScenarios,
         views: inputViewModes,
         operationsPerSample,
@@ -213,10 +262,11 @@ async function collect({ browser, manifest, instrument }, consumers, delay, runt
           ? ['short-lines undo final minimap source correctness']
           : [],
         slowdownMs: side === 'candidate' ? delay : 0,
+        frameSlowdownMs: side === 'candidate' ? frameDelay : 0,
         consumers,
         fixtures: 'frozen-hashed-files',
         compositionCommitTrust: 'cdp-untrusted-compositionend',
-        isolation: 'closed-browser-context-per-fixture-view-scenario',
+        isolation: 'closed-browser-context-per-configuration',
         failureDirectory: dirname(resolve(values.output)),
       },
       environment: inputEnvironment(browser, runtimes[side], instrument),
@@ -243,6 +293,27 @@ async function collect({ browser, manifest, instrument }, consumers, delay, runt
   }
 }
 
+async function collectFrameDetectionFloor(context, runtime) {
+  const attempts = []
+  for (const delayMs of [25, 30]) {
+    const check = await collect(
+      context,
+      'native',
+      0,
+      { baseline: runtime, candidate: runtime },
+      delayMs,
+    )
+    attempts.push(check)
+    await writeInputArtifact(
+      resolve(dirname(values.output), `sensitivity-frame-${delayMs}ms.json.gz`),
+      check,
+    )
+    if (frameFloorRejected(check.comparison))
+      return { key: frameDetectionFloorKey, delayMs, attempts }
+  }
+  fail('Native repeat frame detection floor exceeds 30 ms')
+}
+
 async function readSensitivity(path, instrumentHash) {
   const { readInputArtifact } = await import('./input-artifacts.mjs')
   const stored = await readInputArtifact(path).catch((error) => {
@@ -250,26 +321,7 @@ async function readSensitivity(path, instrumentHash) {
     throw error
   })
   if (!stored) return null
-  if (stored.instrumentHash !== instrumentHash || stored.schemaVersion !== 1 || !stored.passed)
-    fail('Invalid stored input sensitivity check')
-  const check = stored.check
-  const recomputed = comparePairedInput(
-    check.baseline,
-    check.candidate,
-    check.schedule,
-    check.comparison.seed,
-  )
-  if (
-    check.baseline.environment.instrumentHash !== instrumentHash ||
-    check.candidate.config.slowdownMs !== 20 ||
-    check.baseline.environment.packageSet.sourceHash !==
-      check.candidate.environment.packageSet.sourceHash ||
-    check.baseline.environment.packageSet.buildHash !==
-      check.candidate.environment.packageSet.buildHash ||
-    !sensitivityPassed(recomputed)
-  )
-    fail('Stored input sensitivity evidence failed')
-  return stored
+  return verifyInputSensitivity(stored, instrumentHash)
 }
 
 async function freezeFixtures(directory, stress) {

@@ -31,17 +31,23 @@ Every report contains the raw baseline and candidate samples, paired differences
 
 The paired path waits for actual consumer source and render receipts outside the captured input intervals. Undo priming also waits for the seeded worker source before input starts. A fixed 450 ms seed delay left a parse pending on the supported short-lines fixture; both frozen products then exposed a stale source on the final undo. The isolated Tree-sitter probe and its complete quiet comparison pass with seeded-source readiness, with the product bytes unchanged. The inherited absolute runner retains its original fixed waits.
 
-Three measured pairs follow one warmup pair in each group. A three-pair bootstrap is coarse. Its interval cannot establish a narrow effect when a repetition changes sign. Use `--repetitions` to collect more independent pairs when the effect is close to the budget. A passing verdict establishes this regression rule, not statistical equivalence.
+The default maximum is three measured pairs after one warmup pair. After two measured pairs, a group stops only when both paired p95 differences for every blocking measure lie within ± its frozen budget, and their two-point interval span is no larger than that budget. Otherwise it collects the third pair. Advisory screenshot timing does not affect stopping. The comparator revalidates every declared two-pair stop against the raw samples. Sensitivity and delayed candidates use this same rule.
+
+Two- and three-pair bootstraps are coarse. The reported 95% intervals are nominal descriptive repetition-cluster intervals. Conditional early stopping has no adjusted sequential 95% coverage guarantee, and passing does not establish statistical equivalence. `--fixed-repetitions` disables stopping; requesting more than three repetitions also uses fixed sampling. More independent pairs improve resolution near a budget.
+
+Each configuration retains two warm package pages in one Chromium browser. Every group runs one unrecorded warmup on its actual measured fixture. Between bursts, the Editor's public operations restore exact text, cursor, history and hidden-view state. `attachSession` swaps fixture buffers while retaining Editors and consumer owners. Native Tree-sitter remains enabled only on ordinary code. Initial setup, subsequent fixture attachment, reset and settlement durations are recorded outside the input intervals. Final configuration cleanup checks all released buffers and retained Editors; page contexts close after the configuration.
+
+One initial ordinary-code lifecycle warms Playwright's two execution worlds and page-scoped worker owners. Its raw bootstrap receipt must show zero retained Editors/buffers, hosts, frames and tracked workers. The final listener count cannot exceed this disposed initialization receipt's count. A known-good probe observed 13 listeners before locator initialization, 26 afterward, and 28 after the first native Editor disposal. The second disposal stayed at 28. CDP identified the remaining two as Worker message/error listeners. No numerical listener allowance is added.
 
 ## Sensitivity and fixtures
 
-The first run of an instrument injects a real 20 ms pause into the candidate's native inputs. Both sides use the candidate package set. Every one of the 47 keys rejected by the historical native negative must fail, including all 36 dispatch groups and the preedit-frame keys. Measures whose captured interval ends before the injected pause remain blocking, but this pause does not exercise them. The full raw self-check is stored under `/work/tmp/plan-282/sensitivity/<instrument-hash>.json.gz`. A later run recomputes its verdict from the saved raw evidence. Changes to instrument source or instrument dependency bytes require a new self-check.
+The first run of an instrument collects two named native candidate/candidate controls. A 20 ms pause before Editor handling must reject all 72 input-stage keys. A separate 20 ms pause inside each rAF callback must reject 35 frame-stage keys. Native `ordinary/multiple/repeat/inputToFrame` keeps its frozen 15.2 ms budget and records a separate detection-floor proof: test 25 ms, then 30 ms only if needed, and stop at the first rejection. A failure at 30 ms blocks the cache. Both full raw comparisons are stored under `/work/tmp/plan-282/sensitivity/<instrument-hash>.json.gz`. Later runs recompute both verdicts. Changes to instrument source or instrument dependency bytes require fresh controls. All captured intervals remain blocking with their original budgets.
 
 Default fixtures are ordinary TypeScript, 500,000 short comment lines, and a one-megabyte line. Each fits Platform's 10 Mi UTF-16 analysis tier. `--stress` restores the original generated 500,000 declaration lines above that tier. Custom frozen fixtures above the tier require `--stress`. CPU affinity is optional. The heavy-job wrapper controls resource admission.
 
 ## Historical reference
 
-PR [#224](https://github.com/ShaulLavo/fregat/pull/224) accepted five configurations at instrument `56c8e77fb216232116c5acc714bd697d26633bb2`. Its accepted candidates passed all 108 blocking groups. Each delayed negative failed 47 blocking groups, including all 36 dispatch groups. `tree-sitter-shiki` failed its independent holdout. Four other configurations were unrun. That record does not establish full-matrix acceptance.
+PR [#224](https://github.com/ShaulLavo/fregat/pull/224) accepted five configurations at source revision `56c8e77fb216232116c5acc714bd697d26633bb2`. Their accepted calibration artifacts record instrument hash `b0feb67fd9ed6a23ed31cdf3da9dee8c812fce28de42e34e58be3624e79b8c82`. Its accepted candidates passed all 108 blocking groups. Each delayed negative failed 47 blocking groups, including all 36 dispatch groups. `tree-sitter-shiki` failed its independent holdout. Four other configurations were unrun. That record does not establish full-matrix acceptance.
 
 The frozen products are `packages-{baseline,candidate}-x3` for native, disabled, Tree-sitter, and minimap. Shiki uses `packages-{baseline,candidate}-prereq-213-215-x3`, with identical historical worker-teardown and Shiki line-limit prerequisites on both sides. Their external receipt is `a71e25fffb81a474bf8eb5434213af2def69582fce1fa4ffeae9d71cdb0ab893`.
 
@@ -59,7 +65,57 @@ Headless Chromium frame timing is an observable, not physical display latency. W
 
 ## Follow-up validation
 
+Current warm evidence is under `/work/tmp/plan-282/run-20261001T153544Z-sol/floor-controls/`. The frozen products and all budgets are unchanged. The owner selected separate controls for the input and frame stages on 2026-10-01. All 108 measures remain blocking.
+
+### Stage sensitivity
+
+The input control pauses once for 20 ms in native event capture, before Editor handling. Every `inputToApplied` and `dispatch` key must reject it, 72 keys in total. The separate frame control pauses once for 20 ms inside each existing rAF callback before its frame mark. Every frame key except native `ordinary/multiple/repeat/inputToFrame` must reject it. That key retains its frozen 15.2 ms budget and must reject a separate 25 ms control, or 30 ms if 25 ms does not reject. Both attempts are preserved when needed; the first rejecting delay is recorded as its measured detection floor. Both controls and the detection-floor attempts compare the same candidate bytes against themselves. Their raw samples are cached together under the instrument/dependency hash; every reuse recomputes both verdicts and verifies the stage's delay values and matching product bytes.
+
+The first real warm frame control rejected 35/36 keys. Native `ordinary/multiple/repeat/inputToFrame` measured paired differences `[10.3, 14.5]` ms, median 12.4 ms, against its frozen 15.2 ms budget, with a positive `[10.3, 14.5]` ms interval. Its baseline p95 was `[15.0, 14.1]` ms and candidate p95 `[25.3, 28.6]` ms. The 20 ms callback pause shifts input/frame phase; it does not add 20 ms to this p95 difference. The owner authorized a separately recorded 25/30 ms detection-floor proof for this single native key. This changes sensitivity coverage only: the key remains blocking at 15.2 ms in every ordinary comparison. The first control's raw input evidence rejected all 72 synchronous keys. Both raw controls and the terminal log are preserved in `../stage-controls/initial-20ms-a401d944/`. Final-source instrument `5929738efe629176f88be167890f27f88977b4c6ce3bf3d6e518df3f93264f05` now has a raw-verified schema-3 cache. The input control rejected 72/72 keys in 140.418 seconds; the frame control rejected 36/36 in 135.122 seconds. The separate 25 ms floor attempt rejected the named key, with paired differences `[41.8, 113.8, 64.5]` ms, median 64.5 ms, and interval `[41.8, 113.8]` ms. Its budget remains 15.2 ms. That attempt took 149.115 seconds; 30 ms was skipped because the first attempt rejected. Raw control collection totals 424.655 seconds, paid once for this instrument.
+
+Its cached detection-floor statement is: **rejects frame-stage delays ≥25 ms; a 20 ms frame-callback pause measured ~12.4 ms in the initial missed-key run because it shifted input/frame phase.** This is the observed bounded control floor. Callback batching also varies: the final-source 20 ms run measured a 128.6 ms median for that key, with interval `[108.6, 129.9]` ms. Both outcomes are preserved; a callback pause can amplify through queued callbacks as well as change phase. The warm lifecycle and frame instrumentation are unchanged between these runs. The cache recomputes all raw controls and admits only this native key’s separate floor. All other keys retain their 20 ms requirement. The named floor key is outside the historical 47-key negative set, so every historical key still requires direct 20 ms rejection.
+
+An input-handler delay reaches warm frame timing only partially because of refresh quantization. The prior post-applied control's three-pair warm probe rejected 46/47 historical keys. The missed multi-view short-lines preedit frame effect was 9.3 ms against a 9.4 ms budget, with a positive `[8.8, 10.3]` ms interval. The corresponding cold negative carried a 50.1 ms median effect from a larger frame backlog. A fixed five-pair probe rejected 47/47 in 209.264 seconds, but is preserved as a diagnostic rather than adopted as the fix. Its unchanged native comparison passed in 136.579 seconds. The input pause now precedes the applied mark, so it also exercises the 30 applied keys that the old post-applied pause could not test. Each stage is proven against a real delay in that stage; the frame control is explicitly separate from the input control.
+
+`--slowdown-ms 20` selects an input-stage diagnostic. `--frame-slowdown-ms 20` selects a frame-stage diagnostic. The controls cannot be mixed in one comparison. Neither changes a budget or a measure's blocking status.
+
+### Warm quiet and same-core loaded agreement
+
+The current validation checks each historical key with the control for its stage, plus all 72 input keys and the 35 native 20 ms frame requirements. The remaining native frame key uses the separately cached detection-floor proof; other configurations still require every frame key at 20 ms. Minimap remains excluded while its historical source-correctness defect is admitted. Previous cold verdicts below apply only to their recorded instrument hashes.
+
+| Configuration | Historical candidate / negative | Warm quiet candidate | Quiet input / frame controls                        | Warm loaded candidate | Loaded input / frame controls |
+| ------------- | ------------------------------- | -------------------- | --------------------------------------------------- | --------------------- | ----------------------------- |
+| native        | Pass / 47 keys                  | Pass                 | 72/72 input; 36/36 frame; 47/47 historical at 20 ms | Pending               | Pending                       |
+| disabled      | Pass / 47 keys                  | Pass                 | 72/72 input; frame pending                          | Pending               | Pending                       |
+| tree-sitter   | Pass / 47 keys                  | Pending              | Pending                                             | Pending               | Pending                       |
+| shiki         | Pass / 47 keys                  | Pending              | Pending                                             | Pending               | Pending                       |
+| minimap       | Pass / 47 keys                  | Excluded             | Diagnostic pending                                  | Excluded              | Diagnostic pending            |
+
+Actual default and full warm matrix wall times remain pending. The default still includes Platform plus declared/inferred affected configurations; full still executes all ten configurations.
+
+### Readiness and the pending minimap reset
+
+A controlled short-lines/multiple Shiki startup probe used unchanged prerequisite products. Four quiet starts settled in 12.580–13.714 seconds. Four same-core loaded starts settled in 31.227–31.947 seconds, with current source receipts and no page/worker errors. The 30-second readiness cap rejected valid loaded startup. Consumer settlement and awaited source polling now share a 120-second readiness-only deadline. Disposal retains its separate 30-second cap. Latency budgets are untouched. Raw progress is in `../startup-probe.json` and `../startup-progress.jsonl` relative to the current stage-control evidence directory. This establishes a valid loaded startup beyond the old cap; it does not identify the exact cause of the earlier quiet timeout.
+
+With `--pending-minimap-source`, only an observed false final source receipt in short-lines undo triggers a document-session reload before the next burst. The reload retains Editor/consumer owners and happens outside captured input. Raw reset evidence includes the rejected receipt and reload duration. Correct final receipts automatically skip that reload. Fixture changes already attach a fresh document session. No product bytes or captured operation counts change.
+
+## Archived cold follow-up validation
+
 The owner directed three corrections after the first draft: freeze historical budgets, exclude minimap acceptance pending its separately owned correctness fix, and finish native/Tree-sitter/Shiki validation and default/full timing. New evidence is under `/work/tmp/plan-282/fixed-budgets/`; the initial draft evidence below is preserved.
+
+### Quiet and same-core loaded agreement
+
+Each historical unchanged candidate passed, and each historical negative rejected 47 blocking keys. The follow-up recomputes comparisons from raw samples and checks exact historical key membership.
+
+| Configuration | Historical candidate / negative | Quiet candidate | Quiet historical keys rejected | Loaded candidate | Loaded historical keys rejected |
+| ------------- | ------------------------------- | --------------- | ------------------------------ | ---------------- | ------------------------------- |
+| native        | Pass / 47 rejected              | Pass            | 47/47                          | Pending          | Pending                         |
+| disabled      | Pass / 47 rejected              | Pass            | 47/47                          | Pending          | Pending                         |
+| tree-sitter   | Pass / 47 rejected              | Pass            | 47/47                          | Pending          | Pending                         |
+| shiki         | Pass / 47 rejected              | Pass            | Readiness timeout; no verdict  | Pending          | Pending                         |
+| minimap       | Pass / 47 rejected              | Excluded        | Excluded                       | Excluded         | Excluded                        |
+
+Quiet Tree-sitter took 496.312 seconds unchanged and 828.079 seconds delayed. Quiet Shiki unchanged took 780.183 seconds. These focused comparisons are separate from the actual default and full timing commands.
 
 ### Pending minimap exception
 
@@ -69,9 +125,17 @@ Use `--pending-minimap-source` only while validating the historical products wit
 
 An isolated unchanged-product short-lines undo probe measured 3.8–4.4 seconds per sample. Input and paint took approximately 125 ms; opening consumers took 1.2–1.7 seconds, priming and its screenshot approximately 1.5 seconds, and final consumer settlement approximately 956–967 ms. Memory and cleanup took approximately 112–116 ms. The initial evidence is `/work/tmp/plan-282/profile-sample.log`.
 
-The follow-up reuses the accepted final readiness receipt for the correctness assertions, removing a second full-source replay after polling. It retains three measured pairs, one warmup pair, all three supported-tier fixtures, all gating groups, the advisory screenshot timing, and the pixel checks. Per-sample phase durations are saved in raw results to measure its effect. No statistical or fixture coverage reduction has been made at this stage.
+The follow-up reuses the accepted final readiness receipt for the correctness assertions, removing a second full-source replay after polling. Per-sample phase durations are saved in raw results. The first fixed-three-pair default matrix passed with the pending minimap exception, but took 1,659.575 seconds (27 min 39.575 s), including 1,514.827 seconds for Platform. Sensitivity was cached. Multi-view short-lines samples spent about 13 seconds opening consumers and another 4–6 seconds settling them. Native input and paint took about 0.1–0.27 seconds. Repeated cold consumer setup and supported-tier analysis dominate the cost.
 
-Native/disabled fixed-budget runs and the real Platform-plus-native default matrix are running. Their new self-check must reject all 47 historical native negative keys. The default command is `--configurations native --pending-minimap-source`, using the historical Shiki prerequisite products on both sides so Platform's Shiki consumer can run. Remaining acceptance and complete-matrix wall times are not yet confirmed.
+The bounded reduction above collects two pairs only for tightly within-budget groups and substitutes ordinary-fixture warmups. All measured fixtures, gating groups, advisory screenshot timing, pixel checks, source proofs, and per-sample cleanup remain. No product, worker pool, or owner lifecycle is changed. This trades independent pair count and large-fixture warmup coverage for less repeated cold setup.
+
+The reduced-cost instrument `47f66e236f526a5de47909bea5ed76656926f5cadefea0b1bb1354a83b212008` passed its real sensitivity check in 191.758 seconds. It rejected all 47 historical native negative keys; all 36 delayed groups collected three pairs. Quiet unchanged native and disabled pass, with 36/36 groups each stopping after two pairs. Both quiet negatives also reject 47/47 historical keys, with three pairs in every delayed group. Tree-sitter/Shiki quiet and loaded validation, native/disabled loaded validation, and the full-matrix time are still being collected.
+
+The completed reduced-cost default passed in 1,053.647 seconds (17 min 33.647 s), including 935.209 seconds for Platform and 114.424 seconds for native, with cached sensitivity. Platform used two pairs in 33 groups and three pairs in three groups; native used two pairs in 35 groups and three pairs in one group. The 36.5% reduction from the fixed-three-pair default does not meet the 15-minute target. All measured groups gate, and repeated cold supported-tier consumer setup remains the dominant cost; no gating group or lifecycle proof was removed to reach the target.
+
+An earlier reduced-cost default attempt was terminated before completion. The system journal records a client-requested SIGKILL at 17:09:36 on 2026-10-01, with a 6.1 GiB memory peak under an 8 GiB ceiling. The exact caller is unconfirmed. Its logs are in `fixed-budgets/adaptive-interrupted/` and its journal receipt in `fixed-budgets/interrupted-journal.txt`; it has no complete matrix verdict or timing. Completed native/disabled artifacts survive. Remaining collection uses the same admission wrapper's supported `--slice-root heavyp282` invocation option.
+
+The real default command is `--configurations native --pending-minimap-source`, using the historical Shiki prerequisite products on both sides so Platform's Shiki consumer can run. The supported-tier fixture activates analysis paused in the archived over-tier case; historical agreement remains a verdict comparison, not an identical workload comparison.
 
 ## Initial draft validation
 
