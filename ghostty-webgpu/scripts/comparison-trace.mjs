@@ -2,16 +2,141 @@ import assert from 'node:assert/strict'
 import { gzipSync } from 'node:zlib'
 import { mkdir, readdir, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { cpuSample } from './comparison-guards.mjs'
+import { cpuSample, withDeadline } from './comparison-guards.mjs'
+import { quantile } from './comparison-report.mjs'
 
-export function assertDisplay(periods) {
+export function displaySummary(periods, metadata = {}) {
+  return {
+    ...metadata,
+    frameCount: periods.length,
+    median: periods.length ? quantile(periods, 0.5) : null,
+    p95: periods.length ? quantile(periods, 0.95) : null,
+    max: periods.length ? Math.max(...periods) : null,
+    periods,
+  }
+}
+
+export function assertDisplay(probe, { idle = true } = {}) {
+  // Mounted-terminal cadence is workload evidence; only an empty page qualifies the display.
+  if (!idle) return probe.median
   assert(
-    periods.length === 20 && periods.every((period) => period > 0 && period < 1000),
+    probe.frameCount >= 20 &&
+      probe.periods.every((period) => Number.isFinite(period) && period > 0),
     'Mac display unavailable',
   )
-  const sorted = periods.toSorted((a, b) => a - b)
-  assert(sorted[10] >= 15 && sorted[10] <= 18.5, 'Mac display unavailable')
-  return sorted[10]
+  assert(
+    probe.visibility === 'visible' && probe.median >= 16.67 * 0.9 && probe.median <= 16.67 * 1.1,
+    'Mac display unavailable',
+  )
+  assert(!probe.error, 'Mac display unavailable')
+  return probe.median
+}
+
+async function windowInfo(page, browserSession, session) {
+  const { targetInfo } = await session.send('Target.getTargetInfo')
+  return browserSession.send('Browser.getWindowForTarget', { targetId: targetInfo.targetId })
+}
+
+export async function fitWindow(page, browserSession, session) {
+  const screen = await page.evaluate(() => ({
+    left: window.screen.availLeft,
+    top: window.screen.availTop,
+    width: window.screen.availWidth,
+    height: window.screen.availHeight,
+  }))
+  const { windowId, bounds: before } = await windowInfo(page, browserSession, session)
+  const bounds = {
+    left: screen.left + 16,
+    top: screen.top + 16,
+    width: screen.width - 32,
+    height: screen.height - 32,
+  }
+  await browserSession.send('Browser.setWindowBounds', {
+    windowId,
+    bounds: { windowState: 'normal' },
+  })
+  await browserSession.send('Browser.setWindowBounds', { windowId, bounds })
+  await page.bringToFront()
+  return { screen, before, after: (await windowInfo(page, browserSession, session)).bounds }
+}
+
+export async function fitGrid(page) {
+  return page.evaluate(() => {
+    const main = document.querySelector('main')
+    const sections = [...main.querySelectorAll('section')]
+    const canvases = () =>
+      [...main.querySelectorAll('canvas')].map((canvas) => ({
+        width: canvas.width,
+        height: canvas.height,
+      }))
+    const before = canvases()
+    const width = Math.max(...sections.map((section) => section.offsetLeft + section.offsetWidth))
+    const height = Math.max(...sections.map((section) => section.offsetTop + section.offsetHeight))
+    const scale = Math.min(1, (innerWidth - 8) / width, (innerHeight - 8) / height)
+    // Transform only compositor placement; terminal layout and backing buffers keep baseline sizes.
+    main.style.transformOrigin = 'top left'
+    main.style.transform = `scale(${scale})`
+    document.body.style.overflow = 'hidden'
+    return {
+      scale,
+      width,
+      height,
+      innerWidth,
+      innerHeight,
+      backingBefore: before,
+      backingAfter: canvases(),
+      sections: sections.map((section) => {
+        const r = section.getBoundingClientRect()
+        return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+      }),
+    }
+  })
+}
+
+export async function displayProbe({ page, session, browserSession, metadata }) {
+  await page.bringToFront()
+  await page.waitForTimeout(1000)
+  let periods = []
+  let error
+  try {
+    periods = await withDeadline(
+      () => page.evaluate(() => window.__compare.refreshPeriod(120)),
+      8000,
+      () => {},
+    )
+  } catch (failure) {
+    error = String(failure)
+    periods = await page.evaluate(() => window.__compare.refreshSnapshot()).catch(() => [])
+  }
+  const state = await page
+    .evaluate(() => ({
+      visibility: document.visibilityState,
+      focus: document.hasFocus(),
+      url: location.href,
+      innerWidth,
+      innerHeight,
+      outerWidth,
+      outerHeight,
+      screenX,
+      screenY,
+      screen: {
+        width: screen.width,
+        height: screen.height,
+        availWidth: screen.availWidth,
+        availHeight: screen.availHeight,
+      },
+      canvases: window.__compare.info().canvases,
+    }))
+    .catch(() => ({}))
+  const window = await windowInfo(page, browserSession, session).catch(() => ({}))
+  return displaySummary(periods, {
+    ...metadata,
+    ...state,
+    window,
+    error,
+    warmupMilliseconds: 1000,
+    measuredAt: new Date().toISOString(),
+  })
 }
 
 export async function prepareTraceOutput(output) {
@@ -21,7 +146,10 @@ export async function prepareTraceOutput(output) {
 }
 
 export async function discardTraceWindow(output) {
-  for (const name of await readdir(output)) await unlink(join(output, name))
+  for (const name of await readdir(output)) {
+    if (name === 'qualification.json') continue
+    await unlink(join(output, name))
+  }
 }
 
 export function summarizeRecords(records) {

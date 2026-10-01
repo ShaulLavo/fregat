@@ -11,6 +11,9 @@ import { ink } from './comparison-pixels.mjs'
 import {
   assertDisplay,
   discardTraceWindow,
+  displayProbe,
+  fitGrid,
+  fitWindow,
   prepareTraceOutput,
   tracePhase,
 } from './comparison-trace.mjs'
@@ -135,6 +138,7 @@ const artifact = {
   startedAt: new Date().toISOString(),
   environment: {},
   runs: [],
+  qualifications: [],
 }
 const artifactPath = join(output, 'comparison.json')
 
@@ -361,23 +365,50 @@ async function measure(testCase, repetition, browserSession) {
   }
 }
 
-async function displayPeriods(page) {
-  try {
-    return await withDeadline(
-      () => page.evaluate(() => window.__compare.refreshPeriod()),
-      5000,
-      () => {},
-    )
-  } catch {
-    throw new Error('Mac display unavailable')
+async function qualifyDisplay(page, session, browserSession, run, idle = true) {
+  const metadata = {
+    variant: run.variant,
+    count: run.count,
+    repetition: run.repetition,
+    phase: run.phase,
+    kind: idle ? 'idle-display' : 'mounted-workload',
   }
+  let probe
+  try {
+    probe = await displayProbe({ page, session, browserSession, metadata })
+  } catch (error) {
+    probe = {
+      ...metadata,
+      frameCount: 0,
+      median: null,
+      p95: null,
+      max: null,
+      periods: [],
+      error: String(error),
+    }
+  }
+  artifact.qualifications.push(probe)
+  await writeFile(
+    join(output, 'qualification.json'),
+    JSON.stringify(
+      { environment: artifact.environment, qualifications: artifact.qualifications },
+      null,
+      2,
+    ) + '\n',
+  )
+  assertDisplay(probe, { idle })
+  return probe
 }
 
 async function measureBody(testCase, repetition, browserSession, run, contexts) {
   if (!tracing && !args.includes('--smoke-instrumentation') && (testCase.count === 1 || smoke))
     await parserOnly(testCase, run, contexts)
   run.phase = 'rendered/prepare'
-  const context = await browser.newContext({ viewport: s.viewport, deviceScaleFactor: s.dpr })
+  const context = await browser.newContext(
+    tracing && platform() === 'darwin'
+      ? { viewport: null }
+      : { viewport: s.viewport, deviceScaleFactor: s.dpr },
+  )
   contexts.add(context)
   const page = await context.newPage()
   const errors = []
@@ -396,6 +427,13 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.bringToFront()
     const session = await context.newCDPSession(page)
+    if (tracing && platform() === 'darwin')
+      run.window = await fitWindow(page, browserSession, session)
+    if (tracing && !smoke) {
+      run.phase = 'idle-display/qualification'
+      run.idleDisplay = await qualifyDisplay(page, session, browserSession, run)
+    }
+    run.phase = 'rendered/prepare'
     let empty
     if (!smoke) empty = await memory(page, session, browserSession)
     await page.evaluate((testCase) => window.__compare.prepare(testCase), testCase)
@@ -411,6 +449,20 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
     }
     if (tracing) run.historyLengths = await page.evaluate(() => window.__compare.history())
     run.correctness = await page.evaluate(() => window.__compare.correctness())
+    if (tracing) {
+      run.grid = await fitGrid(page)
+      assert.deepEqual(run.grid.backingBefore, run.grid.backingAfter)
+      assert(
+        run.grid.sections.every(
+          (bounds) =>
+            bounds.left >= 0 &&
+            bounds.top >= 0 &&
+            bounds.right <= run.grid.innerWidth &&
+            bounds.bottom <= run.grid.innerHeight,
+        ),
+        'Every terminal must fit the visible window',
+      )
+    }
     const screenshot = `${testCase.variant}-${testCase.path}-${testCase.count}.png`
     if (repetition === 0) {
       await page.locator('main').screenshot({ path: join(output, screenshot) })
@@ -447,8 +499,15 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       run.status = 'correctness-only'
       return run
     }
-    run.refreshPeriods = await displayPeriods(page)
-    run.refreshPeriod = assertDisplay(run.refreshPeriods)
+    const initialProbe = await qualifyDisplay(page, session, browserSession, run, !tracing)
+    run.refreshPeriods = initialProbe.periods
+    run.refreshPeriod = initialProbe.median
+    if (run.grid)
+      assert.deepEqual(
+        initialProbe.canvases,
+        run.grid.backingBefore,
+        'Fitting the window must preserve canvas backing sizes',
+      )
     if (tracing) {
       run.phases = []
       const configurations = [
@@ -466,8 +525,9 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
         run.phase = `trace/${name}`
         if (name !== 'latency') await page.evaluate((name) => window.__compare.burst(name, 8), name)
         for (const traced of repetition % 2 ? [true, false] : [false, true]) {
-          const refreshPeriods = await displayPeriods(page)
-          assertDisplay(refreshPeriods)
+          run.phase = `trace/${name}/${traced ? 'trace' : 'control'}/mounted-probe`
+          const probe = await qualifyDisplay(page, session, browserSession, run, false)
+          const refreshPeriods = probe.periods
           const label = `${testCase.variant}-${testCase.count}-${repetition}-${name}-${traced ? 'trace' : 'control'}`
           run.phases.push(
             Object.assign(

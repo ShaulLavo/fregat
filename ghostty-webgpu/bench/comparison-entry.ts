@@ -585,15 +585,17 @@ async function writeMarker(color: 'red' | 'green'): Promise<number> {
   return started
 }
 
-async function refreshPeriod(): Promise<number[]> {
-  const samples: number[] = []
+const refreshSamples: number[] = []
+
+async function refreshPeriod(count = 20): Promise<number[]> {
+  refreshSamples.length = 0
   let previous = await frame()
-  for (let index = 0; index < 20; index++) {
+  for (let index = 0; index < count; index++) {
     const time = await frame()
-    samples.push(time - previous)
+    refreshSamples.push(time - previous)
     previous = time
   }
-  return samples
+  return refreshSamples
 }
 
 function legacyMemoryBytes(): number {
@@ -632,6 +634,7 @@ window.__compare = {
     texts: drivers.map((driver) => driver.text()),
   }),
   fixtureNames,
+  refreshSnapshot: () => refreshSamples,
   traceBegin: () => tracing.begin(),
   traceEnd: () => tracing.end(),
   dispose: () => {
@@ -659,6 +662,7 @@ declare global {
       prepareInput: typeof prepareInput
       writeMarker: typeof writeMarker
       refreshPeriod: typeof refreshPeriod
+      refreshSnapshot: () => number[]
       keyTime: () => number
       info: () => unknown
       fixtureNames: typeof fixtureNames
