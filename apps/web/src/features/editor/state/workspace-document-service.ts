@@ -1625,6 +1625,10 @@ function recordFromMap<T>(
   return next
 }
 
+export function supportsTextFile(file: FileSnapshot): boolean {
+  return !file.seemsBinary
+}
+
 function assertTextFile(file: FileSnapshot): void {
-  if (file.seemsBinary) throw createBinaryFileError(file.size)
+  if (!supportsTextFile(file)) throw createBinaryFileError(file.size)
 }

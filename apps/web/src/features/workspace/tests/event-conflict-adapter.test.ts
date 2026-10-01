@@ -73,7 +73,7 @@ test('deletion updates an existing conflict so resolving it can recreate the fil
     id: original.id,
     eventType: 'deleted',
     remoteText: null,
-    remoteVersion: null,
+    remoteFile: null,
   })
 })
 
