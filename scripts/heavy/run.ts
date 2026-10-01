@@ -51,6 +51,9 @@ const USAGE =
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
+// rev-parse answers in about a millisecond; a git still running after this is stuck, and the
+// wrapper holds its admission while it waits.
+const GIT_TIMEOUT_MS = 250
 const MiB = 2 ** 20
 // EX_TEMPFAIL: a quiet job whose hold ran out did not fail; it has to queue again.
 const RETRY_EXIT = 75
@@ -200,6 +203,8 @@ async function run(options: Options) {
   )
   // Released however the launch or the job ends, so a failed launch leaves no admission held.
   try {
+    // Read before launch: the job, or another session, may commit while it runs.
+    const checkout = repositoryOf(cwd)
     const job = startJob(placed.spec)
     // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
     // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
@@ -226,6 +231,7 @@ async function run(options: Options) {
     record(options, {
       admission: placed.reason,
       budget: placed.budget,
+      checkout,
       cwd,
       holdExpired,
       id,
@@ -456,9 +462,7 @@ function setting<K extends SettingId>(home: string, id: K): SettingValue<K> {
 function wrapperCommit() {
   const installed = readText(path.join(import.meta.dirname, 'commit')).trim()
   if (installed) return installed
-  return Bun.spawnSync(['git', '-C', import.meta.dirname, 'rev-parse', 'HEAD'])
-    .stdout.toString()
-    .trim()
+  return gitOutput(['-C', import.meta.dirname, 'rev-parse', 'HEAD'])?.trim() ?? ''
 }
 
 function readText(file: string) {
@@ -472,6 +476,7 @@ function readText(file: string) {
 type Finished = {
   readonly admission: string
   readonly budget: Budget | null
+  readonly checkout: ReturnType<typeof repositoryOf>
   readonly cwd: string
   readonly holdExpired: boolean
   readonly id: string
@@ -479,7 +484,7 @@ type Finished = {
   readonly queuedMs: number
 }
 
-// Logging is best effort: a settings, git or disk failure is reported, and the job's exit
+// Logging is best effort: a settings or disk failure is reported, and the job's exit
 // status still becomes the wrapper's.
 function record(options: Options, finished: Finished) {
   try {
@@ -494,7 +499,7 @@ function record(options: Options, finished: Finished) {
 
 function jobRecord(
   options: Options,
-  { admission, budget, cwd, holdExpired, id, outcome, queuedMs }: Finished,
+  { admission, budget, checkout, cwd, holdExpired, id, outcome, queuedMs }: Finished,
 ): HeavyJobRecord {
   const wrapper = wrapperCommit()
   return {
@@ -524,31 +529,43 @@ function jobRecord(
     unit: outcome.unit,
     version: wrapper.slice(0, 9),
     wallMs: outcome.wallMs,
-    ...repositoryOf(cwd),
+    ...checkout,
   }
 }
 
 // Worktrees of one repository share its common git directory, so lanes group together; each
-// worktree has its own HEAD, which is the commit the job ran.
+// worktree has its own HEAD, which is the commit the job runs.
 function repositoryOf(cwd: string) {
-  const result = Bun.spawnSync(
-    [
-      'git',
-      '-C',
-      cwd,
-      'rev-parse',
-      '--path-format=absolute',
-      '--git-common-dir',
-      '--show-prefix',
-      'HEAD',
-    ],
-    { stderr: 'ignore', stdout: 'pipe' },
-  )
-  if (result.exitCode !== 0) return { commitHash: null, repo: null, subdir: null }
-  const [commonDir = '', prefix = '', head = ''] = result.stdout.toString().split('\n')
+  const output = gitOutput([
+    '-C',
+    cwd,
+    'rev-parse',
+    '--path-format=absolute',
+    '--git-common-dir',
+    '--show-prefix',
+    'HEAD',
+  ])
+  if (output === null) return { commitHash: null, repo: null, subdir: null }
+  const [commonDir = '', prefix = '', head = ''] = output.split('\n')
   return {
     commitHash: head,
     repo: commonDir.replace(/\/\.git\/?$/, ''),
     subdir: prefix.replace(/\/$/, ''),
+  }
+}
+
+// Git's output, or null when git fails, is not installed, or outlives GIT_TIMEOUT_MS. Only the
+// launch sits in the try, so a bug here still surfaces.
+function gitOutput(args: readonly string[]) {
+  const options = { stderr: 'ignore', stdout: 'pipe', timeout: GIT_TIMEOUT_MS } as const
+  const result = unlessLaunchFails(() => Bun.spawnSync(['git', ...args], options))
+  return result?.success ? result.stdout.toString() : null
+}
+
+function unlessLaunchFails<T>(launch: () => T): T | null {
+  try {
+    return launch()
+  } catch {
+    return null
   }
 }
