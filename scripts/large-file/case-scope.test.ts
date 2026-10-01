@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
@@ -24,6 +24,7 @@ test.skipIf(process.platform !== 'linux')('joins the heavy job slice when one is
   expect(caseScopeCommand({ ...scope, slice: 'lane_x.slice' })).toContain('--slice=lane_x.slice')
   expect(caseScopeCommand(scope).some((arg) => arg.startsWith('--slice'))).toBe(false)
   expect(caseScopeCommand(scope)).toContain('MemoryMax=2560M')
+  expect(caseScopeCommand(scope)).toContain('--expand-environment=no')
 })
 
 function runCase(name: string, mib: number, memoryMiB: number) {
@@ -54,5 +55,23 @@ describe.skipIf(!userScopes)('a bench case scope', () => {
     const outcome = await runCase('capped', 400, 128)
     expect(outcome.exitCode).not.toBe(0)
     expect(outcome.memoryPeakBytes).toBeGreaterThanOrEqual(100 * MiB)
+  })
+
+  test('runs the case under OOMPolicy=continue, so systemd never kills the shim on OOM', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'large-file-scope-'))
+    roots.push(root)
+    const unit = `large-file-scope-test-${process.pid}-policy.scope`
+    await runCaseScope({
+      unit,
+      memoryMiB: 256,
+      command: ['systemctl', '--user', 'show', '-p', 'OOMPolicy', '--value', unit],
+      accountingFile: path.join(root, 'scope.accounting'),
+      cwd: root,
+      env: process.env,
+      stdout: path.join(root, 'stdout.log'),
+      stderr: path.join(root, 'stderr.log'),
+      timeoutMs: 30_000,
+    })
+    expect(readFileSync(path.join(root, 'stdout.log'), 'utf8').trim()).toBe('continue')
   })
 })

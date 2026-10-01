@@ -92,7 +92,10 @@ stop_lane
  * Shell for the Pi. The job runs in its own slice, which job.sh caps; bench cases join it through
  * HEAVY_JOB_SLICE, so the cap and the totals cover them. The shell holds a lease: it stops the
  * slice when stdin closes, when no heartbeat line arrives for leaseSec, or when it is hung up on.
- * A timer stops the slice at maxWallSec even if this shell is gone. `command` is the only
+ * A timer stops the slice at maxWallSec even if this shell is gone. The job scope takes
+ * OOMPolicy=continue: an OOM kills the offender alone, and job.sh lives to record it rather than
+ * being SIGKILLed by systemd's stop on a second OOM event. systemd-run would expand \$VAR in the
+ * command it is given, so expansion is off and the command reaches bash as written. `command` is the only
  * shell-interpreted part.
  */
 export function laneJobCommand(job: LaneJob) {
@@ -114,7 +117,7 @@ mkdir -p ${shellQuote(run)} || exit 1
 # Tools that write evidence under FREGAT_EVIDENCE_ROOT write it where run.ts copies it back.
 export LANE_RUN=${shellQuote(run)} FREGAT_EVIDENCE_ROOT=${shellQuote(run)} HEAVY_JOB_SLICE=${slice}
 systemd-run --user --quiet --unit=${shellQuote(`${unit}_ceiling`)} --on-active=${maxWall}s --timer-property=AccuracySec=1s systemctl --user stop ${slice} || exit 1
-systemd-run --user --scope --quiet --unit=${shellQuote(`${unit}.scope`)} --slice=${slice} -p RuntimeMaxSec=${maxWall} \\
+systemd-run --user --scope --quiet --expand-environment=no --unit=${shellQuote(`${unit}.scope`)} --slice=${slice} -p RuntimeMaxSec=${maxWall} -p OOMPolicy=continue \\
   bash ${shellQuote(`${platform}/scripts/heavy/pi/job.sh`)} ${shellQuote(job.memoryMax)} ${shellQuote(run)} ${shellQuote(job.command)} </dev/null &
 job=$!
 while kill -0 "$job" 2>/dev/null; do

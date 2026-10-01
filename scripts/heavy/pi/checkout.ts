@@ -1,8 +1,18 @@
 import { createScriptError } from '../../structured-errors'
 import { run } from './remote'
 
-// The first commit on Platform's first-parent history; every Fregat checkout and worktree has it.
-const FREGAT_ROOT_COMMIT = '3d86637e86bdc4cd126cf209e997c2c14b5b56d3'
+export type RepositoryIdentity = {
+  /** The first commit on the repository's first-parent history. */
+  readonly rootCommit: string
+  /** The origin URLs a shallow clone of it may have. */
+  readonly origin: RegExp
+}
+
+export const FREGAT: RepositoryIdentity = {
+  rootCommit: '3d86637e86bdc4cd126cf209e997c2c14b5b56d3',
+  origin:
+    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)ShaulLavo\/fregat(?:\.git)?$/,
+}
 
 function git(cwd: string, args: readonly string[]) {
   const result = run(['git', '-C', cwd, ...args])
@@ -11,16 +21,23 @@ function git(cwd: string, args: readonly string[]) {
 
 /**
  * The Fregat checkout that holds `cwd`. The lane force-checks-out whatever this returns, so
- * another repository is refused here, before anything reaches the Pi.
+ * another repository is refused here, before anything reaches the Pi. A full clone must hold
+ * Fregat's root commit; a shallow clone (CI checks out at depth 1) has no root commit to show,
+ * so its origin must be Fregat's. Anything else is refused.
  */
-export function fregatCheckout(cwd = process.cwd()) {
+export function fregatCheckout(cwd = process.cwd(), identity = FREGAT) {
   const root = git(cwd, ['rev-parse', '--show-toplevel'])
   if (!root) throw createScriptError(`${cwd} is not inside a git checkout.`)
-  const roots = git(root, ['rev-list', '--max-parents=0', 'HEAD'])?.split('\n') ?? []
-  if (!roots.includes(FREGAT_ROOT_COMMIT)) {
+  if (git(root, ['rev-parse', '--is-shallow-repository']) !== 'true') {
+    const roots = git(root, ['rev-list', '--max-parents=0', 'HEAD'])?.split('\n') ?? []
+    if (roots.includes(identity.rootCommit)) return root
     throw createScriptError(
-      `${root} is not a Fregat checkout (its history lacks ${FREGAT_ROOT_COMMIT.slice(0, 9)}); the Pi lane only mirrors Fregat.`,
+      `${root} is not a Fregat checkout (its history lacks ${identity.rootCommit.slice(0, 9)}); the Pi lane only mirrors Fregat.`,
     )
   }
-  return root
+  const origin = git(root, ['remote', 'get-url', 'origin'])
+  if (origin && identity.origin.test(origin)) return root
+  throw createScriptError(
+    `${root} is a shallow clone whose origin (${origin ?? 'none'}) is not Fregat's, so it cannot be shown to be Fregat; the Pi lane only mirrors Fregat.`,
+  )
 }
