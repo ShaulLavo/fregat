@@ -15,6 +15,7 @@ import {
   unitActive,
   userScopes,
 } from './sandbox'
+import { tryLock, unlock } from './lock'
 
 afterEach(removeSandboxes)
 
@@ -191,6 +192,39 @@ function runningEntries(box: Box) {
   const dir = path.join(box.state, 'jobs')
   return existsSync(dir) ? readdirSync(dir).filter((name) => name.endsWith('.json')) : []
 }
+
+test('a Pi job waits only for the Pi lane, never for this machine', async () => {
+  const box = sandbox()
+  const lock = (name: string) => path.join(box.state, name)
+  const held = ['pi.lock', 'slot1.lock', 'slot2.lock', 'slot3.lock'].map((name) =>
+    tryLock(lock(name))!,
+  )
+  const child = spawn(
+    process.execPath,
+    [
+      RUN,
+      '--state-dir',
+      box.state,
+      '--settings-home',
+      box.home,
+      '--host',
+      'pi',
+      'pi-wait',
+      '--',
+      'true',
+    ],
+    { stdio: ['ignore', 'ignore', 'pipe'] },
+  )
+  let stderr = ''
+  child.stderr.on('data', (chunk) => (stderr += chunk))
+  const exited = new Promise((resolve) => child.on('close', resolve))
+  await expect.poll(() => stderr, { timeout: 10_000 }).toContain('the Pi lane is busy')
+  child.kill('SIGTERM')
+  await exited
+  for (const fd of held) unlock(fd)
+  expect(stderr).not.toMatch(/slot\d\.lock|memory/)
+  expect(existsSync(path.join(box.state, 'queue'))).toBe(false)
+})
 
 test('refuses --max-wall without --host pi, and a ceiling that is not whole seconds', () => {
   const label = 'ceiling-check'
