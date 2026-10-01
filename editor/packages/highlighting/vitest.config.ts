@@ -1,29 +1,50 @@
 import { playwright } from '@vitest/browser-playwright'
-import { defineConfig } from 'vitest/config'
+import { defineConfig, type Plugin } from 'vitest/config'
 import type { BrowserCommand } from 'vitest/node'
 import { workspaceRoot } from '../../scripts/workspace-root'
 
-// Fails a third-party grammar chunk the way an outage would, so tests reach real acquisition errors.
-const blockRequests: BrowserCommand<[pattern: string]> = async ({ page }, pattern) => {
-  await page.route(`**/*${pattern}*`, (route) => route.abort('failed'))
+// Outages live in the dev server, shared by every test file: a Playwright route resolves before
+// the test frame's loader intercepts with it, so a request sent right after blocking could load.
+const blocked = new Set<string>()
+const held = new Map<string, { gate: Promise<void>; release: () => void }>()
+const heldGate = (url: string) => {
+  for (const [pattern, { gate }] of held) if (url.includes(pattern)) return gate
+  return undefined
 }
-const unblockRequests: BrowserCommand<[pattern: string]> = async ({ page }, pattern) => {
-  await page.unroute(`**/*${pattern}*`)
+
+const grammarOutages: Plugin = {
+  name: 'highlighting-test:grammar-outages',
+  configureServer(server) {
+    server.middlewares.use((request, response, next) => {
+      const url = request.url ?? ''
+      if ([...blocked].some((pattern) => url.includes(pattern))) {
+        response.statusCode = 503
+        response.end()
+        return
+      }
+      const gate = heldGate(url)
+      if (!gate) return next()
+      void gate.then(() => next())
+    })
+  },
+}
+
+// Fails a third-party grammar chunk the way an outage would, so tests reach real acquisition errors.
+const blockRequests: BrowserCommand<[pattern: string]> = (_context, pattern) => {
+  blocked.add(pattern)
+}
+const unblockRequests: BrowserCommand<[pattern: string]> = (_context, pattern) => {
+  blocked.delete(pattern)
 }
 // Holds a grammar chunk until the test releases it, so work can be caught mid-acquisition.
-const held = new Map<string, () => void>()
-const holdRequests: BrowserCommand<[pattern: string]> = async ({ page }, pattern) => {
-  const gate = new Promise<void>((resolve) => held.set(pattern, resolve))
-  await page.route(`**/*${pattern}*`, async (route) => {
-    await gate
-    // Releasing also unroutes, which may settle the route first.
-    await route.continue().catch(() => undefined)
-  })
+const holdRequests: BrowserCommand<[pattern: string]> = (_context, pattern) => {
+  let release = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  held.set(pattern, { gate, release })
 }
-const releaseRequests: BrowserCommand<[pattern: string]> = async ({ page }, pattern) => {
-  held.get(pattern)?.()
+const releaseRequests: BrowserCommand<[pattern: string]> = (_context, pattern) => {
+  held.get(pattern)?.release()
   held.delete(pattern)
-  await page.unroute(`**/*${pattern}*`)
 }
 const commands = { blockRequests, unblockRequests, holdRequests, releaseRequests }
 
@@ -48,6 +69,7 @@ export default defineConfig({
             'shiki/core',
           ],
         },
+        plugins: [grammarOutages],
         test: {
           name: 'browser',
           include: ['test/**/*.browser.test.ts'],
