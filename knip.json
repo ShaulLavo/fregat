@@ -72,6 +72,8 @@
         "dev.ts",
         "dev-serve.ts",
         "flake-summary.ts",
+        "heavy/report.ts",
+        "heavy/run.ts",
         "generate-settings-reference.ts",
         "generate-settings-schema.ts",
         "themes/generate-palette-css.ts",
@@ -98,7 +100,7 @@
         "parity/snooze.ts",
         "parity/wake.ts"
       ],
-      "ignoreBinaries": ["ssh-keygen"]
+      "ignoreBinaries": ["flock", "ssh-keygen", "systemd-run"]
     },
     ".": {
       "ignoreDependencies": ["typescript-api"]
