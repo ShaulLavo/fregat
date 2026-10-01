@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import {
   assertDisplay,
   discardTraceWindow,
@@ -88,7 +89,7 @@ test('frame counts match each terminal interval and ownership uses object identi
 })
 
 test('failed display qualification discards current and completed cases in a fresh output', async () => {
-  const root = await mkdtemp('/work/tmp/plan-283/trace-cleanup-')
+  const root = await mkdtemp(join(tmpdir(), 'ghostty-trace-cleanup-'))
   try {
     const output = join(root, 'window')
     await prepareTraceOutput(output)
@@ -142,7 +143,7 @@ test('a CPU qualification failure stops recording and drains the Chrome trace st
       traced: true,
       operation: async () => ({}),
       label: 'failure',
-      output: '/work/tmp/plan-283',
+      output: tmpdir(),
     }),
     /process/i,
   )
