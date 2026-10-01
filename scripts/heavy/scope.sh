@@ -7,6 +7,10 @@
 # --grace: seconds the job's leftover processes get between TERM and KILL (default 10).
 # Slot locks the wrapper hands over on fds 3–5 stay with this shim, which outlives the job's
 # processes, and are closed for the command so nothing it starts can keep them.
+# The wrapper's job-entry lock arrives on fd 6 and is dropped here, inside the job's slice, before
+# anything else runs (the wrapper starts this with `bash -p`): from now on the slice, not the
+# launcher, is what shows the job is running.
+exec 6<&-
 whole_slice=
 grace=10
 while [ "${1:-}" = --slice ] || [ "${1:-}" = --grace ]; do

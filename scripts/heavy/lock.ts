@@ -68,6 +68,11 @@ const PRODUCTION_SLICE_ROOT = 'heavy'
 export type Production = { readonly stateDir: string; readonly root: string }
 export const PRODUCTION: Production = { root: PRODUCTION_SLICE_ROOT, stateDir: DEFAULT_STATE_DIR }
 
+/** The slice-root grammar `--slice-root` accepts: lowercase letters and digits. */
+export function isSliceRoot(name: unknown): name is string {
+  return typeof name === 'string' && /^[a-z0-9]+$/.test(name)
+}
+
 /**
  * The slice root a state directory owns. A wrapper reaps every slice under its root that its
  * state directory has no owner for, so only the production state directory may use
