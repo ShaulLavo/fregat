@@ -3,9 +3,14 @@
 Research record for [Plan 099](../../plans/099-document-contributions.md) unit 0, taken 2026-09-25.
 Current canonical sources, publication proof and remaining acceptance limits are recorded in
 [the 2026-09-30 foundations closeout](foundations-publication-proof.md).
-It covers the inventory, the baseline identity, and the measurements that run without changing
-product code. The harness extension the plan puts first in unit 0 is Editor code, so it is listed
-under [Not done](#not-done).
+This historical record covers the inventory, baseline identity and measurements from the research
+pass. Its [Not done](#not-done) section describes that checkpoint, not the current harness.
+
+Closeout, 2026-10-01: unit 0 is partial, **5/10 configurations calibrated** at instrument `56c8e77fb`.
+The harness is delivered; `native`, `disabled`, `tree-sitter`, `shiki` and `minimap` are accepted.
+`tree-sitter-shiki` failed its holdout; four other configurations never ran. The remaining
+absolute-threshold matrix is superseded by **Plan 282's paired A/B instrument**. Units 2–7 remain
+gated. See [the calibration closeout](native-input-calibration.md) for results and evidence.
 
 Probe scripts and raw output live in `/work/tmp/research/099/`: `scan.ts` (inventory scan) and
 `inventory.tsv` (its 296 rows), `publication.ts` and `publication.json`, `head-read.ts`, and
@@ -263,6 +268,9 @@ Generic source bookkeeping each consumer owns today, which the runtime replaces:
 | `documentSync.ts:45`, `:388`        | `syncPoint` 54, `changesSinceLastSync` 380           |
 
 ## Not done
+
+Historical limits of the 2026-09-25 research pass. The harness and partial calibration were delivered
+later; their current status is [recorded separately](native-input-calibration.md).
 
 - **Harness extension.** The plan puts consumer configurations, readiness assertions and frozen
   fixture files into `examples/stress` before any baseline. That is Editor code, which this research

@@ -1,8 +1,8 @@
 # Plan 099: Route document consumers through one contribution runtime
 
 Status: unit 1 publication implemented and focused proof delivered in the foundations wave,
-2026-09-30. Unit 0 is partial: current inventory and headless controls are refreshed; the full expanded
-consumer-matrix native-input calibration remains unverified. The session diff correction and
+2026-09-30. Unit 0 is partial: 5/10 configurations calibrated; the remaining absolute-threshold matrix
+is superseded by Plan 282's paired A/B instrument. Units 2–7 remain gated. The session diff correction and
 Editor E057 transport removal landed. Retained-analysis subscribers now consume captured frames.
 See [current publication proof](../docs/document-contributions/foundations-publication-proof.md). Units 2–7 retain their explicit implementation gate. Requested on 2026-09-12.
 Owner: Editor and Platform. Priority P1, effort XL, change risk high.
@@ -561,6 +561,18 @@ introduce temporary production compatibility layers, or mark a unit complete bec
 
 ### 0. Freeze the baseline and inventory every consumer
 
+Closeout, 2026-10-01: **partial, 5/10 configurations calibrated** at instrument `56c8e77fb`.
+`native`, `disabled`, `tree-sitter`, `shiki` and `minimap` each have three controls, a passing
+independent holdout, an admitted delayed negative and a passing candidate. `tree-sitter-shiki`
+failed its holdout; the driver stopped at `2026-10-01T04:39:01Z`, without running its candidate.
+`shiki-minimap`, `tree-sitter-minimap`, `all` and `platform` never ran in this matrix. The owner
+ended the absolute-threshold work rather than spending approximately three more hours on it;
+the remaining matrix and planned phase sweep are superseded by **Plan 282's paired A/B instrument**.
+Unit 0 is not complete, and units 2–7 remain gated. See
+[the calibration closeout and evidence](../docs/document-contributions/native-input-calibration.md)
+for the accepted results, holdout diagnosis, product findings and limits. The original protocol below
+records what the delivered instrument was built to test; it does not schedule another matrix run.
+
 Record both revisions, dirty diffs, built exports, link resolution, package versions, browser,
 hardware, fixture hashes, viewport, and enabled contributions. Recheck current capability flags.
 Use complete frozen package sets for comparison; freezing only core misses changes in adapters.
@@ -875,10 +887,12 @@ except draft PR #37 (`lane/L7`), which carries an older copy plus a "Landed 2026
 correction" section for the checkpoint diff fix. That fix is on the unmerged `lane/L7` branch, so on
 `main` the session-diff correction is still unit 2 work. Editor read at `origin/main` `e2fd299`.
 
-Unit 0 is partial. The inventory, baseline identity and the measurements that need no product code
-are done; the full record is [baseline and inventory](../docs/document-contributions/baseline-and-inventory.md).
-The harness extension and the calibrated `bench:input` controls are not: the extension is Editor
-code, which this research pass may not write, and the controls need it.
+At this research checkpoint, unit 0 was partial: the inventory, baseline identity and measurements
+that needed no product code were done; the harness extension and calibrated `bench:input` controls
+were outside that research pass. The historical record is
+[baseline and inventory](../docs/document-contributions/baseline-and-inventory.md).
+The 2026-10-01 closeout above records the delivered harness and 5/10 calibrated configurations;
+Plan 282 supersedes the remaining absolute-threshold matrix. Units 2–7 remain gated.
 
 ### Unit 0 questions, answered
 
