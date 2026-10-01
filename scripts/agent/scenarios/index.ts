@@ -258,6 +258,7 @@ import { codeThemeNativePreview } from './code-theme-native-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
 import { bundleWallpapers } from './bundle-wallpapers'
+import { coldWallpaperSwitch } from './cold-wallpaper-switch'
 import { colorModePreview } from './color-mode-preview'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorAutoClose } from './editor-auto-close'
@@ -633,6 +634,7 @@ export const scenarios: readonly Scenario[] = [
   colorModePreview,
   pageLifecycle,
   bundleWallpapers,
+  coldWallpaperSwitch,
   editorAutoClose,
   editorFormatChord,
   editorLspCompletion,
