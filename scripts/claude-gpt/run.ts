@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { createGateway, type GatewayOptions } from './gateway'
+import { createGateway, waitForProxy, type GatewayOptions } from './gateway'
 
 const portSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65535))
 export const configSchema = v.pipe(
@@ -33,6 +33,10 @@ function reportFailure(operation: string, error: unknown) {
       area: 'claude-gpt',
       operation,
       errorType: error instanceof Error ? error.name : typeof error,
+      why:
+        operation === 'proxy-readiness'
+          ? 'The proxy GPT model registry did not load within 15 seconds.'
+          : undefined,
       fix: 'Check the runtime configuration, proxy login and mesh route.',
     })}\n`,
   )
@@ -40,17 +44,28 @@ function reportFailure(operation: string, error: unknown) {
 
 async function run() {
   const config = v.parse(configSchema, await Bun.file(Bun.argv[2] ?? '').json())
-  const server = startGateway(gatewayOptions(config))
+  const options = gatewayOptions(config)
   const proxy = Bun.spawn([config.binary, '-config', config.proxyConfig], {
     stdout: 'inherit',
     stderr: 'inherit',
   })
+  const startup = new AbortController()
+  let server: ReturnType<typeof startGateway> | undefined
   function stop() {
-    server.stop(true)
+    startup.abort()
+    server?.stop(true)
     proxy.kill('SIGTERM')
   }
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)
+  void proxy.exited.then(() => startup.abort())
+  // Mesh checks TCP acceptance, so binding this port must follow registry readiness.
+  if (!(await waitForProxy(options, undefined, startup.signal))) {
+    if (!startup.signal.aborted) reportFailure('proxy-readiness', null)
+    stop()
+    process.exit((await proxy.exited) || 1)
+  }
+  server = startGateway(options)
   const exitCode = await proxy.exited
   server.stop(true)
   process.exit(exitCode)

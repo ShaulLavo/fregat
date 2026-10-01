@@ -1,4 +1,4 @@
-import { createConnection } from 'node:net'
+import * as v from 'valibot'
 
 export type GatewayOptions = {
   gatewayPort: number
@@ -42,33 +42,63 @@ function stripHopHeaders(headers: Headers) {
   for (const name of hopHeaders) headers.delete(name)
 }
 
-function proxyReachable(port: number, timeout: number) {
-  return new Promise<boolean>((resolve) => {
-    const socket = createConnection({ host: '127.0.0.1', port })
-    const finish = (ready: boolean) => {
-      socket.destroy()
-      resolve(ready)
-    }
-    socket.once('connect', () => finish(true))
-    socket.once('error', () => finish(false))
-    socket.setTimeout(timeout, () => finish(false))
-  })
+const registrySchema = v.object({ data: v.array(v.object({ id: v.string() })) })
+const proxyErrorSchema = v.object({ error: v.object({ message: v.string() }) })
+const startupWindowMs = 15_000
+
+type ProxyOptions = Pick<GatewayOptions, 'proxyUrl' | 'apiKey'>
+
+function hasGptModels(models: readonly string[] | null): models is readonly string[] {
+  return models !== null && models.some((model) => model.startsWith('gpt-'))
 }
 
-export async function waitForProxy(port: number, timeoutMs = 15_000) {
-  const deadline = performance.now() + timeoutMs
-  while (performance.now() < deadline) {
-    if (await proxyReachable(port, Math.max(1, Math.min(250, deadline - performance.now()))))
-      return true
-    const remaining = deadline - performance.now()
-    if (remaining > 0) await Bun.sleep(Math.min(100, remaining))
+async function readProxyModels(options: ProxyOptions, timeoutMs: number, signal?: AbortSignal) {
+  const timeout = AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs)))
+  try {
+    const response = await fetch(new URL('/v1/models', options.proxyUrl), {
+      headers: { authorization: `Bearer ${options.apiKey}` },
+      redirect: 'manual',
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    })
+    if (!response.ok) return null
+    const parsed = v.safeParse(registrySchema, await response.json())
+    return parsed.success ? parsed.output.data.map((model) => model.id) : null
+  } catch {
+    return null
   }
-  return false
+}
+
+export async function waitForProxy(
+  options: ProxyOptions,
+  timeoutMs = startupWindowMs,
+  signal?: AbortSignal,
+) {
+  const deadline = performance.now() + timeoutMs
+  while (!signal?.aborted && performance.now() < deadline) {
+    const models = await readProxyModels(
+      options,
+      Math.min(250, deadline - performance.now()),
+      signal,
+    )
+    if (hasGptModels(models)) return models
+    const remaining = deadline - performance.now()
+    if (remaining > 0 && !signal?.aborted) await Bun.sleep(Math.min(100, remaining))
+  }
+  return null
+}
+
+function isUnknownProvider(text: string) {
+  try {
+    const parsed = v.safeParse(proxyErrorSchema, JSON.parse(text))
+    return parsed.success && /^unknown provider for model\b/i.test(parsed.output.error.message)
+  } catch {
+    return false
+  }
 }
 
 function reportReadiness(
   level: 'warn' | 'info',
-  state: 'unavailable' | 'reachable',
+  state: 'unavailable' | 'reachable' | 'gave-up',
   count: number,
 ) {
   process.stderr.write(
@@ -80,9 +110,10 @@ function reportReadiness(
       operation: 'proxy-readiness',
       state,
       count,
+      timeoutMs: state === 'gave-up' ? startupWindowMs : undefined,
       fix:
         level === 'warn'
-          ? 'Check the proxy process; later requests will retry readiness.'
+          ? 'Check the proxy process and login so its GPT model registry can load.'
           : 'GPT requests can proceed.',
     })}\n`,
   )
@@ -92,7 +123,15 @@ function proxyUnavailable() {
   return failure(
     503,
     'api_error',
-    'The local GPT proxy is starting or unavailable. Check the proxy process and retry.',
+    'The GPT proxy model registry did not become ready within the startup wait. Check the proxy process and login, then retry.',
+  )
+}
+
+function missingModel() {
+  return failure(
+    400,
+    'invalid_request_error',
+    'The GPT model is absent from the loaded proxy registry. Choose a listed GPT model or check the proxy account model access.',
   )
 }
 
@@ -101,21 +140,44 @@ function failure(status: number, type: string, message: string) {
 }
 
 export function createGateway(options: GatewayOptions) {
-  let ready = false
+  let models: readonly string[] | null = null
+  let startupUntil = performance.now() + startupWindowMs
   let failedWaits = 0
-  const proxyPort = Number(new URL(options.proxyUrl).port || 80)
-  async function isReady() {
-    if (ready) return true
-    if (await waitForProxy(proxyPort, 250)) {
-      if (!ready && failedWaits > 0) reportReadiness('info', 'reachable', failedWaits)
-      ready = true
-      return true
-    }
-    if (ready) return true
+
+  function unavailable() {
+    if (models !== null) startupUntil = performance.now() + startupWindowMs
+    models = null
     failedWaits++
     if (failedWaits === 1) reportReadiness('warn', 'unavailable', failedWaits)
-    return false
   }
+
+  async function isReady(timeoutMs: number, signal?: AbortSignal) {
+    const next = await waitForProxy(options, timeoutMs, signal)
+    if (next === null) {
+      unavailable()
+      return false
+    }
+    if (failedWaits > 0) reportReadiness('info', 'reachable', failedWaits)
+    failedWaits = 0
+    models = next
+    return true
+  }
+
+  async function recoverModel(model: string, signal: AbortSignal) {
+    const observed = await readProxyModels(options, 250, signal)
+    if (hasGptModels(observed)) {
+      models = observed
+      if (!observed.includes(model)) return missingModel()
+      return performance.now() < startupUntil ? 'retry' : 'forward'
+    }
+    unavailable()
+    if (!(await isReady(Math.max(1, startupUntil - performance.now()), signal))) {
+      reportReadiness('warn', 'gave-up', failedWaits)
+      return proxyUnavailable()
+    }
+    return models?.includes(model) ? 'retry' : missingModel()
+  }
+
   return async (request: Request) => {
     if (
       !loopbackHost.test(request.headers.get('host') ?? '') ||
@@ -125,7 +187,9 @@ export function createGateway(options: GatewayOptions) {
     }
     const url = new URL(request.url)
     if (request.method === 'GET' && url.pathname === '/health') {
-      return (await isReady()) ? Response.json({ status: 'ready' }) : proxyUnavailable()
+      return (await isReady(250, request.signal))
+        ? Response.json({ status: 'ready' })
+        : proxyUnavailable()
     }
     if (request.method !== 'POST' || !messagePaths.has(url.pathname)) {
       return failure(404, 'not_found_error', 'Use the Claude Messages endpoint.')
@@ -162,7 +226,8 @@ export function createGateway(options: GatewayOptions) {
     const headers = new Headers(request.headers)
     stripHopHeaders(headers)
     if (isGpt) {
-      if (!(await isReady())) return proxyUnavailable()
+      if (models === null && !(await isReady(startupWindowMs, request.signal)))
+        return proxyUnavailable()
       for (const name of Array.from(headers.keys())) {
         if (!proxyHeaders.includes(name)) headers.delete(name)
       }
@@ -172,13 +237,23 @@ export function createGateway(options: GatewayOptions) {
       url.pathname + url.search,
       isClaude ? options.anthropicUrl : options.proxyUrl,
     )
-    const response = await fetch(upstream, {
+    const init = {
       method: 'POST',
       headers,
       body,
       signal: request.signal,
       redirect: 'manual',
-    })
+    } as const
+    let response = await fetch(upstream, init)
+    if (isGpt && response.status === 400) {
+      const text = await response.text()
+      response = new Response(text, { status: response.status, headers: response.headers })
+      if (isUnknownProvider(text)) {
+        const recovered = await recoverModel(input.model, request.signal)
+        if (recovered instanceof Response) return recovered
+        if (recovered === 'retry') response = await fetch(upstream, init)
+      }
+    }
     const responseHeaders = new Headers(response.headers)
     stripHopHeaders(responseHeaders)
     // fetch decompresses responses; forwarding their original encoding corrupts the stream.

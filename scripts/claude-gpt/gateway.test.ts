@@ -2,6 +2,9 @@ import { expect, test, vi } from 'vitest'
 import { createGateway, waitForProxy } from './gateway'
 import { configSchema, startGateway } from './run'
 import * as v from 'valibot'
+import { chmod, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const fullRegistry = { data: [{ id: 'gpt-6.1-sol' }] }
 
@@ -76,56 +79,359 @@ test('cold registry GPT request waits for models before forwarding', async () =>
   }
 })
 
-test('cold registry restart waits and replays unknown provider only once with the same bytes', async () => {
-  let warming = false
-  let registryReads = 0
-  const bodies: string[] = []
+test.each(['boot', 'long-running'])(
+  'cold registry restart in a %s gateway waits and replays unknown provider once with the same bytes',
+  async (age) => {
+    let warming = false
+    let registryReads = 0
+    const bodies: string[] = []
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(request) {
+        if (new URL(request.url).pathname === '/v1/models') {
+          if (!warming) return Response.json(fullRegistry)
+          registryReads++
+          return Response.json(registryReads === 1 ? { data: [] } : fullRegistry)
+        }
+        bodies.push(await request.text())
+        if (bodies.length === 1) {
+          return Response.json(
+            { error: { message: 'unknown provider for model gpt-6.1-sol' } },
+            { status: 400 },
+          )
+        }
+        return new Response('event: message_stop\ndata: {"type":"message_stop"}\n\n', {
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      },
+    })
+    const server = startGateway({
+      gatewayPort: 0,
+      anthropicUrl: 'http://127.0.0.1:1',
+      proxyUrl: upstream.url.toString(),
+      apiKey: 'proxy-key',
+    })
+    const body = '{ "model": "gpt-6.1-sol", "stream": true, "messages": [] }'
+    const now = performance.now.bind(performance)
+    let clock: ReturnType<typeof vi.spyOn> | undefined
+    try {
+      expect((await fetch(new URL('/health', server.url))).status).toBe(200)
+      if (age === 'long-running')
+        clock = vi.spyOn(performance, 'now').mockImplementation(() => now() + 60_000)
+      warming = true
+      const response = await fetch(new URL('/v1/messages', server.url), {
+        method: 'POST',
+        headers: { authorization: 'test' },
+        body,
+      })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('text/event-stream')
+      expect(await response.text()).toContain('message_stop')
+      expect(registryReads).toBeGreaterThanOrEqual(2)
+      expect(bodies).toEqual([body, body])
+    } finally {
+      clock?.mockRestore()
+      server.stop(true)
+      upstream.stop(true)
+    }
+  },
+)
+
+test.each([
+  {
+    name: 'missing model',
+    model: 'gpt-missing',
+    message: 'unknown provider for model gpt-missing',
+    attempts: 1,
+    expected: 'absent from the loaded proxy registry',
+    old: false,
+  },
+  {
+    name: 'persistent provider error',
+    model: 'gpt-6.1-sol',
+    message: 'unknown provider for model gpt-6.1-sol',
+    attempts: 2,
+    expected: 'unknown provider for model gpt-6.1-sol',
+    old: false,
+  },
+  {
+    name: 'other invalid request',
+    model: 'gpt-6.1-sol',
+    message: 'invalid token budget',
+    attempts: 1,
+    expected: 'invalid token budget',
+    old: false,
+  },
+  {
+    name: 'loaded registry beyond the startup window',
+    model: 'gpt-6.1-sol',
+    message: 'unknown provider for model gpt-6.1-sol',
+    attempts: 1,
+    expected: 'unknown provider for model gpt-6.1-sol',
+    old: true,
+  },
+])('registry recovery preserves $name with bounded attempts', async (scenario) => {
+  let attempts = 0
   const upstream = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
-    async fetch(request) {
-      if (new URL(request.url).pathname === '/v1/models') {
-        if (!warming) return Response.json(fullRegistry)
-        registryReads++
-        return Response.json(registryReads === 1 ? { data: [] } : fullRegistry)
-      }
-      bodies.push(await request.text())
-      if (bodies.length === 1) {
-        return Response.json(
-          { error: { message: 'unknown provider for model gpt-6.1-sol' } },
-          { status: 400 },
-        )
-      }
-      return new Response('event: message_stop\ndata: {"type":"message_stop"}\n\n', {
-        headers: { 'content-type': 'text/event-stream' },
-      })
+    fetch(request) {
+      if (new URL(request.url).pathname === '/v1/models') return Response.json(fullRegistry)
+      attempts++
+      return Response.json({ error: { message: scenario.message } }, { status: 400 })
     },
   })
   const server = startGateway({
     gatewayPort: 0,
     anthropicUrl: 'http://127.0.0.1:1',
     proxyUrl: upstream.url.toString(),
-    apiKey: 'proxy-key',
+    apiKey: 'test',
   })
-  const body = '{ "model": "gpt-6.1-sol", "stream": true, "messages": [] }'
+  const now = performance.now.bind(performance)
+  let clock: ReturnType<typeof vi.spyOn> | undefined
   try {
     expect((await fetch(new URL('/health', server.url))).status).toBe(200)
-    warming = true
+    if (scenario.old) clock = vi.spyOn(performance, 'now').mockImplementation(() => now() + 16_000)
     const response = await fetch(new URL('/v1/messages', server.url), {
       method: 'POST',
       headers: { authorization: 'test' },
-      body,
+      body: JSON.stringify({ model: scenario.model }),
     })
-    expect(response.status).toBe(200)
-    expect(response.headers.get('content-type')).toBe('text/event-stream')
-    expect(await response.text()).toContain('message_stop')
-    expect(registryReads).toBeGreaterThanOrEqual(2)
-    expect(bodies).toEqual([body, body])
+    expect(response.status).toBe(400)
+    expect(await response.text()).toContain(scenario.expected)
+    expect(attempts).toBe(scenario.attempts)
   } finally {
+    clock?.mockRestore()
     server.stop(true)
     upstream.stop(true)
   }
 })
+
+test.each(['empty', 'Claude only', 'malformed', 'invalid JSON', 'unauthorized', 'hung body'])(
+  'registry readiness gives up within its deadline for %s',
+  async (state) => {
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        if (state === 'invalid JSON') return new Response('{')
+        if (state === 'unauthorized') return new Response('denied', { status: 401 })
+        if (state === 'hung body') {
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode('{'))
+              },
+            }),
+          )
+        }
+        if (state === 'malformed') return Response.json({ data: [{ id: 1 }] })
+        if (state === 'Claude only') return Response.json({ data: [{ id: 'claude-opus-5-5' }] })
+        return Response.json({ data: [] })
+      },
+    })
+    const start = performance.now()
+    try {
+      expect(
+        await waitForProxy({ proxyUrl: upstream.url.toString(), apiKey: 'test' }, 50),
+      ).toBeNull()
+      expect(performance.now() - start).toBeLessThan(500)
+    } finally {
+      upstream.stop(true)
+    }
+  },
+)
+
+test('registry recovery gives up when the restart window expires without replaying', async () => {
+  let warming = false
+  let registryReads = 0
+  let attempts = 0
+  let offset = 0
+  const now = performance.now.bind(performance)
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now() + offset)
+  const logs: Record<string, unknown>[] = []
+  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+    logs.push(JSON.parse(String(chunk)))
+    return true
+  })
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname === '/v1/models') {
+        if (!warming) return Response.json(fullRegistry)
+        registryReads++
+        if (registryReads === 2) offset = 16_000
+        return Response.json({ data: [] })
+      }
+      attempts++
+      return Response.json(
+        { error: { message: 'unknown provider for model gpt-6.1-sol' } },
+        { status: 400 },
+      )
+    },
+  })
+  const gateway = createGateway({
+    gatewayPort: 8318,
+    anthropicUrl: 'http://127.0.0.1:1',
+    proxyUrl: upstream.url.toString(),
+    apiKey: 'test',
+  })
+  try {
+    expect(
+      (
+        await gateway(
+          new Request('http://localhost:8318/health', { headers: { host: 'localhost:8318' } }),
+        )
+      ).status,
+    ).toBe(200)
+    warming = true
+    const response = await gateway(
+      new Request('http://localhost:8318/v1/messages', {
+        method: 'POST',
+        headers: { host: 'localhost:8318', authorization: 'test' },
+        body: '{"model":"gpt-6.1-sol"}',
+      }),
+    )
+    expect(response.status).toBe(503)
+    expect(await response.text()).toContain('startup wait')
+    expect(attempts).toBe(1)
+    expect(registryReads).toBe(2)
+    expect(logs.at(-1)).toMatchObject({ level: 'warn', state: 'gave-up', timeoutMs: 15_000 })
+  } finally {
+    clock.mockRestore()
+    stderr.mockRestore()
+    upstream.stop(true)
+  }
+})
+
+test('registry polling honors cancellation', async () => {
+  let reads = 0
+  const controller = new AbortController()
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch() {
+      reads++
+      controller.abort()
+      return Response.json({ data: [] })
+    },
+  })
+  try {
+    expect(
+      await waitForProxy(
+        { proxyUrl: upstream.url.toString(), apiKey: 'test' },
+        15_000,
+        controller.signal,
+      ),
+    ).toBeNull()
+    expect(reads).toBe(1)
+  } finally {
+    upstream.stop(true)
+  }
+})
+
+test.each([
+  { entry: 'source', state: 'ready' },
+  { entry: 'bundle', state: 'ready' },
+  { entry: 'source', state: 'timeout' },
+  { entry: 'source', state: 'exit' },
+])(
+  'runner $entry $state keeps the mesh readiness port behind the registry',
+  async (scenario) => {
+    const dir = await mkdtemp(join(tmpdir(), 'gateway-cold-start-'))
+    const proxyReservation = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch: () => new Response('ok'),
+    })
+    const gatewayReservation = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch: () => new Response('ok'),
+    })
+    const proxyPort = proxyReservation.port!
+    const gatewayPort = gatewayReservation.port!
+    proxyReservation.stop(true)
+    gatewayReservation.stop(true)
+    const release = join(dir, 'release')
+    const probed = join(dir, 'probed')
+    const binary = join(dir, 'proxy')
+    const config = join(dir, 'config.json')
+    const proxyConfig = join(dir, 'fixture.json')
+    await Bun.write(
+      binary,
+      `#!${process.execPath}
+const config = await Bun.file(Bun.argv[3]).json()
+if (config.state === 'exit') process.exit(7)
+Bun.serve({ hostname: '127.0.0.1', port: config.port, async fetch() {
+  await Bun.write(config.probed, 'probed')
+  return Response.json(await Bun.file(config.release).exists() ? { data: [{ id: 'gpt-6.1-sol' }] } : { data: [] })
+} })
+`,
+    )
+    await chmod(binary, 0o700)
+    await Bun.write(
+      proxyConfig,
+      JSON.stringify({ port: proxyPort, release, probed, state: scenario.state }),
+    )
+    await Bun.write(
+      config,
+      JSON.stringify({ binary, proxyConfig, proxyPort, gatewayPort, apiKey: 'test' }),
+    )
+    let entry = join(import.meta.dirname, 'run.ts')
+    if (scenario.entry === 'bundle') {
+      const build = await Bun.build({
+        entrypoints: [entry],
+        target: 'bun',
+        outdir: dir,
+        naming: 'gateway.js',
+      })
+      expect(build.success).toBe(true)
+      entry = build.outputs[0]!.path
+    }
+    const child = Bun.spawn([process.execPath, entry, config], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    const endpoint = `http://127.0.0.1:${gatewayPort}/health`
+    try {
+      if (scenario.state === 'exit') {
+        expect(await child.exited).toBe(7)
+        await expect(fetch(endpoint)).rejects.toBeDefined()
+        return
+      }
+      const deadline = performance.now() + 5_000
+      while (!(await Bun.file(probed).exists()) && performance.now() < deadline) await Bun.sleep(10)
+      expect(await Bun.file(probed).exists()).toBe(true)
+      await expect(fetch(endpoint)).rejects.toBeDefined()
+      if (scenario.state === 'timeout') {
+        expect(await child.exited).not.toBe(0)
+        const stderr = await new Response(child.stderr).text()
+        expect(stderr).toContain('proxy-readiness')
+        expect(stderr).toContain('did not load within 15 seconds')
+        await expect(fetch(endpoint)).rejects.toBeDefined()
+        return
+      }
+      await Bun.write(release, 'ready')
+      let status = 0
+      while (status !== 200 && performance.now() < deadline) {
+        status = await fetch(endpoint)
+          .then((response) => response.status)
+          .catch(() => 0)
+        if (status !== 200) await Bun.sleep(10)
+      }
+      expect(status).toBe(200)
+      expect(child.exitCode).toBeNull()
+    } finally {
+      if (child.exitCode === null) child.kill('SIGTERM')
+      await child.exited
+      await rm(dir, { recursive: true, force: true })
+    }
+  },
+  20_000,
+)
 
 test('preserves Claude OAuth, beta headers, request bytes and streaming tool events', async () => {
   const body = '{ "model": "claude-opus-5-5", "stream": true, "messages": [] }'
@@ -204,6 +510,7 @@ test('GPT count_tokens reaches the translator with proxy auth and no Claude cred
     hostname: '127.0.0.1',
     port: 0,
     fetch(request) {
+      if (new URL(request.url).pathname === '/v1/models') return Response.json(fullRegistry)
       observed = {
         auth: request.headers.get('authorization'),
         apiKey: request.headers.get('x-api-key'),
@@ -389,7 +696,8 @@ test('health stays unavailable and GPT waits for readiness while Claude proceeds
     proxy = Bun.serve({
       hostname: '127.0.0.1',
       port: proxyPort,
-      fetch() {
+      fetch(request) {
+        if (new URL(request.url).pathname === '/v1/models') return Response.json(fullRegistry)
         requests++
         return Response.json({ ok: true })
       },
@@ -409,19 +717,24 @@ test('health stays unavailable and GPT waits for readiness while Claude proceeds
   }
 })
 
-test('TCP readiness polls cold proxy startup and gives up with a clear GPT 503', async () => {
+test('registry readiness polls cold proxy startup and gives up with a clear GPT 503', async () => {
   const reservation = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response('ok') })
   const port = reservation.port!
   reservation.stop(true)
-  const ready = waitForProxy(port, 1000)
+  const options = { proxyUrl: `http://127.0.0.1:${port}`, apiKey: 'proxy-key' }
+  const ready = waitForProxy(options, 1000)
   await Bun.sleep(150)
-  const upstream = Bun.serve({ hostname: '127.0.0.1', port, fetch: () => new Response('ok') })
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port,
+    fetch: () => Response.json(fullRegistry),
+  })
   try {
-    expect(await ready).toBe(true)
+    expect(await ready).toEqual(['gpt-6.1-sol'])
   } finally {
     upstream.stop(true)
   }
-  expect(await waitForProxy(port, 50)).toBe(false)
+  expect(await waitForProxy(options, 50)).toBeNull()
   const gateway = createGateway({
     anthropicUrl: 'http://127.0.0.1:1',
     proxyUrl: `http://127.0.0.1:${port}`,
@@ -433,6 +746,7 @@ test('TCP readiness polls cold proxy startup and gives up with a clear GPT 503',
       method: 'POST',
       headers: { host: '127.0.0.1:8318', authorization: 'test' },
       body: '{"model":"gpt-6.1-sol"}',
+      signal: AbortSignal.timeout(50),
     }),
   )
   expect(response.status).toBe(503)
@@ -497,6 +811,7 @@ test('GPT allowlist preserves Claude affinity while dropping arbitrary credentia
     hostname: '127.0.0.1',
     port: 0,
     fetch(request) {
+      if (new URL(request.url).pathname === '/v1/models') return Response.json(fullRegistry)
       observed = request.headers
       return new Response('ok')
     },
@@ -595,7 +910,7 @@ test.each(['GPT', 'health'])(
     })
     const port = reservation.port!
     reservation.stop(true)
-    const startup = waitForProxy(port, 25)
+    const startup = waitForProxy({ proxyUrl: `http://127.0.0.1:${port}`, apiKey: 'test' }, 25)
     const gateway = createGateway({
       gatewayPort: 8318,
       anthropicUrl: 'http://127.0.0.1:1',
@@ -609,16 +924,20 @@ test.each(['GPT', 'health'])(
         method: 'POST',
         headers: { host: '127.0.0.1:8318', authorization: 'test' },
         body: '{"model":"gpt-6.1-sol"}',
+        signal: AbortSignal.timeout(50),
       })
     let upstream: ReturnType<typeof Bun.serve> | undefined
     try {
-      expect(await startup).toBe(false)
+      expect(await startup).toBeNull()
       expect((await gateway(gpt())).status).toBe(503)
       expect((await gateway(health())).status).toBe(503)
       upstream = Bun.serve({
         hostname: '127.0.0.1',
         port,
-        fetch: () => Response.json({ ok: true }),
+        fetch: (request) =>
+          Response.json(
+            new URL(request.url).pathname === '/v1/models' ? fullRegistry : { ok: true },
+          ),
       })
       const recovered = await gateway(first === 'GPT' ? gpt() : health())
       expect(recovered.status).toBe(200)
@@ -634,8 +953,9 @@ test.each(['GPT', 'health'])(
       expect(logs[1]!.count).toBe(2)
       upstream.stop(true)
       upstream = undefined
-      expect((await gateway(health())).status).toBe(200)
-      expect(logs).toHaveLength(2)
+      expect((await gateway(health())).status).toBe(503)
+      expect(logs).toHaveLength(3)
+      expect(logs[2]!.state).toBe('unavailable')
       for (const log of logs) {
         expect(log).toMatchObject({
           timestamp: expect.any(String),
@@ -724,7 +1044,11 @@ test('real Node fetch reaches the gateway with undici Sec-Fetch-Mode', async () 
 })
 
 test('loopback Host matching tolerates changed ports, casing, trailing dot and missing port', async () => {
-  const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response('ok') })
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch: () => Response.json(fullRegistry),
+  })
   const gateway = createGateway({
     gatewayPort: 45001,
     anthropicUrl: upstream.url.toString(),
