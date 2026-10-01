@@ -1341,10 +1341,12 @@ function normalizeSummaryPatchRange(
   )
   const previousEndLine = Math.min(Math.max(startLine, range.previousEndLine), previousLineCount)
   const nextEndLine = Math.min(Math.max(startLine, range.nextEndLine), nextLineCount)
+  // Queued edits use intermediate offsets; both ends must preserve the same suffix.
+  const suffixCount = Math.min(previousLineCount - previousEndLine, nextLineCount - nextEndLine)
   return {
     startLine,
-    deleteCount: previousEndLine - startLine,
-    insertEndLine: nextEndLine,
+    deleteCount: previousLineCount - suffixCount - startLine,
+    insertEndLine: nextLineCount - suffixCount,
   }
 }
 

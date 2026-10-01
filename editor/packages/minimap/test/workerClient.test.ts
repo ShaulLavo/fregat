@@ -924,16 +924,20 @@ describe('MinimapWorkerClient', () => {
   })
 
   it.each([
-    { lineCount: 16, inserted: 'x' },
-    { lineCount: 500_000, inserted: 'x' },
-    { lineCount: 16, inserted: 'x\ny\n' },
-    { lineCount: 500_000, inserted: 'x\ny\n' },
+    { lineCount: 16, inserted: 'x', distinct: false },
+    { lineCount: 500_000, inserted: 'x', distinct: false },
+    { lineCount: 16, inserted: 'x\ny\n', distinct: false },
+    { lineCount: 500_000, inserted: 'x\ny\n', distinct: false },
+    { lineCount: 16, inserted: 'x', distinct: true },
+    { lineCount: 16, inserted: 'x\ny\n', distinct: true },
   ])(
-    'keeps summaries aligned after coalesced undo of $inserted in $lineCount lines',
-    ({ lineCount, inserted }) => {
+    'keeps summaries aligned through coalesced undo and redo (%j)',
+    ({ lineCount, inserted, distinct }) => {
       const runtime = installMinimapRuntime()
       const host = createHost()
-      const text = Array(lineCount).fill('//').join('\n')
+      const text = Array.from({ length: lineCount }, (_, index) =>
+        distinct ? `//${index}` : '//',
+      ).join('\n')
       const session = createDocumentSession(text)
       const client = new MinimapWorkerClient({
         host,
@@ -971,7 +975,14 @@ describe('MinimapWorkerClient', () => {
         }
         runtime.flushAnimationFrames()
         applyPostedSummaryUpdates(renderer, worker)
-        expect(rendererSummary(renderer).lines.length).toBe(session.getTextSnapshot().lineCount)
+        const edited = rendererSummary(renderer)
+        expect(edited.lines.length).toBe(session.getTextSnapshot().lineCount)
+        expect(edited.lines).toEqual(
+          session
+            .materializeFullText()
+            .split('\n')
+            .map((line) => ({ text: line, length: line.length })),
+        )
         worker.send(renderedResponse(lastRenderSequence(worker)))
         worker.postMessage.mockClear()
 
@@ -988,6 +999,21 @@ describe('MinimapWorkerClient', () => {
         expect(restored.lines).toEqual(initial.document.lines)
         expect(restored.lineStarts).toEqual(initial.document.lineStarts)
         expect(restored.textLength).toBe(initial.document.textLength)
+        worker.send(renderedResponse(lastRenderSequence(worker)))
+        worker.postMessage.mockClear()
+
+        for (let index = 0; index < 12; index += 1) {
+          const change = session.redo()
+          client.update(snapshot({}, { text: session.materializeFullText() }), 'content', change)
+        }
+        runtime.flushAnimationFrames()
+        applyPostedSummaryUpdates(renderer, worker)
+
+        const redone = rendererSummary(renderer)
+        expect(redone.lines.length).toBe(session.getTextSnapshot().lineCount)
+        expect(redone.lines).toEqual(edited.lines)
+        expect(redone.lineStarts).toEqual(edited.lineStarts)
+        expect(redone.textLength).toBe(edited.textLength)
       } finally {
         client.dispose()
         renderer.dispose()
