@@ -15,5 +15,6 @@ export type PlatformBridge = {
   platform: ShellPlatform
   // The desktop's preference when the webview cannot be trusted to know it.
   colorScheme: ShellColorScheme
-  pickEntry(options: PlatformPickOptions): Promise<string[]>
+  titlebar: 'native' | 'overlay'
+  pickEntry?(options: PlatformPickOptions): Promise<string[]>
 }

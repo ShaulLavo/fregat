@@ -20,6 +20,7 @@ const rpc = Electroview.defineRPC<DesktopRPC>({
 const handoff = readShellHandoff()
 
 window.platformBridge = {
+  titlebar: 'overlay',
   backdrop: handoff.backdrop,
   platform: handoff.platform,
   colorScheme: handoff.colorScheme,

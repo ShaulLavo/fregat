@@ -1405,6 +1405,18 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'cpu', 'load', 'cores', 'admission'],
   }),
+  'window.browser': defineSetting({
+    schema: v.pipe(v.string(), v.regex(/^(?:auto|webview|\/[^\0\r\n]+)$/)),
+    default: 'auto',
+    scope: 'machine',
+    widget: 'string',
+    category: 'Window',
+    title: 'Browser',
+    description:
+      'The desktop window engine: auto selects an installed Chromium browser, webview selects the system window, and an absolute path selects a browser executable.',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'webview', 'desktop'],
+  }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.
     //
