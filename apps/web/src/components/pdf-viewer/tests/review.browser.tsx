@@ -148,3 +148,37 @@ test('navigation waits for a distant page to render before revealing its selecte
     view.unmount()
   }
 })
+
+test('real extracted empty end-of-line items preserve the break and offsets', async () => {
+  const controller = new AbortController()
+  try {
+    const control = await engine.openPdf(makePdf(['first second']), controller.signal)
+    expect(control!.texts[0]!.text).toBe('first second')
+    const stream = 'BT /F1 24 Tf 50 720 Td (first) Tj /F1 20 Tf 0 -600 Td (second) Tj ET'
+    const pdf = await engine.openPdf(makePdf([''], 'Helvetica', 1, [stream]), controller.signal)
+    const content = await pdf!.pages[0]!.getTextContent()
+    expect(
+      content.items.flatMap((item) => ('str' in item ? [[item.str, item.hasEOL]] : [])),
+    ).toEqual([
+      ['first', false],
+      ['', true],
+      ['second', false],
+    ])
+    expect(pdf!.texts[0]!.text).toBe('first\nsecond')
+    const matches = searchPdf(pdf!.texts, 'second')
+    expect(matches).toEqual([{ page: 0, start: 6, end: 12 }])
+    expect(searchPdf(pdf!.texts, 'firstsecond')).toEqual([])
+    const host = document.createElement('div')
+    document.body.append(host)
+    try {
+      const root = host.attachShadow({ mode: 'open' })
+      const layer = await engine.renderPdfPage(pdf!.pages[0]!, root, 612, controller.signal)
+      engine.highlightPdfPage(layer!, itemHighlights(pdf!.texts[0]!, matches, 0, matches[0]))
+      expect(root.querySelector('.highlight.selected')?.textContent).toBe('second')
+    } finally {
+      host.remove()
+    }
+  } finally {
+    controller.abort()
+  }
+})

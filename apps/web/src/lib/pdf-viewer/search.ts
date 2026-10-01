@@ -12,9 +12,9 @@ export type PdfPageText = {
 }
 
 function separator(previous: PdfTextRun | undefined, item: PdfTextRun) {
-  if (!previous || !previous.str || !item.str || /\s$/.test(previous.str) || /^\s/.test(item.str))
-    return ''
+  if (!previous || !item.str) return ''
   if (previous.hasEOL) return '\n'
+  if (/\s$/.test(previous.str) || /^\s/.test(item.str)) return ''
   const [a = 1, b = 0, , , x = 0, y = 0] = previous.transform
   const length = Math.hypot(a, b) || 1
   const dx = (item.transform[4] ?? 0) - x
@@ -33,7 +33,9 @@ export function pdfPageText(runs: readonly PdfTextRun[]): PdfPageText {
     text += separator(previous, item)
     const start = text.length
     text += item.str
-    previous = item
+    // Empty line markers retain the preceding run's geometry and carry its break forward.
+    if (item.str) previous = item
+    else if (item.hasEOL && previous) previous = { ...previous, hasEOL: true }
     return { start, end: text.length }
   })
   return { text, items }
