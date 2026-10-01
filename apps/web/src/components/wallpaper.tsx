@@ -12,7 +12,7 @@ export function Wallpaper({ className }: { readonly className?: string }) {
   const backdrop = documentBackdrop()
   if (source.kind === 'none' || backdrop === 'transparent') return null
   if (source.kind === 'library')
-    return <LibraryWallpaper asset={source.asset} className={className} key={source.asset} />
+    return <LibraryWallpaper asset={source.asset} className={className} />
   if (backdrop !== 'app') return null
   return <WebWallpaper className={className} />
 }

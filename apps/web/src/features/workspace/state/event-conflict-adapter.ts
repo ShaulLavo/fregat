@@ -1,6 +1,6 @@
 import { log } from '@/lib/client-logging'
 import { parentFilesystemPath } from '@/lib/path-formatters'
-import { decodedAsText } from '@workspace/contracts'
+import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { FilesystemConflictToast } from '@/features/editor/components/filesystem-conflict-toast'
 import {
   conflictId,
@@ -78,10 +78,8 @@ export function markDeletedFilesystemDocument(
       ...conflict,
       eventType: 'deleted',
       localText: localConflictText(conflict.localPath, context),
-      remoteMtimeMs: null,
-      remoteSize: null,
+      remoteFile: null,
       remoteText: null,
-      remoteVersion: null,
     },
     context,
   )
@@ -99,11 +97,9 @@ export async function notifyRenamedFilesystemConflict(
       id: createConflictId(),
       localPath,
       localText: localConflictText(localPath, context),
-      remoteMtimeMs: remoteFile.mtimeMs,
+      remoteFile,
       remotePath,
-      remoteSize: remoteFile.size,
-      remoteText: remoteFile.content,
-      remoteVersion: remoteFile.version,
+      remoteText: supportsTextFile(remoteFile) ? remoteFile.content : null,
     },
     context,
   )
@@ -127,11 +123,9 @@ function changedConflict(
     id: createConflictId(),
     localPath: path,
     localText: localConflictText(path, context),
-    remoteMtimeMs: remoteFile.mtimeMs,
+    remoteFile,
     remotePath: path,
-    remoteSize: remoteFile.size,
-    remoteText: remoteFile.content,
-    remoteVersion: remoteFile.version,
+    remoteText: supportsTextFile(remoteFile) ? remoteFile.content : null,
   }
 }
 
@@ -186,6 +180,11 @@ function refreshedConflict(
 function openConflictDiff(id: string, context: WorkspaceConflictContext) {
   const conflict = context.conflictStore.getState().conflicts[id]
   if (!conflict) return
+  if (conflict.remoteFile && !supportsTextFile(conflict.remoteFile)) {
+    setFileSnapshotQueryData(context.queryClient, conflict.remoteFile)
+    context.selectContent(documentTab(fileDocument(fileResource(conflict.remotePath))))
+    return
+  }
 
   const target = {
     kind: 'conflict',
@@ -241,8 +240,8 @@ async function applyLocalConflict(conflict: FilesystemConflict, context: Workspa
       conflict.remotePath,
       conflict.localText,
       {
-        baseVersion: conflict.remoteVersion,
-        expectedMtimeMs: conflict.remoteMtimeMs,
+        baseVersion: conflict.remoteFile?.version ?? null,
+        expectedMtimeMs: conflict.remoteFile?.mtimeMs ?? null,
         origin: 'conflict-resolution',
       },
       context.client,
@@ -250,7 +249,7 @@ async function applyLocalConflict(conflict: FilesystemConflict, context: Workspa
   }
 
   const file = await context.fetchFile(conflict.remotePath, new AbortController().signal)
-  replaceResolvedEditorFile(conflict.localPath, file, context)
+  adoptFilesystemSnapshot(conflict.localPath, file, context)
 }
 
 async function restoreDeletedLocalConflict(conflict: FilesystemConflict, client: Client) {
@@ -262,19 +261,31 @@ async function applyRemoteConflict(
   conflict: FilesystemConflict,
   context: WorkspaceConflictContext,
 ) {
-  if (conflict.remoteText === null) {
+  if (!conflict.remoteFile) {
     discardResolvedEditorFile(conflict.localPath, context)
     return
   }
 
-  replaceResolvedEditorFile(conflict.localPath, remoteFileResult(conflict), context)
+  adoptFilesystemSnapshot(conflict.localPath, conflict.remoteFile, context)
 }
 
-function replaceResolvedEditorFile(
+export function adoptFilesystemSnapshot(
   localPath: FilesystemPath,
   file: FileResult,
   context: WorkspaceConflictContext,
 ) {
+  if (!supportsTextFile(file)) {
+    context.discardLiveEditorDocument(fileDocument(fileResource(localPath)))
+    if (localPath !== file.path) {
+      context.queryClient.removeQueries({
+        exact: true,
+        queryKey: fileSystemKeys.fileSnapshot(localPath),
+      })
+    }
+    setFileSnapshotQueryData(context.queryClient, file)
+    context.selectContent(documentTab(fileDocument(fileResource(file.path))))
+    return
+  }
   if (localPath !== file.path) {
     context.renameLiveEditorDocument(localPath, file.path)
     moveFileSnapshotQueryData(context.queryClient, localPath, file.path)
@@ -305,19 +316,6 @@ function finishConflict(conflict: FilesystemConflict, context: WorkspaceConflict
   context.conflictStore.getState().removeConflict(conflict.id)
 }
 
-function remoteFileResult(conflict: FilesystemConflict): FileResult {
-  return {
-    ...decodedAsText,
-    content: conflict.remoteText ?? '',
-    mtimeMs: conflict.remoteMtimeMs ?? Date.now(),
-    path: conflict.remotePath,
-    size: conflict.remoteSize ?? conflict.remoteText?.length ?? 0,
-    version:
-      conflict.remoteVersion ??
-      syntheticFileVersion(conflict.remoteMtimeMs ?? Date.now(), conflict.remoteSize ?? 0),
-  }
-}
-
 function localConflictText(path: FilesystemPath, context: WorkspaceConflictContext) {
   return context.getLiveEditorDocument(fileDocumentKey(path))?.buffer.materializeFullText() ?? ''
 }
@@ -325,8 +323,4 @@ function localConflictText(path: FilesystemPath, context: WorkspaceConflictConte
 function createConflictId() {
   nextConflictId += 1
   return `${Date.now().toString(36)}-${nextConflictId.toString(36)}`
-}
-
-function syntheticFileVersion(mtimeMs: number, size: number) {
-  return `synthetic:${mtimeMs}:${size}`
 }

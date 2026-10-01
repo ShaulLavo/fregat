@@ -8,6 +8,8 @@ import type { RunProcess } from '../forges/types'
 import type { GitPublishRequest } from '@workspace/contracts'
 import {
   createForgeRepository,
+  readPullRequestComments,
+  postPullRequestComment,
   createPullRequest,
   readBranchPullRequests,
   readPullRequest,
@@ -871,4 +873,272 @@ it('reads distinct pinned GitHub requests in one repository query', async () => 
   expect([...found.keys()]).toEqual([12, 13])
   expect(forge.calls.filter((call) => call.argv[1] === 'api')).toHaveLength(1)
   expect(forge.calls.at(-1)?.argv).toEqual(expect.arrayContaining(['-F', 'n0=12', '-F', 'n1=13']))
+})
+
+describe('forge discussion capabilities', () => {
+  it('GitHub reads and posts on the selected self-hosted host, preserving comment text', async () => {
+    const body = '--flag\n$HOME `command`'
+    const forge = boundary('https://github.example.com/acme/repo.git', (argv) => {
+      if (argv[1] === 'auth') return ok()
+      if (argv.includes('POST')) return ok('{}')
+      if (argv[1] === 'api')
+        return json([
+          {
+            id: 11,
+            body,
+            created_at: '2026-10-01T10:00:00Z',
+            html_url: 'https://github.example.com/acme/repo/pull/7#issuecomment-11',
+            user: null,
+          },
+        ])
+      return undefined
+    })
+    const cwd = await checkout()
+    expect(await readPullRequestComments({ cwd, number: 7 }, forge)).toMatchObject({
+      kind: 'ready',
+      comments: [{ id: '11', body, author: 'Deleted account' }],
+      truncated: false,
+    })
+    expect(await postPullRequestComment({ cwd, number: 7, body }, forge)).toEqual({
+      kind: 'posted',
+    })
+    expect(forge.calls.at(-1)?.argv).toEqual(
+      expect.arrayContaining([
+        '--hostname',
+        'github.example.com',
+        'repos/acme/repo/issues/7/comments',
+        '--input',
+        '-',
+      ]),
+    )
+    expect(forge.calls.at(-1)?.input).toBe(JSON.stringify({ body }))
+    expect(forge.calls.at(-1)?.argv.join(' ')).not.toContain(body)
+  })
+
+  it('GitLab encodes a nested project and excludes system, diff, and threaded notes', async () => {
+    const forge = boundary('https://gitlab.example.com/group/sub/repo.git', (argv) => {
+      if (argv[1] === 'auth') return ok()
+      if (argv.includes('POST')) return ok('{}')
+      if (argv[1] === 'api')
+        return json([
+          {
+            id: 1,
+            body: 'pushed',
+            created_at: 'today',
+            system: true,
+            type: null,
+            author: { username: 'author' },
+          },
+          {
+            id: 2,
+            body: 'review',
+            created_at: 'today',
+            system: false,
+            type: null,
+            author: { username: 'reviewer' },
+          },
+          {
+            id: 3,
+            body: 'replace this expression',
+            created_at: 'today',
+            system: false,
+            type: 'DiffNote',
+            position: { position_type: 'text', new_path: 'src/file.ts', new_line: 12 },
+            author: { username: 'reviewer' },
+          },
+          {
+            id: 4,
+            body: 'threaded reply',
+            created_at: 'today',
+            system: false,
+            type: 'DiscussionNote',
+            author: { username: 'reviewer' },
+          },
+          {
+            id: 5,
+            body: 'positioned note',
+            created_at: 'today',
+            system: false,
+            type: null,
+            position: { position_type: 'text', new_path: 'src/file.ts', new_line: 13 },
+            author: { username: 'reviewer' },
+          },
+        ])
+      return undefined
+    })
+    const cwd = await checkout()
+    expect(await readPullRequestComments({ cwd, number: 7 }, forge)).toMatchObject({
+      kind: 'ready',
+      comments: [{ id: '2', body: 'review' }],
+    })
+    await postPullRequestComment({ cwd, number: 7, body: 'true' }, forge)
+    expect(forge.calls.at(-1)?.argv).toEqual(
+      expect.arrayContaining([
+        'projects/group%2Fsub%2Frepo/merge_requests/7/notes',
+        '--hostname',
+        'gitlab.example.com',
+        '--input',
+        '-',
+        '--header',
+        'Content-Type: application/json',
+      ]),
+    )
+    expect(forge.calls.at(-1)?.input).toBe(JSON.stringify({ body: 'true' }))
+  })
+
+  it('Forgejo sends the body on stdin using the login for the remote host', async () => {
+    const forge = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+      if (argv[1] === 'login')
+        return json([
+          { name: 'wrong', url: 'https://forgejo.example.com' },
+          { name: 'correct', url: 'https://codeberg.org' },
+        ])
+      if (argv.includes('POST')) return ok('{}')
+      if (argv[1] === 'api')
+        return json([
+          {
+            id: 4,
+            body: 'review',
+            created_at: 'today',
+            html_url: 'https://codeberg.org/acme/repo/pulls/7',
+            user: { login: 'reviewer' },
+          },
+        ])
+      return undefined
+    })
+    const cwd = await checkout()
+    expect(await readPullRequestComments({ cwd, number: 7 }, forge)).toMatchObject({
+      kind: 'ready',
+      comments: [{ id: '4' }],
+    })
+    await postPullRequestComment({ cwd, number: 7, body: 'text\nwith quotes "' }, forge)
+    expect(forge.calls.at(-1)).toMatchObject({
+      input: JSON.stringify({ body: 'text\nwith quotes "' }),
+    })
+    expect(forge.calls.at(-1)?.argv).toEqual(
+      expect.arrayContaining([
+        '--login',
+        'correct',
+        'https://codeberg.org/api/v1/repos/acme/repo/issues/7/comments',
+      ]),
+    )
+  })
+
+  it.each([99, 100, 101])(
+    'Forgejo bounds %i unpaginated comments and reports only omitted rows',
+    async (count) => {
+      const forge = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+        if (argv[1] === 'login') return json([{ name: 'fixture', url: 'https://codeberg.org' }])
+        if (argv[1] === 'api')
+          return json(
+            Array.from({ length: count }, (_, index) => ({
+              id: index + 1,
+              body: `Comment ${index + 1}`,
+              created_at: '2026-10-01T10:00:00Z',
+              html_url: `https://codeberg.org/acme/repo/pulls/7#issuecomment-${index + 1}`,
+              user: { login: 'reviewer' },
+            })),
+          )
+        return undefined
+      })
+      const result = await readPullRequestComments({ cwd: await checkout(), number: 7 }, forge)
+      expect(result.kind).toBe('ready')
+      if (result.kind !== 'ready') return
+      expect(result.comments).toHaveLength(Math.min(count, 100))
+      expect(result.comments.at(-1)?.id).toBe(String(Math.min(count, 100)))
+      expect(result.truncated).toBe(count > 100)
+      expect(forge.calls.at(-1)?.argv.at(-1)).toBe(
+        'https://codeberg.org/api/v1/repos/acme/repo/issues/7/comments',
+      )
+    },
+  )
+
+  it.each([99, 100])('GitHub keeps the page-bound preview for %i comments', async (count) => {
+    const forge = boundary('https://github.com/acme/repo.git', (argv) => {
+      if (argv[1] === 'auth') return ok()
+      if (argv[1] === 'api')
+        return json(
+          Array.from({ length: count }, (_, index) => ({
+            id: index + 1,
+            body: `Comment ${index + 1}`,
+            created_at: '2026-10-01T10:00:00Z',
+            html_url: `https://github.com/acme/repo/pull/7#issuecomment-${index + 1}`,
+            user: { login: 'reviewer' },
+          })),
+        )
+      return undefined
+    })
+    const result = await readPullRequestComments({ cwd: await checkout(), number: 7 }, forge)
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.comments).toHaveLength(count)
+    expect(result.truncated).toBe(count === 100)
+    expect(forge.calls.at(-1)?.argv).toContain('repos/acme/repo/issues/7/comments?per_page=100')
+  })
+
+  it('Bitbucket filters inline/reply/deleted comments and explicitly reports a bounded page', async () => {
+    const forge = boundary('https://bitbucket.org/acme/repo.git', (argv) =>
+      argv.includes('credential') ? ok('username=fixture\npassword=fixture\n') : undefined,
+    )
+    const requests: { url: string; body: string | null }[] = []
+    const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(url), body: typeof init?.body === 'string' ? init.body : null })
+      if (init?.method === 'POST') return Response.json({ id: 3 })
+      const comment = {
+        id: 1,
+        content: { raw: 'general' },
+        created_on: 'today',
+        user: { display_name: 'reviewer' },
+        links: { html: { href: 'https://bitbucket.org/acme/repo/pull-requests/7' } },
+      }
+      return Response.json({
+        next: 'https://api.bitbucket.org/next',
+        values: [
+          comment,
+          { ...comment, id: 2, inline: { path: 'file' } },
+          { ...comment, id: 3, parent: { id: 1 } },
+          { ...comment, id: 4, deleted: true },
+        ],
+      })
+    }) as typeof fetch
+    const boundaries = { ...forge, fetch: fetcher }
+    const cwd = await checkout()
+    expect(await readPullRequestComments({ cwd, number: 7 }, boundaries)).toMatchObject({
+      kind: 'ready',
+      comments: [{ id: '1', body: 'general' }],
+      truncated: true,
+    })
+    await postPullRequestComment({ cwd, number: 7, body: 'Thanks' }, boundaries)
+    expect(requests.at(-1)).toEqual({
+      url: 'https://api.bitbucket.org/2.0/repositories/acme/repo/pullrequests/7/comments',
+      body: JSON.stringify({ content: { raw: 'Thanks' } }),
+    })
+  })
+
+  it('Azure discussion is explicitly unsupported without reading or writing a fake universal API', async () => {
+    const forge = boundary('https://dev.azure.com/org/project/_git/repo', (argv) =>
+      argv[1] === 'account' ? ok('fixture') : undefined,
+    )
+    const cwd = await checkout()
+    expect(await readPullRequestComments({ cwd, number: 7 }, forge)).toMatchObject({
+      kind: 'unsupported',
+      forge: { kind: 'azure-devops' },
+    })
+    expect(await postPullRequestComment({ cwd, number: 7, body: 'Thanks' }, forge)).toMatchObject({
+      kind: 'unsupported',
+    })
+    expect(forge.commands('az')).toHaveLength(1)
+  })
+
+  it('a refused comment exposes no forge stderr or comment body', async () => {
+    const forge = boundary('https://github.com/acme/repo.git', (argv) =>
+      argv[1] === 'auth' ? ok() : { exitCode: 1, stdout: '', stderr: 'secret body' },
+    )
+    await expect(
+      postPullRequestComment({ cwd: await checkout(), number: 7, body: 'private comment' }, forge),
+    ).rejects.toMatchObject({
+      code: 'git.PULL_REQUEST_COMMENT_FAILED',
+      message: 'The Git host could not post the comment',
+    })
+  })
 })
