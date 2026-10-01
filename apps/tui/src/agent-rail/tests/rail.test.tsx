@@ -20,6 +20,7 @@ import {
 } from '../../../test/factories/agent-rail'
 import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { runPaletteCommand } from '../../../test/actions'
+import { traceFocus } from '../../../test/focus-trace'
 
 test('native session rail filters, marks, renames, archives, restores and deletes real sessions', async ({
   server,
@@ -255,6 +256,8 @@ test('native delete skips confirmation when configured and selects the first con
     ).error,
   ).toBeNull()
   const h = await renderAgentStage(server)
+  // It flaked once with focus on the composer; a failure prints what moved focus.
+  traceFocus(h.frame)
   try {
     const first = await createRailSession(h.chat, h.worktreeId, 'First survivor')
     const middle = await createRailSession(h.chat, h.worktreeId, 'Delete middle')

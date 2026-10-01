@@ -261,3 +261,104 @@ test('archive and delete route to the real owner when two servers share a sessio
   expect((await h.clientB.orchestration['shell-snapshot'].get()).data!.sessions).toHaveLength(0)
   expect(useSessionMultiSelectStore.getState().refs).toEqual([local])
 })
+
+test('a transport-failed current deletion keeps its row, route and selection', async ({
+  server,
+}) => {
+  let interrupted = 0
+  let failedId: SessionId | undefined
+  const client = createObservedInProcessClient(server, async (request) => {
+    if (!request.url.endsWith('/orchestration/commands')) return
+    const body = await request.clone().json()
+    if (body.type !== 'session.delete' || body.sessionId !== failedId) return
+    interrupted++
+    throw createClientError({
+      code: 'TEST_NETWORK_FAILURE',
+      message: 'Injected deletion network failure',
+      status: 503,
+      why: 'The test interrupts the current session deletion.',
+      fix: 'Retry the failed selection.',
+    })
+  })
+  const harness = await createRailHarness(client, server)
+  failedId = harness.sessionIds[0]!
+  const navigation = createTestNavigation({ application: harness.application })
+  const hook = renderHookWithProviders(() => useSessionActions(), {
+    application: harness.application,
+    queryClient: harness.application.getSnapshot().queryClient,
+    navigation,
+  })
+  await waitForNavigation(navigation)
+  const ref = { environmentId: harness.environmentId, sessionId: failedId }
+  await act(async () => {
+    await navigation.openChat({ ...ref, surface: 'main' })
+  })
+  const before = navigation.router.state.location.href
+  useSessionMultiSelectStore.setState({ refs: [ref], anchor: ref })
+  await act(async () => {
+    await hook.result.current.confirmDelete({ refs: [ref], title: 'First' })
+  })
+  expect(interrupted).toBe(1)
+  expect((await harness.refresh()).sessions.map((session) => session.id)).toEqual(
+    harness.sessionIds,
+  )
+  expect(useSessionSelectionStore.getState().selection).toMatchObject({ kind: 'session', ...ref })
+  expect(useSessionMultiSelectStore.getState().refs).toEqual([ref])
+  expect(navigation.router.state.location.href).toEqual(before)
+})
+
+test('pending deletion preserves a route chosen before its real command finishes', async ({
+  server,
+}) => {
+  let reached = false
+  const commands: string[] = []
+  const release = Promise.withResolvers<void>()
+  let deletedId: SessionId | undefined
+  const client = createObservedInProcessClient(server, async (request) => {
+    if (!request.url.endsWith('/orchestration/commands')) return
+    const body = await request.clone().json()
+    commands.push(body.type)
+    if (body.type !== 'session.delete' || body.sessionId !== deletedId) return
+    reached = true
+    await release.promise
+  })
+  const harness = await createRailHarness(client, server, ['Deleted', 'Chosen', 'Other survivor'])
+  deletedId = harness.sessionIds[0]!
+  const navigation = createTestNavigation({ application: harness.application })
+  const hook = renderHookWithProviders(() => useSessionActions(), {
+    application: harness.application,
+    queryClient: harness.application.getSnapshot().queryClient,
+    navigation,
+  })
+  await waitForNavigation(navigation)
+  const first = { environmentId: harness.environmentId, sessionId: deletedId }
+  const chosen = { environmentId: harness.environmentId, sessionId: harness.sessionIds[1]! }
+  await act(async () => {
+    await navigation.openChat({ ...first, surface: 'main' })
+  })
+  let pending: Promise<void> | undefined
+  try {
+    act(() => {
+      pending = hook.result.current.confirmDelete({ refs: [first], title: 'Deleted' })
+    })
+    await waitFor(() => expect({ reached, commands }).toMatchObject({ reached: true }))
+    await act(async () => {
+      await navigation.openChat({ ...chosen, surface: 'main' })
+    })
+    const before = navigation.router.state.location.href
+    release.resolve()
+    await act(async () => {
+      await pending
+    })
+    expect(useSessionSelectionStore.getState().selection).toMatchObject({
+      kind: 'session',
+      ...chosen,
+    })
+    expect(navigation.router.state.location.href).toEqual(before)
+    expect((await harness.refresh()).sessions.map((session) => session.id)).toEqual(
+      harness.sessionIds.slice(1),
+    )
+  } finally {
+    release.resolve()
+  }
+})

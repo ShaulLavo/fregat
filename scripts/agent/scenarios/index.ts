@@ -55,7 +55,7 @@ import { fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
-import { backgroundLiveness } from './background-liveness'
+import { backgroundLiveness, backgroundMonitorLiveness } from './background-liveness'
 import { spinnerPalette } from './spinner-palette'
 import { sessionBulkFailures } from './session-bulk-failures'
 import { sessionLifecycle } from './session-lifecycle'
@@ -497,6 +497,7 @@ export const scenarios: readonly Scenario[] = [
   draftRecovery,
   asyncQuestions,
   backgroundLiveness,
+  backgroundMonitorLiveness,
   spinnerPalette,
   checkpointRewind,
   workbenchListFocus,
