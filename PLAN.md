@@ -49,7 +49,7 @@ Work that can start without waiting for another program: 114, 126's server and p
 156 P0–P2, 204/205 producer prep, 202's local controls, 198's acceptance proofs, 200's baseline
 research and 209's design review. Bounded product lanes continue beside them: Markdown authoring
 in 111/108 before 171's composer swap (parser work in 176/189), measured typing in 201, tree
-slices in 178 and Ghostty 016's standalone readiness. Native stays editor-first; 088 follows 087.
+slices in 178 and Ghostty's [281](plans/281-ghostty-benchmarks-and-positioning.md) benchmarks and positioning. Native stays editor-first; 088 follows 087.
 
 ## Package cutover delivered
 
@@ -179,8 +179,8 @@ statuses here. In particular:
   [174](plans/174-external-mcp-servers.md).
 - The [native client roadmap](docs/native-plan-of-plans.md) owns Swift work. The TUI designs its
   own terminal UX; web parity items wait where the TUI redesign requires it.
-- Editor and ghostty-webgpu keep package-local backlogs. Paired changes land with their Platform
-  integration and CI ref. Verify current package gates before scheduling from historical numbers.
+- Editor keeps a package-local backlog; ghostty-webgpu's work is planned here, in Fregat's `plans/`.
+  Paired changes land with their Platform integration and CI ref. Verify current package gates before scheduling from historical numbers.
 - [183](plans/183-claude-ide-in-terminals.md) remains low priority. DOCX editing retains its
   Markdown/fidelity gate in 156. The `/platform` prefix removal remains deferred on mesh naming.
 
