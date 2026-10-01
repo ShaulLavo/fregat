@@ -1,4 +1,5 @@
 import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { materializeFileSnapshot, type FileSnapshot } from '@/lib/file-snapshot'
 import { parentPath } from '@/lib/path-formatters'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
@@ -56,6 +57,7 @@ import {
   type WorkspaceTreeOperation,
 } from '@/features/workspace/utils/event-model'
 import {
+  adoptFilesystemSnapshot,
   dismissFilesystemConflicts,
   markDeletedFilesystemDocument,
   notifyChangedFilesystemConflict,
@@ -732,7 +734,7 @@ async function applyRefreshOpenFileOperation({
     isDirty: isDirtyLiveDocument(path, dirtyDocumentKeys, conflictContext),
     liveText: liveDocumentText(path, conflictContext),
     path,
-    remoteText: file.content,
+    remoteText: supportsTextFile(file) ? file.content : null,
     remoteVersion: file.version,
   })
   applyFetchedOpenFileOperation(operation, file, forceReplaceLiveEditorDocument, conflictContext)
@@ -751,6 +753,10 @@ function applyFetchedOpenFileOperation(
   }
   if (!context.getLiveEditorDocument(fileDocumentKey(file.path))) return
 
+  if (!supportsTextFile(file)) {
+    adoptFilesystemSnapshot(file.path, file, context)
+    return
+  }
   forceReplaceLiveEditorDocument(file)
 }
 
