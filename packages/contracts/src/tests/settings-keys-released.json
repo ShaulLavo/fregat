@@ -72,6 +72,8 @@
     "editor.unicodeHighlight.ambiguousCharacters",
     "editor.unicodeHighlight.invisibleCharacters",
     "environments.devicePairing",
+    "environments.loadBalancing",
+    "environments.loadPreferences",
     "environments.machines",
     "files.autoSave",
     "files.autoSaveDelay",

@@ -1136,3 +1136,5 @@ export {
   type AgentReviewResult,
   type AgentReviewTarget,
 } from './agent-review'
+
+export { hostResourcesSchema, type HostResources } from './host-resources'

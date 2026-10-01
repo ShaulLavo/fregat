@@ -1,3 +1,4 @@
+import { machineBalancing } from './machine-balancing'
 import { binaryFileOpen, binaryFileRemote } from './binary-file-open'
 import { ghosttySiteFit } from './ghostty-site-fit'
 import { editorPagedReadonly } from './editor-paged-readonly'
@@ -439,6 +440,7 @@ export const scenarios: readonly Scenario[] = [
   sessionSearch,
   sessionSearchEnvironments,
   projectGrouping,
+  machineBalancing,
   sessionLifecycle,
   sessionBulkFailures,
   sessionUndo,
