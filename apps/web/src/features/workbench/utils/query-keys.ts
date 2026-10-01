@@ -1,3 +1,11 @@
+export const csvPresentationQueryKeys = {
+  presentation: () => ['workbench', 'csv-presentation'] as const,
+}
+
+export const csvEngineQueryKeys = {
+  engine: () => ['workbench', 'csv-engine'] as const,
+}
+
 export const wallpaperQueryKeys = {
   all: ['wallpaper'] as const,
   info: () => [...wallpaperQueryKeys.all, 'info'] as const,
