@@ -5,7 +5,7 @@ import { isRecord } from '@workspace/utils/objects'
 import { browserProfile, chromiumArguments } from './profile'
 import { liveSingletonOwner } from './singleton'
 import { launcherErrors } from './structured-errors'
-import { browserDiagnostics, drainBrowserDiagnostics } from './diagnostics'
+import { browserDiagnostics, browserProcessFacts, drainBrowserDiagnostics } from './diagnostics'
 import type { PlatformBridge } from '../shared/bridge'
 
 type ChromiumOptions = {
@@ -197,7 +197,16 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     () => {
       cdp.close(
         launcherErrors.CDP_FAILED({
-          internal: { reason: 'startup-deadline', startupPhase, ...diagnostics.snapshot() },
+          internal: {
+            reason: 'startup-deadline',
+            startupPhase,
+            ...diagnostics.snapshot(),
+            transport: cdp.snapshot(),
+            ...browserProcessFacts(child.pid, options.candidate.executable, [
+              child.stdio[3] as number,
+              child.stdio[4] as number,
+            ]),
+          },
         }),
       )
     },

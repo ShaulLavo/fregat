@@ -9,7 +9,7 @@ function probe(lock: string | undefined, command: string | undefined) {
   })
 }
 const command =
-  '/usr/lib/chromium/chromium\0--user-data-dir=/state/desktop/chromium\0--remote-debugging-pipe\0'
+  '/usr/lib/chromium/chromium\0--user-data-dir=/state/desktop/chromium\0--profile-directory=Platform\0--remote-debugging-pipe\0'
 
 test('only a live local CDP process for the exact profile confirms handoff', () => {
   expect(probe('host-42', command)).toBe(true)
@@ -27,6 +27,17 @@ test.each([
   '--user-data-dir=/state/desktop/chromium\0',
 ])('foreign/uncontrolled process cannot confirm a handoff', (value) => {
   expect(probe('host-42', value)).toBe(false)
+})
+
+test.each([
+  '--user-data-dir=/state/desktop/chromium\0--profile-directory=Other\0--remote-debugging-pipe',
+  '--user-data-dir=/state/desktop/chromium\0--remote-debugging-pipe',
+  '--user-data-dir=/state/desktop/chromium\0--extra\0--profile-directory=Platform\0--remote-debugging-pipe',
+  '--user-data-dir=/state/desktop/chromium\0--profile-directory=Platform\0--extra\0--remote-debugging-pipe',
+  '--user-data-dir=/state/desktop/chromium-extra\0--profile-directory=Platform\0--remote-debugging-pipe',
+  '--user-data-dir=/state/desktop/chromium\0--profile-directory=Platform\0--remote-debugging-pipe-extra',
+])('split argv requires the same exact contiguous launcher signature %s', (signature) => {
+  expect(probe('host-42', `/usr/lib/chromium/chromium\0${signature}\0`)).toBe(false)
 })
 
 test.each(Array.from({ length: 30 }, (_, run) => run))(

@@ -5,6 +5,7 @@ import { hostname, tmpdir } from 'node:os'
 import path from 'node:path'
 import { launchChromium } from '../chromium'
 import { cdpPipe } from '../cdp'
+import { liveSingletonOwner } from '../singleton'
 import type { BrowserCandidate } from '../browser'
 
 async function fixture(mode: string) {
@@ -44,6 +45,7 @@ test.each(Array.from({ length: 30 }, (_, run) => run))(
         'setInterval(() => {}, 1000)',
         '--',
         `--user-data-dir=${profile}`,
+        '--profile-directory=Platform',
         '--remote-debugging-pipe',
       ],
       { stdio: ['ignore', 'ignore', 'ignore'] },
@@ -182,12 +184,14 @@ test('/bin/true with an existing valid profile owner is rejected and preserves t
       'setInterval(() => {}, 1000)',
       '--',
       `--user-data-dir=${profile}`,
+      '--profile-directory=Platform',
       '--remote-debugging-pipe',
     ],
     { stdio: ['ignore', 'ignore', 'ignore'] },
   )
   await symlink(`${hostname()}-${other.pid}`, path.join(profile, 'SingletonLock'))
   try {
+    expect(liveSingletonOwner(profile, process.execPath)).toBe(true)
     await expect(
       launchChromium({
         candidate: { ...f.candidate, executable: '/bin/true', args: [] },

@@ -21,6 +21,9 @@ export class CdpClient {
   private listeners = new Map<string, Set<(event: CdpEvent) => void>>()
   private closed = false
   private writeTail: Promise<void> = Promise.resolve()
+  private readBytes = 0
+  private writtenBytes = 0
+  private frames = 0
   private reader: ReadableStreamDefaultReader<Uint8Array>
   readonly done: Promise<void>
 
@@ -50,12 +53,17 @@ export class CdpClient {
         JSON.stringify({ id, method, params, sessionId }) + '\0',
       )
       this.writeTail = this.writeTail
-        .then(() => {
+        .then(async () => {
           if (this.closed) return
-          return this.transport.write(bytes)
+          await this.transport.write(bytes)
+          this.writtenBytes += bytes.length
         })
         .catch((error: unknown) => this.close(error))
     })
+  }
+
+  snapshot() {
+    return { readBytes: this.readBytes, writtenBytes: this.writtenBytes, frames: this.frames }
   }
 
   on(method: string, handler: (event: CdpEvent) => void) {
@@ -86,6 +94,7 @@ export class CdpClient {
     while (!this.closed) {
       const chunk = await this.reader.read()
       if (chunk.done) break
+      this.readBytes += chunk.value.length
       buffer += decoder.decode(chunk.value, { stream: true })
       if (buffer.length > 8 * 1024 * 1024) throw this.failure('frame-size')
       let end = buffer.indexOf('\0')
@@ -99,6 +108,7 @@ export class CdpClient {
   }
 
   private receive(frame: string) {
+    this.frames++
     let message: unknown
     try {
       message = JSON.parse(frame)
@@ -116,7 +126,10 @@ export class CdpClient {
           this.failure('request-error', {
             id: message.id,
             method: pending.method,
-            protocolCode: message.error.code,
+            protocolCode:
+              typeof message.error.code === 'number' && Number.isFinite(message.error.code)
+                ? message.error.code
+                : null,
           }),
         )
         return

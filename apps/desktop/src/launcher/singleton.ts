@@ -37,8 +37,11 @@ export function hasSingletonOwner(
   const command = fs.readFile(`/proc/${pid}/cmdline`)?.split('\0').filter(Boolean)
   if (!command?.length) return false
   if (command.length > 1)
-    return (
-      command.includes(`--user-data-dir=${profile}`) && command.includes('--remote-debugging-pipe')
+    return command.some(
+      (token, index) =>
+        token === `--user-data-dir=${profile}` &&
+        command[index + 1] === '--profile-directory=Platform' &&
+        command[index + 2] === '--remote-debugging-pipe',
     )
   // Chromium rewrites argv into one process-title string on Linux.
   const signature = ` --user-data-dir=${profile} --profile-directory=Platform --remote-debugging-pipe`

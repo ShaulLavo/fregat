@@ -97,7 +97,7 @@ export async function observePolaronTerminal(page: Page) {
         }
       }
       for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
-        await stopFixtureLauncherProcess(page, fixture, signal, evidence)
+        const automaticExit = await stopFixtureLauncherProcess(page, fixture, signal, evidence)
         ok(
           page.context().browser()?.isConnected(),
           'The existing app survives launcher-process termination',
@@ -109,6 +109,7 @@ export async function observePolaronTerminal(page: Page) {
           'Launcher termination leaves the existing shell connected',
         )
         await step(`shared-terminal-survives-launcher-${signal.toLowerCase()}`)
+        ok(automaticExit, 'Launcher termination and pipe EOF must leave no live owned browser')
       }
       await evidence.json('polaron-continuity.json', {
         actualPlatformWindow: true,
@@ -170,7 +171,7 @@ async function stopFixtureLauncherProcess(
   const child = Bun.spawn([process.execPath, '-e', source], {
     stdio: ['ignore', 'ignore', 'ignore'],
   })
-  let browserPid: number | undefined
+  let browserIdentity: { pid: number; startTime: string } | undefined
   try {
     const ready = Bun.file(readyFile)
     const deadline = Date.now() + 10_000
@@ -182,7 +183,12 @@ async function stopFixtureLauncherProcess(
       Number.isSafeInteger(info.browserPid) && info.browserPid > 0,
       'The fixture records its own browser PID',
     )
-    browserPid = info.browserPid
+    const observed = await readFixtureProcess(info.browserPid)
+    ok(
+      observed && observed.state !== 'Z',
+      'The private CDP browser must be live before launcher termination',
+    )
+    browserIdentity = { pid: info.browserPid, startTime: observed.startTime }
     child.kill(signal)
     const exitCode = await Promise.race([
       child.exited,
@@ -190,27 +196,56 @@ async function stopFixtureLauncherProcess(
         ok(false, 'Fixture launcher must exit')
       }),
     ])
+    const cleanupDeadline = Date.now() + 5000
+    while (Date.now() < cleanupDeadline && (await trackedFixtureBrowserLives(browserIdentity)))
+      await Bun.sleep(25)
+    const automaticExit = !(await trackedFixtureBrowserLives(browserIdentity))
     await evidence.json(`launcher-${signal.toLowerCase()}.json`, {
       signal,
       exitCode,
+      ownedBrowserAutoExited: automaticExit,
       existingBrowserConnected: page.context().browser()?.isConnected(),
     })
+    if (signal === 'SIGTERM')
+      strictEqual(exitCode, 0, 'Graceful production launcher cleanup must succeed')
+    return automaticExit
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL')
     await child.exited
     // A killed fixture parent cannot reap its child; this PID came from its own private CDP session.
-    await stopTrackedFixtureBrowser(browserPid)
+    await stopTrackedFixtureBrowser(browserIdentity)
   }
 }
 
-async function stopTrackedFixtureBrowser(pid: number | undefined) {
-  if (!pid) return
+async function readFixtureProcess(pid: number) {
+  let stat: string
   try {
-    process.kill(pid, 'SIGTERM')
+    stat = await Bun.file(`/proc/${pid}/stat`).text()
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
+  }
+  const fields = stat.slice(stat.lastIndexOf(') ') + 2).split(' ')
+  const startTime = fields[19]
+  ok(startTime, 'The tracked process must expose its Linux start-time identity')
+  return { state: fields[0], startTime }
+}
+
+async function trackedFixtureBrowserLives(identity: { pid: number; startTime: string }) {
+  const observed = await readFixtureProcess(identity.pid)
+  return (
+    observed?.startTime === identity.startTime && observed.state !== 'Z' && observed.state !== 'X'
+  )
+}
+
+async function stopTrackedFixtureBrowser(identity: { pid: number; startTime: string } | undefined) {
+  if (!identity || !(await trackedFixtureBrowserLives(identity))) return
+  try {
+    process.kill(identity.pid, 'SIGTERM')
     const deadline = Date.now() + 2000
-    while (Date.now() < deadline && (await Bun.file(`/proc/${pid}/stat`).exists()))
+    while (Date.now() < deadline && (await trackedFixtureBrowserLives(identity)))
       await Bun.sleep(25)
-    if (await Bun.file(`/proc/${pid}/stat`).exists()) process.kill(pid, 'SIGKILL')
+    if (await trackedFixtureBrowserLives(identity)) process.kill(identity.pid, 'SIGKILL')
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
   }

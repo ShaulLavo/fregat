@@ -2,7 +2,7 @@ import { accessSync, constants, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { errorMessage } from '@workspace/contracts'
-import { EvlogError } from 'evlog'
+import { launcherFailureFacts, reportStartFailure } from './failure'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
 import { portFromEnv, runtimeUrl } from '../../../../scripts/runtime-network'
 import { desktopErrors } from '../bun/structured-errors'
@@ -33,15 +33,13 @@ try {
   await start()
 } catch (error) {
   if (!controller.signal.aborted) {
-    recordDesktopError('desktop.start_failed', {
-      error: errorMessage(error),
-      code: error instanceof EvlogError ? error.code : undefined,
-      internal: error instanceof EvlogError ? error.internal : undefined,
+    reportStartFailure(error, {
+      log: (facts) => recordDesktopError('desktop.start_failed', facts),
+      stderr: (line) => console.error(line),
+      exit: (code) => {
+        process.exitCode = code
+      },
     })
-    console.error(
-      `Platform could not start. ${errorMessage(error)} ${error instanceof EvlogError ? (error.fix ?? '') : ''}`,
-    )
-    process.exitCode = 1
   }
 } finally {
   await window?.close()
@@ -113,7 +111,12 @@ async function start() {
         onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
         onExit: (context) => recordDesktopInfo('desktop.window.closed', context),
         onFailure: (error) =>
-          recordDesktopError('desktop.window.control_failed', { error: errorMessage(error) }),
+          recordDesktopError('desktop.window.control_failed', {
+            outcome: 'failed',
+            source: candidate.source,
+            confinement: candidate.confinement,
+            ...launcherFailureFacts(error),
+          }),
       })
       recordDesktopInfo('desktop.browser.chosen', {
         source: candidate.source,
@@ -127,9 +130,10 @@ async function start() {
     } catch (error) {
       if (controller.signal.aborted) throw error
       recordDesktopInfo('desktop.browser.rejected', {
+        outcome: 'rejected',
         source: candidate.source,
         confinement: candidate.confinement,
-        error: errorMessage(error),
+        ...launcherFailureFacts(error),
       })
     }
   }

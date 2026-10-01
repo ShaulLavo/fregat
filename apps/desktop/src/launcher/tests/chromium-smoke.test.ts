@@ -1,5 +1,7 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { browserProcessFacts } from '../diagnostics'
+import { chromiumArguments } from '../profile'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
@@ -77,6 +79,25 @@ test.skipIf(!executable)(
     try {
       // CI has no compositor; its browser still exercises the production CDP pipe and profile.
       if (!native) candidate.args = ['--headless', '--no-sandbox']
+      let restrictedUserNamespaces: boolean | null = null
+      try {
+        restrictedUserNamespaces =
+          readFileSync('/proc/sys/kernel/apparmor_restrict_unprivileged_userns', 'utf8').trim() ===
+          '1'
+      } catch {}
+      console.info('smoke startup inputs', {
+        selectedCommand: path.basename(executable!),
+        canonicalCommand: path.basename(realpathSync(executable!)),
+        native,
+        headless: candidate.args.includes('--headless'),
+        noSandbox: candidate.args.includes('--no-sandbox'),
+        restrictedUserNamespaces,
+        argumentNames: chromiumArguments(
+          candidate,
+          path.join(scratch, 'desktop/chromium'),
+          url,
+        ).map((argument) => argument.split('=')[0]),
+      })
       first = await launchChromium({
         candidate,
         stateHome: scratch,
@@ -89,6 +110,15 @@ test.skipIf(!executable)(
       expect(first.kind).toBe('owned')
       if (first.kind !== 'owned') return
       const owner = first
+      const processInfo = await owner.cdp.request('SystemInfo.getProcessInfo')
+      const browserProcess = (processInfo.processInfo as { type: string; id: number }[]).find(
+        (process) => process.type === 'browser',
+      )
+      expect(browserProcess).toBeDefined()
+      console.info('smoke known-good transport', {
+        transport: owner.cdp.snapshot(),
+        ...browserProcessFacts(browserProcess!.id, executable!, []),
+      })
       const sessions = new Map<string, string>()
       await until(async () => {
         const targets = await pages(owner.cdp)

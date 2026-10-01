@@ -92,7 +92,7 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
       const result = await browserWindow.cdp.request(
         'Runtime.evaluate',
         {
-          expression: `Boolean(document.querySelector('[aria-label="Window toolbar"]') && globalThis.platformBridge?.titlebar === 'native' && globalThis.platformDevServerUrl === ${JSON.stringify(serverUrl)} && Array.from(document.querySelectorAll('[role="treeitem"]')).some(row => row.textContent?.includes('a.txt')))`,
+          expression: `Boolean(document.querySelector('[aria-label="Window toolbar"]') && globalThis.platformBridge?.titlebar === 'native' && globalThis.platformDevServerUrl === ${JSON.stringify(serverUrl)} && Boolean(document.querySelector('[aria-label="Folder tree"] [role="treeitem"][aria-label="a.txt"]')))`,
           returnByValue: true,
         },
         session,
@@ -101,10 +101,15 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
       if (ready) break
       await Bun.sleep(50)
     }
-    ok(
-      ready,
-      'Actual Platform must render using the throwaway API in the owned Chromium app window',
+    const inspection = await browserWindow.cdp.request(
+      'Runtime.evaluate',
+      {
+        expression: `JSON.stringify({ href: location.href, toolbar: Boolean(document.querySelector('[aria-label="Window toolbar"]')), titlebar: globalThis.platformBridge?.titlebar, fixtureApi: globalThis.platformDevServerUrl === ${JSON.stringify(serverUrl)}, tree: Array.from(document.querySelectorAll('[role="treeitem"]')).map(row => row.textContent), body: document.body?.innerText })`,
+        returnByValue: true,
+      },
+      session,
     )
+    await evidence.json(path.basename(stateHome) + '-readiness.json', inspection.result)
     const screenshot = await browserWindow.cdp.request(
       'Page.captureScreenshot',
       { format: 'png' },
@@ -113,6 +118,10 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
     await evidence.write(
       path.basename(stateHome) + '.png',
       Buffer.from(screenshot.data as string, 'base64'),
+    )
+    ok(
+      ready,
+      'Actual Platform must render using the throwaway API in the owned Chromium app window',
     )
     return { ...browserWindow, close }
   } catch (error) {
