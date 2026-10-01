@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { createGateway, waitForProxy } from './gateway'
 import { configSchema, startGateway } from './run'
 import * as v from 'valibot'
@@ -165,7 +165,7 @@ test('rejects management paths, missing auth, malformed JSON and unsupported mod
   ).toBe(400)
 })
 
-test('rejects rebound Host and every browser marker on messages and health', async () => {
+test('rejects rebound Host, Origin and Sec-Fetch-Site on messages and health', async () => {
   const gateway = createGateway({
     anthropicUrl: 'http://127.0.0.1:1',
     proxyUrl: 'http://127.0.0.1:1',
@@ -175,11 +175,10 @@ test('rejects rebound Host and every browser marker on messages and health', asy
   for (const path of ['/health', '/v1/messages']) {
     for (const headers of [
       { host: 'attacker.example:8318' },
-      { host: '127.0.0.1:8317' },
+      { host: '127.0.0.1.attacker.example:8317' },
       {},
       { host: '127.0.0.1:8318', origin: 'null' },
       { host: '127.0.0.1:8318', 'sec-fetch-site': 'same-origin' },
-      { host: '127.0.0.1:8318', 'sec-fetch-mode': 'cors' },
     ]) {
       const response = await gateway(
         new Request(`http://127.0.0.1:8318${path}`, { headers: headers as HeadersInit }),
@@ -194,7 +193,7 @@ test('rejects rebound Host and every browser marker on messages and health', asy
   for (const host of ['127.0.0.1:8318', 'localhost:8318', '[::1]:8318']) {
     expect(
       (await gateway(new Request('http://127.0.0.1:8318/health', { headers: { host } }))).status,
-    ).toBe(200)
+    ).toBe(503)
   }
 })
 
@@ -227,11 +226,10 @@ test('Node HTTP client supplies the expected Host without browser markers', asyn
 })
 
 test('health stays unavailable and GPT waits for readiness while Claude proceeds', async () => {
-  let release!: (ready: boolean) => void
-  const proxyReady = new Promise<boolean>((resolve) => {
-    release = resolve
-  })
   let requests = 0
+  const reservation = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response('ok') })
+  const proxyPort = reservation.port!
+  reservation.stop(true)
   const upstream = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
@@ -240,12 +238,12 @@ test('health stays unavailable and GPT waits for readiness while Claude proceeds
       return Response.json({ ok: true })
     },
   })
+  let proxy: ReturnType<typeof Bun.serve> | undefined
   const gateway = createGateway({
     anthropicUrl: upstream.url.toString(),
-    proxyUrl: upstream.url.toString(),
+    proxyUrl: `http://127.0.0.1:${proxyPort}`,
     apiKey: 'proxy-key',
     gatewayPort: 8318,
-    proxyReady,
   })
   const request = (model: string) =>
     new Request('http://127.0.0.1:8318/v1/messages', {
@@ -264,7 +262,14 @@ test('health stays unavailable and GPT waits for readiness while Claude proceeds
     const gpt = gateway(request('gpt-6.1-sol'))
     expect((await gateway(request('claude-opus-5-5'))).status).toBe(200)
     expect(requests).toBe(1)
-    release(true)
+    proxy = Bun.serve({
+      hostname: '127.0.0.1',
+      port: proxyPort,
+      fetch() {
+        requests++
+        return Response.json({ ok: true })
+      },
+    })
     expect((await gpt).status).toBe(200)
     expect(requests).toBe(2)
     expect(
@@ -275,7 +280,7 @@ test('health stays unavailable and GPT waits for readiness while Claude proceeds
       ).status,
     ).toBe(200)
   } finally {
-    release(false)
+    proxy?.stop(true)
     upstream.stop(true)
   }
 })
@@ -292,13 +297,12 @@ test('TCP readiness polls cold proxy startup and gives up with a clear GPT 503',
   } finally {
     upstream.stop(true)
   }
-  const unavailable = waitForProxy(port, 50)
+  expect(await waitForProxy(port, 50)).toBe(false)
   const gateway = createGateway({
     anthropicUrl: 'http://127.0.0.1:1',
     proxyUrl: `http://127.0.0.1:${port}`,
     apiKey: 'proxy-key',
     gatewayPort: 8318,
-    proxyReady: unavailable,
   })
   const response = await gateway(
     new Request('http://127.0.0.1:8318/v1/messages', {
@@ -433,7 +437,6 @@ test('runtime server enforces the documented 32 MiB Messages body cap', async ()
     anthropicUrl: 'http://127.0.0.1:1',
     proxyUrl: 'http://127.0.0.1:1',
     apiKey: 'test',
-    proxyReady: Promise.resolve(true),
   })
   try {
     const response = await fetch(new URL('/v1/messages', server.url), {
@@ -453,26 +456,189 @@ test('runtime server enforces the documented 32 MiB Messages body cap', async ()
   }
 })
 
-test('mesh local forwarding accepts its public loopback Host alongside the backend port', async () => {
+test.each(['GPT', 'health'])(
+  'late proxy startup recovers via %s and logs give-up/recovery once',
+  async (first) => {
+    const logs: Record<string, unknown>[] = []
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      logs.push(JSON.parse(String(chunk)))
+      return true
+    })
+    const reservation = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch: () => new Response('ok'),
+    })
+    const port = reservation.port!
+    reservation.stop(true)
+    const startup = waitForProxy(port, 25)
+    const gateway = createGateway({
+      gatewayPort: 8318,
+      anthropicUrl: 'http://127.0.0.1:1',
+      proxyUrl: `http://127.0.0.1:${port}`,
+      apiKey: 'test',
+    })
+    const health = () =>
+      new Request('http://127.0.0.1:8318/health', { headers: { host: '127.0.0.1:8318' } })
+    const gpt = () =>
+      new Request('http://127.0.0.1:8318/v1/messages', {
+        method: 'POST',
+        headers: { host: '127.0.0.1:8318', authorization: 'test' },
+        body: '{"model":"gpt-6.1-sol"}',
+      })
+    let upstream: ReturnType<typeof Bun.serve> | undefined
+    try {
+      expect(await startup).toBe(false)
+      expect((await gateway(gpt())).status).toBe(503)
+      expect((await gateway(health())).status).toBe(503)
+      upstream = Bun.serve({
+        hostname: '127.0.0.1',
+        port,
+        fetch: () => Response.json({ ok: true }),
+      })
+      const recovered = await gateway(first === 'GPT' ? gpt() : health())
+      expect(recovered.status).toBe(200)
+      await recovered.text()
+      expect((await gateway(health())).status).toBe(200)
+      expect(await (await gateway(gpt())).json()).toEqual({ ok: true })
+      expect(
+        logs.map((log) => ({ level: log.level, operation: log.operation, state: log.state })),
+      ).toEqual([
+        { level: 'warn', operation: 'proxy-readiness', state: 'unavailable' },
+        { level: 'info', operation: 'proxy-readiness', state: 'reachable' },
+      ])
+      expect(logs[1]!.count).toBe(2)
+      upstream.stop(true)
+      upstream = undefined
+      expect((await gateway(health())).status).toBe(200)
+      expect(logs).toHaveLength(2)
+      for (const log of logs) {
+        expect(log).toMatchObject({
+          timestamp: expect.any(String),
+          source: 'be',
+          area: 'claude-gpt',
+          fix: expect.any(String),
+        })
+        expect(JSON.stringify(log)).not.toContain('test')
+      }
+    } finally {
+      upstream?.stop(true)
+      stderr.mockRestore()
+    }
+  },
+)
+
+test('Sec-Fetch-Mode alone passes while Origin and Sec-Fetch-Site still fail', async () => {
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch: () => Response.json({ ok: true }),
+  })
   const gateway = createGateway({
-    gatewayPort: 18318,
-    forwardedPort: 8318,
+    gatewayPort: 8318,
+    anthropicUrl: upstream.url.toString(),
+    proxyUrl: upstream.url.toString(),
+    apiKey: 'test',
+  })
+  const headers = { host: '127.0.0.1:8318', authorization: 'test', 'sec-fetch-mode': 'cors' }
+  try {
+    const response = await gateway(
+      new Request('http://127.0.0.1:8318/v1/messages', {
+        method: 'POST',
+        headers,
+        body: '{"model":"claude-opus-5-5"}',
+      }),
+    )
+    expect(response.status).toBe(200)
+    const browserMarkers: Record<string, string>[] = [
+      { origin: 'http://attacker.example' },
+      { 'sec-fetch-site': 'same-origin' },
+    ]
+    for (const marker of browserMarkers) {
+      expect(
+        (
+          await gateway(
+            new Request('http://127.0.0.1:8318/v1/messages', {
+              method: 'POST',
+              headers: { ...headers, ...marker },
+              body: '{"model":"claude-opus-5-5"}',
+            }),
+          )
+        ).status,
+      ).toBe(403)
+    }
+  } finally {
+    upstream.stop(true)
+  }
+})
+
+test('real Node fetch reaches the gateway with undici Sec-Fetch-Mode', async () => {
+  const server = startGateway({
+    gatewayPort: 0,
     anthropicUrl: 'http://127.0.0.1:1',
     proxyUrl: 'http://127.0.0.1:1',
     apiKey: 'test',
   })
-  for (const host of ['127.0.0.1:8318', 'localhost:8318', '[::1]:8318', '127.0.0.1:18318']) {
-    expect(
-      (await gateway(new Request('http://127.0.0.1:18318/health', { headers: { host } }))).status,
-    ).toBe(200)
+  const endpoint = new URL('/v1/messages', server.url).toString()
+  // A malformed body proves admission without reaching a provider.
+  try {
+    const client = Bun.spawn(
+      [
+        'node',
+        '-e',
+        `fetch(${JSON.stringify(endpoint)}, {method:'POST', headers:{authorization:'test','sec-fetch-mode':'cors'}, body:'{'}).then(async response => { console.log(response.status); console.log(await response.text()) }).catch(() => process.exit(1))`,
+      ],
+      { stdout: 'pipe', stderr: 'pipe' },
+    )
+    const output = await new Response(client.stdout).text()
+    expect(await client.exited).toBe(0)
+    expect(output).toContain('400\n')
+    expect(output).toContain('invalid_request_error')
+  } finally {
+    server.stop(true)
   }
-  expect(
-    (
-      await gateway(
-        new Request('http://127.0.0.1:18318/health', {
-          headers: { host: 'attacker.example:8318' },
-        }),
-      )
-    ).status,
-  ).toBe(403)
+})
+
+test('loopback Host matching tolerates changed ports, casing, trailing dot and missing port', async () => {
+  const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response('ok') })
+  const gateway = createGateway({
+    gatewayPort: 45001,
+    anthropicUrl: upstream.url.toString(),
+    proxyUrl: upstream.url.toString(),
+    apiKey: 'test',
+  })
+  try {
+    for (const host of [
+      '127.0.0.1:45002',
+      '127.0.0.1',
+      '127.0.0.1.:80',
+      'localhost:45002',
+      'LOCALHOST:45002',
+      'localhost.',
+      'LOCALHOST.:443',
+      '[::1]:45002',
+      '[::1]',
+    ]) {
+      expect(
+        (await gateway(new Request('http://127.0.0.1:45001/health', { headers: { host } }))).status,
+        host,
+      ).toBe(200)
+    }
+    for (const host of [
+      'localhost.attacker.example',
+      '127.0.0.1.attacker.example',
+      'localhost:45002,localhost:45001',
+      '[::ffff:127.0.0.1]:45002',
+      'user@localhost:45002',
+      'localhost/path',
+      'localhost:bad',
+    ]) {
+      expect(
+        (await gateway(new Request('http://127.0.0.1:45001/health', { headers: { host } }))).status,
+        host,
+      ).toBe(403)
+    }
+  } finally {
+    upstream.stop(true)
+  }
 })

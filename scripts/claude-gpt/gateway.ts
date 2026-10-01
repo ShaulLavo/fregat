@@ -2,12 +2,12 @@ import { createConnection } from 'node:net'
 
 export type GatewayOptions = {
   gatewayPort: number
-  forwardedPort?: number
-  proxyReady?: Promise<boolean>
   anthropicUrl: string
   proxyUrl: string
   apiKey: string
 }
+
+const loopbackHost = /^(?:127\.0\.0\.1\.?|localhost\.?|\[::1\])(?::[0-9]+)?$/i
 
 const messagePaths = new Set(['/v1/messages', '/v1/messages/count_tokens'])
 const hopHeaders = [
@@ -66,6 +66,28 @@ export async function waitForProxy(port: number, timeoutMs = 15_000) {
   return false
 }
 
+function reportReadiness(
+  level: 'warn' | 'info',
+  state: 'unavailable' | 'reachable',
+  count: number,
+) {
+  process.stderr.write(
+    `${JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level,
+      source: 'be',
+      area: 'claude-gpt',
+      operation: 'proxy-readiness',
+      state,
+      count,
+      fix:
+        level === 'warn'
+          ? 'Check the proxy process; later requests will retry readiness.'
+          : 'GPT requests can proceed.',
+    })}\n`,
+  )
+}
+
 function proxyUnavailable() {
   return failure(
     503,
@@ -79,26 +101,31 @@ function failure(status: number, type: string, message: string) {
 }
 
 export function createGateway(options: GatewayOptions) {
-  const allowedHosts = new Set(
-    [options.gatewayPort, options.forwardedPort]
-      .filter((port) => port !== undefined)
-      .flatMap((port) => [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]),
-  )
-  let ready = options.proxyReady === undefined
-  const proxyReady = (options.proxyReady ?? Promise.resolve(true)).then((value) => {
-    ready = value
-    return value
-  })
+  let ready = false
+  let failedWaits = 0
+  const proxyPort = Number(new URL(options.proxyUrl).port || 80)
+  async function isReady() {
+    if (ready) return true
+    if (await waitForProxy(proxyPort, 250)) {
+      if (!ready && failedWaits > 0) reportReadiness('info', 'reachable', failedWaits)
+      ready = true
+      return true
+    }
+    if (ready) return true
+    failedWaits++
+    if (failedWaits === 1) reportReadiness('warn', 'unavailable', failedWaits)
+    return false
+  }
   return async (request: Request) => {
     if (
-      !allowedHosts.has(request.headers.get('host') ?? '') ||
-      ['origin', 'sec-fetch-site', 'sec-fetch-mode'].some((name) => request.headers.has(name))
+      !loopbackHost.test(request.headers.get('host') ?? '') ||
+      ['origin', 'sec-fetch-site'].some((name) => request.headers.has(name))
     ) {
       return failure(403, 'permission_error', 'Use the local gateway from Claude Code.')
     }
     const url = new URL(request.url)
     if (request.method === 'GET' && url.pathname === '/health') {
-      return ready ? Response.json({ status: 'ready' }) : proxyUnavailable()
+      return (await isReady()) ? Response.json({ status: 'ready' }) : proxyUnavailable()
     }
     if (request.method !== 'POST' || !messagePaths.has(url.pathname)) {
       return failure(404, 'not_found_error', 'Use the Claude Messages endpoint.')
@@ -135,7 +162,7 @@ export function createGateway(options: GatewayOptions) {
     const headers = new Headers(request.headers)
     stripHopHeaders(headers)
     if (isGpt) {
-      if (!(await proxyReady)) return proxyUnavailable()
+      if (!(await isReady())) return proxyUnavailable()
       for (const name of Array.from(headers.keys())) {
         if (!proxyHeaders.includes(name)) headers.delete(name)
       }

@@ -16,11 +16,11 @@ mesh serve stop /ai
 
 ## Local gateway boundary
 
-Claude Code is the intended caller. The launcher sets `ANTHROPIC_BASE_URL=http://127.0.0.1:8318`; a local Node HTTP client test confirms URL-derived loopback Host and absence of browser Origin/fetch-metadata headers. Every endpoint, including `/health`, rejects `Origin`, `Sec-Fetch-Site`, or `Sec-Fetch-Mode`, and accepts only `127.0.0.1:<port>`, `localhost:<port>`, or `[::1]:<port>` as Host. Same-user local processes remain trusted because they can read the proxy key file.
+Claude Code is the intended caller. The launcher sets `ANTHROPIC_BASE_URL=http://127.0.0.1:8318`. Every endpoint, including `/health`, rejects `Origin` and `Sec-Fetch-Site`, and accepts only the loopback hostnames `127.0.0.1`, `localhost`, or `[::1]`, case-insensitively, with optional port and a DNS trailing dot on the IPv4 or localhost name. `Sec-Fetch-Mode` alone is accepted, including the `cors` header sent by Node's built-in fetch. Tests exercise both Node HTTP Host construction and a real Node fetch request. Same-user local processes remain trusted because they can read the proxy key file.
 
-`mesh serve ls` maps local listener 8318 to gateway backend 18318. Mesh preserves the incoming Host, so a gateway configured on 18318 also allows those three loopback Hosts on 8318. Other configured gateway ports allow their own port. The tailnet `/ai` route fronts the CLIProxyAPI backend on 18317.
+Mesh preserves incoming Host, so the hostname-only boundary works across public/backend port changes. Mesh gates the whole `/ai` route on both upstream ports accepting, so Claude requests can wait at the mesh layer during cold startup.
 
-The gateway binds immediately. GPT requests await TCP readiness of the configured proxy port for up to 15 seconds; `/health` returns 503 until that probe succeeds. Giving up returns a JSON Messages error with status 503 for GPT; Claude forwarding proceeds independently. Readiness describes initial startup; a later upstream connection failure still uses the gateway's 502 error handler.
+The gateway binds immediately. Until the proxy is known ready, each GPT request and `/health` re-probes for up to 250 ms, returns a JSON Messages error with status 503 if still unavailable, and records successful readiness for later requests. The first failed wait logs one structured warning; later recovery logs one structured info event with the failed-wait count. Claude forwarding never waits inside the gateway. A later upstream connection failure still uses the gateway's 502 error handler.
 
 Request bodies are capped at 32 MiB, matching Anthropic's [32 MB Messages request limit](https://platform.claude.com/docs/en/api/overview#request-size-limits). The cap is enforced by `Bun.serve` before body parsing. The idle timeout remains disabled so quiet, long-lived SSE operations retain their connection; streams pass through as chunks arrive.
 

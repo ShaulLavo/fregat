@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { createGateway, waitForProxy, type GatewayOptions } from './gateway'
+import { createGateway, type GatewayOptions } from './gateway'
 
 const portSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65535))
 export const configSchema = v.pipe(
@@ -40,15 +40,7 @@ function reportFailure(operation: string, error: unknown) {
 
 async function run() {
   const config = v.parse(configSchema, await Bun.file(Bun.argv[2] ?? '').json())
-  const server = startGateway({
-    gatewayPort: config.gatewayPort,
-    // Mesh's local listener preserves Host while forwarding 8318 to backend 18318.
-    forwardedPort: config.gatewayPort === 18318 ? 8318 : undefined,
-    anthropicUrl: 'https://api.anthropic.com',
-    proxyUrl: `http://127.0.0.1:${config.proxyPort}`,
-    apiKey: config.apiKey,
-    proxyReady: waitForProxy(config.proxyPort),
-  })
+  const server = startGateway(gatewayOptions(config))
   const proxy = Bun.spawn([config.binary, '-config', config.proxyConfig], {
     stdout: 'inherit',
     stderr: 'inherit',
@@ -92,4 +84,13 @@ export function startGateway(options: GatewayOptions) {
   })
   gateway = createGateway({ ...options, gatewayPort: server.port! })
   return server
+}
+
+export function gatewayOptions(config: v.InferOutput<typeof configSchema>): GatewayOptions {
+  return {
+    gatewayPort: config.gatewayPort,
+    anthropicUrl: 'https://api.anthropic.com',
+    proxyUrl: `http://127.0.0.1:${config.proxyPort}`,
+    apiKey: config.apiKey,
+  }
 }
