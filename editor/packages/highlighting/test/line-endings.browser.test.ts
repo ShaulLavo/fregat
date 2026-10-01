@@ -23,19 +23,25 @@ const PALETTE: HighlightTheme = {
     type: 'dark',
     backgroundColor: '#111111',
     foregroundColor: '#eeeeee',
-    syntax: { keyword: '#aa0000', keywordDeclaration: '#aa0000' },
+    syntax: { keyword: '#aa0000', keywordDeclaration: '#aa0000', comment: '#00aa00' },
   },
 }
 
-// Each separator kind, a terminated last line and an unterminated one. A CR not before an LF is
-// line text, as Shiki splits lines, so `const` after it still starts a statement thanks to `;`.
-// A byte order mark and U+2028 are line text too, so no offset moves around them.
+// Each separator kind, a terminated last line and an unterminated one. Tree-sitter reads them as an
+// opened document folds them; Shiki keeps a CR not before an LF as line text, so `;` ends each line.
 const TEXTS = {
   crlf: 'const a = 1;\r\nconst b = 2;\r\nconst c = 3;',
   'crlf terminated': 'const a = 1;\r\nconst b = 2;\r\n',
   'lone cr': 'const a = 1;\rconst b = 2;\r',
   mixed: 'const a = 1;\r\nconst b = 2;\nconst c = 3;\rconst d = 4;\r\n\r\nconst e = 5;',
   'byte order mark and line separator': '\uFEFFconst a = 1;\u2028const b = 2;\r\nconst c = 3;',
+  'cr before crlf': '// note\r\r\nconst next = 1;',
+} as const
+
+// Python ends a comment at a line break, so a CR an opened document folds must reach the parser as one.
+const PYTHON = {
+  'lone cr': '# note\rprint(1)',
+  'crlf and lone cr': '# note\r\nprint(1)\r# two\rprint(2)',
 } as const
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -67,8 +73,8 @@ function snippetTokens(
   })
   cleanups.push(() => editor.dispose())
   const feature = editor.getFeature(EDITOR_SNIPPET_TOKENS_FEATURE)
-  if (!feature) throw new Error('the editor registered no snippet tokens feature')
-  return feature
+  expect(feature, 'the editor registers a snippet tokens feature').not.toBeNull()
+  return feature!
 }
 
 /** For each `const` in the submitted text, the token a painter colours it with, as it slices. */
@@ -77,6 +83,14 @@ function paintedConsts(text: string, tokens: readonly Readonly<EditorToken>[]) {
     const token = tokens.find((candidate) => candidate.start <= index && candidate.end > index)
     return token ? [token.start, text.slice(token.start, token.end)] : null
   })
+}
+
+/** The submitted text of every token painted the colour the snippet's first character has. */
+function paintedLikeStart(text: string, tokens: readonly Readonly<EditorToken>[]) {
+  const color = tokens.find((token) => token.start === 0)?.style.color
+  return tokens
+    .filter((token) => token.style.color === color)
+    .map((token) => text.slice(token.start, token.end))
 }
 
 function constStarts(text: string) {
@@ -109,5 +123,19 @@ describe.each(Object.entries(TEXTS))('%s text', (_name, text) => {
       tokens.map((token) => [token.start, text.slice(token.start, token.end), token.style.color])
     expect(paintedConsts(text, snippet)).toEqual(constStarts(text))
     expect(spans(snippet)).toEqual(spans(standalone.tokens))
+  })
+})
+
+describe.each(Object.entries(PYTHON))('python %s text', (_name, text) => {
+  const comments = [...text.matchAll(/# \w+/g)].map(([comment]) => comment)
+
+  test('highlight under a built-in palette ends each comment at its line break', async () => {
+    const result = await service().highlight(text, { language: 'python', theme: PALETTE })
+    expect(paintedLikeStart(text, result.tokens)).toEqual(comments)
+  })
+
+  test('hover snippets under a built-in palette end each comment at its line break', async () => {
+    const feature = snippetTokens(service(), { format: 'editor' })
+    expect(paintedLikeStart(text, await feature.tokenize(text, 'python'))).toEqual(comments)
   })
 })

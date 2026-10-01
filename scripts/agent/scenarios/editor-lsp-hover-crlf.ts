@@ -1,8 +1,9 @@
+import { strictEqual } from 'node:assert'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { scratchPath } from '../paths'
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
-import { focusEditor, hoverWord, openFileByName, selectors } from '../selectors'
+import { focusEditor, hoverCodePaint, hoverWord, openFileByName } from '../selectors'
 import type { Scenario } from './index'
 
 const EXAMPLE = ['const first = 1', 'const second = 2', 'const third = 3']
@@ -25,7 +26,7 @@ const CALLER = "import { twice } from './twice'\n\nexport const doubled = twice(
 export const editorLspHoverCrlf: Scenario = {
   name: 'editor-lsp-hover-crlf',
   description:
-    'Hover a call into a CRLF TypeScript file the editor never opened, whose doc holds a fenced example of `const` lines. The step label says whether a CR reached the hover code and counts example lines whose `const` is not one whole coloured span.',
+    'Hover a call into a CRLF TypeScript file the editor never opened, whose doc holds a fenced example of `const` lines. Fails unless a CR reaches the hover code and each example `const` is one whole coloured span; the step label records both.',
   async run(page, { step }) {
     const originalUrl = page.url()
     const fixture = await mkdtemp(scratchPath('fregat-hover-crlf-'))
@@ -41,20 +42,19 @@ export const editorLspHoverCrlf: Scenario = {
       await focusEditor(page)
       await page.waitForTimeout(3000)
       await hoverWord(page, 'twice', '.editor-virtualized-viewport')
-      const example = selectors
-        .editorHover(page)
-        .locator('pre > code[data-language]', { hasText: 'const first' })
-      await example.locator('span[style]').first().waitFor({ timeout: 8000 })
-      const { carriageReturn, painted } = await example.evaluate((code) => ({
-        carriageReturn: (code.textContent ?? '').includes('\r'),
-        painted: [...code.querySelectorAll('span[style]')].map((span) => span.textContent ?? ''),
-      }))
-      const whole = painted.filter((text) => text === 'const').length
+      const { carriageReturn, coloured } = await hoverCodePaint(page, 'const first')
+      const whole = coloured.filter((text) => text === 'const').length
       await step(`cr-${carriageReturn ? 'yes' : 'no'}-misaligned-${EXAMPLE.length - whole}`)
+      strictEqual(carriageReturn, true, 'a CR reaches the hover code, so the CRLF case reproduces')
+      strictEqual(whole, EXAMPLE.length, 'each example `const` is one whole coloured span')
       await page.keyboard.press('Escape')
     } finally {
-      await page.goto(originalUrl)
-      await releaseFixture(fixture)
+      // Navigating back can fail once the page is gone; the fixture's terminal and LSP still go.
+      try {
+        await page.goto(originalUrl)
+      } finally {
+        await releaseFixture(fixture)
+      }
     }
   },
 }

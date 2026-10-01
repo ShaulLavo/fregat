@@ -403,7 +403,7 @@ class EditorHighlightingService implements HighlightingService {
     }
     const palette = effectiveEditorTheme(theme.definition)
     const foreground = palette.foregroundColor ?? DEFAULT_FOREGROUND
-    const snippet = createSnippetDocument(text)
+    const snippet = createSnippetDocument(text, 'as-document')
     const session = this.syntaxProvider().createSession({
       documentId: `highlight-snippet-${this.nextSnippetId++}`,
       languageId,

@@ -1,54 +1,80 @@
-import { createPieceTableSnapshot } from '@singapore-editor/textbuffer'
+import {
+  createPieceTableSnapshot,
+  normalizeDocumentText,
+  type PieceTableSnapshot,
+} from '@singapore-editor/textbuffer'
 
-import { createDocumentTextSnapshot } from '../documentTextSnapshot'
+import { createDocumentTextSnapshot, type DocumentTextSnapshot } from '../documentTextSnapshot'
 import type { EditorToken } from '../tokens'
 import { toEditorTokenStore, type EditorTokenInput } from './tokenStore'
 
-/**
- * Text that is not the document, opened as one so a syntax session can tokenize it. A document
- * holds LF line ends, so each CRLF folds to LF; any other CR stays line text, as Shiki splits
- * lines. Tokens come back as offsets into exactly the text submitted.
- */
-export function createSnippetDocument(text: string) {
-  const breaks = foldedCrlfBreaks(text)
-  const folded = breaks.length === 0 ? text : text.replaceAll('\r\n', '\n')
-  const snapshot = createPieceTableSnapshot(folded, { normalized: true })
+// A highlighter (Shiki) splits lines itself, so it reads the text as submitted. A parser needs the
+// line breaks an opened document has, so it reads the text folded the way the editor ingests it.
+export type SnippetLines = 'as-submitted' | 'as-document'
+
+export type SnippetDocument = {
+  readonly snapshot: PieceTableSnapshot
+  readonly textSnapshot: DocumentTextSnapshot
+  /** A session's tokens over this document, as offsets into exactly the submitted text. */
+  submittedTokens(tokens: EditorTokenInput): EditorToken[]
+}
+
+const BYTE_ORDER_MARK = 0xfeff
+
+export function createSnippetDocument(text: string, lines: SnippetLines): SnippetDocument {
+  if (lines === 'as-submitted') return snippetDocument(text, { normalized: true }, [])
+
+  const ingested = normalizeDocumentText(text)
+  const options = {
+    normalized: true,
+    lineEnding: ingested.lineEnding,
+    byteOrderMark: ingested.byteOrderMark,
+    containsUnusualLineTerminators: ingested.containsUnusualLineTerminators,
+  }
+  return snippetDocument(ingested.text, options, foldedAwayUnits(text))
+}
+
+function snippetDocument(
+  text: string,
+  options: Parameters<typeof createPieceTableSnapshot>[1],
+  removed: readonly number[],
+): SnippetDocument {
+  const snapshot = createPieceTableSnapshot(text, options)
   return {
     snapshot,
-    textSnapshot: createDocumentTextSnapshot(snapshot, folded),
-    submittedTokens: (tokens: EditorTokenInput): EditorToken[] =>
-      submittedOffsets(toEditorTokenStore(tokens).toTokens(), breaks),
+    textSnapshot: createDocumentTextSnapshot(snapshot, text),
+    submittedTokens: (tokens) => toSubmitted(toEditorTokenStore(tokens).toTokens(), removed),
   }
 }
 
-/** Where each folded LF that was a CRLF sits in the folded text, ascending. */
-function foldedCrlfBreaks(text: string): number[] {
-  const breaks: number[] = []
-  let index = text.indexOf('\r\n')
+/**
+ * Ascending folded offsets from which one more submitted unit lies behind: a stripped byte order
+ * mark at 0, and each CRLF's CR just past its kept LF. Lone CR and U+2028/U+2029 keep their width.
+ */
+function foldedAwayUnits(text: string): number[] {
+  const removed: number[] = []
+  if (text.charCodeAt(0) === BYTE_ORDER_MARK) removed.push(0)
+  let index = text.indexOf('\r\n', removed.length)
   while (index !== -1) {
-    breaks.push(index - breaks.length)
+    removed.push(index - removed.length + 1)
     index = text.indexOf('\r\n', index + 2)
   }
-  return breaks
+  return removed
 }
 
-function submittedOffsets(tokens: EditorToken[], breaks: readonly number[]): EditorToken[] {
-  if (breaks.length === 0) return tokens
-  return tokens.map((token) => ({
-    ...token,
-    start: submittedOffset(token.start, breaks),
-    end: submittedOffset(token.end, breaks),
-  }))
-}
-
-// Each CR folded away before `offset` moves it one unit later in the submitted text.
-function submittedOffset(offset: number, breaks: readonly number[]): number {
-  let low = 0
-  let high = breaks.length
-  while (low < high) {
-    const middle = (low + high) >>> 1
-    if (breaks[middle]! < offset) low = middle + 1
-    else high = middle
+// Rewrites the fresh tokens in place. The cursor only steps between neighbouring queries, so a
+// sorted token list maps in one linear pass.
+function toSubmitted(tokens: EditorToken[], removed: readonly number[]): EditorToken[] {
+  if (removed.length === 0) return tokens
+  let behind = 0
+  const submitted = (offset: number): number => {
+    while (behind < removed.length && removed[behind]! <= offset) behind += 1
+    while (behind > 0 && removed[behind - 1]! > offset) behind -= 1
+    return offset + behind
   }
-  return offset + low
+  for (const token of tokens) {
+    token.start = submitted(token.start)
+    token.end = submitted(token.end)
+  }
+  return tokens
 }
