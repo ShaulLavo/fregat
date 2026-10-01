@@ -2,6 +2,7 @@ import { documentRow } from './visibleRows'
 import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  createDocumentSession,
   createStringTextSnapshot,
   type TextSnapshot,
   type DocumentSessionChange,
@@ -15,9 +16,14 @@ import {
   type EditorTokenInput,
 } from '@singapore-editor/core/syntax'
 import { resolveMinimapOptions } from '../src/options'
+import { MinimapWorkerRenderer } from '../src/renderer'
 import { computeRenderLayout } from '../src/layout'
 import { MinimapWorkerClient, type MinimapHost } from '../src/workerClient'
-import type { MinimapWorkerRequest, MinimapWorkerResponse } from '../src/types'
+import type {
+  MinimapDocumentPayload,
+  MinimapWorkerRequest,
+  MinimapWorkerResponse,
+} from '../src/types'
 
 describe('MinimapWorkerClient', () => {
   it('exposes worker lifecycle and waits for disposal acknowledgement before terminating', () => {
@@ -917,6 +923,81 @@ describe('MinimapWorkerClient', () => {
     }
   })
 
+  it.each([
+    { lineCount: 16, inserted: 'x' },
+    { lineCount: 500_000, inserted: 'x' },
+    { lineCount: 16, inserted: 'x\ny\n' },
+    { lineCount: 500_000, inserted: 'x\ny\n' },
+  ])(
+    'keeps summaries aligned after coalesced undo of $inserted in $lineCount lines',
+    ({ lineCount, inserted }) => {
+      const runtime = installMinimapRuntime()
+      const host = createHost()
+      const text = Array(lineCount).fill('//').join('\n')
+      const session = createDocumentSession(text)
+      const client = new MinimapWorkerClient({
+        host,
+        options: resolveMinimapOptions(),
+        snapshot: snapshot({}, { text }),
+        decorations: [],
+        onLayoutWidth: vi.fn(),
+        reservedLane: () => 0,
+      })
+      const worker = runtime.workers[0]!
+      const renderer = new MinimapWorkerRenderer()
+
+      try {
+        const requests = worker.postMessage.mock.calls.map(
+          (call) => call[0] as MinimapWorkerRequest,
+        )
+        const init = requests.find((request) => request.type === 'init')
+        const initial = requests.find((request) => request.type === 'openDocument')
+        if (!init || !initial) throw new Error('Expected initialized minimap summaries')
+        const canvas = { getContext: () => ({}) } as unknown as OffscreenCanvas
+        renderer.init({
+          mainCanvas: canvas,
+          decorationsCanvas: canvas,
+          options: resolveMinimapOptions(),
+          styles: init.baseStyles,
+        })
+        renderer.setDocument(initial.document)
+        worker.send(renderedResponse(1))
+        worker.postMessage.mockClear()
+
+        for (let index = 0; index < 12; index += 1) {
+          const offset = 24 + index * inserted.length
+          const change = session.applyEdits([{ from: offset, to: offset, text: inserted }])
+          client.update(snapshot({}, { text: session.materializeFullText() }), 'content', change)
+        }
+        runtime.flushAnimationFrames()
+        applyPostedSummaryUpdates(renderer, worker)
+        expect(rendererSummary(renderer).lines.length).toBe(session.getTextSnapshot().lineCount)
+        worker.send(renderedResponse(lastRenderSequence(worker)))
+        worker.postMessage.mockClear()
+
+        for (let index = 0; index < 12; index += 1) {
+          const change = session.undo()
+          client.update(snapshot({}, { text: session.materializeFullText() }), 'content', change)
+        }
+        expect(session.materializeFullText()).toBe(text)
+        runtime.flushAnimationFrames()
+        applyPostedSummaryUpdates(renderer, worker)
+
+        const restored = rendererSummary(renderer)
+        expect(restored.lines.length).toBe(lineCount)
+        expect(restored.lines).toEqual(initial.document.lines)
+        expect(restored.lineStarts).toEqual(initial.document.lineStarts)
+        expect(restored.textLength).toBe(initial.document.textLength)
+      } finally {
+        client.dispose()
+        renderer.dispose()
+        host.root.remove()
+        host.colorScope.remove()
+        runtime.restore()
+      }
+    },
+  )
+
   it('queues incremental edits while a render is in flight', () => {
     const runtime = installMinimapRuntime()
     try {
@@ -1587,6 +1668,20 @@ function lineStarts(text: string): readonly number[] {
     index = text.indexOf('\n', index + 1)
   }
   return starts
+}
+
+function applyPostedSummaryUpdates(renderer: MinimapWorkerRenderer, worker: MockWorker): void {
+  for (const [request] of worker.postMessage.mock.calls as [MinimapWorkerRequest][]) {
+    if (request.type === 'applyEdit') renderer.applyEdit(request.edit, request.document)
+    if (request.type === 'applyEdits') renderer.applyEdits(request.edits, request.document)
+  }
+}
+
+function rendererSummary(renderer: MinimapWorkerRenderer): MinimapDocumentPayload {
+  const state = (renderer as unknown as { state: { document: MinimapDocumentPayload } | null })
+    .state
+  if (!state) throw new Error('Expected initialized renderer')
+  return state.document
 }
 
 function renderedResponse(sequence: number): MinimapWorkerResponse {
