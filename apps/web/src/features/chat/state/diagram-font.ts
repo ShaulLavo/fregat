@@ -53,11 +53,26 @@ export async function diagramFontLoaded(
     timer = setTimeout(() => resolve('gave-up'), waitMs)
   })
   // Labels are regular; class and entity titles are bold.
-  const loads = ['400', '700'].map((weight) => fonts.load(`${weight} 1em ${fontFamily}`, text))
+  const shown = `${text}\n${displayedText(text)}`
+  const loads = ['400', '700'].map((weight) => fonts.load(`${weight} 1em ${fontFamily}`, shown))
   const settled = Promise.allSettled(loads).then((results) =>
     results.every((result) => result.status === 'fulfilled') ? 'loaded' : 'failed',
   )
   const outcome = await Promise.race([settled, giveUp])
   clearTimeout(timer)
   return outcome
+}
+
+/**
+ * The characters a diagram shows for its source. Mermaid turns `#1044;` and `#amp;` into `&#1044;`
+ * and `&amp;` in its SVG, which the browser then decodes like any HTML entity.
+ */
+function displayedText(source: string) {
+  const entities = source.replace(/#(\w+);/g, (_, name: string) =>
+    /^\d+$/.test(name) ? `&#${name};` : `&${name};`,
+  )
+  // A textarea's content is text only: entities decode and no element is created.
+  const decoder = document.createElement('textarea')
+  decoder.innerHTML = entities
+  return decoder.value
 }
