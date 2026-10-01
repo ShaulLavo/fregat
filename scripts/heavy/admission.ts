@@ -3,6 +3,7 @@ import { availableParallelism } from 'node:os'
 import path from 'node:path'
 
 import { tryLock, unlessMissing, unlock } from './lock'
+import type { DeadJob } from './queue'
 
 const MiB = 2 ** 20
 
@@ -132,17 +133,14 @@ export function sliceState(root: string, slice: string): 'running' | 'empty' | '
 export function orphanSlices(
   root: string,
   owners: readonly { readonly id: string }[],
-  dead: readonly {
-    readonly attributable: boolean
-    readonly entry: { readonly id: string; readonly sliceRoot: string }
-  }[],
+  dead: readonly DeadJob[],
 ): LiveSlice[] {
   const owned = (id: string) => owners.some((job) => job.id === id)
-  const named = dead
-    .filter(({ attributable, entry }) => attributable && !owned(entry.id))
-    .flatMap(
-      ({ entry }) => liveSlice(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`) ?? [],
-    )
+  const named = dead.flatMap((job) =>
+    job.attributable && !owned(job.entry.id)
+      ? (liveSlice(job.entry.sliceRoot, `${job.entry.sliceRoot}-${job.entry.id}.slice`) ?? [])
+      : [],
+  )
   const unowned = liveSlices(root).filter(
     (slice) => !owned(slice.id) && !named.some((n) => n.slice === slice.slice),
   )

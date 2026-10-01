@@ -86,7 +86,7 @@ export function release(held: Held) {
  */
 export function live(stateDir: string, place: Place): Entry[] {
   return scan(stateDir, place).flatMap(({ entry, file, owned }) => {
-    if (owned) return [entry]
+    if (owned) return entry ? [entry] : []
     if (place === 'queue') rmSync(file, { force: true })
     return []
   })
@@ -94,27 +94,31 @@ export function live(stateDir: string, place: Place): Entry[] {
 
 /**
  * Running entries whose wrapper is gone. Only an `attributable` one may name a slice to stop:
- * its file is `<id>.json`, the id has the wrapper's shape and the root the CLI's grammar.
- * The caller removes each file once its slice has stopped.
+ * its file is `<id>.json`, it parses, its id has the wrapper's shape and its root the CLI's
+ * grammar. The caller removes each file once its slice has stopped.
  */
-export function deadJobs(stateDir: string) {
+export function deadJobs(stateDir: string): DeadJob[] {
   return scan(stateDir, 'jobs')
     .filter(({ owned }) => !owned)
-    .map(({ entry, file }) => ({
-      attributable:
-        isJobId(entry.id) &&
-        path.basename(file) === `${entry.id}.json` &&
-        isSliceRoot(entry.sliceRoot),
-      entry,
-      file,
-    }))
+    .map(({ entry, file }) =>
+      entry && path.basename(file) === `${entry.id}.json` && isSliceRoot(entry.sliceRoot)
+        ? { attributable: true, entry, file }
+        : { attributable: false, file },
+    )
 }
 
-/** A job id as the wrapper makes one: six random bytes in hex. */
-function isJobId(id: unknown): id is string {
-  return typeof id === 'string' && /^[0-9a-f]{12}$/.test(id)
+export type DeadJob =
+  | { readonly attributable: true; readonly entry: Entry; readonly file: string }
+  | { readonly attributable: false; readonly file: string }
+
+// File names as `enqueue` and `promote` write them; nothing else in these directories is read.
+const NAMES: Record<Place, RegExp> = {
+  jobs: /^[0-9a-f]{12}\.json$/,
+  queue: /^\d{12}-[0-9a-f]{12}\.json$/,
 }
 
+// Every entry file with its lock state; `entry` is null when the file is not one this wrapper
+// writes, by name or content.
 function scan(stateDir: string, place: Place) {
   const dir = path.join(stateDir, place)
   return (unlessMissing(() => readdirSync(dir)) ?? [])
@@ -122,20 +126,28 @@ function scan(stateDir: string, place: Place) {
     .toSorted()
     .flatMap((name) => {
       const file = path.join(dir, name)
-      const read = readEntry(file)
+      const read = readEntry(file, NAMES[place].test(name))
       return read ? [{ file, ...read }] : []
     })
 }
 
 // Read through the descriptor that saw the lock: the owner may unlink the path meanwhile.
-function readEntry(file: string) {
+function readEntry(file: string, named: boolean) {
   const fd = openExisting(file)
   if (fd === null) return null
   try {
     const owned = !lockDescriptor(fd)
-    return { entry: JSON.parse(readFileSync(fd, 'utf8')) as Entry, owned }
+    return { entry: named ? parseEntry(readFileSync(fd, 'utf8')) : null, owned }
   } finally {
     closeSync(fd)
+  }
+}
+
+function parseEntry(text: string): Entry | null {
+  try {
+    return JSON.parse(text) as Entry
+  } catch {
+    return null
   }
 }
 
