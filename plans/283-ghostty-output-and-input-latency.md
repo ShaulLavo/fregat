@@ -11,23 +11,26 @@
 ghostty-webgpu spends no more CPU than xterm.js WebGL while output streams and answers keystrokes at
 least as fast, without giving up any of its current wins.
 
-| Measure (Mac M1, bytes path)    | ghostty-webgpu | xterm WebGL | Target        |
-| ------------------------------- | -------------- | ----------- | ------------- |
-| Output CPU, 17 terminals        | 103.2 % core   | 84.9 % core | ≤ xterm WebGL |
-| Output CPU, 1 terminal          | 37.6 % core    | 36.0 % core | ≤ xterm WebGL |
-| Input latency p95, 1 terminal   | 46.4 ms        | 32.2 ms     | ≤ xterm WebGL |
-| Input latency p95, 17 terminals | 47.6 ms        | 31.4 ms     | ≤ xterm WebGL |
-| Write latency p50, 1 terminal   | 14.2 ms        | 12.2 ms     | ≤ xterm WebGL |
+| Measure (Mac M1, bytes path, corrected run at 6ef17840) | ghostty-webgpu | xterm WebGL | Target        |
+| ------------------------------------------------------- | -------------- | ----------- | ------------- |
+| Output CPU, 17 terminals                                | 100.1 % core   | 89.9 % core | ≤ xterm WebGL |
+| Input latency p95, 1 terminal                           | 46.2 ms        | 32.1 ms     | ≤ xterm WebGL |
+| Write latency p50, 1 terminal                           | 14.0 ms        | 8.2 ms      | ≤ xterm WebGL |
 
-Keep: parse throughput (2.4–5.2× xterm), idle CPU (8.8 vs 23.1 % core at 17 terminals), memory
-(0.39 vs 7.17 MiB per 10k history rows), zero dropped frames.
+Already level or ahead in the corrected run: output CPU at 1 terminal (30.4 vs 31.5 % core) and input
+p95 at 17 terminals (47.4 vs 47.5 ms).
+
+Keep: parse throughput (164 vs 64 MB/s ASCII, 360 vs 70 MB/s logs), idle CPU (9.0 vs 20.0 % core at
+17 terminals), memory (0.40 vs 7.30 MiB per 10k history rows), zero dropped frames (xterm WebGL drops
+4 at 17 terminals).
 
 ## What the numbers suggest
 
-Idle CPU is low and flat (8.8 % at 1 and at 17 terminals), so the idle scheduler is fine. Output CPU
+Idle CPU is low and flat (7.3 % at 1 terminal, 9.0 % at 17), so the idle scheduler is fine. Output CPU
 grows faster than xterm's as terminals are added, so the cost is per terminal per frame while
-content changes. Input p50 ties at about 30 ms but p95 is about 15 ms worse, which points to
-occasional extra frames of delay, not a slow common path. These are hypotheses until Phase 1
+content changes. Input p50 is close (32.1 vs 30.5 ms) but p95 is about 14 ms worse at 1 terminal, which points to
+occasional extra frames of delay, not a slow common path. Write p50 is the largest relative gap
+(14.0 vs 8.2 ms). These are hypotheses until Phase 1
 attributes the time.
 
 ## Phase 1: attribute the cost
