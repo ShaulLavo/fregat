@@ -8,6 +8,7 @@ import { createScriptError } from '../structured-errors'
 import { runCase, type Highlighting } from './run'
 import { comparisonReport } from './report'
 import { runCaseScope } from './case-scope'
+import { defaultOutput } from './output'
 import { captureRevision, recordedBuildSource } from './provenance'
 
 const { values } = parseArgs({
@@ -39,10 +40,7 @@ const keys = positiveInteger(values.keys, '--keys')
 const settleMs = positiveInteger(values['settle-ms'], '--settle-ms')
 const memoryMiB = positiveInteger(values['memory-mib'], '--memory-mib')
 const sizes = values.sizes.split(',').map((size) => positiveInteger(size, '--sizes'))
-const output = path.resolve(
-  values.out ??
-    `/work/tmp/fregat-evidence/${new Date().toISOString().replaceAll(/[-:.]/g, '')}-large-files`,
-)
+const output = path.resolve(values.out ?? defaultOutput())
 await mkdir(output, { recursive: true })
 if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync('/work/cache/ms-playwright'))
   process.env.PLAYWRIGHT_BROWSERS_PATH = '/work/cache/ms-playwright'

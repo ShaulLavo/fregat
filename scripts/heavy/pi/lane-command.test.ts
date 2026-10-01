@@ -79,8 +79,14 @@ describe.skipIf(!userScopes)('a lane job', () => {
   })
 
   test('starts the command in the caller directory inside the checkout', () => {
-    const { lane, run } = runLane('directory', '1G', 'pwd > "$LANE_RUN/pwd"', 'scripts/heavy/')
+    const { lane, run } = runLane(
+      'directory',
+      '1G',
+      'pwd > "$LANE_RUN/pwd"; printf %s "$FREGAT_EVIDENCE_ROOT" > "$LANE_RUN/evidence-root"',
+      'scripts/heavy/',
+    )
     expect(lane.exitCode).toBe(0)
+    expect(readFileSync(path.join(run, 'evidence-root'), 'utf8')).toBe(run)
     expect(readFileSync(path.join(run, 'pwd'), 'utf8').trim()).toMatch(
       /\/platform\/scripts\/heavy$/,
     )

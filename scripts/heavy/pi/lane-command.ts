@@ -40,7 +40,8 @@ export function laneJobCommand(job: LaneJob) {
   const steps = [
     `cd ${shellQuote(directory ? `${platform}/${directory}` : platform)}`,
     `mkdir -p ${shellQuote(run)}`,
-    `export LANE_RUN=${shellQuote(run)} HEAVY_JOB_SLICE=${slice}`,
+    // Tools that write evidence under FREGAT_EVIDENCE_ROOT write it where run.ts copies it back.
+    `export LANE_RUN=${shellQuote(run)} FREGAT_EVIDENCE_ROOT=${shellQuote(run)} HEAVY_JOB_SLICE=${slice}`,
     [
       'systemd-run --user --scope --quiet',
       `--unit=${shellQuote(`${unit}.scope`)}`,
