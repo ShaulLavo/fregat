@@ -74,6 +74,8 @@ export const selectors = {
   revealFileFacts: (page: Page) => page.getByRole('button', { name: 'Reveal in files' }),
   missingFileMessage: (page: Page) =>
     page.getByText('This file no longer exists.', { exact: true }),
+  forgeActivityTab: (page: Page) => page.getByRole('tab', { name: 'Activity', exact: true }),
+  forgeCommentsTab: (page: Page) => page.getByRole('tab', { name: 'Comments', exact: true }),
   forgeDiscussion: (page: Page) =>
     page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
   forgeReviewSummary: (page: Page) =>

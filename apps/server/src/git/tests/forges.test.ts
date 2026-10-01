@@ -8,6 +8,7 @@ import type { RunProcess } from '../forges/types'
 import type { GitPublishRequest } from '@workspace/contracts'
 import {
   createForgeRepository,
+  readPullRequestActivity,
   readPullRequestComments,
   postPullRequestComment,
   submitPullRequestReview,
@@ -1121,7 +1122,7 @@ describe('forge discussion capabilities', () => {
     ['git@ssh.dev.azure.com:v3/org/project/repo', 'https://dev.azure.com/org'],
     ['git@org.visualstudio.com:v3/org/project/repo', 'https://org.visualstudio.com'],
   ])(
-    'Azure reads returned repository threads for %s with native context and unsupported writes',
+    'Azure reads returned repository discussions for %s with native context and unsupported writes',
     async (remote, organization) => {
       const forge = boundary(remote, (argv) => {
         if (argv[1] === 'account') return ok('fixture')
@@ -1387,4 +1388,554 @@ describe('forge review submission', () => {
       if (!refused) expect(posts[1]?.url).toMatch(/\/request-changes$/)
     },
   )
+})
+
+describe('bounded pull request activity', () => {
+  it('reads GitHub reviews, commits and native parent groups on the selected host', async () => {
+    const fixture = boundary('https://github.example.com/acme/repo.git', (argv) => {
+      if (argv[1] === 'auth') return ok()
+      const endpoint = argv.find((arg) => arg.includes('/pulls/42/')) ?? ''
+      if (endpoint.includes('/reviews?'))
+        return json([
+          {
+            id: 1,
+            body: 'Approved coverage',
+            user: { login: 'alice' },
+            state: 'APPROVED',
+            submitted_at: '2026-10-01T10:00:00Z',
+          },
+          { id: 2, body: '', user: null, state: 'PENDING', submitted_at: null },
+        ])
+      if (endpoint.includes('/commits?'))
+        return json([
+          {
+            sha: 'a'.repeat(40),
+            author: { login: 'bob' },
+            commit: {
+              message: 'Fix edge case',
+              author: { name: 'Git author' },
+              committer: { date: '2026-10-01T09:00:00Z' },
+            },
+          },
+        ])
+      if (endpoint.includes('/comments?'))
+        return json([
+          {
+            id: 9,
+            body: 'Root context',
+            user: { login: 'alice' },
+            path: 'src/main.ts',
+            created_at: '2026-10-01T10:00:00Z',
+            html_url: 'https://github.example.com/acme/repo/pull/42#9',
+          },
+          {
+            id: 10,
+            in_reply_to_id: 9,
+            body: 'Reply context',
+            user: { login: 'bob' },
+            path: 'src/main.ts',
+            created_at: '2026-10-01T11:00:00Z',
+            html_url: 'https://github.example.com/acme/repo/pull/42#10',
+          },
+        ])
+    })
+    const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
+    expect(result).toMatchObject({
+      kind: 'ready',
+      reviews: {
+        kind: 'ready',
+        truncated: false,
+        items: [{ state: 'APPROVED', body: 'Approved coverage' }],
+      },
+      commits: { kind: 'ready', items: [{ message: 'Fix edge case' }] },
+      discussions: {
+        kind: 'ready',
+        items: [
+          {
+            id: '9',
+            path: 'src/main.ts',
+            comments: [{ body: 'Root context' }, { body: 'Reply context' }],
+          },
+        ],
+      },
+    })
+    expect(fixture.commands('gh').filter((call) => call.argv[1] === 'api')).toHaveLength(3)
+    for (const call of fixture.commands('gh')) expect(call.argv).toContain('github.example.com')
+  })
+
+  it('reads GitLab commits and discussion groups without inventing approval records', async () => {
+    const fixture = boundary('https://gitlab.internal/group/sub/project.git', (argv) => {
+      if (argv[1] === 'auth') return ok()
+      if (argv.some((arg) => arg.endsWith('/commits?per_page=100')))
+        return json([
+          {
+            id: 'b'.repeat(40),
+            message: 'GitLab commit',
+            author_name: 'alice',
+            committed_date: '2026-10-01T10:00:00Z',
+          },
+        ])
+      if (argv.some((arg) => arg.endsWith('/discussions?per_page=100')))
+        return json([
+          {
+            id: 'thread-a',
+            individual_note: false,
+            notes: [
+              {
+                id: 3,
+                body: 'Inline note',
+                system: false,
+                author: { username: 'alice' },
+                created_at: '2026-10-01T10:00:00Z',
+                position: { old_path: 'old.ts', new_path: 'new.ts' },
+              },
+              {
+                id: 4,
+                body: 'Reply note',
+                system: false,
+                author: { username: 'bob' },
+                created_at: '2026-10-01T11:00:00Z',
+              },
+              {
+                id: 5,
+                body: 'System event',
+                system: true,
+                author: { username: 'bot' },
+                created_at: '2026-10-01T11:00:00Z',
+              },
+            ],
+          },
+          { id: 'general', individual_note: true, notes: [] },
+        ])
+    })
+    const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
+    expect(result).toMatchObject({
+      kind: 'ready',
+      reviews: { kind: 'unsupported' },
+      commits: { kind: 'ready', items: [{ message: 'GitLab commit' }] },
+      discussions: {
+        kind: 'ready',
+        truncated: false,
+        items: [
+          {
+            id: 'thread-a',
+            path: 'new.ts',
+            comments: [{ body: 'Inline note' }, { body: 'Reply note' }],
+          },
+        ],
+      },
+    })
+    expect(
+      fixture
+        .commands('glab')
+        .some((call) => call.argv.some((arg) => arg.includes('group%2Fsub%2Fproject'))),
+    ).toBe(true)
+  })
+
+  it('reads Forgejo native reviews and per-comment inline contexts', async () => {
+    const fixture = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+      if (argv.includes('login')) return json([{ name: 'selected', url: 'https://codeberg.org' }])
+      const endpoint = argv.at(-1) ?? ''
+      if (endpoint.endsWith('/reviews?limit=100&page=1'))
+        return json([
+          {
+            id: 12,
+            body: 'Forgejo approval',
+            user: { login: 'alice' },
+            state: 'APPROVED',
+            submitted_at: '2026-10-01T10:00:00Z',
+            comments_count: 1,
+          },
+        ])
+      if (endpoint.endsWith('/commits?limit=100&page=1'))
+        return json([
+          {
+            sha: 'c'.repeat(40),
+            author: null,
+            commit: {
+              message: 'Forgejo commit',
+              author: { name: 'Git author' },
+              committer: { date: '2026-10-01T09:00:00Z' },
+            },
+          },
+        ])
+      if (endpoint.endsWith('/reviews/12/comments'))
+        return json([
+          {
+            id: 8,
+            body: 'Forgejo inline',
+            user: null,
+            path: 'src/fj.ts',
+            created_at: '2026-10-01T11:00:00Z',
+          },
+        ])
+      return json([])
+    })
+    expect(
+      await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture),
+    ).toMatchObject({
+      kind: 'ready',
+      reviews: { kind: 'ready', items: [{ state: 'APPROVED' }] },
+      commits: { kind: 'ready', items: [{ message: 'Forgejo commit' }] },
+      discussions: {
+        kind: 'ready',
+        items: [{ id: '8', path: 'src/fj.ts', comments: [{ body: 'Forgejo inline' }] }],
+      },
+    })
+  })
+
+  it('groups Azure contextual conversation and explicitly leaves reviews and commits unsupported', async () => {
+    const fixture = boundary('https://dev.azure.com/org/project/_git/repo', (argv) => {
+      if (argv[1] === 'account') return ok('fixture')
+      if (argv.includes('show'))
+        return json({ repository: { name: 'repo', project: { name: 'project' } } })
+      if (argv.includes('invoke'))
+        return json({
+          value: [
+            {
+              id: 8,
+              threadContext: { filePath: '/src/az.ts' },
+              comments: [
+                {
+                  id: 1,
+                  content: 'Azure inline',
+                  commentType: 'text',
+                  publishedDate: '2026-10-01T10:00:00Z',
+                  author: { displayName: 'alice' },
+                },
+                {
+                  id: 2,
+                  content: 'Azure reply',
+                  commentType: 'text',
+                  publishedDate: '2026-10-01T11:00:00Z',
+                  author: { displayName: 'bob' },
+                },
+              ],
+            },
+          ],
+        })
+    })
+    expect(
+      await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture),
+    ).toMatchObject({
+      kind: 'ready',
+      reviews: { kind: 'unsupported' },
+      commits: { kind: 'unsupported' },
+      discussions: {
+        kind: 'ready',
+        truncated: false,
+        items: [
+          {
+            id: '8',
+            path: '/src/az.ts',
+            comments: [{ body: 'Azure inline' }, { body: 'Azure reply' }],
+          },
+        ],
+      },
+    })
+    expect(fixture.commands('az').filter((call) => call.argv.includes('invoke'))).toHaveLength(1)
+  })
+
+  it('reads Bitbucket participant verdicts, commits, and comment parent contexts', async () => {
+    const fixture = boundary('https://bitbucket.org/acme/repo.git', (argv) =>
+      argv.includes('credential') ? ok('username=fixture\npassword=fixture\n') : undefined,
+    )
+    const urls: string[] = []
+    const fetcher = (async (input: Parameters<typeof fetch>[0]) => {
+      const url = String(input)
+      urls.push(url)
+      if (url.endsWith('/42'))
+        return Response.json({
+          id: 42,
+          participants: [
+            {
+              user: { uuid: 'alice-id', display_name: 'alice' },
+              approved: true,
+              participated_on: '2026-10-01T10:00:00Z',
+            },
+          ],
+        })
+      if (url.includes('/commits?'))
+        return Response.json({
+          values: [
+            {
+              hash: 'd'.repeat(40),
+              message: 'Bitbucket commit',
+              date: '2026-10-01T09:00:00Z',
+              author: { raw: 'bob' },
+            },
+          ],
+        })
+      return Response.json({
+        next: 'https://api.bitbucket.org/next',
+        values: [
+          {
+            id: 9,
+            created_on: '2026-10-01T10:00:00Z',
+            inline: { path: 'src/bb.ts' },
+            content: { raw: 'Bitbucket inline' },
+            user: { display_name: 'alice' },
+            links: { html: { href: 'https://bitbucket.org/acme/repo/pull-requests/42#9' } },
+          },
+          {
+            id: 10,
+            created_on: '2026-10-01T11:00:00Z',
+            parent: { id: 9 },
+            content: { raw: 'Bitbucket reply' },
+            user: { display_name: 'bob' },
+            links: { html: { href: 'https://bitbucket.org/acme/repo/pull-requests/42#10' } },
+          },
+          {
+            id: 11,
+            created_on: '2026-10-01T12:00:00Z',
+            parent: { id: 10 },
+            content: { raw: 'Bitbucket nested reply' },
+            user: { display_name: 'alice' },
+            links: { html: { href: 'https://bitbucket.org/acme/repo/pull-requests/42#11' } },
+          },
+        ],
+      })
+    }) as typeof fetch
+    expect(
+      await readPullRequestActivity(
+        { cwd: await checkout(), number: 42 },
+        { ...fixture, fetch: fetcher },
+      ),
+    ).toMatchObject({
+      kind: 'ready',
+      reviews: { kind: 'ready', items: [{ state: 'approved' }] },
+      commits: { kind: 'ready', items: [{ message: 'Bitbucket commit' }] },
+      discussions: {
+        kind: 'ready',
+        truncated: true,
+        items: [
+          {
+            id: '9',
+            path: 'src/bb.ts',
+            comments: [
+              { body: 'Bitbucket inline' },
+              { body: 'Bitbucket reply' },
+              { body: 'Bitbucket nested reply' },
+            ],
+          },
+        ],
+      },
+    })
+    expect(urls).toHaveLength(3)
+  })
+
+  it.each([99, 100, 101])('keeps GitHub activity bounded for %i native rows', async (count) => {
+    const fixture = boundary('https://github.com/acme/repo.git', (argv) => {
+      if (argv[1] === 'auth') return ok()
+      if (argv.some((arg) => arg.includes('/reviews?')))
+        return json(
+          Array.from({ length: count }, (_, index) => ({
+            id: index + 1,
+            body: '',
+            user: null,
+            state: 'APPROVED',
+            submitted_at: '2026-10-01T10:00:00Z',
+          })),
+        )
+      return json([])
+    })
+    const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
+    expect(result).toMatchObject({
+      kind: 'ready',
+      reviews: { kind: 'ready', truncated: count >= 100 },
+    })
+    if (result.kind === 'ready' && result.reviews.kind === 'ready')
+      expect(result.reviews.items).toHaveLength(Math.min(count, 100))
+  })
+
+  it('bounds Forgejo inline review reads before fetching more native collections', async () => {
+    const fixture = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+      if (argv.includes('login')) return json([{ name: 'selected', url: 'https://codeberg.org' }])
+      if (argv.at(-1)?.endsWith('/reviews?limit=100&page=1'))
+        return json(
+          Array.from({ length: 21 }, (_, index) => ({
+            id: index + 1,
+            body: '',
+            user: null,
+            state: 'COMMENT',
+            submitted_at: '2026-10-01T10:00:00Z',
+            comments_count: 1,
+          })),
+        )
+      return json([])
+    })
+    const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
+    expect(result).toMatchObject({ kind: 'ready', discussions: { kind: 'ready', truncated: true } })
+    expect(
+      fixture.commands('tea').filter((call) => call.argv.at(-1)?.endsWith('/comments')),
+    ).toHaveLength(20)
+  })
+
+  it('walks capped Forgejo pages and includes a later inline review', async () => {
+    const fixture = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+      if (argv.includes('login')) return json([{ name: 'selected', url: 'https://codeberg.org' }])
+      const endpoint = new URL(argv.at(-1)!)
+      const page = Number(endpoint.searchParams.get('page') ?? 1)
+      if (endpoint.pathname.endsWith('/reviews/75/comments'))
+        return json([
+          {
+            id: 81,
+            body: 'Later inline',
+            user: null,
+            path: 'later.ts',
+            created_at: '2026-10-01T11:00:00Z',
+          },
+        ])
+      const indexes = Array.from(
+        { length: Math.max(0, Math.min(50, 75 - (page - 1) * 50)) },
+        (_, index) => (page - 1) * 50 + index + 1,
+      )
+      if (endpoint.pathname.endsWith('/reviews'))
+        return json(
+          indexes.map((id) => ({
+            id,
+            body: '',
+            user: null,
+            state: 'COMMENT',
+            submitted_at: '2026-10-01T10:00:00Z',
+            comments_count: id === 75 ? 1 : 0,
+          })),
+        )
+      if (endpoint.pathname.endsWith('/commits'))
+        return json(
+          indexes.map((id) => ({
+            sha: id.toString(16).padStart(40, '0'),
+            author: null,
+            commit: {
+              message: `Commit ${id}`,
+              author: { name: 'Git author' },
+              committer: { date: '2026-10-01T09:00:00Z' },
+            },
+          })),
+        )
+    })
+    const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
+    expect(result).toMatchObject({
+      kind: 'ready',
+      reviews: { truncated: false },
+      commits: { truncated: false },
+      discussions: { items: [{ comments: [{ body: 'Later inline' }] }] },
+    })
+    if (
+      result.kind !== 'ready' ||
+      result.reviews.kind !== 'ready' ||
+      result.commits.kind !== 'ready'
+    )
+      return
+    expect(result.reviews.items.map((row) => row.id)).toEqual(
+      Array.from({ length: 75 }, (_, index) => String(index + 1)),
+    )
+    expect(result.commits.items.map((row) => row.message)).toEqual(
+      Array.from({ length: 75 }, (_, index) => `Commit ${index + 1}`),
+    )
+    expect(
+      fixture.commands('tea').filter((call) => call.argv.at(-1)?.includes('page=3')),
+    ).toHaveLength(2)
+  })
+
+  it.each([
+    [50, 125, 100, 2],
+    [10, 100, 50, 5],
+  ])(
+    'bounds Forgejo capped pages at %i rows per page and marks unknown exhaustion as truncated',
+    async (pageSize, total, kept, lastPage) => {
+      const fixture = boundary('https://codeberg.org/acme/repo.git', (argv) => {
+        if (argv.includes('login')) return json([{ name: 'selected', url: 'https://codeberg.org' }])
+        const endpoint = new URL(argv.at(-1)!)
+        const page = Number(endpoint.searchParams.get('page') ?? 1)
+        const indexes = Array.from(
+          { length: Math.max(0, Math.min(pageSize, total - (page - 1) * pageSize)) },
+          (_, index) => (page - 1) * pageSize + index + 1,
+        )
+        if (endpoint.pathname.endsWith('/reviews'))
+          return json(
+            indexes.map((id) => ({
+              id,
+              body: '',
+              user: null,
+              state: 'COMMENT',
+              submitted_at: '2026-10-01T10:00:00Z',
+              comments_count: 0,
+            })),
+          )
+        if (endpoint.pathname.endsWith('/commits'))
+          return json(
+            indexes.map((id) => ({
+              sha: id.toString(16).padStart(40, '0'),
+              author: null,
+              commit: {
+                message: `Commit ${id}`,
+                author: { name: 'Git author' },
+                committer: { date: '2026-10-01T09:00:00Z' },
+              },
+            })),
+          )
+      })
+      const result = await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture)
+      expect(result).toMatchObject({
+        kind: 'ready',
+        reviews: { truncated: true },
+        commits: { truncated: true },
+        discussions: { truncated: true },
+      })
+      if (
+        result.kind !== 'ready' ||
+        result.reviews.kind !== 'ready' ||
+        result.commits.kind !== 'ready'
+      )
+        return
+      expect(result.reviews.items.map((row) => row.id)).toEqual(
+        Array.from({ length: kept }, (_, index) => String(index + 1)),
+      )
+      expect(result.commits.items.map((row) => row.message)).toEqual(
+        Array.from({ length: kept }, (_, index) => `Commit ${index + 1}`),
+      )
+      expect(
+        fixture.commands('tea').filter((call) => call.argv.at(-1)?.includes('?')),
+      ).toHaveLength(lastPage * 2)
+      expect(
+        fixture.commands('tea').some((call) => call.argv.at(-1)?.includes(`page=${lastPage + 1}`)),
+      ).toBe(false)
+    },
+  )
+
+  it.each(['https://github.com/acme/repo.git', 'https://codeberg.org/acme/repo.git'])(
+    'preserves unlinked Git commit author on %s',
+    async (remote) => {
+      const fixture = boundary(remote, (argv) => {
+        if (argv[1] === 'auth') return ok()
+        if (argv.includes('login')) return json([{ name: 'selected', url: 'https://codeberg.org' }])
+        if (argv.at(-1)?.includes('/commits?') && !argv.at(-1)?.includes('page=2'))
+          return json([
+            {
+              sha: 'd'.repeat(40),
+              author: null,
+              commit: {
+                message: 'Unlinked commit',
+                author: { name: 'Unlinked Git author' },
+                committer: { date: '2026-10-01T09:00:00Z' },
+              },
+            },
+          ])
+        return json([])
+      })
+      expect(
+        await readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture),
+      ).toMatchObject({ commits: { kind: 'ready', items: [{ author: 'Unlinked Git author' }] } })
+    },
+  )
+
+  it('rejects unreadable activity without fabricating an empty supported section', async () => {
+    const fixture = boundary('https://github.com/acme/repo.git', (argv) =>
+      argv[1] === 'auth' ? ok() : json({ malformed: true }),
+    )
+    await expect(
+      readPullRequestActivity({ cwd: await checkout(), number: 42 }, fixture),
+    ).rejects.toMatchObject({ code: 'git.PULL_REQUEST_RESPONSE_INVALID' })
+  })
 })

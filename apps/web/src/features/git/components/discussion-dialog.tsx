@@ -1,6 +1,8 @@
 import type { GitPullRequestReviewVerdict } from '@workspace/contracts'
 import { useSubmitPullRequestReview } from '@/features/git/hooks/use-submit-pull-request-review'
 import { ReviewComposer } from '@/features/git/components/review-composer'
+import { usePullRequestActivity } from '@/features/git/hooks/use-pull-request-activity'
+import { DiscussionActivity } from '@/features/git/components/discussion-activity'
 import { DiscussionComments } from '@/features/git/components/discussion-comments'
 import { useId, useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
@@ -12,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
+import { Tabs, TabsList, TabsTab, TabsPanel } from '@workspace/ui/components/tabs'
 import { Textarea } from '@workspace/ui/components/textarea'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { InlineError } from '@/components/inline-error'
@@ -43,6 +46,7 @@ export function DiscussionDialog({
   const setBody = (body: string) => setDraft({ subject, body })
   const id = useId()
   const comments = usePullRequestComments(rootPath, number, open)
+  const activity = usePullRequestActivity(rootPath, number, open)
   const post = usePostPullRequestComment(rootPath, number)
   const ready =
     comments.data?.kind === 'ready' &&
@@ -98,12 +102,14 @@ export function DiscussionDialog({
           <Button
             size='sm'
             variant='ghost'
-            disabled={comments.isFetching}
-            onClick={() => void comments.refetch()}
+            disabled={comments.isFetching || activity.isFetching}
+            onClick={() => void Promise.all([comments.refetch(), activity.refetch()])}
           >
             Refresh discussion
           </Button>
-          {comments.isFetching ? <Spinner size='xs' label='Refreshing discussion' /> : null}
+          {comments.isFetching || activity.isFetching ? (
+            <Spinner size='xs' label='Refreshing discussion' />
+          ) : null}
           <a
             href={url}
             target='_blank'
@@ -113,7 +119,18 @@ export function DiscussionDialog({
             Open on Git host
           </a>
         </div>
-        <DiscussionComments query={comments} />
+        <Tabs defaultValue='comments'>
+          <TabsList variant='segmented' aria-label='Pull request discussion view'>
+            <TabsTab value='comments'>Comments</TabsTab>
+            <TabsTab value='activity'>Activity</TabsTab>
+          </TabsList>
+          <TabsPanel value='comments'>
+            <DiscussionComments query={comments} />
+          </TabsPanel>
+          <TabsPanel value='activity'>
+            <DiscussionActivity query={activity} />
+          </TabsPanel>
+        </Tabs>
         {comments.data?.kind === 'ready' && comments.data.comment.kind === 'unsupported' ? (
           <p className='text-muted-foreground text-sm'>{comments.data.comment.reason}</p>
         ) : null}

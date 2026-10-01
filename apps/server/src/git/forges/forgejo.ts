@@ -1,4 +1,4 @@
-import type { GitPullRequest } from '@workspace/contracts'
+import type { GitPullRequest, GitPullRequestComment } from '@workspace/contracts'
 import * as v from 'valibot'
 import { gitPullRequestErrors } from '../utils/pull-request-errors'
 import {
@@ -13,10 +13,40 @@ import {
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseIssueComments } from './issue-comments'
+import {
+  groupActivityDiscussions,
+  parseForgejoInline,
+  parseForgejoReviews,
+  parseRestCommits,
+  restCommitsSchema,
+  forgejoReviewsSchema,
+} from './activity'
 
 /** Recently updated pull requests read per lookup; the branch filter runs on them. */
 const PAGE_SIZE = 50
 const MAX_PAGES = 5
+
+async function readActivityRows<T>(
+  context: ForgeContext,
+  read: (path: string) => Promise<string>,
+  path: string,
+  schema: v.GenericSchema<unknown, T[]>,
+) {
+  const rows: T[] = []
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const entries = parseForgeJson(
+      context,
+      schema,
+      await read(`${path}?limit=100&page=${page}`),
+      `activity-${path}`,
+    )
+    // Hosts cap requested limits; only an empty page proves exhaustion without metadata.
+    if (entries.length === 0) return { rows, truncated: false }
+    rows.push(...entries.slice(0, 100 - rows.length))
+    if (rows.length === 100) return { rows, truncated: true }
+  }
+  return { rows, truncated: true }
+}
 
 const loginSchema = v.array(v.object({ name: v.string(), url: v.string() }))
 
@@ -39,6 +69,46 @@ const pullSchema = v.object({
  */
 export const forgejo: ForgeProvider = {
   kind: 'forgejo',
+  async activity(context, number) {
+    const login = await requireLogin(context)
+    const read = async (path: string) =>
+      requireSuccess(
+        context,
+        await tea(context, [
+          'api',
+          '--login',
+          login.name,
+          apiUrl(login, context, `pulls/${number}/${path}`),
+        ]),
+        `activity-${path}`,
+      ).stdout
+    const [reviewRows, commitRows] = await Promise.all([
+      readActivityRows(context, read, 'reviews', forgejoReviewsSchema),
+      readActivityRows(context, read, 'commits', restCommitsSchema),
+    ])
+    const parsed = parseForgejoReviews(
+      context,
+      JSON.stringify(reviewRows.rows),
+      reviewRows.truncated,
+    )
+    const comments: GitPullRequestComment[] = []
+    let truncated = parsed.inlineTruncated
+    for (const reviewId of parsed.inlineReviewIds) {
+      const rows = parseForgejoInline(context, await read(`reviews/${reviewId}/comments`))
+      const remaining = 100 - comments.length
+      comments.push(...rows.slice(0, remaining))
+      truncated ||= rows.length > remaining
+      if (comments.length === 100) {
+        truncated = true
+        break
+      }
+    }
+    return {
+      reviews: parsed.reviews,
+      commits: parseRestCommits(context, JSON.stringify(commitRows.rows), commitRows.truncated),
+      discussions: groupActivityDiscussions(comments, truncated),
+    }
+  },
   discussion: {
     async read(context, number) {
       const login = await requireLogin(context)

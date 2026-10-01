@@ -296,3 +296,155 @@ test('a refused review waits for refreshed discussion before releasing the compo
     gate.resolve()
   }
 })
+
+test('the existing discussion surface reads review and commit activity and groups native thread comments', async ({
+  client,
+  forge,
+}) => {
+  void client
+  forge.activityReviews.push({
+    id: 1,
+    body: 'Host review summary',
+    state: 'APPROVED',
+    user: { login: 'alice' },
+    submitted_at: '2026-10-01T10:00:00Z',
+  })
+  forge.activityCommits.push({
+    sha: 'a'.repeat(40),
+    author: { login: 'bob' },
+    commit: {
+      message: 'Activity commit headline',
+      author: { name: 'Git author' },
+      committer: { date: '2026-10-01T09:00:00Z' },
+    },
+  })
+  forge.activityDiscussions.push(
+    {
+      id: 9,
+      body: 'Inline root feedback',
+      path: 'src/main.ts',
+      user: { login: 'alice' },
+      created_at: '2026-10-01T10:00:00Z',
+      html_url: 'https://github.com/fixture/repo/pull/7#9',
+    },
+    {
+      id: 10,
+      in_reply_to_id: 9,
+      body: 'Inline reply feedback',
+      path: 'src/main.ts',
+      user: { login: 'bob' },
+      created_at: '2026-10-01T11:00:00Z',
+      html_url: 'https://github.com/fixture/repo/pull/7#10',
+    },
+  )
+  const view = renderWithProviders(
+    <PullRequestDiscussion rootPath='' number={7} url='https://github.com/fixture/repo/pull/7' />,
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Discussion' }))
+  await userEvent.click(await screen.findByRole('tab', { name: 'Activity' }))
+  expect(await screen.findByText('Host review summary')).toBeVisible()
+  expect(screen.getByText('Activity commit headline')).toBeVisible()
+  expect(screen.getByRole('region', { name: 'Discussion 9' })).toHaveTextContent(
+    'Inline root feedback',
+  )
+  expect(screen.getByRole('region', { name: 'Discussion 9' })).toHaveTextContent(
+    'Inline reply feedback',
+  )
+  expect(view.queryClient.getQueryData(pullRequestDiscussionKeys.activity('', 7))).toMatchObject({
+    kind: 'ready',
+    discussions: { kind: 'ready', items: [{ id: '9', comments: [{ id: '9' }, { id: '10' }] }] },
+  })
+  forge.activityReviews.push({
+    id: 2,
+    body: 'External review arrived',
+    state: 'CHANGES_REQUESTED',
+    user: { login: 'bob' },
+    submitted_at: '2026-10-01T11:00:00Z',
+  })
+  await userEvent.click(screen.getByRole('button', { name: 'Refresh discussion' }))
+  expect(await screen.findByText('External review arrived')).toBeVisible()
+})
+
+test('Azure activity presents native grouped conversation and explicit unsupported read sections', async ({
+  client,
+  server,
+  forge,
+}) => {
+  void client
+  runGit(server.root, [
+    'remote',
+    'set-url',
+    'origin',
+    'https://dev.azure.com/org/project/_git/repo',
+  ])
+  forge.azureThreads.push({
+    id: 8,
+    threadContext: { filePath: '/src/main.ts' },
+    comments: [
+      { id: 1, content: 'Azure root feedback', publishedDate: '2026-10-01T10:00:00Z' },
+      { id: 2, content: 'Azure reply feedback', publishedDate: '2026-10-01T11:00:00Z' },
+    ],
+  })
+  renderWithProviders(
+    <PullRequestDiscussion
+      rootPath=''
+      number={7}
+      url='https://dev.azure.com/org/project/_git/repo/pullrequest/7'
+    />,
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Discussion' }))
+  await userEvent.click(await screen.findByRole('tab', { name: 'Activity' }))
+  expect(await screen.findByText('Open Azure DevOps for review history.')).toBeVisible()
+  expect(screen.getByText('Open Azure DevOps for pull request commits.')).toBeVisible()
+  expect(screen.queryByText('No reviews')).toBeNull()
+  expect(screen.queryByText('No commits')).toBeNull()
+  expect(screen.getByRole('region', { name: 'Discussion 8' })).toHaveTextContent(
+    'Azure root feedback',
+  )
+  expect(screen.getByRole('region', { name: 'Discussion 8' })).toHaveTextContent(
+    'Azure reply feedback',
+  )
+})
+
+test('a refused review awaits independently blocked activity settlement before releasing its draft', async ({
+  client,
+  forge,
+}) => {
+  void client
+  const gate = Promise.withResolvers<void>()
+  renderWithProviders(
+    <PullRequestDiscussion rootPath='' number={7} url='https://github.com/fixture/repo/pull/7' />,
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Discussion' }))
+  await userEvent.click(await screen.findByRole('tab', { name: 'Activity' }))
+  await screen.findByText('No reviews')
+  forge.control.failReview = true
+  forge.control.beforeActivityRead = () => gate.promise
+  forge.activityReviews.push({
+    id: 4,
+    body: 'Review appeared during refusal',
+    state: 'APPROVED',
+    user: { login: 'alice' },
+    submitted_at: '2026-10-01T10:00:00Z',
+  })
+  await userEvent.type(
+    screen.getByRole('textbox', { name: 'Review summary' }),
+    'Keep this activity draft',
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Submit review' }))
+  try {
+    await waitFor(() => expect(forge.activityReads).toHaveLength(6))
+    await waitFor(() => expect(forge.reads).toHaveLength(2))
+    expect(screen.getByRole('button', { name: 'Submitting review…' })).toBeDisabled()
+    expect(screen.getByText('No reviews')).toBeVisible()
+    gate.resolve()
+    expect(await screen.findByText('Review appeared during refusal')).toBeVisible()
+    expect(await screen.findByText('The Git host could not submit the review')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Submit review' })).toBeEnabled()
+    expect(screen.getByRole('textbox', { name: 'Review summary' })).toHaveValue(
+      'Keep this activity draft',
+    )
+  } finally {
+    gate.resolve()
+  }
+})

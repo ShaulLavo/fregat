@@ -12,6 +12,7 @@ import {
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 import { parseAzureThreads } from './azure-threads'
+import { groupActivityDiscussions } from './activity'
 
 const JSON_ARGS = ['--only-show-errors', '--output', 'json'] as const
 
@@ -30,6 +31,14 @@ const pullRequestSchema = v.object({
  */
 export const azureDevOps: ForgeProvider = {
   kind: 'azure-devops',
+  async activity(context, number) {
+    const conversation = await azureDevOps.discussion.read(context, number)
+    return {
+      reviews: { kind: 'unsupported', reason: 'Open Azure DevOps for review history.' },
+      commits: { kind: 'unsupported', reason: 'Open Azure DevOps for pull request commits.' },
+      discussions: groupActivityDiscussions(conversation.comments, conversation.truncated),
+    }
+  },
   discussion: {
     write: { kind: 'unsupported', reason: 'Open Azure DevOps to post pull request comments.' },
     async read(context, number) {

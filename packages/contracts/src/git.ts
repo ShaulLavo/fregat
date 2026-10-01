@@ -434,3 +434,39 @@ export type GitPullRequestReviewInput = {
 export type GitPullRequestReviewResult =
   | { kind: 'submitted'; verdict: GitPullRequestReviewVerdict }
   | { kind: 'unsupported'; forge: GitForge | null; reason: string }
+
+/** A bounded host read distinguishes an empty collection from an unavailable capability. */
+export type GitPullRequestActivitySection<T> =
+  | { kind: 'ready'; items: readonly T[]; truncated: boolean }
+  | { kind: 'unsupported'; reason: string }
+
+export type GitPullRequestReviewRecord = {
+  id: string
+  author: string
+  body: string
+  state: string
+  createdAt: string
+}
+
+export type GitPullRequestCommit = {
+  oid: string
+  message: string
+  author: string
+  createdAt: string
+}
+
+export type GitPullRequestDiscussion = {
+  id: string
+  path: string | null
+  comments: readonly GitPullRequestComment[]
+}
+
+export type GitPullRequestActivity =
+  | {
+      kind: 'ready'
+      forge: GitForge
+      reviews: GitPullRequestActivitySection<GitPullRequestReviewRecord>
+      commits: GitPullRequestActivitySection<GitPullRequestCommit>
+      discussions: GitPullRequestActivitySection<GitPullRequestDiscussion>
+    }
+  | { kind: 'unsupported'; forge: GitForge | null; reason: string }

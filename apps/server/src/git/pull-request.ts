@@ -3,6 +3,7 @@ import type {
   GitForgeKind,
   GitPublishRequest,
   GitPullRequest,
+  GitPullRequestActivity,
   GitPullRequestComments,
   GitPullRequestCommentResult,
   GitPullRequestReviewInput,
@@ -303,4 +304,17 @@ export async function submitPullRequestReview(
     }
   await review.submit(supported.context, input.number, input)
   return { kind: 'submitted', verdict: input.verdict }
+}
+
+export async function readPullRequestActivity(
+  input: { cwd: string; number: number },
+  boundaries: Boundaries = {},
+): Promise<GitPullRequestActivity> {
+  const supported = await supportedContext(input.cwd, boundaries)
+  if (!supported.context) throw forgeNotReady(supported)
+  return {
+    kind: 'ready',
+    forge: supported.forge,
+    ...(await forgeProvider(supported.forge.kind).activity(supported.context, input.number)),
+  }
 }

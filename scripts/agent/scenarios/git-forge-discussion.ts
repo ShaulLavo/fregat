@@ -27,6 +27,48 @@ export const gitForgeDiscussion = isolatedNativeScenario({
       isDraft: false,
       closedAt: null,
     })
+    const statePath = join(forge.directory, 'forge.json')
+    const state = JSON.parse(await readFile(statePath, 'utf8'))
+    state.activityReviews = [
+      {
+        id: 1,
+        body: 'Native activity review',
+        state: 'CHANGES_REQUESTED',
+        user: { login: 'alice' },
+        submitted_at: '2026-10-01T10:00:00Z',
+      },
+    ]
+    state.activityCommits = [
+      {
+        sha: 'a'.repeat(40),
+        author: { login: 'bob' },
+        commit: {
+          message: 'Native activity commit',
+          author: { name: 'Git author' },
+          committer: { date: '2026-10-01T09:00:00Z' },
+        },
+      },
+    ]
+    state.activityDiscussions = [
+      {
+        id: 9,
+        body: 'Native inline root',
+        path: 'src/main.ts',
+        user: { login: 'alice' },
+        created_at: '2026-10-01T10:00:00Z',
+        html_url: 'https://github.com/fregat/fixture/pull/7#9',
+      },
+      {
+        id: 10,
+        in_reply_to_id: 9,
+        body: 'Native inline reply',
+        path: 'src/main.ts',
+        user: { login: 'bob' },
+        created_at: '2026-10-01T11:00:00Z',
+        html_url: 'https://github.com/fregat/fixture/pull/7#10',
+      },
+    ]
+    await writeFile(statePath, JSON.stringify(state))
     return { pathPrefix: forge.directory }
   },
   async drive(page, { step }) {
@@ -35,6 +77,12 @@ export const gitForgeDiscussion = isolatedNativeScenario({
       await selectors.buttonNamed(page, 'Discussion').click()
       await selectors.forgeComment(page).waitFor()
       await step('discussion-empty')
+      await selectors.forgeActivityTab(page).click()
+      await selectors.forgeCommentText(page, 'Native activity review').waitFor()
+      await selectors.forgeCommentText(page, 'Native activity commit').waitFor()
+      await selectors.forgeCommentText(page, 'Native inline reply').scrollIntoViewIfNeeded()
+      await step('activity-discussion-grouped')
+      await selectors.forgeCommentsTab(page).click()
       await selectors.forgeComment(page).fill('Please add a regression test.')
       await selectors.buttonNamed(page, 'Post comment').click()
       await selectors.forgeCommentText(page, 'Please add a regression test.').waitFor()
@@ -61,6 +109,10 @@ export const gitForgeDiscussion = isolatedNativeScenario({
       ok(reviewed.reviews.length === 1 && reviewed.reviews[0].event === 'APPROVE')
       ok(reviewed.reviews[0].body === 'Reviewed the regression coverage.')
       await step('review-approved')
+      await selectors.forgeActivityTab(page).click()
+      await selectors.forgeCommentText(page, 'Reviewed the regression coverage.').waitFor()
+      await step('review-activity-settled')
+      await selectors.forgeCommentsTab(page).click()
       reviewed.failReview = true
       await writeFile(statePath, JSON.stringify(reviewed))
       await selectors.forgeReviewSummary(page).fill('Please revise the edge case.')
@@ -106,6 +158,9 @@ export const gitForgeDiscussion = isolatedNativeScenario({
       await step('short-viewport-actions-reachable')
       const calls = await forge.calls()
       ok(calls.filter((call) => call.includes('POST')).length === 4)
+      ok(calls.some((call) => call.some((arg) => arg.includes('/pulls/7/comments?'))))
+      ok(calls.some((call) => call.some((arg) => arg.includes('/pulls/7/commits?'))))
+      ok(calls.some((call) => call.some((arg) => arg.includes('/pulls/7/reviews?'))))
     } finally {
       await forge.release()
       forge = null

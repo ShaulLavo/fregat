@@ -3,6 +3,12 @@ import * as v from 'valibot'
 import { gitPullRequestErrors } from '../utils/pull-request-errors'
 import { forgeCommand, parseForgeJson, perBranch, repositoryParts } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
+import {
+  bitbucketCommentFields,
+  parseBitbucketCommits,
+  parseBitbucketReviews,
+  parseBitbucketDiscussions,
+} from './activity'
 
 const API_BASE = 'https://api.bitbucket.org/2.0'
 const OPEN_STATES = ['OPEN']
@@ -24,6 +30,28 @@ const pullRequestSchema = v.object({
  */
 export const bitbucket: ForgeProvider = {
   kind: 'bitbucket',
+  async activity(context, number) {
+    const authorization = await requireCredentials(context)
+    const read = async (path: string) => {
+      const response = await request(context, authorization, `pullrequests/${number}${path}`)
+      if (!response.ok)
+        throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({
+          forge: context.forge.name,
+          internal: { at: 'activity', status: response.status },
+        })
+      return response.text()
+    }
+    const [reviews, commits, discussions] = await Promise.all([
+      read(''),
+      read('/commits?pagelen=100'),
+      read('/comments?pagelen=100'),
+    ])
+    return {
+      reviews: parseBitbucketReviews(context, reviews),
+      commits: parseBitbucketCommits(context, commits),
+      discussions: parseBitbucketDiscussions(context, discussions),
+    }
+  },
   discussion: {
     async read(context, number) {
       const authorization = await requireCredentials(context)
@@ -48,9 +76,7 @@ export const bitbucket: ForgeProvider = {
               deleted: v.optional(v.boolean()),
               inline: v.optional(v.unknown()),
               parent: v.optional(v.unknown()),
-              content: v.object({ raw: v.string() }),
-              user: v.nullable(v.object({ display_name: v.string() })),
-              links: v.object({ html: v.object({ href: v.pipe(v.string(), v.url()) }) }),
+              ...bitbucketCommentFields,
             }),
           ),
         }),
