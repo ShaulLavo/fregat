@@ -7,6 +7,10 @@ import { checkoutRoot } from './paths'
 
 const cases = [
   { mode: 'healthy', code: 0, consoleCapture: true },
+  { mode: 'delayed-startup', code: 0, consoleCapture: true },
+  { mode: 'delayed-startup-error', code: 1, consoleCapture: true },
+  { mode: 'startup-busy', code: 1, consoleCapture: true },
+  { mode: 'startup-unmarked', code: 1, consoleCapture: true },
   { mode: 'module504', code: 1, consoleCapture: true },
   { mode: 'aborted-script', code: 1, consoleCapture: false },
   { mode: 'module-mime', code: 1, consoleCapture: true },
@@ -21,10 +25,25 @@ const cases = [
 test.each(cases)('doctor classifies $mode through the real CLI', async (fixture) => {
   const scratch = await mkdtemp(path.join(tmpdir(), 'fregat-doctor-test-'))
   let releaseRequests = 0
+  let startupCompleted = false
+  let startupTimer: ReturnType<typeof setTimeout> | undefined
   let heldScript: ServerResponse | undefined
   let heldRelease: ServerResponse | undefined
   const frameReady = Promise.withResolvers<void>()
   const server = createServer((request, response) => {
+    if (request.url === '/deferred.js') {
+      startupTimer = setTimeout(() => {
+        startupCompleted = true
+        response
+          .writeHead(200, { 'content-type': 'text/javascript' })
+          .end(
+            fixture.mode === 'delayed-startup-error' || fixture.mode === 'startup-unmarked'
+              ? 'throw new Error("Deferred startup failed")'
+              : 'const shell = document.querySelector("[aria-label]"); shell.textContent = "Fully loaded"; shell.ariaBusy = "false"',
+          )
+      }, 850)
+      return
+    }
     if (request.url === '/frame.js') {
       frameReady.resolve()
       return
@@ -90,12 +109,19 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
       'cancelled-iframe-script':
         '<iframe srcdoc="<script async src=/frame.js></script>"></iframe><script type="module">await fetch("/frame-ready"); document.querySelector("iframe").remove()</script>',
     }
-    const script =
-      fixture.mode === 'load-during-release'
-        ? `<script type="module" async src="/required.js" onerror="fetch('/failure-recorded')"></script>`
-        : '<script type="module" src="/required.js"></script>'
+    const deferred =
+      fixture.mode === 'delayed-startup' ||
+      fixture.mode === 'delayed-startup-error' ||
+      fixture.mode === 'startup-unmarked'
+    let script = '<script type="module" src="/required.js"></script>'
+    if (deferred) script = '<script type="module">import("/deferred.js")</script>'
+    if (fixture.mode === 'load-during-release')
+      script = `<script type="module" async src="/required.js" onerror="fetch('/failure-recorded')"></script>`
+    let busy = 'aria-busy="false"'
+    if (deferred || fixture.mode === 'startup-busy') busy = 'aria-busy="true"'
+    if (fixture.mode === 'startup-unmarked') busy = ''
     response.end(
-      `<!doctype html><title>Doctor fixture</title><div aria-label="Window toolbar">Partial shell</div>${extra[fixture.mode] ?? ''}${script}`,
+      `<!doctype html><title>Doctor fixture</title><div aria-label="Window toolbar" ${busy}>Partial shell</div>${extra[fixture.mode] ?? ''}${script}`,
     )
   })
   try {
@@ -135,6 +161,18 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
     if (!run) expect.fail(stdout + stderr)
     const observed = JSON.parse(await readFile(path.join(scratch, run, 'observed.json'), 'utf8'))
     expect(releaseRequests).toBe(1)
+    if (
+      fixture.mode === 'delayed-startup' ||
+      fixture.mode === 'delayed-startup-error' ||
+      fixture.mode === 'startup-unmarked'
+    ) {
+      expect(startupCompleted).toBe(true)
+      expect(observed.assets).toContain(`${url}deferred.js`)
+    }
+    if (fixture.mode === 'delayed-startup-error' || fixture.mode === 'startup-unmarked')
+      expect(observed.errors).toContain('Deferred startup failed')
+    if (fixture.mode === 'startup-busy' || fixture.mode === 'startup-unmarked')
+      expect(observed.health.reasons).toContain('initial content did not become ready')
     if (fixture.mode === 'module504' || fixture.mode === 'load-during-release') {
       expect(observed.failedResponses).toContainEqual({
         url: `${url}required.js`,
@@ -193,6 +231,7 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
       expect(observed.failedResponses).toEqual([])
     }
   } finally {
+    clearTimeout(startupTimer)
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     )

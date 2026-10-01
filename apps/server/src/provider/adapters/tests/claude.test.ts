@@ -1368,6 +1368,68 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('uses native live rosters for monitor settlement regardless of task bookend order', async () => {
+    const harness = claudeHarness()
+    const liveness = new BackgroundTaskRegistry()
+    const unsubscribe = harness.adapter.subscribeEvents((event) => liveness.accept(event))
+    try {
+      await harness.adapter.startRuntime(sessionStartInput({}))
+      const query = latestQuery(harness)
+      await waitForEvent(harness, 'conversation.started')
+      const watch = { task_id: 'watch', task_type: 'monitor', description: 'Watch logs' }
+      const agent = { task_id: 'agent', task_type: 'local_agent', description: 'Work' }
+      const ambient = { ...watch, task_id: 'ambient', ambient: true }
+      const rosters = [[watch, agent, ambient], [watch, ambient], [ambient], []]
+      const states = ['working', 'monitoring', null, null]
+      for (const [index, tasks] of rosters.entries()) {
+        query.emit(systemMessage({ subtype: 'background_tasks_changed', tasks }))
+        await waitFor(
+          () =>
+            harness.events.filter((event) => event.type === 'tasks.roster').length === index + 1,
+          'native roster missing',
+        )
+        expect(liveness.get(SESSION_ID)).toBe(states[index])
+        if (index !== 1) continue
+        query.emit(
+          systemMessage({
+            subtype: 'task_updated',
+            task_id: 'watch',
+            patch: { status: 'completed' },
+          }),
+        )
+        await waitFor(
+          () => harness.events.some((event) => event.type === 'task.completed'),
+          'completion bookend missing',
+        )
+        expect(liveness.get(SESSION_ID)).toBe('monitoring')
+      }
+      query.emit(
+        systemMessage({
+          subtype: 'task_started',
+          task_id: 'watch',
+          task_type: 'monitor',
+          description: 'Late start',
+        }),
+      )
+      query.emit(
+        systemMessage({
+          subtype: 'task_progress',
+          task_id: 'watch',
+          description: 'Late progress',
+          usage: { duration_ms: 1, tool_uses: 0, total_tokens: 0 },
+        }),
+      )
+      await waitFor(
+        () => harness.events.some((event) => event.type === 'task.progress'),
+        'progress missing',
+      )
+      expect(liveness.get(SESSION_ID)).toBeNull()
+    } finally {
+      unsubscribe()
+      await harness.adapter.stopAll()
+    }
+  })
+
   it('preserves monitor classification across progress and ignores metadata after completion', async () => {
     const harness = claudeHarness()
     const liveness = new BackgroundTaskRegistry()

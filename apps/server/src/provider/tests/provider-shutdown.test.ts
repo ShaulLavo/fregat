@@ -62,7 +62,10 @@ describe('provider shutdown', () => {
   it('leaves no child process behind', async () => {
     const fixture = createFixture()
     const children: Bun.Subprocess[] = []
-    const registry = new ProviderAdapterRegistry({ drivers: [sleeperDriver(children)] })
+    const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
+      drivers: [sleeperDriver(children)],
+    })
     await registry.reconcile([{ driverKind: DRIVER_KIND, providerInstanceId: INSTANCE_ID }])
     const service = new ProviderService({
       adapterRegistry: registry,

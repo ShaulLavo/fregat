@@ -17,9 +17,10 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Install Editor browsers
         timeout-minutes: 8
-        run: |
-          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
-          editor/packages/editor/node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: editor/packages/editor/node_modules/.bin/playwright
+          browsers: chromium chromium-headless-shell firefox webkit
       - name: Check generated language catalog
         run: bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check
       - name: Check task inputs
@@ -40,9 +41,10 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Install Chromium
         timeout-minutes: 5
-        run: |
-          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
-          ghostty-webgpu/node_modules/.bin/playwright install --with-deps chromium
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: ghostty-webgpu/node_modules/.bin/playwright
+          browsers: chromium
       - name: Verify terminal library and browser package
         run: bun run --cwd ghostty-webgpu verify
       - name: Verify browser package with production npm settings

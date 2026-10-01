@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -13,18 +13,22 @@ import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import {
   bootSeconds,
+  chargeOf,
   decide,
   decideQuiet,
   drainRequest,
   legacyHold,
-  liveSlices,
+  orphanSlices,
   readReadings,
+  sliceState,
   type Limits,
+  type LiveSlice,
 } from './admission'
 import {
   HOSTS,
   isHost,
   reapSlice,
+  removeSlice,
   startJob,
   stopTimeoutSeconds,
   type Host,
@@ -36,13 +40,24 @@ import {
   DEFAULT_STATE_DIR,
   isProductionState,
   PRODUCTION,
+  isSliceRoot,
   sliceRootFor,
   type Production,
   tryLock,
+  unlessMissing,
   unlock,
   waitLock,
 } from './lock'
-import { enqueue, live, promote, release, type Entry, type Held } from './queue'
+import {
+  deadJobs,
+  enqueue,
+  live,
+  promote,
+  release,
+  type DeadJob,
+  type Entry,
+  type Held,
+} from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
@@ -50,6 +65,9 @@ const USAGE =
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
+// rev-parse answers in about a millisecond; a git still running after this is stuck, and the
+// wrapper holds its admission while it waits.
+const GIT_TIMEOUT_MS = 250
 const MiB = 2 ** 20
 // EX_TEMPFAIL: a quiet job whose hold ran out did not fail; it has to queue again.
 const RETRY_EXIT = 75
@@ -171,7 +189,7 @@ function sliceRootOption(given: string | undefined, stateDir: string, production
   // The directory must exist for its identity to decide its root.
   mkdirSync(stateDir, { recursive: true })
   const root = given ?? sliceRootFor(stateDir, production)
-  if (!/^[a-z0-9]+$/.test(root)) {
+  if (!isSliceRoot(root)) {
     throw createScriptError(
       `--slice-root takes lowercase letters and digits; got ${root}. ${USAGE}`,
     )
@@ -199,6 +217,8 @@ async function run(options: Options) {
   )
   // Released however the launch or the job ends, so a failed launch leaves no admission held.
   try {
+    // Read before launch: the job, or another session, may commit while it runs.
+    const checkout = repositoryOf(cwd)
     const job = startJob(placed.spec)
     // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
     // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
@@ -225,6 +245,7 @@ async function run(options: Options) {
     record(options, {
       admission: placed.reason,
       budget: placed.budget,
+      checkout,
       cwd,
       holdExpired,
       id,
@@ -261,6 +282,7 @@ async function admitLocal(
     pid: process.pid,
     quiet: options.quiet,
     since: new Date().toISOString(),
+    sliceRoot: options.sliceRoot,
   }
   const admitted = await admit(options, config, entry)
   if (options.quiet) {
@@ -286,6 +308,7 @@ async function admitLocal(
       id,
       sliceRoot: options.sliceRoot,
       runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
+      entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
   }
@@ -352,7 +375,7 @@ function attemptAdmission(
   const lock = waitLock(path.join(options.stateDir, 'admission.lock'))
   try {
     // Every waiting wrapper reclaims what dead wrappers left, before any rule can stop it.
-    const running = reconcile(options)
+    const running = reconcile(options, config.graceSeconds)
     const ahead = live(options.stateDir, 'queue').findIndex(
       (entry) => entry.id === waiting.entry.id,
     )
@@ -365,10 +388,10 @@ function attemptAdmission(
     const quiet = running.owners.find((job) => job.quiet && (job.quietUntil ?? Infinity) > now)
     if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}` }
     const decision = waiting.entry.quiet
-      ? decideQuiet(running.charges.length)
+      ? decideQuiet(running.owners.length + running.orphanCharges.length)
       : decide(
           waiting.entry.estimateBytes,
-          running.charges,
+          [...running.orphanCharges, ...ownerCharges(running.owners)],
           readReadings(options.procRoot),
           config.limits,
         )
@@ -393,25 +416,81 @@ function attemptAdmission(
 }
 
 /**
- * What each running job is charged. The cgroup tree is what runs: a job slice whose wrapper is
- * gone (no live entry) is an orphan, charged its ceiling while this pass kills and removes it.
- * A job admitted but not yet in its slice is charged through its live entry.
+ * Reaps orphans: job slices whose wrapper is gone (`orphanSlices`). Each is charged its
+ * ceiling less its use, read before the kill; if the kill fails it may still grow that far.
  */
-function reconcile(options: Options) {
+function reconcile(options: Options, graceSeconds: number) {
   const owners = live(options.stateDir, 'jobs')
-  const orphans = liveSlices(options.sliceRoot).filter(
-    (slice) => !owners.some((job) => job.id === slice.id),
+  const dead = deadJobs(options.stateDir)
+  const orphans = orphanSlices(options.sliceRoot, owners, dead)
+  const orphanCharges = orphans.map((orphan) =>
+    chargeOf(orphan.root, orphan.slice, orphan.ceilingBytes),
   )
-  for (const orphan of orphans) {
-    console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
-    reapSlice(options.sliceRoot, orphan.slice)
-  }
+  for (const orphan of orphans) reapOrphan(options.stateDir, orphan, graceSeconds)
+  forgetStoppedFailures(options.stateDir)
+  for (const job of dead) settleDeadEntry(job)
   clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
-  const charges = [
-    ...owners.map((job) => job.estimateBytes),
-    ...orphans.map((orphan) => orphan.ceilingBytes),
-  ]
-  return { charges, owners }
+  return { orphanCharges, owners }
+}
+
+// A slice that outlives its stop stays charged and is retried quietly on each later pass. A
+// marker under `reaping/` keeps the series across wrappers: one warning when it starts, one
+// error once the stop timeout has passed, each naming the slice and how to stop it by hand.
+function reapOrphan(stateDir: string, orphan: LiveSlice, graceSeconds: number) {
+  const marker = path.join(stateDir, 'reaping', orphan.slice)
+  const failing = readText(marker).trim()
+  if (!failing) console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
+  reapSlice(orphan.root, orphan.slice)
+  if (sliceState(orphan.root, orphan.slice) !== 'running') return rmSync(marker, { force: true })
+  const now = bootSeconds()
+  if (!failing) {
+    mkdirSync(path.dirname(marker), { recursive: true })
+    writeFileSync(marker, `${now} warned`)
+    console.error(
+      `[wave-heavy] warn: ${orphan.slice} is still running after a stop; later admissions retry it and count its memory`,
+    )
+    return
+  }
+  const [since = '0', reported] = failing.split(' ')
+  if (reported === 'error' || now - Number(since) < stopTimeoutSeconds(graceSeconds)) return
+  writeFileSync(marker, `${since} error`)
+  console.error(
+    `[wave-heavy] error: ${orphan.slice} is still running ${Math.round(now - Number(since))} s after its first stop; stop it with: systemctl --user stop ${orphan.slice}`,
+  )
+}
+
+// A slice that stopped some other way ends its failure series.
+function forgetStoppedFailures(stateDir: string) {
+  const dir = path.join(stateDir, 'reaping')
+  for (const slice of unlessMissing(() => readdirSync(dir)) ?? []) {
+    const root = slice.slice(0, slice.lastIndexOf('-'))
+    if (isSliceRoot(root) && sliceState(root, slice) === 'running') continue
+    rmSync(path.join(dir, slice), { force: true })
+  }
+}
+
+// A dead entry is the only record of a slice on another root, so it stays until that slice is
+// gone, or empty and stopped; a stop that failed is retried, and charged, on the next pass. An
+// entry this wrapper did not write names nothing and is dropped.
+function settleDeadEntry(job: DeadJob) {
+  if (!job.attributable) {
+    console.error(`[wave-heavy] dropped ${job.file}: not a job entry a wrapper wrote`)
+    return rmSync(job.file, { force: true })
+  }
+  const slice = `${job.entry.sliceRoot}-${job.entry.id}.slice`
+  const state = sliceState(job.entry.sliceRoot, slice)
+  if (state === 'running') return
+  if (state === 'empty' && !removeSlice(slice)) return
+  rmSync(job.file, { force: true })
+}
+
+// The part of each live job's estimate it may still claim, by the slice root it runs under; a
+// job admitted but not yet in its slice is charged its whole estimate. Read beside
+// MemAvailable: both move while jobs run.
+function ownerCharges(owners: readonly Entry[]) {
+  return owners.map((job) =>
+    chargeOf(job.sliceRoot, `${job.sliceRoot}-${job.id}.slice`, job.estimateBytes),
+  )
 }
 
 // The holder line names its job; it is cleared only when that job qualifies, so clearing a
@@ -449,9 +528,7 @@ function setting<K extends SettingId>(home: string, id: K): SettingValue<K> {
 function wrapperCommit() {
   const installed = readText(path.join(import.meta.dirname, 'commit')).trim()
   if (installed) return installed
-  return Bun.spawnSync(['git', '-C', import.meta.dirname, 'rev-parse', 'HEAD'])
-    .stdout.toString()
-    .trim()
+  return gitOutput(['-C', import.meta.dirname, 'rev-parse', 'HEAD'])?.trim() ?? ''
 }
 
 function readText(file: string) {
@@ -465,6 +542,7 @@ function readText(file: string) {
 type Finished = {
   readonly admission: string
   readonly budget: Budget | null
+  readonly checkout: ReturnType<typeof repositoryOf>
   readonly cwd: string
   readonly holdExpired: boolean
   readonly id: string
@@ -472,7 +550,7 @@ type Finished = {
   readonly queuedMs: number
 }
 
-// Logging is best effort: a settings, git or disk failure is reported, and the job's exit
+// Logging is best effort: a settings or disk failure is reported, and the job's exit
 // status still becomes the wrapper's.
 function record(options: Options, finished: Finished) {
   try {
@@ -487,9 +565,9 @@ function record(options: Options, finished: Finished) {
 
 function jobRecord(
   options: Options,
-  { admission, budget, cwd, holdExpired, id, outcome, queuedMs }: Finished,
+  { admission, budget, checkout, cwd, holdExpired, id, outcome, queuedMs }: Finished,
 ): HeavyJobRecord {
-  const commitHash = wrapperCommit()
+  const wrapper = wrapperCommit()
   return {
     action: 'heavy.job',
     admission,
@@ -497,7 +575,6 @@ function jobRecord(
     ceilingBytes: budget ? budget.ceilingMiB * MiB : null,
     class: budget ? options.jobClass : null,
     command: redactCommand(options.command),
-    commitHash,
     cpuUsageUsec: outcome.cpuUsageUsec,
     cwd,
     estimateBytes: budget ? budget.estimateMiB * MiB : null,
@@ -516,19 +593,45 @@ function jobRecord(
     source: 'heavy',
     timestamp: new Date().toISOString(),
     unit: outcome.unit,
-    version: commitHash.slice(0, 9),
+    version: wrapper.slice(0, 9),
     wallMs: outcome.wallMs,
-    ...repositoryOf(cwd),
+    ...checkout,
   }
 }
 
-// Worktrees of one repository share its common git directory, so lanes group together.
+// Worktrees of one repository share its common git directory, so lanes group together; each
+// worktree has its own HEAD, which is the commit the job runs.
 function repositoryOf(cwd: string) {
-  const result = Bun.spawnSync(
-    ['git', '-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir', '--show-prefix'],
-    { stderr: 'ignore', stdout: 'pipe' },
-  )
-  if (result.exitCode !== 0) return { repo: null, subdir: null }
-  const [commonDir = '', prefix = ''] = result.stdout.toString().split('\n')
-  return { repo: commonDir.replace(/\/\.git\/?$/, ''), subdir: prefix.replace(/\/$/, '') }
+  const output = gitOutput([
+    '-C',
+    cwd,
+    'rev-parse',
+    '--path-format=absolute',
+    '--git-common-dir',
+    '--show-prefix',
+    'HEAD',
+  ])
+  if (output === null) return { commitHash: null, repo: null, subdir: null }
+  const [commonDir = '', prefix = '', head = ''] = output.split('\n')
+  return {
+    commitHash: head,
+    repo: commonDir.replace(/\/\.git\/?$/, ''),
+    subdir: prefix.replace(/\/$/, ''),
+  }
+}
+
+// Git's output, or null when git fails, is not installed, or outlives GIT_TIMEOUT_MS. Only the
+// launch sits in the try, so a bug here still surfaces.
+function gitOutput(args: readonly string[]) {
+  const options = { stderr: 'ignore', stdout: 'pipe', timeout: GIT_TIMEOUT_MS } as const
+  const result = unlessLaunchFails(() => Bun.spawnSync(['git', ...args], options))
+  return result?.success ? result.stdout.toString() : null
+}
+
+function unlessLaunchFails<T>(launch: () => T): T | null {
+  try {
+    return launch()
+  } catch {
+    return null
+  }
 }

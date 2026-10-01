@@ -1,3 +1,10 @@
+import type {
+  GitPullRequestActivity,
+  GitPullRequestComments,
+  GitPullRequestCommentResult,
+  GitPullRequestReviewInput,
+  GitPullRequestReviewResult,
+} from '@workspace/contracts'
 import type { GitStatusResult } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type {
@@ -450,4 +457,46 @@ function outputSummary(result: { output: string }) {
   return {
     outputBytes: new Blob([result.output]).size,
   }
+}
+
+export async function fetchPullRequestComments(
+  path: string,
+  number: number,
+  signal: AbortSignal | undefined,
+  client: Client,
+) {
+  const response = await client.git['pull-request'].comments.get({
+    query: { path, number },
+    fetch: { signal },
+  })
+  return unwrapGit<GitPullRequestComments>(response)
+}
+
+export async function postPullRequestComment(
+  input: { path: string; number: number; body: string },
+  client: Client,
+) {
+  const response = await client.git['pull-request'].comment.post(input)
+  return unwrapGit<GitPullRequestCommentResult>(response)
+}
+
+export async function submitPullRequestReview(
+  input: { path: string; number: number } & GitPullRequestReviewInput,
+  client: Client,
+) {
+  const response = await client.git['pull-request'].review.post(input)
+  return unwrapGit<GitPullRequestReviewResult>(response)
+}
+
+export async function fetchPullRequestActivity(
+  path: string,
+  number: number,
+  signal: AbortSignal | undefined,
+  client: Client,
+) {
+  const response = await client.git['pull-request'].activity.get({
+    query: { path, number },
+    fetch: { signal },
+  })
+  return unwrapGit<GitPullRequestActivity>(response)
 }

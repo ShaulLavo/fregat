@@ -15,6 +15,7 @@ import {
   safeRendererInteger,
 } from '../config.js'
 import { renderCursorState, type InactiveCursorStyle } from '../cursor.js'
+import { copiedFrameRow } from '../frame-row.js'
 import { InstanceRows } from '../instances/rows.js'
 import type {
   CanonicalRendererTheme,
@@ -74,13 +75,6 @@ function cursorEquals(left: RenderCursorSnapshot, right: RenderCursorSnapshot): 
   )
 }
 
-function copiedFrameRow(row: RenderRow): RendererFrameRow {
-  const cells = Object.freeze(row.cells.map((cell) => cell.text.slice()))
-  const continuations = Object.freeze(row.cells.map((cell) => cell.continuation))
-  const text = cells.map((cell, index) => (continuations[index] ? '' : cell || ' ')).join('')
-  return Object.freeze({ cells, continuations, text, y: row.y })
-}
-
 export class WebGlTerminalRenderer {
   readonly backend = 'webgl2' as const
   readonly metrics: RendererMetrics = {
@@ -115,6 +109,7 @@ export class WebGlTerminalRenderer {
   private readonly onError?: (cause: unknown) => void
   private readonly onContextLost?: () => void
   private readonly onFrame?: (snapshot: RendererFrameSnapshot) => void
+  private readonly onRowsPainted?: (rows: readonly RenderRow[]) => void
   private readonly overlayRows = new Set<number>()
   private rasterizer: CanvasGlyphRasterizer
   private readonly renderState: RenderStateSource
@@ -138,6 +133,7 @@ export class WebGlTerminalRenderer {
     this.onError = options.onError
     this.onContextLost = options.onContextLost
     this.onFrame = options.onFrame
+    this.onRowsPainted = options.onRowsPainted
     this.cursorBlinkPreference = options.cursorBlink ?? false
     this.themeInput = mergeRendererTheme(options.theme)
     this.theme = canonicalRendererTheme(this.themeInput)
@@ -391,6 +387,7 @@ export class WebGlTerminalRenderer {
     this.needsFullRebuild = false
     this.overlayRows.clear()
     this.emitFrame(rows)
+    this.onRowsPainted?.(rows)
   }
 
   private rebuildRows(rows: readonly RenderRow[]): readonly RowInstanceUpdate[] {
@@ -409,10 +406,11 @@ export class WebGlTerminalRenderer {
   }
 
   private rowsToRebuild(damage: RenderStateDirty): readonly RenderRow[] {
-    if (this.needsFullRebuild) return this.renderState.readRows()
+    if (this.needsFullRebuild) return this.renderState.readRows({ packed: true })
     const rows = new Map<number, RenderRow>()
     if (damage !== RenderStateDirty.False) {
-      for (const row of this.renderState.readRows({ dirtyOnly: true })) rows.set(row.y, row)
+      for (const row of this.renderState.readRows({ packed: true, dirtyOnly: true }))
+        rows.set(row.y, row)
     }
     if (this.overlayRows.size === 0) return [...rows.values()]
     const missingRows = new Set<number>()
@@ -420,7 +418,7 @@ export class WebGlTerminalRenderer {
       if (!rows.has(row)) missingRows.add(row)
     }
     if (missingRows.size === 0) return [...rows.values()]
-    for (const row of this.renderState.readRows({ rows: missingRows })) {
+    for (const row of this.renderState.readRows({ packed: true, rows: missingRows })) {
       if (missingRows.has(row.y)) rows.set(row.y, row)
     }
     return [...rows.values()].sort((left, right) => left.y - right.y)

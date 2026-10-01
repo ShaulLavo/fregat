@@ -1,7 +1,12 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import { chmod, mkdtemp, open, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { openFixtureWorkspace, releaseFixture, waitForFileContent } from '../fixture-workspace'
+import {
+  fixtureGit,
+  openFixtureWorkspace,
+  releaseFixture,
+  waitForFileContent,
+} from '../fixture-workspace'
 import { scratchPath } from '../paths'
 import { connectSecondOwner, type SecondOwner } from '../second-owner'
 import { csvSelectors, focusEditor, openFileFromTree, selectors, waitForApp } from '../selectors'
@@ -27,6 +32,7 @@ export const csvTable: Scenario = {
     })
     const delayed = Promise.withResolvers<void>()
     try {
+      await fixtureGit(root, ['init', '--quiet'])
       await writeFile(file, ORIGINAL)
       await writeFile(path.join(root, 'other.csv'), 'value,count\nother,1\n')
       await writeFile(path.join(root, 'malformed.csv'), 'a,b\n"unclosed,b')

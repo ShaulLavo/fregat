@@ -71,7 +71,7 @@ async function create(
     enabled: true,
     env: { ...env, ...instance.env },
     providerInstanceId: v.parse(providerInstanceIdSchema, `${driverKind}-fixture`),
-    services: {},
+    services: { cwd: process.cwd() },
   })
   await handle.dispose()
 }

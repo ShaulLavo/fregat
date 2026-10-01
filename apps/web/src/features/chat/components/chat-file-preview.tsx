@@ -1,3 +1,5 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { PdfPresentation } from '@/components/pdf-viewer/presentation'
 import { useQuery } from '@tanstack/react-query'
 import type { ChatAttachment } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -22,7 +24,8 @@ export function ChatFilePreview({
   onClose: () => void
 }) {
   const url = attachmentFileUrl(attachment, origin)
-  const previewable = canPreviewAttachmentText(attachment)
+  const pdf = isPdfFile(attachment.name, attachment.mimeType)
+  const previewable = !pdf && canPreviewAttachmentText(attachment)
   const preview = useQuery({ ...attachmentTextOptions(url), enabled: previewable })
   return (
     <Dialog
@@ -38,6 +41,11 @@ export function ChatFilePreview({
         <p className='text-muted-foreground text-xs'>
           {attachment.mimeType} · {formatSize(attachment.sizeBytes)}
         </p>
+        {pdf && (
+          <div className='flex h-[65dvh] min-h-0 flex-col overflow-hidden'>
+            <PdfPresentation source={{ kind: 'attachment', origin, attachment }} />
+          </div>
+        )}
         {previewable && preview.isPending && <Spinner size='lg' label='Loading file preview' />}
         {previewable && preview.isError && (
           <div className='text-destructive text-xs' role='alert'>
@@ -53,7 +61,7 @@ export function ChatFilePreview({
             />
           </div>
         )}
-        {previewable && preview.isSuccess && (
+        {previewable && preview.isSuccess && preview.data !== null && (
           <pre
             className='bg-muted max-h-96 overflow-auto overscroll-contain p-3 text-xs whitespace-pre-wrap'
             data-chat-file-preview
@@ -61,7 +69,7 @@ export function ChatFilePreview({
             {preview.data}
           </pre>
         )}
-        {!previewable && (
+        {!pdf && (!previewable || (preview.isSuccess && preview.data === null)) && (
           <p className='text-muted-foreground text-xs'>Download this file to view its contents.</p>
         )}
         <Button

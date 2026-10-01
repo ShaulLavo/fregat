@@ -1,3 +1,4 @@
+import { browserTestResponses } from '../../editor/scripts/browser-test-responses'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
@@ -128,7 +129,7 @@ const treeCommands = {
 } satisfies Record<string, BrowserCommand<never[]>>
 
 export default defineConfig({
-  plugins: [react({ compiler: true }), tailwindcss()],
+  plugins: [browserTestResponses(), react({ compiler: true }), tailwindcss()],
   resolve: { alias, dedupe: ['react', 'react-dom'] },
   // Found mid-run, a dependency reloads the page and fails the file that found it.
   optimizeDeps: { include: ['@workspace/ui > @base-ui/react/context-menu'] },

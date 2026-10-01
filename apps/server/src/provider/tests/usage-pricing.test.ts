@@ -25,7 +25,7 @@ it('serves automatically priced usage from the real catalog, recorder and histor
   const sqlite = new Database(':memory:')
   const database = drizzle({ client: sqlite, schema })
   initializePlatformDatabase(database)
-  const registry = new ProviderAdapterRegistry({ drivers: [] })
+  const registry = new ProviderAdapterRegistry({ services: { cwd: process.cwd() }, drivers: [] })
   const prices = new ProviderPriceCatalog(database, async () =>
     Response.json({
       openai: { models: { 'pricing-test': { cost: { input: 2, output: 10, cache_read: 0.5 } } } },

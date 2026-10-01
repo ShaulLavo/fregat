@@ -1,3 +1,4 @@
+import { testWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { allEditorTabs, activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
 import {
   testContentMatches,
@@ -39,7 +40,7 @@ import {
   createDefaultWorkbenchPanels,
   openEditorContentInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
-import type { PickedFsEntry } from '@/lib/file-system-types'
+import type { WorkspaceRootFolder } from '@/lib/file-system-types'
 import type { CachedWorkspaceSlice, CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
@@ -792,8 +793,9 @@ function preparedDocumentLease(): EditorPreparedDocument {
   }
 }
 
-function pickedDirectory(path: string): PickedFsEntry {
+function pickedDirectory(path: string): WorkspaceRootFolder {
   return {
+    workspaceAddress: testWorkspaceAddress(path),
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').filter(Boolean).at(-1) ?? path,

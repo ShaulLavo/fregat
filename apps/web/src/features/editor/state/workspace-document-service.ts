@@ -1,8 +1,13 @@
-import { materializeFileSnapshotText } from '@/lib/file-snapshot'
+import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { pdfError } from '@/lib/pdf-viewer/structured-errors'
+import {
+  materializeFileSnapshotDocumentText,
+  materializeFileSnapshotText,
+} from '@/lib/file-snapshot'
 import { scrollPositionsEqual } from '@/lib/scroll-positions'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
-import { createClientInvariantError } from '@/lib/structured-errors'
+import { createBinaryFileError, createClientInvariantError } from '@/lib/structured-errors'
 
 import { contentRevisionForText, fileContentRevision } from '@/features/editor/utils/text-snapshot'
 import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
@@ -367,14 +372,22 @@ export class WorkspaceDocumentService {
     file: FileSnapshot,
     claim: PreparedFileOpenClaim | null = null,
   ): LiveEditorDocument {
+    assertTextFile(file)
     this.assertPathsAvailable([file.path])
     const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
     const cleanClaim = cleanClaimForFile(claim, file)
     if (existing?.sync.kind === 'recovery-conflict') return existing
-    if (existing?.buffer.isDirty()) return existing
-    if (existing && fileSyncVersion(existing) === file.version) {
-      return existing
+    if (existing?.sync.kind === 'file' && existing.sync.fileVersion === file.version) {
+      if (existing.sync.mtimeMs === file.mtimeMs) return existing
+      // Save checks the timestamp too; identical disk bytes can advance it while edits stay dirty.
+      const refreshed = {
+        ...existing,
+        sync: { ...existing.sync, mtimeMs: file.mtimeMs },
+      }
+      this.setLiveDocument(refreshed)
+      return refreshed
     }
+    if (existing?.buffer.isDirty()) return existing
 
     // A touched file with the same bytes keeps its buffer, so the undo history survives.
     const record = existing
@@ -482,6 +495,7 @@ export class WorkspaceDocumentService {
   }
 
   forceReplaceLiveDocument(file: FileSnapshot): { changed: boolean; wasDirty: boolean } {
+    assertTextFile(file)
     this.assertPathsAvailable([file.path])
     const wasDirty = this.isDirtyDocument(fileDocumentKey(file.path))
     const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
@@ -1181,7 +1195,7 @@ export class WorkspaceDocumentService {
     claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
   ): LiveEditorDocument {
     if (!claim) markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-    const buffer = claim?.buffer ?? createHistoryBuffer(materializeFileSnapshotText(file))
+    const buffer = claim?.buffer ?? createHistoryBuffer(materializeFileSnapshotDocumentText(file))
     const target = fileDocument({ path: file.path })
     buffer.markClean()
 
@@ -1621,4 +1635,14 @@ function recordFromMap<T>(
   }
   if (unchanged && previous) return previous
   return next
+}
+
+export function supportsTextFile(file: FileSnapshot): boolean {
+  return !file.seemsBinary && !isPdfFile(file.path)
+}
+
+function assertTextFile(file: FileSnapshot): void {
+  if (supportsTextFile(file)) return
+  if (isPdfFile(file.path)) throw pdfError('TEXT_UNAVAILABLE', file.size, 'registration')
+  throw createBinaryFileError(file.size)
 }
