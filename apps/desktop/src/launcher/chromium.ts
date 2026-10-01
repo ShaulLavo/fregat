@@ -293,7 +293,9 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     // Singleton handoff can close the pipe just before the short-lived process exits.
     const code = await Promise.race([
       child.exited,
-      Bun.sleep(supervisor.idleRemainingMs()).then(() => undefined),
+      Bun.sleep(Math.min(supervisor.idleRemainingMs(), supervisor.remainingMs())).then(
+        () => undefined,
+      ),
     ])
     if (
       !connected &&

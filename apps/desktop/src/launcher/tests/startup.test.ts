@@ -145,6 +145,22 @@ test('a browser that keeps progressing without answering fails at the cap and is
   }
 })
 
+test('a longer idle window cannot extend cap rejection or owned-child cleanup', async () => {
+  const f = await startupFixture('silent')
+  const started = performance.now()
+  try {
+    await expect(
+      f.launch({ idleMs: 3000, limitMs: 1000 }, () => ({ faults: 7 })),
+    ).rejects.toMatchObject({ internal: { reason: 'startup-limit', startupPhase: 'version' } })
+    const waited = performance.now() - started
+    expect(waited).toBeGreaterThanOrEqual(1000)
+    expect(waited).toBeLessThan(2000)
+    expect(await f.reaped()).toBe(true)
+  } finally {
+    await f.cleanup()
+  }
+})
+
 test('a browser that exits during the startup attach fails promptly', async () => {
   const f = await startupFixture('exit-attach')
   const started = performance.now()
