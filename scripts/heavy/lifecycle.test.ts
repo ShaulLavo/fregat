@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
@@ -99,80 +99,154 @@ describe('the queue', () => {
   }, 20_000)
 })
 
+const RUN = path.join(import.meta.dirname, 'run.ts')
+
+/**
+ * A stand-in for production: a private state directory, a private root named as production's,
+ * and a live process in a slice under that root. Every wrapper these tests start names the
+ * stand-in as production, so a broken guard can only reach the stand-in, never the real root.
+ */
+async function standInProduction() {
+  const state = sandbox().state
+  const root = `heavytprod${randomBytes(4).toString('hex')}`
+  const canary = spawn(
+    'systemd-run',
+    [
+      '--user',
+      '--scope',
+      '--quiet',
+      '--expand-environment=no',
+      `--slice=${root}-live.slice`,
+      'bash',
+      '-c',
+      'echo $$; exec sleep 60',
+    ],
+    { stdio: ['ignore', 'pipe', 'ignore'] },
+  )
+  let out = ''
+  canary.stdout.on('data', (chunk) => (out += chunk))
+  await expect.poll(() => out, { timeout: 10_000 }).toMatch(/^\d+\n/)
+  return {
+    args: ['--production-state-dir', state, '--production-slice-root', root],
+    pid: Number(out.trim()),
+    root,
+    stop: () => {
+      canary.kill('SIGTERM')
+      spawnSync('systemctl', ['--user', 'stop', `${root}.slice`])
+    },
+  }
+}
+
+function wrapper(args: readonly string[], cwd?: string) {
+  return spawnSync(process.execPath, [RUN, ...args], { cwd, encoding: 'utf8' })
+}
+
 describe.skipIf(!userScopes)('slice roots', () => {
   test('a wrapper stops only ownerless slices under its own root, never one beside it', async () => {
-    const standIn = `heavytprod${randomBytes(4).toString('hex')}`
-    const production = spawn(
-      'systemd-run',
-      [
-        '--user',
-        '--scope',
-        '--quiet',
-        '--expand-environment=no',
-        `--slice=${standIn}-live.slice`,
-        'bash',
-        '-c',
-        'echo $$; exec sleep 60',
-      ],
-      { stdio: ['ignore', 'pipe', 'ignore'] },
-    )
+    const production = await standInProduction()
     try {
-      let out = ''
-      production.stdout.on('data', (chunk) => (out += chunk))
-      await expect.poll(() => out, { timeout: 10_000 }).toMatch(/^\d+\n/)
-      const sleeper = Number(out.trim())
       const box = lifecycleBox(65536)
       expect((await heavy(box, 'own-root', ['true'], { jobClass: 'light' })).code).toBe(0)
-
       const unrooted = sandbox()
-      expect(sliceRootFor(unrooted.state)).toMatch(/^heavys[0-9a-f]{10}$/)
-      const result = spawnSync(
-        process.execPath,
-        [
-          path.join(import.meta.dirname, 'run.ts'),
-          '--state-dir',
-          unrooted.state,
-          '--log-dir',
-          unrooted.logs,
-          'no-root',
-          '--',
-          'true',
-        ],
-        { encoding: 'utf8' },
-      )
+      const result = wrapper([
+        ...production.args,
+        '--state-dir',
+        unrooted.state,
+        '--log-dir',
+        unrooted.logs,
+        'no-root',
+        '--',
+        'true',
+      ])
       expect(result.status).toBe(0)
       expect(recordOf(unrooted, 'no-root')?.slice).toMatch(/^heavys[0-9a-f]{10}-[0-9a-f]+\.slice$/)
-      expect(alive(sleeper)).toBe(true)
-      expect(liveSlices(standIn).map((slice) => slice.slice)).toEqual([`${standIn}-live.slice`])
+      expect(alive(production.pid)).toBe(true)
+      expect(liveSlices(production.root).map((slice) => slice.slice)).toEqual([
+        `${production.root}-live.slice`,
+      ])
       spawnSync('systemctl', ['--user', 'stop', `${sliceRootFor(unrooted.state)}.slice`])
     } finally {
-      production.kill('SIGTERM')
-      spawnSync('systemctl', ['--user', 'stop', `${standIn}.slice`])
+      production.stop()
     }
   }, 40_000)
 
-  test("production's root is refused with any other state directory", () => {
-    const box = sandbox()
-    const result = spawnSync(
-      process.execPath,
-      [
-        path.join(import.meta.dirname, 'run.ts'),
+  test("production's root is refused with any other state directory", async () => {
+    const production = await standInProduction()
+    try {
+      const box = sandbox()
+      const result = wrapper([
+        ...production.args,
         '--state-dir',
         box.state,
         '--slice-root',
-        'heavy',
+        production.root,
         'refused',
         '--',
         'true',
-      ],
-      { encoding: 'utf8' },
-    )
-    expect(result.status).toBe(2)
-    expect(result.stderr).toContain(
-      '--slice-root heavy belongs to the state directory /work/tmp/wave-heavy',
-    )
-    expect(existsSync(path.join(box.state, 'queue'))).toBe(false)
-  })
+      ])
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain(
+        `--slice-root ${production.root} belongs to the state directory`,
+      )
+      expect(existsSync(path.join(box.state, 'queue'))).toBe(false)
+      expect(alive(production.pid)).toBe(true)
+    } finally {
+      production.stop()
+    }
+  }, 30_000)
+
+  test('every path to one state directory owns the same slices', async () => {
+    const production = await standInProduction()
+    const box = sandbox()
+    const alias = path.join(box.root, 'alias')
+    symlinkSync(box.state, alias)
+    try {
+      expect(sliceRootFor(alias)).toBe(sliceRootFor(box.state))
+      const viaAlias = spawn(
+        process.execPath,
+        [
+          RUN,
+          ...production.args,
+          '--state-dir',
+          alias,
+          '--log-dir',
+          box.logs,
+          'via-alias',
+          '--',
+          'bash',
+          '-c',
+          'echo $$; exec sleep 60',
+        ],
+        { stdio: ['ignore', 'pipe', 'ignore'] },
+      )
+      let out = ''
+      viaAlias.stdout.on('data', (chunk) => (out += chunk))
+      await expect.poll(() => out, { timeout: 10_000 }).toMatch(/^\d+\n/)
+      const sleeper = Number(out.trim())
+      const killed = new Promise((resolve) => viaAlias.on('exit', resolve))
+      viaAlias.kill('SIGKILL')
+      await killed
+      const physical = wrapper([
+        ...production.args,
+        '--state-dir',
+        box.state,
+        '--log-dir',
+        box.logs,
+        'physical',
+        '--',
+        'true',
+      ])
+      expect(physical.status).toBe(0)
+      expect(physical.stderr).toMatch(
+        /stopping heavys[0-9a-f]{10}-[0-9a-f]+\.slice: its wrapper is gone/,
+      )
+      expect(alive(sleeper)).toBe(false)
+      expect(alive(production.pid)).toBe(true)
+    } finally {
+      spawnSync('systemctl', ['--user', 'stop', `${sliceRootFor(box.state)}.slice`])
+      production.stop()
+    }
+  }, 40_000)
 
   test('the reaper refuses a slice outside the root it was given', () => {
     expect(() => reapSlice('heavytmine', 'heavy-0123abcd.slice')).toThrow(

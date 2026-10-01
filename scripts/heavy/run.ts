@@ -23,8 +23,10 @@ import { HOSTS, isHost, reapSlice, startJob, type Host, type JobOutcome, type Jo
 import {
   acquirePiLane,
   DEFAULT_STATE_DIR,
-  PRODUCTION_SLICE_ROOT,
+  isProductionState,
+  PRODUCTION,
   sliceRootFor,
+  type Production,
   tryLock,
   unlock,
   waitLock,
@@ -33,7 +35,7 @@ import { enqueue, live, promote, release, type Entry, type Held } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
@@ -44,6 +46,8 @@ const FLAGS = [
   '--max-wall',
   '--state-dir',
   '--slice-root',
+  '--production-state-dir',
+  '--production-slice-root',
   '--log-dir',
   '--settings-home',
   '--proc',
@@ -120,23 +124,29 @@ function parseOptions(argv: readonly string[]): Options {
     maxWallSec,
     procRoot: flags.get('--proc') ?? '/proc',
     settingsHome: flags.get('--settings-home') ?? productionStateHome,
-    sliceRoot: sliceRootOption(flags.get('--slice-root'), stateDir),
+    sliceRoot: sliceRootOption(flags.get('--slice-root'), stateDir, {
+      root: flags.get('--production-slice-root') ?? PRODUCTION.root,
+      stateDir: flags.get('--production-state-dir') ?? PRODUCTION.stateDir,
+    }),
     stateDir,
   }
 }
 
 // Production's root pairs only with production's state directory: a wrapper with any other
-// state directory would find no owner for production's slices and stop them.
-function sliceRootOption(given: string | undefined, stateDir: string) {
-  const root = given ?? sliceRootFor(stateDir)
+// state directory would find no owner for production's slices and stop them. Tests name a
+// private stand-in as production, so a broken guard can only reach the stand-in.
+function sliceRootOption(given: string | undefined, stateDir: string, production: Production) {
+  // The directory must exist for its identity to decide its root.
+  mkdirSync(stateDir, { recursive: true })
+  const root = given ?? sliceRootFor(stateDir, production)
   if (!/^[a-z0-9]+$/.test(root)) {
     throw createScriptError(
       `--slice-root takes lowercase letters and digits; got ${root}. ${USAGE}`,
     )
   }
-  if (root === PRODUCTION_SLICE_ROOT && path.resolve(stateDir) !== DEFAULT_STATE_DIR) {
+  if (root === production.root && !isProductionState(stateDir, production)) {
     throw createScriptError(
-      `--slice-root ${PRODUCTION_SLICE_ROOT} belongs to the state directory ${DEFAULT_STATE_DIR}; another state directory gets its own root. ${USAGE}`,
+      `--slice-root ${production.root} belongs to the state directory ${production.stateDir}; another state directory gets its own root. ${USAGE}`,
     )
   }
   return root
