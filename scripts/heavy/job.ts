@@ -38,6 +38,8 @@ export function isHost(value: string): value is Host {
 }
 
 export type JobAccounting = {
+  /** Processes still running when the command exited, which the shim stopped. */
+  readonly leftoverProcesses: number | null
   readonly memoryPeakBytes: number | null
   readonly cpuUsageUsec: number | null
   readonly oomKills: number | null
@@ -56,7 +58,10 @@ export type JobSpec = {
   readonly cwd: string
 }
 
-/** Launches the job; `stop` signals every process in its scope, `done` settles when it exits. */
+/**
+ * Launches the job; `stop` signals every process in its scope, and `done` settles once the
+ * command and everything it left running have exited.
+ */
 export function startJob(job: JobSpec) {
   const unit = `heavy-${job.id}.scope`
   const accountingFile = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `${unit}.accounting`)
@@ -88,7 +93,9 @@ export function startJob(job: JobSpec) {
 }
 
 function readAccounting(file: string): JobAccounting {
-  if (!existsSync(file)) return { cpuUsageUsec: null, memoryPeakBytes: null, oomKills: null }
+  if (!existsSync(file)) {
+    return { cpuUsageUsec: null, leftoverProcesses: null, memoryPeakBytes: null, oomKills: null }
+  }
   const values = new Map(
     readFileSync(file, 'utf8')
       .split('\n')
@@ -99,5 +106,10 @@ function readAccounting(file: string): JobAccounting {
     const value = values.get(key)
     return value && /^\d+$/.test(value) ? Number(value) : null
   }
-  return { cpuUsageUsec: number('cpu'), memoryPeakBytes: number('peak'), oomKills: number('oom') }
+  return {
+    cpuUsageUsec: number('cpu'),
+    leftoverProcesses: number('left'),
+    memoryPeakBytes: number('peak'),
+    oomKills: number('oom'),
+  }
 }

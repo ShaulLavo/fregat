@@ -24,12 +24,20 @@ function sandbox() {
 
 type Box = ReturnType<typeof sandbox>
 
-function start(box: Box, label: string, command: readonly string[]) {
-  const child = spawn(
-    'bun',
-    [RUN, '--lock-dir', box.locks, '--log-dir', box.logs, label, '--', ...command],
-    { cwd: box.root, stdio: ['ignore', 'pipe', 'pipe'] },
-  )
+type StartOptions = {
+  readonly detached?: boolean
+  readonly env?: NodeJS.ProcessEnv
+  readonly logDir?: boolean
+}
+
+function start(box: Box, label: string, command: readonly string[], options: StartOptions = {}) {
+  const logArgs = options.logDir === false ? [] : ['--log-dir', box.logs]
+  const child = spawn('bun', [RUN, '--lock-dir', box.locks, ...logArgs, label, '--', ...command], {
+    cwd: box.root,
+    detached: options.detached ?? false,
+    env: options.env ?? process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
   let stderr = ''
   let stdout = ''
   child.stderr.on('data', (chunk) => (stderr += chunk))
@@ -132,6 +140,65 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     expect(holders(box).every((line) => line === '')).toBe(true)
   })
 
+  test('stops processes the command left running before it records and frees the slot', async () => {
+    const box = sandbox()
+    const job = start(box, 'forks', ['bash', '-c', 'sleep 30 & echo $!'])
+    const result = await job.done
+    expect(result.code).toBe(0)
+    const orphan = Number(job.stdout().trim())
+    expect(alive(orphan)).toBe(false)
+    const [record] = records(box)
+    expect(record).toMatchObject({ exitCode: 0, label: 'forks', leftoverProcesses: 1 })
+    expect(record?.wallMs).toBeLessThan(10_000)
+    expect(unitActive(record!.unit)).toBe(false)
+    expect(holders(box).every((line) => line === '')).toBe(true)
+  })
+
+  test('counts the memory of a leftover process in the job', async () => {
+    const box = sandbox()
+    const hold = `const b = Buffer.alloc(150 * 2 ** 20, 1); await Bun.sleep(30_000)`
+    await heavy(box, 'forked-alloc', ['bash', '-c', `bun -e '${hold}' & sleep 1.5`])
+    const [record] = records(box)
+    expect(record?.memoryPeakBytes).toBeGreaterThanOrEqual(150 * MiB)
+    expect(record?.leftoverProcesses).toBe(1)
+  })
+
+  test('a SIGINT sent to the wrapper PID stops the job and records it', async () => {
+    const box = sandbox()
+    const job = start(box, 'int-pid', ['bash', '-c', 'echo started; exec sleep 30'])
+    await expect.poll(job.stdout, { timeout: 10_000 }).toContain('started')
+    job.child.kill('SIGINT')
+    const result = await job.done
+    expect(result.code).toBe(130)
+    expect(records(box)[0]).toMatchObject({ exitCode: 130, label: 'int-pid' })
+    expect(records(box)[0]?.wallMs).toBeLessThan(10_000)
+  })
+
+  test('Ctrl-C to the whole foreground process group stops the job and records it', async () => {
+    const box = sandbox()
+    const job = start(box, 'int-group', ['bash', '-c', 'echo started; exec sleep 30'], {
+      detached: true,
+    })
+    await expect.poll(job.stdout, { timeout: 10_000 }).toContain('started')
+    process.kill(-job.child.pid!, 'SIGINT')
+    const result = await job.done
+    expect(result.code).toBe(130)
+    expect(records(box)[0]).toMatchObject({ exitCode: 130, label: 'int-group' })
+  })
+
+  test('a settings read failure is reported and the command exit status still wins', async () => {
+    const box = sandbox()
+    const home = path.join(box.root, 'home')
+    mkdirSync(path.join(home, '.platform', 'settings.json'), { recursive: true })
+    const job = start(box, 'no-settings', ['true'], {
+      env: { ...process.env, HOME: home },
+      logDir: false,
+    })
+    const result = await job.done
+    expect(result.code).toBe(0)
+    expect(result.stderr).toContain('record was not written')
+  })
+
   test('waits while another process holds all three slot locks, then runs', async () => {
     const box = sandbox()
     for (const slot of [1, 2, 3])
@@ -178,4 +245,17 @@ function holders(box: Box) {
       return ''
     }
   })
+}
+
+function alive(pid: number) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function unitActive(unit: string) {
+  return spawnSync('systemctl', ['--user', 'is-active', unit]).stdout.toString().trim() === 'active'
 }

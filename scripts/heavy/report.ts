@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { homedir } from 'node:os'
+import path from 'node:path'
 import { parseArgs } from 'node:util'
 
 import { parseSince, readLogs } from '../agent/logs'
@@ -12,25 +12,38 @@ const USAGE =
   'Usage: bun /work/platform-production/heavy/current/report.js [--since 1d] [--until <time>] [--by command|label] [--sort peak|cpu|wall|jobs] [--top 20] [--log-dir <dir>] [--json]'
 const GiB = 2 ** 30
 
+/** Usage sums and peaks cover measured jobs only; null means no job in the row was measured. */
 type Row = {
   readonly key: string
   readonly jobs: number
+  /** Jobs whose scope was killed before its totals were read. */
+  readonly unmeasuredJobs: number
   readonly failures: number
-  readonly oomKills: number
-  readonly peakMaxBytes: number
-  readonly peakMedianBytes: number
-  readonly cpuSeconds: number
+  readonly oomKills: number | null
+  readonly peakMaxBytes: number | null
+  readonly peakMedianBytes: number | null
+  readonly cpuSeconds: number | null
   readonly wallSeconds: number
 }
 
+type Group = { readonly id: string; readonly display: string }
+
 const groupings = {
-  command: (record: HeavyJobRecord) => foldPaths(`${record.cwd}$ ${record.command.join(' ')}`),
-  label: (record: HeavyJobRecord) => record.label,
+  // One repository's worktrees share `repo`; argv stays an array so its boundaries count.
+  command: (record: HeavyJobRecord): Group => ({
+    display: `${record.repo === null ? record.cwd : path.join(record.repo, record.subdir ?? '')}$ ${shellQuote(record.command)}`,
+    id: JSON.stringify([
+      record.repo,
+      record.repo === null ? record.cwd : record.subdir,
+      record.command,
+    ]),
+  }),
+  label: (record: HeavyJobRecord): Group => ({ display: record.label, id: record.label }),
 }
 const orders = {
-  cpu: (row: Row) => row.cpuSeconds,
+  cpu: (row: Row) => row.cpuSeconds ?? -1,
   jobs: (row: Row) => row.jobs,
-  peak: (row: Row) => row.peakMaxBytes,
+  peak: (row: Row) => row.peakMaxBytes ?? -1,
   wall: (row: Row) => row.wallSeconds,
 }
 
@@ -78,42 +91,65 @@ async function report() {
   console.log(formatTable(rows, by))
 }
 
-function summarize(records: readonly HeavyJobRecord[], keyOf: (record: HeavyJobRecord) => string) {
-  const groups = new Map<string, HeavyJobRecord[]>()
+function summarize(records: readonly HeavyJobRecord[], groupOf: (record: HeavyJobRecord) => Group) {
+  const groups = new Map<string, { display: string; jobs: HeavyJobRecord[] }>()
   for (const record of records) {
-    const key = keyOf(record)
-    const group = groups.get(key)
-    if (group) group.push(record)
-    else groups.set(key, [record])
+    const { display, id } = groupOf(record)
+    const group = groups.get(id)
+    if (group) group.jobs.push(record)
+    else groups.set(id, { display, jobs: [record] })
   }
-  return [...groups].map(([key, jobs]): Row => {
-    const peaks = jobs.flatMap((job) => (job.memoryPeakBytes === null ? [] : [job.memoryPeakBytes]))
+  return [...groups.values()].map(({ display, jobs }): Row => {
+    const peaks = measured(jobs, (job) => job.memoryPeakBytes)
+    const cpu = measured(jobs, (job) => job.cpuUsageUsec)
+    const ooms = measured(jobs, (job) => job.oomKills)
     return {
-      cpuSeconds: total(jobs, (job) => job.cpuUsageUsec ?? 0) / 1e6,
+      cpuSeconds: cpu.length ? cpu.reduce(add, 0) / 1e6 : null,
       failures: jobs.filter((job) => job.exitCode !== 0).length,
       jobs: jobs.length,
-      key,
-      oomKills: total(jobs, (job) => job.oomKills ?? 0),
-      peakMaxBytes: Math.max(0, ...peaks),
-      peakMedianBytes: median(peaks),
-      wallSeconds: total(jobs, (job) => job.wallMs) / 1e3,
+      key: display,
+      oomKills: ooms.length ? ooms.reduce(add, 0) : null,
+      peakMaxBytes: peaks.length ? Math.max(...peaks) : null,
+      peakMedianBytes: peaks.length ? median(peaks) : null,
+      unmeasuredJobs: jobs.filter(
+        (job) => job.memoryPeakBytes === null || job.cpuUsageUsec === null || job.oomKills === null,
+      ).length,
+      wallSeconds: jobs.reduce((total, job) => total + job.wallMs, 0) / 1e3,
     }
   })
 }
 
+// `?` is unknown; `≥` and `+` mark a total that leaves out unmeasured jobs.
 function formatTable(rows: readonly Row[], by: string) {
-  const header = ['peak max', 'peak p50', 'cpu s', 'wall s', 'cores', 'jobs', 'fail', 'oom', by]
-  const lines = rows.map((row) => [
-    `${(row.peakMaxBytes / GiB).toFixed(2)}G`,
-    `${(row.peakMedianBytes / GiB).toFixed(2)}G`,
-    row.cpuSeconds.toFixed(0),
-    row.wallSeconds.toFixed(0),
-    (row.wallSeconds ? row.cpuSeconds / row.wallSeconds : 0).toFixed(1),
-    String(row.jobs),
-    String(row.failures),
-    String(row.oomKills),
-    row.key,
-  ])
+  const header = [
+    'peak max',
+    'peak p50',
+    'cpu s',
+    'wall s',
+    'cores',
+    'jobs',
+    'unmeasured',
+    'fail',
+    'oom',
+    by,
+  ]
+  const lines = rows.map((row) => {
+    const partial = row.unmeasuredJobs > 0
+    const cores =
+      row.cpuSeconds === null || !row.wallSeconds ? null : row.cpuSeconds / row.wallSeconds
+    return [
+      known(row.peakMaxBytes, (value) => `${partial ? '≥' : ''}${gib(value)}`),
+      known(row.peakMedianBytes, gib),
+      known(row.cpuSeconds, (value) => `${value.toFixed(0)}${partial ? '+' : ''}`),
+      row.wallSeconds.toFixed(0),
+      known(cores, (value) => value.toFixed(1)),
+      String(row.jobs),
+      String(row.unmeasuredJobs),
+      String(row.failures),
+      known(row.oomKills, (value) => `${value}${partial ? '+' : ''}`),
+      row.key,
+    ]
+  })
   const widths = header.map((title, column) =>
     Math.max(title.length, ...lines.map((line) => line[column]!.length)),
   )
@@ -126,19 +162,34 @@ function formatTable(rows: readonly Row[], by: string) {
     .join('\n')
 }
 
-// Worktree and home paths differ per lane; folding them groups one command across lanes.
-function foldPaths(text: string) {
-  return text
-    .replace(/\/work\/worktrees\/[^/\s]+\/[^/\s]+/g, '<worktree>')
-    .replaceAll(homedir(), '~')
+function known(value: number | null, format: (value: number) => string) {
+  return value === null ? '?' : format(value)
 }
 
-function total(jobs: readonly HeavyJobRecord[], field: (job: HeavyJobRecord) => number) {
-  return jobs.reduce((sum, job) => sum + field(job), 0)
+function gib(bytes: number) {
+  return `${(bytes / GiB).toFixed(2)}G`
+}
+
+function shellQuote(argv: readonly string[]) {
+  return argv
+    .map((argument) =>
+      /^[\w@%+=:,./-]+$/.test(argument) ? argument : `'${argument.replaceAll("'", `'\\''`)}'`,
+    )
+    .join(' ')
+}
+
+function measured(jobs: readonly HeavyJobRecord[], field: (job: HeavyJobRecord) => number | null) {
+  return jobs.flatMap((job) => {
+    const value = field(job)
+    return value === null ? [] : [value]
+  })
+}
+
+function add(left: number, right: number) {
+  return left + right
 }
 
 function median(values: readonly number[]) {
-  if (values.length === 0) return 0
   const sorted = values.toSorted((left, right) => left - right)
   return sorted[Math.floor(sorted.length / 2)]!
 }

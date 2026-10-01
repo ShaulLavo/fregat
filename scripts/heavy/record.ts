@@ -14,6 +14,10 @@ export type HeavyJobRecord = {
   readonly commitHash: string
   readonly label: string
   readonly cwd: string
+  /** The repository's main checkout (shared by its worktrees); null outside git. */
+  readonly repo: string | null
+  /** `cwd` relative to its checkout's root; empty at the root, null outside git. */
+  readonly subdir: string | null
   readonly command: readonly string[]
   readonly host: string
   readonly slot: number
@@ -25,6 +29,7 @@ export type HeavyJobRecord = {
   readonly memoryPeakBytes: number | null
   readonly cpuUsageUsec: number | null
   readonly oomKills: number | null
+  readonly leftoverProcesses: number | null
 }
 
 export function appendRecord(logDir: string, record: HeavyJobRecord) {
@@ -36,33 +41,80 @@ export function appendRecord(logDir: string, record: HeavyJobRecord) {
 const REDACTED = '<redacted>'
 const MAX_ARGUMENT = 1_000
 const SECRET_NAME = /secret|token|passw|api[-_]?key|private[-_]?key|credential|auth/i
+const SECRET_QUERY = /^(?:key|sig|signature)$/i
 const SECRET_FLAG = new RegExp(`^--?[\\w-]*(?:${SECRET_NAME.source})[\\w-]*$`, 'i')
-const ASSIGNMENTS = /(--?[\w-]+|\b[A-Za-z_][\w]*)([=:]\s*)(\S+)/g
+const ASSIGNMENT = /^(--?[\w-]+|[A-Za-z_]\w*)=([\s\S]*)$/
+const HEADER = /^([\w-]+)\s*:\s*([\s\S]+)$/
+const SHELL_WORD = /(?:[^\s'"\\;|&()<>]+|'[^']*'|"(?:[^"\\]|\\.)*"|\\.)+/g
+const QUOTED = /'([^']*)'|"((?:[^"\\]|\\.)*)"|\\(.)/g
+const URL_CREDENTIALS = /(\w+:\/\/)[^\s/@]+@/g
+const URL_QUERY = /([?&;])([\w.%-]+)=([^&#\s'"]*)/g
 const SECRET_SHAPES = [
-  /\b(?:Bearer|Basic)\s+\S+/gi,
+  /\b(?:Bearer|Basic)\s+[^\s'"]+/gi,
   /\b(?:sk|pk|rk)-[\w-]{16,}/g,
   /\bgh[pousr]_\w{20,}/g,
   /\bxox[abprs]-[\w-]{10,}/g,
   /\bAKIA[0-9A-Z]{16}\b/g,
   /\beyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{8,}/g,
+  // Opaque mixed-case tokens; lowercase hex such as commit hashes stays readable.
+  /\b(?=[\w-]*[a-z])(?=[\w-]*[A-Z])(?=[\w-]*\d)[\w-]{32,}\b/g,
 ]
 
 /**
- * The command as it is safe to log: values of secret-named variables and flags, bearer
- * tokens, URL credentials and well-known key shapes are replaced. Over-redaction is fine.
+ * The command as it is safe to log. A secret-named assignment, flag value or header loses
+ * its whole value; credential shapes, URL credentials and secret query parameters are
+ * replaced wherever they appear; shell text is split into words and checked word by word.
+ * Over-redaction is fine.
  */
 export function redactCommand(command: readonly string[]): string[] {
-  return command.map((argument, index) => {
-    if (index > 0 && SECRET_FLAG.test(command[index - 1]!)) return REDACTED
-    return cap(redactText(argument))
-  })
+  return command.map((argument, index) => cap(redactArgument(argument, command[index - 1])))
 }
 
-function redactText(text: string) {
-  let out = text.replace(/(\w+:\/\/)[^\s/@]+@/g, `$1${REDACTED}@`)
+function redactArgument(argument: string, previous: string | undefined) {
+  if (previous !== undefined && SECRET_FLAG.test(previous)) return REDACTED
+  const named = redactNamed(argument)
+  if (named !== null) return named
+  return redactShapes(/\s/.test(argument) ? redactShellText(argument) : argument)
+}
+
+function redactNamed(word: string): string | null {
+  const assignment = ASSIGNMENT.exec(word)
+  if (assignment && SECRET_NAME.test(assignment[1]!)) return `${assignment[1]}=${REDACTED}`
+  const header = HEADER.exec(word)
+  if (header && SECRET_NAME.test(header[1]!)) return `${header[1]}: ${REDACTED}`
+  return null
+}
+
+function redactShapes(text: string) {
+  let out = text.replace(URL_CREDENTIALS, `$1${REDACTED}@`)
+  out = out.replace(URL_QUERY, (whole, separator: string, name: string) =>
+    SECRET_NAME.test(name) || SECRET_QUERY.test(name) ? `${separator}${name}=${REDACTED}` : whole,
+  )
   for (const shape of SECRET_SHAPES) out = out.replace(shape, REDACTED)
-  return out.replace(ASSIGNMENTS, (whole, name: string, joiner: string) =>
-    SECRET_NAME.test(name) ? `${name}${joiner}${REDACTED}` : whole,
+  return out
+}
+
+function redactShellText(text: string) {
+  const words = [...text.matchAll(SHELL_WORD)]
+  let out = ''
+  let cursor = 0
+  for (const [index, word] of words.entries()) {
+    const previous = words[index - 1]
+    const replacement =
+      previous && SECRET_FLAG.test(unquote(previous[0])) ? REDACTED : redactNamed(unquote(word[0]))
+    if (replacement === null) continue
+    out +=
+      text.slice(cursor, word.index) + (/\s/.test(replacement) ? `'${replacement}'` : replacement)
+    cursor = word.index + word[0].length
+  }
+  return out + text.slice(cursor)
+}
+
+function unquote(word: string) {
+  return word.replace(
+    QUOTED,
+    (_, single?: string, double?: string, escaped?: string) =>
+      single ?? double?.replace(/\\(.)/g, '$1') ?? escaped ?? '',
   )
 }
 

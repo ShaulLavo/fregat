@@ -8,7 +8,7 @@ import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import { HOSTS, isHost, startJob, type Host, type JobOutcome } from './job'
 import { tryLock, unlock } from './lock'
-import { appendRecord, redactCommand } from './record'
+import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
   'Usage: bun /work/platform-production/heavy/current/run.js [--host local] [--log-dir <dir>] [--lock-dir <dir>] <label> -- <command…>'
@@ -76,17 +76,24 @@ async function run(options: Options) {
 
   const id = randomBytes(6).toString('hex')
   const job = startJob({ command: options.command, cwd, host: options.host, id })
-  // Ctrl-C already reaches the job through the terminal's process group; wait for it to exit.
-  process.on('SIGINT', () => {})
-  process.on('SIGTERM', () => job.stop('SIGTERM'))
-  process.on('SIGHUP', () => job.stop('SIGHUP'))
+  // A signal to this PID alone reaches the job only through its scope. A terminal's Ctrl-C
+  // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+    process.on(signal, () => job.stop(signal))
+  }
+  const outcome = await job.done
+  record(options, { cwd, id, outcome, queuedMs, slot })
+  clearHolder(holder)
+  unlock(fd)
+  return outcome.exitCode
+}
+
+// The job's exit status is the wrapper's; failing to clear a status line must not replace it.
+function clearHolder(holder: string) {
   try {
-    const outcome = await job.done
-    record(options, { cwd, id, outcome, queuedMs, slot })
-    return outcome.exitCode
-  } finally {
     writeFileSync(holder, '')
-    unlock(fd)
+  } catch (error) {
+    console.error(`[wave-heavy] could not clear ${holder}: ${scriptFailureText(error)}`)
   }
 }
 
@@ -136,35 +143,57 @@ type Finished = {
   readonly slot: number
 }
 
-function record(options: Options, { cwd, id, outcome, queuedMs, slot }: Finished) {
-  const logDir =
-    options.logDir ?? readHomeSetting(productionStateHome, 'developer.heavyJobLogDirectory')
-  const commitHash = wrapperCommit()
+// Logging is best effort: a settings, git or disk failure is reported, and the job's exit
+// status still becomes the wrapper's.
+function record(options: Options, finished: Finished) {
   try {
-    appendRecord(logDir, {
-      action: 'heavy.job',
-      area: 'heavy-jobs',
-      command: redactCommand(options.command),
-      commitHash,
-      cwd,
-      cpuUsageUsec: outcome.cpuUsageUsec,
-      exitCode: outcome.exitCode,
-      host: options.host,
-      label: options.label,
-      level: outcome.oomKills ? 'warn' : 'info',
-      memoryPeakBytes: outcome.memoryPeakBytes,
-      oomKills: outcome.oomKills,
-      queuedMs,
-      requestId: id,
-      slot,
-      source: 'heavy',
-      timestamp: new Date().toISOString(),
-      unit: outcome.unit,
-      version: commitHash.slice(0, 9),
-      wallMs: outcome.wallMs,
-    })
+    const logDir =
+      options.logDir ?? readHomeSetting(productionStateHome, 'developer.heavyJobLogDirectory')
+    appendRecord(logDir, jobRecord(options, finished))
   } catch (error) {
-    console.error(`[wave-heavy] the job ran but its record was not written to ${logDir}:`)
+    console.error('[wave-heavy] the job ran but its record was not written:')
     console.error(scriptFailureText(error))
   }
+}
+
+function jobRecord(
+  options: Options,
+  { cwd, id, outcome, queuedMs, slot }: Finished,
+): HeavyJobRecord {
+  const commitHash = wrapperCommit()
+  return {
+    action: 'heavy.job',
+    area: 'heavy-jobs',
+    command: redactCommand(options.command),
+    commitHash,
+    cpuUsageUsec: outcome.cpuUsageUsec,
+    cwd,
+    exitCode: outcome.exitCode,
+    host: options.host,
+    label: options.label,
+    leftoverProcesses: outcome.leftoverProcesses,
+    level: outcome.oomKills ? 'warn' : 'info',
+    memoryPeakBytes: outcome.memoryPeakBytes,
+    oomKills: outcome.oomKills,
+    queuedMs,
+    requestId: id,
+    slot,
+    source: 'heavy',
+    timestamp: new Date().toISOString(),
+    unit: outcome.unit,
+    version: commitHash.slice(0, 9),
+    wallMs: outcome.wallMs,
+    ...repositoryOf(cwd),
+  }
+}
+
+// Worktrees of one repository share its common git directory, so lanes group together.
+function repositoryOf(cwd: string) {
+  const result = Bun.spawnSync(
+    ['git', '-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir', '--show-prefix'],
+    { stderr: 'ignore', stdout: 'pipe' },
+  )
+  if (result.exitCode !== 0) return { repo: null, subdir: null }
+  const [commonDir = '', prefix = ''] = result.stdout.toString().split('\n')
+  return { repo: commonDir.replace(/\/\.git\/?$/, ''), subdir: prefix.replace(/\/$/, '') }
 }
