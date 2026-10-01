@@ -63,6 +63,8 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  fileReadRetry: (page: Page) => page.getByRole('button', { name: 'Retry', exact: true }),
+  fileReadErrorHeader: (page: Page) => page.locator('header[aria-label="File read error"]'),
   startupFailure: (page: Page) =>
     page.getByRole('status').filter({ hasText: 'App could not start' }),
   reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
