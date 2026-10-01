@@ -32,6 +32,7 @@ export type AcpPeerInput = {
 export class AcpPeer {
   private readonly child: ChildProcessWithoutNullStreams
   private readonly pending = new Map<string | number, Pending>()
+  private delivery = Promise.resolve()
   private nextId = 0
   private closed = false
   private readonly exited = Promise.withResolvers<void>()
@@ -49,6 +50,8 @@ export class AcpPeer {
     })
     // Drain stderr without retaining account information or provider output in errors.
     this.child.stderr.resume()
+    this.child.stderr.on('error', () => this.fail('stderr'))
+    this.child.stdout.on('error', () => this.fail('stdout'))
     this.child.stdin.on('error', () => this.fail('stdin'))
     this.child.on('error', () => {
       this.fail('spawn')
@@ -60,6 +63,7 @@ export class AcpPeer {
     })
     const lines = createInterface({ input: this.child.stdout })
     lines.on('line', (line) => this.receive(line))
+    lines.on('close', () => this.fail('stdout-eof'))
     this.child.once('close', () => lines.close())
   }
 
@@ -88,21 +92,40 @@ export class AcpPeer {
 
   async dispose() {
     if (!this.closed) this.fail('dispose')
-    const pid = this.child.pid
-    if (pid) {
-      try {
-        if (process.platform === 'win32') this.child.kill('SIGKILL')
-        else process.kill(-pid, 'SIGKILL')
-      } catch {
-        // Exit may race disposal; the exit event still releases the waiter.
-      }
-    }
+    this.kill()
     await this.exited.promise
+  }
+
+  private kill() {
+    const pid = this.child.pid
+    if (!pid) return
+    try {
+      if (process.platform === 'win32') this.child.kill('SIGKILL')
+      else process.kill(-pid, 'SIGKILL')
+    } catch {
+      // Exit may race disposal; the exit event still releases the waiter.
+    }
   }
 
   private write(frame: Record<string, unknown>) {
     if (this.closed) return
-    this.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', ...frame })}\n`)
+    this.delivery = this.delivery.then(() => this.deliver(frame))
+    void this.delivery.catch(() => this.fail('stdin'))
+  }
+
+  private deliver(frame: Record<string, unknown>): Promise<void> {
+    if (this.closed) return Promise.resolve()
+    if (typeof frame.id === 'number' && frame.method && !this.pending.has(frame.id))
+      return Promise.resolve()
+    return new Promise((resolve, reject) => {
+      this.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', ...frame })}\n`, (error) => {
+        if (error) {
+          reject(acpErrors.CLOSED({ internal: { reason: 'stdin-write' } }))
+          return
+        }
+        resolve()
+      })
+    })
   }
 
   private receive(line: string) {
@@ -175,5 +198,6 @@ export class AcpPeer {
       pending.reject(error)
     }
     this.pending.clear()
+    this.kill()
   }
 }

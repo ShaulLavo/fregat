@@ -2,16 +2,26 @@ import * as v from 'valibot'
 import { AcpPeer, type AcpPeerInput } from './peer'
 import { acpErrors } from './structured-errors'
 
+// Consumed ACP v0.11.3 unstable schema, source e87bde7322ceb8d52d9e81718f5783beb66f9f6d.
+// Implementation is optional; advertised auth names and nullable resume objects are required wire shapes.
 const initializeSchema = v.object({
   protocolVersion: v.literal(1),
   agentCapabilities: v.optional(
     v.object({
       loadSession: v.optional(v.boolean()),
-      sessionCapabilities: v.optional(v.object({ resume: v.optional(v.unknown()) })),
+      sessionCapabilities: v.optional(
+        v.object({
+          resume: v.optional(
+            v.nullable(
+              v.object({ _meta: v.optional(v.nullable(v.record(v.string(), v.unknown()))) }),
+            ),
+          ),
+        }),
+      ),
     }),
     {},
   ),
-  authMethods: v.optional(v.array(v.object({ id: v.string() })), []),
+  authMethods: v.optional(v.array(v.object({ id: v.string(), name: v.string() })), []),
 })
 const newSessionSchema = v.object({ sessionId: v.pipe(v.string(), v.minLength(1)) })
 const promptResponseSchema = v.object({ stopReason: v.string() })
@@ -57,7 +67,6 @@ export class AcpSession {
           {
             protocolVersion: 1,
             clientCapabilities: input.clientCapabilities ?? {},
-            clientInfo: { name: 'fregat', title: 'Fregat' },
           },
           input.signal,
         ),
@@ -76,7 +85,7 @@ export class AcpSession {
       const supported =
         input.resume.method === 'load'
           ? capabilities.loadSession === true
-          : capabilities.sessionCapabilities?.resume !== undefined
+          : capabilities.sessionCapabilities?.resume != null
       if (!supported)
         throw acpErrors.RESUME_UNSUPPORTED({ internal: { operation: input.resume.method } })
       await peer.request(
@@ -97,29 +106,43 @@ export class AcpSession {
     }
   }
 
+  // Caller abort retires the peer before releasing its native busy barrier.
   prompt(content: readonly AcpContent[], signal: AbortSignal): Promise<string> {
     if (this.activePrompt)
       return Promise.reject(acpErrors.BUSY({ internal: { operation: 'session/prompt' } }))
+    if (signal.aborted)
+      return Promise.reject(acpErrors.ABORTED({ internal: { operation: 'session/prompt' } }))
+    let aborted = false
+    const abort = () => {
+      aborted = true
+      void this.peer.dispose()
+    }
     const prompt = this.peer
-      .request(
-        'session/prompt',
-        {
-          sessionId: this.sessionId,
-          prompt: content,
-        },
-        signal,
-      )
+      .request('session/prompt', {
+        sessionId: this.sessionId,
+        prompt: content,
+      })
       .then((result) => {
         const parsed = v.safeParse(promptResponseSchema, result)
         if (!parsed.success) throw acpErrors.PROTOCOL({ internal: { reason: 'prompt-response' } })
         return parsed.output.stopReason
       })
     this.activePrompt = prompt
+    signal.addEventListener('abort', abort, { once: true })
     void prompt.then(
-      () => this.clearPrompt(prompt),
-      () => this.clearPrompt(prompt),
+      () => {
+        signal.removeEventListener('abort', abort)
+        this.clearPrompt(prompt)
+      },
+      () => {
+        signal.removeEventListener('abort', abort)
+        this.clearPrompt(prompt)
+      },
     )
-    return prompt
+    return prompt.catch((error) => {
+      if (aborted) throw acpErrors.ABORTED({ internal: { operation: 'session/prompt' } })
+      throw error
+    })
   }
 
   /** ACP cancellation is a notification; the original prompt response is the drain barrier. */
