@@ -2,13 +2,15 @@ import { pdfMutationKeys } from '@/lib/pdf-viewer/mutation-keys'
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useState } from 'react'
 import type * as Engine from '@/lib/pdf-viewer/engine'
-import { itemHighlights, type PdfMatch } from '@/lib/pdf-viewer/search'
+import { itemHighlights, type PdfMatch, type PdfPageText } from '@/lib/pdf-viewer/search'
 
 export function usePdfPage(
   engine: typeof Engine,
   page: Engine.PDFPageProxy,
   width: number,
+  text: PdfPageText,
   matches: readonly PdfMatch[],
+  selected?: PdfMatch,
 ) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [visible, setVisible] = useState(false)
@@ -41,13 +43,19 @@ export function usePdfPage(
   const highlight = useEffectEvent(() => {
     const layer = mutation.data
     if (!layer) return
-    engine.highlightPdfPage(
+    const mark = engine.highlightPdfPage(
       layer,
-      itemHighlights(layer.textContentItemsStr, matches, page.pageNumber - 1),
+      itemHighlights(text, matches, page.pageNumber - 1, selected),
     )
+    const scroller = host?.closest('[data-pdf-pages]')
+    if (!mark || !scroller) return
+    const bounds = scroller.getBoundingClientRect()
+    const target = mark.getBoundingClientRect()
+    if (target.top >= bounds.top && target.bottom <= bounds.bottom) return
+    scroller.scrollTop += target.top - bounds.top - (bounds.height - target.height) / 2
   })
   useEffect(() => {
     highlight()
-  }, [mutation.data, matches, page])
+  }, [mutation.data, matches, page, selected, text])
   return { setHost, error: mutation.error }
 }

@@ -422,7 +422,21 @@ function recordEventChurn(scope: WideEventScope, churn: DirectoryChurn) {
   scope.set({ events: { churn: summary } })
 }
 
-async function applyWorkspaceReady({ openFilePaths, scope, ...context }: WorkspaceEventContext) {
+export async function applyWorkspaceReady({
+  openFilePaths,
+  scope,
+  ...context
+}: WorkspaceEventContext) {
+  await Promise.all(
+    openFilePaths
+      .filter((path) => isPdfFile(path))
+      .map((path) =>
+        context.queryClient.invalidateQueries({
+          queryKey: fileSystemKeys.fileMetadata(path),
+          exact: true,
+        }),
+      ),
+  )
   const plan = planWorkspaceReady({
     openFiles: openFileSnapshots(
       openFilePaths,

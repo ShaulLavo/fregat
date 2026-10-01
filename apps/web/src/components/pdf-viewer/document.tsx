@@ -41,7 +41,9 @@ export function PdfDocument({
         : (selected + direction + matches.length) % matches.length
     setSelected(next)
     const page = matches[next]?.page
-    host?.querySelector(`[data-pdf-page="${(page ?? 0) + 1}"]`)?.scrollIntoView({ block: 'start' })
+    host
+      ?.querySelector(`[data-pdf-page="${(page ?? 0) + 1}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
   }
   return (
     <ToolPane
@@ -111,6 +113,8 @@ export function PdfDocument({
                 page={page}
                 width={width}
                 matches={matches}
+                text={ready.texts[page.pageNumber - 1]!}
+                selected={matches[selected]}
               />
             ))}
         </div>

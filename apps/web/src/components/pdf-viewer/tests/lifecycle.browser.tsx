@@ -22,7 +22,7 @@ test('real PDF worker preserves cached bytes, selects and searches multi-page te
     const root = host.attachShadow({ mode: 'open' })
     const layer = await renderPdfPage(pdf!.pages[0]!, root, 612, controller.signal)
     expect(layer?.textContentItemsStr.join(' ')).toContain('PDF verification first page')
-    highlightPdfPage(layer!, itemHighlights(layer!.textContentItemsStr, matches, 0))
+    highlightPdfPage(layer!, itemHighlights(pdf!.texts[0]!, matches, 0))
     expect(root.querySelector('.highlight')?.textContent).toBe('PDF verification')
     const range = document.createRange()
     range.selectNodeContents(layer!.textDivs[0]!)
@@ -109,18 +109,18 @@ test('hook retains the shown worker until replacement, destroys on failure and r
     command: false,
   })
   try {
-    await expect.poll(() => view.result.current.data?.texts[0]?.join('')).toBe('first')
+    await expect.poll(() => view.result.current.data?.texts[0]?.text).toBe('first')
     const first = view.result.current.data!
     view.rerender({ bytes: makePdf(['replacement']) })
     expect(first.controller.signal.aborted).toBe(false)
-    await expect.poll(() => view.result.current.data?.texts[0]?.join('')).toBe('replacement')
+    await expect.poll(() => view.result.current.data?.texts[0]?.text).toBe('replacement')
     const second = view.result.current.data!
     expect(first.controller.signal.aborted).toBe(true)
     view.rerender({ bytes: new TextEncoder().encode('corrupt') })
     await expect.poll(() => view.result.current.isError).toBe(true)
     expect(second.controller.signal.aborted).toBe(true)
     view.rerender({ bytes: makePdf(['recovered']) })
-    await expect.poll(() => view.result.current.data?.texts[0]?.join('')).toBe('recovered')
+    await expect.poll(() => view.result.current.data?.texts[0]?.text).toBe('recovered')
     const final = view.result.current.data!
     view.unmount()
     expect(final.controller.signal.aborted).toBe(true)

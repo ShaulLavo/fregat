@@ -2,6 +2,7 @@ import { getDocument, GlobalWorkerOptions, TextLayer, type PDFPageProxy } from '
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import pageStyles from 'pdfjs-dist/web/pdf_viewer.css?inline'
 import { PdfBinaryDataFactory } from '@/lib/pdf-viewer/assets'
+import { pdfPageText, type PdfPageText } from '@/lib/pdf-viewer/search'
 import { pdfError } from '@/lib/pdf-viewer/structured-errors'
 
 GlobalWorkerOptions.workerSrc = workerUrl
@@ -37,13 +38,13 @@ export async function openPdf(bytes: Uint8Array, signal: AbortSignal) {
     const document = await task.promise
     phase = 'parse'
     const pages: PDFPageProxy[] = []
-    const texts: string[][] = []
+    const texts: PdfPageText[] = []
     for (let number = 1; number <= document.numPages; number++) {
       if (signal.aborted) return null
       const page = await document.getPage(number)
       const content = await page.getTextContent()
       pages.push(page)
-      texts.push(content.items.flatMap((item) => ('str' in item ? [item.str] : [])))
+      texts.push(pdfPageText(content.items.flatMap((item) => ('str' in item ? [item] : []))))
     }
     if (signal.aborted) return null
     return { document, pages, texts }
@@ -115,8 +116,9 @@ export async function renderPdfPage(
 
 export function highlightPdfPage(
   layer: TextLayer,
-  ranges: readonly (readonly { start: number; end: number }[])[],
-) {
+  ranges: readonly (readonly { start: number; end: number; selected: boolean }[])[],
+): HTMLElement | null {
+  let selected: HTMLElement | null = null
   layer.textDivs.forEach((element, index) => {
     const text = layer.textContentItemsStr[index] ?? ''
     const fragments: Node[] = []
@@ -124,7 +126,8 @@ export function highlightPdfPage(
     for (const range of ranges[index] ?? []) {
       fragments.push(document.createTextNode(text.slice(offset, range.start)))
       const mark = document.createElement('span')
-      mark.className = 'highlight appended'
+      mark.className = range.selected ? 'highlight appended selected' : 'highlight appended'
+      if (range.selected && !selected) selected = mark
       mark.textContent = text.slice(range.start, range.end)
       fragments.push(mark)
       offset = range.end
@@ -132,4 +135,5 @@ export function highlightPdfPage(
     fragments.push(document.createTextNode(text.slice(offset)))
     element.replaceChildren(...fragments)
   })
+  return selected
 }
