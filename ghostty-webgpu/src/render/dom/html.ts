@@ -50,7 +50,7 @@ export function frameStyle(
   theme: CanonicalRendererTheme,
 ): string {
   const colors = new CanvasColorCache(theme.minimumContrast)
-  return `width:calc(${grid.columns} * var(--ghostty-cell-width, ${font.cssCellWidth}px));height:calc(${grid.rows} * var(--ghostty-cell-height, ${font.cssCellHeight}px));overflow:hidden;white-space:pre;text-align:left;font-variant-ligatures:none;font-family:${cssFontFamily(font.settings.family)};font-size:var(--ghostty-font-size, ${font.settings.size}px);font-weight:${font.settings.weight};line-height:var(--ghostty-cell-height, ${font.cssCellHeight}px);color:${colors.css(theme.foreground)};background-color:${colors.css(theme.background)}`
+  return `width:calc(${grid.columns} * var(--ghostty-cell-width, ${font.cssCellWidth}px));height:calc(${grid.rows} * var(--ghostty-cell-height, ${font.cssCellHeight}px));overflow:hidden;white-space:pre;direction:ltr;unicode-bidi:bidi-override;text-align:left;font-variant-ligatures:none;font-family:${cssFontFamily(font.settings.family)};font-size:var(--ghostty-font-size, ${font.settings.size}px);font-weight:${font.settings.weight};line-height:var(--ghostty-cell-height, ${font.cssCellHeight}px);color:${colors.css(theme.foreground)};background-color:${colors.css(theme.background)}`
 }
 
 function cursorDecoration(
@@ -97,7 +97,7 @@ function cellStyle(
     .filter(Boolean)
     .join(' ')
   const underlineStyles = ['solid', 'solid', 'double', 'wavy', 'dotted', 'dashed']
-  let css = `display:inline-block;flex:none;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);vertical-align:top;`
+  let css = `display:inline-block;flex:none;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);vertical-align:top;`
   if (width > 1) css += 'text-align:center;'
   css += `color:${style?.invisible ? 'transparent' : foreground};`
   if (style?.faint && !style.invisible)
@@ -153,7 +153,7 @@ export function renderRowToHtml(
     if (width > 1 || paintedCursor) flush()
   }
   flush()
-  return `<div data-row="${row.y}" style="display:flex;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);">${runs.join('')}</div>`
+  return `<div data-row="${row.y}" style="display:flex;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);">${runs.join('')}</div>`
 }
 
 export function renderFrameToHtml(

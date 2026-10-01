@@ -161,7 +161,7 @@ describe('DOM terminal renderer', () => {
     expect(getComputedStyle(host.querySelector('span')!).backgroundColor).toBe('rgb(51, 68, 85)')
     probe.renderer.dispose()
     expect(host.querySelector('.ghostty-webgpu-frame')).toBeNull()
-    expect(probe.canvas.style.visibility).toBe('')
+    expect(probe.canvas.style.opacity).toBe('')
   })
 
   it('continues through DOM when a lost WebGL context cannot acquire Canvas2D', async () => {
@@ -204,6 +204,83 @@ describe('DOM terminal renderer', () => {
     await vi.waitFor(() => expect(renderer.backend).toBe('dom'))
     clock.flush()
     expect(host.querySelector('.ghostty-webgpu-frame')?.textContent).toContain('after')
+  })
+
+  it('preserves logical RTL cell coordinates in live, serialized, and compacted frames', async () => {
+    const probe = await rendererProbe('dom')
+    probe.canvas.parentElement!.style.direction = 'rtl'
+    probe.terminal.write('\x1b[?25l\x1b[2J\x1b[HאבגABC')
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+    const live = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+    await page.screenshot({
+      element: live,
+      path: '../../../.artifacts/p285-dom-rtl-frame.png',
+      scale: 'css',
+    })
+    const serialized = document.createElement('div')
+    serialized.style.direction = 'rtl'
+    serialized.innerHTML = renderFrameToHtml(snapshotRenderState(probe.state), {
+      columns: 12,
+      rows: 3,
+      font: probeFont,
+    })
+    document.body.append(serialized)
+    cleanups.push(() => serialized.remove())
+    const saved = serialized.firstElementChild!
+    const compact = saved.cloneNode(false) as HTMLElement
+    compact.textContent = 'אבגABC'
+    serialized.append(compact)
+    for (const frame of [live, saved, compact]) {
+      const text = frame.querySelector('span')?.firstChild ?? frame.firstChild!
+      const lefts = Array.from({ length: 6 }, (_, index) => {
+        const range = document.createRange()
+        range.setStart(text, index)
+        range.setEnd(text, index + 1)
+        return range.getBoundingClientRect().left
+      })
+      for (let index = 1; index < lefts.length; index += 1)
+        expect(lefts[index]!).toBeGreaterThan(lefts[index - 1]!)
+    }
+  })
+
+  it('keeps real focus, drag selection, wheel, and mouse reporting under forced DOM fallback', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const host = document.createElement('div')
+    host.style.width = '300px'
+    host.style.height = '100px'
+    document.body.append(host)
+    cleanups.push(() => host.remove())
+    const terminal = await Terminal.create({
+      appearance: {
+        grid: { columns: 12, rows: 3 },
+        font: { family: 'monospace', size: 16 },
+        cursor: { blink: false },
+      },
+    })
+    cleanups.push(() => terminal.dispose())
+    await terminal.open(host)
+    terminal.write('first\r\nsecond\r\nthird\r\nfourth\r\nfifth')
+    await vi.waitFor(() => expect(terminal.visibleLines().join('')).toContain('fifth'))
+    const firstVisible = terminal.visibleLines()[0]!.trim()
+    const canvas = host.querySelector('canvas')!
+    const box = canvas.getBoundingClientRect()
+    expect(document.elementFromPoint(box.left + 2, box.top + 2)).toBe(canvas)
+    const locator = page.elementLocator(canvas)
+    await locator.click({ position: { x: 2, y: 2 } })
+    expect(document.activeElement).toBe(terminal.textarea)
+    await locator.dropTo(locator, {
+      sourcePosition: { x: 2, y: 2 },
+      targetPosition: { x: box.width - 2, y: 2 },
+    })
+    expect(terminal.getSelection()).toContain(firstVisible)
+    await locator.wheel({ delta: { y: -100 } })
+    await vi.waitFor(() => expect(terminal.visibleLines().join('')).toContain('first'))
+    const data: string[] = []
+    terminal.onData((value) => data.push(new TextDecoder().decode(value)))
+    terminal.write('\x1b[?1000h\x1b[?1006h')
+    await locator.click({ position: { x: 2, y: 2 } })
+    expect(data.join('')).toContain('\x1b[<0;1;1M')
   })
 
   it('opens the public Terminal with every canvas context disabled and publishes damaged rows', async () => {

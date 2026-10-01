@@ -17,7 +17,7 @@ export type { RenderFrameHtmlOptions } from './html.js'
 class DomSurface implements RowRendererSurface {
   private readonly container: HTMLDivElement
   private readonly canvas: HTMLCanvasElement
-  private readonly previousVisibility: string
+  private readonly previousOpacity: string
   private font: TerminalFittedFont
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
@@ -33,15 +33,16 @@ class DomSurface implements RowRendererSurface {
     this.container = this.canvas.ownerDocument.createElement('div')
     this.container.style.position = 'absolute'
     this.container.style.pointerEvents = 'none'
-    this.previousVisibility = this.canvas.style.visibility
+    this.previousOpacity = this.canvas.style.opacity
     this.resize(this.font, this.grid)
-    this.canvas.style.visibility = 'hidden'
+    // Transparency preserves the canvas as the terminal pointer target.
+    this.canvas.style.opacity = '0'
     this.canvas.after(this.container)
   }
 
   dispose(): void {
     this.container.remove()
-    this.canvas.style.visibility = this.previousVisibility
+    this.canvas.style.opacity = this.previousOpacity
   }
 
   beginFrame(): void {
