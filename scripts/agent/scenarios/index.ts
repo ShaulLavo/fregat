@@ -53,6 +53,13 @@ import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
 import { screenshotDrop } from './screenshot-drop'
 import { binaryFileAttachment, fileAttachments } from './file-attachments'
+import {
+  pdfDocuments,
+  pdfAttachment,
+  pdfEngineUnavailable,
+  pdfWorkerUnavailable,
+  pdfRemoteOwner,
+} from './pdf-documents'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
@@ -477,6 +484,11 @@ export const scenarios: readonly Scenario[] = [
   codexApprovalRules,
   fileAttachments,
   binaryFileAttachment,
+  pdfDocuments,
+  pdfAttachment,
+  pdfEngineUnavailable,
+  pdfWorkerUnavailable,
+  pdfRemoteOwner,
   screenshotDrop,
   chatStashContext,
   chatDraftSentLeftover,

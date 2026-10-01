@@ -26,6 +26,29 @@ import {
 } from '@/lib/file-open-intent/state/service'
 
 describe('file open intent service', () => {
+  it('ignores PDF speculation before fetching or preparing decoded text', () => {
+    const queryClient = new QueryClient()
+    const prepare = vi.fn()
+    const owner = createTestFileOpenIntentOwner(
+      queryClient,
+      testPreparer(prepare),
+      () => null,
+      () => false,
+      () => false,
+      () => undefined,
+    )
+    try {
+      owner.setRoot(filesystemPath('/repo'))
+      owner.prepare(intent(filesystemPath('/repo/pages.PDF')))
+      expect(queryClient.getQueryCache().getAll()).toHaveLength(0)
+      expect(prepare).not.toHaveBeenCalled()
+      expect(owner.claimReadyClean(filesystemPath('/repo/pages.PDF'))).toBeNull()
+    } finally {
+      owner.disposeNow()
+      queryClient.clear()
+    }
+  })
+
   it('rejects binary preparation before building a buffer or analysis', async () => {
     const queryClient = new QueryClient()
     const file = { ...fileResult('/repo/data.txt'), seemsBinary: true }

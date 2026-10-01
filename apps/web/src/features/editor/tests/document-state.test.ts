@@ -25,6 +25,17 @@ import {
 } from '@singapore-editor/core/editor'
 
 describe('editor document store state identity', () => {
+  it('rejects ASCII-only PDF registration before constructing a text buffer', () => {
+    const store = createEditorDocumentStore()
+    const pdf = { ...fileResult('/repo/pages.PDF'), seemsBinary: false }
+    expect(() => store.getState().ensureEditorView(tabId('pdf'), pdf)).toThrow()
+    expect(() => store.getState().ensureLiveEditorDocument(pdf)).toThrow()
+    expect(() => store.getState().forceReplaceLiveEditorDocument(pdf)).toThrow()
+    expect(store.getState().liveDocumentsByKey).toEqual({})
+    expect(store.getState().viewsByTabId).toEqual({})
+    expect(store.getState().dirtyDocumentKeys.size).toBe(0)
+  })
+
   it('rejects binary file registration and replacement without a text buffer or dirty state', () => {
     const store = createEditorDocumentStore()
     const binary = { ...fileResult('/repo/data.txt'), seemsBinary: true }

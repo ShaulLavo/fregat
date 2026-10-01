@@ -69,6 +69,19 @@ export const selectors = {
   revealFileFacts: (page: Page) => page.getByRole('button', { name: 'Reveal in files' }),
   missingFileMessage: (page: Page) =>
     page.getByText('This file no longer exists.', { exact: true }),
+  pdfEngineFailure: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'The PDF viewer could not be loaded' }),
+  pdfScroller: (page: Page) => page.locator('[data-pdf-pages]'),
+  pdfSearch: (page: Page) => page.getByRole('textbox', { name: 'Search PDF', exact: true }),
+  pdfPage: (page: Page, number: number) => page.locator(`[data-pdf-page="${number}"]`),
+  pdfMatchCountValue: (page: Page, count: number) =>
+    page
+      .getByRole('status')
+      .filter({ hasText: new RegExp(`^${count} ${count === 1 ? 'match' : 'matches'}$`) }),
+  pdfMatchCount: (page: Page) => page.getByRole('status').filter({ hasText: '2 matches' }),
+  pdfNext: (page: Page) => page.getByRole('button', { name: 'Next', exact: true }),
+  pdfFailure: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'The PDF could not be opened' }),
   startupFailure: (page: Page) =>
     page.getByRole('status').filter({ hasText: 'App could not start' }),
   reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),

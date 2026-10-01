@@ -1,3 +1,4 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { materializeFileSnapshot, type FileSnapshot } from '@/lib/file-snapshot'
 import { parentPath } from '@/lib/path-formatters'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
@@ -328,6 +329,21 @@ export async function applyWorkspaceEvents({
   events: FilesystemEvent[]
   isOwnWorkspaceEditEvent: (writeId: string) => boolean
 }) {
+  for (const path of openFilePaths) {
+    if (!isPdfFile(path)) continue
+    const affected = events.some(
+      (event) =>
+        path === event.path ||
+        path.startsWith(`${event.path}/`) ||
+        (event.type === 'renamed' &&
+          (path === event.oldPath || path.startsWith(`${event.oldPath}/`))),
+    )
+    if (!affected) continue
+    await context.queryClient.invalidateQueries({
+      queryKey: fileSystemKeys.fileMetadata(path),
+      exact: true,
+    })
+  }
   const plan = planWorkspaceEditAwareEventBatch(
     events,
     openFileSnapshots(openFilePaths, context.dirtyDocumentKeys, context.getLiveEditorDocument),
@@ -676,6 +692,13 @@ async function applyRefreshOpenFileOperation({
   // Share reads with the selected-file query. Only that query owns cancellation;
   // subscription teardown stops application without cancelling other consumers.
   if (signal.aborted) return
+  if (isPdfFile(path)) {
+    await queryClient.invalidateQueries({
+      queryKey: fileSystemKeys.fileMetadata(path),
+      exact: true,
+    })
+    return
+  }
   await settlePendingSaves(queryClient, fileDocumentKey(filesystemPath(path)), signal)
   if (signal.aborted) return
 

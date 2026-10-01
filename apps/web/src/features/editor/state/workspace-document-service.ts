@@ -1,3 +1,5 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { pdfError } from '@/lib/pdf-viewer/structured-errors'
 import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { scrollPositionsEqual } from '@/lib/scroll-positions'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
@@ -1626,5 +1628,6 @@ function recordFromMap<T>(
 }
 
 function assertTextFile(file: FileSnapshot): void {
+  if (isPdfFile(file.path)) throw pdfError('TEXT_UNAVAILABLE', file.size, 'registration')
   if (file.seemsBinary) throw createBinaryFileError(file.size)
 }

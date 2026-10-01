@@ -1,3 +1,4 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { statPath } from '@/lib/file-server'
@@ -16,7 +17,7 @@ export function useSelectedFile(filePath: FilesystemPath | null) {
   const queryClient = useQueryClient()
   const query = useQuery<FileSnapshot>({
     ...fileSnapshotQueryOptions(filePath ?? filesystemPath('')),
-    enabled: Boolean(filePath),
+    enabled: Boolean(filePath) && !isPdfFile(filePath ?? ''),
     placeholderData: (previousFile) => previousFile,
   })
   const { data, error, isError, isPending } = query
