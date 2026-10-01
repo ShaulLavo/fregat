@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -60,6 +60,48 @@ it('rejects an unpinned bridge source before invoking Zig', () => {
     `Expected Ghostty ${GHOSTTY_SOURCE_REVISION}, received ${revision}`,
   )
   expect(result.stderr).not.toContain('zig-must-not-run')
+})
+
+it('validates and compiles the same relative bridge source from an external cwd', () => {
+  source = mkdtempSync(join(tmpdir(), 'ghostty-source-test-'))
+  const path = join(source, 'ghostty')
+  const bin = join(source, 'bin')
+  const calls = join(source, 'calls.jsonl')
+  mkdirSync(join(path, 'include'), { recursive: true })
+  mkdirSync(bin)
+  const record = `import { appendFileSync } from 'node:fs';
+appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2) }) + '\\n');`
+  writeFileSync(
+    join(bin, 'git'),
+    `#!/usr/bin/env bun
+${record}
+if (process.argv[2] === 'rev-parse') console.log(${JSON.stringify(GHOSTTY_SOURCE_REVISION)});
+`,
+    { mode: 0o755 },
+  )
+  writeFileSync(join(bin, 'zig'), `#!/usr/bin/env bun\n${record}\nprocess.exit(1);\n`, {
+    mode: 0o755,
+  })
+  const result = spawnSync(
+    'bun',
+    [join(import.meta.dirname, 'build-bridge.ts'), '--source', 'ghostty'],
+    { cwd: source, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8' },
+  )
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('zig exited with status 1')
+  const invocations: { cwd: string; args: string[] }[] = readFileSync(calls, 'utf8')
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  expect(invocations).toHaveLength(3)
+  expect(invocations[0]).toEqual({ cwd: path, args: ['rev-parse', 'HEAD'] })
+  expect(invocations[1]).toEqual({
+    cwd: path,
+    args: ['status', '--porcelain=v1', '--untracked-files=all'],
+  })
+  const compilation = invocations[2]!
+  expect(compilation.cwd).toBe(join(import.meta.dirname, '..'))
+  expect(compilation.args[compilation.args.indexOf('-I') + 1]).toBe(join(path, 'include'))
 })
 
 it('accepts a clean source tree', () => {
