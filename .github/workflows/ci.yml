@@ -305,7 +305,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
 
       # The workspace's own playwright binary, never `bunx playwright` — bunx
       # resolves a fresh copy from npm and downloads the browser revision *that*

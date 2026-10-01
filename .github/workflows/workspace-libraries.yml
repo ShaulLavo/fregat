@@ -15,11 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-chromium-headless-shell-firefox-webkit-${{ hashFiles('bun.lock') }}
       - name: Install Editor browsers
         timeout-minutes: 8
         run: |
@@ -43,11 +38,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock') }}
       - name: Install Chromium
         timeout-minutes: 5
         run: |
