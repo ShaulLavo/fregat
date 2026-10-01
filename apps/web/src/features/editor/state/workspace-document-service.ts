@@ -372,11 +372,11 @@ export class WorkspaceDocumentService {
     const cleanClaim = cleanClaimForFile(claim, file)
     if (existing?.sync.kind === 'recovery-conflict') return existing
     if (existing?.sync.kind === 'file' && existing.sync.fileVersion === file.version) {
-      if (existing.sync.mtimeMs === file.mtimeMs && !existing.sync.orphaned) return existing
+      if (existing.sync.mtimeMs === file.mtimeMs) return existing
       // Save checks the timestamp too; identical disk bytes can advance it while edits stay dirty.
       const refreshed = {
         ...existing,
-        sync: { ...existing.sync, mtimeMs: file.mtimeMs, orphaned: false },
+        sync: { ...existing.sync, mtimeMs: file.mtimeMs },
       }
       this.setLiveDocument(refreshed)
       return refreshed

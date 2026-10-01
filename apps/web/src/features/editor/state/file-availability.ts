@@ -41,6 +41,11 @@ export function watchFileAvailability({
     )
     if (event.action.type === 'success') {
       for (const tab of tabs) establishedTabs.add(tab.id)
+      // Retained presentation data can remount after deletion; only a read confirms existence.
+      const file = queryClient.getQueryData<FileResult>(event.query.queryKey)
+      if (!event.action.manual && file?.path === path) {
+        documentStore.getState().setFileOrphaned(fileDocumentKey(path), false)
+      }
       return
     }
     if (event.action.type !== 'error') return
