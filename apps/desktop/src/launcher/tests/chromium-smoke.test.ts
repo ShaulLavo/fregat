@@ -98,6 +98,7 @@ test.skipIf(!executable)(
           url,
         ).map((argument) => argument.split('=')[0]),
       })
+      const launchedAt = performance.now()
       first = await launchChromium({
         candidate,
         stateHome: scratch,
@@ -107,6 +108,7 @@ test.skipIf(!executable)(
         onExit: (exit) => exits.push(exit),
         onFailure: (error) => failures.push(error),
       })
+      const startupMs = Math.round(performance.now() - launchedAt)
       expect(first.kind).toBe('owned')
       if (first.kind !== 'owned') return
       const owner = first
@@ -116,6 +118,7 @@ test.skipIf(!executable)(
       )
       expect(browserProcess).toBeDefined()
       console.info('smoke known-good transport', {
+        startupMs,
         transport: owner.cdp.snapshot(),
         ...browserProcessFacts(browserProcess!.id, executable!, []),
       })

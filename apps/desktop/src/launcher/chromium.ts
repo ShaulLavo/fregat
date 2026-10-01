@@ -177,7 +177,8 @@ function reportFrames(
 export async function launchChromium(options: ChromiumOptions): Promise<ChromiumWindow> {
   const profile = browserProfile(options.candidate, options.stateHome, options.home)
   mkdirSync(profile, { recursive: true })
-  const deadline = Date.now() + 5000
+  const startedAt = Date.now()
+  const deadline = startedAt + 5000
   const child = Bun.spawn({
     cmd: [
       options.candidate.executable,
@@ -185,6 +186,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     ],
     stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'],
   })
+  const spawnMs = Date.now() - startedAt
   const diagnostics = browserDiagnostics()
   void drainBrowserDiagnostics(child.stderr as ReadableStream<Uint8Array>, diagnostics).catch(
     () => {},
@@ -200,6 +202,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
           internal: {
             reason: 'startup-deadline',
             startupPhase,
+            spawnMs,
             ...diagnostics.snapshot(),
             transport: cdp.snapshot(),
             ...browserProcessFacts(child.pid, options.candidate.executable, [
