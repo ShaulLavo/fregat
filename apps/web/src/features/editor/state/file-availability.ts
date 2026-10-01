@@ -55,7 +55,8 @@ export function watchFileAvailability({
     if (
       tabs.length > 0 &&
       !documents.getLiveEditorDocument(fileDocumentKey(path)) &&
-      cached?.path === path
+      cached?.path === path &&
+      !cached.seemsBinary
     ) {
       documents.ensureLiveEditorDocument(cached)
     }

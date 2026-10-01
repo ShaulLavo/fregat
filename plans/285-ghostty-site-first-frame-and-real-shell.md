@@ -150,27 +150,29 @@ Done when `look` at 1280 px and 390 px shows each change and the resize sequence
 
 ## Phase 4: demos that prove the claims
 
-Tabs return as a quiet row in the window chrome beside the backend label, not a control bar; the
-page stays as spare as today. The Ghost tab is the default and the only one pre-rendered.
+Tabs return as a quiet row in the window chrome beside the backend label; the page stays as
+spare as today. The Ghost tab is the default and the only one pre-rendered.
 
-- **Shell**: a real bash. [`just-bash`](https://github.com/vercel-labs/just-bash) (Apache-2.0,
-  TypeScript, in-memory filesystem, 70+ commands) loads on first selection of the tab, never on
-  page load. The line editor from the old `shell.ts` (`0efdf5f^`) drives it: echo, backspace,
-  history, and `bash.exec` on Enter, output written as bytes. The filesystem starts with a few
-  files worth exploring (the README, a `colors.sh`, a `logs/` directory). Measure its bundle size
-  before committing to it; if it is unreasonable, the tab waits for a lighter runtime.
+Three tabs: Ghost, Matrix, Shell. Owner ruling 2026-10-01: only the good demos; Cube, Donut and
+Colors stay deleted.
+
+- **Shell**: a real bash. [`just-bash`](https://github.com/vercel-labs/just-bash) 3.6.0
+  (Apache-2.0, TypeScript, in-memory filesystem, 70+ commands) loads on first selection of the
+  tab, never on page load: 354 KB gzipped. Its browser bundle imports `node:zlib` for gzip only;
+  `astro.config.ts` aliases it to a stub. The line editor from the old `shell.ts` (`0efdf5f^`)
+  drives it, carrying `result.env` between `exec` calls so `cd` and exports persist. Files:
+  `README.md`, `colors.sh` (24-bit ramps, styles, wide text, emoji), `logs/build.log`.
   [`almostnode`](https://github.com/macaly/almostnode) stays an option for a Node tab later.
-- **Matrix**: new, animated; a full-grid stream whose redrawn-cells figure sits near the whole
-  grid, the opposite end of the ghost's. The stat line under the window makes the contrast.
-- **Throughput**: writes N MB of a corpus from `bench/` and reports MB/s and frames dropped, the
-  same measures as `docs/benchmarks.md`, so the visitor's machine joins the table.
-- Colors, Cube and Donut come back from history only if they still fit the row; the owner decides
-  per demo when the row exists.
+- **Throughput** is the shell's `bench [MB]` command: it streams generated colored log lines
+  straight into the terminal in 64 KiB chunks and prints MB/s. `seq 1 50000` shows the same
+  through bash's own output.
+- **Matrix**: full-grid rain in the site palette; the stat line reports cells redrawn per frame,
+  the opposite end of the ghost's.
 
 Damage overlay: a toggle in the chrome tints the cells redrawn in the current frame over the live
-terminal. The package exposes the per-frame damage it already computes (`rebuiltRows` and the
-dirty rows from `readRows`) through `diagnostics.onFrame`, and the site draws the tint on an
-overlay canvas. The overlay is off by default and remembers nothing.
+terminal. The package exposes the rows it rebuilt in each painted frame through
+`terminal.onFrame(({ rows }) => …)` on every backend, free with no listener, and the site draws the
+tint on an overlay. The overlay is off by default and remembers nothing.
 
 Done when each tab has `look` evidence, the Shell tab runs `ls | head`, `echo $((6*7))` and a
 `for` loop, and the page's initial transfer size has not grown beyond Phase 2's.

@@ -27,6 +27,8 @@ export const editorViewportSelector = '.editor-virtualized-viewport'
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
 export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
+const chatComposerSelector = '[data-testid="chat-input-editor"]'
+const projectSwitcherSelector = '[aria-label="Switch project"]'
 export const mermaidSelectors = {
   diagram: '[data-markdown="mermaid-block"] [role="img"]',
   svg: 'svg',
@@ -64,6 +66,14 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  fileReadRetry: (page: Page) => page.getByRole('button', { name: 'Retry', exact: true }),
+  fileReadErrorHeader: (page: Page) => page.locator('header[aria-label="File read error"]'),
+  chatFileFallback: (page: Page) =>
+    page.getByText('Download this file to view its contents.', { exact: true }),
+  fileFacts: (page: Page) => page.getByRole('region', { name: 'File facts' }),
+  revealFileFacts: (page: Page) => page.getByRole('button', { name: 'Reveal in files' }),
+  missingFileMessage: (page: Page) =>
+    page.getByText('This file no longer exists.', { exact: true }),
   forgeDiscussion: (page: Page) =>
     page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
   forgeComment: (page: Page) => page.getByRole('textbox', { name: 'Comment', exact: true }),
@@ -1260,6 +1270,32 @@ export async function pressShortcut(page: Page, chord: string) {
   const platform = await page.evaluate(detectPlatform)
   const modifier = platform === 'mac' ? 'Meta' : 'Control'
   await page.keyboard.press(chord.replace(/\b(?:ControlOrMeta|Mod)\b/g, modifier))
+}
+
+export async function waitForSessionWorkspace(
+  page: Page,
+  sessionId: string,
+  canonicalPath: string,
+  environmentId: string,
+) {
+  await page.waitForFunction(
+    ({ composerSelector, switcherSelector, expectedNamespace, rootPath }) => {
+      const title = document.querySelector(switcherSelector)?.getAttribute('title')
+      const composer = document.querySelector(composerSelector) as
+        | (HTMLElement & { __lexicalEditor?: { _config: { namespace: string } } })
+        | null
+      // Lexical's rendered owner can lag the session URL during a workspace switch.
+      const namespace = composer?.__lexicalEditor?._config.namespace
+      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
+      return workspaceReady && namespace === expectedNamespace
+    },
+    {
+      composerSelector: chatComposerSelector,
+      switcherSelector: projectSwitcherSelector,
+      expectedNamespace: `platform-chat-input:${environmentId}:${canonicalPath.replace(/^\/+/, '')}:${sessionId}`,
+      rootPath: canonicalPath.replace(/^\/+/, ''),
+    },
+  )
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {

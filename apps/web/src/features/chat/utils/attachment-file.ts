@@ -1,3 +1,4 @@
+import { decodeText } from '@workspace/contracts/text-encoding'
 import { chatAttachmentUrlPath, type ChatAttachment } from '@workspace/contracts'
 import { queryOptions } from '@tanstack/react-query'
 import { createClientInvariantError } from '@/lib/structured-errors'
@@ -22,7 +23,9 @@ export function attachmentTextOptions(url: string, fetcher: typeof fetch = fetch
     queryFn: async ({ signal }) => {
       const response = await fetcher(url, { signal, credentials: 'include' })
       if (!response.ok) throw createClientInvariantError('Attachment preview could not be loaded.')
-      return response.text()
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      const decoded = decodeText(bytes)
+      return decoded.seemsBinary ? null : decoded.content
     },
   })
 }
