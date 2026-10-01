@@ -1,11 +1,11 @@
 import { ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 
+import { committedFixture } from '../fixture-workspace'
 import { runPaletteCommand, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
-import { openChat, readShell } from './chat-verification'
-import { createMockProviderSession } from './mock-provider-session'
-import type { Scenario } from './index'
+import { readShell } from './chat-verification'
+import { isolatedNativeScenario, settingsSnapshot } from './native-provider-verification'
 
 const AUTO_PULL = 'Keep the default branch current'
 
@@ -24,69 +24,81 @@ async function shows(page: Page, matches: (text: string) => boolean) {
   throw createScriptError('The auto-pull override never showed its new value')
 }
 
-export const projectSettings: Scenario = {
+export const projectSettings = isolatedNativeScenario({
   name: 'project-settings',
   description:
-    'Open project settings from both menus, recover from remembered JSON and Defaults views, edit an override, and navigate to Usage and Font settings with a mock session.',
-  async run(page, { step }) {
-    const base = await openChat(page)
-    const fixture = await createMockProviderSession(page, base, {
-      name: 'project-settings',
-      displayLabel: 'Project settings fixture',
-      config: {},
-    })
-    const title = `project-settings ${fixture.sessionId.slice(0, 8)}`
-    try {
-      const shell = await readShell(page, base)
-      const worktree = shell.worktrees[0]
-      const project = shell.projects.find((item) => item.id === worktree?.projectId)
-      ok(project, 'The fixture worktree must belong to a project')
-      await selectors.sessionSearch(page).fill(title)
-      await selectors.sessionByTitle(page, title).click({ button: 'right' })
-      await step('session-menu')
-      await selectors.sessionLifecycleAction(page, 'Project Settings').click()
-      const section = selectors.projectSettingsSection(page, project.title)
-      await section.waitFor({ timeout: 15_000 })
-      const autoPull = selectors.projectSetting(page, AUTO_PULL)
-      await autoPull.waitFor()
-      ok((await autoPull.textContent())?.startsWith('Default'), 'Starts on the machine default')
-      await step('project-settings-open')
-
-      await choose(page, AUTO_PULL, 'On')
-      await shows(page, (text) => text === 'On')
-      await step('override-on')
-
-      await autoPull.click()
-      await selectors.projectSettingOption(page, /^Default/).click()
-      await shows(page, (text) => text.startsWith('Default'))
-      await step('back-to-default')
-
-      for (const remembered of ['json', 'Defaults'] as const) {
-        await selectors.settingsShowAll(page).click()
-        if (remembered === 'json') await selectors.settingsJsonView(page).click()
-        else await selectors.settingsScopeTab(page, remembered).click()
-        await step(`remembered-${remembered}`)
-        await selectors.sessionByTitle(page, title).click({ button: 'right' })
-        await selectors.sessionLifecycleAction(page, 'Project Settings').click()
-        await autoPull.waitFor()
-        ok(
-          (await selectors.settingsScopeTab(page, 'User').getAttribute('aria-selected')) === 'true',
+    'Open project settings from both menus, recover from remembered JSON and Defaults views, edit an override, and navigate to Usage and Font settings with a native fixture session.',
+  fixture: new URL('../fixtures/native-conversation.mjs', import.meta.url),
+  prepareWorktree: () => committedFixture('project-settings'),
+  async drive(page, { step, orchestration, sessionId, projectId, providerInstanceId }) {
+    const base = orchestration.replace(/\/orchestration$/, '')
+    const title = `project-settings verification ${sessionId.slice(0, 8)}`
+    const shell = await readShell(page, orchestration)
+    const project = shell.projects.find((item) => item.id === projectId)
+    ok(project, 'The fixture worktree must belong to a project')
+    await selectors.sessionSearch(page).fill(title)
+    await selectors.sessionByTitle(page, title).click({ button: 'right' })
+    await step('session-menu')
+    await selectors.sessionLifecycleAction(page, 'Project Settings').click()
+    const section = selectors.projectSettingsSection(page, project.title)
+    await section.waitFor({ timeout: 15_000 })
+    const autoPull = selectors.projectSetting(page, AUTO_PULL)
+    await autoPull.waitFor()
+    ok((await autoPull.textContent())?.startsWith('Default'), 'Starts on the machine default')
+    await step('project-settings-open')
+    await choose(page, 'Project grouping', 'Each machine apart')
+    await selectors.projectSetting(page, 'Title generation model').click()
+    await selectors.projectSettingOption(page, /Conversation fixture$/).click()
+    await page.waitForFunction(
+      async ({ base, projectId, providerInstanceId }) => {
+        const snapshot = await (await fetch(`${base}/settings`)).json()
+        return (
+          snapshot.values['chat.projectTextGenerationModels'][projectId]?.providerInstanceId ===
+          providerInstanceId
         )
-        await step(`project-from-${remembered}`)
-      }
+      },
+      { base, projectId, providerInstanceId },
+    )
+    const overrides = await settingsSnapshot(page, base)
+    ok(overrides.values['chat.projectTextGenerationModels'][projectId]?.model === 'gpt-5.5')
+    ok(Object.values(overrides.values['chat.projectGroupingOverrides']).includes('separate'))
+    await step('title-model-and-grouping')
+    for (const row of ['Title generation model', 'Project grouping']) {
+      await selectors.projectSetting(page, row).click()
+      await selectors.projectSettingOption(page, /^Default ·/).click()
+    }
+    await step('title-model-and-grouping-defaults')
 
-      await runPaletteCommand(page, 'Open usage')
-      await selectors.settingsCategoryHeading(page, 'Usage').waitFor()
-      await step('usage-after-project')
-      await selectors.projectGroups(page).first().click({ button: 'right' })
+    await choose(page, AUTO_PULL, 'On')
+    await shows(page, (text) => text === 'On')
+    await step('override-on')
+
+    await autoPull.click()
+    await selectors.projectSettingOption(page, /^Default/).click()
+    await shows(page, (text) => text.startsWith('Default'))
+    await step('back-to-default')
+
+    for (const remembered of ['json', 'Defaults'] as const) {
+      await selectors.settingsShowAll(page).click()
+      if (remembered === 'json') await selectors.settingsJsonView(page).click()
+      else await selectors.settingsScopeTab(page, remembered).click()
+      await step(`remembered-${remembered}`)
+      await selectors.sessionByTitle(page, title).click({ button: 'right' })
       await selectors.sessionLifecycleAction(page, 'Project Settings').click()
       await autoPull.waitFor()
-      await step('project-menu-settings')
-      await runPaletteCommand(page, 'Open font settings')
-      await selectors.settingsFontPicker(page, 'Code font').waitFor()
-      await step('font-after-project')
-    } finally {
-      await fixture.cleanup()
+      ok((await selectors.settingsScopeTab(page, 'User').getAttribute('aria-selected')) === 'true')
+      await step(`project-from-${remembered}`)
     }
+
+    await runPaletteCommand(page, 'Open usage')
+    await selectors.settingsCategoryHeading(page, 'Usage').waitFor()
+    await step('usage-after-project')
+    await selectors.projectGroups(page).first().click({ button: 'right' })
+    await selectors.sessionLifecycleAction(page, 'Project Settings').click()
+    await autoPull.waitFor()
+    await step('project-menu-settings')
+    await runPaletteCommand(page, 'Open font settings')
+    await selectors.settingsFontPicker(page, 'Code font').waitFor()
+    await step('font-after-project')
   },
-}
+})

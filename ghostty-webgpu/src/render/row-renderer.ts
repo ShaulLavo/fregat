@@ -1,4 +1,4 @@
-import { copiedFrameRow } from './frame.js'
+import { copiedFrameRow } from './frame-row.js'
 import { RenderStateDirty } from '../core/abi.js'
 import type { RenderCursorSnapshot, RenderRow } from '../core/types.js'
 import type { TerminalFittedFont } from '../term/types.js'
