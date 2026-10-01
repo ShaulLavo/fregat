@@ -114,7 +114,12 @@ test.skipIf(!userScopes || !checkoutClean)(
     expect(job.code).toBe(0)
     const [file] = readdirSync(path.join(work, 'logs'))
     const record = JSON.parse(readFileSync(path.join(work, 'logs', file!), 'utf8'))
-    expect(record).toMatchObject({ commitHash: head, exitCode: 0, label: 'installed' })
+    expect(record).toMatchObject({
+      commitHash: null,
+      exitCode: 0,
+      label: 'installed',
+      version: head.slice(0, 9),
+    })
     expect(record.memoryPeakBytes).toBeGreaterThan(0)
     expect(readdirSync(root).filter((entry) => entry.startsWith('.'))).toEqual([])
   },

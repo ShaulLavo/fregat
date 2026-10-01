@@ -1540,7 +1540,10 @@ describe('CodexProviderAdapter', () => {
       const grants = new McpGrantRegistry()
       const endpoint = 'http://127.0.0.1:39087/mcp'
       const service = new ProviderService({
-        adapterRegistry: new ProviderAdapterRegistry([adapter]),
+        adapterRegistry: new ProviderAdapterRegistry({
+          adapters: [adapter],
+          services: { cwd: process.cwd() },
+        }),
         sessionDirectory: new ProviderSessionDirectory(database),
         mcp: { endpoint, grants },
       })
@@ -3482,7 +3485,10 @@ describe('CodexProviderAdapter', () => {
         const fixture = await createOrchestrationFixture()
         process.env.PLATFORM_FAKE_CODEX_PROJECT = fixture.checkout
         const adapter = new CodexProviderAdapter()
-        const registry = new ProviderAdapterRegistry([adapter])
+        const registry = new ProviderAdapterRegistry({
+          adapters: [adapter],
+          services: { cwd: process.cwd() },
+        })
         const directory = new ProviderSessionDirectory(fixture.database)
         const service = new ProviderService({
           adapterRegistry: registry,

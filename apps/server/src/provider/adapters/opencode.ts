@@ -73,12 +73,28 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
   >()
   private readonly nativeOwners = new Map<string, NativeLease>()
   private stopped = false
+  private catalog: {
+    cwd: string
+    server: OpenCodeServer
+    controller: AbortController
+    ready: Promise<string>
+  } | null = null
 
   private readonly options: Options
 
   constructor(options: Options) {
     this.options = options
     this.adapterKey = options.providerInstanceId
+  }
+
+  initialize(cwd: string) {
+    if (!this.options.enabled || this.stopped || this.catalog) return
+    const server = new OpenCodeServer(this.options)
+    const controller = new AbortController()
+    const ready = server.start(cwd, controller.signal)
+    this.catalog = { cwd, server, controller, ready }
+    // Initialization can fail before the registry asks for its first snapshot.
+    void ready.catch(() => undefined)
   }
 
   subscribeEvents(subscriber: (event: ProviderRuntimeEvent) => void) {
@@ -113,8 +129,9 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     } satisfies Partial<ProviderSnapshot>
     if (!this.options.enabled)
       return { ...base, installed: false, status: 'disabled', auth: { status: 'unknown' } }
-    const url = this.options.serverUrl ?? this.sessions.values().next().value?.server.currentUrl()
-    if (!url) {
+    const runtimeUrl =
+      this.options.serverUrl ?? this.sessions.values().next().value?.server.currentUrl()
+    if (!runtimeUrl && !this.catalog) {
       const installed = Boolean(
         Bun.which(this.options.binaryPath ?? 'opencode', { PATH: this.options.env.PATH ?? '' }),
       )
@@ -129,12 +146,21 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
       }
     }
     try {
+      const url = this.catalog ? await this.catalog.ready : runtimeUrl!
+      const cwd = this.catalog?.cwd ?? ''
+      const signal = this.catalog?.controller.signal
       const http = new OpenCodeHttp(url)
-      const health = await http.request<{ version: string }>('/global/health', '')
+      const health = await http.request<{ version: string }>(
+        '/global/health',
+        cwd,
+        undefined,
+        'GET',
+        signal,
+      )
       const catalog = await http.request<{
         connected: string[]
         all: { id: string; models: Record<string, { name: string }> }[]
-      }>('/provider', '')
+      }>('/provider', cwd, undefined, 'GET', signal)
       const connected = new Set(catalog.connected)
       const models = catalog.all
         .filter((provider) => connected.has(provider.id))
@@ -152,12 +178,16 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
         installed: true,
         status: 'ready',
         version: health.version,
-        auth: { status: connected.size ? 'authenticated' : 'unauthenticated' },
+        // Connected providers include anonymous free models; catalog availability proves no account state.
+        auth: { status: 'unknown' },
       }
     } catch {
       return {
         ...base,
-        installed: true,
+        installed: Boolean(
+          this.options.serverUrl ||
+          Bun.which(this.options.binaryPath ?? 'opencode', { PATH: this.options.env.PATH ?? '' }),
+        ),
         status: 'error',
         auth: { status: 'unknown' },
         message: 'OpenCode server could not be reached.',
@@ -280,8 +310,12 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
 
   async stopAll() {
     this.stopped = true
+    this.catalog?.controller.abort()
     for (const pending of this.starting.values()) pending.controller.abort()
-    await Promise.allSettled(Array.from(this.starting.values(), (pending) => pending.promise))
+    await Promise.allSettled([
+      ...Array.from(this.starting.values(), (pending) => pending.promise),
+      this.catalog?.server.close(),
+    ])
     await Promise.allSettled(
       [...this.sessions.keys()].map((sessionId) => this.stopRuntime({ sessionId })),
     )

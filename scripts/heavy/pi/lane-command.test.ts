@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { laneJobCommand, laneRunDirectory, laneUnit, type LaneLimits } from './lane-command'
 
@@ -57,31 +57,155 @@ async function runLane(
   })
   const stdin = options.stdin ?? 'heartbeat'
   const run = laneRunDirectory(job)
-  let open = stdin !== 'closed'
-  const close = () => {
-    if (!open) return
-    open = false
-    void child.stdin.end()
+  let open = true
+  let beat: ReturnType<typeof setInterval> | undefined
+  let closing: Promise<void> | undefined
+  const pending: Promise<void>[] = []
+  const failures: unknown[] = []
+  const complete = async (operation: () => number | Promise<number>) => {
+    try {
+      await operation()
+    } catch (error) {
+      if (
+        child.exitCode !== null &&
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'EPIPE'
+      )
+        return
+      failures.push(error)
+      void close()
+    }
   }
-  const beat =
-    stdin === 'heartbeat' || stdin === 'ready'
-      ? setInterval(() => {
-          if (stdin === 'ready' && existsSync(path.join(run, 'ready'))) return close()
-          if (!open) return
+  function close() {
+    if (closing) return closing
+    open = false
+    clearInterval(beat)
+    // End cannot race a buffered flush, and every sink rejection is owned before the test returns.
+    closing = Promise.all(pending).then(() => complete(() => child.stdin.end()))
+    return closing
+  }
+  if (stdin === 'heartbeat' || stdin === 'ready') {
+    beat = setInterval(() => {
+      if (stdin === 'ready' && existsSync(path.join(run, 'ready'))) return void close()
+      if (!open) return
+      pending.push(
+        complete(() => {
           child.stdin.write('\n')
-          void child.stdin.flush()
-        }, 50)
-      : undefined
-  if (stdin === 'closed') void child.stdin.end()
+          return child.stdin.flush()
+        }),
+      )
+    }, 50)
+  }
+  if (stdin === 'closed') void close()
   const status = await child.exited
   const ms = performance.now() - started
-  clearInterval(beat)
-  close()
+  await close()
+  if (failures.length > 0) throw failures[0]
   const file = path.join(run, 'lane.json')
   const lane = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as Lane) : null
   const unit = laneUnit(job.name)
   return { status, lane, run, ms, unit, stderr: await new Response(child.stderr).text() }
 }
+
+test('awaits heartbeat flush before ending stdin and awaits end before returning', async () => {
+  vi.useFakeTimers()
+  const exited = Promise.withResolvers<number>()
+  const flushed = Promise.withResolvers<number>()
+  const ended = Promise.withResolvers<number>()
+  const child = {
+    exitCode: null as number | null,
+    exited: exited.promise,
+    stdin: {
+      write: vi.fn(() => 1),
+      flush: vi.fn(() => flushed.promise),
+      end: vi.fn(() => ended.promise),
+    },
+    stderr: new ReadableStream({ start: (controller) => controller.close() }),
+  }
+  vi.spyOn(Bun, 'spawn').mockReturnValue(child as unknown as ReturnType<typeof Bun.spawn>)
+  let settled = false
+  const running = runLane('completion', 'true').then(() => {
+    settled = true
+  })
+  try {
+    await vi.advanceTimersByTimeAsync(50)
+    expect(child.stdin.flush).toHaveBeenCalledTimes(1)
+    child.exitCode = 0
+    exited.resolve(0)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(child.stdin.end).not.toHaveBeenCalled()
+    expect(settled).toBe(false)
+    flushed.resolve(1)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(child.stdin.end).toHaveBeenCalledTimes(1)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(child.stdin.write).toHaveBeenCalledTimes(1)
+    ended.resolve(0)
+    await running
+    expect(settled).toBe(true)
+  } finally {
+    flushed.resolve(1)
+    ended.resolve(0)
+    exited.resolve(0)
+    await running
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  }
+})
+
+test.for([
+  { sink: 'flush', code: 'EPIPE', closed: true },
+  { sink: 'end', code: 'EPIPE', closed: true },
+  { sink: 'flush', code: 'EPIPE', closed: false },
+  { sink: 'flush', code: 'EIO', closed: true },
+  { sink: 'end', code: 'EIO', closed: true },
+])('owns $sink $code errors with child closed=$closed', async ({ sink, code, closed }) => {
+  vi.useFakeTimers()
+  const exited = Promise.withResolvers<number>()
+  const operation = Promise.withResolvers<number>()
+  const child = {
+    exitCode: null as number | null,
+    exited: exited.promise,
+    stdin: {
+      write: vi.fn(() => 1),
+      flush: vi.fn(() => (sink === 'flush' ? operation.promise : 1)),
+      end: vi.fn(() => (sink === 'end' ? operation.promise : 0)),
+    },
+    stderr: new ReadableStream({ start: (controller) => controller.close() }),
+  }
+  vi.spyOn(Bun, 'spawn').mockReturnValue(child as unknown as ReturnType<typeof Bun.spawn>)
+  let failure: unknown
+  const running = runLane('errors', 'true').catch((error) => {
+    failure = error
+  })
+  const error = { code }
+  try {
+    await vi.advanceTimersByTimeAsync(50)
+    if (closed) {
+      child.exitCode = 0
+      exited.resolve(0)
+      await vi.advanceTimersByTimeAsync(0)
+    }
+    operation.reject(error)
+    await vi.advanceTimersByTimeAsync(0)
+    child.exitCode = 0
+    exited.resolve(0)
+    await running
+    expect(failure).toBe(code === 'EPIPE' && closed ? undefined : error)
+    expect(child.stdin.end).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(child.stdin.write).toHaveBeenCalledTimes(1)
+  } finally {
+    operation.resolve(0)
+    exited.resolve(0)
+    await running
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  }
+})
 
 // list-units, not show: show loads the unit it is asked about.
 function loaded(unit: string) {

@@ -70,6 +70,7 @@ function body({
           definitionTarget={null}
           fileState={{ status: 'loading' }}
           fileVersion={null}
+          readError={null}
           languageServerReferences={null}
           liveDocument={document}
           target={fileDocument(fileResource(filesystemPath(path)))}

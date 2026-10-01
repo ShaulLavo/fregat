@@ -66,7 +66,10 @@ export async function restartFixture(
       metadataDatabase: database,
       orchestration: {
         database: database.db,
-        providerAdapterRegistry: new ProviderAdapterRegistry([next]),
+        providerAdapterRegistry: new ProviderAdapterRegistry({
+          adapters: [next],
+          services: { cwd: process.cwd() },
+        }),
         providerRuntime: true,
       },
       settings: testSettingsOptions(root),

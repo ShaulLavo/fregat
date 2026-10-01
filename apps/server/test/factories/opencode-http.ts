@@ -5,7 +5,9 @@ type NativeFixtureSession = { id: string; directory: string }
 export function startOpenCodeHttpFixture(
   options: {
     port?: number
+    modelName?: string
     sessionFile?: string
+    beforeCatalogResponse?: () => Promise<void>
     beforeAbortResponse?: () => Promise<void>
     beforePromptResponse?: () => Promise<Response | null>
     beforeReplyResponse?: () => Promise<Response | null>
@@ -21,6 +23,7 @@ export function startOpenCodeHttpFixture(
   const requests: { path: string; method: string; directory: string; body: any }[] = []
   const encoder = new TextEncoder()
   let count = 0
+  let modelName = options.modelName ?? 'Fixture text'
   const emit = (type: string, properties: Record<string, unknown>) => {
     const bytes = encoder.encode(`data: ${JSON.stringify({ type, properties })}\r\n\r\n`)
     for (const stream of streams) stream.enqueue(bytes)
@@ -33,6 +36,10 @@ export function startOpenCodeHttpFixture(
       const directory = url.searchParams.get('directory') ?? ''
       const body = request.method === 'GET' ? undefined : await request.json()
       requests.push({ path: url.pathname, method: request.method, directory, body })
+      if (url.pathname === '/fixture/model-name') {
+        modelName = body.name
+        return Response.json(true)
+      }
       if (url.pathname === '/fixture/requests') return Response.json(requests)
       if (url.pathname === '/fixture/disconnect') {
         for (const stream of streams) stream.close()
@@ -41,11 +48,13 @@ export function startOpenCodeHttpFixture(
       }
       if (url.pathname === '/global/health')
         return Response.json({ healthy: true, version: 'fixture-v2' })
-      if (url.pathname === '/provider')
+      if (url.pathname === '/provider') {
+        await options.beforeCatalogResponse?.()
         return Response.json({
           connected: ['fixture'],
-          all: [{ id: 'fixture', models: { text: { name: 'Fixture text' } } }],
+          all: [{ id: 'fixture', models: { text: { name: modelName } } }],
         })
+      }
       if (url.pathname === '/event') {
         await options.beforeEventHeaders?.()
         let controller: ReadableStreamDefaultController<Uint8Array>

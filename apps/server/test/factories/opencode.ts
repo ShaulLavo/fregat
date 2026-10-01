@@ -16,7 +16,10 @@ export async function openCodeAppFixture() {
   await mkdir(checkout)
   const http = startOpenCodeHttpFixture()
   const instanceId = v.parse(providerInstanceIdSchema, 'opencode-fixture')
-  const registry = new ProviderAdapterRegistry({ drivers: [opencodeDriver] })
+  const registry = new ProviderAdapterRegistry({
+    drivers: [opencodeDriver],
+    services: { cwd: process.cwd() },
+  })
   await registry.reconcile([
     {
       driverKind: OPENCODE_DRIVER_KIND,

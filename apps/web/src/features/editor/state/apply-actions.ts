@@ -60,7 +60,7 @@ import {
   notePressPrefetch,
   type PressPrefetch,
 } from '@/lib/intent-prefetch/state/press-paint'
-import type { PickedFsEntry } from '@/lib/file-system-types'
+import type { WorkspaceRootFolder } from '@/lib/file-system-types'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type {
   FileOpenIntentActivation,
@@ -88,7 +88,7 @@ export type EditorApplyActions = {
   selectPreviousEditor: () => boolean
   selectTab: (selection: { groupId: GroupId; tabId: TabId }) => void
   /** Parks the open project and restores the target's tabs, history and search results. */
-  switchRootFolder: (rootFolder: PickedFsEntry) => void
+  switchRootFolder: (rootFolder: WorkspaceRootFolder) => void
 }
 
 export type EditorActivation = {
@@ -269,7 +269,7 @@ function openDefinition(
 
 // Park each workspace before switching so unsaved documents and search buffers remain owned.
 function switchRootFolder(
-  rootFolder: PickedFsEntry,
+  rootFolder: WorkspaceRootFolder,
   {
     activation,
     documentStore,

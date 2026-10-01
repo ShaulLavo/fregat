@@ -235,6 +235,7 @@ describe('reconcile against a live session', () => {
   it('keeps an adapter that is still serving a session', async () => {
     const live = new Set<string>()
     const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
       adapters: [new MockProviderAdapter()],
       hasLiveSessions: (id) => live.has(id),
     })
@@ -253,6 +254,7 @@ describe('reconcile against a live session', () => {
   it('disposes it on a later reconcile once the session ends', async () => {
     const live = new Set<string>()
     const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
       adapters: [new MockProviderAdapter()],
       hasLiveSessions: (id) => live.has(id),
     })
@@ -268,7 +270,10 @@ describe('reconcile against a live session', () => {
   })
 
   it('disposes immediately when nothing is using it', async () => {
-    const registry = new ProviderAdapterRegistry({ adapters: [new MockProviderAdapter()] })
+    const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
+      adapters: [new MockProviderAdapter()],
+    })
     expect(registry.listInstances()).toHaveLength(1)
 
     await registry.reconcile([])
@@ -283,6 +288,7 @@ describe('reconcile against a live session', () => {
     // — the same kill the deferral exists to prevent.
     const spy = disposeSpy()
     const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
       drivers: [spy.driver],
       hasLiveSessions: (id) => spy.live.has(id),
     })
@@ -299,6 +305,7 @@ describe('reconcile against a live session', () => {
   it('applies the changed config on a later reconcile once the session ends', async () => {
     const spy = disposeSpy()
     const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
       drivers: [spy.driver],
       hasLiveSessions: (id) => spy.live.has(id),
     })

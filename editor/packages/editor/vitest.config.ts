@@ -1,3 +1,4 @@
+import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
 import { workspaceRoot } from '../../scripts/workspace-root'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
@@ -30,6 +31,7 @@ export default defineConfig({
         // and measured advances under a CSS transform. happy-dom reports every
         // rect empty, so these assertions are meaningless anywhere else.
         // Discovered mid-run, these make Vite reload and strand the browser test that was loading.
+        plugins: [browserTestResponses()],
         server: { fs: { allow: [workspaceRoot] } },
         optimizeDeps: {
           // tree-sitter-md is plain ESM over web-tree-sitter; served as-is, it is never discovered.
@@ -119,6 +121,7 @@ export default defineConfig({
         },
       },
       {
+        plugins: [browserTestResponses()],
         test: {
           name: 'highlight-paint',
           sequence: { groupOrder: 2 },

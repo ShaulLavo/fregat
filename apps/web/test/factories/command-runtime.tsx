@@ -1,3 +1,4 @@
+import { testWorkspaceAddress } from './workspace-address'
 import { allEditorTabs } from '@/lib/documents/utils/groups'
 import { createTestGroupCommands } from './editor-group-commands'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
@@ -498,6 +499,7 @@ function createTestWorkspaceStore(rootPath: string | null) {
 
 function pickedDirectory(path: string) {
   return {
+    workspaceAddress: testWorkspaceAddress(path),
     birthtimeMs: 0,
     mtimeMs: 0,
     name: path.split('/').filter(Boolean).at(-1) ?? path,

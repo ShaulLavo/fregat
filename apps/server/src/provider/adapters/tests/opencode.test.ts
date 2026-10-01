@@ -10,6 +10,7 @@ import { OPENCODE_DRIVER_KIND, OpenCodeProviderAdapter } from '../opencode'
 import { opencodeDriver } from '../../drivers/opencode'
 import { OpenCodeHttp } from '../utils/opencode-http'
 import { ProviderAdapterRegistry } from '../../provider-adapter-registry'
+import { ProviderStatusCache } from '../../status-cache'
 import type { ProviderRuntimeEvent, ProviderTurnInput } from '../../types'
 
 const cleanup: (() => Promise<void> | void)[] = []
@@ -50,6 +51,316 @@ function setup(options?: Parameters<typeof startOpenCodeHttpFixture>[0]) {
   adapter.subscribeEvents((event) => events.push(event))
   return { http, adapter, events }
 }
+
+test('update advice returns a structured missing-instance response after removal', async () => {
+  const fixture = await openCodeAppFixture()
+  cleanup.push(fixture.close)
+  const url = `http://localhost/providers/${fixture.instanceId}/update`
+  const before = await fixture.app.handle(
+    new Request(url, { headers: { origin: 'http://localhost:5173' } }),
+  )
+  expect(before.status).toBe(200)
+
+  await fixture.registry.reconcile([])
+  const after = await fixture.app.handle(
+    new Request(url, { headers: { origin: 'http://localhost:5173' } }),
+  )
+
+  expect(after.status).toBe(404)
+  expect(await after.json()).toMatchObject({ error: { code: 'provider.INSTANCE_NOT_FOUND' } })
+})
+
+test('enabled initialization discovers native models before a turn using one owned catalog process', async () => {
+  const fixture = await openCodeProcessFixture({ wrapper: 'alive' })
+  const registry = new ProviderAdapterRegistry({
+    drivers: [opencodeDriver],
+    services: { cwd: fixture.root },
+  })
+  cleanup.push(fixture.close, () => registry.dispose())
+  await registry.reconcile([
+    {
+      driverKind: OPENCODE_DRIVER_KIND,
+      providerInstanceId: instanceId,
+      binaryPath: fixture.binaryPath,
+      config: { dataHome: `${fixture.root}/profile` },
+    },
+  ])
+  expect(await registry.snapshot(instanceId)).toMatchObject({
+    status: 'ready',
+    auth: { status: 'unknown' },
+    models: [{ slug: 'fixture/text' }],
+  })
+  const cached = await registry.snapshot(instanceId)
+  const calls = (await readFile(fixture.marker, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  expect(calls.filter((call) => call.args)).toHaveLength(1)
+  expect(calls.find((call) => call.args)).toMatchObject({
+    cwd: fixture.root,
+    dataHome: `${fixture.root}/profile`,
+  })
+  const { url, pid } = calls.find((call) => call.url)
+  await fetch(`${url}/fixture/model-name`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Refreshed native model' }),
+  })
+  expect(await registry.snapshot(instanceId)).toBe(cached)
+  expect(await registry.refreshSnapshot(instanceId)).toMatchObject({
+    models: [{ name: 'Refreshed native model' }],
+  })
+  await registry.refreshSnapshot(instanceId)
+  const refreshedCalls = (await readFile(fixture.marker, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  expect(refreshedCalls.filter((call) => call.args)).toHaveLength(1)
+  const requests = await (await fetch(`${url}/fixture/requests`)).json()
+  expect(requests.filter((request: { path: string }) => request.path === '/provider')).toHaveLength(
+    3,
+  )
+  expect(
+    requests
+      .filter((request: { path: string }) => !request.path.startsWith('/fixture/'))
+      .every((request: { directory: string }) => request.directory === fixture.root),
+  ).toBe(true)
+  expect(
+    requests.some(
+      (request: { path: string }) => request.path === '/session' || request.path === '/event',
+    ),
+  ).toBe(false)
+  await registry.dispose()
+  await expect
+    .poll(async () =>
+      (await readFile(`/proc/${pid}/cmdline`, 'utf8').catch(() => '')).includes(fixture.root),
+    )
+    .toBe(false)
+})
+
+test.each([false, true])(
+  'live enable settles native models with persisted status %s',
+  async (persisted) => {
+    const fixture = await openCodeProcessFixture()
+    const registry = new ProviderAdapterRegistry({
+      drivers: [opencodeDriver],
+      services: { cwd: fixture.root },
+      statusCache: new ProviderStatusCache({
+        directory: persisted ? `${fixture.root}/status-cache` : undefined,
+      }),
+    })
+    cleanup.push(fixture.close, () => registry.dispose())
+    const entry = {
+      driverKind: OPENCODE_DRIVER_KIND,
+      providerInstanceId: instanceId,
+      binaryPath: fixture.binaryPath,
+      config: { dataHome: `${fixture.root}/profile` },
+    }
+    await registry.reconcile([{ ...entry, enabled: false }])
+    expect(await registry.snapshot(instanceId)).toMatchObject({ status: 'disabled', models: [] })
+
+    await registry.reconcile([{ ...entry, enabled: true }])
+
+    expect((await registry.listProviders()).providers).toContainEqual(
+      expect.objectContaining({
+        status: 'ready',
+        models: [expect.objectContaining({ slug: 'fixture/text' })],
+      }),
+    )
+  },
+)
+
+test('enabled local instances initialize independent native catalogs and storage profiles', async () => {
+  const first = await openCodeProcessFixture({ modelName: 'First profile model' })
+  const second = await openCodeProcessFixture({ modelName: 'Second profile model' })
+  const registry = new ProviderAdapterRegistry({
+    drivers: [opencodeDriver],
+    services: { cwd: first.root },
+  })
+  cleanup.push(first.close, second.close, () => registry.dispose())
+  const otherId = v.parse(providerInstanceIdSchema, 'opencode-catalog-second')
+  await registry.reconcile([
+    {
+      driverKind: OPENCODE_DRIVER_KIND,
+      providerInstanceId: instanceId,
+      binaryPath: first.binaryPath,
+      config: { dataHome: first.root },
+    },
+    {
+      driverKind: OPENCODE_DRIVER_KIND,
+      providerInstanceId: otherId,
+      binaryPath: second.binaryPath,
+      config: { dataHome: second.root },
+    },
+  ])
+  expect(await registry.snapshot(instanceId)).toMatchObject({
+    models: [{ name: 'First profile model' }],
+  })
+  expect(await registry.snapshot(otherId)).toMatchObject({
+    models: [{ name: 'Second profile model' }],
+  })
+  const firstCalls = (await readFile(first.marker, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  const secondCalls = (await readFile(second.marker, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  expect(firstCalls.find((call) => call.args).dataHome).toBe(first.root)
+  expect(secondCalls.find((call) => call.args).dataHome).toBe(second.root)
+  expect(firstCalls.find((call) => call.url).url).not.toBe(secondCalls.find((call) => call.url).url)
+  await registry.reconcile([
+    {
+      driverKind: OPENCODE_DRIVER_KIND,
+      providerInstanceId: otherId,
+      binaryPath: second.binaryPath,
+      config: { dataHome: second.root },
+    },
+  ])
+  expect(await registry.refreshSnapshot(otherId)).toMatchObject({
+    status: 'ready',
+    models: [{ name: 'Second profile model' }],
+  })
+})
+
+test('disabled initialization never starts a native catalog executable', async () => {
+  const fixture = await openCodeProcessFixture()
+  const handle = await opencodeDriver.create({
+    binaryPath: fixture.binaryPath,
+    config: {},
+    env: {},
+    displayLabel: 'Disabled fixture',
+    enabled: false,
+    providerInstanceId: instanceId,
+    services: { cwd: fixture.root },
+  })
+  cleanup.push(fixture.close, handle.dispose)
+  expect(await handle.adapter.snapshot()).toMatchObject({ status: 'disabled', models: [] })
+  await handle.dispose()
+  await expect(access(fixture.marker)).rejects.toBeDefined()
+})
+
+test('failed catalog initialization reports a missing executable without a ready catalog', async () => {
+  const fixture = await openCodeProcessFixture()
+  const handle = await opencodeDriver.create({
+    binaryPath: `${fixture.root}/missing`,
+    config: {},
+    env: {},
+    displayLabel: 'Missing fixture',
+    enabled: true,
+    providerInstanceId: instanceId,
+    services: { cwd: fixture.root },
+  })
+  cleanup.push(fixture.close, handle.dispose)
+  expect(await handle.adapter.snapshot()).toMatchObject({
+    installed: false,
+    status: 'error',
+    models: [],
+    auth: { status: 'unknown' },
+  })
+  await expect(access(fixture.marker)).rejects.toBeDefined()
+})
+
+test('catalog disposal cancels owned initialization and reaps the wrapper descendants', async () => {
+  const fixture = await openCodeProcessFixture({ wrapper: 'alive', holdReadiness: true })
+  const handle = await opencodeDriver.create({
+    binaryPath: fixture.binaryPath,
+    config: {},
+    env: {},
+    displayLabel: 'Starting fixture',
+    enabled: true,
+    providerInstanceId: instanceId,
+    services: { cwd: fixture.root },
+  })
+  cleanup.push(fixture.close, handle.dispose)
+  const snapshot = handle.adapter.snapshot()
+  await expect
+    .poll(async () => (await readFile(fixture.marker, 'utf8').catch(() => '')).includes('"url"'))
+    .toBe(true)
+  const calls = (await readFile(fixture.marker, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  await handle.dispose()
+  expect(await snapshot).toMatchObject({ status: 'error' })
+  for (const call of calls)
+    for (const pid of [call.pid, call.wrapperPid, call.childPid]) {
+      if (!pid) continue
+      await expect
+        .poll(async () =>
+          (await readFile(`/proc/${pid}/cmdline`, 'utf8').catch(() => '')).includes(fixture.root),
+        )
+        .toBe(false)
+    }
+})
+
+test('catalog disposal cancels HTTP discovery while leaving an external server alive', async () => {
+  const held = Promise.withResolvers<void>()
+  const http = startOpenCodeHttpFixture({ beforeCatalogResponse: () => held.promise })
+  const handle = await opencodeDriver.create({
+    config: { serverUrl: http.url },
+    env: {},
+    displayLabel: 'External fixture',
+    enabled: true,
+    providerInstanceId: instanceId,
+    services: { cwd: process.cwd() },
+  })
+  cleanup.push(
+    () => http.close(),
+    () => held.resolve(),
+    handle.dispose,
+  )
+  const snapshot = handle.adapter.snapshot()
+  await expect.poll(() => http.requests.some((request) => request.path === '/provider')).toBe(true)
+  await handle.dispose()
+  expect(await snapshot).toMatchObject({ status: 'error' })
+  expect((await fetch(`${http.url}/global/health`)).ok).toBe(true)
+  expect(http.requests.find((request) => request.path === '/provider')?.directory).toBe(
+    process.cwd(),
+  )
+})
+
+test('anonymous connected free models are usable without claiming account authentication', async () => {
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname === '/global/health')
+        return Response.json({ healthy: true, version: 'anonymous-fixture' })
+      return Response.json({
+        connected: ['opencode'],
+        all: [
+          {
+            id: 'opencode',
+            source: 'custom',
+            options: { apiKey: 'public' },
+            models: { 'free-text': { name: 'Free text', cost: { input: 0, output: 0 } } },
+          },
+        ],
+      })
+    },
+  })
+  const adapter = new OpenCodeProviderAdapter({
+    serverUrl: server.url.toString(),
+    env: {},
+    displayLabel: 'Anonymous OpenCode',
+    enabled: true,
+    providerInstanceId: instanceId,
+  })
+  cleanup.push(
+    () => server.stop(true),
+    () => adapter.stopAll(),
+  )
+
+  expect(await adapter.snapshot()).toMatchObject({
+    installed: true,
+    status: 'ready',
+    supportsSignIn: false,
+    auth: { status: 'unknown' },
+    models: [{ slug: 'opencode/free-text', name: 'Free text' }],
+  })
+})
 
 test('SDKv2 fixture streams one answer, filters user/foreign events, and completes one turn', async () => {
   const { http, adapter, events } = setup()
@@ -193,7 +504,10 @@ test('two enabled driver instances keep native cursors, model catalogs, and abor
   const first = startOpenCodeHttpFixture()
   const second = startOpenCodeHttpFixture()
   const otherId = v.parse(providerInstanceIdSchema, 'opencode-second')
-  const registry = new ProviderAdapterRegistry({ drivers: [opencodeDriver] })
+  const registry = new ProviderAdapterRegistry({
+    drivers: [opencodeDriver],
+    services: { cwd: process.cwd() },
+  })
   cleanup.push(
     () => first.close(),
     () => second.close(),
