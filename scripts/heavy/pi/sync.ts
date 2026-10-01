@@ -6,7 +6,7 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { shellQuote } from '../../../apps/server/src/utils/shell'
 import { createScriptError, scriptFailureText } from '../../structured-errors'
-import { check, remote, resolveLane, verifyLane } from './remote'
+import { check, remote, resolveLane, run, verifyLane } from './remote'
 import { fregatCheckout } from './checkout'
 import { holdLaneLock } from './lane-lock'
 import { shipPlan } from './transfer'
@@ -46,16 +46,22 @@ export function buildsTransfer(root: string, builds: readonly string[], destinat
   return ['rsync', '-aR', '--delete', ...builds.map((dist) => `${root}/./${dist}`), destination]
 }
 
-export function syncLane(options: SyncOptions) {
-  const root = fregatCheckout()
-  const builds = builtWorkspaces(root)
-  const plan = shipPlan(root, options.includes ?? [], (options.maxTransferMiB ?? 64) * 2 ** 20)
-  const lane = resolveLane(options.host, options.lane)
-  verifyLane(options.host, lane)
-  const platform = `${lane}/platform`
-  const commit = check(['git', '-C', root, 'rev-parse', 'HEAD'], 'Reading HEAD').toString().trim()
-
-  // A ref the lane checkout never has checked out, so the push is never refused.
+/**
+ * Force-pushes HEAD to the lane ref, which the lane checkout never has checked out, so the push
+ * is never refused for that. A shallow source fetches its history first: a full receiver that is
+ * behind it refuses a shallow push ("shallow update not allowed"), and --force cannot help.
+ */
+export function pushCheckout(root: string, destination: string) {
+  const shallow = run(['git', '-C', root, 'rev-parse', '--is-shallow-repository'])
+  if (shallow.stdout.toString().trim() === 'true') {
+    const fetched = run(['git', '-C', root, 'fetch', '--quiet', '--unshallow', 'origin'])
+    // Git's own message can quote the origin URL with its credentials, so it stays out.
+    if (fetched.exitCode !== 0) {
+      throw createScriptError(
+        `${root} is a shallow clone, and fetching its history from origin failed with exit ${fetched.exitCode}. Run \`git -C ${root} fetch --unshallow origin\`, then sync again.`,
+      )
+    }
+  }
   check(
     [
       'git',
@@ -65,11 +71,23 @@ export function syncLane(options: SyncOptions) {
       '--quiet',
       '--no-verify',
       '--force',
-      `${options.host}:${platform}`,
+      destination,
       'HEAD:refs/heads/lane',
     ],
     'Pushing HEAD to the lane',
   )
+}
+
+export function syncLane(options: SyncOptions) {
+  const root = fregatCheckout()
+  const builds = builtWorkspaces(root)
+  const plan = shipPlan(root, options.includes ?? [], (options.maxTransferMiB ?? 64) * 2 ** 20)
+  const lane = resolveLane(options.host, options.lane)
+  verifyLane(options.host, lane)
+  const platform = `${lane}/platform`
+  const commit = check(['git', '-C', root, 'rev-parse', 'HEAD'], 'Reading HEAD').toString().trim()
+
+  pushCheckout(root, `${options.host}:${platform}`)
   const cd = `cd ${shellQuote(platform)}`
   remote(
     options.host,

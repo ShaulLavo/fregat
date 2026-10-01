@@ -80,3 +80,22 @@ test('a shallow clone with another origin, or none, is refused', () => {
 test('a directory outside git is refused', () => {
   expect(() => fregatCheckout(scratch('no-git-'))).toThrow(/not inside a git checkout/)
 })
+
+test.each([
+  'https://ci:s3cr3t-token@github.com/someone/fregat.git',
+  'https://s3cr3t-token@github.com/someone/fregat.git',
+  'ssh://git:s3cr3t-token@github.com/someone/fregat.git',
+  's3cr3t-token@github.com:someone/fregat.git',
+])('never puts credentials from the origin %s into the refusal', (origin) => {
+  const { root, rootCommit } = fullRepository()
+  const clone = shallowClone(root, origin)
+  let message = ''
+  try {
+    fregatCheckout(clone, { ...FREGAT, rootCommit })
+  } catch (error) {
+    message = `${String(error)} ${JSON.stringify(error)}`
+  }
+  expect(message).toMatch(/shallow clone/)
+  expect(message).toContain('github.com')
+  expect(message).not.toContain('s3cr3t-token')
+})
