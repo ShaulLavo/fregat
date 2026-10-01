@@ -301,45 +301,56 @@ Use the complete input suite below for budget comparisons.
 
 ## Input latency budgets
 
-Before changing the implementation, preserve its measurements for the comparison report:
+The absolute-threshold workflow below is the delivered historical instrument. Plan 282 replaces
+its verdict with a paired A/B instrument. PR #224 closed the existing matrix as partial; these
+commands document reusable collection and are not a request to repeat that matrix.
+
+Run the following in Bash from the Editor workspace (`editor/` in Platform). Input runs require
+all built public packages, their external-dependency receipt and a frozen fixture manifest. A
+core-only directory cannot supply that identity. Before building or freezing, verify that `/work`
+is mounted and has free space. Use a new, empty run directory for each collection:
 
 ```sh
-bun run bench:input --repetitions 1 --output /work/tmp/editor-input/before.json.gz
+findmnt --target /work
+df -h /work
+run_root=$(mktemp -d /work/tmp/editor-input-XXXXXX)
+bun run build
+node examples/stress/fixtures.mjs "$run_root/fixtures"
+
+freeze_input_packages() {
+  node examples/stress/package-set.mjs "$PWD/packages" "$run_root/$1" \
+    "$(git rev-parse HEAD)" \
+    "$(git diff HEAD --binary -- packages | sha256sum | cut -d ' ' -f 1)" \
+    "$(sha256sum ../bun.lock | cut -d ' ' -f 1)"
+}
+freeze_input_packages baseline
+
+run_input() {
+  local packages=$1
+  shift
+  node examples/stress/run.mjs --suite input-latency \
+    --packages-directory "$run_root/$packages" --fixture-directory "$run_root/fixtures" \
+    --consumers native "$@"
+}
+run_input baseline --repetitions 1 --output "$run_root/before.json.gz"
+run_input baseline --repetitions 3 --output "$run_root/control-1.json.gz"
+run_input baseline --repetitions 3 --output "$run_root/control-2.json.gz"
+run_input baseline --repetitions 3 --output "$run_root/control-3.json.gz"
+run_input baseline --repetitions 3 --output "$run_root/rerun.json.gz"
 ```
 
-Establish a reference calibration by running the six input scenarios over all three fixtures and both view configurations:
+The freeze command takes the source package directory, destination, product commit, dirty package
+diff SHA-256 and workspace lock SHA-256. It copies every public package's matching `src`, `dist`
+and `package.json`, and records the resolved external dependency bytes. Keep the frozen directories
+and dependencies available. The runner validates the receipt before collection.
+
+Keep the browser, hardware, instrument source, fixtures and consumer selection fixed. Run without
+other benchmarks or builds competing for the CPU. All controls and the independent reference
+holdout use the baseline package set. Calibrate and check that same-build holdout:
 
 ```sh
-bun run bench:input --repetitions 3 --output /work/tmp/editor-input/control-1.json.gz
-```
-
-Repeat the unchanged command with `control-2.json.gz` and `control-3.json.gz` as output paths.
-Use the same command for a separate `rerun.json.gz`. Keep the browser, hardware and workload fixed.
-Run without other benchmarks or builds competing for the CPU.
-
-To collect baseline controls after changing the active core, preserve a core package with matching
-`src`, `package.json`, and built `dist` before making changes. Its dependencies must remain
-resolvable from that directory. After building the public packages, run the runner directly to use
-the existing builds:
-
-```sh
-node examples/stress/run.mjs --suite input-latency --core-directory /work/tmp/editor-input/baseline/packages/editor --repetitions 3 --output /work/tmp/editor-input/control-1.json.gz
-```
-
-Use the same frozen directory for all three controls and the independent reference rerun.
-`--core-directory` aliases every `@singapore-editor/core` export to the selected package's `dist`; omitting
-it selects the active `packages/editor` package. It cannot be combined with `--url`.
-The selected path is recorded as `environment.coreDirectory`, without changing the workload config.
-`environment.sourceHash` enumerates the selected `src` tree under canonical `packages/editor/src`
-paths, replacing active core sources while retaining the existing source hashing rules for other
-packages and the runner. The hash identifies source content; keep the preserved source and build
-matched. Moving an identical source tree does not change its identity.
-
-Calibrate and check the independent rerun:
-
-```sh
-node examples/stress/input-compare.mjs calibrate /work/tmp/editor-input/calibration.json.gz /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/control-2.json.gz /work/tmp/editor-input/control-3.json.gz
-node examples/stress/input-compare.mjs check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/rerun.json.gz /work/tmp/editor-input/calibration.json.gz
+node examples/stress/input-compare.mjs calibrate "$run_root/calibration.json.gz" "$run_root/control-1.json.gz" "$run_root/control-2.json.gz" "$run_root/control-3.json.gz"
+node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/rerun.json.gz" "$run_root/calibration.json.gz" --same-build
 ```
 
 Each input limit is the largest control p95 plus the largest of three times the between-run p95
@@ -357,38 +368,42 @@ Playwright transport, and capture overhead. Raw screenshot distributions and cal
 remain in the report, but exceeding those timing limits alone does not fail acceptance.
 Screenshot evidence, changed pixels, rendered text, and revision correctness remain mandatory.
 
-Check a candidate build against those established limits. Preserve the controls and reference rerun:
+Prove the gate catches a real 20 ms pause inside each measured input operation on the **baseline
+build**, before changing the product:
 
 ```sh
-bun run bench:input --repetitions 3 --output /work/tmp/editor-input/candidate.json.gz
-node examples/stress/input-compare.mjs check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/candidate.json.gz /work/tmp/editor-input/calibration.json.gz
+run_input baseline --repetitions 3 --slowdown-ms 20 --output "$run_root/delayed.json.gz"
+node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/delayed.json.gz" "$run_root/calibration.json.gz" --allow-slowdown > "$run_root/delayed-check.json"
+node examples/stress/input-admission.mjs "$run_root/delayed-check.json" "$run_root/delayed.json.gz"
 ```
 
-Prove the gate catches delayed work with a real 20 ms pause inside each measured input operation:
+The delayed comparison must exit with status 1 and fail all 36 dispatch groups. Run admission after
+that expected nonzero comparison; admission must exit with status 0 and report `admitted: true` and
+`full: true`. `--allow-slowdown` permits the explicit delay while requiring baseline package identity.
+
+After implementing the product change, rebuild the public packages and freeze a separate candidate
+set. Keep the instrument and external dependencies unchanged. Check the candidate against the
+preserved controls, then collect its diagnostic phase correlations separately:
 
 ```sh
-bun run bench:input --repetitions 3 --slowdown-ms 20 --output /work/tmp/editor-input/delayed.json.gz
-node examples/stress/input-compare.mjs check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/delayed.json.gz /work/tmp/editor-input/calibration.json.gz --allow-slowdown
+bun run build
+freeze_input_packages candidate
+run_input candidate --repetitions 3 --output "$run_root/candidate.json.gz"
+node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/candidate.json.gz" "$run_root/calibration.json.gz"
+run_input candidate --repetitions 1 --diagnostics --output "$run_root/diagnostic.json.gz"
+node examples/stress/test/verify-input-results.mjs "$run_root"
 ```
 
-The delayed comparison must exit with status 1 and report failed synchronous-duration groups.
-`--allow-slowdown` permits that explicit configuration difference; it does not bypass the gate.
-Collect diagnostic phase correlations separately:
-
-```sh
-bun run bench:input --repetitions 1 --diagnostics --output /work/tmp/editor-input/diagnostic.json.gz
-node examples/stress/test/verify-input-results.mjs /work/tmp/editor-input
-```
-
-Keep the candidate source unchanged for its delayed and diagnostic runs. The proof command checks
-the saved before measurements, controls, independent reference rerun, candidate, delayed run and diagnostic records.
-It writes `verification.json` and `calibration.json.gz`. It fails on missing or incomparable samples,
-incorrect text/revisions/paint, malformed index ranges, listener growth, incomplete context closure,
-reused run identities, or a candidate exceeding the established blocking limits. A valid run that
-exceeds blocking timing limits still writes `verification.json` with `passed: false` and
-`candidateFailures`, then exits with status 1. Screenshot timing excesses appear separately in
-`candidateAdvisories`. Malformed evidence fails before the report is written.
-`.json.gz` stores the same raw records as `.json` using gzip.
+The delayed run stays on the baseline source and build; the diagnostic run stays on the candidate
+source and build. The proof command checks saved before measurements, controls, same-build holdout,
+candidate, full delayed admission and diagnostic records. It writes `verification.json` and
+`calibration.json.gz`. It fails on missing or incomparable samples, incorrect text/revisions/paint,
+malformed index ranges, listener growth, incomplete context closure, reused run identities, or a
+candidate exceeding the established blocking limits. A valid run that exceeds blocking timing
+limits still writes `verification.json` with `passed: false` and `candidateFailures`, then exits
+with status 1. Screenshot timing excesses appear separately in `candidateAdvisories`. Malformed
+evidence fails before the report is written. `.json.gz` stores the same raw records as `.json`
+using gzip.
 
 For a quick probe, add `--input-smoke`. That runs ordinary/single-view cases and marks the artifact
 `smokeOnly`; the acceptance gate rejects it. Use the full suite to accept a change.
