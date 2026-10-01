@@ -6870,7 +6870,8 @@
           "p50": 12.232421875,
           "p95": 25.81689453125
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -8205,7 +8206,8 @@
           "p50": 23.872802734375,
           "p95": 40.1259765625
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -8220,7 +8222,7 @@
           "GPU": 0.7856310000000002,
           "network.mojom.NetworkService": 0.0020000000000000018,
           "storage.mojom.StorageService": 0,
-          "tracing.mojom.TracingService": 0.0000740000000000185
+          "tracing.mojom.TracingService": 7.40000000000185e-5
         },
         "percentOfOneCore": 109.1915026510767,
         "processChurn": false
@@ -8498,7 +8500,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -9456,7 +9459,8 @@
         "submit": 38.34000015258789,
         "acknowledge": 7.220004558563232,
         "drawFrame": 184.50999450683594
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -9471,7 +9475,7 @@
           "GPU": 0.7726359999999999,
           "network.mojom.NetworkService": 0.00039600000000000746,
           "storage.mojom.StorageService": 0,
-          "tracing.mojom.TracingService": 0.000023999999999801958
+          "tracing.mojom.TracingService": 2.3999999999801958e-5
         },
         "percentOfOneCore": 110.02621216726759,
         "processChurn": false
@@ -9749,7 +9753,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -10720,7 +10725,8 @@
         "submit": 36.88501167297363,
         "acknowledge": 6.649991512298584,
         "drawFrame": 172.8699951171875
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -10734,7 +10740,7 @@
           "renderer": 0.1931640000000001,
           "GPU": 0.23930000000000007,
           "network.mojom.NetworkService": 0.0049960000000000004,
-          "storage.mojom.StorageService": 0.000019999999999999185,
+          "storage.mojom.StorageService": 1.9999999999999185e-5,
           "tracing.mojom.TracingService": 0
         },
         "percentOfOneCore": 37.621042160916836,
@@ -11169,7 +11175,8 @@
           "p50": 15.23095703125,
           "p95": 24.10400390625
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -12629,7 +12636,8 @@
           "p50": 15.87060546875,
           "p95": 23.963134765625
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -12643,7 +12651,7 @@
           "renderer": 1.5278970000000007,
           "GPU": 1.1379039999999998,
           "network.mojom.NetworkService": 0.00038199999999999346,
-          "storage.mojom.StorageService": 0.00004099999999999937,
+          "storage.mojom.StorageService": 4.099999999999937e-5,
           "tracing.mojom.TracingService": 0.0002459999999997464
         },
         "percentOfOneCore": 86.88840900365206,
@@ -13066,7 +13074,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -14174,7 +14183,8 @@
         "bufferData": 15.599989891052246,
         "drawElementsInstanced": 11.1850004196167,
         "renderRows": 22.80498504638672
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -14187,9 +14197,9 @@
           "browser": 0.00371900000000025,
           "renderer": 1.6924279999999996,
           "GPU": 1.1142569999999985,
-          "network.mojom.NetworkService": 0.00003399999999997849,
-          "storage.mojom.StorageService": 0.000024000000000003185,
-          "tracing.mojom.TracingService": 0.0000659999999985672
+          "network.mojom.NetworkService": 3.399999999997849e-5,
+          "storage.mojom.StorageService": 2.4000000000003185e-5,
+          "tracing.mojom.TracingService": 6.59999999985672e-5
         },
         "percentOfOneCore": 91.72842553340784,
         "processChurn": false
@@ -14611,7 +14621,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -15722,7 +15733,8 @@
         "bufferData": 19.999993801116943,
         "drawElementsInstanced": 12.754996299743652,
         "renderRows": 26.21002435684204
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -17216,7 +17228,8 @@
           "p50": 20.8955078125,
           "p95": 39.429931640625
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -17230,7 +17243,7 @@
           "renderer": 0.21310099999999962,
           "GPU": 0.2892379999999992,
           "network.mojom.NetworkService": 0.004528000000000032,
-          "storage.mojom.StorageService": 0.00003799999999999637,
+          "storage.mojom.StorageService": 3.799999999999637e-5,
           "tracing.mojom.TracingService": 0.00038200000000188084
         },
         "percentOfOneCore": 39.069723369122045,
@@ -17665,7 +17678,8 @@
           "p50": 15.75341796875,
           "p95": 31.09814453125
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -18793,7 +18807,8 @@
         "bufferData": 16.68999481201172,
         "drawElementsInstanced": 12.224998950958252,
         "renderRows": 25.79000473022461
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -18808,7 +18823,7 @@
           "GPU": 1.1703840000000003,
           "network.mojom.NetworkService": 0.0004609999999999892,
           "storage.mojom.StorageService": 0.0001510000000000053,
-          "tracing.mojom.TracingService": 0.00004899999999707916
+          "tracing.mojom.TracingService": 4.899999999707916e-5
         },
         "percentOfOneCore": 91.25878637125533,
         "processChurn": false
@@ -19230,7 +19245,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -20348,7 +20364,8 @@
         "bufferData": 15.769988536834717,
         "drawElementsInstanced": 11.38999891281128,
         "renderRows": 22.54999876022339
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -20361,8 +20378,8 @@
           "browser": 0.004429999999999268,
           "renderer": 1.6007190000000007,
           "GPU": 1.1197859999999977,
-          "network.mojom.NetworkService": 0.00006100000000003325,
-          "storage.mojom.StorageService": 0.00006599999999999662,
+          "network.mojom.NetworkService": 6.100000000003325e-5,
+          "storage.mojom.StorageService": 6.599999999999662e-5,
           "tracing.mojom.TracingService": 0.000506999999998925
         },
         "percentOfOneCore": 88.80567575284765,
@@ -20785,7 +20802,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -22148,7 +22166,8 @@
           "p50": 23.600830078125,
           "p95": 40.218017578125
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -22453,7 +22472,8 @@
           "p50": 22.7060546875,
           "p95": 26.7880859375
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -23422,7 +23442,8 @@
         "submit": 41.55497169494629,
         "acknowledge": 8.435022830963135,
         "drawFrame": 211.45500326156616
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -23436,7 +23457,7 @@
           "renderer": 2.6030080000000004,
           "GPU": 0.876773,
           "network.mojom.NetworkService": 0.00011200000000000099,
-          "storage.mojom.StorageService": 0.00007000000000000062,
+          "storage.mojom.StorageService": 7.000000000000062e-5,
           "tracing.mojom.TracingService": 0.0002610000000018431
         },
         "percentOfOneCore": 113.62387853965119,
@@ -23715,7 +23736,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -24685,7 +24707,8 @@
         "submit": 38.69999694824219,
         "acknowledge": 6.774993419647217,
         "drawFrame": 175.22501134872437
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -24699,7 +24722,7 @@
           "renderer": 2.705319,
           "GPU": 0.8257919999999999,
           "network.mojom.NetworkService": 0.000128000000000017,
-          "storage.mojom.StorageService": 0.00003599999999999437,
+          "storage.mojom.StorageService": 3.599999999999437e-5,
           "tracing.mojom.TracingService": 0
         },
         "percentOfOneCore": 114.58548629389944,
@@ -24978,7 +25001,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -24993,7 +25017,7 @@
           "GPU": 0.2947950000000006,
           "network.mojom.NetworkService": 0.0048819999999999975,
           "storage.mojom.StorageService": 0,
-          "tracing.mojom.TracingService": 0.00003600000000147929
+          "tracing.mojom.TracingService": 3.600000000147929e-5
         },
         "percentOfOneCore": 44.028257037297045,
         "processChurn": false
@@ -25427,7 +25451,8 @@
           "p50": 23.723876953125,
           "p95": 39.287841796875
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -26876,7 +26901,8 @@
           "p50": 31.02197265625,
           "p95": 47.091064453125
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -26889,8 +26915,8 @@
           "browser": 0.0036269999999980485,
           "renderer": 1.5505439999999997,
           "GPU": 1.1699300000000008,
-          "network.mojom.NetworkService": 0.000053999999999998494,
-          "storage.mojom.StorageService": 0.00003199999999999037,
+          "network.mojom.NetworkService": 5.3999999999998494e-5,
+          "storage.mojom.StorageService": 3.199999999999037e-5,
           "tracing.mojom.TracingService": 0.0005390000000033979
         },
         "percentOfOneCore": 88.74968354298913,
@@ -27313,7 +27339,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -28414,7 +28441,8 @@
         "bufferData": 17.795010089874268,
         "drawElementsInstanced": 11.629997730255127,
         "renderRows": 25.320006370544434
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -28851,7 +28879,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "xterm-webgl",
@@ -29957,7 +29986,8 @@
         "bufferData": 15.644994258880615,
         "drawElementsInstanced": 11.199995040893555,
         "renderRows": 21.505017280578613
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -29971,7 +30001,7 @@
           "renderer": 0.20427499999999996,
           "GPU": 0.2741180000000014,
           "network.mojom.NetworkService": 0.00477099999999997,
-          "storage.mojom.StorageService": 0.00003299999999999137,
+          "storage.mojom.StorageService": 3.299999999999137e-5,
           "tracing.mojom.TracingService": 0.00013600000001190438
         },
         "percentOfOneCore": 36.74092715500344,
@@ -30262,7 +30292,8 @@
           "p50": 30.62890625,
           "p95": 32.912109375
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -31577,7 +31608,8 @@
           "p50": 31.7659912109375,
           "p95": 47.515869140625
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -31591,7 +31623,7 @@
           "renderer": 2.5526999999999997,
           "GPU": 0.8026290000000031,
           "network.mojom.NetworkService": 0,
-          "storage.mojom.StorageService": 0.000024999999999997247,
+          "storage.mojom.StorageService": 2.4999999999997247e-5,
           "tracing.mojom.TracingService": 0.0004860000000093123
         },
         "percentOfOneCore": 108.7433638398521,
@@ -31870,7 +31902,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -32810,7 +32843,8 @@
         "submit": 37.50498008728027,
         "acknowledge": 7.404997825622559,
         "drawFrame": 180.8200273513794
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -32823,8 +32857,8 @@
           "browser": 0.004615000000001146,
           "renderer": 2.530165,
           "GPU": 0.7925700000000049,
-          "network.mojom.NetworkService": 0.00004300000000001525,
-          "storage.mojom.StorageService": 0.000024999999999997247,
+          "network.mojom.NetworkService": 4.300000000001525e-5,
+          "storage.mojom.StorageService": 2.4999999999997247e-5,
           "tracing.mojom.TracingService": 0
         },
         "percentOfOneCore": 107.79836158009485,
@@ -33103,7 +33137,8 @@
           "height": 868,
           "windowState": "normal"
         }
-      }
+      },
+      "cpuIntervalQualified": false
     },
     {
       "variant": "ghostty-webgpu",
@@ -34049,7 +34084,8 @@
         "submit": 37.22001361846924,
         "acknowledge": 6.844996452331543,
         "drawFrame": 172.13998556137085
-      }
+      },
+      "cpuIntervalQualified": false
     }
   ]
 }

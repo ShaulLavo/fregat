@@ -332,3 +332,9 @@ test('a stalled trace drain terminates the window deadline instead of hanging', 
     /deadline exceeded/,
   )
 })
+
+test('mounted probe metadata must match real finite samples', () => {
+  const valid = displaySummary(Array(120).fill(16.67), { visibility: 'visible' })
+  assert.throws(() => assertDisplay({ ...valid, periods: [] }, { idle: false }))
+  assert.throws(() => assertDisplay({ ...valid, median: NaN }, { idle: false }))
+})

@@ -21,6 +21,10 @@ export function assertDisplay(probe, { idle = true, expectedPeriod = 16.67 } = {
     !probe.error &&
       probe.visibility === 'visible' &&
       probe.frameCount >= 20 &&
+      Array.isArray(probe.periods) &&
+      probe.frameCount === probe.periods.length &&
+      Number.isFinite(probe.median) &&
+      probe.median > 0 &&
       probe.periods.every((period) => Number.isFinite(period) && period > 0),
     'Mac display unavailable',
   )
