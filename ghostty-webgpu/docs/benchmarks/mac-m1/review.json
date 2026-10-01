@@ -9,7 +9,7 @@
   ],
   "limits": [
     "The measurement matrix completed 72 cases in 10 minutes 52 seconds: 53 completed rendered cases and 19 failures. Native WebGPU and xterm WebGL completed all their cases.",
-    "ghostty-web 0.4.0 fails in Unicode burst output on both paths at 1, 8, and 17 terminals, and its string parser phase fails at Unicode. Its independently qualified byte parser samples remain reported. Rendered metrics and failed parser batches remain unmeasured.",
+    "ghostty-web 0.4.0 fails in Unicode burst output on the byte path at 1, 8, and 17 terminals and the string path at 8 and 17 terminals. Its one-terminal string parser phase fails at Unicode before reaching burst output. Independently qualified byte parser samples remain reported. Rendered metrics and failed parser batches remain unmeasured.",
     "xterm DOM/string/1, repetition 3, timed out awaiting a captured green glyph. The direct failure screenshot shows the echoed glyph, while the last screencast classifier reported zero green ink. This is a capture qualification failure, not evidence of an xterm renderer failure.",
     "The recorded run used a brightness floor of 150 in its pixel classifier. The current runner recognizes antialiased channel-dominant ink and saves timeout capture images. A later headed correctness-only smoke passed all four renderers and both paths; no timing values from that smoke replace the recorded run. The exact cause of the recorded timeout remains unconfirmed.",
     "Per-10k memory deltas include first ASCII-output and renderer-cache growth. Retained JS/backing storage and WASM capacity are separate buckets; neither is a total-memory measurement."
