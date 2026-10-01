@@ -1,9 +1,9 @@
 # Plan 099 unit 0: native input calibration over consumer configurations
 
-Status: partial, 2026-09-30. The corrected instrument (`a5c0c82b6`) and its identity, admission and
-receipt proofs are complete. The fresh ten-configuration matrix under it has not run. No earlier
-matrix closes unit 0: all of them lack contemporaneous external-byte and per-view current-source
-receipts, and several of their calibrations are invalid under the delayed-control rule below.
+Status: partial, 2026-10-01. The corrected method's identity, admission and receipt proofs are
+complete. Its first fresh matrix (instrument `983233763`) stopped at the first configuration: the
+`native` calibration is invalid because its delayed control was not admitted. No configuration has a
+valid calibration under the corrected method yet, and no earlier matrix closes unit 0.
 
 Evidence: `/work/tmp/fregat-evidence/foundations-documents/native-input/`, with a hashed snapshot of
 every driver, adapter, patch and proof log in `method/` (`SHA256SUMS`). Checklist:
@@ -67,22 +67,24 @@ text, one view's ranges removed, and one minimap view missing an edit while the 
 
 These were measured before the corrections and stay as recorded. None counts toward unit 0.
 
-| Run                                                   | Outcome under the current admission rule                                                                             |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| First matrix, native, minimap, tree-sitter-minimap    | Valid calibration and candidate pass under the old instrument and environment                                        |
-| First matrix, tree-sitter and platform                | Delayed control let a dispatch group pass; calibration invalid, candidate result void                                |
-| First matrix, shiki, shiki-minimap, all               | Partial 72/24 shape (long-line excluded); not a full result                                                          |
-| First and serialized tree-sitter-shiki                | Holdout failed twice; calibration rejected                                                                           |
-| First disabled                                        | Holdout failed; calibration rejected                                                                                 |
-| Serialized disabled                                   | Delayed control let a dispatch group pass; its 106/108 candidate failure was measured against an invalid calibration |
-| Corrected-environment shiki control 1–2 (`5a31d0493`) | Superseded when the review findings stopped the matrix; incomplete                                                   |
+| Run                                                   | Outcome under the current admission rule                                                                                                                                                                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| First matrix, native, minimap, tree-sitter-minimap    | Valid calibration and candidate pass under the old instrument and environment                                                                                                                                                                                             |
+| First matrix, tree-sitter and platform                | Delayed control let a dispatch group pass; calibration invalid, candidate result void                                                                                                                                                                                     |
+| First matrix, shiki, shiki-minimap, all               | Partial 72/24 shape (long-line excluded); not a full result                                                                                                                                                                                                               |
+| First and serialized tree-sitter-shiki                | Holdout failed twice; calibration rejected                                                                                                                                                                                                                                |
+| First disabled                                        | Holdout failed; calibration rejected                                                                                                                                                                                                                                      |
+| Serialized disabled                                   | Delayed control let a dispatch group pass; its 106/108 candidate failure was measured against an invalid calibration                                                                                                                                                      |
+| Corrected-environment shiki control 1–2 (`5a31d0493`) | Superseded when the review findings stopped the matrix; incomplete                                                                                                                                                                                                        |
+| Fresh matrix, `native` (`983233763`)                  | Delayed control not admitted: long-line/multiple/paste dispatch p95 27.3 ms (max 28.1) under a limit of 37.5 ms, widened by control-3 (p95 14.1 ms against 6.3, 6.4 and holdout 6.7). Calibration invalid, candidate not run. Diagnosis in `calibration-native-causal.md` |
 
 The old Shiki long-line runs also record the pre-prerequisite product: the Shiki worker never
 finished the one-megabyte line and its disposal stalled.
 
 ## Limits
 
-- The fresh matrix has not run; no latency result exists for the corrected method yet.
+- No configuration has a valid calibration under the corrected method; no latency result exists for it yet.
+- Unwrapped peer jobs on the host are not excluded by the wave slots; while they run, measured runs share the host with them. Each run records a per-group CPU estimate for its pinned cores (correlation evidence only).
 - Build tools and the browser binary are identified by version, not by bytes.
 - Tree-sitter above the analysis limit, language servers, worker and WASM memory, and pixel-level
   comparison of every token are not measured here.
