@@ -7,11 +7,15 @@ import { create } from 'zustand'
  * conversation on the next frame, while opening its folder in the editor has to stat
  * the path first. Both read this store, so they agree on the destination even while
  * the editor is still catching up — and a slow earlier open can tell it lost by
- * checking whether its own root is still the active one.
+ * checking whether it still holds its own activation.
  *
  * Null means "wherever the editor is": on a cold start nothing has been activated yet.
  */
-type ActiveProject = { readonly workspaceRoot: string | null }
+type ActiveProject = {
+  readonly workspaceRoot: string | null
+  /** Set when the open behind this activation gives up: the activation it replaced. */
+  abandonedFor?: ActiveProject
+}
 
 export const useActiveProjectStore = create<ActiveProject>()(() => ({ workspaceRoot: null }))
 
@@ -21,23 +25,20 @@ export function activateWorkspaceRoot(workspaceRoot: string | null): ActiveProje
   return useActiveProjectStore.getState()
 }
 
-/** False once a later activation has superseded this one. */
-export function isActiveWorkspaceRoot(workspaceRoot: string) {
-  return useActiveProjectStore.getState().workspaceRoot === workspaceRoot
+/** False once a later activation, even of the same root, has superseded this one. */
+export function holdsActiveProject(activation: ActiveProject) {
+  return useActiveProjectStore.getState() === activation
 }
-
-// An abandoned activation points at the one it replaced, so a later rollback skips past it.
-const abandoned = new WeakMap<ActiveProject, ActiveProject>()
 
 /**
  * Gives up an activation that never landed. While it still holds the project, the project goes
  * back to the last activation before it that was not abandoned. False when a later claim holds it.
  */
 export function releaseActiveProject(activation: ActiveProject, previous: ActiveProject) {
-  abandoned.set(activation, previous)
-  if (useActiveProjectStore.getState() !== activation) return false
+  activation.abandonedFor = previous
+  if (!holdsActiveProject(activation)) return false
   let target = previous
-  for (let next = abandoned.get(target); next; next = abandoned.get(target)) target = next
+  while (target.abandonedFor) target = target.abandonedFor
   restoreActiveProject(target)
   return true
 }

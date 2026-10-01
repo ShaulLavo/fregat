@@ -16,7 +16,7 @@ import { recordRecentMutationOptions } from '@/features/workspace/utils/record-r
 import { openWorkspaceRootMutationOptions } from '@/features/workspace/utils/open-root-mutation'
 import {
   activateWorkspaceRoot,
-  isActiveWorkspaceRoot,
+  holdsActiveProject,
   releaseActiveProject,
   useActiveProjectStore,
 } from '@/features/workspace/state/active-project'
@@ -70,7 +70,7 @@ export async function openWorkspaceRootForOwner(
     // A later request already claimed the app; landing now would drag it back.
     if (activity.aborted) return abandon('aborted')
     if (options.isCurrent?.() === false) return abandon('not-current')
-    if (!isActiveWorkspaceRoot(workspaceRoot)) return abandon('claimed')
+    if (!holdsActiveProject(activation)) return abandon('claimed')
     confirmedEnvironmentId(origin)
     const entry = result.entry
     // Still this open's activation: a switch that throws must hand the project back.
