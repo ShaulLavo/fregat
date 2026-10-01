@@ -67,6 +67,32 @@ describe('settings mutation schemas', () => {
     )
   })
 
+  it('validates and applies whole-record machine preferences through scalar mutations', () => {
+    const value = {
+      '00000000-0000-4000-8000-000000000001': 'prefer',
+      '00000000-0000-4000-8000-000000000002': 'normal',
+      '00000000-0000-4000-8000-000000000003': 'less-often',
+      '00000000-0000-4000-8000-000000000004': 'manual-only',
+    } as const
+    const input: ScalarSettingOperation = {
+      kind: 'set',
+      key: 'environments.loadPreferences',
+      value,
+    }
+    expect(descriptorFor(input.key).widget).toBe('record')
+    expect(parseRequest([input]).success).toBe(true)
+    const result = applyIdempotently({ 'files.showHidden': true }, operation(input))
+    expect(result.raw).toEqual({
+      'files.showHidden': true,
+      'environments.loadPreferences': value,
+    })
+    expect(result.touchedSettingIds).toEqual(['environments.loadPreferences'])
+    expect(
+      parseRequest([{ ...input, value: { [Object.keys(value)[0]!]: 'unsupported' } }]).success,
+    ).toBe(false)
+    expect(parseRequest([{ ...input, value: 'prefer' }]).success).toBe(false)
+  })
+
   it('narrows scalar values by key and exposes no generic collection replacement or toggle', () => {
     expect(
       v.safeParse(settingsOperationSchema, {

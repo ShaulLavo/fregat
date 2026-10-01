@@ -333,7 +333,7 @@ export const SETTINGS_REGISTRY = {
     schema: v.record(v.string(), v.picklist(['prefer', 'normal', 'less-often', 'manual-only'])),
     default: {},
     scope: 'application',
-    widget: 'complex',
+    widget: 'record',
     merge: 'record',
     category: 'Machines',
     title: 'Machine selection preferences',
