@@ -220,6 +220,7 @@ import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
 import { filePickerLocations } from './file-picker-locations'
 import { filePickerAppearance } from './file-picker-appearance'
+import { quickOpenCrlfPreview } from './quick-open-crlf-preview'
 import { quickOpenPreview } from './quick-open-preview'
 import { themeStudio } from './theme-studio'
 import { themeStudioSettings } from './theme-studio-settings'
@@ -607,6 +608,7 @@ export const scenarios: readonly Scenario[] = [
   themeStudioPreview,
   themeStudioAsync,
   quickOpenPreview,
+  quickOpenCrlfPreview,
   themeStudio,
   themeStudioSettings,
   themeStudioLibrary,

@@ -27,3 +27,5 @@ The index never scans a symlinked directory and the watcher cannot see into one,
 `scenario palette-scripts-pending` holds filesystem reads for 1.5 s and opens script mode (`run `). The pending step must show one skeleton row under "From package.json" and never "No scripts in this project."
 
 `scenario quick-open-preview` types a file name and requires the highlighted file's first lines in the preview under the results.
+
+`scenario quick-open-crlf-preview` turns the preview on, previews a CRLF TypeScript file and labels its step `lines-3-misaligned-N`. N must be 0: each line's first coloured span is a whole `const`. Any other count means highlight offsets drifted on the CRLF separators.
