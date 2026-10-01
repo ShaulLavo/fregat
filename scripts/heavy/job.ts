@@ -42,6 +42,12 @@ export function localCommand({
     '--quiet',
     `--unit=${unit}`,
     `--slice=${slice}`,
+    // systemd-run expands `$VAR` in the command itself, mangling `${x%y}` and `$$`.
+    '--expand-environment=no',
+    // The default `stop` SIGTERMs the scope after an OOM kill, and a second OOM during that
+    // stop SIGKILLs the shim, losing the record. The kernel still kills only the offender.
+    '-p',
+    'OOMPolicy=continue',
     'bash',
     SCOPE_SHIM,
     '--slice',

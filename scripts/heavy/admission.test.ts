@@ -226,6 +226,35 @@ describe.skipIf(!userScopes)('the job slice', () => {
     expect(recordOf(box, 'case')?.memoryPeakBytes).toBeGreaterThanOrEqual(casePeak)
   }, 30_000)
 
+  test('the job scope keeps running through an OOM kill, so its shim survives to record', async () => {
+    const box = sandbox()
+    const script = 'systemctl --user show -p OOMPolicy --value "${HEAVY_JOB_SLICE%.slice}.scope"'
+    const job = start(box, 'policy', ['bash', '-c', script], { jobClass: 'light' })
+    await job.done
+    expect(job.stdout()).toBe('continue\n')
+  }, 30_000)
+
+  test('a job whose own command is OOM-killed still gets its record', async () => {
+    const box = sandbox()
+    writeSettings(box, { 'developer.heavyJobClasses': classes })
+    const overflow = `bun -e 'Buffer.alloc(600 * 2 ** 20, 1)'; echo "exit $?"`
+    const job = start(box, 'own-oom', ['bash', '-c', overflow], { jobClass: 'light' })
+    await job.done
+    expect(job.stdout()).toContain('exit 137')
+    expect(recordOf(box, 'own-oom')?.oomKills).toBeGreaterThanOrEqual(1)
+  }, 30_000)
+
+  test('the command reaches the job as given, with no systemd expansion', async () => {
+    const box = sandbox()
+    const literal = ['printf', '%s|%s\n', '${HEAVY_JOB_SLICE%.slice}', '$$']
+    const direct = start(box, 'literal', literal, { jobClass: 'light' })
+    await direct.done
+    expect(direct.stdout()).toBe('${HEAVY_JOB_SLICE%.slice}|$$\n')
+    const nested = start(box, 'nested-literal', [NESTED, ...literal], { jobClass: 'light' })
+    await nested.done
+    expect(nested.stdout()).toBe('${HEAVY_JOB_SLICE%.slice}|$$\n')
+  }, 30_000)
+
   test('the slice is stopped and its ceiling drop-in removed after the job', async () => {
     const box = sandbox()
     await heavy(box, 'tidy', ['true'], { jobClass: 'light' })
