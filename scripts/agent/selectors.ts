@@ -1386,6 +1386,8 @@ export async function chooseColorMode(page: Page, value: 'light' | 'dark' | 'sys
  * capped at a second. Looping spinners and paused animations are left alone.
  */
 export async function settleRunningAnimations(page: Page, capMs = 1_000) {
+  const cap = Promise.withResolvers<void>()
+  const timer = setTimeout(cap.resolve, capMs)
   await Promise.race([
     page.evaluate(async () => {
       const finite = document
@@ -1397,8 +1399,8 @@ export async function settleRunningAnimations(page: Page, capMs = 1_000) {
         )
       await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)))
     }),
-    new Promise((resolve) => setTimeout(resolve, capMs)),
-  ])
+    cap.promise,
+  ]).finally(() => clearTimeout(timer))
 }
 
 /** Two frames, then every running animation under the target. Collapsed panels animate open. */

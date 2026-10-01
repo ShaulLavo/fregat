@@ -777,7 +777,7 @@ async function open(page: Page, url: string) {
   try {
     await waitForApp(page)
     mark('ready')
-    await page.waitForTimeout(1_500)
+    await settleRunningAnimations(page)
     mark('settled')
     return true
   } catch {
