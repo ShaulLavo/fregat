@@ -5,6 +5,9 @@
 - Status: APPROVED 2026-10-01. Carries the unfinished parts 3 and 4 of the retired ghostty-webgpu
   Plan 017, whose parts 1 and 2 shipped as #219 (xterm facade removed, 0.2.0) and #218 (native
   history reads).
+- Results stay private until Plan 283 lands (owner, 2026-10-01): the first Mac run lives in
+  `/work/reports/ghostty-benchmarks/2026-10-01-mac-m1/`; the repo gets only the runner. Section 2's
+  README case waits for Plan 283's numbers.
 - Part 1 is in progress: a comparison runner is being built, with real measurements on the owner's
   MacBook (Apple M1) over mesh host `mac`, only on AC power.
 
