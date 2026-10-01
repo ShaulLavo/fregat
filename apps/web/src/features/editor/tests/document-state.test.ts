@@ -25,6 +25,17 @@ import {
 } from '@singapore-editor/core/editor'
 
 describe('editor document store state identity', () => {
+  it('rejects binary file registration and replacement without a text buffer or dirty state', () => {
+    const store = createEditorDocumentStore()
+    const binary = { ...fileResult('/repo/data.txt'), seemsBinary: true }
+    expect(() => store.getState().ensureEditorView(tabId('binary'), binary)).toThrow()
+    expect(() => store.getState().ensureLiveEditorDocument(binary)).toThrow()
+    expect(() => store.getState().forceReplaceLiveEditorDocument(binary)).toThrow()
+    expect(store.getState().liveDocumentsByKey).toEqual({})
+    expect(store.getState().viewsByTabId).toEqual({})
+    expect(store.getState().dirtyDocumentKeys.size).toBe(0)
+  })
+
   it('keeps unrelated slices referentially stable across scroll updates', () => {
     const store = createEditorDocumentStore()
     store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))

@@ -1,6 +1,7 @@
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig, type Plugin } from 'vitest/config'
 import type { BrowserCommand } from 'vitest/node'
+import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
 import { workspaceRoot } from '../../scripts/workspace-root'
 
 // Outages live in the dev server, shared by every test file: a Playwright route resolves before
@@ -69,7 +70,7 @@ export default defineConfig({
             'shiki/core',
           ],
         },
-        plugins: [grammarOutages],
+        plugins: [browserTestResponses(), grammarOutages],
         test: {
           name: 'browser',
           include: ['test/**/*.browser.test.ts'],

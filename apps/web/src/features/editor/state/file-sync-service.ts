@@ -1,6 +1,7 @@
 import { materializeFileSnapshotText, type FileSnapshot } from '@/lib/file-snapshot'
-import { createClientInvariantError } from '@/lib/structured-errors'
+import { createBinaryFileError, createClientInvariantError } from '@/lib/structured-errors'
 import { decodedAsText } from '@workspace/contracts'
+import { pieceTableDocumentText } from '@singapore-editor/core/document'
 
 import type {
   LiveEditorDocument,
@@ -196,6 +197,7 @@ export class FileSyncService {
   ): Promise<WorkspaceFileSnapshot> {
     signal.throwIfAborted()
     const file = await this.ports.readFileContent(path, signal)
+    if (file.seemsBinary) throw createBinaryFileError(file.size)
     signal.throwIfAborted()
     return {
       byteLength: file.size,
@@ -217,13 +219,14 @@ export class FileSyncService {
     const path = document.target.resource.path
     const textSnapshot = document.buffer.getTextSnapshot()
     const text = textSnapshot.materializeFullText()
+    const diskText = pieceTableDocumentText(document.buffer.getSnapshot())
     const savedContentRevision = document.contentRevision
     // Issued, not random, so the watcher echo of this write classifies as ours.
     const writeId = this.issueWriteId()
     const identity = { origin: 'editor', writeId }
     const entry = sync.orphaned
-      ? await this.ports.recreateFileContent(path, text, identity)
-      : await this.ports.writeFileContent(path, text, {
+      ? await this.ports.recreateFileContent(path, diskText, identity)
+      : await this.ports.writeFileContent(path, diskText, {
           baseVersion: sync.fileVersion,
           expectedMtimeMs: sync.mtimeMs,
           ...identity,
@@ -580,7 +583,7 @@ export class FileSyncService {
       const cached = this.queryClient.getQueryData<FileSnapshot>(
         fileSystemKeys.fileSnapshot(rename.from),
       )
-      if (cached && !candidates.has(rename.to))
+      if (cached && !cached.seemsBinary && !candidates.has(rename.to))
         candidates.set(rename.to, materializeFileSnapshotText(cached))
       candidates.delete(rename.from)
     }
