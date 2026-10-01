@@ -1,3 +1,4 @@
+import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { offerSessionUndo } from '@/features/chat-mode/state/session-undo'
 import { useSessionUndoStore } from '@/features/chat-mode/state/session-undo-history'
 import { sessionLifecycleUndoEntry } from '@workspace/client-core/chat/rail/lifecycle-undo'
@@ -32,6 +33,7 @@ import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environ
 import { railOrderOverrides } from '@/features/chat-mode/state/rail-order-intents'
 import {
   createSessionLifecycleCommand,
+  createSessionPlaceCommand,
   createSessionArchiveCommand,
 } from '@workspace/client-core/chat/commands'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
@@ -359,4 +361,41 @@ test('a session drop waits behind a running Undo step', async ({ client, server 
   expect(
     (await h.refresh()).sessions.find((session) => session.id === h.sessionIds[0])?.pinOrderKey,
   ).not.toBeNull()
+})
+
+test('a filtered pinned drop reserves a snoozed sibling key and materializes visible keyless neighbors', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server, [
+    'Visible moved',
+    'Visible target',
+    'Hidden sibling',
+  ])
+  for (const sessionId of h.sessionIds.slice(0, 2))
+    await h.dispatch(createSessionLifecycleCommand(sessionId, { type: 'pin' }))
+  const snoozedUntil = new Date(Date.now() + 60_000).toISOString()
+  await h.dispatch(createSessionPlaceCommand({ sessionId: h.sessionIds[2]!, orderKey: 'n' }))
+  await h.dispatch(
+    createSessionLifecycleCommand(h.sessionIds[2]!, { type: 'snooze', snoozedUntil }),
+  )
+  await h.refresh()
+  useSessionRailStore.getState().setQuery('Visible')
+  const [first, second, hidden] = h.sessionIds
+  const key = (sessionId: typeof first) =>
+    scopedSessionKey({ environmentId: h.environmentId, sessionId: sessionId! })
+  const outcome = await reorderRailSession({ activeId: key(first), overId: key(second) })
+  expect(outcome?.ok).toBe(true)
+  const sessions = (await h.refresh()).sessions
+  expect(sessions.find((session) => session.id === first)?.pinOrderKey).not.toBeNull()
+  expect(sessions.find((session) => session.id === second)?.pinOrderKey).not.toBeNull()
+  expect(sessions.find((session) => session.id === hidden)?.pinOrderKey).toBe('n')
+  expect(sessions.find((session) => session.id === hidden)?.snoozedUntil).toBe(snoozedUntil)
+  expect(new Set(sessions.map((session) => session.pinOrderKey)).size).toBe(3)
+  expect(
+    sessionRailModel({ environments: currentRailEnvironments(), query: 'Visible' }).sessions.map(
+      (row) => row.id,
+    ),
+  ).toEqual([first, second])
+  expect(railOrderOverrides().sessionLifecycleByKey).toEqual({})
 })
