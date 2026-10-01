@@ -1,3 +1,4 @@
+import { copiedFrameRow } from '../frame.js'
 import { RenderStateDirty } from '../../core/abi.js'
 import type { RenderCursorSnapshot, RenderRow } from '../../core/types.js'
 import type { TerminalFittedFont } from '../../term/types.js'
@@ -74,13 +75,6 @@ function cursorEquals(left: RenderCursorSnapshot, right: RenderCursorSnapshot): 
   )
 }
 
-function copiedFrameRow(row: RenderRow): RendererFrameRow {
-  const cells = Object.freeze(row.cells.map((cell) => cell.text.slice()))
-  const continuations = Object.freeze(row.cells.map((cell) => cell.continuation))
-  const text = cells.map((cell, index) => (continuations[index] ? '' : cell || ' ')).join('')
-  return Object.freeze({ cells, continuations, text, y: row.y })
-}
-
 export class WebGlTerminalRenderer {
   readonly backend = 'webgl2' as const
   readonly metrics: RendererMetrics = {
@@ -115,6 +109,7 @@ export class WebGlTerminalRenderer {
   private readonly onError?: (cause: unknown) => void
   private readonly onContextLost?: () => void
   private readonly onFrame?: (snapshot: RendererFrameSnapshot) => void
+  private readonly onRowsPainted?: (rows: readonly RenderRow[]) => void
   private readonly overlayRows = new Set<number>()
   private rasterizer: CanvasGlyphRasterizer
   private readonly renderState: RenderStateSource
@@ -138,6 +133,7 @@ export class WebGlTerminalRenderer {
     this.onError = options.onError
     this.onContextLost = options.onContextLost
     this.onFrame = options.onFrame
+    this.onRowsPainted = options.onRowsPainted
     this.cursorBlinkPreference = options.cursorBlink ?? false
     this.themeInput = mergeRendererTheme(options.theme)
     this.theme = canonicalRendererTheme(this.themeInput)
@@ -391,6 +387,7 @@ export class WebGlTerminalRenderer {
     this.needsFullRebuild = false
     this.overlayRows.clear()
     this.emitFrame(rows)
+    this.onRowsPainted?.(rows)
   }
 
   private rebuildRows(rows: readonly RenderRow[]): readonly RowInstanceUpdate[] {
