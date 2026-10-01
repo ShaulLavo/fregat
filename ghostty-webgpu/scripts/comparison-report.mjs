@@ -43,9 +43,10 @@ export function summaries(artifact) {
     groups.get(key).values.push(value)
   }
   for (const run of artifact.runs) {
-    if (run.error) continue
+    if (run.error && !run.parseQualified) continue
     for (const [name, sample] of Object.entries(run.parse ?? {}))
       add(run, `parse/${name}`, sample.bytes / sample.milliseconds / 1000, 'MB/s')
+    if (run.error) continue
     for (const name of ['write', 'input']) {
       if (!run.latency?.[name]?.length) continue
       add(run, `${name}/p50`, quantile(run.latency[name], 0.5), 'ms')
@@ -241,7 +242,7 @@ export function markdown(artifact) {
     'Firefox and Safari were not measured. This run qualifies headed Chromium on the recorded hardware only.',
     'The corpus and font hashes, raw latency samples, raw frame intervals, process CPU snapshots, memory buckets,',
     'actual execution order, and failed cases are retained in JSON.',
-    'A failed case is excluded from timing summaries. A metric appears in the tables only after all three repetitions complete.',
+    'Completed isolated parser samples remain valid when a later rendered case fails. Other metrics from failed cases are excluded. A metric appears in the tables only after all three repetitions complete.',
     '',
   )
   for (const run of artifact.runs.filter((run) => run.error))

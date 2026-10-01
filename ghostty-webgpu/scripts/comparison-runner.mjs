@@ -271,6 +271,17 @@ async function measure(testCase, repetition, browserSession) {
     if (!smoke && testCase.variant === 'ghostty-webgpu')
       assert(info.adapter?.fallback === false, 'Software WebGPU adapter rejected')
     run.info = info
+    if (!smoke && testCase.count === 1) {
+      run.parse = {}
+      for (const { name, bytes } of manifest.fixtures) {
+        await page.evaluate((name) => window.__compare.parse(name, 8192), name)
+        run.parse[name] = await page.evaluate(
+          ({ name, bytes }) => window.__compare.parse(name, bytes),
+          { name, bytes },
+        )
+      }
+      run.parseQualified = true
+    }
     if (!smoke) {
       const initial = await memory(page, session, browserSession)
       run.historyLengths = await page.evaluate(() => window.__compare.history())
@@ -330,16 +341,6 @@ async function measure(testCase, repetition, browserSession) {
       ...outputSample,
       cpu: cpu(beforeOutput, await processCpu(browserSession), outputMs),
     }
-    if (testCase.count === 1) {
-      run.parse = {}
-      for (const { name, bytes } of manifest.fixtures) {
-        await page.evaluate((name) => window.__compare.parse(name, 8192), name)
-        run.parse[name] = await page.evaluate(
-          ({ name, bytes }) => window.__compare.parse(name, bytes),
-          { name, bytes },
-        )
-      }
-    }
     assert.deepEqual(errors, [])
     return run
   } catch (error) {
@@ -355,7 +356,14 @@ async function measure(testCase, repetition, browserSession) {
         })),
       }))
       .catch(() => null)
-    await page.screenshot({ path: join(output, 'failure.png') }).catch(() => {})
+    await page
+      .screenshot({
+        path: join(
+          output,
+          `failure-${testCase.variant}-${testCase.path}-${testCase.count}-${repetition}.png`,
+        ),
+      })
+      .catch(() => {})
     return run
   } finally {
     await context.close()

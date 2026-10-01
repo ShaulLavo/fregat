@@ -58,3 +58,19 @@ test('results take medians across repetitions and preserve negative memory noise
 test('software smoke never produces a results document', () => {
   assert.throws(() => markdown({ smoke: true, hardware: false }))
 })
+
+test('qualified parser measurements survive a later rendering failure', () => {
+  const run = {
+    variant: 'ghostty-web',
+    path: 'bytes',
+    count: 1,
+    error: 'history failed',
+    parseQualified: true,
+    parse: { ascii: { bytes: 1_000_000, milliseconds: 100 } },
+    latency: { write: [1, 2] },
+  }
+  const rows = summaries({ runs: [run] })
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].metric, 'parse/ascii')
+  assert.equal(rows[0].median, 10)
+})
