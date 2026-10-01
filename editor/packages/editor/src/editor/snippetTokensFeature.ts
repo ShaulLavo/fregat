@@ -1,4 +1,3 @@
-import { createDocumentTextSnapshot } from '../documentTextSnapshot'
 import { createEditorCapabilityToken, type EditorPluginHost } from '../plugins'
 import { type EditorDisposable } from './disposables'
 import {
@@ -6,8 +5,7 @@ import {
   type EditorHighlighterSession,
   type EditorHighlighterSessionOptions,
 } from '../syntax/highlighter'
-import { createPieceTableSnapshot } from '@singapore-editor/textbuffer'
-import { toEditorTokenStore } from '../syntax/tokenStore'
+import { createSnippetDocument } from '../syntax/snippetDocument'
 import type {
   EditorSyntaxLanguageId,
   EditorSyntaxProvider,
@@ -63,13 +61,12 @@ async function tokenizeSnippet(
 ): Promise<readonly EditorToken[]> {
   if (text.length === 0) return []
 
-  const snapshot = createPieceTableSnapshot(text)
-  const textSnapshot = createDocumentTextSnapshot(snapshot, text)
+  const snippet = createSnippetDocument(text)
   const document = {
     documentId: `editor-snippet-${nextSnippetId}`,
     languageId,
-    snapshot,
-    textSnapshot,
+    snapshot: snippet.snapshot,
+    textSnapshot: snippet.textSnapshot,
   }
   nextSnippetId += 1
 
@@ -83,8 +80,8 @@ async function tokenizeSnippet(
   if (!session) return []
 
   try {
-    const result = await session.refresh(textSnapshot)
-    return toEditorTokenStore(result.tokens).toTokens()
+    const result = await session.refresh(snippet.textSnapshot)
+    return snippet.submittedTokens(result.tokens)
   } finally {
     session.dispose()
   }

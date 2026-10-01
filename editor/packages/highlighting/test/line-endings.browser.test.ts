@@ -29,11 +29,13 @@ const PALETTE: HighlightTheme = {
 
 // Each separator kind, a terminated last line and an unterminated one. A CR not before an LF is
 // line text, as Shiki splits lines, so `const` after it still starts a statement thanks to `;`.
+// A byte order mark and U+2028 are line text too, so no offset moves around them.
 const TEXTS = {
   crlf: 'const a = 1;\r\nconst b = 2;\r\nconst c = 3;',
   'crlf terminated': 'const a = 1;\r\nconst b = 2;\r\n',
   'lone cr': 'const a = 1;\rconst b = 2;\r',
   mixed: 'const a = 1;\r\nconst b = 2;\nconst c = 3;\rconst d = 4;\r\n\r\nconst e = 5;',
+  'byte order mark and line separator': '\uFEFFconst a = 1;\u2028const b = 2;\r\nconst c = 3;',
 } as const
 
 const cleanups: (() => Promise<void> | void)[] = []
