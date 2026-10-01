@@ -8,8 +8,11 @@ import {
   parseForgeJson,
   perBranch,
   requireSuccess,
+  requireCommentPosted,
+  requireReviewSubmitted,
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
+import { parseGitlabCommits, parseGitlabDiscussions } from './activity'
 
 const mergeRequestSchema = v.object({
   iid: v.pipe(v.number(), v.integer(), v.minValue(1)),
@@ -31,6 +34,86 @@ const projectSchema = v.object({
 /** `glab`, bound to the selected repository on every request. */
 export const gitlab: ForgeProvider = {
   kind: 'gitlab',
+  async activity(context, number) {
+    const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}`
+    const read = async (path: string) =>
+      requireSuccess(
+        context,
+        await glab(context, ['api', `${endpoint}/${path}?per_page=100`]),
+        `activity-${path}`,
+      ).stdout
+    const [commits, discussions] = await Promise.all([read('commits'), read('discussions')])
+    return {
+      reviews: { kind: 'unsupported', reason: 'Open GitLab for approval history.' },
+      commits: parseGitlabCommits(context, commits),
+      discussions: parseGitlabDiscussions(context, discussions),
+    }
+  },
+  discussion: {
+    async read(context, number) {
+      const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}/notes`
+      const result = requireSuccess(
+        context,
+        await glab(context, ['api', `${endpoint}?per_page=100&sort=asc&order_by=created_at`]),
+        'comments',
+      )
+      const rows = parseForgeJson(
+        context,
+        v.array(
+          v.object({
+            id: v.number(),
+            body: v.string(),
+            created_at: v.string(),
+            system: v.boolean(),
+            type: v.nullable(v.string()),
+            position: v.optional(v.nullable(v.object({ position_type: v.string() }))),
+            author: v.object({ username: v.string() }),
+          }),
+        ),
+        result.stdout,
+        'comments',
+      )
+      return {
+        comments: rows
+          .filter((row) => !row.system && row.type === null && row.position == null)
+          .map((row) => ({
+            id: String(row.id),
+            body: row.body,
+            author: row.author.username,
+            createdAt: row.created_at,
+            url: null,
+          })),
+        truncated: rows.length === 100,
+      }
+    },
+    write: {
+      kind: 'supported',
+      async post(context, number, body) {
+        const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}/notes`
+        requireCommentPosted(context, await glabPost(context, endpoint, { body }))
+      },
+    },
+  },
+  review: {
+    kind: 'supported',
+    verdicts: ['comment', 'approve'],
+    async submit(context, number, input) {
+      const endpoint = `projects/${encodeURIComponent(context.repository ?? '')}/merge_requests/${number}`
+      if (input.body.trim())
+        requireReviewSubmitted(
+          context,
+          await glabPost(context, `${endpoint}/notes`, { body: input.body }),
+          'summary',
+        )
+      // GitLab has no pending review: a refused summary must prevent approval.
+      if (input.verdict === 'approve')
+        requireReviewSubmitted(
+          context,
+          await glabPost(context, `${endpoint}/approve`, {}),
+          'verdict',
+        )
+    },
+  },
   async support(context) {
     return cliSupport(await glab(context, ['auth', 'status', '--hostname', context.forge.host]))
   },
@@ -149,12 +232,12 @@ async function namespaceIdOf(context: ForgeContext, namespace: string) {
   return parseForgeJson(context, v.object({ id: v.number() }), result.stdout, 'namespace').id
 }
 
-function glab(context: ForgeContext, args: readonly string[]) {
-  return forgeCommand(context, [
-    'glab',
-    ...args,
-    ...(args[0] === 'api' ? ['--hostname', context.forge.host] : []),
-  ])
+function glab(context: ForgeContext, args: readonly string[], input?: string) {
+  return forgeCommand(
+    context,
+    ['glab', ...args, ...(args[0] === 'api' ? ['--hostname', context.forge.host] : [])],
+    input === undefined ? {} : { input },
+  )
 }
 
 function toPullRequest(request: v.InferOutput<typeof mergeRequestSchema>): GitPullRequest {
@@ -172,4 +255,21 @@ function mergeRequestState(state: string): GitPullRequest['state'] {
   const normalized = state.toLowerCase()
   if (normalized === 'merged' || normalized === 'closed') return normalized
   return 'open'
+}
+
+function glabPost(context: ForgeContext, endpoint: string, payload: unknown) {
+  return glab(
+    context,
+    [
+      'api',
+      '--method',
+      'POST',
+      endpoint,
+      '--input',
+      '-',
+      '--header',
+      'Content-Type: application/json',
+    ],
+    JSON.stringify(payload),
+  )
 }

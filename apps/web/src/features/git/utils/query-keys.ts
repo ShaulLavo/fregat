@@ -7,3 +7,11 @@ export const historyKeys = {
 }
 
 export const disabledDiffQueryKey = ['git', 'diffs', 'disabled'] as const
+
+export const pullRequestDiscussionKeys = {
+  dialogModule: [...gitKeys.all, 'discussion-dialog-module'] as const,
+  activity: (path: string, number: number) =>
+    [...gitKeys.all, 'pull-request-activity', path, number] as const,
+  comments: (path: string, number: number) =>
+    [...gitKeys.all, 'pull-request-comments', path, number] as const,
+}

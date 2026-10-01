@@ -211,8 +211,8 @@ test('native answer history preserves question order, nested choices and file re
           {
             type: 'file',
             id: 'history-file',
-            name: 'spec.pdf',
-            mimeType: 'application/pdf',
+            name: 'spec.zip',
+            mimeType: 'application/zip',
             sizeBytes: 40,
           },
         ],
@@ -227,10 +227,10 @@ test('native answer history preserves question order, nested choices and file re
   expect(screen.getByText('Repository, Tests')).toBeVisible()
   expect(screen.getByText('Use the attached spec.')).toBeVisible()
   expect(screen.getByText('Provide a spec')).toBeVisible()
-  await userEvent.click(screen.getByRole('button', { name: 'spec.pdf' }))
-  expect(screen.getByRole('dialog', { name: 'spec.pdf' })).toBeVisible()
-  expect(screen.getByRole('link', { name: 'Download spec.pdf' })).toHaveAttribute(
+  await userEvent.click(screen.getByRole('button', { name: 'spec.zip' }))
+  expect(screen.getByRole('dialog', { name: 'spec.zip' })).toBeVisible()
+  expect(screen.getByRole('link', { name: 'Download spec.zip' })).toHaveAttribute(
     'download',
-    'spec.pdf',
+    'spec.zip',
   )
 })

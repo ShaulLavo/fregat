@@ -13,7 +13,9 @@ export function DraftBranchMenu({
   rootPath,
   value,
   onSelect,
+  pending,
 }: {
+  readonly pending: boolean
   readonly rootPath: string
   /** The branch the new worktree starts from. */
   readonly value: string
@@ -26,6 +28,7 @@ export function DraftBranchMenu({
           <Button
             aria-label='Start from branch'
             className='text-muted-foreground min-w-0 gap-1 text-xs font-normal'
+            disabled={pending}
             size='sm'
             title={`New worktree starts from ${value}`}
             type='button'

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -12,34 +12,65 @@ import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import {
+  bootSeconds,
+  chargeOf,
   decide,
+  decideQuiet,
   drainRequest,
   legacyHold,
-  liveSlices,
+  orphanSlices,
   readReadings,
+  sliceState,
   type Limits,
+  type LiveSlice,
 } from './admission'
-import { HOSTS, isHost, reapSlice, startJob, type Host, type JobOutcome, type JobSpec } from './job'
+import {
+  HOSTS,
+  isHost,
+  reapSlice,
+  removeSlice,
+  startJob,
+  stopTimeoutSeconds,
+  type Host,
+  type JobOutcome,
+  type JobSpec,
+} from './job'
 import {
   acquirePiLane,
   DEFAULT_STATE_DIR,
   isProductionState,
   PRODUCTION,
+  isSliceRoot,
   sliceRootFor,
   type Production,
   tryLock,
+  unlessMissing,
   unlock,
   waitLock,
 } from './lock'
-import { enqueue, live, promote, release, type Entry, type Held } from './queue'
+import {
+  deadJobs,
+  enqueue,
+  live,
+  promote,
+  release,
+  type DeadJob,
+  type Entry,
+  type Held,
+} from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--quiet] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
+// rev-parse answers in about a millisecond; a git still running after this is stuck, and the
+// wrapper holds its admission while it waits.
+const GIT_TIMEOUT_MS = 250
 const MiB = 2 ** 20
+// EX_TEMPFAIL: a quiet job whose hold ran out did not fail; it has to queue again.
+const RETRY_EXIT = 75
 const FLAGS = [
   '--class',
   '--host',
@@ -63,6 +94,8 @@ type Options = {
   readonly label: string
   readonly command: readonly string[]
   readonly stateDir: string
+  /** Runs alone, after running jobs drain, for at most one quiet hold. */
+  readonly quiet: boolean
   /** Job slices are `<root>-<id>.slice` under `<root>.slice`; tests keep their own root. */
   readonly sliceRoot: string
   readonly logDir: string | null
@@ -71,7 +104,12 @@ type Options = {
   readonly maxWallSec?: number
 }
 
-type Config = { readonly classes: Classes; readonly limits: Limits; readonly graceSeconds: number }
+type Config = {
+  readonly classes: Classes
+  readonly limits: Limits
+  readonly graceSeconds: number
+  readonly quietHoldSeconds: number
+}
 
 try {
   process.exit(await run(parseOptions(Bun.argv.slice(2))))
@@ -85,6 +123,11 @@ function parseOptions(argv: readonly string[]): Options {
   let index = 0
   while (argv[index]?.startsWith('--') && argv[index] !== '--') {
     const flag = argv[index]!
+    if (flag === '--quiet') {
+      flags.set(flag, '')
+      index += 1
+      continue
+    }
     const value = argv[index + 1]
     if (!FLAGS.includes(flag) || value === undefined) {
       throw createScriptError(`Unknown or incomplete option ${flag}. ${USAGE}`)
@@ -110,6 +153,12 @@ function parseOptions(argv: readonly string[]): Options {
   if (maxWallSec !== undefined && (!Number.isSafeInteger(maxWallSec) || maxWallSec <= 0)) {
     throw createScriptError(`--max-wall must be a positive whole number of seconds. ${USAGE}`)
   }
+  const quiet = flags.has('--quiet')
+  if (quiet && host === 'pi') {
+    throw createScriptError(
+      `--quiet applies to this machine; the Pi lane already runs one job at a time. ${USAGE}`,
+    )
+  }
   const jobClass = flags.get('--class') ?? 'suite'
   if (!Object.hasOwn(SETTINGS_REGISTRY['developer.heavyJobClasses'].default, jobClass)) {
     throw createScriptError(`Unknown class ${jobClass}. ${USAGE}`)
@@ -123,6 +172,7 @@ function parseOptions(argv: readonly string[]): Options {
     logDir: flags.get('--log-dir') ?? null,
     maxWallSec,
     procRoot: flags.get('--proc') ?? '/proc',
+    quiet,
     settingsHome: flags.get('--settings-home') ?? productionStateHome,
     sliceRoot: sliceRootOption(flags.get('--slice-root'), stateDir, {
       root: flags.get('--production-slice-root') ?? PRODUCTION.root,
@@ -139,7 +189,7 @@ function sliceRootOption(given: string | undefined, stateDir: string, production
   // The directory must exist for its identity to decide its root.
   mkdirSync(stateDir, { recursive: true })
   const root = given ?? sliceRootFor(stateDir, production)
-  if (!/^[a-z0-9]+$/.test(root)) {
+  if (!isSliceRoot(root)) {
     throw createScriptError(
       `--slice-root takes lowercase letters and digits; got ${root}. ${USAGE}`,
     )
@@ -167,15 +217,42 @@ async function run(options: Options) {
   )
   // Released however the launch or the job ends, so a failed launch leaves no admission held.
   try {
+    // Read before launch: the job, or another session, may commit while it runs.
+    const checkout = repositoryOf(cwd)
     const job = startJob(placed.spec)
     // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
     // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
       process.on(signal, () => job.stop(signal))
     }
+    const holdMs = config.quietHoldSeconds * 1000
+    let stoppedAtHold = false
+    const hold = options.quiet
+      ? setTimeout(() => {
+          stoppedAtHold = true
+          job.stop('SIGTERM')
+        }, holdMs)
+      : undefined
     const outcome = await job.done
-    record(options, { admission: placed.reason, budget: placed.budget, cwd, id, outcome, queuedMs })
-    return outcome.exitCode
+    clearTimeout(hold)
+    // systemd ends the scope at the hold too, so a run this process slept through counts.
+    const holdExpired = options.quiet && (stoppedAtHold || outcome.wallMs >= holdMs)
+    if (holdExpired) {
+      console.error(
+        `[wave-heavy] quiet hold for '${options.label}' reached its ${config.quietHoldSeconds} s limit (developer.heavyJobQuietHoldSeconds), so the job was stopped. Run it again to queue for another hold.`,
+      )
+    }
+    record(options, {
+      admission: placed.reason,
+      budget: placed.budget,
+      checkout,
+      cwd,
+      holdExpired,
+      id,
+      outcome,
+      queuedMs,
+    })
+    return holdExpired ? RETRY_EXIT : outcome.exitCode
   } finally {
     placed.release()
   }
@@ -203,13 +280,22 @@ async function admitLocal(
     jobClass: options.jobClass,
     label: options.label,
     pid: process.pid,
+    quiet: options.quiet,
     since: new Date().toISOString(),
+    sliceRoot: options.sliceRoot,
   }
   const admitted = await admit(options, config, entry)
+  if (options.quiet) {
+    writeFileSync(
+      path.join(options.stateDir, 'quiet.holder'),
+      `${options.label} id=${id} pid=${process.pid} since=${new Date().toISOString()} cwd=${cwd}\n`,
+    )
+  }
   return {
     budget,
     reason: admitted.reason,
     release: () => {
+      if (options.quiet) clearQuietHolder(options.stateDir, (holder) => holder === id)
       release(admitted.held)
       for (const fd of admitted.slots) unlock(fd)
     },
@@ -221,6 +307,8 @@ async function admitLocal(
       host: 'local',
       id,
       sliceRoot: options.sliceRoot,
+      runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
+      entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
   }
@@ -286,21 +374,27 @@ function attemptAdmission(
 ): Admitted | { reason: string } {
   const lock = waitLock(path.join(options.stateDir, 'admission.lock'))
   try {
+    // Every waiting wrapper reclaims what dead wrappers left, before any rule can stop it.
+    const running = reconcile(options, config.graceSeconds)
     const ahead = live(options.stateDir, 'queue').findIndex(
       (entry) => entry.id === waiting.entry.id,
     )
     if (ahead > 0) return { reason: `${ahead} job(s) ahead in the queue` }
-    const drain = drainRequest(options.stateDir)
+    const drain = drainRequest(options.stateDir, config.quietHoldSeconds * 1000)
     if (drain) return { reason: `draining for ${drain}` }
     const hold = legacyHold(options.stateDir, SLOT_FILES)
     if (hold) return { reason: hold }
-    const charges = runningCharges(options)
-    const decision = decide(
-      waiting.entry.estimateBytes,
-      charges,
-      readReadings(options.procRoot),
-      config.limits,
-    )
+    const now = bootSeconds()
+    const quiet = running.owners.find((job) => job.quiet && (job.quietUntil ?? Infinity) > now)
+    if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}` }
+    const decision = waiting.entry.quiet
+      ? decideQuiet(running.owners.length + running.orphanCharges.length)
+      : decide(
+          waiting.entry.estimateBytes,
+          [...running.orphanCharges, ...ownerCharges(running.owners)],
+          readReadings(options.procRoot),
+          config.limits,
+        )
     if (!decision.admit) return { reason: decision.reason }
     const slots = SLOT_FILES.map((slot) => tryLock(path.join(options.stateDir, slot), 'shared'))
     const taken = slots.filter((fd): fd is number => fd !== null)
@@ -308,31 +402,110 @@ function attemptAdmission(
       for (const fd of taken) unlock(fd)
       return { reason: 'a slot lock was taken exclusively' }
     }
-    return { held: promote(options.stateDir, waiting), reason: decision.reason, slots: taken }
+    const lease = waiting.entry.quiet
+      ? { quietUntil: now + config.quietHoldSeconds + stopTimeoutSeconds(config.graceSeconds) }
+      : {}
+    return {
+      held: promote(options.stateDir, waiting, lease),
+      reason: decision.reason,
+      slots: taken,
+    }
   } finally {
     unlock(lock)
   }
 }
 
 /**
- * What each running job is charged. The cgroup tree is what runs: a job slice whose wrapper is
- * gone (no live entry) is an orphan, charged its ceiling while this pass kills and removes it.
- * A job admitted but not yet in its slice is charged through its live entry.
+ * Reaps orphans: job slices whose wrapper is gone (`orphanSlices`). Each is charged its
+ * ceiling less its use, read before the kill; if the kill fails it may still grow that far.
  */
-function runningCharges(options: Options) {
-  const owned = new Map(live(options.stateDir, 'jobs').map((job) => [job.id, job.estimateBytes]))
-  const orphans = liveSlices(options.sliceRoot).filter((slice) => !owned.has(slice.id))
-  for (const orphan of orphans) {
-    console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
-    reapSlice(options.sliceRoot, orphan.slice)
+function reconcile(options: Options, graceSeconds: number) {
+  const owners = live(options.stateDir, 'jobs')
+  const dead = deadJobs(options.stateDir)
+  const orphans = orphanSlices(options.sliceRoot, owners, dead)
+  const orphanCharges = orphans.map((orphan) =>
+    chargeOf(orphan.root, orphan.slice, orphan.ceilingBytes),
+  )
+  for (const orphan of orphans) reapOrphan(options.stateDir, orphan, graceSeconds)
+  forgetStoppedFailures(options.stateDir)
+  for (const job of dead) settleDeadEntry(job)
+  clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
+  return { orphanCharges, owners }
+}
+
+// A slice that outlives its stop stays charged and is retried quietly on each later pass. A
+// marker under `reaping/` keeps the series across wrappers: one warning when it starts, one
+// error once the stop timeout has passed, each naming the slice and how to stop it by hand.
+function reapOrphan(stateDir: string, orphan: LiveSlice, graceSeconds: number) {
+  const marker = path.join(stateDir, 'reaping', orphan.slice)
+  const failing = readText(marker).trim()
+  if (!failing) console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
+  reapSlice(orphan.root, orphan.slice)
+  if (sliceState(orphan.root, orphan.slice) !== 'running') return rmSync(marker, { force: true })
+  const now = bootSeconds()
+  if (!failing) {
+    mkdirSync(path.dirname(marker), { recursive: true })
+    writeFileSync(marker, `${now} warned`)
+    console.error(
+      `[wave-heavy] warn: ${orphan.slice} is still running after a stop; later admissions retry it and count its memory`,
+    )
+    return
   }
-  return [...owned.values(), ...orphans.map((orphan) => orphan.ceilingBytes)]
+  const [since = '0', reported] = failing.split(' ')
+  if (reported === 'error' || now - Number(since) < stopTimeoutSeconds(graceSeconds)) return
+  writeFileSync(marker, `${since} error`)
+  console.error(
+    `[wave-heavy] error: ${orphan.slice} is still running ${Math.round(now - Number(since))} s after its first stop; stop it with: systemctl --user stop ${orphan.slice}`,
+  )
+}
+
+// A slice that stopped some other way ends its failure series.
+function forgetStoppedFailures(stateDir: string) {
+  const dir = path.join(stateDir, 'reaping')
+  for (const slice of unlessMissing(() => readdirSync(dir)) ?? []) {
+    const root = slice.slice(0, slice.lastIndexOf('-'))
+    if (isSliceRoot(root) && sliceState(root, slice) === 'running') continue
+    rmSync(path.join(dir, slice), { force: true })
+  }
+}
+
+// A dead entry is the only record of a slice on another root, so it stays until that slice is
+// gone, or empty and stopped; a stop that failed is retried, and charged, on the next pass. An
+// entry this wrapper did not write names nothing and is dropped.
+function settleDeadEntry(job: DeadJob) {
+  if (!job.attributable) {
+    console.error(`[wave-heavy] dropped ${job.file}: not a job entry a wrapper wrote`)
+    return rmSync(job.file, { force: true })
+  }
+  const slice = `${job.entry.sliceRoot}-${job.entry.id}.slice`
+  const state = sliceState(job.entry.sliceRoot, slice)
+  if (state === 'running') return
+  if (state === 'empty' && !removeSlice(slice)) return
+  rmSync(job.file, { force: true })
+}
+
+// The part of each live job's estimate it may still claim, by the slice root it runs under; a
+// job admitted but not yet in its slice is charged its whole estimate. Read beside
+// MemAvailable: both move while jobs run.
+function ownerCharges(owners: readonly Entry[]) {
+  return owners.map((job) =>
+    chargeOf(job.sliceRoot, `${job.sliceRoot}-${job.id}.slice`, job.estimateBytes),
+  )
+}
+
+// The holder line names its job; it is cleared only when that job qualifies, so clearing a
+// stale line cannot erase a newer holder's.
+function clearQuietHolder(stateDir: string, stale: (id: string) => boolean) {
+  const file = path.join(stateDir, 'quiet.holder')
+  const named = /\bid=(\S+)/.exec(readText(file))?.[1]
+  if (named && stale(named)) clearHolder(file)
 }
 
 function readConfig(home: string): Config {
   return {
     classes: setting(home, 'developer.heavyJobClasses'),
     graceSeconds: setting(home, 'developer.heavyJobStopGraceSeconds'),
+    quietHoldSeconds: setting(home, 'developer.heavyJobQuietHoldSeconds'),
     limits: {
       cpuLoadLimit: setting(home, 'developer.heavyJobCpuLoadLimit'),
       memoryPressureLimit: setting(home, 'developer.heavyJobMemoryPressureLimit'),
@@ -355,9 +528,7 @@ function setting<K extends SettingId>(home: string, id: K): SettingValue<K> {
 function wrapperCommit() {
   const installed = readText(path.join(import.meta.dirname, 'commit')).trim()
   if (installed) return installed
-  return Bun.spawnSync(['git', '-C', import.meta.dirname, 'rev-parse', 'HEAD'])
-    .stdout.toString()
-    .trim()
+  return gitOutput(['-C', import.meta.dirname, 'rev-parse', 'HEAD'])?.trim() ?? ''
 }
 
 function readText(file: string) {
@@ -371,13 +542,15 @@ function readText(file: string) {
 type Finished = {
   readonly admission: string
   readonly budget: Budget | null
+  readonly checkout: ReturnType<typeof repositoryOf>
   readonly cwd: string
+  readonly holdExpired: boolean
   readonly id: string
   readonly outcome: JobOutcome
   readonly queuedMs: number
 }
 
-// Logging is best effort: a settings, git or disk failure is reported, and the job's exit
+// Logging is best effort: a settings or disk failure is reported, and the job's exit
 // status still becomes the wrapper's.
 function record(options: Options, finished: Finished) {
   try {
@@ -392,9 +565,9 @@ function record(options: Options, finished: Finished) {
 
 function jobRecord(
   options: Options,
-  { admission, budget, cwd, id, outcome, queuedMs }: Finished,
+  { admission, budget, checkout, cwd, holdExpired, id, outcome, queuedMs }: Finished,
 ): HeavyJobRecord {
-  const commitHash = wrapperCommit()
+  const wrapper = wrapperCommit()
   return {
     action: 'heavy.job',
     admission,
@@ -402,7 +575,6 @@ function jobRecord(
     ceilingBytes: budget ? budget.ceilingMiB * MiB : null,
     class: budget ? options.jobClass : null,
     command: redactCommand(options.command),
-    commitHash,
     cpuUsageUsec: outcome.cpuUsageUsec,
     cwd,
     estimateBytes: budget ? budget.estimateMiB * MiB : null,
@@ -414,24 +586,52 @@ function jobRecord(
     memoryPeakBytes: outcome.memoryPeakBytes,
     oomKills: outcome.oomKills,
     queuedMs,
+    quiet: options.quiet,
+    quietHoldExpired: holdExpired,
     requestId: id,
     slice: outcome.slice,
     source: 'heavy',
     timestamp: new Date().toISOString(),
     unit: outcome.unit,
-    version: commitHash.slice(0, 9),
+    version: wrapper.slice(0, 9),
     wallMs: outcome.wallMs,
-    ...repositoryOf(cwd),
+    ...checkout,
   }
 }
 
-// Worktrees of one repository share its common git directory, so lanes group together.
+// Worktrees of one repository share its common git directory, so lanes group together; each
+// worktree has its own HEAD, which is the commit the job runs.
 function repositoryOf(cwd: string) {
-  const result = Bun.spawnSync(
-    ['git', '-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir', '--show-prefix'],
-    { stderr: 'ignore', stdout: 'pipe' },
-  )
-  if (result.exitCode !== 0) return { repo: null, subdir: null }
-  const [commonDir = '', prefix = ''] = result.stdout.toString().split('\n')
-  return { repo: commonDir.replace(/\/\.git\/?$/, ''), subdir: prefix.replace(/\/$/, '') }
+  const output = gitOutput([
+    '-C',
+    cwd,
+    'rev-parse',
+    '--path-format=absolute',
+    '--git-common-dir',
+    '--show-prefix',
+    'HEAD',
+  ])
+  if (output === null) return { commitHash: null, repo: null, subdir: null }
+  const [commonDir = '', prefix = '', head = ''] = output.split('\n')
+  return {
+    commitHash: head,
+    repo: commonDir.replace(/\/\.git\/?$/, ''),
+    subdir: prefix.replace(/\/$/, ''),
+  }
+}
+
+// Git's output, or null when git fails, is not installed, or outlives GIT_TIMEOUT_MS. Only the
+// launch sits in the try, so a bug here still surfaces.
+function gitOutput(args: readonly string[]) {
+  const options = { stderr: 'ignore', stdout: 'pipe', timeout: GIT_TIMEOUT_MS } as const
+  const result = unlessLaunchFails(() => Bun.spawnSync(['git', ...args], options))
+  return result?.success ? result.stdout.toString() : null
+}
+
+function unlessLaunchFails<T>(launch: () => T): T | null {
+  try {
+    return launch()
+  } catch {
+    return null
+  }
 }

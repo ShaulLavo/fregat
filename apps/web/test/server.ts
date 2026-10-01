@@ -48,6 +48,7 @@ type TestServerOptions = Pick<
   environmentId?: EnvironmentId
   filesystemWatch?: boolean
   providerAdapter?: MockProviderAdapter
+  forgeBoundaries?: NonNullable<AppOptions['orchestration']>['forgeBoundaries']
   settingsWatch?: boolean
 }
 
@@ -58,6 +59,7 @@ export async function makeTestServer({
   filesystemWatch = true,
   providerAdapter = new MockProviderAdapter(),
   settingsWatch = false,
+  forgeBoundaries,
   workspaceEditClock,
   workspaceEditDriver,
   machines,
@@ -92,10 +94,14 @@ export async function makeTestServer({
         providerRuntime,
         // The default lookup runs the real forge CLI; tests record pull requests themselves.
         pullRequestLookup: null,
+        forgeBoundaries,
         // Never the default registry: its Codex and Claude adapters shell out to
         // real CLIs, so any route that touches a provider would spawn a binary,
         // read the developer's own machine, and answer differently per checkout.
-        providerAdapterRegistry: new ProviderAdapterRegistry([providerAdapter]),
+        providerAdapterRegistry: new ProviderAdapterRegistry({
+          adapters: [providerAdapter],
+          services: { cwd: process.cwd() },
+        }),
       },
       // The defaults reach registry.npmjs.org and models.dev for real CLI versions
       // and prices; every origin here is the in-process happy-dom window, whose

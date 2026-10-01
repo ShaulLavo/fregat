@@ -7,17 +7,15 @@ on:
       - main
   workflow_dispatch:
 
-# A second push to a PR branch makes the first run's answer worthless. On main every
-# run finishes, so main always has a verdict; pushes during a run collapse into one
-# pending run of the newest commit, because GitHub keeps one pending run per group.
+# GitHub cancels older pending runs in a shared group even with cancellation disabled.
+# PRs share a group; each main commit gets its own.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ci-${{ github.workflow }}-${{ startsWith(github.ref, 'refs/pull/') && github.ref || github.sha }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  # A PR runs only the jobs its files can affect. `code` is anything outside plans and docs;
-  # web and TUI tests drive the real server, so a server change runs them too. Main runs
-  # everything: collapsed pending runs mean one run's diff is not everything since the last verdict.
+  # A PR runs only the jobs its files can affect. Main runs everything.
+  # Web and TUI tests drive the real server, so a server change runs them too.
   changes:
     name: Changes
     runs-on: ubuntu-latest
@@ -312,10 +310,18 @@ jobs:
       # version wants, leaving the pinned playwright pointing at a build that
       # was never fetched.
       - name: Install Chromium
-        run: apps/web/node_modules/.bin/playwright install --with-deps chromium
+        timeout-minutes: 5
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: apps/web/node_modules/.bin/playwright
+          browsers: chromium
 
       - name: Agent browser doctor
         run: bun --bun vitest run scripts/agent/browser-doctor.test.ts --environment node
+
+      - name: Agent browser shared memory
+        if: ${{ !cancelled() }}
+        run: bun --bun vitest run scripts/agent/browser-launch.test.ts --environment node
 
       - name: Cold dev startup
         if: ${{ !cancelled() }}

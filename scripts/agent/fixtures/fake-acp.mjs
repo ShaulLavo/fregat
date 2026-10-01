@@ -35,6 +35,7 @@ trace({
   pid: process.pid,
   args: process.argv.slice(2),
   profile: process.env.XDG_CONFIG_HOME,
+  cwd: process.cwd(),
 })
 const write = (value) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...value })}\n`)
 let prompt
@@ -184,6 +185,27 @@ for await (const line of lines) {
         ],
       },
     })
+    continue
+  }
+  if (frame.method === 'session/set_model') {
+    if (!['auto', 'fixture-cursor-small'].includes(frame.params.modelId)) {
+      write({ id: frame.id, error: { code: -32602, message: 'Unavailable native model' } })
+      continue
+    }
+    write({ id: frame.id, result: {} })
+    continue
+  }
+  if (frame.method === 'session/set_config_option') {
+    const { configId, value } = frame.params
+    const valid =
+      (configId === 'reasoning' && ['low', 'high'].includes(value)) ||
+      (configId === 'context' && ['small', 'wide'].includes(value)) ||
+      (configId === 'fast' && typeof value === 'boolean')
+    if (!valid) {
+      write({ id: frame.id, error: { code: -32602, message: 'Unavailable native config choice' } })
+      continue
+    }
+    write({ id: frame.id, result: {} })
     continue
   }
   if (frame.method === 'fixture/error') {

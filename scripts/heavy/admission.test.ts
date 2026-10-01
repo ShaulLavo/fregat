@@ -1,11 +1,13 @@
-import { spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import { decide, type Limits, type Readings } from './admission'
+import { decide, liveSlices, sliceStat, type Limits, type Readings } from './admission'
 import {
+  type Box,
   endedAt,
+  firstDecision,
   heavy,
   MiB,
   recordOf,
@@ -14,6 +16,7 @@ import {
   start,
   startedAt,
   unitActive,
+  until,
   userScopes,
   writeMachine,
   writeSettings,
@@ -32,7 +35,7 @@ describe('decide', () => {
     expect(decide(8 * GiB, [], swamped, limits).admit).toBe(true)
   })
 
-  test('reserves every running job its whole estimate beside what MemAvailable shows', () => {
+  test('reserves every running job its charge beside what MemAvailable shows', () => {
     expect(decide(8 * GiB, [6 * GiB], calm, limits).admit).toBe(true)
     expect(decide(8.1 * GiB, [6 * GiB], calm, limits).admit).toBe(false)
     expect(decide(7 * GiB, [6 * GiB, 4 * GiB], calm, limits)).toMatchObject({
@@ -70,6 +73,41 @@ function admissionBox(machine: Parameters<typeof writeMachine>[1]) {
 }
 
 const sleeper = (seconds: number) => ['bash', '-c', `echo started; sleep ${seconds}`]
+const SYSTEMCTL = spawnSync('sh', ['-c', 'command -v systemctl'], {
+  encoding: 'utf8',
+}).stdout.trim()
+
+const anon = (mib: number) =>
+  `bun -e 'const b = Buffer.alloc(${mib} * 2 ** 20, 1); setInterval(() => b.at(0), 1000)'`
+const holdingAnon = (mib: number, release: string) => [
+  'bash',
+  '-c',
+  `${anon(mib)} & echo started; ${until(release)}; kill $!`,
+]
+
+/** The one job slice in the sandbox. */
+function onlySlice(box: Box) {
+  const slices = liveSlices(box.sliceRoot)
+  expect(slices).toHaveLength(1)
+  return { root: box.sliceRoot, slice: slices[0]!.slice }
+}
+
+function counter({ root, slice }: { root: string; slice: string }, name: string) {
+  return sliceStat(root, slice)?.[name] ?? 0
+}
+
+// A directory on disk: on tmpfs a file is shmem, which is memory in use.
+const scratches: string[] = []
+function diskScratch() {
+  const cache = path.join(import.meta.dirname, '..', '..', 'node_modules', '.cache')
+  mkdirSync(cache, { recursive: true })
+  const dir = mkdtempSync(path.join(cache, 'heavy-admission-'))
+  scratches.push(dir)
+  return dir
+}
+afterEach(() => {
+  for (const dir of scratches.splice(0)) rmSync(dir, { force: true, recursive: true })
+})
 
 describe.skipIf(!userScopes)('admission between real jobs', () => {
   test('starts a second job beside a running one when memory covers both', async () => {
@@ -80,6 +118,140 @@ describe.skipIf(!userScopes)('admission between real jobs', () => {
     await first.done
     expect(startedAt(recordOf(box, 'second'))).toBeLessThan(endedAt(recordOf(box, 'first')))
   }, 30_000)
+
+  test('charges a running job only the part of its estimate it has not used yet', async () => {
+    // 768 MiB free: the first job's 512 MiB estimate would leave too little, but 400 MiB of it
+    // is already in use and so already missing from MemAvailable.
+    const box = admissionBox({ availableMiB: 768 })
+    const release = path.join(box.root, 'release')
+    const first = start(box, 'first', holdingAnon(400, release), {
+      jobClass: 'light',
+      machine: true,
+    })
+    await expect.poll(first.stdout, { timeout: 10_000 }).toContain('started')
+    const slice = onlySlice(box)
+    await expect
+      .poll(() => counter(slice, 'anon'), { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(400 * MiB)
+    const second = start(box, 'second', ['true'], { jobClass: 'light', machine: true })
+    expect(await firstDecision(second)).toBe('started')
+    writeFileSync(release, '')
+    await Promise.all([first.done, second.done])
+  }, 30_000)
+
+  test("charges a running job's page cache as unused, since MemAvailable counts it free", async () => {
+    const box = admissionBox({ availableMiB: 768 })
+    const release = path.join(box.root, 'release')
+    const dir = diskScratch()
+    const caching = [
+      'bash',
+      '-c',
+      `dd if=/dev/zero of=${dir}/file bs=1M count=320 status=none && echo started && ${until(release)}`,
+    ]
+    const first = start(box, 'first', caching, { jobClass: 'light', machine: true })
+    await expect.poll(first.stdout, { timeout: 10_000 }).toContain('started')
+    const slice = onlySlice(box)
+    expect(counter(slice, 'active_file') + counter(slice, 'inactive_file')).toBeGreaterThanOrEqual(
+      300 * MiB,
+    )
+    const second = start(box, 'second', ['true'], { jobClass: 'light', machine: true })
+    expect(await firstDecision(second)).toBe('waiting')
+    expect(second.stderr()).toMatch(/'second' is waiting: memory: \d+ MiB free/)
+    writeFileSync(release, '')
+    await Promise.all([first.done, second.done])
+  }, 30_000)
+
+  test("charges a running job's reclaimable slab as unused, since MemAvailable counts it free", async () => {
+    const box = admissionBox({ availableMiB: 4096 })
+    const release = path.join(box.root, 'release')
+    const dir = diskScratch()
+    const files = [
+      'bash',
+      '-c',
+      `for i in $(seq 20000); do : > ${dir}/$i; done; echo started; ${until(release)}`,
+    ]
+    const first = start(box, 'first', files, { jobClass: 'light', machine: true })
+    await expect.poll(first.stdout, { timeout: 20_000 }).toContain('started')
+    const slice = onlySlice(box)
+    const slab = counter(slice, 'slab_reclaimable')
+    expect(slab).toBeGreaterThanOrEqual(8 * MiB)
+    // Free memory half a slab short of the 512 MiB job once that slab counts as unused, and
+    // half a slab over if it counted as used.
+    const used =
+      counter(slice, 'current') -
+      counter(slice, 'active_file') -
+      counter(slice, 'inactive_file') -
+      slab
+    writeMachine(box, { availableMiB: Math.floor((1024 * MiB - used - slab / 2) / MiB) })
+    const second = start(box, 'second', ['true'], { jobClass: 'light', machine: true })
+    expect(await firstDecision(second)).toBe('waiting')
+    writeFileSync(release, '')
+    await Promise.all([first.done, second.done])
+  }, 60_000)
+
+  test('charges a running job what it may claim after reaping an orphan, not before', async () => {
+    const box = admissionBox({ availableMiB: 4096 })
+    writeSettings(box, {
+      'developer.heavyJobClasses': {
+        ...classes,
+        bench: { ceilingMiB: 64, estimateMiB: 32 },
+        light: { ceilingMiB: 1024, estimateMiB: 512 },
+      },
+      'developer.heavyJobMemoryReserveMiB': 0,
+    })
+    const free = path.join(box.root, 'free')
+    const release = path.join(box.root, 'release')
+    const owner = start(
+      box,
+      'owner',
+      [
+        'bash',
+        '-c',
+        `${anon(400)} & echo started; ${until(free)}; kill $!; wait; echo freed; ${until(release)}`,
+      ],
+      { jobClass: 'light', machine: true },
+    )
+    await expect.poll(owner.stdout, { timeout: 10_000 }).toContain('started')
+    const ownerSlice = onlySlice(box)
+    await expect
+      .poll(() => counter(ownerSlice, 'anon'), { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(400 * MiB)
+    const orphaned = start(box, 'orphaned', ['bash', '-c', 'echo started; exec sleep 600'], {
+      jobClass: 'bench',
+      machine: true,
+    })
+    await expect.poll(orphaned.stdout, { timeout: 10_000 }).toContain('started')
+    // The orphan keeps the wrapper's stdout open, so its exit is what to wait for.
+    const killed = new Promise((resolve) => orphaned.child.on('exit', resolve))
+    orphaned.child.kill('SIGKILL')
+    await killed
+
+    // While the orphan is reaped, the owner frees its 400 MiB and MemAvailable shows it.
+    writeMachine(box, { availableMiB: 368 })
+    const reaped = path.join(box.root, 'reaped')
+    const bin = path.join(box.root, 'bin')
+    mkdirSync(bin)
+    writeFileSync(
+      path.join(bin, 'systemctl'),
+      `#!/bin/bash\nif [ "$2" = kill ] && [ ! -e ${free} ]; then : > ${free}; ${until(reaped)}; fi\nexec ${SYSTEMCTL} "$@"\n`,
+      { mode: 0o755 },
+    )
+    const next = start(box, 'next', ['true'], {
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      jobClass: 'light',
+      machine: true,
+    })
+    await expect.poll(owner.stdout, { timeout: 20_000 }).toContain('freed')
+    await expect
+      .poll(() => counter(ownerSlice, 'anon'), { timeout: 10_000 })
+      .toBeLessThan(100 * MiB)
+    writeMachine(box, { availableMiB: 768 })
+    writeFileSync(reaped, '')
+    expect(await firstDecision(next)).toBe('waiting')
+    expect(next.stderr()).toMatch(/stopping \S+\.slice: its wrapper is gone/)
+    writeFileSync(release, '')
+    await Promise.all([owner.done, next.done])
+  }, 60_000)
 
   test('holds a job while memory is short and starts it when the running job ends', async () => {
     const box = admissionBox({ availableMiB: 768 })

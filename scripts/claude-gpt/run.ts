@@ -17,7 +17,7 @@ export const configSchema = v.pipe(
 )
 if (import.meta.main) {
   try {
-    await run()
+    process.exit(await run())
   } catch (error) {
     reportFailure('startup', error)
     process.exit(1)
@@ -33,27 +33,52 @@ function reportFailure(operation: string, error: unknown) {
       area: 'claude-gpt',
       operation,
       errorType: error instanceof Error ? error.name : typeof error,
+      why:
+        operation === 'proxy-shutdown'
+          ? 'The owned proxy process stayed alive after SIGKILL.'
+          : undefined,
       fix: 'Check the runtime configuration, proxy login and mesh route.',
     })}\n`,
   )
 }
 
+async function stopProxy(proxy: Bun.Subprocess) {
+  if (proxy.exitCode !== null) return true
+  for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
+    proxy.kill(signal)
+    const exited = await Promise.race([
+      proxy.exited.then(() => true),
+      Bun.sleep(1_000).then(() => false),
+    ])
+    if (exited) return true
+  }
+  reportFailure('proxy-shutdown', null)
+  return false
+}
+
 async function run() {
   const config = v.parse(configSchema, await Bun.file(Bun.argv[2] ?? '').json())
-  const server = startGateway(gatewayOptions(config))
   const proxy = Bun.spawn([config.binary, '-config', config.proxyConfig], {
     stdout: 'inherit',
     stderr: 'inherit',
   })
-  function stop() {
-    server.stop(true)
-    proxy.kill('SIGTERM')
-  }
+  const stopping = Promise.withResolvers<number>()
+  const stop = () => stopping.resolve(0)
+  let server: ReturnType<typeof startGateway> | undefined
+  let exitCode = 1
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)
-  const exitCode = await proxy.exited
-  server.stop(true)
-  process.exit(exitCode)
+  try {
+    // Claude forwarding can start while the GPT registry loads or remains unavailable.
+    server = startGateway(gatewayOptions(config))
+    exitCode = await Promise.race([proxy.exited, stopping.promise])
+  } finally {
+    process.off('SIGTERM', stop)
+    process.off('SIGINT', stop)
+    server?.stop(true)
+    if (!(await stopProxy(proxy))) exitCode = 1
+  }
+  return exitCode
 }
 
 export function startGateway(options: GatewayOptions) {

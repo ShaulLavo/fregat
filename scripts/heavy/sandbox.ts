@@ -81,7 +81,11 @@ export function writeSettings(box: Box, values: Record<string, unknown>) {
 }
 
 export type StartOptions = {
+  readonly cwd?: string
+  /** Another slice root for this job, beside the sandbox's state directory. */
+  readonly sliceRoot?: string
   readonly jobClass?: string
+  readonly quiet?: boolean
   readonly detached?: boolean
   readonly env?: NodeJS.ProcessEnv
   readonly logDir?: boolean
@@ -101,13 +105,14 @@ export function start(
     '--settings-home',
     box.home,
     '--slice-root',
-    box.sliceRoot,
+    options.sliceRoot ?? box.sliceRoot,
   ]
   if (options.logDir !== false) args.push('--log-dir', box.logs)
   if (options.machine) args.push('--proc', box.proc)
   if (options.jobClass) args.push('--class', options.jobClass)
+  if (options.quiet) args.push('--quiet')
   const child = spawn('bun', [...args, label, '--', ...command], {
-    cwd: box.root,
+    cwd: options.cwd ?? box.root,
     detached: options.detached ?? false,
     env: options.env ?? process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -154,4 +159,18 @@ export function endedAt(record: HeavyJobRecord | undefined) {
 
 export function unitActive(unit: string) {
   return spawnSync('systemctl', ['--user', 'is-active', unit]).stdout.toString().trim() === 'active'
+}
+
+/** A shell loop that holds until the test creates `file`. */
+export const until = (file: string) => `until [ -e ${file} ]; do sleep 0.02; done`
+
+/** Whether a job started at once or reported a wait first; either way it is left to finish. */
+export async function firstDecision(job: ReturnType<typeof start>) {
+  let ended = false
+  void job.done.then(() => (ended = true))
+  for (;;) {
+    if (job.stderr().includes('is waiting:')) return 'waiting'
+    if (ended) return 'started'
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
 }

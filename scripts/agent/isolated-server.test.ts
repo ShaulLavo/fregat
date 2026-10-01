@@ -25,6 +25,8 @@ it('ends the isolated host and its live shell before removing its home', async (
     ).toEqual([
       ['codex', false],
       ['claude', false],
+      ['cursor', false],
+      ['opencode', false],
     ])
     const usage = await fetch(`${server.origin}/providers/usage`, {
       headers: { origin: 'http://localhost:5214' },

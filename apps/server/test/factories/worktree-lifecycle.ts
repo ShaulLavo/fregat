@@ -48,7 +48,10 @@ export async function worktreeLifecycleFixture(
         database: database.db,
         providerRuntime: true,
         attachmentsDir: path.join(root, '.git', 'attachments'),
-        providerAdapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }),
+        providerAdapterRegistry: new ProviderAdapterRegistry({
+          services: { cwd: process.cwd() },
+          adapters: [adapter],
+        }),
         pullRequestLookup: options.pullRequestLookup ?? null,
         forgeBoundaries: options.forgeBoundaries,
       },

@@ -99,11 +99,11 @@ export function planFetchedOpenFileRefresh({
   baseVersion: string | null
   liveText: string | null
   isDirty: boolean
-  remoteText: string
+  remoteText: string | null
   remoteVersion: string
   path: string
 }): WorkspaceFetchedOpenFileOperation {
-  if (liveText === remoteText) return { path, type: 'replace-open-file' }
+  if (remoteText !== null && liveText === remoteText) return { path, type: 'replace-open-file' }
   if (isDirty && baseVersion === remoteVersion) return { path, type: 'unchanged-open-file' }
   if (isDirty) return { type: 'changed-conflict', path }
 

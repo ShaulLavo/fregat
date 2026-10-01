@@ -53,7 +53,7 @@ it('starts an enabled Cursor instance, streams an answer, settles an error and r
   )
   expect(await adapter.snapshot()).toMatchObject({
     installed: true,
-    message: 'Live account smoke test pending.',
+    message: 'Native model catalog available.',
     traits: { supportsSteering: true },
   })
 })

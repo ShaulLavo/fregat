@@ -150,30 +150,34 @@ export class AcpProviderAdapter implements ProviderAdapter {
     } catch {
       /* Availability reads never execute the CLI. */
     }
-    const models =
-      installed && this.options.settings.enabled && this.options.catalog
-        ? await this.options.catalog()
-        : [
-            {
-              slug: this.options.defaultModel,
-              name: this.options.defaultModel,
-              isCustom: false,
-              capabilities: null,
-            },
-          ]
+    const catalog = installed && this.options.settings.enabled ? this.options.catalog : undefined
+    let status: ProviderSnapshot['status'] = 'disabled'
+    if (this.options.settings.enabled) status = catalog ? 'ready' : 'warning'
+    let message = installed
+      ? 'Live account smoke test pending.'
+      : 'Set the provider executable path to enable this agent.'
+    if (catalog) message = 'Native model catalog available.'
+    const models = catalog
+      ? await catalog()
+      : [
+          {
+            slug: this.options.defaultModel,
+            name: this.options.defaultModel,
+            isCustom: false,
+            capabilities: null,
+          },
+        ]
     return {
       ...this.options.settings,
       installed,
       version: null,
-      status: this.options.settings.enabled ? 'warning' : 'disabled',
+      status,
       availability: installed ? 'available' : 'unavailable',
       auth: { status: 'unknown' },
       checkedAt: new Date().toISOString(),
       models,
       supportsSignIn: false,
-      message: installed
-        ? 'Live account smoke test pending.'
-        : 'Set the provider executable path to enable this agent.',
+      message,
     }
   }
 

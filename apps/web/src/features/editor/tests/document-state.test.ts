@@ -5,6 +5,7 @@ import { describe, vi } from 'vitest'
 import { expect, test as it } from '../../../../test/fixtures'
 
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
+import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import type { FileResult } from '@/lib/file-system-types'
 import {
   acquireDocumentMutationLease,
@@ -25,6 +26,29 @@ import {
 } from '@singapore-editor/core/editor'
 
 describe('editor document store state identity', () => {
+  it('rejects ASCII-only PDF registration before constructing a text buffer', () => {
+    const store = createEditorDocumentStore()
+    const pdf = { ...fileResult('/repo/pages.PDF'), seemsBinary: false }
+    expect(supportsTextFile(pdf)).toBe(false)
+    expect(() => store.getState().ensureEditorView(tabId('pdf'), pdf)).toThrow()
+    expect(() => store.getState().ensureLiveEditorDocument(pdf)).toThrow()
+    expect(() => store.getState().forceReplaceLiveEditorDocument(pdf)).toThrow()
+    expect(store.getState().liveDocumentsByKey).toEqual({})
+    expect(store.getState().viewsByTabId).toEqual({})
+    expect(store.getState().dirtyDocumentKeys.size).toBe(0)
+  })
+
+  it('rejects binary file registration and replacement without a text buffer or dirty state', () => {
+    const store = createEditorDocumentStore()
+    const binary = { ...fileResult('/repo/data.txt'), seemsBinary: true }
+    expect(() => store.getState().ensureEditorView(tabId('binary'), binary)).toThrow()
+    expect(() => store.getState().ensureLiveEditorDocument(binary)).toThrow()
+    expect(() => store.getState().forceReplaceLiveEditorDocument(binary)).toThrow()
+    expect(store.getState().liveDocumentsByKey).toEqual({})
+    expect(store.getState().viewsByTabId).toEqual({})
+    expect(store.getState().dirtyDocumentKeys.size).toBe(0)
+  })
+
   it('keeps unrelated slices referentially stable across scroll updates', () => {
     const store = createEditorDocumentStore()
     store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))

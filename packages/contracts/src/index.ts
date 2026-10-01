@@ -53,6 +53,19 @@ export type {
   GitLineStat,
   GitLineChange,
   GitPullRequest,
+  GitPullRequestActivity,
+  GitPullRequestActivitySection,
+  GitPullRequestReviewRecord,
+  GitPullRequestCommit,
+  GitPullRequestDiscussion,
+  GitPullRequestComment,
+  GitPullRequestComments,
+  GitPullRequestCommentResult,
+  GitPullRequestCommentCapability,
+  GitPullRequestReviewVerdict,
+  GitPullRequestReviewCapability,
+  GitPullRequestReviewInput,
+  GitPullRequestReviewResult,
   GitPullRequestCreateResult,
   GitPullRequestState,
   GitPullRequestSupport,
@@ -1129,3 +1142,5 @@ export {
   type AgentReviewResult,
   type AgentReviewTarget,
 } from './agent-review'
+
+export { hostResourcesSchema, type HostResources } from './host-resources'

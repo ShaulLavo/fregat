@@ -390,3 +390,83 @@ export type GitShipResult = {
   /** Null when the push failed and nothing was asked of the forge. */
   pullRequest: GitPullRequestCreateResult | { kind: 'failed'; message: string } | null
 }
+
+/** General discussion on the forge, separate from local diff notes sent to an agent. */
+export type GitPullRequestComment = {
+  id: string
+  author: string
+  body: string
+  createdAt: string
+  url: string | null
+  context?: { discussionId: string; path: string | null }
+}
+
+export type GitPullRequestComments =
+  | {
+      kind: 'ready'
+      forge: GitForge
+      comments: readonly GitPullRequestComment[]
+      truncated: boolean
+      comment: GitPullRequestCommentCapability
+      review: GitPullRequestReviewCapability
+    }
+  | { kind: 'unsupported'; forge: GitForge | null; reason: string }
+
+export type GitPullRequestCommentResult =
+  | { kind: 'posted' }
+  | { kind: 'unsupported'; forge: GitForge | null; reason: string }
+
+export type GitPullRequestCommentCapability =
+  | { kind: 'supported' }
+  | { kind: 'unsupported'; reason: string }
+
+export type GitPullRequestReviewVerdict = 'comment' | 'approve' | 'request-changes'
+
+export type GitPullRequestReviewCapability =
+  | { kind: 'supported'; verdicts: readonly GitPullRequestReviewVerdict[] }
+  | { kind: 'unsupported'; reason: string }
+
+export type GitPullRequestReviewInput = {
+  readonly verdict: GitPullRequestReviewVerdict
+  readonly body: string
+}
+
+export type GitPullRequestReviewResult =
+  | { kind: 'submitted'; verdict: GitPullRequestReviewVerdict }
+  | { kind: 'unsupported'; forge: GitForge | null; reason: string }
+
+/** A bounded host read distinguishes an empty collection from an unavailable capability. */
+export type GitPullRequestActivitySection<T> =
+  | { kind: 'ready'; items: readonly T[]; truncated: boolean }
+  | { kind: 'unsupported'; reason: string }
+
+export type GitPullRequestReviewRecord = {
+  id: string
+  author: string
+  body: string
+  state: string
+  createdAt: string
+}
+
+export type GitPullRequestCommit = {
+  oid: string
+  message: string
+  author: string
+  createdAt: string
+}
+
+export type GitPullRequestDiscussion = {
+  id: string
+  path: string | null
+  comments: readonly GitPullRequestComment[]
+}
+
+export type GitPullRequestActivity =
+  | {
+      kind: 'ready'
+      forge: GitForge
+      reviews: GitPullRequestActivitySection<GitPullRequestReviewRecord>
+      commits: GitPullRequestActivitySection<GitPullRequestCommit>
+      discussions: GitPullRequestActivitySection<GitPullRequestDiscussion>
+    }
+  | { kind: 'unsupported'; forge: GitForge | null; reason: string }

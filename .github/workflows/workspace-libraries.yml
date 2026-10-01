@@ -15,8 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - name: Install browsers
-        run: editor/packages/editor/node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
+      - name: Install Editor browsers
+        timeout-minutes: 8
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: editor/packages/editor/node_modules/.bin/playwright
+          browsers: chromium chromium-headless-shell firefox webkit
       - name: Check generated language catalog
         run: bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check
       - name: Check task inputs
@@ -36,7 +40,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - name: Install Chromium
-        run: ghostty-webgpu/node_modules/.bin/playwright install --with-deps chromium
+        timeout-minutes: 5
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: ghostty-webgpu/node_modules/.bin/playwright
+          browsers: chromium
       - name: Verify terminal library and browser package
         run: bun run --cwd ghostty-webgpu verify
       - name: Verify browser package with production npm settings

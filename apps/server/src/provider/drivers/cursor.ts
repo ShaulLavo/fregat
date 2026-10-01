@@ -5,6 +5,7 @@ import { platformHomePath } from '../../home'
 import { CursorProviderAdapter } from '../adapters/cursor'
 import { acpErrors } from '../acp/structured-errors'
 import type { ProviderDriver } from '../driver'
+import { readCursorCatalog } from '../utils/cursor-catalog'
 
 const configSchema = v.object({
   configHome: v.optional(
@@ -35,6 +36,14 @@ export const cursorDriver: ProviderDriver<CursorDriverConfig> = {
       throw acpErrors.SERVICE_UNAVAILABLE({
         internal: { driverKind: 'cursor', service: 'operation-timeout' },
       })
+    const binaryPath =
+      input.binaryPath || Bun.which('cursor-agent', { PATH: input.env.PATH }) || 'cursor-agent'
+    const env = {
+      ...input.env,
+      XDG_CONFIG_HOME:
+        input.config.configHome ??
+        platformHomePath('providers', 'cursor', input.providerInstanceId),
+    }
     const adapter = new CursorProviderAdapter({
       settings: {
         ...DEFAULT_CURSOR_PROVIDER_SETTINGS,
@@ -42,15 +51,17 @@ export const cursorDriver: ProviderDriver<CursorDriverConfig> = {
         enabled: input.enabled,
         providerInstanceId: input.providerInstanceId,
       },
-      binaryPath:
-        input.binaryPath || Bun.which('cursor-agent', { PATH: input.env.PATH }) || 'cursor-agent',
-      env: {
-        ...input.env,
-        XDG_CONFIG_HOME:
-          input.config.configHome ??
-          platformHomePath('providers', 'cursor', input.providerInstanceId),
-      },
+      binaryPath,
+      env,
       operationTimeoutMs,
+      catalog: () =>
+        readCursorCatalog({
+          executable: binaryPath,
+          args: ['acp'],
+          cwd: input.services.cwd,
+          env,
+          operationTimeoutMs,
+        }),
     })
     return { adapter, dispose: () => adapter.stopAll() }
   },

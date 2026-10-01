@@ -318,6 +318,29 @@ export const SETTINGS_REGISTRY = {
     title: 'Project grouping overrides',
     description: 'Grouping mode per scoped project key (environment UUID:project UUID).',
   }),
+  'environments.loadBalancing': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Machines',
+    title: 'Balance new sessions across machines',
+    description:
+      'Choose a connected checkout with available CPU and memory for a new draft. The draft keeps its chosen machine.',
+    keywords: ['capacity', 'automatic', 'load'],
+  }),
+  'environments.loadPreferences': defineSetting({
+    schema: v.record(v.string(), v.picklist(['prefer', 'normal', 'less-often', 'manual-only'])),
+    default: {},
+    scope: 'application',
+    widget: 'record',
+    merge: 'record',
+    category: 'Machines',
+    title: 'Machine selection preferences',
+    description:
+      'Weight automatic selection for each connected machine. Manual only requires choosing the machine yourself.',
+    keywords: ['capacity', 'automatic', 'load'],
+  }),
   'environments.machines': defineSetting({
     schema: machinesSchema,
     default: {},
@@ -1310,15 +1333,17 @@ export const SETTINGS_REGISTRY = {
       light: heavyJobBudgetSchema,
       suite: heavyJobBudgetSchema,
     }),
-    // Seeded from the heavy-job log (Plan 284): estimate the class's p75 peak rounded up to
-    // 512 MiB, ceiling 1.25x its largest peak rounded up to 1 GiB. Bench covers the large-file
-    // bench's 8 GiB case cap plus its driver.
+    // Estimate: p90 peak of the class's runs that were not OOM-killed, in the 2026-10-01 heavy-job
+    // log, rounded up to 512 MiB: build 2968, light 1368, suite 6158 MiB; browser 3882 from runs
+    // after bounded browser-test memory. Bench keeps 3072 for the large-file bench's 8 GiB case
+    // cap. A job past its estimate is still capped by its ceiling; the reserve and the pressure
+    // gate cover overlaps.
     default: {
       bench: { ceilingMiB: 9216, estimateMiB: 3072 },
-      browser: { ceilingMiB: 10240, estimateMiB: 5632 },
+      browser: { ceilingMiB: 10240, estimateMiB: 4096 },
       build: { ceilingMiB: 4096, estimateMiB: 3072 },
-      light: { ceilingMiB: 2048, estimateMiB: 512 },
-      suite: { ceilingMiB: 8192, estimateMiB: 4096 },
+      light: { ceilingMiB: 2048, estimateMiB: 1536 },
+      suite: { ceilingMiB: 8192, estimateMiB: 6656 },
     },
     // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
     scope: 'machine',
@@ -1374,6 +1399,22 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'stop', 'cancel', 'grace', 'sigterm', 'sigkill'],
   }),
+  'developer.heavyJobQuietHoldSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(7200)),
+    // Long enough for one quiet measurement; other sessions' jobs queue behind it meanwhile.
+    default: 600,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job quiet hold',
+    details:
+      'A `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.',
+    description:
+      'Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'quiet', 'exclusive', 'hold', 'drain', 'benchmark'],
+  }),
   'developer.heavyJobCpuLoadLimit': defineSetting({
     schema: v.pipe(v.number(), v.minValue(0.1), v.maxValue(16)),
     default: 1,
@@ -1388,6 +1429,46 @@ export const SETTINGS_REGISTRY = {
       'Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.',
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'cpu', 'load', 'cores', 'admission'],
+  }),
+  'window.browser': defineSetting({
+    schema: v.pipe(v.string(), v.regex(/^(?:auto|webview|\/[^\0\r\n]+)$/)),
+    default: 'auto',
+    scope: 'machine',
+    widget: 'string',
+    category: 'Window',
+    title: 'Browser',
+    description:
+      'The desktop window engine: auto selects an installed Chromium browser, webview selects the system window, and an absolute path selects a browser executable.',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'webview', 'desktop'],
+  }),
+  'window.browserStartupIdleSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    // A cold start on a slow disk keeps faulting in its files long after this; only a silent browser waits it out.
+    default: 5,
+    // Machine scope: it decides when the launcher stops a browser process on this machine.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Browser startup idle limit',
+    description:
+      'Seconds a starting browser may spend without reading its files, using the CPU or answering the launcher before the launcher stops it.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'startup', 'idle', 'stall', 'desktop'],
+  }),
+  'window.browserStartupLimitSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    default: 60,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Browser startup limit',
+    description:
+      'Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'startup', 'limit', 'desktop'],
   }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.

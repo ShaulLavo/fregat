@@ -34,6 +34,7 @@ describe('backdropFor', () => {
 describe('resolveBackdrop', () => {
   it('reads the shell bridge when there is one', () => {
     window.platformBridge = {
+      titlebar: 'overlay',
       backdrop: 'transparent',
       platform: 'darwin',
       colorScheme: null,

@@ -1,3 +1,4 @@
+import { MachinePreferences } from '@/features/settings/components/machine-preferences'
 import { NotificationModeWidget } from '@/features/settings/components/widgets/notification-mode-widget'
 import { ThemeWidget } from '@/features/settings/components/widgets/theme-widget'
 import {
@@ -197,6 +198,7 @@ function SettingControl({
   onChange: (next: SettingValue<SettingId>) => void
   value: SettingValue<SettingId>
 }) {
+  if (id === 'environments.loadPreferences') return <MachinePreferences disabled={disabled} />
   const control = settingControl(id, value)
 
   if (control.widget === 'theme') return <ThemeWidget disabled={disabled} />

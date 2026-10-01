@@ -25,7 +25,7 @@ export async function createAcpFixture(driver: AnyProviderDriver) {
     enabled: true,
     env,
     providerInstanceId,
-    services: { acpOperationTimeoutMs: () => 5000 },
+    services: { cwd: root, acpOperationTimeoutMs: () => 5000 },
   })
   const input: ProviderTurnInput = {
     attachments: [],

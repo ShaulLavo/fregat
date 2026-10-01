@@ -60,7 +60,12 @@ describe('orchestration engine', () => {
     const adapter = new MockProviderAdapter()
     const engine = new OrchestrationEngine(fixture.database, {
       attachmentsDir,
-      providerRuntime: { adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }) },
+      providerRuntime: {
+        adapterRegistry: new ProviderAdapterRegistry({
+          services: { cwd: process.cwd() },
+          adapters: [adapter],
+        }),
+      },
     })
     const sourceSessionId = '00000000-0000-4000-8000-000000000001'
     const forkId = '00000000-0000-4000-8000-000000000004'
@@ -693,7 +698,10 @@ describe('orchestration engine', () => {
   it('serves provider snapshots through the provider adapter registry route', async () => {
     const fixture = createFixture()
     const root = await fixtureRoot()
-    const adapterRegistry = new ProviderAdapterRegistry([new MockProviderAdapter()])
+    const adapterRegistry = new ProviderAdapterRegistry({
+      adapters: [new MockProviderAdapter()],
+      services: { cwd: process.cwd() },
+    })
     const app = createTestApp({
       auth: { allowedOrigins: ['http://localhost:5173'] },
       orchestration: { database: fixture.database, providerAdapterRegistry: adapterRegistry },
@@ -909,7 +917,10 @@ describe('orchestration engine', () => {
       const engine = new OrchestrationEngine(fixture.database, {
         providerRuntime: {
           checkpointGit: new GitService(createWorkspacePaths(root)),
-          adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }),
+          adapterRegistry: new ProviderAdapterRegistry({
+            services: { cwd: process.cwd() },
+            adapters: [adapter],
+          }),
         },
       })
       const turnTwoRef = checkpointRefForSessionTurn('00000000-0000-4000-8000-000000000001', 2)
@@ -1387,7 +1398,12 @@ function createRuntimeEngine(
   adapter: MockProviderAdapter,
 ) {
   return new OrchestrationEngine(fixture.database, {
-    providerRuntime: { adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }) },
+    providerRuntime: {
+      adapterRegistry: new ProviderAdapterRegistry({
+        services: { cwd: process.cwd() },
+        adapters: [adapter],
+      }),
+    },
   })
 }
 

@@ -1,5 +1,12 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
@@ -26,6 +33,32 @@ const allocate = (mib: number) =>
 const spin = (ms: number) =>
   ['bun', '-e', `const end = Date.now() + ${ms}; let n = 0; while (Date.now() < end) n++`] as const
 
+const git = (cwd: string, ...args: string[]) =>
+  spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+    cwd,
+    encoding: 'utf8',
+  }).stdout.trim()
+
+function repository(dir: string) {
+  mkdirSync(dir, { recursive: true })
+  git(dir, 'init', '-q')
+  git(dir, 'commit', '-q', '--allow-empty', '-m', path.basename(dir))
+  return git(dir, 'rev-parse', 'HEAD')
+}
+
+// A PATH holding every tool the wrapper and its job reach for, with `git` left out.
+function pathWithoutGit(box: Box) {
+  const bin = path.join(box.root, 'no-git')
+  mkdirSync(bin)
+  for (const dir of (process.env.PATH ?? '').split(':')) {
+    for (const name of existsSync(dir) ? readdirSync(dir) : []) {
+      if (name === 'git' || existsSync(path.join(bin, name))) continue
+      symlinkSync(path.join(dir, name), path.join(bin, name))
+    }
+  }
+  return bin
+}
+
 describe.skipIf(!userScopes)('a job run through the wrapper', () => {
   test('records the peak memory and CPU time of its own cgroup scope', async () => {
     const box = sandbox()
@@ -47,8 +80,76 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
       source: 'heavy',
     })
     expect(record?.unit).toMatch(new RegExp(`^${box.sliceRoot}-[0-9a-f]+\\.scope$`))
-    expect(record?.commitHash).toMatch(/^[0-9a-f]{40}$/)
+    expect(record?.version).toMatch(/^[0-9a-f]{9}$/)
   })
+
+  test('stamps the commit checked out where the job ran, null outside git', async () => {
+    const box = sandbox()
+    const main = path.join(box.root, 'platform')
+    const mainHead = repository(main)
+    const lane = path.join(box.root, 'lane')
+    git(main, 'worktree', 'add', '-q', '-b', 'lane', lane)
+    git(lane, 'commit', '-q', '--allow-empty', '-m', 'lane')
+    const laneHead = git(lane, 'rev-parse', 'HEAD')
+    mkdirSync(path.join(lane, 'apps', 'tui'), { recursive: true })
+    const otherHead = repository(path.join(box.root, 'mesh'))
+    const outside = path.join(box.root, 'outside')
+    mkdirSync(outside)
+
+    for (const cwd of [main, path.join(lane, 'apps', 'tui'), path.join(box.root, 'mesh'), outside])
+      expect((await heavy(box, path.basename(cwd), ['true'], { cwd })).code).toBe(0)
+
+    const commits = Object.fromEntries(records(box).map((r) => [r.label, r.commitHash]))
+    expect(new Set([mainHead, laneHead, otherHead]).size).toBe(3)
+    expect(commits).toEqual({ mesh: otherHead, outside: null, platform: mainHead, tui: laneHead })
+  })
+
+  test('stamps the commit the job started on, not one made while it ran', async () => {
+    const box = sandbox()
+    const checkout = path.join(box.root, 'platform')
+    const started = repository(checkout)
+    const committing = ['git', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q']
+    await heavy(box, 'commits', [...committing, '--allow-empty', '-m', 'during'], {
+      cwd: checkout,
+    })
+    expect(git(checkout, 'rev-parse', 'HEAD')).not.toBe(started)
+    expect(records(box)[0]).toMatchObject({ commitHash: started, exitCode: 0 })
+  })
+
+  test('gives up on a git that hangs and records the job without its checkout', async () => {
+    const box = sandbox()
+    const checkout = path.join(box.root, 'platform')
+    repository(checkout)
+    const bin = path.join(box.root, 'bin')
+    mkdirSync(bin)
+    const real = spawnSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim()
+    writeFileSync(path.join(bin, 'git'), `#!/bin/sh\nsleep 5\nexec ${real} "$@"\n`, { mode: 0o755 })
+    const begun = performance.now()
+    const result = await heavy(box, 'slow-git', ['true'], {
+      cwd: checkout,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    })
+    expect(result.code).toBe(0)
+    expect(performance.now() - begun).toBeLessThan(4_000)
+    expect(records(box)[0]).toMatchObject({ commitHash: null, exitCode: 0, repo: null })
+  }, 30_000)
+
+  test('records the job when git is not installed', async () => {
+    const box = sandbox()
+    const checkout = path.join(box.root, 'platform')
+    repository(checkout)
+    const result = await heavy(box, 'no-git', ['true'], {
+      cwd: checkout,
+      env: { ...process.env, PATH: pathWithoutGit(box) },
+    })
+    expect(result.code).toBe(0)
+    expect(records(box)[0]).toMatchObject({
+      commitHash: null,
+      exitCode: 0,
+      repo: null,
+      subdir: null,
+    })
+  }, 30_000)
 
   test('counts CPU time across the whole job and wall time from launch to exit', async () => {
     const box = sandbox()
@@ -168,7 +269,7 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     const result = await heavy(box, 'queued', ['true'])
     hold.kill()
     expect(result.code).toBe(0)
-    expect(result.stderr).toContain('slot1.lock is held exclusively')
+    expect(result.stderr).toContain('quiet hold by another tool')
     expect(records(box)[0]?.queuedMs).toBeGreaterThanOrEqual(1_500)
   }, 20_000)
 

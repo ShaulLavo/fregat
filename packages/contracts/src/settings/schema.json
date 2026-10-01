@@ -281,7 +281,7 @@
         },
         "browser": {
           "ceilingMiB": 10240,
-          "estimateMiB": 5632
+          "estimateMiB": 4096
         },
         "build": {
           "ceilingMiB": 4096,
@@ -289,11 +289,11 @@
         },
         "light": {
           "ceilingMiB": 2048,
-          "estimateMiB": 512
+          "estimateMiB": 1536
         },
         "suite": {
           "ceilingMiB": 8192,
-          "estimateMiB": 4096
+          "estimateMiB": 6656
         }
       },
       "description": "Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.",
@@ -410,6 +410,14 @@
       "description": "MiB of available memory that heavy-job admission leaves free for the desktop, the app and work outside the wrapper.",
       "maximum": 65536,
       "minimum": 0,
+      "type": "integer"
+    },
+    "developer.heavyJobQuietHoldSeconds": {
+      "default": 600,
+      "description": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.",
+      "markdownDescription": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.\n\nA `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.",
+      "maximum": 7200,
+      "minimum": 1,
       "type": "integer"
     },
     "developer.heavyJobStopGraceSeconds": {
@@ -600,6 +608,23 @@
       "default": true,
       "description": "A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.",
       "type": "boolean"
+    },
+    "environments.loadBalancing": {
+      "default": false,
+      "description": "Choose a connected checkout with available CPU and memory for a new draft. The draft keeps its chosen machine.",
+      "type": "boolean"
+    },
+    "environments.loadPreferences": {
+      "additionalProperties": {
+        "enum": ["less-often", "manual-only", "normal", "prefer"],
+        "type": "string"
+      },
+      "default": {},
+      "description": "Weight automatic selection for each connected machine. Manual only requires choosing the machine yourself.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
     },
     "environments.machines": {
       "additionalProperties": {
@@ -1329,6 +1354,26 @@
       "description": "Colors for the terminal app: the selected theme’s, or the colors of the terminal it runs in.",
       "enum": ["terminal", "theme"],
       "type": "string"
+    },
+    "window.browser": {
+      "default": "auto",
+      "description": "The desktop window engine: auto selects an installed Chromium browser, webview selects the system window, and an absolute path selects a browser executable.",
+      "pattern": "^(?:auto|webview|\\/[^\\0\\r\\n]+)$",
+      "type": "string"
+    },
+    "window.browserStartupIdleSeconds": {
+      "default": 5,
+      "description": "Seconds a starting browser may spend without reading its files, using the CPU or answering the launcher before the launcher stops it.",
+      "maximum": 600,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "window.browserStartupLimitSeconds": {
+      "default": 60,
+      "description": "Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it.",
+      "maximum": 600,
+      "minimum": 1,
+      "type": "integer"
     },
     "window.transparency": {
       "default": "compositor",

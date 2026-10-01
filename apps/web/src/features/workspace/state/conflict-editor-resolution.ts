@@ -1,3 +1,4 @@
+import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { parentFilesystemPath } from '@/lib/path-formatters'
 import { type TextSnapshot } from '@singapore-editor/core/document'
 import { parseMergeConflicts } from '@singapore-editor/core/editor'
@@ -105,6 +106,7 @@ export class ConflictEditorResolutionCoordinator {
     const resolution = documentStore.getState().getLiveEditorDocument(documentKey(target))
     const root = this.context.getOperationRoot()
     if (!conflict || !resolution || !root) return null
+    if (conflict.remoteFile && !supportsTextFile(conflict.remoteFile)) return null
     if (!textSnapshotEqualsText(resolution.buffer.getTextSnapshot(), text)) return null
     return {
       conflict,
@@ -190,8 +192,8 @@ export class ConflictEditorResolutionCoordinator {
             conflict.remotePath,
             text,
             {
-              baseVersion: conflict.remoteVersion,
-              expectedMtimeMs: conflict.remoteMtimeMs,
+              baseVersion: conflict.remoteFile?.version ?? null,
+              expectedMtimeMs: conflict.remoteFile?.mtimeMs ?? null,
               ...identity,
             },
             client,
@@ -215,10 +217,8 @@ export class ConflictEditorResolutionCoordinator {
       this.context.conflictStore.getState().addConflict({
         ...capture.conflict,
         eventType: retryEventType(capture.conflict),
+        remoteFile: file,
         remoteText: file.content,
-        remoteMtimeMs: file.mtimeMs,
-        remoteSize: file.size,
-        remoteVersion: file.version,
       })
       return 'retry'
     }

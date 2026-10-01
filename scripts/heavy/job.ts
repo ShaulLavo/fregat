@@ -38,7 +38,12 @@ export function localCommand({
   command,
   slice,
   graceSeconds,
-}: Launch & { readonly slice: string; readonly graceSeconds: number }) {
+  runtimeLimitSeconds = null,
+}: Launch & {
+  readonly slice: string
+  readonly graceSeconds: number
+  readonly runtimeLimitSeconds?: number | null
+}) {
   return [
     'systemd-run',
     '--user',
@@ -52,7 +57,20 @@ export function localCommand({
     // stop SIGKILLs the shim, losing the record. The kernel still kills only the offender.
     '-p',
     'OOMPolicy=continue',
+    // systemd ends the scope at the limit even when the wrapper cannot (suspended, say); its
+    // stop timeout leaves the shim time to drain the slice before what remains is killed.
+    ...(runtimeLimitSeconds === null
+      ? []
+      : [
+          '-p',
+          `RuntimeMaxSec=${runtimeLimitSeconds}s`,
+          '-p',
+          `TimeoutStopSec=${stopTimeoutSeconds(graceSeconds)}s`,
+        ]),
+    // Privileged mode: Bash runs no BASH_ENV, ENV or imported function before the shim's first
+    // line, so nothing can inherit the entry lock it closes there. The command still gets them.
     'bash',
+    '-p',
     SCOPE_SHIM,
     '--slice',
     '--grace',
@@ -113,6 +131,14 @@ export type JobSpec =
       readonly sliceRoot: string
       readonly ceilingBytes: number
       readonly slotLocks: readonly number[]
+      /**
+       * The job entry's lock, handed to the launcher on fd 6: the entry stays live until the
+       * shim, already inside the job's slice, closes it, so no wrapper drops an entry whose
+       * launcher may still start the job.
+       */
+      readonly entryLock: number
+      /** Wall-clock limit systemd enforces on the job's scope; null for none. */
+      readonly runtimeLimitSeconds: number | null
     })
   | (JobBase & { readonly host: 'pi'; readonly maxWallSec?: number })
 
@@ -138,7 +164,12 @@ export function startJob(job: JobSpec) {
         ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
         VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
       },
-      stdio: ['inherit', 'inherit', 'inherit', ...(job.host === 'local' ? job.slotLocks : [])],
+      stdio: [
+        'inherit',
+        'inherit',
+        'inherit',
+        ...(job.host === 'local' ? [...job.slotLocks, job.entryLock] : []),
+      ],
     })
   } catch (error) {
     if (slice) removeSlice(slice)
@@ -171,6 +202,11 @@ export function startJob(job: JobSpec) {
   return { done, stop }
 }
 
+/** How long systemd waits for a stopped scope: the shim's TERM grace, then its KILL settle. */
+export function stopTimeoutSeconds(graceSeconds: number) {
+  return graceSeconds + 3
+}
+
 type LocalJob = Extract<JobSpec, { readonly host: 'local' }>
 
 function jobSlice(job: LocalJob) {
@@ -181,7 +217,12 @@ function launchCommand(job: JobSpec, unit: string, accountingFile: string) {
   const launch = { accountingFile, command: job.command, unit }
   if (job.host === 'pi') return piCommand({ ...launch, maxWallSec: job.maxWallSec })
   limitSlice(jobSlice(job), job.ceilingBytes)
-  return localCommand({ ...launch, graceSeconds: job.graceSeconds, slice: jobSlice(job) })
+  return localCommand({
+    ...launch,
+    graceSeconds: job.graceSeconds,
+    runtimeLimitSeconds: job.runtimeLimitSeconds,
+    slice: jobSlice(job),
+  })
 }
 
 /**
@@ -196,9 +237,10 @@ export function reapSlice(root: string, slice: string) {
   removeSlice(slice)
 }
 
-function removeSlice(slice: string) {
-  systemctl(['stop', slice])
-  systemctl(['revert', slice])
+/** Stops the slice and drops its drop-ins; false when systemd refused either. */
+export function removeSlice(slice: string) {
+  const stopped = systemctl(['stop', slice]).exitCode === 0
+  return systemctl(['revert', slice]).exitCode === 0 && stopped
 }
 
 // No MemoryHigh: above it the kernel throttles a runaway into a crawl instead of killing it

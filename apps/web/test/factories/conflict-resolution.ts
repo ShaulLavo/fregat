@@ -59,10 +59,8 @@ export async function createConflictResolutionFixture(
     localPath: path,
     localText: 'local text',
     remotePath: path,
+    remoteFile: deleted ? null : remote,
     remoteText: deleted ? null : remote.content,
-    remoteMtimeMs: deleted ? null : remote.mtimeMs,
-    remoteSize: deleted ? null : remote.size,
-    remoteVersion: deleted ? null : remote.version,
   })
   const fileSync = new FileSyncService(documentStore, queryClient)
   const coordinator = new ConflictEditorResolutionCoordinator({

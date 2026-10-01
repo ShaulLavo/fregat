@@ -1,6 +1,18 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const gitPullRequestErrors = defineErrorCatalog('git', {
+  PULL_REQUEST_REVIEW_FAILED: {
+    status: 502,
+    message: 'The Git host could not submit the review',
+    why: 'The request failed before the Git host confirmed the complete review.',
+    fix: 'Refresh the discussion and open the Git host to check the summary and verdict before trying again.',
+  },
+  PULL_REQUEST_COMMENT_FAILED: {
+    status: 502,
+    message: 'The Git host could not post the comment',
+    why: 'The request failed before the Git host confirmed the comment.',
+    fix: 'Refresh the discussion to check whether the comment arrived before trying again.',
+  },
   FORGE_HOST_INVALID: {
     status: 400,
     message: 'The host does not match the selected service',

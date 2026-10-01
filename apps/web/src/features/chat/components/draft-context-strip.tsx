@@ -90,9 +90,22 @@ export function DraftContextStrip({
   const lockedReason = canChangeMachine ? null : MACHINE_LOCKED
   const startBranch = target.kind === 'new' ? (target.baseBranch ?? base.branch ?? 'HEAD') : null
 
+  function pinMachine() {
+    if (!move.canChange()) return false
+    const store = useChatInputDraftStore.getState()
+    const identity = store.getDraft(draftTarget).identity
+    if (identity) store.setIdentity(draftTarget, { ...identity, machineSelection: 'pinned' })
+    return true
+  }
+
+  function changeTarget(next: SessionWorktreeTarget) {
+    if (move.canChange()) onTarget(next)
+  }
+
   function chooseWorktree(worktree: OrchestrationWorktreeShell) {
+    if (!pinMachine()) return
     if (worktree.id === base.id) {
-      onTarget({ kind: 'current', worktreeId: base.id })
+      changeTarget({ kind: 'current', worktreeId: base.id })
       return
     }
     move.mutate({
@@ -104,6 +117,8 @@ export function DraftContextStrip({
 
   function chooseMachine(machine: DraftMachine) {
     if (!machine.worktree) return
+    if (!pinMachine()) return
+    if (machine.environmentId === draftTarget.environmentId) return
     move.mutate({
       environmentId: machine.environmentId,
       projectId: machine.projectId,
@@ -112,7 +127,11 @@ export function DraftContextStrip({
   }
 
   function chooseStartBranch(branch: string) {
-    if (target.kind === 'new') onTarget({ ...target, baseBranch: branch })
+    if (target.kind === 'new') changeTarget({ ...target, baseBranch: branch })
+  }
+
+  function chooseAgent(next: string | null) {
+    if (move.canChange()) onAgent(next)
   }
 
   if (presentation === 'sheet') {
@@ -130,12 +149,12 @@ export function DraftContextStrip({
         id: 'machine',
         label: 'Runs on',
         value: machine.label,
-        icon: move.isPending ? (
+        icon: move.isMoving ? (
           <Spinner size='xs' label='Moving draft' />
         ) : (
           <Phase phase={machine.phase} label={machine.label} />
         ),
-        disabled: move.isPending,
+        disabled: move.isMoving,
         choices: (
           <DraftMachineList
             environmentId={draftTarget.environmentId}
@@ -152,14 +171,14 @@ export function DraftContextStrip({
         value: choice.label,
         detail: startBranch === null ? worktreeLabel(base, 'git') : undefined,
         icon: <WorkspaceIcon className={ICON_CLASS} />,
-        disabled: move.isPending,
+        disabled: move.isMoving,
         choices: (
           <DraftWorkspaceList
             base={base}
             currentCheckout={currentCheckout}
             target={target}
             worktrees={linked}
-            onNew={() => onTarget(newWorktreeTarget(base.id))}
+            onNew={() => changeTarget(newWorktreeTarget(base.id))}
             onWorktree={chooseWorktree}
           />
         ),
@@ -168,6 +187,7 @@ export function DraftContextStrip({
       sections.push({
         id: 'branch',
         label: 'Starts from',
+        disabled: move.isMoving,
         value: startBranch,
         mono: true,
         icon: <GitBranchIcon className={ICON_CLASS} />,
@@ -178,6 +198,7 @@ export function DraftContextStrip({
     sections.push({
       id: 'agent',
       label: 'Agent',
+      disabled: move.isMoving,
       value: agent ?? 'Default agent',
       icon: <RobotIcon className={ICON_CLASS} />,
       choices: (
@@ -186,7 +207,7 @@ export function DraftContextStrip({
           enabled
           providerInstanceId={providerInstanceId}
           value={agent}
-          onSelect={onAgent}
+          onSelect={chooseAgent}
         />
       ),
     })
@@ -197,7 +218,7 @@ export function DraftContextStrip({
           .filter(Boolean)
           .join(' · ')}
         icon={
-          move.isPending ? (
+          move.isMoving ? (
             <Spinner size='xs' label='Moving draft' />
           ) : (
             <WorkspaceIcon className={ICON_CLASS} />
@@ -220,7 +241,7 @@ export function DraftContextStrip({
           environmentId={draftTarget.environmentId}
           lockedReason={lockedReason}
           machines={machines}
-          pending={move.isPending}
+          pending={move.isMoving}
           onSelect={chooseMachine}
         />
       ) : null}
@@ -228,18 +249,19 @@ export function DraftContextStrip({
         <DraftWorkspaceMenu
           base={base}
           currentCheckout={currentCheckout}
-          pending={move.isPending}
+          pending={move.isMoving}
           target={target}
           worktrees={linked}
-          onNew={() => onTarget(newWorktreeTarget(base.id))}
+          onNew={() => changeTarget(newWorktreeTarget(base.id))}
           onWorktree={chooseWorktree}
         />
       ) : null}
       <DraftAgentMenu
+        pending={move.isMoving}
         cwd={base.canonicalPath}
         providerInstanceId={providerInstanceId}
         value={agent}
-        onSelect={onAgent}
+        onSelect={chooseAgent}
       />
       {git ? (
         <div className='ml-auto flex min-w-0 justify-end'>
@@ -253,6 +275,7 @@ export function DraftContextStrip({
             </span>
           ) : (
             <DraftBranchMenu
+              pending={move.isMoving}
               rootPath={base.path}
               value={startBranch}
               onSelect={chooseStartBranch}

@@ -5,7 +5,13 @@
       "entry": ["bench/lookup.ts"]
     },
     "apps/desktop": {
-      "entry": ["src/bun/index.ts", "src/preload/index.ts", "electrobun.config.ts"]
+      "entry": [
+        "src/bun/index.ts",
+        "src/preload/index.ts",
+        "src/launcher/index.ts",
+        "src/launcher/tests/fixtures/browser.mjs",
+        "electrobun.config.ts"
+      ]
     },
     "apps/server": {
       "entry": [
@@ -117,7 +123,9 @@
         "src/search/tests/replacement.test-d.ts",
         "test/processes/job-control-launcher.ts",
         "test/processes/job-control-session.ts",
-        "test/processes/storage-writer.ts"
+        "test/processes/storage-writer.ts",
+        "test/processes/focus-trace-timeout.probe.ts",
+        "test/processes/focus-trace.vitest.config.ts"
       ]
     },
     "packages/pty": {

@@ -19,7 +19,10 @@ export async function createAcpAppFixture(driver: AnyProviderDriver) {
     orchestration: {
       providerRuntime: true,
       attachmentsDir: path.join(native.root, '.git', 'attachments'),
-      providerAdapterRegistry: new ProviderAdapterRegistry({ adapters: [native.handle.adapter] }),
+      providerAdapterRegistry: new ProviderAdapterRegistry({
+        adapters: [native.handle.adapter],
+        services: { cwd: native.root },
+      }),
     },
   })
   const engine = orchestrationForApp(app)

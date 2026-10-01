@@ -10,8 +10,10 @@ export type HeavyJobRecord = {
   readonly action: 'heavy.job'
   /** The job id; also names its scope unit. */
   readonly requestId: string
+  /** The wrapper build that ran the job. */
   readonly version: string
-  readonly commitHash: string
+  /** HEAD of the checkout holding `cwd`; null outside git. */
+  readonly commitHash: string | null
   readonly label: string
   readonly cwd: string
   /** The repository's main checkout (shared by its worktrees); null outside git. */
@@ -28,6 +30,9 @@ export type HeavyJobRecord = {
   readonly admission: string
   /** The local job slice; null for a Pi job. */
   readonly slice: string | null
+  readonly quiet: boolean
+  /** A quiet job stopped because its hold ran out; it has to queue again. */
+  readonly quietHoldExpired: boolean
   readonly unit: string
   readonly queuedMs: number
   readonly wallMs: number

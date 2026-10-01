@@ -106,3 +106,53 @@ test('settles a silent native catalogue with the injected operation deadline and
   await failure
   expect(() => process.kill(pid, 0)).toThrow()
 })
+
+test('driver discovers native models before a session and applies advertised choices on the wire', async () => {
+  const fixture = await createAcpFixture(cursorDriver)
+  fixtures.push(fixture)
+  const snapshot = await fixture.handle.adapter.snapshot()
+  expect(snapshot.status).toBe('ready')
+  expect(snapshot.auth.status).toBe('unknown')
+  expect((await fixture.records()).find((entry) => entry.event === 'spawn')?.cwd).toBe(fixture.root)
+  const model = snapshot.models.find((entry) => entry.slug === 'fixture-cursor-small')
+  expect(model?.capabilities?.optionDescriptors).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'context', type: 'select', currentValue: 'wide' }),
+      expect.objectContaining({ id: 'fast', type: 'boolean', currentValue: false }),
+    ]),
+  )
+  expect((await fixture.records()).some((entry) => entry.method === 'session/new')).toBe(false)
+  await fixture.handle.adapter.startRuntime({
+    ...fixture.input,
+    modelSelection: {
+      ...fixture.input.modelSelection,
+      model: 'fixture-cursor-small',
+      options: { reasoning: 'low', context: 'small', fast: true },
+    },
+  })
+  expect(
+    (await fixture.records())
+      .filter(
+        (entry) =>
+          entry.method === 'session/set_model' || entry.method === 'session/set_config_option',
+      )
+      .map((entry) => ({ method: entry.method, params: entry.params })),
+  ).toEqual([
+    {
+      method: 'session/set_model',
+      params: { sessionId: expect.any(String), modelId: 'fixture-cursor-small' },
+    },
+    {
+      method: 'session/set_config_option',
+      params: { sessionId: expect.any(String), configId: 'reasoning', value: 'low' },
+    },
+    {
+      method: 'session/set_config_option',
+      params: { sessionId: expect.any(String), configId: 'context', value: 'small' },
+    },
+    {
+      method: 'session/set_config_option',
+      params: { sessionId: expect.any(String), configId: 'fast', value: true },
+    },
+  ])
+})
