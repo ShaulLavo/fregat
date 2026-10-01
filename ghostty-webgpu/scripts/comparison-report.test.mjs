@@ -2,7 +2,32 @@ import { PNG } from 'pngjs'
 import { ink } from './comparison-pixels.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { droppedFrames, markdown, order, quantile, summaries } from './comparison-report.mjs'
+
+test('benchmark package metadata matches native resolver provenance', () => {
+  const packageBytes = readFileSync(new URL('../package.json', import.meta.url))
+  const inputBytes = readFileSync(
+    new URL('./config-resolver-native/native-inputs.json', import.meta.url),
+  )
+  const inputs = JSON.parse(inputBytes)
+  const nativeRoot = new URL('../native/config-resolver/', import.meta.url)
+  const markerName = existsSync(new URL('bootstrap.json', nativeRoot))
+    ? 'bootstrap.json'
+    : 'manifest.json'
+  const marker = JSON.parse(readFileSync(new URL(markerName, nativeRoot)))
+  assert.deepEqual(
+    inputs.ownedFiles.find((file) => file.path === 'package.json'),
+    {
+      path: 'package.json',
+      mode: '100644',
+      bytes: packageBytes.length,
+      sha256: createHash('sha256').update(packageBytes).digest('hex'),
+    },
+  )
+  assert.equal(marker.nativeInputsTreeSha256, createHash('sha256').update(inputBytes).digest('hex'))
+})
 
 test('median averages the middle pair and p95 uses nearest rank', () => {
   assert.equal(quantile([4, 1, 3, 2], 0.5), 2.5)
