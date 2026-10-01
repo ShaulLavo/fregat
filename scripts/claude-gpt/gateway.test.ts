@@ -335,10 +335,13 @@ test('registry polling honors cancellation', async () => {
 test.each([
   { entry: 'source', state: 'ready' },
   { entry: 'bundle', state: 'ready' },
-  { entry: 'source', state: 'timeout' },
+  { entry: 'source', state: 'empty' },
+  { entry: 'source', state: 'unauthorized' },
+  { entry: 'source', state: 'stubborn' },
+  { entry: 'source', state: 'occupied' },
   { entry: 'source', state: 'exit' },
 ])(
-  'runner $entry $state keeps the mesh readiness port behind the registry',
+  'runner review $entry $state serves Claude independently and cleans up its child',
   async (scenario) => {
     const dir = await mkdtemp(join(tmpdir(), 'gateway-cold-start-'))
     const proxyReservation = Bun.serve({
@@ -354,7 +357,8 @@ test.each([
     const proxyPort = proxyReservation.port!
     const gatewayPort = gatewayReservation.port!
     proxyReservation.stop(true)
-    gatewayReservation.stop(true)
+    if (scenario.state !== 'occupied') gatewayReservation.stop(true)
+    const pidFile = join(dir, 'pid')
     const release = join(dir, 'release')
     const probed = join(dir, 'probed')
     const binary = join(dir, 'proxy')
@@ -365,16 +369,21 @@ test.each([
       `#!${process.execPath}
 const config = await Bun.file(Bun.argv[3]).json()
 if (config.state === 'exit') process.exit(7)
-Bun.serve({ hostname: '127.0.0.1', port: config.port, async fetch() {
+await Bun.write(config.pidFile, String(process.pid))
+if (config.state === 'stubborn') process.on('SIGTERM', () => {})
+Bun.serve({ hostname: '127.0.0.1', port: config.port, async fetch(request) {
+  if (new URL(request.url).pathname.startsWith('/claude/')) return new Response('Claude fixture')
   await Bun.write(config.probed, 'probed')
-  return Response.json(await Bun.file(config.release).exists() ? { data: [{ id: 'gpt-6.1-sol' }] } : { data: [] })
+  if (config.state === 'unauthorized') return new Response('denied', { status: 401 })
+  const ready = ['stubborn', 'occupied'].includes(config.state) || await Bun.file(config.release).exists()
+  return Response.json(ready ? { data: [{ id: 'gpt-6.1-sol' }] } : { data: [] })
 } })
 `,
     )
     await chmod(binary, 0o700)
     await Bun.write(
       proxyConfig,
-      JSON.stringify({ port: proxyPort, release, probed, state: scenario.state }),
+      JSON.stringify({ port: proxyPort, release, probed, pidFile, state: scenario.state }),
     )
     await Bun.write(
       config,
@@ -391,7 +400,19 @@ Bun.serve({ hostname: '127.0.0.1', port: config.port, async fetch() {
       expect(build.success).toBe(true)
       entry = build.outputs[0]!.path
     }
-    const child = Bun.spawn([process.execPath, entry, config], {
+    const preload = join(dir, 'provider-fixture.ts')
+    await Bun.write(
+      preload,
+      `const original = globalThis.fetch
+const proxy = 'http://127.0.0.1:${proxyPort}'
+globalThis.fetch = (input, init) => {
+  const url = new URL(String(input))
+  if (url.hostname === 'api.anthropic.com') return original(proxy + '/claude' + url.pathname, init)
+  return original(input, init)
+}
+`,
+    )
+    const child = Bun.spawn([process.execPath, '--preload', preload, entry, config], {
       stdout: 'pipe',
       stderr: 'pipe',
     })
@@ -402,31 +423,64 @@ Bun.serve({ hostname: '127.0.0.1', port: config.port, async fetch() {
         await expect(fetch(endpoint)).rejects.toBeDefined()
         return
       }
-      const deadline = performance.now() + 5_000
-      while (!(await Bun.file(probed).exists()) && performance.now() < deadline) await Bun.sleep(10)
-      expect(await Bun.file(probed).exists()).toBe(true)
-      await expect(fetch(endpoint)).rejects.toBeDefined()
-      if (scenario.state === 'timeout') {
-        expect(await child.exited).not.toBe(0)
-        const stderr = await new Response(child.stderr).text()
-        expect(stderr).toContain('proxy-readiness')
-        expect(stderr).toContain('did not load within 15 seconds')
-        await expect(fetch(endpoint)).rejects.toBeDefined()
+      if (scenario.state === 'occupied') {
+        expect(await child.exited).toBe(1)
+        await expect(fetch(`http://127.0.0.1:${proxyPort}/v1/models`)).rejects.toBeDefined()
         return
       }
-      await Bun.write(release, 'ready')
       let status = 0
-      while (status !== 200 && performance.now() < deadline) {
+      const deadline = performance.now() + 2_000
+      while (status === 0 && performance.now() < deadline) {
         status = await fetch(endpoint)
           .then((response) => response.status)
           .catch(() => 0)
-        if (status !== 200) await Bun.sleep(10)
+        if (status === 0) await Bun.sleep(10)
       }
-      expect(status).toBe(200)
+      expect(status).toBe(scenario.state === 'stubborn' ? 200 : 503)
+      expect(await Bun.file(probed).exists()).toBe(true)
+      const claude = await fetch(endpoint.replace('/health', '/v1/messages'), {
+        method: 'POST',
+        headers: { authorization: 'test' },
+        body: '{"model":"claude-opus-5-5"}',
+      })
+      expect(await claude.text()).toBe('Claude fixture')
+      expect(claude.status).toBe(200)
+      if (scenario.state === 'stubborn') {
+        child.kill('SIGTERM')
+        const exited = await Promise.race([child.exited, Bun.sleep(3_000).then(() => 'hung')])
+        expect(exited).not.toBe('hung')
+        await expect(fetch(`http://127.0.0.1:${proxyPort}/v1/models`)).rejects.toBeDefined()
+        return
+      }
+      if (scenario.state === 'empty') {
+        const gpt = await fetch(endpoint.replace('/health', '/v1/messages'), {
+          method: 'POST',
+          headers: { authorization: 'test' },
+          body: '{"model":"gpt-6.1-sol"}',
+        })
+        expect(gpt.status).toBe(503)
+        const stderr = new Response(child.stderr).text()
+        child.kill('SIGTERM')
+        await child.exited
+        expect(await stderr).toContain('gave-up')
+        return
+      }
+      if (scenario.state === 'unauthorized') {
+        expect(child.exitCode).toBeNull()
+        return
+      }
+      await Bun.write(release, 'ready')
+      expect((await fetch(endpoint)).status).toBe(200)
       expect(child.exitCode).toBeNull()
     } finally {
-      if (child.exitCode === null) child.kill('SIGTERM')
+      if (child.exitCode === null) child.kill('SIGKILL')
       await child.exited
+      if (await Bun.file(pidFile).exists()) {
+        try {
+          process.kill(Number(await Bun.file(pidFile).text()), 'SIGKILL')
+        } catch {}
+      }
+      gatewayReservation.stop(true)
       await rm(dir, { recursive: true, force: true })
     }
   },
@@ -1089,4 +1143,193 @@ test('loopback Host matching tolerates changed ports, casing, trailing dot and m
   } finally {
     upstream.stop(true)
   }
+})
+
+test('review startup accepts a healthy 300 ms catalog within the overall budget', async () => {
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    async fetch() {
+      await Bun.sleep(300)
+      return Response.json(fullRegistry)
+    },
+  })
+  try {
+    expect(
+      await waitForProxy({ proxyUrl: upstream.url.toString(), apiKey: 'test' }, 1_000),
+    ).toEqual(['gpt-6.1-sol'])
+  } finally {
+    upstream.stop(true)
+  }
+})
+
+test.each(['initial', 'recovery'])(
+  'review %s waits through a partially loaded GPT catalog',
+  async (phase) => {
+    let warming = phase === 'initial'
+    let reads = 0
+    const bodies: string[] = []
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(request) {
+        if (new URL(request.url).pathname === '/v1/models') {
+          if (!warming) return Response.json(fullRegistry)
+          reads++
+          return Response.json(reads < 3 ? { data: [{ id: 'gpt-older' }] } : fullRegistry)
+        }
+        bodies.push(await request.text())
+        if (reads < 3)
+          return Response.json(
+            { error: { message: 'unknown provider for model gpt-6.1-sol' } },
+            { status: 400 },
+          )
+        return new Response('ready')
+      },
+    })
+    const server = startGateway({
+      gatewayPort: 0,
+      anthropicUrl: 'http://127.0.0.1:1',
+      proxyUrl: upstream.url.toString(),
+      apiKey: 'test',
+    })
+    const body = '{ "model": "gpt-6.1-sol", "messages": [] }'
+    try {
+      if (phase === 'recovery') {
+        expect((await fetch(new URL('/health', server.url))).status).toBe(200)
+        warming = true
+      }
+      const response = await fetch(new URL('/v1/messages', server.url), {
+        method: 'POST',
+        headers: { authorization: 'test' },
+        body,
+      })
+      expect(response.status).toBe(200)
+      expect(await response.text()).toBe('ready')
+      expect(reads).toBe(3)
+      expect(bodies).toEqual(phase === 'initial' ? [body] : [body, body])
+    } finally {
+      server.stop(true)
+      upstream.stop(true)
+    }
+  },
+)
+
+test.each([
+  { model: 'gpt-6.1-sol(high)', listed: 'gpt-6.1-sol' },
+  { model: 'gpt-6.1-sol(8192)', listed: 'gpt-6.1-sol' },
+  { model: 'gpt-6.1-sol (high)', listed: 'gpt-6.1-sol' },
+  { model: 'gpt-custom(nested)(high)', listed: 'gpt-custom(nested)' },
+  { model: 'gpt-custom(high)', listed: 'gpt-custom(high)' },
+])(
+  'review recovery canonicalizes $model while preserving original bytes',
+  async ({ model, listed }) => {
+    const bodies: string[] = []
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(request) {
+        if (new URL(request.url).pathname === '/v1/models')
+          return Response.json({ data: [{ id: listed }] })
+        bodies.push(await request.text())
+        if (bodies.length === 1)
+          return Response.json(
+            { error: { message: 'unknown provider for model ' + model } },
+            { status: 400 },
+          )
+        return new Response('ready')
+      },
+    })
+    const server = startGateway({
+      gatewayPort: 0,
+      anthropicUrl: 'http://127.0.0.1:1',
+      proxyUrl: upstream.url.toString(),
+      apiKey: 'test',
+    })
+    const body = `{ "model": ${JSON.stringify(model)}, "messages": [] }`
+    try {
+      const response = await fetch(new URL('/v1/messages', server.url), {
+        method: 'POST',
+        headers: { authorization: 'test' },
+        body,
+        signal: AbortSignal.timeout(2_000),
+      })
+      expect(response.status).toBe(200)
+      expect(bodies).toEqual([body, body])
+    } finally {
+      server.stop(true)
+      upstream.stop(true)
+    }
+  },
+)
+
+test.each(['open', 'oversized'])(
+  'review bounds %s GPT error inspection and cancels without replay',
+  async (state) => {
+    let attempts = 0
+    let canceled = false
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        if (new URL(request.url).pathname === '/v1/models') return Response.json(fullRegistry)
+        attempts++
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              const prefix = '{"error":{"message":"unknown provider for model gpt-6.1-sol"}}'
+              controller.enqueue(
+                new TextEncoder().encode(
+                  state === 'open' ? prefix : prefix + ' '.repeat(128 * 1024),
+                ),
+              )
+            },
+            cancel() {
+              canceled = true
+            },
+          }),
+          { status: 400 },
+        )
+      },
+    })
+    const server = startGateway({
+      gatewayPort: 0,
+      anthropicUrl: 'http://127.0.0.1:1',
+      proxyUrl: upstream.url.toString(),
+      apiKey: 'test',
+    })
+    try {
+      const result = await Promise.race([
+        fetch(new URL('/v1/messages', server.url), {
+          method: 'POST',
+          headers: { authorization: 'test' },
+          body: '{"model":"gpt-6.1-sol"}',
+          signal: AbortSignal.timeout(3_000),
+        }),
+        Bun.sleep(2_000).then(() => null),
+      ])
+      expect(result?.status).toBe(502)
+      expect(await result?.text()).toContain('inspection limit')
+      const deadline = performance.now() + 500
+      while (!canceled && performance.now() < deadline) await Bun.sleep(10)
+      expect(canceled).toBe(true)
+      expect(attempts).toBe(1)
+    } finally {
+      server.stop(true)
+      upstream.stop(true)
+    }
+  },
+)
+
+test('review README places the no-active-request prerequisite beside both stop examples', async () => {
+  const readme = await Bun.file(join(import.meta.dirname, 'README.md')).text()
+  const lines = readme.split('\n')
+  const stopLines = lines.flatMap((line, index) =>
+    line.includes('mesh serve stop /ai') ? [index] : [],
+  )
+  expect(stopLines).toHaveLength(2)
+  for (const index of stopLines)
+    expect(lines.slice(Math.max(0, index - 1), index + 1).join('\n')).toContain(
+      'wait until no agents are mid-request',
+    )
 })
