@@ -12,23 +12,30 @@ import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
 import { createScriptError, scriptFailureText } from '../structured-errors'
 import { decide, legacyHold, readReadings, sliceMemory, type Limits } from './admission'
-import { HOSTS, isHost, startJob, type Host, type JobOutcome } from './job'
-import { tryLock, unlock, waitLock } from './lock'
+import { HOSTS, isHost, startJob, type Host, type JobOutcome, type JobSpec } from './job'
+import { acquirePiLane, DEFAULT_STATE_DIR, tryLock, unlock, waitLock } from './lock'
 import { enqueue, live, promote, release, type Entry, type Held } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--host local] [--state-dir <dir>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
-// Also the directory of the slot locks that tools taking all three for a quiet machine use.
-const STATE_DIR = '/work/tmp/wave-heavy'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
 const MiB = 2 ** 20
-const FLAGS = ['--class', '--host', '--state-dir', '--log-dir', '--settings-home', '--proc']
+const FLAGS = [
+  '--class',
+  '--host',
+  '--max-wall',
+  '--state-dir',
+  '--log-dir',
+  '--settings-home',
+  '--proc',
+]
 
 type Classes = SettingValue<'developer.heavyJobClasses'>
 type JobClass = keyof Classes
+type Budget = Classes[JobClass]
 
 type Options = {
   readonly jobClass: JobClass
@@ -39,6 +46,7 @@ type Options = {
   readonly logDir: string | null
   readonly settingsHome: string
   readonly procRoot: string
+  readonly maxWallSec?: number
 }
 
 type Config = { readonly classes: Classes; readonly limits: Limits }
@@ -70,6 +78,16 @@ function parseOptions(argv: readonly string[]): Options {
   if (!isHost(host)) {
     throw createScriptError(`Unknown host ${host}. Hosts: ${HOSTS.join(', ')}.`)
   }
+  const maxWall = flags.get('--max-wall')
+  if (maxWall !== undefined && host !== 'pi') {
+    throw createScriptError(
+      `--max-wall applies to --host pi, which enforces it on the Pi. ${USAGE}`,
+    )
+  }
+  const maxWallSec = maxWall === undefined ? undefined : Number(maxWall)
+  if (maxWallSec !== undefined && (!Number.isSafeInteger(maxWallSec) || maxWallSec <= 0)) {
+    throw createScriptError(`--max-wall must be a positive whole number of seconds. ${USAGE}`)
+  }
   const jobClass = flags.get('--class') ?? 'suite'
   if (!Object.hasOwn(SETTINGS_REGISTRY['developer.heavyJobClasses'].default, jobClass)) {
     throw createScriptError(`Unknown class ${jobClass}. ${USAGE}`)
@@ -80,49 +98,97 @@ function parseOptions(argv: readonly string[]): Options {
     jobClass: jobClass as JobClass,
     label,
     logDir: flags.get('--log-dir') ?? null,
+    maxWallSec,
     procRoot: flags.get('--proc') ?? '/proc',
     settingsHome: flags.get('--settings-home') ?? productionStateHome,
-    stateDir: flags.get('--state-dir') ?? STATE_DIR,
+    stateDir: flags.get('--state-dir') ?? DEFAULT_STATE_DIR,
   }
 }
 
 async function run(options: Options) {
-  const config = readConfig(options.settingsHome)
-  const budget = config.classes[options.jobClass]
   const cwd = process.cwd()
-  const entry: Entry = {
-    cwd,
-    estimateBytes: budget.estimateMiB * MiB,
-    id: randomBytes(6).toString('hex'),
-    jobClass: options.jobClass,
-    label: options.label,
-    pid: process.pid,
-    since: new Date().toISOString(),
-  }
+  const id = randomBytes(6).toString('hex')
   const queuedAt = performance.now()
-  const admitted = await admit(options, config, entry)
+  const placed =
+    options.host === 'pi' ? await admitPi(options, cwd, id) : await admitLocal(options, cwd, id)
   const queuedMs = Math.round(performance.now() - queuedAt)
   console.error(
-    `[wave-heavy] started '${options.label}' (${options.jobClass}) after ${Math.round(queuedMs / 1000)}s: ${admitted.reason}`,
+    `[wave-heavy] started '${options.label}' on ${options.host} after ${Math.round(queuedMs / 1000)}s: ${placed.reason}`,
   )
 
-  const job = startJob({
-    ceilingBytes: budget.ceilingMiB * MiB,
-    command: options.command,
-    cwd,
-    host: options.host,
-    id: entry.id,
-  })
+  const job = startJob(placed.spec)
   // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
   // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     process.on(signal, () => job.stop(signal))
   }
   const outcome = await job.done
-  record(options, { admission: admitted.reason, budget, cwd, id: entry.id, outcome, queuedMs })
-  release(admitted.held)
-  for (const fd of admitted.slots) unlock(fd)
+  record(options, { admission: placed.reason, budget: placed.budget, cwd, id, outcome, queuedMs })
+  placed.release()
   return outcome.exitCode
+}
+
+/** Where a job was admitted, and how to give its place back once it has exited. */
+type Placed = {
+  readonly spec: JobSpec
+  readonly budget: Budget | null
+  readonly reason: string
+  readonly release: () => void
+}
+
+async function admitLocal(options: Options, cwd: string, id: string): Promise<Placed> {
+  const config = readConfig(options.settingsHome)
+  const budget = config.classes[options.jobClass]
+  const entry: Entry = {
+    cwd,
+    estimateBytes: budget.estimateMiB * MiB,
+    id,
+    jobClass: options.jobClass,
+    label: options.label,
+    pid: process.pid,
+    since: new Date().toISOString(),
+  }
+  const admitted = await admit(options, config, entry)
+  return {
+    budget,
+    reason: admitted.reason,
+    release: () => {
+      release(admitted.held)
+      for (const fd of admitted.slots) unlock(fd)
+    },
+    spec: {
+      ceilingBytes: budget.ceilingMiB * MiB,
+      command: options.command,
+      cwd,
+      host: 'local',
+      id,
+    },
+  }
+}
+
+// The Pi runs one job at a time under its own ceiling, so this machine's memory is not asked.
+async function admitPi(options: Options, cwd: string, id: string): Promise<Placed> {
+  const { fd, holder } = await acquirePiLane(options.stateDir)
+  const since = new Date().toTimeString().slice(0, 8)
+  writeFileSync(holder, `${options.label} pid=${process.pid} since=${since} cwd=${cwd}\n`)
+  return {
+    budget: null,
+    reason: 'the Pi lane is free',
+    release: () => {
+      clearHolder(holder)
+      unlock(fd)
+    },
+    spec: { command: options.command, cwd, host: 'pi', id, maxWallSec: options.maxWallSec },
+  }
+}
+
+// The job's exit status is the wrapper's; failing to clear a status line must not replace it.
+function clearHolder(holder: string) {
+  try {
+    writeFileSync(holder, '')
+  } catch (error) {
+    console.error(`[wave-heavy] could not clear ${holder}: ${scriptFailureText(error)}`)
+  }
 }
 
 type Admitted = { readonly held: Held; readonly slots: readonly number[]; readonly reason: string }
@@ -222,7 +288,7 @@ function readText(file: string) {
 
 type Finished = {
   readonly admission: string
-  readonly budget: Classes[JobClass]
+  readonly budget: Budget | null
   readonly cwd: string
   readonly id: string
   readonly outcome: JobOutcome
@@ -251,13 +317,13 @@ function jobRecord(
     action: 'heavy.job',
     admission,
     area: 'heavy-jobs',
-    ceilingBytes: budget.ceilingMiB * MiB,
-    class: options.jobClass,
+    ceilingBytes: budget ? budget.ceilingMiB * MiB : null,
+    class: budget ? options.jobClass : null,
     command: redactCommand(options.command),
     commitHash,
     cpuUsageUsec: outcome.cpuUsageUsec,
     cwd,
-    estimateBytes: budget.estimateMiB * MiB,
+    estimateBytes: budget ? budget.estimateMiB * MiB : null,
     exitCode: outcome.exitCode,
     host: options.host,
     label: options.label,

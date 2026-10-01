@@ -20,12 +20,14 @@ export type HeavyJobRecord = {
   readonly subdir: string | null
   readonly command: readonly string[]
   readonly host: string
-  readonly class: string
-  readonly estimateBytes: number
-  readonly ceilingBytes: number
+  /** The admission class and its budget; null on the Pi, which runs under its own ceiling. */
+  readonly class: string | null
+  readonly estimateBytes: number | null
+  readonly ceilingBytes: number | null
   /** Why admission let it start: the free memory it saw, or that nothing else ran. */
   readonly admission: string
-  readonly slice: string
+  /** The local job slice; null for a Pi job. */
+  readonly slice: string | null
   readonly unit: string
   readonly queuedMs: number
   readonly wallMs: number

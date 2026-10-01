@@ -18,6 +18,8 @@ import {
 
 afterEach(removeSandboxes)
 
+const RUN = path.join(import.meta.dirname, 'run.ts')
+
 const allocate = (mib: number) =>
   ['bun', '-e', `const b = Buffer.alloc(${mib} * 2 ** 20, 1); console.log(b.length)`] as const
 const spin = (ms: number) =>
@@ -189,3 +191,15 @@ function runningEntries(box: Box) {
   const dir = path.join(box.state, 'jobs')
   return existsSync(dir) ? readdirSync(dir).filter((name) => name.endsWith('.json')) : []
 }
+
+test('refuses --max-wall without --host pi, and a ceiling that is not whole seconds', () => {
+  const label = 'ceiling-check'
+  const wrapper = (flags: readonly string[]) =>
+    spawnSync(process.execPath, [RUN, ...flags, label, '--', 'true'], { encoding: 'utf8' })
+  const local = wrapper(['--max-wall', '60'])
+  expect(local.status).toBe(2)
+  expect(local.stderr).toContain('--max-wall applies to --host pi')
+  const fraction = wrapper(['--host', 'pi', '--max-wall', '1.5'])
+  expect(fraction.status).toBe(2)
+  expect(fraction.stderr).toContain('positive whole number of seconds')
+})

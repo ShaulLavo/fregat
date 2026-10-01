@@ -208,10 +208,28 @@ describe.skipIf(!userScopes)('the job slice', () => {
     expect(record?.level).toBe('warn')
   }, 30_000)
 
+  test('a case scope running the shim alone inside the job counts itself and spares the job', async () => {
+    const box = admissionBox({ availableMiB: 65536 })
+    const accounting = path.join(box.root, 'case.accounting')
+    const shim = path.join(import.meta.dirname, 'scope.sh')
+    const script = [
+      'sleep 5 & sibling=$!',
+      `systemd-run --user --scope --quiet --slice="$HEAVY_JOB_SLICE" bash ${shim} ${accounting} bun -e 'Buffer.alloc(150 * 2 ** 20, 1)'`,
+      'kill -0 $sibling && echo "sibling alive"',
+      `cat ${accounting}`,
+    ].join('; ')
+    const job = start(box, 'case', ['bash', '-c', script], { jobClass: 'build' })
+    await job.done
+    expect(job.stdout()).toContain('sibling alive')
+    const casePeak = Number(/^peak (\d+)$/m.exec(job.stdout())?.[1])
+    expect(casePeak).toBeGreaterThanOrEqual(150 * MiB)
+    expect(recordOf(box, 'case')?.memoryPeakBytes).toBeGreaterThanOrEqual(casePeak)
+  }, 30_000)
+
   test('the slice is stopped and its ceiling drop-in removed after the job', async () => {
     const box = sandbox()
     await heavy(box, 'tidy', ['true'], { jobClass: 'light' })
-    const slice = recordOf(box, 'tidy')!.slice
+    const slice = recordOf(box, 'tidy')!.slice!
     expect(unitActive(slice)).toBe(false)
     const dropIn = `/run/user/${process.getuid?.()}/systemd/user.control/${slice}.d`
     expect(existsSync(dropIn)).toBe(false)

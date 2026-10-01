@@ -38,7 +38,10 @@ const groupings = {
       record.command,
     ]),
   }),
-  class: (record: HeavyJobRecord): Group => ({ display: record.class, id: record.class }),
+  class: (record: HeavyJobRecord): Group => {
+    const name = record.class ?? `host ${record.host}`
+    return { display: name, id: name }
+  },
   label: (record: HeavyJobRecord): Group => ({ display: record.label, id: record.label }),
 }
 const orders = {

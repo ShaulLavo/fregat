@@ -74,11 +74,13 @@ test.skipIf(!userScopes || !checkoutClean)(
     expect(readdirSync(path.join(root, head)).toSorted()).toEqual([
       'commit',
       'nested-scope.sh',
+      'pi',
       'report.js',
       'run.js',
       'scope.sh',
       'status.js',
     ])
+    expect(readdirSync(path.join(root, head, 'pi'))).toEqual(['launch.js'])
 
     const again = run('bun', [INSTALL, '--root', root])
     expect(again.stdout).toContain('Already installed')
