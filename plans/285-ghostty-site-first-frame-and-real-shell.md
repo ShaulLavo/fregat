@@ -2,7 +2,10 @@
 
 ## Status and authorization
 
-- Status: APPROVED 2026-10-01 by the owner, answering two site reviews in one pass. The owner's own
+- Status: DONE 2026-10-02, pending the owner's look on the phone and the MacBook. Shipped in
+  #282 (content), #278 (demos), #285 (DOM renderer, ghostty-webgpu 0.3.0), #302 (Redraws
+  overlay) and #304 (first frame in the HTML). Approved 2026-10-01 by the owner, answering two
+  site reviews in one pass. The owner's own
   gripe is speed: "we should make it faster … servo render the first frame of the terminal."
 - Site: <https://shaullavo.github.io/ghostty-webgpu/>, built from `ghostty-webgpu/site/` by
   `.github/workflows/site.yml` on every push to `main` that touches `ghostty-webgpu/**`.
@@ -361,3 +364,11 @@ public string renderer), Phase 4's `diagnostics.onFrame` another.
   what it measures.
 - The Shell tab runs real bash, loaded only when asked for.
 - The owner has looked at it on the phone and the MacBook.
+
+## Follow-ups
+
+- Flip `SHOW_MEASUREMENTS` once Plan 283's numbers land (Measured section, Phase 3).
+- Check WebGPU on real hardware and the layout in Firefox and WebKit; every check so far ran in
+  headless Chromium on SwiftShader or WebGL2.
+- When the ghost frames fail to load, the live terminal replaces the static first frame with a
+  one-line error; keep the static frame on the Ghost tab instead, until another tab is chosen.
