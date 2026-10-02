@@ -1,5 +1,5 @@
 import { copyFileSync, cpSync, lstatSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { hostname, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createScriptError, scriptFailureText } from './structured-errors'
 
@@ -9,7 +9,6 @@ interface MeshResult {
   stderr: string
 }
 interface ShowOptions {
-  host?: string
   run?: (args: string[]) => MeshResult
 }
 
@@ -121,13 +120,7 @@ export function showFiles(files: readonly string[], options: ShowOptions = {}) {
   const directory = mkdtempSync(path.join(tmpdir(), 'fregat-show-'))
   try {
     writePage(files, directory)
-    const result = (options.run ?? runMesh)([
-      'app',
-      'create',
-      options.host ?? hostname(),
-      directory,
-      '--json',
-    ])
+    const result = (options.run ?? runMesh)(['app', 'create', 'local', directory, '--json'])
     const failure = () =>
       createScriptError('Mesh could not publish the show page.', {
         why: 'Mesh must return a private app URL and its expiry after uploading the files.',

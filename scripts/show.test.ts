@@ -7,7 +7,7 @@ import {
   existsSync,
   symlinkSync,
 } from 'node:fs'
-import { hostname, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 import { showFiles } from './show'
@@ -38,7 +38,7 @@ fixture(
     let uploaded = ''
     const result = showFiles(files, {
       run: (args) => {
-        expect(args.slice(0, 3)).toEqual(['app', 'create', hostname()])
+        expect(args.slice(0, 3)).toEqual(['app', 'create', 'local'])
         expect(args[4]).toBe('--json')
         uploaded = args[3]!
         const html = readFileSync(path.join(uploaded, 'index.html'), 'utf8')
@@ -95,9 +95,8 @@ fixture('reports missing files and mesh failures with stderr', ({ root }) => {
   let uploaded = ''
   try {
     showFiles([image], {
-      host: 'fixture-host',
       run: (args) => {
-        expect(args[2]).toBe('fixture-host')
+        expect(args[2]).toBe('local')
         uploaded = args[3]!
         return { exitCode: 1, stdout: '', stderr: 'mesh diagnostic' }
       },
