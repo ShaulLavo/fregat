@@ -140,6 +140,7 @@ export async function compactEvidence(artifact, directory) {
     qualifications: artifact.qualifications,
     runs: artifact.runs.map((run) => ({
       variant: run.variant,
+      frameBuilder: run.frameBuilder,
       path: run.path,
       count: run.count,
       repetition: run.repetition,

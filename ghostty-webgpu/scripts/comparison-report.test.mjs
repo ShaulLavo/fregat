@@ -708,6 +708,23 @@ test('portable compaction preserves between-repetition qualifications and bounde
   assert(!JSON.stringify(compact).includes('Infinity'))
 })
 
+test('compaction preserves paired frame-builder identities and ratios', async () => {
+  const artifact = pairedArtifact()
+  artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
+  artifact.qualifications = []
+  artifact.runs = artifact.runs.flatMap((run) =>
+    run.variant === 'ghostty-webgpu'
+      ? ['js', 'zig'].map((frameBuilder) => ({ ...run, frameBuilder }))
+      : [run],
+  )
+  const compact = await compactEvidence(artifact)
+  assert.deepEqual(
+    compact.runs.map((run) => run.frameBuilder),
+    artifact.runs.map((run) => run.frameBuilder),
+  )
+  assert.deepEqual(pairedRatios(compact), pairedRatios(artifact))
+})
+
 test('compaction retains preparation failures and incomplete paired verdicts', async () => {
   const artifact = pairedArtifact()
   artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
