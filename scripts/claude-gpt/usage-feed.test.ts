@@ -335,6 +335,93 @@ test.each(['primary', 'secondary'])(
   },
 )
 
+test.each([
+  {
+    known: 'X-Codex-Bengalfox',
+    unknown: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
+    position: 'primary',
+  },
+  {
+    known: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
+    unknown: 'X-Codex-Bengalfox',
+    position: 'primary',
+  },
+  {
+    known: 'X-Codex-Bengalfox',
+    unknown: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
+    position: 'secondary',
+  },
+  {
+    known: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
+    unknown: 'X-Codex-Bengalfox',
+    position: 'secondary',
+  },
+])(
+  'equivalent prefixes prefer the identified $position window from $known within one sample',
+  ({ known, unknown, position }) => {
+    const file = proxyBody({
+      ...weeklySignals,
+      [`${known}-${position}-Window-Minutes`]: '300',
+      [`${known}-${position}-Used-Percent`]: '25',
+      [`${unknown}-${position}-Used-Percent`]: '12',
+    }).files[0]!
+    const body = {
+      observed_at: checked,
+      files: [{ ...file, model_quotas: { 'gpt-6.1-sol': file.quota } }],
+    }
+    const windows = normalizeProxySnapshot(
+      body,
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!.accounts[1]!.windows
+    expect(windows).toHaveLength(6)
+    expect(windows.map(({ id }) => id)).not.toContain(`bengalfox:${position}`)
+    expect(windows.map(({ id }) => id)).not.toContain(`model:gpt-6.1-sol:bengalfox:${position}`)
+    expect(windows.find(({ id }) => id === 'bengalfox:five_hour')).toMatchObject({
+      usedPercent: 25,
+      windowMinutes: 300,
+    })
+    expect(windows.find(({ id }) => id === 'model:gpt-6.1-sol:bengalfox:five_hour')).toMatchObject({
+      usedPercent: 25,
+      windowMinutes: 300,
+    })
+  },
+)
+
+test('equivalent prefixes preserve distinct identified quota durations', () => {
+  const file = proxyBody({
+    ...weeklySignals,
+    'X-Codex-Bengalfox-Primary-Window-Minutes': '300',
+    'X-Codex-Bengalfox-Primary-Used-Percent': '12',
+    'X-Codex-Additional-Gpt-5.3-Codex-Spark-Primary-Window-Minutes': '10080',
+    'X-Codex-Additional-Gpt-5.3-Codex-Spark-Primary-Used-Percent': '25',
+  }).files[0]!
+  const body = {
+    observed_at: checked,
+    files: [{ ...file, model_quotas: { 'gpt-6.1-sol': file.quota } }],
+  }
+  const windows = normalizeProxySnapshot(
+    body,
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+  )!.accounts[1]!.windows
+  expect(windows).toHaveLength(8)
+  expect(windows.find(({ id }) => id === 'bengalfox:five_hour')).toMatchObject({
+    usedPercent: 12,
+    windowMinutes: 300,
+  })
+  expect(windows.find(({ id }) => id === 'bengalfox:weekly')).toMatchObject({
+    usedPercent: 25,
+    windowMinutes: 10080,
+  })
+  expect(windows.find(({ id }) => id === 'model:gpt-6.1-sol:bengalfox:five_hour')).toMatchObject({
+    usedPercent: 12,
+  })
+  expect(windows.find(({ id }) => id === 'model:gpt-6.1-sol:bengalfox:weekly')).toMatchObject({
+    usedPercent: 25,
+  })
+})
+
 test('restart rejects cached windows with an epoch reset placeholder', () => {
   const snapshot = createUsageSnapshot(configuredAccounts, checked)
   snapshot.accounts[1]!.windows = [

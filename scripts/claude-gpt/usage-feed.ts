@@ -297,19 +297,31 @@ function mergeWindows(previous: readonly Window[], incoming: readonly Window[]) 
   })
 }
 function mergeCodexWindows(previous: readonly Window[], incoming: readonly CodexObservation[]) {
-  const windows = new Map(previous.map((window) => [window.id, window]))
-  const accepted: Window[] = []
-  for (const { window, slotId } of incoming) {
+  const prior = new Map(previous.map((window) => [window.id, window]))
+  const accepted = incoming.filter(({ window, slotId }) => {
+    const alias = prior.get(slotId)
+    if (!alias?.lastSeenAt) return true
+    if (!window.lastSeenAt) return false
+    return Date.parse(alias.lastSeenAt) <= Date.parse(window.lastSeenAt)
+  })
+  const windows = new Map(
+    mergeWindows(
+      previous,
+      accepted.map(({ window }) => window),
+    ).map((window) => [window.id, window]),
+  )
+  // Reconcile after merging so equivalent HTTP and websocket prefixes share aliases.
+  for (const { window, slotId } of accepted) {
+    if (window.id === slotId) continue
     const alias = windows.get(slotId)
     if (
       alias?.lastSeenAt &&
       (!window.lastSeenAt || Date.parse(alias.lastSeenAt) > Date.parse(window.lastSeenAt))
     )
       continue
-    if (window.id !== slotId) windows.delete(slotId)
-    accepted.push(window)
+    windows.delete(slotId)
   }
-  return mergeWindows([...windows.values()], accepted)
+  return [...windows.values()]
 }
 function latestObservation(windows: readonly Window[]) {
   const observed = windows.flatMap(({ lastSeenAt }) => (lastSeenAt ? [lastSeenAt] : []))
