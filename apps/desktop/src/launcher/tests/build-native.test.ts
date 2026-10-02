@@ -1,7 +1,65 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { tmpdir } from 'node:os'
 import { expect, test } from 'vitest'
 import { buildNative } from '../../../scripts/build-native'
+
+const desktopDir = path.resolve(import.meta.dirname, '../../..')
+
+test('native hosts require explicit persistent storage and parse named window options', async () => {
+  for (const source of ['macos/platform-webview.m', 'linux/platform-webview.c']) {
+    const text = await Bun.file(path.join(desktopDir, 'native', source)).text()
+    expect(text).toContain('--data-dir')
+    expect(text).toContain('--vibrancy')
+    expect(text).toMatch(/for \(int i = 3; i < argc; i\+\+\)/)
+    expect(text).toContain('Native window options invalid')
+    expect(text).not.toContain('nonPersistentDataStore')
+  }
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).not.toContain('_WKWebsiteDataStoreConfiguration')
+  expect(mac).not.toContain('_initWithConfiguration:')
+  expect(mac).toContain('if (@available(macOS 14.0, *))')
+  expect(mac).toContain('WKWebsiteDataStore dataStoreForIdentifier:identifier')
+  expect(mac).toContain('WKWebsiteDataStore.defaultDataStore')
+  expect(mac).toContain('CC_SHA256(pathData.bytes')
+  expect(mac).toContain('stringByStandardizingPath.stringByResolvingSymlinksInPath')
+  expect(mac).not.toContain('@interface WKWebsiteDataStore (PlatformStorage)')
+  expect(mac).toContain(
+    'if (@available(macOS 12.0, *)) view.underPageBackgroundColor = NSColor.clearColor',
+  )
+  const linux = await Bun.file(path.join(desktopDir, 'native/linux/platform-webview.c')).text()
+  expect(linux).toContain('webkit_website_data_manager_new(')
+  expect(linux).toContain('"base-data-directory", data_dir')
+  expect(linux).toContain('"base-cache-directory", cache_dir')
+  expect(linux).toContain('webkit_web_context_new_with_website_data_manager')
+  expect(linux).toContain('webkit_cookie_manager_set_persistent_storage')
+})
+
+test('macOS publishes actual fullscreen state to the app document', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('self.window.styleMask & NSWindowStyleMaskFullScreen')
+  expect(mac).toContain("toggleAttribute('data-native-fullscreen'")
+  expect(mac).toContain("new Event('platform-native-window-state')")
+  expect(mac).toContain('location.origin !== new URL(')
+  expect(mac).toContain(
+    'initWithSource:[self windowStateSource] injectionTime:WKUserScriptInjectionTimeAtDocumentStart',
+  )
+  expect(mac).toMatch(
+    /decidePolicyForNavigationAction:[\s\S]*?\[self refreshWindowStateScript\];\s*decisionHandler\(WKNavigationActionPolicyAllow\)/,
+  )
+  expect(mac).toMatch(/windowDidEnterFullScreen:[\s\S]*?\[self refreshWindowStateScript\]/)
+  expect(mac).toMatch(/windowDidExitFullScreen:[\s\S]*?\[self refreshWindowStateScript\]/)
+  expect(mac).toMatch(/\[host refreshWindowStateScript\];\s*\[view loadRequest:/)
+  expect(mac).toMatch(/didCommitNavigation:[\s\S]*?\[self publishWindowState\]/)
+  expect(mac).toMatch(/didFinishNavigation:[\s\S]*?\[self publishWindowState\]/)
+  expect(mac).toContain('if (document.documentElement) { apply(); return; }')
+  expect(mac).toContain('new MutationObserver(')
+  expect(mac).toContain('observer.disconnect(); apply();')
+  expect(mac).toContain('observer.observe(document, { childList: true })')
+  expect(mac).toContain('[controller addUserScript:self.initScript]')
+  expect(mac).toMatch(/windowDidEnterFullScreen:[\s\S]*?\[self publishWindowState\]/)
+  expect(mac).toMatch(/windowDidExitFullScreen:[\s\S]*?\[self publishWindowState\]/)
+})
 
 const supported = process.platform === 'linux'
 const webkit =
@@ -22,6 +80,26 @@ test.skipIf(!webkit || !compiler)(
     const output = buildNative(desktopDir, 'installed')
     expect(output).toBe(path.join(desktopDir, 'native/build/platform-webview'))
     expect(existsSync(output!)).toBe(true)
+    for (const options of [
+      [],
+      ['--data-dir'],
+      ['--data-dir', 'relative'],
+      ['--unknown'],
+      [
+        '--data-dir',
+        path.join(tmpdir(), 'unused-native-options'),
+        '--data-dir',
+        path.join(tmpdir(), 'unused-native-options'),
+      ],
+      ['--data-dir', path.join(tmpdir(), 'unused-native-options'), '--vibrancy', '--vibrancy'],
+      ['--vibrancy', '--data-dir', 'relative'],
+    ]) {
+      const result = Bun.spawnSync([output!, 'http://127.0.0.1', 'unused-script', ...options], {
+        env: { ...process.env, DISPLAY: '', WAYLAND_DISPLAY: '' },
+      })
+      expect(result.exitCode).toBe(2)
+      expect(result.stderr.toString()).toContain('Native window options invalid')
+    }
   },
 )
 

@@ -165,7 +165,25 @@ int main(int argc, char **argv) {
   pid_t parent = getppid();
   if (parent <= 1) return 1;
   if (prctl(PR_SET_PDEATHSIG, SIGTERM) != 0 || getppid() != parent) return 1;
-  if (argc < 3) { fprintf(stderr, "usage: platform-webview <url> <init-script-file> | pick <options-json> | message <text-file>\n"); return 2; }
+  if (argc < 3) { fprintf(stderr, "usage: platform-webview <url> <init-script-file> --data-dir <absolute-path> [--vibrancy] | pick <options-json> | message <text-file>\n"); return 2; }
+  const char *data_dir = NULL;
+  gboolean vibrant = FALSE;
+  gboolean helper = strcmp(argv[1], "pick") == 0 || strcmp(argv[1], "message") == 0;
+  if (!helper) {
+    for (int i = 3; i < argc; i++) {
+      if (strcmp(argv[i], "--data-dir") == 0 && !data_dir && i + 1 < argc) {
+        data_dir = argv[++i];
+        continue;
+      }
+      if (strcmp(argv[i], "--vibrancy") == 0 && !vibrant) {
+        vibrant = TRUE;
+        continue;
+      }
+      fprintf(stderr, "Native window options invalid\n");
+      return 2;
+    }
+    if (!data_dir || !g_path_is_absolute(data_dir)) { fprintf(stderr, "Native window options invalid\n"); return 2; }
+  }
   g_setenv("GTK_USE_PORTAL", "1", TRUE);
   if (!gtk_init_check(&argc, &argv)) { fprintf(stderr, "Native display unavailable\n"); return 1; }
   if (strcmp(argv[1], "pick") == 0) {
@@ -190,6 +208,22 @@ int main(int argc, char **argv) {
     g_free(text);
     return 0;
   }
+  char *cache_dir = g_build_filename(data_dir, "cache", NULL);
+  if (g_mkdir_with_parents(data_dir, 0700) != 0 || g_mkdir_with_parents(cache_dir, 0700) != 0) {
+    fprintf(stderr, "Native browser storage directories unavailable\n");
+    g_free(cache_dir);
+    g_free(text);
+    return 1;
+  }
+  WebKitWebsiteDataManager *data_manager = webkit_website_data_manager_new(
+      "base-data-directory", data_dir, "base-cache-directory", cache_dir, NULL);
+  char *cookies = g_build_filename(data_dir, "cookies.sqlite", NULL);
+  webkit_cookie_manager_set_persistent_storage(webkit_website_data_manager_get_cookie_manager(data_manager),
+      cookies, WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE);
+  WebKitWebContext *web_context = webkit_web_context_new_with_website_data_manager(data_manager);
+  g_object_unref(data_manager);
+  g_free(cookies);
+  g_free(cache_dir);
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   gtk_window_set_title(GTK_WINDOW(window), "Platform");
   gtk_window_set_default_size(GTK_WINDOW(window), 1440, 960);
@@ -201,7 +235,9 @@ int main(int argc, char **argv) {
   webkit_user_script_unref(script);
   g_signal_connect(manager, "script-message-received::platformShell", G_CALLBACK(on_message), NULL);
   webkit_user_content_manager_register_script_message_handler(manager, "platformShell");
-  view = WEBKIT_WEB_VIEW(webkit_web_view_new_with_user_content_manager(manager));
+  view = WEBKIT_WEB_VIEW(g_object_new(WEBKIT_TYPE_WEB_VIEW, "web-context", web_context,
+      "user-content-manager", manager, NULL));
+  g_object_unref(web_context);
   WebKitSettings *settings = webkit_web_view_get_settings(view);
   webkit_settings_set_enable_developer_extras(settings, TRUE);
   webkit_settings_set_hardware_acceleration_policy(settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS);

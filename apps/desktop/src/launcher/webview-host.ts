@@ -44,6 +44,7 @@ export type WebviewHostOptions = {
   vibrancy?: boolean
   url: string
   initScriptPath: string
+  dataDir: string
   spawn?: HostSpawn
   signal?: AbortSignal
   budget?: NativeBudget
@@ -73,6 +74,8 @@ export class WebviewHost {
         options.binary,
         options.url,
         options.initScriptPath,
+        '--data-dir',
+        options.dataDir,
         ...(options.vibrancy ? ['--vibrancy'] : []),
       ],
       this.budget.stopGraceMs,

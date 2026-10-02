@@ -124,6 +124,7 @@ async function start() {
     launchWebview({
       binary,
       url: web,
+      stateHome,
       signal: controller.signal,
       budget: settings.native,
       startup: settings.startup,

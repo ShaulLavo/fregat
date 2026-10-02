@@ -84,7 +84,7 @@ test('WCO geometry reserves either control edge and responds to geometry changes
   expect(toolbar).toHaveStyle({ marginLeft: '80px', width: '900px', height: '32px' })
 })
 
-test('native macOS traffic-light inset follows full-screen entry, reload, and exit', () => {
+test('native macOS traffic-light inset follows full-screen entry, rerender, and exit', () => {
   window.platformBridge = {
     platform: 'darwin',
     titlebar: 'overlay',

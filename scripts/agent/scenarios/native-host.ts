@@ -30,7 +30,8 @@ export const nativeHost: Scenario = {
   description:
     'Open real WebKitGTK fixture windows and preserve the existing shell across native host close, crash and launcher termination.',
   requiresIsolatedServer: true,
-  async run(page, { step, evidence }) {
+  async run(page, { step, evidence, server }) {
+    ok(server, 'Native windows require a throwaway state home')
     // NOT-PORTABLE: Requires the private Hyprland proof display and a built native host.
     const runtime = process.env.XDG_RUNTIME_DIR
     const signature = process.env.HYPRLAND_INSTANCE_SIGNATURE
@@ -64,6 +65,7 @@ export const nativeHost: Scenario = {
         current = await launchWebview({
           binary: native,
           url: page.url(),
+          stateHome: server.home,
           budget: nativeBudget({
             'window.nativeDialogTimeoutSeconds': action === 'close' ? 1 : 300,
           }),

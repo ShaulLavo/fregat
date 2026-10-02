@@ -41,6 +41,7 @@ test('frames split and coalesced JSON lines, writes escaped eval, and records fr
     binary: '/host',
     url: 'http://localhost',
     initScriptPath: '/init',
+    dataDir: '/fixture/state/desktop/webview',
     spawn: () => fake.process,
     onEvent: (event) => events.push(event),
     recordOpen: (context) => records.push(context),
@@ -74,6 +75,7 @@ test('serializes picks and preserves cancellation and Unicode paths', async () =
     binary: '/host',
     url: 'http://localhost',
     initScriptPath: '/init',
+    dataDir: '/fixture/state/desktop/webview',
     spawn: () => fake.process,
     cleanupOwnedWindow: () => {},
   })
@@ -101,6 +103,7 @@ test('exit rejects outstanding and queued picks and cleans only this window', as
     binary: '/host',
     url: 'http://localhost',
     initScriptPath: '/init',
+    dataDir: '/fixture/state/desktop/webview',
     spawn: () => fake.process,
     cleanupOwnedWindow: () => {
       cleanup++
@@ -128,6 +131,7 @@ test('malformed frames kill the host and reject startup with a structured error'
     binary: '/host',
     url: 'http://localhost',
     initScriptPath: '/init',
+    dataDir: '/fixture/state/desktop/webview',
     spawn: () => fake.process,
     cleanupOwnedWindow: () => {
       cleanup++
@@ -162,6 +166,7 @@ test('missing host rejects startup and performs owned cleanup', async () => {
     binary: '/nonexistent/platform-webview',
     url: 'http://localhost',
     initScriptPath: '/init',
+    dataDir: '/fixture/state/desktop/webview',
     cleanupOwnedWindow: () => {
       cleanup++
     },
@@ -186,6 +191,7 @@ test('chooser timeout cancels only the chooser, drains late replies, and retains
     binary: '/host',
     url: 'http://localhost',
     initScriptPath: '/init',
+    dataDir: '/fixture/state/desktop/webview',
     spawn: () => fake.process,
     budget: { dialogMs: 20, stopGraceMs: 100 },
     cleanupOwnedWindow: () => {
@@ -241,6 +247,7 @@ test('unacknowledged chooser cancellation bounds a stalled host and rejects queu
     binary: '/host',
     url: 'http://localhost',
     initScriptPath: '/init',
+    dataDir: '/fixture/state/desktop/webview',
     spawn: () => fake.process,
     budget: { dialogMs: 10, stopGraceMs: 10 },
     cleanupOwnedWindow: () => {},

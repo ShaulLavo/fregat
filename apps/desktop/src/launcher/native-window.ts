@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { isRecord } from '@workspace/utils/objects'
 import { tmpdir } from 'node:os'
@@ -19,6 +19,7 @@ export function nativeHostBinary(root: string) {
 export async function launchWebview(options: {
   binary: string
   url: string
+  stateHome: string
   signal?: AbortSignal
   budget: NativeBudget
   startup: StartupBudget
@@ -31,6 +32,8 @@ export async function launchWebview(options: {
 }) {
   const platform = options.platform ?? process.platform
   const vibrancy = platform === 'darwin' && options.vibrancy === true
+  const dataDir = path.resolve(options.stateHome, 'desktop', 'webview')
+  mkdirSync(dataDir, { recursive: true, mode: 0o700 })
   const directory = mkdtempSync(path.join(tmpdir(), 'platform-webview-'))
   const script = path.join(directory, 'init.js')
   const token = randomUUID()
@@ -53,6 +56,7 @@ export async function launchWebview(options: {
       ...options,
       platform,
       vibrancy,
+      dataDir,
       initScriptPath: script,
       recordOpen: options.onOpen,
       cleanupOwnedWindow: () => rmSync(directory, { recursive: true, force: true }),
