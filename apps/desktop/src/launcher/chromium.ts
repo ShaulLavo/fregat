@@ -77,6 +77,13 @@ export async function attachChromium(
   const sessions = new Set<string>()
   const contexts = new Map<string, Set<number>>()
   const origin = new URL(url).origin
+  const preparing = new Set<Promise<void>>()
+  const initialErrors: unknown[] = []
+  let attaching = true
+  const fail = (error: unknown) => {
+    if (attaching) initialErrors.push(error)
+    else onFailure(error)
+  }
   cdp.on('Target.detachedFromTarget', (event) => {
     const session = event.params.sessionId
     if (typeof session !== 'string') return
@@ -107,14 +114,17 @@ export async function attachChromium(
     const session = event.params.sessionId
     const target = event.params.targetInfo
     if (typeof session !== 'string' || !isRecord(target)) {
-      onFailure(launcherErrors.CDP_FAILED({ internal: { reason: 'invalid-attachment' } }))
+      fail(launcherErrors.CDP_FAILED({ internal: { reason: 'invalid-attachment' } }))
       return
     }
     if (sessions.has(session)) return
     sessions.add(session)
-    void preparePage(cdp, session, target.type, script, origin).catch((error: unknown) => {
-      if (sessions.has(session)) onFailure(error)
-    })
+    const preparation = preparePage(cdp, session, target.type, script, origin)
+      .catch((error: unknown) => {
+        if (sessions.has(session)) fail(error)
+      })
+      .finally(() => preparing.delete(preparation))
+    preparing.add(preparation)
   })
   cdp.on('Runtime.bindingCalled', (event) =>
     reportFrames(event, sessions, contexts, origin, onOpen),
@@ -125,6 +135,10 @@ export async function attachChromium(
     waitForDebuggerOnStart: true,
     flatten: true,
   })
+  // Auto-attach acknowledges before its page commands finish; keep startup supervision until they settle.
+  while (preparing.size) await Promise.all(preparing)
+  if (initialErrors.length) throw initialErrors[0]
+  attaching = false
 }
 
 async function preparePage(

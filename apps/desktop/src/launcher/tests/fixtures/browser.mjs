@@ -28,6 +28,24 @@ for await (const chunk of Bun.file(3).stream()) {
     buffered = buffered.slice(end + 1)
     if (mode === 'exit-attach' && message.method === 'Target.setDiscoverTargets') process.exit(3)
     if (mode === 'slow-attach' && message.method === 'Target.setAutoAttach') busy(6000)
+    if (mode.endsWith('-page') && message.method === 'Target.setAutoAttach')
+      writeSync(
+        4,
+        JSON.stringify({
+          method: 'Target.attachedToTarget',
+          params: { sessionId: 'initial', targetInfo: { type: 'page' } },
+        }) + '\0',
+      )
+    if (mode === 'slow-page' && message.method === 'Page.enable') busy(6000)
+    if (mode === 'reject-page' && message.method === 'Page.enable') {
+      writeSync(4, JSON.stringify({ id: message.id, error: { code: -1 } }) + '\0')
+      end = buffered.indexOf('\0')
+      continue
+    }
+    if (mode === 'silent-page' && message.method === 'Page.enable') {
+      end = buffered.indexOf('\0')
+      continue
+    }
     const product = mode === 'old-version' ? 'Chrome/125.0.1' : 'Chrome/130.0.1'
     const result = message.method === 'Browser.getVersion' ? { product } : {}
     writeSync(4, JSON.stringify({ id: message.id, result }) + '\0')

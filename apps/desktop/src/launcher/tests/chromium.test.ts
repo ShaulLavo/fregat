@@ -160,3 +160,51 @@ test('telemetry accepts only the attached app origin default execution context',
   })
   expect(opened).toHaveLength(1)
 })
+
+test('startup enrolls pages attached while preparing and later failures keep their ordinary callback', async () => {
+  const handlers = new Map<string, (event: CdpEvent) => void>()
+  const first = Promise.withResolvers<Record<string, unknown>>()
+  const second = Promise.withResolvers<Record<string, unknown>>()
+  const later = Promise.withResolvers<Record<string, unknown>>()
+  const failures: unknown[] = []
+  const attach = (sessionId: string) =>
+    handlers.get('Target.attachedToTarget')!({
+      method: 'Target.attachedToTarget',
+      params: { sessionId, targetInfo: { type: 'page' } },
+    })
+  const cdp = {
+    on: (method: string, callback: (event: CdpEvent) => void) => {
+      handlers.set(method, callback)
+      return () => {}
+    },
+    request: async (method: string, _params: Record<string, unknown> = {}, session?: string) => {
+      if (method === 'Target.setAutoAttach') attach('first')
+      if (method !== 'Page.enable') return {}
+      if (session === 'first') return first.promise
+      if (session === 'second') return second.promise
+      return later.promise
+    },
+  }
+  let ready = false
+  const startup = attachChromium(
+    cdp,
+    'http://localhost:123/',
+    () => {},
+    (error) => failures.push(error),
+  ).then(() => {
+    ready = true
+  })
+  for (let i = 0; i < 4; i++) await Promise.resolve()
+  expect(ready).toBe(false)
+  attach('second')
+  first.resolve({})
+  for (let i = 0; i < 20; i++) await Promise.resolve()
+  expect(ready).toBe(false)
+  second.resolve({})
+  await startup
+  expect(ready).toBe(true)
+  attach('later')
+  later.reject('fixture later failure')
+  for (let i = 0; i < 4; i++) await Promise.resolve()
+  expect(failures).toEqual(['fixture later failure'])
+})
