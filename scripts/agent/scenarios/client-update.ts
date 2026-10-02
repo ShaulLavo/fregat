@@ -111,6 +111,9 @@ export const verifyClientUpdate: Scenario['run'] = async (page, { step, server }
     if (fixture) {
       try {
         await openFixtureWorkspace(page, checkoutRoot)
+        // Recreate the runtime so retained fixture readers stop before its files are removed.
+        await page.reload()
+        await waitForApp(page)
       } finally {
         await releaseFixture(fixture)
       }
