@@ -67,9 +67,9 @@ work can proceed independently where their files and contracts do not overlap.
    [307](plans/307-diff-row-topology.md), machine controls
    [318](plans/318-machine-connection-controls.md), and heavy root ownership
    [312](plans/312-heavy-slice-ownership.md) are bounded correctness units.
-3. Adopt Plan 289's passive feed with [308](plans/308-account-usage-feed.md), then integrate
+3. Build Fregat's bounded usage cache and Mesh feed with [308](plans/308-account-usage-feed.md), alongside
    transcript history [309](plans/309-account-usage-history.md) and allowance visibility
-   [310](plans/310-allowance-visibility.md). These scopes preserve owner-started agents.
+   [310](plans/310-allowance-visibility.md). Plan 308 supersedes Plan 289's gateway producer after coordinator-confirmed TV cut-over.
    Quiet admission [313](plans/313-heavy-quiet-lifecycle.md) and non-cache measurements
    [314](plans/314-heavy-non-cache-memory.md) share the heavy runner but keep separate receipts.
 4. Build the ordinary issue collector [295](plans/295-cross-repository-issue-collection.md)

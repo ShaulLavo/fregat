@@ -1,10 +1,18 @@
 # Plan 309: Report deduplicated usage from local tools and connected hosts
 
-- Status: APPROVED
+- Status: Approved
 - Date: 2026-10-03
 - Implementation owner: `ShaulLavo/fregat`, server transcript usage and Settings Usage.
 - Source: the history portion of [Fregat #345](https://github.com/ShaulLavo/fregat/issues/345).
 - Related plans: [141](141-usage-and-rate-limits.md) owns existing recording/imports. [308](308-account-usage-feed.md) owns provider account allowances. They report different quantities.
+
+## Current execution wave (2026-10-03)
+
+[Plan 308](308-account-usage-feed.md) owns the coordinated server-cache/UI/feed delivery under the owner's new bounded-request decision. This wave implements the local Claude/Codex transcript scanner and coverage, independent of registered project discovery, alongside allowance collection. Connected-host composition and other detected tool-format readers remain Approved follow-on increments here; local history must say which sources it covers and never imply all-device completeness.
+
+T3 was fetched and fast-forwarded on 2026-10-03 from `6c8fed35dded9ff71c5b46807125457acbb76be6` to `a7b3ce8c0896d123a7c3f02c586ff8193841cc09`. Read its current usage service, streaming readers, incremental scan cache, aggregation and pricing. Refresh added orchestration-v2 and unrelated desktop/mobile work; no such architecture change is part of this wave.
+
+Quota requests are bounded by Plan 308's single service owner. Local transcript scanning makes no provider requests. Historical Codex quota records remain unattributable after resumed-account changes; transcript token accounting must not invent account identities.
 
 ## Outcome
 
