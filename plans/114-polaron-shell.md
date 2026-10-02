@@ -173,8 +173,9 @@ No runtime bridge, debugging connection, chooser binding or permission grant rea
 4. Before closing the controller, query `Target.getTargets` and collect its HTTP(S) page URLs;
    the dedicated controller's bootstrap is `about:blank`, and workers are excluded. De-duplicate
    those app-window URLs with the launcher's URL. Close the pipe, await exit, then replay every
-   collected URL through `--app-id`. This preserves OS shortcut launches that bypass the launcher
-   lock during setup. If an OS app wins the singleton after the idle check, the controller exits
+   collected URL through the same installed `--app-id`, computed once from the original install
+   URL. Target navigation changes only the launch URL, including nested paths. This preserves OS
+   shortcut launches that bypass the launcher lock during setup. If an OS app wins the singleton after the idle check, the controller exits
    through singleton handoff or EOF; recheck ownership and forward the launcher's URL to that
    live browser. Skip installation this run and leave repair to the next idle launch.
    Compute Chromium's app id from the canonical manifest URL using two SHA256 hashes of raw bytes,

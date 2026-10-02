@@ -33,6 +33,7 @@ type ChromiumOptions = {
   signal?: AbortSignal
   onOpen(context: Record<string, unknown>): void
 }
+type InstalledOptions = ChromiumOptions & { appId: string }
 export type ChromiumWindow = { kind: 'handoff' }
 
 export function assertChromiumVersion(product: unknown) {
@@ -59,7 +60,12 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
       throw launcherErrors.PROFILE_BUSY({ internal: { reason: 'unverified-profile-owner' } })
     if (cap.remainingMs() <= 0)
       throw launcherErrors.PROFILE_BUSY({ internal: { reason: 'launcher-lock-limit' } })
-    const remaining = { ...options, startup: { ...options.startup, limitMs: cap.remainingMs() } }
+    const remaining = {
+      ...options,
+      // Replay destinations can navigate; the registered identity stays tied to the install URL.
+      appId: installedIdentity(options.url).appId,
+      startup: { ...options.startup, limitMs: cap.remainingMs() },
+    }
     if (owner === 'live') return await launchInstalledBrowser(remaining, profile, true)
     const receipt = installReceipt(options.url, options.manifest)
     if (hasVerifiedInstall(profile, receipt)) {
@@ -85,7 +91,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
 }
 
 async function installAndLaunch(
-  options: ChromiumOptions,
+  options: InstalledOptions,
   profile: string,
 ): Promise<ChromiumWindow> {
   const supervisor = startupSupervisor(options.startup, () => performance.now())
@@ -217,7 +223,7 @@ async function installAndLaunch(
 }
 
 async function launchInstalledBrowser(
-  options: ChromiumOptions,
+  options: InstalledOptions,
   profile: string,
   running: boolean,
 ): Promise<ChromiumWindow> {
@@ -226,7 +232,7 @@ async function launchInstalledBrowser(
     cmd: [
       options.candidate.executable,
       ...chromiumArguments(options.candidate, profile, {
-        ...installedIdentity(options.url),
+        appId: options.appId,
         url: options.url,
       }),
     ],

@@ -12,7 +12,7 @@ import { chromiumArguments } from '../profile'
 // Chromium's POSIX singleton and flock require Linux or macOS.
 const posixTest = test.skipIf(process.platform !== 'linux' && process.platform !== 'darwin')
 
-async function fixture(mode: string, initialManifest?: string) {
+async function fixture(mode: string, initialManifest?: string, baseUrl = 'http://localhost:123/') {
   let manifest = initialManifest
   const root = await mkdtemp(path.join(tmpdir(), 'fregat-arbitration-'))
   const pidFile = path.join(root, 'pid')
@@ -34,7 +34,7 @@ async function fixture(mode: string, initialManifest?: string) {
       candidate,
       stateHome: root,
       home: root,
-      url: `http://localhost:123/?subject=${subject}`,
+      url: new URL(`?subject=${subject}`, baseUrl).href,
       manifest,
       startup: { idleMs: 1000, limitMs: 4000 },
       // Arbitration is independent of fixture CPU scheduling; startup tests cover idle sampling.
@@ -436,3 +436,45 @@ posixTest(
     }
   },
 )
+
+posixTest('a nested controller target replays with the installed base app identity', async () => {
+  const base = 'http://localhost:123/platform/'
+  const box = await fixture('review', undefined, base)
+  const first = box.launch('one')
+  const nested = new URL('chat/42?subject=shortcut', base).href
+  const identity = installedIdentity(base)
+  try {
+    await until(box.pidFile + '.installing')
+    const shortcut = Bun.spawn(
+      [
+        box.candidate.executable,
+        ...chromiumArguments(box.candidate, box.profile, { ...identity, url: nested }),
+      ],
+      { stdio: ['ignore', 'ignore', 'ignore'] },
+    )
+    expect(await shortcut.exited).toBe(0)
+    await writeFile(box.pidFile + '.release', 'go')
+    expect(await first).toEqual({ kind: 'handoff' })
+    const deliveries: string[][] = (await readFile(box.pidFile + '.deliveries', 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    expect(
+      deliveries.map((args) =>
+        args.find((arg) => arg.startsWith('--app-launch-url-for-shortcuts-menu-item=')),
+      ),
+    ).toEqual([
+      `--app-launch-url-for-shortcuts-menu-item=${base}?subject=one`,
+      `--app-launch-url-for-shortcuts-menu-item=${nested}`,
+    ])
+    expect(deliveries.map((args) => args.find((arg) => arg.startsWith('--app-id=')))).toEqual([
+      `--app-id=${identity.appId}`,
+      `--app-id=${identity.appId}`,
+    ])
+    expect(installedIdentity(nested).appId).not.toBe(identity.appId)
+  } finally {
+    await writeFile(box.pidFile + '.release', 'go')
+    await Promise.allSettled([first])
+    await box.cleanup()
+  }
+})
