@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { descriptorFor } from '../settings/keys'
 import * as v from 'valibot'
 
 import {
@@ -115,5 +116,15 @@ describe('native picker request type', () => {
     const accept: readonly string[] = ['.ts']
     const request: NativePickerRequest = { mode: 'file', accept }
     expect(request.accept).toBe(accept)
+  })
+})
+
+describe('server release folder setting', () => {
+  it('takes empty or an absolute path without NUL', () => {
+    const schema = descriptorFor('server.releaseRoot').schema
+    expect(v.safeParse(schema, '').success).toBe(true)
+    expect(v.safeParse(schema, '/srv/fregat').success).toBe(true)
+    expect(v.safeParse(schema, '/srv/a\0b').success).toBe(false)
+    expect(v.safeParse(schema, 'srv').success).toBe(false)
   })
 })

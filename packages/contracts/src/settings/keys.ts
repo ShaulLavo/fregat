@@ -5,6 +5,7 @@ import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { machinesSchema } from '../machines'
+import { absolutePathSchema } from '../server-identity'
 import { WORKTREE_SUBMODULE_MODES } from '../git'
 import {
   keybindingOverridesSchema,
@@ -386,7 +387,7 @@ export const SETTINGS_REGISTRY = {
   }),
   'server.releaseRoot': defineSetting({
     // Empty resolves per platform in scripts/service/release-root.ts; a path ships in no repository.
-    schema: v.union([v.literal(''), v.pipe(v.string(), v.startsWith('/'), v.maxLength(4096))]),
+    schema: v.union([v.literal(''), absolutePathSchema]),
     default: '',
     scope: 'machine',
     widget: 'string',

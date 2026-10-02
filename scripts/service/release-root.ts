@@ -15,6 +15,8 @@ export function machineReleaseRoot(
   if (configured) return configured
   if (host.platform === 'darwin')
     return path.join(host.home, 'Library', 'Application Support', 'Fregat', 'releases')
-  const data = host.env.XDG_DATA_HOME || path.join(host.home, '.local', 'share')
+  // The XDG spec says a relative value is invalid and must be ignored.
+  const xdg = host.env.XDG_DATA_HOME
+  const data = xdg && path.isAbsolute(xdg) ? xdg : path.join(host.home, '.local', 'share')
   return path.join(data, 'fregat', 'releases')
 }

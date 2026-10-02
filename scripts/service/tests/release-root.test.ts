@@ -24,3 +24,15 @@ describe('release root', () => {
     ).toBe('/data/a/fregat/releases')
   })
 })
+
+describe('release root against the XDG spec', () => {
+  it('ignores a relative XDG_DATA_HOME', () => {
+    expect(
+      machineReleaseRoot('', {
+        platform: 'linux',
+        home: '/home/a',
+        env: { XDG_DATA_HOME: 'data' },
+      }),
+    ).toBe('/home/a/.local/share/fregat/releases')
+  })
+})
