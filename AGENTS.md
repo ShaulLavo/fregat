@@ -2,7 +2,7 @@
 
 ## Running A Task
 
-- Keep going when a step does not need the owner; put status notes in the same message as the next action. Stop only when blocked, or before something destructive: deleting data the owner keeps (`~/.platform`, `/work/platform-dev/home`, anything not yours in `/work`), force-pushing, taking another session's changes out of the tree, or changing anything outside this checkout.
+- Keep going when a step does not need the owner; put status notes in the same message as the next action. Stop only when blocked, or before something destructive: deleting data the owner keeps (`~/.platform`, `/work/platform-dev/home`, anything not yours in `/work`), force-pushing, or taking another session's changes out of the tree.
 - Done means: the narrowest check that could fail passes, a UI change has `look` evidence you read back, your files are committed by path and pushed, and the mesh runs it. Name anything you skipped.
 - Long runs keep their checklist in a file (the plan file, or the scratchpad) and tick items as they land.
 - End a run with what you need from the owner first, then what changed, then what you found. Mark what you could not confirm and where you looked.
