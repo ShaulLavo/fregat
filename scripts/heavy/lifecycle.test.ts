@@ -36,6 +36,19 @@ import {
   writeSettings,
 } from './sandbox'
 
+const scanOpen = vi.hoisted(() => ({
+  beforeOpen: undefined as ((file: unknown) => void) | undefined,
+}))
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  const openSync: typeof actual.openSync = (file, flags, mode) => {
+    scanOpen.beforeOpen?.(file)
+    return actual.openSync(file, flags, mode)
+  }
+  return { ...actual, openSync }
+})
+
 afterEach(() => {
   vi.restoreAllMocks()
   return removeSandboxes()
@@ -90,38 +103,27 @@ describe('the queue', () => {
     for (const entry of held) release(entry)
   })
 
-  test('a scan never fails on an entry its owner releases mid-read', async () => {
+  test('a scan never fails on an entry its owner releases mid-read', () => {
     const box = sandbox()
-    mkdirSync(path.join(box.state, 'queue'), { recursive: true })
-    const stop = path.join(box.root, 'stop')
-    const ready = path.join(box.root, 'ready')
-    const churn = startExternal(box, [
-      process.execPath,
-      '-e',
-      `const { enqueue, release } = await import(${JSON.stringify(path.join(import.meta.dirname, 'queue.ts'))})
-         const { existsSync, writeFileSync } = await import('node:fs')
-         writeFileSync(${JSON.stringify(ready)}, '')
-         let n = 0
-         while (!existsSync(${JSON.stringify(stop)})) release(enqueue(${JSON.stringify(box.state)}, { id: (n++).toString(16).padStart(12, '0'), cwd: '/', estimateBytes: 1, jobClass: 'light', label: 'c', pid: process.pid, quiet: false, since: '' }))`,
-    ])
-    await expect.poll(() => existsSync(ready), { timeout: 10_000 }).toBe(true)
-    const exited = new Promise((resolve) => churn.on('close', resolve))
-    let scans = 0
-    const errors: unknown[] = []
-    for (let scan = 0; scan < 200; scan++) {
-      try {
-        live(box.state, 'queue')
-        scans += 1
-      } catch (error) {
-        errors.push(error)
+    const disappearing = enqueue(box.state, { ...job, id: 'a'.repeat(12), since: '' })
+    const surviving = enqueue(box.state, { ...job, id: 'b'.repeat(12), since: '' })
+    let released = false
+    scanOpen.beforeOpen = (file) => {
+      if (file === disappearing.file) {
+        release(disappearing)
+        released = true
       }
-      await new Promise((resolve) => setImmediate(resolve))
     }
-    writeFileSync(stop, '')
-    await exited
-    expect(errors).toEqual([])
-    expect(scans).toBe(200)
-  }, 20_000)
+    try {
+      expect(live(box.state, 'queue')).toEqual([surviving.entry])
+      expect(released).toBe(true)
+      expect(existsSync(disappearing.file)).toBe(false)
+    } finally {
+      scanOpen.beforeOpen = undefined
+      release(surviving)
+      if (!released) release(disappearing)
+    }
+  })
 })
 
 const RUN = path.join(import.meta.dirname, 'run.ts')
