@@ -43,7 +43,12 @@ function systemdQuote(value: string) {
   return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%')}"`
 }
 
-function environment(values: UnitValues) {
+const SERVICE_PATH = {
+  darwin: '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+  linux: '/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin',
+}
+
+function environment(values: UnitValues, platform: keyof typeof SERVICE_PATH) {
   const root = values.releaseRoot
   return {
     NODE_ENV: 'production',
@@ -55,7 +60,7 @@ function environment(values: UnitValues) {
     PLATFORM_PRODUCTION_ROOT: root,
     PLATFORM_HOME: values.stateHome,
     OBSERVABILITY_DIR: path.join(root, 'logs'),
-    PATH: `${path.dirname(values.bun)}:/usr/local/bin:/usr/bin:/bin`,
+    PATH: `${path.dirname(values.bun)}:${SERVICE_PATH[platform]}`,
   }
 }
 
@@ -77,7 +82,7 @@ WantedBy=sockets.target
 export function renderSystemdService(values: UnitValues) {
   const root = values.releaseRoot
   const bun = systemdQuote(values.bun)
-  const env = Object.entries(environment(values))
+  const env = Object.entries(environment(values, 'linux'))
     .map(([key, value]) => `Environment=${systemdQuote(`${key}=${value}`)}`)
     .join('\n')
   return `# ${marker(values)}
@@ -123,7 +128,7 @@ export function renderLaunchAgent(values: UnitValues) {
   const root = values.releaseRoot
   // $0 and $1 carry the paths, so no path is ever parsed as shell text.
   const script = `"$0" "$1/bin/promote.js" "$1"; "$0" "$1/bin/promote.js" readiness "$1" "$$" & exec "$0" "$1/current/server/index.js" --launchd-socket=${LAUNCHD_SOCKET} --service=launchd:${LAUNCHD_LABEL}`
-  const env = Object.entries(environment(values))
+  const env = Object.entries(environment(values, 'darwin'))
     .map(([key, value]) => `      <key>${xml(key)}</key>${plistString(value)}`)
     .join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>

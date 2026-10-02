@@ -13,6 +13,23 @@ const values = {
   port: 3301,
 }
 
+it.each(['/opt/bun/bin/bun', '/Applications/Fregat.app/Contents/MacOS/fregat'])(
+  'renders platform-specific service PATH with the runtime directory first for %s',
+  (bun) => {
+    const runtimeDirectory = path.dirname(bun)
+    expect
+      .soft(renderSystemdService({ ...values, bun }))
+      .toContain(
+        `Environment="PATH=${runtimeDirectory}:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"`,
+      )
+    expect
+      .soft(renderLaunchAgent({ ...values, bun }))
+      .toContain(
+        `<key>PATH</key><string>${runtimeDirectory}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>`,
+      )
+  },
+)
+
 describe('systemd units', () => {
   it('listens on one loopback stream for one service', () => {
     const socket = renderSystemdSocket(values)

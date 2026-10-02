@@ -13,6 +13,12 @@ export const serviceErrors = defineErrorCatalog('service', {
     why: 'The server at this address keeps another state folder or environment, and one address serves one state folder.',
     fix: 'Choose that server as the one to use, or set another loopback port for this state folder, then run setup again.',
   },
+  IDENTITY_CHECK_FAILED: {
+    status: 502,
+    message: 'The installed Fregat server failed its identity check',
+    why: 'The identity route returned a Fregat server error during setup.',
+    fix: 'Check the Fregat server log, resolve the reported error, then launch Fregat again.',
+  },
   IDENTITY_UNVERIFIED: {
     status: 502,
     message: 'The server at this address did not prove which state folder it serves',

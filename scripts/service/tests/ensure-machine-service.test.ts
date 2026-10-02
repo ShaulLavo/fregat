@@ -181,6 +181,95 @@ describe('ensureMachineService', () => {
     expect(commands).toEqual([])
   })
 
+  it.each(['darwin', 'linux'] as const)(
+    'reports the installed %s server failing identity with its error code and log path',
+    async (platform) => {
+      const context = await setup(platform)
+      fregatServer({
+        port: context.port,
+        stateHome: context.stateHome,
+        identityError: { code: 'system.MACHINE_ID_UNAVAILABLE', message: 'Machine id failed' },
+      })
+      const { host, commands } = recordingHost(context.root, platform)
+      const logPath = path.join(context.productionRoot, 'logs')
+      await expect(
+        ensureMachineService(intent(context.address, context.stateHome), {
+          productionRoot: context.productionRoot,
+          host,
+          readinessMs: 5000,
+        }),
+      ).rejects.toMatchObject({
+        code: 'service.IDENTITY_CHECK_FAILED',
+        message: 'The installed Fregat server failed its identity check',
+        fix: `Check the Fregat server JSONL logs in ${logPath}, resolve system.MACHINE_ID_UNAVAILABLE, then launch Fregat again.`,
+        internal: { status: 500, serverCode: 'system.MACHINE_ID_UNAVAILABLE' },
+      })
+      expect(commands).toEqual([])
+    },
+  )
+
+  it('recognizes a proved generic server error from the identity route', async () => {
+    const context = await setup()
+    fregatServer({
+      port: context.port,
+      stateHome: context.stateHome,
+      identityError: { code: 'OPERATION_FAILED', message: 'filesystem operation failed' },
+    })
+    const { host } = recordingHost(context.root, 'linux')
+    await expect(
+      ensureMachineService(intent(context.address, context.stateHome), {
+        productionRoot: context.productionRoot,
+        host,
+        readinessMs: 5000,
+      }),
+    ).rejects.toMatchObject({
+      code: 'service.IDENTITY_CHECK_FAILED',
+      why: expect.stringContaining('OPERATION_FAILED'),
+      internal: { serverCode: 'OPERATION_FAILED' },
+    })
+  })
+
+  it('keeps a foreign listener with a lookalike error envelope classified as another program', async () => {
+    const context = await setup()
+    otherProgram(
+      context.port,
+      Response.json(
+        {
+          error: { code: 'foreign.BOGUS', message: 'Failed', why: 'x', fix: 'y' },
+        },
+        { status: 500 },
+      ),
+    )
+    const { host } = recordingHost(context.root, 'linux')
+    await expect(
+      ensureMachineService(intent(context.address, context.stateHome), {
+        productionRoot: context.productionRoot,
+        host,
+        readinessMs: 5000,
+      }),
+    ).rejects.toMatchObject({
+      code: 'service.ADDRESS_HELD_BY_OTHER_PROGRAM',
+      internal: { status: 500 },
+    })
+  })
+
+  it('keeps a foreign 500 response classified as another program', async () => {
+    const context = await setup()
+    otherProgram(context.port)
+    const { host } = recordingHost(context.root, 'linux')
+    const fetcher = Object.assign(async () => new Response('failure', { status: 500 }), {
+      preconnect: fetch.preconnect,
+    }) as typeof fetch
+    await expect(
+      ensureMachineService(intent(context.address, context.stateHome), {
+        productionRoot: context.productionRoot,
+        host,
+        fetch: fetcher,
+        readinessMs: 5000,
+      }),
+    ).rejects.toMatchObject({ code: 'service.ADDRESS_HELD_BY_OTHER_PROGRAM' })
+  })
+
   it('names the other program holding the address and leaves it running', async () => {
     const context = await setup()
     const program = otherProgram(context.port)

@@ -1,5 +1,58 @@
 import { describe, expect, it } from 'vitest'
-import { machineIdFrom } from '../machine-id'
+import { machineIdFrom, readOsMachineId } from '../machine-id'
+
+describe('OS machine id lookup', () => {
+  it('uses the absolute macOS ioreg path without reading files', () => {
+    const commands: string[][] = []
+    const files: string[] = []
+    const uuid = '11111111-2222-3333-4444-555555555555'
+    const result = readOsMachineId({
+      platform: 'darwin',
+      readFile: (file) => {
+        files.push(file)
+        return ''
+      },
+      run: (command) => {
+        commands.push(command)
+        return {
+          stdout: new TextEncoder().encode(`"IOPlatformUUID" = "${uuid}"`),
+          exitCode: 0,
+        }
+      },
+    })
+    expect(result).toBe(uuid)
+    expect(commands).toEqual([['/usr/sbin/ioreg', '-rd1', '-c', 'IOPlatformExpertDevice']])
+    expect(files).toEqual([])
+  })
+
+  it.each(['primary', 'missing', 'empty'] as const)(
+    'reads absolute Linux machine-id files with a %s primary file',
+    (primary) => {
+      const files: string[] = []
+      const commands: string[][] = []
+      const result = readOsMachineId({
+        platform: 'linux',
+        readFile: (file) => {
+          files.push(file)
+          if (file === '/var/lib/dbus/machine-id') return 'fallback-id\n'
+          if (primary === 'missing') throw { code: 'ENOENT' }
+          return primary === 'empty' ? '\n' : 'primary-id\n'
+        },
+        run: (command) => {
+          commands.push(command)
+          return { stdout: new Uint8Array(), exitCode: 1 }
+        },
+      })
+      expect(result).toBe(primary === 'primary' ? 'primary-id' : 'fallback-id')
+      expect(files).toEqual(
+        primary === 'primary'
+          ? ['/etc/machine-id']
+          : ['/etc/machine-id', '/var/lib/dbus/machine-id'],
+      )
+      expect(commands).toEqual([])
+    },
+  )
+})
 
 describe('machine id', () => {
   it('hashes the OS id so the raw value never leaves the machine', () => {

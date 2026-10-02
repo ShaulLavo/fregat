@@ -77,13 +77,6 @@ function install(
   return { disposition: current ? 'staged' : 'installed', release }
 }
 
-/** A failed first activation keeps its copied release for diagnostics and retries. */
-export function rollbackBundledInstall(root: string, result: BundledInstall) {
-  if (result.disposition !== 'installed' || currentRelease(root) !== result.release.directory)
-    return
-  rmSync(path.join(root, 'current'), { force: true })
-}
-
 function readConfig(directory: string): (Record<string, unknown> & { commit: string }) | null {
   try {
     const value = JSON.parse(readFileSync(path.join(directory, 'build-config.json'), 'utf8'))
