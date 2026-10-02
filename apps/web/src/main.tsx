@@ -43,7 +43,8 @@ import {
 import { initializeClientLogging, log } from '@/lib/client-logging.ts'
 import { fontQueryOptions } from '@/lib/fonts/state/queries'
 import { fontsInUse } from '@/lib/fonts/utils/stack'
-import { isDesktop } from '@/lib/platform/bridge.ts'
+import { runtimeCapabilities } from '@/lib/platform/capabilities'
+import { launchAddress } from '@/components/utils/launch-address'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
 import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
@@ -72,7 +73,7 @@ log.info({
   availWidth: window.screen.availWidth,
   area: 'app',
   mode: import.meta.env.MODE,
-  desktop: isDesktop(),
+  ...runtimeCapabilities(),
   devicePixelRatio: window.devicePixelRatio,
   innerHeight: window.innerHeight,
   screenWidth: window.screen.width,
@@ -213,6 +214,16 @@ async function start() {
     </StrictMode>,
   )
 
+  sampleStartupFrameCadence()
+
+  window.launchQueue?.setConsumer(({ targetURL }) => {
+    window.focus()
+    const href = launchAddress(targetURL, new URL(import.meta.env.BASE_URL, location.href).href)
+    if (!href || href === `${location.pathname}${location.search}${location.hash}`) return
+    router.history.push(href)
+    router.history.flush()
+  })
+
   if ('requestIdleCallback' in window) window.requestIdleCallback(prefetchDeferredChunks)
   else setTimeout(prefetchDeferredChunks, 2000)
 }
@@ -240,4 +251,37 @@ function prefetchDeferredChunks() {
     .query(logsPanelQueryOptions)
     .then(() => undefined)
     .catch(() => undefined)
+}
+
+// Renderer-frame sampling is bounded startup observability, with no transport or query state.
+function sampleStartupFrameCadence() {
+  const startedAt = performance.now()
+  let frames = 0
+  let frame: number | null = null
+  const timeout = window.setTimeout(finish, 1_000)
+  function finish() {
+    if (frame === null) return
+    window.cancelAnimationFrame(frame)
+    frame = null
+    window.clearTimeout(timeout)
+    const durationMs = performance.now() - startedAt
+    log.info({
+      action: 'app.startup.frames',
+      area: 'app',
+      ...runtimeCapabilities(),
+      frames,
+      durationMs: Math.round(durationMs),
+      rafPerSecond: Math.round((frames * 1_000) / durationMs),
+      visibility: document.visibilityState,
+    })
+  }
+  function tick() {
+    frames += 1
+    if (performance.now() - startedAt >= 1_000) {
+      finish()
+      return
+    }
+    frame = window.requestAnimationFrame(tick)
+  }
+  frame = window.requestAnimationFrame(tick)
 }
