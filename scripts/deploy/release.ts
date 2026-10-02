@@ -226,7 +226,7 @@ export async function buildServer(release: Release) {
 // and the server reports no native chooser, so the deploy itself still succeeds.
 function bundleNativePicker(release: Release) {
   try {
-    const built = buildNative(path.join(checkoutRoot, 'apps/desktop'), 'polaron')
+    const built = buildNative(path.join(checkoutRoot, 'apps/desktop'), 'installed')
     if (!built) return log('server', 'native chooser helper: none for this platform')
     mkdirSync(path.join(release.server, 'native'), { recursive: true })
     cpSync(built, path.join(release.server, 'native', 'platform-webview'))

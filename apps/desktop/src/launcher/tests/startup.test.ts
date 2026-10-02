@@ -7,7 +7,7 @@ import { startupBudget, startupSupervisor, type StartupBudget } from '../startup
 import type { BrowserCandidate } from '../browser'
 
 async function startupFixture(mode: string) {
-  const root = await mkdtemp(path.join(tmpdir(), 'polaron-startup-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'launcher-startup-'))
   const pidFile = path.join(root, 'pid')
   const candidate: BrowserCandidate = {
     kind: 'chromium',

@@ -1761,7 +1761,7 @@ export const ghosttySiteSelectors = {
   window: '#window',
 } as const
 
-export const polaronNativeSelectors = {
+export const nativeHostSelectors = {
   settledPickerError: `Promise.all(Array.from(document.querySelectorAll('[data-sonner-toast]')).flatMap(toast => toast.getAnimations({subtree:true})).map(animation => animation.finished.catch(() => {}))).then(() => true)`,
   openProjectMenu: `document.querySelector('button[aria-label="Switch project"]')?.click()`,
   openFolderMenu: `Array.from(document.querySelectorAll('[role="menuitem"]')).find(row => row.textContent?.trim() === 'Open folder…')?.click()`,

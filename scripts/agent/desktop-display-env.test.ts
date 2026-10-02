@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { expect, test } from 'vitest'
 import { scratchRoot } from './paths'
-import { isPrivateDisplayRuntime, outerWaylandDisplay } from './polaron-display-env'
+import { isPrivateDisplayRuntime, outerWaylandDisplay } from './desktop-display-env'
 
 test('resolves a relative outer Wayland display under the original runtime before isolation', () => {
   const original = { WAYLAND_DISPLAY: 'wayland-1', XDG_RUNTIME_DIR: '/fixture/owner-runtime' }

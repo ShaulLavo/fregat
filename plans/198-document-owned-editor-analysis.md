@@ -26,7 +26,7 @@ to create a second analysis resource.
 099 unit 1 delivered the canonical revision-tagged publication contract and retained-analysis
 subscriber in PR #203. 198 consumes that event contract. The remaining attachment and memory
 acceptance checks exercise this landed owner. Full minimap/LSP
-migration, Polaron and binary viewers are independent. Plan 197 owns standalone/diff highlighting;
+migration, the installed-app path and binary viewers are independent. Plan 197 owns standalone/diff highlighting;
 200 consumes the relevant retained-source and attachment guarantees as they become proven.
 
 ## Outcome

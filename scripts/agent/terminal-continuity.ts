@@ -3,8 +3,8 @@ import type { Page } from 'playwright'
 import { installCaptureTerminalNamespace, killCaptureTerminal } from './product-terminal'
 import { selectors } from './selectors'
 
-export async function observePolaronTerminal(page: Page) {
-  const prefix = `polaron-proof-${crypto.randomUUID()}-`
+export async function observeTerminalContinuity(page: Page) {
+  const prefix = `desktop-proof-${crypto.randomUUID()}-`
   const terminals = new Map<
     string,
     { socketUrl: string; killUrl: string; worktreeId: string; terminalId: string }
@@ -52,7 +52,7 @@ export async function observePolaronTerminal(page: Page) {
       .first()
       .click({ position: { x: 100, y: 60 } })
     await page.keyboard.type(
-      `${initialize ? 'POLARON_SURVIVAL=retained; ' : ''}printf '\\n${label}_%s\\n' "$POLARON_SURVIVAL"`,
+      `${initialize ? 'NATIVE_HOST_SURVIVAL=retained; ' : ''}printf '\\n${label}_%s\\n' "$NATIVE_HOST_SURVIVAL"`,
     )
     await page.keyboard.press('Enter')
     await until(() => output.includes(`${label}_retained`))
@@ -61,12 +61,12 @@ export async function observePolaronTerminal(page: Page) {
   return {
     async afterNative(label: string, action: () => Promise<void>) {
       if (nativeReady === undefined) {
-        await command('POLARON_NATIVE_BEFORE', true)
+        await command('NATIVE_HOST_NATIVE_BEFORE', true)
         nativeReady = readyCount
       }
       await action()
       ok(page.context().browser()?.isConnected(), 'The existing app survives native host exit')
-      await command(`POLARON_AFTER_${label}`)
+      await command(`NATIVE_HOST_AFTER_${label}`)
       strictEqual(readyCount, nativeReady, 'The existing native-proof shell stays connected')
     },
     async dispose() {
