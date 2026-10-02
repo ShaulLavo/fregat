@@ -16,6 +16,7 @@ import {
   rollbackBundledInstall,
 } from '../../../../scripts/service/bundled-release'
 import { machineReleaseRoot } from '../../../../scripts/service/release-root'
+import { acquireSetupLock } from '../../../../scripts/service/setup-lock'
 
 const installationErrors = defineErrorCatalog('desktop.installation', {
   SERVICE_UNAVAILABLE: {
@@ -34,7 +35,7 @@ const installationErrors = defineErrorCatalog('desktop.installation', {
 
 export type EnsureMachineService = (
   intent: MachineServiceIntent,
-  options: { productionRoot: string; signal?: AbortSignal },
+  options: { productionRoot: string; signal?: AbortSignal; readinessMs?: number },
 ) => Promise<MachineServiceResult>
 
 export function installationReleaseRoot(stateHome: string, home: string) {
@@ -111,13 +112,46 @@ export async function ensureInstalledService(options: {
   options.signal.throwIfAborted()
   if (!options.productionRoot)
     throw installationErrors.SERVICE_UNAVAILABLE({ internal: { stage: 'release-root' } })
+  const readinessMs =
+    readHomeSetting(options.intent.stateHome, 'server.activationTimeoutSeconds') * 1000
+  const lock = await acquireSetupLock(
+    path.join(options.productionRoot, 'release-activation.lock'),
+    Date.now() + readinessMs,
+    options.signal,
+  )
+  try {
+    return await installAndActivate({
+      ...options,
+      productionRoot: options.productionRoot,
+      readinessMs,
+    })
+  } finally {
+    lock.release()
+  }
+}
+
+async function installAndActivate(options: {
+  intent: MachineServiceIntent
+  productionRoot: string
+  signal: AbortSignal
+  ensure?: EnsureMachineService
+  bundledRelease?: string
+  readinessMs: number
+}) {
   const installed = options.bundledRelease
-    ? installBundledRelease(options.bundledRelease, options.productionRoot, options.intent)
+    ? installBundledRelease(options.bundledRelease, options.productionRoot, options.intent, {
+        readinessMs: options.readinessMs,
+      })
     : null
   let result: MachineServiceResult
   try {
     result = await verifiedService(
-      { intent: options.intent, productionRoot: options.productionRoot, signal: options.signal },
+      {
+        intent: options.intent,
+        productionRoot: options.productionRoot,
+        signal: options.signal,
+        readinessMs: options.readinessMs,
+      },
       options.ensure ?? ensureMachineService,
     )
   } catch (error) {
@@ -129,13 +163,19 @@ export async function ensureInstalledService(options: {
 }
 
 async function verifiedService(
-  options: { intent: MachineServiceIntent; productionRoot: string; signal: AbortSignal },
+  options: {
+    intent: MachineServiceIntent
+    productionRoot: string
+    signal: AbortSignal
+    readinessMs: number
+  },
   ensure: EnsureMachineService,
 ) {
   const intent = options.intent
   const returned = await ensure(intent, {
     productionRoot: options.productionRoot,
     signal: options.signal,
+    readinessMs: options.readinessMs,
   })
   const parsed = v.safeParse(machineServiceResultSchema, returned)
   if (!parsed.success)

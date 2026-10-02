@@ -15,6 +15,7 @@ import path from 'node:path'
 import * as v from 'valibot'
 import { machineServiceIntentSchema } from '../../../packages/contracts/src/server-identity'
 import { probeAddress } from '../../service/probe'
+import { serviceErrors } from '../../service/structured-errors'
 import { currentRelease, pointCurrentAt } from '../release-operations'
 
 export const serverPort = 3301
@@ -340,7 +341,25 @@ export async function checkReadiness(
       status: 'checking',
     })
     pointCurrentAt(root, previous)
-    launch(machineRestartCommand())
+    if (launch(machineRestartCommand())) return false
+    const compensated = currentRelease(root) === previous
+    if (compensated) pointCurrentAt(root, directory)
+    const error = serviceErrors.RECOVERY_RESTART_FAILED({
+      internal: { restartAccepted: false, compensated },
+    })
+    const failure = {
+      code: error.code,
+      message: error.message,
+      status: error.status,
+      why: error.why,
+      fix: error.fix,
+    }
+    writeRecord(path.join(root, 'readiness-recovery.json'), {
+      release: directory,
+      status: 'failed',
+      error: failure,
+    })
+    console.error(JSON.stringify({ source: 'promote', ...failure, internal: error.internal }))
   } else rmSync(path.join(root, 'current'), { force: true })
   return false
 }

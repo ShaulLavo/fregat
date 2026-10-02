@@ -279,3 +279,130 @@ test('failed service activation rolls back first install through the launcher tr
   ).rejects.toMatchObject({ code: 'service.IDENTITY_UNVERIFIED' })
   expect(existsSync(path.join(releaseRoot, 'current'))).toBe(false)
 })
+
+test('overlapping launches serialize activation and rollback before same-commit reuse', async () => {
+  const root = scratch()
+  const releaseRoot = path.join(root, 'installed')
+  const port = await freePort()
+  const requested = { ...intent(root), address: `http://127.0.0.1:${port}` }
+  const server = fregatServer({ stateHome: root, port })
+  const identity = await (await fetch(new URL('/system/identity', server.url))).json()
+  const { ensureInstalledService } =
+    await import('../../../apps/desktop/src/launcher/installation-client')
+  const { serviceErrors } = await import('../structured-errors')
+  let started!: () => void
+  const entered = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  let fail!: () => void
+  const failure = new Promise<void>((resolve) => {
+    fail = resolve
+  })
+  const options = {
+    intent: requested,
+    productionRoot: releaseRoot,
+    bundledRelease: payload(root, 'bundle'),
+    signal: new AbortController().signal,
+  }
+  const first = ensureInstalledService({
+    ...options,
+    ensure: async () => {
+      started()
+      await failure
+      throw serviceErrors.IDENTITY_UNVERIFIED({ internal: { reason: 'fixture' } })
+    },
+  }).catch((error) => error)
+  await entered
+  let secondEntered = false
+  const second = ensureInstalledService({
+    ...options,
+    ensure: async () => {
+      secondEntered = true
+      return { identity, disposition: 'reused' }
+    },
+  })
+  await Bun.sleep(20)
+  const overlapped = secondEntered
+  fail()
+  expect(await first).toMatchObject({ code: 'service.IDENTITY_UNVERIFIED' })
+  await second
+  expect(overlapped).toBe(false)
+  expect(existsSync(path.join(releaseRoot, 'current'))).toBe(true)
+})
+
+test('launcher uses one machine activation budget for copied readiness and service setup', async () => {
+  const root = scratch()
+  writeFileSync(
+    path.join(root, 'settings.json'),
+    JSON.stringify({
+      'server.activationTimeoutSeconds': 1,
+    }),
+  )
+  const releaseRoot = path.join(root, 'installed')
+  const port = await freePort()
+  const requested = { ...intent(root), address: `http://127.0.0.1:${port}` }
+  const server = fregatServer({ stateHome: root, port })
+  const identity = await (await fetch(new URL('/system/identity', server.url))).json()
+  const { ensureInstalledService } =
+    await import('../../../apps/desktop/src/launcher/installation-client')
+  let activationBudget: number | undefined
+  await ensureInstalledService({
+    intent: requested,
+    productionRoot: releaseRoot,
+    bundledRelease: payload(root, 'bundle'),
+    signal: new AbortController().signal,
+    ensure: async (_intent, options) => {
+      activationBudget = options.readinessMs
+      return { identity, disposition: 'reused' }
+    },
+  })
+  const config = JSON.parse(
+    readFileSync(path.join(releaseRoot, 'current/build-config.json'), 'utf8'),
+  )
+  expect(config.readiness.timeoutMs).toBe(1000)
+  expect(activationBudget).toBe(1000)
+})
+
+test('rejected recovery restart compensates current and records an actionable terminal failure', async () => {
+  const root = scratch()
+  const releaseRoot = path.join(root, 'installed')
+  const requested = { ...intent(root), address: `http://127.0.0.1:${await freePort()}` }
+  const first = installBundledRelease(payload(root, 'old'), releaseRoot, requested)
+  const staged = installBundledRelease(
+    payload(root, 'new', 'b'.repeat(40)),
+    releaseRoot,
+    requested,
+    {
+      readinessMs: 1,
+    },
+  )
+  approveRestart(releaseRoot, {
+    release: staged.release.name,
+    stagedAt: lstatSync(path.join(releaseRoot, 'pending')).mtime.toISOString(),
+  })
+  promote(releaseRoot, () => true)
+  let commands = 0
+  const rejected = () => {
+    commands++
+    return false
+  }
+  expect(
+    await checkReadiness(releaseRoot, staged.release.directory, first.release.directory, rejected),
+  ).toBe(false)
+  expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(staged.release.directory)
+  const recovery = JSON.parse(
+    readFileSync(path.join(releaseRoot, 'readiness-recovery.json'), 'utf8'),
+  )
+  expect(recovery).toMatchObject({
+    release: staged.release.directory,
+    status: 'failed',
+    error: {
+      code: 'service.RECOVERY_RESTART_FAILED',
+      why: expect.any(String),
+      fix: expect.any(String),
+    },
+  })
+  const { checkCurrentReadiness } = await import('../../deploy/systemd/promote')
+  expect(await checkCurrentReadiness(releaseRoot, rejected)).toBe(false)
+  expect(commands).toBe(1)
+})

@@ -8,7 +8,7 @@ import {
 } from '../../packages/contracts/src/server-identity'
 import { descriptorFor } from '../../packages/contracts/src/settings/keys'
 import * as v from 'valibot'
-import { tryFileLock, type FileLock } from '../../apps/server/src/system/file-lock'
+import { acquireSetupLock } from './setup-lock'
 import { buildPromoterSource } from '../deploy/promoter-source'
 import { realServiceHost, type ServiceHost } from './host'
 import { portHolder } from './holder'
@@ -56,7 +56,7 @@ export async function ensureMachineService(
   const readinessMs =
     options.readinessMs ?? descriptorFor('server.activationTimeoutSeconds').default * 1000
   const deadline = Date.now() + readinessMs
-  const lock = await registrationLock(registrationFiles(host).lock, deadline, options.signal)
+  const lock = await acquireSetupLock(registrationFiles(host).lock, deadline, options.signal)
   try {
     const context = { ...parsed, stateHome, host, deadline, options }
     const first = await probe(context)
@@ -189,21 +189,6 @@ async function required(host: ServiceHost, argv: readonly string[], stage: strin
     throw serviceErrors.REGISTRATION_FAILED({ internal: { stage, exitCode: result.code } })
 }
 
-async function registrationLock(
-  file: string,
-  deadline: number,
-  signal?: AbortSignal,
-): Promise<FileLock> {
-  for (;;) {
-    signal?.throwIfAborted()
-    const lock = tryFileLock(file)
-    if (lock) return lock
-    if (Date.now() >= deadline)
-      throw serviceErrors.SETUP_BUSY({ internal: { waitedForDeadline: true } })
-    await Bun.sleep(RETRY_MS)
-  }
-}
-
 /**
  * The explicit machine-server uninstall. Under the registration lock setup also takes, every
  * present file must be an exact re-render of one shared set of recorded values, and the address
@@ -217,7 +202,7 @@ export async function removeMachineService(
   const files = registrationFiles(host)
   const readinessMs =
     options.readinessMs ?? descriptorFor('server.activationTimeoutSeconds').default * 1000
-  const lock = await registrationLock(files.lock, Date.now() + readinessMs, options.signal)
+  const lock = await acquireSetupLock(files.lock, Date.now() + readinessMs, options.signal)
   try {
     const owned = ownedRegistration(host, files)
     if (!owned) return { removed: false }
