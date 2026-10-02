@@ -1,4 +1,4 @@
-import type { RenderCell, RenderRow } from '../../core/types.js'
+import type { RenderCell, RenderRow, RgbColor } from '../../core/types.js'
 import type { TerminalFittedFont } from '../../term/types.js'
 import { CanvasColorCache, resolveCanvasCellColors } from '../canvas/colors.js'
 import {
@@ -115,6 +115,28 @@ function cellStyle(
   return css + cursorDecoration(cursor, colors.foreground(resolved), font, width)
 }
 
+function sameColor(left: RgbColor | undefined, right: RgbColor | undefined): boolean {
+  if (left === undefined || right === undefined) return left === right
+  return left.r === right.r && left.g === right.g && left.b === right.b
+}
+
+function sameAppearance(left: RenderCell, right: RenderCell): boolean {
+  return (
+    sameColor(left.foreground, right.foreground) &&
+    sameColor(left.background, right.background) &&
+    left.selected === right.selected &&
+    left.style?.blink === right.style?.blink &&
+    left.style?.bold === right.style?.bold &&
+    left.style?.faint === right.style?.faint &&
+    left.style?.invisible === right.style?.invisible &&
+    left.style?.inverse === right.style?.inverse &&
+    left.style?.italic === right.style?.italic &&
+    left.style?.overline === right.style?.overline &&
+    left.style?.strikethrough === right.style?.strikethrough &&
+    left.style?.underline === right.style?.underline
+  )
+}
+
 export interface RowRun {
   readonly cursor: CursorState['style'] | undefined
   readonly style: string
@@ -133,6 +155,7 @@ export function renderRowRuns(
   let currentText = ''
   let currentWidth = 0
   let currentCursor: CursorState['style'] | undefined
+  let previousCell: RenderCell | undefined
   function flush(): void {
     if (currentWidth === 0) return
     runs.push({
@@ -150,7 +173,13 @@ export function renderRowRuns(
     while (row.cells[index + width]?.continuation) width += 1
     const paintedCursor =
       cursor?.visible && cursor.y === row.y && cursor.x === cell.x ? cursor : undefined
-    const style = cellStyle(cell, paintedCursor, font, theme, colors, width)
+    // Cursor and wide-cell paint stays isolated; font, theme and contrast are fixed for this row.
+    const reusable = width === 1 && !paintedCursor
+    const style =
+      reusable && previousCell && sameAppearance(previousCell, cell)
+        ? currentStyle
+        : cellStyle(cell, paintedCursor, font, theme, colors, width)
+    previousCell = reusable ? cell : undefined
     if (style !== currentStyle || paintedCursor || currentCursor || width > 1) flush()
     currentStyle = style
     currentCursor = paintedCursor?.style
