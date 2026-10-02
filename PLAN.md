@@ -64,7 +64,8 @@ slices in 178 and Ghostty's [281](plans/281-ghostty-benchmarks-and-positioning.m
 positioning plus [283](plans/283-ghostty-output-and-input-latency.md) output CPU and input latency,
 and its site in [285](plans/285-ghostty-site-first-frame-and-real-shell.md), done 2026-10-02: a DOM
 renderer, the first frame server-rendered into the HTML, a real shell demo (the benchmarks section
-waits on 283).
+waits on 283). [286](plans/286-ghostty-extensions.md) moves non-core features into extensions,
+starting with a line editor for the site's Shell.
 Each keeps its existing evidence and execution gates. Native stays editor-first; 088 follows 087.
 
 ## Package cutover delivered
