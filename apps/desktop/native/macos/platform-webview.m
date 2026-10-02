@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 static WKWebsiteDataStore *persistent_store(NSString *directory) {
   if (@available(macOS 14.0, *)) {
@@ -36,6 +37,7 @@ static void emit(NSDictionary *event) {
 @interface PlatformHost : NSObject <NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate>
 @property(strong) NSWindow *window;
 @property(strong) WKWebView *view;
+@property(strong) NSVisualEffectView *effect;
 @property(strong) NSURL *appURL;
 @property(strong) WKUserScript *startupScript;
 @property(strong) NSOpenPanel *picker;
@@ -168,6 +170,15 @@ static void emit(NSDictionary *event) {
 }
 - (void)command:(NSDictionary *)command {
   if (self.closed) return;
+  if (command[@"surfaceOpacity"]) {
+    id opacity = command[@"surfaceOpacity"];
+    if (![opacity isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()) return;
+    double value = [opacity doubleValue];
+    if (!isfinite(value) || value < 0 || value > 100) return;
+    // The page paints pane opacity; a native material below it adds a second opaque floor.
+    self.effect.hidden = value < 100;
+    return;
+  }
   if ([command[@"eval"] isKindOfClass:NSString.class]) {
     [self.view evaluateJavaScript:command[@"eval"] completionHandler:nil];
     return;
@@ -295,6 +306,8 @@ int main(int argc, char **argv) {
       effect.material = NSVisualEffectMaterialUnderWindowBackground;
       effect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
       effect.state = NSVisualEffectStateActive;
+      effect.hidden = YES;
+      host.effect = effect;
       effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
       [window.contentView addSubview:effect];
     }
