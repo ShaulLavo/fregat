@@ -20,6 +20,7 @@ const fixtures = path.join(scratch, 'browser.mjs')
 const native = { binary, budget: { dialogMs: 2000, stopGraceMs: 1000 } }
 const pids = new Set<number>()
 const events: Record<string, unknown>[] = []
+const failures: unknown[] = []
 const server = Bun.serve({
   hostname: '127.0.0.1',
   port: 0,
@@ -100,6 +101,8 @@ try {
   }
   // Incoming frames advance idle, while the absolute cap still ends an unresponsive version request.
   let capPid = 0
+  const capStarted = performance.now()
+  let capFacts: Record<string, unknown> = {}
   await assert.rejects(
     launchChromium({
       candidate: {
@@ -122,11 +125,21 @@ try {
       onOpen: () => assert.fail('Cap fixture opened'),
       onFailure: () => {},
     }),
-    (error: unknown) =>
-      (error as { internal: { reason: string } }).internal.reason === 'startup-limit',
+    (error: unknown) => {
+      capFacts = (error as { internal: Record<string, unknown> }).internal
+      return capFacts.reason === 'startup-limit'
+    },
   )
   assert.ok(capPid > 0 && !alive(capPid))
-  emit({ stage: 'cap-cleanup', pid: capPid, alive: alive(capPid) })
+  emit({
+    stage: 'cap-cleanup',
+    pid: capPid,
+    alive: alive(capPid),
+    elapsedMs: Math.round(performance.now() - capStarted),
+    reason: capFacts.reason,
+    startupPhase: capFacts.startupPhase,
+    startupObservation: capFacts.startupObservation,
+  })
 
   const candidates = resolveBrowserCandidates(
     'auto',
@@ -175,6 +188,39 @@ try {
         family,
         version: await baselineCdp.request('Browser.getVersion'),
       })
+      const baselineTargets = await baselineCdp.request('Target.getTargets')
+      emit({ stage: 'plain-headless-initial', family, targets: baselineTargets })
+      const baselinePage = (
+        baselineTargets.targetInfos as { type: string; targetId: string }[]
+      ).find((entry) => entry.type === 'page')
+      if (baselinePage) {
+        const attached = await baselineCdp.request('Target.attachToTarget', {
+          targetId: baselinePage.targetId,
+          flatten: true,
+        })
+        baselineCdp.on('Network.loadingFailed', (event) =>
+          emit({ stage: 'plain-headless-network-failed', family, params: event.params }),
+        )
+        await baselineCdp.request('Network.enable', {}, attached.sessionId as string)
+        emit({
+          stage: 'plain-headless-frame',
+          family,
+          frame: await baselineCdp.request('Page.getFrameTree', {}, attached.sessionId as string),
+        })
+        emit({
+          stage: 'plain-headless-document',
+          family,
+          document: await baselineCdp.request(
+            'Runtime.evaluate',
+            {
+              expression:
+                'JSON.stringify({url:location.href,title:document.title,ready:document.readyState})',
+              returnByValue: true,
+            },
+            attached.sessionId as string,
+          ),
+        })
+      }
       await until(async () => {
         const targets = await baselineCdp.request('Target.getTargets')
         const infos = targets.targetInfos as { url: string; title: string }[]
@@ -182,6 +228,13 @@ try {
           return false
         emit({ stage: 'plain-headless-targets', family, targets })
         return true
+      })
+    } catch (error) {
+      emit({
+        stage: 'plain-headless-unconfirmed',
+        family,
+        targets: await baselineCdp.request('Target.getTargets'),
+        error: String(error),
       })
     } finally {
       baselineCdp.close()
@@ -196,9 +249,10 @@ try {
     }
     let owner: ChromiumWindow | undefined
     let pid = 0
+    let failureStage = 'launch'
     try {
       owner = await launchChromium({
-        candidate: { ...candidate, args: ['--headless'] },
+        candidate,
         stateHome: path.join(scratch, family),
         home: scratch,
         url,
@@ -213,10 +267,12 @@ try {
           emit({ stage: 'chromium-failure', family, ...launcherFailureFacts(error) })
         },
       })
+      failureStage = 'owned-window'
       assert.equal(owner.kind, 'owned')
       if (owner.kind !== 'owned') continue
       const cdp = owner.cdp
       emit({ stage: 'chromium-targets', family, targets: await cdp.request('Target.getTargets') })
+      failureStage = 'page-target'
       let targetId = ''
       await until(async () => {
         const targets = await cdp.request('Target.getTargets')
@@ -227,7 +283,7 @@ try {
         return Boolean(targetId)
       })
       const session = await cdp.request('Target.attachToTarget', { targetId, flatten: true })
-      await cdp.request('Page.navigate', { url }, session.sessionId as string)
+      failureStage = 'document-bridge'
       let bridge: unknown
       await until(async () => {
         const evaluated = await cdp.request(
@@ -250,11 +306,22 @@ try {
         picker: 'function',
       })
       emit({ stage: 'chromium-bridge', family, pid, bridge: JSON.parse(bridge as string) })
+      failureStage = 'last-page-cleanup'
       await cdp.request('Target.closeTarget', { targetId })
       await until(async () => !alive(pid))
       await owner.exited
       assert.equal((await fetch(url)).status, 200)
       emit({ stage: 'last-page-cleanup', family, pid, alive: alive(pid), sharedFixtureAlive: true })
+    } catch (error) {
+      failures.push(error)
+      emit({
+        stage: 'chromium-unconfirmed',
+        family,
+        failureStage,
+        launchOwned: owner?.kind === 'owned',
+        probeError: error instanceof Error ? error.message : String(error),
+        ...(failureStage === 'launch' ? launcherFailureFacts(error) : {}),
+      })
     } finally {
       await owner?.close()
     }
@@ -339,6 +406,7 @@ try {
   )
   assert.ok(!alive(nativePid))
   emit({ stage: 'message-helper-cleanup', pid: nativePid, alive: alive(nativePid) })
+  assert.equal(failures.length, 0, 'Chromium proof failed')
 } finally {
   server.stop(true)
   emit({

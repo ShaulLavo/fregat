@@ -44,7 +44,12 @@ export function shellBridge(
   vibrancy = false,
 ): string {
   const bridge: PlatformBridge = {
-    backdrop: vibrancy ? 'transparent' : platform === 'darwin' ? 'app' : 'compositor',
+    backdrop:
+      engine === 'wkwebview' && vibrancy
+        ? 'transparent'
+        : platform === 'darwin'
+          ? 'app'
+          : 'compositor',
     platform: platform === 'darwin' ? 'darwin' : 'linux',
     colorScheme: null,
     titlebar: engine === 'wkwebview' ? 'overlay' : 'native',

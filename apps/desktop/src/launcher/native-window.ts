@@ -25,6 +25,8 @@ export async function launchWebview(options: {
   onMessage?(body: unknown): void
   onOpen(context: Record<string, unknown>): void
 }) {
+  const platform = options.platform ?? process.platform
+  const vibrancy = platform === 'darwin' && options.vibrancy === true
   const directory = mkdtempSync(path.join(tmpdir(), 'platform-webview-'))
   const script = path.join(directory, 'init.js')
   const token = randomUUID()
@@ -34,10 +36,10 @@ export async function launchWebview(options: {
       '\n' +
       shellBridge(
         options.url,
-        (options.platform ?? process.platform) === 'darwin' ? 'wkwebview' : 'webkitgtk',
+        platform === 'darwin' ? 'wkwebview' : 'webkitgtk',
         token,
-        options.platform,
-        options.vibrancy,
+        platform,
+        vibrancy,
       ),
     { mode: 0o600 },
   )
@@ -45,6 +47,8 @@ export async function launchWebview(options: {
   try {
     host = new WebviewHost({
       ...options,
+      platform,
+      vibrancy,
       initScriptPath: script,
       recordOpen: options.onOpen,
       cleanupOwnedWindow: () => rmSync(directory, { recursive: true, force: true }),

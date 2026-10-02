@@ -179,3 +179,61 @@ test('WKWebView reports its own transparent overlay while Chromium keeps native 
     '"backdrop":"app"',
   )
 })
+
+test('WK drag listener sends only primary presses on non-interactive regions', () => {
+  const messages: unknown[] = []
+  const listeners = new Map<string, (event: unknown) => void>()
+  class Element {
+    constructor(
+      readonly region: boolean,
+      readonly interactive: boolean,
+    ) {}
+    closest(selector: string) {
+      return selector === '[data-native-window-drag-region]' ? this.region : this.interactive
+    }
+  }
+  const global: Record<string, unknown> = {}
+  const window = { top: undefined as unknown }
+  window.top = window
+  const script = new Function(
+    'globalThis',
+    'window',
+    'location',
+    'document',
+    'addEventListener',
+    'setTimeout',
+    'requestAnimationFrame',
+    'webkit',
+    'Element',
+    shellBridge('http://localhost:123', 'wkwebview', 'fixture-token', 'darwin', true),
+  )
+  script(
+    global,
+    window,
+    { origin: 'http://localhost:123' },
+    { readyState: 'loading' },
+    (name: string, callback: (event: unknown) => void) => listeners.set(name, callback),
+    () => {},
+    () => {},
+    { messageHandlers: { platformShell: { postMessage: (body: unknown) => messages.push(body) } } },
+    Element,
+  )
+  expect(global.platformBridge).toMatchObject({
+    titlebar: 'overlay',
+    platform: 'darwin',
+    backdrop: 'transparent',
+    capabilities: { displayCapture: false },
+  })
+  const down = listeners.get('mousedown')!
+  down({ button: 1, target: new Element(true, false) })
+  down({ button: 0, target: new Element(false, false) })
+  down({ button: 0, target: new Element(true, true) })
+  expect(messages).toEqual([])
+  down({ button: 0, target: new Element(true, false) })
+  expect(messages).toEqual([
+    { method: 'drag', origin: 'http://localhost:123', token: 'fixture-token' },
+  ])
+  expect(shellBridge('http://localhost:123', 'webkitgtk', undefined, 'linux', true)).toContain(
+    '"backdrop":"compositor"',
+  )
+})

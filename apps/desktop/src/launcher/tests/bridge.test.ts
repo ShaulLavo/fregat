@@ -37,8 +37,8 @@ function documentFixture(origin: string) {
 
 test('bridge executes in current document only on app origin and exposes its native picker', () => {
   expect(documentFixture('http://localhost:123').global.platformBridge).toEqual({
-    backdrop: 'compositor',
-    platform: 'linux',
+    backdrop: process.platform === 'darwin' ? 'app' : 'compositor',
+    platform: process.platform === 'darwin' ? 'darwin' : 'linux',
     colorScheme: null,
     titlebar: 'native',
     capabilities: { displayCapture: true },

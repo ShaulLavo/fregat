@@ -255,6 +255,38 @@ through the same portal dialog.
 Owner: `apps/desktop/native/macos/platform-webview.m` (new, absorbs `vibrancy.m`),
 `apps/desktop/src/launcher/*`.
 
+**Status: PARTIAL — 2026-10-02.** The launcher now discovers LaunchServices' supported default,
+reads bundle executables, uses Chromium first, and falls back to the owned Objective-C host or
+`open`. The WKWebView owns its window, document-start bridge, picker sheets, startup message,
+drag handling and vibrancy view directly. Electrobun remains the default and keeps its library;
+its titlebar classes stay until Gate 4 while WKWebView uses the data-region listener.
+
+The Mac scratch proof passed both native backdrop contracts, overlay titlebar and capture policy,
+picker timeout acknowledgement, host close, startup-message cleanup, and window/picker/message
+parent TERM and KILL cleanup. The fixture server remained reachable after each owned host exit.
+The actual macOS build function produced both `platform-webview` and `libVibrancy.dylib`.
+On macOS, only incoming CDP bytes renew startup idle: no Linux `/proc` progress is inferred.
+Silent and CPU-busy fixtures stalled and were reaped; incoming-CDP progress reached the absolute
+startup cap and was reaped. Registered production idle/cap settings are unchanged.
+
+**Chromium runtime gap — next implementation unit, Approved.** Helium and Chrome discovery and
+CDP version/target inspection work, but their fixture page never fetched the endpoint. The target
+URL points at the fixture while the actual DOM remains `about:blank`, with an empty title and
+`readyState: complete`. The same result occurs with plain headless, production `--app`, and the
+root's exact shell baseline (Chrome, `--headless=new`, fresh profile,
+`--remote-debugging-port=0`, fixture URL; zero fixture requests). Chromium bridge, last-page
+shutdown and live singleton handoff remain unconfirmed. This is implementation work, separate
+from owner-only checks. Do not change production flags, timeouts or host settings to mask it.
+
+Next unit begins with same-session fixture `curl`, then `data:`/`file:` navigation, then explicit
+`localhost`/`127.0.0.1`/`::1` bindings, then read-only non-GUI SSH launchd/Local Network privacy
+inspection. It preserves scratch isolation and service ownership and changes no security settings.
+
+Owner-only checks remain compositor/vibrancy pixels, Cmd-Q, drag and interactive picker selection.
+No rendering-rate or visual acceptance claim is made. Evidence is in
+`/work/tmp/fregat-evidence/114-g3-macos-20261002/`; the whole Chromium/native probe fails its
+Chromium DOM assertion, while the native, budget and cleanup records above pass individually.
+
 1. Detection, macOS half: LaunchServices default, bundle table, `Info.plist` executable.
 2. Chromium lifecycle: on `Target.targetDestroyed` of the last page, `Browser.close` (measured on
    Chrome 153: closing the last app window leaves the browser running).
@@ -275,6 +307,9 @@ Owner: `apps/desktop/native/macos/platform-webview.m` (new, absorbs `vibrancy.m`
 **Exit**: the Gate 1 and 2 checklists pass on the Mac in both paths.
 
 ### Gate 4 — Delete Electrobun (S–M)
+
+**Status: PARKED.** Chromium on macOS must pass Gate 3 before removal, and removal needs explicit
+root approval. The partial native delivery does not authorize changing the default shell.
 
 1. Remove `src/bun/index.ts`, `src/preload` (its Electroview transport), `src/shared/rpc.ts`,
    `electrobun.config.ts`, the package, the tsconfig paths, vitest scoping, the `.hutch` ignores

@@ -159,6 +159,17 @@ int main(int argc, char **argv) {
     NSMenu *appMenu = [NSMenu new];
     [appMenu addItemWithTitle:@"Quit Platform" action:@selector(terminate:) keyEquivalent:@"q"];
     appItem.submenu = appMenu;
+    NSMenuItem *editItem = [NSMenuItem new];
+    [menu addItem:editItem];
+    NSMenu *editMenu = [[NSMenu alloc] initWithTitle:@"Edit"];
+    [editMenu addItemWithTitle:@"Undo" action:@selector(undo:) keyEquivalent:@"z"];
+    NSMenuItem *redo = [editMenu addItemWithTitle:@"Redo" action:@selector(redo:) keyEquivalent:@"z"];
+    redo.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagShift;
+    [editMenu addItemWithTitle:@"Cut" action:@selector(cut:) keyEquivalent:@"x"];
+    [editMenu addItemWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"c"];
+    [editMenu addItemWithTitle:@"Paste" action:@selector(paste:) keyEquivalent:@"v"];
+    [editMenu addItemWithTitle:@"Select all" action:@selector(selectAll:) keyEquivalent:@"a"];
+    editItem.submenu = editMenu;
     NSApp.mainMenu = menu;
     NSString *mode = [NSString stringWithUTF8String:argv[1]];
     NSString *input = [NSString stringWithUTF8String:argv[2]];

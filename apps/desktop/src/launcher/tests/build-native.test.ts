@@ -50,3 +50,16 @@ test('default Electrobun and explicit Polaron entrypoints select their own nativ
   const dev = await Bun.file(path.resolve(desktop, '../../scripts/desktop-dev.ts')).text()
   expect(dev).toMatch(/'build:native',\s*'--shell=polaron'/)
 })
+
+test.skipIf(process.platform !== 'darwin')(
+  'builds the macOS Polaron executable beside the retained Electrobun library',
+  () => {
+    const desktopDir = path.resolve(import.meta.dirname, '../../..')
+    const host = buildNative(desktopDir, 'polaron')
+    expect(host).toBe(path.join(desktopDir, 'native/build/platform-webview'))
+    expect(existsSync(host!)).toBe(true)
+    const library = buildNative(desktopDir, 'electrobun')
+    expect(library).toBe(path.join(desktopDir, 'native/build/libVibrancy.dylib'))
+    expect(existsSync(library!)).toBe(true)
+  },
+)
