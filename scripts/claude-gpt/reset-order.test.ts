@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -408,32 +408,38 @@ test.each(['last-resort', 'reset-passed'])(
   },
 )
 
-test('a failed disable is not recorded as loop ownership', async () => {
+test('ownership survives a proxy-applied disable with an unreadable acknowledgement', async () => {
   const scratch = await mkdtemp(join(tmpdir(), 'reset-order-'))
   const keyFile = join(scratch, 'key')
   const stateFile = join(scratch, 'state.json')
   await writeFile(keyFile, 'management-key\n')
   let attempts = 0
+  let disabled = false
+  let usablePercent = '0'
   const resetAt = String(Math.floor(Date.now() / 1_000) + 3_600)
   const upstream = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
-    fetch(request) {
+    async fetch(request) {
       if (request.method === 'PATCH') {
-        expect(new URL(request.url).pathname).toBe('/v0/management/auth-files/status')
+        const patch = (await request.json()) as { disabled?: boolean }
+        if (new URL(request.url).pathname.endsWith('/fields'))
+          return Response.json({ status: 'ok' })
         attempts++
-        return Response.json({ status: 'unavailable' }, { status: 503 })
+        disabled = patch.disabled!
+        if (attempts === 1) return new Response('invalid-json', { status: 200 })
+        return Response.json({ status: 'ok' })
       }
       return Response.json({
         files: ['spent', 'usable'].map((index) => ({
           name: `${index}.json`,
           auth_index: index,
           provider: 'codex',
-          disabled: false,
+          disabled: index === 'spent' && disabled,
           quota: {
             signals: {
               'X-Codex-Primary-Reset-At': resetAt,
-              'X-Codex-Primary-Used-Percent': index === 'spent' ? '100' : '0',
+              'X-Codex-Primary-Used-Percent': index === 'spent' ? '100' : usablePercent,
             },
           },
         })),
@@ -447,11 +453,73 @@ test('a failed disable is not recorded as loop ownership', async () => {
     intervalMs: 10,
   })
   try {
-    await expect.poll(() => attempts).toBeGreaterThanOrEqual(1)
-    expect((await Bun.file(stateFile).json()).spent.disabledByLoop).toBeUndefined()
+    await expect.poll(() => attempts).toBe(1)
+    expect(disabled).toBe(true)
+    expect((await Bun.file(stateFile).json()).spent.disabledByLoop).toBe(true)
+    usablePercent = '100'
+    await expect
+      .poll(async () => (await Bun.file(stateFile).json()).spent?.disabledByLoop ?? false)
+      .toBe(false)
+    expect(disabled).toBe(false)
+    expect(attempts).toBe(2)
   } finally {
     loop.stop()
     upstream.stop(true)
+    await rm(scratch, { recursive: true, force: true })
+  }
+})
+
+test('unknown remaining quota keeps a spent loop-owned account disabled', () => {
+  const credentials = [
+    { ...credential('spent', { resetAt: now + 100, usedPercent: 100 }), disabled: true },
+    credential('unknown', null),
+  ]
+  expect(
+    planDisabled(credentials, mergeObservations(credentials, {}, now), new Set(['spent'])).size,
+  ).toBe(0)
+})
+
+test.each([
+  'invalid-json',
+  '{"spent":{"resetAt":9999999999,"usedPercent":100,"disabledByLoop":true},"broken":{}}',
+])('invalid state reaches give-up without erasing ownership (%s)', async (contents) => {
+  const scratch = await mkdtemp(join(tmpdir(), 'reset-order-'))
+  const keyFile = join(scratch, 'key')
+  const stateFile = join(scratch, 'state.json')
+  await writeFile(keyFile, 'management-key\n')
+  await writeFile(stateFile, contents)
+  let reads = 0
+  const logs: Record<string, unknown>[] = []
+  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+    logs.push(JSON.parse(String(chunk)))
+    return true
+  })
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      expect(request.method).toBe('GET')
+      reads++
+      return Response.json({
+        files: [{ name: 'spent.json', auth_index: 'spent', provider: 'codex', disabled: true }],
+      })
+    },
+  })
+  const loop = startResetOrder({
+    proxyUrl: upstream.url.toString(),
+    managementKeyFile: keyFile,
+    stateFile,
+    intervalMs: 1,
+  })
+  try {
+    await expect.poll(() => logs.some((event) => event.state === 'gave-up')).toBe(true)
+    expect(reads).toBe(10)
+    expect(logs.map((event) => event.state)).toEqual(['failing', 'gave-up'])
+    expect(await Bun.file(stateFile).text()).toBe(contents)
+  } finally {
+    loop.stop()
+    upstream.stop(true)
+    stderr.mockRestore()
     await rm(scratch, { recursive: true, force: true })
   }
 })

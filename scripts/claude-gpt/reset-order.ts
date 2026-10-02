@@ -150,11 +150,16 @@ export function planDisabled(
       (!credential.disabled || owned.has(credential.index)) &&
       (observations[credential.index]?.usedPercent ?? 100) < 100,
   )
+  const allSpent = codex.every((credential) => {
+    if (credential.disabled && !owned.has(credential.index)) return true
+    return (observations[credential.index]?.usedPercent ?? 0) >= 100
+  })
   const changes = new Map<string, boolean>()
   for (const credential of codex) {
     if (credential.disabled && !owned.has(credential.index)) continue
     const spent = (observations[credential.index]?.usedPercent ?? 0) >= 100
-    const disabled = weeklyAvailable && spent
+    const keepDisabled = credential.disabled && !allSpent
+    const disabled = spent && (weeklyAvailable || keepDisabled)
     if (disabled !== credential.disabled) changes.set(credential.index, disabled)
   }
   return changes
@@ -176,10 +181,11 @@ function report(level: 'warn' | 'info', state: string, fields: Record<string, un
 
 async function readState(stateFile: string) {
   try {
-    const parsed = v.safeParse(stateSchema, await Bun.file(stateFile).json())
-    return parsed.success ? parsed.output : {}
-  } catch {
-    return {}
+    return v.parse(stateSchema, await Bun.file(stateFile).json())
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
+      return {}
+    throw error
   }
 }
 
@@ -244,17 +250,20 @@ async function applyOrder(options: ResetOrderOptions) {
   for (const credential of credentials) {
     const next = disabled.get(credential.index)
     if (next === undefined) continue
+    if (next) {
+      // The proxy can apply a change before its response is lost; record the intent first.
+      state[credential.index] = { ...observations[credential.index]!, disabledByLoop: true }
+      await writeState(options.stateFile, state)
+    }
     const patched = await management(options, 'auth-files/status', {
       method: 'PATCH',
       body: JSON.stringify({ name: credential.name, auth_index: credential.index, disabled: next }),
     })
     if (!patched.ok) return { ok: false as const, status: patched.status }
     credential.disabled = next
-    if (next) state[credential.index] = { ...observations[credential.index]!, disabledByLoop: true }
-    else if (observations[credential.index])
-      state[credential.index] = observations[credential.index]!
+    if (next) continue
+    if (observations[credential.index]) state[credential.index] = observations[credential.index]!
     else delete state[credential.index]
-    // Persist ownership after each accepted change so a later API failure cannot lose it.
     await writeState(options.stateFile, state)
   }
   if (disabled.size > 0) {
@@ -310,8 +319,8 @@ export function startResetOrder(options: ResetOrderOptions) {
       if (failures === 1) {
         report('warn', 'failing', {
           status: result.status,
-          why: 'The proxy management API did not return or accept credential routing changes.',
-          fix: 'Check that the proxy runs with management enabled and the management key file matches.',
+          why: 'The proxy routing check could not read its state or apply credential changes.',
+          fix: 'Check proxy management access and that the routing state file is readable and valid.',
         })
       }
       if (failures >= giveUpAfterFailures) {
