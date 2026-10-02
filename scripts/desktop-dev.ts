@@ -9,7 +9,7 @@ const polaron = process.argv.includes('--shell=polaron')
 const output = polaron || observabilityEnabledFromEnv(env) ? 'inherit' : 'ignore'
 if (polaron) {
   const native = Bun.spawnSync({
-    cmd: [process.execPath, 'run', '--cwd', 'apps/desktop', 'build:native'],
+    cmd: [process.execPath, 'run', '--cwd', 'apps/desktop', 'build:native', '--shell=polaron'],
     cwd: root,
     env,
     stdio: ['ignore', 'inherit', 'inherit'],

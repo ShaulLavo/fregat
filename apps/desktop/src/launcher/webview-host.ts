@@ -10,17 +10,23 @@ import {
 } from './native-helper'
 import { startupBudget, type StartupBudget } from './startup'
 
-export type WebviewCommand = { eval: string } | { pick: PlatformPickOptions } | { close: true }
+export type WebviewCommand =
+  | { eval: string }
+  | { pick: PlatformPickOptions }
+  | { cancelPick: true }
+  | { close: true }
 export type WebviewEvent =
   | { event: 'ready' }
   | { event: 'message'; body: unknown }
   | { event: 'picked'; paths: string[] }
+  | { event: 'pickCancelled' }
   | { event: 'closed' }
 function parseWebviewEvent(line: string): WebviewEvent {
   const value: unknown = JSON.parse(line)
   if (typeof value !== 'object' || value === null || !('event' in value))
     throw nativeErrors.HOST_FAILED({ internal: { stage: 'event-shape' } })
-  if (value.event === 'ready' || value.event === 'closed') return { event: value.event }
+  if (value.event === 'ready' || value.event === 'closed' || value.event === 'pickCancelled')
+    return { event: value.event }
   if (value.event === 'message' && 'body' in value) return { event: 'message', body: value.body }
   if (
     value.event === 'picked' &&
@@ -52,6 +58,7 @@ export class WebviewHost {
   private state: 'starting' | 'open' | 'closing' | 'closed' = 'starting'
   private pendingPick: ReturnType<typeof Promise.withResolvers<string[]>> | undefined
   private picks: Promise<unknown> = Promise.resolve()
+  private cancellingPick = false
   private recordedOpen = false
   private readonly budget: NativeBudget
   constructor(options: WebviewHostOptions) {
@@ -84,14 +91,29 @@ export class WebviewHost {
       await this.ready
       const pending = Promise.withResolvers<string[]>()
       this.pendingPick = pending
+      let cancellationTimer: ReturnType<typeof setTimeout> | undefined
       const timer = setTimeout(() => {
-        void this.helper.stop()
+        this.cancellingPick = true
+        // Wait for the cancellation acknowledgement before the next queued chooser starts.
+        cancellationTimer = setTimeout(() => {
+          void this.helper.stop()
+        }, this.budget.stopGraceMs)
+        try {
+          this.send({ cancelPick: true })
+        } catch (error) {
+          pending.reject(error)
+        }
       }, this.budget.dialogMs)
       try {
         this.send({ pick: options })
-        return await pending.promise
+        const paths = await pending.promise
+        if (this.cancellingPick)
+          throw nativeErrors.PICKER_TIMEOUT({ internal: { stage: 'picker-timeout' } })
+        return paths
       } finally {
         clearTimeout(timer)
+        clearTimeout(cancellationTimer)
+        this.cancellingPick = false
         this.pendingPick = undefined
       }
     })
@@ -125,7 +147,8 @@ export class WebviewHost {
           this.state = 'open'
           ready.resolve()
         }
-        if (event.event === 'picked') this.pendingPick?.resolve(event.paths)
+        if (event.event === 'picked' && !this.cancellingPick) this.pendingPick?.resolve(event.paths)
+        if (event.event === 'pickCancelled' && this.cancellingPick) this.pendingPick?.resolve([])
         if (event.event === 'message') this.recordFrames(event.body, options)
         options.onEvent?.(event)
       }
@@ -198,7 +221,9 @@ export async function runNativeDialog(options: {
     options.signal,
     options.spawn,
   )
+  let timedOut = false
   const timer = setTimeout(() => {
+    timedOut = true
     void helper.stop()
   }, budget.dialogMs)
   const events: WebviewEvent[] = []
@@ -215,6 +240,8 @@ export async function runNativeDialog(options: {
   try {
     const result = await Promise.allSettled([helper.exited, reading])
     options.signal?.throwIfAborted()
+    if (timedOut && options.args[0] === 'pick')
+      throw nativeErrors.PICKER_TIMEOUT({ internal: { stage: 'dialog-timeout' } })
     if (
       result[0]!.status !== 'fulfilled' ||
       result[0]!.value.code !== 0 ||

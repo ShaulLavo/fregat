@@ -4,11 +4,17 @@ import { descriptorFor } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 
 export const nativeErrors = defineErrorCatalog('desktop.webview', {
+  PICKER_TIMEOUT: {
+    status: 408,
+    message: 'The file chooser closed after its time limit.',
+    why: 'The file chooser did not receive a selection before the allowed interval ended.',
+    fix: 'Open the file chooser again and select an entry before it closes.',
+  },
   HOST_FAILED: {
     status: 500,
     message: 'The desktop native helper stopped.',
     why: 'The native helper could not start or complete its window protocol.',
-    fix: 'Run desktop build:native and check the desktop logs before opening the window again.',
+    fix: 'Run desktop build:native --shell=polaron and check the desktop logs before opening the window again.',
   },
 })
 export type NativeBudget = { dialogMs: number; stopGraceMs: number }

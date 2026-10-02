@@ -8,9 +8,13 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 import { scriptErrors } from '../structured-errors'
+import { scratchPath } from './paths'
+import { outerWaylandDisplay } from './polaron-display-env'
 
 // This fixture owns a nested compositor and session bus; it never controls the outer display.
-const scratch = mkdtempSync('/work/tmp/g2d-')
+const outerDisplay = outerWaylandDisplay(process.env)
+// Hyprland's Unix control socket needs a short runtime path; artifacts keep the evidence root.
+const scratch = mkdtempSync(scratchPath('g2d-'))
 const home = path.join(scratch, 'home')
 for (const directory of [
   home,
@@ -26,12 +30,6 @@ writeFileSync(
   `monitor = ,1920x1080@60,auto,1\nmisc {\n disable_hyprland_logo = true\n force_default_wallpaper = 0\n disable_autoreload = true\n}\necosystem {\n no_update_news = true\n no_donation_nag = true\n}\ndebug {\n disable_logs = false\n enable_stdout_logs = true\n}\n`,
 )
 const bus = `unix:path=${scratch}/bus`
-const outerDisplay = process.env.WAYLAND_DISPLAY
-if (!outerDisplay)
-  throw scriptErrors.INVALID_INPUT({
-    message: 'An outer Wayland display is required for the private native proof.',
-    internal: { stage: 'outer-display' },
-  })
 const env = {
   ...process.env,
   HOME: home,

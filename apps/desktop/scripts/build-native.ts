@@ -8,13 +8,17 @@ const buildErrors = defineErrorCatalog('desktop.native', {
     message: 'The native desktop helper could not be built.',
     status: 500,
     why: 'The native helper needs a C compiler and the platform development libraries.',
-    fix: 'Install cc, pkg-config and webkit2gtk-4.1 on Linux, or the Xcode command-line tools on macOS, then run build:native again.',
+    fix: 'Install cc, pkg-config and webkit2gtk-4.1 on Linux, or the Xcode command-line tools on macOS, then run build:native --shell=polaron again.',
   },
 })
 
-export function buildNative(desktopDir = path.join(import.meta.dirname, '..')) {
+export function buildNative(
+  desktopDir = path.join(import.meta.dirname, '..'),
+  shell: 'electrobun' | 'polaron' = 'electrobun',
+) {
   if (process.platform !== 'linux' && process.platform !== 'darwin') return null
   const linux = process.platform === 'linux'
+  if (linux && shell !== 'polaron') return null
   const source = path.join(desktopDir, 'native', linux ? 'linux/platform-webview.c' : 'vibrancy.m')
   const output = path.join(
     nativeLibraryDir(desktopDir),
@@ -48,6 +52,9 @@ export function buildNative(desktopDir = path.join(import.meta.dirname, '..')) {
 }
 
 if (import.meta.main) {
-  const output = buildNative()
+  const output = buildNative(
+    undefined,
+    process.argv.includes('--shell=polaron') ? 'polaron' : 'electrobun',
+  )
   if (output) console.log(`[native] built ${output}`)
 }

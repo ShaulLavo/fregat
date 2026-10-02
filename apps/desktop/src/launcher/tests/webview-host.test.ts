@@ -171,3 +171,101 @@ test('malformed standalone picker output terminates its process', async () => {
   fake.stdout.write('invalid json\n')
   await expect(result).rejects.toMatchObject({ code: 'desktop.webview.HOST_FAILED' })
 })
+
+test('chooser timeout cancels only the chooser, drains late replies, and retains the app for the next pick', async () => {
+  const fake = fakeHost()
+  let cleanup = 0
+  let exited = false
+  const host = new WebviewHost({
+    binary: '/host',
+    url: 'http://localhost',
+    initScriptPath: '/init',
+    spawn: () => fake.process,
+    budget: { dialogMs: 20, stopGraceMs: 100 },
+    cleanupOwnedWindow: () => {
+      cleanup++
+    },
+  })
+  void host.exited.then(
+    () => {
+      exited = true
+    },
+    () => {
+      exited = true
+    },
+  )
+  fake.process.stdin.on('data', (line) => {
+    const command = JSON.parse(line)
+    if (command.cancelPick) {
+      fake.stdout.write('{"event":"picked","paths":["/late-selection"]}\n')
+      fake.stdout.write('{"event":"pickCancelled"}\n')
+    }
+    if (command.pick?.mode === 'file')
+      fake.stdout.write('{"event":"picked","paths":["/next-selection"]}\n')
+  })
+  fake.stdout.write('{"event":"ready"}\n')
+  await host.ready
+  const first = expect(host.pick({ mode: 'folder' })).rejects.toMatchObject({
+    code: 'desktop.webview.PICKER_TIMEOUT',
+    message: 'The file chooser closed after its time limit.',
+    why: 'The file chooser did not receive a selection before the allowed interval ended.',
+    fix: 'Open the file chooser again and select an entry before it closes.',
+  })
+  const second = host.pick({ mode: 'file' })
+  await first
+  expect(await second).toEqual(['/next-selection'])
+  host.evaluate('document.title')
+  expect(fake.commands.map((line) => JSON.parse(line))).toEqual([
+    { pick: { mode: 'folder' } },
+    { cancelPick: true },
+    { pick: { mode: 'file' } },
+    { eval: 'document.title' },
+  ])
+  expect(exited).toBe(false)
+  expect(cleanup).toBe(0)
+  const closing = host.close()
+  fake.finish()
+  await closing
+  expect(cleanup).toBe(1)
+})
+
+test('unacknowledged chooser cancellation bounds a stalled host and rejects queued picks', async () => {
+  const fake = fakeHost()
+  const host = new WebviewHost({
+    binary: '/host',
+    url: 'http://localhost',
+    initScriptPath: '/init',
+    spawn: () => fake.process,
+    budget: { dialogMs: 10, stopGraceMs: 10 },
+    cleanupOwnedWindow: () => {},
+  })
+  fake.stdout.write('{"event":"ready"}\n')
+  await host.ready
+  const first = expect(host.pick({ mode: 'folder' })).rejects.toMatchObject({
+    code: 'desktop.webview.HOST_FAILED',
+  })
+  const second = expect(host.pick({ mode: 'file' })).rejects.toMatchObject({
+    code: 'desktop.webview.HOST_FAILED',
+  })
+  await expect(host.exited).rejects.toMatchObject({ code: 'desktop.webview.HOST_FAILED' })
+  await Promise.all([first, second])
+  expect(fake.commands.filter((line) => JSON.parse(line).cancelPick)).toHaveLength(1)
+})
+
+test('standalone native chooser timeout exposes selection guidance after reaping', async () => {
+  const fake = fakeHost()
+  await expect(
+    pick({
+      binary: '/host',
+      options: { mode: 'folder' },
+      spawn: () => fake.process,
+      budget: { dialogMs: 10, stopGraceMs: 10 },
+    }),
+  ).rejects.toMatchObject({
+    code: 'desktop.webview.PICKER_TIMEOUT',
+    message: 'The file chooser closed after its time limit.',
+    why: 'The file chooser did not receive a selection before the allowed interval ended.',
+    fix: 'Open the file chooser again and select an entry before it closes.',
+  })
+  await expect(fake.process.exited).resolves.toMatchObject({ code: 1 })
+})

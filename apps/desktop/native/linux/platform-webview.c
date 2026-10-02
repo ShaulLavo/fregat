@@ -95,6 +95,15 @@ static void pick(JSCValue *options) {
   gtk_native_dialog_show(GTK_NATIVE_DIALOG(chooser));
 }
 
+static void cancel_pick(void) {
+  if (chooser) {
+    g_signal_handlers_disconnect_by_func(chooser, G_CALLBACK(on_picked), NULL);
+    gtk_native_dialog_hide(GTK_NATIVE_DIALOG(chooser));
+    g_clear_object(&chooser);
+  }
+  emit("{\"event\":\"pickCancelled\"}");
+}
+
 static gboolean on_stdin(GIOChannel *channel, GIOCondition condition, gpointer data) {
   if (condition & (G_IO_HUP | G_IO_ERR)) { gtk_widget_destroy(window); return FALSE; }
   char *text = NULL;
@@ -117,7 +126,8 @@ static gboolean on_stdin(GIOChannel *channel, GIOCondition condition, gpointer d
     JSCValue *value = jsc_value_object_get_property(command, "pick");
     if (jsc_value_is_object(value)) pick(value);
     g_object_unref(value);
-  } else if (jsc_value_object_has_property(command, "close")) gtk_widget_destroy(window);
+  } else if (jsc_value_object_has_property(command, "cancelPick")) cancel_pick();
+  else if (jsc_value_object_has_property(command, "close")) gtk_widget_destroy(window);
 done:
   g_clear_object(&command);
   g_object_unref(context);

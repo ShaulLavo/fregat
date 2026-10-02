@@ -12,6 +12,7 @@ import {
 import { openPolaronFixtureWindow } from '../polaron-window'
 import { observePolaronTerminal } from '../polaron-continuity'
 import { polaronNativeSelectors } from '../selectors'
+import { isPrivateDisplayRuntime } from '../polaron-display-env'
 import type { Scenario } from './index'
 
 export const polaronChromiumNativePicker: Scenario = {
@@ -28,7 +29,7 @@ export const polaronChromiumNativePicker: Scenario = {
       await chooseFixtureFolder(page, fixture)
       const nativeExecutable = nativeHostBinary(path.resolve(import.meta.dirname, '../../..'))
       const binary =
-        file.startsWith('/work/tmp/g2d-') && path.basename(file) === 'native-picker'
+        isPrivateDisplayRuntime(path.dirname(file)) && path.basename(file) === 'native-picker'
           ? file
           : nativeExecutable
       current = await openPolaronFixtureWindow(
