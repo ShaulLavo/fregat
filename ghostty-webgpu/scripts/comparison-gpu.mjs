@@ -167,6 +167,7 @@ export async function sampleNvidiaGpu({
       const receipt = {
         binary: 'nvidia-smi',
         args,
+        timeoutMilliseconds,
         started: now(),
         observedAt: new Date().toISOString(),
         stdout: '',
