@@ -25,10 +25,7 @@ beforeAll(async () => {
     .filter((entry) => entry.type === 'chunk')
     .map((entry) => entry.code)
     .join('\n')
-  browser = await chromium.launch({
-    headless: true,
-    env: { ...process.env, TMPDIR: '/work/tmp/plan-282' },
-  })
+  browser = await chromium.launch({ headless: true })
 }, 20_000)
 afterAll(async () => {
   await browser?.close()
