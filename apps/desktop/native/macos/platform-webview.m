@@ -170,13 +170,20 @@ static void emit(NSDictionary *event) {
 }
 - (void)command:(NSDictionary *)command {
   if (self.closed) return;
-  if (command[@"surfaceOpacity"]) {
-    id opacity = command[@"surfaceOpacity"];
+  if (command[@"windowAppearance"]) {
+    id appearance = command[@"windowAppearance"];
+    if (![appearance isKindOfClass:NSDictionary.class]) return;
+    id opacity = appearance[@"opacity"];
+    id frost = appearance[@"frost"];
     if (![opacity isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()) return;
-    double value = [opacity doubleValue];
-    if (!isfinite(value) || value < 0 || value > 100) return;
-    // The page paints pane opacity; a native material below it adds a second opaque floor.
-    self.effect.hidden = value < 100;
+    if (![frost isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)frost) == CFBooleanGetTypeID()) return;
+    double opacityValue = [opacity doubleValue];
+    double frostValue = [frost doubleValue];
+    if (!isfinite(opacityValue) || opacityValue < 0 || opacityValue > 100) return;
+    if (!isfinite(frostValue) || frostValue < 0 || frostValue > 100) return;
+    // The page paints pane opacity; AppKit's blurred layer has independent strength.
+    self.effect.alphaValue = frostValue / 100;
+    self.effect.hidden = frostValue == 0;
     return;
   }
   if ([command[@"eval"] isKindOfClass:NSString.class]) {

@@ -41,6 +41,7 @@ stays safe to read, share and export.
 | `workbench.density`                 | `"compact"`                                    | window      | Use tighter compact spacing or roomier cozy spacing throughout the app.                                                                                         |
 | `workbench.surface.continuousSeams` | `false`                                        | window      | Paint one background across panels and the resize handles between them, so the panels read as one surface. Off, the wallpaper shows in the gaps between panels. |
 | `workbench.tree.indentGuides`       | `"always"`                                     | window      | When to show indentation guides in the file tree. Guides take editor colours while the tree is hovered.                                                         |
+| `window.frost`                      | `50`                                           | window      | Strength of the blurred desktop layer behind a transparent native macOS window. 0 keeps the desktop clear; 100 shows the full layer.                            |
 
 ### Details
 
@@ -51,6 +52,7 @@ stays safe to read, share and export.
 - `workbench.reduceMotion`: Applies to the terminal app: its spinners and loaders run at half speed. The web app follows the operating system's reduce-motion setting.
 - `workbench.fontFamily`: Bundled fonts ship with the app and load with no network. Installed fonts come from the server machine's fontconfig (fc-list), so a font installed there works on every device; a server without fontconfig lists none.
 - `workbench.feel`: Flat moves on fixed durations with flat controls. Seam, Brisk, Relaxed and Playful move on springs and give controls raised keys, sunken wells and squircle corners (squircles in Chromium only). Under reduced motion every feel uses fades.
+- `window.frost`: AppKit sets the blur radius. This percentage controls the strength of its blurred layer, independently of pane opacity. It applies to the transparent native macOS host and updates immediately.
 
 ## Chat
 

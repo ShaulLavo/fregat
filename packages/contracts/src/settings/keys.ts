@@ -1579,6 +1579,19 @@ export const SETTINGS_REGISTRY = {
     requiresRestart: true,
     keywords: ['window', 'transparency', 'vibrancy', 'compositor', 'desktop', 'wallpaper', 'blur'],
   }),
+  'window.frost': defineSetting({
+    schema: percentSchema,
+    default: 50,
+    scope: 'window',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Window frost',
+    description:
+      'Strength of the blurred desktop layer behind a transparent native macOS window. 0 keeps the desktop clear; 100 shows the full layer.',
+    details:
+      'AppKit sets the blur radius. This percentage controls the strength of its blurred layer, independently of pane opacity. It applies to the transparent native macOS host and updates immediately.',
+    keywords: ['window', 'frost', 'blur', 'vibrancy', 'desktop', 'material'],
+  }),
   'prefetch.enabled': defineSetting({
     schema: v.boolean(),
     default: true,

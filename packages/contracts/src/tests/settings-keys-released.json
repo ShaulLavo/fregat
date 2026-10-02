@@ -137,6 +137,7 @@
     "window.browserStartupLimitSeconds",
     "window.defaultHeight",
     "window.defaultWidth",
+    "window.frost",
     "window.nativeDialogTimeoutSeconds",
     "window.nativeHostStopGraceSeconds",
     "window.nativeVibrancy",

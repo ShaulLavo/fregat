@@ -206,7 +206,7 @@ test.each([
   ['webkitgtk', 'linux', true, false],
   ['webkitgtk', 'linux', false, false],
 ] as const)(
-  '%s on %s with vibrancy %s exposes surface opacity: %s',
+  '%s on %s with vibrancy %s exposes window appearance: %s',
   (engine, platform, vibrancy, available) => {
     const messages: unknown[] = []
     const global: Record<string, unknown> = {}
@@ -223,25 +223,29 @@ test.each([
     )(global, window, { origin: 'http://localhost:123' }, { readyState: 'loading' }, () => {}, {
       messageHandlers: { platformShell: { postMessage: (body: unknown) => messages.push(body) } },
     })
-    const bridge = global.platformBridge as { setSurfaceOpacity?: (opacity: number) => void }
+    const bridge = global.platformBridge as {
+      setWindowAppearance?: (appearance: { opacity: number; frost: number }) => void
+    }
     if (!available) {
-      expect(bridge).not.toHaveProperty('setSurfaceOpacity')
+      expect(bridge).not.toHaveProperty('setWindowAppearance')
       expect(messages).toEqual([])
       return
     }
-    expect(bridge.setSurfaceOpacity).toBeTypeOf('function')
-    bridge.setSurfaceOpacity!(20)
-    bridge.setSurfaceOpacity!(80)
+    expect(bridge.setWindowAppearance).toBeTypeOf('function')
+    bridge.setWindowAppearance!({ opacity: 20, frost: 50 })
+    bridge.setWindowAppearance!({ opacity: 80, frost: 0 })
     expect(messages).toEqual([
       {
-        method: 'setSurfaceOpacity',
+        method: 'setWindowAppearance',
         opacity: 20,
+        frost: 50,
         origin: 'http://localhost:123',
         token: 'fixture-token',
       },
       {
-        method: 'setSurfaceOpacity',
+        method: 'setWindowAppearance',
         opacity: 80,
+        frost: 0,
         origin: 'http://localhost:123',
         token: 'fixture-token',
       },
