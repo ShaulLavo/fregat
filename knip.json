@@ -101,6 +101,7 @@
         "icons/generate.ts",
         "app-icon/generate.ts",
         "install-server.ts",
+        "import-proxy-usage-key.ts",
         "pair.ts",
         "prod.ts",
         "tui.ts",

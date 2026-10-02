@@ -237,6 +237,11 @@ export class SettingsStore {
    * Reads a server-owned secret, creating it on first use. Runs under the same
    * coordinator as settings writes, so two first uses agree on one value.
    */
+  async readSecret(ref: ServerSecretRef): Promise<string | null> {
+    this.assertOperational()
+    return (await this.secretStore.read()).get(ref) ?? null
+  }
+
   async ensureSecret(ref: ServerSecretRef, create: () => string): Promise<string> {
     this.assertOperational()
     return withSettingsSecretTransactionOwner(this.secretsPath, async (lease) => {

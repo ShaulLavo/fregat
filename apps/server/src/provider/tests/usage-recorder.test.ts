@@ -549,6 +549,8 @@ function recorderFixture(
         accountKey,
         driverKind: v.parse(providerDriverKindSchema, driverKind),
         enabled: true,
+        claudeCachePath: null,
+        credentialFingerprint: null,
       }
     },
   }

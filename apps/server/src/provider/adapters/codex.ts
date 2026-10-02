@@ -3025,6 +3025,9 @@ async function readCodexUsage(client: CodexAppServerRpcClient): Promise<Provider
   return {
     kind: 'reading',
     update: codexUsageUpdate(snapshot),
+    identityFingerprint: response.accountId
+      ? createHash('sha256').update(`codex-usage-account\0${response.accountId}`).digest('hex')
+      : undefined,
     resetCredits: codexResetCredits(response),
   }
 }

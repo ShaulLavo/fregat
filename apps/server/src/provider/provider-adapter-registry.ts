@@ -1,4 +1,7 @@
+import { statSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import path from 'node:path'
+import { homedir } from 'node:os'
 import type { SessionId } from '@workspace/contracts'
 import type { AgentTerminalProcess } from '../terminal/agent-launch'
 
@@ -237,6 +240,11 @@ export class ProviderAdapterRegistry {
       accountKey,
       driverKind: instance.config.driverKind,
       enabled: instance.config.enabled !== false,
+      credentialFingerprint: credentialFingerprint(instance.credentialPaths),
+      claudeCachePath:
+        instance.config.driverKind === 'claude'
+          ? claudeUsageCachePath(instance.env.CLAUDE_CONFIG_DIR)
+          : null,
     }
   }
 
@@ -757,4 +765,24 @@ function compareProviderSnapshots(left: ProviderSnapshot, right: ProviderSnapsho
     left.driverKind.localeCompare(right.driverKind) ||
     left.providerInstanceId.localeCompare(right.providerInstanceId)
   )
+}
+
+function claudeUsageCachePath(configDir: string | undefined) {
+  if (!configDir || path.resolve(configDir) === path.join(homedir(), '.claude'))
+    return path.join(homedir(), '.claude.json')
+  return path.join(configDir, '.claude.json')
+}
+
+function credentialFingerprint(paths: readonly string[]) {
+  if (!paths.length) return null
+  const hash = createHash('sha256')
+  for (const filePath of paths.toSorted()) {
+    try {
+      const stat = statSync(filePath, { bigint: true })
+      hash.update(`${stat.ino}\0${stat.size}\0${stat.mtimeNs}\0${stat.ctimeNs}\0`)
+    } catch {
+      hash.update('missing\0')
+    }
+  }
+  return hash.digest('hex')
 }
