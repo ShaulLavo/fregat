@@ -159,6 +159,7 @@ in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json
 | [e058-spellcheck.md](e058-spellcheck.md)                                                       | E058: Spellcheck for text the editor paints itself                                     |
 | [e063-tree-sitter-queries.md](e063-tree-sitter-queries.md)                                     | E063: More editor features from tree-sitter queries                                    |
 | [e064-one-highlight-pipeline.md](e064-one-highlight-pipeline.md)                               | E064: One highlight pipeline for tokens and range highlights                           |
+| [e065-injection-and-range-query-cost.md](e065-injection-and-range-query-cost.md)               | E065: Bound injection discovery and independent range-query scheduling                 |
 | [editor-authoring.md](editor-authoring.md)                                                     | Editor backlog plan contract                                                           |
 | [editor-backlog.md](editor-backlog.md)                                                         | Editor backlog                                                                         |
 | [bubli-markdown-consumer.md](bubli-markdown-consumer.md)                                       | Shared Markdown semantics for Editor and Fregat TUI                                    |
