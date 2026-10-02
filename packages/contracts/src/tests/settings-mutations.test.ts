@@ -67,6 +67,32 @@ describe('settings mutation schemas', () => {
     )
   })
 
+  it('validates and applies whole-record machine preferences through scalar mutations', () => {
+    const value = {
+      '00000000-0000-4000-8000-000000000001': 'prefer',
+      '00000000-0000-4000-8000-000000000002': 'normal',
+      '00000000-0000-4000-8000-000000000003': 'less-often',
+      '00000000-0000-4000-8000-000000000004': 'manual-only',
+    } as const
+    const input: ScalarSettingOperation = {
+      kind: 'set',
+      key: 'environments.loadPreferences',
+      value,
+    }
+    expect(descriptorFor(input.key).widget).toBe('record')
+    expect(parseRequest([input]).success).toBe(true)
+    const result = applyIdempotently({ 'files.showHidden': true }, operation(input))
+    expect(result.raw).toEqual({
+      'files.showHidden': true,
+      'environments.loadPreferences': value,
+    })
+    expect(result.touchedSettingIds).toEqual(['environments.loadPreferences'])
+    expect(
+      parseRequest([{ ...input, value: { [Object.keys(value)[0]!]: 'unsupported' } }]).success,
+    ).toBe(false)
+    expect(parseRequest([{ ...input, value: 'prefer' }]).success).toBe(false)
+  })
+
   it('narrows scalar values by key and exposes no generic collection replacement or toggle', () => {
     expect(
       v.safeParse(settingsOperationSchema, {
@@ -404,6 +430,54 @@ describe('settings operation reducer', () => {
       value: null,
     })
     expect(empty.raw).toEqual({})
+  })
+
+  it('edits title models and scoped grouping without replacing other projects', () => {
+    const title = {
+      ...modelRef('codex', 'fixture-model'),
+      options: { reasoningEffort: 'low' },
+    }
+    const set = applyIdempotently(
+      { 'chat.projectTextGenerationModels': { other: title } },
+      {
+        kind: 'project.set',
+        key: 'chat.projectTextGenerationModels',
+        projectId: 'project-a',
+        value: title,
+      },
+    )
+    expect(set.raw['chat.projectTextGenerationModels']).toEqual({
+      other: title,
+      'project-a': title,
+    })
+    const removed = applyIdempotently(set.raw, {
+      kind: 'project.set',
+      key: 'chat.projectTextGenerationModels',
+      projectId: 'project-a',
+      value: null,
+    })
+    expect(removed.raw['chat.projectTextGenerationModels']).toEqual({ other: title })
+    expect(
+      v.safeParse(settingsOperationSchema, {
+        kind: 'project.set',
+        key: 'chat.projectTextGenerationModels',
+        projectId: 'project-a',
+        value: { model: '' },
+      }).success,
+    ).toBe(false)
+    const grouped = applyIdempotently(
+      { 'chat.projectGroupingOverrides': { 'owner-a:project-a': 'repository' } },
+      {
+        kind: 'project.set',
+        key: 'chat.projectGroupingOverrides',
+        projectId: 'owner-b:project-a',
+        value: 'separate',
+      },
+    )
+    expect(grouped.raw['chat.projectGroupingOverrides']).toEqual({
+      'owner-a:project-a': 'repository',
+      'owner-b:project-a': 'separate',
+    })
   })
 
   it('refuses a project override that the record would not parse', () => {

@@ -5,9 +5,21 @@ import { observabilityEnvFromFile } from '../packages/observability/src/env-file
 
 const root = path.resolve(import.meta.dirname, '..')
 const env = observabilityEnvFromFile(path.join(root, '.env'), Bun.env)
-const output = observabilityEnabledFromEnv(env) ? 'inherit' : 'ignore'
+const polaron = process.argv.includes('--shell=polaron')
+const output = polaron || observabilityEnabledFromEnv(env) ? 'inherit' : 'ignore'
+if (polaron) {
+  const native = Bun.spawnSync({
+    cmd: [process.execPath, 'run', '--cwd', 'apps/desktop', 'build:native', '--shell=polaron'],
+    cwd: root,
+    env,
+    stdio: ['ignore', 'inherit', 'inherit'],
+  })
+  if (native.exitCode !== 0) process.exit(native.exitCode)
+}
 const child = Bun.spawn({
-  cmd: [process.execPath, 'run', '--cwd', 'apps/desktop', 'dev'],
+  cmd: polaron
+    ? [process.execPath, 'apps/desktop/src/launcher/index.ts', '--dev']
+    : [process.execPath, 'run', '--cwd', 'apps/desktop', 'dev'],
   cwd: root,
   env,
   stderr: output,

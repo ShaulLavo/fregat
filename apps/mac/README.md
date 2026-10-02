@@ -1,6 +1,6 @@
 # mac
 
-Native macOS client. Second frontend beside `apps/web` — the web app stays for cross-platform; the Bun server stays the brain. Editor-first: see `docs/native-plan-of-plans.md` for the doctrine, the gate, and the plan queue.
+Native macOS client. Second frontend beside `apps/web` — the web app stays for cross-platform; the Bun server stays the brain. Editor-first: see `plans/native-plan-of-plans.md` for the doctrine, the gate, and the plan queue.
 
 ## Toolchain
 

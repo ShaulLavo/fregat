@@ -1,5 +1,10 @@
 import * as v from 'valibot'
-import { eventIdSchema } from '@workspace/contracts'
+import {
+  DEFAULT_CODEX_PROVIDER_SETTINGS,
+  DEFAULT_CLAUDE_PROVIDER_SETTINGS,
+  DEFAULT_CURSOR_PROVIDER_SETTINGS,
+  eventIdSchema,
+} from '@workspace/contracts'
 import { act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach } from 'vitest'
 import type {
@@ -39,6 +44,45 @@ beforeEach(() => {
   resetChatMessageIntents()
 })
 afterEach(() => resetChatMessageIntents())
+
+test('provider defaults and the Codex snapshot fixture declare their steering capabilities', () => {
+  expect(DEFAULT_CODEX_PROVIDER_SETTINGS.traits.supportsSteering).toBe(true)
+  expect(DEFAULT_CLAUDE_PROVIDER_SETTINGS.traits.supportsSteering).toBe(false)
+  expect(DEFAULT_CURSOR_PROVIDER_SETTINGS.traits.supportsSteering).toBe(true)
+  expect(providerSnapshot().traits.supportsSteering).toBe(true)
+})
+
+test('Cursor queues a busy follow-up through its advertised steering capability', async () => {
+  const fixture = composerFixture(
+    providerSnapshot({ ...DEFAULT_CURSOR_PROVIDER_SETTINGS, enabled: true }),
+  )
+  const view = fixture.render()
+  await waitFor(() => expect(view.result.current.sendBlocked).toBe(false))
+  await act(async () => expect(await view.result.current.send(fixture.payload)).toBe('queued'))
+  view.rerender({
+    session: { ...fixture.running, activities: [sessionActivity({ kind: 'tool.completed' })] },
+    blocked: false,
+  })
+  await waitFor(() => expect(fixture.commands).toHaveLength(1))
+  expect(fixture.commands[0]?.type).toBe('session.turn.steer')
+})
+
+test('an explicit Codex steering-disabled override blocks busy follow-ups', async () => {
+  const provider = providerSnapshot()
+  const fixture = composerFixture({
+    ...provider,
+    traits: { ...provider.traits, supportsSteering: false },
+  })
+  const view = fixture.render()
+  view.rerender({
+    session: { ...fixture.running, latestTurn: null, runtime: null },
+    blocked: false,
+  })
+  await waitFor(() => expect(view.result.current.sendBlocked).toBe(false))
+  view.rerender({ session: fixture.running, blocked: false })
+  expect(view.result.current.sendBlocked).toBe(true)
+  expect(fixture.commands).toHaveLength(0)
+})
 
 test('queue retains files and context through draft changes; Stop restores before a failed interrupt', async () => {
   const fixture = composerFixture()
@@ -249,8 +293,10 @@ test('two composers observing one due head dispatch it once', async () => {
   expect(fixture.commands).toHaveLength(1)
 })
 
-function composerFixture() {
-  const running = session()
+function composerFixture(provider = providerSnapshot()) {
+  const running = session({
+    modelSelection: { model: 'fixture-model', providerInstanceId: provider.providerInstanceId },
+  })
   const ref = { environmentId: TEST_ENVIRONMENT_ID, sessionId: running.id }
   const target = { environmentId: TEST_ENVIRONMENT_ID, draftKey: running.id, rootPath: '/repo' }
   const payload: ChatInputSubmitPayload = {
@@ -263,7 +309,7 @@ function composerFixture() {
   }
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), settingsSnapshot())
-  queryClient.setQueryData(providerListQueryOptions().queryKey, { providers: [providerSnapshot()] })
+  queryClient.setQueryData(providerListQueryOptions().queryKey, { providers: [provider] })
   let snapshot: OrchestrationSessionDetailSnapshot = {
     snapshotSequence: 1,
     checkpoints: [],

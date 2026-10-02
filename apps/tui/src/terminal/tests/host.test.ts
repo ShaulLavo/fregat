@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { expect, test } from '../../../test/fixtures'
 
+// NOT-PORTABLE: Guards nvim only; Python and bash attach prerequisites are unguarded.
 test.runIf(process.platform === 'linux' && Bun.which('nvim'))(
   'raw attach runs Neovim on a real host PTY and restores the interactive application',
   async () => {

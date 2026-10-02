@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const { sources } = JSON.parse(await readFile(resolve(root, 'languages.json'), 'utf8'))
 const source = sources.astro
+// NOT-PORTABLE: Scratch falls back to /work/tmp when TMPDIR is unset.
 const scratchRoot = process.env.TMPDIR ?? '/work/tmp'
 await mkdir(scratchRoot, { recursive: true })
 const scratch = await mkdtemp(resolve(scratchRoot, 'native-grammars-'))

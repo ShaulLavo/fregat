@@ -498,6 +498,7 @@ export async function runSample(
         }),
       }),
     )
+    // NOT-PORTABLE: Failure screenshots default to /work/tmp/editor-e002.
     await page
       .screenshot({ path: `${config.failureDirectory ?? '/work/tmp/editor-e002'}/failure.png` })
       .catch(() => {})

@@ -1,3 +1,11 @@
+export const csvPresentationQueryKeys = {
+  presentation: () => ['workbench', 'csv-presentation'] as const,
+}
+
+export const csvEngineQueryKeys = {
+  engine: () => ['workbench', 'csv-engine'] as const,
+}
+
 export const wallpaperQueryKeys = {
   all: ['wallpaper'] as const,
   info: () => [...wallpaperQueryKeys.all, 'info'] as const,
@@ -10,6 +18,8 @@ export const projectMenuQueryKeys = {
 }
 
 export const pagedFileQueryKeys = {
+  facts: (path: string, version: string | null) =>
+    ['workbench', 'file-facts', path, version] as const,
   limits: (path: string) => ['workbench', 'file-limit', path] as const,
   instance: (instance: string, path: string, generation: number) =>
     ['workbench', 'paged-file', instance, path, generation] as const,

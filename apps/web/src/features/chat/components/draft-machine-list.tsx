@@ -37,7 +37,7 @@ export function DraftMachineList({
           title={machine.label}
           value={machine.environmentId}
           onClick={() => {
-            if (machine.environmentId !== environmentId) onSelect(machine)
+            onSelect(machine)
           }}
         >
           <Phase phase={machine.phase} label={machine.label} />

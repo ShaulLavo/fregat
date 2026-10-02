@@ -1,3 +1,4 @@
+import { isCancelledError, QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, vi } from 'vitest'
 
 import { expect, test } from '../../../test/fixtures'
@@ -288,3 +289,48 @@ test('reports a git failure raised outside the observed transport', () => {
 function emit(level: string, event: Record<string, unknown>) {
   emittedEvents.push({ event, level })
 }
+
+test('cancelled queries produce no client error report or error toast', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryKey = ['cancelled-report']
+  const pending = client.query({
+    queryKey,
+    queryFn: ({ signal }) => {
+      signal.throwIfAborted()
+      return new Promise<never>(() => undefined)
+    },
+  })
+  const rejected = pending.catch((cause: unknown) => cause)
+  await client.cancelQueries({ queryKey })
+  const cause = await rejected
+  expect(isCancelledError(cause)).toBe(true)
+
+  reportError(toClientError(cause))
+  reportClientError({
+    area: 'query',
+    operation: 'query.rejected',
+    cause,
+    message: 'Query failed.',
+  })
+
+  expect(emittedEvents).toEqual([])
+  expect(toastError).not.toHaveBeenCalled()
+  client.clear()
+})
+
+test('genuine query errors named like cancellation still produce a report and toast', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const failure = Object.assign(new Error('CancelledError'), { code: 'OPERATION_FAILED' })
+  const cause = await client
+    .query({ queryKey: ['failed-report'], queryFn: () => Promise.reject(failure) })
+    .catch((error: unknown) => error)
+
+  expect(isCancelledError(cause)).toBe(false)
+  reportError(toClientError(cause))
+
+  expect(emittedEvents).toMatchObject([
+    { level: 'error', event: { action: 'client.error', category: 'io_error' } },
+  ])
+  expect(toastError).toHaveBeenCalledOnce()
+  client.clear()
+})

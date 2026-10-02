@@ -1,14 +1,19 @@
 import { realpathSync } from 'node:fs'
 import path from 'node:path'
+import * as v from 'valibot'
 import {
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
+  DEFAULT_CURSOR_PROVIDER_SETTINGS,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
+  providerInstanceIdSchema,
 } from '@workspace/contracts'
 import type { AnyProviderDriver, ProviderInstanceConfig } from '../driver'
 import { sessionIdentityErrors } from '../structured-errors'
 import { claudeDriver } from './claude'
 import { codexDriver } from './codex'
 import { mockDriver } from './mock'
+import { cursorDriver } from './cursor'
+import { opencodeDriver } from './opencode'
 
 /**
  * Every driver this build knows how to instantiate. A settings entry naming a
@@ -18,13 +23,18 @@ import { mockDriver } from './mock'
  * The mock driver is deliberately absent: it is registered explicitly by tests
  * and by the deterministic harness, never by the product default.
  */
-const BUILT_IN_PROVIDER_DRIVERS: readonly AnyProviderDriver[] = [codexDriver, claudeDriver]
+const BUILT_IN_PROVIDER_DRIVERS: readonly AnyProviderDriver[] = [
+  codexDriver,
+  claudeDriver,
+  cursorDriver,
+  opencodeDriver,
+]
 
 /** The agent browser harness sets this on its throwaway server to reach the mock driver. */
 const HARNESS_ENV = 'PLATFORM_AGENT_HARNESS'
 /** Set only by `agent:browser --real-providers`: the owner lets this run use real accounts. */
 export const HARNESS_REAL_PROVIDERS_ENV = 'PLATFORM_AGENT_REAL_PROVIDERS'
-/** The folder harness fixture binaries live under; a Codex or Claude instance runs nothing else. */
+/** The folder harness fixture binaries live under; a native instance runs nothing else. */
 export const HARNESS_FIXTURE_ROOT_ENV = 'PLATFORM_AGENT_FIXTURE_ROOT'
 
 export function productProviderDrivers(env: NodeJS.ProcessEnv = process.env) {
@@ -53,7 +63,10 @@ function fixtureOnlyDriver(
         driver.driverKind === codexDriver.driverKind
           ? (input.env.PLATFORM_CODEX_BINARY ?? input.binaryPath)
           : input.binaryPath
-      const refusal = fixtureRefusal(binary, fixtureRoot)
+      const refusal =
+        driver.driverKind === opencodeDriver.driverKind && input.config.serverUrl
+          ? 'external-server-url'
+          : fixtureRefusal(binary, fixtureRoot)
       if (refusal)
         throw sessionIdentityErrors.HARNESS_FIXTURES_ONLY({
           internal: { driverKind: driver.driverKind, refusal },
@@ -96,5 +109,12 @@ export const DEFAULT_PROVIDER_INSTANCES: readonly ProviderInstanceConfig[] = [
     driverKind: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
     enabled: DEFAULT_CLAUDE_PROVIDER_SETTINGS.enabled,
     providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId,
+  },
+  { ...DEFAULT_CURSOR_PROVIDER_SETTINGS },
+  {
+    displayLabel: opencodeDriver.displayName,
+    driverKind: opencodeDriver.driverKind,
+    enabled: false,
+    providerInstanceId: v.parse(providerInstanceIdSchema, 'opencode'),
   },
 ]

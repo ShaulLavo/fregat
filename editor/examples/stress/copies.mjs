@@ -24,6 +24,7 @@ const sizes = values.sizes.split(',').map(Number)
 const repetitions = Number(values.repetitions)
 if (![...sizes, repetitions].every((value) => Number.isSafeInteger(value) && value > 0))
   fail('Invalid sizes/repetitions')
+// NOT-PORTABLE: Scratch creation requires /work/tmp.
 await mkdir('/work/tmp', { recursive: true })
 const directory = await mkdtemp('/work/tmp/editor-e007-build-')
 const core = await loadCorePackage(values['core-directory'])

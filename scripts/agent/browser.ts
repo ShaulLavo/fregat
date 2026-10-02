@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { copyFile, readdir } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import type { Browser, Page } from 'playwright'
@@ -9,7 +8,7 @@ import { createEvidence, type Evidence } from './evidence'
 import { formatLogEvent, readLogs } from './logs'
 import { attachObserver, observedProblems, serializable, type Observed } from './observe.mjs'
 import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
-import { settleRunningAnimations, waitForApp } from './selectors'
+import { settleRunningAnimations, waitForApp, waitForInitialContent } from './selectors'
 import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
 import { summarizeSelectors } from './selector-stats'
 import { captureTraceSources } from './trace-source-maps'
@@ -28,6 +27,7 @@ import { startIsolatedServer, type IsolatedServer } from './isolated-server'
 import { providerAccessRefusal } from './provider-access'
 import { devStateHome } from '../state-home'
 import { checkoutRoot, evidenceRoot } from './paths'
+import { ENGINES, launchBrowser, type Engine } from './browser-launch'
 
 const PRODUCT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
@@ -673,7 +673,7 @@ async function withPage(
     browser: Browser,
   ) => Promise<number>,
 ) {
-  const browser = await launch(options.engine, options.headed, options.notifications)
+  const browser = await launchBrowser(options.engine, options.headed, options.notifications)
   const context = await browser.newContext({
     // Only Chromium knows these permission names; Firefox and WebKit reject the context.
     permissions: options.engine === 'chromium' ? chromiumPermissions(options) : [],
@@ -760,7 +760,8 @@ async function open(page: Page, url: string) {
   await page.goto(url, { waitUntil: 'domcontentloaded' })
   try {
     await waitForApp(page)
-    await page.waitForTimeout(1_500)
+    if (!(await waitForInitialContent(page))) return false
+    await settleRunningAnimations(page)
     return true
   } catch {
     return false
@@ -769,7 +770,7 @@ async function open(page: Page, url: string) {
 
 async function doctor(page: Page, url: string, ready: boolean, observed: Observed) {
   const reasons: string[] = []
-  if (!ready) reasons.push('window toolbar never rendered')
+  if (!ready) reasons.push('initial content did not become ready')
   const release = await page.request.get(`${apiBase(url)}release`).catch(() => null)
   if (!release?.ok()) reasons.push('release route did not answer')
   const errors = await page.locator('[role="alert"]').count()
@@ -838,10 +839,6 @@ async function writeSummary(evidence: Evidence, lines: readonly string[]) {
   await evidence.write('summary.md', `${lines.join('\n')}\n`)
 }
 
-const ENGINES = ['chromium', 'firefox', 'webkit'] as const
-
-type Engine = (typeof ENGINES)[number]
-
 function isEngine(value: string): value is Engine {
   return (ENGINES as readonly string[]).includes(value)
 }
@@ -849,26 +846,6 @@ function isEngine(value: string): value is Engine {
 function chromiumPermissions(options: Options) {
   const clipboard = ['clipboard-read', 'clipboard-write']
   return options.notifications ? [...clipboard, 'notifications'] : clipboard
-}
-
-async function launch(engine: Engine, headed: boolean, notifications = false): Promise<Browser> {
-  const cache = '/work/cache/ms-playwright'
-  if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(cache)) {
-    process.env.PLAYWRIGHT_BROWSERS_PATH = cache
-  }
-  // Imported here: Playwright fixes its browser directory when it loads, and Bun loads a static
-  // import before any code in this file runs.
-  const playwright = await import('playwright')
-  const { chromium } = playwright
-  if (engine !== 'chromium') return playwright[engine].launch({ headless: !headed })
-  // Playwright hides scrollbars by default. Users have them, and a scrollbar that appears with
-  // content changes every width the app measures.
-  const ignoreDefaultArgs = ['--hide-scrollbars']
-  // The headless shell denies notification permission; full Chromium in headless mode grants it.
-  if (notifications)
-    return chromium.launch({ channel: 'chromium', headless: !headed, ignoreDefaultArgs })
-
-  return chromium.launch({ headless: !headed, ignoreDefaultArgs })
 }
 
 process.exitCode = await main()

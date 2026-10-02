@@ -273,6 +273,160 @@
       "minimum": 1,
       "type": "integer"
     },
+    "developer.heavyJobClasses": {
+      "default": {
+        "bench": {
+          "ceilingMiB": 9216,
+          "estimateMiB": 3072
+        },
+        "browser": {
+          "ceilingMiB": 10240,
+          "estimateMiB": 4096
+        },
+        "build": {
+          "ceilingMiB": 4096,
+          "estimateMiB": 3072
+        },
+        "light": {
+          "ceilingMiB": 2048,
+          "estimateMiB": 1536
+        },
+        "suite": {
+          "ceilingMiB": 8192,
+          "estimateMiB": 6656
+        }
+      },
+      "description": "Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.",
+      "markdownDescription": "Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.\n\nThe estimate is what admission reserves for a job of the class until the job uses it. The ceiling is the memory limit of the job’s slice: the kernel kills a job that grows past it.",
+      "properties": {
+        "bench": {
+          "properties": {
+            "ceilingMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            },
+            "estimateMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            }
+          },
+          "required": ["ceilingMiB", "estimateMiB"],
+          "type": "object"
+        },
+        "browser": {
+          "properties": {
+            "ceilingMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            },
+            "estimateMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            }
+          },
+          "required": ["ceilingMiB", "estimateMiB"],
+          "type": "object"
+        },
+        "build": {
+          "properties": {
+            "ceilingMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            },
+            "estimateMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            }
+          },
+          "required": ["ceilingMiB", "estimateMiB"],
+          "type": "object"
+        },
+        "light": {
+          "properties": {
+            "ceilingMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            },
+            "estimateMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            }
+          },
+          "required": ["ceilingMiB", "estimateMiB"],
+          "type": "object"
+        },
+        "suite": {
+          "properties": {
+            "ceilingMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            },
+            "estimateMiB": {
+              "maximum": 262144,
+              "minimum": 16,
+              "type": "integer"
+            }
+          },
+          "required": ["ceilingMiB", "estimateMiB"],
+          "type": "object"
+        }
+      },
+      "required": ["bench", "browser", "build", "light", "suite"],
+      "type": "object"
+    },
+    "developer.heavyJobCpuLoadLimit": {
+      "default": 1,
+      "description": "Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.",
+      "markdownDescription": "Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.\n\nThe one-minute load average divided by the number of cores: 1 means every core has a runnable task. CPU pressure’s `some` share stays high on an idle desktop and its `full` share reads zero for the whole machine, so admission counts runnable tasks.",
+      "maximum": 16,
+      "minimum": 0.1,
+      "type": "number"
+    },
+    "developer.heavyJobLogDirectory": {
+      "default": "/work/platform-production/heavy-jobs",
+      "description": "Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.",
+      "minLength": 1,
+      "type": "string"
+    },
+    "developer.heavyJobMemoryPressureLimit": {
+      "default": 10,
+      "description": "Percent of memory pressure at or above which heavy-job admission starts no further job while one runs.",
+      "markdownDescription": "Percent of memory pressure at or above which heavy-job admission starts no further job while one runs.\n\nMemory pressure is the share of the last ten seconds in which some task waited for memory (`/proc/pressure/memory`, `some avg10`). It stays near zero until the machine reclaims or swaps.",
+      "maximum": 100,
+      "minimum": 0,
+      "type": "number"
+    },
+    "developer.heavyJobMemoryReserveMiB": {
+      "default": 2048,
+      "description": "MiB of available memory that heavy-job admission leaves free for the desktop, the app and work outside the wrapper.",
+      "maximum": 65536,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "developer.heavyJobQuietHoldSeconds": {
+      "default": 600,
+      "description": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.",
+      "markdownDescription": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.\n\nA `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.",
+      "maximum": 7200,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "developer.heavyJobStopGraceSeconds": {
+      "default": 10,
+      "description": "Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.",
+      "maximum": 600,
+      "minimum": 1,
+      "type": "integer"
+    },
     "developer.simulatedLatencyMs": {
       "default": 0,
       "description": "Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.",
@@ -454,6 +608,23 @@
       "default": true,
       "description": "A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.",
       "type": "boolean"
+    },
+    "environments.loadBalancing": {
+      "default": false,
+      "description": "Choose a connected checkout with available CPU and memory for a new draft. The draft keeps its chosen machine.",
+      "type": "boolean"
+    },
+    "environments.loadPreferences": {
+      "additionalProperties": {
+        "enum": ["less-often", "manual-only", "normal", "prefer"],
+        "type": "string"
+      },
+      "default": {},
+      "description": "Weight automatic selection for each connected machine. Manual only requires choosing the machine yourself.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
     },
     "environments.machines": {
       "additionalProperties": {
@@ -1024,6 +1195,13 @@
       "markdownDescription": "Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.\n\nApplies while `prefetch.enabled` is on.",
       "type": "boolean"
     },
+    "providers.acpOperationTimeoutMs": {
+      "default": 30000,
+      "description": "Milliseconds an ACP agent has to initialize, change configuration or drain a cancelled turn. Active answers wait until they finish or you stop them.",
+      "maximum": 1800000,
+      "minimum": 1,
+      "type": "integer"
+    },
     "providers.instances": {
       "default": [],
       "description": "Your agent providers, such as Codex and Claude, in the order the model picker shows them.",
@@ -1176,6 +1354,40 @@
       "description": "Colors for the terminal app: the selected theme’s, or the colors of the terminal it runs in.",
       "enum": ["terminal", "theme"],
       "type": "string"
+    },
+    "window.browser": {
+      "default": "auto",
+      "description": "The desktop window engine: auto selects an installed Chromium browser, webview selects the system window, and an absolute path selects a browser executable.",
+      "pattern": "^(?:auto|webview|\\/[^\\0\\r\\n]+)$",
+      "type": "string"
+    },
+    "window.browserStartupIdleSeconds": {
+      "default": 5,
+      "description": "Seconds a starting browser may spend without reading its files, using the CPU or answering the launcher before the launcher stops it.",
+      "maximum": 600,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "window.browserStartupLimitSeconds": {
+      "default": 60,
+      "description": "Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it.",
+      "maximum": 600,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "window.nativeDialogTimeoutSeconds": {
+      "default": 300,
+      "description": "Seconds a desktop file chooser or startup message stays open before its helper closes.",
+      "maximum": 3600,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "window.nativeHostStopGraceSeconds": {
+      "default": 2,
+      "description": "Seconds the desktop gives an owned native helper to stop before terminating it.",
+      "maximum": 30,
+      "minimum": 1,
+      "type": "integer"
     },
     "window.transparency": {
       "default": "compositor",

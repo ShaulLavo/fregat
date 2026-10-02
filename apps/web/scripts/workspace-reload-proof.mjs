@@ -15,6 +15,7 @@ import {
 import { createBenchmarkError } from './structured-errors.mjs'
 
 const repository = fileURLToPath(new URL('../../..', import.meta.url))
+// NOT-PORTABLE: Defaults to /work/tmp and live app/server ports 5173 and 3001.
 const { values } = parseArgs({
   options: {
     url: { type: 'string', default: 'http://localhost:5173/' },

@@ -67,7 +67,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const confirmedQuery = useSettingsDocument()
   const projection = useSettingsProjection()
   const { applyBundle, selectBundle, setColorTheme, setSetting } = useSettingsActions()
-  const catalog = usePaletteCatalog()
+  const { palettes: catalog, pending: palettePending } = usePaletteCatalog()
   const bundles = useBundleLibrary().catalog
   const [bootValues] = useState(readSettingsMirror)
   const prefersDark = useSystemColorMode() === 'dark'
@@ -163,7 +163,11 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     applyPaletteStylesheet(globalThis.document, paletteStylesheet(renderedPalette))
   }, [renderedPalette])
 
-  useQueries({ queries: fontsInUse(appearanceValues).map((ref) => fontQueryOptions(ref)) })
+  const fonts = useQueries({
+    queries: fontsInUse(appearanceValues).map((ref) => fontQueryOptions(ref)),
+  })
+  const appearancePending =
+    confirmedQuery.isPending || palettePending || fonts.some((font) => font.isPending)
 
   const confirmedValues = confirmedQuery.data?.values
 
@@ -328,7 +332,11 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
                   default='none'
                   update={{ 'color-mode': 'color-mode', default: 'none' }}
                 >
-                  <div className='size-full' data-color-mode={resolvedMode}>
+                  <div
+                    className='size-full'
+                    data-color-mode={resolvedMode}
+                    aria-busy={appearancePending}
+                  >
                     {children}
                   </div>
                 </ViewTransition>

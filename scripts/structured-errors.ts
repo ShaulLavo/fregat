@@ -42,6 +42,41 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     why: 'A restart ends running turns, so `--restart` waits for them to finish, as the Restart button does.',
     fix: 'Run `bun run deploy --restart` again later, or add `--interrupt` to end those turns now. Inside a Platform chat your own turn counts as busy, so use `--interrupt` there.',
   },
+  HEAVY_INSTALL_DIRTY: {
+    status: 409,
+    message: ({ source, changes }: { source: string; changes: number }) =>
+      `${source} has ${changes} uncommitted change${changes === 1 ? '' : 's'}, so the heavy-job wrapper was not installed.`,
+    why: 'Every session runs the installed wrapper, so it is built only from a committed tree whose commit names it.',
+    fix: 'Install from a clean worktree at the merged commit: `git worktree add <dir> origin/main`, `bun install --frozen-lockfile`, then `bun scripts/heavy/install.ts` there.',
+  },
+  HEAVY_INSTALL_COMMIT: {
+    status: 409,
+    message: ({ wanted, head }: { wanted: string; head: string }) =>
+      `The checkout is at ${head}, not ${wanted}.`,
+    why: 'The install builds the files in the checkout, so it must be at the commit being installed.',
+    fix: 'Check out that commit in a clean worktree (`git switch --detach <commit>` there) and run the install again.',
+  },
+  HEAVY_INSTALL_BUILD: {
+    status: 500,
+    message: ({ source, detail }: { source: string; detail: string }) =>
+      `Bundling the heavy-job wrapper from ${source} failed: ${detail}`,
+    why: 'The installed wrapper is a self-contained bundle, so every import must resolve in the source checkout.',
+    fix: 'Run `bun install --frozen-lockfile` in that checkout and run the install again.',
+  },
+  HEAVY_SLICE_OUTSIDE_ROOT: {
+    status: 500,
+    message: ({ root, slice }: { root: string; slice: string }) =>
+      `${slice} is outside the slice root ${root}, so it was left running.`,
+    why: 'A wrapper stops only ownerless slices under its own root; slices under another root belong to another state directory.',
+    fix: 'Report this as a bug in scripts/heavy: the reaper was handed a slice it does not own.',
+  },
+  HEAVY_SLICE_FAILED: {
+    status: 502,
+    message: ({ slice, detail }: { slice: string; detail: string }) =>
+      `systemd could not set the memory ceiling of ${slice}: ${detail}`,
+    why: 'Each heavy job runs in its own slice, and the job starts only once the slice has its ceiling.',
+    fix: 'Check the user manager with `systemctl --user status` and run the job again.',
+  },
   RESTART_REQUEST_FAILED: {
     status: 502,
     message: ({ detail }: { detail: string }) => `The restart request failed: ${detail}`,

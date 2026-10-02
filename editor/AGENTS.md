@@ -2,6 +2,13 @@
 
 Instructions for AI coding agents working with this codebase.
 
+## Roadmap
+
+Fregat's [PLAN.md](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) schedules all work.
+Create and update Editor plans in Fregat's root `plans/`, using the
+[Editor inventory](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-backlog.md)
+and [authoring contract](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-authoring.md).
+
 ## Project Overview
 
 Browser-based code editor targeting ultra-low latency typing (<1-2ms perceived). Balanced-tree piece table with persistent immutable snapshots, CSS Highlight API rendering, and optional Tree-sitter syntax plugins.

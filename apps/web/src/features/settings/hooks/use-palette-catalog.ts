@@ -1,11 +1,11 @@
-import { BUNDLED_PALETTES, type Palette } from '@workspace/contracts'
+import { BUNDLED_PALETTES } from '@workspace/contracts'
 
 import { usePaletteLibrary } from '@/features/settings/hooks/use-palette-library'
 
 /** Every selectable palette: the bundled ones, then the user's library. */
-export function usePaletteCatalog(): readonly Palette[] {
+export function usePaletteCatalog() {
   const library = usePaletteLibrary()
-  if (library.length === 0) return BUNDLED_PALETTES
-
-  return [...BUNDLED_PALETTES, ...library]
+  const palettes =
+    library.palettes.length === 0 ? BUNDLED_PALETTES : [...BUNDLED_PALETTES, ...library.palettes]
+  return { palettes, pending: library.pending }
 }

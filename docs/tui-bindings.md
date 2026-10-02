@@ -44,7 +44,7 @@ the palette without default bindings. Development origin selection uses the laun
 
 Audited 2026-09-05 against the current working tree. Source metadata was loaded with Bun from the actual web command table and default Linux preset, with no DOM, then recorded in `/work/tmp/platform-tui-command-audit.json`. This record makes no source changes. The following original scope table records the proposals made before implementation. The installed defaults above and the shared metadata are authoritative.
 
-The live table has **179 production rows: 56 workspace and 123 editor**. `environment.devSwitchOrigin` adds one development-only row. The strategy and earlier research still say 142. All 180 rows have a disposition below. Numbering and navigation decisions come from `docs/tui-plan.md` sections 3.3, 10, and D3/D7.
+The live table has **179 production rows: 56 workspace and 123 editor**. `environment.devSwitchOrigin` adds one development-only row. The strategy and earlier research still say 142. All 180 rows have a disposition below. Numbering and navigation decisions come from `plans/tui-plan.md` sections 3.3, 10, and D3/D7.
 
 ## Foundation decisions
 

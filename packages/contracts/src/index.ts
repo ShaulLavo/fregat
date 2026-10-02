@@ -53,6 +53,19 @@ export type {
   GitLineStat,
   GitLineChange,
   GitPullRequest,
+  GitPullRequestActivity,
+  GitPullRequestActivitySection,
+  GitPullRequestReviewRecord,
+  GitPullRequestCommit,
+  GitPullRequestDiscussion,
+  GitPullRequestComment,
+  GitPullRequestComments,
+  GitPullRequestCommentResult,
+  GitPullRequestCommentCapability,
+  GitPullRequestReviewVerdict,
+  GitPullRequestReviewCapability,
+  GitPullRequestReviewInput,
+  GitPullRequestReviewResult,
   GitPullRequestCreateResult,
   GitPullRequestState,
   GitPullRequestSupport,
@@ -250,6 +263,7 @@ export {
 } from './orchestration-runtime'
 export {
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
+  DEFAULT_CURSOR_PROVIDER_SETTINGS,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
   providerAuthResultSchema,
   providerAgentSchema,
@@ -1128,3 +1142,5 @@ export {
   type AgentReviewResult,
   type AgentReviewTarget,
 } from './agent-review'
+
+export { hostResourcesSchema, type HostResources } from './host-resources'

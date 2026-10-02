@@ -10,16 +10,20 @@ export function LibraryWallpaper({
   readonly asset: AssetId
   readonly className?: string
 }) {
-  const [ready, setReady] = useState(false)
-  const [thumbnailFailed, setThumbnailFailed] = useState(false)
-  const [fullFailed, setFullFailed] = useState(false)
+  const [readyAsset, setReadyAsset] = useState<AssetId | null>(null)
+  const [attempt, setAttempt] = useState({ asset, thumbnailFailed: false, fullFailed: false })
+  if (attempt.asset !== asset) {
+    setAttempt({ asset, thumbnailFailed: false, fullFailed: false })
+  }
+  // Promote the decoded node itself; changing a painted image's src can clear it before paint.
+  const assets = readyAsset === null || readyAsset === asset ? [asset] : [readyAsset, asset]
   const classes = cn(
     'pointer-events-none absolute inset-0 z-0 h-full w-full object-cover',
     className,
   )
   return (
     <>
-      {!ready && !thumbnailFailed ? (
+      {readyAsset === null && !attempt.thumbnailFailed ? (
         <img
           crossOrigin='anonymous'
           alt=''
@@ -28,29 +32,47 @@ export function LibraryWallpaper({
           data-workbench-wallpaper=''
           data-workbench-wallpaper-layer='thumbnail'
           src={libraryImageUrl(asset, 'thumbnail')}
-          onError={() => setThumbnailFailed(true)}
+          onError={() => setAttempt((current) => ({ ...current, thumbnailFailed: true }))}
         />
       ) : null}
-      {!fullFailed ? (
-        <img
-          crossOrigin='anonymous'
-          alt=''
-          aria-hidden='true'
-          className={cn(classes, !ready && 'opacity-0')}
-          data-workbench-wallpaper={ready ? '' : undefined}
-          data-workbench-wallpaper-layer={ready ? 'still' : 'pending-still'}
-          src={libraryImageUrl(asset, 'display')}
-          decoding='async'
-          onError={() => setFullFailed(true)}
-          onLoad={(event) => {
-            const image = event.currentTarget
-            void image.decode().then(
-              () => setReady(true),
-              () => setFullFailed(true),
-            )
-          }}
-        />
-      ) : null}
+      {assets.map((imageAsset) => {
+        if (imageAsset === attempt.asset && attempt.fullFailed) return null
+        const ready = imageAsset === readyAsset
+        return (
+          <img
+            key={imageAsset}
+            crossOrigin='anonymous'
+            alt=''
+            aria-hidden='true'
+            className={cn(classes, !ready && 'opacity-0')}
+            data-workbench-wallpaper={ready ? '' : undefined}
+            data-workbench-wallpaper-layer={ready ? 'still' : 'pending-still'}
+            src={libraryImageUrl(imageAsset, 'display')}
+            decoding='async'
+            onError={() =>
+              setAttempt((current) => {
+                if (current.asset !== imageAsset) return current
+                return { ...current, fullFailed: true }
+              })
+            }
+            onLoad={(event) => {
+              const image = event.currentTarget
+              void image.decode().then(
+                () => {
+                  // Superseded images may finish decoding after their nodes have detached.
+                  if (!image.isConnected) return
+                  setReadyAsset(imageAsset)
+                },
+                () =>
+                  setAttempt((current) => {
+                    if (!image.isConnected || current.asset !== imageAsset) return current
+                    return { ...current, fullFailed: true }
+                  }),
+              )
+            }}
+          />
+        )
+      })}
     </>
   )
 }

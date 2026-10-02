@@ -7,6 +7,8 @@ import { openFixtureWorkspace, releaseFixture } from '../agent/fixture-workspace
 import { paintedTokenColors, selectors } from '../agent/selectors'
 import { createScriptError } from '../structured-errors'
 import { expectedEditedHash, fileHash, MARKER, writeFixture } from './fixture'
+import { hostLabel, renderingPath, type RenderingPath } from './host'
+import { collectKeyLatency, KEY_MEASURE } from './key-latency'
 import { sampleMemory } from './memory'
 import { workerHeaps } from './workers'
 
@@ -37,33 +39,20 @@ async function typeBurst(page: Page, keys: number) {
     .click({ position: { x: 180, y: 12 } })
   await selectors.editorInput(page).first().focus()
   await page.keyboard.press('Control+Home')
-  await page.evaluate(() => {
-    performance.clearMeasures('large-file-key')
+  await page.evaluate((name) => {
+    performance.clearMeasures(name)
     const input = document.activeElement
     input?.addEventListener('keydown', (event) => {
       if (!(event instanceof KeyboardEvent) || event.key !== 'x') return
       const start = event.timeStamp
-      requestAnimationFrame(() =>
-        performance.measure('large-file-key', { start, end: performance.now() }),
-      )
+      requestAnimationFrame(() => performance.measure(name, { start, end: performance.now() }))
     })
-  })
+  }, KEY_MEASURE)
   for (let index = 0; index < keys; index += 1) {
     await page.keyboard.press('x')
     await page.waitForTimeout(80)
   }
-  await page.waitForTimeout(200)
-  const values = await page.evaluate(() =>
-    performance.getEntriesByName('large-file-key').map((entry) => entry.duration),
-  )
-  strictEqual(values.length, keys, 'Every input must reach a painted frame')
-  values.sort((a, b) => a - b)
-  return {
-    count: values.length,
-    p50: values[Math.floor(values.length * 0.5)],
-    p95: values[Math.min(values.length - 1, Math.ceil(values.length * 0.95) - 1)],
-    max: values.at(-1),
-  }
+  return collectKeyLatency(page, keys)
 }
 
 async function copyLogs(logs: string, output: string) {
@@ -244,10 +233,13 @@ export async function runCase(options: CaseOptions) {
     initialBytes,
     corpus: `${options.extension === 'ts' ? 'scoped-functions-v2' : 'folded-functions-v1'}${options.twoByte ? '-unicode-body-v2' : ''}`,
     browser: browser.version(),
+    host: hostLabel(),
     runtime: Bun.version,
     timestamp: new Date().toISOString(),
   }
+  let rendering: RenderingPath | null = null
   try {
+    rendering = await renderingPath(browser)
     await page.goto(server.origin)
     await openFixtureWorkspace(page, fixture)
     if (options.profile)
@@ -263,13 +255,14 @@ export async function runCase(options: CaseOptions) {
       })
     const metrics = await exercise(page, options, file, memory)
     if (errors.length > 0) throw createScriptError(`Browser errors: ${errors.join('; ')}`)
-    return { ...metadata, status: 'passed', metrics, errors }
+    return { ...metadata, rendering, status: 'passed', metrics, errors }
   } catch (error) {
     await page
       .screenshot({ path: path.join(options.output, 'failed.png'), timeout: 5000 })
       .catch(() => {})
     return {
       ...metadata,
+      rendering,
       status: 'failed',
       metrics: await readFile(path.join(options.output, 'measurements.json'), 'utf8').then(
         (text) => JSON.parse(text),

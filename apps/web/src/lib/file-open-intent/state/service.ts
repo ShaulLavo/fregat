@@ -1,4 +1,5 @@
-import { materializeFileSnapshotText } from '@/lib/file-snapshot'
+import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { materializeFileSnapshotDocumentText } from '@/lib/file-snapshot'
 import { isRecord } from '@workspace/utils/objects'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
@@ -677,6 +678,7 @@ class FileOpenIntentServiceState {
     if (!this.isEnabled()) return
     if (canonicalRoot !== this.rootPath) return
     if (!this.pathBelongsToRoot(canonical)) return
+    if (isPdfFile(canonical)) return
     if (intent.knownSize !== undefined && intent.knownSize > MAX_PREPARED_FILE_BYTES) {
       this.finishImmediateIntent(intent, canonicalRoot, canonical, 'rejected', {
         reason: 'size-gated',
@@ -1482,6 +1484,7 @@ class FileOpenIntentServiceState {
   ): string | null {
     if (abortSignal.aborted || !this.generationIsCurrent(lifecycleGeneration)) return 'aborted'
     if (file.path !== path) return 'path-mismatch'
+    if (file.seemsBinary) return 'binary-file'
     if (file.size > MAX_PREPARED_FILE_BYTES) return 'size-gated'
     if (!this.pathBelongsToRoot(path)) return 'root-mismatch'
     if (this.isActive(path) || this.isMounted(path)) return 'already-active'
@@ -2045,7 +2048,7 @@ function createCleanBuffer(
   createBuffer: (text: string) => EditorTextBuffer,
 ): EditorTextBuffer {
   markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-  const buffer = createBuffer(materializeFileSnapshotText(file))
+  const buffer = createBuffer(materializeFileSnapshotDocumentText(file))
   buffer.markClean()
   return buffer
 }

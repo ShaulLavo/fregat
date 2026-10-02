@@ -47,9 +47,11 @@ type ProviderDriverCapabilities = ProviderAdapter['capabilities'] & {
   multiInstance: boolean
 }
 
-/** App services a driver may hand its adapter; absent in tests and harnesses. */
+/** Execution context and app services handed to every driver instance. */
 export type ProviderDriverServices = {
+  readonly cwd: string
   readonly agentDiagnostics?: AgentDiagnosticsSource
+  readonly acpOperationTimeoutMs?: () => number
 }
 
 type ProviderDriverCreateInput<Config> = {
@@ -90,7 +92,10 @@ export type ProviderDriver<Config> = {
   displayName: string
   driverKind: ProviderDriverKind
   /** Env vars derived from this instance's config (its home / credential dir). */
-  environment: (config: Config) => ProviderEnvironmentVariable[]
+  environment: (
+    config: Config,
+    providerInstanceId: ProviderInstanceId,
+  ) => ProviderEnvironmentVariable[]
   /** Decodes the opaque envelope once, at registration time. Throws on garbage. */
   parseConfig: (config: unknown) => Config
 }

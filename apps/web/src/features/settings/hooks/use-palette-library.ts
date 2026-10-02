@@ -6,7 +6,7 @@ import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 
 /** The user's palettes on the primary server; empty until the list arrives. */
-export function usePaletteLibrary(): readonly Palette[] {
+export function usePaletteLibrary() {
   const owner = useSettingsOwner()
   const query = useQuery(
     {
@@ -26,7 +26,7 @@ export function usePaletteLibrary(): readonly Palette[] {
     owner,
   )
 
-  return query.data ?? EMPTY
+  return { palettes: query.data ?? EMPTY, pending: query.isPending }
 }
 
 const EMPTY: readonly Palette[] = []

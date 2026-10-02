@@ -39,6 +39,7 @@ const metricNames = [
   'TaskDuration',
 ]
 
+// NOT-PORTABLE: Scratch creation requires /work/tmp.
 await mkdir('/work/tmp', { recursive: true })
 const directory = await mkdtemp('/work/tmp/editor-e036-build-')
 const core = await loadCorePackage(values['core-directory'])

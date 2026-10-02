@@ -13,6 +13,9 @@ import {
   gitDiffQuerySchema,
   gitFileQuerySchema,
   gitCreatePullRequestBodySchema,
+  gitPullRequestCommentsQuerySchema,
+  gitPullRequestCommentBodySchema,
+  gitPullRequestReviewBodySchema,
   gitPathBodySchema,
   gitPathQuerySchema,
   gitStatusQuerySchema,
@@ -189,6 +192,18 @@ export function gitRoutes(
       })
       .get('/pull-request', ({ query }) => git.pullRequestState(query.path), {
         query: gitPathQuerySchema,
+      })
+      .get('/pull-request/activity', ({ query }) => git.pullRequestActivity(query), {
+        query: gitPullRequestCommentsQuerySchema,
+      })
+      .get('/pull-request/comments', ({ query }) => git.pullRequestComments(query), {
+        query: gitPullRequestCommentsQuerySchema,
+      })
+      .post('/pull-request/comment', ({ body }) => git.postPullRequestComment(body), {
+        body: gitPullRequestCommentBodySchema,
+      })
+      .post('/pull-request/review', ({ body }) => git.submitPullRequestReview(body), {
+        body: gitPullRequestReviewBodySchema,
       })
       .post('/pull-request', ({ body }) => git.createPullRequest(body), {
         body: gitCreatePullRequestBodySchema,

@@ -280,7 +280,10 @@ test('a turn cut off by server shutdown is recovered as interrupted, not recorde
       throw createInternalError('Claude session stopped.')
     },
   })
-  const adapterRegistry = new ProviderAdapterRegistry({ adapters: [adapter] })
+  const adapterRegistry = new ProviderAdapterRegistry({
+    services: { cwd: process.cwd() },
+    adapters: [adapter],
+  })
   const fixture = await createOrchestrationFixture()
   onTestFinished(() => fixture.close())
   const providerService = new ProviderService({

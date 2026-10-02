@@ -97,6 +97,7 @@ describe('semantic token delta against a real server', () => {
       },
     } satisfies LspServerMatch
     const session = await pool.acquire(socket, match, root)
+    // NOT-PORTABLE: An installed rust-analyzer that fails to spawn is skipped.
     if (!session) return skip('rust-analyzer did not spawn')
 
     const uri = `file://${file}`
@@ -147,6 +148,7 @@ describe('semantic token delta against a real server', () => {
       }
       await new Promise((resolve) => setTimeout(resolve, 1_000))
     }
+    // NOT-PORTABLE: Rust indexing timeout becomes a skip and can hide regressions.
     if (!baseline) return skip('rust-analyzer produced no tokens inside the indexing window')
 
     // A real edit: a new item at the end, which shifts nothing before it and adds

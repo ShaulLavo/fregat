@@ -55,6 +55,7 @@ export function AppShell({
         // The phone keyboard shrinks the dynamic viewport; the desktop window never does.
         phone ? 'h-dvh' : 'h-svh overflow-hidden',
       )}
+      aria-busy={restoringWorkspace}
       ref={shellRef}
       tabIndex={-1}
     >

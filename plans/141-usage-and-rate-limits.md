@@ -48,7 +48,7 @@ Platform already receives.
   the same chain. **This plan owns both.** When a phase lands, mark the row in Plan 126's ledger as
   moved to Plan 141 with the phase that closed it. INTERACTION-07 closes with Phase 1; RUNTIME-08
   closes with Phase 5.
-- `docs/t3code-chat-parity-gap-analysis.md` "Deliberate non-parity" rejected
+- `plans/t3code-chat-parity-gap-analysis.md` "Deliberate non-parity" rejected
   `adjacent-usage-analytics`: a transcript-scanning and pricing pipeline is a product of its own,
   and price tables go stale. Both reasons have weakened. Claude now reports its own cost estimate
   per model (`modelUsage[].costUSD`), so no price table is needed for Claude; T3 answered

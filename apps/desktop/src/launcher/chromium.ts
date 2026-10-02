@@ -1,0 +1,496 @@
+import { closeLastMacPage } from './mac-lifecycle'
+import { mkdirSync } from 'node:fs'
+import type { BrowserCandidate } from './browser'
+import { CdpClient, cdpPipe, type CdpEvent } from './cdp'
+import { isRecord } from '@workspace/utils/objects'
+import { browserProfile, chromiumArguments } from './profile'
+import { liveSingletonOwner } from './singleton'
+import { launcherErrors } from './structured-errors'
+import {
+  browserDiagnostics,
+  browserProcessFacts,
+  drainBrowserDiagnostics,
+  startupProcessCounters,
+} from './diagnostics'
+import { startupSupervisor, type StartupBudget, type StartupCounters } from './startup'
+import type { PlatformPickOptions } from '../shared/bridge'
+import { shellBridge, parsePickRequest } from './shell-bridge'
+import { pick } from './webview-host'
+import { nativeBudget, nativeErrors, type NativeBudget } from './native-helper'
+import { nativeHostBinary, completePick } from './native-window'
+import path from 'node:path'
+
+type ChromiumOptions = {
+  candidate: BrowserCandidate
+  stateHome: string
+  home: string
+  url: string
+  native?: { binary: string; budget: NativeBudget }
+  startup: StartupBudget
+  // Tests replace the /proc sampler to drive progress deterministically.
+  observe?: (pid: number) => StartupCounters
+  signal?: AbortSignal
+  onOpen(context: Record<string, unknown>): void
+  onFailure(error: unknown): void
+  onExit?(context: { exitCode: number; signal: string | null }): void
+}
+export type ChromiumWindow =
+  | { kind: 'handoff' }
+  | { kind: 'owned'; cdp: CdpClient; exited: Promise<number>; close(): Promise<void> }
+
+export function assertChromiumVersion(product: unknown) {
+  const major = typeof product === 'string' ? /^Chrome\/(\d+)\./.exec(product)?.[1] : undefined
+  if (major && Number(major) >= 126) return
+  throw launcherErrors.VERSION_UNSUPPORTED({
+    internal: { reportedMajor: major ? Number(major) : null, requiredMajor: 126 },
+  })
+}
+
+export function chromiumBridge(url: string): string {
+  return shellBridge(url, 'chromium')
+}
+
+type AppDocument = {
+  contextId: number | undefined
+  revision: number
+  active: boolean
+  changed: ReturnType<typeof Promise.withResolvers<void>>
+}
+
+function updateDocument(document: AppDocument, contextId: number | undefined) {
+  document.contextId = contextId
+  document.revision++
+  document.changed.resolve()
+  document.changed = Promise.withResolvers<void>()
+}
+
+export async function attachChromium(
+  cdp: Pick<CdpClient, 'request' | 'on' | 'disconnected'>,
+  url: string,
+  onOpen: (context: Record<string, unknown>) => void,
+  onFailure: (error: unknown) => void,
+  pickEntry?: (options: PlatformPickOptions) => Promise<string[]>,
+) {
+  const script = chromiumBridge(url)
+  const sessions = new Set<string>()
+  const contexts = new Map<string, Set<number>>()
+  const documents = new Map<string, AppDocument>()
+  const targetIds = new Map<string, string>()
+  const readySessions = new Set<string>()
+  const connection = { active: true, error: undefined as unknown }
+  let changed = Promise.withResolvers<void>()
+  const notify = () => {
+    changed.resolve()
+    changed = Promise.withResolvers<void>()
+  }
+  const pendingPicks = new Map<string, Promise<string[]>>()
+  const origin = new URL(url).origin
+  const preparing = new Map<string, Promise<void>>()
+  const initialErrors: unknown[] = []
+  let attaching = true
+  const fail = (error: unknown) => {
+    if (attaching) initialErrors.push(error)
+    else onFailure(error)
+  }
+  void cdp.disconnected.then((error) => {
+    connection.active = false
+    connection.error = error
+    for (const document of documents.values()) document.changed.resolve()
+    notify()
+  })
+  const detach = (session: string) => {
+    sessions.delete(session)
+    contexts.delete(session)
+    targetIds.delete(session)
+    readySessions.delete(session)
+    const document = documents.get(session)
+    if (document) {
+      document.active = false
+      document.changed.resolve()
+    }
+    documents.delete(session)
+    preparing.delete(session)
+    notify()
+  }
+  cdp.on('Target.detachedFromTarget', (event) => {
+    if (typeof event.params.sessionId === 'string') detach(event.params.sessionId)
+  })
+  cdp.on('Target.targetDestroyed', (event) => {
+    for (const [session, targetId] of targetIds) {
+      if (targetId === event.params.targetId) detach(session)
+    }
+  })
+  cdp.on('Runtime.executionContextCreated', (event) => {
+    const context = event.params.context
+    if (!event.sessionId || !isRecord(context) || typeof context.id !== 'number') return
+    if (
+      context.origin !== origin ||
+      !isRecord(context.auxData) ||
+      context.auxData.isDefault !== true
+    )
+      return
+    const ids = contexts.get(event.sessionId) ?? new Set<number>()
+    ids.add(context.id)
+    contexts.set(event.sessionId, ids)
+    const document = documents.get(event.sessionId)
+    if (document) updateDocument(document, context.id)
+  })
+  cdp.on('Runtime.executionContextDestroyed', (event) => {
+    if (!event.sessionId || typeof event.params.executionContextId !== 'number') return
+    contexts.get(event.sessionId)?.delete(event.params.executionContextId)
+    const document = documents.get(event.sessionId)
+    if (document?.contextId === event.params.executionContextId) updateDocument(document, undefined)
+  })
+  cdp.on('Runtime.executionContextsCleared', (event) => {
+    if (!event.sessionId) return
+    contexts.delete(event.sessionId)
+    const document = documents.get(event.sessionId)
+    if (document) updateDocument(document, undefined)
+  })
+  cdp.on('Target.attachedToTarget', (event) => {
+    const session = event.params.sessionId
+    const target = event.params.targetInfo
+    if (typeof session !== 'string' || !isRecord(target)) {
+      fail(launcherErrors.CDP_FAILED({ internal: { reason: 'invalid-attachment' } }))
+      return
+    }
+    if (sessions.has(session)) return
+    sessions.add(session)
+    if (typeof target.targetId === 'string') targetIds.set(session, target.targetId)
+    const document: AppDocument = {
+      contextId: undefined,
+      revision: 0,
+      active: true,
+      changed: Promise.withResolvers<void>(),
+    }
+    documents.set(session, document)
+    const preparation = preparePage(cdp, session, target.type, script, origin, document, connection)
+      .then((ready) => {
+        if (ready && document.active) readySessions.add(session)
+      })
+      .catch((error: unknown) => {
+        if (sessions.has(session)) fail(error)
+      })
+      .finally(() => {
+        documents.delete(session)
+        preparing.delete(session)
+        notify()
+      })
+    preparing.set(session, preparation)
+    notify()
+  })
+  cdp.on('Runtime.bindingCalled', (event) => {
+    reportFrames(event, sessions, contexts, origin, onOpen)
+    if (!pickEntry || !trustedBinding(event, sessions, contexts)) return
+    let body: unknown
+    try {
+      body = JSON.parse(event.params.payload as string)
+    } catch {
+      return
+    }
+    const request = parsePickRequest(body, origin)
+    if (!request) return
+    const reply = (response: unknown) =>
+      cdp.request(
+        'Runtime.evaluate',
+        {
+          expression: `globalThis.__platformShellReply?.(${JSON.stringify(response)})`,
+          contextId: event.params.executionContextId,
+        },
+        event.sessionId,
+      )
+    const key = `${request.documentId}:${request.id}`
+    let pending = pendingPicks.get(key)
+    if (!pending) {
+      pending = pickEntry(request.options)
+      pendingPicks.set(key, pending)
+      // Two attached CDP sessions can report the same document binding call.
+      void pending.finally(() => pendingPicks.delete(key)).catch(() => {})
+    }
+    void completePick(request.id, request.documentId, pending, reply)
+  })
+  await cdp.request('Target.setDiscoverTargets', { discover: true })
+  await cdp.request('Target.setAutoAttach', {
+    autoAttach: true,
+    waitForDebuggerOnStart: true,
+    flatten: true,
+  })
+  // Auto-attach acknowledges before its page commands finish; keep startup supervision until they settle.
+  while (preparing.size || !readySessions.size) {
+    if (initialErrors.length) throw initialErrors[0]
+    if (!connection.active) throw connection.error
+    await changed.promise
+  }
+  if (initialErrors.length) throw initialErrors[0]
+  attaching = false
+}
+
+async function preparePage(
+  cdp: Pick<CdpClient, 'request'>,
+  session: string,
+  type: unknown,
+  script: string,
+  origin: string,
+  document: AppDocument,
+  connection: { active: boolean; error: unknown },
+) {
+  if (type !== 'page') {
+    await cdp.request('Runtime.runIfWaitingForDebugger', {}, session)
+    return false
+  }
+  await cdp.request('Page.enable', {}, session)
+  await cdp.request('Runtime.enable', {}, session)
+  await cdp.request('Runtime.addBinding', { name: 'platformShellCall' }, session)
+  await cdp.request('Page.addScriptToEvaluateOnNewDocument', { source: script }, session)
+  await cdp.request('Browser.grantPermissions', {
+    origin,
+    permissions: ['clipboardReadWrite', 'notifications'],
+  })
+  await cdp.request('Runtime.runIfWaitingForDebugger', {}, session)
+  // A target can advertise the app URL while its current document is still about:blank.
+  while (document.active) {
+    if (!connection.active) throw connection.error
+    const { contextId, revision } = document
+    if (contextId === undefined) {
+      await document.changed.promise
+      continue
+    }
+    let evaluated: Record<string, unknown>
+    try {
+      evaluated = await cdp.request('Runtime.evaluate', { expression: script, contextId }, session)
+    } catch (error) {
+      if (!document.active) return false
+      if (revision !== document.revision) continue
+      throw error
+    }
+    if (!document.active) return false
+    if (revision !== document.revision) continue
+    if (evaluated.exceptionDetails)
+      throw launcherErrors.CDP_FAILED({ internal: { reason: 'app-document-bridge' } })
+    return true
+  }
+  return false
+}
+
+function trustedBinding(
+  event: CdpEvent,
+  sessions: ReadonlySet<string>,
+  contexts: ReadonlyMap<string, ReadonlySet<number>>,
+) {
+  return (
+    !!event.sessionId &&
+    sessions.has(event.sessionId) &&
+    typeof event.params.executionContextId === 'number' &&
+    !!contexts.get(event.sessionId)?.has(event.params.executionContextId) &&
+    event.params.name === 'platformShellCall' &&
+    typeof event.params.payload === 'string'
+  )
+}
+
+function reportFrames(
+  event: CdpEvent,
+  sessions: ReadonlySet<string>,
+  contexts: ReadonlyMap<string, ReadonlySet<number>>,
+  origin: string,
+  onOpen: (context: Record<string, unknown>) => void,
+) {
+  if (!trustedBinding(event, sessions, contexts)) return
+  let payload: unknown
+  try {
+    payload = JSON.parse(event.params.payload as string)
+  } catch {
+    return
+  }
+  if (
+    !isRecord(payload) ||
+    payload.origin !== origin ||
+    typeof payload.rafPerSecond !== 'number' ||
+    !Number.isFinite(payload.rafPerSecond) ||
+    payload.rafPerSecond < 0
+  )
+    return
+  onOpen({ engine: 'chromium', rafPerSecond: payload.rafPerSecond })
+}
+
+export async function launchChromium(options: ChromiumOptions): Promise<ChromiumWindow> {
+  const profile = browserProfile(options.candidate, options.stateHome, options.home)
+  mkdirSync(profile, { recursive: true })
+  const supervisor = startupSupervisor(options.startup, () => performance.now())
+  const child = Bun.spawn({
+    cmd: [
+      options.candidate.executable,
+      ...chromiumArguments(options.candidate, profile, options.url),
+    ],
+    stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'],
+  })
+  const spawnMs = Math.round(supervisor.elapsedMs())
+  const diagnostics = browserDiagnostics()
+  void drainBrowserDiagnostics(child.stderr as ReadableStream<Uint8Array>, diagnostics).catch(
+    () => {},
+  )
+  let startupPhase = 'version'
+  const cdp = cdpPipe(child.stdio[3] as number, child.stdio[4] as number)
+  const helperTasks = new Set<Promise<string[]>>()
+  const helpers = new AbortController()
+  const helperSignal = options.signal
+    ? AbortSignal.any([options.signal, helpers.signal])
+    : helpers.signal
+  const native = options.native ?? {
+    binary: nativeHostBinary(path.resolve(import.meta.dirname, '../../../..')),
+    budget: nativeBudget(),
+  }
+  let closing: Promise<void> | undefined
+  let connected = false
+  let starting = true
+  const startupFailure = (reason: string) =>
+    launcherErrors.CDP_FAILED({
+      internal: {
+        reason,
+        startupPhase,
+        startupObservation: process.platform === 'linux' ? 'process-and-cdp' : 'cdp-only',
+        spawnMs,
+        waitedMs: Math.round(supervisor.elapsedMs()),
+        ...diagnostics.snapshot(),
+        transport: cdp.snapshot(),
+        ...browserProcessFacts(child.pid, options.candidate.executable, [
+          child.stdio[3] as number,
+          child.stdio[4] as number,
+        ]),
+      },
+    })
+  // Requests sent while starting time out exactly at the startup cap; later ones keep the client default.
+  const startupCdp: Pick<CdpClient, 'request' | 'on' | 'disconnected'> = {
+    disconnected: cdp.disconnected,
+    on: (method, handler) => cdp.on(method, handler),
+    request: (method, params, sessionId) => {
+      if (!starting) return cdp.request(method, params, sessionId)
+      return cdp
+        .request(method, params, sessionId, supervisor.remainingMs())
+        .catch((error: unknown) => {
+          const reason = (error as { internal?: { reason?: unknown } }).internal?.reason
+          throw reason === 'timeout' ? startupFailure('startup-limit') : error
+        })
+    },
+  }
+  const observe = options.observe ?? ((pid: number) => startupProcessCounters(pid))
+  const startupMonitor = setInterval(
+    () => {
+      const verdict = supervisor.check({
+        ...observe(child.pid),
+        cdpReadBytes: cdp.snapshot().readBytes,
+      })
+      if (verdict === 'progressing') return
+      clearInterval(startupMonitor)
+      cdp.close(startupFailure(verdict))
+    },
+    // Sampling resolution, a twentieth of the shorter bound.
+    Math.min(options.startup.idleMs, options.startup.limitMs) / 20,
+  )
+  const close = () => {
+    helpers.abort()
+    return (closing ??= (async () => {
+      await stopOwnedBrowser(cdp, child)
+      await Promise.allSettled(helperTasks)
+    })())
+  }
+  const pickEntry = (options: PlatformPickOptions) => {
+    if (helperTasks.size)
+      return Promise.reject(nativeErrors.HOST_FAILED({ internal: { stage: 'picker-busy' } }))
+    const task = pick({
+      binary: native.binary,
+      options,
+      budget: native.budget,
+      signal: helperSignal,
+    })
+    helperTasks.add(task)
+    void task.finally(() => helperTasks.delete(task)).catch(() => {})
+    return task
+  }
+  const abort = () => {
+    void close()
+  }
+  options.signal?.addEventListener('abort', abort, { once: true })
+  void child.exited.then((exitCode) => {
+    helpers.abort()
+    options.signal?.removeEventListener('abort', abort)
+    options.onExit?.({ exitCode, signal: child.signalCode })
+  })
+  try {
+    options.signal?.throwIfAborted()
+    const startup = startupCdp.request('Browser.getVersion')
+    const first = await Promise.race([
+      startup.then((version) => ({ kind: 'version' as const, version })),
+      child.exited.then((code) => ({ kind: 'exit' as const, code })),
+    ])
+    if (first.kind === 'exit') {
+      cdp.close()
+      options.signal?.throwIfAborted()
+      if (first.code === 0 && liveSingletonOwner(profile, options.candidate.executable))
+        return { kind: 'handoff' }
+      throw launcherErrors.LAUNCH_FAILED({
+        internal: { exitCode: first.code, startupPhase, ...diagnostics.snapshot() },
+      })
+    }
+    connected = true
+    startupPhase = 'attach'
+    assertChromiumVersion(first.version.product)
+    if (process.platform === 'darwin')
+      closeLastMacPage(cdp, (error) => {
+        options.onFailure(error)
+        void close()
+      })
+    await attachChromium(
+      startupCdp,
+      options.url,
+      (context) => options.onOpen({ ...context, product: first.version.product }),
+      (error) => {
+        options.onFailure(error)
+        void close()
+      },
+      pickEntry,
+    )
+    void cdp.done.then(() => close())
+    return { kind: 'owned', cdp, exited: child.exited, close }
+  } catch (error) {
+    if (connected || options.signal?.aborted) {
+      await close()
+      throw error
+    }
+    // Singleton handoff can close the pipe just before the short-lived process exits.
+    const code = await Promise.race([
+      child.exited,
+      Bun.sleep(Math.min(supervisor.idleRemainingMs(), supervisor.remainingMs())).then(
+        () => undefined,
+      ),
+    ])
+    if (
+      !connected &&
+      !options.signal?.aborted &&
+      code === 0 &&
+      liveSingletonOwner(profile, options.candidate.executable)
+    ) {
+      cdp.close()
+      return { kind: 'handoff' }
+    }
+    await close()
+    if (!connected && !options.signal?.aborted && code === 0) {
+      throw launcherErrors.LAUNCH_FAILED({
+        internal: { reason: 'unconfirmed-handoff', exitCode: code },
+      })
+    }
+    throw error
+  } finally {
+    starting = false
+    clearInterval(startupMonitor)
+  }
+}
+
+async function stopOwnedBrowser(cdp: CdpClient, child: ReturnType<typeof Bun.spawn>) {
+  cdp.close()
+  if (child.exitCode !== null) return
+  child.kill('SIGTERM')
+  await Promise.race([child.exited, Bun.sleep(2000)])
+  if (child.exitCode !== null) return
+  child.kill('SIGKILL')
+  await child.exited
+}

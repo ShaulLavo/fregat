@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { performance } from 'node:perf_hooks'
+// NOT-PORTABLE: Imports ignored textbuffer/dist without owning the prerequisite build.
 import {
   createPieceTableSnapshot,
   deleteFromPieceTable,

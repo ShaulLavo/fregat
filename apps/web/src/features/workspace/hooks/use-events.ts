@@ -1,3 +1,5 @@
+import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { materializeFileSnapshot, type FileSnapshot } from '@/lib/file-snapshot'
 import { parentPath } from '@/lib/path-formatters'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
@@ -55,6 +57,7 @@ import {
   type WorkspaceTreeOperation,
 } from '@/features/workspace/utils/event-model'
 import {
+  adoptFilesystemSnapshot,
   dismissFilesystemConflicts,
   markDeletedFilesystemDocument,
   notifyChangedFilesystemConflict,
@@ -328,6 +331,21 @@ export async function applyWorkspaceEvents({
   events: FilesystemEvent[]
   isOwnWorkspaceEditEvent: (writeId: string) => boolean
 }) {
+  for (const path of openFilePaths) {
+    if (!isPdfFile(path)) continue
+    const affected = events.some(
+      (event) =>
+        path === event.path ||
+        path.startsWith(`${event.path}/`) ||
+        (event.type === 'renamed' &&
+          (path === event.oldPath || path.startsWith(`${event.oldPath}/`))),
+    )
+    if (!affected) continue
+    await context.queryClient.invalidateQueries({
+      queryKey: fileSystemKeys.fileMetadata(path),
+      exact: true,
+    })
+  }
   const plan = planWorkspaceEditAwareEventBatch(
     events,
     openFileSnapshots(openFilePaths, context.dirtyDocumentKeys, context.getLiveEditorDocument),
@@ -404,7 +422,21 @@ function recordEventChurn(scope: WideEventScope, churn: DirectoryChurn) {
   scope.set({ events: { churn: summary } })
 }
 
-async function applyWorkspaceReady({ openFilePaths, scope, ...context }: WorkspaceEventContext) {
+export async function applyWorkspaceReady({
+  openFilePaths,
+  scope,
+  ...context
+}: WorkspaceEventContext) {
+  await Promise.all(
+    openFilePaths
+      .filter((path) => isPdfFile(path))
+      .map((path) =>
+        context.queryClient.invalidateQueries({
+          queryKey: fileSystemKeys.fileMetadata(path),
+          exact: true,
+        }),
+      ),
+  )
   const plan = planWorkspaceReady({
     openFiles: openFileSnapshots(
       openFilePaths,
@@ -676,6 +708,13 @@ async function applyRefreshOpenFileOperation({
   // Share reads with the selected-file query. Only that query owns cancellation;
   // subscription teardown stops application without cancelling other consumers.
   if (signal.aborted) return
+  if (isPdfFile(path)) {
+    await queryClient.invalidateQueries({
+      queryKey: fileSystemKeys.fileMetadata(path),
+      exact: true,
+    })
+    return
+  }
   await settlePendingSaves(queryClient, fileDocumentKey(filesystemPath(path)), signal)
   if (signal.aborted) return
 
@@ -709,7 +748,7 @@ async function applyRefreshOpenFileOperation({
     isDirty: isDirtyLiveDocument(path, dirtyDocumentKeys, conflictContext),
     liveText: liveDocumentText(path, conflictContext),
     path,
-    remoteText: file.content,
+    remoteText: supportsTextFile(file) ? file.content : null,
     remoteVersion: file.version,
   })
   applyFetchedOpenFileOperation(operation, file, forceReplaceLiveEditorDocument, conflictContext)
@@ -728,6 +767,10 @@ function applyFetchedOpenFileOperation(
   }
   if (!context.getLiveEditorDocument(fileDocumentKey(file.path))) return
 
+  if (!supportsTextFile(file)) {
+    adoptFilesystemSnapshot(file.path, file, context)
+    return
+  }
   forceReplaceLiveEditorDocument(file)
 }
 

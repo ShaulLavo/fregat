@@ -1,5 +1,14 @@
 ---
-import '../styles/styles.css'
+import pageCss from '../styles/styles.css?inline'
+import fontCss from '../styles/fonts.css?inline'
+import firstFrameCss from '../styles/first-frame.css?inline'
+import { firstGhostFrame } from '../first-frame.js'
+
+const firstFrame = await firstGhostFrame()
+import { measurements, measurementEnvironment, SHOW_MEASUREMENTS } from '../measurements'
+
+const version = __SITE_VERSION__
+const base = import.meta.env.BASE_URL
 ---
 
 <!doctype html>
@@ -8,21 +17,28 @@ import '../styles/styles.css'
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ghostty-webgpu</title>
+    <style is:inline set:html={pageCss + fontCss + firstFrameCss}></style>
     <meta
       name="description"
       content="An unofficial Ghostty for the web: libghostty-vt in WebAssembly with a damage-aware WebGPU renderer and a native API. Try it live."
     />
+    <script is:inline>
+      document.documentElement.style.setProperty('--ghost-device-pixel', `${1 / devicePixelRatio}px`)
+    </script>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap"
-    />
+    <link rel="preload" href="fonts/jetbrains-mono-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/jetbrains-mono-latin-600-normal.woff2" fetchpriority="low" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/jetbrains-mono-latin-400-italic.woff2" fetchpriority="low" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/bricolage-grotesque-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="ghostty-vt.wasm" fetchpriority="low" as="fetch" type="application/wasm" crossorigin />
+    <link rel="preload" href="ghost-frames.txt.gz" fetchpriority="low" as="fetch" crossorigin />
   </head>
   <body>
     <header class="masthead">
-      <a class="wordmark" href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>
+      <div class="identity">
+        <a class="wordmark" href={base}>ghostty-webgpu</a>
+        <a class="version" href="https://github.com/ShaulLavo/ghostty-webgpu/blob/main/CHANGELOG.md">v{version}</a>
+      </div>
       <nav class="links" aria-label="Project links">
         <a href="https://github.com/ShaulLavo/ghostty-webgpu">GitHub</a>
         <a href="https://www.npmjs.com/package/ghostty-webgpu">npm</a>
@@ -34,8 +50,7 @@ import '../styles/styles.css'
       <section class="intro">
         <h1>An unofficial Ghostty for the web.</h1>
         <p class="lede">
-          libghostty-vt compiled to WebAssembly, drawn by a damage-aware WebGPU renderer, behind a
-          native API.
+          libghostty-vt compiled to WebAssembly and drawn by a damage-aware WebGPU renderer. Its own API: bytes in, bytes out.
         </p>
         <div class="install">
           <code>npm install ghostty-webgpu</code>
@@ -43,23 +58,51 @@ import '../styles/styles.css'
         </div>
       </section>
 
-      <section class="window" id="window" aria-label="Live terminal">
+      <section class="window" id="window" data-ready="true" aria-label="Live terminal">
         <div class="chrome">
           <div class="window-dots" aria-hidden="true">
             <span></span><span></span><span></span>
           </div>
-          <span class="backend" id="backend" title="Renderer in use on this device">loading</span>
+          <div class="tabs" id="tabs" role="tablist" aria-label="Demos">
+            <button type="button" role="tab" data-demo="ghost" aria-selected="true">Ghost</button>
+            <button type="button" role="tab" data-demo="matrix" aria-selected="false">Matrix</button>
+            <button type="button" role="tab" data-demo="shell" aria-selected="false">Shell</button>
+          </div>
+          <span class="backend" id="backend" title="Renderer in use on this device">html</span>
         </div>
         <div class="screen">
-          <div id="terminal" role="img" aria-label="Animated Ghostty ghost"></div>
-          <div class="fatal" id="fatal" role="alert" hidden>
-            <p>The terminal could not start in this browser.</p>
-            <pre id="fatal-message"></pre>
-            <p>WebGPU, WebGL2, or Canvas2D is needed, along with WebAssembly.</p>
+          <div id="terminal" role="tabpanel" aria-label="Animated Ghostty ghost">
+            <div id="ghost-first-frame" set:html={firstFrame}></div>
           </div>
         </div>
       </section>
+      <p class="caption" id="caption"></p>
       <p class="stat" id="stat" aria-live="polite"></p>
+      <section class="usage" aria-label="Usage">
+        <pre class="example" aria-label="Create a terminal"><code><span class="tk-k">import</span> <span class="tk-p">{'{'}</span> <span class="tk-t">Terminal</span> <span class="tk-p">{'}'}</span> <span class="tk-k">from</span> <span class="tk-s">'ghostty-webgpu'</span>
+
+<span class="tk-k">const</span> host <span class="tk-p">=</span> document.<span class="tk-f">getElementById</span><span class="tk-p">(</span><span class="tk-s">'terminal'</span><span class="tk-p">)!</span>
+<span class="tk-k">const</span> terminal <span class="tk-p">=</span> <span class="tk-k">await</span> <span class="tk-t">Terminal</span>.<span class="tk-f">create</span><span class="tk-p">()</span>
+<span class="tk-k">await</span> terminal.<span class="tk-f">open</span><span class="tk-p">(</span>host<span class="tk-p">)</span>
+terminal.<span class="tk-f">write</span><span class="tk-p">(</span><span class="tk-s">'hello from ghostty\r\n'</span><span class="tk-p">)</span>
+terminal.<span class="tk-f">focus</span><span class="tk-p">()</span></code></pre>
+        <details class="pty-example">
+          <summary>Connect a WebSocket PTY</summary>
+          <pre class="example" aria-label="WebSocket PTY wiring"><code><span class="tk-k">const</span> socket <span class="tk-p">=</span> <span class="tk-k">new</span> <span class="tk-t">WebSocket</span><span class="tk-p">(</span><span class="tk-s">'wss://host/pty'</span><span class="tk-p">)</span>
+socket.binaryType <span class="tk-p">=</span> <span class="tk-s">'arraybuffer'</span>
+
+terminal.<span class="tk-f">onData</span><span class="tk-p">((</span>bytes<span class="tk-p">) =&gt;</span> <span class="tk-p">{'{'}</span>
+  <span class="tk-k">if</span> <span class="tk-p">(</span>socket.readyState <span class="tk-p">!==</span> <span class="tk-t">WebSocket</span>.OPEN<span class="tk-p">)</span> <span class="tk-k">return</span>
+  socket.<span class="tk-f">send</span><span class="tk-p">(</span>bytes<span class="tk-p">)</span>
+<span class="tk-p">{'}'})</span>
+
+socket.<span class="tk-f">addEventListener</span><span class="tk-p">(</span><span class="tk-s">'message'</span><span class="tk-p">,</span> <span class="tk-p">(</span><span class="tk-p">{'{'}</span> data <span class="tk-p">{'}'}</span><span class="tk-p">) =&gt;</span> <span class="tk-p">{'{'}</span>
+  <span class="tk-k">if</span> <span class="tk-p">(!(</span>data <span class="tk-k">instanceof</span> <span class="tk-t">ArrayBuffer</span><span class="tk-p">))</span> <span class="tk-k">return</span>
+  terminal.<span class="tk-f">write</span><span class="tk-p">(</span><span class="tk-k">new</span> <span class="tk-t">Uint8Array</span><span class="tk-p">(</span>data<span class="tk-p">))</span>
+<span class="tk-p">{'}'})</span></code></pre>
+          <p>The mount needs a height and width. Dispose the terminal and close the socket when the connection ends.</p>
+        </details>
+      </section>
 
       <section class="facts" aria-label="What makes it different">
         <p>
@@ -67,22 +110,47 @@ import '../styles/styles.css'
           idle terminal costs nothing and a busy one costs only its busy rows.
         </p>
         <p>
-          <strong>Falls back on its own.</strong> WebGPU first, then WebGL2, then Canvas2D, with the
-          same output. This page is drawing with
-          <span id="backend-fact">a renderer it is still choosing</span>.
+          <strong>Runs anywhere.</strong> WebGPU where the browser has it, then WebGL2, then Canvas2D, then plain DOM. Each draws the same cells. This page is drawing with <span id="backend-fact">html</span>.
         </p>
         <p>
           <strong>PTY traffic stays as bytes.</strong> The native API takes
           <code>Uint8Array</code> input and emits bytes for your PTY connection.
         </p>
       </section>
+      <section class="measured" aria-labelledby="measured-heading">
+        <h2 id="measured-heading">Measured</h2>
+        {SHOW_MEASUREMENTS ? (
+          <>
+            <p>{measurementEnvironment}</p>
+            <div class="measurement-table">
+              <table>
+                <caption>One terminal, byte input. Median of three runs; latency ends at the captured frame.</caption>
+                <thead><tr><th scope="col">Measure</th><th scope="col">ghostty-webgpu</th><th scope="col">xterm.js WebGL</th></tr></thead>
+                <tbody>{measurements.map((row) => (
+                  <tr><th scope="row">{row.label}</th><td>{row.ghostty}</td><td>{row.xterm}</td></tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </>
+        ) : <p>Measurements in progress.</p>}
+        <a href="https://github.com/ShaulLavo/ghostty-webgpu/blob/main/docs/benchmarks.md">Benchmark method and results</a>
+      </section>
     </main>
 
     <footer class="colophon">
+      <section class="preview" aria-labelledby="preview-heading">
+        <h2 id="preview-heading">In progress</h2>
+        <ul>
+          <li>Lower CPU while many terminals stream output.</li>
+          <li>Faster keystroke-to-screen latency.</li>
+          <li>Keybindings shared with the host app.</li>
+        </ul>
+        <a href="https://github.com/ShaulLavo/fregat/blob/main/PLAN.md">Development roadmap</a>
+      </section>
       <p>
         MIT licensed. Built on libghostty-vt. Not affiliated with the Ghostty project. The ghost
         animation is from <a href="https://github.com/ghostty-org/website">ghostty.org</a>, used
-        under its MIT license. Still a preview, so expect gaps.
+        under its MIT license.
       </p>
     </footer>
 

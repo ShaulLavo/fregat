@@ -11,6 +11,7 @@ if (!executable) {
   throw smokeError('The optional PTY smoke check requires nvim on PATH.')
 }
 
+// NOT-PORTABLE: Selects /work/tmp when /work exists without checking writability.
 const base = existsSync('/work') ? '/work/tmp' : tmpdir()
 await mkdir(base, { recursive: true })
 const root = await mkdtemp(path.join(base, 'pty-nvim-'))

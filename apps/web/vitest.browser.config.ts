@@ -1,3 +1,4 @@
+import { browserTestResponses } from '../../editor/scripts/browser-test-responses'
 import fs from 'node:fs'
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
@@ -40,7 +41,7 @@ process.env.VITEST_BROWSER_FILE_SERVER_URL = browserFileServerUrl
 
 // Real-paint / layout / visual tests in a real browser via Playwright.
 export default defineConfig({
-  plugins: [react({ compiler: true }), tailwindcss()],
+  plugins: [browserTestResponses(), react({ compiler: true }), tailwindcss()],
   resolve: { alias, dedupe: ['react', 'react-dom'] },
   server: { fs: { allow: [path.resolve(import.meta.dirname, '../..'), ...linkedPackageRoots] } },
   define: {

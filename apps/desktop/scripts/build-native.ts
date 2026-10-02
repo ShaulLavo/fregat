@@ -1,43 +1,76 @@
-// Compiles the vibrancy dylib that gives the window real macOS behind-window
-// blur. Runs before `electrobun dev`/`build`; a no-op off macOS, where the
-// runtime loader simply finds no library and leaves the window opaque.
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-
+import { defineErrorCatalog } from 'evlog'
 import { NATIVE_LIBRARY_NAME, nativeLibraryDir } from '../src/bun/native-paths'
 
-const DESKTOP_DIR = path.join(import.meta.dirname, '..')
-const SOURCE = path.join(DESKTOP_DIR, 'native', 'vibrancy.m')
-const OUTPUT = path.join(nativeLibraryDir(DESKTOP_DIR), NATIVE_LIBRARY_NAME)
-
-if (process.platform !== 'darwin') process.exit(0)
-
-if (!existsSync(SOURCE)) {
-  console.error(`[native] missing source ${SOURCE}`)
-  process.exit(1)
-}
-
-const result = Bun.spawnSync({
-  cmd: [
-    'clang',
-    '-dynamiclib',
-    '-fobjc-arc',
-    '-mmacosx-version-min=11.0',
-    '-framework',
-    'Cocoa',
-    '-O2',
-    '-o',
-    OUTPUT,
-    SOURCE,
-  ],
-  stderr: 'pipe',
-  stdout: 'pipe',
+const buildErrors = defineErrorCatalog('desktop.native', {
+  BUILD_FAILED: {
+    message: 'The native desktop helper could not be built.',
+    status: 500,
+    why: 'The native helper needs a C compiler and the platform development libraries.',
+    fix: 'Install cc, pkg-config and webkit2gtk-4.1 on Linux, or the Xcode command-line tools on macOS, then run build:native --shell=polaron again.',
+  },
 })
 
-if (result.exitCode !== 0) {
-  console.error(`[native] failed to build ${NATIVE_LIBRARY_NAME}`)
-  console.error(new TextDecoder().decode(result.stderr))
-  process.exit(result.exitCode ?? 1)
+export function buildNative(
+  desktopDir = path.join(import.meta.dirname, '..'),
+  shell: 'electrobun' | 'polaron' = 'electrobun',
+) {
+  if (process.platform !== 'linux' && process.platform !== 'darwin') return null
+  const linux = process.platform === 'linux'
+  if (linux && shell !== 'polaron') return null
+  const source = path.join(
+    desktopDir,
+    'native',
+    linux
+      ? 'linux/platform-webview.c'
+      : shell === 'polaron'
+        ? 'macos/platform-webview.m'
+        : 'vibrancy.m',
+  )
+  const output = path.join(
+    nativeLibraryDir(desktopDir),
+    linux || shell === 'polaron' ? 'platform-webview' : NATIVE_LIBRARY_NAME,
+  )
+  if (!existsSync(source))
+    throw buildErrors.BUILD_FAILED({ internal: { stage: 'source', platform: process.platform } })
+  const compiler = linux ? 'cc' : 'clang'
+  if (!Bun.which(compiler))
+    throw buildErrors.BUILD_FAILED({ internal: { stage: 'compiler', compiler } })
+  let flags: string[] = []
+  if (linux) {
+    if (!Bun.which('pkg-config'))
+      throw buildErrors.BUILD_FAILED({ internal: { stage: 'pkg-config' } })
+    const pkg = Bun.spawnSync(['pkg-config', '--cflags', '--libs', 'webkit2gtk-4.1'])
+    if (pkg.exitCode !== 0)
+      throw buildErrors.BUILD_FAILED({
+        internal: { stage: 'webkit2gtk-4.1', exitCode: pkg.exitCode },
+      })
+    flags = new TextDecoder().decode(pkg.stdout).trim().split(/\s+/)
+  }
+  const args = linux
+    ? []
+    : [
+        ...(shell === 'electrobun'
+          ? ['-dynamiclib']
+          : ['-framework', 'WebKit', '-framework', 'UniformTypeIdentifiers']),
+        '-fobjc-arc',
+        '-mmacosx-version-min=11.0',
+        '-framework',
+        'Cocoa',
+      ]
+  const result = Bun.spawnSync([compiler, ...args, '-O2', '-o', output, source, ...flags])
+  if (result.exitCode !== 0) {
+    process.stderr.write(result.stderr)
+    throw buildErrors.BUILD_FAILED({ internal: { stage: 'compile', exitCode: result.exitCode } })
+  }
+  return output
 }
 
-console.log(`[native] built ${OUTPUT}`)
+if (import.meta.main) {
+  const output = buildNative(
+    undefined,
+    process.argv.includes('--shell=polaron') ? 'polaron' : 'electrobun',
+  )
+  if (output) console.log(`[native] built ${output}`)
+}

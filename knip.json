@@ -5,7 +5,14 @@
       "entry": ["bench/lookup.ts"]
     },
     "apps/desktop": {
-      "entry": ["src/bun/index.ts", "src/preload/index.ts", "electrobun.config.ts"]
+      "entry": [
+        "src/bun/index.ts",
+        "src/preload/index.ts",
+        "src/launcher/index.ts",
+        "src/launcher/tests/fixtures/browser.mjs",
+        "src/launcher/tests/fixtures/native-helper.mjs",
+        "electrobun.config.ts"
+      ]
     },
     "apps/server": {
       "entry": [
@@ -58,9 +65,15 @@
     },
     "scripts": {
       "entry": [
+        "check-editor-backlog.mjs",
         "agent/browser.ts",
+        "agent/polaron-display.ts",
         "claude-gpt/run.ts",
         "large-file/bench.ts",
+        "heavy/pi/launch.ts",
+        "heavy/pi/run.ts",
+        "heavy/pi/setup.ts",
+        "heavy/pi/sync.ts",
         "agent/injected/renders.ts",
         "agent/injected/style-marks.ts",
         "agent/fixtures/fake-*.mjs",
@@ -72,6 +85,10 @@
         "dev.ts",
         "dev-serve.ts",
         "flake-summary.ts",
+        "heavy/install.ts",
+        "heavy/report.ts",
+        "heavy/run.ts",
+        "heavy/status.ts",
         "generate-settings-reference.ts",
         "generate-settings-schema.ts",
         "themes/generate-palette-css.ts",
@@ -98,7 +115,7 @@
         "parity/snooze.ts",
         "parity/wake.ts"
       ],
-      "ignoreBinaries": ["ssh-keygen"]
+      "ignoreBinaries": ["flock", "ssh-keygen", "systemd-run"]
     },
     ".": {
       "ignoreDependencies": ["typescript-api"]
@@ -108,7 +125,9 @@
         "src/search/tests/replacement.test-d.ts",
         "test/processes/job-control-launcher.ts",
         "test/processes/job-control-session.ts",
-        "test/processes/storage-writer.ts"
+        "test/processes/storage-writer.ts",
+        "test/processes/focus-trace-timeout.probe.ts",
+        "test/processes/focus-trace.vitest.config.ts"
       ]
     },
     "packages/pty": {

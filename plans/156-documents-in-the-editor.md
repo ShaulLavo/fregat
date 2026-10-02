@@ -2,9 +2,9 @@
 
 ## Status and authorization
 
-- Status: wave 2 P0–P2 remaining, reconciled 2026-09-28. Research and owner direction are
-  recorded below. Later format/editing phases remain follow-up work under their stated gates.
-- Priority: wave 2 closeout for P0–P2; later phases follow format readiness.
+- Status: wave 2 P0–P2 delivered 2026-10-02 in PRs #269, #280 and #286. The whole plan remains
+  open: P3 onward is Approved follow-up under the format, review and editing gates below.
+- Priority: wave 2 P0–P2 closed; remaining Approved phases follow format readiness.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
   ([docs/ui-research/extend-ui.md](../docs/ui-research/extend-ui.md)).
 
@@ -14,12 +14,73 @@ PDF, Word, Excel, PowerPoint and CSV files are first-class documents. They open 
 with a real rendering, and agents can read them, edit them, create new ones and preview the
 result, the way they already work on text files today.
 
-## Current implementation and dependencies (2026-09-28)
+## Current implementation and dependencies (2026-10-02)
 
-The source audit found no production web consumer of `seemsBinary` and no installed PDF/Office
-viewer integration in the web app. P0–P2 remain implementation work. The measurements below are
-2026-09-25 research results, not refreshed dependency recommendations or current bundle budgets.
-Recheck versions, licences and representative files before selecting an engine.
+Binary metadata/classification now guards text preparation, PDF opens in file tabs and chat
+previews, and CSV has an editable table presentation of the existing live text document.
+Office viewers, projection diffs and binary checkpoint per-file restore remain follow-up work.
+The source audit and measurements in the research section are historical 2026-09-25 results,
+not current implementation claims, refreshed recommendations or current bundle budgets.
+Recheck versions, licences and representative files before selecting each later engine.
+
+### Wave 2 delivery
+
+All commits below are actual squash commits on main, not branch heads:
+
+- **P0:** [#269](https://github.com/ShaulLavo/fregat/pull/269),
+  `e64eec2dac4a56ccd9752f7e751c353ff53c9885`. Binary metadata/classification runs before
+  text-size checks, preparation, indexing and buffer creation. Oversized binaries show file
+  facts and Reveal; their bytes are not decoded into a text document.
+- **P1:** [#280](https://github.com/ShaulLavo/fregat/pull/280),
+  `87340481c5366135e5bc8674e844e51407708f66`. File and chat share the PDF viewer, with lazy
+  presentation/core/worker loading, geometry-based search and selectable text. `pdfjs-dist`
+  6.3.289 is Apache-2.0; scripting and evaluation are disabled. Queries retain owner/path/version
+  identity. The distribution audit excludes native canvas, QuickJS, GPL payloads, evaluation
+  and Liberation fonts; the viewer uses `useSystemFonts`.
+- **P2:** [#286](https://github.com/ShaulLavo/fregat/pull/286),
+  `f621b6a5493a57ab6d1f79a3816e9f29bc943fad`. PapaParse 5.7.0 and `VirtualList` present the
+  canonical live buffer, publication, history and save owner; no additional document/content,
+  synchronization or save owner. Text/Table and header choice are per-tab presentation state.
+  Source-span edits preserve quoting, delimiters and unrelated bytes. One two-axis scroller
+  hosts the opaque sticky header and virtualized keyboard row/column reveal. Remote proofs cover
+  exact BOM/CRLF bytes, undo/redo, per-tab/header state, external changes, malformed input,
+  denied-read Retry and lazy engine/presentation failure with Reload.
+  [Narrow review approved](https://github.com/ShaulLavo/fregat/pull/286#issuecomment-5942851724);
+  [CI 36942260761](https://github.com/ShaulLavo/fregat/actions/runs/36942260761) succeeded on
+  branch head `efcda7ff` before the squash above.
+
+Supporting merged fixes: [#287](https://github.com/ShaulLavo/fregat/pull/287)
+(`867fed419322eb04190c8e4866b894067707b411`) preserves BOM/EOL through immutable
+`DocumentTextSnapshot` saves; [#289](https://github.com/ShaulLavo/fregat/pull/289)
+(`7bbb6f647669a6e976ca324a30196cca804f3c28`) retains read errors and Retry;
+[#291](https://github.com/ShaulLavo/fregat/pull/291)
+(`805cf3f2b3499bbecdd4a3b906824acfeb67daea`) refreshes saved mtime after byte-identical external
+rewrites. [#306](https://github.com/ShaulLavo/fregat/pull/306)
+(`a63cab73fddc0f8466162fcb162c30b17e19897e`) is a test-only happy-dom stringified-binary guard:
+exact bytes are proved in Node, with the 13-byte collision documented. It adds no production
+transport seam.
+
+Delivery evidence (absolute paths on the verification host):
+
+- PDF distribution: `/work/tmp/fregat-evidence/pdf-dist-d8becce-5FtIpO/`.
+  Main integration: `/work/tmp/fregat-evidence/pdf-integration-final-main/`.
+- PDF file, chat and presentation failure:
+  `/work/tmp/fregat-evidence/20261001T215700Z-scenario-pdf-documents/`,
+  `/work/tmp/fregat-evidence/20261001T220116Z-scenario-pdf-attachment/`,
+  `/work/tmp/fregat-evidence/20261001T220307Z-scenario-pdf-presentation-unavailable/`.
+- CSV final lazy correction: `/work/tmp/fregat-evidence/csv-lazy-correction-427a5c2b/`.
+  Remote table and navigation: `/work/tmp/fregat-evidence/20261001T233048Z-scenario-csv-table/`,
+  `/work/tmp/fregat-evidence/20261001T233106Z-scenario-csv-keyboard-navigation/`.
+  Final boundary readiness, presentation failure and engine failure:
+  `/work/tmp/fregat-evidence/20261001T233948Z-scenario-csv-presentation-readiness/`,
+  `/work/tmp/fregat-evidence/20261001T234002Z-scenario-csv-presentation-failure/`,
+  `/work/tmp/fregat-evidence/20261001T234015Z-scenario-csv-engine-failure/`.
+
+Deployment is root-owned. The root coordinator reports P0 live in earlier releases (exact release
+ID not supplied), P1 live as `20261001T225237Z-87340481-w2-280`, and P2 live as
+`20261001T235342Z-f621b6a5-w2-286`, with the latter live check PASS and zero warnings.
+This documentation track did not deploy or independently recheck the live mesh. Physical
+Mac/iPhone and real-account checks are unconfirmed; fixture/remote proofs do not certify them.
 
 Use existing file-document identity. Plan 200 owns shared content-source ownership, 198 owns
 retained analysis and attachment, and 099 owns buffer publication/consumer synchronization.
@@ -76,7 +137,7 @@ Read from `origin/main` at `9f343825`; no open PR branch changes this plan. The 
 survey, with method and screenshots, is [docs/documents/library-survey.md](../docs/documents/library-survey.md).
 Probes ran under `/work/tmp/research/156/`.
 
-### What happens today
+### Historical implementation audit (2026-09-25)
 
 - Opening a PDF, DOCX, XLSX or PPTX opens it as text. `/fs/read` decodes any bytes and reports
   `seemsBinary` and `lossy` (`apps/server/src/fs/read.ts:48-59`); nothing in `apps/web` reads
@@ -227,16 +288,14 @@ Shipped weight is esbuild-minified JS plus runtime wasm, gzip -9.
 
 ### Execution phases
 
-Wave 2 closes P0–P2, following 132, 179, 099 and 114 in the closeout queue, with 126 split by
-remaining batch. These are scheduling preferences, not dependencies on every phase of those
-plans. P3 onward stays the documented follow-up scope; DOCX editing retains its owner gate.
+Wave 2 P0–P2 is delivered. P3 onward remains Approved follow-up; DOCX editing retains its
+Markdown-authoring prerequisite and fidelity gate. Delivery of P0–P2 does not close this plan.
 
-0. **Binary files stop opening as text.** Honour `seemsBinary`: show a file-facts body (size,
-   type, reveal) and no text buffer.
-1. **PDF viewer.** pdf.js core in a lazy chunk, pages in measured flow, text layer and search.
-   Chat attachment preview uses it.
-2. **CSV table view** over the text buffer: papaparse and `VirtualList`. Edits in the table become
-   buffer edits.
+0. **Delivered — binary files stop opening as text** (#269): file facts and Reveal, no text buffer.
+1. **Delivered — PDF viewer** (#280): lazy pdf.js, measured pages, selectable text and search,
+   shared by file tabs and chat attachment preview.
+2. **Delivered — CSV table view** (#286): PapaParse and `VirtualList` over the existing live text
+   buffer, with table edits applied through its history/save contracts.
 3. **Projection diffs** for DOCX, XLSX and PDF in Git and checkpoint diffs, computed on the server.
    Add a blob-restore per-file undo to Plan 139.
 4. **DOCX and XLSX viewers:** docx-preview, and SheetJS into our grid. Both are lazy.
@@ -257,4 +316,5 @@ plans. P3 onward stays the documented follow-up scope; DOCX editing retains its 
 
 Each delivered format needs an actual open/preview scenario, read-back screenshots, remote-file
 ownership checks and the relevant unavailable-engine/error cases. P3 additionally proves review
-and whole-file restore against binary checkpoint blobs. This refresh ran no format/browser tests.
+and whole-file restore against binary checkpoint blobs. P0–P2 evidence is recorded above;
+this documentation-only closeout ran no new format/browser tests.

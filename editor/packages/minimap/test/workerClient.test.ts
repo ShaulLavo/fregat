@@ -1,7 +1,8 @@
 import { documentRow } from './visibleRows'
-import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
+import { createTestLineStartsView } from '@singapore-editor/core/testing'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  createDocumentSession,
   createStringTextSnapshot,
   type TextSnapshot,
   type DocumentSessionChange,
@@ -15,9 +16,14 @@ import {
   type EditorTokenInput,
 } from '@singapore-editor/core/syntax'
 import { resolveMinimapOptions } from '../src/options'
+import { MinimapWorkerRenderer } from '../src/renderer'
 import { computeRenderLayout } from '../src/layout'
 import { MinimapWorkerClient, type MinimapHost } from '../src/workerClient'
-import type { MinimapWorkerRequest, MinimapWorkerResponse } from '../src/types'
+import type {
+  MinimapDocumentPayload,
+  MinimapWorkerRequest,
+  MinimapWorkerResponse,
+} from '../src/types'
 
 describe('MinimapWorkerClient', () => {
   it('exposes worker lifecycle and waits for disposal acknowledgement before terminating', () => {
@@ -917,6 +923,145 @@ describe('MinimapWorkerClient', () => {
     }
   })
 
+  it.each([
+    { lineCount: 16, inserted: 'x', distinct: false },
+    { lineCount: 500_000, inserted: 'x', distinct: false },
+    { lineCount: 16, inserted: 'x\ny\n', distinct: false },
+    { lineCount: 500_000, inserted: 'x\ny\n', distinct: false },
+    { lineCount: 16, inserted: 'x', distinct: true },
+    { lineCount: 16, inserted: 'x\ny\n', distinct: true },
+  ])(
+    'keeps summaries aligned through coalesced undo and redo (%j)',
+    ({ lineCount, inserted, distinct }) => {
+      const runtime = installMinimapRuntime()
+      const host = createHost()
+      const text = Array.from({ length: lineCount }, (_, index) =>
+        distinct ? `//${index}` : '//',
+      ).join('\n')
+      const session = createDocumentSession(text)
+      const client = new MinimapWorkerClient({
+        host,
+        options: resolveMinimapOptions(),
+        snapshot: snapshot({}, { text }),
+        decorations: [],
+        onLayoutWidth: vi.fn(),
+        reservedLane: () => 0,
+      })
+      const worker = runtime.workers[0]!
+      const { renderer, initial } = createSummaryRenderer(worker)
+
+      try {
+        worker.send(renderedResponse(1))
+        worker.postMessage.mockClear()
+
+        for (let index = 0; index < 12; index += 1) {
+          const offset = 24 + index * inserted.length
+          const change = session.applyEdits([{ from: offset, to: offset, text: inserted }])
+          client.update(snapshot({}, { textSnapshot: change.textSnapshot }), 'content', change)
+        }
+        runtime.flushAnimationFrames()
+        applyPostedSummaryUpdates(renderer, worker)
+        const edited = rendererSummary(renderer)
+        expect(edited.lines.length).toBe(session.getTextSnapshot().lineCount)
+        expect(edited.lines).toEqual(
+          session
+            .materializeFullText()
+            .split('\n')
+            .map((line) => ({ text: line, length: line.length })),
+        )
+        worker.send(renderedResponse(lastRenderSequence(worker)))
+        worker.postMessage.mockClear()
+
+        for (let index = 0; index < 12; index += 1) {
+          const change = session.undo()
+          client.update(snapshot({}, { textSnapshot: change.textSnapshot }), 'content', change)
+        }
+        expect(session.materializeFullText()).toBe(text)
+        runtime.flushAnimationFrames()
+        applyPostedSummaryUpdates(renderer, worker)
+
+        const restored = rendererSummary(renderer)
+        expect(restored.lines.length).toBe(lineCount)
+        expect(restored.lines).toEqual(initial.lines)
+        expect(restored.lineStarts).toEqual(initial.lineStarts)
+        expect(restored.textLength).toBe(initial.textLength)
+        worker.send(renderedResponse(lastRenderSequence(worker)))
+        worker.postMessage.mockClear()
+
+        for (let index = 0; index < 12; index += 1) {
+          const change = session.redo()
+          client.update(snapshot({}, { textSnapshot: change.textSnapshot }), 'content', change)
+        }
+        runtime.flushAnimationFrames()
+        applyPostedSummaryUpdates(renderer, worker)
+
+        const redone = rendererSummary(renderer)
+        expect(redone.lines.length).toBe(session.getTextSnapshot().lineCount)
+        expect(redone.lines).toEqual(edited.lines)
+        expect(redone.lineStarts).toEqual(edited.lineStarts)
+        expect(redone.textLength).toBe(edited.textLength)
+      } finally {
+        client.dispose()
+        renderer.dispose()
+        host.root.remove()
+        host.colorScope.remove()
+        runtime.restore()
+      }
+    },
+  )
+
+  it.each(['edit', 'undo', 'redo'] as const)(
+    'tracks cancelling offsets through queued %s',
+    (operation) => {
+      const fixture = createSummaryFixture('AAAAAAAAAA\nZ\nC')
+      const edits: readonly TextEdit[] = [
+        { from: 1, to: 10, text: '' },
+        { from: 2, to: 3, text: 'B' },
+        { from: 1, to: 1, text: 'AAAAAAAAA' },
+      ]
+      try {
+        for (const edit of edits) {
+          fixture.update(fixture.session.applyEdits([edit]))
+          if (operation !== 'edit') fixture.verify()
+        }
+        if (operation === 'edit') {
+          fixture.verify()
+          return
+        }
+        for (let index = 0; index < edits.length; index += 1) {
+          fixture.update(fixture.session.undo())
+          if (operation === 'redo') fixture.verify()
+        }
+        if (operation === 'undo') {
+          fixture.verify()
+          return
+        }
+        for (let index = 0; index < edits.length; index += 1) {
+          fixture.update(fixture.session.redo())
+        }
+        fixture.verify()
+      } finally {
+        fixture.dispose()
+      }
+    },
+  )
+
+  it.each(Array.from({ length: 80 }, (_, index) => index + 1))(
+    'matches fresh summaries after mixed edits, undo and redo with seed %d',
+    (seed) => {
+      const fixtures = ['', 'AAAAAAAAAA\nZ\nC', 'one\ntwo\nthree\n', '😀\né\n中']
+      const fixture = createSummaryFixture(fixtures[seed % fixtures.length]!)
+      const randomIndex = seededIndex(seed)
+      try {
+        for (let round = 0; round < 12; round += 1) {
+          runSummaryRound(fixture, round % 2 === 0, randomIndex)
+        }
+      } finally {
+        fixture.dispose()
+      }
+    },
+  )
+
   it('queues incremental edits while a render is in flight', () => {
     const runtime = installMinimapRuntime()
     try {
@@ -1495,16 +1640,19 @@ function snapshot(
   viewport: Partial<EditorViewSnapshot['viewport']> = {},
   overrides: Partial<Pick<EditorViewSnapshot, 'contentWidth' | 'visibleRows'>> & {
     readonly text?: string
+    readonly textSnapshot?: TextSnapshot
     readonly tokens?: EditorTokenInput
   } = {},
 ): EditorViewSnapshot {
-  const text = overrides.text ?? 'line 1\nline 2\nline 3'
-  const starts = lineStarts(text)
+  const textSnapshot =
+    overrides.textSnapshot ?? createStringTextSnapshot(overrides.text ?? 'line 1\nline 2\nline 3')
+  const lineStartsView = createTestLineStartsView(textSnapshot)
   const contentWidth = overrides.contentWidth ?? 160
   return {
     documentId: 'minimap-test',
     languageId: 'typescript',
-    ...createTestViewSnapshotSource(text),
+    textSnapshot,
+    lineStartsView,
     textVersion: 1,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -1515,12 +1663,14 @@ function snapshot(
       textVersion: 1,
     },
     changesSinceDocumentSyncPoint: () => null,
-    lineStarts: starts,
+    get lineStarts() {
+      return lineStartsView.toArray()
+    },
     tokens: toEditorTokenStore(overrides.tokens ?? []),
     brackets: [],
     selections: [],
     metrics: { rowHeight: 20, characterWidth: 8 },
-    lineCount: starts.length,
+    lineCount: textSnapshot.lineCount,
     contentWidth,
     totalHeight: 60,
     gutterWidth: 0,
@@ -1587,6 +1737,159 @@ function lineStarts(text: string): readonly number[] {
     index = text.indexOf('\n', index + 1)
   }
   return starts
+}
+
+function createSummaryFixture(text: string) {
+  const runtime = installMinimapRuntime()
+  const host = createHost()
+  const session = createDocumentSession(text)
+  const client = new MinimapWorkerClient({
+    host,
+    options: resolveMinimapOptions(),
+    snapshot: snapshot({}, { textSnapshot: session.getTextSnapshot() }),
+    decorations: [],
+    onLayoutWidth: vi.fn(),
+    reservedLane: () => 0,
+  })
+  const worker = runtime.workers[0]!
+  const { renderer } = createSummaryRenderer(worker)
+  worker.send(renderedResponse(1))
+  worker.postMessage.mockClear()
+
+  return {
+    session,
+    update(change: DocumentSessionChange) {
+      client.update(snapshot({}, { textSnapshot: change.textSnapshot }), 'content', change)
+    },
+    verify() {
+      runtime.flushAnimationFrames()
+      applyPostedSummaryUpdates(renderer, worker)
+      const actual = rendererSummary(renderer)
+      const expected = freshSummary(session.getTextSnapshot(), runtime)
+      expect(actual.lines.length).toBe(session.getTextSnapshot().lineCount)
+      expect(actual.lines).toEqual(expected.lines)
+      expect(actual.lineStarts).toEqual(expected.lineStarts)
+      expect(actual.textLength).toBe(expected.textLength)
+      worker.send(renderedResponse(lastRenderSequence(worker)))
+      worker.postMessage.mockClear()
+    },
+    dispose() {
+      client.dispose()
+      renderer.dispose()
+      host.root.remove()
+      host.colorScope.remove()
+      runtime.restore()
+    },
+  }
+}
+
+function createSummaryRenderer(worker: MockWorker) {
+  const requests = worker.postMessage.mock.calls.map((call) => call[0] as MinimapWorkerRequest)
+  const init = requests.find((request) => request.type === 'init')
+  const initial = requests.find((request) => request.type === 'openDocument')
+  if (!init || !initial) throw new Error('Expected initialized minimap summaries')
+  const canvas = { getContext: () => ({}) } as unknown as OffscreenCanvas
+  const renderer = new MinimapWorkerRenderer()
+  renderer.init({
+    mainCanvas: canvas,
+    decorationsCanvas: canvas,
+    options: resolveMinimapOptions(),
+    styles: init.baseStyles,
+  })
+  renderer.setDocument(initial.document)
+  return { renderer, initial: initial.document }
+}
+
+function freshSummary(
+  textSnapshot: TextSnapshot,
+  runtime: ReturnType<typeof installMinimapRuntime>,
+): MinimapDocumentPayload {
+  const host = createHost()
+  const client = new MinimapWorkerClient({
+    host,
+    options: resolveMinimapOptions(),
+    snapshot: snapshot({}, { textSnapshot }),
+    decorations: [],
+    onLayoutWidth: vi.fn(),
+    reservedLane: () => 0,
+  })
+  const worker = runtime.workers.at(-1)!
+  try {
+    const request = worker.postMessage.mock.calls
+      .map((call) => call[0] as MinimapWorkerRequest)
+      .find((item) => item.type === 'openDocument')
+    if (!request) throw new Error('Expected fresh summaries')
+    return request.document
+  } finally {
+    client.dispose()
+    worker.send({ type: 'disposed' })
+    host.root.remove()
+    host.colorScope.remove()
+  }
+}
+
+function runSummaryRound(
+  fixture: ReturnType<typeof createSummaryFixture>,
+  queued: boolean,
+  randomIndex: (length: number) => number,
+): void {
+  const count = randomIndex(4) + 1
+  let undoCount = 0
+  for (let index = 0; index < count; index += 1) {
+    const edit = randomSummaryEdit(fixture.session.getTextSnapshot().length, randomIndex)
+    const change = fixture.session.applyEdits([edit])
+    if (change.kind === 'edit') undoCount += 1
+    fixture.update(change)
+    if (!queued) fixture.verify()
+  }
+  if (queued) fixture.verify()
+  for (let index = 0; index < undoCount; index += 1) {
+    fixture.update(fixture.session.undo())
+    if (!queued) fixture.verify()
+  }
+  if (queued && undoCount > 0) fixture.verify()
+  for (let index = 0; index < undoCount; index += 1) {
+    fixture.update(fixture.session.redo())
+    if (!queued) fixture.verify()
+  }
+  if (queued && undoCount > 0) fixture.verify()
+}
+
+function seededIndex(seed: number): (length: number) => number {
+  let state = seed
+  return (length) => {
+    state ^= state << 13
+    state ^= state >>> 17
+    state ^= state << 5
+    return (state >>> 0) % length
+  }
+}
+
+function randomSummaryEdit(length: number, randomIndex: (length: number) => number): TextEdit {
+  const operation = randomIndex(3)
+  const first = randomIndex(length + 1)
+  const second = operation === 0 ? first : randomIndex(length + 1)
+  const from = Math.min(first, second)
+  const to = Math.max(first, second)
+  const texts = ['x', 'q', '中', '😀', 'é', '\n', 'x\ny\n', '\r\n', '']
+  const text = operation === 1 ? '' : texts[randomIndex(texts.length)]!
+  return { from, to, text }
+}
+
+function applyPostedSummaryUpdates(renderer: MinimapWorkerRenderer, worker: MockWorker): void {
+  for (const [request] of worker.postMessage.mock.calls as [MinimapWorkerRequest][]) {
+    if (request.type === 'openDocument' || request.type === 'replaceDocument')
+      renderer.setDocument(request.document)
+    if (request.type === 'applyEdit') renderer.applyEdit(request.edit, request.document)
+    if (request.type === 'applyEdits') renderer.applyEdits(request.edits, request.document)
+  }
+}
+
+function rendererSummary(renderer: MinimapWorkerRenderer): MinimapDocumentPayload {
+  const state = (renderer as unknown as { state: { document: MinimapDocumentPayload } | null })
+    .state
+  if (!state) throw new Error('Expected initialized renderer')
+  return state.document
 }
 
 function renderedResponse(sequence: number): MinimapWorkerResponse {

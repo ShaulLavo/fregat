@@ -2,6 +2,32 @@ import type { Locator, Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const csvSelectors = {
+  engineModule: '**/src/features/workbench/utils/csv.ts*',
+  presentationModule: '**/src/features/workbench/utils/csv-presentation.ts*',
+  presentationError: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'CSV table could not load' }),
+  table: (page: Page) => page.getByRole('table', { name: 'CSV rows', exact: true }),
+  scroll: (page: Page) =>
+    page
+      .getByRole('table', { name: 'CSV rows', exact: true })
+      .locator('[data-slot="virtual-list"]'),
+  cell: (page: Page, row: number, column: number) =>
+    page.getByRole('button', { name: `Row ${row}, column ${column}`, exact: true }),
+  cellEditor: (page: Page, row: number, column: number) =>
+    page.getByRole('textbox', { name: `Row ${row}, column ${column}`, exact: true }),
+  mode: (page: Page, mode: 'Text' | 'Table') =>
+    page.getByRole('button', { name: mode, exact: true }),
+  header: (page: Page) => page.getByRole('button', { name: 'First row is header', exact: true }),
+  undo: (page: Page) => page.getByRole('button', { name: 'Undo', exact: true }),
+  redo: (page: Page) => page.getByRole('button', { name: 'Redo', exact: true }),
+  parseError: (page: Page) => page.getByText('CSV could not be read', { exact: true }),
+  engineError: (page: Page) => page.getByText('CSV engine could not load', { exact: true }),
+  preparing: (page: Page) => page.getByRole('status', { name: 'Preparing CSV table' }),
+  queryRetry: (page: Page) =>
+    page.getByRole('status').getByRole('button', { name: 'Retry', exact: true }),
+}
+
 export const treeScrollSelectors = {
   scroll: '[data-file-tree-virtualized-scroll]',
   flow: '[data-file-tree-virtualized-sticky]',
@@ -17,6 +43,7 @@ export const rootSwitchRows = {
 
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
+export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
@@ -26,6 +53,8 @@ export const editorViewportSelector = '.editor-virtualized-viewport'
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
 export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
+const chatComposerSelector = '[data-testid="chat-input-editor"]'
+const projectSwitcherSelector = '[aria-label="Switch project"]'
 export const mermaidSelectors = {
   diagram: '[data-markdown="mermaid-block"] [role="img"]',
   svg: 'svg',
@@ -63,6 +92,39 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  fileReadRetry: (page: Page) => page.getByRole('button', { name: 'Retry', exact: true }),
+  fileReadErrorHeader: (page: Page) => page.locator('header[aria-label="File read error"]'),
+  chatFileFallback: (page: Page) =>
+    page.getByText('Download this file to view its contents.', { exact: true }),
+  fileFacts: (page: Page) => page.getByRole('region', { name: 'File facts' }),
+  revealFileFacts: (page: Page) => page.getByRole('button', { name: 'Reveal in files' }),
+  missingFileMessage: (page: Page) =>
+    page.getByText('This file no longer exists.', { exact: true }),
+  pdfEngineFailure: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'The PDF viewer could not be loaded' }),
+  pdfScroller: (page: Page) => page.locator('[data-pdf-pages]'),
+  pdfSearch: (page: Page) => page.getByRole('textbox', { name: 'Search PDF', exact: true }),
+  pdfPage: (page: Page, number: number) => page.locator(`[data-pdf-page="${number}"]`),
+  pdfMatchCountValue: (page: Page, count: number) =>
+    page
+      .getByRole('status')
+      .filter({ hasText: new RegExp(`^${count} ${count === 1 ? 'match' : 'matches'}$`) }),
+  pdfMatchCount: (page: Page) => page.getByRole('status').filter({ hasText: '2 matches' }),
+  pdfNext: (page: Page) => page.getByRole('button', { name: 'Next', exact: true }),
+  pdfFailure: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'The PDF could not be opened' }),
+  forgeActivityTab: (page: Page) => page.getByRole('tab', { name: 'Activity', exact: true }),
+  forgeCommentsTab: (page: Page) => page.getByRole('tab', { name: 'Comments', exact: true }),
+  forgeDiscussion: (page: Page) =>
+    page.getByRole('dialog', { name: 'Pull request #7 discussion', exact: true }),
+  forgeReviewSummary: (page: Page) =>
+    page.getByRole('textbox', { name: 'Review summary', exact: true }),
+  forgeComment: (page: Page) => page.getByRole('textbox', { name: 'Comment', exact: true }),
+  forgeCommentText: (page: Page, text: string) =>
+    page
+      .getByRole('dialog', { name: 'Pull request #7 discussion', exact: true })
+      .getByText(text, { exact: true }),
+
   startupFailure: (page: Page) =>
     page.getByRole('status').filter({ hasText: 'App could not start' }),
   reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
@@ -95,7 +157,9 @@ export const selectors = {
   discardDraft: (page: Page, label: string) =>
     page.getByRole('button', { name: `Discard draft: ${label}`, exact: true }),
   composerAccess: (page: Page) => page.getByRole('menuitemradio', { name: /^Full access/ }),
+  composerAskFirst: (page: Page) => page.getByRole('menuitemradio', { name: /^Ask first/ }),
   chatExactText: (page: Page, text: string) => page.getByText(text, { exact: true }),
+  chatContainingText: (page: Page, text: string) => page.getByText(text, { exact: false }),
   composerModes: (page: Page) =>
     page.getByRole('button', { name: 'Agent access and mode', exact: true }),
   composerPlan: (page: Page) => page.getByRole('menuitemradio', { name: /^Plan/ }),
@@ -191,6 +255,10 @@ export const selectors = {
       .getByRole('button', { name: label, exact: true }),
   genericApproval: (page: Page) =>
     page.getByRole('region', { name: 'Approval requested', exact: true }),
+  genericApprovalDecision: (page: Page, label: string) =>
+    page
+      .getByRole('region', { name: 'Approval requested', exact: true })
+      .getByRole('button', { name: label, exact: true }),
   commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
   commandApprovalDecision: (page: Page, label: string | RegExp) =>
     page
@@ -233,6 +301,8 @@ export const selectors = {
   draftWorkspace: (page: Page) => page.getByRole('button', { name: 'Workspace', exact: true }),
   draftBaseBranch: (page: Page) =>
     page.getByRole('button', { name: 'Start from branch', exact: true }),
+  machinePreferences: (page: Page) => page.getByRole('combobox', { name: /selection preference$/ }),
+  selectOption: (page: Page, name: string) => page.getByRole('option', { name, exact: true }),
   draftMachine: (page: Page) => page.getByRole('button', { name: 'Machine', exact: true }),
   menuRadio: (page: Page, name: string) =>
     page.getByRole('menu').getByRole('menuitemradio', { name, exact: true }),
@@ -426,6 +496,10 @@ export const selectors = {
       .getByRole('tree', { name: 'Search results', exact: true })
       .locator('[aria-selected="true"] [data-row-action="replace"]'),
   terminalList: (page: Page) => page.getByRole('tablist', { name: 'Open terminals', exact: true }),
+  terminalById: (page: Page, id: string) =>
+    page
+      .getByRole('tablist', { name: 'Open terminals', exact: true })
+      .locator(`[data-terminal-tab-id=${JSON.stringify(id)}]`),
   terminalRows: (page: Page) =>
     page.getByRole('tablist', { name: 'Open terminals', exact: true }).getByRole('tab'),
   terminalDraggingRow: (page: Page) =>
@@ -1051,6 +1125,7 @@ export const selectors = {
   editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),
   editorLargeFileNotice: (page: Page) => page.getByTestId('large-file-mode'),
   editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
+  terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
@@ -1249,6 +1324,32 @@ export async function pressShortcut(page: Page, chord: string) {
   await page.keyboard.press(chord.replace(/\b(?:ControlOrMeta|Mod)\b/g, modifier))
 }
 
+export async function waitForSessionWorkspace(
+  page: Page,
+  sessionId: string,
+  canonicalPath: string,
+  environmentId: string,
+) {
+  await page.waitForFunction(
+    ({ composerSelector, switcherSelector, expectedNamespace, rootPath }) => {
+      const title = document.querySelector(switcherSelector)?.getAttribute('title')
+      const composer = document.querySelector(composerSelector) as
+        | (HTMLElement & { __lexicalEditor?: { _config: { namespace: string } } })
+        | null
+      // Lexical's rendered owner can lag the session URL during a workspace switch.
+      const namespace = composer?.__lexicalEditor?._config.namespace
+      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
+      return workspaceReady && namespace === expectedNamespace
+    },
+    {
+      composerSelector: chatComposerSelector,
+      switcherSelector: projectSwitcherSelector,
+      expectedNamespace: `platform-chat-input:${environmentId}:${canonicalPath.replace(/^\/+/, '')}:${sessionId}`,
+      rootPath: canonicalPath.replace(/^\/+/, ''),
+    },
+  )
+}
+
 export async function waitForApp(page: Page, timeoutMs = 45_000) {
   // The phone shell carries no window toolbar; its stack frame is its first paint.
   await selectors
@@ -1256,6 +1357,32 @@ export async function waitForApp(page: Page, timeoutMs = 45_000) {
     .or(selectors.phoneShell(page))
     .first()
     .waitFor({ timeout: timeoutMs })
+}
+
+export async function waitForInitialContent(page: Page) {
+  const timeoutMs = 1_500
+  const cap = Promise.withResolvers<boolean>()
+  const timer = setTimeout(() => cap.resolve(false), timeoutMs)
+  const ready = page
+    .waitForFunction(initialContentReady, undefined, { timeout: timeoutMs })
+    .then(async () => {
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      )
+      return page.evaluate(initialContentReady)
+    })
+  return Promise.race([ready, cap.promise]).finally(() => clearTimeout(timer))
+}
+
+function initialContentReady() {
+  const shell = document.querySelector('[aria-label="Window toolbar"], [data-phone-shell]')
+  const surface = shell?.closest('[aria-busy]')
+  return (
+    surface?.getAttribute('aria-busy') === 'false' && !document.querySelector('[aria-busy="true"]')
+  )
 }
 
 export async function openGitPanel(page: Page) {
@@ -1373,6 +1500,8 @@ export async function chooseColorMode(page: Page, value: 'light' | 'dark' | 'sys
  * capped at a second. Looping spinners and paused animations are left alone.
  */
 export async function settleRunningAnimations(page: Page, capMs = 1_000) {
+  const cap = Promise.withResolvers<void>()
+  const timer = setTimeout(cap.resolve, capMs)
   await Promise.race([
     page.evaluate(async () => {
       const finite = document
@@ -1384,8 +1513,8 @@ export async function settleRunningAnimations(page: Page, capMs = 1_000) {
         )
       await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)))
     }),
-    new Promise((resolve) => setTimeout(resolve, capMs)),
-  ])
+    cap.promise,
+  ]).finally(() => clearTimeout(timer))
 }
 
 /** Two frames, then every running animation under the target. Collapsed panels animate open. */
@@ -1617,3 +1746,26 @@ export function focusedEditorSelectedText(): string {
   if (context) return context.text.slice(context.selectionStart, context.selectionEnd)
   return document.getSelection()?.toString() ?? ''
 }
+
+export const ghosttySiteSelectors = {
+  examples: '.example',
+  factLead: '.facts strong',
+  sectionHeadings: '.measured h2, .preview h2',
+  backend: '#backend',
+  canvas: 'canvas',
+  composition: '.ghostty-webgpu-composition',
+  pty: '.pty-example',
+  preview: '.preview',
+  screen: '.screen',
+  stat: '#stat',
+  window: '#window',
+} as const
+
+export const polaronNativeSelectors = {
+  settledPickerError: `Promise.all(Array.from(document.querySelectorAll('[data-sonner-toast]')).flatMap(toast => toast.getAnimations({subtree:true})).map(animation => animation.finished.catch(() => {}))).then(() => true)`,
+  openProjectMenu: `document.querySelector('button[aria-label="Switch project"]')?.click()`,
+  openFolderMenu: `Array.from(document.querySelectorAll('[role="menuitem"]')).find(row => row.textContent?.trim() === 'Open folder…')?.click()`,
+  pickerError: `document.body.innerText.includes('The file chooser closed after its time limit.')`,
+  bridgeFacts: `({picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture,titlebar:globalThis.platformBridge?.titlebar})`,
+  readiness: `({ready:Boolean(document.querySelector('[aria-label="Window toolbar"]') && document.querySelector('[aria-label="Folder tree"] [role="treeitem"][aria-label="a.txt"]')),picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture})`,
+} as const

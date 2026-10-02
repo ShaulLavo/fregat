@@ -11,6 +11,7 @@ export const pin = '7445aa733ada33e45289e5aa5055f79142556513'
 strictEqual(pin, inventory.upstream_commit)
 
 export function readPinned(path: string) {
+  // NOT-PORTABLE: Requires ignored references/t3code and execution from the checkout root.
   return execFileSync('git', ['-C', 'references/t3code', 'show', `${pin}:${path}`], {
     encoding: 'utf8',
   })

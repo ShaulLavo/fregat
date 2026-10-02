@@ -67,3 +67,8 @@ export const sessionToolKeys = {
   hooks: (environmentId: EnvironmentId, sessionId: SessionId) =>
     ['chat', 'session-hooks', environmentId, sessionId] as const,
 }
+
+export const machineCapacityKeys = {
+  resources: (environmentId: EnvironmentId, origin: string) =>
+    ['chat', 'machine-capacity', environmentId, origin] as const,
+}

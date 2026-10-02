@@ -45,6 +45,7 @@ export async function setupScenario(page, scenario) {
   return { source: 'workspace-search', query: 'useState', cleanup: async () => {} }
 }
 
+// NOT-PORTABLE: Chat reload proof requires an existing sufficiently long session.
 async function setupChat(page) {
   await runPaletteCommand(page, 'Chat mode')
   const sessions = selectors.sessionRows(page)

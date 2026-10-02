@@ -17,6 +17,7 @@ export async function rebuildPackage(path, expectedName) {
   const sourceDirectory = join(directory, 'src')
   const sourceSha256 = await hashDirectory(sourceDirectory)
   const inputs = await buildInputs(packagePath)
+  // NOT-PORTABLE: Child build TMPDIR is forced to /work/tmp.
   await run('bun', [buildScript, directory], {
     cwd: repository,
     env: { ...process.env, TMPDIR: '/work/tmp' },
@@ -34,6 +35,7 @@ export async function rebuildPackage(path, expectedName) {
 }
 
 async function buildInputs(packagePath) {
+  // NOT-PORTABLE: Reads untracked editor/bun.lock; Platform commits the root lockfile.
   const files = {
     packageJson: packagePath,
     buildScript,

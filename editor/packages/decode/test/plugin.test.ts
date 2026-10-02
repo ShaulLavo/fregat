@@ -1,3 +1,4 @@
+// NOT-PORTABLE: Imports ignored editor/dist; direct tests require a prior workspace build.
 import {
   acquireRowPresentation,
   invalidateRowPresentations,

@@ -18,7 +18,7 @@ Execute selected code or a runnable cell in a local kernel, see anchored results
 
 ## Existing Fregat and Editor support
 
-Process/terminal ownership exists in [apps/server/src/terminal-host](../apps/server/src/terminal-host) and [apps/web/src/features/terminal](../apps/web/src/features/terminal). Typed document ownership exists in [apps/web/src/lib/documents/utils/types.ts](../apps/web/src/lib/documents/utils/types.ts). Editor snapshots, anchored selections and transactions are in `editor/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/editor/src/documentSession.ts). No Jupyter transport or kernel session owner was found in the current server/contracts/web source.
+Process/terminal ownership exists in [apps/server/src/terminal-host](../apps/server/src/terminal-host) and [apps/web/src/features/terminal](../apps/web/src/features/terminal). Typed document ownership exists in [apps/web/src/lib/documents/utils/types.ts](../apps/web/src/lib/documents/utils/types.ts). Editor snapshots, anchored selections and transactions are in `editor/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../editor/packages/editor/src/documentSession.ts). No Jupyter transport or kernel session owner was found in the current server/contracts/web source.
 
 ## Design
 

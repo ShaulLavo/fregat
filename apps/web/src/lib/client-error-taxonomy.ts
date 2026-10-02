@@ -1,3 +1,4 @@
+import { isCancelledError } from '@tanstack/react-query'
 import { isConnectivityError } from '@workspace/client-core/transport/connectivity-error'
 import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import { isObject } from '@workspace/utils/objects'
@@ -45,6 +46,7 @@ type FsErrorCode =
   | 'GIT_COMMAND_FAILED'
   | 'GIT_REPOSITORY_NOT_FOUND'
   | 'NOT_FOUND'
+  | 'WORKSPACE_ADDRESS_NOT_FOUND'
   | 'ALREADY_EXISTS'
   | 'FILE_CHANGED'
   | 'INVALID_PATH'
@@ -58,6 +60,7 @@ type FsErrorCode =
 
 const categoryByFsErrorCode: Record<FsErrorCode, ErrorCategory> = {
   NOT_FOUND: 'not_found',
+  WORKSPACE_ADDRESS_NOT_FOUND: 'not_found',
   PATH_OUTSIDE_WORKSPACE: 'permission_denied',
   UNAUTHORIZED: 'permission_denied',
   FORBIDDEN_ORIGIN: 'permission_denied',
@@ -142,7 +145,7 @@ function copyAgentReport(error: ClientError) {
 }
 
 export function reportError(error: ClientError): void {
-  if (isAbortError(error.cause)) return
+  if (isCancelledError(error.cause) || isAbortError(error.cause)) return
 
   if (!clientErrorMetadata(error.cause)) {
     reportClientError({

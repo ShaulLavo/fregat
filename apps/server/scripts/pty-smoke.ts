@@ -179,6 +179,7 @@ async function verifyNeovim(shell: Shell, root: string) {
 }
 
 async function main() {
+  // NOT-PORTABLE: Selects /work/tmp when /work exists without checking writability.
   const base = existsSync('/work') ? '/work/tmp' : tmpdir()
   await mkdir(base, { recursive: true })
   const root = await mkdtemp(path.join(base, 'terminal-service-smoke-'))

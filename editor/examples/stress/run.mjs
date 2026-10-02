@@ -23,6 +23,7 @@ import { installInputWorkerProof } from './input-worker-proof.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const repository = resolve(root, '../..')
+// NOT-PORTABLE: Output, scratch and failure screenshots use /work/tmp.
 const { values } = parseArgs({
   options: {
     suite: { type: 'string', default: 'stress' },

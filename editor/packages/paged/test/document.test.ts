@@ -147,9 +147,10 @@ test('revision mismatch invalidates cached pages and every viewer', async () => 
       return { ...result, revision }
     },
   }
-  const doc = new PagedDocument(source, { ...small, cacheBytes: 7 })
+  const doc = new PagedDocument(source, small)
   const view = doc.createView()
   await doc.initialize()
+  expect(doc.stats.cachedBytes).toBe(underlying.byteLength)
   revision = 'two'
   await expect(view.readLines(0, 1)).rejects.toThrow('file changed')
   expect(doc.stats.state).toBe('stale')
@@ -169,11 +170,11 @@ test('source invalidation clears cached pages and prevents reads from every view
       return underlying.readBytes(start, end, signal)
     },
   }
-  const doc = new PagedDocument(source, { ...small, cacheBytes: 7 })
+  const doc = new PagedDocument(source, small)
   const first = doc.createView()
   const second = doc.createView()
   await doc.initialize()
-  expect(doc.stats.cachedBytes).toBeGreaterThan(0)
+  expect(doc.stats.cachedBytes).toBe(underlying.byteLength)
   invalid = true
   await expect(first.readLines(0, 1)).rejects.toMatchObject({ code: 'PAGED_DOCUMENT_STALE' })
   expect(doc.stats.state).toBe('stale')
@@ -217,6 +218,153 @@ test('late invalidation from an aborted source read leaves the document reusable
   view.dispose()
   doc.dispose()
 })
+
+test('a late foreground page retained after indexing still detects a source change', async () => {
+  const underlying = textSource('line\n'.repeat(32))
+  let enterIndex!: () => void
+  const indexEntered = new Promise<void>((resolve) => {
+    enterIndex = resolve
+  })
+  let releaseIndex!: () => void
+  const indexReleased = new Promise<void>((resolve) => {
+    releaseIndex = resolve
+  })
+  let enterPage!: () => void
+  const pageEntered = new Promise<void>((resolve) => {
+    enterPage = resolve
+  })
+  let releasePage!: () => void
+  const pageReleased = new Promise<void>((resolve) => {
+    releasePage = resolve
+  })
+  let firstPageReads = 0
+  let invalid = false
+  const source: RangeSource = {
+    ...underlying,
+    async readBytes(start, end, signal) {
+      if (invalid) throw new PagedSourceInvalidatedError()
+      if (start === 0 && end > start) {
+        firstPageReads++
+        const entered = firstPageReads === 1 ? enterIndex : enterPage
+        const released = firstPageReads === 1 ? indexReleased : pageReleased
+        entered()
+        await released
+      }
+      return underlying.readBytes(start, end, signal)
+    },
+  }
+  const doc = new PagedDocument(source, small)
+  const view = doc.createView()
+  const indexing = doc.initialize()
+  await indexEntered
+  const foreground = view.readLines(0, 1)
+  await pageEntered
+  releaseIndex()
+  await indexing
+  releasePage()
+  expect((await foreground).rows[0]?.text).toBe('line')
+  expect(doc.stats.state).toBe('ready')
+  invalid = true
+  await expect(view.readLines(0, 1)).rejects.toMatchObject({ code: 'PAGED_DOCUMENT_STALE' })
+  expect(doc.stats.cachedBytes).toBe(0)
+  view.dispose()
+  doc.dispose()
+})
+
+test('cached multi-page reads and copies validate once without transferring page bytes', async () => {
+  const underlying = textSource('one\ntwo\nthree\nfour\n')
+  const ranges: [number, number][] = []
+  const source: RangeSource = {
+    ...underlying,
+    async readBytes(start, end, signal) {
+      ranges.push([start, end])
+      return underlying.readBytes(start, end, signal)
+    },
+  }
+  const doc = new PagedDocument(source, small)
+  const view = doc.createView()
+  await doc.initialize()
+  expect(doc.stats.cachedBytes).toBe(underlying.byteLength)
+  const bytesRead = doc.stats.bytesRead
+  ranges.length = 0
+  expect((await view.readLines(0, 4)).rows.map((row) => row.text)).toEqual([
+    'one',
+    'two',
+    'three',
+    'four',
+  ])
+  expect(ranges).toEqual([[0, 0]])
+  ranges.length = 0
+  expect(await view.copyRange(0, 19)).toBe('one\ntwo\nthree\nfour\n')
+  expect(ranges).toEqual([[0, 0]])
+  expect(doc.stats.bytesRead).toBe(bytesRead)
+  view.dispose()
+  doc.dispose()
+})
+
+test('a malformed empty validation response rejects retained reads and copies', async () => {
+  const underlying = textSource('one\ntwo\nthree\nfour\n')
+  const source: RangeSource = {
+    ...underlying,
+    async readBytes(start, end, signal) {
+      if (start === end) return { revision: underlying.revision, bytes: new Uint8Array(1) }
+      return underlying.readBytes(start, end, signal)
+    },
+  }
+  const doc = new PagedDocument(source, small)
+  const view = doc.createView()
+  await doc.initialize()
+  await expect(view.readLines(0, 1)).rejects.toThrow('bytes for an empty range')
+  await expect(view.copyRange(0, 3)).rejects.toThrow('bytes for an empty range')
+  expect(doc.stats.inFlight).toBe(0)
+  view.dispose()
+  doc.dispose()
+})
+
+test.each(['stale', 'disposed'] as const)(
+  'cached validations obey admission and cannot publish after the document becomes %s',
+  async (state) => {
+    const underlying = textSource('one\ntwo\nthree\nfour\n')
+    let enter!: () => void
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve
+    })
+    let release!: () => void
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let validations = 0
+    const source: RangeSource = {
+      ...underlying,
+      async readBytes(start, end, signal) {
+        if (start !== end) return underlying.readBytes(start, end, signal)
+        validations++
+        if (validations === 2) enter()
+        await released
+        if (state === 'stale') throw new PagedSourceInvalidatedError()
+        return underlying.readBytes(start, end, signal)
+      },
+    }
+    const doc = new PagedDocument(source, { ...small, maxViews: 3 })
+    const views = [doc.createView(), doc.createView(), doc.createView()]
+    await doc.initialize()
+    const settled = Promise.allSettled(views.map((view) => view.readLines(0, 1)))
+    await entered
+    expect(validations).toBe(2)
+    expect(doc.stats.inFlight).toBe(2)
+    if (state === 'disposed') doc.dispose()
+    release()
+    const results = await settled
+    expect(results.map((result) => result.status)).toEqual(['rejected', 'rejected', 'rejected'])
+    expect(validations).toBe(2)
+    expect(doc.stats.state).toBe(state)
+    expect(doc.stats.cachedBytes).toBe(0)
+    expect(doc.stats.inFlight).toBe(0)
+    expect(doc.stats.peakInFlight).toBe(2)
+    for (const view of views) view.dispose()
+    doc.dispose()
+  },
+)
 
 test('query cancellation aborts a cached-page continuation and leaves the view reusable', async () => {
   const doc = new PagedDocument(textSource('first\nlast'), small)

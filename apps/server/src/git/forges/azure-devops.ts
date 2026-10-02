@@ -11,6 +11,8 @@ import {
   requireSuccess,
 } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
+import { parseAzureThreads } from './azure-threads'
+import { groupActivityDiscussions } from './activity'
 
 const JSON_ARGS = ['--only-show-errors', '--output', 'json'] as const
 
@@ -29,6 +31,72 @@ const pullRequestSchema = v.object({
  */
 export const azureDevOps: ForgeProvider = {
   kind: 'azure-devops',
+  async activity(context, number) {
+    const conversation = await azureDevOps.discussion.read(context, number)
+    return {
+      reviews: { kind: 'unsupported', reason: 'Open Azure DevOps for review history.' },
+      commits: { kind: 'unsupported', reason: 'Open Azure DevOps for pull request commits.' },
+      discussions: groupActivityDiscussions(conversation.comments, conversation.truncated),
+    }
+  },
+  discussion: {
+    write: { kind: 'unsupported', reason: 'Open Azure DevOps to post pull request comments.' },
+    async read(context, number) {
+      const organization = organizationUrl(context)
+      const locationResult = requireSuccess(
+        context,
+        await az(context, [
+          'repos',
+          'pr',
+          'show',
+          '--detect',
+          'true',
+          '--org',
+          organization,
+          '--id',
+          String(number),
+          ...JSON_ARGS,
+        ]),
+        'discussion-location',
+      )
+      const location = parseForgeJson(
+        context,
+        v.object({
+          repository: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            project: v.object({ name: v.pipe(v.string(), v.minLength(1)) }),
+          }),
+        }),
+        locationResult.stdout,
+        'discussion-location',
+      )
+      const result = requireSuccess(
+        context,
+        await az(context, [
+          'devops',
+          'invoke',
+          '--detect',
+          'true',
+          '--org',
+          organization,
+          '--area',
+          'git',
+          '--resource',
+          'pullRequestThreads',
+          '--api-version',
+          '7.1',
+          '--route-parameters',
+          `project=${location.repository.project.name}`,
+          `repositoryId=${location.repository.name}`,
+          `pullRequestId=${number}`,
+          ...JSON_ARGS,
+        ]),
+        'discussion-threads',
+      )
+      return parseAzureThreads(context, result.stdout)
+    },
+  },
+  review: { kind: 'unsupported', reason: 'Open Azure DevOps to submit a pull request review.' },
   async support(context) {
     return cliSupport(
       await az(context, ['account', 'show', '--query', 'user.name', '--output', 'tsv']),
@@ -176,4 +244,14 @@ function pullRequestState(status: string): GitPullRequest['state'] {
   if (status === 'completed') return 'merged'
   if (status === 'abandoned') return 'closed'
   return 'open'
+}
+
+function organizationUrl(context: ForgeContext) {
+  if (context.forge.host === 'ssh.dev.azure.com') {
+    const [, organization] = (context.repository ?? '').split('/')
+    return `https://dev.azure.com/${organization ?? ''}`
+  }
+  if (context.forge.host !== 'dev.azure.com') return `https://${context.forge.host}`
+  const [organization] = (context.repository ?? '').split('/')
+  return `https://dev.azure.com/${organization ?? ''}`
 }

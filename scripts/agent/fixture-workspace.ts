@@ -152,3 +152,21 @@ function killFixtureProcess(pid: number) {
     throw error
   }
 }
+
+export async function chooseFixtureFolder(
+  page: Page,
+  fixture: string,
+  beforeChoose?: () => Promise<void>,
+) {
+  await selectors.projectMenu(page).click()
+  await selectors.openFolderMenu(page).click()
+  await selectors.pickerGoToFolder(page).click()
+  await selectors.pickerFolderPath(page).fill(fixture)
+  await page.keyboard.press('Enter')
+  await selectors.pickerRow(page, 'a.txt').waitFor()
+  await beforeChoose?.()
+  await selectors.pickerChoose(page).click()
+  await selectors.pickerDialog(page).waitFor({ state: 'hidden' })
+  await waitForApp(page)
+  await selectors.treeItem(page, 'a.txt').waitFor()
+}

@@ -1,6 +1,8 @@
+import { resetSettingsIntentStore } from '@workspace/client-core/settings/intent-store'
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { activeServerOrigin } from '@/lib/client'
+// NOT-PORTABLE: Needs build:workspaces; highlighting exports only generated dist files.
 import { disposeHighlightingService } from '@/lib/highlighting/state/service'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { TEST_ENVIRONMENT_ID } from '../factories/chat'
@@ -67,6 +69,8 @@ afterEach(async () => {
     })
   }
   cleanup()
+  // Optimistic UI can finish a test while a settings write still owns diagnostic timers.
+  resetSettingsIntentStore()
   // Unmounted diff views hand their parse to the shared service; the next test starts empty.
   await disposeHighlightingService()
   if (showedToast) await new Promise((resolve) => setTimeout(resolve, TOAST_REMOVAL_MS + 20))

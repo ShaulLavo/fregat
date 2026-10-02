@@ -142,3 +142,17 @@ export async function perBranch<T>(
   for (const branch of new Set(branches)) answers.set(branch, await lookup(branch))
   return answers
 }
+
+export function requireCommentPosted(context: Named, result: ForgeCommandResult) {
+  if (result.exitCode === 0) return
+  throw gitPullRequestErrors.PULL_REQUEST_COMMENT_FAILED({
+    internal: { forge: context.forge.name, exitCode: result.exitCode },
+  })
+}
+
+export function requireReviewSubmitted(context: Named, result: ForgeCommandResult, at: string) {
+  if (result.exitCode === 0) return
+  throw gitPullRequestErrors.PULL_REQUEST_REVIEW_FAILED({
+    internal: { forge: context.forge.name, exitCode: result.exitCode, at },
+  })
+}

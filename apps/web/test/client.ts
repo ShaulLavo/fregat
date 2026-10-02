@@ -2,6 +2,7 @@ import { createEnvironmentClient, type Client } from '@workspace/client-core/tra
 import { inProcessServerSocketConstructor } from '@workspace/client-core/test/in-process-server-socket'
 
 import type { TestServer } from './server'
+import { binaryBodyUnsupportedError } from './structured-errors'
 
 type InjectedSettingsError = {
   readonly code: string
@@ -402,8 +403,31 @@ export function directInProcessFetcher(server: TestServer): typeof fetch {
   return (async (input, init) => {
     const response = await server.app.handle(withOrigin(new Request(input, init), server.origin))
     normalizeInProcessSseHeaders(response)
+    await rejectStringifiedBinaryBody(response)
     return response
   }) as typeof fetch
+}
+
+async function rejectStringifiedBinaryBody(response: Response) {
+  if (typeof window === 'undefined' || !('happyDOM' in window)) return
+  const declaredLength = response.headers.get('content-length')
+  if (declaredLength === null || Number(declaredLength) === 13 || !response.body) return
+
+  // Happy DOM stringifies native Bun files before the fetcher receives them.
+  // Inspect a clone's first chunk so ordinary bodies and live streams stay intact.
+  const reader = response.clone().body?.getReader()
+  if (!reader) return
+  try {
+    const { value, done } = await reader.read()
+    if (done || value.byteLength !== 13) return
+    const text = new TextDecoder().decode(value)
+    if (text !== '[object File]' && text !== '[object Blob]') return
+    if (!(await reader.read()).done) return
+    throw binaryBodyUnsupportedError(response)
+  } finally {
+    // Tee cancellation can wait for the caller's original body to settle.
+    void reader.cancel().catch(() => undefined)
+  }
 }
 
 function normalizeInProcessSseHeaders(response: Response) {

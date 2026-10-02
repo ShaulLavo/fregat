@@ -1,11 +1,19 @@
 import { RenderStateDirty } from '../core/abi.js'
 import type { GhosttyRenderState } from '../core/render-state.js'
-import { type ReadRowsOptions, type RenderCursorSnapshot, type RenderRow } from '../core/types.js'
+import {
+  type CellStyle,
+  type RgbColor,
+  type RenderCell,
+  type ReadRowsOptions,
+  type RenderCursorSnapshot,
+  type RenderRow,
+} from '../core/types.js'
 import type { TerminalFittedFont } from '../term/types.js'
 import { GlyphAtlas } from './atlas/atlas.js'
 import { CanvasGlyphRasterizer } from './atlas/canvas-rasterizer.js'
 import { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import { renderCursorState, type InactiveCursorStyle } from './cursor.js'
+import { copiedFrameRow } from './frame-row.js'
 import type { GlyphBitmap } from './atlas/types.js'
 import {
   browserRenderClock,
@@ -34,7 +42,16 @@ export interface RenderStateSource {
   update(): RenderStateDirty
 }
 
+export type RendererFrameCell = Readonly<
+  Omit<RenderCell, 'background' | 'foreground' | 'style'>
+> & {
+  readonly background?: Readonly<RgbColor>
+  readonly foreground?: Readonly<RgbColor>
+  readonly style?: Readonly<CellStyle>
+}
+
 export interface RendererFrameRow {
+  readonly renderCells: readonly RendererFrameCell[]
   readonly cells: readonly string[]
   readonly continuations: readonly boolean[]
   readonly text: string
@@ -70,6 +87,7 @@ export interface WebGpuTerminalRendererOptions {
   font: TerminalFittedFont
   onError?: (cause: unknown) => void
   onFrame?: (snapshot: RendererFrameSnapshot) => void
+  onRowsPainted?: (rows: readonly RenderRow[]) => void
   replaceCanvas?: () => HTMLCanvasElement | OffscreenCanvas
   renderState: GhosttyRenderState | RenderStateSource
   rows: number
@@ -157,13 +175,6 @@ function copiedCursor(cursor: RenderCursorSnapshot): Readonly<RenderCursorSnapsh
   return Object.freeze({ ...cursor, viewport })
 }
 
-function copiedFrameRow(row: RenderRow): RendererFrameRow {
-  const cells = Object.freeze(row.cells.map((cell) => cell.text.slice()))
-  const continuations = Object.freeze(row.cells.map((cell) => cell.continuation))
-  const text = cells.map((cell, index) => (continuations[index] ? '' : cell || ' ')).join('')
-  return Object.freeze({ cells, continuations, text, y: row.y })
-}
-
 function validateRenderer(options: WebGpuTerminalRendererOptions): ValidatedRenderer {
   return {
     font: copyFittedFont(options.font),
@@ -209,6 +220,7 @@ export class WebGpuTerminalRenderer {
   private instances: InstanceRows
   private needsFullRebuild = true
   private readonly onFrame?: (snapshot: RendererFrameSnapshot) => void
+  private readonly onRowsPainted?: (rows: readonly RenderRow[]) => void
   private readonly overlayRows = new Set<number>()
   private rasterizer: CanvasGlyphRasterizer
   private readonly renderState: RenderStateSource
@@ -251,6 +263,7 @@ export class WebGpuTerminalRenderer {
     this.theme = canonicalRendererTheme(this.themeInput)
     this.cursorBlinkPreference = options.cursorBlink ?? false
     this.onFrame = options.onFrame
+    this.onRowsPainted = options.onRowsPainted
     this.visibleRows = Array.from({ length: this.grid.rows })
     this.format = prepared.format
     this.resizeCanvas()
@@ -485,6 +498,7 @@ export class WebGpuTerminalRenderer {
     this.needsFullRebuild = false
     this.overlayRows.clear()
     this.emitFrame(rows)
+    this.onRowsPainted?.(rows)
   }
 
   private glyphLookup() {
@@ -631,10 +645,11 @@ export class WebGpuTerminalRenderer {
   }
 
   private rowsToRebuild(damage: RenderStateDirty): readonly RenderRow[] {
-    if (this.needsFullRebuild) return this.renderState.readRows()
+    if (this.needsFullRebuild) return this.renderState.readRows({ packed: true })
     const rows = new Map<number, RenderRow>()
     if (damage !== RenderStateDirty.False) {
-      for (const row of this.renderState.readRows({ dirtyOnly: true })) rows.set(row.y, row)
+      for (const row of this.renderState.readRows({ packed: true, dirtyOnly: true }))
+        rows.set(row.y, row)
     }
     if (this.overlayRows.size === 0) return [...rows.values()]
     const missingRows = new Set<number>()
@@ -642,7 +657,7 @@ export class WebGpuTerminalRenderer {
       if (!rows.has(row)) missingRows.add(row)
     }
     if (missingRows.size === 0) return [...rows.values()]
-    for (const row of this.renderState.readRows({ rows: missingRows })) {
+    for (const row of this.renderState.readRows({ packed: true, rows: missingRows })) {
       if (missingRows.has(row.y)) rows.set(row.y, row)
     }
     return [...rows.values()].sort((left, right) => left.y - right.y)

@@ -81,6 +81,7 @@ function parseOptions(args) {
       'Required: --app-url URL --server-url URL --output-dir /work/tmp/DIRECTORY',
     )
   result.outputDir = resolve(result.outputDir)
+  // NOT-PORTABLE: Rejects output directories outside /work/tmp.
   if (!result.outputDir.startsWith('/work/tmp/'))
     throw createBenchmarkError('Verification output must be inside /work/tmp')
   if (Boolean(result.secondMachine) !== Boolean(result.secondFixtureParent))
@@ -155,6 +156,7 @@ async function verifyConfiguredApp() {
 }
 
 async function createFixture(health) {
+  // NOT-PORTABLE: Fixture needs /work/tmp, matching server access and installed provider metadata.
   const directory = mkdtempSync('/work/tmp/platform-navigation-')
   const rootPath = relative(health.workspaceRoot, directory).split(sep).join('/')
   if (rootPath.startsWith('..'))

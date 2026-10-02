@@ -5,8 +5,9 @@ import { createRequestGate } from './request-gate'
 export function createDeferredReadSessionClient(server: TestServer) {
   const requests: string[] = []
   const gate = createRequestGate((request) => {
-    if (request.method !== 'GET' || !new URL(request.url).pathname.startsWith('/fs/read-session/'))
-      return false
+    const url = new URL(request.url)
+    if (request.method !== 'GET' || !url.pathname.startsWith('/fs/read-session/')) return false
+    if (url.searchParams.get('start') === url.searchParams.get('end')) return false
     requests.push(request.url)
     return requests.length === 1
   })

@@ -1197,6 +1197,7 @@ describe('workspace disk search provider', () => {
 
     const baselineEvents = await collectEvents(findInWorkspaceStream(paths, options))
     const baselineDone = doneEvent(baselineEvents)
+    // NOT-PORTABLE: Missing or unselected fd returns before the intended assertions.
     if (!baselineDone?.measurement?.providerSources.includes('fd')) return
 
     const index = await buildWorkspaceIndex(paths, TEST_INDEX_OPTIONS)
@@ -1489,6 +1490,7 @@ describe('workspace disk search provider', () => {
       collectEvents(findInWorkspaceStream(paths, options)),
     )
     const earlyDone = doneEvent(earlyEvents)
+    // NOT-PORTABLE: Missing or unselected fd returns before the intended assertions.
     if (!earlyDone?.measurement?.providerSources.includes('fd')) return
 
     const earlyPaths = nameMatchPaths(earlyEvents)

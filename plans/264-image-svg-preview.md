@@ -20,7 +20,7 @@ Inspect images at actual size or fit them to a pane, zoom in and out, reset pan/
 
 [apps/web/src/lib/file-preview/utils/preview.ts](../apps/web/src/lib/file-preview/utils/preview.ts) recognizes image/SVG extensions and constructs `/fs/blob` URLs. [apps/web/src/lib/fs-blob-image.ts](../apps/web/src/lib/fs-blob-image.ts) supplies the authenticated CORS image policy. Existing [apps/web/src/features/chat/components/chat-image-lightbox.tsx](../apps/web/src/features/chat/components/chat-image-lightbox.tsx) is a chat attachment view. A source-linked zoomable workbench image/SVG viewer has not been established.
 
-SVG can read existing document snapshots from `editor/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../../Editor/packages/editor/src/documentSession.ts).
+SVG can read existing document snapshots from `editor/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../editor/packages/editor/src/documentSession.ts).
 
 ## Design
 

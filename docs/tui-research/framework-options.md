@@ -24,7 +24,7 @@ Read (not guessed):
 - opentui.com docs pages (`/docs`, `/docs/getting-started/runtime-support`, `/docs/bindings/react`, `/docs/bindings/solid`) and GitHub (`anomalyco/opentui`, releases).
 - `OC/packages/tui` (Solid TUI, 185 source files), `OC/packages/opencode/script/build.ts` (single-binary build), `OC/script/upgrade-opentui.ts`.
 - `T1/apps/tui` (React TUI, one 17,407-line `ui.tsx`), `T1/packages/client-core` (framework-free shared logic).
-- `P/apps/web` dependency and feature layout, `P/packages/contracts`, `P/docs/product-vision.md`, `P/docs/environments-and-remote-plan.md`.
+- `P/apps/web` dependency and feature layout, `P/packages/contracts`, `P/docs/product-vision.md`, `P/plans/environments-and-remote-plan.md`.
 - crush `go.mod` (Go only; used for the "chroma equivalent" question).
 
 Ran (Bun 1.4.0): headless core render, React `testRender`, Solid `testRender` with and without preload, `bun --bun vitest` over OpenTUI, `bun build --compile` single binary, Ink 7 under Bun, markdown/tree-sitter paint timing. Results are in section 9.

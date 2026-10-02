@@ -2,6 +2,7 @@
 // Both apply the same edits; the candidate is compacted at random points, and
 // every held anchor must resolve alike in both after every edit.
 import assert from 'node:assert/strict'
+// NOT-PORTABLE: Imports ignored textbuffer/dist without owning the prerequisite build.
 import {
   anchorAt,
   applyBatchToPieceTable,

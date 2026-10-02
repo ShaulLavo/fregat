@@ -49,6 +49,14 @@ import { WORKSPACE_SEARCH_LIMIT_MAX } from '../workspace-search'
  */
 /** Percent, as a whole number, for the surface material knobs. */
 const percentSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100))
+const mebibytesSchema = v.pipe(v.number(), v.integer(), v.minValue(16), v.maxValue(262144))
+const heavyJobBudgetSchema = v.pipe(
+  v.object({ ceilingMiB: mebibytesSchema, estimateMiB: mebibytesSchema }),
+  v.check(
+    (budget) => budget.ceilingMiB >= budget.estimateMiB,
+    'The ceiling is at least the estimate.',
+  ),
+)
 
 export const SETTINGS_REGISTRY = {
   'chat.followUpBehavior': defineSetting({
@@ -309,6 +317,29 @@ export const SETTINGS_REGISTRY = {
     category: 'Chat',
     title: 'Project grouping overrides',
     description: 'Grouping mode per scoped project key (environment UUID:project UUID).',
+  }),
+  'environments.loadBalancing': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Machines',
+    title: 'Balance new sessions across machines',
+    description:
+      'Choose a connected checkout with available CPU and memory for a new draft. The draft keeps its chosen machine.',
+    keywords: ['capacity', 'automatic', 'load'],
+  }),
+  'environments.loadPreferences': defineSetting({
+    schema: v.record(v.string(), v.picklist(['prefer', 'normal', 'less-often', 'manual-only'])),
+    default: {},
+    scope: 'application',
+    widget: 'record',
+    merge: 'record',
+    category: 'Machines',
+    title: 'Machine selection preferences',
+    description:
+      'Weight automatic selection for each connected machine. Manual only requires choosing the machine yourself.',
+    keywords: ['capacity', 'automatic', 'load'],
   }),
   'environments.machines': defineSetting({
     schema: machinesSchema,
@@ -1280,6 +1311,190 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'deploy', 'restart', 'update', 'busy', 'wait'],
   }),
+  'developer.heavyJobLogDirectory': defineSetting({
+    schema: v.pipe(v.string(), v.minLength(1)),
+    // Beside production's logs, so every checkout's wrapper writes one machine-wide record.
+    default: '/work/platform-production/heavy-jobs',
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'string',
+    category: 'Developer',
+    title: 'Heavy job log directory',
+    description:
+      'Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'wrapper', 'memory', 'log', 'report'],
+  }),
+  'developer.heavyJobClasses': defineSetting({
+    schema: v.object({
+      bench: heavyJobBudgetSchema,
+      browser: heavyJobBudgetSchema,
+      build: heavyJobBudgetSchema,
+      light: heavyJobBudgetSchema,
+      suite: heavyJobBudgetSchema,
+    }),
+    // Estimate: p90 peak of the class's runs that were not OOM-killed, in the 2026-10-01 heavy-job
+    // log, rounded up to 512 MiB: build 2968, light 1368, suite 6158 MiB; browser 3882 from runs
+    // after bounded browser-test memory. Bench keeps 3072 for the large-file bench's 8 GiB case
+    // cap. A job past its estimate is still capped by its ceiling; the reserve and the pressure
+    // gate cover overlaps.
+    default: {
+      bench: { ceilingMiB: 9216, estimateMiB: 3072 },
+      browser: { ceilingMiB: 10240, estimateMiB: 4096 },
+      build: { ceilingMiB: 4096, estimateMiB: 3072 },
+      light: { ceilingMiB: 2048, estimateMiB: 1536 },
+      suite: { ceilingMiB: 8192, estimateMiB: 6656 },
+    },
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'complex',
+    category: 'Developer',
+    title: 'Heavy job classes',
+    details:
+      'The estimate is what admission reserves for a job of the class until the job uses it. The ceiling is the memory limit of the job’s slice: the kernel kills a job that grows past it.',
+    description:
+      'Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'class', 'memory', 'estimate', 'ceiling', 'admission'],
+  }),
+  'developer.heavyJobMemoryReserveMiB': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(65536)),
+    default: 2048,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job memory reserve',
+    description:
+      'MiB of available memory that heavy-job admission leaves free for the desktop, the app and work outside the wrapper.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'memory', 'reserve', 'admission'],
+  }),
+  'developer.heavyJobMemoryPressureLimit': defineSetting({
+    schema: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
+    default: 10,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job memory pressure limit',
+    details:
+      'Memory pressure is the share of the last ten seconds in which some task waited for memory (`/proc/pressure/memory`, `some avg10`). It stays near zero until the machine reclaims or swaps.',
+    description:
+      'Percent of memory pressure at or above which heavy-job admission starts no further job while one runs.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'memory', 'pressure', 'psi', 'admission'],
+  }),
+  'developer.heavyJobStopGraceSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    // Long enough for a test runner to shut its workers down after SIGTERM.
+    default: 10,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job stop grace',
+    description:
+      'Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'stop', 'cancel', 'grace', 'sigterm', 'sigkill'],
+  }),
+  'developer.heavyJobQuietHoldSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(7200)),
+    // Long enough for one quiet measurement; other sessions' jobs queue behind it meanwhile.
+    default: 600,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job quiet hold',
+    details:
+      'A `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.',
+    description:
+      'Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'quiet', 'exclusive', 'hold', 'drain', 'benchmark'],
+  }),
+  'developer.heavyJobCpuLoadLimit': defineSetting({
+    schema: v.pipe(v.number(), v.minValue(0.1), v.maxValue(16)),
+    default: 1,
+    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Heavy job CPU load limit',
+    details:
+      'The one-minute load average divided by the number of cores: 1 means every core has a runnable task. CPU pressure’s `some` share stays high on an idle desktop and its `full` share reads zero for the whole machine, so admission counts runnable tasks.',
+    description:
+      'Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'jobs', 'cpu', 'load', 'cores', 'admission'],
+  }),
+  'window.browser': defineSetting({
+    schema: v.pipe(v.string(), v.regex(/^(?:auto|webview|\/[^\0\r\n]+)$/)),
+    default: 'auto',
+    scope: 'machine',
+    widget: 'string',
+    category: 'Window',
+    title: 'Browser',
+    description:
+      'The desktop window engine: auto selects an installed Chromium browser, webview selects the system window, and an absolute path selects a browser executable.',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'webview', 'desktop'],
+  }),
+  'window.browserStartupIdleSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    // A cold start on a slow disk keeps faulting in its files long after this; only a silent browser waits it out.
+    default: 5,
+    // Machine scope: it decides when the launcher stops a browser process on this machine.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Browser startup idle limit',
+    description:
+      'Seconds a starting browser may spend without reading its files, using the CPU or answering the launcher before the launcher stops it.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'startup', 'idle', 'stall', 'desktop'],
+  }),
+  'window.browserStartupLimitSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    default: 60,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Browser startup limit',
+    description:
+      'Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'browser', 'chromium', 'startup', 'limit', 'desktop'],
+  }),
+  'window.nativeDialogTimeoutSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(3600)),
+    default: 300,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Native dialog time limit',
+    description:
+      'Seconds a desktop file chooser or startup message stays open before its helper closes.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'picker', 'native', 'timeout'],
+  }),
+  'window.nativeHostStopGraceSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(30)),
+    default: 2,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Native host stop grace',
+    description: 'Seconds the desktop gives an owned native helper to stop before terminating it.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'native', 'shutdown', 'grace'],
+  }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.
     //
@@ -1633,6 +1848,17 @@ export const SETTINGS_REGISTRY = {
     description:
       "Server id to true or false, overriding the per-server default. Turns one server's semantic colour on or off while the feature stays on.",
     keywords: ['lsp', 'semantic', 'tokens', 'server', 'override'],
+  }),
+  'providers.acpOperationTimeoutMs': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1_800_000)),
+    default: 30_000,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'ACP operation timeout',
+    description:
+      'Milliseconds an ACP agent has to initialize, change configuration or drain a cancelled turn. Active answers wait until they finish or you stop them.',
+    keywords: ['provider', 'acp', 'timeout'],
   }),
   'providers.instances': defineSetting({
     schema: providerInstanceConfigsSchema,

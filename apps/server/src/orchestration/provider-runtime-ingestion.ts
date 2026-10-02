@@ -76,6 +76,7 @@ export class ProviderRuntimeIngestion {
   private readonly seenEventIds: BoundedTtlCache<string, true>
   /** Hooks that succeeded without output, per `session:turn`: counted, never listed. */
   private readonly silentHooks: BoundedTtlCache<string, number>
+  private readonly taskMembership = new Map<SessionId, { epoch: string; signature: string }>()
   private readonly worker: SerialWorker<ProviderRuntimeEvent>
 
   constructor(
@@ -149,6 +150,12 @@ export class ProviderRuntimeIngestion {
     if (expectedEpoch && expectedEpoch !== event.runtimeEpoch) return
 
     this.seenEventIds.set(event.eventId, true)
+    if (
+      event.type === 'runtime.started' ||
+      event.type === 'runtime.exited' ||
+      (event.type === 'runtime.state.changed' && event.payload.state === 'stopped')
+    )
+      this.taskMembership.delete(event.sessionId)
     this.onLiveness?.(event.sessionId)
     if (event.type === 'turn.started' && event.payload?.origin)
       await this.dispatchProviderStartedTurn(event)
@@ -719,6 +726,7 @@ export class ProviderRuntimeIngestion {
   }
 
   private async dispatchActivityCommands(event: ProviderRuntimeEvent) {
+    if (event.type === 'tasks.roster' && !this.acceptTaskMembership(event)) return
     if (this.countSilentHook(event)) return
 
     const activities = this.getReadModel?.().sessions.get(event.sessionId)?.activities ?? []
@@ -739,6 +747,19 @@ export class ProviderRuntimeIngestion {
         event,
       )
     }
+  }
+
+  private acceptTaskMembership(event: Extract<ProviderRuntimeEvent, { type: 'tasks.roster' }>) {
+    // Native roster order and descriptions can change while membership stays the same.
+    const signature = JSON.stringify(
+      [
+        ...new Set(event.payload.tasks.map((task) => JSON.stringify([task.taskId, task.taskType]))),
+      ].sort(),
+    )
+    const previous = this.taskMembership.get(event.sessionId)
+    if (previous?.epoch === event.runtimeEpoch && previous.signature === signature) return false
+    this.taskMembership.set(event.sessionId, { epoch: event.runtimeEpoch, signature })
+    return true
   }
 
   /** PreToolUse hooks fire on every tool call; one row each would bury the turn. */
@@ -1006,6 +1027,12 @@ function activitiesForRuntimeEvent(
       return [taskProgressActivity(event)]
     case 'task.completed':
       return [taskCompletedActivity(event, taskTitle)]
+    case 'tasks.roster':
+      return [
+        baseActivity(event, 'info', 'tasks.roster', 'Background tasks updated', {
+          taskCount: event.payload.tasks.length,
+        }),
+      ]
     case 'turn.plan.updated':
       return [turnPlanUpdatedActivity(event)]
     case 'turn.started':

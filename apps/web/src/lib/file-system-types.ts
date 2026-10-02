@@ -84,6 +84,8 @@ export type PickedFsEntry = FsEntry & { workspaceAddress?: WorkspaceAddress } & 
       }
   )
 
+export type WorkspaceRootFolder = PickedFsEntry & { workspaceAddress: WorkspaceAddress }
+
 export function isPickedFsEntry(entry: FsEntry): entry is PickedFsEntry {
   return isPickableEntry(entry)
 }

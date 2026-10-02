@@ -7,6 +7,16 @@
 - Long runs keep their checklist in a file (the plan file, or the scratchpad) and tick items as they land.
 - End a run with what you need from the owner first, then what changed, then what you found. Mark what you could not confirm and where you looked.
 
+## Planning ownership
+
+- Root `PLAN.md` schedules work across every package and client. All plan documents,
+  backlogs and wishlists live in root `plans/`; package `PLAN.md` or `ROADMAP.md` files link
+  to Fregat's root roadmap.
+- Keep package instructions and READMEs pointed at that roadmap. Add plans to
+  `plans/README.md` and run `bun run plans:check` when editing the Editor inventory.
+- `docs/` holds architecture, research and delivery evidence. Put execution checklists
+  and work ordering in the owning root plan and roadmap.
+
 ## Reference Clones
 
 - Upstream code we compare against (vscode, t3code, opencode, codex, …) lives in `references/` at the repo root, gitignored. Check there before cloning; add new clones there, not in `/work/projects/references/`. Tests and `scripts/parity` resolve `references/t3code` by relative path; CI does not fetch it, so those checks skip there and run locally.
@@ -123,6 +133,7 @@
 
 - The dev server is a mesh route: the first connection to 5173 (Vite) or 3001 (API) starts it, and it stops after the idle window (`developer.devServerIdleMinutes`). Never start one by hand. `mesh serve ls` shows the `:5173` route, `mesh serve stop :5173` restarts it on the next connection, and `bun run dev:serve` registers it on a machine that lacks it. State homes: production `~/.platform`, dev `/work/platform-dev/home`, each `agent:browser` run a temp home. `/dev` (and `/platform/dev` on the mesh) is a component gallery; add a tab for anything worth eyeballing.
 - An agent's own dev server (not the shared mesh route) always takes an explicit free `--port`: a bare `vite`/host default resolves to `::1` and can shadow the shared `:5173`/`:3001` route instead of colliding with it (2026-09-27 incident).
+- Heavy commands (full suites, browser tests, builds, long benchmarks) run through `bun /work/platform-production/heavy/current/run.js --class suite|browser|build|bench|light <label> -- <command…>` from the directory the command needs. A job waits in a first-in first-out queue until available memory covers its class estimate (`developer.heavyJobClasses`) beside what the running jobs may still claim of theirs and memory pressure and CPU load are under their limits, then runs in its own slice whose memory ceiling is the class ceiling. A scope the job opens itself joins that ceiling through `nested-scope.sh` beside `run.js`. `status.js` shows running and waiting jobs. A job that outlives its wrapper is stopped by the next admission; a stopped job gets `developer.heavyJobStopGraceSeconds` between SIGTERM and SIGKILL. A measurement that needs the machine to itself runs with `--quiet`: it waits for running jobs to finish while jobs queued after it wait for it, runs for at most `developer.heavyJobQuietHoldSeconds` (10 min), and exits 75 when the hold runs out, so it queues again behind the others. An external tool that needs a quiet machine writes `/work/tmp/wave-heavy/drain.request` as `pid=<its pid> since=<ISO time> holder=<who>`: while that process lives no new job starts, and the running ones finish (they hold `slot1..3.lock` shared, so taking all three exclusively waits for them). It removes the file when done; a request older than one quiet hold is ignored. `status.js` shows the current quiet hold, including another tool holding all three slot locks, which the wrapper cannot bound. Each job's peak memory, CPU time, wall time and exit code go to `developer.heavyJobLogDirectory`; `report.js --since 1d --by command` ranks the biggest consumers, and a command that keeps topping it gets a fix, not a bigger ceiling. `--host pi` runs a low-CPU or low-memory scenario on the Raspberry Pi instead: it mirrors the checkout there, runs the command from the same directory in a 3 GiB slice that the Pi stops if the connection drops or `--max-wall` (1 h) passes, and records the Pi's totals; one Pi job runs at a time and it takes no machine slot (`scripts/heavy/pi/README.md`). A merged change to `scripts/heavy/` takes effect when someone runs `bun scripts/heavy/install.ts` from a clean worktree at that commit; it refuses a dirty tree.
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); evidence lands in `/work/tmp/fregat-evidence/<run>/`. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 
@@ -135,6 +146,9 @@
 
 ## Testing
 
+- Every committed test and verification script runs from a fresh clone on any machine and in CI: no hard-coded home directories, user names, host names, absolute `/work` or `/Users` paths, or tools that only exist on one machine. Paths come from the checkout root, the OS temp dir, or a setting.
+- A test that needs a platform or tool CI lacks skips itself with a stated reason when it's absent, and still passes where it's present. A check that only makes sense on one specific machine (an owner's Mac over SSH, a live account) is a one-off proof: run it from a scratch directory, keep the evidence in the evidence directory, and don't commit the script.
+- A known non-portable spot carries a `NOT-PORTABLE: <what breaks on another machine>` comment until it's fixed; `rg 'NOT-PORTABLE:'` lists them. New code doesn't add markers; it follows the rule above.
 - Live-agent testing in the running app is allowed without asking: use the cheapest available model and only a few ad hoc prompts. Never automate these runs or add them to loops, CI, or deploy checks.
 - Run only a test that could catch a specific plausible failure, and the narrowest one.
 - Vitest. Apps run `bun --bun vitest` (Bun APIs need `--bun`); runtime-neutral `packages/*` run plain `vitest`. Projects: `node`, `dom` (happy-dom, never jsdom), `browser` (`*.browser.tsx`, Playwright, plain Node, own `vitest.browser.config.ts` because `define` leaks across projects in one config).

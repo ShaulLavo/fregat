@@ -127,7 +127,7 @@ the app, and edit it until the throw fires.
 
 ### Note
 
-`docs/logseq-parity-implementation-plan.md:341`,
+`plans/logseq-parity-implementation-plan.md:341`,
 `docs/logseq-port-map.md:623` and `docs/logseq-parity-gap-matrix.md:229` in the
 platform repo all list this as blocking outliner/collapse work. Update those
 lines when it lands.

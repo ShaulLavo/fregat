@@ -7,7 +7,7 @@ export type AgentTerminalReservation = Omit<AgentTerminalProcess, 'command'> & {
 }
 import { sessionIdentityErrors } from './structured-errors'
 import { claudeTerminalResumeArgv } from './utils/claude-terminal-resume'
-import { createInternalError } from '../observability/structured-errors'
+import { createInternalError, providerErrors } from '../observability/structured-errors'
 
 import {
   jsonEqual,
@@ -57,7 +57,7 @@ export type ProviderAdapterRegistryOptions = {
   adapters?: readonly ProviderAdapter[]
   drivers?: readonly AnyProviderDriver[]
   /** Handed to every driver's `create`. */
-  services?: ProviderDriverServices
+  services: ProviderDriverServices
   statusCache?: ProviderStatusCache
   /**
    * Whether an instance is still serving a session.
@@ -99,18 +99,15 @@ export class ProviderAdapterRegistry {
   private readonly leaseDeferredInstances = new Set<ProviderInstanceId>()
   private desiredEntries: readonly ProviderInstanceConfig[] | null = null
   private disposed = false
+  private hasReconciled = false
   private reconcileChain: Promise<void> = Promise.resolve()
   private readonly statusCache: ProviderStatusCache
   private readonly unavailable = new Map<ProviderInstanceId, ProviderSnapshot>()
 
-  /** An array is shorthand for `{ adapters }` — the shape tests and harnesses use. */
-  constructor(options: ProviderAdapterRegistryOptions | readonly ProviderAdapter[] = {}) {
-    const resolved = Array.isArray(options)
-      ? { adapters: options as readonly ProviderAdapter[] }
-      : (options as ProviderAdapterRegistryOptions)
+  constructor(resolved: ProviderAdapterRegistryOptions) {
     this.statusCache = resolved.statusCache ?? new ProviderStatusCache()
     this.hasLiveSessions = resolved.hasLiveSessions ?? (() => false)
-    this.services = resolved.services ?? {}
+    this.services = resolved.services
     for (const driver of resolved.drivers ?? []) {
       this.registerDriver(driver)
     }
@@ -193,6 +190,7 @@ export class ProviderAdapterRegistry {
       this.unavailable.set(providerInstanceId, snapshot)
     }
     this.reorderInstances(entries)
+    this.hasReconciled = true
 
     recordChatPipelineInfo('chat.pipeline.provider_registry.reconcile', {
       instanceCount: this.instances.size,
@@ -305,7 +303,7 @@ export class ProviderAdapterRegistry {
   /** The instance's adapter with the environment its CLI runs in, for maintenance. */
   updateTarget(providerInstanceId: ProviderInstanceId) {
     const instance = this.instances.get(providerInstanceId)
-    if (!instance) throw createInternalError(`Provider instance not found: ${providerInstanceId}`)
+    if (!instance) throw providerErrors.INSTANCE_NOT_FOUND({ providerInstanceId })
 
     return { adapter: instance.adapter, env: instance.env }
   }
@@ -468,10 +466,14 @@ export class ProviderAdapterRegistry {
       await disposeInstance(entry.providerInstanceId, existing)
     }
 
+    // Disk seeds belong to process boot; live additions and replacements need their own probe.
+    this.statusCache.forget(entry.providerInstanceId)
+    if (existing || this.hasReconciled) this.statusCache.invalidate(entry.providerInstanceId)
     try {
       await this.create(driver, entry)
       return null
     } catch (error) {
+      this.statusCache.forget(entry.providerInstanceId)
       recordChatPipelineWarning('chat.pipeline.provider_registry.instance_failed', {
         driverKind: entry.driverKind,
         error,
@@ -484,7 +486,7 @@ export class ProviderAdapterRegistry {
   private async create(driver: AnyProviderDriver, entry: ProviderInstanceConfig) {
     const config = driver.parseConfig(entry.config ?? driver.defaultConfig())
     const env = resolveProviderInstanceEnvironment({
-      derived: driver.environment(config),
+      derived: driver.environment(config, entry.providerInstanceId),
       overrides: entry.environment,
     })
     const handle = await driver.create({
@@ -504,8 +506,6 @@ export class ProviderAdapterRegistry {
       credentialPaths: driver.credentialPaths({ config, env }),
       dispose: handle.dispose,
     })
-    // A recycled id must not inherit the previous account's auth state.
-    this.statusCache.forget(entry.providerInstanceId)
   }
 
   private async refreshInstances(providerInstanceIds: readonly ProviderInstanceId[]) {
@@ -655,11 +655,11 @@ export class ProviderAdapterRegistry {
  * disk so a cold start renders providers without waiting on a CLI probe.
  */
 export function createDefaultProviderAdapterRegistry(
-  savedInstances: readonly ProviderInstanceConfig[] = [],
+  savedInstances: readonly ProviderInstanceConfig[],
   options: {
     hasLiveSessions?: (providerInstanceId: ProviderInstanceId) => boolean | Promise<boolean>
-    services?: ProviderDriverServices
-  } = {},
+    services: ProviderDriverServices
+  },
 ) {
   const registry = new ProviderAdapterRegistry({
     drivers: productProviderDrivers(),
@@ -739,6 +739,7 @@ function unavailableSnapshot(entry: ProviderInstanceConfig, reason: string): Pro
       supportsFullAccess: false,
       supportsInterrupt: false,
       supportsSessionStop: false,
+      supportsSteering: false,
       supportsStreaming: false,
       supportsUserInput: false,
     },

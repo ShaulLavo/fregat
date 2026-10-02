@@ -97,16 +97,27 @@ stays safe to read, share and export.
 
 ## Developer
 
-| Setting                              | Default | Scope       | What it does                                                                                                                                                                                      |
-| ------------------------------------ | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `developer.simulatedLatencyMs`       | `0`     | application | Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.                                                                               |
-| `developer.devServerIdleMinutes`     | `15`    | machine     | Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs. |
-| `developer.clientUpdateCheckSeconds` | `60`    | application | Seconds between checks for an available web update while the app is visible. Refresh applies the update when you choose.                                                                          |
-| `developer.deployRestartWaitMinutes` | `30`    | machine     | Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.                                                  |
+| Setting                                 | Default                                                                                                                                                                                                                                           | Scope       | What it does                                                                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `developer.simulatedLatencyMs`          | `0`                                                                                                                                                                                                                                               | application | Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.                                                                               |
+| `developer.devServerIdleMinutes`        | `15`                                                                                                                                                                                                                                              | machine     | Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs. |
+| `developer.clientUpdateCheckSeconds`    | `60`                                                                                                                                                                                                                                              | application | Seconds between checks for an available web update while the app is visible. Refresh applies the update when you choose.                                                                          |
+| `developer.deployRestartWaitMinutes`    | `30`                                                                                                                                                                                                                                              | machine     | Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.                                                  |
+| `developer.heavyJobLogDirectory`        | `"/work/platform-production/heavy-jobs"`                                                                                                                                                                                                          | machine     | Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.                                |
+| `developer.heavyJobClasses`             | `{"bench":{"ceilingMiB":9216,"estimateMiB":3072},"browser":{"ceilingMiB":10240,"estimateMiB":4096},"build":{"ceilingMiB":4096,"estimateMiB":3072},"light":{"ceilingMiB":2048,"estimateMiB":1536},"suite":{"ceilingMiB":8192,"estimateMiB":6656}}` | machine     | Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.                                                                             |
+| `developer.heavyJobMemoryReserveMiB`    | `2048`                                                                                                                                                                                                                                            | machine     | MiB of available memory that heavy-job admission leaves free for the desktop, the app and work outside the wrapper.                                                                               |
+| `developer.heavyJobMemoryPressureLimit` | `10`                                                                                                                                                                                                                                              | machine     | Percent of memory pressure at or above which heavy-job admission starts no further job while one runs.                                                                                            |
+| `developer.heavyJobStopGraceSeconds`    | `10`                                                                                                                                                                                                                                              | machine     | Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.                                                                                          |
+| `developer.heavyJobQuietHoldSeconds`    | `600`                                                                                                                                                                                                                                             | machine     | Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.                                                                                                 |
+| `developer.heavyJobCpuLoadLimit`        | `1`                                                                                                                                                                                                                                               | machine     | Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.                                                                                               |
 
 ### Details
 
 - `developer.deployRestartWaitMinutes`: Thirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.
+- `developer.heavyJobClasses`: The estimate is what admission reserves for a job of the class until the job uses it. The ceiling is the memory limit of the job’s slice: the kernel kills a job that grows past it.
+- `developer.heavyJobMemoryPressureLimit`: Memory pressure is the share of the last ten seconds in which some task waited for memory (`/proc/pressure/memory`, `some avg10`). It stays near zero until the machine reclaims or swaps.
+- `developer.heavyJobQuietHoldSeconds`: A `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.
+- `developer.heavyJobCpuLoadLimit`: The one-minute load average divided by the number of cores: 1 means every core has a runnable task. CPU pressure’s `some` share stays high on an idle desktop and its `full` share reads zero for the whole machine, so admission counts runnable tasks.
 
 ## Editor
 
@@ -231,10 +242,12 @@ stays safe to read, share and export.
 
 ## Machines
 
-| Setting                      | Default | Scope   | What it does                                                                                                                                                                                   |
-| ---------------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `environments.machines`      | `{}`    | machine | Other machines this app can connect to, over SSH or by address. This machine is always available.                                                                                              |
-| `environments.devicePairing` | `true`  | machine | A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing. |
+| Setting                        | Default | Scope       | What it does                                                                                                                                                                                   |
+| ------------------------------ | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `environments.loadBalancing`   | `false` | application | Choose a connected checkout with available CPU and memory for a new draft. The draft keeps its chosen machine.                                                                                 |
+| `environments.loadPreferences` | `{}`    | application | Weight automatic selection for each connected machine. Manual only requires choosing the machine yourself.                                                                                     |
+| `environments.machines`        | `{}`    | machine     | Other machines this app can connect to, over SSH or by address. This machine is always available.                                                                                              |
+| `environments.devicePairing`   | `true`  | machine     | A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing. |
 
 ## Models
 
@@ -258,9 +271,10 @@ stays safe to read, share and export.
 
 ## Providers
 
-| Setting               | Default | Scope       | What it does                                                                              |
-| --------------------- | ------- | ----------- | ----------------------------------------------------------------------------------------- |
-| `providers.instances` | `[]`    | application | Your agent providers, such as Codex and Claude, in the order the model picker shows them. |
+| Setting                           | Default | Scope       | What it does                                                                                                                                         |
+| --------------------------------- | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `providers.acpOperationTimeoutMs` | `30000` | machine     | Milliseconds an ACP agent has to initialize, change configuration or drain a cancelled turn. Active answers wait until they finish or you stop them. |
+| `providers.instances`             | `[]`    | application | Your agent providers, such as Codex and Claude, in the order the model picker shows them.                                                            |
 
 ## Search
 
@@ -305,9 +319,14 @@ stays safe to read, share and export.
 
 ## Window
 
-| Setting               | Default        | Scope   | What it does                                                                                                                                                          |
-| --------------------- | -------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `window.transparency` | `"compositor"` | machine | What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame. _(restart)_ |
+| Setting                             | Default        | Scope   | What it does                                                                                                                                                             |
+| ----------------------------------- | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `window.browser`                    | `"auto"`       | machine | The desktop window engine: auto selects an installed Chromium browser, webview selects the system window, and an absolute path selects a browser executable. _(restart)_ |
+| `window.browserStartupIdleSeconds`  | `5`            | machine | Seconds a starting browser may spend without reading its files, using the CPU or answering the launcher before the launcher stops it. _(restart)_                        |
+| `window.browserStartupLimitSeconds` | `60`           | machine | Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it. _(restart)_                                        |
+| `window.nativeDialogTimeoutSeconds` | `300`          | machine | Seconds a desktop file chooser or startup message stays open before its helper closes. _(restart)_                                                                       |
+| `window.nativeHostStopGraceSeconds` | `2`            | machine | Seconds the desktop gives an owned native helper to stop before terminating it. _(restart)_                                                                              |
+| `window.transparency`               | `"compositor"` | machine | What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame. _(restart)_    |
 
 ### Details
 

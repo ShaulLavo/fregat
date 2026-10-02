@@ -8,6 +8,7 @@ import { createSpellEngine, type SpellEngine } from '../src/engine'
 import { tokenizeSpellWords, type SpellTextRange } from '../src/tokenizer'
 import { bundledEngineSource } from '../test/dictionaries'
 
+// NOT-PORTABLE: Default corpus/data use the owner's checkout and /work/tmp/research2.
 const plansDir = process.argv[2] ?? '/work/projects/platform/plans'
 const testsetDir = process.argv[3] ?? '/work/tmp/research2/spellcheck/data'
 const CORPUS_LINES = 10_000

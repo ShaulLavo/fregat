@@ -891,7 +891,7 @@ and complete validation. Writing the plan does not schedule production execution
   ([decision](../editor/docs/performance/sab-transport-2026-09-12.md#decision-2026-09-25)); E011
   is parked under Plan 112. All were outside this architecture. Reopening shared text storage requires a separate explicit
   decision; this plan provides no production abstraction or implementation dependency for it.
-- [E014](../editor/plans/e014-parallel-search.md) must reuse the common reader and job lifecycle
+- [E014](e014-parallel-search.md) must reuse the common reader and job lifecycle
   if parallel search is implemented. This plan does not add a parallel search engine.
 - The highlight retry (Plan 071, landed with Editor E050 row 11) stays in the syntax controller.
   Common endpoint lifecycle must not accidentally introduce retries or replay failed requests as

@@ -8,6 +8,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { chromium } from 'playwright'
 
 const appUrl = process.env.CHAT_PROOF_URL ?? 'http://127.0.0.1:3300'
+// NOT-PORTABLE: Default proof artifacts are written under /work/tmp.
 const artifactDirectory = process.env.CHAT_PROOF_ARTIFACTS ?? '/work/tmp/platform-chat-ux'
 const phase = process.argv[2] ?? 'after'
 const baselineSourceDirectory = process.env.CHAT_PROOF_BASELINE_SOURCE
@@ -451,6 +452,7 @@ async function buildProof(outDir) {
       {
         name: 'chat-scroll-proof',
         async load(id) {
+          // NOT-PORTABLE: Missing external baseline inputs can make a baseline run use current code.
           if (!baselineSourceDirectory) return
           if (id.endsWith('/src/features/chat/components/messages-timeline.tsx')) {
             return readFile(resolve(baselineSourceDirectory, 'messages-timeline.tsx'), 'utf8')

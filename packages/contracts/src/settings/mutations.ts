@@ -54,6 +54,7 @@ const NON_SCALAR_SETTING_IDS = [
   'git.projectWorktreeCleanupOnDelete',
   'workbench.theme.customizations',
   'spellcheck.words',
+  'developer.heavyJobClasses',
 ] as const satisfies readonly SettingId[]
 
 type NonScalarSettingId = (typeof NON_SCALAR_SETTING_IDS)[number]
@@ -147,6 +148,8 @@ export type SetProviderEnabledOperation = {
 
 /** The per-project records, each keyed by project id, that `project.set` edits one entry of. */
 export const PROJECT_OVERRIDE_SETTING_IDS = [
+  'chat.projectTextGenerationModels',
+  'chat.projectGroupingOverrides',
   'chat.projectResponseStreamingModes',
   'chat.projectAutoSettle',
   'git.projectAutoPull',

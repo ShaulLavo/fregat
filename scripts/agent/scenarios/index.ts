@@ -1,3 +1,8 @@
+import { cursorProvider } from './cursor-provider'
+import { cursorModelCatalog } from './cursor-model-catalog'
+import { machineBalancing } from './machine-balancing'
+import { binaryFileOpen, binaryFileRemote } from './binary-file-open'
+import { ghosttySiteFit } from './ghostty-site-fit'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
 import { editorSavedSnapshot } from './editor-saved-snapshot'
@@ -29,7 +34,7 @@ import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
-import { terminalHistory } from './terminal-history'
+import { terminalHistory, terminalIdleShells } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
 import {
@@ -51,11 +56,19 @@ import { chatQueueAway } from './chat-queue-away'
 import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
 import { screenshotDrop } from './screenshot-drop'
-import { fileAttachments } from './file-attachments'
+import { binaryFileAttachment, fileAttachments } from './file-attachments'
+import {
+  pdfDocuments,
+  pdfAttachment,
+  pdfEngineUnavailable,
+  pdfPresentationUnavailable,
+  pdfWorkerUnavailable,
+  pdfRemoteOwner,
+} from './pdf-documents'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
-import { backgroundLiveness } from './background-liveness'
+import { backgroundLiveness, backgroundMonitorLiveness } from './background-liveness'
 import { spinnerPalette } from './spinner-palette'
 import { sessionBulkFailures } from './session-bulk-failures'
 import { sessionLifecycle } from './session-lifecycle'
@@ -177,6 +190,7 @@ import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
+import { opencodeModelCatalog } from './opencode-model-catalog'
 import { chatUsageMeter } from './chat-usage-meter'
 import { chatComposerNarrow } from './chat-composer-narrow'
 import { settingsUsage } from './settings-usage'
@@ -189,6 +203,7 @@ import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
+import { terminalCancelledStartup } from './terminal-cancelled-startup'
 import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
@@ -196,6 +211,15 @@ import { itemNavigation } from './item-navigation'
 import { shortcutHints } from './shortcut-hints'
 import { editorAddToChat } from './editor-add-to-chat'
 import { editorSpellcheck } from './editor-spellcheck'
+import {
+  csvTable,
+  csvEngineFailure,
+  csvQueryFailure,
+  csvTextSave,
+  csvKeyboardNavigation,
+  csvPresentationReadiness,
+  csvPresentationFailure,
+} from './csv-table'
 import { markdownSplitView } from './markdown-split-view'
 import { markdownAuthoring } from './markdown-authoring'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
@@ -217,6 +241,9 @@ import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
 import { themeStudioPreview } from './theme-studio-preview'
+import { polaronWebPicker } from './polaron-web-picker'
+import { polaronNativeHost } from './polaron-native-host'
+import { polaronChromiumNativePicker } from './polaron-chromium-native-picker'
 import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
 import { filePickerLocations } from './file-picker-locations'
@@ -258,11 +285,13 @@ import { codeThemeNativePreview } from './code-theme-native-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
 import { bundleWallpapers } from './bundle-wallpapers'
+import { coldWallpaperSwitch } from './cold-wallpaper-switch'
 import { colorModePreview } from './color-mode-preview'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorAutoClose } from './editor-auto-close'
 import { editorFormatChord } from './editor-format-chord'
 import { editorLspCompletion } from './editor-lsp-completion'
+import { editorReadRecovery } from './editor-read-recovery'
 import { editorExternalDeletion } from './editor-external-deletion'
 import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
@@ -386,6 +415,7 @@ import { worktreeCleanupOnDelete } from './worktree-cleanup-on-delete'
 import { sessionPullRequestSync } from './session-pull-request-sync'
 import { sessionPullRequestBadge } from './session-pull-request-badge'
 import { sessionAutoSettle } from './session-auto-settle'
+import { gitForgeDiscussion } from './git-forge-discussion'
 import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
 import { worktreeSetupImport } from './worktree-setup-import'
@@ -416,6 +446,9 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  binaryFileOpen,
+  binaryFileRemote,
+  ghosttySiteFit,
   devPackageUpdates,
   editorPagedReadonly,
   diffNoFlicker,
@@ -424,12 +457,14 @@ export const scenarios: readonly Scenario[] = [
   editorSavedSnapshot,
   historyComparisonNoFlicker,
   terminalHistory,
+  terminalIdleShells,
   responseDelivery,
   archiveLifecycle,
   sessionUnread,
   sessionSearch,
   sessionSearchEnvironments,
   projectGrouping,
+  machineBalancing,
   sessionLifecycle,
   sessionBulkFailures,
   sessionUndo,
@@ -473,6 +508,13 @@ export const scenarios: readonly Scenario[] = [
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
+  binaryFileAttachment,
+  pdfDocuments,
+  pdfAttachment,
+  pdfEngineUnavailable,
+  pdfPresentationUnavailable,
+  pdfWorkerUnavailable,
+  pdfRemoteOwner,
   screenshotDrop,
   chatStashContext,
   chatDraftSentLeftover,
@@ -492,10 +534,13 @@ export const scenarios: readonly Scenario[] = [
   chatQueue,
   chatQueueAway,
   chatQueueStopUpload,
+  cursorProvider,
+  cursorModelCatalog,
   providerModelOptions,
   draftRecovery,
   asyncQuestions,
   backgroundLiveness,
+  backgroundMonitorLiveness,
   spinnerPalette,
   checkpointRewind,
   workbenchListFocus,
@@ -507,6 +552,7 @@ export const scenarios: readonly Scenario[] = [
   iconHints,
   chatIconHints,
   chatModelPicker,
+  opencodeModelCatalog,
   chatUsageMeter,
   chatComposerNarrow,
   restNoFlicker,
@@ -577,6 +623,7 @@ export const scenarios: readonly Scenario[] = [
   editorLinkedPackage,
   editorOfflineResync,
   terminalBackground,
+  terminalCancelledStartup,
   terminalOfflineHost,
   terminalRenderer,
   terminalRendererWebgl,
@@ -586,6 +633,13 @@ export const scenarios: readonly Scenario[] = [
   shortcutHints,
   editorAddToChat,
   editorSpellcheck,
+  csvTable,
+  csvTextSave,
+  csvKeyboardNavigation,
+  csvEngineFailure,
+  csvQueryFailure,
+  csvPresentationReadiness,
+  csvPresentationFailure,
   markdownSplitView,
   markdownAuthoring,
   markdownPreviewClobber,
@@ -608,6 +662,9 @@ export const scenarios: readonly Scenario[] = [
   filePickerBrowse,
   filePickerLocations,
   filePickerAppearance,
+  polaronWebPicker,
+  polaronNativeHost,
+  polaronChromiumNativePicker,
   filePickerSelection,
   themeStudioPreview,
   themeStudioAsync,
@@ -632,6 +689,7 @@ export const scenarios: readonly Scenario[] = [
   colorModePreview,
   pageLifecycle,
   bundleWallpapers,
+  coldWallpaperSwitch,
   editorAutoClose,
   editorFormatChord,
   editorLspCompletion,
@@ -646,6 +704,7 @@ export const scenarios: readonly Scenario[] = [
   editorDecodeReveal,
   editorDefinitionCrlf,
   editorExternalDeletion,
+  editorReadRecovery,
   fileTreeUndo,
   editorLspRenameKey,
   editorLspSignatureHelp,
@@ -785,6 +844,7 @@ export const scenarios: readonly Scenario[] = [
   sessionPullRequestBadge,
   sessionAutoSettle,
   gitMergeRequest,
+  gitForgeDiscussion,
   gitClonePublish,
   worktreeSetupImport,
   editorCaretBurst,

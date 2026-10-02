@@ -1270,38 +1270,35 @@ function editSummaryPatchRange(
   nextLineStarts: MinimapLineStarts,
   edits: readonly TextEdit[],
 ): SummaryLineChangeRange | null {
-  let startLine = Number.POSITIVE_INFINITY
-  let previousEndLine = 0
-  let nextEndLine = 0
+  let startOffset = Number.POSITIVE_INFINITY
+  let previousEndOffset = 0
+  let nextEndOffset = 0
+  let offsetDelta = 0
 
   for (const edit of edits) {
     if (editIsEmpty(edit)) continue
-    const previousRange = previousLineRangeForEdit(previousLineStarts, nextLineStarts, edit)
-    const nextRange = lineRangeForEdit(nextLineStarts, edit.from, edit.from + edit.text.length)
-    startLine = Math.min(startLine, previousRange.startLine, nextRange.startLine)
-    previousEndLine = Math.max(previousEndLine, previousRange.endLine)
-    nextEndLine = Math.max(nextEndLine, nextRange.endLine)
+    const from = Math.min(edit.from, edit.to)
+    const to = Math.max(edit.from, edit.to)
+    const editDelta = edit.text.length - (to - from)
+    startOffset = Math.min(startOffset, from)
+    // The unchanged suffix maps back by the accumulated delta; the changed end moves with each edit.
+    previousEndOffset = Math.max(previousEndOffset, to - offsetDelta)
+    nextEndOffset = Math.max(nextEndOffset, to) + editDelta
+    offsetDelta += editDelta
   }
 
-  if (startLine === Number.POSITIVE_INFINITY) return null
-  return { startLine, previousEndLine, nextEndLine }
+  if (startOffset === Number.POSITIVE_INFINITY) return null
+  const previousRange = lineRangeForEdit(previousLineStarts, startOffset, previousEndOffset)
+  const nextRange = lineRangeForEdit(nextLineStarts, startOffset, nextEndOffset)
+  return {
+    startLine: Math.min(previousRange.startLine, nextRange.startLine),
+    previousEndLine: previousRange.endLine,
+    nextEndLine: nextRange.endLine,
+  }
 }
 
 function editIsEmpty(edit: TextEdit): boolean {
   return edit.from === edit.to && edit.text.length === 0
-}
-
-function previousLineRangeForEdit(
-  previousLineStarts: MinimapLineStarts,
-  nextLineStarts: MinimapLineStarts,
-  edit: TextEdit,
-): { readonly startLine: number; readonly endLine: number } {
-  if (edit.from !== edit.to || edit.text.includes('\n')) {
-    return lineRangeForEdit(previousLineStarts, edit.from, edit.to)
-  }
-
-  const line = nextLineStarts.indexForOffset(edit.from)
-  return { startLine: line, endLine: line + 1 }
 }
 
 function lineRangeForEdit(
@@ -1341,10 +1338,12 @@ function normalizeSummaryPatchRange(
   )
   const previousEndLine = Math.min(Math.max(startLine, range.previousEndLine), previousLineCount)
   const nextEndLine = Math.min(Math.max(startLine, range.nextEndLine), nextLineCount)
+  // Both range ends must preserve the same suffix of complete lines.
+  const suffixCount = Math.min(previousLineCount - previousEndLine, nextLineCount - nextEndLine)
   return {
     startLine,
-    deleteCount: previousEndLine - startLine,
-    insertEndLine: nextEndLine,
+    deleteCount: previousLineCount - suffixCount - startLine,
+    insertEndLine: nextLineCount - suffixCount,
   }
 }
 

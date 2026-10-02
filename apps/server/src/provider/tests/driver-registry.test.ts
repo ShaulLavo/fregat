@@ -29,8 +29,31 @@ afterEach(async () => {
 })
 
 describe('provider driver registry', () => {
+  it('hands the explicit execution cwd unchanged to each driver instance', async () => {
+    const cwd = await fixtureRoot()
+    const received: string[] = []
+    const registry = new ProviderAdapterRegistry({
+      services: { cwd },
+      drivers: [
+        {
+          ...mockDriver,
+          create: async (input) => {
+            received.push(input.services.cwd)
+            return mockDriver.create(input)
+          },
+        },
+      ],
+    })
+    registries.push(registry)
+
+    await registry.reconcile([instance(WORK, {}), instance(PERSONAL, {})])
+
+    expect(received).toEqual([cwd, cwd])
+  })
+
   it('lists import-capable instances with default or explicit enablement and excludes disabled instances', async () => {
     const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
       drivers: [
         {
           ...mockDriver,
@@ -219,6 +242,67 @@ describe('provider status cache', () => {
     expect(await readdir(directory)).toEqual([`${WORK}.json`])
   })
 
+  it('seeds the first registry read on boot while the live probe refreshes behind it', async () => {
+    const directory = await fixtureRoot()
+    const warm = createRegistry(new ProviderStatusCache({ directory }))
+    await warm.reconcile([instance(WORK, {})])
+    const written = await warm.refreshSnapshot(WORK)
+    await warm.dispose()
+
+    const cold = createRegistry(new ProviderStatusCache({ directory }))
+    await cold.reconcile([instance(WORK, {})])
+    adapterFor(cold, WORK).probeError = 'Fixture probe failure'
+
+    expect(await cold.snapshot(WORK)).toMatchObject({
+      status: 'ready',
+      checkedAt: written.checkedAt,
+    })
+    await expect.poll(async () => (await cold.snapshot(WORK)).status).toBe('error')
+  })
+
+  it.each(['replacement', 'removed-id', 'new-id'])(
+    'probes a live %s before returning persisted state',
+    async (change) => {
+      const directory = await fixtureRoot()
+      const registry = createRegistry(new ProviderStatusCache({ directory }))
+      await registry.reconcile([{ ...instance(WORK, {}), displayLabel: 'Original fixture' }])
+      await registry.refreshSnapshot(WORK)
+      if (change !== 'replacement') await registry.reconcile([])
+      if (change === 'new-id') {
+        const seed = createRegistry(new ProviderStatusCache({ directory }))
+        await seed.reconcile([instance(PERSONAL, {})])
+        await seed.refreshSnapshot(PERSONAL)
+        await seed.dispose()
+      }
+      const id = change === 'new-id' ? PERSONAL : WORK
+
+      await registry.reconcile([{ ...instance(id, {}), displayLabel: 'Live fixture' }])
+
+      expect(await registry.snapshot(id)).toMatchObject({ displayLabel: 'Live fixture' })
+    },
+  )
+
+  it('releases cache invalidation after failed creation and probes its later replacement', async () => {
+    const directory = await fixtureRoot()
+    const cache = new ProviderStatusCache({ directory })
+    const registry = createRegistry(cache)
+    await registry.reconcile([instance(WORK, {})])
+    await registry.refreshSnapshot(WORK)
+
+    await registry.reconcile([instance(WORK, { responseText: 42 })])
+
+    expect(registry.adapter(WORK)).toBeNull()
+    expect(cache.get(WORK)).toBeNull()
+    expect(cache.hydrate(WORK, MOCK_DRIVER_KIND)).toMatchObject({ status: 'ready' })
+    expect((await registry.listProviders()).providers).toContainEqual(
+      expect.objectContaining({ providerInstanceId: WORK, availability: 'unavailable' }),
+    )
+
+    await registry.reconcile([{ ...instance(WORK, {}), displayLabel: 'Recovered fixture' }])
+
+    expect(await registry.snapshot(WORK)).toMatchObject({ displayLabel: 'Recovered fixture' })
+  })
+
   it('removes its temp file when the snapshot cannot replace the target', async () => {
     const directory = await fixtureRoot()
     await mkdir(path.join(directory, `${WORK}.json`))
@@ -291,6 +375,7 @@ describe('provider registry change stream', () => {
 
 function createRegistry(statusCache?: ProviderStatusCache) {
   const registry = new ProviderAdapterRegistry({
+    services: { cwd: process.cwd() },
     drivers: [mockDriver],
     ...(statusCache ? { statusCache } : {}),
   })

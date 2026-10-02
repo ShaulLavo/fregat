@@ -20,6 +20,7 @@ const sizes = values.sizes.split(',').map(Number)
 const modes = values.modes.split(',')
 if (sizes.some((size) => !Number.isSafeInteger(size) || size < 1024)) fail('Invalid sizes')
 if (modes.some((mode) => !['resident', 'streamed', 'paged'].includes(mode))) fail('Invalid modes')
+// NOT-PORTABLE: mkdtemp requires /work/tmp, which this script does not create.
 const directory = await mkdtemp('/work/tmp/editor-e015-build-')
 await mkdir(dirname(resolve(values.output)), { recursive: true })
 let browser

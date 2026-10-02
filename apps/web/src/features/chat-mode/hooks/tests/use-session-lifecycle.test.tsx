@@ -1,3 +1,4 @@
+import { createSessionLifecycleCommand } from '@workspace/client-core/chat/commands'
 import { act } from '@testing-library/react'
 import { createClientError } from '@workspace/client-core/errors'
 import type { ScopedSessionRef, SessionId } from '@workspace/contracts'
@@ -67,4 +68,26 @@ test('partial bulk snooze clears selection before every command and Undo include
   expect((await harness.refresh()).sessions.every((session) => session.snoozedUntil === null)).toBe(
     true,
   )
+})
+
+test('repeated settle commands preserve the first settled timestamp and placement', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server, ['Only'])
+  const command = createSessionLifecycleCommand(h.sessionIds[0]!, { type: 'settle' })
+  const firstReceipt = await h.dispatch(command)
+  const first = (await h.refresh()).sessions[0]!
+  const replayReceipt = await h.dispatch(command)
+  const nextReceipt = await h.dispatch(
+    createSessionLifecycleCommand(h.sessionIds[0]!, { type: 'settle' }),
+  )
+  const settled = (await h.refresh()).sessions[0]!
+  expect(replayReceipt).toEqual({ ...firstReceipt, deduped: true })
+  expect(nextReceipt.deduped).toBe(false)
+  expect(first.settledAt).not.toBeNull()
+  expect(settled.settledAt).toBe(first.settledAt)
+  expect(settled.settledOverride).toBe('settled')
+  expect(settled.pinnedAt).toBeNull()
+  expect(settled.snoozedUntil).toBeNull()
 })
