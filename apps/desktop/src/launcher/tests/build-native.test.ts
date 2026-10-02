@@ -56,9 +56,20 @@ test('macOS publishes actual fullscreen state to the app document', async () => 
   expect(mac).toContain('new MutationObserver(')
   expect(mac).toContain('observer.disconnect(); apply();')
   expect(mac).toContain('observer.observe(document, { childList: true })')
-  expect(mac).toContain('[controller addUserScript:self.initScript]')
+  expect(mac).toContain('[controller addUserScript:self.startupScript]')
   expect(mac).toMatch(/windowDidEnterFullScreen:[\s\S]*?\[self publishWindowState\]/)
   expect(mac).toMatch(/windowDidExitFullScreen:[\s\S]*?\[self publishWindowState\]/)
+})
+
+test('macOS host getters and methods avoid implicit ARC ownership families', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  const properties = mac.matchAll(/@property\([^)]*\)[^;]*?\b([A-Za-z_]\w*)\s*;/g)
+  const methods = mac.matchAll(/^[+-]\s*\([^)]*\)\s*([A-Za-z_]\w*)/gm)
+  const ownershipFamily = /^_*(?:init|alloc|new|copy|mutableCopy)(?:$|[^a-z])/
+  // Property names declare getter selectors, including ARC's initializer return-type rules.
+  for (const declaration of [...properties, ...methods]) {
+    expect(declaration[1]).not.toMatch(ownershipFamily)
+  }
 })
 
 const supported = process.platform === 'linux'

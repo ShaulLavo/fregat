@@ -37,7 +37,7 @@ static void emit(NSDictionary *event) {
 @property(strong) NSWindow *window;
 @property(strong) WKWebView *view;
 @property(strong) NSURL *appURL;
-@property(strong) WKUserScript *initScript;
+@property(strong) WKUserScript *startupScript;
 @property(strong) NSOpenPanel *picker;
 @property(strong) NSEvent *mouseDown;
 @property(strong) id mouseMonitor;
@@ -70,7 +70,7 @@ static void emit(NSDictionary *event) {
   WKUserContentController *controller = self.view.configuration.userContentController;
   [controller removeAllUserScripts];
   [controller addUserScript:[[WKUserScript alloc] initWithSource:[self windowStateSource] injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
-  [controller addUserScript:self.initScript];
+  [controller addUserScript:self.startupScript];
 }
 - (void)publishWindowState {
   if (self.closed || !self.view || !self.appURL) return;
@@ -300,7 +300,7 @@ int main(int argc, char **argv) {
     }
     WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
     configuration.websiteDataStore = dataStore;
-    host.initScript = [[WKUserScript alloc] initWithSource:text injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
+    host.startupScript = [[WKUserScript alloc] initWithSource:text injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
     [configuration.userContentController addScriptMessageHandler:host name:@"platformShell"];
     WKWebView *view = [[WKWebView alloc] initWithFrame:window.contentView.bounds configuration:configuration];
     host.view = view;
