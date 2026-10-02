@@ -1,5 +1,5 @@
-// Installed at <production root>/bin/promote.ts and run by the unit's ExecStartPre, so it
-// imports nothing from the checkout, never throws, and always exits 0.
+// Bundled into bin/promote.js for machine services and bin/promote.ts for the mesh unit.
+// The entry point keeps startup available by logging failures and exiting 0.
 import { spawnSync } from 'node:child_process'
 import {
   existsSync,
@@ -9,8 +9,13 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
+import * as v from 'valibot'
+import { machineServiceIntentSchema } from '../../../packages/contracts/src/server-identity'
+import { probeAddress } from '../../service/probe'
+import { currentRelease, pointCurrentAt } from '../release-operations'
 
 export const serverPort = 3301
 export const serverUnit = 'platform-prod.service'
@@ -188,6 +193,7 @@ function takeApproval(root: string) {
 
 function startLiveCheck(directory: string, previous: string | null, root: string, launch: Launch) {
   const config = readConfig(directory)
+  if (config?.readiness) return log('identity readiness runs after server activation')
   if (config?.liveCheck === false) return log('live check skipped (--skip-live-check)')
   if (!config?.source) return log(`live check skipped: ${directory} records no source checkout`)
 
@@ -226,12 +232,152 @@ export function spawnLauncher(argv: readonly string[]) {
   return false
 }
 
-function readConfig(directory: string): { liveCheck?: boolean; source?: string } | null {
+function readConfig(
+  directory: string,
+): { liveCheck?: boolean; source?: string; readiness?: unknown; previousRelease?: unknown } | null {
   try {
     return JSON.parse(readFileSync(path.join(directory, 'build-config.json'), 'utf8'))
   } catch {
     return null
   }
+}
+
+type ReadinessOptions = { recovery?: boolean; isActive?: () => boolean }
+const recoverySchema = v.object({
+  release: v.string(),
+  status: v.picklist(['checking', 'passed', 'failed']),
+})
+const readinessVerdictSchema = v.object({
+  release: v.string(),
+  status: v.picklist(['passed', 'failed']),
+})
+
+export async function checkCurrentReadiness(
+  root: string,
+  launch: Launch = spawnLauncher,
+  fetcher: typeof fetch = fetch,
+  isActive?: () => boolean,
+) {
+  const directory = currentRelease(root)
+  if (!directory) return false
+  const config = readConfig(directory)
+  if (!config?.readiness) return true
+  const recovery = readRecord(path.join(root, 'readiness-recovery.json'), recoverySchema)
+  if (recovery?.release === directory) {
+    if (recovery.status !== 'checking') return recovery.status === 'passed'
+    return checkReadiness(root, directory, null, launch, fetcher, { recovery: true, isActive })
+  }
+  const verdict = readRecord(path.join(directory, 'live-check.json'), readinessVerdictSchema)
+  if (verdict?.release === path.basename(directory) && verdict.status === 'passed') return true
+  const previous =
+    typeof config.previousRelease === 'string'
+      ? path.join(root, 'releases', path.basename(config.previousRelease))
+      : null
+  return checkReadiness(root, directory, previous, launch, fetcher, { isActive })
+}
+
+/** The app checks the same nonce proof as setup, then rolls back only the release it checked. */
+export async function checkReadiness(
+  root: string,
+  directory: string,
+  previous: string | null,
+  launch: Launch = spawnLauncher,
+  fetcher: typeof fetch = fetch,
+  options: ReadinessOptions = {},
+) {
+  const config = readConfig(directory)
+  const parsed = v.safeParse(machineServiceIntentSchema, config?.readiness)
+  const timeoutMs = (config?.readiness as { timeoutMs?: unknown } | undefined)?.timeoutMs
+  if (
+    !parsed.success ||
+    typeof timeoutMs !== 'number' ||
+    !Number.isFinite(timeoutMs) ||
+    timeoutMs <= 0
+  )
+    return false
+  const intent = parsed.output
+  const deadline = Date.now() + timeoutMs
+  let ready = false
+  do {
+    if (!activeRelease(root, directory, options)) return false
+    const outcome = await probeAddress(
+      { ...intent, timeoutMs: Math.max(1, deadline - Date.now()) },
+      fetcher,
+    )
+    if (outcome.kind === 'fregat' && outcome.proven) {
+      const identity = outcome.identity
+      ready =
+        identity.stateHome === intent.stateHome &&
+        identity.address === intent.address &&
+        identity.webBase === intent.webBase &&
+        (!intent.expected || identity.machineId === intent.expected.machineId) &&
+        (!intent.expected?.environmentId ||
+          identity.environmentId === intent.expected.environmentId)
+    }
+    if (ready || Date.now() >= deadline) break
+    await Bun.sleep(Math.min(100, Math.max(0, deadline - Date.now())))
+  } while (Date.now() < deadline)
+  if (!activeRelease(root, directory, options)) return false
+  const report = {
+    release: path.basename(directory),
+    status: ready ? 'passed' : 'failed',
+    checkedAt: new Date().toISOString(),
+    fresh: ready ? [] : ['Server identity readiness failed'],
+  }
+  writeRecord(path.join(directory, 'live-check.json'), report)
+  if (options.recovery) {
+    writeRecord(path.join(root, 'readiness-recovery.json'), {
+      release: directory,
+      status: ready ? 'passed' : 'failed',
+    })
+    if (!ready) console.error('[promote] identity readiness failed; keeping the previous release')
+    return ready
+  }
+  if (ready) return true
+  if (previous) {
+    writeRecord(path.join(root, 'readiness-recovery.json'), {
+      release: previous,
+      status: 'checking',
+    })
+    pointCurrentAt(root, previous)
+    launch(machineRestartCommand())
+  } else rmSync(path.join(root, 'current'), { force: true })
+  return false
+}
+
+function activeRelease(root: string, directory: string, options: ReadinessOptions) {
+  return currentRelease(root) === directory && (options.isActive?.() ?? true)
+}
+
+function writeRecord(file: string, value: unknown) {
+  const staging = `${file}.next-${process.pid}`
+  writeFileSync(staging, JSON.stringify(value), { mode: 0o600 })
+  renameSync(staging, file)
+}
+
+function readRecord<T extends v.GenericSchema>(file: string, schema: T): v.InferOutput<T> | null {
+  try {
+    const result = v.safeParse(schema, JSON.parse(readFileSync(file, 'utf8')))
+    return result.success ? result.output : null
+  } catch {
+    return null
+  }
+}
+
+function processAlive(pid: number) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function machineRestartCommand() {
+  if (process.platform === 'darwin')
+    return ['launchctl', 'kickstart', '-k', `gui/${process.getuid!()}/dev.fregat.server`]
+  return ['systemctl', '--user', '--no-block', 'restart', 'fregat-server.service']
 }
 
 function isLink(file: string) {
@@ -271,7 +417,11 @@ function log(message: string) {
 }
 
 async function main(argv: readonly string[]) {
-  const [command] = argv
+  const [command, root, pid] = argv
+  if (command === 'readiness' && root) {
+    await checkCurrentReadiness(root, spawnLauncher, fetch, () => processAlive(Number(pid)))
+    return
+  }
   if (command === 'notify') return log(`notify: ${await signalServer()}`)
   if (!command) return log('usage: promote.ts <production root> | notify')
 

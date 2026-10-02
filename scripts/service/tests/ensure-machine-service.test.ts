@@ -70,7 +70,7 @@ describe('ensureMachineService', () => {
     expect(readFileSync(path.join(units, 'fregat-server.service'), 'utf8')).toBe(
       renderSystemdService(values),
     )
-    expect(existsSync(path.join(context.productionRoot, 'bin', 'promote.ts'))).toBe(true)
+    expect(existsSync(path.join(context.productionRoot, 'bin', 'promote.js'))).toBe(true)
   })
 
   it('reuses the server already serving this state home and registers nothing', async () => {

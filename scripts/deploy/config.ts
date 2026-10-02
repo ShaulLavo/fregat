@@ -22,5 +22,4 @@ export { serverPort, serverUnit }
 export const tuiOrigin = 'platform-tui://local'
 
 export const unitTemplate = path.join(import.meta.dirname, 'systemd', serverUnit)
-export const promoteSource = path.join(import.meta.dirname, 'systemd', 'promote.ts')
 export const installedPromote = path.join(productionRoot, 'bin', 'promote.ts')

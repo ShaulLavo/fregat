@@ -26,14 +26,16 @@ import { isRecord } from '@workspace/utils/objects'
 import { desktopStateHome } from './profile'
 import { launcherErrors } from './structured-errors'
 import { readInstallManifest } from './install-receipt'
+import { appBundle } from './bundle'
 
-const root = path.resolve(import.meta.dirname, '../../../..')
-applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
+const bundle = appBundle()
+const root = bundle ? null : path.resolve(import.meta.dirname, '../../../..')
+if (root) applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
 initializeDesktopObservability()
 const controller = new AbortController()
 let window: { exited: Promise<unknown>; close(): Promise<void> } | undefined
 let helperBudget = nativeBudget()
-const binary = nativeHostBinary(root)
+const binary = bundle?.nativeHost ?? nativeHostBinary(root!)
 const stop = () => {
   controller.abort()
   void window?.close()
@@ -85,6 +87,7 @@ async function start() {
     const service = await ensureInstalledService({
       intent: installationIntent(stateHome),
       productionRoot: installationReleaseRoot(stateHome, home),
+      bundledRelease: bundle?.release,
       signal: controller.signal,
     })
     web = service.url

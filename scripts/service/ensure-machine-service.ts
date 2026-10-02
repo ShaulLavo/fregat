@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import {
   machineServiceIntentSchema,
@@ -9,6 +9,7 @@ import {
 import { descriptorFor } from '../../packages/contracts/src/settings/keys'
 import * as v from 'valibot'
 import { tryFileLock, type FileLock } from '../../apps/server/src/system/file-lock'
+import { buildPromoterSource } from '../deploy/promoter-source'
 import { realServiceHost, type ServiceHost } from './host'
 import { portHolder } from './holder'
 import { probeAddress, type ProbeOutcome } from './probe'
@@ -35,7 +36,6 @@ export type EnsureMachineServiceOptions = {
   fetch?: typeof fetch
 }
 
-const PROMOTE_SOURCE = path.join(import.meta.dirname, '..', 'deploy', 'systemd', 'promote.ts')
 const RETRY_MS = 100
 
 /**
@@ -139,7 +139,7 @@ async function register(context: Context) {
     throw serviceErrors.REGISTRATION_FAILED({
       internal: { stage: 'release', hasRoot: existsSync(root) },
     })
-  installPromote(host, root)
+  await installPromote(host, root)
   const values: UnitValues = {
     bun: host.bun,
     releaseRoot: root,
@@ -169,9 +169,10 @@ function writeOwned(host: ServiceHost, file: string, content: string) {
   host.writeFile(file, content)
 }
 
-function installPromote(host: ServiceHost, root: string) {
-  const target = path.join(root, 'bin', 'promote.ts')
-  const source = readFileSync(PROMOTE_SOURCE, 'utf8')
+async function installPromote(host: ServiceHost, root: string) {
+  const target = path.join(root, 'bin', 'promote.js')
+  const source =
+    host.readFile(path.join(root, 'current', 'bin', 'promote.js')) ?? (await buildPromoterSource())
   if (host.readFile(target) !== source) host.writeFile(target, source)
 }
 

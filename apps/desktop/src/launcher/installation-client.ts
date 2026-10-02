@@ -10,6 +10,11 @@ import {
   type MachineServiceResult,
 } from '@workspace/contracts'
 import { readHomeSetting } from '../../../../scripts/home-setting'
+import { ensureMachineService } from '../../../../scripts/service/ensure-machine-service'
+import {
+  installBundledRelease,
+  rollbackBundledInstall,
+} from '../../../../scripts/service/bundled-release'
 import { machineReleaseRoot } from '../../../../scripts/service/release-root'
 
 const installationErrors = defineErrorCatalog('desktop.installation', {
@@ -101,11 +106,32 @@ export async function ensureInstalledService(options: {
   productionRoot: string | undefined
   signal: AbortSignal
   ensure?: EnsureMachineService
+  bundledRelease?: string
 }) {
   options.signal.throwIfAborted()
   if (!options.productionRoot)
     throw installationErrors.SERVICE_UNAVAILABLE({ internal: { stage: 'release-root' } })
-  const ensure = options.ensure ?? (await loadServiceSetup())
+  const installed = options.bundledRelease
+    ? installBundledRelease(options.bundledRelease, options.productionRoot, options.intent)
+    : null
+  let result: MachineServiceResult
+  try {
+    result = await verifiedService(
+      { intent: options.intent, productionRoot: options.productionRoot, signal: options.signal },
+      options.ensure ?? ensureMachineService,
+    )
+  } catch (error) {
+    if (installed) rollbackBundledInstall(options.productionRoot, installed)
+    throw error
+  }
+  rememberInstallation(options.intent, result)
+  return { ...result, url: new URL(result.identity.webBase, result.identity.address).href }
+}
+
+async function verifiedService(
+  options: { intent: MachineServiceIntent; productionRoot: string; signal: AbortSignal },
+  ensure: EnsureMachineService,
+) {
   const intent = options.intent
   const returned = await ensure(intent, {
     productionRoot: options.productionRoot,
@@ -128,22 +154,5 @@ export async function ensureInstalledService(options: {
   }
   if (Object.values(matches).some((match) => !match))
     throw installationErrors.IDENTITY_CONFLICT({ internal: { matches } })
-  rememberInstallation(intent, result)
-  return { ...result, url: new URL(identity.webBase, identity.address).href }
-}
-
-async function loadServiceSetup(): Promise<EnsureMachineService> {
-  // The service implementation is published independently of the portable setup contract.
-  const entry = path.resolve(
-    import.meta.dirname,
-    '../../../../scripts/service/ensure-machine-service.ts',
-  )
-  try {
-    const module = await import(entry)
-    if (typeof module.ensureMachineService === 'function') return module.ensureMachineService
-  } catch (error) {
-    const code = (error as { code?: string }).code
-    if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'MODULE_NOT_FOUND') throw error
-  }
-  throw installationErrors.SERVICE_UNAVAILABLE({ internal: { stage: 'setup-entry' } })
+  return result
 }

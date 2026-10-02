@@ -77,3 +77,10 @@ describe('launchd agent', () => {
     expect(Bun.spawnSync(['plutil', '-lint', file]).exitCode).toBe(0)
   })
 })
+
+it('runs a compiled launcher as Bun in both service managers', () => {
+  const compiled = { ...values, bun: '/Applications/Fregat.app/Contents/MacOS/fregat' }
+  expect(renderLaunchAgent(compiled)).toContain('<key>BUN_BE_BUN</key><string>1</string>')
+  expect(renderSystemdService(compiled)).toContain('Environment="BUN_BE_BUN=1"')
+  expect(renderLaunchAgent(values)).not.toContain('<key>BUN_BE_BUN</key>')
+})

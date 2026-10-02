@@ -30,12 +30,15 @@ export async function probeAddress(
   fetcher: typeof fetch = fetch,
 ): Promise<ProbeOutcome> {
   const url = new URL(probe.address)
-  if (!(await listening(url.hostname, Number(url.port)))) return { kind: 'free' }
-  const nonce = randomBytes(24).toString('base64url')
   const signal = AbortSignal.any([
     AbortSignal.timeout(probe.timeoutMs),
     ...(probe.signal ? [probe.signal] : []),
   ])
+  if (!(await listening(url.hostname, Number(url.port), signal))) {
+    probe.signal?.throwIfAborted()
+    return signal.aborted ? { kind: 'unverified', reason: 'timeout' } : { kind: 'free' }
+  }
+  const nonce = randomBytes(24).toString('base64url')
   let response: Response
   try {
     response = await fetcher(`${probe.address}/system/identity?challenge=${nonce}`, {
@@ -82,9 +85,9 @@ function fregatRefusal(body: unknown) {
   )
 }
 
-function listening(host: string, port: number) {
+function listening(host: string, port: number, signal: AbortSignal) {
   return new Promise<boolean>((resolve) => {
-    const socket = net.connect({ host, port })
+    const socket = net.connect({ host, port, signal })
     socket.once('connect', () => {
       socket.destroy()
       resolve(true)
