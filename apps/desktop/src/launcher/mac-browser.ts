@@ -42,9 +42,8 @@ export function macBrowserCandidates(
       entry.LSHandlerURLScheme === 'https',
   )
   const preferred = handler?.LSHandlerRoleAll
-  const ordered = [...bundles].sort(
-    (a, b) => Number(b[1] === preferred) - Number(a[1] === preferred),
-  )
+  const priority = (id: string) => Number(id === 'com.google.Chrome') * 2 + Number(id === preferred)
+  const ordered = [...bundles].sort((a, b) => priority(b[1]) - priority(a[1]))
   const result: BrowserCandidate[] = []
   for (const [family, id, name] of ordered) {
     const indexed =

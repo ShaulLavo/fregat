@@ -1438,7 +1438,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Window',
     title: 'Browser',
     description:
-      'The desktop window engine: auto selects an installed Chromium browser, webview selects the system window, and an absolute path selects a browser executable.',
+      'The desktop window engine: auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. webview selects the system window, and an absolute path selects a browser executable first.',
     requiresRestart: true,
     keywords: ['window', 'browser', 'chromium', 'webview', 'desktop'],
   }),

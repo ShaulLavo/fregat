@@ -9,13 +9,8 @@ const env: BrowserEnvironment = { home: '/home/test', path: '/usr/bin:/opt/bin' 
 function filesystem(files: Record<string, string>): BrowserFileSystem {
   return { readFile: (file) => files[file], exists: (file) => file in files }
 }
-function resolve(
-  files: Record<string, string>,
-  setting: unknown = 'auto',
-  transparency = 'compositor',
-  environment = env,
-) {
-  return resolveBrowserCandidates(setting, transparency, environment, filesystem(files))
+function resolve(files: Record<string, string>, setting: unknown = 'auto', environment = env) {
+  return resolveBrowserCandidates(setting, environment, filesystem(files))
 }
 const defaultFiles = {
   '/home/test/.config/mimeapps.list':
@@ -27,23 +22,26 @@ const defaultFiles = {
   '/usr/bin/chromium': '',
 }
 
-test('absolute setting precedes supported default and table; desktop arguments never execute', () => {
+test('absolute setting precedes Chrome and supported default; desktop arguments never execute', () => {
   const result = resolve({ ...defaultFiles, '/custom/browser': '' }, '/custom/browser')
   expect(result.slice(0, 3)).toMatchObject([
     { executable: '/custom/browser', source: 'setting', args: [] },
-    { executable: '/opt/bin/helium-browser', source: 'default', args: [] },
     { executable: '/usr/bin/google-chrome', source: 'scan' },
+    { executable: '/opt/bin/helium-browser', source: 'default', args: [] },
   ])
 })
-test('auto prefers default, deduplicates scan and keeps native/tab fallbacks', () => {
+test('auto prefers Chrome over the default, deduplicates scan and keeps native/tab fallbacks', () => {
   const result = resolve(defaultFiles)
-  expect(result[0]).toMatchObject({ executable: '/opt/bin/helium-browser', source: 'default' })
+  expect(result.slice(0, 3)).toMatchObject([
+    { executable: '/usr/bin/google-chrome', source: 'scan' },
+    { executable: '/opt/bin/helium-browser', source: 'default' },
+    { executable: '/usr/bin/chromium', source: 'scan' },
+  ])
   expect(result.filter((value) => value.kind === 'chromium')).toHaveLength(3)
   expect(result.slice(-2)).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
 })
-test('webview and auto transparency select native fallback first', () => {
+test('explicit webview selects native fallback', () => {
   expect(resolve(defaultFiles, 'webview')).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
-  expect(resolve(defaultFiles, 'auto', 'window')).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
 })
 test.each(['relative/browser', '', '/bad\0path', '/bad\npath', 1, null])(
   'reject malformed setting %s',
@@ -70,7 +68,6 @@ test('desktop-specific XDG config beats generic config and honours data roots', 
       '/data/applications/chrome.desktop': '[Desktop Entry]\nExec=google-chrome %U',
     },
     'auto',
-    'compositor',
     { ...env, configHome: '/config', dataHome: '/data', currentDesktop: 'Hyprland' },
   )
   expect(result[0]).toMatchObject({ executable: '/usr/bin/google-chrome', source: 'default' })
@@ -97,18 +94,22 @@ test('flatpak export candidates separate launcher executable, id and confinement
     confinement: 'flatpak',
   })
 })
-test('default flatpak strips desktop arguments and precedes native scan', () => {
+test('Chrome precedes default flatpak, which strips desktop arguments and precedes other scan', () => {
   const result = resolve({
     ...defaultFiles,
     '/usr/bin/flatpak': '',
     '/usr/share/applications/helium.desktop':
       '[Desktop Entry]\nExec=/usr/bin/flatpak run --branch=stable com.brave.Browser --bad %U',
   })
-  expect(result[0]).toMatchObject({
-    executable: '/usr/bin/flatpak',
-    args: ['run', 'com.brave.Browser'],
-    source: 'default',
-  })
+  expect(result.slice(0, 3)).toMatchObject([
+    { family: 'chrome' },
+    {
+      executable: '/usr/bin/flatpak',
+      args: ['run', 'com.brave.Browser'],
+      source: 'default',
+    },
+    { family: 'chromium' },
+  ])
 })
 test('snap candidate is explicit and missing setting falls through', () => {
   expect(resolve({ '/snap/bin/chromium': '' }, '/missing/browser')[0]).toMatchObject({
@@ -128,4 +129,36 @@ test('configured flatpak export keeps setting precedence and explicit confinemen
     confinement: 'flatpak',
     source: 'setting',
   })
+})
+
+test('without Chrome, auto selects the supported default before scan', () => {
+  const files = { ...defaultFiles }
+  delete (files as Record<string, string>)['/usr/bin/google-chrome']
+  expect(resolve(files).slice(0, 2)).toMatchObject([
+    { family: 'helium', source: 'default' },
+    { family: 'chromium', source: 'scan' },
+  ])
+})
+test('without Chrome or a supported default, auto scans before webview', () => {
+  expect(resolve({ '/usr/bin/brave': '' })).toMatchObject([
+    { family: 'brave', source: 'scan' },
+    { kind: 'webview' },
+    { kind: 'tab' },
+  ])
+  expect(resolve({})).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
+})
+test('Flatpak Chrome precedes a supported native default and native Chromium scan', () => {
+  const files = { ...defaultFiles }
+  delete (files as Record<string, string>)['/usr/bin/google-chrome']
+  expect(
+    resolve({
+      ...files,
+      '/usr/bin/flatpak': '',
+      '/var/lib/flatpak/exports/bin/com.google.Chrome': '',
+    }).slice(0, 3),
+  ).toMatchObject([
+    { family: 'chrome', confinement: 'flatpak', args: ['run', 'com.google.Chrome'] },
+    { family: 'helium', source: 'default' },
+    { family: 'chromium', source: 'scan' },
+  ])
 })

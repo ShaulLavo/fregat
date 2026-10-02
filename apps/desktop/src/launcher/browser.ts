@@ -51,11 +51,10 @@ const families = [
 
 export function resolveBrowserCandidates(
   setting: unknown,
-  transparency: unknown,
   env: BrowserEnvironment,
   fs: BrowserFileSystem,
 ): readonly WindowCandidate[] {
-  if (setting === 'webview' || (setting === 'auto' && transparency === 'window')) {
+  if (setting === 'webview') {
     return [{ kind: 'webview' }, { kind: 'tab' }]
   }
   if (typeof setting !== 'string' || (setting !== 'auto' && !validAbsolutePath(setting))) {
@@ -87,7 +86,15 @@ export function resolveBrowserCandidates(
     const exported = flatpakExport(family.flatpak, env, fs)
     if (exported) candidates.push(flatpakCandidate(exported, family.flatpak, 'scan', family.name))
   }
+  candidates.sort((a, b) => browserPriority(a) - browserPriority(b))
   return [...deduplicate(candidates), { kind: 'webview' }, { kind: 'tab' }]
+}
+
+function browserPriority(value: BrowserCandidate) {
+  if (value.source === 'setting') return 0
+  if (value.family === 'chrome') return 1
+  if (value.source === 'default') return 2
+  return 3
 }
 
 function deduplicate(candidates: readonly BrowserCandidate[]) {

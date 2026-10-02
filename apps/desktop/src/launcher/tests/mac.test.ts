@@ -43,17 +43,17 @@ function macFixture(preferred = 'net.imput.helium') {
 
 test('macOS supports default bundle, per-user Applications, Spotlight and absolute override', () => {
   const { env, fs } = macFixture()
-  const result = resolveBrowserCandidates('auto', 'compositor', env, fs)
+  const result = resolveBrowserCandidates('auto', env, fs)
   expect(result.slice(0, 3)).toMatchObject([
-    {
-      family: 'helium',
-      source: 'default',
-      executable: '/Applications/Helium.app/Contents/MacOS/Helium',
-    },
     {
       family: 'chrome',
       source: 'scan',
       executable: '/Users/test/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    },
+    {
+      family: 'helium',
+      source: 'default',
+      executable: '/Applications/Helium.app/Contents/MacOS/Helium',
     },
     {
       family: 'brave',
@@ -62,11 +62,37 @@ test('macOS supports default bundle, per-user Applications, Spotlight and absolu
     },
   ])
   expect(result.slice(-2)).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
-  expect(resolveBrowserCandidates('/custom/browser', 'compositor', env, fs)[0]).toMatchObject({
+  expect(resolveBrowserCandidates('/custom/browser', env, fs)[0]).toMatchObject({
     source: 'setting',
     executable: '/custom/browser',
   })
-  expect(resolveBrowserCandidates('auto', 'window', env, fs)).toEqual([
+})
+
+test('macOS without Chrome selects the supported default before scan', () => {
+  const { env, fs } = macFixture()
+  const withoutChrome = {
+    ...fs,
+    exists: (file: string) => !file.endsWith('/Google Chrome') && fs.exists(file),
+  }
+  expect(resolveBrowserCandidates('auto', env, withoutChrome)).toMatchObject([
+    { family: 'helium', source: 'default' },
+    { family: 'brave', source: 'scan' },
+    { kind: 'webview' },
+    { kind: 'tab' },
+  ])
+})
+
+test('macOS without Chrome or supported default scans before webview', () => {
+  const { env, fs } = macFixture('org.mozilla.firefox')
+  const withoutChrome = {
+    ...fs,
+    exists: (file: string) => !file.endsWith('/Google Chrome') && fs.exists(file),
+  }
+  expect(resolveBrowserCandidates('auto', env, withoutChrome)[0]).toMatchObject({
+    family: 'brave',
+    source: 'scan',
+  })
+  expect(resolveBrowserCandidates('auto', env, { ...fs, exists: () => false })).toEqual([
     { kind: 'webview' },
     { kind: 'tab' },
   ])
@@ -82,12 +108,13 @@ test('unsupported defaults, malformed metadata and escaped bundle executables ar
     CFBundleIdentifier: 'other',
     CFBundleExecutable: 'Brave Browser',
   }
-  expect(resolveBrowserCandidates('auto', 'compositor', env, fs).slice(0, -2)).toMatchObject([
+  expect(resolveBrowserCandidates('auto', env, fs).slice(0, -2)).toMatchObject([
     { family: 'chrome', source: 'scan' },
   ])
-  expect(
-    resolveBrowserCandidates('auto', 'compositor', { ...env, runMac: () => 'invalid' }, fs),
-  ).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
+  expect(resolveBrowserCandidates('auto', { ...env, runMac: () => 'invalid' }, fs)).toEqual([
+    { kind: 'webview' },
+    { kind: 'tab' },
+  ])
 })
 
 test('macOS closes its owned browser once after last page, ignoring workers and unknown destruction', async () => {
