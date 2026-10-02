@@ -1,4 +1,5 @@
-import { strictEqual } from 'node:assert/strict'
+import { ok, strictEqual } from 'node:assert/strict'
+import { writeSettings } from './native-provider-verification'
 import { shellBridge } from '../../../apps/desktop/src/launcher/shell-bridge'
 import { selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
@@ -7,7 +8,17 @@ export const nativeWindow: Scenario = {
   name: 'native-window',
   description:
     'Use the native host initialization script, verify a clear page root, and follow traffic-light spacing through full-screen entry and exit.',
-  async run(page, { step }) {
+  requiresIsolatedServer: true,
+  async run(page, { step, server, evidence }) {
+    ok(server, 'Window appearance settings use the throwaway server')
+    await writeSettings(page, server.origin, [
+      {
+        kind: 'set',
+        key: 'workbench.wallpaper',
+        value: { enabled: true, source: { kind: 'desktop' } },
+      },
+      { kind: 'set', key: 'workbench.surface.opacity', value: 80 },
+    ])
     await page.addInitScript({
       content:
         `globalThis.webkit = { messageHandlers: { platformShell: { postMessage() {} } } };
@@ -42,6 +53,30 @@ export const nativeWindow: Scenario = {
     )
     strictEqual(windowedPadding, '76px')
     await step('native-transparent-root-windowed')
+    const paint = await page.evaluate((selector) => {
+      const shell = document.querySelector(selector)?.closest('[aria-busy]')
+      return {
+        body: getComputedStyle(document.body).backgroundColor,
+        shell: shell ? getComputedStyle(shell).backgroundColor : null,
+        surfaceOpacity: getComputedStyle(document.documentElement).getPropertyValue(
+          '--surface-opacity',
+        ),
+        wallpaperImages: document.querySelectorAll('[data-workbench-wallpaper-layer]').length,
+      }
+    }, selectors.desktopFirstScreenSelector)
+    await evidence.json('native-window-paint.json', paint)
+    strictEqual(paint.surfaceOpacity.trim(), '80%')
+    strictEqual(paint.wallpaperImages, 0)
+    strictEqual(
+      paint.body,
+      'rgba(0, 0, 0, 0)',
+      'The body must leave native panes their own opacity',
+    )
+    strictEqual(
+      paint.shell,
+      'rgba(0, 0, 0, 0)',
+      'The shell must leave native panes their own opacity',
+    )
     await page.evaluate(() => {
       sessionStorage.setItem('fixture-native-fullscreen', 'true')
       document.documentElement.setAttribute('data-native-fullscreen', '')
