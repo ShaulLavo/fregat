@@ -10,6 +10,7 @@
         "src/preload/index.ts",
         "src/launcher/index.ts",
         "src/launcher/tests/fixtures/browser.mjs",
+        "src/launcher/tests/fixtures/native-helper.mjs",
         "electrobun.config.ts"
       ]
     },
@@ -66,6 +67,7 @@
       "entry": [
         "check-editor-backlog.mjs",
         "agent/browser.ts",
+        "agent/polaron-display.ts",
         "claude-gpt/run.ts",
         "large-file/bench.ts",
         "heavy/pi/launch.ts",

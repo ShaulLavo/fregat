@@ -6,7 +6,11 @@ import { createClientInvariantError } from '@/lib/structured-errors'
 
 import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
 import type { FilePickerMode } from '@/features/file-picker/utils/model'
-import { clientErrorMessage } from '@/lib/client-error-taxonomy'
+import {
+  clientErrorDescription,
+  clientErrorMessage,
+  toClientError,
+} from '@/lib/client-error-taxonomy'
 import { statPath } from '@/lib/file-server'
 import {
   isDirectoryEntry,
@@ -166,7 +170,13 @@ async function selectedNativePath(
   } catch (error) {
     if (isActive()) {
       scope.increment('picker.errorCount')
-      scope.warn('Native picker failed.', { message: clientErrorMessage(error) })
+      const failure = toClientError(error)
+      scope.warn('Native picker failed.', { message: failure.message })
+      toastError(
+        'Could not open file chooser',
+        { description: clientErrorDescription(failure) },
+        failure,
+      )
       scope.set({ outcome: 'error' })
     }
 

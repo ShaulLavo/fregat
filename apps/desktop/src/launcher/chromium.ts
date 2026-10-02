@@ -12,13 +12,19 @@ import {
   processCounters,
 } from './diagnostics'
 import { startupSupervisor, type StartupBudget, type StartupCounters } from './startup'
-import type { PlatformBridge } from '../shared/bridge'
+import type { PlatformPickOptions } from '../shared/bridge'
+import { shellBridge, parsePickRequest } from './shell-bridge'
+import { pick } from './webview-host'
+import { nativeBudget, nativeErrors, type NativeBudget } from './native-helper'
+import { nativeHostBinary, completePick } from './native-window'
+import path from 'node:path'
 
 type ChromiumOptions = {
   candidate: BrowserCandidate
   stateHome: string
   home: string
   url: string
+  native?: { binary: string; budget: NativeBudget }
   startup: StartupBudget
   // Tests replace the /proc sampler to drive progress deterministically.
   observe?: (pid: number) => StartupCounters
@@ -40,31 +46,7 @@ export function assertChromiumVersion(product: unknown) {
 }
 
 export function chromiumBridge(url: string): string {
-  const bridge: PlatformBridge = {
-    backdrop: 'compositor',
-    platform: 'linux',
-    colorScheme: null,
-    titlebar: 'native',
-  }
-  return `(() => {
-    if (location.origin !== ${JSON.stringify(new URL(url).origin)} || window !== window.top) return;
-    globalThis.__platformShell = ${JSON.stringify(bridge)};
-    globalThis.platformBridge = ${JSON.stringify(bridge)};
-    if (globalThis.__platformFrameCounter) return;
-    globalThis.__platformFrameCounter = true;
-    const measure = () => setTimeout(() => {
-      let frames = 0;
-      let active = true;
-      const frame = () => { if (!active) return; frames++; requestAnimationFrame(frame); };
-      requestAnimationFrame(frame);
-      setTimeout(() => {
-        active = false;
-        globalThis.platformShellCall(JSON.stringify({ rafPerSecond: frames, origin: location.origin }));
-      }, 1000);
-    }, 2000);
-    if (document.readyState === 'complete') measure();
-    else addEventListener('load', measure, { once: true });
-  })()`
+  return shellBridge(url, 'chromium')
 }
 
 export async function attachChromium(
@@ -72,10 +54,12 @@ export async function attachChromium(
   url: string,
   onOpen: (context: Record<string, unknown>) => void,
   onFailure: (error: unknown) => void,
+  pickEntry?: (options: PlatformPickOptions) => Promise<string[]>,
 ) {
   const script = chromiumBridge(url)
   const sessions = new Set<string>()
   const contexts = new Map<string, Set<number>>()
+  const pendingPicks = new Map<string, Promise<string[]>>()
   const origin = new URL(url).origin
   cdp.on('Target.detachedFromTarget', (event) => {
     const session = event.params.sessionId
@@ -116,9 +100,36 @@ export async function attachChromium(
       if (sessions.has(session)) onFailure(error)
     })
   })
-  cdp.on('Runtime.bindingCalled', (event) =>
-    reportFrames(event, sessions, contexts, origin, onOpen),
-  )
+  cdp.on('Runtime.bindingCalled', (event) => {
+    reportFrames(event, sessions, contexts, origin, onOpen)
+    if (!pickEntry || !trustedBinding(event, sessions, contexts)) return
+    let body: unknown
+    try {
+      body = JSON.parse(event.params.payload as string)
+    } catch {
+      return
+    }
+    const request = parsePickRequest(body, origin)
+    if (!request) return
+    const reply = (response: unknown) =>
+      cdp.request(
+        'Runtime.evaluate',
+        {
+          expression: `globalThis.__platformShellReply?.(${JSON.stringify(response)})`,
+          contextId: event.params.executionContextId,
+        },
+        event.sessionId,
+      )
+    const key = `${request.documentId}:${request.id}`
+    let pending = pendingPicks.get(key)
+    if (!pending) {
+      pending = pickEntry(request.options)
+      pendingPicks.set(key, pending)
+      // Two attached CDP sessions can report the same document binding call.
+      void pending.finally(() => pendingPicks.delete(key)).catch(() => {})
+    }
+    void completePick(request.id, request.documentId, pending, reply)
+  })
   await cdp.request('Target.setDiscoverTargets', { discover: true })
   await cdp.request('Target.setAutoAttach', {
     autoAttach: true,
@@ -150,6 +161,21 @@ async function preparePage(
   await cdp.request('Runtime.runIfWaitingForDebugger', {}, session)
 }
 
+function trustedBinding(
+  event: CdpEvent,
+  sessions: ReadonlySet<string>,
+  contexts: ReadonlyMap<string, ReadonlySet<number>>,
+) {
+  return (
+    !!event.sessionId &&
+    sessions.has(event.sessionId) &&
+    typeof event.params.executionContextId === 'number' &&
+    !!contexts.get(event.sessionId)?.has(event.params.executionContextId) &&
+    event.params.name === 'platformShellCall' &&
+    typeof event.params.payload === 'string'
+  )
+}
+
 function reportFrames(
   event: CdpEvent,
   sessions: ReadonlySet<string>,
@@ -157,18 +183,10 @@ function reportFrames(
   origin: string,
   onOpen: (context: Record<string, unknown>) => void,
 ) {
-  if (
-    !event.sessionId ||
-    !sessions.has(event.sessionId) ||
-    typeof event.params.executionContextId !== 'number' ||
-    !contexts.get(event.sessionId)?.has(event.params.executionContextId) ||
-    event.params.name !== 'platformShellCall' ||
-    typeof event.params.payload !== 'string'
-  )
-    return
+  if (!trustedBinding(event, sessions, contexts)) return
   let payload: unknown
   try {
-    payload = JSON.parse(event.params.payload)
+    payload = JSON.parse(event.params.payload as string)
   } catch {
     return
   }
@@ -201,6 +219,15 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
   )
   let startupPhase = 'version'
   const cdp = cdpPipe(child.stdio[3] as number, child.stdio[4] as number)
+  const helperTasks = new Set<Promise<string[]>>()
+  const helpers = new AbortController()
+  const helperSignal = options.signal
+    ? AbortSignal.any([options.signal, helpers.signal])
+    : helpers.signal
+  const native = options.native ?? {
+    binary: nativeHostBinary(path.resolve(import.meta.dirname, '../../../..')),
+    budget: nativeBudget(),
+  }
   let closing: Promise<void> | undefined
   let connected = false
   let starting = true
@@ -246,12 +273,32 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     // Sampling resolution, a twentieth of the shorter bound.
     Math.min(options.startup.idleMs, options.startup.limitMs) / 20,
   )
-  const close = () => (closing ??= stopOwnedBrowser(cdp, child))
+  const close = () => {
+    helpers.abort()
+    return (closing ??= (async () => {
+      await stopOwnedBrowser(cdp, child)
+      await Promise.allSettled(helperTasks)
+    })())
+  }
+  const pickEntry = (options: PlatformPickOptions) => {
+    if (helperTasks.size)
+      return Promise.reject(nativeErrors.HOST_FAILED({ internal: { stage: 'picker-busy' } }))
+    const task = pick({
+      binary: native.binary,
+      options,
+      budget: native.budget,
+      signal: helperSignal,
+    })
+    helperTasks.add(task)
+    void task.finally(() => helperTasks.delete(task)).catch(() => {})
+    return task
+  }
   const abort = () => {
     void close()
   }
   options.signal?.addEventListener('abort', abort, { once: true })
   void child.exited.then((exitCode) => {
+    helpers.abort()
     options.signal?.removeEventListener('abort', abort)
     options.onExit?.({ exitCode, signal: child.signalCode })
   })
@@ -282,6 +329,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
         options.onFailure(error)
         void close()
       },
+      pickEntry,
     )
     void cdp.done.then(() => close())
     return { kind: 'owned', cdp, exited: child.exited, close }

@@ -1368,6 +1368,20 @@
       "minimum": 1,
       "type": "integer"
     },
+    "window.nativeDialogTimeoutSeconds": {
+      "default": 300,
+      "description": "Seconds a desktop file chooser or startup message stays open before its helper closes.",
+      "maximum": 3600,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "window.nativeHostStopGraceSeconds": {
+      "default": 2,
+      "description": "Seconds the desktop gives an owned native helper to stop before terminating it.",
+      "maximum": 30,
+      "minimum": 1,
+      "type": "integer"
+    },
     "window.transparency": {
       "default": "compositor",
       "description": "What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame.",

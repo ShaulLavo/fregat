@@ -4,6 +4,7 @@ import { captureScreenshot, screenCaptureSupported } from '@/features/chat/utils
 
 afterEach(() => {
   vi.restoreAllMocks()
+  delete window.platformBridge
 })
 
 /** A real `MediaStream` with a painted video track, standing in for the OS share picker. */
@@ -65,4 +66,16 @@ it('reports capture as unsupported without getDisplayMedia', () => {
   expect(screenCaptureSupported(undefined)).toBe(false)
   expect(screenCaptureSupported({} as MediaDevices)).toBe(false)
   expect(screenCaptureSupported(navigator.mediaDevices)).toBe(true)
+})
+
+it('reports the native webview capture capability as unsupported', () => {
+  window.platformBridge = {
+    backdrop: 'compositor',
+    titlebar: 'native',
+    platform: 'linux',
+    colorScheme: null,
+    capabilities: { displayCapture: false },
+    pickEntry: async () => [],
+  }
+  expect(screenCaptureSupported(navigator.mediaDevices)).toBe(false)
 })
