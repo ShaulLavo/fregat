@@ -283,24 +283,28 @@ describe.skipIf(!userScopes)('quiet holds', () => {
   }, 30_000)
 })
 
-describe.skipIf(!userScopes)('slices that run nothing', () => {
-  test('an empty slice left behind counts as nothing running and is left alone', async () => {
+describe('slices that run nothing', () => {
+  test('an empty slice left behind counts as nothing running and is left alone', async (context) => {
+    if (!userScopes) context.skip('Requires a working user systemd manager and user scopes')
     const box = quietBox(600)
     const empty = `${box.sliceRoot}-leftover.slice`
-    spawnSync('systemd-run', ['--user', '--scope', '--quiet', `--slice=${empty}`, 'true'])
-    expect(spawnSync('systemctl', ['--user', 'is-active', empty]).stdout.toString().trim()).toBe(
-      'active',
-    )
+    // Explicitly activate a process-free slice and check the cgroup that admission reads.
+    const setup = spawnSync('systemctl', ['--user', 'start', empty], { encoding: 'utf8' })
+    expect(setup.status, setup.error?.message ?? setup.stderr).toBe(0)
+    expect(sliceState(box.sliceRoot, empty)).toBe('empty')
     const quiet = await heavy(box, 'quiet-now', ['true'], {
       jobClass: 'light',
       machine: true,
       quiet: true,
     })
-    expect(quiet.code).toBe(0)
+    expect(quiet.code, quiet.stderr).toBe(0)
     expect(quiet.stderr).toContain('the machine is quiet')
+    expect(sliceState(box.sliceRoot, empty)).toBe('empty')
     const next = await heavy(box, 'alone', ['true'], { jobClass: 'light', machine: true })
+    expect(next.code).toBe(0)
     expect(next.stderr).toContain('no heavy job is running')
     expect(`${quiet.stderr}${next.stderr}`).not.toContain('its wrapper is gone')
+    expect(sliceState(box.sliceRoot, empty)).toBe('empty')
   }, 30_000)
 })
 
