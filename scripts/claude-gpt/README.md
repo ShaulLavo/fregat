@@ -27,6 +27,7 @@ The gateway forwards original JSON request bytes and end-to-end headers on the d
 - Codex: one serialized, bounded `GET /v0/management/auth-files` at intervals of at least 60 seconds, using the existing management key. This reads cached quota/model/cooldown observations. It sends zero provider requests.
 - Claude: capture understood `Anthropic-Ratelimit-Unified-*` response headers only on ordinary direct Anthropic requests. The observer reads no body and leaves headers, streams, status, errors and abort behavior unchanged.
 - Publish sanitized generic JSON v1 to `v1.json` with same-directory atomic replacement. The whole response and output file are each bounded to 64 KiB. Observation ages and relative resets come from upstream observation timestamps. Inspection/publication times cannot freshen quotas.
+- The understood websocket Spark namespace and HTTP Bengalfox namespace share one additional allowance identity. Aggregate windows remain separate; window identity comes from known quota namespaces.
 - Retain previous valid windows through cache failures, missing signals and gateway restart. Independently aged windows stay independent. Passed resets retain historical readings until ordinary traffic supplies new observations.
 - Include the registered Claude Max and both Codex Pro identities before traffic, as `no-data`. Proxy availability describes schedulability; it supplies no last-serving attribution. `lastServedAt` remains null.
 - The feed directory contains only the sanitized snapshot and a transient sanitized atomic-write file. Credentials, raw header names/values, complete emails, paths, request bodies and upstream error text never enter the feed.
@@ -56,6 +57,8 @@ Enable through the existing runtime JSON mechanism. These tool-owned options do 
 ```
 
 `managementKeyFile` is required when the feed is enabled. Defaults are the three approved accounts above, `60000` ms cadence, `5000` ms deadline, and a dedicated `~/.claude-gpt/usage-feed` directory. Choose an explicit isolated directory for deployment. Account IDs, short labels and plans are validated safe display values. Exactly one Claude account is supported; full emails are used only transiently to match approved Codex local-part labels. No auth-directory fallback exists.
+
+The publication root must be a real directory. The producer resolves physical ancestor paths and management-key targets before reading or publishing a snapshot, including dangling aliases into future feed files. Key targets inside the feed are rejected before any publication or fetch. Safe temporary-directory ancestor aliases remain supported; a temporarily missing key preserves previous data while sampling fails.
 
 `resetOrder` remains a separate Codex routing policy. It reads cached weekly quota and can patch account priority/disabled status. The passive producer neither invokes its actions nor changes that policy. Existing Codex OAuth refresh and session affinity remain owned by CLIProxyAPI.
 

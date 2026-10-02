@@ -241,18 +241,17 @@ function codexWindows(
   if (!observedAt || !quota?.signals) return []
   const signals = lowerSignals(quota.signals)
   const windows: Window[] = []
+  // HTTP and websocket use different names for the same Spark allowance.
   const prefixes = [
-    'x-codex',
-    'x-codex-bengalfox',
-    'x-codex-additional-bengalfox',
-    'x-codex-code-review',
-  ]
-  for (const prefix of prefixes) {
+    ['x-codex', ''],
+    ['x-codex-bengalfox', 'bengalfox:'],
+    ['x-codex-additional-gpt-5.3-codex-spark', 'bengalfox:'],
+    ['x-codex-code-review', 'code-review:'],
+  ] as const
+  for (const [prefix, extra] of prefixes) {
     for (const position of ['primary', 'secondary']) {
       const window = codexWindow(signals, prefix, position, observedAt)
       if (!window) continue
-      const extra =
-        prefix === 'x-codex' ? '' : `${prefix.replace('x-codex-', '').replace('additional-', '')}:`
       windows.push({
         ...window,
         id: `${namespace}${extra}${window.id}`,

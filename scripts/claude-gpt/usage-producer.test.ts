@@ -299,3 +299,105 @@ test('many passive responses coalesce without partial JSON or lost newest observ
     await rm(paths.directory, { recursive: true, force: true })
   }
 })
+
+test.each(['root', 'ancestor', 'key'] as const)(
+  'physical %s alias rejects publication before any fetch or credential overwrite',
+  async (alias) => {
+    const paths = await fixture()
+    const { mkdir, symlink } = await import('node:fs/promises')
+    const realDirectory = join(paths.directory, 'real')
+    const realFeed = join(realDirectory, 'feed')
+    const filename = join(realFeed, 'v1.json')
+    const original = 'private-credential-bytes'
+    const fetcher = vi.fn(async () => Response.json(cachedBody))
+    await mkdir(realFeed, { recursive: true })
+    await writeFile(filename, original)
+    let feedDirectory = realFeed
+    let managementKeyFile = paths.managementKeyFile
+    if (alias === 'root') {
+      feedDirectory = paths.feedDirectory
+      await symlink(realFeed, feedDirectory, 'dir')
+    }
+    if (alias === 'ancestor') {
+      const ancestor = join(paths.directory, 'alias')
+      await symlink(realDirectory, ancestor, 'dir')
+      feedDirectory = join(ancestor, 'feed')
+      managementKeyFile = filename
+    }
+    if (alias === 'key') {
+      managementKeyFile = join(paths.directory, 'key-alias')
+      await symlink(filename, managementKeyFile)
+    }
+    try {
+      await expect(
+        createUsageProducer({
+          proxyUrl: 'http://127.0.0.1:18317',
+          feedDirectory,
+          managementKeyFile,
+          fetcher,
+        }),
+      ).rejects.toMatchObject({ code: 'usage-feed.UNSAFE_LOCATION' })
+      expect(fetcher).not.toHaveBeenCalled()
+      expect(await readFile(filename, 'utf8')).toBe(original)
+      expect(await readFile(paths.managementKeyFile, 'utf8')).toBe('test-private-key\n')
+      expect(await readdir(realFeed)).toEqual(['v1.json'])
+    } finally {
+      await rm(paths.directory, { recursive: true, force: true })
+    }
+  },
+)
+
+test('a dangling management-key alias into the future feed cannot become a credential during publication', async () => {
+  const paths = await fixture()
+  const { symlink } = await import('node:fs/promises')
+  const keyAlias = join(paths.directory, 'future-key')
+  await symlink(join(paths.feedDirectory, 'v1.json'), keyAlias)
+  const fetcher = vi.fn(async () => Response.json(cachedBody))
+  try {
+    await expect(
+      createUsageProducer({
+        ...paths,
+        managementKeyFile: keyAlias,
+        proxyUrl: 'http://127.0.0.1:18317',
+        fetcher,
+      }),
+    ).rejects.toMatchObject({ code: 'usage-feed.UNSAFE_LOCATION' })
+    expect(fetcher).not.toHaveBeenCalled()
+    await expect(readFile(join(paths.feedDirectory, 'v1.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+    expect(await readFile(paths.managementKeyFile, 'utf8')).toBe('test-private-key\n')
+  } finally {
+    await rm(paths.directory, { recursive: true, force: true })
+  }
+})
+
+test('safe ancestor aliases retain portable temporary-directory behavior and missing-key restart data', async () => {
+  const paths = await fixture()
+  const { symlink } = await import('node:fs/promises')
+  const ancestor = join(paths.directory, 'alias')
+  await symlink(paths.directory, ancestor, 'dir')
+  const fetcher = vi.fn(async () => Response.json(cachedBody))
+  const options = {
+    ...paths,
+    feedDirectory: join(ancestor, 'feed'),
+    proxyUrl: 'http://127.0.0.1:18317',
+    fetcher,
+  }
+  let producer: Awaited<ReturnType<typeof createUsageProducer>> | undefined
+  try {
+    producer = await createUsageProducer(options)
+    expect(await producer.poll()).toBe(true)
+    await producer.stop()
+    const before = JSON.parse(await readFile(join(paths.feedDirectory, 'v1.json'), 'utf8'))
+    await rm(paths.managementKeyFile)
+    producer = await createUsageProducer(options)
+    expect(await producer.poll()).toBe(false)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    const after = JSON.parse(await readFile(join(paths.feedDirectory, 'v1.json'), 'utf8'))
+    expect(after.accounts).toEqual(before.accounts)
+  } finally {
+    await producer?.stop()
+    await rm(paths.directory, { recursive: true, force: true })
+  }
+})

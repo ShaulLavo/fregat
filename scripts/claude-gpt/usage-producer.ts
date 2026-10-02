@@ -1,8 +1,8 @@
 import { defineErrorCatalog } from 'evlog'
 import * as v from 'valibot'
-import { mkdir, open, readdir, rename, unlink } from 'node:fs/promises'
+import { lstat, mkdir, open, readdir, readlink, realpath, rename, unlink } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import {
   configuredAccounts,
   createUsageSnapshot,
@@ -54,23 +54,49 @@ function report(level: 'warn' | 'info', state: string, count: number) {
     })}\n`,
   )
 }
+async function entryAt(filename: string) {
+  try {
+    return await lstat(filename)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw error
+  }
+}
+async function physicalPath(filename: string): Promise<string> {
+  try {
+    return await realpath(filename)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  }
+  const entry = await entryAt(filename)
+  if (entry?.isSymbolicLink())
+    return physicalPath(resolve(dirname(filename), await readlink(filename)))
+  const parent = dirname(filename)
+  if (parent === filename)
+    throw usageErrors.UNSAFE_LOCATION({ internal: { constraint: 'resolvable-filesystem-root' } })
+  return join(await physicalPath(parent), basename(filename))
+}
 async function prepareDirectory(options: UsageProducerOptions) {
   const url = new URL(options.proxyUrl)
-  const directory = resolve(options.feedDirectory)
-  const keyLocation = relative(directory, resolve(options.managementKeyFile))
-  const keyInside =
-    keyLocation !== '..' && !keyLocation.startsWith(`..${sep}`) && !isAbsolute(keyLocation)
+  const requested = resolve(options.feedDirectory)
   if (
     url.protocol !== 'http:' ||
     !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ||
     url.username ||
     url.password ||
-    keyInside
+    (await entryAt(requested))?.isSymbolicLink()
   ) {
     throw usageErrors.UNSAFE_LOCATION({
-      internal: { constraint: 'loopback-management-and-isolated-feed' },
+      internal: { constraint: 'loopback-management-and-direct-feed-root' },
     })
   }
+  // Canonicalize ancestors and future paths so temporary-directory aliases stay safe.
+  const directory = await physicalPath(requested)
+  const keyLocation = relative(directory, await physicalPath(resolve(options.managementKeyFile)))
+  const keyInside =
+    keyLocation !== '..' && !keyLocation.startsWith(`..${sep}`) && !isAbsolute(keyLocation)
+  if (keyInside)
+    throw usageErrors.UNSAFE_LOCATION({ internal: { constraint: 'physical-key-outside-feed' } })
   await mkdir(directory, { recursive: true, mode: 0o700 })
   const entries = await readdir(directory, { withFileTypes: true })
   const unsafe = entries.some(

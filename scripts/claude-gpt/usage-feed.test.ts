@@ -311,3 +311,48 @@ test('strict restart validation preserves null window age without using publicat
     restoreUsageSnapshot(snapshot, configuredAccounts)!.accounts[1]!.windows[0]!.lastSeenAt,
   ).toBeNull()
 })
+
+test('known websocket Spark allowance shares HTTP Bengalfox identity and preserves its actual age and reset', () => {
+  const prefix = 'X-Codex-Additional-Gpt-5.3-Codex-Spark'
+  const body = proxyBody({
+    ...weeklySignals,
+    [`${prefix}-Limit-Name`]: 'GPT-5.3-Codex-Spark',
+    [`${prefix}-Primary-Used-Percent`]: '0',
+    [`${prefix}-Primary-Window-Minutes`]: '300',
+    [`${prefix}-Primary-Reset-After-Seconds`]: '18000',
+    'X-Codex-Additional-Unknown-Primary-Used-Percent': '99',
+    'X-Codex-Credits-Balance': '0',
+  })
+  const initial = normalizeProxySnapshot(
+    body,
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+  )!
+  const allowance = initial.accounts[1]!.windows.find(({ id }) => id === 'bengalfox:five_hour')
+  expect(allowance).toMatchObject({
+    usedPercent: 0,
+    resetsAt: '2026-10-02T23:00:00.000Z',
+    windowMinutes: 300,
+    lastSeenAt: seen,
+    source: 'proxy-state',
+  })
+  expect(initial.accounts[1]!.windows.find(({ id }) => id === 'five_hour')!.usedPercent).toBe(80)
+  expect(initial.accounts[1]!.windows).toHaveLength(3)
+  expect(initial.accounts[1]!.routing.lastServedAt).toBeNull()
+  expect(JSON.stringify(initial)).not.toMatch(/Unknown|GPT-5.3|model:|Credits|Limit-Name/)
+
+  const resetAt = Date.parse('2026-10-03T01:00:00.000Z') / 1000
+  const http = proxyBody({
+    'X-Codex-Bengalfox-Primary-Used-Percent': '35',
+    'X-Codex-Bengalfox-Primary-Window-Minutes': '300',
+    'X-Codex-Bengalfox-Primary-Reset-At': String(resetAt),
+  })
+  http.files[0]!.quota.observed_at = checked
+  const updated = normalizeProxySnapshot(http, initial, later)!
+  expect(updated.accounts[1]!.windows.filter(({ id }) => id === 'bengalfox:five_hour')).toEqual([
+    { ...allowance, usedPercent: 35, resetsAt: '2026-10-03T01:00:00.000Z', lastSeenAt: checked },
+  ])
+  expect(updated.accounts[1]!.windows.find(({ id }) => id === 'five_hour')!.lastSeenAt).toBe(seen)
+  const staleWebsocket = normalizeProxySnapshot(body, updated, later)!
+  expect(staleWebsocket.accounts[1]!.windows).toEqual(updated.accounts[1]!.windows)
+})

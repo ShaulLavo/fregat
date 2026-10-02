@@ -122,8 +122,12 @@ The terminal has no hover. TXT grids are the readable table equivalent. Status c
 - [x] Lifecycle-bound serialized sampler and atomic sanitized publication. Preserve valid prior values through failures/restart; initial registered identities use no-data. Bound fetch time/size and file size. No auth-directory fallback exposing credentials.
 - [x] Counters prove zero extra provider calls and no readiness/demand requests. Temp paths derive from OS temp/config, never owner paths in portable tests.
 - [x] Record gateway runtime configuration and coordinator deployment/restart requirements. No installed service changes.
+- [x] Address independent review: known websocket Spark namespace shares HTTP Bengalfox allowance identity; preserve resets and observation ages without aggregate/model inference.
+- [x] Address independent review: physical feed/key isolation rejects root and credential aliases before publication; retain safe OS-temp ancestor aliases and missing-key restart data.
 
 Producer source and portable verification are complete. `scripts/claude-gpt/usage-feed.ts` normalizes and strictly restores v1; `usage-producer.ts` owns bounded cached sampling and coalesced atomic publication. Direct-Claude capture stays header-only; runtime feed configuration requires explicit empty Claude pool entrypoints and no Claude proxy. Root `test:scripts` runs the three new usage suites. Fail-first evidence captured missing producer modules, absent direct response observation, and absent feed configuration before implementation. The README records configuration, staging bundle/copy, scheduled runner restart (including its owned Codex proxy), and the separate static feed route.
+
+Independent HIGH review follow-ups passed fail-first and targeted verification: actual websocket Spark allowance maps to the same HTTP Bengalfox window; physical path isolation rejects unsafe root/ancestor/key aliases before writing or fetching, including a dangling key alias into a future feed. A safe ancestor-alias/missing-key restart regression preserves portable temporary paths and cached data. All three usage suites pass 30 tests after these corrections.
 
 Deployment remains deferred: no installed gateway/proxy/Mesh/Pi changes, restarts, provider requests or management requests were performed. Live route isolation, sleeping inference-route behavior, stale-host retention and final Pi appearance remain coordinator acceptance checks below.
 
