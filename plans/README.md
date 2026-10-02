@@ -134,6 +134,7 @@ not a second live status register.
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                           |
 | [287](287-ghostty-worker-mode.md)                     | ghostty-webgpu worker mode: the terminal on an OffscreenCanvas worker         |
 | [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                          |
+| [289](289-proxy-usage-feed.md)                        | Passive AI plans feed and the Mesh TV panel                                   |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
