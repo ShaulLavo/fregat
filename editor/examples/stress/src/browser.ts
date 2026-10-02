@@ -1,4 +1,9 @@
-import { Editor, type EditorInitialPaintEvent } from '@singapore-editor/core/editor'
+import {
+  Editor,
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+  type EditorInitialPaintEvent,
+} from '@singapore-editor/core/editor'
 import {
   createEditorBufferSession,
   createEditorTextBuffer,
@@ -11,13 +16,8 @@ import { typeScript } from '@singapore-editor/tree-sitter-languages'
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/find/style.css'
 import { createInputLatencyProbe } from './inputLatency.ts'
-import { createInputConsumers } from './inputConsumers.ts'
-import {
-  minimapMatches,
-  replayMinimapLines,
-  replayShikiSource,
-  replayTreeSitterSource,
-} from '../input-worker-proof.mjs'
+import { createInputConsumers, inputConsumersForFixture } from './inputConsumers.ts'
+import { readInputOutput } from './input-output.ts'
 import { fixtureFacts, generateFixture, normalizedText, type FixtureId } from './fixtures.ts'
 
 type Diagnostic = {
@@ -34,7 +34,9 @@ type KeySample = {
 }
 type Paint = EditorInitialPaintEvent & { readonly at: number }
 type Active = {
+  readonly ownerIdentity: string
   readonly buffer: EditorTextBuffer
+  readonly analysis: EditorDocumentAnalysis
   readonly editors: readonly Editor[]
   readonly inputAbort: AbortController
   readonly consumers: ReturnType<typeof createInputConsumers> | null
@@ -44,8 +46,6 @@ declare global {
   var __stress: typeof bridge
   var __EDITOR_PERFORMANCE_DIAGNOSTICS__: ((event: Diagnostic) => void) | null
   var __inputWorkerProof: readonly { readonly terminated: boolean }[] | undefined
-  var __inputWorkerSources: Map<string, ConsumerSession> | undefined
-  var __inputReadinessNegative: string | null | undefined
 }
 
 let active: Active | null = null
@@ -79,8 +79,18 @@ function current(): Active {
   return active
 }
 
-async function prepare(id: FixtureId, seed: number, instrumented: boolean, frozen = false) {
-  await dispose()
+async function prepare(
+  id: FixtureId,
+  seed: number,
+  instrumented: boolean,
+  frozen = false,
+  retained = false,
+) {
+  if (retained) inputLatency.dispose()
+  else {
+    await dispose()
+    released = []
+  }
   fixture = id
   if (frozen) {
     const response = await fetch(`/frozen-fixtures/${id}.txt`)
@@ -106,6 +116,33 @@ async function prepare(id: FixtureId, seed: number, instrumented: boolean, froze
   return { ...fixtureFacts(source), sha256 }
 }
 
+function resetInput() {
+  inputLatency.dispose()
+  const { editors, buffer } = current()
+  keys = []
+  editors[0]!.syncText(expected, {
+    languageId: current().consumers || fixture === 'ordinary' ? 'typescript' : null,
+  })
+  buffer.clearHistory()
+  check(!buffer.canUndo() && !buffer.canRedo(), 'Input reset retained undo history')
+  check(frames.size === 0, 'Input reset retained pending key frames')
+  for (const [index, editor] of editors.entries()) {
+    const host = document.querySelector<HTMLElement>(`#view-${index}`)!
+    host.hidden = index === 2
+    if (index !== 2) host.style.display = 'flex'
+    editor.setSelection(0, 0, { reveal: true })
+  }
+  paints = []
+  diagnostics = []
+  droppedDiagnostics = 0
+  return {
+    ...verifyText(),
+    ownerIdentity: current().ownerIdentity,
+    historyEmpty: true,
+    hiddenViews: editors.length === 3 ? 1 : 0,
+  }
+}
+
 function createHost(index: number): HTMLElement {
   const host = document.createElement('section')
   host.id = `view-${index}`
@@ -122,33 +159,85 @@ function createHost(index: number): HTMLElement {
 function open(multiple: boolean, highlight: boolean, consumerId?: string) {
   start = performance.now()
   const buffer = createEditorTextBuffer(source)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
   const editors: Editor[] = []
   const inputAbort = new AbortController()
   const consumers = consumerId ? createInputConsumers(consumerId, fixture, source.length) : null
-  active = { buffer, editors, inputAbort, consumers }
-  for (let index = 0; index < (multiple ? 3 : 1); index++) {
-    const editor = new Editor(createHost(index), {
-      lineHeight: 20,
-      plugins:
-        consumers?.plugins ??
-        (highlight ? [typeScript(), createEditorFindPlugin()] : [createEditorFindPlugin()]),
-      onInitialPaint: (event) => paints.push({ ...event, at: performance.now() }),
-      onChange: (_state, change) => {
-        if (change?.kind === 'edit') recordAppliedKey()
-        if (index === 0 && change && change.kind !== 'selection' && change.kind !== 'none')
-          inputLatency.applied()
-      },
-    })
-    editors.push(editor)
-    editor.attachSession(createEditorBufferSession(buffer), {
-      documentId: fixture,
-      languageId: consumers || highlight ? 'typescript' : null,
-    })
-  }
+  active = { buffer, analysis, editors, inputAbort, consumers, ownerIdentity: crypto.randomUUID() }
+  for (let index = 0; index < (multiple ? 3 : 1); index++)
+    editors.push(createInputEditor(index, highlight))
   editors[0]!
     .getInputElement()
     .addEventListener('keydown', recordKey, { signal: inputAbort.signal, capture: true })
   return { start, attachedAt: performance.now() }
+}
+
+function createInputEditor(index: number, highlight: boolean) {
+  const { consumers, buffer, analysis } = current()
+  const editor = new Editor(createHost(index), {
+    lineHeight: 20,
+    plugins:
+      consumers?.plugins ??
+      (highlight ? [typeScript(), createEditorFindPlugin()] : [createEditorFindPlugin()]),
+    onInitialPaint: (event) => paints.push({ ...event, at: performance.now() }),
+    onChange: (_state, change) => {
+      if (change?.kind === 'edit') recordAppliedKey()
+      if (index === 0 && change && change.kind !== 'selection' && change.kind !== 'none')
+        inputLatency.applied()
+    },
+  })
+  editor.attachSession(createEditorBufferSession(buffer), {
+    analysis,
+    documentId: fixture,
+    languageId: consumers || highlight ? 'typescript' : null,
+  })
+  return editor
+}
+
+async function reloadInputDocument(multiple = current().editors.length === 3) {
+  inputLatency.dispose()
+  const previous = current()
+  const consumers = inputConsumersForFixture(previous.consumers, fixture, source.length)
+  released.push(new WeakRef(previous.buffer), new WeakRef(previous.analysis))
+  const buffer = createEditorTextBuffer(expected)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
+  const editors = [...previous.editors]
+  check(editors.length <= (multiple ? 3 : 1), 'Warm view count must grow once')
+  active = { ...previous, buffer, analysis, editors, consumers }
+  for (const editor of editors) {
+    if (consumers && consumers !== previous.consumers) editor.setPlugins(consumers.plugins)
+    if (!consumers)
+      editor.setPlugins(
+        fixture === 'ordinary'
+          ? [typeScript(), createEditorFindPlugin()]
+          : [createEditorFindPlugin()],
+      )
+    editor.attachSession(createEditorBufferSession(buffer), {
+      analysis,
+      documentId: fixture,
+      languageId: consumers || fixture === 'ordinary' ? 'typescript' : null,
+    })
+  }
+  while (editors.length < (multiple ? 3 : 1))
+    editors.push(createInputEditor(editors.length, fixture === 'ordinary'))
+  previous.analysis.dispose()
+  if (consumers !== previous.consumers) await previous.consumers?.dispose()
+  return resetInput()
+}
+
+async function warmInputSubject(
+  id: FixtureId,
+  seed: number,
+  instrumented: boolean,
+  frozen: boolean,
+  multiple: boolean,
+  consumerId: string,
+) {
+  const retained = active !== null
+  const facts = await prepare(id, seed, instrumented, frozen, retained)
+  if (retained) await reloadInputDocument(multiple)
+  else open(multiple, id === 'ordinary', consumerId === 'native' ? undefined : consumerId)
+  return { ...facts, retained, ownerIdentity: current().ownerIdentity }
 }
 
 function recordKey(event: KeyboardEvent) {
@@ -305,9 +394,12 @@ async function dispose() {
   const consumers = active?.consumers
   if (active) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    released = [active.buffer, ...active.editors].map((value) => new WeakRef(value))
+    released.push(
+      ...[active.buffer, active.analysis, ...active.editors].map((value) => new WeakRef(value)),
+    )
     active.inputAbort.abort()
     for (const editor of active.editors) editor.dispose()
+    active.analysis.dispose()
   }
   active = null
   for (const frame of frames) cancelAnimationFrame(frame)
@@ -326,132 +418,7 @@ async function settleConsumers() {
   const { consumers, editors, buffer } = current()
   if (!consumers) return null
   const readiness = await consumers.settle(editors)
-  if (globalThis.__inputReadinessNegative === 'drop-view-ranges') dropLastVisibleViewRanges()
-  const text = buffer.materializeFullText()
-  const colors = highlightColors()
-  const highlights = [...CSS.highlights].map(([name, ranges]) => ({
-    name,
-    ranges: ranges.size,
-    color: colors.get(name) ?? null,
-  }))
-  const lineLimit = readiness.shiki?.maxTokenizationLineLength ?? null
-  const row = document.querySelector('#view-0 [data-editor-virtual-row]')
-  return {
-    ...readiness,
-    views: readiness.views.map((view, index) => ({ ...view, tokenRanges: viewTokenRanges(index) })),
-    sessions: consumerSessions(text),
-    minimaps: minimapReceipts(text),
-    highlights,
-    lineCount: text.split('\n').length,
-    overLimitLines: lineLimit === null ? null : linesLongerThan(text, lineLimit),
-    rowColor: row ? getComputedStyle(row).color : null,
-  }
-}
-
-type ConsumerSession = {
-  readonly kind: string
-  readonly worker: { readonly terminated: boolean }
-  readonly log: readonly unknown[]
-  readonly requested: number
-  readonly answered: number
-  readonly failed: number
-  readonly requestedVersion: number | null
-  readonly answeredVersion: number | null
-  readonly disposed: boolean
-}
-
-type MinimapProof = {
-  readonly terminated: boolean
-  readonly minimap: boolean
-  readonly minimapLog: readonly unknown[]
-  readonly latestRender: number
-  readonly acceptedRender: number
-  readonly renderAfterSource: number
-}
-
-// Each live consumer session's receipt, replayed after the measured interval: the source its
-// worker last received equals the current text, and that request was answered.
-function consumerSessions(text: string) {
-  const sessions: Iterable<ConsumerSession> = globalThis.__inputWorkerSources?.values() ?? []
-  return [...sessions]
-    .filter(
-      (session) =>
-        !session.disposed &&
-        !session.worker.terminated &&
-        (session.kind === 'shiki' || session.kind === 'treeSitter'),
-    )
-    .map((session) => {
-      const source =
-        session.kind === 'shiki'
-          ? replayShikiSource(session.log)
-          : replayTreeSitterSource(session.log)
-      return {
-        kind: session.kind,
-        current: source === text,
-        answered: session.requested > 0 && session.answered === session.requested,
-        failed: session.failed === session.requested && session.requested > 0,
-        requestedVersion: session.requestedVersion,
-        answeredVersion: session.answeredVersion,
-      }
-    })
-}
-
-// Each live minimap worker, one per view: its replayed line summaries match the current text, and
-// its accepted render was requested after its last source update.
-function minimapReceipts(text: string) {
-  const workers = (globalThis.__inputWorkerProof ?? []) as readonly MinimapProof[]
-  return workers
-    .filter((worker) => worker.minimap && !worker.terminated)
-    .map((worker) => ({
-      current: minimapMatches(replayMinimapLines(worker.minimapLog), text),
-      renderedAfterSource:
-        worker.renderAfterSource === worker.minimapLog.length &&
-        worker.latestRender > 0 &&
-        worker.acceptedRender === worker.latestRender,
-    }))
-}
-
-function tokenHighlights() {
-  return [...CSS.highlights].filter(([name]) => name.startsWith('editor-shared-token-'))
-}
-
-function viewTokenRanges(index: number): number {
-  const host = document.getElementById(`view-${index}`)
-  if (!host) return 0
-  let count = 0
-  for (const [, ranges] of tokenHighlights())
-    for (const range of ranges) if (host.contains(range.startContainer)) count++
-  return count
-}
-
-// Probe-only negative: the last visible view loses its token ranges while the others keep theirs.
-function dropLastVisibleViewRanges() {
-  const visible = current()
-    .editors.map((_, index) => document.getElementById(`view-${index}`))
-    .filter((host): host is HTMLElement => Boolean(host?.checkVisibility()))
-  const host = visible.at(-1)
-  if (!host || visible.length < 2) return
-  for (const [, ranges] of tokenHighlights())
-    for (const range of [...ranges]) if (host.contains(range.startContainer)) ranges.delete(range)
-}
-
-function linesLongerThan(text: string, limit: number): number {
-  let count = 0
-  for (const line of text.split('\n')) if (line.replace(/\r$/, '').length > limit) count++
-  return count
-}
-
-// The colour each `::highlight(name)` rule paints, read from the page's own stylesheets.
-function highlightColors(): Map<string, string> {
-  const colors = new Map<string, string>()
-  for (const sheet of document.styleSheets) {
-    for (const rule of sheet.cssRules) {
-      if (!(rule instanceof CSSStyleRule)) continue
-      const name = /::highlight\(([^)]+)\)/.exec(rule.selectorText)?.[1]
-      if (name && rule.style.color) colors.set(name, rule.style.color)
-    }
-  }
-  return colors
+  return readInputOutput(readiness, buffer.materializeFullText())
 }
 
 function retention() {
@@ -470,6 +437,9 @@ const inputLatency = createInputLatencyProbe({ current, expected: () => expected
 const bridge = {
   inputLatency,
   prepare,
+  resetInput,
+  warmInputSubject,
+  reloadInputDocument,
   open,
   observe,
   verifyRows,

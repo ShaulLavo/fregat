@@ -40,6 +40,7 @@
     }
   },
   "scripts": {
+    "bench:input:paired": "bun run --cwd editor/examples/stress bench:input:paired",
     "bench:large-file": "bun scripts/large-file/bench.ts",
     "build": "bun scripts/prod.ts build",
     "deploy": "bun scripts/deploy/mesh.ts",

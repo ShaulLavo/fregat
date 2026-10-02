@@ -1,5 +1,7 @@
 # Input latency measurements
 
+Current paired comparisons use Platform's [paired input runner](../../../docs/document-contributions/paired-input-latency.md). It retains warm package pages, uses fixed historical budgets and key-local balanced two-pair blocks, and collects two or four measured pairs under the strict blocking-only stopping guard. Its sensitivity cache keys on measurement identity. The counterbalanced sampler requires fresh controls, loaded A/A reliability evidence and complete-matrix timings before Plan 282 acceptance. The E002 results below remain historical evidence for their original instrument.
+
 E002 was implemented on 2026-09-07. The optimized candidate passes all 108 blocking timing limits
 and the correctness checks across 10,488 measured input events. One screenshot-duration advisory
 remains visible. The independent unchanged reference passes, and a real 20 ms delay fails all 36
@@ -216,12 +218,13 @@ The review corrections passed these focused checks:
   metrics, and rendering transitions. Editor and stress typechecks, focused lint, and repository
   formatting passed.
 
-Replay the saved benchmark acceptance proof from the repository root:
-
-```sh
-bun run --cwd examples/stress input:proof
-```
-
-The [runner instructions](../../examples/stress/README.md#input-latency-budgets) explain how to
-collect new controls and a candidate. The [result reference](../../examples/stress/results/input-latency/README.md)
+The saved results retain the historical absolute-calibration acceptance proof.
+The [runner instructions](../../examples/stress/README.md#input-latency-budgets) now use
+`bench:input:paired` to compare fresh baseline and candidate package sets. The [result reference](../../examples/stress/results/input-latency/README.md)
 records the measured source hash and retains all raw distributions.
+
+Declared `--loaded` comparisons keep every key blocking. Standalone Tree-sitter uses a 5 ms
+minimum blocking margin under contention and runs in the full loaded matrix or focused
+verification. Quiet Tree-sitter retains its frozen fine margins, as do all other loaded
+configurations. Every metric records frozen/applied margins and the reason. Root Plan 282 owns
+the affected-key inventory and requires real 20 ms stage sensitivity under this policy.

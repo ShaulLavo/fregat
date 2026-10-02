@@ -79,11 +79,20 @@ async function externalRoot(from, name) {
  * Bytes of every external package the frozen Editor packages resolve, transitively. Editor
  * packages are skipped: their own identity is the frozen src/dist/package.json.
  */
-export async function externalReceipt(directory, folders, seeds = []) {
+export async function externalReceipt(
+  directory,
+  folders,
+  seeds = [],
+  { includePeers = false } = {},
+) {
   const pending = [...seeds]
   for (const folder of folders) {
     const manifest = JSON.parse(await readFile(resolve(directory, folder, 'package.json'), 'utf8'))
-    for (const name of Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies }))
+    for (const name of Object.keys({
+      ...manifest.dependencies,
+      ...manifest.optionalDependencies,
+      ...(includePeers ? manifest.peerDependencies : {}),
+    }))
       pending.push({ from: resolve(directory, folder), name })
   }
   const packages = new Map()
@@ -108,6 +117,7 @@ export async function externalReceipt(directory, folders, seeds = []) {
     for (const dependency of Object.keys({
       ...manifest.dependencies,
       ...manifest.optionalDependencies,
+      ...(includePeers ? manifest.peerDependencies : {}),
     }))
       pending.push({ from: root, name: dependency })
   }
@@ -121,8 +131,9 @@ export async function externalReceipt(directory, folders, seeds = []) {
     sha256,
   }))
   return {
-    policy:
-      'transitive dependencies and optionalDependencies of every frozen package, resolved from the frozen package directory; every file of each resolved package root except nested node_modules',
+    policy: includePeers
+      ? 'transitive dependencies, optionalDependencies and peerDependencies of every seeded execution package; every file of each resolved package root except nested node_modules'
+      : 'transitive dependencies and optionalDependencies of every frozen package, resolved from the frozen package directory; every file of each resolved package root except nested node_modules',
     packages: list,
     unresolved: [...unresolved].sort(),
     sha256: digest(JSON.stringify({ identity, unresolved: [...unresolved].sort() })),

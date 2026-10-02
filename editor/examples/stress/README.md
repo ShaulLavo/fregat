@@ -301,111 +301,165 @@ Use the complete input suite below for budget comparisons.
 
 ## Input latency budgets
 
-The absolute-threshold workflow below is the delivered historical instrument. Plan 282 replaces
-its verdict with a paired A/B instrument. PR #224 closed the existing matrix as partial; these
-commands document reusable collection and are not a request to repeat that matrix.
+The paired command uses frozen historical group budgets. The coordinator approves shipping
+Plan 282 with its actual 855.026-second default and 215/216 blocking keys passing. The one
+Platform short-lines/multiple applied-undo rejection (+1.000 ms versus 0.800 ms budget) is
+unclassified: a real #224 large-file undo cost or noise. The runner keeps its failing verdict.
+The retained ten-run A/A has zero selected ordinary/multiple rejects; it does not cover this key.
+Corrected-identity controls reject all 72 input and 36 frame keys; the native positive passes.
+Follow-up is a restricted alternating A/A and A/B undo cohort after its scoped cleanup counts
+reset replacement generations. The first attempted cohort produces no valid comparisons.
+Full historical agreement is not claimed. Expanded final-identity loaded/historical proofs
+and full-matrix timing are explicit follow-ups. Minimap acceptance remains temporarily excluded
+pending its separately owned undo source-correctness fix. See the
+[acceptance record](../../../docs/document-contributions/paired-input-latency.md#minimap-proof-retention-correction).
+Plan 099 units 2–7 retain their implementation authorization gate.
 
-Run the following in Bash from the Editor workspace (`editor/` in Platform). Input runs require
-all built public packages, their external-dependency receipt and a frozen fixture manifest. A
-core-only directory cannot supply that identity. Before building or freezing, verify that `/work`
-is mounted and has free space. Use a new, empty run directory for each collection:
+Compare complete frozen package sets with one command from the Platform or Editor root:
+
+```sh
+export PATH=$HOME/.local/share/mise/shims:$PATH
+bash /work/tmp/wave-heavy/run.sh p282-candidate -- env PATH="$PATH" \
+  bun run bench:input:paired --baseline /work/tmp/plan-282/baseline \
+  --candidate /work/tmp/plan-282/candidate
+```
+
+The quiet default runs Platform's shipping composition and native input. The loaded default
+runs native and disabled input. Package changes do not expand these defaults. Platform already
+includes Tree-sitter, Shiki and minimap; individual compositions supply attribution in `--full`,
+which runs all ten configurations. `--configurations shiki` extends a default explicitly;
+worker-backed Tree-sitter compositions require loaded full or focused verification.
+A focused `--only native,disabled` run is diagnostic.
+
+Before freezing either package set, verify `/work` is mounted and has free space. Build the public
+packages through the heavy-job wrapper. From the Editor root, freeze each product revision:
 
 ```sh
 findmnt --target /work
 df -h /work
-run_root=$(mktemp -d /work/tmp/editor-input-XXXXXX)
-bun run build
-node examples/stress/fixtures.mjs "$run_root/fixtures"
-
-freeze_input_packages() {
-  node examples/stress/package-set.mjs "$PWD/packages" "$run_root/$1" \
-    "$(git rev-parse HEAD)" \
-    "$(git diff HEAD --binary -- packages | sha256sum | cut -d ' ' -f 1)" \
-    "$(sha256sum ../bun.lock | cut -d ' ' -f 1)"
-}
-freeze_input_packages baseline
-
-run_input() {
-  local packages=$1
-  shift
-  node examples/stress/run.mjs --suite input-latency \
-    --packages-directory "$run_root/$packages" --fixture-directory "$run_root/fixtures" \
-    --consumers native "$@"
-}
-run_input baseline --repetitions 1 --output "$run_root/before.json.gz"
-run_input baseline --repetitions 3 --output "$run_root/control-1.json.gz"
-run_input baseline --repetitions 3 --output "$run_root/control-2.json.gz"
-run_input baseline --repetitions 3 --output "$run_root/control-3.json.gz"
-run_input baseline --repetitions 3 --output "$run_root/rerun.json.gz"
+bash /work/tmp/wave-heavy/run.sh p282-build -- env PATH="$PATH" bun run build
+node examples/stress/package-set.mjs "$PWD/packages" /work/tmp/plan-282/baseline \
+  "$(git rev-parse HEAD)" \
+  "$(git diff HEAD --binary -- packages | sha256sum | cut -d ' ' -f 1)" \
+  "$(sha256sum ../bun.lock | cut -d ' ' -f 1)"
 ```
 
-The freeze command takes the source package directory, destination, product commit, dirty package
-diff SHA-256 and workspace lock SHA-256. It copies every public package's matching `src`, `dist`
-and `package.json`, and records the resolved external dependency bytes. Keep the frozen directories
-and dependencies available. The runner validates the receipt before collection.
+Freeze the candidate in a separate directory after building it. Keep both sets and their external
+dependencies available. Each set includes all public packages' `src`, `dist`, and manifests. The
+runner verifies their receipts and the built runtime graph.
 
-Keep the browser, hardware, instrument source, fixtures and consumer selection fixed. Run without
-other benchmarks or builds competing for the CPU. All controls and the independent reference
-holdout use the baseline package set. Calibrate and check that same-build holdout:
+Baseline and candidate alternate within randomized repetition pairs in one Chromium session.
+Each measure reports the median of paired p95 differences, a fixed declared historical noise budget,
+and a 95% bootstrap interval over repetitions. Native, disabled, Tree-sitter, Shiki, and minimap
+use their exact accepted calibration values; other compositions explicitly inherit native's
+frozen budgets. Each budget carries its artifact hash and instrument provenance. A blocking regression requires both a difference
+above budget and an interval entirely above zero. The 108 blocking and 36 advisory measures,
+native input scenarios, visible and hidden views, correctness, and cleanup checks are retained.
+Advisory screenshot duration never fails acceptance.
 
-```sh
-node examples/stress/input-compare.mjs calibrate "$run_root/calibration.json.gz" "$run_root/control-1.json.gz" "$run_root/control-2.json.gz" "$run_root/control-3.json.gz"
-node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/rerun.json.gz" "$run_root/calibration.json.gz" --same-build
-```
+Two cached native candidate/candidate controls prove each blocking stage. A real 20 ms pause in
+native event capture before Editor handling must reject all 72 `inputToApplied`/`dispatch` keys.
+A separate 20 ms pause inside each rAF callback must reject 35 native `inputToFrame` keys.
+The remaining native key, `ordinary/multiple/repeat/inputToFrame`, keeps its frozen 15.2 ms
+budget and has a separate detection-floor proof: test 25 ms, then 30 ms only if needed, stopping
+at its first rejection. The initial 20 ms pause measured a 12.4 ms paired effect because it
+shifted input/frame phase. The current instrument records: rejects frame-stage delays ≥25 ms;
+a 20 ms frame-callback pause measured ~12.4 ms in that initial run because it shifted phase.
+The separate 25 ms attempt rejected, so 30 ms was skipped. The archived final-source 20 ms
+repeat measurement was amplified to 128.6 ms by callback batching. Fresh split-identity controls
+reject 72/72 input keys and 36/36 frame keys at 20 ms, and the named floor at 25 ms, with 30 ms
+skipped. They take 436.559 seconds once. The fresh repeat-frame medians are 68.4 ms at 20 ms
+and 113.2 ms at 25 ms; phase/batching variability remains recorded, with every budget unchanged.
+All raw outcomes are preserved under `/work/tmp/plan-282/run-20261001T153544Z-sol/`.
+A failure at 30 ms blocks sensitivity. Both controls and all floor
+attempts are keyed by the measurement hash; reuse recomputes their verdicts. Schema-4 caches
+record the validation hash their controls used. Measurement covers all sources except
+`input-output.mjs` and `src/input-output.ts`, plus external bytes and browser/runner versions.
+Those two modules hold output predicates and post-interval receipt readers. Unknown files,
+readiness fences, worker interception, marks/delays, pairing/statistics, budgets and launch all
+belong to measurement. A validation-only change keeps controls valid and requires new
+acceptance for each configuration whose predicate changed. Tests prove assertion-only reuse
+and timing-path invalidation. The initial split changes measurement-file bytes, so its strict
+transfer audit refuses the old cache; that evidence stays archived.
+The first run of a changed measurement instrument pays for both controls and its floor proof. An input-handler pause is only
+partially visible in warm frame timing because of refresh quantization, so each stage is tested
+with a delay in that stage. `--slowdown-ms 20` and `--frame-slowdown-ms 20` select their respective
+diagnostics. They cannot be combined in one comparison. All 108 measures remain blocking.
 
-Each input limit is the largest control p95 plus the largest of three times the between-run p95
-spread, three times the between-run median spread, or the widest observed within-run range
-(maximum minus minimum). Calibration records each control's median, p95, minimum, and maximum.
-This local envelope includes the observed timing variation across the full sample, including
-arrival at different points in a frame. It is not a statistical confidence bound. Establish the
-rule before collecting its independent unchanged holdout, and require the real delayed control
-to fail before accepting the calibration.
+Default fixtures fit Platform's 10 Mi UTF-16 analysis tier, including 500,000 short comment lines.
+`--stress` enables the larger original declaration fixture. `--fixture-directory` accepts frozen
+hashed fixtures and requires `--stress` if they exceed the tier. CPU pinning is optional.
+`--output` selects the compressed matrix report. The default maximum is four measured pairs.
+Each key/block gets a deterministic seeded AB/BA order; each complete two-pair block runs both
+sides first once. A key's order is independent of earlier groups' adaptive counts. After the first
+block, a group stops only if all three blocking measures have both paired p95 differences within
+± their fixed budget and a two-point interval span no larger than that budget. This preserves the
+acceptance predicate. Otherwise it completes the second block. The raw comparator checks every
+early stop and key-local order. Delayed candidates and sensitivity use the same rule.
+`--fixed-repetitions` disables stopping; requesting more than four pairs uses fixed sampling.
+Fixed sampling requires at least four pairs and complete even-sized blocks.
+Conditional stopping has no sequential 95% coverage guarantee. Small-sample bootstrap intervals
+are nominal descriptive intervals, and passing does not establish equivalence.
 
-The input comparison has **108 blocking groups**: input-to-applied, synchronous dispatch, and
-input-to-next-frame for every fixture, view configuration, and scenario. Its **36 screenshot
-groups are advisory**. Their burst-to-screenshot-completion upper bounds include input delivery,
-Playwright transport, and capture overhead. Raw screenshot distributions and calibrated limits
-remain in the report, but exceeding those timing limits alone does not fail acceptance.
-Screenshot evidence, changed pixels, rendered text, and revision correctness remain mandatory.
+Per configuration, baseline and candidate keep two pages warm in one Chromium browser. Each
+group's warmup uses its measured fixture. Editor operations restore text, selection, undo history
+and the hidden view between bursts. Fixture swaps attach fresh shared buffers while retaining
+Editors and consumer owners. Native's Tree-sitter policy still enables only ordinary code.
+Setup, fixture attachment, reset and settlement are recorded outside input intervals. Final
+cleanup verifies all released buffers/Editors, hosts, frames, workers and listener counts before
+closing the configuration's contexts. More independent measured pairs improve near-budget resolution.
 
-Prove the gate catches a real 20 ms pause inside each measured input operation on the **baseline
-build**, before changing the product:
+One disposed ordinary-code bootstrap initializes Playwright worlds and page-scoped workers. Its
+raw receipt must show zero retained Editors/buffers; final listeners cannot exceed that receipt's
+count. The old cold runner also initialized these globals in its first unrecorded warmup. There
+is no listener allowance. Consumer/source readiness has a bounded 120-second deadline; disposal
+keeps its separate 30-second deadline. Quiet margins stay frozen; declared loaded Tree-sitter uses
+the blocking floor described below.
 
-```sh
-run_input baseline --repetitions 3 --slowdown-ms 20 --output "$run_root/delayed.json.gz"
-node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/delayed.json.gz" "$run_root/calibration.json.gz" --allow-slowdown > "$run_root/delayed-check.json"
-node examples/stress/input-admission.mjs "$run_root/delayed-check.json" "$run_root/delayed.json.gz"
-```
+`--pending-minimap-source` records the authorized temporary minimap exception. It excludes the
+standalone minimap configuration from aggregate acceptance and relaxes only the final minimap
+source-equality check after short-lines undo. Workers, renders, runtime cost, and all other
+correctness checks remain active. An observed admitted final source mismatch reloads only the
+document session before the next burst, outside captured input. Raw reset evidence saves the
+rejected receipt and reload duration. Correct receipts automatically skip that reload. Full
+minimap acceptance awaits the product fix.
 
-The delayed comparison must exit with status 1 and fail all 36 dispatch groups. Run admission after
-that expected nonzero comparison; admission must exit with status 0 and report `admitted: true` and
-`full: true`. `--allow-slowdown` permits the explicit delay while requiring baseline package identity.
+See [paired method and validation](../../../docs/document-contributions/paired-input-latency.md)
+for statistical limits, historical comparison, and measured wall times. The old absolute input
+calibration and proof commands have been removed. Historical evidence stays unchanged.
 
-After implementing the product change, rebuild the public packages and freeze a separate candidate
-set. Keep the instrument and external dependencies unchanged. Check the candidate against the
-preserved controls, then collect its diagnostic phase correlations separately:
+### Declared loaded comparisons
 
-```sh
-bun run build
-freeze_input_packages candidate
-run_input candidate --repetitions 3 --output "$run_root/candidate.json.gz"
-node examples/stress/input-compare.mjs check "$run_root/control-1.json.gz" "$run_root/candidate.json.gz" "$run_root/calibration.json.gz"
-run_input candidate --repetitions 1 --diagnostics --output "$run_root/diagnostic.json.gz"
-node examples/stress/test/verify-input-results.mjs "$run_root"
-```
+`--loaded` records externally applied CPU contention. Supply and retain the load-worker evidence
+alongside the report; the runner starts no CPU workers. Loaded default is native+disabled. The five
+worker-backed Tree-sitter configurations `tree-sitter`, `tree-sitter-shiki`, `tree-sitter-minimap`,
+`all` and `platform` are measured with `--full --loaded`; `--only` selects focused verification.
+Their blocking margins are `max(frozen margin, 5 ms)`; per-key output records frozen and applied
+margins, reason and historical provenance. All 540 keys across these configurations remain
+blocking, with 309 raised margins. Advisory timing, quiet comparisons and the other five loaded
+configurations keep frozen margins. Native's ordinary-only Tree-sitter keeps native margins.
+Platform remains in quiet default and loaded full. Real 20 ms input and frame negatives must
+still reject every required key.
 
-The delayed run stays on the baseline source and build; the diagnostic run stays on the candidate
-source and build. The proof command checks saved before measurements, controls, same-build holdout,
-candidate, full delayed admission and diagnostic records. It writes `verification.json` and
-`calibration.json.gz`. It fails on missing or incomparable samples, incorrect text/revisions/paint,
-malformed index ranges, listener growth, incomplete context closure, reused run identities, or a
-candidate exceeding the established blocking limits. A valid run that exceeds blocking timing
-limits still writes `verification.json` with `passed: false` and `candidateFailures`, then exits
-with status 1. Screenshot timing excesses appear separately in `candidateAdvisories`. Malformed
-evidence fails before the report is written. `.json.gz` stores the same raw records as `.json`
-using gzip.
+The two-pair stopping guard uses the applied blocking margins and preserves its strict span check.
+A load declaration changes the workload receipt and cannot be mixed between paired sides.
+See root [Plan 282](../../../plans/282-fast-paired-input-latency-check.md) for the exact margin audit
+and acceptance evidence. Pre-input and post-input readiness require the current source and its
+accepted render; a reset can publish its source after the prior render has been accepted.
 
-For a quick probe, add `--input-smoke`. That runs ordinary/single-view cases and marks the artifact
-`smokeOnly`; the acceptance gate rejects it. Use the full suite to accept a change.
-See [measurement boundaries and diagnostic fields](../../docs/performance/input-latency.md)
-for what each duration proves and the CDP composition-commit limitation.
+The harness mirrors Platform document ownership: every buffer has one public document-analysis
+owner shared by its independent view sessions. Replacing a buffer replaces and disposes its
+analysis after view attachment; final cleanup disposes views, analysis and consumer owners.
+This ownership correction changes measurement identity. Earlier three-analysis-owner controls
+and loaded Tree-sitter receipts stay archived; final acceptance requires fresh evidence.
+Strict lifetime accounting includes analysis: three bootstrap/single objects, five isolated
+multiple-view objects, and at least fifteen across six retained subjects. Zero retained bootstrap
+objects, listener limits, workers and context closure remain required.
+
+Minimap proof capture releases the superseded prefix on authoritative `openDocument` or
+`replaceDocument`, retaining the latest full source and all subsequent patches. Accepted-render
+freshness uses monotonic `sourceUpdates`, independent of compacted log length. Nine-subject heap
+proof keeps repeated short-lines heaps near 122.7 MiB, where the old capture climbed from 122.0
+to 250.5 MiB. This is a measurement-capture correction; frozen products, sampling and budgets
+stay unchanged. Its new measurement identity requires fresh controls before the single default
+rerun; the approved earlier A/A stays stamped with its original identity.

@@ -11,10 +11,8 @@ export const inputScenarios = Object.freeze([
 ])
 export const inputViewModes = Object.freeze(['single', 'multiple'])
 const fixtureIds = ['ordinary', 'short-lines', 'long-line']
-const metrics = ['inputToApplied', 'dispatch', 'inputToFrame', 'burstToPaintUpperBound']
 const timingEpsilonMs = 0.000001
-const formula =
-  'max(control p95) + max(3 * range(control p95), 3 * range(control p50), max(control max - control min))'
+const metrics = ['inputToApplied', 'dispatch', 'inputToFrame', 'burstToPaintUpperBound']
 
 function record(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`Missing ${label}`)
@@ -91,19 +89,52 @@ function validateFixture(fixture) {
 
 function validateConfig(config) {
   record(config, 'workload configuration')
+  if (config.loadProfile !== undefined && !['quiet', 'loaded'].includes(config.loadProfile))
+    fail('Unknown input load profile')
   integer(config.repetitions, 'repetitions', 1)
   integer(config.warmups, 'warmups', 1)
   same(config.scenarios, inputScenarios, 'scenario coverage')
   same(config.views, inputViewModes, 'view coverage')
   same(config.compositionCommitTrust, 'cdp-untrusted-compositionend', 'composition commit trust')
-  same(config.isolation, 'closed-browser-context-per-fixture-view-scenario', 'sample isolation')
+  if (
+    ![
+      'closed-browser-context-per-fixture-view-scenario',
+      'closed-browser-context-per-configuration',
+    ].includes(config.isolation)
+  )
+    fail('Unknown sample isolation')
   if (typeof config.diagnostics !== 'boolean') fail('Missing diagnostics mode')
   finite(config.slowdownMs, 'slowdown duration')
+  if (config.frameSlowdownMs !== undefined)
+    finite(config.frameSlowdownMs, 'frame slowdown duration')
   keys(config.operationsPerSample, inputScenarios, 'operation counts')
   if (config.unsupportedFixtures !== undefined) {
     if (!Array.isArray(config.unsupportedFixtures)) fail('Invalid unsupported fixture list')
     for (const id of config.unsupportedFixtures)
       if (!fixtureIds.includes(id)) fail('Unknown unsupported fixture')
+  }
+  if (
+    config.warmupFixture !== undefined &&
+    !['ordinary', 'measured'].includes(config.warmupFixture)
+  )
+    fail('Unknown warmup fixture policy')
+  if (config.adaptivePairs) {
+    same(config.adaptivePairs, 'counterbalanced-tight-within-budget', 'adaptive pair policy')
+    same(config.repetitions, 4, 'adaptive maximum repetitions')
+    keys(
+      config.groupRepetitions,
+      fixtureIds.flatMap((fixture) =>
+        inputViewModes.flatMap((views) =>
+          inputScenarios.map((scenario) => `${fixture}/${views}/${scenario}`),
+        ),
+      ),
+      'adaptive group counts',
+    )
+    for (const count of Object.values(config.groupRepetitions)) {
+      integer(count, 'adaptive repetition count', 2)
+      if (count % 2 !== 0) fail('Invalid adaptive repetition count: incomplete two-pair block')
+      if (count > config.repetitions) fail('Adaptive count exceeds maximum repetitions')
+    }
   }
   for (const scenario of inputScenarios)
     integer(config.operationsPerSample[scenario], `${scenario} operation count`, 1)
@@ -122,13 +153,16 @@ export function validateInputResult(result) {
   validateEnvironment(result.environment)
   validateManifest(result.manifest)
   validateConfig(result.config)
+  if (result.config.isolation === 'closed-browser-context-per-configuration')
+    validateWarmLifecycle(result)
   const seen = new Set()
   for (const sample of result.samples) validateSample(sample, result, seen)
-  const expected =
-    (fixtureIds.length - (result.config.unsupportedFixtures?.length ?? 0)) *
-    inputViewModes.length *
-    inputScenarios.length *
-    result.config.repetitions
+  const expected = result.config.adaptivePairs
+    ? Object.values(result.config.groupRepetitions).reduce((sum, count) => sum + count, 0)
+    : (fixtureIds.length - (result.config.unsupportedFixtures?.length ?? 0)) *
+      inputViewModes.length *
+      inputScenarios.length *
+      result.config.repetitions
   if (seen.size !== expected) fail(`Missing samples: expected ${expected}, got ${seen.size}`)
   return result
 }
@@ -145,20 +179,113 @@ function validateSample(sample, result, seen) {
   )
     fail('Unknown sample configuration')
   integer(sample.repetition, 'sample repetition')
-  if (sample.repetition >= result.config.repetitions) fail('Invalid sample repetition')
+  const repetitions = result.config.adaptivePairs
+    ? result.config.groupRepetitions[`${sample.fixture}/${sample.views}/${sample.scenario}`]
+    : result.config.repetitions
+  if (sample.repetition >= repetitions) fail('Invalid sample repetition')
   const key = `${sample.fixture}/${sample.views}/${sample.scenario}/${sample.repetition}`
   if (seen.has(key)) fail(`Duplicate sample ${key}`)
   seen.add(key)
   if (sample.fixtureHash !== fixture.sha256) fail(`Fixture hash mismatch ${key}`)
   if (sample.correct !== true) fail(`Failed correctness ${key}`)
-  validateCleanup(sample, key)
+  if (result.config.isolation === 'closed-browser-context-per-configuration')
+    validateWarmReset(sample, result, fixture)
+  else validateCleanup(sample, key)
   validateObservation(sample, result.config)
 }
 
-function validateCleanup(sample, key) {
+function validateWarmLifecycle(result) {
+  validateInputBootstrap(result)
+  const cleanup = result.cleanup
+  record(cleanup, 'configuration cleanup')
+  same(
+    cleanup.beforeListeners,
+    result.bootstrap.cleanup.afterListeners,
+    'initialized listener baseline',
+  )
+  same(cleanup.scope, 'configuration', 'cleanup scope')
+  text(cleanup.ownerIdentity, 'warm owner identity')
+  integer(cleanup.trackedObjects, 'tracked configuration objects', 15)
+  validateCleanup({ cleanup, views: 'multiple' }, 'configuration', cleanup.trackedObjects)
+  if (!Array.isArray(result.startup)) fail('Missing warm startup receipts')
+  same(
+    result.startup.map((entry) => `${entry.fixture}/${entry.views}`).sort(),
+    fixtureIds.flatMap((fixture) => inputViewModes.map((views) => `${fixture}/${views}`)).sort(),
+    'warm startup coverage',
+  )
+  for (const [index, entry] of result.startup.entries()) {
+    finite(entry.milliseconds, 'startup duration')
+    same(entry.ownerIdentity, cleanup.ownerIdentity, 'retained startup owner')
+    same(entry.retained, index !== 0, 'warm startup retention')
+  }
+  same(result.config.warmupFixture, 'measured', 'warm input fixture')
+}
+
+function validateInputBootstrap(result) {
+  const bootstrap = result.bootstrap
+  record(bootstrap, 'input bootstrap')
+  const fixture = result.manifest.fixtures.find((entry) => entry.id === 'ordinary')
+  same(bootstrap.fixture, 'ordinary', 'bootstrap fixture')
+  same(bootstrap.fixtureHash, fixture.sha256, 'bootstrap fixture hash')
+  same(bootstrap.views, 'single', 'bootstrap views')
+  same(bootstrap.scenario, 'typing', 'bootstrap scenario')
+  same(bootstrap.repetition, -1, 'bootstrap repetition')
+  same(bootstrap.correct, true, 'bootstrap correctness')
+  finite(bootstrap.wallMs, 'bootstrap duration')
+  const cleanup = bootstrap.cleanup
+  record(cleanup, 'bootstrap cleanup')
+  for (const [key, expected] of Object.entries({
+    active: false,
+    hosts: 0,
+    pendingFrames: 0,
+    retainedObjects: 0,
+    trackedObjects: 3,
+    contextClosed: true,
+  }))
+    same(cleanup[key], expected, `bootstrap cleanup ${key}`)
+  if (cleanup.liveWorkers !== undefined) same(cleanup.liveWorkers, 0, 'bootstrap workers')
+  integer(cleanup.beforeListeners, 'bootstrap listener count before disposal')
+  integer(cleanup.afterListeners, 'bootstrap listener count after disposal')
+  validateObservation(bootstrap, result.config)
+}
+
+function validateWarmReset(sample, result, fixture) {
+  const reset = sample.reset
+  record(reset, 'input reset')
+  same(reset.ownerIdentity, result.cleanup.ownerIdentity, 'retained input owner')
+  same(reset.fixtureHash, fixture.sha256, 'reset fixture')
+  same(reset.length, fixture.normalizedLength, 'reset text length')
+  same(reset.views, sample.views === 'multiple' ? 3 : 1, 'reset views')
+  same(reset.hiddenViews, sample.views === 'multiple' ? 1 : 0, 'reset hidden views')
+  same(reset.cursor, { row: 0, column: 0 }, 'reset cursor')
+  same(reset.historyEmpty, true, 'reset history')
+  same(reset.sourceCurrent, true, 'reset consumer source')
+  finite(reset.milliseconds, 'reset duration')
+  if (typeof reset.documentReloaded !== 'boolean') fail('Missing document reload receipt')
+  if (
+    reset.documentReloaded &&
+    !(
+      result.config.pendingMinimapSource &&
+      sample.fixture === 'short-lines' &&
+      sample.scenario === 'undo'
+    )
+  )
+    fail('Unadmitted reset document reload')
+  if (
+    reset.documentReloaded &&
+    (!Array.isArray(reset.rejectedSource) ||
+      !reset.rejectedSource.some((source) => source.current === false))
+  )
+    fail('Document reload requires a rejected source receipt')
+  if (!reset.documentReloaded && reset.rejectedSource !== null)
+    fail('Unexpected rejected reset source')
+  if (sample.cleanup !== null) fail('Warm bursts must use configuration cleanup')
+}
+
+function validateCleanup(sample, key, trackedOverride = null) {
   record(sample.cleanup, `cleanup ${key}`)
   const cleanup = sample.cleanup
-  const trackedObjects = sample.views === 'multiple' ? 4 : 2
+  const trackedObjects = trackedOverride ?? (sample.views === 'multiple' ? 5 : 3)
   if (
     cleanup.active !== false ||
     cleanup.hosts !== 0 ||
@@ -349,12 +476,16 @@ export function summarizeInputResult(result) {
   return Object.fromEntries([...groups(result)].map(([key, values]) => [key, distribution(values)]))
 }
 
-function comparable(left, right, allowSlowdown = false) {
+export function assertInputComparable(left, right, allowSlowdown = false) {
   validateInputResult(left)
   validateInputResult(right)
   same(left.manifest, right.manifest, 'fixture manifests/hashes')
   const candidateConfig = allowSlowdown
-    ? { ...right.config, slowdownMs: left.config.slowdownMs }
+    ? {
+        ...right.config,
+        slowdownMs: left.config.slowdownMs,
+        frameSlowdownMs: left.config.frameSlowdownMs,
+      }
     : right.config
   same(left.config, candidateConfig, 'workload options or repetitions')
   same(left.environment.browser, right.environment.browser, 'browser')
@@ -366,133 +497,4 @@ function comparable(left, right, allowSlowdown = false) {
     'instrument external dependencies',
   )
   same(left.environment.instrumentHash, right.environment.instrumentHash, 'instrument source')
-}
-
-// Product source, build and external dependency bytes of the frozen set a run measured.
-function packageIdentity(run) {
-  const set = run.environment.packageSet
-  return set
-    ? { sourceHash: set.sourceHash, buildHash: set.buildHash, externalHash: set.externalHash }
-    : null
-}
-
-function range(values) {
-  return Math.max(...values) - Math.min(...values)
-}
-
-function controlLimit(summaries, key) {
-  const controlP50Ms = summaries.map((summary) => summary[key].p50Ms)
-  const controlP95Ms = summaries.map((summary) => summary[key].p95Ms)
-  const controlMinMs = summaries.map((summary) => Math.min(...summary[key].rawSamples))
-  const controlMaxMs = summaries.map((summary) => summary[key].maxMs)
-  const noiseMarginMs = Math.max(
-    3 * range(controlP95Ms),
-    3 * range(controlP50Ms),
-    ...controlMaxMs.map((value, index) => value - controlMinMs[index]),
-  )
-  return {
-    p95Ms: Math.max(...controlP95Ms) + noiseMarginMs,
-    noiseMarginMs,
-    controlP50Ms,
-    controlP95Ms,
-    controlMinMs,
-    controlMaxMs,
-  }
-}
-
-export function calibrateInput(controls) {
-  if (!Array.isArray(controls) || controls.length < 3)
-    fail('Calibration requires three independent unchanged control runs')
-  if (new Set(controls.map((control) => control?.id)).size !== controls.length)
-    fail('Calibration requires distinct control runs')
-  const first = controls[0]
-  for (const control of controls) {
-    comparable(first, control)
-    if (control.config.slowdownMs !== 0)
-      fail('Calibration requires clean controls without injected delay')
-    same(first.environment.commit, control.environment.commit, 'control commits')
-    same(first.environment.sourceHash, control.environment.sourceHash, 'control source trees')
-    same(
-      packageIdentity(first),
-      packageIdentity(control),
-      'control package builds and external bytes',
-    )
-  }
-  const summaries = controls.map(summarizeInputResult)
-  return {
-    schemaVersion: 1,
-    suite: 'input-latency',
-    kind: 'local-control-envelope',
-    scope:
-      'Matching browser, hardware and workload only; requires an independent rerun and delayed control.',
-    formula,
-    controls: controls.map((control) => control.id),
-    controlRuns: controls,
-    limits: Object.fromEntries(
-      Object.keys(summaries[0]).map((key) => [key, controlLimit(summaries, key)]),
-    ),
-  }
-}
-
-function validateCalibration(baseline, calibration) {
-  if (
-    calibration?.schemaVersion !== 1 ||
-    calibration.suite !== 'input-latency' ||
-    !Array.isArray(calibration.controlRuns)
-  )
-    fail('Unsupported input-latency calibration schema')
-  same(
-    calibration,
-    calibrateInput(calibration.controlRuns),
-    'calibration derived from raw controls',
-  )
-  const storedBaseline = calibration.controlRuns.find((control) => control.id === baseline.id)
-  if (!storedBaseline) fail('Calibration does not identify this baseline')
-  same(baseline, storedBaseline, 'calibration baseline observations')
-}
-
-export function compareInput(
-  baseline,
-  candidate,
-  calibration,
-  { allowSlowdown = false, sameBuild = false } = {},
-) {
-  comparable(baseline, candidate, allowSlowdown)
-  // A holdout or delayed control measures the calibrated build; a candidate differs only in product.
-  const expected = packageIdentity(baseline)
-  const actual = packageIdentity(candidate)
-  if (sameBuild || allowSlowdown)
-    same(expected, actual, 'holdout or delayed control package identity')
-  else same(expected?.externalHash, actual?.externalHash, 'candidate external dependency bytes')
-  validateCalibration(baseline, calibration)
-  if (calibration.controls.includes(candidate.id)) fail('Candidate must be an independent run')
-  if (allowSlowdown && candidate.config.slowdownMs <= 0)
-    fail('Slowdown control requires an injected delay')
-  const reference = summarizeInputResult(baseline)
-  const proposed = summarizeInputResult(candidate)
-  const results = Object.entries(proposed).map(([key, value]) => {
-    const limit = calibration.limits[key]
-    return {
-      key,
-      blocking: !key.endsWith('/burstToPaintUpperBound'),
-      ...value,
-      baseline: reference[key],
-      limit,
-      limitToControlP95Ratio:
-        Math.max(...limit.controlP95Ms) === 0
-          ? null
-          : limit.p95Ms / Math.max(...limit.controlP95Ms),
-      passed: value.p95Ms - limit.p95Ms <= timingEpsilonMs,
-    }
-  })
-  return {
-    schemaVersion: 1,
-    suite: 'input-latency',
-    baseline: baseline.id,
-    candidate: candidate.id,
-    kind: allowSlowdown ? 'delayed-control' : 'candidate',
-    comparisonEpsilonMs: timingEpsilonMs,
-    passed: results.every((metric) => !metric.blocking || metric.passed),
-    metrics: results,
-  }
 }

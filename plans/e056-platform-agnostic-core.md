@@ -143,8 +143,8 @@ The detailed P00-P14 units define owners, prerequisites, exit evidence and rollb
 - Run `node scripts/check-editor-backlog.mjs` for plan inventory changes. Implementation uses
   existing `bun run build`, `bun run health`, `bun run typecheck`, `bun run test`, `bun run lint`
   and `bun run format:check`, plus provisioned Fregat's `bun run verify`. Run package scripts,
-  never `bun test`. Replay `bun run --cwd examples/stress input:proof` as saved-evidence validation;
-  use documented fresh `bun run bench:input` collection for the candidate, not replay as a timing result.
+  never `bun test`. Historical input results remain as saved evidence; use documented fresh
+  `bun run bench:input:paired --baseline <packages> --candidate <packages>` collection for timing.
 
 ## Risks and decisions
 

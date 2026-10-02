@@ -537,17 +537,14 @@ bun run test
 bun run lint
 bun run format:check
 
-# Singapore: replay the recorded input acceptance proof
-bun run --cwd examples/stress input:proof
-
-# Singapore: collect input benchmark work through the documented runner
-bun run bench:input
+# Singapore: compare frozen package sets through the paired input runner
+bun run bench:input:paired --baseline <packages> --candidate <packages>
 
 # Fregat: after building/linking the intended Singapore checkout
 bun run verify
 ```
 
-Replaying `input:proof` checks saved evidence; it does not measure a fresh candidate. Fresh collection must follow the stress-runner instructions, fixture/control protocol and actual argument schema. The new headless/native/package fixtures need explicit scripts added in their owning migration units rather than guessed command names. A skipped browser/physical-device case is not a pass. [SG21], [SG23], [SG24], [FG01], [FG11]
+Historical input results remain as saved evidence. Fresh collection uses the paired runner and follows the stress-runner instructions, frozen-package protocol and actual argument schema. The new headless/native/package fixtures need explicit scripts added in their owning migration units rather than guessed command names. A skipped browser/physical-device case is not a pass. [SG21], [SG23], [SG24], [FG01], [FG11]
 
 ## 9. Existing plans: cooperate rather than fork ownership
 

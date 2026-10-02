@@ -82,8 +82,14 @@
     "@singapore-editor/markdown#test": {
       "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
     },
+    "@singapore-editor/stress#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "cache": false
+    },
     "@singapore-editor/stress#test": {
       "dependsOn": ["^build", "build"],
+      "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/docs/performance/e034-*.json.gz"]
     }
   },

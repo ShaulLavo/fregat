@@ -16,7 +16,12 @@ import typescript from '@shikijs/langs/typescript'
 import githubDark from '@shikijs/themes/github-dark'
 import { inputConsumerConfiguration } from '../input-configurations.mjs'
 import { inputPlatformPlugins } from './inputPlatformPlugins.ts'
-import { awaitInputStage, inputReadyDelay, waitForInputReady } from './inputReadiness.ts'
+import {
+  awaitInputStage,
+  inputReadinessTimeoutMs,
+  inputReadyDelay,
+  waitForInputReady,
+} from './inputReadiness.ts'
 
 export function createInputConsumers(id: string, fixture: string, length: number) {
   const configuration = inputConsumerConfiguration(id, fixture, length)
@@ -46,7 +51,7 @@ export function createInputConsumers(id: string, fixture: string, length: number
     plugins,
     async settle(editors: readonly Editor[]) {
       const startedAt = performance.now()
-      const deadline = startedAt + 30_000
+      const deadline = startedAt + inputReadinessTimeoutMs
       const syntax = configuration.treeSitter || configuration.shiki
       // A line over Shiki's limit is plain by policy, so live tokens cannot be required for it.
       const tokensLive = () =>
@@ -124,6 +129,17 @@ export function createInputConsumers(id: string, fixture: string, length: number
       ])
     },
   }
+}
+
+export function inputConsumersForFixture(
+  previous: ReturnType<typeof createInputConsumers> | null,
+  fixture: string,
+  length: number,
+) {
+  if (!previous) return null
+  const configuration = inputConsumerConfiguration(previous.configuration.id, fixture, length)
+  if (JSON.stringify(configuration) === JSON.stringify(previous.configuration)) return previous
+  return createInputConsumers(configuration.id, fixture, length)
 }
 
 type WorkerProof = {

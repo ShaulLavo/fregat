@@ -1,5 +1,8 @@
 import { createError } from '@singapore-editor/core/logging/evlog'
 
+// Supported-tier Shiki startup takes over 30 seconds under same-core CPU load.
+export const inputReadinessTimeoutMs = 120_000
+
 type PendingState = () => Readonly<Record<string, unknown>>
 
 function timeoutError(stage: string, observe: PendingState) {

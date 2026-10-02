@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bench:input:paired": "node paired.mjs",
     "build": "vite build",
     "bench": "node run.mjs",
     "bench:hidden": "node hidden.mjs",
@@ -21,8 +22,6 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "bench:input": "node run.mjs --suite input-latency",
-    "input:compare": "node input-compare.mjs",
-    "input:proof": "node test/verify-input-results.mjs results/input-latency",
     "bench:reclamation-live": "node reclamation-live.mjs",
     "bench:geometry": "node geometry.mjs",
     "bench:blink": "node blink.mjs",

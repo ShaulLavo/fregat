@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest'
 import {
   analysisLimitCodeUnits,
-  assertConsumerReadiness,
   inputConsumerConfiguration,
   minimapLimitCodeUnits,
 } from '../input-configurations.mjs'
+import { assertConsumerReadiness } from '../input-output.mjs'
 
 const owner = { lifecycle: 'ready', pendingRequests: 0, lastError: null }
 const worker = (name, extra = {}) => ({
@@ -143,16 +143,17 @@ test('pauses analysis consumers above the Platform analysis limit', () => {
   })
 })
 
-test('accepts uniform plain output when the reported plain lines match the text', () => {
+test('accepts one plain line painted across two uniformly coloured rendered chunks', () => {
   const plain = readiness('shiki', {
     shiki: { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 1 },
     overLimitLines: 1,
-    highlights: [{ name: 'editor-shared-token-0', ranges: 1, color: '#e1e4e8' }],
+    highlights: [{ name: 'editor-shared-token-0', ranges: 2, color: '#e1e4e8' }],
     views: [
       {
         initialHighlightStatus: 'painted',
         visible: true,
-        tokenRanges: 1,
+        tokenRanges: 2,
+        plainCoverage: { chunks: 2, covered: 2 },
         minimapElements: 0,
         gutterElements: 0,
       },
@@ -163,31 +164,43 @@ test('accepts uniform plain output when the reported plain lines match the text'
   ).not.toThrow()
 })
 
-test('rejects plain output with a wrong count, a second colour or a missing limit', () => {
-  const base = { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 1 }
+test('rejects missing plain coverage, wrong colour, range accounting, counts and limit', () => {
+  const shiki = { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 1 }
+  const view = {
+    initialHighlightStatus: 'painted',
+    visible: true,
+    tokenRanges: 2,
+    plainCoverage: { chunks: 2, covered: 2 },
+    minimapElements: 0,
+    gutterElements: 0,
+  }
+  const base = {
+    shiki,
+    overLimitLines: 1,
+    highlights: [{ name: 'editor-shared-token-0', ranges: 2, color: '#e1e4e8' }],
+    views: [view],
+  }
   const cases = [
-    { shiki: { ...base, untokenizedLines: 0 }, overLimitLines: 1 },
-    { shiki: { ...base, untokenizedLines: 2 }, overLimitLines: 1 },
+    { views: [{ ...view, plainCoverage: { chunks: 2, covered: 1 } }] },
+    { views: [{ ...view, plainCoverage: { chunks: 0, covered: 0 } }] },
+    { views: [{ ...view, plainCoverage: null }] },
+    { highlights: [{ name: 'editor-shared-token-0', ranges: 2, color: '#ff0000' }] },
+    { highlights: [{ name: 'editor-shared-token-0', ranges: 1, color: '#e1e4e8' }] },
+    { shiki: { ...shiki, untokenizedLines: 0 } },
+    { shiki: { ...shiki, untokenizedLines: 2 } },
+    { overLimitLines: 0 },
     {
-      shiki: base,
-      overLimitLines: 1,
-      highlights: [{ name: 'editor-shared-token-0', ranges: 2, color: '#e1e4e8' }],
-    },
-    { shiki: base, overLimitLines: 0 },
-    {
-      shiki: base,
-      overLimitLines: 1,
       highlights: [
         { name: 'editor-shared-token-0', ranges: 1, color: '#e1e4e8' },
         { name: 'editor-shared-token-1', ranges: 1, color: '#ff0000' },
       ],
     },
-    { shiki: { ...base, maxTokenizationLineLength: null }, overLimitLines: 1 },
+    { shiki: { ...shiki, maxTokenizationLineLength: null } },
   ]
   for (const overrides of cases)
     expect(() =>
       assertConsumerReadiness(
-        readiness('shiki', overrides),
+        readiness('shiki', { ...base, ...overrides }),
         'shiki',
         'ordinary',
         4469,
@@ -243,4 +256,21 @@ test('rejects a visible view without token ranges while another view has them', 
   expect(() =>
     assertConsumerReadiness(both, 'tree-sitter', 'ordinary', 4469, 'multiple', 'typing', null),
   ).not.toThrow()
+})
+
+test('scopes the pending minimap exception to final short-lines undo source equality', () => {
+  const stale = readiness('minimap', {
+    minimaps: [{ current: false, renderedAfterSource: true }],
+  })
+  const assert =
+    (fixture, scenario, opened, pending = true) =>
+    () =>
+      assertConsumerReadiness(stale, 'minimap', fixture, 4469, 'single', scenario, opened, pending)
+  expect(assert('short-lines', 'undo', {})).not.toThrow()
+  expect(assert('short-lines', 'undo', {}, false)).toThrow(/holds text that differs/)
+  expect(assert('short-lines', 'undo', null)).toThrow(/holds text that differs/)
+  expect(assert('ordinary', 'undo', {})).toThrow(/holds text that differs/)
+  expect(assert('short-lines', 'typing', {})).toThrow(/holds text that differs/)
+  stale.minimaps[0].renderedAfterSource = false
+  expect(assert('short-lines', 'undo', {})).toThrow(/has no accepted render/)
 })

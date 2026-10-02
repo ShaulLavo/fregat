@@ -134,6 +134,5 @@ The recorded runs used these commands from `examples/stress`:
 ```sh
 node first-paint.mjs --core-directory /work/tmp/e031-accepted/packages/editor --repetitions 1 --output /work/tmp/e031-first-paint.json
 node run.mjs --core-directory /work/tmp/e031-accepted/packages/editor --repetitions 1 --warmups 1 --output /work/tmp/e031-stress.json.gz
-node run.mjs --suite input-latency --core-directory /work/tmp/e031-final-gate/packages/editor --repetitions 3 --warmups 1 --output /work/tmp/e031-input.json.gz
-node input-compare.mjs check results/input-latency/control-1.json.gz /work/tmp/e031-input.json.gz results/input-latency/calibration.json.gz
+bun run bench:input:paired --baseline /work/tmp/plan-282/baseline --candidate /work/tmp/plan-282/candidate
 ```
