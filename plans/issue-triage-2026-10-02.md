@@ -1,5 +1,10 @@
 # Cross repository issue triage
 
+The owner's October 3 decisions and current execution tracking are in
+[the plan conversion report](issue-plan-conversion-2026-10-03.md). This document retains
+the October 2 snapshot. Mesh #107 has since shipped its measured optimization;
+Mesh #103 has a live DNS fix, and the fresh #364 build still emits its diagnostic.
+
 Status: Approved. The owner authorized full backlog triage and fixes for small confirmed bugs.
 Larger work and closure candidates remain for the owner's go/no-go decisions. This pass
 does not authorize every feature described by an issue or reopen previously deferred work.

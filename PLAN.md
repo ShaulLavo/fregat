@@ -1,6 +1,6 @@
 # Execution roadmap
 
-Updated 2026-10-02. This file owns cross-project ordering. Each [plan](plans/README.md)
+Updated 2026-10-03. This file owns cross-project ordering. Each [plan](plans/README.md)
 owns its scope, decisions, status and acceptance checks. [AGENTS.md](AGENTS.md) owns execution
 rules; [docs](docs/README.md) holds architecture, research and delivery evidence.
 
@@ -15,9 +15,11 @@ Package roadmap files link here. Create and update plans in root `plans/`.
 
 ## Current execution order
 
-The approved [October 2 issue triage](plans/issue-triage-2026-10-02.md) collects the selected
-repositories and fixes small confirmed bugs. Larger scopes remain for issue review;
-preserve existing dependency gates and explicit deferrals recorded there.
+The [October 2 issue triage](plans/issue-triage-2026-10-02.md) delivered its small confirmed
+fixes. The approved [October 3 plan conversion](plans/issue-plan-conversion-2026-10-03.md)
+transfers wanted larger scopes into Plans 290–318. Source issues close after published plan
+links carry their remaining work. Reproduction and benchmark investigations stay in the next
+review pass. Preserve the dependency gates and explicit deferrals below.
 
 The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remaining
 work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
@@ -42,6 +44,43 @@ snapshot; this file remains the scheduler and each plan remains its scope author
 
 The default is one active structural cutover plus independent closeout/proof work. This order
 schedules Approved work; it does not expand any plan's authorization.
+
+## Approved issue work
+
+The October 3 plans retain the existing structural-cutover limit. Mesh and application bug
+work can proceed independently where their files and contracts do not overlap.
+
+1. Address Mesh control authorization in [290](plans/290-mesh-device-authorization.md).
+   Public app removal and pill extraction [291](plans/291-mesh-private-services.md) is separate.
+   Update recovery [296](plans/296-mesh-update-recovery.md), installer guidance
+   [297](plans/297-mesh-installer-path.md), DNS recovery
+   [298](plans/298-mesh-download-dns-recovery.md), and session removal
+   [299](plans/299-mesh-session-removal.md) can start in parallel.
+   Machine identity [300](plans/300-mesh-machine-identity.md), owner-authorized GUI inspection
+   [301](plans/301-mesh-gui-inspection.md), and private app inspection
+   [302](plans/302-mesh-private-app-observability.md) follow their authentication and routing gates.
+   ZeroTier [292](plans/292-mesh-zerotier.md) waits for working enrollment and revocation.
+2. Preserve shipped spellcheck hardening through [303](plans/303-spellcheck-correctness.md).
+   Incremental underline work [304](plans/304-spellcheck-rendering-cost.md) uses Plan 201's
+   shared renderer. Language support [305](plans/305-spellcheck-language-support.md) is independent.
+   JSON worker syntax [306](plans/306-bun-json-worker.md), diff topology
+   [307](plans/307-diff-row-topology.md), machine controls
+   [318](plans/318-machine-connection-controls.md), and heavy root ownership
+   [312](plans/312-heavy-slice-ownership.md) are bounded correctness units.
+3. Adopt Plan 289's passive feed with [308](plans/308-account-usage-feed.md), then integrate
+   transcript history [309](plans/309-account-usage-history.md) and allowance visibility
+   [310](plans/310-allowance-visibility.md). These scopes preserve owner-started agents.
+   Quiet admission [313](plans/313-heavy-quiet-lifecycle.md) and non-cache measurements
+   [314](plans/314-heavy-non-cache-memory.md) share the heavy runner but keep separate receipts.
+4. Build the ordinary issue collector [295](plans/295-cross-repository-issue-collection.md)
+   for manual use before scheduler integration. Durable storage
+   [293](plans/293-mesh-durable-job-state.md) precedes coordinated dispatch
+   [294](plans/294-mesh-job-coordination.md). Schedule the collector after those guarantees pass.
+5. Automatic placement [311](plans/311-automatic-machine-placement.md), design-first onboarding
+   [315](plans/315-local-remote-onboarding.md), and session attention
+   [316](plans/316-session-attention.md) follow their owning product and verification gates.
+   Grammar re-pinning and held-out corpus [317](plans/317-tree-sitter-phase-two-prerequisites.md)
+   remain Approved and deferred to Phase 2 preparation. They do not start the stopped parser wave.
 
 ## Next programs
 

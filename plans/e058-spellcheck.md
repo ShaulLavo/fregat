@@ -1,5 +1,10 @@
 # E058: Spellcheck for text the editor paints itself
 
+Approved follow-ups from [Singapore #58](https://github.com/ShaulLavo/singapore/issues/58)
+are tracked in [303](303-spellcheck-correctness.md) for validation of shipped correctness,
+[304](304-spellcheck-rendering-cost.md) for incremental overlay cost through Plan 201,
+and [305](305-spellcheck-language-support.md) for explicit spelling languages.
+
 Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
 
 - Status: In progress
