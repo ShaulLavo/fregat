@@ -406,3 +406,42 @@ test('rejected recovery restart compensates current and records an actionable te
   expect(await checkCurrentReadiness(releaseRoot, rejected)).toBe(false)
   expect(commands).toBe(1)
 })
+
+test('a rejected restart after the candidate exits leaves recovery with the next activation', async () => {
+  const root = scratch()
+  const releaseRoot = path.join(root, 'installed')
+  const requested = { ...intent(root), address: `http://127.0.0.1:${await freePort()}` }
+  const first = installBundledRelease(payload(root, 'old'), releaseRoot, requested)
+  const staged = installBundledRelease(
+    payload(root, 'new', 'b'.repeat(40)),
+    releaseRoot,
+    requested,
+    { readinessMs: 1 },
+  )
+  approveRestart(releaseRoot, {
+    release: staged.release.name,
+    stagedAt: lstatSync(path.join(releaseRoot, 'pending')).mtime.toISOString(),
+  })
+  promote(releaseRoot, () => true)
+  let active = true
+  let ownedRecovery: string | undefined
+  const rejected = () => {
+    active = false
+    ownedRecovery = readFileSync(path.join(releaseRoot, 'readiness-recovery.json'), 'utf8')
+    return false
+  }
+  expect(
+    await checkReadiness(
+      releaseRoot,
+      staged.release.directory,
+      first.release.directory,
+      rejected,
+      fetch,
+      { isActive: () => active },
+    ),
+  ).toBe(false)
+  expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(first.release.directory)
+  expect(readFileSync(path.join(releaseRoot, 'readiness-recovery.json'), 'utf8')).toBe(
+    ownedRecovery,
+  )
+})

@@ -342,8 +342,10 @@ export async function checkReadiness(
     })
     pointCurrentAt(root, previous)
     if (launch(machineRestartCommand())) return false
-    const compensated = currentRelease(root) === previous
-    if (compensated) pointCurrentAt(root, directory)
+    // The restart command can outlive the activation that requested recovery.
+    const compensated = activeRelease(root, previous, options)
+    if (!compensated) return false
+    pointCurrentAt(root, directory)
     const error = serviceErrors.RECOVERY_RESTART_FAILED({
       internal: { restartAccepted: false, compensated },
     })
