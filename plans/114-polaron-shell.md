@@ -566,12 +566,16 @@ environmentId, stateHome, address, webBase, service: { kind, registrationId } }`
   State-home disclosure is restricted to authenticated installation/owner scope. Authentication
   failure is distinct from another program or mismatched state. Do not invent a second UUID
   when the existing durable environment identity provides the state identity.
-- `GET /system/capabilities` returns `{ machineId, environmentId, nativePicker: {
-available, ownerMachineId } }`. Availability means the helper and desktop session are usable,
-  not proof that the browser is on that machine. U2 separately requires the authenticated
-  same-machine proof established by local setup; hostname/platform/capability claims alone do
-  not establish locality. U3 validates that proof under existing machine authentication on the
-  mutation. No proof means in-app picker in U2 and denial of native invocation in U3.
+- `GET /system/capabilities` returns `{ machineId, environmentId, nativePicker }`, evaluated
+  for the request that asked. `nativePicker` is `true` only when that request is local and a
+  native helper with a usable desktop session exists. A request is local only when it arrived
+  on a loopback socket (judged by the socket's remote address, never by a header), its Origin is
+  the local install origin, and it carries no proxy hop: any `Forwarded`, `X-Forwarded-*`,
+  `X-Real-IP` or `Via` header makes it remote. mesh serve always sets `X-Forwarded-For`, and
+  Fregat's own machine proxy stamps `Via: 1.1 fregat` after stripping forwarding headers, so
+  a request relayed from another device or machine through a loopback tunnel is remote. The
+  browser carries no locality proof; U2 reads the boolean, and U3 re-checks the same rule on
+  the mutation. Hostname, platform or capability claims alone never establish locality.
 - `POST /fs/native-picker` takes `{ mode: "folder" | "file", accept?: readonly string[],
 startingPath?: string, multiple?: boolean }` and returns `{ outcome: "selected" | "cancelled",
 paths: string[] }`. Paths are selected-server absolute paths; cancellation returns an empty
@@ -585,8 +589,8 @@ paths: string[] }`. Paths are selected-server absolute paths; cancellation retur
   It resolves with verified identity and `reused`/`registered` disposition after readiness,
   or rejects with a structured conflict. U1 calls it during one-time setup before PWA registration;
   ordinary Dock launch calls no setup code. Remote target setup verifies the selected remote
-  service without installing a second local state-home server. Locality-proof issuance and
-  validation remain inside this authenticated setup boundary, shared by both launch paths.
+  service without installing a second local state-home server. Locality is decided by the
+  server per request (above), so setup issues no locality credential.
 
 U1 owns manifest `launch_handler`; U2 owns its `launchQueue` consumer. U1 owns installed/native
 host choice; U2 owns runtime web capability/picker choice; U3 owns server capability truth and
