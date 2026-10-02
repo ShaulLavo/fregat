@@ -4,8 +4,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#191724",
-  "theme_color": "#191724",
+  "background_color": "#232136",
+  "theme_color": "#232136",
   "icons": [
     { "src": "icons/fregat.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

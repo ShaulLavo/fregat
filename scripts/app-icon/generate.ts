@@ -18,8 +18,8 @@ const master = readFileSync(path.join(dir, 'fregat.svg'), 'utf8')
 // Apple's grid draws the squircle 824 wide on a 1024 canvas.
 const GRID_BODY = 824 / 1024
 
-// Rosé Pine Dawn's gold: the master's gold drops to 1.6:1 on a white tab strip.
-const LIGHT_TAB = { body: '#ea9d34', flame: '#ea9d34' }
+// Rosé Pine Dawn's rose and gold: the master's pale rose drops to 1.6:1 on a white tab strip.
+const LIGHT_TAB = { body: '#d7827e', flame: '#ea9d34' }
 
 // PNG-backed icns entries macOS reads; the @2x types reuse the next size up.
 const ICNS_ENTRIES = [
