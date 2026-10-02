@@ -11,15 +11,8 @@ export async function createAcpFixture(
   driver: AnyProviderDriver,
   options: { config?: unknown; environment?: NodeJS.ProcessEnv } = {},
 ) {
-  const root = await mkdtemp(path.join(tmpdir(), `fregat-acp-${driver.driverKind}-`))
-  const binaryPath = path.join(root, `${driver.driverKind}-fixture.mjs`)
-  const source = await readFile(
-    path.resolve(import.meta.dirname, '../../../../scripts/agent/fixtures/fake-acp.mjs'),
-    'utf8',
-  )
-  await writeFile(binaryPath, source.replace(/^#!.*$/m, `#!${process.execPath}`))
-  await chmod(binaryPath, 0o755)
-  const log = path.join(root, 'rpc.jsonl')
+  const executable = await createAcpExecutableFixture(driver.driverKind)
+  const { root, binaryPath, log } = executable
   const providerInstanceId = v.parse(providerInstanceIdSchema, `${driver.driverKind}-fixture`)
   const config = driver.parseConfig(options.config ?? { configHome: path.join(root, 'profile') })
   const env = resolveProviderInstanceEnvironment({
@@ -51,12 +44,32 @@ export async function createAcpFixture(
     turnId: v.parse(turnIdSchema, `${driver.driverKind}-turn`),
   }
   return {
-    root,
-    binaryPath,
+    ...executable,
     handle,
     input,
     env,
     config,
+    dispose: async () => {
+      await handle.dispose()
+      await executable.dispose()
+    },
+  }
+}
+
+export async function createAcpExecutableFixture(driverKind: string) {
+  const root = await mkdtemp(path.join(tmpdir(), `fregat-acp-${driverKind}-`))
+  const binaryPath = path.join(root, `${driverKind}-fixture.mjs`)
+  const source = await readFile(
+    path.resolve(import.meta.dirname, '../../../../scripts/agent/fixtures/fake-acp.mjs'),
+    'utf8',
+  )
+  await writeFile(binaryPath, source.replace(/^#!.*$/m, `#!${process.execPath}`))
+  await chmod(binaryPath, 0o755)
+  const log = path.join(root, 'rpc.jsonl')
+  return {
+    root,
+    binaryPath,
+    log,
     records: async (): Promise<Array<Record<string, any>>> => {
       try {
         return (await readFile(log, 'utf8'))
@@ -68,9 +81,6 @@ export async function createAcpFixture(
         return []
       }
     },
-    dispose: async () => {
-      await handle.dispose()
-      await rm(root, { recursive: true, force: true })
-    },
+    dispose: () => rm(root, { recursive: true, force: true }),
   }
 }
