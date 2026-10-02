@@ -42,7 +42,7 @@ for await (const chunk of Bun.file(3).stream()) {
     buffered = buffered.slice(end + 1)
     if (mode === 'exit-attach' && message.method === 'Target.setDiscoverTargets') process.exit(3)
     if (mode === 'slow-attach' && message.method === 'Target.setAutoAttach') busy(6000)
-    if (mode.endsWith('-page') && message.method === 'Target.setAutoAttach')
+    if (message.method === 'Target.setAutoAttach')
       writeSync(
         4,
         JSON.stringify({
@@ -50,7 +50,7 @@ for await (const chunk of Bun.file(3).stream()) {
           params: { sessionId: 'initial', targetInfo: { type: 'page' } },
         }) + '\0',
       )
-    if (mode.endsWith('-page') && message.method === 'Runtime.enable')
+    if (message.method === 'Runtime.enable')
       writeSync(
         4,
         JSON.stringify({
