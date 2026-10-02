@@ -448,6 +448,7 @@ async function measure(testCase, repetition, browserSession) {
 async function qualifyDisplay(page, session, browserSession, run, idle = true) {
   const metadata = {
     variant: run.variant,
+    frameBuilder: run.frameBuilder,
     count: run.count,
     repetition: run.repetition,
     phase: run.phase,

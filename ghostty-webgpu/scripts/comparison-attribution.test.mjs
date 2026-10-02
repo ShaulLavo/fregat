@@ -232,3 +232,45 @@ test('qualified analysis rejects a missing case or phase even with finishedAt', 
   hidden.qualifications[1].visibility = 'hidden'
   assert.throws(() => validateArtifact(hidden), /display unavailable/)
 })
+function pairedFrameArtifact() {
+  const artifact = completeArtifact()
+  artifact.environment.arguments = ['--paired-frame-builders']
+  artifact.runs = artifact.runs.flatMap((run) => {
+    if (run.variant !== 'ghostty-webgpu') return [run]
+    return ['js', 'zig'].map((frameBuilder) => ({
+      ...run,
+      frameBuilder,
+      phases: run.phases.map((phase) => ({
+        ...phase,
+        label: phase.label.replace(run.variant, `${run.variant}-${frameBuilder}`),
+      })),
+    }))
+  })
+  artifact.qualifications = artifact.qualifications.flatMap((probe) => {
+    if (probe.variant !== 'ghostty-webgpu') return [probe]
+    return ['js', 'zig'].map((frameBuilder) => ({ ...probe, frameBuilder }))
+  })
+  return artifact
+}
+
+test('trace validation distinguishes complete JS and Zig treatments beside one xterm control', () => {
+  assert.doesNotThrow(() => validateArtifact(pairedFrameArtifact()))
+  const missing = pairedFrameArtifact()
+  missing.runs.pop()
+  assert.throws(() => validateArtifact(missing), /Incomplete case matrix/)
+  const duplicate = pairedFrameArtifact()
+  duplicate.runs[1] = structuredClone(duplicate.runs[0])
+  assert.throws(() => validateArtifact(duplicate), /duplicate case matrix/)
+})
+
+test('paired trace validation rejects unknown treatments and cross-treatment qualification', () => {
+  const unknown = pairedFrameArtifact()
+  unknown.runs[0].frameBuilder = 'unknown'
+  assert.throws(() => validateArtifact(unknown), /unexpected case/)
+  const wrongControl = pairedFrameArtifact()
+  wrongControl.runs.find((run) => run.variant === 'xterm-webgl').frameBuilder = 'js'
+  assert.throws(() => validateArtifact(wrongControl), /unexpected case/)
+  const mismatched = pairedFrameArtifact()
+  mismatched.qualifications[0].frameBuilder = 'zig'
+  assert.throws(() => validateArtifact(mismatched), /Incomplete display evidence/)
+})

@@ -242,7 +242,8 @@ function validateRun(run, artifact, phases) {
   assert(run.phases?.length === phases.length * 2, 'Incomplete phase pairs')
   for (const name of phases) {
     for (const traced of [false, true]) {
-      const label = `${run.variant}-${run.count}-${run.repetition}-${name}-${traced ? 'trace' : 'control'}`
+      const treatment = run.frameBuilder ? `${run.variant}-${run.frameBuilder}` : run.variant
+      const label = `${treatment}-${run.count}-${run.repetition}-${name}-${traced ? 'trace' : 'control'}`
       const matches = run.phases.filter((phase) => phase.label === label && phase.traced === traced)
       assert(matches.length === 1, 'Incomplete or duplicate phase pair')
       validatePhase(matches[0], name, artifact)
@@ -251,6 +252,7 @@ function validateRun(run, artifact, phases) {
   const probes = artifact.qualifications.filter(
     (probe) =>
       probe.variant === run.variant &&
+      probe.frameBuilder === run.frameBuilder &&
       probe.count === run.count &&
       probe.repetition === run.repetition,
   )
@@ -298,14 +300,18 @@ export function validateArtifact(artifact) {
     'Incomplete phase matrix',
   )
   assert(Array.isArray(artifact.qualifications), 'Incomplete display evidence')
+  const builders = args.includes('--paired-frame-builders') ? ['js', 'zig'] : [undefined]
   assert(
-    artifact.runs?.length === counts.length * artifact.repetitions * 2,
+    artifact.runs?.length === counts.length * artifact.repetitions * (builders.length + 1),
     'Incomplete case matrix',
   )
   const slots = new Set()
   for (const run of artifact.runs) {
     assert(
       ['ghostty-webgpu', 'xterm-webgl'].includes(run.variant) &&
+        (run.variant === 'ghostty-webgpu'
+          ? builders.includes(run.frameBuilder)
+          : run.frameBuilder === undefined) &&
         counts.includes(run.count) &&
         run.path === 'bytes' &&
         Number.isInteger(run.repetition) &&
@@ -313,7 +319,7 @@ export function validateArtifact(artifact) {
         run.repetition < artifact.repetitions,
       'Incomplete or unexpected case',
     )
-    const slot = `${run.variant}/${run.count}/${run.repetition}`
+    const slot = `${run.variant}/${run.frameBuilder ?? ''}/${run.count}/${run.repetition}`
     assert(!slots.has(slot), 'Incomplete or duplicate case matrix')
     slots.add(slot)
     validateRun(run, artifact, phases)
@@ -330,6 +336,7 @@ export async function analyze(directory) {
     for (const phase of run.phases ?? []) {
       const row = {
         variant: run.variant,
+        frameBuilder: run.frameBuilder,
         count: run.count,
         repetition: run.repetition,
         label: phase.label,
