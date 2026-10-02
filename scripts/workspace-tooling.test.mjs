@@ -136,3 +136,16 @@ test('root and standalone terminal install Node types ahead of ancestor packages
     })
   }
 })
+
+test('terminal native input closure agrees with its package dependencies', () => {
+  const terminal = fileURLToPath(new URL('../ghostty-webgpu/', import.meta.url))
+  const verifier = fileURLToPath(
+    new URL('../ghostty-webgpu/scripts/verify-config-resolver-artifacts.ts', import.meta.url),
+  )
+  const result = spawnSync('bun', [verifier, '--state', 'either'], {
+    cwd: terminal,
+    encoding: 'utf8',
+  })
+  expect(result.status, result.stdout + result.stderr).toBe(0)
+  expect(['bootstrap', 'assembled']).toContain(result.stdout.trim())
+})
