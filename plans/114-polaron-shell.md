@@ -103,21 +103,27 @@ Order, per OS:
 
 1. **The setting.** `window.browser` (machine scope, it selects a binary): `auto` (default),
    `webview`, or an absolute path to a Chromium-family executable.
-2. **The default browser, if it is in the table.** Linux: `x-scheme-handler/https` from the XDG
+2. **Google Chrome**, when installed, regardless of the OS default. Linux finds its binaries
+   and flatpak export; macOS finds the `com.google.Chrome` bundle.
+3. **The default browser, if it is in the table.** Linux: `x-scheme-handler/https` from the XDG
    `mimeapps.list` search path (0 ms; `xdg-settings get default-web-browser` answers the same in
    106 ms), then the `.desktop` file's `Exec` token. macOS: `LSHandlerRoleAll` for `https` in
    `~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist` (read
    with `plutil -convert json`), then the app path by bundle id (`/Applications`, `~/Applications`,
    `mdfind kMDItemCFBundleIdentifier`), executable from `Info.plist` `CFBundleExecutable`. This
    machine resolves to Helium on both the PC and the Mac.
-3. **The table, top to bottom**, on `PATH`, then the flatpak export dirs
+4. **The table, top to bottom**, on `PATH`, then the flatpak export dirs
    (`/var/lib/flatpak/exports/bin`, `~/.local/share/flatpak/exports/bin`), then the macOS bundles.
-4. **The webview host**, if its library loads (`libwebkit2gtk-4.1.so.0` on Linux; always on macOS).
-5. **The default browser in a tab** (`xdg-open` / `open`), with the reason in the log and a
+5. **The webview host**, if its library loads (`libwebkit2gtk-4.1.so.0` on Linux; always on macOS).
+6. **The default browser in a tab** (`xdg-open` / `open`), with the reason in the log and a
    `desktop.window.degraded` event. The web picker and the web wallpaper cover what the bridge would.
 
+**Approved owner decision, 2026-10-02.** `auto` uses the Chrome-first order above on Linux and
+macOS. An explicit browser path stays first. The Browser setting describes the automatic order.
+
 `window.transparency: 'window'` needs a see-through window, which only the webview host can make,
-so under `auto` it selects the webview (Decided below).
+so under `auto` it selects the webview. The default transparency is `compositor`, which retains
+Chrome-first selection.
 
 Flatpak and snap run confined. Flatpak needs `flatpak run --filesystem=<profile dir>`; snap cannot
 write hidden directories in `$HOME`, so its profile goes under `~/snap/<name>/common/platform`.
@@ -503,9 +509,9 @@ now uses):
 
 ## Owner questions
 
-1. **Chrome-first or not?** Decided 2026-09-26: owner — the shell uses the user's installed
-   Chromium (`--app`) when there is one and falls back to the system webview when there is none.
-   This plan is built around that order.
+1. **Chrome-first.** Approved 2026-10-02: owner. Automatic selection tries Google Chrome before
+   the OS-default supported Chromium browser, then the remaining scan and native fallback.
+   Explicit browser selection wins. This supersedes the 2026-09-26 installed-Chromium order.
 2. **The Chromium `--app` fallback as a flag.** Superseded 2026-09-26 by question 1: Chromium is
    the first choice, not a flag.
 3. **Screenshot attachment on WebKitGTK.** Decided 2026-09-26: research recommendation — hide it in
@@ -518,7 +524,8 @@ now uses):
    `vibrancy.m`).
 5. **Transparency picks the engine.** Decided 2026-09-26: research recommendation — under
    `window.browser: auto`, `window.transparency: 'window'` selects the webview, because a Chromium
-   app window cannot be see-through and the user asked for see-through.
+   app window cannot be see-through and the user asked for see-through. Reconfirmed 2026-10-02:
+   this explicit transparency choice retains the native webview; the default is `compositor`.
 6. **The browser profile.** Decided 2026-09-26: research recommendation — a separate
    `--user-data-dir` under `PLATFORM_HOME`. Chrome refuses remote debugging on the default profile,
    and a separate profile keeps the app's storage and permissions out of the user's browsing.

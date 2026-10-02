@@ -87,7 +87,15 @@ export function resolveBrowserCandidates(
     const exported = flatpakExport(family.flatpak, env, fs)
     if (exported) candidates.push(flatpakCandidate(exported, family.flatpak, 'scan', family.name))
   }
+  candidates.sort((a, b) => browserPriority(a) - browserPriority(b))
   return [...deduplicate(candidates), { kind: 'webview' }, { kind: 'tab' }]
+}
+
+function browserPriority(value: BrowserCandidate) {
+  if (value.source === 'setting') return 0
+  if (value.family === 'chrome') return 1
+  if (value.source === 'default') return 2
+  return 3
 }
 
 function deduplicate(candidates: readonly BrowserCandidate[]) {
