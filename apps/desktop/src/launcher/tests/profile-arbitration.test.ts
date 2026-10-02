@@ -55,11 +55,22 @@ async function fixture(mode: string, initialManifest?: string, baseUrl = 'http:/
   }
   const closeApp = async () => {
     const owner = await readlink(path.join(profile, 'SingletonLock'))
-    process.kill(Number(owner.slice(hostname().length + 1)), 'SIGTERM')
+    const pid = Number(owner.slice(hostname().length + 1))
+    process.kill(pid, 'SIGTERM')
     const deadline = Date.now() + 2000
-    while (existsSync(path.join(profile, 'SingletonLock')) && Date.now() < deadline)
+    // SingletonLock is a dangling symlink; wait for its owner to exit before starting another app.
+    while (Date.now() < deadline) {
+      try {
+        process.kill(pid, 0)
+      } catch {
+        break
+      }
       await Bun.sleep(5)
-    expect(existsSync(path.join(profile, 'SingletonLock'))).toBe(false)
+    }
+    expect(() => process.kill(pid, 0)).toThrow()
+    expect(
+      await readlink(path.join(profile, 'SingletonLock')).catch(() => undefined),
+    ).toBeUndefined()
   }
   return {
     root,
@@ -475,6 +486,33 @@ posixTest('a nested controller target replays with the installed base app identi
   } finally {
     await writeFile(box.pidFile + '.release', 'go')
     await Promise.allSettled([first])
+    await box.cleanup()
+  }
+})
+
+posixTest('fixture shutdown waits for a dangling singleton lock owner to finish', async () => {
+  const box = await fixture('race-simultaneous', firstManifest)
+  let owner: number | undefined
+  let closing: Promise<void> | undefined
+  try {
+    await box.launch('one')
+    owner = Number(
+      (await readlink(path.join(box.profile, 'SingletonLock'))).slice(hostname().length + 1),
+    )
+    expect(existsSync(path.join(box.profile, 'SingletonLock'))).toBe(false)
+    process.kill(owner, 'SIGSTOP')
+    closing = box.closeApp()
+    const settled = closing.then(() => 'done')
+    expect(await Promise.race([settled, Bun.sleep(100).then(() => 'waiting')])).toBe('waiting')
+    process.kill(owner, 'SIGCONT')
+    await closing
+  } finally {
+    if (owner) {
+      try {
+        process.kill(owner, 'SIGCONT')
+      } catch {}
+    }
+    await Promise.allSettled(closing ? [closing] : [])
     await box.cleanup()
   }
 })
