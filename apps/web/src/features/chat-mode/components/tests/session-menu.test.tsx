@@ -1,6 +1,6 @@
 import { commandIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
@@ -97,8 +97,24 @@ test('timer wake appears at its deadline and acknowledgment retains server snooz
     })
     .finally(() => vi.useRealTimers())
   await h.refresh()
-  renderRailHarness(h)
-  await screen.findByText('Woke')
+  vi.useFakeTimers({
+    now: Date.parse(deadline) - 1,
+    toFake: ['Date', 'setTimeout', 'clearTimeout'],
+  })
+  try {
+    renderRailHarness(h)
+    expect(
+      within(screen.getByRole('region', { name: 'Snoozed' })).getByTitle('First'),
+    ).not.toHaveTextContent('Woke')
+    // The deadline timer runs one tick after expiry; the moved row schedules its own tick.
+    await act(() => vi.advanceTimersByTimeAsync(2))
+    await act(() => vi.advanceTimersByTimeAsync(1))
+    expect(
+      within(screen.getByRole('region', { name: 'Active' })).getByTitle('First'),
+    ).toHaveTextContent('Woke')
+  } finally {
+    vi.useRealTimers()
+  }
   await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTitle('First') })
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Acknowledge wake' }))
   await waitFor(() => expect(screen.queryByText('Woke')).toBeNull())
