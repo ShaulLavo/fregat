@@ -173,20 +173,181 @@ web single-window guarantee when the browser ignores `launch_handler`. Owner app
 explicitly choose whether to retain a named degraded fallback or require a capable installed-app
 browser and proceed to the native host. Do not describe that fallback as full installed-app parity.
 
-### Service ownership and reachability
+### Server availability without user steps
 
-A Dock shortcut opens the manifest's stable start URL directly. The API and web route must therefore
-be reachable independently of the launcher. Preserve mesh-owned service startup; do not spawn a
-second server from the web app or launcher. For production, prove the `/platform/` route can wake
-the service from idle and restore the selected machine/workspace. For local development, prove the
-Vite/API mesh routes from a cold state. A closed server, a missing mesh route, or an untrusted HTTP
-origin is an availability failure, not something CDP injection can solve.
+A Dock shortcut opens the manifest's stable start URL directly. The page cannot start a local
+process, so the installer/first Polaron setup must register its server with the OS before
+installing the PWA. This is one-time setup, performed automatically. Subsequent browser launches
+need only a connection to the stable endpoint; they do not run the launcher or an installation
+script. Setup itself is idempotent and verifies the service, origin and served release before
+creating the browser registration.
 
-Do not rewrite an installed app's identity on each deployment. A loopback production origin and a
-mesh production origin would be distinct installed apps; settle the intended production URL before
-registration. The current launcher waits for loopback development URLs, while production is
-served at `/platform/` on the mesh. Stable production origin, local chooser access, and the
-already-running-browser handoff are explicit gates, not hidden dependencies on the launcher.
+#### Stable endpoint and origin
+
+Choose the install target once and persist that choice as installation intent.
+
+| Install mode               | Stable installed start URL                                                                   | Server ownership                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Local packaged desktop     | `http://127.0.0.1:3301/` by default, a single origin serving the packaged web client and API | Per-user launchd/systemd socket-activated installation       |
+| Existing remote production | `https://omarchy.mesh.shaulavo.dev/platform/` today                                          | The remote host's existing production service and mesh route |
+| Development                | The existing registered Vite/API mesh routes, with a separate browser profile                | Existing `scripts/dev-serve.ts` registration                 |
+
+The local desktop port becomes a machine-scoped registry entry, with 3301 as the initial default.
+Honor an already configured endpoint. Reserve the chosen port through the OS socket unit before
+PWA installation; on conflict, report the occupying service and resolve setup before installing.
+Do not pick a different port on every run, silently share another app's origin, or bind publicly.
+Use one explicit IPv4 loopback address, not an ambiguous `localhost` resolution. HTTP loopback is
+a potentially trustworthy browser context; prove required web APIs on that exact origin.
+
+The packaged local release uses web base `/`. Today's remote release uses `/platform/` through
+mesh; a local install must not point that remote bundle at a different base. Reuse the release
+builder with an explicit install-target build configuration. Server-generated URLs, CORS,
+WebSocket/MCP URLs, cookies, and route helpers use the stable public origin, not the activator's
+private upstream endpoint. Install manifest identity `./` against the chosen start URL.
+
+Changing scheme, host, port, or base path changes browser origin, storage, permissions, and app
+identity. Such a change is a new installation with explicit owner review, not an automatic release
+update. Dev and local/remote production installations remain separate. No account/state migration
+or browser-database editing is part of this work.
+
+#### macOS registration and socket activation
+
+Install a user-owned `~/Library/LaunchAgents/dev.fregat.server.plist` into the logged-in user's
+launchd GUI domain. The LaunchAgent names the installed activator by absolute path and declares
+a named `Sockets` TCP stream listener with `SockNodeName: 127.0.0.1`, the configured stable port
+as `SockServiceName`, and `SockType: stream`. launchd owns the listener while the server is absent
+and starts the agent on the first connection. Socket demand provides activation; do not make
+`RunAtLoad` or unconditional `KeepAlive` an always-running-server substitute.
+
+The activator obtains the named listener with `launch_activate_socket`, validates the returned
+descriptors and address, then starts the current server release. It runs in the user's GUI
+session so native chooser helpers can use that desktop and real keychain. Keep the socket in
+launchd across server exit/restart. Setup bootstraps the agent in `gui/<uid>`, verifies activation
+with an HTTP request, then installs the PWA. The owner performs no `launchctl` step.
+
+#### Linux registration and socket activation
+
+Install a user-owned `fregat-server.socket` and `fregat-server.service` in
+`~/.config/systemd/user/`. The socket unit uses `ListenStream=127.0.0.1:<configured port>`,
+`Accept=no`, an explicit matching service, and `WantedBy=sockets.target`. Enable/start the socket
+through the user manager during setup. The service starts the activator once for the shared
+listening socket and receives it through `LISTEN_PID`, `LISTEN_FDS`, and the named activation
+descriptor at fd 3. Validate one expected stream listener rather than accepting arbitrary fd 3.
+
+The socket unit stays active while the service is stopped. The first browser TCP connection starts
+the service and remains queued during startup. The service's owned process group includes the
+activator and current server, not mesh, another installed app, or the shared terminal host. Use
+the existing registered process budgets and OS supervision rather than an unbounded launcher
+retry loop. The user session environment must allow a local native chooser; absence of a usable
+desktop is a capability/availability result, not a silent dialog on another host. Do not enable
+machine-wide services or user lingering as a side effect of a desktop install.
+
+#### Taking the activated socket
+
+The current server in `apps/server/src/index.ts` calls Elysia `app.listen({ hostname, port })`.
+Checked-in Bun 1.4.2 `Bun.serve` types provide TCP/unix listeners but no public inherited-listener
+option. An `fd` type elsewhere in Bun's low-level networking declarations does not establish
+that its HTTP server can adopt a listening fd. A tiny helper that merely `exec`s Bun leaves the
+same issue; it cannot make Bun bind a port launchd/systemd already owns.
+
+**Execution choice unless a direct-adoption prototype proves otherwise.** A small native activator
+takes the OS-owned listener and relays accepted byte streams to a private Unix-domain listener
+of the unmodified HTTP/WebSocket application. It forks/execs the Bun server from `current`,
+passes an internal activation descriptor identifying its runtime socket/public origin, and
+waits for the existing health/release endpoint before forwarding queued clients. The activator
+remains the transport relay. It preserves bytes and backpressure, so browser WebSocket upgrades,
+SSE, uploads, HTTP keep-alive and half-close do not require a second HTTP implementation.
+
+The server adds a Unix-listen boot path to its existing Elysia/Bun setup. The runtime socket lives
+under a per-user, permission-restricted runtime directory and is freshly allocated for each
+owned activation. It is not the PWA's address. Do not expose the private listener over the network,
+close inherited descriptors accidentally during exec, spin while awaiting readiness, or drop
+the first browser request and require the user to reload. Startup timeout/failure ends the owned
+activation and reaches structured logs; OS socket supervision bounds retry behavior. Configurable
+limits belong in the settings registry, not new environment variables or embedded tunables.
+
+First prototype direct listener adoption on the supported Bun build. If it handles real HTTP,
+WebSocket, SSE, queued first connection, restart and disconnect correctly on both OSes, adopt the
+descriptor directly and delete the relay. Otherwise implement the bounded activator path above.
+Reuse existing mesh transport behavior or code where applicable; do not introduce a second
+general reverse-proxy framework. The minimum acceptable implementation is a socket activation
+adapter plus the existing server, not another application runtime.
+
+#### State, logs, idle and ownership
+
+- Production app state remains the resolved production `PLATFORM_HOME`, default `~/.platform`,
+  through `scripts/state-home.ts`. Dev uses its existing writable `/work/platform-dev/home` or
+  home fallback. Never seed a packaged local production server from a disposable test profile.
+- Releases, runtime and large logs use the existing production layout on a verified writable
+  data drive. Prefer `/work` where available; choose a user-owned data location on macOS through
+  install configuration. Unit/plist files are small OS-required configuration. Do not embed a
+  developer checkout path, host name, or `/work` dependency into portable installation code.
+- Reuse structured JSONL logging and `OBSERVABILITY_DIR`. The service records release, commit,
+  activation/startup outcome and one wide event per operation. launchd stdout/stderr and the
+  systemd user journal retain early activator failures; application logs remain in the release
+  installation's configured logs directory. Record rotation follows the existing logger.
+- A closed app does not remove the socket or state. Idle shutdown is allowed only when there are
+  no active sessions, terminals, streams or work keeping the server busy. Use a registered idle
+  policy and existing lifecycle owners; app-window count alone cannot decide server shutdown.
+  The socket remains ready and the next app launch wakes the service. Do not terminate the shared
+  terminal host to achieve an idle server.
+- Two setup invocations converge on one installed unit/plist and one listener. A second browser
+  client reaches the same state home and server. Read/validate a served environment identity
+  before trusting an already occupied endpoint as this installation.
+
+#### Updates and uninstall
+
+Reuse `scripts/deploy/release.ts`, staged `releases/`, `current`/`pending` links, explicit restart
+approval, promotion and post-promotion live checks. Stage complete web/server/activator artifacts;
+never replace files inside a running release. Swap the `current` link atomically only through
+the approved restart path. Adapt the existing promotion host actions for launchd and local
+systemd supervision; do not duplicate release validation or let a crash promote an unapproved
+pending release. The stable socket/origin stays registered while the server drains and restarts.
+Existing connections may reconnect through the app's normal recovery behavior. A queued cold
+launch reads the approved `current` release and wakes into it.
+
+A replaced activator binary needs its own supervised restart after draining. The OS continues to
+own the stable socket across that transition. Release rollback retains the same app identity,
+state and socket; reuse the existing previous-release/live-check mechanism. Test the combined
+failure boundary, including a bad candidate server and an activator that fails before readiness.
+The current release's `server/node_modules` relationship means dependency updates must follow
+the existing deployment contract; a link rollback does not undo a dependency install.
+
+Uninstall automatically unregisters the local app's LaunchAgent or systemd socket/service pair,
+stops only that installation's owned processes after handling busy-work approval, and removes
+its browser registration through a browser-supported uninstall route. Do not delete `~/.platform`,
+workspaces, secrets, logs, or shared terminals by default. Data deletion is a separate explicit
+action. A browser-client uninstall for remote mode never disables or deletes the remote server
+or mesh route, since other clients use them. Do not manually delete browser databases or app
+bundles as a substitute for a browser uninstall. Test unregister/reinstall while retaining state.
+
+#### Existing mesh infrastructure and remote mode
+
+`scripts/deploy/systemd/platform-prod.service`, rendered through `scripts/deploy/mesh.ts`, already
+runs the production server on 3301 with restart/backoff, `WEB_ROOT`, structured log configuration,
+`ExecStartPre` promotion and `current` releases. It is a user service enabled under `default.target`,
+not currently a socket-activated service. The mesh `/platform` route provides the stable HTTPS
+origin and proxies to that server. Reuse this deployment/release arrangement for today's remote
+production app; a Mac client needs no local server merely to load that remote app.
+
+`scripts/dev-serve.ts` already registers mesh `--run` routes for Vite/API, starts their upstreams
+on demand, and keeps its route bound while they idle. Keep that development path. It is not an
+automatic replacement for a standalone macOS LaunchAgent or Linux socket installer on a machine
+without mesh. Similarly, today's fixed production mesh proxy cannot wake a manually stopped
+upstream unless upstream socket activation or a mesh command route is registered.
+
+If remote production itself becomes idle/on-demand, add socket activation to the existing remote
+production upstream or register its command with the existing mesh demand mechanism. Choose one
+supervisor for that upstream and retain its release/update semantics; never register a competing
+listener for the same 3301 port. A remote user's browser connection reaches the mesh listener,
+then wakes the upstream. No local page starts or installs remote OS services. TLS/network/auth
+failures stay real connection errors with recovery; a local activator cannot repair a remote outage.
+
+Remote mode also does not move a native chooser to the client machine. Keep the picker decision
+above explicit. A remote installation remains usable without a local service if the server-side
+filesystem picker is the approved policy. If native viewing-host selection is required, the
+authenticated local capability service is installed once as well, with its own tightly scoped
+authorization; it is never introduced as an invisible Dock-launch interception.
 
 ### Execution gates after design approval
 
@@ -196,6 +357,9 @@ already-running-browser handoff are explicit gates, not hidden dependencies on t
       unsupported capabilities, and remote/native-picker constraints here.
 - [ ] Owner reviews this design, production origin, remote chooser policy, and incapable-browser
       fallback. Installed-app implementation remains paused until that review.
+- [ ] Prototype OS socket activation and queued first-request boot on macOS/Linux; decide direct
+      socket adoption from evidence or ship the minimal relay. Prove stable-origin setup, no launcher
+      present, server idle/restart, update/rollback, and retained-data uninstall/reinstall.
 - [ ] Prototype cold installation, repeat installation, Dock-first then launcher launch, user
       uninstall then repair, launch URL delivery, and CDP release using disposable profiles. Confirm
       Chrome 154 and Helium 154 separately. No real accounts or default browsing profiles.
