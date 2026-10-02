@@ -11,8 +11,8 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
-import { installBundledRelease, rollbackBundledInstall } from '../bundled-release'
-import { cleanup, scratch, fregatServer, freePort } from './fixtures'
+import { installBundledRelease } from '../bundled-release'
+import { cleanup, scratch, fregatServer, freePort, recordingHost } from './fixtures'
 import { approveRestart } from '../../../apps/server/src/update/staged-release'
 import { promote, checkReadiness } from '../../deploy/systemd/promote'
 
@@ -76,13 +76,34 @@ test('different commit stages once, preserving current until exact restart appro
   expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(first.release.directory)
 })
 
-test('failed first readiness removes only the current link it installed', () => {
+test('first-install readiness failure retains current and records a failed verdict', async () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
-  const installed = installBundledRelease(payload(root, 'first'), releaseRoot, intent(root))
-  rollbackBundledInstall(releaseRoot, installed)
-  expect(existsSync(path.join(releaseRoot, 'current'))).toBe(false)
-  expect(existsSync(installed.release.directory)).toBe(true)
+  const port = await freePort()
+  const requested = { ...intent(root), address: `http://127.0.0.1:${port}` }
+  const installed = installBundledRelease(payload(root, 'first'), releaseRoot, requested, {
+    readinessMs: 1000,
+  })
+  const commands: string[][] = []
+  expect(
+    await checkReadiness(releaseRoot, installed.release.directory, null, (argv) => {
+      commands.push([...argv])
+      return true
+    }),
+  ).toBe(false)
+  expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(installed.release.directory)
+  expect(commands).toHaveLength(0)
+  expect(
+    JSON.parse(readFileSync(path.join(installed.release.directory, 'live-check.json'), 'utf8')),
+  ).toMatchObject({
+    release: installed.release.name,
+    status: 'failed',
+    fresh: ['Server identity readiness failed'],
+  })
+  fregatServer({ port, stateHome: root })
+  const { checkCurrentReadiness } = await import('../../deploy/systemd/promote')
+  expect(await checkCurrentReadiness(releaseRoot, () => true)).toBe(true)
+  expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(installed.release.directory)
 })
 
 test('failed post-promotion identity readiness restores previous release without a mesh live check', async () => {
@@ -184,8 +205,6 @@ test('a readiness failure cannot roll back a newer current chosen meanwhile', as
     ),
   ).toBe(false)
   expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(first.release.directory)
-  rollbackBundledInstall(releaseRoot, { disposition: 'installed', release: staged.release })
-  expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(first.release.directory)
 })
 
 test('failed recovery keeps the previous release and requests only one restart', async () => {
@@ -257,30 +276,58 @@ test('a listener with another state-home key cannot satisfy readiness', async ()
   expect(await checkReadiness(releaseRoot, installed.release.directory, null, () => true)).toBe(
     false,
   )
-  expect(existsSync(path.join(releaseRoot, 'current'))).toBe(false)
+  expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(installed.release.directory)
 })
 
-test('failed service activation rolls back first install through the launcher transaction', async () => {
-  const root = scratch()
-  const releaseRoot = path.join(root, 'installed')
-  const { ensureInstalledService } =
-    await import('../../../apps/desktop/src/launcher/installation-client')
-  const { serviceErrors } = await import('../structured-errors')
-  await expect(
-    ensureInstalledService({
-      intent: intent(root),
+test.each(['linux', 'darwin'] as const)(
+  'failed first activation keeps the %s registration target usable on retry',
+  async (platform) => {
+    const root = scratch()
+    const releaseRoot = path.join(root, 'installed')
+    const port = await freePort()
+    const requested = { ...intent(root), address: `http://127.0.0.1:${port}` }
+    const source = payload(root, 'first')
+    mkdirSync(path.join(source, 'bin'))
+    writeFileSync(path.join(source, 'bin/promote.js'), '')
+    const forger = scratch()
+    let failedServer: ReturnType<typeof fregatServer> | undefined
+    const { host, commands } = recordingHost(root, platform, (argv) => {
+      if (argv.includes('print')) return { code: 1 }
+      if (argv.includes('bootstrap') || argv.includes('enable'))
+        failedServer = fregatServer({ port, stateHome: root, keyHome: forger })
+    })
+    const { ensureMachineService } = await import('../ensure-machine-service')
+    const { ensureInstalledService } =
+      await import('../../../apps/desktop/src/launcher/installation-client')
+    const options: Parameters<typeof ensureInstalledService>[0] = {
+      intent: requested,
       productionRoot: releaseRoot,
-      bundledRelease: payload(root, 'first'),
+      bundledRelease: source,
       signal: new AbortController().signal,
-      ensure: async () => {
-        throw serviceErrors.IDENTITY_UNVERIFIED({ internal: { reason: 'fixture' } })
-      },
-    }),
-  ).rejects.toMatchObject({ code: 'service.IDENTITY_UNVERIFIED' })
-  expect(existsSync(path.join(releaseRoot, 'current'))).toBe(false)
-})
+      ensure: (value, setup) => ensureMachineService(value, { ...setup, host, readinessMs: 1000 }),
+    }
+    await expect(ensureInstalledService(options)).rejects.toMatchObject({
+      code: 'service.IDENTITY_UNVERIFIED',
+      internal: { reason: 'proof' },
+    })
+    expect(commands.some((argv) => argv.includes('bootstrap') || argv.includes('enable'))).toBe(
+      true,
+    )
+    expect(existsSync(path.join(releaseRoot, 'current/server/index.js'))).toBe(true)
+    const current = realpathSync(path.join(releaseRoot, 'current'))
+    expect(existsSync(path.join(root, 'desktop/installation.json'))).toBe(false)
+    const registeredCommands = commands.length
+    failedServer?.stop(true)
+    fregatServer({ port, stateHome: root })
+    const result = await ensureInstalledService(options)
+    expect(result.disposition).toBe('reused')
+    expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(current)
+    expect(commands).toHaveLength(registeredCommands)
+    expect(existsSync(path.join(root, 'desktop/installation.json'))).toBe(true)
+  },
+)
 
-test('overlapping launches serialize activation and rollback before same-commit reuse', async () => {
+test('overlapping launches serialize activation before same-commit reuse', async () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
   const port = await freePort()

@@ -50,6 +50,7 @@ export function fregatServer(options: {
   environmentId?: string
   /** Runs as each request arrives, before the answer. */
   onRequest?: () => void
+  identityError?: { code: string; message: string; why?: string; fix?: string }
 }) {
   const key = ensureIdentityKey(options.keyHome ?? options.stateHome)
   const server = Bun.serve({
@@ -59,6 +60,14 @@ export function fregatServer(options: {
       options.onRequest?.()
       const url = new URL(request.url)
       const challenge = url.searchParams.get('challenge') ?? ''
+      if (options.identityError)
+        return Response.json(
+          { error: options.identityError },
+          {
+            status: 500,
+            headers: { [IDENTITY_PROOF_HEADER]: identityProof(key, challenge) },
+          },
+        )
       return Response.json(
         {
           product: 'fregat',
