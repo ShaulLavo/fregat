@@ -15,6 +15,7 @@ const buildErrors = defineErrorCatalog('desktop.native', {
 export function buildNative(
   desktopDir = path.join(import.meta.dirname, '..'),
   shell: 'electrobun' | 'installed' = 'electrobun',
+  arch?: 'arm64' | 'x64',
 ) {
   if (process.platform !== 'linux' && process.platform !== 'darwin') return null
   const linux = process.platform === 'linux'
@@ -54,6 +55,7 @@ export function buildNative(
         ...(shell === 'electrobun'
           ? ['-dynamiclib']
           : ['-framework', 'WebKit', '-framework', 'UniformTypeIdentifiers']),
+        ...(arch ? ['-arch', arch === 'x64' ? 'x86_64' : arch] : []),
         '-fobjc-arc',
         '-mmacosx-version-min=11.0',
         '-framework',

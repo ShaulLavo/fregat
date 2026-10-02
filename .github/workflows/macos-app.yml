@@ -1,0 +1,58 @@
+name: Fregat.app
+
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/server/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'scripts/deploy/**'
+      - 'scripts/service/**'
+      - 'scripts/app-icon/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/macos-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      - name: Test bundle resolution and layout checker
+        working-directory: apps/desktop
+        run: bun --bun vitest run src/launcher/tests/bundle.test.ts src/launcher/tests/check-app.test.ts
+      - name: Build app
+        run: bun run app:mac
+      - name: Check relocated bundle and runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/path with spaces/Fregat.app"
+          mkdir -p "$(dirname "$app")"
+          mv apps/desktop/build/Fregat.app "$app"
+          bun apps/desktop/scripts/check-app.ts "$app"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist" | grep -Fx dev.shaulavo.fregat
+          /usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$app/Contents/Info.plist" | grep -Fx true
+          find "$app" -type l -print
+          codesign --verify --deep --strict "$app"
+          BUN_BE_BUN=1 "$app/Contents/MacOS/fregat" -e 'if (!Bun.version) process.exit(1); console.log(Bun.version)'
+          printf '%s\n' 'if (!Bun.version) process.exit(1); console.log("script-runtime-ok")' > "$RUNNER_TEMP/runtime proof.ts"
+          BUN_BE_BUN=1 "$app/Contents/MacOS/fregat" "$RUNNER_TEMP/runtime proof.ts" | grep -Fx script-runtime-ok
+          tar -C "$(dirname "$app")" -czf "$RUNNER_TEMP/Fregat.app.tar.gz" Fregat.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fregat-app
+          path: ${{ runner.temp }}/Fregat.app.tar.gz
