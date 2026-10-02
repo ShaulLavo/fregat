@@ -249,6 +249,109 @@ test.each([
   },
 )
 
+test.each(['primary', 'secondary'])(
+  'learning %s duration replaces only fresh positional aliases in the same quota namespace',
+  (position) => {
+    const other = position === 'primary' ? 'secondary' : 'primary'
+    const unknown = { [`X-Codex-${position}-Used-Percent`]: '12' }
+    const initialBody = {
+      ...proxyBody(),
+      files: [
+        {
+          ...proxyBody().files[0]!,
+          quota: {
+            observed_at: checked,
+            signals: {
+              ...unknown,
+              [`X-Codex-${other}-Window-Minutes`]: '10080',
+              [`X-Codex-${other}-Used-Percent`]: '35',
+              [`X-Codex-Bengalfox-${position}-Used-Percent`]: '13',
+              [`X-Codex-Code-Review-${position}-Used-Percent`]: '14',
+            },
+          },
+          model_quotas: {
+            'gpt-6.1-sol': { observed_at: checked, signals: unknown },
+            'gpt-6.2': { observed_at: checked, signals: unknown },
+          },
+        },
+      ],
+    }
+    const initial = normalizeProxySnapshot(
+      initialBody,
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    const identified = {
+      [`X-Codex-${position}-Window-Minutes`]: '300',
+      [`X-Codex-${position}-Used-Percent`]: '25',
+      [`X-Codex-${position}-Reset-After-Seconds`]: '3600',
+    }
+    const incoming = {
+      ...proxyBody(),
+      files: [
+        {
+          ...proxyBody().files[0]!,
+          quota: {
+            observed_at: seen,
+            signals: {
+              ...identified,
+              [`X-Codex-Additional-Gpt-5.3-Codex-Spark-${position}-Window-Minutes`]: '300',
+              [`X-Codex-Additional-Gpt-5.3-Codex-Spark-${position}-Used-Percent`]: '25',
+            },
+          },
+          model_quotas: { 'gpt-6.1-sol': { observed_at: seen, signals: identified } },
+        },
+      ],
+    }
+    expect(normalizeProxySnapshot(incoming, initial, later)!.accounts[1]!.windows).toEqual(
+      initial.accounts[1]!.windows,
+    )
+    for (const observation of [checked, later]) {
+      incoming.files[0]!.quota.observed_at = observation
+      incoming.files[0]!.model_quotas['gpt-6.1-sol'].observed_at = observation
+      const windows = normalizeProxySnapshot(incoming, initial, later)!.accounts[1]!.windows
+      expect(windows.map(({ id }) => id)).toEqual([
+        'five_hour',
+        'weekly',
+        'bengalfox:five_hour',
+        `code-review:${position}`,
+        'model:gpt-6.1-sol:five_hour',
+        `model:gpt-6.2:${position}`,
+      ])
+      expect(windows.find(({ id }) => id === 'five_hour')).toMatchObject({
+        usedPercent: 25,
+        lastSeenAt: observation,
+      })
+      expect(windows.find(({ id }) => id === 'weekly')).toEqual(
+        initial.accounts[1]!.windows.find(({ id }) => id === 'weekly'),
+      )
+      expect(windows.find(({ id }) => id === `code-review:${position}`)).toEqual(
+        initial.accounts[1]!.windows.find(({ id }) => id === `code-review:${position}`),
+      )
+      expect(windows.find(({ id }) => id === `model:gpt-6.2:${position}`)).toEqual(
+        initial.accounts[1]!.windows.find(({ id }) => id === `model:gpt-6.2:${position}`),
+      )
+    }
+  },
+)
+
+test('restart rejects cached windows with an epoch reset placeholder', () => {
+  const snapshot = createUsageSnapshot(configuredAccounts, checked)
+  snapshot.accounts[1]!.windows = [
+    {
+      id: 'primary',
+      label: 'Primary',
+      usedPercent: null,
+      resetsAt: '1970-01-01T00:00:00.000Z',
+      windowMinutes: null,
+      status: 'unknown',
+      lastSeenAt: seen,
+      source: 'proxy-state',
+    },
+  ]
+  expect(restoreUsageSnapshot(snapshot, configuredAccounts)).toBeNull()
+})
+
 test('generic cooldown never invents percentages; model restrictions do not become account cooldown', () => {
   const body = {
     ...proxyBody({}),

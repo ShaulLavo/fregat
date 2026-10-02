@@ -41,7 +41,12 @@ const windowSchema = v.strictObject({
   id: v.pipe(v.string(), v.regex(/^[a-z0-9][a-z0-9._:-]{0,127}$/)),
   label: v.pipe(v.string(), v.regex(/^[a-zA-Z0-9][a-zA-Z0-9 .:_-]{0,95}$/)),
   usedPercent: v.nullable(percentSchema),
-  resetsAt: v.nullable(timeSchema),
+  resetsAt: v.nullable(
+    v.pipe(
+      timeSchema,
+      v.check((value) => Date.parse(value) > 0),
+    ),
+  ),
   windowMinutes: v.nullable(minutesSchema),
   status: v.picklist(['allowed', 'warning', 'exhausted', 'unknown']),
   lastSeenAt: v.nullable(timeSchema),
@@ -239,14 +244,15 @@ function codexWindow(
     source: 'proxy-state',
   }
 }
+type CodexObservation = { window: Window; slotId: string }
 function codexWindows(
   quota: v.InferOutput<typeof quotaSchema> | undefined,
   namespace = '',
-): Window[] {
+): CodexObservation[] {
   const observedAt = timestamp(quota?.observed_at)
   if (!observedAt || !quota?.signals) return []
   const signals = lowerSignals(quota.signals)
-  const windows: Window[] = []
+  const windows: CodexObservation[] = []
   // HTTP and websocket use different names for the same Spark allowance.
   const prefixes = [
     ['x-codex', ''],
@@ -259,10 +265,13 @@ function codexWindows(
       const window = codexWindow(signals, prefix, position, observedAt)
       if (!window) continue
       windows.push({
-        ...window,
-        id: `${namespace}${extra}${window.id}`,
-        label:
-          `${namespace.replaceAll(':', ' ')}${extra.replaceAll(':', ' ')}${window.label}`.trim(),
+        slotId: `${namespace}${extra}${position}`,
+        window: {
+          ...window,
+          id: `${namespace}${extra}${window.id}`,
+          label:
+            `${namespace.replaceAll(':', ' ')}${extra.replaceAll(':', ' ')}${window.label}`.trim(),
+        },
       })
     }
   }
@@ -286,6 +295,21 @@ function mergeWindows(previous: readonly Window[], incoming: readonly Window[]) 
     if (first >= 0 || second >= 0) return (first < 0 ? 4 : first) - (second < 0 ? 4 : second)
     return a.id.localeCompare(b.id)
   })
+}
+function mergeCodexWindows(previous: readonly Window[], incoming: readonly CodexObservation[]) {
+  const windows = new Map(previous.map((window) => [window.id, window]))
+  const accepted: Window[] = []
+  for (const { window, slotId } of incoming) {
+    const alias = windows.get(slotId)
+    if (
+      alias?.lastSeenAt &&
+      (!window.lastSeenAt || Date.parse(alias.lastSeenAt) > Date.parse(window.lastSeenAt))
+    )
+      continue
+    if (window.id !== slotId) windows.delete(slotId)
+    accepted.push(window)
+  }
+  return mergeWindows([...windows.values()], accepted)
 }
 function latestObservation(windows: readonly Window[]) {
   const observed = windows.flatMap(({ lastSeenAt }) => (lastSeenAt ? [lastSeenAt] : []))
@@ -330,7 +354,7 @@ function proxyAccount(
     if (!/^gpt-\d[a-z0-9._-]{0,48}$/.test(model)) continue
     incoming.push(...codexWindows(quota, `model:${model}:`))
   }
-  const windows = mergeWindows(account.windows, incoming)
+  const windows = mergeCodexWindows(account.windows, incoming)
   const restriction = cooldown(file, observedAt, account.cooldown)
   const active = file.disabled || file.unavailable ? false : null
   const available = active === null && file.status === 'active' ? true : active

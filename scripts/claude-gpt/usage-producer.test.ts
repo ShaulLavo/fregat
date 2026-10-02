@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createUsageProducer } from './usage-producer'
@@ -77,6 +77,42 @@ test('only cached management GET is called; failures/restart retain sanitized ob
     } finally {
       await restarted.stop()
     }
+  } finally {
+    await producer.stop()
+    await rm(paths.directory, { recursive: true, force: true })
+  }
+})
+
+test('startup discards an invalid epoch-reset cache before publishing fresh passive data', async () => {
+  const paths = await fixture()
+  const previous = createUsageSnapshot(configuredAccounts, observedAt)
+  previous.accounts[1]!.windows = [
+    {
+      id: 'primary',
+      label: 'Primary',
+      usedPercent: null,
+      resetsAt: '1970-01-01T00:00:00.000Z',
+      windowMinutes: null,
+      status: 'unknown',
+      lastSeenAt: observedAt,
+      source: 'proxy-state',
+    },
+  ]
+  await mkdir(paths.feedDirectory)
+  const filename = join(paths.feedDirectory, 'v1.json')
+  await writeFile(filename, JSON.stringify(previous))
+  const producer = await createUsageProducer({
+    ...paths,
+    proxyUrl: 'http://127.0.0.1:18317',
+    now: () => Date.parse(observedAt),
+    fetcher: async () => Response.json(cachedBody),
+  })
+  try {
+    expect(JSON.parse(await readFile(filename, 'utf8')).accounts[1].windows).toEqual([])
+    expect(await producer.poll()).toBe(true)
+    expect(JSON.parse(await readFile(filename, 'utf8')).accounts[1].windows).toMatchObject([
+      { id: 'five_hour', usedPercent: 25, resetsAt: null },
+    ])
   } finally {
     await producer.stop()
     await rm(paths.directory, { recursive: true, force: true })
