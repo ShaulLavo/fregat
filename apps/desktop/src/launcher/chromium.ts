@@ -5,6 +5,13 @@ import { browserProfile, chromiumArguments } from './profile'
 import { singletonState } from './singleton'
 import { acquireProfileLock } from './profile-lock'
 import { installedIdentity, ensureInstalledApp } from './installed-app'
+import { controllerAppUrls } from './controller-apps'
+import {
+  forgetVerifiedInstall,
+  hasVerifiedInstall,
+  installReceipt,
+  rememberVerifiedInstall,
+} from './install-receipt'
 import { launcherErrors } from './structured-errors'
 import {
   browserDiagnostics,
@@ -19,6 +26,7 @@ type ChromiumOptions = {
   stateHome: string
   home: string
   url: string
+  manifest?: string
   startup: StartupBudget
   // Tests replace the /proc sampler to drive progress deterministically.
   observe?: (pid: number) => StartupCounters
@@ -53,7 +61,24 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
       throw launcherErrors.PROFILE_BUSY({ internal: { reason: 'launcher-lock-limit' } })
     const remaining = { ...options, startup: { ...options.startup, limitMs: cap.remainingMs() } }
     if (owner === 'live') return await launchInstalledBrowser(remaining, profile, true)
-    return await installAndLaunch(remaining, profile)
+    const receipt = installReceipt(options.url, options.manifest)
+    if (hasVerifiedInstall(profile, receipt)) {
+      try {
+        const result = await launchInstalledBrowser(remaining, profile, false)
+        options.onOpen({ engine: 'chromium', installed: true, installation: 'receipt' })
+        return result
+      } catch (error) {
+        options.signal?.throwIfAborted()
+        if ((error as { code?: string }).code !== 'desktop.launcher.LAUNCH_FAILED') throw error
+        forgetVerifiedInstall(profile)
+        const after = await singletonState(profile, cap.remainingMs(), options.signal)
+        if (after !== 'idle' || cap.remainingMs() <= 0) throw error
+      }
+    }
+    return await installAndLaunch(
+      { ...remaining, startup: { ...remaining.startup, limitMs: cap.remainingMs() } },
+      profile,
+    )
   } finally {
     release()
   }
@@ -140,25 +165,50 @@ async function installAndLaunch(
     startupPhase = 'installation'
     assertChromiumVersion(first.version.product)
     await ensureInstalledApp(startupCdp, options.url)
+    const urls = await controllerAppUrls(startupCdp, options.url)
+    rememberVerifiedInstall(profile, installReceipt(options.url, options.manifest))
     startupPhase = 'controller-exit'
     cdp.close()
     const exitCode = await waitForBrowserExit(child, supervisor.remainingMs())
     if (exitCode === undefined) throw startupFailure('controller-exit-limit')
     clearInterval(startupMonitor)
     options.signal?.removeEventListener('abort', abort)
-    const result = await launchInstalledBrowser(
-      {
-        ...options,
-        startup: { idleMs: options.startup.idleMs, limitMs: supervisor.remainingMs() },
-      },
-      profile,
-      false,
-    )
-    handedOff = true
+    let running =
+      (await singletonState(profile, supervisor.remainingMs(), options.signal)) === 'live'
+    for (const url of urls) {
+      await launchInstalledBrowser(
+        {
+          ...options,
+          url,
+          startup: { idleMs: options.startup.idleMs, limitMs: supervisor.remainingMs() },
+        },
+        profile,
+        running,
+      )
+      running = true
+      handedOff = true
+    }
     options.onOpen({ engine: 'chromium', installed: true, product: first.version.product })
-    return result
+    return { kind: 'handoff' }
   } catch (error) {
     if (!handedOff) await close()
+    options.signal?.throwIfAborted()
+    const internal = (error as { internal?: { reason?: string } }).internal
+    const lostSingleton =
+      internal?.reason === 'eof' || (startupPhase === 'version' && child.exitCode === 0)
+    if (
+      !handedOff &&
+      lostSingleton &&
+      (await singletonState(profile, supervisor.remainingMs(), options.signal)) === 'live'
+    ) {
+      const result = await launchInstalledBrowser(
+        { ...options, startup: { ...options.startup, limitMs: supervisor.remainingMs() } },
+        profile,
+        true,
+      )
+      options.onOpen({ engine: 'chromium', installed: true, installation: 'singleton-handoff' })
+      return result
+    }
     throw error
   } finally {
     options.signal?.removeEventListener('abort', abort)

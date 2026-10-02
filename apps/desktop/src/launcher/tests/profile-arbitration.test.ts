@@ -1,16 +1,19 @@
 import { expect, test } from 'vitest'
 import { existsSync } from 'node:fs'
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { hostname, tmpdir } from 'node:os'
 import path from 'node:path'
 import { launchChromium } from '../chromium'
 import type { BrowserCandidate } from '../browser'
+import { installedIdentity } from '../installed-app'
+import { chromiumArguments } from '../profile'
 
 // Chromium's POSIX singleton and flock require Linux or macOS.
 const posixTest = test.skipIf(process.platform !== 'linux' && process.platform !== 'darwin')
 
-async function fixture(mode: string) {
+async function fixture(mode: string, initialManifest?: string) {
+  let manifest = initialManifest
   const root = await mkdtemp(path.join(tmpdir(), 'fregat-arbitration-'))
   const pidFile = path.join(root, 'pid')
   const profile = path.join(root, 'desktop/chromium')
@@ -18,7 +21,10 @@ async function fixture(mode: string) {
   const candidate: BrowserCandidate = {
     kind: 'chromium',
     executable: process.execPath,
-    args: [path.join(import.meta.dirname, 'fixtures/browser.mjs'), mode, pidFile],
+    args:
+      mode === 'review'
+        ? [path.join(import.meta.dirname, 'fixtures/review-race-browser.mjs'), pidFile]
+        : [path.join(import.meta.dirname, 'fixtures/browser.mjs'), mode, pidFile],
     confinement: 'none',
     source: 'setting',
     family: 'fixture',
@@ -29,6 +35,7 @@ async function fixture(mode: string) {
       stateHome: root,
       home: root,
       url: `http://localhost:123/?subject=${subject}`,
+      manifest,
       startup: { idleMs: 1000, limitMs: 4000 },
       onOpen: () => {},
     })
@@ -44,7 +51,26 @@ async function fixture(mode: string) {
     }
     await rm(root, { recursive: true, force: true })
   }
-  return { root, pidFile, profile, candidate, launch, cleanup }
+  const closeApp = async () => {
+    const owner = await readlink(path.join(profile, 'SingletonLock'))
+    process.kill(Number(owner.slice(hostname().length + 1)), 'SIGTERM')
+    const deadline = Date.now() + 2000
+    while (existsSync(path.join(profile, 'SingletonLock')) && Date.now() < deadline)
+      await Bun.sleep(5)
+    expect(existsSync(path.join(profile, 'SingletonLock'))).toBe(false)
+  }
+  return {
+    root,
+    pidFile,
+    profile,
+    candidate,
+    launch,
+    cleanup,
+    closeApp,
+    setManifest: (next: string) => {
+      manifest = next
+    },
+  }
 }
 
 async function until(file: string) {
@@ -180,6 +206,230 @@ posixTest(
     } finally {
       for (const launcher of launchers) if (launcher.exitCode === null) launcher.kill('SIGTERM')
       await Promise.all(launchers.map((launcher) => launcher.exited))
+      await box.cleanup()
+    }
+  },
+)
+
+posixTest(
+  'OS shortcuts opened during installation survive controller shutdown with deduplicated URLs',
+  async () => {
+    const box = await fixture('race-shortcut')
+    const first = box.launch('one')
+    try {
+      await until(box.pidFile + '.paused')
+      for (const subject of ['one', 'two', 'three']) {
+        const url = `http://localhost:123/?subject=${subject}`
+        const shortcut = Bun.spawn(
+          [
+            box.candidate.executable,
+            ...chromiumArguments(box.candidate, box.profile, {
+              ...installedIdentity(url),
+              url,
+            }),
+          ],
+          { stdio: ['ignore', 'ignore', 'ignore'] },
+        )
+        expect(await shortcut.exited).toBe(0)
+      }
+      expect(await readFile(box.pidFile + '.forwarded', 'utf8')).toContain('controller')
+      expect(existsSync(box.pidFile + '.deliveries')).toBe(false)
+      await writeFile(box.pidFile + '.release', 'go')
+      expect(await first).toEqual({ kind: 'handoff' })
+      const delivered = (await readFile(box.pidFile + '.deliveries', 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) =>
+          JSON.parse(line).find((arg: string) =>
+            arg.startsWith('--app-launch-url-for-shortcuts-menu-item='),
+          ),
+        )
+      expect(delivered).toEqual(
+        ['one', 'two', 'three'].map(
+          (subject) =>
+            `--app-launch-url-for-shortcuts-menu-item=http://localhost:123/?subject=${subject}`,
+        ),
+      )
+      const requests = await readFile(box.pidFile + '.requests', 'utf8')
+      expect(requests.indexOf('Target.getTargets')).toBeGreaterThan(requests.indexOf('PWA.install'))
+      expect(requests.indexOf('Target.getTargets')).toBeLessThan(
+        requests.indexOf('fixture.pipeClosed'),
+      )
+    } finally {
+      await writeFile(box.pidFile + '.release', 'go')
+      await Promise.allSettled([first])
+      await box.cleanup()
+    }
+  },
+)
+
+posixTest(
+  'reviewer OS-shortcut probe preserves every controller app target after handoff',
+  async () => {
+    const box = await fixture('review')
+    const first = box.launch('one')
+    try {
+      await until(box.pidFile + '.installing')
+      for (const subject of ['one', 'two', 'three']) {
+        const url = `http://localhost:123/?subject=${subject}`
+        const shortcut = Bun.spawn(
+          [
+            box.candidate.executable,
+            ...chromiumArguments(box.candidate, box.profile, { ...installedIdentity(url), url }),
+          ],
+          { stdio: ['ignore', 'ignore', 'ignore'] },
+        )
+        expect(await shortcut.exited).toBe(0)
+      }
+      expect(await readFile(box.pidFile + '.forwarded', 'utf8')).toContain(
+        '"ownerPhase":"installing"',
+      )
+      await writeFile(box.pidFile + '.release', 'go')
+      expect(await first).toEqual({ kind: 'handoff' })
+      const delivered = (await readFile(box.pidFile + '.deliveries', 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) =>
+          JSON.parse(line).find((arg: string) =>
+            arg.startsWith('--app-launch-url-for-shortcuts-menu-item='),
+          ),
+        )
+      expect(delivered).toEqual(
+        ['one', 'two', 'three'].map(
+          (subject) =>
+            `--app-launch-url-for-shortcuts-menu-item=http://localhost:123/?subject=${subject}`,
+        ),
+      )
+    } finally {
+      await writeFile(box.pidFile + '.release', 'go')
+      await Promise.allSettled([first])
+      await box.cleanup()
+    }
+  },
+)
+
+posixTest(
+  'a direct OS app winning the singleton after the idle check receives the launcher URL',
+  async () => {
+    const box = await fixture('review')
+    await writeFile(box.pidFile + '.gate', 'gate')
+    const first = box.launch('one')
+    const settled = first.then(
+      (value) => ({ status: 'fulfilled', value }),
+      (error) => ({ status: 'rejected', code: error.code }),
+    )
+    let owner: ReturnType<typeof Bun.spawn> | undefined
+    try {
+      await until(box.pidFile + '.spawned')
+      const url = 'http://localhost:123/?subject=os-wins'
+      owner = Bun.spawn(
+        [
+          box.candidate.executable,
+          ...chromiumArguments(box.candidate, box.profile, { ...installedIdentity(url), url }),
+        ],
+        { stdio: ['ignore', 'ignore', 'ignore'] },
+      )
+      await until(box.pidFile + '.app')
+      await writeFile(box.pidFile + '.allow', 'go')
+      expect(await settled).toEqual({ status: 'fulfilled', value: { kind: 'handoff' } })
+      expect(await readFile(box.pidFile + '.deliveries', 'utf8')).toContain('subject=one')
+      expect(owner.exitCode).toBe(null)
+      expect(existsSync(box.pidFile + '.installing')).toBe(false)
+    } finally {
+      await writeFile(box.pidFile + '.allow', 'go')
+      await settled
+      if (owner?.exitCode === null) owner.kill('SIGTERM')
+      if (owner) await owner.exited
+      await box.cleanup()
+    }
+  },
+)
+
+const firstManifest = JSON.stringify({ id: './', start_url: './', name: 'Fregat' })
+
+posixTest(
+  'an idle launch with a matching receipt and Chrome install records skips the controller',
+  async () => {
+    const box = await fixture('race-simultaneous', firstManifest)
+    try {
+      await box.launch('one')
+      await box.closeApp()
+      await box.launch('two')
+      const requests = (await readFile(box.pidFile + '.requests', 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+      expect(requests.filter((request) => request.method === 'Browser.getVersion')).toHaveLength(1)
+      expect(await readFile(box.pidFile + '.deliveries', 'utf8')).toContain('subject=two')
+    } finally {
+      await box.cleanup()
+    }
+  },
+)
+
+posixTest(
+  'a changed manifest invalidates the receipt and triggers one controller pass',
+  async () => {
+    const box = await fixture('race-simultaneous', firstManifest)
+    try {
+      await box.launch('one')
+      await box.closeApp()
+      await box.launch('two')
+      await box.closeApp()
+      box.setManifest(JSON.stringify({ id: './', start_url: './', name: 'Fregat updated' }))
+      await box.launch('three')
+      const requests = (await readFile(box.pidFile + '.requests', 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+      expect(requests.filter((request) => request.method === 'Browser.getVersion')).toHaveLength(2)
+    } finally {
+      await box.cleanup()
+    }
+  },
+)
+
+posixTest(
+  'a failed receipt app launch repairs registration once before retrying the app',
+  async () => {
+    const box = await fixture('race-simultaneous', firstManifest)
+    try {
+      await box.launch('one')
+      await box.closeApp()
+      await writeFile(box.pidFile + '.fail-next-app', 'fail')
+      expect(await box.launch('two')).toEqual({ kind: 'handoff' })
+      const requests = (await readFile(box.pidFile + '.requests', 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+      expect(requests.filter((request) => request.method === 'Browser.getVersion')).toHaveLength(2)
+      expect(await readFile(box.pidFile + '.deliveries', 'utf8')).toContain('subject=two')
+    } finally {
+      await box.cleanup()
+    }
+  },
+)
+
+posixTest(
+  'Chrome uninstall resource removal overrides a matching receipt and runs setup',
+  async () => {
+    const box = await fixture('race-simultaneous', firstManifest)
+    try {
+      await box.launch('one')
+      await box.closeApp()
+      const { appId } = installedIdentity('http://localhost:123/')
+      await rm(
+        path.join(box.profile, 'Platform', 'Web Applications', 'Manifest Resources', appId),
+        { recursive: true },
+      )
+      await rm(box.pidFile + '.installed')
+      expect(await box.launch('two')).toEqual({ kind: 'handoff' })
+      const requests = (await readFile(box.pidFile + '.requests', 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+      expect(requests.filter((request) => request.method === 'PWA.install')).toHaveLength(2)
+    } finally {
       await box.cleanup()
     }
   },

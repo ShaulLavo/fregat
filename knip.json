@@ -11,6 +11,7 @@
         "src/launcher/index.ts",
         "src/launcher/tests/fixtures/browser.mjs",
         "src/launcher/tests/fixtures/launch.mjs",
+        "src/launcher/tests/fixtures/review-race-browser.mjs",
         "src/launcher/tests/fixtures/native-helper.mjs",
         "electrobun.config.ts"
       ]

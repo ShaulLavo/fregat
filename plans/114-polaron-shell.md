@@ -152,7 +152,17 @@ No runtime bridge, debugging connection, chooser binding or permission grant rea
    send no launch data on the probe. If the socket cannot be checked, a `SingletonLock` naming a
    live local hostname-pid owner suffices. Ownership never depends on argv or executable paths,
    so a Dock app-shim owner or a confined browser can use the same dedicated profile.
-2. On an idle profile, start a temporary browser with the existing CDP pipe. Call
+2. An idle profile goes straight to the registered app when its verified receipt matches the
+   current served manifest id, resolved start URL and SHA256 of the manifest bytes, and Chrome's
+   per-app resource directory exists. The directory is
+   `<user-data-dir>/Platform/Web Applications/Manifest Resources/<appId>`: Chromium 154's
+   `GetManifestResourcesDirectoryForApp` and `kWebAppDirname` define it, and
+   `WebAppIconManager::DeleteData` recursively removes it on uninstall. This read-only directory
+   check detects uninstall without opening a controller or reading a browser database. A missing
+   receipt, changed manifest or missing directory runs setup. A failed direct app launch invalidates
+   its receipt and retries setup while idle within the remaining startup cap; an exhausted cap
+   leaves setup for the next idle launch. Singleton presence proves ownership, never an app window.
+   Setup starts a temporary browser with the existing CDP pipe and calls
    `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. An unknown
    app returns `InvalidParams` (`-32602`) with the unknown-app reason. Other parameter failures
    remain operational errors; there is no `installed: false` field.
@@ -160,7 +170,13 @@ No runtime bridge, debugging connection, chooser binding or permission grant rea
    `PWA.install({ manifestId, installUrlOrBundleUrl: installUrl })` and check OS state again.
    A failed installation is a failed launch with structured guidance. Repeat idle setup converges
    after a partial install or uninstall. Installation repair runs only while the profile is idle.
-4. Close the temporary controller's pipe and await its exit before launching the user app.
+4. Before closing the controller, query `Target.getTargets` and collect its HTTP(S) page URLs;
+   the dedicated controller's bootstrap is `about:blank`, and workers are excluded. De-duplicate
+   those app-window URLs with the launcher's URL. Close the pipe, await exit, then replay every
+   collected URL through `--app-id`. This preserves OS shortcut launches that bypass the launcher
+   lock during setup. If an OS app wins the singleton after the idle check, the controller exits
+   through singleton handoff or EOF; recheck ownership and forward the launcher's URL to that
+   live browser. Skip installation this run and leave repair to the next idle launch.
    Compute Chromium's app id from the canonical manifest URL using two SHA256 hashes of raw bytes,
    then encode the first 128 bits as letters a–p. This uses Chromium's public identity algorithm;
    no browser database is read or changed.

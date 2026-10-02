@@ -25,6 +25,7 @@ import { startupBudget } from './startup'
 import { isRecord } from '@workspace/utils/objects'
 import { desktopStateHome } from './profile'
 import { launcherErrors } from './structured-errors'
+import { readInstallManifest } from './install-receipt'
 
 const root = path.resolve(import.meta.dirname, '../../../..')
 applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
@@ -174,6 +175,7 @@ async function start() {
           stateHome,
           home,
           url: web,
+          manifest: await readInstallManifest(web, requestSignal()),
           startup: settings.startup,
           signal: controller.signal,
           onOpen: (context) => recordDesktopInfo('desktop.window.open', context),

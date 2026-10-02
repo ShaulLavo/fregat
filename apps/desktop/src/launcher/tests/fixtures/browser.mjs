@@ -1,6 +1,7 @@
 import {
   appendFileSync,
   existsSync,
+  mkdirSync,
   readlinkSync,
   readFileSync,
   symlinkSync,
@@ -41,6 +42,17 @@ if (race) {
       process.argv[3] + '.forwarded',
       JSON.stringify({ target, app, args: process.argv }) + '\n',
     )
+    if (app && target === 'controller')
+      appendFileSync(
+        process.argv[3] + '.controller-targets',
+        JSON.stringify({
+          targetId: `shortcut-${process.pid}`,
+          type: 'page',
+          url: process.argv
+            .find((arg) => arg.startsWith('--app-launch-url-for-shortcuts-menu-item='))
+            ?.slice('--app-launch-url-for-shortcuts-menu-item='.length),
+        }) + '\n',
+      )
     if (app && target === 'app')
       appendFileSync(process.argv[3] + '.deliveries', JSON.stringify(process.argv) + '\n')
     process.exit(0)
@@ -57,6 +69,11 @@ if (race) {
   })
 }
 if (app) {
+  if (race && existsSync(process.argv[3] + '.fail-next-app')) {
+    unlinkSync(process.argv[3] + '.fail-next-app')
+    cleanupLock()
+    process.exit(7)
+  }
   await Bun.write(process.argv[3] + '.args', JSON.stringify(process.argv.slice(4)))
   if (mode === 'handoff') process.exit(0)
   if (!race) symlinkSync(identity, lock)
@@ -88,7 +105,10 @@ for await (const chunk of Bun.file(3).stream()) {
     buffered = buffered.slice(end + 1)
     appendFileSync(process.argv[3] + '.requests', JSON.stringify(message) + '\n')
     if (message.method.startsWith('PWA.')) {
-      if (mode === 'race-paused' && message.method === 'PWA.getOsAppState' && !installed) {
+      if (
+        message.method === 'PWA.getOsAppState' &&
+        ((mode === 'race-paused' && !installed) || (mode === 'race-shortcut' && installed))
+      ) {
         await Bun.write(process.argv[3] + '.paused', 'ready')
         while (!existsSync(process.argv[3] + '.release')) await Bun.sleep(5)
       }
@@ -125,7 +145,20 @@ for await (const chunk of Bun.file(3).stream()) {
         else result = { badgeCount: 0, fileHandlers: [] }
       } else if (message.method === 'PWA.install') {
         installed = true
-        if (race) await Bun.write(process.argv[3] + '.installed', 'yes')
+        if (race) {
+          await Bun.write(process.argv[3] + '.installed', 'yes')
+          const { installedIdentity } = await import('../../installed-app.ts')
+          mkdirSync(
+            path.join(
+              profile,
+              'Platform',
+              'Web Applications',
+              'Manifest Resources',
+              installedIdentity(message.params.manifestId).appId,
+            ),
+            { recursive: true },
+          )
+        }
       } else if (message.method === 'PWA.launch') {
         result = { targetId: 'installed-app' }
       }
@@ -137,7 +170,22 @@ for await (const chunk of Bun.file(3).stream()) {
       continue
     }
     const product = mode === 'old-version' ? 'Chrome/125.0.1' : 'Chrome/130.0.1'
-    const result = message.method === 'Browser.getVersion' ? { product } : {}
+    let result = message.method === 'Browser.getVersion' ? { product } : {}
+    if (message.method === 'Target.getTargets') {
+      const targets = existsSync(process.argv[3] + '.controller-targets')
+        ? readFileSync(process.argv[3] + '.controller-targets', 'utf8')
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line))
+        : []
+      result = {
+        targetInfos: [
+          { targetId: 'controller', type: 'page', url: 'about:blank' },
+          { targetId: 'worker', type: 'service_worker', url: 'http://localhost:123/worker.js' },
+          ...targets,
+        ],
+      }
+    }
     writeSync(4, JSON.stringify({ id: message.id, result }) + '\0')
     end = buffered.indexOf('\0')
   }
