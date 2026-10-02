@@ -24,6 +24,7 @@ import {
   type TranscriptFileCache,
   type TranscriptScanLimits,
   type TranscriptSource,
+  type TranscriptWalkEntry,
 } from './utils/transcript-scan'
 
 export type LocalTranscriptUsageOptions = {
@@ -39,10 +40,11 @@ export type LocalTranscriptUsageOptions = {
 type Snapshot = {
   readonly records: readonly TranscriptRecord[]
   readonly failedPasses: number
+  readonly nextSource: number
   readonly coverage: ProviderUsageHistoryCoverage
 }
 type Discovery = {
-  iterator: AsyncGenerator<string | null>
+  iterator: AsyncGenerator<TranscriptWalkEntry>
   root: number
   pendingFile: string | null
   readableRoots: number
@@ -69,6 +71,7 @@ export class LocalTranscriptUsageService {
     this.store = createStore<Snapshot>(() => ({
       records: [],
       failedPasses: 0,
+      nextSource: 0,
       coverage: {
         scope: 'local-transcripts',
         accountAttribution: 'unverified',
@@ -101,6 +104,7 @@ export class LocalTranscriptUsageService {
       const file = parseCache(transcriptFileCacheSchema, row.value)
       if (!file || !this.options.sources.some((source) => source.id === file.sourceId)) {
         rejected++
+        this.database.query('DELETE FROM files WHERE id = ?').run(row.id)
         continue
       }
       this.files.set(row.id, file)
@@ -131,28 +135,42 @@ export class LocalTranscriptUsageService {
   read(query: ProviderUsageHistoryQuery) {
     const snapshot = this.store.getState()
     const utilities = this.options.utilityHistory?.readUtilities(query) ?? []
+    const sessions = this.options.utilityHistory?.readUncoveredSessions(query) ?? []
     const coverage = { ...snapshot.coverage, sources: [...snapshot.coverage.sources] }
-    if (this.options.utilityHistory)
-      coverage.sources.push({
-        id: 'fregat-utility',
-        hostId: this.options.hostId,
-        driverKind: 'fregat',
-        sourceKind: 'fregat-utility',
-        status: 'ready',
-        scannedAt: new Date(this.now()).toISOString(),
-        latestEventAt: utilities.reduce<string | null>(
-          (latest, row) => (!latest || row.recordedAt > latest ? row.recordedAt : latest),
-          null,
-        ),
-        files: 0,
-        records: utilities.length,
-        malformedLines: 0,
-        oversizedLines: 0,
-        unidentifiedRecords: 0,
-      })
+    if (this.options.utilityHistory) {
+      coverage.sources.push(this.recordedSource('fregat-utility', utilities))
+      if (sessions.length) coverage.sources.push(this.recordedSource('fregat-session', sessions))
+    }
     return {
-      ...aggregateTranscriptHistory([...snapshot.records, ...utilities], query, this.now()),
+      ...aggregateTranscriptHistory(
+        [...snapshot.records, ...utilities, ...sessions],
+        query,
+        this.now(),
+      ),
       coverage,
+    }
+  }
+
+  private recordedSource(
+    kind: 'fregat-utility' | 'fregat-session',
+    rows: readonly TranscriptRecord[],
+  ): ProviderUsageHistorySource {
+    return {
+      id: kind,
+      hostId: this.options.hostId,
+      driverKind: 'fregat',
+      sourceKind: kind,
+      status: 'ready',
+      scannedAt: new Date(this.now()).toISOString(),
+      latestEventAt: rows.reduce<string | null>(
+        (latest, row) => (!latest || row.recordedAt > latest ? row.recordedAt : latest),
+        null,
+      ),
+      files: 0,
+      records: rows.length,
+      malformedLines: 0,
+      oversizedLines: 0,
+      unidentifiedRecords: 0,
     }
   }
 
@@ -210,24 +228,32 @@ export class LocalTranscriptUsageService {
     let bytesRead = 0
     let failures = 0
     const updates = new Map<string, TranscriptFileCache>()
-    const sources: ProviderUsageHistorySource[] = []
+    const sources = new Map(before.coverage.sources.map((source) => [source.id, source]))
     try {
-      for (const source of this.options.sources) {
+      for (let offset = 0; offset < this.options.sources.length; offset++) {
+        if (!remaining || !visits) break
+        const source =
+          this.options.sources[(before.nextSource + offset) % this.options.sources.length]
+        if (!source) continue
         signal.throwIfAborted()
         const status = await this.scanSource(source, { remaining, visits, signal, updates })
         remaining -= status.bytesRead
         visits -= status.visits
         bytesRead += status.bytesRead
         failures += status.failures
-        sources.push(status.source)
+        sources.set(source.id, status.source)
       }
       signal.throwIfAborted()
       const coverage: ProviderUsageHistoryCoverage = {
         ...before.coverage,
-        sources,
+        sources: this.options.sources.map(
+          (source) => sources.get(source.id) ?? this.emptySource(source),
+        ),
         bytesRead,
         scannedAt: new Date(this.now()).toISOString(),
-        status: sources.some((source) => source.status !== 'ready') ? 'partial' : 'ready',
+        status: [...sources.values()].some((source) => source.status !== 'ready')
+          ? 'partial'
+          : 'ready',
       }
       // Cache writes and publication settle together; cancellation leaves the previous report intact.
       this.database?.transaction(() => {
@@ -248,7 +274,10 @@ export class LocalTranscriptUsageService {
         failedReads: failures,
         coverage: coverage.status,
       }
-      this.store.setState({ failedPasses: failures ? before.failedPasses + 1 : 0 })
+      this.store.setState({
+        failedPasses: failures ? before.failedPasses + 1 : 0,
+        nextSource: (before.nextSource + 1) % Math.max(1, this.options.sources.length),
+      })
       if (failures && !before.failedPasses)
         recordProcessWarning('provider.transcript_history.scanned', event)
       if (!failures && (before.failedPasses || before.coverage.status !== coverage.status))
@@ -309,7 +338,7 @@ export class LocalTranscriptUsageService {
     let complete = false
     while (visits < budget.visits && bytesRead < budget.remaining) {
       budget.signal.throwIfAborted()
-      let entry: IteratorResult<string | null>
+      let entry: IteratorResult<TranscriptWalkEntry>
       try {
         entry = discovery.pendingFile
           ? { done: false, value: discovery.pendingFile }
@@ -334,8 +363,16 @@ export class LocalTranscriptUsageService {
         discovery.iterator = walkTranscriptRoot(root)
         continue
       }
-      discovery.readableRoots++
       if (!entry.value) continue
+      if (typeof entry.value === 'object') {
+        if (entry.value.kind === 'directory') discovery.readableRoots++
+        else if (entry.value.reason === 'absent') discovery.absentRoots++
+        else {
+          discovery.failedRoots++
+          failures++
+        }
+        continue
+      }
       const id = JSON.stringify([source.id, entry.value])
       try {
         const result = await scanTranscriptFile({
@@ -360,7 +397,7 @@ export class LocalTranscriptUsageService {
         discovery.failedFiles++
       }
     }
-    const stats = this.sourceStats(source, budget.updates)
+    const { pendingFiles, ...stats } = this.sourceStats(source, budget.updates)
     let status: ProviderUsageHistorySource['status'] = 'partial'
     if (complete && !discovery.readableRoots && discovery.absentRoots) status = 'absent'
     else if (complete && discovery.failedRoots) status = 'unreadable'
@@ -371,7 +408,8 @@ export class LocalTranscriptUsageService {
       !failures &&
       !stats.malformedLines &&
       !stats.oversizedLines &&
-      !stats.unidentifiedRecords
+      !stats.unidentifiedRecords &&
+      !pendingFiles
     )
       status = 'ready'
     if (complete) this.discovery.delete(source.id)
@@ -394,6 +432,16 @@ export class LocalTranscriptUsageService {
     const selected = [...files.values()].filter((file) => file.sourceId === source.id)
     const records = selected.flatMap((file) => Object.values(file.published.records))
     return {
+      pendingFiles: selected.filter((file) => {
+        const projector = file.published.projector
+        return (
+          projector.frames.length ||
+          projector.mode !== 'idle' ||
+          projector.complete ||
+          projector.invalid ||
+          projector.oversized
+        )
+      }).length,
       files: selected.length,
       records: deduplicateTranscriptRecords(records).length,
       unidentifiedRecords: records.filter((row) => row.identityKind === 'source').length,

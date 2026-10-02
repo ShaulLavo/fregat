@@ -1,60 +1,24 @@
-import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, writeFile, appendFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { LocalTranscriptUsageService } from '../transcript-history'
-import { modelPrice } from '../utils/model-prices'
+import {
+  transcriptHistoryFixture,
+  nativeClaudeResponse,
+  TRANSCRIPT_FIXTURE_NOW as now,
+} from '../../testing/transcript-usage'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => {
   for (const close of cleanup.splice(0)) await close()
 })
-const now = Date.parse('2026-10-03T12:00:00Z')
 const query = { days: 7 as const, utcOffsetMinutes: 0 }
-const response = (id: string, output = 20) => ({
-  type: 'assistant',
-  timestamp: '2026-10-03T10:00:00Z',
-  message: { id, model: 'test-model', usage: { input_tokens: 100, output_tokens: output } },
-})
-
-async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), 'usage-transcripts-'))
-  const transcripts = join(root, 'native', 'outside-projects')
-  await mkdir(transcripts, { recursive: true })
-  const options = {
-    cacheDirectory: join(root, 'cache'),
-    hostId: 'fixture-host',
-    sources: [{ id: 'claude-native', driverKind: 'claude' as const, roots: [transcripts] }],
-    limits: { maxBytes: 1024 * 1024, maxFiles: 100, maxLineBytes: 64 * 1024, readChunkBytes: 1024 },
-    priceCatalog: {
-      lookupLocal: (driver: string, model: string) =>
-        modelPrice(
-          {
-            fetchedAt: '2026-10-01T00:00:00Z',
-            prices: {
-              'anthropic/test-model': { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 1.25 },
-            },
-          },
-          driver,
-          model,
-        ),
-    },
-    now: () => now,
-  }
-  const service = new LocalTranscriptUsageService(options)
-  await service.initialize()
-  cleanup.push(async () => {
-    service.close()
-    await rm(root, { recursive: true, force: true })
-  })
-  return { root, transcripts, options, service }
-}
 
 it('finds native usage outside Fregat projects; range reads never scan', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   await writeFile(
     join(f.transcripts, 'session.jsonl'),
-    JSON.stringify(response('request-1')) + '\n',
+    JSON.stringify(nativeClaudeResponse('request-1')) + '\n',
   )
   expect(f.service.read(query).totals.tokens).toBe(0)
   await f.service.refresh()
@@ -66,7 +30,7 @@ it('finds native usage outside Fregat projects; range reads never scan', async (
   })
   await appendFile(
     join(f.transcripts, 'session.jsonl'),
-    JSON.stringify(response('request-2')) + '\n',
+    JSON.stringify(nativeClaudeResponse('request-2')) + '\n',
   )
   expect(f.service.read({ ...query, days: 30 }).totals.tokens).toBe(120)
   await f.service.refresh()
@@ -74,10 +38,13 @@ it('finds native usage outside Fregat projects; range reads never scan', async (
 })
 
 it('keeps incomplete tails out, resumes appends and takes maxima across Claude fragments and copies', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   const file = join(f.transcripts, 'main.jsonl')
-  const partial = JSON.stringify(response('request-1', 40))
-  await writeFile(file, JSON.stringify(response('request-1')) + '\n' + partial.slice(0, 40))
+  const partial = JSON.stringify(nativeClaudeResponse('request-1', 40))
+  await writeFile(
+    file,
+    JSON.stringify(nativeClaudeResponse('request-1')) + '\n' + partial.slice(0, 40),
+  )
   await f.service.refresh()
   expect(f.service.read(query).totals.tokens).toBe(120)
   await appendFile(file, partial.slice(40) + '\n')
@@ -91,11 +58,11 @@ it('keeps incomplete tails out, resumes appends and takes maxima across Claude f
 })
 
 it('rebuilds replaced and truncated file contributions and preserves vanished history on restart', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   const file = join(f.transcripts, 'session.jsonl')
-  await writeFile(file, JSON.stringify(response('old', 80)) + '\n')
+  await writeFile(file, JSON.stringify(nativeClaudeResponse('old', 80)) + '\n')
   await f.service.refresh()
-  await writeFile(file, JSON.stringify(response('new', 1)) + '\n')
+  await writeFile(file, JSON.stringify(nativeClaudeResponse('new', 1)) + '\n')
   await f.service.refresh()
   expect(f.service.read(query).totals.tokens).toBe(101)
   await rm(file)
@@ -108,8 +75,8 @@ it('rebuilds replaced and truncated file contributions and preserves vanished hi
 })
 
 it('rebuckets timestamps, leaves unknown price explicit, and never adds reasoning twice', async () => {
-  const f = await fixture()
-  const event = response('unknown')
+  const f = await transcriptHistoryFixture(cleanup)
+  const event = nativeClaudeResponse('unknown')
   event.timestamp = '2026-10-02T23:30:00Z'
   event.message.model = 'unknown-model'
   await writeFile(join(f.transcripts, 'session.jsonl'), JSON.stringify(event) + '\n')
@@ -120,7 +87,7 @@ it('rebuckets timestamps, leaves unknown price explicit, and never adds reasonin
 })
 
 it('uses persistent Codex cumulative baselines across append, copies and forked child rollouts', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   f.service.close()
   const service = new LocalTranscriptUsageService({
     ...f.options,
@@ -184,7 +151,7 @@ it('uses persistent Codex cumulative baselines across append, copies and forked 
 })
 
 it('bounds cold scans, stages rewrites atomically, and streams huge conversation fields without caching them', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   f.service.close()
   const service = new LocalTranscriptUsageService({
     ...f.options,
@@ -192,7 +159,7 @@ it('bounds cold scans, stages rewrites atomically, and streams huge conversation
   })
   cleanup.push(async () => service.close())
   await service.initialize()
-  const line = response('large')
+  const line = nativeClaudeResponse('large')
   const file = join(f.transcripts, 'large.jsonl')
   await writeFile(
     file,
@@ -219,8 +186,11 @@ it('bounds cold scans, stages rewrites atomically, and streams huge conversation
   await writeFile(
     file,
     JSON.stringify({
-      ...response('replacement', 80),
-      message: { ...response('replacement', 80).message, content: 'replacement'.repeat(2000) },
+      ...nativeClaudeResponse('replacement', 80),
+      message: {
+        ...nativeClaudeResponse('replacement', 80).message,
+        content: 'replacement'.repeat(2000),
+      },
     }) + '\n',
   )
   await service.refresh()
@@ -231,9 +201,9 @@ it('bounds cold scans, stages rewrites atomically, and streams huge conversation
 })
 
 it('restarts partial projection safely, invalidates corrupt/parser-version cache and reports malformed input', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   const file = join(f.transcripts, 'session.jsonl')
-  const text = JSON.stringify(response('request-1'))
+  const text = JSON.stringify(nativeClaudeResponse('request-1'))
   await writeFile(file, text.slice(0, 80))
   await f.service.refresh()
   f.service.close()
@@ -261,8 +231,8 @@ it('restarts partial projection safely, invalidates corrupt/parser-version cache
 })
 
 it('retains source-scoped unknown identities, exposes absent roots, and rolls back cancelled scans', async () => {
-  const f = await fixture()
-  const event = response('')
+  const f = await transcriptHistoryFixture(cleanup)
+  const event = nativeClaudeResponse('')
   await writeFile(join(f.transcripts, 'unknown.jsonl'), JSON.stringify(event) + '\n')
   await writeFile(join(f.transcripts, 'other.jsonl'), JSON.stringify(event) + '\n')
   await f.service.refresh()
@@ -284,7 +254,7 @@ it('retains source-scoped unknown identities, exposes absent roots, and rolls ba
 })
 
 it('keeps ephemeral Fregat utilities once while excluding recorder turns already covered by transcripts', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   const { Database } = await import('bun:sqlite')
   const { drizzle } = await import('drizzle-orm/bun-sqlite')
   const schema = await import('../../db/schema')
@@ -313,11 +283,12 @@ it('keeps ephemeral Fregat utilities once while excluding recorder turns already
     .values([
       { ...common, purpose: 'turn', turnId: 'chat-turn' },
       { ...common, purpose: 'title', turnId: 'utility-title' },
+      { ...common, driverKind: 'opencode', purpose: 'turn', turnId: 'uncovered-chat' },
     ])
     .run()
   await writeFile(
     join(f.transcripts, 'native.jsonl'),
-    JSON.stringify(response('native-chat-response')) + '\n',
+    JSON.stringify(nativeClaudeResponse('native-chat-response')) + '\n',
   )
   f.service.close()
   const service = new LocalTranscriptUsageService({
@@ -327,22 +298,25 @@ it('keeps ephemeral Fregat utilities once while excluding recorder turns already
   cleanup.push(async () => service.close())
   await service.initialize()
   await service.refresh()
-  expect(service.read(query).totals.tokens).toBe(240)
+  expect(service.read(query).totals.tokens).toBe(360)
   expect(service.read(query).purposes).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ purpose: 'title', turns: 1 }),
-      expect.objectContaining({ purpose: 'turn', turns: 1 }),
+      expect.objectContaining({ purpose: 'turn', turns: 2 }),
     ]),
   )
   expect(service.read(query).coverage?.sources).toContainEqual(
     expect.objectContaining({ sourceKind: 'fregat-utility', records: 1 }),
   )
+  expect(service.read(query).coverage?.sources).toContainEqual(
+    expect.objectContaining({ sourceKind: 'fregat-session', records: 1 }),
+  )
   await service.refresh()
-  expect(service.read(query).totals.tokens).toBe(240)
+  expect(service.read(query).totals.tokens).toBe(360)
 })
 
 it('projects local catalog prices without making provider or pricing network calls', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   const { Database } = await import('bun:sqlite')
   const { drizzle } = await import('drizzle-orm/bun-sqlite')
   const schema = await import('../../db/schema')
@@ -364,15 +338,21 @@ it('projects local catalog prices without making provider or pricing network cal
   const service = new LocalTranscriptUsageService({ ...f.options, priceCatalog: catalog })
   cleanup.push(async () => service.close())
   await service.initialize()
-  await writeFile(join(f.transcripts, 'native.jsonl'), JSON.stringify(response('request')) + '\n')
+  await writeFile(
+    join(f.transcripts, 'native.jsonl'),
+    JSON.stringify(nativeClaudeResponse('request')) + '\n',
+  )
   await service.refresh()
   for (const days of [7, 30, 90] as const) service.read({ ...query, days })
   expect(calls).toBe(0)
 })
 
 it('recreates a corrupt SQLite cache and rebuilds only from local transcripts', async () => {
-  const f = await fixture()
-  await writeFile(join(f.transcripts, 'native.jsonl'), JSON.stringify(response('native')) + '\n')
+  const f = await transcriptHistoryFixture(cleanup)
+  await writeFile(
+    join(f.transcripts, 'native.jsonl'),
+    JSON.stringify(nativeClaudeResponse('native')) + '\n',
+  )
   f.service.close()
   await writeFile(join(f.options.cacheDirectory, 'transcript-history.sqlite'), 'broken sqlite')
   const service = new LocalTranscriptUsageService(f.options)
@@ -384,24 +364,27 @@ it('recreates a corrupt SQLite cache and rebuilds only from local transcripts', 
 })
 
 it('detects same-size replacement and changed prefixes on a growing file', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   const file = join(f.transcripts, 'native.jsonl')
-  await writeFile(file, JSON.stringify(response('old')) + '\n')
+  await writeFile(file, JSON.stringify(nativeClaudeResponse('old')) + '\n')
   await f.service.refresh()
   await rm(file)
-  await writeFile(file, JSON.stringify(response('new')) + '\n')
+  await writeFile(file, JSON.stringify(nativeClaudeResponse('new')) + '\n')
   await f.service.refresh()
   expect(f.service.read(query).totals.tokens).toBe(120)
   await writeFile(
     file,
-    JSON.stringify(response('changed', 80)) + '\n' + JSON.stringify(response('next')) + '\n',
+    JSON.stringify(nativeClaudeResponse('changed', 80)) +
+      '\n' +
+      JSON.stringify(nativeClaudeResponse('next')) +
+      '\n',
   )
   await f.service.refresh()
   expect(f.service.read(query).totals.tokens).toBe(300)
 })
 
 it('keeps recorded price provenance, including unknown prices, across appends and restart', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   f.service.close()
   let priced = false
   const options = {
@@ -415,12 +398,15 @@ it('keeps recorded price provenance, including unknown prices, across appends an
   cleanup.push(async () => service.close())
   await service.initialize()
   const file = join(f.transcripts, 'native.jsonl')
-  await writeFile(file, JSON.stringify(response('unknown')) + '\n')
+  await writeFile(file, JSON.stringify(nativeClaudeResponse('unknown')) + '\n')
   await service.refresh()
   priced = true
   await appendFile(
     file,
-    JSON.stringify(response('unknown', 40)) + '\n' + JSON.stringify(response('priced')) + '\n',
+    JSON.stringify(nativeClaudeResponse('unknown', 40)) +
+      '\n' +
+      JSON.stringify(nativeClaudeResponse('priced')) +
+      '\n',
   )
   await service.refresh()
   const report = service.read(query)
@@ -435,9 +421,9 @@ it('keeps recorded price provenance, including unknown prices, across appends an
 })
 
 it('resumes UTF-8 codepoint boundaries across bounded passes and process restart', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   f.service.close()
-  const text = JSON.stringify(response('native-🚀')) + '\n'
+  const text = JSON.stringify(nativeClaudeResponse('native-🚀')) + '\n'
   const budget = Buffer.byteLength(text.slice(0, text.indexOf('🚀'))) + 1
   const options = {
     ...f.options,
@@ -461,9 +447,9 @@ it('resumes UTF-8 codepoint boundaries across bounded passes and process restart
 })
 
 it('coalesces concurrent refreshes and rolls back cancellation after actual file work', async () => {
-  const f = await fixture()
+  const f = await transcriptHistoryFixture(cleanup)
   const file = join(f.transcripts, 'native.jsonl')
-  await writeFile(file, JSON.stringify(response('initial')) + '\n')
+  await writeFile(file, JSON.stringify(nativeClaudeResponse('initial')) + '\n')
   const results = await Promise.all([f.service.refresh(), f.service.refresh(), f.service.refresh()])
   expect(results[0]).toBe(results[1])
   expect(results[1]).toBe(results[2])
@@ -483,7 +469,7 @@ it('coalesces concurrent refreshes and rolls back cancellation after actual file
   cleanup.push(async () => service.close())
   await service.initialize()
   const before = service.read(query)
-  await appendFile(file, JSON.stringify(response('cancelled')) + '\n')
+  await appendFile(file, JSON.stringify(nativeClaudeResponse('cancelled')) + '\n')
   await expect(service.refresh({ signal: abort.signal })).rejects.toThrow()
   expect(seen).toBe(1)
   expect(service.read(query)).toEqual(before)
@@ -492,16 +478,16 @@ it('coalesces concurrent refreshes and rolls back cancellation after actual file
 })
 
 it('reports oversized selected metadata and enforces viewer-local range boundaries', async () => {
-  const f = await fixture()
-  const old = response('old')
+  const f = await transcriptHistoryFixture(cleanup)
+  const old = nativeClaudeResponse('old')
   old.timestamp = '2026-09-27T02:59:59Z'
-  const boundary = response('boundary')
+  const boundary = nativeClaudeResponse('boundary')
   boundary.timestamp = '2026-09-27T03:00:00Z'
-  const future = response('future')
+  const future = nativeClaudeResponse('future')
   future.timestamp = '2026-10-03T12:00:01Z'
   await writeFile(
     join(f.transcripts, 'native.jsonl'),
-    [old, boundary, future, response('x'.repeat(70000))]
+    [old, boundary, future, nativeClaudeResponse('x'.repeat(70000))]
       .map((row) => JSON.stringify(row))
       .join('\n') + '\n',
   )
@@ -511,4 +497,160 @@ it('reports oversized selected metadata and enforces viewer-local range boundari
     status: 'partial',
     oversizedLines: 1,
   })
+})
+
+it('groups Claude tool-round billing responses by sanitized native user prompts', async () => {
+  const f = await transcriptHistoryFixture(cleanup)
+  const rows = [
+    { type: 'user', uuid: 'prompt-1', message: { content: 'PRIVATE PROMPT' } },
+    nativeClaudeResponse('round-1'),
+    {
+      type: 'user',
+      uuid: 'tool-uuid',
+      message: { content: [{ type: 'tool_result', content: 'PRIVATE TOOL' }] },
+    },
+    nativeClaudeResponse('round-2'),
+    nativeClaudeResponse('round-3'),
+    { type: 'user', uuid: 'interrupted', message: { content: '[Request interrupted by user]' } },
+    { type: 'user', uuid: 'meta', isMeta: true, message: { content: 'PRIVATE META' } },
+    {
+      type: 'user',
+      uuid: 'prompt-2',
+      message: { content: [{ type: 'text', text: 'PRIVATE NEXT' }] },
+    },
+    nativeClaudeResponse('round-4'),
+    nativeClaudeResponse('round-5'),
+  ]
+  await writeFile(
+    join(f.transcripts, 'claude.jsonl'),
+    rows.map((row) => JSON.stringify(row)).join('\n') + '\n',
+  )
+  await f.service.refresh()
+  expect(f.service.read(query).totals).toMatchObject({ turns: 2, tokens: 600 })
+  const { Database } = await import('bun:sqlite')
+  const database = new Database(join(f.options.cacheDirectory, 'transcript-history.sqlite'))
+  expect(
+    database
+      .query<{ value: string }, []>('SELECT value FROM files')
+      .all()
+      .map((row) => row.value)
+      .join(''),
+  ).not.toContain('PRIVATE')
+  database.close()
+})
+
+it('honors fork baselines when native Codex metadata reports source cli', async () => {
+  const f = await transcriptHistoryFixture(cleanup)
+  f.service.close()
+  const service = new LocalTranscriptUsageService({
+    ...f.options,
+    sources: [{ id: 'codex', driverKind: 'codex', roots: [f.transcripts] }],
+  })
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  const rows = [
+    { type: 'session_meta', payload: { id: 'child', source: 'cli', forked_from_id: 'parent' } },
+    { type: 'turn_context', payload: { turn_id: 'child-turn', model: 'gpt-test' } },
+    {
+      type: 'event_msg',
+      timestamp: '2026-10-03T10:00:00Z',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: { input_tokens: 150, output_tokens: 30 },
+          last_token_usage: { input_tokens: 50, output_tokens: 10 },
+        },
+      },
+    },
+  ]
+  await writeFile(
+    join(f.transcripts, 'codex.jsonl'),
+    rows.map((row) => JSON.stringify(row)).join('\n') + '\n',
+  )
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(60)
+})
+
+it('rotates shared scan budgets so earlier stores cannot starve later stores', async () => {
+  const f = await transcriptHistoryFixture(cleanup)
+  const other = join(f.root, 'other-native')
+  await mkdir(other)
+  await writeFile(
+    join(f.transcripts, 'first.jsonl'),
+    JSON.stringify(nativeClaudeResponse('first')) + '\n',
+  )
+  await writeFile(
+    join(other, 'second.jsonl'),
+    JSON.stringify(nativeClaudeResponse('second')) + '\n',
+  )
+  f.service.close()
+  const service = new LocalTranscriptUsageService({
+    ...f.options,
+    limits: { ...f.options.limits, maxFiles: 2 },
+    sources: [
+      { id: 'first', driverKind: 'claude', roots: [f.transcripts] },
+      { id: 'second', driverKind: 'claude', roots: [other] },
+    ],
+  })
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  for (let index = 0; index < 6; index++) await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(240)
+  expect(service.read(query).coverage?.sources.map((source) => source.records)).toEqual([1, 1])
+})
+
+it('continues discovering readable siblings after a queued child disappears', async () => {
+  const f = await transcriptHistoryFixture(cleanup)
+  const good = join(f.transcripts, 'good')
+  const bad = join(f.transcripts, 'bad')
+  await mkdir(good)
+  await mkdir(bad)
+  const file = join(good, 'native.jsonl')
+  await writeFile(file, JSON.stringify(nativeClaudeResponse('good')) + '\n')
+  const { walkTranscriptRoot } = await import('../utils/transcript-scan')
+  const walker = walkTranscriptRoot(f.transcripts)
+  await walker.next()
+  await walker.next()
+  await walker.next()
+  await rm(bad, { recursive: true })
+  const remaining = []
+  for await (const entry of walker) remaining.push(entry)
+  expect(remaining).toContain(file)
+  expect(remaining).toContainEqual({ kind: 'error', reason: 'absent' })
+})
+
+it('keeps complete JSON without a newline pending until the native writer terminates the record', async () => {
+  const f = await transcriptHistoryFixture(cleanup)
+  const file = join(f.transcripts, 'native.jsonl')
+  await writeFile(file, JSON.stringify(nativeClaudeResponse('tail')))
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(0)
+  expect(f.service.read(query).coverage?.sources[0]?.status).toBe('partial')
+  await appendFile(file, '\n')
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(120)
+  expect(f.service.read(query).coverage?.sources[0]?.status).toBe('ready')
+})
+
+it('documents the append-only assumption for arbitrary interior edits that preserve both sampled guards', async () => {
+  const f = await transcriptHistoryFixture(cleanup)
+  const file = join(f.transcripts, 'native.jsonl')
+  const padding = JSON.stringify({ type: 'progress', content: 'x'.repeat(1000) }) + '\n'
+  await writeFile(file, padding + JSON.stringify(nativeClaudeResponse('old', 20)) + '\n' + padding)
+  await f.service.refresh()
+  await writeFile(
+    file,
+    padding +
+      JSON.stringify(nativeClaudeResponse('new', 80)) +
+      '\n' +
+      padding +
+      JSON.stringify(nativeClaudeResponse('append')) +
+      '\n',
+  )
+  await f.service.refresh()
+  // Native writers append; detecting this unsupported interior edit would require rereading the consumed prefix.
+  expect(f.service.read(query).totals.tokens).toBe(240)
+  await writeFile(file, padding + JSON.stringify(nativeClaudeResponse('new', 80)) + '\n' + padding)
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(180)
 })

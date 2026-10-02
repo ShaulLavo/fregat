@@ -18,6 +18,10 @@ export const transcriptJsonStateSchema = v.object({
   isKey: v.boolean(),
   escaped: v.boolean(),
   unicodeRemaining: v.number(),
+  unicodeValue: v.number(),
+  redacted: v.boolean(),
+  nonWhitespace: v.boolean(),
+  interruptionMatch: v.number(),
   output: v.string(),
   invalid: v.boolean(),
   oversized: v.boolean(),
@@ -25,47 +29,53 @@ export const transcriptJsonStateSchema = v.object({
 })
 export type TranscriptJsonState = v.InferOutput<typeof transcriptJsonStateSchema>
 
-type Fields = { readonly [key: string]: true | Fields }
+type Field = 'string' | 'number' | 'boolean' | Fields
+type Fields = { readonly [key: string]: Field }
+type ValueKind = 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null'
+const interruption = '[Request interrupted by user'
 const fields: Fields = {
-  type: true,
-  timestamp: true,
-  uuid: true,
-  sessionId: true,
-  requestId: true,
-  costUSD: true,
+  type: 'string',
+  timestamp: 'string',
+  uuid: 'string',
+  sessionId: 'string',
+  requestId: 'string',
+  costUSD: 'number',
+  isMeta: 'boolean',
+  isCompactSummary: 'boolean',
   message: {
-    id: true,
-    model: true,
+    id: 'string',
+    model: 'string',
+    content: { type: 'string', text: 'string' },
     usage: {
-      input_tokens: true,
-      output_tokens: true,
-      cache_read_input_tokens: true,
-      cache_creation_input_tokens: true,
-      output_tokens_details: { thinking_tokens: true },
+      input_tokens: 'number',
+      output_tokens: 'number',
+      cache_read_input_tokens: 'number',
+      cache_creation_input_tokens: 'number',
+      output_tokens_details: { thinking_tokens: 'number' },
     },
   },
   payload: {
-    type: true,
-    id: true,
-    session_id: true,
-    turn_id: true,
-    model: true,
-    forked_from_id: true,
-    source: { subagent: { thread_spawn: { parent_thread_id: true } } },
+    type: 'string',
+    id: 'string',
+    session_id: 'string',
+    turn_id: 'string',
+    model: 'string',
+    forked_from_id: 'string',
+    source: { subagent: { thread_spawn: { parent_thread_id: 'string' } } },
     info: {
       total_token_usage: {
-        input_tokens: true,
-        cached_input_tokens: true,
-        cache_write_input_tokens: true,
-        output_tokens: true,
-        reasoning_output_tokens: true,
+        input_tokens: 'number',
+        cached_input_tokens: 'number',
+        cache_write_input_tokens: 'number',
+        output_tokens: 'number',
+        reasoning_output_tokens: 'number',
       },
       last_token_usage: {
-        input_tokens: true,
-        cached_input_tokens: true,
-        cache_write_input_tokens: true,
-        output_tokens: true,
-        reasoning_output_tokens: true,
+        input_tokens: 'number',
+        cached_input_tokens: 'number',
+        cache_write_input_tokens: 'number',
+        output_tokens: 'number',
+        reasoning_output_tokens: 'number',
       },
     },
   },
@@ -80,6 +90,10 @@ export function initialTranscriptJsonState(): TranscriptJsonState {
     isKey: false,
     escaped: false,
     unicodeRemaining: 0,
+    unicodeValue: 0,
+    redacted: false,
+    nonWhitespace: false,
+    interruptionMatch: 0,
     output: '',
     invalid: false,
     oversized: false,
@@ -87,15 +101,39 @@ export function initialTranscriptJsonState(): TranscriptJsonState {
   }
 }
 
-function selectedPath(path: readonly string[]) {
-  let current: true | Fields = fields
+function fieldAt(path: readonly string[]): Field | undefined {
+  let current: Field | undefined = fields
   for (const key of path) {
-    if (current === true) return true
-    const next: true | Fields | undefined = current[key]
-    if (next === undefined) return false
-    current = next
+    if (!current || typeof current === 'string') return undefined
+    current = current[key]
   }
-  return true
+  return current
+}
+
+function isContentText(path: readonly string[]) {
+  return (
+    path[0] === 'message' &&
+    path[1] === 'content' &&
+    (path.length === 2 || (path.length === 3 && path[2] === 'text'))
+  )
+}
+
+function selectedPath(path: readonly string[], kind: ValueKind) {
+  const field = fieldAt(path)
+  if (!field) return false
+  if (kind === 'string' && isContentText(path)) return true
+  if (kind === 'object') return typeof field === 'object'
+  if (kind === 'array') return path.length === 2 && path[0] === 'message' && path[1] === 'content'
+  return field === kind || (kind === 'null' && typeof field === 'string')
+}
+
+function decodedEscape(char: string) {
+  if (char === 'b') return '\b'
+  if (char === 'f') return '\f'
+  if (char === 'n') return '\n'
+  if (char === 'r') return '\r'
+  if (char === 't') return '\t'
+  return char
 }
 
 /** Incremental JSON projection discards conversation strings before allocating or persisting them. */
@@ -115,7 +153,11 @@ export class TranscriptJsonProjector {
         this.state.mode === 'string' &&
         !this.state.capture &&
         !this.state.escaped &&
-        !this.state.unicodeRemaining
+        !this.state.unicodeRemaining &&
+        (!this.state.redacted ||
+          (this.state.nonWhitespace &&
+            (this.state.interruptionMatch < 0 ||
+              this.state.interruptionMatch >= interruption.length)))
       ) {
         const quote = text.indexOf('"', index)
         const slash = text.indexOf('\\', index)
@@ -155,7 +197,17 @@ export class TranscriptJsonProjector {
     }
     if (this.state.mode === 'scalar') {
       if (!/[ \t\r\n,}\]]/u.test(char)) {
-        this.state.token += char
+        const next = this.state.token + char
+        const numeric = /^[0-9-]/u.test(this.state.token)
+        const valid = numeric
+          ? /^[0-9eE+.-]$/u.test(char)
+          : ['true', 'false', 'null'].some((word) => word.startsWith(next))
+        if (!valid) {
+          this.state.invalid = true
+          this.state.token = ''
+          return
+        }
+        this.state.token = next
         return
       }
       this.scalar()
@@ -167,7 +219,7 @@ export class TranscriptJsonProjector {
       return
     }
     if (char === '{' || char === '[') {
-      const selection = this.startValue()
+      const selection = this.startValue(char === '{' ? 'object' : 'array')
       this.state.frames.push({
         kind: char === '{' ? 'object' : 'array',
         ...selection,
@@ -207,42 +259,86 @@ export class TranscriptJsonProjector {
   private startString() {
     const frame = this.state.frames.at(-1)
     this.state.isKey = frame?.kind === 'object' && frame.stage === 'key'
-    this.state.capture = this.state.isKey ? (frame?.selected ?? false) : this.startValue().selected
+    const selection = this.state.isKey ? null : this.startValue('string')
+    this.state.redacted = Boolean(selection?.selected && isContentText(selection.path))
+    this.state.capture = this.state.isKey
+      ? (frame?.selected ?? false)
+      : Boolean(selection?.selected && !this.state.redacted)
     this.state.token = ''
     this.state.mode = 'string'
     this.state.escaped = false
     this.state.unicodeRemaining = 0
+    this.state.unicodeValue = 0
+    this.state.nonWhitespace = false
+    this.state.interruptionMatch = 0
   }
 
   private string(char: string) {
     if (this.state.unicodeRemaining) {
       if (!/[0-9a-f]/iu.test(char)) this.state.invalid = true
-      if (this.state.capture) this.state.token += char
+      this.state.unicodeValue = this.state.unicodeValue * 16 + (Number.parseInt(char, 16) || 0)
+      if (this.state.capture && !this.state.isKey) this.state.token += char
       this.state.unicodeRemaining--
+      if (!this.state.unicodeRemaining)
+        this.observeCharacter(String.fromCharCode(this.state.unicodeValue))
       return
     }
     if (this.state.escaped) {
-      if (char === 'u') this.state.unicodeRemaining = 4
-      else if (!'"\\/bfnrt'.includes(char)) this.state.invalid = true
-      if (this.state.capture) this.state.token += char
+      if (char === 'u') {
+        this.state.unicodeRemaining = 4
+        this.state.unicodeValue = 0
+      } else if (!'"\\/bfnrt'.includes(char)) this.state.invalid = true
+      else this.observeCharacter(decodedEscape(char))
+      if (this.state.capture && !this.state.isKey) this.state.token += char
       this.state.escaped = false
       return
     }
     if (char === '\\') {
-      if (this.state.capture) this.state.token += char
+      if (this.state.capture && !this.state.isKey) this.state.token += char
       this.state.escaped = true
       return
     }
     if (char !== '"') {
       if (char.charCodeAt(0) < 32) this.state.invalid = true
-      if (this.state.capture) this.state.token += char
+      this.observeCharacter(char)
+      if (this.state.capture && !this.state.isKey) this.state.token += char
       return
     }
+    this.finishString()
+  }
+
+  private observeCharacter(char: string) {
+    if (this.state.isKey && this.state.capture) {
+      this.state.token += char
+      const field = fieldAt(this.state.frames.at(-1)?.path ?? [])
+      const recognized =
+        typeof field === 'object' &&
+        Object.keys(field).some((key) => key.startsWith(this.state.token))
+      if (!recognized) {
+        this.state.capture = false
+        this.state.token = ''
+      }
+    }
+    if (!this.state.redacted) return
+    if (char.trim()) this.state.nonWhitespace = true
+    if (this.state.interruptionMatch < 0 || this.state.interruptionMatch >= interruption.length)
+      return
+    this.state.interruptionMatch =
+      interruption[this.state.interruptionMatch] === char ? this.state.interruptionMatch + 1 : -1
+  }
+
+  private finishString() {
     this.state.mode = 'idle'
     if (!this.state.isKey) {
       if (this.state.capture) this.emit('"' + this.state.token + '"')
+      if (this.state.redacted) {
+        let marker = this.state.nonWhitespace ? 'x' : ''
+        if (this.state.interruptionMatch >= interruption.length) marker = interruption
+        this.emit(JSON.stringify(marker))
+      }
       this.endValue()
       this.state.token = ''
+      this.state.redacted = false
       return
     }
     const frame = this.state.frames.at(-1)
@@ -250,27 +346,23 @@ export class TranscriptJsonProjector {
       this.state.invalid = true
       return
     }
-    try {
-      frame.key = this.state.capture ? JSON.parse('"' + this.state.token + '"') : ''
-    } catch {
-      this.state.invalid = true
-    }
+    frame.key = this.state.capture ? this.state.token : ''
     frame.stage = 'colon'
     this.state.token = ''
   }
 
-  private startValue() {
+  private startValue(kind: ValueKind) {
     const frame = this.state.frames.at(-1)
     if (!frame) {
       if (this.state.complete) this.state.invalid = true
-      return { selected: true, path: [] }
+      return { selected: kind === 'object', path: [] }
     }
     if (frame.stage !== 'value') this.state.invalid = true
-    const path = [...frame.path, frame.key]
-    const selected = frame.selected && frame.kind === 'object' && selectedPath(path)
+    const path = frame.kind === 'array' ? frame.path : [...frame.path, frame.key]
+    const selected = frame.selected && selectedPath(path, kind)
     if (selected) {
       if (frame.entries) this.emit(',')
-      this.emit(JSON.stringify(frame.key) + ':')
+      if (frame.kind === 'object') this.emit(JSON.stringify(frame.key) + ':')
       frame.entries++
     }
     return { selected, path: selected ? path : [] }
@@ -303,7 +395,14 @@ export class TranscriptJsonProjector {
   }
 
   private startScalar(char: string) {
-    this.state.capture = this.startValue().selected
+    if (!/[-0-9tfn]/u.test(char)) {
+      this.state.invalid = true
+      return
+    }
+    let kind: ValueKind = 'number'
+    if (char === 't' || char === 'f') kind = 'boolean'
+    if (char === 'n') kind = 'null'
+    this.state.capture = this.startValue(kind).selected
     this.state.mode = 'scalar'
     this.state.token = char
   }

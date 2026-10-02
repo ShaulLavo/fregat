@@ -14,6 +14,8 @@ import { usageTokenCount } from '@workspace/contracts'
 import { and, eq, gte, ne, sql } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
 import { providerUsageTurns as turns } from '../db/schema'
+import { nativeTranscriptDriverKinds } from './utils/transcript-scan'
+import type { TranscriptRecord } from './utils/transcript-records'
 
 const DAY_MS = 24 * 60 * 60_000
 const COST_SOURCE_RANK: Record<ProviderUsageCostSource, number> = {
@@ -83,14 +85,23 @@ export class ProviderUsageHistoryReader {
       .from(turns)
       .where(and(gte(turns.recordedAt, since), ne(turns.purpose, 'turn')))
       .all()
-      .map((row) => ({
-        ...row,
-        billingKey: JSON.stringify(['fregat-utility', row.sessionId, row.turnId]),
-        turnKey: JSON.stringify([row.sessionId, row.turnId]),
-        identityKind: 'source',
-        price: row.priceSnapshot,
-        reportedCostUsd: row.priceSnapshot ? null : row.costUsd,
-      }))
+      .map((row) => recordedTranscriptRow(row, 'fregat-utility'))
+  }
+
+  /** Recorder chat rows remain authoritative for drivers without a native transcript reader. */
+  readUncoveredSessions(query: ProviderUsageHistoryQuery): TranscriptRecord[] {
+    return this.database
+      .select()
+      .from(turns)
+      .where(
+        and(
+          gte(turns.recordedAt, rangeStart(this.now(), query)),
+          eq(turns.purpose, 'turn'),
+          ...nativeTranscriptDriverKinds.map((driver) => ne(turns.driverKind, driver)),
+        ),
+      )
+      .all()
+      .map((row) => recordedTranscriptRow(row, 'fregat-session'))
   }
 
   /** One set of rates per model, only when every catalog-priced turn in the range used it. */
@@ -405,4 +416,15 @@ function transcriptCostSource(
   if (row.costUsd === null) return 'none'
   if (row.reportedCostUsd !== null) return 'provider'
   return 'catalog'
+}
+
+function recordedTranscriptRow(row: typeof turns.$inferSelect, source: string): TranscriptRecord {
+  return {
+    ...row,
+    billingKey: JSON.stringify([source, row.sessionId, row.turnId]),
+    turnKey: JSON.stringify([row.sessionId, row.turnId]),
+    identityKind: 'source',
+    price: row.priceSnapshot,
+    reportedCostUsd: row.priceSnapshot ? null : row.costUsd,
+  }
 }

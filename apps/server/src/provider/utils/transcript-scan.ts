@@ -32,24 +32,54 @@ export type TranscriptScanLimits = {
   readonly maxLineBytes: number
   readonly readChunkBytes: number
 }
+export const nativeTranscriptDriverKinds = ['claude', 'codex'] as const
 export type TranscriptSource = {
   readonly id: string
-  readonly driverKind: 'claude' | 'codex'
+  readonly driverKind: (typeof nativeTranscriptDriverKinds)[number]
   readonly roots: readonly string[]
 }
 
-/** Yields every directory entry so the owner's per-pass cap also bounds discovery work. */
-export async function* walkTranscriptRoot(root: string): AsyncGenerator<string | null> {
+export type TranscriptWalkEntry =
+  | string
+  | null
+  | { readonly kind: 'directory' }
+  | {
+      readonly kind: 'error'
+      readonly reason: 'absent' | 'unreadable'
+    }
+
+/** Every opened directory and entry consumes a visit; a failed child keeps its siblings queued. */
+export async function* walkTranscriptRoot(root: string): AsyncGenerator<TranscriptWalkEntry> {
   const directories = [root]
   while (directories.length) {
     const directory = directories.pop()
     if (!directory) continue
-    const handle = await opendir(directory)
-    for await (const entry of handle) {
+    try {
+      yield* readTranscriptDirectory(directory, directories)
+    } catch (error) {
+      const absent =
+        typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
+      yield { kind: 'error', reason: absent ? 'absent' : 'unreadable' }
+    }
+  }
+}
+
+async function* readTranscriptDirectory(
+  directory: string,
+  directories: string[],
+): AsyncGenerator<TranscriptWalkEntry> {
+  const handle = await opendir(directory)
+  try {
+    yield { kind: 'directory' }
+    while (true) {
+      const entry = await handle.read()
+      if (!entry) return
       const path = join(directory, entry.name)
       if (entry.isDirectory()) directories.push(path)
       yield entry.isFile() && entry.name.endsWith('.jsonl') ? path : null
     }
+  } finally {
+    await handle.close()
   }
 }
 
@@ -78,6 +108,7 @@ export async function scanTranscriptFile(options: {
       return { file: previous, bytesRead: 0, complete: true }
     }
     const prefixLength = Math.min(previous?.cursor ?? 0, 256)
+    // Native JSONL resumes assume append-only writes; sampled guards cannot prove an unchanged interior.
     const resume =
       previous &&
       previous.identity === identity &&

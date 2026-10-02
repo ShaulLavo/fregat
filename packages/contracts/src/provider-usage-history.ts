@@ -8,7 +8,7 @@ export const providerUsageHistorySourceSchema = v.object({
   id: v.string(),
   hostId: v.string(),
   driverKind: v.string(),
-  sourceKind: v.picklist(['native-transcript', 'fregat-utility']),
+  sourceKind: v.picklist(['native-transcript', 'fregat-utility', 'fregat-session']),
   unidentifiedRecords: count,
   status: v.picklist(['pending', 'ready', 'partial', 'absent', 'unreadable']),
   scannedAt: timestamp,
