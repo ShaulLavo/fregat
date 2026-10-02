@@ -157,10 +157,6 @@ export const serverUpdate: Scenario = {
     })
     await page.setViewportSize({ width: 390, height: 844 })
     await selectors.phoneShell(page).waitFor()
-    if (await selectors.phoneBack(page).isVisible()) {
-      await selectors.phoneBack(page).click()
-      await selectors.phoneLevel(page, 'sessions').waitFor()
-    }
     await verifyClientUpdate(page, {
       ...context,
       step: (name) => context.step(`phone-${name}`),
