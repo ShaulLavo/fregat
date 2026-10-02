@@ -19,7 +19,7 @@ export const importedUsageListSchema = v.array(
   }),
 )
 
-const count = v.optional(v.number(), 0)
+const count = v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 0)
 
 const claudeRowSchema = v.looseObject({
   type: v.string(),
@@ -54,6 +54,15 @@ const codexRowSchema = v.looseObject({
     v.looseObject({
       type: v.optional(v.string()),
       forked_from_id: v.optional(v.nullable(v.string())),
+      source: v.optional(
+        v.looseObject({
+          subagent: v.optional(
+            v.looseObject({
+              thread_spawn: v.optional(v.looseObject({ parent_thread_id: v.optional(v.string()) })),
+            }),
+          ),
+        }),
+      ),
     }),
   ),
 })
@@ -205,32 +214,69 @@ export function isCodexUsageLine(line: string) {
  */
 export function codexRolloutUsage(lines: readonly unknown[]): ProviderImportedUsage[] {
   const usage = new TurnUsage()
-  let turn: { key: string; model: string | null } | null = null
-  let previous: Totals | null = null
-  let forked: boolean | null = null
-  for (const row of parsedRows(codexRowSchema, lines)) {
-    if (row.type === 'session_meta') {
-      forked ??= Boolean(row.payload?.forked_from_id)
-      continue
-    }
-    const kind = row.type === 'event_msg' ? row.payload?.type : row.type
-    if (kind === 'task_started' || kind === 'turn_context') {
-      turn = codexTurn(row.payload, turn)
-      continue
-    }
-    if (kind !== 'token_count') continue
-    const total = codexTotal(row.payload)
-    if (!total) continue
-
-    const delta =
-      !previous && forked
-        ? codexTotal(row.payload, 'last_token_usage')
-        : codexDelta(total, previous)
-    previous = total
-    if (!turn?.model || !row.timestamp || !delta) continue
-    usage.add(turn.key, turn.model, row.timestamp, delta)
+  const state = initialCodexUsageState()
+  for (const row of lines) {
+    const request = reduceCodexUsage(state, row)
+    if (request) usage.add(request.turnKey, request.model, request.recordedAt, request)
   }
   return usage.list()
+}
+
+export const codexUsageStateSchema = v.object({
+  turn: v.nullable(v.object({ key: v.string(), model: v.nullable(v.string()) })),
+  previous: v.nullable(
+    v.object({
+      inputTokens: count,
+      outputTokens: count,
+      cacheReadTokens: count,
+      cacheWriteTokens: count,
+      reasoningTokens: count,
+    }),
+  ),
+  forked: v.nullable(v.boolean()),
+})
+export type CodexUsageState = v.InferOutput<typeof codexUsageStateSchema>
+
+export function initialCodexUsageState(): CodexUsageState {
+  return { turn: null, previous: null, forked: null }
+}
+
+/** Shared with incremental local scans: reducer state contains only usage metadata. */
+export function reduceCodexUsage(
+  state: CodexUsageState,
+  input: unknown,
+): ProviderImportedUsage | null {
+  const parsed = v.safeParse(codexRowSchema, input)
+  if (!parsed.success) return null
+  const row = parsed.output
+  if (row.type === 'session_meta') {
+    state.forked ??= Boolean(
+      row.payload?.forked_from_id || row.payload?.source?.subagent?.thread_spawn?.parent_thread_id,
+    )
+    return null
+  }
+  const kind = row.type === 'event_msg' ? row.payload?.type : row.type
+  if (kind === 'task_started' || kind === 'turn_context') {
+    state.turn = codexTurn(row.payload, state.turn)
+    return null
+  }
+  if (kind !== 'token_count') return null
+  const total = codexTotal(row.payload)
+  if (!total) return null
+  const delta =
+    !state.previous && state.forked
+      ? codexTotal(row.payload, 'last_token_usage')
+      : codexDelta(total, state.previous)
+  state.previous = total
+  if (!state.turn?.model || !row.timestamp || !delta) return null
+  return {
+    ...delta,
+    billingKey: state.turn.key,
+    turnKey: state.turn.key,
+    model: state.turn.model,
+    recordedAt: row.timestamp,
+    costUsd: null,
+  }
 }
 
 function codexTurn(payload: unknown, current: { key: string; model: string | null } | null) {
@@ -269,7 +315,14 @@ export function codexRolloutBaseline(lines: readonly unknown[]) {
 
 /** A total below the previous one is a restarted counter, so all of it is new. */
 function codexDelta(total: Totals, previous: Totals | null): Totals {
-  if (!previous || total.outputTokens < previous.outputTokens) return total
+  if (
+    !previous ||
+    total.outputTokens < previous.outputTokens ||
+    total.inputTokens < previous.inputTokens ||
+    total.cacheReadTokens < previous.cacheReadTokens ||
+    total.cacheWriteTokens < previous.cacheWriteTokens
+  )
+    return total
   return {
     cacheReadTokens: Math.max(0, total.cacheReadTokens - previous.cacheReadTokens),
     cacheWriteTokens: Math.max(0, total.cacheWriteTokens - previous.cacheWriteTokens),
