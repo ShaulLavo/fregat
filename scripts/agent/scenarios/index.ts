@@ -312,6 +312,7 @@ import { settingsColdLoad } from './settings-cold-load'
 import { settingsOpen, settingsOpenNavigation } from './settings-open'
 import { serverRestart, serverRestartRecovery } from './server-restart'
 import { serverUpdateDeadline } from './server-update-deadline'
+import { watcherRestart } from './watcher-restart'
 import { settingsDefaults } from './settings-defaults'
 import { settingsFocus } from './settings-focus'
 import { settingsAppearanceRows } from './settings-appearance-rows'
@@ -762,6 +763,7 @@ export const scenarios: readonly Scenario[] = [
   serverRestart,
   serverRestartRecovery,
   serverUpdateDeadline,
+  watcherRestart,
   sidebarSettingsButton,
   fontPicker,
   fontPickerHover,

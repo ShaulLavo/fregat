@@ -165,6 +165,8 @@ function response(method) {
       }
     case 'account/read':
       return { account: { type: 'apiKey' }, requiresOpenaiAuth: false }
+    case 'config/read':
+      return { config: {}, origins: {}, layers: null }
     case 'model/list':
       return {
         data: [

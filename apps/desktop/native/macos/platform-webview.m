@@ -1,11 +1,13 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#import <QuartzCore/QuartzCore.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 static WKWebsiteDataStore *persistent_store(NSString *directory) {
   if (@available(macOS 14.0, *)) {
@@ -36,6 +38,7 @@ static void emit(NSDictionary *event) {
 @interface PlatformHost : NSObject <NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate>
 @property(strong) NSWindow *window;
 @property(strong) WKWebView *view;
+@property(strong) NSVisualEffectView *effect;
 @property(strong) NSURL *appURL;
 @property(strong) WKUserScript *startupScript;
 @property(strong) NSOpenPanel *picker;
@@ -168,6 +171,22 @@ static void emit(NSDictionary *event) {
 }
 - (void)command:(NSDictionary *)command {
   if (self.closed) return;
+  if (command[@"windowAppearance"]) {
+    id appearance = command[@"windowAppearance"];
+    if (![appearance isKindOfClass:NSDictionary.class]) return;
+    id opacity = appearance[@"opacity"];
+    id frost = appearance[@"frost"];
+    if (![opacity isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()) return;
+    if (![frost isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)frost) == CFBooleanGetTypeID()) return;
+    double opacityValue = [opacity doubleValue];
+    double frostValue = [frost doubleValue];
+    if (!isfinite(opacityValue) || opacityValue < 0 || opacityValue > 100) return;
+    if (!isfinite(frostValue) || frostValue < 0 || frostValue > 100) return;
+    // The page paints pane opacity; AppKit's blurred layer has independent strength.
+    self.effect.alphaValue = frostValue / 100;
+    self.effect.hidden = frostValue == 0;
+    return;
+  }
   if ([command[@"eval"] isKindOfClass:NSString.class]) {
     [self.view evaluateJavaScript:command[@"eval"] completionHandler:nil];
     return;
@@ -291,10 +310,15 @@ int main(int argc, char **argv) {
     if (vibrant) {
       window.opaque = NO;
       window.backgroundColor = NSColor.clearColor;
+      window.contentView.wantsLayer = YES;
+      window.contentView.layer.opaque = NO;
+      window.contentView.layer.backgroundColor = NSColor.clearColor.CGColor;
       NSVisualEffectView *effect = [[NSVisualEffectView alloc] initWithFrame:window.contentView.bounds];
       effect.material = NSVisualEffectMaterialUnderWindowBackground;
       effect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
       effect.state = NSVisualEffectStateActive;
+      effect.hidden = YES;
+      host.effect = effect;
       effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
       [window.contentView addSubview:effect];
     }
@@ -308,8 +332,11 @@ int main(int argc, char **argv) {
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     if (@available(macOS 13.3, *)) view.inspectable = YES;
     if (vibrant) {
+      // Clearing WebKit's background can leave its root layer's initial opaque hint.
       [view setValue:@NO forKey:@"drawsBackground"];
       if (@available(macOS 12.0, *)) view.underPageBackgroundColor = NSColor.clearColor;
+      view.layer.opaque = NO;
+      view.layer.backgroundColor = NSColor.clearColor.CGColor;
     }
     [window.contentView addSubview:view];
     __weak PlatformHost *weakHost = host;

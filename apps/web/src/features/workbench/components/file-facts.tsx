@@ -1,11 +1,8 @@
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import type { FileSnapshot } from '@/lib/file-snapshot'
 import { basename, formatSize } from '@/lib/path-formatters'
-import { useCommandBus } from '@/keymap/hooks/use-command-bus'
-import { Button } from '@workspace/ui/components/button'
 
 export function FileFacts({ file }: { readonly file: Pick<FileSnapshot, 'path' | 'size'> }) {
-  const bus = useCommandBus()
   const extension = basename(file.path).split('.').slice(1).at(-1)
   return (
     <ToolPane
@@ -26,17 +23,6 @@ export function FileFacts({ file }: { readonly file: Pick<FileSnapshot, 'path' |
         <dt className='text-muted-foreground'>Type</dt>
         <dd>{extension ? `${extension.toUpperCase()} file` : 'Binary file'}</dd>
       </dl>
-      <Button
-        size='sm'
-        variant='secondary'
-        onClick={() =>
-          bus.dispatch('workspace.revealActiveFileInTree', {
-            source: { kind: 'programmatic', caller: 'file-facts' },
-          })
-        }
-      >
-        Reveal in files
-      </Button>
     </ToolPane>
   )
 }

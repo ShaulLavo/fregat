@@ -60,6 +60,7 @@ export function shellBridge(
     const bridge = ${JSON.stringify(bridge)};
     const send = body => { webkit.messageHandlers.platformShell.postMessage(body); };
     const token = ${JSON.stringify(token)};
+    ${engine === 'wkwebview' && vibrancy ? "bridge.setWindowAppearance = appearance => { send({ ...appearance, method: 'setWindowAppearance', origin: location.origin, token }); };" : ''}
     const documentId = crypto.randomUUID();
     const pending = new Map();
     let next = 0;

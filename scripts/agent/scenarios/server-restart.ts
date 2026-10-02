@@ -12,8 +12,6 @@ const EXPECTED_OFFLINE_NOTICE =
   /^.+ is unreachable\. (Reconnect to use this terminal\.|Showing cached data\.)$/
 const EXPECTED_TERMINAL_CONNECTING_NOTICE =
   'Connecting to the terminal. You can scroll the saved output until it connects.'
-const KNOWN_WATCHER_STARTUP_ALERT =
-  'Filesystem error\nCould not start watching files for changes. Try again. If it keeps failing, open the Logs panel to see what went wrong.\nCopy\nFix with AI'
 
 type Sample = {
   readonly at: number
@@ -154,17 +152,13 @@ async function verifyRestart(
         sample.alerts.filter(
           (alert) =>
             alert !== EXPECTED_TERMINAL_CONNECTING_NOTICE &&
-            (sample.item !== 'restarting' ||
-              (!EXPECTED_OFFLINE_NOTICE.test(alert) && alert !== KNOWN_WATCHER_STARTUP_ALERT)),
+            (sample.item !== 'restarting' || !EXPECTED_OFFLINE_NOTICE.test(alert)),
         ),
       ),
     ),
   ]
   const expectedNotices = alerts.filter((alert) => EXPECTED_OFFLINE_NOTICE.test(alert))
   console.log(`expected offline notices recorded: ${expectedNotices.join(' | ') || 'none'}`)
-  console.log(
-    `known #389 watcher startup alerts recorded: ${alerts.filter((alert) => alert === KNOWN_WATCHER_STARTUP_ALERT).length}`,
-  )
   console.log(
     `transient terminal connecting statuses recorded: ${alerts.filter((alert) => alert === EXPECTED_TERMINAL_CONNECTING_NOTICE).length}`,
   )

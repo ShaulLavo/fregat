@@ -1,6 +1,10 @@
 import * as v from 'valibot'
 import { createGateway, nativeEntrypoints, type GatewayOptions } from './gateway'
 import { startResetOrder } from './reset-order'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { configuredAccounts, usageAccountsSchema } from './usage-feed'
+import { createUsageProducer } from './usage-producer'
 
 const portSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65535))
 const resetOrderSchema = v.object({ managementKeyFile: v.string(), stateFile: v.string() })
@@ -12,6 +16,21 @@ export const configSchema = v.pipe(
     gatewayPort: portSchema,
     apiKey: v.pipe(v.string(), v.nonEmpty()),
     resetOrder: v.optional(resetOrderSchema),
+    usageFeed: v.optional(
+      v.object({
+        managementKeyFile: v.pipe(v.string(), v.nonEmpty()),
+        directory: v.optional(
+          v.pipe(v.string(), v.nonEmpty()),
+          join(homedir(), '.claude-gpt', 'usage-feed'),
+        ),
+        intervalMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(60_000)), 60_000),
+        requestTimeoutMs: v.optional(
+          v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60_000)),
+          5_000,
+        ),
+        accounts: v.optional(usageAccountsSchema, configuredAccounts),
+      }),
+    ),
     // A second proxy instance, bound to loopback and kept off the tailnet route, owns the Claude logins.
     claudeProxy: v.optional(
       v.object({
@@ -32,6 +51,11 @@ export const configSchema = v.pipe(
     const used = ports.filter((port) => port !== undefined)
     return new Set(used).size === used.length
   }, 'Choose separate ports for the gateway and each proxy.'),
+  v.check(
+    (config) =>
+      !config.usageFeed || (!config.claudeProxy && config.claudePoolEntrypoints.length === 0),
+    'The usage feed requires direct Claude traffic with empty Claude pool entrypoints.',
+  ),
 )
 if (import.meta.main) {
   try {
@@ -86,12 +110,24 @@ async function run() {
   const stop = () => stopping.resolve(0)
   let server: ReturnType<typeof startGateway> | undefined
   const resetOrders: ReturnType<typeof startResetOrder>[] = []
+  let usageProducer: Awaited<ReturnType<typeof createUsageProducer>> | undefined
   let exitCode = 1
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)
   try {
     // Claude forwarding can start while the GPT registry loads or remains unavailable.
-    server = startGateway(gatewayOptions(config))
+    if (config.usageFeed) {
+      usageProducer = await createUsageProducer({
+        ...config.usageFeed,
+        feedDirectory: config.usageFeed.directory,
+        proxyUrl: `http://127.0.0.1:${config.proxyPort}`,
+      })
+    }
+    server = startGateway({
+      ...gatewayOptions(config),
+      observeClaudeHeaders: usageProducer?.observeClaude,
+    })
+    usageProducer?.start()
     for (const instance of [config, config.claudeProxy]) {
       if (!instance?.resetOrder) continue
       resetOrders.push(
@@ -105,6 +141,7 @@ async function run() {
   } finally {
     process.off('SIGTERM', stop)
     process.off('SIGINT', stop)
+    await usageProducer?.stop()
     for (const resetOrder of resetOrders) resetOrder.stop()
     server?.stop(true)
     const stopped = await Promise.all(proxies.map(stopProxy))

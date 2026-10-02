@@ -61,6 +61,28 @@ test('macOS publishes actual fullscreen state to the app document', async () => 
   expect(mac).toMatch(/windowDidExitFullScreen:[\s\S]*?\[self publishWindowState\]/)
 })
 
+test('macOS clears content and WebKit root layer opacity only in vibrant mode', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('#import <QuartzCore/QuartzCore.h>')
+  const vibrantBlocks = [...mac.matchAll(/if \(vibrant\) \{([\s\S]*?)\n    \}/g)]
+  expect(vibrantBlocks).toHaveLength(2)
+  expect(vibrantBlocks[0]?.[1]).toMatch(
+    /window\.opaque = NO;[\s\S]*?window\.contentView\.wantsLayer = YES;\s*window\.contentView\.layer\.opaque = NO;\s*window\.contentView\.layer\.backgroundColor = NSColor\.clearColor\.CGColor;/,
+  )
+  expect(vibrantBlocks[1]?.[1]).toMatch(
+    /\[view setValue:@NO forKey:@"drawsBackground"\];\s*if \(@available\(macOS 12\.0, \*\)\) view\.underPageBackgroundColor = NSColor\.clearColor;\s*view\.layer\.opaque = NO;\s*view\.layer\.backgroundColor = NSColor\.clearColor\.CGColor;/,
+  )
+  for (const statement of [
+    'window.contentView.wantsLayer = YES;',
+    'window.contentView.layer.opaque = NO;',
+    'window.contentView.layer.backgroundColor = NSColor.clearColor.CGColor;',
+    'view.layer.opaque = NO;',
+    'view.layer.backgroundColor = NSColor.clearColor.CGColor;',
+  ]) {
+    expect(mac.split(statement)).toHaveLength(2)
+  }
+})
+
 test('macOS host getters and methods avoid implicit ARC ownership families', async () => {
   const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
   const properties = mac.matchAll(/@property\([^)]*\)[^;]*?\b([A-Za-z_]\w*)\s*;/g)
@@ -153,3 +175,22 @@ test.skipIf(process.platform !== 'darwin')(
     expect(existsSync(library!)).toBe(true)
   },
 )
+
+test('macOS leaves translucent opacity to the page and starts with a clear backdrop', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('@property(strong) NSVisualEffectView *effect;')
+  expect(mac).toMatch(/effect.hidden = YES;[\s\S]*?host.effect = effect;/)
+  expect(mac).toContain('command[@"windowAppearance"]')
+  expect(mac).toContain('CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()')
+  expect(mac).toContain('!isfinite(opacityValue) || opacityValue < 0 || opacityValue > 100')
+  expect(mac).toContain('!isfinite(frostValue) || frostValue < 0 || frostValue > 100')
+  expect(mac).toContain('CFGetTypeID((__bridge CFTypeRef)frost) == CFBooleanGetTypeID()')
+  expect(mac).toMatch(
+    /if \(!isfinite\(frostValue\)[^\n]+return;\s*\/\/[^\n]+\s*self\.effect\.alphaValue/,
+  )
+  expect(mac).toContain('self.effect.alphaValue = frostValue / 100;')
+  expect(mac).toContain('self.effect.hidden = frostValue == 0;')
+  expect(mac).not.toMatch(/self\.effect\.hidden = .*opacity|self\.effect\.hidden = value < 100/)
+  expect(mac).not.toMatch(/@property[^;]*\b(?:new|init|copy)\w*\s*;/)
+  expect(mac).toContain('dispatch_async(dispatch_get_main_queue(), ^{ [host command:command]; });')
+})
