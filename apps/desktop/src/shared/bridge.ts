@@ -18,4 +18,5 @@ export type PlatformBridge = {
   colorScheme: ShellColorScheme
   titlebar: 'native' | 'overlay'
   pickEntry?(options: PlatformPickOptions): Promise<string[]>
+  setSurfaceOpacity?(opacity: number): void
 }

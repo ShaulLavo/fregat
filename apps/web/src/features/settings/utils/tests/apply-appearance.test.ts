@@ -1,5 +1,5 @@
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { applyAppearance, resolveColorTheme, type AppearanceValues } from '../apply-appearance'
 
 function fakeRoot() {
@@ -50,6 +50,31 @@ describe('resolveColorTheme', () => {
 })
 
 describe('applyAppearance', () => {
+  it('forwards first-paint and live surface opacity after writing CSS', () => {
+    const { properties, root } = fakeRoot()
+    const received: { opacity: number; css: string | undefined }[] = []
+    vi.stubGlobal('window', {
+      platformBridge: {
+        setSurfaceOpacity: (opacity: number) =>
+          received.push({ opacity, css: properties.get('--surface-opacity') }),
+      },
+    })
+    try {
+      applyAppearance(appearance({ 'workbench.surface.opacity': 20 }), root, false)
+      expect(properties.get('--surface-opacity')).toBe('20%')
+      expect(received).toEqual([{ opacity: 20, css: '20%' }])
+
+      applyAppearance(appearance({ 'workbench.surface.opacity': 80 }), root, false)
+      expect(properties.get('--surface-opacity')).toBe('80%')
+      expect(received).toEqual([
+        { opacity: 20, css: '20%' },
+        { opacity: 80, css: '80%' },
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('replaces the theme class rather than accumulating one', () => {
     const { classes, root } = fakeRoot()
 

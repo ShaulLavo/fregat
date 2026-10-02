@@ -16,6 +16,7 @@ export type WebviewCommand =
   | { cancelPick: true }
   | { close: true }
   | { drag: true }
+  | { surfaceOpacity: number }
 export type WebviewEvent =
   | { event: 'ready' }
   | { event: 'message'; body: unknown }
@@ -96,6 +97,9 @@ export class WebviewHost {
   }
   drag() {
     this.send({ drag: true })
+  }
+  setSurfaceOpacity(opacity: number) {
+    this.send({ surfaceOpacity: opacity })
   }
   evaluate(script: string) {
     this.send({ eval: script })

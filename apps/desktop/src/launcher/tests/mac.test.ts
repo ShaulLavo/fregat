@@ -199,3 +199,52 @@ test('WK drag listener sends only primary presses on non-interactive regions', (
     '"backdrop":"compositor"',
   )
 })
+
+test.each([
+  ['wkwebview', 'darwin', true, true],
+  ['wkwebview', 'darwin', false, false],
+  ['webkitgtk', 'linux', true, false],
+  ['webkitgtk', 'linux', false, false],
+] as const)(
+  '%s on %s with vibrancy %s exposes surface opacity: %s',
+  (engine, platform, vibrancy, available) => {
+    const messages: unknown[] = []
+    const global: Record<string, unknown> = {}
+    const window = { top: undefined as unknown }
+    window.top = window
+    new Function(
+      'globalThis',
+      'window',
+      'location',
+      'document',
+      'addEventListener',
+      'webkit',
+      shellBridge('http://localhost:123', engine, 'fixture-token', platform, vibrancy),
+    )(global, window, { origin: 'http://localhost:123' }, { readyState: 'loading' }, () => {}, {
+      messageHandlers: { platformShell: { postMessage: (body: unknown) => messages.push(body) } },
+    })
+    const bridge = global.platformBridge as { setSurfaceOpacity?: (opacity: number) => void }
+    if (!available) {
+      expect(bridge).not.toHaveProperty('setSurfaceOpacity')
+      expect(messages).toEqual([])
+      return
+    }
+    expect(bridge.setSurfaceOpacity).toBeTypeOf('function')
+    bridge.setSurfaceOpacity!(20)
+    bridge.setSurfaceOpacity!(80)
+    expect(messages).toEqual([
+      {
+        method: 'setSurfaceOpacity',
+        opacity: 20,
+        origin: 'http://localhost:123',
+        token: 'fixture-token',
+      },
+      {
+        method: 'setSurfaceOpacity',
+        opacity: 80,
+        origin: 'http://localhost:123',
+        token: 'fixture-token',
+      },
+    ])
+  },
+)
