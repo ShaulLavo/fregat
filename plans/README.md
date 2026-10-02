@@ -132,6 +132,7 @@ not a second live status register.
 | [284](284-resource-aware-heavy-jobs.md)               | Resource-aware heavy jobs and a weak-machine (Raspberry Pi) lane              |
 | [285](285-ghostty-site-first-frame-and-real-shell.md) | The ghostty-webgpu site paints before the wasm and runs a real shell          |
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                           |
+| [287](287-proxy-usage-feed.md)                        | Passive per-account proxy usage feed and the Mesh TV panel                    |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |

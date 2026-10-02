@@ -1,0 +1,45 @@
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── MOCKUP v2 + usage · sample data ──┐
+│ MESH fleet · reachable 4 · unreachable 0 · sessions 16 live 0 cached · services 14 · ready 13 · failed 1                                 2026-10-02 14:32:07 │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌pc · ● reachable · up 1d 17h ───────────────────────── metrics 0s catalogs 0s┐ ┌shauls-macbook-air · ● reachable · up 35d 21h ──────── metrics 1s catalogs 1s┐ 
+│ CPU ▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  9%  RAM 18.4 / 31.1 GiB               59% │ │ CPU ▃▃▄▂▁▁▁▁                     19%  RAM 10.8 / 16.0 GiB               68% │ 
+│ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ │ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ 
+│ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ │ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ 
+│                                       ⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤ │ │                                       ⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒⠒ │ 
+│ · · · · · · · · · · · · · · · · · ·   █████████████████████████████████████ │ │ · · · ⠤⣀⣀ · · · · · ⠒⠒⠒ · · · · · ·   █████████████████████████████████████ │ 
+│ ⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⠒⠒⠒⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⣀⠤  █████████████████████████████████████ │ │ ⠤⠒⠒⠤⠤⠉███⠤⠒⠒⠒⠤⠒⠤⠉⠒⠒⠉███⠤⠉⠒⠒⠒⠒⠒⠒⠉⠉⠤⠉⠉  █████████████████████████████████████ │ 
+│ -2m                              now  -2m                               now │ │ -2m                              now  -2m                               now │ 
+│ GPU ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ 12%  VRAM 3.1 / 8.0 GiB ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ │ GPU ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ 18%  BAT ▪▪▪▪▪▪▪▪▪▪  71% on battery 3h 40m │ 
+│ DISK r 48 MB/s  w 12 MB/s    7% busy  NET ↓ 2.4 MB/s  ↑ 310 kB/s            │ │ DISK r 1.2 MB/s  w 640 kB/s  2% busy  NET ↓ 420 kB/s  ↑ 88 kB/s             │ 
+│ CPU 61° · GPU 44° · NVMe 41° · sessions 10 live · services 8 · 1 failed     │ │ CPU 52° · GPU 47° · sessions 3 live · services 0                            │ 
+└─────────────────────────────────────────────────────────────────────────────┘ └─────────────────────────────────────────────────────────────────────────────┘ 
+┌pi · ● reachable · this host · up 1d 2h ────────────── metrics 1s catalogs 1s┐ ┌vps · ● reachable · up 41d 6h ──────────────────────── metrics 1s catalogs 2s┐ 
+│ CPU ▁▁▁▁                          5%  RAM 0.5 / 3.7 GiB                 14% │ │ CPU ▂▁                           12%  RAM 2.1 / 3.8 GiB                 55% │ 
+│ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ │ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ 
+│ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ │ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ 
+│                                                                             │ │                                       ⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀ │ 
+│ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ │ · · · · · · · ·⠤⠤ · · · · · · · · ·   █████████████████████████████████████ │ 
+│ ⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀  ⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤ │ │ ⠤⣀⣀⠤⣀⣀⣀⣀⠤⣀⠤⠤⠤⣀⠤██⣀⠤⠤⣀⣀⠤⠤⠤⠤⠤⠤⠤⠤⠤⣀⠤⠤⣀⠤  █████████████████████████████████████ │ 
+│ -2m                              now  -2m                               now │ │ -2m                              now  -2m                               now │ 
+│ DISK r 0 B/s  w 96 kB/s      1% busy  NET ↓ 64 kB/s  ↑ 21 kB/s              │ │ DISK r 220 kB/s  w 1.4 MB/s  3% busy  NET ↓ 180 kB/s  ↑ 1.1 MB/s            │ 
+│ SoC 48° · sessions 1 live · services 0                                      │ │ sessions 2 live · services 6                                                │ 
+└─────────────────────────────────────────────────────────────────────────────┘ └─────────────────────────────────────────────────────────────────────────────┘ 
+Hosts 4 / 4 visible · 0 omitted                                                                                                                                 
+┌Sessions · live 13/16 · cached 0 ───────────────────── ┐ ┌Services · 9/14 · 1 failed ───────────────── ┐ ┌AI plans · 3 accounts · passive ─────────────────── ┐
+│ HOST     ID   NAME       STATE    COMMAND             │ │ HOST       SERVICE        STATE      AGE    │ │ Claude · Max                               seen 2m │
+│ pc       7K3D platform   running  claude --model o…   │ │ pc         comfy         ● unhealthy  0s    │ │ 5h      20% used · 80% left · resets 2h 14m        │
+│ pc       9N2A dev        detached bun run dev         │ │ pc         5173          ● ready      0s    │ │ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪│▪▪▪▪▪▪▪▪▪▪▪▪  ● OK                 │
+│ pc       A1F4 mesh       running  codex exec --ful…   │ │ pc         ai            ● ready      0s    │ │ Weekly  66% used · 34% left · resets 5d 7h         │
+│ pc       B7Q2 comfy      detached python main.py -…   │ │ pc         life          ● ready      0s    │ │ ▪▪▪▪▪▪│▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ● OK                 │
+│ pc       C0M8 review     detached nvim internal/tu…   │ │ pc         place         ● ready      0s    │ │ shaul9191 · Pro · last served              seen 1m │
+│ pc       D3X9 logs       detached journalctl -fu m…   │ │ pc         platform      ● ready      0s    │ │ 5h      42% used · 58% left · resets 1h 32m        │
+│ pc       F8T6 bench      running  bun run bench --…   │ │ pc         studio        ● ready      0s    │ │ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪│▪▪▪▪▪▪▪▪  ● OK                 │
+│ shauls-… 3F9Q notes      detached nvim draft.md       │ │ pc         workbench     ● ready      0s    │ │ Weekly  89% used · 11% left · resets 4d 9h         │
+│ shauls-… 5H2K fregat     running  bun run dev --po…   │ │ vps        coolify       ● ready      2s    │ │ ▪▪▪▪▪▪▪▪▪▪│▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ● high               │
+│ shauls-… 6J2W --         detached /bin/zsh            │ └─────────────────────────────────────────────┘ │ shaul.lavochkin · Pro Lite · cooldown    stale 18m │
+│ pi       2P8R tv         detached journalctl -fu m…   │ ┌Attention · 1/1 ──────────────────────────── ┐ │ 5h     100% used ·  0% left · resets 38m           │
+│ vps      4B7T coolify    detached docker logs -f c…   │ │ pc/comfy · unhealthy                        │ │ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ● exhausted          │
+│ vps      8C1M --         detached bash                │ │ health check :8188 refused                  │ │ Weekly  97% used ·  3% left · resets 2d 6h         │
+│ 13/16 live · 0 cached · 3 more on pc                  │ └─────────────────────────────────────────────┘ │ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ● high               │
+└───────────────────────────────────────────────────────┘                                                 └────────────────────────────────────────────────────┘
+metrics 2s · usage file 60s · bars used 0–100% · │ elapsed pace · last served ≠ in flight                                                   frame 14:32:07 on pi
