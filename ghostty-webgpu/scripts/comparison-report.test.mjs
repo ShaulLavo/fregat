@@ -19,6 +19,7 @@ import { cpuSample, verifyHash, withDeadline } from './comparison-guards.mjs'
 import './comparison-trace.test.mjs'
 import './comparison-attribution.test.mjs'
 import './comparison-options.test.mjs'
+import './comparison-rolling.test.mjs'
 import './comparison-gpu.test.mjs'
 import './comparison-latency.test.mjs'
 import {

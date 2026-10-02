@@ -4,7 +4,14 @@ import { execFileSync } from 'node:child_process'
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
-import { corpus, fixtureNames, fixtureText, settings, variants } from '../bench/comparison-fixtures'
+import {
+  corpus,
+  fixtureNames,
+  fixtureText,
+  rollingFixture,
+  settings,
+  variants,
+} from '../bench/comparison-fixtures'
 
 const root = resolve(import.meta.dirname, '..')
 const output = resolve(process.argv[2] ?? join(root, '.artifacts/comparison-bundle'))
@@ -65,6 +72,16 @@ for (const name of [
 }
 const logs = await readFile(assets['logs.txt'], 'utf8')
 const fixtures = fixtureNames.map((name) => {
+  if (name === 'rolling-logs') {
+    const fixture = rollingFixture(logs)
+    return {
+      name,
+      bytes: fixture.bytes.length,
+      sha256: hash(fixture.bytes),
+      chunkBytes: settings.chunkBytes,
+      chunks: fixture.chunks.map((chunk) => ({ bytes: chunk.length, sha256: hash(chunk) })),
+    }
+  }
   const text = corpus(fixtureText(name, logs), settings.corpusBytes)
   return { name, bytes: Buffer.byteLength(text), sha256: hash(text) }
 })

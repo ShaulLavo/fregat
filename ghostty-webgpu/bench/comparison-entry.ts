@@ -28,6 +28,9 @@ import {
   fixtureNames,
   fixtureText,
   marker,
+  rollingByteCount,
+  rollingFixture,
+  rollingInputs,
   settings,
   spotCheck,
   type ComparisonCase,
@@ -561,15 +564,31 @@ async function legacyOriginalUnicode(): Promise<unknown> {
 }
 
 async function burst(name: FixtureName, steps: number): Promise<unknown> {
-  const text = corpus(fixtureText(name, logs), settings.chunkBytes)
+  const rolling = name === 'rolling-logs' ? rollingFixture(logs) : undefined
+  const chunks = rolling ? rollingInputs(rolling, current.path) : undefined
+  const text = rolling ? '' : corpus(fixtureText(name, logs), settings.chunkBytes)
   await writeAll('\x1b[3J\x1b[2J\x1b[H')
   await settle()
+  let offset = 0
   const started = performance.now()
-  const intervals = await pacedBurst(() => writeAll(text), frame, steps)
+  const intervals = await pacedBurst(
+    chunks
+      ? async () => {
+          const data = chunks[offset % chunks.length]!
+          offset++
+          await Promise.all(drivers.map((driver) => driver.write(data)))
+        }
+      : () => writeAll(text),
+    frame,
+    steps,
+  )
   await settle()
+  const bytes = rolling ? rollingByteCount(rolling, steps) : encoder.encode(text).length * steps
   return {
+    fixture: name,
     intervals,
-    bytes: encoder.encode(text).length * steps * drivers.length,
+    bytes: bytes * drivers.length,
+    rollingChunks: chunks?.length,
     milliseconds: performance.now() - started,
   }
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { analysisArguments, positiveInteger } from './comparison-options.mjs'
+import { analysisArguments, positiveInteger, selectedOutputFixture } from './comparison-options.mjs'
 
 test('sample overrides require finite positive integers and a value', () => {
   for (const value of [undefined, '--output', 'NaN', 'Infinity', '1.5', '0', '-1']) {
@@ -23,6 +23,19 @@ test('compact analysis flag is never interpreted as an output filename', () => {
     compact: true,
   })
   assert.throws(() => analysisArguments(['directory', '--unknown']))
+})
+
+test('output fixture selection is explicit, singular and independent from fixture probes', () => {
+  const available = ['ascii', 'logs', 'rolling-logs']
+  assert.equal(selectedOutputFixture([], available), 'ascii')
+  assert.equal(selectedOutputFixture(['--fixtures', 'rolling-logs'], available), 'ascii')
+  assert.equal(
+    selectedOutputFixture(['--output-fixture', 'rolling-logs'], available),
+    'rolling-logs',
+  )
+  for (const value of [undefined, '', '--counts', 'unknown', 'ascii,rolling-logs']) {
+    assert.throws(() => selectedOutputFixture(['--output-fixture', value], available))
+  }
 })
 
 test('Linux hardware runs are headless Vulkan and Mac measurements stay headed', async () => {

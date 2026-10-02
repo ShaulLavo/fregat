@@ -36,6 +36,12 @@ export function selection(args, flag, fallback, allowed) {
   return selected
 }
 
+export function selectedOutputFixture(args, available) {
+  const selected = selection(args, '--output-fixture', ['ascii'], available)
+  assert.equal(selected.length, 1, '--output-fixture needs exactly one fixture')
+  return selected[0]
+}
+
 export function hardwareLaunch(host, smoke, smokeHeaded = false) {
   const headless = host === 'linux' ? !smokeHeaded : smoke && !smokeHeaded
   const arguments_ =

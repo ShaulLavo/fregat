@@ -102,7 +102,7 @@ export function expectedScreen(
   }
   let unitLines: string[]
   if (name === 'sgr') unitLines = ['red truecolor style']
-  else if (name === 'logs') {
+  else if (name === 'logs' || name === 'rolling-logs') {
     unitLines = unit
       .split('\r\n')
       .slice(0, -1)

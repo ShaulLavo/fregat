@@ -21,6 +21,7 @@ import {
   frameBuilders,
   selectedVariants,
   selectedPhases,
+  selectedOutputFixture,
   measurementCases,
   measurementRepetitions,
 } from './comparison-options.mjs'
@@ -75,6 +76,10 @@ const fixtures = selection(
   args,
   '--fixtures',
   manifest.fixtures.map(({ name }) => name),
+  manifest.fixtures.map(({ name }) => name),
+)
+const outputFixture = selectedOutputFixture(
+  args,
   manifest.fixtures.map(({ name }) => name),
 )
 const writePaths = selection(args, '--paths', ['bytes', 'string'], ['bytes', 'string'])
@@ -197,6 +202,7 @@ const artifact = {
   repetitions: smoke ? 1 : repetitions,
   latencySamples,
   outputFrames,
+  outputFixture,
   cpuTickSeconds: tickSeconds,
   counts,
   variants: variantIds,
@@ -510,9 +516,9 @@ async function qualifiedWindow(run, label, operation) {
     await refreshGpuOwnership()
     const idle = await gpuGate.waitForIdle()
     run.gpuWindows.push({ label, idle })
-    const sampleMilliseconds = ['idle', 'output/ascii', 'latency', 'delayed-write'].includes(label)
-      ? s.gpuMeasuredSampleMilliseconds
-      : s.gpuSampleMilliseconds
+    const measured =
+      ['idle', 'latency', 'delayed-write'].includes(label) || label.startsWith('output/')
+    const sampleMilliseconds = measured ? s.gpuMeasuredSampleMilliseconds : s.gpuSampleMilliseconds
     const { value, gpu } = await gpuGate.monitorWindow(operation, { sampleMilliseconds })
     run.gpuWindows.at(-1).window = gpu
     const skipped = idle.skipReason ?? gpu.skipReason ?? run.gpuIdle?.skipped
@@ -735,13 +741,17 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       )
     }
     if (phases.includes('output')) {
-      run.phase = 'output/ascii/warmup'
-      await page.evaluate(() => window.__compare.burst('ascii', 3))
-      run.phase = 'output/ascii'
-      const outputMeasurement = await qualifiedWindow(run, 'output/ascii', () =>
+      run.phase = `output/${outputFixture}/warmup`
+      await page.evaluate((name) => window.__compare.burst(name, 3), outputFixture)
+      run.phase = `output/${outputFixture}`
+      const outputMeasurement = await qualifiedWindow(run, run.phase, () =>
         measureCpu(
           browserSession,
-          () => page.evaluate((frames) => window.__compare.burst('ascii', frames), outputFrames),
+          () =>
+            page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
+              name: outputFixture,
+              frames: outputFrames,
+            }),
           cpuOptions,
         ),
       )
