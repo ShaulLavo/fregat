@@ -121,21 +121,59 @@ export function sampledProfile(events, clock, records) {
     )
     .toSorted((a, b) => a.ts - b.ts)
   const nodes = new Map()
-  const milliseconds = {}
+  const samples = []
+  const milliseconds = Object.create(null)
   const start = records.markers.find((marker) => marker.operation === 'begin').time + clock.offset
   const end = records.markers.find((marker) => marker.operation === 'end').time + clock.offset
   let time = profile.args.data.startTime / 1000
+  assert(Number.isFinite(time), 'Finite CPU profile start required')
   for (const chunk of chunks) {
     const data = chunk.args.data
     for (const node of data.cpuProfile?.nodes ?? []) nodes.set(node.id, node)
-    for (const [index, id] of (data.cpuProfile?.samples ?? []).entries()) {
-      const previous = time
+    const ids = data.cpuProfile?.samples ?? []
+    assert.equal(ids.length, data.timeDeltas?.length ?? 0, 'CPU samples require matching deltas')
+    for (const [index, id] of ids.entries()) {
+      assert(Number.isFinite(data.timeDeltas[index]), 'Finite CPU sample delta required')
       time += data.timeDeltas[index] / 1000
-      const duration = Math.max(0, Math.min(end, time) - Math.max(start, previous))
-      const name = nodes.get(id)?.callFrame.functionName ?? '(unknown)'
-      milliseconds[name] = (milliseconds[name] ?? 0) + duration
+      samples.push({ time, id })
     }
   }
+  // Chrome can deliver backwards sample deltas; chronological intervals must partition time once.
+  samples.sort((a, b) => a.time - b.time)
+  const tasks = []
+  const ranges = clock.main
+    .filter((event) => event.name === 'RunTask' && event.ph === 'X')
+    .map((event) => [
+      Math.max(start, event.ts / 1000),
+      Math.min(end, (event.ts + event.dur) / 1000),
+    ])
+    .filter(([left, right]) => right > left)
+    .toSorted((a, b) => a[0] - b[0])
+  for (const range of ranges) {
+    const previous = tasks.at(-1)
+    if (previous && range[0] <= previous[1]) {
+      previous[1] = Math.max(previous[1], range[1])
+      continue
+    }
+    tasks.push(range)
+  }
+  let taskIndex = 0
+  for (const [index, sample] of samples.entries()) {
+    const left = Math.max(start, sample.time)
+    const right = Math.min(end, samples[index + 1]?.time ?? sample.time)
+    if (right <= left) continue
+    while (taskIndex < tasks.length && tasks[taskIndex][1] <= left) taskIndex++
+    let duration = 0
+    for (let cursor = taskIndex; cursor < tasks.length && tasks[cursor][0] < right; cursor++) {
+      duration += Math.max(0, Math.min(right, tasks[cursor][1]) - Math.max(left, tasks[cursor][0]))
+    }
+    if (!duration) continue
+    const name = nodes.get(sample.id)?.callFrame.functionName ?? '(unknown)'
+    milliseconds[name] = (milliseconds[name] ?? 0) + duration
+  }
+  const covered = Object.values(milliseconds).reduce((sum, value) => sum + value, 0)
+  const unsampled = Math.max(0, unionMilliseconds(tasks) - covered)
+  if (unsampled) milliseconds['(unsampled)'] = (milliseconds['(unsampled)'] ?? 0) + unsampled
   return Object.fromEntries(Object.entries(milliseconds).toSorted((a, b) => b[1] - a[1]))
 }
 
