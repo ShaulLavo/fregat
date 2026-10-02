@@ -175,7 +175,7 @@ The production `/release` response checked on 2026-10-01 at 06:59 UTC reported:
 
 The served web head precedes #224's merge. This records the actual deployed state; it does not
 claim #224's harness is deployed. The earlier coordinator's production capture remains in
-`/work/tmp/fregat-evidence/20261001T002116Z-look-platform-1440x1000/`. Its screenshot and log
+`fregat-evidence/20261001T002116Z-look-platform-1440x1000`. Its screenshot and log
 window belong to that earlier release, not this endpoint check. This documentation closeout
 runs no measurements, browser capture or deployment. Other sessions can advance production;
 read `/platform/release` before citing its current state.
