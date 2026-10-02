@@ -85,3 +85,38 @@ test('unstructured failures cannot leak process arguments through the public fai
   expect(JSON.stringify(facts)).not.toContain('private')
   expect(JSON.stringify(facts)).not.toContain('secret')
 })
+
+test('native startup message contains public guidance and deletes its private input after owned exit', async () => {
+  const { showStartFailure } = await import('../native-window')
+  const { spawnHost } = await import('../native-helper')
+  const { readFileSync, existsSync, mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const path = await import('node:path')
+  const directory = mkdtempSync(path.join(tmpdir(), 'startup-message-test-'))
+  let file = ''
+  let text = ''
+  const failure = launcherErrors.LAUNCH_FAILED({ internal: { reason: 'private-source-content' } })
+  try {
+    await showStartFailure(failure, {
+      binary: '/fixture/native',
+      spawn: (args) => {
+        expect(args.slice(0, 2)).toEqual(['/fixture/native', 'message'])
+        file = args[2]!
+        text = readFileSync(file, 'utf8')
+        return spawnHost([
+          process.execPath,
+          path.join(import.meta.dirname, 'fixtures/native-helper.mjs'),
+          path.join(directory, 'pid'),
+          'message',
+        ])
+      },
+    })
+    expect(text).toContain(failure.why)
+    expect(text).toContain(failure.fix)
+    expect(text).not.toContain('private-source-content')
+    expect(existsSync(file)).toBe(false)
+    expect(existsSync(`/proc/${readFileSync(path.join(directory, 'pid'), 'utf8')}`)).toBe(false)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})

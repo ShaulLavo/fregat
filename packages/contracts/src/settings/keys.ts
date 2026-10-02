@@ -1470,6 +1470,31 @@ export const SETTINGS_REGISTRY = {
     requiresRestart: true,
     keywords: ['window', 'browser', 'chromium', 'startup', 'limit', 'desktop'],
   }),
+  'window.nativeDialogTimeoutSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(3600)),
+    default: 300,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Native dialog time limit',
+    description:
+      'Seconds a desktop file chooser or startup message stays open before its helper closes.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'picker', 'native', 'timeout'],
+  }),
+  'window.nativeHostStopGraceSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(30)),
+    default: 2,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Window',
+    title: 'Native host stop grace',
+    description: 'Seconds the desktop gives an owned native helper to stop before terminating it.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['window', 'native', 'shutdown', 'grace'],
+  }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.
     //

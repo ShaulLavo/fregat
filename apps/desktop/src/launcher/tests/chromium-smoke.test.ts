@@ -83,6 +83,7 @@ test.skipIf(!executable)(
     try {
       // CI has no compositor; its browser still exercises the production CDP pipe and profile.
       if (!native) candidate.args = ['--headless', '--no-sandbox']
+      if (process.env.WAYLAND_DISPLAY) candidate.args = ['--ozone-platform=wayland']
       let restrictedUserNamespaces: boolean | null = null
       try {
         restrictedUserNamespaces =
@@ -136,7 +137,7 @@ test.skipIf(!executable)(
             owner.cdp,
             sessions,
             targets[0].targetId,
-            'globalThis.platformBridge?.titlebar === "native" && !globalThis.platformBridge.pickEntry',
+            'globalThis.platformBridge?.titlebar === "native" && typeof globalThis.platformBridge.pickEntry === "function"',
           ),
         )
       })

@@ -13,7 +13,9 @@ import {
   recordDesktopError,
 } from '../bun/observability'
 import { resolveBrowserCandidates } from './browser'
-import { launchChromium, type ChromiumWindow } from './chromium'
+import { launchChromium } from './chromium'
+import { launchWebview, nativeHostBinary, showStartFailure } from './native-window'
+import { nativeBudget } from './native-helper'
 import { startupBudget } from './startup'
 import { isRecord } from '@workspace/utils/objects'
 import { desktopStateHome } from './profile'
@@ -23,7 +25,9 @@ const root = path.resolve(import.meta.dirname, '../../../..')
 applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
 initializeDesktopObservability()
 const controller = new AbortController()
-let window: Extract<ChromiumWindow, { kind: 'owned' }> | undefined
+let window: { exited: Promise<unknown>; close(): Promise<void> } | undefined
+let helperBudget = nativeBudget()
+const binary = nativeHostBinary(root)
 const stop = () => {
   controller.abort()
   void window?.close()
@@ -41,6 +45,12 @@ try {
         process.exitCode = code
       },
     })
+    try {
+      await showStartFailure(error, { binary, signal: controller.signal, budget: helperBudget })
+    } catch (messageError) {
+      if (!controller.signal.aborted)
+        recordDesktopError('desktop.start_message_failed', launcherFailureFacts(messageError))
+    }
   }
 } finally {
   await window?.close()
@@ -60,6 +70,7 @@ async function start() {
   await waitForHttp(`${server}/health`, web)
   await waitForHttp(web, web)
   const settings = await readSettings(server, web)
+  helperBudget = settings.native
   const home = homedir()
   const stateHome = desktopStateHome(
     { PLATFORM_HOME: Bun.env.PLATFORM_HOME },
@@ -80,10 +91,36 @@ async function start() {
     },
     { readFile: safeRead, exists: executableExists },
   )
-  recordDesktopInfo('desktop.browser.detect', { candidates })
+  recordDesktopInfo('desktop.browser.detect', {
+    candidates: candidates.map((candidate) =>
+      candidate.kind === 'chromium'
+        ? { kind: candidate.kind, source: candidate.source, confinement: candidate.confinement }
+        : { kind: candidate.kind },
+    ),
+  })
   for (const candidate of candidates) {
     controller.signal.throwIfAborted()
-    if (candidate.kind === 'webview') continue
+    if (candidate.kind === 'webview') {
+      try {
+        window = await launchWebview({
+          binary,
+          url: web,
+          signal: controller.signal,
+          budget: settings.native,
+          startup: settings.startup,
+          onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
+        })
+      } catch (error) {
+        if (controller.signal.aborted) throw error
+        recordDesktopInfo('desktop.browser.rejected', {
+          engine: 'webkitgtk',
+          ...launcherFailureFacts(error),
+        })
+        continue
+      }
+      await window.exited
+      return
+    }
     if (candidate.kind === 'tab') {
       recordDesktopInfo('desktop.window.degraded', {
         engine: 'tab',
@@ -109,6 +146,7 @@ async function start() {
         home,
         url: web,
         startup: settings.startup,
+        native: { binary, budget: settings.native },
         signal: controller.signal,
         onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
         onExit: (context) => recordDesktopInfo('desktop.window.closed', context),
@@ -122,7 +160,6 @@ async function start() {
       })
       recordDesktopInfo('desktop.browser.chosen', {
         source: candidate.source,
-        path: candidate.executable,
         outcome: result.kind,
       })
       if (result.kind === 'handoff') return
@@ -149,16 +186,27 @@ async function readSettings(server: string, origin: string) {
     })
     const snapshot: unknown = await response.json()
     if (!response.ok || !isRecord(snapshot) || !isRecord(snapshot.values))
-      return { browser: 'auto', transparency: 'compositor', startup: startupBudget() }
+      return {
+        browser: 'auto',
+        transparency: 'compositor',
+        startup: startupBudget(),
+        native: nativeBudget(),
+      }
     return {
       browser: snapshot.values['window.browser'] ?? 'auto',
       transparency: snapshot.values['window.transparency'] ?? 'compositor',
       startup: startupBudget(snapshot.values),
+      native: nativeBudget(snapshot.values),
     }
   } catch (error) {
     controller.signal.throwIfAborted()
     recordDesktopInfo('desktop.settings.unreachable', { error: errorMessage(error) })
-    return { browser: 'auto', transparency: 'compositor', startup: startupBudget() }
+    return {
+      browser: 'auto',
+      transparency: 'compositor',
+      startup: startupBudget(),
+      native: nativeBudget(),
+    }
   }
 }
 

@@ -107,11 +107,11 @@ test('handlers precede discovery and bridge is installed before debugger resumes
   }
   expect(failures).toEqual([])
 })
-test('bridge contract has native titlebar, web picker, current document injection and origin guard', () => {
+test('bridge contract has native titlebar, native picker, current document injection and origin guard', () => {
   const script = chromiumBridge('http://localhost:123/platform/')
   expect(script).toContain('location.origin !== "http://localhost:123"')
   expect(script).toContain('"titlebar":"native"')
-  expect(script).not.toContain('pickEntry')
+  expect(script).toContain('pickEntry')
   expect(script).toContain('globalThis.platformBridge =')
 })
 
@@ -159,6 +159,67 @@ test('telemetry accepts only the attached app origin default execution context',
     payload: JSON.stringify({ origin: 'http://localhost:123', rafPerSecond: 60 }),
   })
   expect(opened).toHaveLength(1)
+})
+
+test('duplicate CDP session binding reports share one native picker request', async () => {
+  const handlers = new Map<string, (event: CdpEvent) => void>()
+  const pending = Promise.withResolvers<string[]>()
+  let picks = 0
+  let replies = 0
+  const cdp = {
+    on: (method: string, callback: (event: CdpEvent) => void) => {
+      handlers.set(method, callback)
+      return () => {}
+    },
+    request: async (method: string, params: Record<string, unknown> = {}) => {
+      if (
+        method === 'Runtime.evaluate' &&
+        String(params.expression).includes('__platformShellReply?.')
+      )
+        replies++
+      return {}
+    },
+  }
+  await attachChromium(
+    cdp,
+    'http://localhost:123/',
+    () => {},
+    () => {},
+    async () => {
+      picks++
+      return pending.promise
+    },
+  )
+  for (const sessionId of ['owner', 'inspector']) {
+    handlers.get('Target.attachedToTarget')!({
+      method: 'Target.attachedToTarget',
+      params: { sessionId, targetInfo: { type: 'page' } },
+    })
+    handlers.get('Runtime.executionContextCreated')!({
+      method: 'Runtime.executionContextCreated',
+      sessionId,
+      params: { context: { id: 1, origin: 'http://localhost:123', auxData: { isDefault: true } } },
+    })
+    handlers.get('Runtime.bindingCalled')!({
+      method: 'Runtime.bindingCalled',
+      sessionId,
+      params: {
+        name: 'platformShellCall',
+        executionContextId: 1,
+        payload: JSON.stringify({
+          method: 'pickEntry',
+          origin: 'http://localhost:123',
+          id: 1,
+          documentId: '01234567-0123-4567-8901-012345678901',
+          options: { mode: 'folder' },
+        }),
+      },
+    })
+  }
+  expect(picks).toBe(1)
+  pending.resolve(['/fixture/資料'])
+  for (let count = 0; count < 20; count++) await Promise.resolve()
+  expect(replies).toBe(2)
 })
 
 test('startup enrolls pages attached while preparing and later failures keep their ordinary callback', async () => {

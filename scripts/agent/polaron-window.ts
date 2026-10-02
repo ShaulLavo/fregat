@@ -2,12 +2,19 @@ import { ok } from 'node:assert/strict'
 import path from 'node:path'
 import type { Page } from 'playwright'
 import { launchChromium } from '../../apps/desktop/src/launcher/chromium'
+import { launcherFailureFacts } from '../../apps/desktop/src/launcher/failure'
 import { startupBudget } from '../../apps/desktop/src/launcher/startup'
 import type { Evidence } from './evidence'
 import { killCaptureTerminal } from './product-terminal'
+import type { NativeBudget } from '../../apps/desktop/src/launcher/native-helper'
 
-// The inert same-origin manifest lets fixture wiring land before the app's first script runs.
-export async function openPolaronFixtureWindow(page: Page, stateHome: string, evidence: Evidence) {
+// The inert same-origin license page lets fixture wiring land before the app's first script runs.
+export async function openPolaronFixtureWindow(
+  page: Page,
+  stateHome: string,
+  evidence: Evidence,
+  options: { headless?: boolean; native?: { binary: string; budget: NativeBudget } } = {},
+) {
   const executable =
     Bun.which('chromium') ?? Bun.which('google-chrome') ?? Bun.which('google-chrome-stable')
   ok(executable, 'A real Chromium executable is required for launcher continuity proof')
@@ -15,22 +22,34 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
     () => (window as { platformDevServerUrl?: string }).platformDevServerUrl,
   )
   ok(serverUrl, 'The Polaron app window must use the throwaway API server')
+  const attachmentFailures: ReturnType<typeof launcherFailureFacts>[] = []
   const browserWindow = await launchChromium({
     candidate: {
       kind: 'chromium',
       executable,
-      args:
-        process.env.DISPLAY || process.env.WAYLAND_DISPLAY ? [] : ['--headless', '--no-sandbox'],
+      args: options.headless ? ['--headless', '--no-sandbox'] : displayArguments(),
       confinement: 'none',
       source: 'setting',
       family: 'chromium',
     },
     stateHome,
     home: stateHome,
-    url: new URL('/manifest.webmanifest', page.url()).href,
+    url: new URL('/licenses/index.html', page.url()).href,
+    native: options.native,
     startup: startupBudget(),
-    onOpen: () => {},
-    onFailure: () => {},
+    onOpen: (context) => {
+      void evidence.json(path.basename(stateHome) + '-frames.json', context)
+    },
+    onExit: (exit) => {
+      void evidence.json('polaron-browser-exit.json', exit)
+    },
+    onFailure: (error) => {
+      attachmentFailures.push(launcherFailureFacts(error))
+      void evidence.json('polaron-attachment-failure.json', attachmentFailures)
+    },
+  }).catch(async (error) => {
+    await evidence.json('polaron-start-failure.json', launcherFailureFacts(error))
+    throw error
   })
   ok(browserWindow.kind === 'owned', 'The isolated Polaron profile must be owned')
   const prefix = path.basename(stateHome) + '-'
@@ -70,6 +89,7 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
   }
   try {
     const targets = await browserWindow.cdp.request('Target.getTargets')
+    await evidence.json('polaron-targets.json', targets)
     const target = (targets.targetInfos as { targetId: string; type: string }[]).find(
       (value) => value.type === 'page',
     )
@@ -79,6 +99,15 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
       flatten: true,
     })
     const session = attached.sessionId as string
+    const inert = await browserWindow.cdp.request(
+      'Runtime.evaluate',
+      {
+        expression: '({href:location.href,origin:location.origin})',
+        returnByValue: true,
+      },
+      session,
+    )
+    await evidence.json('polaron-inert-document.json', inert.result)
     await browserWindow.cdp.request('Network.enable', {}, session)
     await browserWindow.cdp.request(
       'Page.addScriptToEvaluateOnNewDocument',
@@ -87,7 +116,12 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
       },
       session,
     )
-    await browserWindow.cdp.request('Page.navigate', { url: page.url() }, session)
+    await browserWindow.cdp.request(
+      'Page.navigate',
+      { url: page.url() },
+      session,
+      startupBudget().limitMs,
+    )
     const deadline = Date.now() + 15_000
     let ready = false
     while (Date.now() < deadline) {
@@ -125,9 +159,19 @@ export async function openPolaronFixtureWindow(page: Page, stateHome: string, ev
       ready,
       'Actual Platform must render using the throwaway API in the owned Chromium app window',
     )
-    return { ...browserWindow, close }
+    return { ...browserWindow, close, session }
   } catch (error) {
+    await evidence.json('polaron-drive-failure.json', {
+      ...launcherFailureFacts(error),
+      transport: browserWindow.cdp.snapshot(),
+    })
     await close()
     throw error
   }
+}
+
+function displayArguments() {
+  if (process.env.WAYLAND_DISPLAY) return ['--ozone-platform=wayland']
+  if (process.env.DISPLAY) return []
+  return ['--headless', '--no-sandbox']
 }
