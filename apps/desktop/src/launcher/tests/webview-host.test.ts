@@ -1,4 +1,8 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { PassThrough } from 'node:stream'
+import { launchWebview } from '../native-window'
 import { expect, test } from 'vitest'
 import { WebviewHost, pick } from '../webview-host'
 import type { HostProcess } from '../native-helper'
@@ -271,3 +275,61 @@ test('standalone native chooser timeout exposes selection guidance after reaping
   })
   await expect(fake.process.exited).resolves.toMatchObject({ code: 1 })
 })
+
+test.each(['darwin', 'linux'] as const)(
+  'reopening a %s window reuses its state-home data directory and retains only browsing data',
+  async (platform) => {
+    const stateHome = mkdtempSync(path.join(tmpdir(), 'native-window-storage-'))
+    const dataDir = path.join(stateHome, 'desktop', 'webview')
+    const scripts: string[] = []
+    try {
+      for (let launch = 0; launch < 2; launch++) {
+        const fake = fakeHost()
+        let argv: readonly string[] = []
+        const options = {
+          binary: '/host',
+          url: 'http://localhost:3301/',
+          stateHome,
+          platform,
+          vibrancy: true,
+          budget: {
+            dialogMs: 200,
+            stopGraceMs: 20,
+          },
+          startup: {
+            limitMs: 1e3,
+            idleMs: 500,
+          },
+          spawn: (command: readonly string[]) => {
+            argv = command
+            fake.stdout.write('{"event":"ready"}\n')
+            return fake.process
+          },
+          onOpen: () => {},
+        }
+        const window = await launchWebview(options)
+        const script = argv[2]!
+        scripts.push(script)
+        const closing = window.close()
+        fake.finish()
+        await closing
+        expect(argv).toEqual([
+          '/host',
+          'http://localhost:3301/',
+          script,
+          '--data-dir',
+          dataDir,
+          ...(platform === 'darwin' ? ['--vibrancy'] : []),
+        ])
+        expect(existsSync(script)).toBe(false)
+        expect(existsSync(dataDir)).toBe(true)
+        const marker = path.join(dataDir, 'stored-view-state')
+        if (launch === 0) writeFileSync(marker, 'workspace')
+        else expect(readFileSync(marker, 'utf8')).toBe('workspace')
+      }
+      expect(scripts[0]).not.toBe(scripts[1])
+    } finally {
+      rmSync(stateHome, { recursive: true, force: true })
+    }
+  },
+)
