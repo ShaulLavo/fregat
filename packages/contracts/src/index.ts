@@ -1179,3 +1179,9 @@ export {
   type NativePickerRequest,
   type NativePickerResult,
 } from './native-picker'
+export {
+  providerUsageHistoryCoverageSchema,
+  providerUsageHistorySourceSchema,
+  type ProviderUsageHistoryCoverage,
+  type ProviderUsageHistorySource,
+} from './provider-usage-history'
