@@ -681,56 +681,87 @@ needs: no Bun, Git checkout or terminal step on the user's machine.
 
 ### Window choice
 
-- `window.transparency` off or auto (the default): the installed Chrome app from the section
-  above. Chrome owns the window and its Dock identity; `Fregat.app` hands off and exits.
-- `window.transparency` = transparent: Fregat's own window, the `platform-webview` WKWebView host
-  with vibrancy. The owner accepts WebKit's rendering here; no WebKit performance study is needed.
-- No Chromium-family browser installed: the same native window, opaque.
-- Both paths give a native macOS window. Electron and a bundled engine are later (see below).
+- `window.browser=auto` with `window.transparency=compositor` (the default): the installed Chrome
+  app from the section above, preferring Chrome. Chrome owns the window and its Dock identity;
+  `Fregat.app` hands off and exits.
+- `window.browser=auto` with `window.transparency=window`: Fregat's own window, the
+  `platform-webview` WKWebView host with vibrancy. The owner accepts WebKit's rendering here; no
+  WebKit performance study is needed.
+- `window.browser=webview` selects the native host explicitly; an explicit browser executable takes
+  precedence over automatic selection.
+- No supported Chromium browser: the native host, with vibrancy set by `window.transparency`.
+- Every path gives a native macOS window. Electron and a bundled engine are later (see below).
 
 ### Bundle layout
 
 ```text
 Fregat.app/Contents/
-  Info.plist            CFBundleIdentifier dev.shaulavo.fregat, LSUIElement true
-  MacOS/fregat          `bun build --compile` of apps/desktop/src/launcher/index.ts (carries Bun)
+  Info.plist             CFBundleIdentifier dev.shaulavo.fregat, LSUIElement true
+  MacOS/fregat           `bun build --compile` of apps/desktop/src/launcher/index.ts
   MacOS/platform-webview the native host; runs from MacOS/ so it shares the bundle identity
-  Resources/release/    a complete release: server bundle, web build, bin/promote.ts
-  Resources/Fregat.icns from scripts/app-icon (fregat.svg)
+  Resources/release/     a self-contained release (below)
+  Resources/Fregat.icns  from scripts/app-icon (fregat.svg)
 ```
 
 `LSUIElement` keeps the launcher out of the Dock on the Chrome path. The native host already calls
-`setActivationPolicy:Regular` when it opens a window, so the native path shows Fregat in the Dock
-and Cmd-Tab under the bundle's name and icon.
+`setActivationPolicy:Regular` (`platform-webview.m`), so the native path shows Fregat in the Dock and
+Cmd-Tab under the bundle's name and icon.
+
+**Self-contained release.** Today `buildServer()` links `server/node_modules` and the release-root
+`node_modules` into the build checkout. `Resources/release/` instead holds the server and worker
+bundles, web assets, `build-config.json`, `bin/promote.ts`, and the darwin runtime dependencies
+installed from the generated manifest and lock. Every dependency link resolves inside the payload.
+
+**One runtime.** The LaunchAgent runs `promote.ts` and `current/server/index.js` with the service
+host's `bun`, which is `process.execPath`: in a compiled launcher that names `MacOS/fregat`. A1
+proves the compiled executable runs scripts as Bun with `BUN_BE_BUN=1` and the service unit sets
+it; if that fails, A1 ships `MacOS/bun` and the service host points there. Either way no system Bun
+is needed.
+
+**Bundle-relative resources.** The launcher resolves resources from its executable inside the
+bundle: the native host from `Contents/MacOS/platform-webview` (today
+`apps/desktop/native/build/`), the release from `Contents/Resources/release`. The service setup
+(`ensure-machine-service.ts`, today a computed dynamic import in `installation-client.ts`) is
+imported statically so it compiles in, and the promotion source it reads becomes an embedded asset.
+The checkout-root derivation in `launcher/index.ts` stays for development runs only.
 
 ### First launch and updates
 
 1. The launcher resolves `server.releaseRoot` (default `~/Library/Application Support/Fregat/releases`).
-2. When `current` is missing, or its commit differs from `Resources/release`, it stages the bundled
-   release through `scripts/deploy/release.ts`: first install promotes directly, an update stages
+2. When `current` is missing, or its commit differs from `Resources/release`, it copies the bundled
+   release into `releases/` and links it: first install promotes directly, an update stages
    `pending` and follows the existing restart approval. No file inside a running release changes.
-3. `ensureMachineService` registers the LaunchAgent and socket against that release root, then the
-   launcher opens the window for the chosen path. A Dock relaunch with the server stopped wakes it
-   through the socket.
+3. `ensureMachineService(intent, { productionRoot })` registers the LaunchAgent and socket against
+   that release root, then the launcher opens the window for the chosen path. A Dock relaunch with
+   the server stopped wakes it through the socket.
 
-`bun run deploy` keeps serving this machine's mesh production from `/work/platform-production`.
-`Fregat.app` is the release carrier for every other Mac; both use the same release format.
+`scripts/deploy/release.ts` takes its root from `scripts/deploy/config.ts`, fixed to
+`/work/platform-production`, and `createRelease`, `stagePending` and `swapCurrent` take no root. A2
+extracts root-parameterized release creation, staging and atomic link operations; the app passes
+its `server.releaseRoot`, and `bun run deploy` keeps `/work/platform-production` and its mesh live
+check. The app's promotion skips the systemd and checkout live check and runs the server's own
+readiness probe (`GET /system/identity`).
 
 ### Build
 
 `bun run app:mac` builds the bundle on macOS into the build directory: compile the launcher, build
-the native host, assemble the release with the deploy script's builder, generate the icon, write
-`Info.plist`, then ad-hoc `codesign`. Signing with a Developer ID, notarization and a DMG wait for
-a public release. CI builds the bundle on the macOS runner and checks its layout and `Info.plist`;
-it does not launch it.
+the native host, assemble the self-contained release, generate the icon, write `Info.plist`, then
+ad-hoc `codesign`. Developer ID signing, notarization and a DMG wait for a public release. CI builds
+the bundle on the macOS runner and checks its layout, `Info.plist`, and that no file or link in it
+points outside the bundle; it does not open a window.
 
 ### Units
 
 - **A1 — bundle builder**: `apps/desktop/scripts/build-app.ts`, `app:mac` script, icon and plist,
-  CI layout check.
-- **A2 — bundled first launch**: launcher reads `Resources/release`, seeds or stages it under
-  `server.releaseRoot`, calls `ensureMachineService`, then opens the window. Tests run against a temp
-  release root with the real release scripts.
+  self-contained release payload, the runtime proof (`BUN_BE_BUN` or `MacOS/bun`), bundle-relative
+  resource resolution in the launcher, CI layout check. Done when the built app, moved to a path
+  with spaces and with the checkout renamed away, launches the server through the LaunchAgent.
+- **A2 — bundled first launch**: root-parameterized release operations extracted from
+  `scripts/deploy/release.ts`, seeding or staging `Resources/release` under `server.releaseRoot`,
+  the static service-setup import and embedded promotion source, then `ensureMachineService` and the
+  window. Tests run against a temp release root with the real release code. A2 owns
+  `scripts/deploy/` and `scripts/service/`; A1 owns `apps/desktop/scripts/` and the launcher's
+  resource resolution.
 - **A3 — owner Mac acceptance over mesh**: the checks in "Coordinator's Mac acceptance" above, run
   from the built `Fregat.app`, plus: a clean `~/Library/Application Support/Fregat`, Dock launch with
   the server stopped, transparency on and off, and the native-window path through the Browser setting
