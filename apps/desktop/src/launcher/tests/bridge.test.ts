@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { chromiumBridge } from '../chromium'
 import { parsePickRequest } from '../shell-bridge'
 import type { PlatformBridge } from '../../shared/bridge'
-import { isMacDesktop } from '../../../../web/src/lib/platform/bridge'
+import { hasNativeMacOverlay } from '../../../../web/src/lib/platform/bridge'
 
 function documentFixture(origin: string) {
   const requests: Record<string, unknown>[] = []
@@ -59,11 +59,11 @@ test('Mac desktop layout reserves traffic lights only for an overlay titlebar', 
       colorScheme: null,
       titlebar: 'native',
     }
-    expect(isMacDesktop()).toBe(false)
+    expect(hasNativeMacOverlay()).toBe(false)
     window.platformBridge.titlebar = 'overlay'
-    expect(isMacDesktop()).toBe(true)
+    expect(hasNativeMacOverlay()).toBe(true)
     window.platformBridge.platform = 'linux'
-    expect(isMacDesktop()).toBe(false)
+    expect(hasNativeMacOverlay()).toBe(false)
   } finally {
     if (previous)
       Object.defineProperty(globalThis, 'window', { configurable: true, value: previous })

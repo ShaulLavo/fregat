@@ -4,8 +4,8 @@ import type { ShellBackdrop } from '@/lib/platform/backdrop'
 
 export type SettingEnvironment = {
   readonly backdrop: ShellBackdrop
-  /** Whether a desktop shell — the only thing that can create a window — is hosting us. */
-  readonly isShell: boolean
+  /** The retained native host can create a transparent window. */
+  readonly nativeTransparency: boolean
 }
 
 /**
@@ -20,5 +20,5 @@ export type SettingEnvironment = {
 export function isSettingAvailable(id: SettingId, environment: SettingEnvironment): boolean {
   if (id !== 'window.transparency') return true
 
-  return environment.isShell && environment.backdrop !== 'app'
+  return environment.nativeTransparency && environment.backdrop !== 'app'
 }
