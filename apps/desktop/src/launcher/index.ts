@@ -30,7 +30,12 @@ import { readSettings } from './settings'
 const bundle = appBundle()
 const root = bundle ? null : path.resolve(import.meta.dirname, '../../../..')
 if (root) applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
-initializeDesktopObservability()
+const mode = Bun.argv.includes('--dev') ? 'dev' : 'production'
+const home = homedir()
+const stateHome = desktopStateHome({ PLATFORM_HOME: Bun.env.PLATFORM_HOME }, home, mode)
+let observability = initializeDesktopObservability(
+  mode === 'production' ? { stateHome } : undefined,
+)
 const controller = new AbortController()
 let window: { exited: Promise<unknown>; close(): Promise<void> } | undefined
 let helperBudget = nativeBudget()
@@ -52,8 +57,14 @@ try {
         process.exitCode = code
       },
     })
+    await flushDesktopObservability()
     try {
-      await showStartFailure(error, { binary, signal: controller.signal, budget: helperBudget })
+      await showStartFailure(error, {
+        binary,
+        signal: controller.signal,
+        budget: helperBudget,
+        logDir: observability.config.logDir,
+      })
     } catch (messageError) {
       if (!controller.signal.aborted)
         recordDesktopError('desktop.start_message_failed', launcherFailureFacts(messageError))
@@ -71,9 +82,6 @@ async function start() {
     throw launcherErrors.LAUNCH_FAILED({
       internal: { platform: process.platform, supportedPlatforms: ['linux', 'darwin'] },
     })
-  const mode = Bun.argv.includes('--dev') ? 'dev' : 'production'
-  const home = homedir()
-  const stateHome = desktopStateHome({ PLATFORM_HOME: Bun.env.PLATFORM_HOME }, home, mode)
   let web: string
   let server: string
   if (mode === 'dev') {
@@ -83,9 +91,12 @@ async function start() {
     await waitForHttp(`${server}/health`, web)
     await waitForHttp(web, web)
   } else {
+    const releaseRoot = installationReleaseRoot(stateHome, home)
+    await flushDesktopObservability()
+    observability = initializeDesktopObservability({ stateHome, releaseRoot })
     const service = await ensureInstalledService({
       intent: installationIntent(stateHome),
-      productionRoot: installationReleaseRoot(stateHome, home),
+      productionRoot: releaseRoot,
       bundledRelease: bundle?.release,
       signal: controller.signal,
     })

@@ -99,6 +99,7 @@ test('native startup message contains public guidance and deletes its private in
   try {
     await showStartFailure(failure, {
       binary: '/fixture/native',
+      logDir: path.join(directory, 'logs'),
       spawn: (args) => {
         expect(args.slice(0, 2)).toEqual(['/fixture/native', 'message'])
         file = args[2]!
@@ -113,9 +114,11 @@ test('native startup message contains public guidance and deletes its private in
     })
     expect(text).toContain(failure.why)
     expect(text).toContain(failure.fix)
+    expect(text).toContain(`Launcher logs are in ${path.join(directory, 'logs')}.`)
     expect(text).not.toContain('private-source-content')
     expect(existsSync(file)).toBe(false)
-    expect(existsSync(`/proc/${readFileSync(path.join(directory, 'pid'), 'utf8')}`)).toBe(false)
+    const pid = Number(readFileSync(path.join(directory, 'pid'), 'utf8'))
+    expect(() => process.kill(pid, 0)).toThrow(expect.objectContaining({ code: 'ESRCH' }))
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }

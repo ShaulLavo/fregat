@@ -1,0 +1,113 @@
+diff --git a/dist/adapters/fs.d.mts b/dist/adapters/fs.d.mts
+index bb9c2a844e80a63e8686ff1d30c1f0bedca4d7c8..0732502dc0e625b58dd1bc10a3c785dbd082a3b7 100644
+--- a/dist/adapters/fs.d.mts
++++ b/dist/adapters/fs.d.mts
+@@ -4,6 +4,8 @@ import { DrainFn } from "../toolkit.mjs";
+ export interface FsConfig {
+   /** Directory for log files. Default: `.evlog/logs` */
+   dir: string;
++  /** Independent desktop file series in the same log directory. */
++  filePrefix?: "desktop-";
+   /** Max number of log files to keep (auto-deletes oldest when exceeded) */
+   maxFiles?: number;
+   /** Max bytes per file before rotating to a new suffixed file */
+diff --git a/dist/adapters/fs.mjs b/dist/adapters/fs.mjs
+index 962d88a21d817bf7e7b24ea480aab4f00557865f..5ae60c056071bef123dc94d533c9a1ad7b662857 100644
+--- a/dist/adapters/fs.mjs
++++ b/dist/adapters/fs.mjs
+@@ -9,6 +9,7 @@ const FS_FIELDS = [
+ 		key: "dir",
+ 		env: ["NUXT_EVLOG_FS_DIR", "EVLOG_FS_DIR"]
+ 	},
++	{ key: "filePrefix" },
+ 	{ key: "maxFiles" },
+ 	{ key: "maxSizePerFile" },
+ 	{ key: "pretty" }
+@@ -56,38 +57,38 @@ async function ensureGitignore(dir) {
+ function getDateString() {
+ 	return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+ }
+-async function resolveFilePath(dir, maxSizePerFile) {
++async function resolveFilePath(dir, maxSizePerFile, filePrefix = "") {
+ 	const date = getDateString();
+-	const basePath = join(dir, `${date}.jsonl`);
+-	if (!maxSizePerFile) return basePath;
++	const stem = filePrefix + date;
++	if (!maxSizePerFile) return join(dir, `${stem}.jsonl`);
++	const files = (await readdir(dir)).map(parseLogFilename).filter((file) => file.date === date && file.prefix === filePrefix);
++	const index = files.reduce((latest, file) => Math.max(latest, file.index), 0);
++	const filePath = join(dir, index === 0 ? `${stem}.jsonl` : `${stem}.${index}.jsonl`);
+ 	try {
+-		if ((await stat(basePath)).size < maxSizePerFile) return basePath;
++		if ((await stat(filePath)).size < maxSizePerFile) return filePath;
+ 	} catch {
+-		return basePath;
++		return filePath;
+ 	}
+-	for (let i = 1; i < 1e3; i++) {
+-		const rotatedPath = join(dir, `${date}.${i}.jsonl`);
+-		try {
+-			if ((await stat(rotatedPath)).size < maxSizePerFile) return rotatedPath;
+-		} catch {
+-			return rotatedPath;
+-		}
+-	}
+-	return join(dir, `${date}.999.jsonl`);
++	return join(dir, `${stem}.${index + 1}.jsonl`);
+ }
+ function parseLogFilename(filename) {
+-	const match = filename.match(/^(\d{4}-\d{2}-\d{2})(?:\.(\d+))?\.jsonl$/);
++	const match = filename.match(/^(desktop-)?(\d{4}-\d{2}-\d{2})(?:\.(\d+))?\.jsonl$/);
+ 	if (!match) return {
++		prefix: "",
+ 		date: "",
+ 		index: 0
+ 	};
+ 	return {
+-		date: match[1],
+-		index: match[2] ? Number.parseInt(match[2], 10) : 0
++		prefix: match[1] ?? "",
++		date: match[2],
++		index: match[3] ? Number.parseInt(match[3], 10) : 0
+ 	};
+ }
+-async function cleanupOldFiles(dir, maxFiles) {
+-	const jsonlFiles = (await readdir(dir)).filter((f) => f.endsWith(".jsonl")).sort((a, b) => {
++async function cleanupOldFiles(dir, maxFiles, filePrefix = "") {
++	const jsonlFiles = (await readdir(dir)).filter((f) => {
++		const parsed = parseLogFilename(f);
++		return parsed.date !== "" && parsed.prefix === filePrefix;
++	}).sort((a, b) => {
+ 		const pa = parseLogFilename(a);
+ 		const pb = parseLogFilename(b);
+ 		return pa.date.localeCompare(pb.date) || pa.index - pb.index;
+@@ -103,10 +104,10 @@ async function writeBatchToFs(events, config) {
+ 	if (events.length === 0) return;
+ 	await mkdir(config.dir, { recursive: true });
+ 	await ensureGitignore(config.dir);
+-	const filePath = await resolveFilePath(config.dir, config.maxSizePerFile);
++	const filePath = await resolveFilePath(config.dir, config.maxSizePerFile, config.filePrefix);
+ 	const lines = `${events.map((e) => config.pretty ? JSON.stringify(e, null, 2) : JSON.stringify(e)).join("\n")}\n`;
+ 	await appendFile(filePath, lines, "utf-8");
+-	if (config.maxFiles) await cleanupOldFiles(config.dir, config.maxFiles);
++	if (config.maxFiles) await cleanupOldFiles(config.dir, config.maxFiles, config.filePrefix);
+ }
+ /**
+ * Create a drain function that writes logs to the local file system as NDJSON.
+@@ -147,6 +148,7 @@ function createFsDrain(overrides) {
+ 			return {
+ 				dir,
+ 				pretty: resolved.pretty ?? false,
++				filePrefix: resolved.filePrefix,
+ 				maxFiles: resolved.maxFiles,
+ 				maxSizePerFile: resolved.maxSizePerFile
+ 			};
+@@ -162,7 +164,7 @@ function createFsDrain(overrides) {
+ 	});
+ }
+ function isLogFilename(filename) {
+-	return /^\d{4}-\d{2}-\d{2}(\.\d+)?\.jsonl$/.test(filename);
++	return /^(?:desktop-)?\d{4}-\d{2}-\d{2}(\.\d+)?\.jsonl$/.test(filename);
+ }
+ function compareLogFiles(a, b) {
+ 	const pa = parseLogFilename(a);

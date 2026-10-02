@@ -24,6 +24,7 @@ export type InitializeObservabilityOptions = {
   /** Which build is running. Stamped on every line so deploy skew is visible. */
   build?: { commit?: string | null; release?: string | null }
   env?: ObservabilityEnv
+  filePrefix?: 'desktop-'
   shouldPersistEvent?: ShouldPersistObservabilityEvent
   source: string
 }
@@ -56,7 +57,9 @@ export function initializeObservabilityRuntime(options: InitializeObservabilityO
   const rawConfig = observabilityConfigFromEnv(options.env ?? process.env)
   const config = { ...rawConfig, logDir: resolveLogDir(rawConfig.logDir) }
   const shouldPersistEvent = options.shouldPersistEvent ?? persistEveryEvent
-  const drain = config.enabled ? createObservabilityDrain(config, shouldPersistEvent) : null
+  const drain = config.enabled
+    ? createObservabilityDrain(config, shouldPersistEvent, options.filePrefix)
+    : null
 
   initLogger({
     enabled: config.enabled,
@@ -135,17 +138,23 @@ export function recordObservabilityError(action: string, context: Record<string,
 function createObservabilityDrain(
   config: ObservabilityConfig,
   shouldPersistEvent: ShouldPersistObservabilityEvent,
+  filePrefix: InitializeObservabilityOptions['filePrefix'],
 ) {
-  const adapters = [createFileDrainAdapter(config), createPostHogDrainAdapter(config)].filter(
-    isDrainAdapter,
-  )
+  const adapters = [
+    createFileDrainAdapter(config, filePrefix),
+    createPostHogDrainAdapter(config),
+  ].filter(isDrainAdapter)
 
   return combineDrainAdapters(adapters, shouldPersistEvent)
 }
 
-function createFileDrainAdapter(config: ObservabilityConfig): DrainAdapter {
+function createFileDrainAdapter(
+  config: ObservabilityConfig,
+  filePrefix: InitializeObservabilityOptions['filePrefix'],
+): DrainAdapter {
   const fsDrain = createFsDrain({
     dir: config.logDir,
+    filePrefix,
     maxFiles: config.maxFiles,
     maxSizePerFile: config.maxSizePerFile,
     pretty: config.filePretty,
@@ -160,6 +169,7 @@ function createFileDrainAdapter(config: ObservabilityConfig): DrainAdapter {
         action: 'observability.log_retention_failed',
         message: error instanceof Error ? error.message : 'unknown retention failure',
       }),
+    filePrefix,
   )
 
   return {
