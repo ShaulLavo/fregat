@@ -1516,22 +1516,67 @@ describe('declared loaded Tree-sitter policy', () => {
           ? 'Declared loaded Tree-sitter contention floor: 5 ms'
           : 'Frozen historical margin',
       )
-      for (const configuration of [
-        'native',
-        'disabled',
-        'shiki',
-        'minimap',
-        'platform',
-        'tree-sitter-shiki',
-        'tree-sitter-minimap',
-        'shiki-minimap',
-        'all',
-      ])
+      for (const configuration of ['native', 'disabled', 'shiki', 'minimap', 'shiki-minimap'])
         expect(inputBudget(configuration, metric.key, 'loaded').noiseMarginMs).toBe(
           inputBudget(configuration, metric.key).noiseMarginMs,
         )
     }
   })
+
+  it.each(['tree-sitter-shiki', 'tree-sitter-minimap', 'all', 'platform'])(
+    'raises 62 blocking margins for loaded %s and keeps its frozen provenance',
+    (configuration) => {
+      const { baseline, candidate, schedule } = pairedResults()
+      for (const run of [baseline, candidate]) {
+        run.config.consumers = configuration
+        run.config.loadProfile = 'loaded'
+      }
+      const check = comparePairedInput(baseline, candidate, schedule, 17)
+      expect(check.metrics.filter((metric) => metric.blocking)).toHaveLength(108)
+      expect(
+        check.metrics.filter((metric) => metric.blocking && metric.frozenBudgetMs < 5),
+      ).toHaveLength(62)
+      expect(
+        check.metrics.filter((metric) => metric.blocking && metric.frozenBudgetMs < 1),
+      ).toHaveLength(17)
+      for (const metric of check.metrics) {
+        const frozen = inputBudget(configuration, metric.key)
+        expect(metric.frozenBudgetMs).toBe(frozen.noiseMarginMs)
+        expect(metric.budgetMs).toBe(
+          metric.blocking ? Math.max(metric.frozenBudgetMs, 5) : metric.frozenBudgetMs,
+        )
+        expect(metric.budget.sha256).toBe(frozen.sha256)
+        expect(metric.budget.reference).toBe('native')
+        expect(metric.budget.inherited).toBe(true)
+        expect(metric.budget.reason).toBe(
+          metric.blocking && metric.frozenBudgetMs < 5
+            ? 'Declared loaded Tree-sitter contention floor: 5 ms'
+            : 'Frozen historical margin',
+        )
+      }
+      const fine = check.metrics.find((metric) => metric.blocking && metric.frozenBudgetMs < 1)
+      for (const run of [baseline, candidate]) run.config.loadProfile = 'quiet'
+      const quiet = comparePairedInput(baseline, candidate, schedule, 17).metrics.find(
+        (metric) => metric.key === fine.key,
+      )
+      expect(quiet.budgetMs).toBe(fine.frozenBudgetMs)
+      expect(quiet.blocking).toBe(true)
+    },
+  )
+
+  it.each(['tree-sitter-shiki', 'tree-sitter-minimap', 'all', 'platform'])(
+    'keeps twenty-millisecond synthetic stage regressions rejecting for loaded %s',
+    (configuration) => {
+      const { baseline, candidate, schedule } = pairedResults(30)
+      for (const run of [baseline, candidate]) {
+        run.config.consumers = configuration
+        run.config.loadProfile = 'loaded'
+      }
+      const check = comparePairedInput(baseline, candidate, schedule, 17)
+      expect(sensitivityPassed(check, 'input')).toBe(true)
+      expect(sensitivityPassed(check, 'frame')).toBe(true)
+    },
+  )
 
   it('retains quiet sub-ms rejection and reports the declared applied floor', () => {
     const { baseline, candidate, schedule } = pairedResults(11)
@@ -1602,7 +1647,7 @@ describe('declared loaded Tree-sitter policy', () => {
     )
   })
 
-  it('includes loaded Tree-sitter only in full or focused verification', () => {
+  it('includes loaded worker-backed Tree-sitter only in full or focused verification', () => {
     const baseline = {
       manifest: { packages: [{ name: '@singapore-editor/core', sourceHash: 'a', buildHash: 'a' }] },
     }
@@ -1611,23 +1656,24 @@ describe('declared loaded Tree-sitter policy', () => {
     }
     const quiet = inputMatrixConfigurations(baseline, candidate)
     const loaded = inputMatrixConfigurations(baseline, candidate, { loadProfile: 'loaded' })
-    expect(quiet).toContain('tree-sitter')
-    expect(loaded).toEqual(quiet.filter((configuration) => configuration !== 'tree-sitter'))
+    expect(quiet).toHaveLength(10)
+    expect(quiet).toContain('platform')
+    expect(loaded).toEqual(['native', 'disabled', 'shiki', 'minimap', 'shiki-minimap'])
     expect(
       inputMatrixConfigurations(baseline, candidate, { loadProfile: 'loaded', full: true }),
     ).toEqual(quiet.filter((configuration) => configuration !== 'platform').concat('platform'))
     expect(
       inputMatrixConfigurations(baseline, candidate, {
         loadProfile: 'loaded',
-        declared: ['tree-sitter', 'native'],
+        declared: ['tree-sitter', 'tree-sitter-shiki', 'tree-sitter-minimap', 'all', 'native'],
       }),
-    ).toEqual(['platform', 'native'])
+    ).toEqual(['native'])
     expect(
       inputMatrixConfigurations(baseline, candidate, {
         loadProfile: 'loaded',
         only: true,
-        declared: ['tree-sitter'],
+        declared: ['tree-sitter', 'tree-sitter-shiki', 'tree-sitter-minimap', 'all', 'platform'],
       }),
-    ).toEqual(['tree-sitter'])
+    ).toEqual(['tree-sitter', 'tree-sitter-shiki', 'tree-sitter-minimap', 'all', 'platform'])
   })
 })

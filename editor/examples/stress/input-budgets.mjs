@@ -1,5 +1,6 @@
 import declared from './input-budgets.json' with { type: 'json' }
 import { fail } from './errors.mjs'
+import { inputHasWorkerTreeSitter } from './input-configurations.mjs'
 
 export function inputBudget(configuration, key, loadProfile = 'quiet') {
   if (!['quiet', 'loaded'].includes(loadProfile)) fail('Unknown input load profile')
@@ -9,8 +10,8 @@ export function inputBudget(configuration, key, loadProfile = 'quiet') {
   if (!Number.isFinite(frozenNoiseMarginMs) || frozenNoiseMarginMs < 0)
     fail(`Missing frozen input budget for ${configuration}/${key}`)
   const loadedFloor =
-    configuration === 'tree-sitter' &&
     loadProfile === 'loaded' &&
+    inputHasWorkerTreeSitter(configuration) &&
     !key.endsWith('/burstToPaintUpperBound') &&
     frozenNoiseMarginMs < 5
   return {

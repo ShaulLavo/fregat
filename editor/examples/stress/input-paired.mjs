@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto'
 import { fail } from './errors.mjs'
-import { inputConsumerIds, inputConsumerConfiguration } from './input-configurations.mjs'
+import {
+  inputConsumerIds,
+  inputConsumerConfiguration,
+  inputHasWorkerTreeSitter,
+} from './input-configurations.mjs'
 import { assertInputComparable, inputScenarios, inputViewModes } from './input-results.mjs'
 import { canStopInputPairs } from './input-pair-stopping.mjs'
 import { inputBudget } from './input-budgets.mjs'
@@ -145,7 +149,7 @@ export function comparePairedInput(baseline, candidate, schedule, seed, draws) {
     statistic:
       'median of paired repetition p95 differences; repetition-cluster percentile bootstrap',
     budgetPolicy:
-      'frozen historical noise margins; declared native inheritance for new compositions; loaded standalone Tree-sitter blocking margins have a 5 ms floor',
+      'frozen historical noise margins; declared native inheritance for new compositions; loaded worker-backed Tree-sitter blocking margins have a 5 ms floor',
     stoppingPolicy: baseline.config.adaptivePairs || 'fixed-repetitions',
     confidenceInterpretation: baseline.config.adaptivePairs
       ? 'nominal descriptive bootstrap; conditional early stopping has no sequential coverage guarantee'
@@ -245,6 +249,6 @@ export function inputMatrixConfigurations(baseline, candidate, options = {}) {
     ...new Set(['platform', ...(options.declared ?? touchedConfigurations(baseline, candidate))]),
   ]
   return configurations.filter(
-    (configuration) => options.loadProfile !== 'loaded' || configuration !== 'tree-sitter',
+    (configuration) => options.loadProfile !== 'loaded' || !inputHasWorkerTreeSitter(configuration),
   )
 }

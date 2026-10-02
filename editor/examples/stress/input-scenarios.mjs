@@ -330,10 +330,15 @@ export async function runSample(
   if (facts.sha256 !== fixture.sha256) fail('Input fixture hash mismatch')
   if (consumerId === 'native' && fixture.id === 'ordinary')
     await page.waitForFunction(() => __stress.observe().state.initialHighlightStatus === 'painted')
+  // Reset source updates can follow acceptance of the prior render; require the current source.
+  const readySource =
+    config.readiness === 'receipt-poll' && consumerId !== 'native'
+      ? await waitForConsumerSource(page)
+      : null
   const opened =
     consumerId === 'native'
       ? null
-      : await settleConsumers(page, consumerId, fixture, views, scenario)
+      : await settleConsumers(page, consumerId, fixture, views, scenario, null, false, readySource)
   phase('openAndConsumers')
   const target = await page.evaluate(
     ({ scenario, slowdownMs, frameSlowdownMs, count }) => {

@@ -17,6 +17,10 @@ const miCodeUnits = 1_048_576
 export const analysisLimitCodeUnits = 10 * miCodeUnits
 export const minimapLimitCodeUnits = 50 * miCodeUnits
 
+export function inputHasWorkerTreeSitter(id) {
+  return id !== 'native' && inputConsumerConfiguration(id, 'ordinary', 1).treeSitter
+}
+
 export function inputConsumerConfiguration(id, fixture, length) {
   if (!inputConsumerIds.includes(id))
     throw new TypeError(`Unknown input consumer configuration: ${id}`)
