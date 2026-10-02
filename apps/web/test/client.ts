@@ -473,9 +473,8 @@ function setGlobalWebSocket(value: typeof WebSocket) {
 function withHttpHeaders(request: Request, origin: string) {
   if (request.headers.get('origin') === origin && request.headers.has('host')) return request
 
-  const headers = new Headers(request.headers)
-  headers.set('origin', origin)
-  if (!headers.has('host')) headers.set('host', new URL(request.url).host)
-  Object.defineProperty(request, 'headers', { value: headers })
+  // Keep Bun's native Headers: replacing them loses FormData's generated content type.
+  request.headers.set('origin', origin)
+  if (!request.headers.has('host')) request.headers.set('host', new URL(request.url).host)
   return request
 }
