@@ -50,6 +50,20 @@ export function chromiumBridge(url: string): string {
   return shellBridge(url, 'chromium')
 }
 
+type AppDocument = {
+  contextId: number | undefined
+  revision: number
+  active: boolean
+  changed: ReturnType<typeof Promise.withResolvers<void>>
+}
+
+function updateDocument(document: AppDocument, contextId: number | undefined) {
+  document.contextId = contextId
+  document.revision++
+  document.changed.resolve()
+  document.changed = Promise.withResolvers<void>()
+}
+
 export async function attachChromium(
   cdp: Pick<CdpClient, 'request' | 'on' | 'disconnected'>,
   url: string,
@@ -60,22 +74,51 @@ export async function attachChromium(
   const script = chromiumBridge(url)
   const sessions = new Set<string>()
   const contexts = new Map<string, Set<number>>()
-  const documents = new Map<string, ReturnType<typeof Promise.withResolvers<number>>>()
+  const documents = new Map<string, AppDocument>()
+  const targetIds = new Map<string, string>()
+  const readySessions = new Set<string>()
+  const connection = { active: true, error: undefined as unknown }
+  let changed = Promise.withResolvers<void>()
+  const notify = () => {
+    changed.resolve()
+    changed = Promise.withResolvers<void>()
+  }
   const pendingPicks = new Map<string, Promise<string[]>>()
   const origin = new URL(url).origin
-  const preparing = new Set<Promise<void>>()
+  const preparing = new Map<string, Promise<void>>()
   const initialErrors: unknown[] = []
   let attaching = true
   const fail = (error: unknown) => {
     if (attaching) initialErrors.push(error)
     else onFailure(error)
   }
-  cdp.on('Target.detachedFromTarget', (event) => {
-    const session = event.params.sessionId
-    if (typeof session !== 'string') return
+  void cdp.disconnected.then((error) => {
+    connection.active = false
+    connection.error = error
+    for (const document of documents.values()) document.changed.resolve()
+    notify()
+  })
+  const detach = (session: string) => {
     sessions.delete(session)
     contexts.delete(session)
+    targetIds.delete(session)
+    readySessions.delete(session)
+    const document = documents.get(session)
+    if (document) {
+      document.active = false
+      document.changed.resolve()
+    }
     documents.delete(session)
+    preparing.delete(session)
+    notify()
+  }
+  cdp.on('Target.detachedFromTarget', (event) => {
+    if (typeof event.params.sessionId === 'string') detach(event.params.sessionId)
+  })
+  cdp.on('Target.targetDestroyed', (event) => {
+    for (const [session, targetId] of targetIds) {
+      if (targetId === event.params.targetId) detach(session)
+    }
   })
   cdp.on('Runtime.executionContextCreated', (event) => {
     const context = event.params.context
@@ -89,14 +132,20 @@ export async function attachChromium(
     const ids = contexts.get(event.sessionId) ?? new Set<number>()
     ids.add(context.id)
     contexts.set(event.sessionId, ids)
-    documents.get(event.sessionId)?.resolve(context.id)
+    const document = documents.get(event.sessionId)
+    if (document) updateDocument(document, context.id)
   })
   cdp.on('Runtime.executionContextDestroyed', (event) => {
-    if (event.sessionId && typeof event.params.executionContextId === 'number')
-      contexts.get(event.sessionId)?.delete(event.params.executionContextId)
+    if (!event.sessionId || typeof event.params.executionContextId !== 'number') return
+    contexts.get(event.sessionId)?.delete(event.params.executionContextId)
+    const document = documents.get(event.sessionId)
+    if (document?.contextId === event.params.executionContextId) updateDocument(document, undefined)
   })
   cdp.on('Runtime.executionContextsCleared', (event) => {
-    if (event.sessionId) contexts.delete(event.sessionId)
+    if (!event.sessionId) return
+    contexts.delete(event.sessionId)
+    const document = documents.get(event.sessionId)
+    if (document) updateDocument(document, undefined)
   })
   cdp.on('Target.attachedToTarget', (event) => {
     const session = event.params.sessionId
@@ -107,14 +156,28 @@ export async function attachChromium(
     }
     if (sessions.has(session)) return
     sessions.add(session)
-    const document = Promise.withResolvers<number>()
+    if (typeof target.targetId === 'string') targetIds.set(session, target.targetId)
+    const document: AppDocument = {
+      contextId: undefined,
+      revision: 0,
+      active: true,
+      changed: Promise.withResolvers<void>(),
+    }
     documents.set(session, document)
-    const preparation = preparePage(cdp, session, target.type, script, origin, document.promise)
+    const preparation = preparePage(cdp, session, target.type, script, origin, document, connection)
+      .then((ready) => {
+        if (ready && document.active) readySessions.add(session)
+      })
       .catch((error: unknown) => {
         if (sessions.has(session)) fail(error)
       })
-      .finally(() => preparing.delete(preparation))
-    preparing.add(preparation)
+      .finally(() => {
+        documents.delete(session)
+        preparing.delete(session)
+        notify()
+      })
+    preparing.set(session, preparation)
+    notify()
   })
   cdp.on('Runtime.bindingCalled', (event) => {
     reportFrames(event, sessions, contexts, origin, onOpen)
@@ -153,22 +216,27 @@ export async function attachChromium(
     flatten: true,
   })
   // Auto-attach acknowledges before its page commands finish; keep startup supervision until they settle.
-  while (preparing.size) await Promise.all(preparing)
+  while (preparing.size || !readySessions.size) {
+    if (initialErrors.length) throw initialErrors[0]
+    if (!connection.active) throw connection.error
+    await changed.promise
+  }
   if (initialErrors.length) throw initialErrors[0]
   attaching = false
 }
 
 async function preparePage(
-  cdp: Pick<CdpClient, 'request' | 'disconnected'>,
+  cdp: Pick<CdpClient, 'request'>,
   session: string,
   type: unknown,
   script: string,
   origin: string,
-  document: Promise<number>,
+  document: AppDocument,
+  connection: { active: boolean; error: unknown },
 ) {
   if (type !== 'page') {
     await cdp.request('Runtime.runIfWaitingForDebugger', {}, session)
-    return
+    return false
   }
   await cdp.request('Page.enable', {}, session)
   await cdp.request('Runtime.enable', {}, session)
@@ -180,19 +248,28 @@ async function preparePage(
   })
   await cdp.request('Runtime.runIfWaitingForDebugger', {}, session)
   // A target can advertise the app URL while its current document is still about:blank.
-  const contextId = await Promise.race([
-    document,
-    cdp.disconnected.then((error) => {
+  while (document.active) {
+    if (!connection.active) throw connection.error
+    const { contextId, revision } = document
+    if (contextId === undefined) {
+      await document.changed.promise
+      continue
+    }
+    let evaluated: Record<string, unknown>
+    try {
+      evaluated = await cdp.request('Runtime.evaluate', { expression: script, contextId }, session)
+    } catch (error) {
+      if (!document.active) return false
+      if (revision !== document.revision) continue
       throw error
-    }),
-  ])
-  const evaluated = await cdp.request(
-    'Runtime.evaluate',
-    { expression: script, contextId },
-    session,
-  )
-  if (evaluated.exceptionDetails)
-    throw launcherErrors.CDP_FAILED({ internal: { reason: 'app-document-bridge' } })
+    }
+    if (!document.active) return false
+    if (revision !== document.revision) continue
+    if (evaluated.exceptionDetails)
+      throw launcherErrors.CDP_FAILED({ internal: { reason: 'app-document-bridge' } })
+    return true
+  }
+  return false
 }
 
 function trustedBinding(
