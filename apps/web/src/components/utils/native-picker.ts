@@ -6,7 +6,6 @@ import {
   serverCapabilitiesSchema,
   type NativePickerRequest,
   type NativePickerResult,
-  type ServerCapabilities,
 } from '@workspace/contracts'
 import { entryPickerMutationKeys } from '@/components/utils/mutation-keys'
 import { entryPickerQueryKeys } from '@/components/utils/query-keys'
@@ -31,37 +30,14 @@ import {
 import { toastError } from '@/lib/toast-error'
 import { createClientInvariantError, createRpcError } from '@/lib/structured-errors'
 
-// The contract-only dependency publishes schemas before the server adds these Eden routes.
-type PickerClient = {
-  system: {
-    capabilities: {
-      get(options: {
-        fetch: { signal: AbortSignal }
-      }): Promise<{ data: ServerCapabilities | null; error: unknown; status: number }>
-    }
-  }
-  fs: {
-    'native-picker': {
-      post(
-        request: NativePickerRequest,
-        options: { fetch: { signal: AbortSignal } },
-      ): Promise<{ data: NativePickerResult | null; error: unknown }>
-    }
-  }
-}
-
-function pickerClient(client: Client): PickerClient {
-  return client as unknown as PickerClient
-}
-
 export function nativePickerCapabilitiesOptions(client: Client) {
   return queryOptions({
     queryKey: entryPickerQueryKeys.capabilities,
     retry: false,
     staleTime: 0,
     queryFn: async ({ signal }) => {
-      const response = await pickerClient(client)
-        .system.capabilities.get({ fetch: { signal } })
+      const response = await client.system.capabilities
+        .get({ fetch: { signal } })
         .catch((error: unknown) => {
           throw createRpcError(error)
         })
@@ -175,7 +151,7 @@ async function nativeSelection(
     if (paths.length === 0) return { outcome: 'cancelled', paths: [] }
     return { outcome: 'selected', paths }
   }
-  const response = await pickerClient(client).fs['native-picker'].post(request, {
+  const response = await client.fs['native-picker'].post(request, {
     fetch: { signal },
   })
   if (response.error) throw createRpcError(response.error)

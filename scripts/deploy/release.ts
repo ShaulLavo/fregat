@@ -25,6 +25,8 @@ import {
   missingReleaseFiles,
   writeRuntimeManifest,
 } from '../../apps/server/src/installation/release-files'
+import { buildNative } from '../../apps/desktop/scripts/build-native'
+import { errorMessage } from '../../packages/contracts/src/error-fields'
 
 export type Checkout = {
   commit: string
@@ -215,8 +217,23 @@ export async function buildServer(release: Release) {
     path.join(release.directory, 'server-build.log'),
   )
   cpSync(path.join(serverPackage, 'dist'), release.server, { recursive: true })
+  bundleNativePicker(release)
   await writeRuntimeManifest(release.server, path.join(checkoutRoot, 'bun.lock'))
   linkServerDependencies(release)
+}
+
+// The server finds the chooser helper at server/native/; a host without the toolchain ships none
+// and the server reports no native chooser, so the deploy itself still succeeds.
+function bundleNativePicker(release: Release) {
+  try {
+    const built = buildNative(path.join(checkoutRoot, 'apps/desktop'), 'polaron')
+    if (!built) return log('server', 'native chooser helper: none for this platform')
+    mkdirSync(path.join(release.server, 'native'), { recursive: true })
+    cpSync(built, path.join(release.server, 'native', 'platform-webview'))
+    log('server', 'native chooser helper bundled')
+  } catch (error) {
+    log('server', `native chooser helper not bundled: ${errorMessage(error)}`)
+  }
 }
 
 // The copy keeps the runtime manifest written when that server was built, which matches its bundle.

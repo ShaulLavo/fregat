@@ -33,8 +33,17 @@ import {
 import { errorPayload, FsError, isFsError } from './errors'
 import type { SearchStreamEvent } from './search'
 import type { FileSystemService } from './service'
+import type { SystemService } from '../system/service'
 import { parseWatchInputs } from './watch'
 import { sseResponse, toErrorYieldingSse, toSse } from '../sse'
+
+/** The only native chooser endpoint: the service re-checks locality for every request. */
+export function nativePickerRoutes(system: SystemService) {
+  return new Elysia({ name: 'native-picker-routes' }).post(
+    '/fs/native-picker',
+    ({ request, server, body }) => system.pickNative(request, server, body),
+  )
+}
 
 export function fsRoutes(fs: FileSystemService) {
   return new Elysia({ name: 'fs-routes' }).group('/fs', (app) =>

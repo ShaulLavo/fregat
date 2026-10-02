@@ -4,6 +4,7 @@ import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { act, screen, waitFor } from '@testing-library/react'
 import { entryPickerQueryKeys } from '@/components/utils/query-keys'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { createObservedInProcessClient } from '../../../test/client'
 import { installTestClient } from '../../../test/factories/client-binding'
 import { recordClientLog } from '../../../test/factories/client-log'
@@ -20,6 +21,37 @@ afterEach(() => {
 function PickerFixture({ open = true }: { open?: boolean }) {
   return usePickEntry({ open, value: null, onOpenChange: () => {}, onPick: () => {} })
 }
+
+test('closed picker defers its runtime and capabilities until it opens', async ({
+  server,
+  client,
+}) => {
+  const identity = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  let calls = 0
+  server.app
+    .get('/system/capabilities', () => {
+      calls += 1
+      return serverCapabilities(identity.environmentId)
+    })
+    .compile()
+  resourceQueryClient.removeQueries({ queryKey: entryPickerQueryKeys.module, exact: true })
+  const view = renderWithProviders(<PickerFixture open={false} />)
+  expect(resourceQueryClient.getQueryState(entryPickerQueryKeys.module)).toMatchObject({
+    status: 'pending',
+    fetchStatus: 'idle',
+  })
+  expect(view.queryClient.getQueryState(entryPickerQueryKeys.capabilities)).toBeUndefined()
+  expect(calls).toBe(0)
+  expect(screen.queryByRole('dialog')).toBeNull()
+
+  view.rerender(<PickerFixture />)
+  expect(await screen.findByRole('dialog')).toBeTruthy()
+  expect(resourceQueryClient.getQueryState(entryPickerQueryKeys.module)?.status).toBe('success')
+  expect(calls).toBe(1)
+  expect(view.queryClient.getQueryData(entryPickerQueryKeys.capabilities)).toMatchObject({
+    nativePicker: false,
+  })
+})
 
 test('Chromium bridge without native picker opens the web folder picker', async ({ client }) => {
   void client

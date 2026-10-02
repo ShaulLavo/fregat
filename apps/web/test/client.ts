@@ -104,7 +104,7 @@ export function createControlledInProcessClient(server: TestServer) {
   const controller = new SettingsStreamFetchController()
   const directFetch = directInProcessFetcher(server)
   const fetcher = (async (input, init) => {
-    const request = withOrigin(new Request(input, init), server.origin)
+    const request = withHttpHeaders(new Request(input, init), server.origin)
     controller.observe(request)
     const injected = await controller.injectedResponse(request)
     if (injected) return injected
@@ -401,7 +401,9 @@ function settingsErrorResponse({ code, message, status }: InjectedSettingsError)
 
 export function directInProcessFetcher(server: TestServer): typeof fetch {
   return (async (input, init) => {
-    const response = await server.app.handle(withOrigin(new Request(input, init), server.origin))
+    const response = await server.app.handle(
+      withHttpHeaders(new Request(input, init), server.origin),
+    )
     normalizeInProcessSseHeaders(response)
     await rejectStringifiedBinaryBody(response)
     return response
@@ -466,13 +468,14 @@ function setGlobalWebSocket(value: typeof WebSocket) {
   Object.defineProperty(globalThis, 'WebSocket', { configurable: true, writable: true, value })
 }
 
-// happy-dom's Request drops `origin` (a browser-forbidden header), which the
-// app's auth guard requires. Re-attach it so dom tests reach the real routes.
-function withOrigin(request: Request, origin: string) {
-  if (request.headers.get('origin') === origin) return request
+// In-process requests need the browser's Origin and the HTTP listener's Host.
+// happy-dom drops browser-forbidden headers when constructing a Request.
+function withHttpHeaders(request: Request, origin: string) {
+  if (request.headers.get('origin') === origin && request.headers.has('host')) return request
 
   const headers = new Headers(request.headers)
   headers.set('origin', origin)
+  if (!headers.has('host')) headers.set('host', new URL(request.url).host)
   Object.defineProperty(request, 'headers', { value: headers })
   return request
 }
