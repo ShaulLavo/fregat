@@ -206,7 +206,26 @@ Rules, all of them:
 
 Handler lists are compiled when the set of extensions changes, so a keystroke with no `input`
 contribution costs nothing extra and `frame` handlers run only when something subscribed.
-Benchmarks before and after confirm the keystroke and frame paths did not slow down.
+
+**Cost budget (owner, 2026-10-02).** Hosts may run a hundred extensions or more, so cost must not
+scale with how many are installed: an extension that does not take part in an operation costs
+nothing on it, and attaching many extensions stays cheap. A small cost per _interested_ extension
+is acceptable; any cost per _installed_ extension on the keystroke, write or frame path is a design
+bug, not a tuning task. Gates, with counters exact and timings against a same-machine control:
+
+| Gate | Measure                                                                                                           | Required                                                       |
+| ---- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| X1   | Calls into 1,000 extensions that contribute no `input`, per keystroke, paste and IME commit                       | 0                                                              |
+| X2   | Calls into 1,000 extensions with no `frame` or output subscription, per write and per painted frame               | 0                                                              |
+| X3   | Keystroke-to-PTY and write-to-paint latency with 100 and 1,000 inert extensions against none                      | inside the control envelope                                    |
+| X4   | Marginal cost per extra `input` handler that passes, 10 → 1,000 handlers                                          | small and flat (linear, no per-call allocation)                |
+| X5   | Payload objects built for an event no extension subscribes to (frame rows, OSC payloads, geometry)                | 0                                                              |
+| X6   | `Terminal.create` with 100 extensions against none; `terminal.use` and dispose of one extension with 100 attached | inside the control envelope; independent of the count attached |
+| X7   | Memory retained per inert extension after attach                                                                  | a few hundred bytes, measured                                  |
+
+Harness: a counter test in the package's browser suite and `bun run bench:renderer` workloads with
+0, 100 and 1,000 inert extensions on the hardware adapter. If indexing bookkeeping grows with the
+number installed, the design is revised before the phase lands.
 
 Core hooks this phase adds, each with a test extension that uses it without private access:
 
@@ -222,7 +241,7 @@ Core hooks this phase adds, each with a test extension that uses it without priv
 
 Done when: test extensions claim input, read geometry, measure `👩‍💻` and CJK text, register an
 OSC handler and a duplicate (rejected), and dispose cleanly on terminal dispose and on their own;
-a throwing `setup` leaves nothing behind; keystroke and frame benchmarks show no regression.
+a throwing `setup` leaves nothing behind; gates X1–X7 pass.
 
 ## Phase 1: the line editor
 
@@ -276,8 +295,8 @@ extension and deletes the core code and options it replaces (no shims; greenfiel
    imports HTML export from there.
 
 For each step: the extension uses only public hooks (a hook it needs lands in core first), the
-package's browser tests and Platform's terminal scenarios pass, and `bun run bench:renderer`
-shows no regression on the hardware adapter for anything near the frame path.
+package's browser tests and Platform's terminal scenarios pass, `bun run bench:renderer` shows no
+regression on the hardware adapter for anything near the frame path, and gates X1–X7 still pass.
 
 Ship a `defaultExtensions()` preset (fit, scrollbar, links, accessibility, clipboard) for hosts
 that want today's behavior in one call; Platform and the site load what they use explicitly.

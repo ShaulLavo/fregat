@@ -418,6 +418,12 @@ speedups from source inspection. At fixed interested work, unrelated plugin coun
 callback/payload counters, and runtime overhead must stay inside the calibrated control envelope.
 If indexing or derivation bookkeeping scales with all installed pieces, revise the design.
 
+Owner, 2026-10-02: Fregat may run a hundred extensions or more, so these gates are the budget, not
+targets to approach: a small cost per interested extension is acceptable, any cost per installed
+extension on typing, selection, scroll or paint is a design bug. The 5b model keeps the budget by
+indexing returned contributions at attach time, running `select`/`equals` only for extensions that
+watch the changed input, and building no payload for an input nobody watches.
+
 Proposed numbers, from the Phase 0 controls. Counter gates are exact and hardware-independent;
 timing gates compare against controls run on the same machine and build, never against a fixed
 millisecond figure. Today's values are from the 20,000-line fixture in the research doc.
