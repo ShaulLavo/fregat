@@ -195,9 +195,10 @@ Rules, all of them:
    providers with core resolving the hit, a renderer is single-owner.
 4. No dependency injection. An extension that needs another receives its API from the host.
    `name` is for diagnostics only.
-5. The scope owns resources: contributions are removed automatically, and `scope.own(cleanup)`
-   covers observers, timers and native handles. If `setup` throws, everything it registered is
-   undone and the error reaches the host's `error` event.
+5. Cleanup is automatic. Contributions are removed when the extension detaches, and
+   `scope.signal` aborts on dispose, so `addEventListener(..., { signal })`, `fetch` and observers
+   built on it clean up by themselves; `scope.own(cleanup)` covers the rest (native handles). If
+   `setup` throws, everything it registered is undone and the error reaches the host's `error` event.
 6. `terminal.use` returns `{ api, dispose }`. Disposing aborts the extension's pending work;
    attaching again starts fresh state.
 7. One extension value may attach to many terminals, never twice to the same one.

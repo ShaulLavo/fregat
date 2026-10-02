@@ -1,6 +1,13 @@
 # Plan 122: Composable, full-power plugins with selective execution
 
-Status: RESEARCH DONE 2026-09-26 — Phase 0 comparison, measured controls and the selected
+Status: APPROVED, REVISED 2026-10-02 by the owner: "go fix that plan and keep all the goodies … add
+the actual model, that was supposed to be the actual plan from the beginning." The authoring model
+below replaces the `createPlugin` surface that phase 3 built; the selective runtime, lifecycle
+ownership, commands, modal input, ownership rules, loading, proofs and gates stay. The terminal's
+[Plan 286](286-ghostty-extensions.md) uses the same model, so the Editor and ghostty-webgpu share one
+extension style.
+
+History: RESEARCH DONE 2026-09-26 — Phase 0 comparison, measured controls and the selected
 `createPlugin` shape are below; the evidence is in [Phase 0 research](../docs/composable-plugins/phase-0-research.md).
 Both owner questions are decided (below). Phases 1 and 2 done 2026-09-26 in wave 2, lane E1:
 [singapore#50](https://github.com/ShaulLavo/singapore/pull/50) (lifecycle ownership, D7) and
@@ -33,10 +40,10 @@ Build a plugin system that is simple to author, open-ended to compose, and inexp
 installed functionality is irrelevant to the current operation. A plugin is a package of
 behavior, not the unit that receives every editor update.
 
-1. **One `createPlugin` authoring entrypoint.** No required family of `createXPlugin`
-   constructors, nested contribution factories, or parallel host/editor definitions for the
-   same editor feature. Library authors may export convenience functions, but those are
-   compositions, not new core plugin categories. Renaming the current ceremony is insufficient.
+1. **One authoring model: an extension is a value.** No family of `createXPlugin` constructors,
+   nested contribution factories, or parallel host/editor definitions for the same feature.
+   Library authors export functions that return extension values or arrays of them; those are
+   compositions, not new core categories. Renaming the current ceremony is insufficient.
 2. **Composable building blocks, not a fixed feature menu.** Plugins can combine state,
    subscriptions, commands, rendering, and other plugins. A third-party library can define a
    typed extension point that another library contributes to without modifying Singapore.
@@ -96,38 +103,90 @@ research doc.
 
 ## Selected authoring model
 
-Selected in Phase 0 (decision record in the research doc): one `createPlugin` with static
-declarations plus a scoped per-view setup. A composition-first shape (every capability a piece in
-an `extensions` array) was written for the same four examples and type-checked; it needed 10
-constructors against 4, threaded `view` through every callback, and kept per-view state in module
-values, which is how E027's factory-state bug happens. Dispatch cost is the same for both.
+Decided 2026-10-02 by the owner, replacing the 2026-09-26 selection. An extension is a plain
+value: a name, static declarations known before any editor exists, and one setup function per
+lifetime it lives in. Each setup keeps its state in its closure and returns what it plugs into.
 
 ```ts
-export const modal = createPlugin({
-  name: 'acme.modal', // namespace and dedup identity
-  uses: [wordMotions], // bundles: identity dedup, ref-counted ownership, order is precedence
-  commands: [enterInsert], // E026 declarations: data, known before any editor exists
+export const modal = {
+  name: 'acme.modal', // command namespace and diagnostics; not a lookup key
+  commands: [enterInsert], // E026 declarations: data, listed in the palette before any editor exists
   view(scope) {
-    // once per matching editor view; everything registered here is owned by the scope
-    const mode = scope.state<Mode>({ kind: 'normal', count: 0 })
-    scope.handle(enterInsert, () => mode.set({ kind: 'insert' }))
-    scope.keyParticipant((event, context) =>
-      mode.get().kind === 'insert' ? 'delegate' : 'consume',
-    )
+    // once per matching editor view; state is a closure variable, one per view
+    let mode: Mode = { kind: 'normal', count: 0 }
+    return {
+      handle: { [enterInsert.id]: () => (mode = { kind: 'insert', count: 0 }) },
+      keys: (event) => (mode.kind === 'insert' ? 'delegate' : 'consume'),
+      cursor: () => (mode.kind === 'insert' ? 'line' : 'block'),
+    }
   },
-  // document(scope) arrives with Plan 099 unit 2; backend with the loader phase
-})
+  // document(scope) arrives with Plan 099 unit 2; backend(scope) with the loader phase
+} satisfies EditorExtension
+
+// Hosts list extensions; arrays are presets and flatten in order.
+<Editor extensions={[firstPartyPreset(), modal, annotations(lintSource)]} />
 ```
 
-The scope carries `editor` (the live editor, labelled unstable), `read` and `watch` over typed
-inputs (`selection`, `text`, `viewport`, `tokens`, `theme`, `document`) and over inputs built with
-`derive` (recompute on change, stop on equality), `provide` to a library-defined channel, `handle`, `decorations`, `keyParticipant`, `textGate`,
-`applyEdits`, `state`, `onDispose` and `own`. Channels are the existing tokens with a public change
-subscription and a `one`, `many` or `combine` policy, so a third-party library defines an extension
-point, others contribute, and core adds no method. `onDispose` is explicit cleanup for raw DOM
-listeners, timers and processes; the scope does not claim to collect them. `createPlugin` lowers to
-the existing `EditorPlugin` host, so there is no second lifecycle. The full contract, the rules for
-dynamic subscriptions and the rejected alternatives are in the research doc.
+A view setup returns any of: `watch` (typed inputs it reacts to, see below), `handle` (command
+handlers), `keys` (the key participant), `textGate`, `cursor`, `decorations`, `provide`
+(contributions to typed points), and `api` (a typed object for whoever composed it). The scope
+passes the live `editor` (labelled unstable), `read(input)`, `getSelections`, `applyEdits` and
+`signal`.
+
+```ts
+// Selective updates: only declared inputs call back, select narrows, equality stops propagation.
+view: (scope) => ({
+  watch: {
+    selection: { select: wordAtCaret, equals: sameWord, run: (word) => highlight(word) },
+  },
+})
+
+// A third-party extension point, no core change: a typed object, not a string id.
+export const annotations = point<Annotation>({ combine: 'many' })
+// contributors: view: () => ({ provide: [annotations.of(myAnnotations)] })
+// consumer:     scope.read(annotations)  // or watch it like any input
+```
+
+Rules, all of them:
+
+1. **One lifecycle.** Each setup runs once per attachment; disposal runs once. `EditorPlugin` and
+   the six `register*Contribution` kinds become internal (owner question 1, decided (a)); there is
+   no second public lifecycle.
+2. **Arrays are presets.** Host order is precedence. The same extension value listed twice
+   attaches once (the old `uses` deduplication, without reference counting). Reconfiguring passes a
+   new list: values that left are disposed, values that stayed keep their state, new ones attach.
+3. **Core picks the combine rule per contribution kind:** `keys` follows owner question 2's order,
+   commands are one handler per ID, decorations and annotations merge, a typed point declares
+   `one`, `many` or `combine` when it is created.
+4. **No dependency injection.** An extension that needs another's API gets it from the host or
+   from a typed point. Names namespace commands and label diagnostics; nothing is looked up by name.
+5. **Cleanup is automatic.** Everything a setup returns is removed when it detaches. `scope.signal`
+   aborts on dispose, so `addEventListener(..., { signal })`, `fetch` and timers built on it clean up
+   by themselves; `scope.own(dispose)` covers the rest (subprocesses, native handles). A setup that
+   throws leaves nothing registered and reports the error.
+6. **State lives in the closure,** one per attachment, so one extension value serves any number of
+   views and documents without sharing state by accident (the diff plugin's factory-state bug).
+7. **Typed end to end.** Inputs, points, commands and `api` are typed objects; no string channels.
+
+What this replaces from phase 3, and why:
+
+| Phase 3 `createPlugin` piece                                     | Becomes                            | Why                                                                                                                          |
+| ---------------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `scope.state()`                                                  | a closure variable                 | per-view state already has one home; a reactive cell added a concept                                                         |
+| `derive` + `watch`                                               | `watch` with `select` and `equals` | one concept; derived values compute once per input revision and publish in the batched pass, never synchronously per watcher |
+| `createChannel(id, policy)`                                      | `point<T>({ combine })`            | identity is the object, so a type mismatch cannot hide behind a shared string                                                |
+| `uses` with ref-counted ownership                                | arrays plus identity dedup         | reconfiguration by list diff covers removal without counting                                                                 |
+| `scope.handle/keyParticipant/textGate/cursorStyle/provide` calls | fields of the returned object      | what an extension plugs into is visible in one place, and core can index it at attach time                                   |
+| `onDispose`                                                      | `scope.signal` and `scope.own`     | the common cases clean up automatically                                                                                      |
+| `createPlugin` lowering onto `EditorPlugin`                      | the only public model              | there were effectively two lifecycles                                                                                        |
+
+Why the survey rejected the alternatives (2026-10-02, alongside Plan 286): xterm.js addons are
+mutable instances with no rollback; CodeMirror 6 composes best but its facets, fields, effects,
+compartments and five precedence buckets are more machinery than either editor or terminal needs;
+VS Code and Lexical's newer layer add manifests, activation events and dependency graphs; Vite and
+Rollup's factory-with-named-hooks shape is the closest relative, and this model takes it. The
+2026-09-26 comparison's concern about composition-first shapes (10 constructors, per-view state in
+module values) does not apply: this model has one value per feature and state in the setup closure.
 
 ## Selective runtime contract
 
@@ -294,8 +353,15 @@ carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week
 5. **Done (singapore#56).** **Modal input (M).** E028 on `createPlugin`: key participant, text gate, cursor style and the
    `applyEdits` selection list as scope methods, proved in a real browser on both input routes, two
    splits, readonly and IME. Applies owner question 2's key precedence. Owner: Editor.
-6. **Fregat attachment (M).** `editor.tsx` takes plugin values; the first-party set becomes one list of
-   `createPlugin` values that configuration can replace by name; surfaces are opt-in beyond code tabs
+   5b. **The extension model (M).** Replace phase 3's `createPlugin` surface with the model above in one
+   pass: `EditorExtension` and its view setup, `watch` with `select`/`equals` lowering onto phase 2's
+   per-input dispatch, typed `point`, `scope.signal`, list reconfiguration with identity dedup.
+   Move the plugins already on `createPlugin` (occurrence highlight, bracket match, document links,
+   markdown authoring) and re-run the phase 5 modal proof and the annotation proof on it; delete
+   `createPlugin`, `derive`, `createChannel`, `scope.state` and `uses` in the same pass. Owner:
+   Editor. Gates D1–D9, T1, T2.
+6. **Fregat attachment (M).** `editor.tsx` takes extension values; the first-party set becomes one
+   preset array that configuration can replace by name; surfaces are opt-in beyond code tabs
    (diff, search, settings, composer); an application-scoped enable setting and a startup mode with
    third-party plugins off. Scenarios under `scripts/agent/scenarios/` for two splits, document swap
    and A-to-B-to-A environment switch. Owner: Platform. Gate T5.
@@ -306,9 +372,9 @@ carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week
    measured comparison of prebuilt ESM and host-compiled TypeScript, an in-process Bun backend entry,
    the typed service bridge with captured environment, document, view and generation identity, and the
    backend formatter proof. The loader is a lazy chunk. Owner: Platform with Editor. Gates T6, T8.
-9. **Migration and documentation (M–L).** The remaining first-party plugins move to `createPlugin`
-   (about 20 across Editor and Platform), the public `EditorPlugin` and provider kinds go per owner
-   question 1, author docs and the measured costs are published, and the counter and dispatch gates
+9. **Migration and documentation (M–L).** The remaining first-party plugins move to the extension
+   model (about 20 across Editor and Platform, the diff plugin included), the public `EditorPlugin`
+   and provider kinds become internal per owner question 1, author docs and the measured costs are published, and the counter and dispatch gates
    run in CI. Owner: Editor and Platform.
 
 Paired-plan changes for the Editor repository, to land with phase 1: E027's phase 2 is phase 3 here
@@ -365,6 +431,8 @@ millisecond figure. Today's values are from the 20,000-line fixture in the resea
 | D5   | Calls to 1,000 command-only plugins per edit, selection or scroll                                                        | not installable                    | 0                                                                              | counter test (phase 3)                                    |
 | D6   | Downstream calls when a derived input's value is equal                                                                   | no derive                          | 0                                                                              | counter test                                              |
 | D7   | Registrations surviving plugin removal, including late ones, `onDidType` and key readers                                 | survive (E027 probes 1–2)          | 0                                                                              | lifecycle test (phase 1)                                  |
+| D8   | State shared between two views attached from one extension value                                                         | shared (diff plugin)               | none                                                                           | lifecycle test (phase 5b)                                 |
+| D9   | Registrations, listeners and requests left after a setup throws or a view detaches, including `signal`-bound listeners   | not measured                       | 0                                                                              | lifecycle test (phase 5b)                                 |
 | T1   | Back-to-back pass, 1 interested piece plus 1,000 irrelevant, against 0 irrelevant                                        | 38–42 µs against 6–8 µs            | inside the control envelope (±2 µs in Phase 0)                                 | dispatch suite (phase 2)                                  |
 | T2   | Marginal cost per interested no-op subscriber between 1,000 and 4,000                                                    | 111 ns and rising (quadratic)      | ≤ 20 ns and flat (CM 5 ns; Monaco 4 ns to 1,000)                               | dispatch suite                                            |
 | T3   | E002 input suite, 108 blocking groups, for two new workloads: first-party set, and the same plus 1,000 irrelevant pieces | no plugin workloads exist          | every group inside its calibrated limit, 20 ms negative control fails          | `bench:input` with the Plan 099 unit 1 workload extension |
@@ -399,8 +467,8 @@ portability of arbitrary UI, new agent plugin engine, or OS sandbox is part of t
 Do not expand API surface merely to imitate another editor. Further primitives follow demonstrated
 needs and measured costs, while keeping extension points open to third-party composition.
 
-Completion means the chosen `createPlugin` contract, selective runtime, Fregat attachment, full-stack
-proof, and required verification all work together. Landing a convenience wrapper or loader alone
+Completion means the extension model, selective runtime, Fregat attachment, full-stack proof, and
+required verification all work together. Landing a convenience wrapper or loader alone
 is not completion of this plan.
 
 ## Research findings (2026-09-26)
@@ -431,6 +499,11 @@ Probes are throwaway, in `/work/tmp/research2/122/` (real Chromium 153, three en
   static const with no runtime segment.
 
 ### Decisions
+
+- Decided 2026-10-02: owner — the authoring model is extension values with per-lifetime setup
+  returning typed contributions (Selected authoring model above), shared with Plan 286. It
+  supersedes the 2026-09-26 `createPlugin` selection below; phases 1, 2, 4 and 5 stand, phase 3's
+  surface is replaced in phase 5b.
 
 - Decided 2026-09-26: research recommendation — scoped setup with static declarations (candidate B)
   over composition-first. Fewer concepts (4 imports against 10), per-view state has one home, and
