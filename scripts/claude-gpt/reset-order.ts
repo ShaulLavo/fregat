@@ -2,8 +2,10 @@ import * as v from 'valibot'
 import { rename, writeFile } from 'node:fs/promises'
 
 export type Observation = { resetAt: number; usedPercent: number }
+export type Provider = 'codex' | 'claude'
 export type Credential = {
   name: string
+  provider: Provider
   index: string
   priority: number
   observation: Observation | null
@@ -35,11 +37,35 @@ const spentPriority = -1
 const giveUpAfterFailures = 10
 const requestTimeoutMs = 5_000
 
-export function readObservation(signals: Readonly<Record<string, string>> | undefined) {
-  const resetAt = Number(signals?.['X-Codex-Primary-Reset-At'] ?? Number.NaN)
-  const usedPercent = Number(signals?.['X-Codex-Primary-Used-Percent'] ?? Number.NaN)
-  if (!Number.isFinite(resetAt) || !Number.isFinite(usedPercent)) return null
-  return { resetAt, usedPercent }
+const pooledProviders: readonly string[] = ['codex', 'claude'] satisfies Provider[]
+
+function isPooled(provider: string): provider is Provider {
+  return pooledProviders.includes(provider)
+}
+
+function readSeconds(value: string | undefined) {
+  if (value === undefined || value.trim() === '') return Number.NaN
+  const seconds = Number(value)
+  return Number.isNaN(seconds) ? Date.parse(value) / 1_000 : seconds
+}
+
+// Codex reports its weekly window as a percentage; Claude as a 0–1 utilization plus a status
+// that reads `rejected` once the window is spent.
+export function readObservation(
+  provider: Provider,
+  signals: Readonly<Record<string, string>> | undefined,
+): Observation | null {
+  if (provider === 'codex') {
+    const resetAt = Number(signals?.['X-Codex-Primary-Reset-At'] ?? Number.NaN)
+    const usedPercent = Number(signals?.['X-Codex-Primary-Used-Percent'] ?? Number.NaN)
+    if (!Number.isFinite(resetAt) || !Number.isFinite(usedPercent)) return null
+    return { resetAt, usedPercent }
+  }
+  const resetAt = readSeconds(signals?.['Anthropic-Ratelimit-Unified-7d-Reset'])
+  const utilization = Number(signals?.['Anthropic-Ratelimit-Unified-7d-Utilization'] ?? Number.NaN)
+  if (!Number.isFinite(resetAt) || !Number.isFinite(utilization)) return null
+  const rejected = signals?.['Anthropic-Ratelimit-Unified-7d-Status']?.toLowerCase() === 'rejected'
+  return { resetAt, usedPercent: rejected ? 100 : Math.min(100, utilization * 100) }
 }
 
 // Proxy quota observations live in memory only, so the last one per account survives restarts here.
@@ -59,7 +85,20 @@ export function mergeObservations(
 
 // Soonest weekly reset first among accounts with quota left; unknown accounts sit at the default
 // priority, and spent ones below it so a lapsed cooldown cannot put them ahead of usable quota.
+// Each provider ranks separately: a Claude account never competes with a Codex one for a model.
 export function planPriorities(
+  credentials: readonly Credential[],
+  observations: Readonly<Record<string, Observation>>,
+) {
+  const priorities = new Map<string, number>()
+  for (const provider of pooledProviders) {
+    const group = credentials.filter((credential) => credential.provider === provider)
+    for (const [name, priority] of planGroup(group, observations)) priorities.set(name, priority)
+  }
+  return priorities
+}
+
+function planGroup(
   credentials: readonly Credential[],
   observations: Readonly<Record<string, Observation>>,
 ) {
@@ -132,14 +171,17 @@ async function readCredentials(options: ResetOrderOptions) {
   if (!listed.ok) return { ok: false as const, status: listed.status }
   const parsed = v.safeParse(authFilesSchema, listed.body)
   if (!parsed.success) return { ok: false as const, status: 'invalid-body' }
-  const credentials: Credential[] = parsed.output.files
-    .filter((file) => file.provider === 'codex' && !file.disabled)
-    .map((file) => ({
+  const credentials: Credential[] = []
+  for (const file of parsed.output.files) {
+    if (file.disabled || !isPooled(file.provider)) continue
+    credentials.push({
       name: file.name,
+      provider: file.provider,
       index: file.auth_index,
       priority: file.priority ?? neutralPriority,
-      observation: readObservation(file.quota?.signals),
-    }))
+      observation: readObservation(file.provider, file.quota?.signals),
+    })
+  }
   return { ok: true as const, credentials }
 }
 
@@ -168,6 +210,7 @@ async function applyOrder(options: ResetOrderOptions) {
       order: listed.credentials
         .toSorted((a, b) => priorities.get(b.name)! - priorities.get(a.name)!)
         .map((credential) => ({
+          provider: credential.provider,
           authIndex: credential.index,
           priority: priorities.get(credential.name),
         })),

@@ -12,8 +12,12 @@ import {
 
 const now = 1_000_000
 
-function credential(index: string, observation: Credential['observation'], priority = 0) {
-  return { name: `${index}.json`, index, priority, observation }
+function credential(
+  index: string,
+  observation: Credential['observation'],
+  provider: Credential['provider'] = 'codex',
+): Credential {
+  return { name: `${index}.json`, provider, index, priority: 0, observation }
 }
 
 test('accounts with quota left rank by soonest weekly reset', () => {
@@ -86,14 +90,64 @@ test('equal resets order by auth index so the plan stays stable', () => {
 })
 
 test('signals without a numeric reset or usage give no observation', () => {
-  expect(readObservation(undefined)).toBeNull()
-  expect(readObservation({ 'X-Codex-Primary-Reset-At': '12' })).toBeNull()
+  expect(readObservation('codex', undefined)).toBeNull()
+  expect(readObservation('codex', { 'X-Codex-Primary-Reset-At': '12' })).toBeNull()
   expect(
-    readObservation({ 'X-Codex-Primary-Reset-At': '12', 'X-Codex-Primary-Used-Percent': 'x' }),
+    readObservation('codex', {
+      'X-Codex-Primary-Reset-At': '12',
+      'X-Codex-Primary-Used-Percent': 'x',
+    }),
   ).toBeNull()
   expect(
-    readObservation({ 'X-Codex-Primary-Reset-At': '12', 'X-Codex-Primary-Used-Percent': '94' }),
+    readObservation('codex', {
+      'X-Codex-Primary-Reset-At': '12',
+      'X-Codex-Primary-Used-Percent': '94',
+    }),
   ).toEqual({ resetAt: 12, usedPercent: 94 })
+})
+
+test('Claude weekly signals read as reset seconds and percent used', () => {
+  expect(readObservation('claude', undefined)).toBeNull()
+  expect(readObservation('claude', { 'Anthropic-Ratelimit-Unified-7d-Reset': '12' })).toBeNull()
+  expect(
+    readObservation('claude', {
+      'Anthropic-Ratelimit-Unified-7d-Reset': '12',
+      'Anthropic-Ratelimit-Unified-7d-Utilization': '0.42',
+      'Anthropic-Ratelimit-Unified-5h-Utilization': '0.99',
+    }),
+  ).toEqual({ resetAt: 12, usedPercent: 42 })
+  expect(
+    readObservation('claude', {
+      'Anthropic-Ratelimit-Unified-7d-Reset': '1970-01-01T00:00:20Z',
+      'Anthropic-Ratelimit-Unified-7d-Utilization': '0.5',
+      'Anthropic-Ratelimit-Unified-7d-Status': 'rejected',
+    }),
+  ).toEqual({ resetAt: 20, usedPercent: 100 })
+  // Codex signal names mean nothing on a Claude account, and the reverse.
+  expect(
+    readObservation('claude', {
+      'X-Codex-Primary-Reset-At': '12',
+      'X-Codex-Primary-Used-Percent': '94',
+    }),
+  ).toBeNull()
+})
+
+test('Claude and Codex accounts rank separately', () => {
+  const credentials = [
+    credential('codex-late', { resetAt: now + 500, usedPercent: 10 }),
+    credential('codex-soon', { resetAt: now + 100, usedPercent: 10 }),
+    credential('claude-late', { resetAt: now + 900, usedPercent: 10 }, 'claude'),
+    credential('claude-soon', { resetAt: now + 50, usedPercent: 99 }, 'claude'),
+    credential('claude-spent', { resetAt: now + 10, usedPercent: 100 }, 'claude'),
+  ]
+  const priorities = planPriorities(credentials, mergeObservations(credentials, {}, now))
+  expect(Object.fromEntries(priorities)).toEqual({
+    'codex-soon.json': 2,
+    'codex-late.json': 1,
+    'claude-soon.json': 2,
+    'claude-late.json': 1,
+    'claude-spent.json': -1,
+  })
 })
 
 test('the loop patches only changed priorities and records observations', async () => {
@@ -101,6 +155,7 @@ test('the loop patches only changed priorities and records observations', async 
   const resetAt = String(Math.floor(Date.now() / 1_000) + 3_600)
   const patches: { name: string; priority: number }[] = []
   let soonPriority: number | null = null
+  let claudePriority: number | null = null
   let ticks = 0
   const upstream = Bun.serve({
     hostname: '127.0.0.1',
@@ -111,7 +166,8 @@ test('the loop patches only changed priorities and records observations', async 
       if (request.method === 'PATCH' && pathname === '/v0/management/auth-files/fields') {
         const patch = (await request.json()) as { name: string; priority: number }
         patches.push(patch)
-        soonPriority = patch.priority
+        if (patch.name === 'soon.json') soonPriority = patch.priority
+        if (patch.name === 'claude.json') claudePriority = patch.priority
         return Response.json({ status: 'ok' })
       }
       expect(pathname).toBe('/v0/management/auth-files')
@@ -131,7 +187,20 @@ test('the loop patches only changed priorities and records observations', async 
             },
           },
           { name: 'new.json', auth_index: 'new', provider: 'codex', quota: { signals: {} } },
-          { name: 'claude.json', auth_index: 'other', provider: 'claude', priority: 7 },
+          {
+            name: 'claude.json',
+            auth_index: 'claude',
+            provider: 'claude',
+            priority: claudePriority,
+            quota: {
+              signals: {
+                'Anthropic-Ratelimit-Unified-7d-Reset': resetAt,
+                'Anthropic-Ratelimit-Unified-7d-Utilization': '0.25',
+              },
+            },
+          },
+          { name: 'off.json', auth_index: 'off', provider: 'claude', disabled: true, priority: 7 },
+          { name: 'gemini.json', auth_index: 'gemini', provider: 'gemini', priority: 7 },
         ],
       })
     },
@@ -147,9 +216,13 @@ test('the loop patches only changed priorities and records observations', async 
   })
   try {
     await expect.poll(() => ticks).toBeGreaterThanOrEqual(3)
-    expect(patches).toEqual([{ name: 'soon.json', priority: 1 }])
+    expect(patches).toEqual([
+      { name: 'soon.json', priority: 1 },
+      { name: 'claude.json', priority: 1 },
+    ])
     expect(await Bun.file(stateFile).json()).toEqual({
       soon: { resetAt: Number(resetAt), usedPercent: 10 },
+      claude: { resetAt: Number(resetAt), usedPercent: 25 },
     })
   } finally {
     loop.stop()
