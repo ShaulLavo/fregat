@@ -229,35 +229,27 @@ describe('ensureMachineService', () => {
     })
   })
 
-  it('recognizes an unproved structured Fregat identity failure', async () => {
+  it('keeps a foreign listener with a lookalike error envelope classified as another program', async () => {
     const context = await setup()
-    fregatServer({ port: context.port, stateHome: context.stateHome })
+    otherProgram(
+      context.port,
+      Response.json(
+        {
+          error: { code: 'foreign.BOGUS', message: 'Failed', why: 'x', fix: 'y' },
+        },
+        { status: 500 },
+      ),
+    )
     const { host } = recordingHost(context.root, 'linux')
-    const fetcher = Object.assign(
-      async () =>
-        Response.json(
-          {
-            error: {
-              code: 'system.MACHINE_ID_UNAVAILABLE',
-              message: 'Machine id failed',
-              why: 'The operating system id is unavailable.',
-              fix: 'Check the server log.',
-            },
-          },
-          { status: 500 },
-        ),
-      { preconnect: fetch.preconnect },
-    ) as typeof fetch
     await expect(
       ensureMachineService(intent(context.address, context.stateHome), {
         productionRoot: context.productionRoot,
         host,
-        fetch: fetcher,
         readinessMs: 5000,
       }),
     ).rejects.toMatchObject({
-      code: 'service.IDENTITY_CHECK_FAILED',
-      internal: { serverCode: 'system.MACHINE_ID_UNAVAILABLE' },
+      code: 'service.ADDRESS_HELD_BY_OTHER_PROGRAM',
+      internal: { status: 500 },
     })
   })
 

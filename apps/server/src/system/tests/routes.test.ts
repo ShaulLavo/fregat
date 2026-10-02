@@ -15,12 +15,15 @@ import {
   nativePickerResultSchema,
   serverCapabilitiesSchema,
   serverIdentitySchema,
+  type MachineId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { afterEach, describe, expect, it } from 'vitest'
 import { closeTestApps, createTestApp } from '../../../test/server'
 import { testSettingsOptions } from '../../settings/testing'
 import { ensureIdentityKey, IDENTITY_PROOF_HEADER, identityProof } from '../identity-key'
+import { systemErrors } from '../structured-errors'
+import { probeAddress } from '../../../../../scripts/service/probe'
 
 const MACHINE_ID = '0123456789abcdef0123456789abcdef'
 const roots: string[] = []
@@ -54,7 +57,9 @@ async function helperScript(body: string) {
   return { file, root }
 }
 
-async function listening(options: { helper?: string | null; desktop?: boolean } = {}) {
+async function listening(
+  options: { helper?: string | null; desktop?: boolean; machineId?: () => MachineId } = {},
+) {
   const root = await scratch()
   const stateHome = path.join(root, 'state')
   await mkdir(stateHome, { mode: 0o700 })
@@ -72,7 +77,8 @@ async function listening(options: { helper?: string | null; desktop?: boolean } 
       webBase: '/',
       service: { kind: 'systemd-socket', registrationId: 'fregat-server.socket' },
       stateHome: linked,
-      machineId: () => v.parse(serverIdentitySchema.entries.machineId, MACHINE_ID),
+      machineId:
+        options.machineId ?? (() => v.parse(serverIdentitySchema.entries.machineId, MACHINE_ID)),
       nativePickerHelper: options.helper ?? null,
       desktop: () => options.desktop ?? true,
     },
@@ -127,6 +133,25 @@ describe('system identity', () => {
     expect(response.headers.get(IDENTITY_PROOF_HEADER)).toBe(
       identityProof(key, 'abcdefghijklmnop0123'),
     )
+  })
+
+  it('preserves the identity proof on a machine-id failure and the probe recognizes its server', async () => {
+    const { base, stateHome } = await listening({
+      machineId: () => {
+        throw systemErrors.MACHINE_ID_UNAVAILABLE({ internal: { platform: 'darwin', exitCode: 1 } })
+      },
+    })
+    const key = ensureIdentityKey(stateHome)
+    const challenge = 'abcdefghijklmnop0123'
+    const response = await get(base, `/system/identity?challenge=${challenge}`)
+    expect(response.status).toBe(500)
+    expect(await code(response)).toBe('system.MACHINE_ID_UNAVAILABLE')
+    expect(response.headers.get(IDENTITY_PROOF_HEADER)).toBe(identityProof(key, challenge))
+    expect(await probeAddress({ address: base, stateHome, timeoutMs: 5000 })).toEqual({
+      kind: 'fregat-error',
+      status: 500,
+      serverCode: 'system.MACHINE_ID_UNAVAILABLE',
+    })
   })
 
   it.each([

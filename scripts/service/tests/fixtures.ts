@@ -87,11 +87,11 @@ export function fregatServer(options: {
   return server
 }
 
-export function otherProgram(port: number) {
+export function otherProgram(port: number, response?: Response) {
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port,
-    fetch: () => new Response('<title>Not Fregat</title>', { status: 404 }),
+    fetch: () => response?.clone() ?? new Response('<title>Not Fregat</title>', { status: 404 }),
   })
   cleanups.push(() => server.stop(true))
   return server

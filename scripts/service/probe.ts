@@ -74,11 +74,8 @@ async function classify(
   // A Fregat server that refuses identity to this request says so in its own error envelope.
   if (fregatRefusal(body)) return { kind: 'unverified', reason: 'refused-auth' }
   const failure = v.safeParse(identityFailureSchema, body)
-  if (response.status >= 500 && failure.success) {
-    const error = failure.output.error
-    if (proven || (error.why !== undefined && error.fix !== undefined))
-      return { kind: 'fregat-error', status: response.status, serverCode: error.code }
-  }
+  if (response.status >= 500 && failure.success && proven)
+    return { kind: 'fregat-error', status: response.status, serverCode: failure.output.error.code }
   return { kind: 'other', status: response.status }
 }
 
@@ -86,8 +83,6 @@ const identityFailureSchema = v.object({
   error: v.object({
     code: v.string(),
     message: v.string(),
-    why: v.optional(v.string()),
-    fix: v.optional(v.string()),
   }),
 })
 
