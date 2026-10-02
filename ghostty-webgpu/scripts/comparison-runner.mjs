@@ -42,8 +42,8 @@ const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag)
 const output = resolve(value('--output', join(root, smoke ? 'smoke' : 'results')))
 const repetitions = positiveInteger(args, '--repetitions', manifest.settings.repetitions)
 assert(
-  Number.isInteger(repetitions) && repetitions >= 3,
-  'Measurements require at least three repetitions',
+  Number.isInteger(repetitions) && repetitions >= 4 && repetitions % 2 === 0,
+  'Measurements require an even number of at least four repetitions',
 )
 const smokeHistoryRows = Number(value('--smoke-history-rows', 64))
 assert(
@@ -91,6 +91,11 @@ const latencySamples = positiveInteger(
   s.latencySamples,
 )
 const outputFrames = positiveInteger(args, '--output-frames', s.outputFrames)
+const tickSeconds =
+  platform() === 'linux'
+    ? 1 / Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
+    : null
+const cpuOptions = { tickSeconds }
 const traceFrames = positiveInteger(args, '--trace-frames', 180)
 const tracePhases = args.includes('--trace-phase')
   ? [value('--trace-phase')]
@@ -175,11 +180,19 @@ const artifact = {
   tracing,
   repetitions: smoke ? 1 : repetitions,
   latencySamples,
+  outputFrames,
+  cpuTickSeconds: tickSeconds,
   counts,
   variants: variantIds,
   paths: tracing ? ['bytes'] : writePaths,
   fixtures,
   hardware: false,
+  measurementBudgetMilliseconds:
+    counts.length *
+    (tracing ? 1 : writePaths.length) *
+    variantIds.length *
+    (smoke ? 1 : repetitions) *
+    s.caseDeadlineMilliseconds,
   startedAt: new Date().toISOString(),
   environment: {},
   runs: [],
@@ -407,11 +420,13 @@ async function measure(testCase, repetition, browserSession) {
     status: 'running',
   }
   const contexts = new Set()
-  const remaining = smoke ? 120_000 : 30 * 60_000 - (Date.now() - Date.parse(artifact.startedAt))
+  const remaining = smoke
+    ? 120_000
+    : artifact.measurementBudgetMilliseconds - (Date.now() - Date.parse(artifact.startedAt))
   try {
     const result = await withDeadline(
       () => measureBody(testCase, repetition, browserSession, run, contexts),
-      Math.min(10 * 60_000, remaining),
+      Math.min(s.caseDeadlineMilliseconds, remaining),
       () => Promise.all([...contexts].map((context) => context.close().catch(() => {}))),
       { drain: true },
     )
@@ -476,9 +491,13 @@ async function qualifiedWindow(run, label, operation) {
     await refreshGpuOwnership()
     const idle = await gpuGate.waitForIdle()
     run.gpuWindows.push({ label, idle })
-    const { value, gpu } = await gpuGate.monitorWindow(operation)
+    const sampleMilliseconds = ['idle', 'output/ascii', 'latency', 'delayed-write'].includes(label)
+      ? s.gpuMeasuredSampleMilliseconds
+      : s.gpuSampleMilliseconds
+    const { value, gpu } = await gpuGate.monitorWindow(operation, { sampleMilliseconds })
     run.gpuWindows.at(-1).window = gpu
-    run.gpuIdle = { qualified: true }
+    const skipped = idle.skipReason ?? gpu.skipReason ?? run.gpuIdle?.skipped
+    run.gpuIdle = { qualified: true, ...(skipped ? { skipped } : {}) }
     return value
   } catch (error) {
     if (error.evidence) {
@@ -658,7 +677,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       return run
     }
     run.idle = await qualifiedWindow(run, 'idle', () =>
-      measureCpu(browserSession, () => page.waitForTimeout(s.idleMilliseconds)),
+      measureCpu(browserSession, () => page.waitForTimeout(s.idleMilliseconds), cpuOptions),
     )
     run.phase = 'presentation-feedback latency'
     run.latency = await presentedLatency(page, session, browserSession, run, 'latency')
@@ -689,8 +708,10 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
     }
     run.phase = 'output/ascii'
     const outputMeasurement = await qualifiedWindow(run, 'output/ascii', () =>
-      measureCpu(browserSession, () =>
-        page.evaluate((frames) => window.__compare.burst('ascii', frames), outputFrames),
+      measureCpu(
+        browserSession,
+        () => page.evaluate((frames) => window.__compare.burst('ascii', frames), outputFrames),
+        cpuOptions,
       ),
     )
     run.output = {
@@ -781,15 +802,15 @@ try {
       try {
         await refreshGpuOwnership()
         artifact.qualifications.push({
+          ...(await gpuGate.waitForIdle()),
           kind: 'between-repetitions-gpu',
           repetition,
-          ...(await gpuGate.waitForIdle()),
         })
       } catch (error) {
         artifact.qualifications.push({
+          ...error.evidence,
           kind: 'between-repetitions-gpu',
           repetition,
-          ...error.evidence,
           error: error.message,
         })
         throw error
@@ -810,8 +831,9 @@ try {
           'AC power lost; stopping measurement',
         )
       assert(
-        smoke || Date.now() - Date.parse(artifact.startedAt) < 30 * 60_000,
-        '30-minute measurement window expired',
+        smoke ||
+          Date.now() - Date.parse(artifact.startedAt) < artifact.measurementBudgetMilliseconds,
+        'Configured measurement budget expired',
       )
       console.log(
         `${smoke ? 'Correctness' : 'Measure'} ${repetition + 1}/${artifact.repetitions} ${testCase.variant}/${testCase.path}/${testCase.count}`,

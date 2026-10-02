@@ -1,4 +1,5 @@
 import { PNG } from 'pngjs'
+import { compactEvidence } from './comparison-compact.mjs'
 import { ink } from './comparison-pixels.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -377,8 +378,9 @@ function pairedArtifact() {
         variant === 'ghostty-webgpu' ? [1, 10, 100][repetition] : [2, 100, 101][repetition]
       const cpu = {
         percentOfOneCore: value,
-        secondsByType: { renderer: value / 100 },
-        milliseconds: 1000,
+        secondsByType: { renderer: value },
+        milliseconds: 100_000,
+        tickSeconds: 0.01,
       }
       return {
         variant,
@@ -497,7 +499,7 @@ test('missing CPU attribution and missing latency affect only their own metric',
   assert.equal(rows.find(({ metric }) => metric === 'idle/cpu/renderer').status, 'incomplete')
   assert.equal(rows.find(({ metric }) => metric === 'input/p50').status, 'incomplete')
   assert.equal(rows.find(({ metric }) => metric === 'input/p95').status, 'incomplete')
-  assert.equal(rows.find(({ metric }) => metric === 'idle/cpu/total').status, 'pass')
+  assert.equal(rows.find(({ metric }) => metric === 'idle/cpu/total').status, 'unresolved')
   assert.equal(rows.find(({ metric }) => metric === 'write/p50').status, 'pass')
 })
 
@@ -505,12 +507,13 @@ test('zero baseline is a tie only at zero and positive work fails against zero',
   const artifact = pairedArtifact()
   for (const run of artifact.runs) run.latency.write = [0]
   let row = pairedRatios(artifact).find(({ metric }) => metric === 'write/p50')
-  assert.equal(row.median, 1)
-  assert.equal(row.status, 'pass')
+  assert.equal(row.median, null)
+  assert.equal(row.status, 'unresolved')
   for (const run of artifact.runs.filter(({ variant }) => variant === 'ghostty-webgpu'))
     run.latency.write = [1]
   row = pairedRatios(artifact).find(({ metric }) => metric === 'write/p50')
-  assert.equal(row.median, Infinity)
+  assert.equal(row.median, null)
+  assert.match(row.medianReason, /unbounded/)
   assert.equal(row.status, 'fail')
   artifact.runs[0].error = 'failed'
   assert(pairedRatios(artifact).every((entry) => entry.status === 'incomplete'))
@@ -564,4 +567,97 @@ test('matching pair IDs in distinct browser sessions cannot become a performance
   assert(
     pairedRatios(artifact).every((row) => row.status === 'incomplete' && row.repetitions === 2),
   )
+})
+
+test('CPU resolution rejects low ticks, tick ties, and zero/zero without wall-time verdicts', () => {
+  for (const [nativeTicks, xtermTicks] of [
+    [6, 6],
+    [6, 7],
+    [0, 0],
+    [2, 0],
+    [100, 101],
+  ]) {
+    const artifact = pairedArtifact()
+    for (const run of artifact.runs) {
+      const ticks = run.variant === 'ghostty-webgpu' ? nativeTicks : xtermTicks
+      run.output.cpu = {
+        tickSeconds: 0.01,
+        milliseconds: run.variant === 'ghostty-webgpu' ? 1078 : 1062,
+        secondsByType: { renderer: ticks * 0.01 },
+        percentOfOneCore: ticks,
+      }
+    }
+    const rows = pairedRatios(artifact).filter(({ metric }) => metric.startsWith('output/'))
+    assert(rows.every(({ status }) => status === 'unresolved'))
+    assert(rows.every(({ pairs }) => pairs.every(({ status }) => status === 'unresolved')))
+    assert(!JSON.stringify(rows).includes('Infinity'))
+  }
+})
+
+test('one unresolved CPU pair prevents a passing median from claiming resolution', () => {
+  const artifact = pairedArtifact()
+  artifact.runs[0].output.cpu.secondsByType.renderer = 0.06
+  assert.equal(
+    pairedRatios(artifact).find(({ metric }) => metric === 'output/cpu/renderer').status,
+    'unresolved',
+  )
+})
+
+test('skipped GPU qualification remains explicit in pairs rows and markdown', () => {
+  const artifact = pairedArtifact()
+  artifact.runs[0].gpuIdle = { qualified: true, skipped: 'nvidia-smi unavailable' }
+  const rows = pairedRatios(artifact)
+  assert(rows.every(({ gpuSkipped }) => gpuSkipped.includes('nvidia-smi unavailable')))
+  assert.match(markdown(artifact), /pass \(GPU unqualified: nvidia-smi unavailable\)/)
+})
+
+test('four adjacent two-renderer pairs balance leading variants', () => {
+  const variants = ['ghostty-webgpu', 'xterm-webgl']
+  const leaders = [0, 1, 2, 3].map((repetition) => order(variants, repetition)[0])
+  assert.equal(leaders.filter((variant) => variant === variants[0]).length, 2)
+})
+
+test('portable compaction preserves between-repetition qualifications and bounded ratio types', async () => {
+  const artifact = pairedArtifact()
+  artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
+  artifact.qualifications = [
+    {
+      kind: 'between-repetitions-gpu',
+      repetition: 0,
+      samples: [{ processes: [] }],
+      qualified: true,
+    },
+  ]
+  for (const run of artifact.runs) {
+    run.info = { adapter: {} }
+    run.gpuWindows = []
+    run.latency.write = run.variant === 'ghostty-webgpu' ? [1] : [0]
+  }
+  const compact = await compactEvidence(artifact)
+  assert.deepEqual(compact.qualifications, artifact.qualifications)
+  assert.deepEqual(pairedRatios(compact), compact.pairedRatios)
+  const row = compact.pairedRatios.find(({ metric }) => metric === 'write/p50')
+  assert.equal(row.median, null)
+  assert.match(row.medianReason, /unbounded/)
+  assert(row.pairs.every(({ ratio, ratioReason }) => ratio === null && ratioReason))
+  assert(!JSON.stringify(compact).includes('Infinity'))
+})
+
+test('compaction retains preparation failures and incomplete paired verdicts', async () => {
+  const artifact = pairedArtifact()
+  artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
+  artifact.qualifications = []
+  for (const run of artifact.runs) {
+    run.info = { adapter: {} }
+    run.gpuWindows = []
+  }
+  const failed = artifact.runs[0]
+  failed.error = 'preparation failed'
+  delete failed.info
+  delete failed.idle
+  delete failed.output
+  delete failed.latency
+  const compact = await compactEvidence(artifact, '.')
+  assert.equal(compact.runs[0].error, failed.error)
+  assert(compact.pairedRatios.every(({ status }) => status === 'incomplete'))
 })

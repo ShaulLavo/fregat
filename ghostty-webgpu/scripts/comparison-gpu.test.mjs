@@ -123,10 +123,11 @@ test('missing NVIDIA tooling and other platforms record skip reasons', async () 
   assert.match((await other.waitForIdle()).skipReason, /Linux/)
 })
 
-test('driver and command timeout failures fail qualification rather than skip', async () => {
+test('driver and repeated command timeouts fail qualification rather than skip', async () => {
   for (const code of [1, 'ETIMEDOUT']) {
     const gate = createGpuGate(settings, {
       platform: 'linux',
+      ...clock(),
       sample: async () => {
         throw Object.assign(new Error('sampling failed'), { code })
       },
@@ -365,4 +366,141 @@ test('threshold settings are required and validated', () => {
   assert.throws(() => createGpuGate({ ...settings, gpuIdleConsecutiveSamples: 0 }))
   assert.throws(() => createGpuGate({ ...settings, gpuIdleUtilizationPercent: 101 }))
   assert.throws(() => createGpuGate({ ...settings, gpuComputeMemoryMiB: -1 }))
+})
+
+test('new foreign PIDs below the memory threshold invalidate intermediate and final samples', async () => {
+  for (const appearDuring of [true, false]) {
+    let calls = 0
+    let resolveDuring
+    const during = new Promise((resolve) => {
+      resolveDuring = resolve
+    })
+    const gate = createGpuGate(
+      { ...settings, gpuSampleMilliseconds: 1 },
+      {
+        platform: 'linux',
+        sample: async () => {
+          const compute = ++calls === 1 ? 'GPU-A, 10, 341' : 'GPU-A, 10, 341\nGPU-A, 20, 1'
+          if (calls === 2) resolveDuring()
+          return parseGpuSample('GPU-A, 0', compute)
+        },
+      },
+    )
+    await assert.rejects(
+      gate.monitorWindow(async () => {
+        if (appearDuring) await during
+      }),
+      (error) => {
+        assert.match(error.message, /External NVIDIA compute/)
+        assert.deepEqual(error.evidence.baselineForeignComputePids, [10])
+        assert.deepEqual(error.evidence.newForeignComputePids, [20])
+        assert.equal(error.evidence.samples.at(-1).computeMemoryMiB, 342)
+        return true
+      },
+    )
+    assert.equal(calls, 2)
+  }
+})
+
+test('foreign PID starting after idle qualification rejects before operation starts', async () => {
+  let calls = 0
+  const gate = createGpuGate(settings, {
+    platform: 'linux',
+    ...clock(),
+    sample: async () =>
+      parseGpuSample('GPU-A, 0', ++calls <= 2 ? 'GPU-A, 10, 341' : 'GPU-A, 20, 1'),
+  })
+  await gate.waitForIdle()
+  await assert.rejects(
+    gate.monitorWindow(async () => assert.fail('operation must not start')),
+    (error) => {
+      assert.deepEqual(error.evidence.baselineForeignComputePids, [10])
+      assert.deepEqual(error.evidence.newForeignComputePids, [20])
+      return true
+    },
+  )
+})
+
+test('existing foreign PIDs and new owned PIDs remain qualified', async () => {
+  let calls = 0
+  const gate = createGpuGate(settings, {
+    platform: 'linux',
+    sample: async () =>
+      parseGpuSample(
+        'GPU-A, 0',
+        ++calls === 1 ? 'GPU-A, 10, 341' : 'GPU-A, 10, 350\nGPU-A, 20, 5900',
+        [20],
+      ),
+  })
+  assert.equal((await gate.monitorWindow(async () => 42)).gpu.qualified, true)
+})
+
+test('idle timeout retries reset consecutive samples and remain within the wait budget', async () => {
+  for (const failure of [{ code: 'ETIMEDOUT' }, { killed: true, signal: 'SIGTERM' }]) {
+    const time = clock()
+    const timeouts = []
+    let calls = 0
+    const gate = createGpuGate(settings, {
+      platform: 'linux',
+      ...time,
+      sample: async (timeout) => {
+        timeouts.push(timeout)
+        if (++calls !== 2) return reading()
+        await time.sleep(timeout)
+        throw Object.assign(new Error('sampling timed out'), failure)
+      },
+    })
+    const result = await gate.waitForIdle()
+    assert.equal(calls, 4)
+    assert.equal(result.qualified, true)
+    assert.equal(result.waitMilliseconds, 50)
+    assert.equal(result.samples.length, 3)
+    assert.equal(result.samplingTimeouts.length, 1)
+    assert.deepEqual(timeouts, [20, 20, 20, 20])
+  }
+})
+
+test('repeated idle timeouts clamp command timeout to remaining wait budget', async () => {
+  const time = clock()
+  const timeouts = []
+  const gate = createGpuGate(settings, {
+    platform: 'linux',
+    ...time,
+    sample: async (timeout) => {
+      timeouts.push(timeout)
+      await time.sleep(timeout)
+      throw Object.assign(new Error('sampling timed out'), { code: 'ETIMEDOUT' })
+    },
+  })
+  await assert.rejects(gate.waitForIdle(), (error) => {
+    assert.equal(error.evidence.waitMilliseconds, 100)
+    assert.equal(error.evidence.samplingTimeouts.length, 4)
+    assert.match(error.message, /idle wait expired/)
+    return true
+  })
+  assert.deepEqual(timeouts, [20, 20, 20, 10])
+})
+
+test('window polling override changes cadence and evidence while retaining boundary samples', async () => {
+  const intervals = []
+  let calls = 0
+  const gate = createGpuGate(settings, {
+    platform: 'linux',
+    sample: async () => {
+      calls++
+      return reading()
+    },
+    sleep: async (milliseconds, _value, { signal }) => {
+      intervals.push(milliseconds)
+      await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }))
+    },
+  })
+  const result = await gate.monitorWindow(async () => 42, { sampleMilliseconds: 250 })
+  assert.deepEqual(intervals, [250])
+  assert.equal(calls, 2)
+  assert.equal(result.gpu.settings.gpuSampleMilliseconds, 250)
+  await assert.rejects(
+    gate.monitorWindow(async () => 42, { sampleMilliseconds: 0 }),
+    /Positive sampleMilliseconds/,
+  )
 })

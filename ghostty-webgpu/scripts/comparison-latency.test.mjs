@@ -7,6 +7,12 @@ const recorded = JSON.parse(
   await readFile(new URL('./fixtures/comparison-presentation.json', import.meta.url)),
 )
 
+const linuxRecorded = JSON.parse(
+  await readFile(
+    new URL('./fixtures/comparison-presentation-linux-headless-shell.json', import.meta.url),
+  ),
+)
+
 test('recorded render identity selects presentation feedback, independently of PNG capture time', () => {
   const result = presentationLatency(recorded.phase, recorded.events)
   assert.equal(result.endpoint, latencyEndpoint)
@@ -81,6 +87,51 @@ test('latency requires parse, GPU submission, and input echo evidence', () => {
   const phase = structuredClone(recorded.phase)
   phase.sample.captures[0].operation = 'input'
   assert.throws(() => presentationLatency(phase, recorded.events), /echo receipt/)
+})
+
+test('recorded Linux headless-shell write and input select their own submission presentations', () => {
+  assert.equal(linuxRecorded.browserChannel, 'chromium-headless-shell')
+  const result = presentationLatency(linuxRecorded.phase, linuxRecorded.events)
+  for (const operation of ['write', 'input']) {
+    assert.equal(result[operation].length, 1)
+    assert.ok(Math.abs(result[operation][0] - linuxRecorded.expected[operation]) < 0.001)
+  }
+  assert.notEqual(result.presentations[0].animationId, result.presentations[1].animationId)
+  for (const presentation of result.presentations)
+    assert.ok(presentation.milliseconds >= presentation.submitEnd)
+})
+
+test('matching frame identity with positive feedback before GPU submission fails closed', () => {
+  for (const operation of ['write', 'input']) {
+    const fixture = structuredClone(linuxRecorded)
+    const result = presentationLatency(fixture.phase, fixture.events)
+    const selected = result.presentations.find(
+      (presentation) => presentation.operation === operation,
+    )
+    const capture = fixture.phase.sample.captures.find((sample) => sample.operation === operation)
+    const begin = fixture.events.find((event) => event.name === 'compare/begin')
+    const offset = begin.ts / 1000 - begin.args.data.startTime
+    const feedback = fixture.events.find(
+      (event) =>
+        event.name === 'AnimationFrame::Presentation' && event.args.id === selected.animationId,
+    )
+    const started = capture.started - fixture.phase.records.timeOrigin
+    feedback.ts = (started + offset + selected.submitEnd / 2) * 1000
+    assert.ok(feedback.ts / 1000 - offset - started > 0)
+    assert.throws(() => presentationLatency(fixture.phase, fixture.events), /GPU submission end/)
+  }
+})
+
+test('presentation feedback exactly at GPU submission end is accepted', () => {
+  const fixture = structuredClone(recorded)
+  const begin = fixture.events.find((event) => event.name === 'compare/begin')
+  const offset = begin.ts / 1000 - begin.args.data.startTime
+  const submit = fixture.phase.records.spans.find((span) => span.operation === 'submit')
+  const feedback = fixture.events.find((event) => event.name === 'AnimationFrame::Presentation')
+  feedback.ts = (submit.end + offset) * 1000
+  submit.end = feedback.ts / 1000 - offset
+  const result = presentationLatency(fixture.phase, fixture.events)
+  assert.equal(result.presentations[0].milliseconds, result.presentations[0].submitEnd)
 })
 
 test('recorded xterm WebGL submission selects its own Chrome frame presentation', async () => {

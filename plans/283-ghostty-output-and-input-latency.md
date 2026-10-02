@@ -92,3 +92,12 @@ product performance work remains separate.
 - [x] Retain compact Linux evidence, per-pair latency/CPU attribution, delayed-rAF sensitivity and endpoint limits.
 - [x] Complete independent benchmark review.
 - [x] Commit by path, push, and open [benchmark PR #343](https://github.com/ShaulLavo/fregat/pull/343); leave merge and product performance work separate.
+
+### PR #343 review repairs
+
+- [x] Record Linux CPU tick size; require at least 100 ticks per side and a difference exceeding one tick.
+- [x] Preserve skipped GPU qualification in run/paired output and reject newly appearing foreign compute PIDs.
+- [x] Commit portable evidence compaction that retains between-repetition qualifications and null/reason ratios.
+- [x] Balance four pairs, guard presentation-after-submission, add a recorded Linux fixture, slow measured-window GPU sampling and retry idle timeouts.
+- [x] Rerun counts 1 and 17 in separate idle-GPU quiet windows: 2700/1800 output frames respectively, four pairs and 96 latency samples per operation.
+- [x] Refresh compact evidence, attribution and PR numbers; commit by path, push and reply without merging.
