@@ -348,35 +348,113 @@ describe('SharedRenderClock', () => {
     expect(source.frames).toHaveLength(0)
   })
 
-  it('reports a callback failure without stranding its peers or the next frame', () => {
+  it('reports failures synchronously so recovery can cancel a remaining peer', () => {
     const source = new FakeClock()
-    const clock = new SharedRenderClock(source)
+    const reported: unknown[] = []
+    const clock = new SharedRenderClock(source, (error) => {
+      reported.push(error)
+      canceled.dispose()
+    })
     const frames: RenderFrameState[] = []
     const error = new Error('callback failure')
-    const reported: VoidFunction[] = []
-    const report = vi
-      .spyOn(globalThis, 'queueMicrotask')
-      .mockImplementation((fn) => reported.push(fn))
-    try {
-      const failed = new RenderScheduler({
-        clock,
-        onFrame: () => {
-          throw error
-        },
-      })
-      const peer = createScheduler(clock, frames)
-      failed.schedule()
-      peer.schedule()
-      source.takeFrame()()
-      expect(frames).toHaveLength(1)
-      expect(reported).toHaveLength(1)
-      expect(reported[0]).toThrow(error)
-      peer.schedule()
-      source.takeFrame()()
-      expect(frames).toHaveLength(2)
-    } finally {
-      report.mockRestore()
+    const failed = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        throw error
+      },
+    })
+    const canceled = createScheduler(clock, frames)
+    const peer = createScheduler(clock, frames)
+    failed.schedule()
+    canceled.schedule()
+    peer.schedule()
+    source.takeFrame()()
+    expect(reported).toEqual([error])
+    expect(frames).toHaveLength(1)
+    peer.schedule()
+    source.takeFrame()()
+    expect(frames).toHaveLength(2)
+  })
+
+  it('defers a peer hidden and shown again during delivery', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: string[] = []
+    const peer = new RenderScheduler({ clock, onFrame: () => frames.push('peer') })
+    const first = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        frames.push('first')
+        peer.setDocumentVisible(false)
+        peer.setDocumentVisible(true)
+      },
+    })
+    first.schedule()
+    peer.schedule()
+    source.takeFrame()()
+    expect(frames).toEqual(['first'])
+    expect(source.frames).toHaveLength(1)
+    source.takeFrame()()
+    expect(frames).toEqual(['first', 'peer'])
+  })
+
+  it('cancels next-frame work without canceling peers in the current batch', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: string[] = []
+    const next = createScheduler(clock, [])
+    const first = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        frames.push('first')
+        next.schedule()
+        next.dispose()
+      },
+    })
+    const peer = new RenderScheduler({ clock, onFrame: () => frames.push('peer') })
+    first.schedule()
+    peer.schedule()
+    source.takeFrame()()
+    expect(frames).toEqual(['first', 'peer'])
+    expect(source.frames).toHaveLength(0)
+  })
+
+  it('keeps a peer blink timer alive when the other terminal unfocuses or disposes', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const first = createScheduler(clock, [])
+    const peer = createScheduler(clock, [])
+    for (const scheduler of [first, peer]) {
+      scheduler.setFocused(true)
+      scheduler.setCursorBlinkEnabled(true)
     }
+    source.takeFrame()()
+    const stale = source.takeTimer()
+    first.setFocused(false)
+    first.dispose()
+    stale()
+    expect(peer.hasPendingTimer).toBe(true)
+    expect(source.timers).toHaveLength(1)
+    source.takeTimer()()
+    source.takeFrame()()
+    expect(peer.cursorVisible).toBe(false)
+    peer.dispose()
+    expect(source.timers).toHaveLength(0)
+  })
+
+  it('does not retain callbacks when the native frame request fails', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const failed = vi.fn()
+    const peer = vi.fn()
+    vi.spyOn(source, 'requestFrame').mockImplementationOnce(() => {
+      throw new Error('native request failed')
+    })
+    expect(() => clock.requestFrame(failed)).toThrow('native request failed')
+    clock.requestFrame(peer)
+    source.takeFrame()()
+    expect(failed).not.toHaveBeenCalled()
+    expect(peer).toHaveBeenCalledOnce()
   })
 
   it('uses the same default clock for a Window and isolates other Windows', () => {
@@ -386,13 +464,31 @@ describe('SharedRenderClock', () => {
       requestAnimationFrame: vi.fn(() => 1),
       setTimeout: vi.fn(() => 1),
     }
-    const secondWindow = { ...firstWindow }
+    const secondWindow = {
+      cancelAnimationFrame: vi.fn(),
+      clearTimeout: vi.fn(),
+      requestAnimationFrame: vi.fn(() => 1),
+      setTimeout: vi.fn(() => 1),
+    }
     vi.stubGlobal('window', firstWindow)
     try {
       const first = browserRenderClock()
       expect(browserRenderClock()).toBe(first)
       vi.stubGlobal('window', secondWindow)
-      expect(browserRenderClock()).not.toBe(first)
+      const second = browserRenderClock()
+      expect(second).not.toBe(first)
+      const firstFrame = first.requestFrame(() => {})
+      const secondFrame = second.requestFrame(() => {})
+      first.cancelFrame(firstFrame)
+      first.clearTimer(first.setTimer(() => {}, 500))
+      expect(firstWindow.requestAnimationFrame).toHaveBeenCalledOnce()
+      expect(firstWindow.cancelAnimationFrame).toHaveBeenCalledWith(1)
+      expect(firstWindow.setTimeout).toHaveBeenCalledOnce()
+      expect(firstWindow.clearTimeout).toHaveBeenCalledWith(1)
+      expect(secondWindow.cancelAnimationFrame).not.toHaveBeenCalled()
+      expect(secondWindow.setTimeout).not.toHaveBeenCalled()
+      second.cancelFrame(secondFrame)
+      expect(secondWindow.cancelAnimationFrame).toHaveBeenCalledWith(1)
     } finally {
       vi.unstubAllGlobals()
     }

@@ -46,15 +46,19 @@ function fontSettingsEqual(left: TerminalFittedFont, right: TerminalFittedFont):
 const browserClocks = new WeakMap<Window, RenderSchedulerClock>()
 
 export function browserRenderClock(): RenderSchedulerClock {
-  const cached = browserClocks.get(window)
+  const view = window
+  const cached = browserClocks.get(view)
   if (cached) return cached
-  const clock = new SharedRenderClock({
-    cancelFrame: (handle) => window.cancelAnimationFrame(handle),
-    clearTimer: (handle) => window.clearTimeout(handle),
-    requestFrame: (callback) => window.requestAnimationFrame(callback),
-    setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
-  })
-  browserClocks.set(window, clock)
+  const clock = new SharedRenderClock(
+    {
+      cancelFrame: (handle) => view.cancelAnimationFrame(handle),
+      clearTimer: (handle) => view.clearTimeout(handle),
+      requestFrame: (callback) => view.requestAnimationFrame(callback),
+      setTimer: (callback, delayMs) => view.setTimeout(callback, delayMs),
+    },
+    (error) => view.reportError(error),
+  )
+  browserClocks.set(view, clock)
   return clock
 }
 

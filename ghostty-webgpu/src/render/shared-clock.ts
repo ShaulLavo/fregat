@@ -1,6 +1,6 @@
 import type { RenderSchedulerClock } from './scheduler.js'
 
-/** Shares frame delivery while keeping each scheduler's cancellation and timers independent. */
+/** Delivers pending terminals as one synchronous batch; new work during delivery waits a frame. */
 export class SharedRenderClock implements RenderSchedulerClock {
   private frameHandle?: number
   private frameToken = 0
@@ -8,7 +8,11 @@ export class SharedRenderClock implements RenderSchedulerClock {
   private pending = new Map<number, () => void>()
   private running = new Map<number, () => void>()
 
-  constructor(private readonly clock: RenderSchedulerClock) {}
+  constructor(
+    private readonly clock: RenderSchedulerClock,
+    private readonly reportError: (error: unknown) => void = (error) =>
+      globalThis.reportError(error),
+  ) {}
 
   cancelFrame(handle: number): void {
     this.running.delete(handle)
@@ -25,11 +29,11 @@ export class SharedRenderClock implements RenderSchedulerClock {
 
   requestFrame(callback: () => void): number {
     const handle = this.nextHandle++
-    this.pending.set(handle, callback)
     if (this.frameHandle === undefined) {
       const token = ++this.frameToken
       this.frameHandle = this.clock.requestFrame(() => this.runFrame(token))
     }
+    this.pending.set(handle, callback)
     return handle
   }
 
@@ -49,9 +53,7 @@ export class SharedRenderClock implements RenderSchedulerClock {
         callback()
       } catch (error) {
         // Native rAF reports callback errors without stopping the other terminals.
-        queueMicrotask(() => {
-          throw error
-        })
+        this.reportError(error)
       }
     }
   }
