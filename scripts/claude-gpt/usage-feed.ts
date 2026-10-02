@@ -366,6 +366,9 @@ function mergeWindows(
     return a.id.localeCompare(b.id)
   })
 }
+function codexNamespace(id: string) {
+  return id.slice(0, id.lastIndexOf(':') + 1)
+}
 function mergeCodexWindows(previous: readonly Window[], incoming: readonly CodexObservation[]) {
   const prior = new Map(previous.map((window) => [window.id, window]))
   const accepted = incoming.filter(({ observedAt, slotId }) => {
@@ -379,21 +382,27 @@ function mergeCodexWindows(previous: readonly Window[], incoming: readonly Codex
       true,
     ).map((window) => [window.id, window]),
   )
-  // Reconcile after merging so equivalent HTTP and websocket prefixes share aliases.
+  // Canonical IDs do not retain their old slot; absence withdraws ambiguous history in that namespace.
   for (const { window, slotId, observedAt } of accepted) {
-    if (window?.id === slotId) continue
-    if (
-      !window &&
-      accepted.some(
-        (item) =>
-          item.slotId === slotId &&
-          item.window?.windowMinutes != null &&
-          Date.parse(item.observedAt) >= Date.parse(observedAt),
-      )
-    )
+    if (!window) {
+      for (const [id, retained] of windows) {
+        if (codexNamespace(id) !== codexNamespace(slotId)) continue
+        if (retained.lastSeenAt && Date.parse(retained.lastSeenAt) > Date.parse(observedAt))
+          continue
+        const present = accepted.some(
+          (item) =>
+            item.window?.id === id &&
+            (item.slotId !== slotId || item.window.windowMinutes !== null) &&
+            Date.parse(item.observedAt) >= Date.parse(observedAt),
+        )
+        if (!present) windows.delete(id)
+      }
       continue
+    }
+    if (window.id === slotId) continue
     const alias = windows.get(slotId)
-    if (alias?.lastSeenAt && Date.parse(alias.lastSeenAt) > Date.parse(observedAt)) continue
+    if (alias?.windowMinutes !== null) continue
+    if (alias.lastSeenAt && Date.parse(alias.lastSeenAt) > Date.parse(observedAt)) continue
     windows.delete(slotId)
   }
   return [...windows.values()]
@@ -441,7 +450,9 @@ function proxyAccount(
   const stored = file.auth_index ? policy?.observations[file.auth_index] : undefined
   const storedSeen = stored?.observedAt ?? policy?.observedAt
   if (
-    !incoming.some(({ window }) => window) &&
+    !incoming.some(
+      ({ window, slotId }) => window?.id === 'weekly' || (!window && !slotId.includes(':')),
+    ) &&
     stored?.resetAt !== undefined &&
     stored.usedPercent !== undefined &&
     storedSeen
@@ -475,18 +486,38 @@ function proxyAccount(
   const windows = mergeCodexWindows(account.windows, incoming)
   const quotaSeen = timestamp(file.quota?.observed_at)
   const observedCredits = quotaSeen ? readCredits(file.quota?.signals) : undefined
+  const storedCredits = stored?.credits
+  const policyHasAbsence =
+    storedCredits !== undefined &&
+    (!storedCredits || (storedCredits.balance === 0 && !storedCredits.unlimited))
   const creditIsStale =
-    quotaSeen && account.lastSeenAt && Date.parse(quotaSeen) < Date.parse(account.lastSeenAt)
-  const receivedCredits = creditIsStale ? undefined : observedCredits
-  const previousIsNewer =
-    account.lastSeenAt && storedSeen && Date.parse(account.lastSeenAt) > Date.parse(storedSeen)
-  const storedCredits = stored?.credits === undefined ? account.credits : stored.credits
-  const retainedCredits = previousIsNewer && account.credits ? account.credits : storedCredits
-  const knownCredits = receivedCredits === undefined ? retainedCredits : receivedCredits
+    quotaSeen &&
+    [
+      account.lastSeenAt,
+      latestObservation(windows),
+      policyHasAbsence ? policy?.observedAt : null,
+    ].some((age) => age && Date.parse(age) > Date.parse(quotaSeen))
+  const policyAgrees =
+    storedCredits &&
+    account.credits &&
+    storedCredits.balance === account.credits.balance &&
+    storedCredits.unlimited === account.credits.unlimited
+  const policyMayInitialize =
+    account.checkedAt === null &&
+    !account.lastSeenAt &&
+    !account.credits &&
+    !windows.some(({ source }) => source === 'proxy-state')
+  // Weekly timestamps do not date credit changes; conflicting balances stay unknown.
+  let knownCredits: Account['credits'] | null = account.credits
+  if (storedCredits !== undefined)
+    knownCredits = policyAgrees || policyMayInitialize ? storedCredits : null
+  if (observedCredits !== undefined) knownCredits = creditIsStale ? null : observedCredits
   const credits =
     knownCredits && (knownCredits.balance > 0 || knownCredits.unlimited) ? knownCredits : null
-  const creditSeen =
-    receivedCredits !== undefined ? quotaSeen : credits ? (storedSeen ?? account.lastSeenAt) : null
+  // Preserve absence age so older policy credits cannot reappear after quota omission.
+  let creditSeen = account.lastSeenAt
+  if (credits && policyMayInitialize && !windows.length) creditSeen = policy?.observedAt ?? null
+  if (observedCredits !== undefined && !creditIsStale) creditSeen = quotaSeen
   const lastSeenAt = latestObservation(windows)
   const accountSeen =
     [lastSeenAt, creditSeen]

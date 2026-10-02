@@ -161,6 +161,190 @@ test('stored metadata and legacy records survive omitted quota and disabled acco
   })
 })
 
+test('enabled credentials relinquish loop ownership before a later manual disable', () => {
+  const stored = {
+    a: { resetAt: now + 50, usedPercent: 20, disabledByLoop: true, credits: null },
+  }
+  const enabled = credential('a', null)
+  const cleared = mergeStoredObservations([enabled], stored)
+  expect(cleared.a).toEqual({ resetAt: now + 50, usedPercent: 20, credits: null })
+  const manuallyDisabled = { ...enabled, disabled: true }
+  expect(mergeStoredObservations([manuallyDisabled], cleared).a?.disabledByLoop).toBeUndefined()
+  expect(
+    planDisabled([manuallyDisabled], mergeObservations([manuallyDisabled], cleared, now), new Set())
+      .size,
+  ).toBe(0)
+})
+
+test.each([
+  { resetAt: 0, usedPercent: 20 },
+  { resetAt: -1, usedPercent: 20 },
+  { resetAt: Number.NaN, usedPercent: 20 },
+  { resetAt: Number.POSITIVE_INFINITY, usedPercent: 20 },
+  { resetAt: 253402300800, usedPercent: 20 },
+  { resetAt: now + 50, usedPercent: -1 },
+  { resetAt: now + 50, usedPercent: 101 },
+  { resetAt: now + 50, usedPercent: Number.NaN },
+  { resetAt: now + 50, usedPercent: Number.POSITIVE_INFINITY },
+])('malformed weekly observations retain valid history (%j)', (observation) => {
+  const stored = {
+    a: { resetAt: now + 100, usedPercent: 40, observedAt: '2026-10-03T08:00:00Z' },
+  }
+  const incoming = credential('a', { ...observation, observedAt: '2026-10-03T09:00:00Z' })
+  expect(mergeStoredObservations([incoming], stored)).toEqual(stored)
+  expect(mergeStoredObservations([incoming], {})).toEqual({})
+  expect(
+    readObservation('codex', {
+      'X-Codex-Primary-Reset-At': String(observation.resetAt),
+      'X-Codex-Primary-Used-Percent': String(observation.usedPercent),
+    }),
+  ).toBeNull()
+  expect(
+    readObservation('claude', {
+      'Anthropic-Ratelimit-Unified-7d-Reset': String(observation.resetAt),
+      'Anthropic-Ratelimit-Unified-7d-Utilization': String(observation.usedPercent / 100),
+    }),
+  ).toBeNull()
+})
+
+test.each([
+  { resetAt: 1, usedPercent: 0 },
+  { resetAt: 253402300799, usedPercent: 100 },
+])('weekly numeric boundaries remain valid (%j)', (observation) => {
+  const credentials = [credential('a', observation)]
+  expect(mergeStoredObservations(credentials, {})).toEqual({ a: observation })
+  expect(
+    readObservation('codex', {
+      'X-Codex-Primary-Reset-At': String(observation.resetAt),
+      'X-Codex-Primary-Used-Percent': String(observation.usedPercent),
+    }),
+  ).toEqual(observation)
+  expect(
+    readObservation('claude', {
+      'Anthropic-Ratelimit-Unified-7d-Reset': String(observation.resetAt),
+      'Anthropic-Ratelimit-Unified-7d-Utilization': String(observation.usedPercent / 100),
+    }),
+  ).toEqual(observation)
+})
+
+test('malformed weekly data still permits independently observed credit absence', () => {
+  const stored = {
+    a: { resetAt: now + 50, usedPercent: 20, credits: { balance: 25, unlimited: false } },
+  }
+  const incoming = { ...credential('a', { resetAt: 0, usedPercent: 101 }), credits: null }
+  expect(mergeStoredObservations([incoming], stored)).toEqual({ a: { ...stored.a, credits: null } })
+})
+
+test('the loop leaves a later manual disable alone after management reports the account enabled', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'reset-order-'))
+  const keyFile = join(scratch, 'key')
+  const stateFile = join(scratch, 'state.json')
+  const resetAt = Math.floor(Date.now() / 1_000) + 3_600
+  await writeFile(keyFile, 'management-key\n')
+  await writeFile(
+    stateFile,
+    JSON.stringify({ a: { resetAt, usedPercent: 20, disabledByLoop: true } }),
+  )
+  let reads = 0
+  let disabled = false
+  let priority = 0
+  const statuses: boolean[] = []
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    async fetch(request) {
+      const { pathname } = new URL(request.url)
+      if (request.method === 'PATCH') {
+        const patch = (await request.json()) as { priority: number; disabled: boolean }
+        if (pathname.endsWith('/fields')) priority = patch.priority
+        if (pathname.endsWith('/status')) {
+          statuses.push(patch.disabled)
+          disabled = patch.disabled
+        }
+        return Response.json({ status: 'ok' })
+      }
+      reads++
+      return Response.json({
+        files: [{ name: 'a.json', auth_index: 'a', provider: 'codex', disabled, priority }],
+      })
+    },
+  })
+  const loop = startResetOrder({
+    proxyUrl: upstream.url.toString(),
+    managementKeyFile: keyFile,
+    stateFile,
+    intervalMs: 10,
+  })
+  try {
+    await expect.poll(() => reads).toBeGreaterThanOrEqual(3)
+    expect((await Bun.file(stateFile).json()).a.disabledByLoop).toBeUndefined()
+    disabled = true
+    const before = reads
+    await expect.poll(() => reads).toBeGreaterThanOrEqual(before + 3)
+    expect(disabled).toBe(true)
+    expect(statuses).toEqual([])
+    expect((await Bun.file(stateFile).json()).a).toEqual({ resetAt, usedPercent: 20 })
+  } finally {
+    loop.stop()
+    upstream.stop(true)
+    await rm(scratch, { recursive: true, force: true })
+  }
+})
+
+test('malformed current weekly headers preserve the valid policy map', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'reset-order-'))
+  const keyFile = join(scratch, 'key')
+  const stateFile = join(scratch, 'state.json')
+  const resetAt = Math.floor(Date.now() / 1_000) + 3_600
+  const stored = {
+    prior: { resetAt, usedPercent: 20, observedAt: '2026-10-03T08:00:00Z' },
+    fallback: { resetAt: resetAt + 500, usedPercent: 40, observedAt: '2026-10-03T07:00:00Z' },
+  }
+  await writeFile(keyFile, 'management-key\n')
+  await writeFile(stateFile, JSON.stringify(stored))
+  let reads = 0
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      expect(request.method).toBe('GET')
+      reads++
+      return Response.json({
+        files: ['prior', 'unknown', 'fallback'].map((index) => ({
+          name: `${index}.json`,
+          auth_index: index,
+          provider: 'codex',
+          disabled: true,
+          quota:
+            index === 'fallback'
+              ? undefined
+              : {
+                  observed_at: '2026-10-03T09:00:00Z',
+                  signals: {
+                    'X-Codex-Primary-Reset-At': index === 'prior' ? String(resetAt) : '0',
+                    'X-Codex-Primary-Used-Percent': index === 'prior' ? '101' : '20',
+                  },
+                },
+        })),
+      })
+    },
+  })
+  const loop = startResetOrder({
+    proxyUrl: upstream.url.toString(),
+    managementKeyFile: keyFile,
+    stateFile,
+    intervalMs: 10,
+  })
+  try {
+    await expect.poll(() => reads).toBeGreaterThanOrEqual(3)
+    expect(await Bun.file(stateFile).json()).toEqual(stored)
+  } finally {
+    loop.stop()
+    upstream.stop(true)
+    await rm(scratch, { recursive: true, force: true })
+  }
+})
+
 test('new weekly observations replace timestamps and retain omitted credits', () => {
   const stored = {
     a: {
@@ -172,11 +356,14 @@ test('new weekly observations replace timestamps and retain omitted credits', ()
     },
   }
   const credentials = [
-    credential('a', {
-      resetAt: now + 70,
-      usedPercent: 40,
-      observedAt: '2026-10-03T09:00:00Z',
-    }),
+    {
+      ...credential('a', {
+        resetAt: now + 70,
+        usedPercent: 40,
+        observedAt: '2026-10-03T09:00:00Z',
+      }),
+      disabled: true,
+    },
   ]
   const state = mergeStoredObservations(credentials, stored)
   expect(state.a).toEqual({
@@ -831,6 +1018,11 @@ test('unknown remaining quota keeps a spent loop-owned account disabled', () => 
 test.each([
   'invalid-json',
   '{"spent":{"resetAt":9999999999,"usedPercent":100,"disabledByLoop":true},"broken":{}}',
+  '{"spent":{"resetAt":0,"usedPercent":100,"disabledByLoop":true}}',
+  '{"spent":{"resetAt":253402300800,"usedPercent":100,"disabledByLoop":true}}',
+  '{"spent":{"resetAt":1e999,"usedPercent":100,"disabledByLoop":true}}',
+  '{"spent":{"resetAt":9999999999,"usedPercent":101,"disabledByLoop":true}}',
+  '{"spent":{"resetAt":9999999999,"usedPercent":-1,"disabledByLoop":true}}',
 ])('invalid state reaches give-up without erasing ownership (%s)', async (contents) => {
   const scratch = await mkdtemp(join(tmpdir(), 'reset-order-'))
   const keyFile = join(scratch, 'key')

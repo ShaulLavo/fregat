@@ -52,14 +52,17 @@ const creditsSchema = v.object({
   balance: v.pipe(v.number(), v.finite(), v.minValue(0)),
   unlimited: v.boolean(),
 })
+const observationSchema = v.object({
+  resetAt: v.pipe(v.number(), v.finite(), v.minValue(1), v.maxValue(253402300799)),
+  usedPercent: v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100)),
+  observedAt: v.optional(v.string()),
+  credits: v.optional(v.nullable(creditsSchema)),
+})
 const stateSchema = v.record(
   v.string(),
   v.union([
     v.object({
-      resetAt: v.number(),
-      usedPercent: v.number(),
-      observedAt: v.optional(v.string()),
-      credits: v.optional(v.nullable(creditsSchema)),
+      ...observationSchema.entries,
       disabledByLoop: v.optional(v.boolean()),
     }),
     v.object({
@@ -103,8 +106,8 @@ export function readObservation(
       return null
     const resetAt = Number(signals?.[`X-Codex-${window}-Reset-At`] ?? Number.NaN)
     const usedPercent = Number(signals?.[`X-Codex-${window}-Used-Percent`] ?? Number.NaN)
-    if (!Number.isFinite(resetAt) || !Number.isFinite(usedPercent)) return null
     const observation: Observation = { resetAt, usedPercent }
+    if (!v.is(observationSchema, observation)) return null
     if (observedAt !== undefined) observation.observedAt = observedAt
     const credits = readCredits(signals)
     if (credits !== undefined) observation.credits = credits
@@ -112,12 +115,10 @@ export function readObservation(
   }
   const resetAt = readSeconds(signals?.['Anthropic-Ratelimit-Unified-7d-Reset'])
   const utilization = Number(signals?.['Anthropic-Ratelimit-Unified-7d-Utilization'] ?? Number.NaN)
-  if (!Number.isFinite(resetAt) || !Number.isFinite(utilization)) return null
+  const observation: Observation = { resetAt, usedPercent: utilization * 100 }
+  if (!v.is(observationSchema, observation)) return null
   const rejected = signals?.['Anthropic-Ratelimit-Unified-7d-Status']?.toLowerCase() === 'rejected'
-  const observation: Observation = {
-    resetAt,
-    usedPercent: rejected ? 100 : Math.min(100, utilization * 100),
-  }
+  if (rejected) observation.usedPercent = 100
   if (observedAt !== undefined) observation.observedAt = observedAt
   return observation
 }
@@ -130,9 +131,11 @@ export function mergeStoredObservations(
   const merged: Record<string, StoredObservation> = {}
   for (const credential of credentials) {
     const previous = stored[credential.index]
-    const current = credential.observation
+    const current = v.is(observationSchema, credential.observation) ? credential.observation : null
     const next: Partial<Observation> & { disabledByLoop?: boolean } = { ...(current ?? previous) }
-    if (previous?.disabledByLoop !== undefined) next.disabledByLoop = previous.disabledByLoop
+    if (credential.disabled && previous?.disabledByLoop !== undefined)
+      next.disabledByLoop = previous.disabledByLoop
+    if (!credential.disabled) delete next.disabledByLoop
     const observedCredits = credential.credits === undefined ? current?.credits : credential.credits
     const credits = observedCredits === undefined ? previous?.credits : observedCredits
     if (credits !== undefined) next.credits = credits

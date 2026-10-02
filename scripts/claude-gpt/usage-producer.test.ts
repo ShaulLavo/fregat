@@ -687,7 +687,7 @@ test.each([true, false])(
   },
 )
 
-test('a newer policy file supplies weekly quota and credits after restart without refreshing retained history', async () => {
+test('a newer policy file updates weekly quota while ambiguous credit changes remain omitted', async () => {
   const paths = await fixture()
   const previous = await seedWeeklyFeed(paths.feedDirectory)
   const resetOrderStateFile = join(paths.directory, 'synthetic-reset-order.json')
@@ -723,10 +723,11 @@ test('a newer policy file supplies weekly quota and credits after restart withou
     )
     now += 60000
     expect(await producer.poll()).toBe(true)
-    expect(JSON.parse(await readFile(filename, 'utf8')).accounts[1]).toMatchObject({
-      credits: { balance: 0, unlimited: true },
-      windows: [{ usedPercent: 100, lastSeenAt: updatedAt, source: 'reset-order' }],
-    })
+    const account = JSON.parse(await readFile(filename, 'utf8')).accounts[1]
+    expect(account.credits).toBeUndefined()
+    expect(account.windows).toMatchObject([
+      { usedPercent: 100, lastSeenAt: updatedAt, source: 'reset-order' },
+    ])
   } finally {
     await producer.stop()
     await rm(paths.directory, { recursive: true, force: true })

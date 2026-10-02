@@ -41,6 +41,303 @@ function proxyBody(signals: Record<string, string> = weeklySignals) {
   }
 }
 
+test('explicit live credit absence stays absent through later quota omissions and stale policy repeats', () => {
+  const first = '2026-10-02T08:00:00.000Z'
+  const absentAt = '2026-10-02T09:00:00.000Z'
+  const policy = {
+    observedAt: first,
+    observations: { 'synthetic-index': { credits: { balance: 12.5, unlimited: false } } },
+  }
+  const body = {
+    observed_at: checked,
+    files: [{ provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index' }],
+  }
+  const positive = normalizeProxySnapshot(
+    body,
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+    policy,
+  )!
+  expect(positive.accounts[1]!.credits).toEqual({ balance: 12.5, unlimited: false })
+  const absent = normalizeProxySnapshot(
+    {
+      ...body,
+      files: [
+        {
+          ...body.files[0]!,
+          quota: {
+            observed_at: absentAt,
+            signals: {
+              'X-Codex-Credits-Balance': '0',
+              'X-Codex-Credits-Has-Credits': 'false',
+              'X-Codex-Credits-Unlimited': 'false',
+            },
+          },
+        },
+      ],
+    },
+    positive,
+    checked,
+    policy,
+  )!
+  expect(absent.accounts[1]!.credits).toBeUndefined()
+  const omitted = normalizeProxySnapshot(body, absent, checked, policy)!
+  expect(omitted.accounts[1]!.credits).toBeUndefined()
+  expect(normalizeProxySnapshot(body, omitted, later, policy)!.accounts[1]!.credits).toBeUndefined()
+})
+
+test.each([false, true])(
+  'credits-only policy absence supersedes older balances independently of stored Weekly age (cached aggregate: %s)',
+  (aggregate) => {
+    const weeklyAt = '2026-10-02T08:00:00.000Z'
+    const positiveAt = '2026-10-02T09:00:00.000Z'
+    const absentAt = '2026-10-02T10:00:00.000Z'
+    const file = proxyBody({
+      'X-Codex-Credits-Balance': '12.5',
+      'X-Codex-Credits-Has-Credits': 'true',
+      'X-Codex-Credits-Unlimited': 'false',
+    }).files[0]!
+    file.quota.observed_at = positiveAt
+    const previous = normalizeProxySnapshot(
+      { observed_at: checked, files: [file] },
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    expect(previous.accounts[1]!.credits).toEqual({ balance: 12.5, unlimited: false })
+    const policy = {
+      observedAt: absentAt,
+      observations: {
+        'synthetic-index': {
+          resetAt: 1791314592,
+          usedPercent: 100,
+          observedAt: weeklyAt,
+          credits: null,
+        },
+      },
+    }
+    const identity = { provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index' }
+    const body = {
+      observed_at: checked,
+      files: [{ ...identity, ...(aggregate ? { quota: file.quota } : {}) }],
+    }
+    const next = normalizeProxySnapshot(body, previous, checked, policy)!
+    expect(next.accounts[1]!.credits).toBeUndefined()
+    const omission = { observed_at: later, files: [identity] }
+    expect(
+      normalizeProxySnapshot(omission, next, later, policy)!.accounts[1]!.credits,
+    ).toBeUndefined()
+    file.quota.observed_at = '2026-10-02T11:00:00.000Z'
+    const fresh = normalizeProxySnapshot(
+      { observed_at: later, files: [{ ...identity, quota: file.quota }] },
+      next,
+      later,
+      policy,
+    )!
+    expect(fresh.accounts[1]!.credits).toEqual({ balance: 12.5, unlimited: false })
+  },
+)
+
+test.each([false, true])(
+  'aggregate credits older than a model window omit ambiguous balances (new model observation: %s)',
+  (newModel) => {
+    const initialAt = '2026-10-02T08:00:00.000Z'
+    const aggregateAt = '2026-10-02T09:00:00.000Z'
+    const modelAt = '2026-10-02T10:00:00.000Z'
+    const credits = {
+      'X-Codex-Credits-Balance': '12.5',
+      'X-Codex-Credits-Has-Credits': 'true',
+      'X-Codex-Credits-Unlimited': 'false',
+    }
+    const file = proxyBody(credits).files[0]!
+    file.quota.observed_at = initialAt
+    let previous = normalizeProxySnapshot(
+      { observed_at: checked, files: [file] },
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    const modelQuotas = { 'gpt-6.1-sol': { observed_at: modelAt, signals: weeklySignals } }
+    if (!newModel) {
+      previous = normalizeProxySnapshot(
+        {
+          observed_at: checked,
+          files: [{ provider: 'codex', label: 'shaul9191', model_quotas: modelQuotas }],
+        },
+        previous,
+        checked,
+      )!
+      expect(previous.accounts[1]!.credits).toEqual({ balance: 12.5, unlimited: false })
+    }
+    const quota = {
+      observed_at: aggregateAt,
+      signals: { ...credits, 'X-Codex-Credits-Balance': '3.5' },
+    }
+    const body = { observed_at: checked, files: [{ ...file, quota, model_quotas: modelQuotas }] }
+    const next = normalizeProxySnapshot(body, previous, checked)!
+    expect(next.accounts[1]!.credits).toBeUndefined()
+    expect(next.accounts[1]!.lastSeenAt).toBe(modelAt)
+    expect(normalizeProxySnapshot(body, next, later)!.accounts[1]!.credits).toBeUndefined()
+    quota.observed_at = '2026-10-02T11:00:00.000Z'
+    expect(normalizeProxySnapshot(body, next, later)!.accounts[1]!.credits).toEqual({
+      balance: 3.5,
+      unlimited: false,
+    })
+  },
+)
+
+test('stable policy agreement and omitted credit evidence preserve uncontradicted balances without freshening them', () => {
+  const policy = {
+    observedAt: seen,
+    observations: { 'synthetic-index': { credits: { balance: 12.5, unlimited: false } } },
+  }
+  const body = {
+    observed_at: checked,
+    files: [{ provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index' }],
+  }
+  const initial = normalizeProxySnapshot(
+    body,
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+    policy,
+  )!
+  const repeated = normalizeProxySnapshot(body, initial, checked, { ...policy, observedAt: later })!
+  expect(repeated.accounts[1]!.credits).toEqual({ balance: 12.5, unlimited: false })
+  expect(repeated.accounts[1]!.lastSeenAt).toBe(seen)
+  const omitted = normalizeProxySnapshot(body, repeated, later)!
+  expect(omitted.accounts[1]!.credits).toEqual({ balance: 12.5, unlimited: false })
+  expect(omitted.accounts[1]!.lastSeenAt).toBe(seen)
+})
+
+test.each(['2026-10-02T08:00:00.000Z', '2026-10-02T10:00:00.000Z'])(
+  'changed policy balances stay unknown regardless of stored Weekly age (%s)',
+  (weeklyAt) => {
+    const file = proxyBody({
+      'X-Codex-Credits-Balance': '12.5',
+      'X-Codex-Credits-Has-Credits': 'true',
+      'X-Codex-Credits-Unlimited': 'false',
+    }).files[0]!
+    file.quota.observed_at = '2026-10-02T09:00:00.000Z'
+    const previous = normalizeProxySnapshot(
+      { observed_at: checked, files: [file] },
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    const policy = {
+      observedAt: checked,
+      observations: {
+        'synthetic-index': {
+          resetAt: 1791314592,
+          usedPercent: 100,
+          observedAt: weeklyAt,
+          credits: { balance: 3.5, unlimited: false },
+        },
+      },
+    }
+    const body = {
+      observed_at: checked,
+      files: [{ provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index' }],
+    }
+    const next = normalizeProxySnapshot(body, previous, checked, policy)!
+    expect(next.accounts[1]!.credits).toBeUndefined()
+    expect(normalizeProxySnapshot(body, next, later, policy)!.accounts[1]!.credits).toBeUndefined()
+  },
+)
+
+test('initial policy balance stays unknown when current model quota mixes observation ages', () => {
+  const policy = {
+    observedAt: checked,
+    observations: {
+      'synthetic-index': {
+        resetAt: 1791314592,
+        usedPercent: 100,
+        observedAt: seen,
+        credits: { balance: 12.5, unlimited: false },
+      },
+    },
+  }
+  const body = {
+    observed_at: later,
+    files: [
+      {
+        provider: 'codex',
+        label: 'shaul9191',
+        auth_index: 'synthetic-index',
+        model_quotas: { 'gpt-6.1-sol': { observed_at: later, signals: weeklySignals } },
+      },
+    ],
+  }
+  const next = normalizeProxySnapshot(
+    body,
+    createUsageSnapshot(configuredAccounts, checked),
+    later,
+    policy,
+  )!
+  expect(next.accounts[1]!.credits).toBeUndefined()
+  expect(next.accounts[1]!.lastSeenAt).toBe(later)
+})
+
+test('null policy modification times never freshen retained Weekly or account observation ages', () => {
+  let previous = normalizeProxySnapshot(
+    proxyBody({
+      ...weeklySignals,
+      'X-Codex-Credits-Balance': '12.5',
+      'X-Codex-Credits-Has-Credits': 'true',
+      'X-Codex-Credits-Unlimited': 'false',
+    }),
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+  )!
+  const body = {
+    observed_at: later,
+    files: [
+      { provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index', disabled: true },
+    ],
+  }
+  for (const modifiedAt of [checked, later, '2026-10-03T18:00:00.000Z']) {
+    const policy = {
+      observedAt: modifiedAt,
+      observations: {
+        'synthetic-index': {
+          resetAt: 1790967600,
+          usedPercent: 35,
+          observedAt: seen,
+          credits: null,
+        },
+      },
+    }
+    previous = normalizeProxySnapshot(body, previous, later, policy)!
+    expect(previous.accounts[1]!.credits).toBeUndefined()
+    expect(previous.accounts[1]!.windows.find(({ id }) => id === 'weekly')!.lastSeenAt).toBe(seen)
+    expect(previous.accounts[1]!.lastSeenAt).toBe(seen)
+  }
+})
+
+test('initial null policy stays undated and prevents later ambiguous policy balance initialization', () => {
+  const body = {
+    observed_at: checked,
+    files: [{ provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index' }],
+  }
+  const absent = normalizeProxySnapshot(
+    body,
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+    { observedAt: checked, observations: { 'synthetic-index': { credits: null } } },
+  )!
+  expect(absent.accounts[1]!.credits).toBeUndefined()
+  expect(absent.accounts[1]!.lastSeenAt).toBeNull()
+  const repeated = normalizeProxySnapshot(body, absent, later, {
+    observedAt: later,
+    observations: { 'synthetic-index': { credits: null } },
+  })!
+  expect(repeated.accounts[1]!.lastSeenAt).toBeNull()
+  const policy = {
+    observedAt: seen,
+    observations: { 'synthetic-index': { credits: { balance: 12.5, unlimited: false } } },
+  }
+  expect(
+    normalizeProxySnapshot(body, repeated, later, policy)!.accounts[1]!.credits,
+  ).toBeUndefined()
+})
+
 test('known Claude Max and both Codex Pro accounts exist before traffic', () => {
   const snapshot = createUsageSnapshot(configuredAccounts, checked)
   expect(snapshot.accounts.map(({ provider, label, plan }) => [provider, label, plan])).toEqual([
@@ -845,3 +1142,105 @@ test('credits-only explicit absence survives policy restoration without inventin
   expect(next.accounts[1]!.credits).toBeUndefined()
   expect(next.accounts[1]!.windows).toEqual([])
 })
+
+test('complete current slot durations retire older canonical windows that are now absent', () => {
+  const file = proxyBody(weeklySignals).files[0]!
+  const initialBody = {
+    observed_at: checked,
+    files: [{ ...file, model_quotas: { 'gpt-6.1-sol': file.quota } }],
+  }
+  const previous = normalizeProxySnapshot(
+    initialBody,
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+  )!
+  const signals = {
+    'X-Codex-Primary-Window-Minutes': '10080',
+    'X-Codex-Primary-Used-Percent': '35',
+    'X-Codex-Secondary-Window-Minutes': '0',
+    'X-Codex-Secondary-Used-Percent': '0',
+  }
+  const quota = { observed_at: later, signals }
+  const body = {
+    observed_at: later,
+    files: [{ ...file, quota, model_quotas: { 'gpt-6.1-sol': quota } }],
+  }
+  expect(
+    normalizeProxySnapshot(body, previous, later)!.accounts[1]!.windows.map(({ id }) => id),
+  ).toEqual(['weekly', 'model:gpt-6.1-sol:weekly'])
+  quota.observed_at = '2026-10-02T17:00:00Z'
+  expect(normalizeProxySnapshot(body, previous, later)!.accounts[1]!.windows).toEqual(
+    previous.accounts[1]!.windows,
+  )
+})
+
+test('an explicit slot absence withdraws an older identified reading without guessing its slot', () => {
+  const body = proxyBody({
+    'X-Codex-Primary-Window-Minutes': '300',
+    'X-Codex-Primary-Used-Percent': '35',
+  })
+  const previous = normalizeProxySnapshot(
+    body,
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+  )!
+  body.files[0]!.quota = {
+    observed_at: later,
+    signals: { 'X-Codex-Primary-Window-Minutes': '0', 'X-Codex-Primary-Used-Percent': '0' },
+  }
+  expect(normalizeProxySnapshot(body, previous, later)!.accounts[1]!.windows).toEqual([])
+})
+
+test.each([false, true])(
+  'equivalent prefixes retain distinct identified unfamiliar durations, reversed=%s',
+  (reverse) => {
+    const signals = {
+      'X-Codex-Bengalfox-Primary-Window-Minutes': reverse ? '300' : '120',
+      'X-Codex-Bengalfox-Primary-Used-Percent': '35',
+      'X-Codex-Additional-gpt-5.3-codex-spark-Primary-Window-Minutes': reverse ? '120' : '300',
+      'X-Codex-Additional-gpt-5.3-codex-spark-Primary-Used-Percent': '45',
+    }
+    const file = proxyBody(signals).files[0]!
+    const body = {
+      observed_at: checked,
+      files: [{ ...file, model_quotas: { 'gpt-6.1-sol': file.quota } }],
+    }
+    const next = normalizeProxySnapshot(
+      body,
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    expect(next.accounts[1]!.windows.map(({ windowMinutes }) => windowMinutes).sort()).toEqual([
+      120, 120, 300, 300,
+    ])
+  },
+)
+
+test.each(['five-hour', 'spark'])(
+  'restore omitted policy Weekly alongside a live %s allowance',
+  (kind) => {
+    const signals: Record<string, string> =
+      kind === 'spark'
+        ? {
+            'X-Codex-Bengalfox-Primary-Window-Minutes': '300',
+            'X-Codex-Bengalfox-Primary-Used-Percent': '35',
+          }
+        : { 'X-Codex-Primary-Window-Minutes': '300', 'X-Codex-Primary-Used-Percent': '35' }
+    const file = { ...proxyBody(signals).files[0]!, auth_index: 'synthetic-approved' }
+    const policy = restoreResetOrderSnapshot(
+      { 'synthetic-approved': { resetAt: 1790967600, usedPercent: 90, observedAt: seen } },
+      checked,
+    )!
+    const next = normalizeProxySnapshot(
+      { observed_at: checked, files: [file] },
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+      policy,
+    )!
+    expect(next.accounts[1]!.windows.find(({ id }) => id === 'weekly')).toMatchObject({
+      source: 'reset-order',
+      usedPercent: 90,
+      lastSeenAt: seen,
+    })
+  },
+)
