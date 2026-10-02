@@ -426,25 +426,174 @@ follow that policy.
       unsupported capabilities, and remote/native-picker constraints here.
 - [x] Owner approves the installed-app design, shared machine/state-home server, remote in-app
       picker and native-webview fallback (2026-10-02). Implementation starts after this plan PR merges.
-- [ ] Prototype OS socket activation and queued first-request boot on macOS/Linux; decide direct
-      socket adoption from evidence or ship the minimal relay. Prove stable-origin setup, no launcher
-      present, server idle/restart, update/rollback, and retained-data uninstall/reinstall. Test same-state
-      identity reuse, another-program/different-state conflicts, concurrent setup, state-home locking,
-      and app/browser/phone clients sharing one server.
-- [ ] Prototype cold installation, repeat installation, Dock-first then launcher launch, user
-      uninstall then repair, launch URL delivery, and CDP release using disposable profiles. Confirm
-      Chrome 154 and Helium 154 separately. No real accounts or default browsing profiles.
-- [ ] Move local native picker ownership into a capability-gated authenticated server mutation,
-      with tests for cancellation, serialized calls, authorization, unavailable desktop, and path
-      hydration. Test zero injected globals on both Dock and launcher surfaces.
-- [ ] Add WCO drag/no-drag primitives, geometry subscription and launchQueue consumer. Test
-      control hit areas, overlay on/off, incoming URL selection, and focusing one live client without
-      disrupting terminals or drafts. Remove installed-browser bridge consumers in the same pass.
-- [ ] Update manifest identity/name/display/launch policy and verify actual browser OS integration.
-      Keep native-host bridge code only while the existing native gates require it.
-- [ ] Run portable fake-browser regressions and real Linux browser proof. Read visual evidence.
-      After merge, the coordinator performs the Mac check below. Gate 4 stays parked until its
-      separate owner acceptance is complete.
+
+#### Parallel build units and ownership
+
+Start U1, U2 and U3 in parallel after this plan merges. Each owns its listed files and tests.
+U3 publishes the contract-only schemas first so U1/U2 can compile against the exact interface
+while service implementation continues. Those units may use outside-world fixtures for browser/
+OS protocols, but final integration tests use the real server. Shared-file edits go through the
+named owning unit; no two units independently modify the same manifest, registry or API route.
+The coordinator owns integration order and ticks acceptance after reviewing each unit's evidence.
+Native picker **endpoint implementation belongs only to U3**; U2 owns its web consumer.
+
+##### U1 — installed client
+
+**Scope.** Manifest identity/OS registration, Chrome-first/explicit selection integration, PWA
+install/launch/repair, CDP release and native-webview capability fallback. Consume U3's setup/
+identity API before registration; connect to its matching shared service. Implement no server,
+socket activator, picker endpoint or web capability policy here.
+
+**Owner files/directories.** All paths are repository-relative.
+
+- Existing `apps/web/public/manifest.webmanifest` and its existing icon assets: U1 alone changes
+  manifest `id`, names, display policy and `launch_handler` declaration. U2 owns the JS consumer.
+- Existing `apps/desktop/src/launcher/` and its `tests/`, including `index.ts`, `chromium.ts`,
+  `cdp.ts`, `profile.ts`, `singleton.ts`, `webview-host.ts`, `native-window.ts`, `shell-bridge.ts`
+  and existing browser-selection files. New `installed-app.ts` and its fake-browser tests live
+  here. Remove installed-browser injection while retaining native-host transport where required.
+- Existing `apps/desktop/src/shared/bridge.ts`, `apps/desktop/src/bun/` and desktop launch scripts
+  for native-host integration if needed. Native source/build changes belong to U3 below; request
+  that owner for an existing host protocol change rather than editing its files independently.
+- New launcher installation-client adapter under `apps/desktop/src/launcher/`, consuming U3's
+  public service-setup entry point and shared contract exports; it does not implement setup.
+
+**Acceptance.**
+
+- [ ] Failing-before/passing-after fake-browser tests cover unknown/installed identity,
+      install/launch repair, unavailable PWA domain/install support, explicit browser choice,
+      no-Chromium and native-webview fallback. A plain `--app=` fallback is absent.
+- [ ] Real disposable-profile Linux browser evidence proves registration, repeat launch,
+      uninstall/repair, URL delivery and CDP release. Separate Chrome/Helium capability proofs;
+      report unavailable browsers. Do not claim headless proof establishes OS icon/window identity.
+- [ ] Dock-first then launcher and launcher-first then Dock use one app client and U3's shared
+      server. An already-running browser is preserved. No owner accounts/default profiles are used.
+- [ ] Native fallback owns its Fregat window/icon, uses the shared server and preserves other
+      browser profiles/terminals. Read `look` evidence for the delivered window/UI where available.
+
+##### U2 — web bridge removal
+
+**Scope.** Installed-browser runtime capabilities with no injected globals: WCO geometry and
+drag/no-drag, client-platform conventions, launchQueue URL delivery/focus and picker routing.
+Authenticated same-machine capability uses U3's native endpoint; remote or unproven locality
+uses the existing in-app server-filesystem picker. Native-host compatibility is an explicit
+capability seam, never the installed-browser runtime requirement.
+
+**Owner files/directories.**
+
+- Existing `apps/web/src/lib/platform/` (`bridge.ts`, `platform.d.ts`, `backdrop.ts`,
+  `window-drag.ts`) and new `capabilities.ts`; shared browser capabilities stay here only while
+  their consumers satisfy the repository's multi-consumer rule.
+- Existing `apps/web/src/components/app-titlebar.tsx`, `use-pick-entry.tsx`, their `tests/`,
+  `components/utils/picked-path.ts` and `apps/web/src/lib/file-server.ts` for query/mutation
+  consumption and backend path hydration. Add feature-owned query/mutation keys with the
+  owning consumer; no endpoint or helper implementation in these files.
+- Existing `apps/web/src/features/settings/state/system-color-mode.ts`, settings desktop
+  availability consumers, `features/chat/utils/screenshot-capture.ts` and browser notification
+  consumers identified in the bridge inventory, changing only the capability seam.
+- New WCO/launchQueue hooks and pure URL validation beside their consuming component/domain,
+  `packages/ui/src/styles/globals.css` for reusable app-region utilities, and any required
+  design-census exceptions. No per-call-site raw CSS or custom motion policy.
+- Existing `scripts/agent/selectors.ts` and new installed-app/picker/WCO scenarios in
+  `scripts/agent/scenarios/` for web evidence. U1/U3 request shared selector changes from U2.
+
+**Acceptance.**
+
+- [ ] Real-server tests open the app with zero `platformBridge`/shell globals. Capabilities,
+      theme, capture, backdrop, titlebar and picker behave on both direct and launcher launches.
+- [ ] WCO on/off, geometry changes, drag/no-drag controls and launchQueue incoming URL validation
+      preserve drafts/terminals. Existing clients focus without surprise navigation.
+- [ ] Verified same-machine native selection/cancellation hydrates U3 backend paths; remote,
+      unavailable-desktop and unverified-locality cases open the in-app picker. No remote desktop
+      chooser is invoked. Query/mutation state settles before completion, including failures.
+- [ ] Portable tests, compiler/design gates and `look` screenshots read back prove the changed
+      web surfaces. Dock/OS drag acceptance remains in the coordinator's Mac gate below.
+
+##### U3 — server service and native picker endpoint
+
+**Scope.** Sole owner of the server-side native-picker endpoint and helper lifecycle, shared
+service installation/activation, identity probe, state-home lock, authenticated capabilities,
+release/service integration, and shared contract schemas. No manifest/launcher/web consumer edits.
+
+**Owner files/directories.**
+
+- Existing `apps/server/src/index.ts`, `app.ts`, `home.ts`, `db/environment-identity.ts`,
+  `installation/`, `machines/authentication.ts` and existing server authentication/mount seams.
+  New `apps/server/src/system/` owns identity/capability routes, state-home ownership and tests.
+- Existing `apps/server/src/fs/routes.ts` plus new `fs/native-picker.ts` and its tests own
+  **the only native-picker endpoint**, authorization, request cancellation, serialization,
+  timeout/stop grace and backend-path validation. New server native-helper adapter belongs here.
+- New `apps/server/native/` for picker-only helpers and new `scripts/service/` for the native
+  activator, launchd/systemd registration, service-setup entry point and portable tests. Existing
+  `apps/desktop/native/` and `apps/desktop/scripts/build-native.ts` are U3-owned only where helper
+  extraction/build integration is needed; preserve the native window ABI consumed by U1. Do not
+  import desktop feature modules into the server or duplicate native picker business logic.
+- Existing `scripts/state-home.ts`, `scripts/deploy/` (including systemd promotion/release/live
+  check), server packaging/build integration and release assets needed for the shared service.
+  New launchd/socket templates live in `scripts/service/`. Reuse existing production ownership.
+- New `packages/contracts/src/server-identity.ts` and `native-picker.ts`, package entry exports,
+  `settings/keys.ts`, generated schema/reference and relevant contract tests. U3 owns registry
+  entries for service limits/ports and existing native-dialog budgets, updating scopes if needed.
+
+**Acceptance.**
+
+- [ ] Prove inherited-listener adoption or the bounded native relay on both OSes, with queued
+      first request, simultaneous connections, WebSocket/SSE/backpressure, disconnect and restart.
+      Cold app/browser/mesh access activates the same service with no launcher running.
+- [ ] Authenticated identity reuse succeeds for the same state home; another program,
+      different state identity/home and unverifiable listener fail with structured conflicts.
+      Concurrent setup and a second-port start cannot create duplicate state-home servers.
+- [ ] Real server/native-helper fixture tests cover picker option validation, unavailable
+      desktop, same-machine authorization, CSRF/origin rejection, cancellation/disconnect,
+      serialized requests, timeout and owned-child cleanup. Remote/unproven-local requests are
+      rejected even if a caller bypasses U2's routing.
+- [ ] Stable base/origin, state/log paths, updates, approved promotion, live-check failure,
+      rollback, shared-client app uninstall and retained-state server reinstall are verified.
+      Existing production/dev mesh services are reused without competing listeners.
+
+#### Interfaces between units
+
+U3 owns portable Valibot schemas/types and their package exports; U1/U2 consume them. New routes
+are authenticated selected-machine APIs, using the existing client/proxy routing. Paths below
+are relative to the configured server API base (including `/platform/` where applicable).
+
+- `GET /system/identity` returns `{ product: "fregat", protocolVersion, machineId,
+environmentId, stateHome, address, webBase, service: { kind, registrationId } }`.
+  `environmentId` reuses the durable environment identity; `stateHome` is canonical. `address`
+  is the stable public listener, never the private Unix upstream. `kind` identifies launchd,
+  systemd or an existing supported supervisor. U1 setup compares identity/state against local
+  installation intent; U2 uses machine identity, never the state path, for target capabilities.
+  State-home disclosure is restricted to authenticated installation/owner scope. Authentication
+  failure is distinct from another program or mismatched state. Do not invent a second UUID
+  when the existing durable environment identity provides the state identity.
+- `GET /system/capabilities` returns `{ machineId, environmentId, nativePicker: {
+available, ownerMachineId } }`. Availability means the helper and desktop session are usable,
+  not proof that the browser is on that machine. U2 separately requires the authenticated
+  same-machine proof established by local setup; hostname/platform/capability claims alone do
+  not establish locality. U3 validates that proof under existing machine authentication on the
+  mutation. No proof means in-app picker in U2 and denial of native invocation in U3.
+- `POST /fs/native-picker` takes `{ mode: "folder" | "file", accept?: readonly string[],
+startingPath?: string, multiple?: boolean }` and returns `{ outcome: "selected" | "cancelled",
+paths: string[] }`. Paths are selected-server absolute paths; cancellation returns an empty
+  array. Authenticated same-machine authorization travels through the established auth layer,
+  not a caller-supplied `isLocal` boolean. Unsupported desktop, invalid options, forbidden origin,
+  timeout and helper failures use existing structured error envelopes. Closing/aborting the
+  request cancels its owned chooser. U2 serializes through mutation scope, then hydrates using
+  the existing filesystem API; U3 also enforces one active chooser per desktop host.
+- U3 exposes `ensureMachineService` from `scripts/service/` with installation intent containing
+  canonical state home, fixed address, web base and expected machine/environment identity.
+  It resolves with verified identity and `reused`/`registered` disposition after readiness,
+  or rejects with a structured conflict. U1 calls it during one-time setup before PWA registration;
+  ordinary Dock launch calls no setup code. Remote target setup verifies the selected remote
+  service without installing a second local state-home server. Locality-proof issuance and
+  validation remain inside this authenticated setup boundary, shared by both launch paths.
+
+U1 owns manifest `launch_handler`; U2 owns its `launchQueue` consumer. U1 owns installed/native
+host choice; U2 owns runtime web capability/picker choice; U3 owns server capability truth and
+authorization. Interface changes are published by U3 with all three units agreeing on consumer
+updates before integration. The coordinator runs combined real-server acceptance after the
+parallel unit checks. After implementation merges, the coordinator performs the Mac check below;
+Gate 4 stays parked until its separate owner acceptance is complete.
 
 ### Protocol evidence and limits
 
