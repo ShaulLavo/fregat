@@ -76,6 +76,7 @@ const MIRRORED_KEYS = [
   'search.maxResultFiles',
   'search.quickOpenLimit',
   'search.wholeWord',
+  'server.activationTimeoutSeconds',
   'terminal.integrated.fontSize',
   'terminal.integrated.cursorBlinking',
   'terminal.integrated.scrollback',

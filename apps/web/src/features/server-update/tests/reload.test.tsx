@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -14,11 +14,14 @@ import { createInProcessClient, createObservedInProcessClient } from '../../../.
 import { TEST_ENVIRONMENT_ID } from '../../../../test/factories/chat'
 import { installTestClient } from '../../../../test/factories/client-binding'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
 import { makeTestServer } from '../../../../test/server'
 import { ServerUpdateStatus } from '@/components/server-update-status'
 import { updateIntentStore } from '@/features/server-update/state/intent'
 import { serverUpdateQueryKeys } from '@/features/server-update/utils/query-keys'
+import { serverUpdateMutationKeys } from '@/features/server-update/utils/mutation-keys'
 import { primaryServerOrigin } from '@/lib/client'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { resetServerConnectionStore, useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -41,17 +44,28 @@ async function releaseFixture({ liveCheck = true } = {}) {
   await symlink(release('target-release'), path.join(production, 'pending'))
   const requests: unknown[] = []
   const exits: unknown[] = []
+  const serverReleaseFile = path.join(production, 'server-build-config.json')
+  await writeFile(
+    serverReleaseFile,
+    await readFile(path.join(release('running-release'), 'build-config.json')),
+  )
   const server = await makeTestServer({
     environmentId: TEST_ENVIRONMENT_ID,
     web: {
       root: path.join(production, 'current', 'web'),
-      serverReleaseFile: path.join(production, 'current', 'build-config.json'),
+      serverReleaseFile,
     },
     update: { root: production, restart: (record) => exits.push(record) },
   })
+  let descriptorUnavailable = false
+  const restartTransport = Promise.withResolvers<void>()
+  let holdRestart = false
   const client = createObservedInProcessClient(server, async (request) => {
-    if (new URL(request.url).pathname === '/server/restart')
-      requests.push(await request.clone().json())
+    if (new URL(request.url).pathname === '/release' && descriptorUnavailable)
+      throw new TypeError('Failed to fetch')
+    if (new URL(request.url).pathname !== '/server/restart') return
+    requests.push(await request.clone().json())
+    if (holdRestart) await restartTransport.promise
   })
   const restore = installTestClient(client)
   const meta = document.createElement('meta')
@@ -70,6 +84,12 @@ async function releaseFixture({ liveCheck = true } = {}) {
   )
   useEnvironmentsStore.getState().recordServerUpdate(origin, updateForApp(server.app).state())
   onTestFinished(async () => {
+    restartTransport.resolve()
+    await waitFor(() =>
+      expect(
+        primaryQueryClient().isMutating({ mutationKey: serverUpdateMutationKeys.restart() }),
+      ).toBe(0),
+    )
     meta.remove()
     restore()
     resetServerConnectionStore()
@@ -82,7 +102,9 @@ async function releaseFixture({ liveCheck = true } = {}) {
   async function refresh() {
     await act(async () => {
       useEnvironmentsStore.getState().recordServerUpdate(origin, updateForApp(server.app).state())
-      await primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+      await primaryQueryClient().invalidateQueries({
+        queryKey: serverUpdateQueryKeys.release(),
+      })
     })
   }
 
@@ -90,6 +112,32 @@ async function releaseFixture({ liveCheck = true } = {}) {
     requests,
     exits,
     refresh,
+    holdRestart() {
+      holdRestart = true
+    },
+    releaseRestart() {
+      restartTransport.resolve()
+    },
+    failDescriptor() {
+      descriptorUnavailable = true
+    },
+    restoreDescriptor() {
+      descriptorUnavailable = false
+    },
+    async deadlineSettings() {
+      await saveSettings(
+        {
+          mutationId: 'update-reload-deadline',
+          operations: [{ key: 'server.activationTimeoutSeconds', kind: 'set', value: 1 }],
+          target: 'user',
+        },
+        client,
+      )
+      const queryClient = createTestQueryClient()
+      queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, client))
+      onTestFinished(() => queryClient.clear())
+      return queryClient
+    },
     disconnect() {
       act(() => useEnvironmentsStore.getState().markDisconnected(origin))
     },
@@ -108,7 +156,17 @@ async function releaseFixture({ liveCheck = true } = {}) {
       await rm(path.join(production, 'current'))
       await symlink(release(name), path.join(production, 'current'))
       await rm(path.join(production, 'pending'), { force: true })
+      await writeFile(
+        serverReleaseFile,
+        await readFile(path.join(release(name), 'build-config.json')),
+      )
       await server.restart()
+      await refresh()
+    },
+    async publishWeb(name = 'newer-release') {
+      await rm(path.join(production, 'current'))
+      await symlink(release(name), path.join(production, 'current'))
+      updateForApp(server.app).reread('release')
       await refresh()
     },
     async verdict(
@@ -120,6 +178,11 @@ async function releaseFixture({ liveCheck = true } = {}) {
         path.join(release(name), 'live-check.json'),
         JSON.stringify({ release: name, status, checkedAt, fresh: [] }),
       )
+      updateForApp(server.app).reread('release')
+      await refresh()
+    },
+    async clearVerdict(name = 'target-release') {
+      await rm(path.join(release(name), 'live-check.json'), { force: true })
       updateForApp(server.app).reread('release')
       await refresh()
     },
@@ -160,6 +223,222 @@ test('an explicitly skipped live check reloads the exact healthy target without 
   expect(toast.getHistory().some((shown) => shown.id === 'client-update')).toBe(false)
 })
 
+test.each(['old server still running', 'missing live check', 'unavailable descriptor'] as const)(
+  'an accepted restart reaches bounded retry recovery with %s',
+  async (failure) => {
+    const fixture = await releaseFixture()
+    const queryClient = await fixture.deadlineSettings()
+    let reloads = 0
+    const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+    renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />, {
+      queryClient,
+    })
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Update app' }))
+    await waitFor(() => expect(fixture.exits).toHaveLength(1))
+    const accepted = updateIntentStore.getState().intent
+    expect(accepted.kind).toBe('restarting')
+    if (accepted.kind !== 'restarting') return
+
+    if (failure === 'unavailable descriptor') {
+      fixture.failDescriptor()
+      fixture.disconnect()
+      await fixture.refresh()
+    }
+    if (failure === 'missing live check') await fixture.promote()
+    expect(reloads).toBe(0)
+    expect(await screen.findByText('Updating…')).toBeInTheDocument()
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(),
+      { timeout: 4000 },
+    )
+    expect(updateIntentStore.getState().intent).toMatchObject({
+      kind: 'failed',
+      target: accepted.target,
+    })
+    expect(reloads).toBe(0)
+    expect(fixture.requests).toHaveLength(1)
+    expect(screen.queryByText('Updating…')).toBeNull()
+    await user.unhover(screen.getByRole('button', { name: 'Retry update' }))
+    await user.hover(screen.getByRole('button', { name: 'Retry update' }))
+    expect(await screen.findByText(/within the update time limit/)).toBeVisible()
+  },
+)
+
+test.each(['timeout', 'unreachable'] as const)(
+  'retrying a %s restart resends the exact target when the old server still has it staged',
+  async (reason) => {
+    const fixture = await releaseFixture()
+    const queryClient = await fixture.deadlineSettings()
+    let reloads = 0
+    const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+    renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />, {
+      queryClient,
+    })
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Update app' }))
+    await waitFor(() => expect(fixture.exits).toHaveLength(1))
+    if (reason === 'unreachable') {
+      fixture.failDescriptor()
+      fixture.disconnect()
+      await fixture.refresh()
+    }
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(),
+      {
+        timeout: 4000,
+      },
+    )
+    if (reason === 'unreachable') {
+      fixture.restoreDescriptor()
+      fixture.reconnect()
+      await fixture.refresh()
+    }
+    await user.click(screen.getByRole('button', { name: 'Retry update' }))
+    await waitFor(() => expect(fixture.requests).toHaveLength(2))
+    expect(fixture.requests[1]).toEqual(fixture.requests[0])
+    expect(fixture.requests[1]).toMatchObject({ interrupt: [] })
+    expect(reloads).toBe(0)
+    await fixture.promote()
+    await fixture.verdict('passed')
+    await waitFor(() => expect(reloads).toBe(1))
+  },
+)
+
+test('a newer promoted release clears a timed out staged intent and offers its own reload', async () => {
+  const fixture = await releaseFixture()
+  const queryClient = await fixture.deadlineSettings()
+  let reloads = 0
+  const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+  renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />, {
+    queryClient,
+  })
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'Update app' }))
+  await waitFor(() => expect(fixture.exits).toHaveLength(1))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(), {
+    timeout: 4000,
+  })
+  fixture.disconnect()
+  await fixture.promote('newer-release')
+  fixture.reconnect()
+  await fixture.refresh()
+  await waitFor(() => expect(updateIntentStore.getState().intent.kind).toBe('idle'))
+  expect(await screen.findByRole('button', { name: 'Reload app' })).toBeInTheDocument()
+  expect((await fixture.response())?.pending).toBeNull()
+  expect((await fixture.response())?.server.release).toBe('newer-release')
+  expect(reloads).toBe(0)
+})
+
+test.each(['restarting', 'failed'] as const)(
+  'a web-only publication clears a %s staged intent when server and web releases differ',
+  async (phase) => {
+    const fixture = await releaseFixture()
+    let reloads = 0
+    const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+    renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />)
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Update app' }))
+    await waitFor(() => expect(fixture.exits).toHaveLength(1))
+    await fixture.promote()
+    if (phase === 'failed') await fixture.verdict('failed')
+    await waitFor(() => expect(updateIntentStore.getState().intent.kind).toBe(phase))
+    await fixture.publishWeb()
+    const descriptor = await fixture.response()
+    expect(descriptor?.server.release).toBe('target-release')
+    expect(descriptor?.release).toBe('newer-release')
+    expect(descriptor?.pending).toBeNull()
+    await waitFor(() => expect(updateIntentStore.getState().intent.kind).toBe('idle'))
+    expect(await screen.findByRole('button', { name: 'Reload app' })).toBeInTheDocument()
+    expect(reloads).toBe(0)
+  },
+)
+
+test.each(['missing', 'failed'] as const)(
+  'a waiting staged target externally promoted with a %s check reaches bounded recovery after saving',
+  async (check) => {
+    const fixture = await releaseFixture()
+    const queryClient = await fixture.deadlineSettings()
+    let reloads = 0
+    const safety = createStore(() => ({ dirtyFiles: ['draft.ts'] as readonly string[] }))
+    renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />, {
+      queryClient,
+    })
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Update app' }))
+    await user.click(await screen.findByRole('button', { name: 'Update when done' }))
+    expect(updateIntentStore.getState().intent.kind).toBe('waiting')
+    await fixture.promote()
+    if (check === 'failed') await fixture.verdict('failed')
+    expect(reloads).toBe(0)
+    act(() => safety.setState({ dirtyFiles: [] }))
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(),
+      {
+        timeout: 4000,
+      },
+    )
+    expect(updateIntentStore.getState().intent).toMatchObject({
+      kind: 'failed',
+      reason: check === 'failed' ? 'health-check' : 'timeout',
+      target: { release: 'target-release', stagedAt: expect.any(String) },
+    })
+    expect(fixture.requests).toEqual([])
+    expect(fixture.exits).toEqual([])
+    expect(reloads).toBe(0)
+  },
+)
+
+test.each(['page-only', 'staged'] as const)(
+  'an old hung restart cannot keep a superseding %s release busy',
+  async (next) => {
+    const fixture = await releaseFixture()
+    const queryClient = await fixture.deadlineSettings()
+    let reloads = 0
+    const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+    renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />, {
+      queryClient,
+    })
+    const user = userEvent.setup()
+    fixture.holdRestart()
+    await user.click(await screen.findByRole('button', { name: 'Update app' }))
+    await waitFor(() => expect(fixture.requests).toHaveLength(1))
+    if (next === 'page-only') await fixture.promote('newer-release')
+    else await fixture.restage()
+    await waitFor(() => expect(updateIntentStore.getState().intent.kind).toBe('idle'))
+    expect(
+      await screen.findByRole('button', {
+        name: next === 'page-only' ? 'Reload app' : 'Update app',
+      }),
+    ).toBeEnabled()
+    expect(screen.queryByText('Updating…')).toBeNull()
+    if (next === 'page-only') {
+      act(() => safety.setState({ dirtyFiles: ['draft.ts'] }))
+      await user.click(screen.getByRole('button', { name: 'Reload app' }))
+      expect(await screen.findByText('draft.ts')).toBeInTheDocument()
+      expect(reloads).toBe(0)
+    } else {
+      await user.click(screen.getByRole('button', { name: 'Update app' }))
+      await waitFor(
+        () => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(),
+        {
+          timeout: 4000,
+        },
+      )
+      expect(updateIntentStore.getState().intent).toMatchObject({
+        kind: 'failed',
+        target: { release: 'newer-release' },
+      })
+    }
+    expect(fixture.requests).toHaveLength(1)
+    expect(fixture.exits).toEqual([])
+    fixture.releaseRestart()
+    await waitFor(() =>
+      expect(
+        primaryQueryClient().isMutating({ mutationKey: serverUpdateMutationKeys.restart() }),
+      ).toBe(0),
+    )
+  },
+)
+
 test('a required live check waits for a fresh passed verdict after the exact target is served', async () => {
   const fixture = await releaseFixture()
   let reloads = 0
@@ -174,6 +453,57 @@ test('a required live check waits for a fresh passed verdict after the exact tar
   expect((await fixture.response())?.liveCheck).toBeNull()
   expect(reloads).toBe(0)
   await fixture.verdict('passed')
+  await waitFor(() => expect(reloads).toBe(1))
+})
+
+test('retrying a failed staged live check preserves its exact health target until a fresh pass', async () => {
+  const fixture = await releaseFixture()
+  let reloads = 0
+  const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+  renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />)
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'Update app' }))
+  await waitFor(() => expect(fixture.exits).toHaveLength(1))
+  const target = updateIntentStore.getState().intent
+  expect(target.kind).toBe('restarting')
+  if (target.kind !== 'restarting') return
+
+  await fixture.promote()
+  await fixture.verdict('failed')
+  await user.click(await screen.findByRole('button', { name: 'Retry update' }))
+  expect(reloads).toBe(0)
+  expect(updateIntentStore.getState().intent).toMatchObject({
+    target: target.target,
+  })
+  expect(fixture.requests).toHaveLength(1)
+  await fixture.refresh()
+  expect(reloads).toBe(0)
+  await fixture.verdict('passed', 'target-release', '2000-01-01T00:00:00.000Z')
+  expect(reloads).toBe(0)
+  await fixture.verdict('passed')
+  await waitFor(() => expect(reloads).toBe(1))
+})
+
+test('a successful health retry keeps unsaved buffers protected until the last buffer is saved', async () => {
+  const fixture = await releaseFixture()
+  let reloads = 0
+  const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+  renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />)
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'Update app' }))
+  await waitFor(() => expect(fixture.exits).toHaveLength(1))
+  await fixture.promote()
+  await fixture.verdict('failed')
+  await user.click(await screen.findByRole('button', { name: 'Retry update' }))
+  expect(reloads).toBe(0)
+  act(() => safety.setState({ dirtyFiles: ['draft.ts'] }))
+  await fixture.verdict('passed')
+  expect(await screen.findByRole('button', { name: 'Reload app' })).toBeInTheDocument()
+  expect(reloads).toBe(0)
+  expect(fixture.requests).toHaveLength(1)
+  await fixture.refresh()
+  expect(reloads).toBe(0)
+  act(() => safety.setState({ dirtyFiles: [] }))
   await waitFor(() => expect(reloads).toBe(1))
 })
 
@@ -196,7 +526,9 @@ test('a stale passed verdict cannot satisfy the exact staged target until a fres
 test('unsaved buffers defer a healthy target reload and saving the last buffer clears the deferral', async () => {
   const fixture = await releaseFixture()
   let reloads = 0
-  const safety = createStore(() => ({ dirtyFiles: ['draft.ts', 'other.ts'] as readonly string[] }))
+  const safety = createStore(() => ({
+    dirtyFiles: ['draft.ts', 'other.ts'] as readonly string[],
+  }))
   renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />)
   const user = userEvent.setup()
   await user.click(await screen.findByRole('button', { name: 'Update app' }))
@@ -218,6 +550,46 @@ test('unsaved buffers defer a healthy target reload and saving the last buffer c
   await fixture.refresh()
   expect(reloads).toBe(1)
 })
+
+test.each(['failed', 'missing'] as const)(
+  'a dirty deferred reload whose verdict becomes %s reaches recovery and retains its health target',
+  async (verdict) => {
+    const fixture = await releaseFixture()
+    const queryClient = await fixture.deadlineSettings()
+    let reloads = 0
+    const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+    renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />, {
+      queryClient,
+    })
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Update app' }))
+    await waitFor(() => expect(fixture.exits).toHaveLength(1))
+    await fixture.promote()
+    act(() => safety.setState({ dirtyFiles: ['draft.ts'] }))
+    await fixture.verdict('passed')
+    expect(await screen.findByRole('button', { name: 'Reload app' })).toBeInTheDocument()
+    const deferred = updateIntentStore.getState().intent
+    expect(deferred.kind).toBe('reload')
+    if (deferred.kind !== 'reload') return
+    if (verdict === 'failed') await fixture.verdict('failed')
+    else await fixture.clearVerdict()
+    expect(reloads).toBe(0)
+    act(() => safety.setState({ dirtyFiles: [] }))
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(),
+      {
+        timeout: 4000,
+      },
+    )
+    expect(updateIntentStore.getState().intent).toMatchObject({
+      kind: 'failed',
+      reason: verdict === 'failed' ? 'health-check' : 'timeout',
+      target: deferred.target,
+    })
+    expect(reloads).toBe(0)
+    expect(fixture.requests).toHaveLength(1)
+    expect(fixture.exits).toHaveLength(1)
+  },
+)
 
 test('a healthy different release after restaging never fulfills the original reload intent', async () => {
   const fixture = await releaseFixture()

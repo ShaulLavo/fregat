@@ -933,6 +933,10 @@ export const selectors = {
   clientUpdateReload: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
   serverUpdating: (page: Page) => page.getByRole('button', { name: 'Updating…', exact: true }),
+  serverUpdateRetry: (page: Page) =>
+    page.getByRole('button', { name: 'Retry update', exact: true }),
+  serverUpdateTooltip: (page: Page) =>
+    page.locator('[data-slot="tooltip-content"]').filter({ hasText: 'Retry update' }),
   serverUpdateApply: (page: Page) =>
     page.locator('[data-server-update]').getByRole('button', { name: 'Update app', exact: true }),
   updatePopover: (page: Page) => page.getByRole('dialog', { name: 'Update now?' }),

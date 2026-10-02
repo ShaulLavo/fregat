@@ -15,6 +15,9 @@ import { useRelease } from '@/features/server-update/hooks/use-release'
 import { useRestart } from '@/features/server-update/hooks/use-restart'
 import { useServerUpdate } from '@/features/server-update/hooks/use-server-update'
 import { updateIntentStore, type UpdateTarget } from '@/features/server-update/state/intent'
+import { reconcileUpdateIntent } from '@/features/server-update/utils/reconcile-intent'
+import { updateRestartTimeoutMs } from '@/features/server-update/utils/restart-timeout'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { serverUpdateMutationKeys } from '@/features/server-update/utils/mutation-keys'
 import { notifyMutationError } from '@/features/server-update/utils/notify-mutation-error'
 import { isRestartDisconnect } from '@/features/server-update/utils/restart-outcome'
@@ -54,17 +57,26 @@ export function useUpdateApp({
     selectServerConnection(state, primaryServerOrigin()),
   )
   const restart = useRestart()
-  const restarting =
-    intent.kind === 'restarting' &&
-    (intent.confirmed ||
-      connection.phase !== 'connected' ||
-      connection.serverInstanceId !== intent.instance)
+  const activationSeconds = useSettingValue('server.activationTimeoutSeconds')
+  const recoveryTimeoutMs = updateRestartTimeoutMs(activationSeconds)
   const pageTarget: UpdateTarget | null =
     loadedRelease && data?.release && loadedRelease !== data.release
       ? { release: data.release, stagedAt: null }
       : null
   const available = pending ?? pageTarget
   const currentTarget = intent.kind === 'idle' ? available : intent.target
+
+  function observe(target: UpdateTarget) {
+    setIntent({
+      kind: 'restarting',
+      target,
+      confirmed: true,
+      instance: connection.serverInstanceId,
+      fromRelease: data?.server.release ?? null,
+      startedAt: Date.now(),
+    })
+    void primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+  }
 
   function send(target: UpdateTarget, interrupt: SessionId[], waiting: boolean) {
     if (target.stagedAt === null) {
@@ -73,14 +85,28 @@ export function useUpdateApp({
     }
     const instance = connection.serverInstanceId
     const fromRelease = data?.server.release ?? null
+    const startedAt = Date.now()
+    setIntent({ kind: 'restarting', target, confirmed: false, instance, fromRelease, startedAt })
     restart.mutate(
       { target, interrupt },
       {
         onSuccess: (answer) => {
           const current = updateIntentStore.getState().intent
-          if (current.kind === 'idle' || !sameUpdateTarget(current.target, target)) return
+          if (
+            current.kind !== 'restarting' ||
+            current.startedAt !== startedAt ||
+            !sameUpdateTarget(current.target, target)
+          )
+            return
           if (answer.restarting)
-            setIntent({ kind: 'restarting', target, confirmed: true, instance, fromRelease })
+            setIntent({
+              kind: 'restarting',
+              target,
+              confirmed: true,
+              instance,
+              fromRelease,
+              startedAt,
+            })
           else if (waiting)
             setIntent({
               kind: 'waiting',
@@ -94,11 +120,23 @@ export function useUpdateApp({
         },
         onError: (error) => {
           const current = updateIntentStore.getState().intent
-          if (current.kind === 'idle' || !sameUpdateTarget(current.target, target)) return
+          if (
+            current.kind !== 'restarting' ||
+            current.startedAt !== startedAt ||
+            !sameUpdateTarget(current.target, target)
+          )
+            return
           if (isRestartDisconnect(error))
-            setIntent({ kind: 'restarting', target, confirmed: false, instance, fromRelease })
+            setIntent({
+              kind: 'restarting',
+              target,
+              confirmed: false,
+              instance,
+              fromRelease,
+              startedAt,
+            })
           else {
-            setIntent({ kind: 'failed', target })
+            setIntent({ kind: 'failed', target, reason: 'request' })
             notifyMutationError(error)
           }
         },
@@ -132,53 +170,82 @@ export function useUpdateApp({
   const reconcile = useEffectEvent(() => {
     if (intent.kind === 'idle' || !data) return
     const target = intent.target
-    if (newerUpdateTarget(pending, target) || newerUpdateTarget(pushed?.pending, target)) {
+    if (intent.kind === 'restarting' && query.dataUpdatedAt < intent.startedAt) return
+    const disposition = reconcileUpdateIntent(intent, data)
+    if (disposition === 'superseded' || disposition === 'gone') {
       setIntent({ kind: 'idle' })
       return
     }
-    if (target.stagedAt === null && data.release !== target.release) {
+    if (newerUpdateTarget(pushed?.pending, target)) {
       setIntent({ kind: 'idle' })
       return
     }
     const healthy = releaseReadyForReload(data, target)
+    if (
+      (intent.kind === 'restarting' || intent.kind === 'reload') &&
+      target.stagedAt !== null &&
+      data.liveCheck?.release === target.release &&
+      data.liveCheck.status === 'failed' &&
+      Date.parse(data.liveCheck.at) >= Date.parse(target.stagedAt)
+    ) {
+      setIntent({ kind: 'failed', target, reason: 'health-check' })
+      return
+    }
     if (intent.kind === 'restarting') {
-      if (
-        data.server.release &&
-        data.server.release !== intent.fromRelease &&
-        data.server.release !== target.release
-      ) {
-        setIntent({ kind: 'idle' })
-        return
-      }
-      if (
-        data.liveCheck?.release === target.release &&
-        data.liveCheck.status === 'failed' &&
-        target.stagedAt !== null &&
-        Date.parse(data.liveCheck.at) >= Date.parse(target.stagedAt)
-      ) {
-        setIntent({ kind: 'failed', target })
-        return
-      }
       if (healthy) setIntent({ kind: 'reload', target })
       return
     }
     if (intent.kind === 'reload') {
-      if (healthy && dirtyFiles.length === 0 && !navigation.isPending) navigation.mutate(target)
+      if (dirtyFiles.length > 0) return
+      if (!healthy && target.stagedAt !== null) {
+        observe(target)
+        return
+      }
+      if (healthy && !navigation.isPending) navigation.mutate(target)
       return
     }
-    if (intent.kind !== 'waiting' || restart.isPending) return
-    if (target.stagedAt === null) {
-      if (dirtyFiles.length === 0) setIntent({ kind: 'reload', target })
+    if (intent.kind === 'failed') {
+      if (intent.reason === 'health-check' && healthy) setIntent({ kind: 'reload', target })
       return
     }
-    if (!sameUpdateTarget(pending, target)) {
-      setIntent({ kind: 'idle' })
+    if (intent.kind !== 'waiting') return
+    if (disposition === 'served') {
+      if (dirtyFiles.length > 0 || (target.stagedAt !== null && busy.length > 0)) return
+      if (healthy) setIntent({ kind: 'reload', target })
+      else if (target.stagedAt !== null) observe(target)
       return
     }
-    if (dirtyFiles.length === 0 && busy.length === 0 && query.dataUpdatedAt > intent.gateReadAt)
-      send(target, [], true)
-    else if (!sameBusySessions(intent.busy, busy)) setIntent({ ...intent, busy })
+    if (dirtyFiles.length === 0 && busy.length === 0 && query.dataUpdatedAt > intent.gateReadAt) {
+      if (restart.isPending) observe(target)
+      else send(target, [], true)
+      return
+    }
+    if (!sameBusySessions(intent.busy, busy)) setIntent({ ...intent, busy })
   })
+
+  const expireRestart = useEffectEvent((target: UpdateTarget, startedAt: number) => {
+    const current = updateIntentStore.getState().intent
+    if (
+      current.kind !== 'restarting' ||
+      current.startedAt !== startedAt ||
+      !sameUpdateTarget(current.target, target)
+    )
+      return
+    setIntent({
+      kind: 'failed',
+      target,
+      reason: query.isError || connection.phase !== 'connected' ? 'unreachable' : 'timeout',
+    })
+  })
+
+  useEffect(() => {
+    if (intent.kind !== 'restarting') return
+    const timer = window.setTimeout(
+      () => expireRestart(intent.target, intent.startedAt),
+      Math.max(0, intent.startedAt + recoveryTimeoutMs - Date.now()),
+    )
+    return () => window.clearTimeout(timer)
+  }, [intent, recoveryTimeoutMs])
 
   useEffect(() => {
     void primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
@@ -197,25 +264,30 @@ export function useUpdateApp({
   ])
 
   function request() {
-    if (!data || intent.kind === 'reload' || !available || restart.isPending || restarting) return
-    if (dirtyFiles.length > 0 || (available.stagedAt !== null && busy.length > 0)) {
+    const target = intent.kind === 'failed' ? intent.target : available
+    if (intent.kind === 'reload' || intent.kind === 'restarting' || !target) return
+    if (
+      intent.kind === 'failed' &&
+      target.stagedAt !== null &&
+      (!data || !sameUpdateTarget(pending, target))
+    ) {
+      observe(target)
+      return
+    }
+    if (!data) return
+    if (dirtyFiles.length > 0 || (target.stagedAt !== null && busy.length > 0)) {
       setIntent({
         kind: 'confirm',
-        target: available,
-        busy: available.stagedAt === null ? NO_BUSY : busy,
+        target,
+        busy: target.stagedAt === null ? NO_BUSY : busy,
       })
       return
     }
-    if (available.stagedAt === null) setIntent({ kind: 'reload', target: available })
-    else
-      setIntent({
-        kind: 'restarting',
-        target: available,
-        confirmed: false,
-        instance: connection.serverInstanceId,
-        fromRelease: data?.server.release ?? null,
-      })
-    if (available.stagedAt !== null) send(available, [], false)
+    if (target.stagedAt !== null && restart.isPending) {
+      observe(target)
+      return
+    }
+    send(target, [], false)
   }
 
   function wait() {
@@ -226,15 +298,10 @@ export function useUpdateApp({
   function updateNow() {
     if (intent.kind !== 'confirm') return
     const { target, busy: accepted } = intent
-    if (target.stagedAt === null) setIntent({ kind: 'reload', target })
-    else
-      setIntent({
-        kind: 'restarting',
-        target,
-        confirmed: false,
-        instance: connection.serverInstanceId,
-        fromRelease: data?.server.release ?? null,
-      })
+    if (target.stagedAt !== null && restart.isPending) {
+      observe(target)
+      return
+    }
     send(
       target,
       accepted.map((session) => session.sessionId),
@@ -244,12 +311,11 @@ export function useUpdateApp({
 
   return {
     intent,
-    restarting,
     available,
     currentTarget,
     dirtyFiles,
     busy: intent.kind === 'confirm' || intent.kind === 'waiting' ? intent.busy : NO_BUSY,
-    pending: restart.isPending,
+    pending: intent.kind === 'restarting' && restart.isPending,
     request,
     wait,
     updateNow,

@@ -1,7 +1,7 @@
 import { sameUpdateTarget, type LiveCheckVerdict, type StagedRelease } from '@workspace/contracts'
 import type { UpdateTarget } from '@/features/server-update/state/intent'
 
-type ReleaseStatus = {
+export type ReleaseStatus = {
   readonly release: string | null
   readonly server: { readonly release: string | null }
   readonly pending: StagedRelease | null
