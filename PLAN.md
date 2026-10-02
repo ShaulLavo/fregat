@@ -15,6 +15,10 @@ Package roadmap files link here. Create and update plans in root `plans/`.
 
 ## Current execution order
 
+The approved [October 2 issue triage](plans/issue-triage-2026-10-02.md) collects the selected
+repositories and fixes small confirmed bugs. Larger scopes remain for issue review;
+preserve existing dependency gates and explicit deferrals recorded there.
+
 The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remaining
 work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
 snapshot; this file remains the scheduler and each plan remains its scope authority.

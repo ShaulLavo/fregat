@@ -275,6 +275,26 @@ describe('a fixture whose stdin closes mid-approval', () => {
 })
 
 describe('the scenario Codex fixture config/read contract', () => {
+  it('returns an empty config for the held queue fixture', async () => {
+    const { root, file, repo } = fixtureRoot('queue-config', 'native-queue.mjs', 'codex.mjs')
+    const fixture = new FixtureProcess(file, [], { cwd: repo, env: { CODEX_HOME: root } })
+    try {
+      fixture.send({ id: 1, method: 'config/read', params: { cwd: repo, includeLayers: true } })
+      expect(await fixture.next((message) => message.id === 1)).toEqual({
+        id: 1,
+        result: { config: {}, origins: {}, layers: null },
+      })
+      fixture.send({ id: 2, method: 'config/unsupported', params: {} })
+      expect(await fixture.next((message) => message.id === 2)).toEqual({
+        id: 2,
+        error: { code: -32601, message: 'Unsupported queue fixture method config/unsupported' },
+      })
+    } finally {
+      fixture.child.kill()
+      await fixture.exited
+    }
+  })
+
   it.each(['file-attachments', 'mcp-approval', 'background-liveness'])(
     'returns the consumed empty config shape in %s mode',
     async (scenario) => {
