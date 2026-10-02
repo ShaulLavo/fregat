@@ -294,9 +294,11 @@ The corrected harness removes its own stale port file before launching the next 
 This is causal behavioral evidence for the SSH keychain interaction, not a real-keychain acceptance
 claim or a reason to weaken production Chromium arguments.
 
-`apps/desktop/scripts/verify-chromium-macos.ts` requires Darwin, the approved scratch prefix and
-an isolated scratch `HOME`; its mock keychain requires explicit `--mock-keychain`. With that
-scratch-only switch, **Chrome and Helium both passed actual `--app` / production CDP-pipe**
+The Mac native and Chromium proofs were one-off runs on the owner's Mac over SSH; their
+machine-specific scripts are removed from the checkout. The Chromium proof used Darwin, the
+approved scratch prefix and an isolated scratch `HOME`; its mock keychain required explicit
+`--mock-keychain`. With that scratch-only switch, **Chrome and Helium both passed actual
+`--app` / production CDP-pipe**
 fixture DOM and bridge checks, a new bridged window, live same-profile singleton handoff to a
 third bridged page, and last-page shutdown. The fixture remained reachable after each owned
 browser exited. This is separate from the bare WebSocket diagnostic baseline. A regression locks
