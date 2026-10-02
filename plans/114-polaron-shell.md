@@ -176,11 +176,20 @@ browser and proceed to the native host. Do not describe that fallback as full in
 ### Server availability without user steps
 
 A Dock shortcut opens the manifest's stable start URL directly. The page cannot start a local
-process, so the installer/first Polaron setup must register its server with the OS before
+process, so the installer/first Polaron setup must register or reuse the machine server before
 installing the PWA. This is one-time setup, performed automatically. Subsequent browser launches
 need only a connection to the stable endpoint; they do not run the launcher or an installation
 script. Setup itself is idempotent and verifies the service, origin and served release before
 creating the browser registration.
+
+#### One server per machine and state home
+
+**Approved owner decision (2026-10-02).** Each machine has one Fregat server for each state home.
+Installed apps, ordinary browser tabs and phones over mesh all share it. The OS-managed service
+is that machine's server at a fixed address; the installed app never starts a second server
+against the same state. Opening any client connects to the running server or activates that
+same service. A remote target is another machine's server, not an additional client-owned server.
+Development remains separate, with its own ports and resolved dev state home.
 
 #### Stable endpoint and origin
 
@@ -194,21 +203,64 @@ Choose the install target once and persist that choice as installation intent.
 
 The local desktop port becomes a machine-scoped registry entry, with 3301 as the initial default.
 Honor an already configured endpoint. Reserve the chosen port through the OS socket unit before
-PWA installation; on conflict, report the occupying service and resolve setup before installing.
+PWA installation when free; when occupied, run the identity probe below and reuse only a match.
 Do not pick a different port on every run, silently share another app's origin, or bind publicly.
 Use one explicit IPv4 loopback address, not an ambiguous `localhost` resolution. HTTP loopback is
 a potentially trustworthy browser context; prove required web APIs on that exact origin.
 
-The packaged local release uses web base `/`. Today's remote release uses `/platform/` through
-mesh; a local install must not point that remote bundle at a different base. Reuse the release
-builder with an explicit install-target build configuration. Server-generated URLs, CORS,
+A new packaged local release uses web base `/`. Today's shared production release uses
+`/platform/` through mesh. Reusing an existing same-state server also reuses its configured web
+base, release and service; for example the loopback client uses `/platform/` if that is what the
+shared server serves. No second root-base server is started to suit the app. Reuse the release
+builder with an explicit server-installation target when creating a new machine service. Server-generated URLs, CORS,
 WebSocket/MCP URLs, cookies, and route helpers use the stable public origin, not the activator's
 private upstream endpoint. Install manifest identity `./` against the chosen start URL.
 
 Changing scheme, host, port, or base path changes browser origin, storage, permissions, and app
 identity. Such a change is a new installation with explicit owner review, not an automatic release
-update. Dev and local/remote production installations remain separate. No account/state migration
+update. Browser registrations for loopback and mesh origins have separate browser storage even
+when they reach the same server; that does not create separate backend state or services. Dev
+keeps its separate state home and ports. No account/state migration
 or browser-database editing is part of this work.
+
+#### Identity probe, reuse and conflict handling
+
+Add an authenticated machine-server identity endpoint returning the product/protocol identity,
+persistent server/state identity, canonical resolved state-home path, machine identity, configured
+stable address/web base and service registration owner. A health response or matching HTML title
+is insufficient. Resolve symlinks before comparing the expected state home; the persisted state
+identity distinguishes a replaced directory at the same path. Use the existing machine/server
+authentication and secret store for local setup; do not expose state-home paths to unauthenticated
+mesh clients or log credentials and state paths. Verify the response against local installation
+intent and credentials, not an untrusted server's self-declared product name alone.
+
+Setup serializes service registration and performs this decision before PWA installation.
+
+| Probe outcome                                                                     | Required action                                                                                                                                                                 |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fixed address free                                                                | Register one OS listener/service, activate it, verify the authenticated identity, then install the client                                                                       |
+| Existing Fregat, same canonical state home and state identity                     | Reuse its service, address, web base, release and state; register the browser app only                                                                                          |
+| Existing Fregat, different state home/identity                                    | Fail with a structured address conflict identifying Fregat and the mismatch; require choosing the intended existing server or explicitly configuring another state-home service |
+| Another program owns the address                                                  | Fail with a structured address conflict naming the known program/process holder; leave it untouched                                                                             |
+| Listener exists but is starting, unreachable to the probe, or cannot authenticate | Await a bounded activation/readiness probe; if identity cannot be established, fail with a structured verification conflict and leave the listener untouched                    |
+
+Use OS listener/process inspection when permitted to identify the holder; if its identity is
+unavailable, state that fact instead of guessing. Public error guidance explains the address
+conflict and how to select the intended server; runtime facts carry product/holder and mismatch
+category without leaking credentials or setting values into logs. Do not kill a port owner,
+silently select an ephemeral port, launch a second state-home server, or adopt an unauthenticated
+listener. After registration, probe again to close the setup race. Two simultaneous installers
+must converge or fail cleanly without overwriting each other's unit configuration.
+
+Service ownership is persisted installation intent. An existing continuously running production
+service is reused as it stands. Converting it to socket activation is a coordinated server update
+through its current supervisor, preserving its port, state, release and mesh route, not a second
+`fregat-server` service alongside it. A same-state server found on a different address is resolved
+through its recorded service registration and fixed address, not restarted at a new default.
+Enforce a process-lifetime state-home ownership lock in the shared server boot path as well as
+setup serialization. All entry points respect it, so even an accidental invocation on a second
+port cannot start another server against the same state. Lock ownership ends with the process;
+do not rely on deleting stale PID files or forcibly evict a live owner.
 
 #### macOS registration and socket activation
 
@@ -254,7 +306,8 @@ same issue; it cannot make Bun bind a port launchd/systemd already owns.
 takes the OS-owned listener and relays accepted byte streams to a private Unix-domain listener
 of the unmodified HTTP/WebSocket application. It forks/execs the Bun server from `current`,
 passes an internal activation descriptor identifying its runtime socket/public origin, and
-waits for the existing health/release endpoint before forwarding queued clients. The activator
+waits for the health/release and authenticated identity endpoints before forwarding queued
+clients. One activation starts one server; concurrent first connections share that startup. The activator
 remains the transport relay. It preserves bytes and backpressure, so browser WebSocket upgrades,
 SSE, uploads, HTTP keep-alive and half-close do not require a second HTTP implementation.
 
@@ -313,13 +366,18 @@ failure boundary, including a bad candidate server and an activator that fails b
 The current release's `server/node_modules` relationship means dependency updates must follow
 the existing deployment contract; a link rollback does not undo a dependency install.
 
-Uninstall automatically unregisters the local app's LaunchAgent or systemd socket/service pair,
-stops only that installation's owned processes after handling busy-work approval, and removes
-its browser registration through a browser-supported uninstall route. Do not delete `~/.platform`,
-workspaces, secrets, logs, or shared terminals by default. Data deletion is a separate explicit
-action. A browser-client uninstall for remote mode never disables or deletes the remote server
-or mesh route, since other clients use them. Do not manually delete browser databases or app
-bundles as a substitute for a browser uninstall. Test unregister/reinstall while retaining state.
+Removing an installed browser app removes only its browser registration, through a browser-supported
+uninstall route. It keeps the shared machine server, socket and mesh route: ordinary browser tabs,
+phones and other app registrations still use them. A separate explicit machine-server uninstall
+unregisters the recorded service owner (LaunchAgent or systemd socket/service pair), stops only
+its owned processes after handling busy-work approval, and removes installer-owned registration
+files. Reusing an existing service does not transfer uninstall ownership to the browser client.
+
+Neither operation deletes `~/.platform`, workspaces, secrets, logs, or shared terminals by default.
+Data deletion is a separate explicit action. A remote-target client uninstall never disables or
+deletes the remote server or mesh route. Do not manually delete browser databases or app bundles
+as a substitute for browser uninstall. Test app uninstall with another browser/phone still using
+the shared server, then explicit server unregister/reinstall with state retained.
 
 #### Existing mesh infrastructure and remote mode
 
@@ -355,11 +413,13 @@ authorization; it is never introduced as an invisible Dock-launch interception.
       Browser setting copy, and generated settings artifacts.
 - [x] Inventory every bridge member, transport message, and web consumer. Name replacements,
       unsupported capabilities, and remote/native-picker constraints here.
-- [ ] Owner reviews this design, production origin, remote chooser policy, and incapable-browser
-      fallback. Installed-app implementation remains paused until that review.
+- [ ] Owner reviews the remaining stable-origin, activation-adapter, remote chooser and incapable-
+      browser decisions. The shared machine/state-home server model above is already approved. Installed-app implementation remains paused until that review.
 - [ ] Prototype OS socket activation and queued first-request boot on macOS/Linux; decide direct
       socket adoption from evidence or ship the minimal relay. Prove stable-origin setup, no launcher
-      present, server idle/restart, update/rollback, and retained-data uninstall/reinstall.
+      present, server idle/restart, update/rollback, and retained-data uninstall/reinstall. Test same-state
+      identity reuse, another-program/different-state conflicts, concurrent setup, state-home locking,
+      and app/browser/phone clients sharing one server.
 - [ ] Prototype cold installation, repeat installation, Dock-first then launcher launch, user
       uninstall then repair, launch URL delivery, and CDP release using disposable profiles. Confirm
       Chrome 154 and Helium 154 separately. No real accounts or default browsing profiles.
@@ -437,8 +497,9 @@ What the 2.x migration cost, measured on 2026-09-13 and 2026-09-25:
 Today the desktop waits for the mesh-managed API and Vite URLs, opens a window, installs
 `window.platformBridge`, answers `pickEntry`, and flushes observability on quit. It does not
 spawn or stop those shared servers. On macOS it attaches vibrancy behind a transparent window.
-Polaron preserves that ownership. A future packaged standalone server lifecycle belongs to the
-packaging follow-up and requires an explicit owned-process contract.
+Polaron preserves shared-server ownership. The approved installed-app design above extends the
+packaging follow-up with OS activation and a single server per machine/state home, never an
+app-window-owned server.
 
 ## The shape
 
