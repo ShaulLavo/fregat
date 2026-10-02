@@ -12,7 +12,7 @@ const acceptEntrySchema = v.pipe(
 /** `POST /fs/native-picker`. `startingPath` is an absolute path on the server's machine. */
 export const nativePickerRequestSchema = v.object({
   mode: v.picklist(['folder', 'file']),
-  accept: v.optional(v.pipe(v.array(acceptEntrySchema), v.maxLength(64))),
+  accept: v.optional(v.pipe(v.array(acceptEntrySchema), v.maxLength(64), v.readonly())),
   startingPath: v.optional(absolutePathSchema),
   multiple: v.optional(v.boolean()),
 })

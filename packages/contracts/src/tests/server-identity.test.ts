@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 
-import { nativePickerRequestSchema, nativePickerResultSchema } from '../native-picker'
+import {
+  nativePickerRequestSchema,
+  nativePickerResultSchema,
+  type NativePickerRequest,
+} from '../native-picker'
 import { serverCapabilitiesSchema, serverIdentitySchema } from '../server-identity'
 
 const identity = {
@@ -103,5 +107,13 @@ describe('native picker', () => {
     expect(
       v.safeParse(nativePickerResultSchema, { outcome: 'selected', paths: ['/a'] }).success,
     ).toBe(true)
+  })
+})
+
+describe('native picker request type', () => {
+  it('takes a readonly accept list', () => {
+    const accept: readonly string[] = ['.ts']
+    const request: NativePickerRequest = { mode: 'file', accept }
+    expect(request.accept).toBe(accept)
   })
 })
