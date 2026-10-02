@@ -60,9 +60,9 @@ try {
 }
 
 async function start() {
-  if (process.platform !== 'linux')
+  if (process.platform !== 'linux' && process.platform !== 'darwin')
     throw launcherErrors.LAUNCH_FAILED({
-      internal: { platform: process.platform, supportedPlatform: 'linux' },
+      internal: { platform: process.platform, supportedPlatforms: ['linux', 'darwin'] },
     })
   const web = runtimeUrl(Bun.env.WEB_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'WEB_PORT', 5173))
   const server = runtimeUrl(Bun.env.FS_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'PORT', 3001))
@@ -82,6 +82,7 @@ async function start() {
     settings.transparency,
     {
       home,
+      platform: process.platform,
       path: Bun.env.PATH || '',
       configHome: Bun.env.XDG_CONFIG_HOME,
       configDirs: Bun.env.XDG_CONFIG_DIRS,
@@ -108,12 +109,13 @@ async function start() {
           signal: controller.signal,
           budget: settings.native,
           startup: settings.startup,
+          vibrancy: settings.transparency === 'window',
           onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
         })
       } catch (error) {
         if (controller.signal.aborted) throw error
         recordDesktopInfo('desktop.browser.rejected', {
-          engine: 'webkitgtk',
+          engine: process.platform === 'darwin' ? 'wkwebview' : 'webkitgtk',
           ...launcherFailureFacts(error),
         })
         continue
@@ -126,7 +128,10 @@ async function start() {
         engine: 'tab',
         reason: 'controlled-browser-unavailable',
       })
-      const child = Bun.spawn({ cmd: ['xdg-open', web], stdio: ['ignore', 'ignore', 'ignore'] })
+      const child = Bun.spawn({
+        cmd: [process.platform === 'darwin' ? '/usr/bin/open' : 'xdg-open', web],
+        stdio: ['ignore', 'ignore', 'ignore'],
+      })
       const stopOpener = () => child.kill('SIGTERM')
       controller.signal.addEventListener('abort', stopOpener, { once: true })
       try {

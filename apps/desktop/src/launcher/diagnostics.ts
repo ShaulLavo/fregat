@@ -129,7 +129,7 @@ const ioCounter = (io: string | undefined, name: string) =>
   counter(new RegExp(`^${name}: (\\d+)$`, 'm').exec(io ?? '')?.[1])
 
 // Two small reads, cheap enough to sample through startup; null where /proc is absent.
-export function processCounters(
+function processCounters(
   pid: number,
   read: (file: string) => string = (file) => readFileSync(file, 'utf8'),
 ) {
@@ -170,4 +170,12 @@ function threadWaits(
     blockedWaits[wait] = (blockedWaits[wait] ?? 0) + 1
   }
   return { threadStates, blockedWaits }
+}
+
+// Without Linux /proc, only incoming DevTools traffic renews the startup idle budget.
+export function startupProcessCounters(
+  pid: number,
+  platform: NodeJS.Platform = process.platform,
+): Record<string, number | null> {
+  return platform === 'linux' ? processCounters(pid) : {}
 }

@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { macBrowserCandidates, runMacCommand, type MacCommand } from './mac-browser'
 import { launcherErrors } from './structured-errors'
 
 export type BrowserCandidate = {
@@ -21,6 +22,8 @@ export type BrowserEnvironment = {
   configDirs?: string
   dataHome?: string
   dataDirs?: string
+  platform?: NodeJS.Platform
+  runMac?: MacCommand
   currentDesktop?: string
 }
 
@@ -63,6 +66,10 @@ export function resolveBrowserCandidates(
     const configured = configuredBrowser(setting, env, fs)
     if (configured) candidates.push(configured)
   }
+  if (env.platform === 'darwin') {
+    candidates.push(...macBrowserCandidates(env, fs, env.runMac ?? runMacCommand))
+    return [...deduplicate(candidates), { kind: 'webview' }, { kind: 'tab' }]
+  }
   const desktop = defaultDesktop(env, fs)
   const preferred = desktop && desktopBrowser(desktop, env, fs)
   if (preferred) candidates.push(preferred)
@@ -80,14 +87,17 @@ export function resolveBrowserCandidates(
     const exported = flatpakExport(family.flatpak, env, fs)
     if (exported) candidates.push(flatpakCandidate(exported, family.flatpak, 'scan', family.name))
   }
-  const unique = candidates.filter(
+  return [...deduplicate(candidates), { kind: 'webview' }, { kind: 'tab' }]
+}
+
+function deduplicate(candidates: readonly BrowserCandidate[]) {
+  return candidates.filter(
     (value, index) =>
       candidates.findIndex(
         (other) =>
           other.executable === value.executable && other.args.join('\0') === value.args.join('\0'),
       ) === index,
   )
-  return [...unique, { kind: 'webview' }, { kind: 'tab' }]
 }
 
 function configuredBrowser(setting: string, env: BrowserEnvironment, fs: BrowserFileSystem) {

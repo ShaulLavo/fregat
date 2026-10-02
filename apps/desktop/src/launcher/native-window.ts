@@ -18,6 +18,8 @@ export async function launchWebview(options: {
   signal?: AbortSignal
   budget: NativeBudget
   startup: StartupBudget
+  platform?: NodeJS.Platform
+  vibrancy?: boolean
   initialScript?: string
   spawn?: HostSpawn
   onMessage?(body: unknown): void
@@ -28,7 +30,15 @@ export async function launchWebview(options: {
   const token = randomUUID()
   writeFileSync(
     script,
-    (options.initialScript ?? '') + '\n' + shellBridge(options.url, 'webkitgtk', token),
+    (options.initialScript ?? '') +
+      '\n' +
+      shellBridge(
+        options.url,
+        (options.platform ?? process.platform) === 'darwin' ? 'wkwebview' : 'webkitgtk',
+        token,
+        options.platform,
+        options.vibrancy,
+      ),
     { mode: 0o600 },
   )
   let host: WebviewHost
@@ -41,6 +51,10 @@ export async function launchWebview(options: {
       onEvent: (event) => {
         if (event.event === 'message') options.onMessage?.(event.body)
         if (event.event !== 'message' || !isRecord(event.body) || event.body.token !== token) return
+        if (event.body.method === 'drag' && event.body.origin === new URL(options.url).origin) {
+          host.drag()
+          return
+        }
         const request = parsePickRequest(event.body, new URL(options.url).origin)
         if (!request) return
         void completePick(request.id, request.documentId, host.pick(request.options), reply)

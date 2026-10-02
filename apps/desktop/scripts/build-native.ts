@@ -19,10 +19,18 @@ export function buildNative(
   if (process.platform !== 'linux' && process.platform !== 'darwin') return null
   const linux = process.platform === 'linux'
   if (linux && shell !== 'polaron') return null
-  const source = path.join(desktopDir, 'native', linux ? 'linux/platform-webview.c' : 'vibrancy.m')
+  const source = path.join(
+    desktopDir,
+    'native',
+    linux
+      ? 'linux/platform-webview.c'
+      : shell === 'polaron'
+        ? 'macos/platform-webview.m'
+        : 'vibrancy.m',
+  )
   const output = path.join(
     nativeLibraryDir(desktopDir),
-    linux ? 'platform-webview' : NATIVE_LIBRARY_NAME,
+    linux || shell === 'polaron' ? 'platform-webview' : NATIVE_LIBRARY_NAME,
   )
   if (!existsSync(source))
     throw buildErrors.BUILD_FAILED({ internal: { stage: 'source', platform: process.platform } })
@@ -42,7 +50,15 @@ export function buildNative(
   }
   const args = linux
     ? []
-    : ['-dynamiclib', '-fobjc-arc', '-mmacosx-version-min=11.0', '-framework', 'Cocoa']
+    : [
+        ...(shell === 'electrobun'
+          ? ['-dynamiclib']
+          : ['-framework', 'WebKit', '-framework', 'UniformTypeIdentifiers']),
+        '-fobjc-arc',
+        '-mmacosx-version-min=11.0',
+        '-framework',
+        'Cocoa',
+      ]
   const result = Bun.spawnSync([compiler, ...args, '-O2', '-o', output, source, ...flags])
   if (result.exitCode !== 0) {
     process.stderr.write(result.stderr)
