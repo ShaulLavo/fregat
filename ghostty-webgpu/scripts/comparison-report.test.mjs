@@ -1,5 +1,5 @@
 import { PNG } from 'pngjs'
-import { compactEvidence } from './comparison-compact.mjs'
+import { compactEvidence, comparisonLatencyEndpoint } from './comparison-compact.mjs'
 import { ink } from './comparison-pixels.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -660,4 +660,59 @@ test('compaction retains preparation failures and incomplete paired verdicts', a
   const compact = await compactEvidence(artifact, '.')
   assert.equal(compact.runs[0].error, failed.error)
   assert(compact.pairedRatios.every(({ status }) => status === 'incomplete'))
+})
+
+test('compaction preserves rejected GPU window diagnostics through JSON serialization', async () => {
+  for (const failure of [
+    {
+      status: 'failed',
+      qualified: false,
+      reason: 'External NVIDIA compute activity detected during measurement',
+      baselineForeignComputePids: [123],
+      newForeignComputePids: [999],
+      samples: [{ utilizationPercent: 20, processes: [{ pid: 999, memoryMiB: 128 }] }],
+    },
+    {
+      status: 'failed',
+      qualified: false,
+      reason: 'GPU utilization exceeds measurement limit',
+      samples: [{ utilizationPercent: 81, processes: [] }],
+    },
+    {
+      status: 'failed',
+      qualified: false,
+      reason: 'NVIDIA sampling failed',
+      samplingError: { code: 'ETIMEDOUT', signal: 'SIGTERM', killed: true },
+      samples: [],
+    },
+  ]) {
+    const artifact = pairedArtifact()
+    artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
+    artifact.qualifications = []
+    const rejected = artifact.runs[0]
+    rejected.error = failure.reason
+    rejected.gpuWindows = [{ label: 'output/ascii', failure }]
+    const compact = JSON.parse(JSON.stringify(await compactEvidence(artifact)))
+    assert.deepEqual(compact.runs[0].gpuWindows, rejected.gpuWindows)
+    assert(compact.pairedRatios.every(({ status }) => status === 'incomplete'))
+  }
+})
+
+test('trace latency metadata names PNG capture while ordinary mode keeps presentation endpoints', () => {
+  for (const options of [
+    { platform: 'linux', headless: true },
+    { platform: 'linux', headless: false },
+    { platform: 'darwin', headless: false },
+    { platform: 'win32', headless: true },
+  ]) {
+    assert.equal(
+      comparisonLatencyEndpoint({ ...options, tracing: true }),
+      'keydown/write to first screencast PNG containing the intended colored glyph',
+    )
+    const expected =
+      options.platform === 'linux' && options.headless
+        ? 'keydown/write to compositor presentation ack (headless-shell, on-demand, not vsync)'
+        : 'keydown/write to Chrome presentation feedback (terminal submission frame)'
+    assert.equal(comparisonLatencyEndpoint({ ...options, tracing: false }), expected)
+  }
 })
