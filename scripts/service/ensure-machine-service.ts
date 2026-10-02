@@ -95,6 +95,14 @@ async function verified(context: Context, outcome: ProbeOutcome): Promise<Server
     throw serviceErrors.IDENTITY_UNVERIFIED({
       internal: { reason: outcome.kind === 'free' ? 'not-listening' : outcome.reason },
     })
+  if (outcome.kind === 'fregat-error') {
+    const logPath = path.join(context.options.productionRoot, 'logs')
+    throw serviceErrors.IDENTITY_CHECK_FAILED({
+      why: `The identity route returned server error ${outcome.serverCode}.`,
+      fix: `Check the Fregat server JSONL logs in ${logPath}, resolve ${outcome.serverCode}, then launch Fregat again.`,
+      internal: { status: outcome.status, serverCode: outcome.serverCode },
+    })
+  }
   if (outcome.kind === 'other') {
     const port = Number(new URL(context.address).port)
     throw serviceErrors.ADDRESS_HELD_BY_OTHER_PROGRAM({

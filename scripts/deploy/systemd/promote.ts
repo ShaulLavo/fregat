@@ -277,7 +277,7 @@ export async function checkCurrentReadiness(
   return checkReadiness(root, directory, previous, launch, fetcher, { isActive })
 }
 
-/** The app checks the same nonce proof as setup, then rolls back only the release it checked. */
+/** Failed updates restore the previous release; first installs keep the service target intact. */
 export async function checkReadiness(
   root: string,
   directory: string,
@@ -362,7 +362,7 @@ export async function checkReadiness(
       error: failure,
     })
     console.error(JSON.stringify({ source: 'promote', ...failure, internal: error.internal }))
-  } else rmSync(path.join(root, 'current'), { force: true })
+  }
   return false
 }
 

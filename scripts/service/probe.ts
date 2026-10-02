@@ -15,6 +15,7 @@ import {
 export type ProbeOutcome =
   | { kind: 'free' }
   | { kind: 'fregat'; identity: ServerIdentity; proven: boolean }
+  | { kind: 'fregat-error'; status: number; serverCode: string }
   | { kind: 'other'; status: number | null }
   | { kind: 'unverified'; reason: 'timeout' | 'refused-auth' | 'connection' }
 
@@ -46,7 +47,7 @@ export async function probeAddress(
       redirect: 'manual',
       signal,
     })
-  } catch (error) {
+  } catch {
     probe.signal?.throwIfAborted()
     return { kind: 'unverified', reason: signal.aborted ? 'timeout' : 'connection' }
   }
@@ -60,19 +61,35 @@ async function classify(
 ): Promise<ProbeOutcome> {
   const body: unknown = await response.json().catch(() => null)
   const identity = v.safeParse(serverIdentitySchema, body)
+  const key = readIdentityKey(stateHome)
+  const proof = response.headers.get(IDENTITY_PROOF_HEADER)
+  const proven = key !== null && proofMatches(key, nonce, proof)
   if (response.ok && identity.success) {
-    const key = readIdentityKey(stateHome)
-    const proof = response.headers.get(IDENTITY_PROOF_HEADER)
     return {
       kind: 'fregat',
       identity: identity.output,
-      proven: key !== null && proofMatches(key, nonce, proof),
+      proven,
     }
   }
   // A Fregat server that refuses identity to this request says so in its own error envelope.
   if (fregatRefusal(body)) return { kind: 'unverified', reason: 'refused-auth' }
+  const failure = v.safeParse(identityFailureSchema, body)
+  if (response.status >= 500 && failure.success) {
+    const error = failure.output.error
+    if (proven || (error.why !== undefined && error.fix !== undefined))
+      return { kind: 'fregat-error', status: response.status, serverCode: error.code }
+  }
   return { kind: 'other', status: response.status }
 }
+
+const identityFailureSchema = v.object({
+  error: v.object({
+    code: v.string(),
+    message: v.string(),
+    why: v.optional(v.string()),
+    fix: v.optional(v.string()),
+  }),
+})
 
 function fregatRefusal(body: unknown) {
   if (typeof body !== 'object' || body === null || !('error' in body)) return false

@@ -11,10 +11,7 @@ import {
 } from '@workspace/contracts'
 import { readHomeSetting } from '../../../../scripts/home-setting'
 import { ensureMachineService } from '../../../../scripts/service/ensure-machine-service'
-import {
-  installBundledRelease,
-  rollbackBundledInstall,
-} from '../../../../scripts/service/bundled-release'
+import { installBundledRelease } from '../../../../scripts/service/bundled-release'
 import { machineReleaseRoot } from '../../../../scripts/service/release-root'
 import { acquireSetupLock } from '../../../../scripts/service/setup-lock'
 
@@ -138,26 +135,19 @@ async function installAndActivate(options: {
   bundledRelease?: string
   readinessMs: number
 }) {
-  const installed = options.bundledRelease
-    ? installBundledRelease(options.bundledRelease, options.productionRoot, options.intent, {
-        readinessMs: options.readinessMs,
-      })
-    : null
-  let result: MachineServiceResult
-  try {
-    result = await verifiedService(
-      {
-        intent: options.intent,
-        productionRoot: options.productionRoot,
-        signal: options.signal,
-        readinessMs: options.readinessMs,
-      },
-      options.ensure ?? ensureMachineService,
-    )
-  } catch (error) {
-    if (installed) rollbackBundledInstall(options.productionRoot, installed)
-    throw error
-  }
+  if (options.bundledRelease)
+    installBundledRelease(options.bundledRelease, options.productionRoot, options.intent, {
+      readinessMs: options.readinessMs,
+    })
+  const result = await verifiedService(
+    {
+      intent: options.intent,
+      productionRoot: options.productionRoot,
+      signal: options.signal,
+      readinessMs: options.readinessMs,
+    },
+    options.ensure ?? ensureMachineService,
+  )
   rememberInstallation(options.intent, result)
   return { ...result, url: new URL(result.identity.webBase, result.identity.address).href }
 }

@@ -17,11 +17,23 @@ export function readMachineId(): MachineId {
   return cached
 }
 
-function readOsMachineId() {
-  if (process.platform === 'darwin') return macPlatformUuid()
+type MachineIdProvider = {
+  platform: NodeJS.Platform
+  readFile: (file: string) => string
+  run: (command: string[]) => { stdout: Uint8Array; exitCode: number | null }
+}
+
+const machineIdProvider: MachineIdProvider = {
+  platform: process.platform,
+  readFile: (file) => readFileSync(file, 'utf8'),
+  run: (command) => Bun.spawnSync(command),
+}
+
+export function readOsMachineId(provider: MachineIdProvider = machineIdProvider) {
+  if (provider.platform === 'darwin') return macPlatformUuid(provider)
   for (const file of ['/etc/machine-id', '/var/lib/dbus/machine-id']) {
     try {
-      const value = readFileSync(file, 'utf8').trim()
+      const value = provider.readFile(file).trim()
       if (value) return value
     } catch {
       continue
@@ -30,8 +42,8 @@ function readOsMachineId() {
   throw machineIdError('linux')
 }
 
-function macPlatformUuid() {
-  const result = Bun.spawnSync(['ioreg', '-rd1', '-c', 'IOPlatformExpertDevice'])
+function macPlatformUuid(provider: MachineIdProvider) {
+  const result = provider.run(['/usr/sbin/ioreg', '-rd1', '-c', 'IOPlatformExpertDevice'])
   const match = /"IOPlatformUUID" = "([^"]+)"/.exec(new TextDecoder().decode(result.stdout))
   if (!match?.[1]) throw machineIdError('darwin', result.exitCode)
   return match[1]
