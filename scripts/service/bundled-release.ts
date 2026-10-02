@@ -14,6 +14,7 @@ import {
 } from '../deploy/release-operations'
 import { releaseProblem } from '../deploy/systemd/promote'
 import { serviceErrors } from './structured-errors'
+import { stampWebRelease } from '../deploy/web-release'
 
 export type BundledInstall = { disposition: 'installed' | 'staged' | 'unchanged'; release: Release }
 
@@ -55,6 +56,7 @@ function install(
   const release = createRelease(root, config.commit, 'app')
   try {
     cpSync(source, release.directory, { recursive: true, verbatimSymlinks: true })
+    stampWebRelease(release.web, release.name)
     writeFileSync(
       path.join(release.directory, 'build-config.json'),
       JSON.stringify({

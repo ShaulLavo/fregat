@@ -829,6 +829,10 @@ export const selectors = {
   workspaceEditApplyAll: (page: Page) =>
     page.getByRole('button', { name: 'Make these changes', exact: true }),
   toast: (page: Page, title: string) => page.locator('[data-sonner-toast]', { hasText: title }),
+  toastDismiss: (page: Page, title: string) =>
+    page
+      .locator('[data-sonner-toast]', { hasText: title })
+      .getByRole('button', { name: 'Close toast', exact: true }),
   /** Every element on the page whose own text contains `text`, for counting how often a message shows. */
   textAnywhere: (page: Page, text: string) => page.getByText(text),
   toastAction: (page: Page, title: string, label: string) =>

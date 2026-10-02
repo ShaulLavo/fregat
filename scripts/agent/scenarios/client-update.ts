@@ -46,6 +46,25 @@ export const verifyClientUpdate: Scenario['run'] = async (page, { step, server }
   )
   await step('refresh-available')
 
+  await selectors.toastDismiss(page, 'Update available').click()
+  await selectors.clientUpdateRefresh(page).waitFor({ state: 'hidden' })
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true })),
+  )
+  await page.waitForTimeout(500)
+  ok(
+    (await selectors.clientUpdateRefresh(page).count()) === 0,
+    'Dismissal survives a release refetch',
+  )
+  ok(
+    (await page.evaluate(() => performance.timeOrigin)) === started,
+    'Dismissal leaves the app running',
+  )
+  await step('dismissed-without-reload')
+
+  await page.reload()
+  await selectors.clientUpdateRefresh(page).waitFor({ timeout: 15_000 })
+
   await page.evaluate(() => sessionStorage.setItem('scenario-client-release', 'client-2'))
   await Promise.all([
     page.waitForResponse((response) => response.url().endsWith('/release')),

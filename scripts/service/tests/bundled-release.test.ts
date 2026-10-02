@@ -61,6 +61,25 @@ test('same commit is a no-op, preserving the running release and pending timesta
   expect(existsSync(path.join(releaseRoot, 'pending'))).toBe(false)
 })
 
+test('installed web documents identify the release the server reports', () => {
+  const root = scratch()
+  const source = payload(root, 'bundle')
+  const document = '<html><head><meta name="platform-release" content="bundle"></head></html>'
+  for (const name of ['index.html', 'dev.html'])
+    writeFileSync(path.join(source, 'web', name), document)
+  const installed = installBundledRelease(source, path.join(root, 'installed'), intent(root))
+  const config = JSON.parse(
+    readFileSync(path.join(installed.release.directory, 'build-config.json'), 'utf8'),
+  )
+  for (const name of ['index.html', 'dev.html']) {
+    const html = readFileSync(path.join(installed.release.web, name), 'utf8')
+    expect(html.match(/<meta name="platform-release"[^>]*>/g)).toEqual([
+      `<meta name="platform-release" content="${config.release}">`,
+    ])
+    expect(readFileSync(path.join(source, 'web', name), 'utf8')).toBe(document)
+  }
+})
+
 test('different commit stages once, preserving current until exact restart approval', () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
