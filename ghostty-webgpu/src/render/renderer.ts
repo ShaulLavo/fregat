@@ -512,10 +512,15 @@ export class WebGpuTerminalRenderer {
       return
     }
     this.atlasTextures.sync(this.atlas.consumeUploads())
+    const uploadedBefore = this.textPass.metrics.uploadedBytes
     const instanceUploadOperations = this.textPass.upload(this.instances, updates)
     this.textPass.submit(this.context.getCurrentTexture().createView())
     if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
-    this.recordFrame(updates, instanceUploadOperations)
+    this.recordFrame(
+      updates,
+      instanceUploadOperations,
+      this.textPass.metrics.uploadedBytes - uploadedBefore,
+    )
     if (this.zigFrame) this.metrics.jsFallbackFrames += 1
     this.needsFullRebuild = false
     this.overlayRows.clear()
@@ -555,14 +560,17 @@ export class WebGpuTerminalRenderer {
     if (status !== 0) return false
     const updates = builder.changedRanges()
     this.atlasTextures.sync(this.atlas.consumeUploads())
+    const uploadedBefore = this.textPass.metrics.uploadedBytes
     const operations = this.textPass.uploadFrame(builder, updates)
-    this.textPass.submit(this.context.getCurrentTexture().createView())
+    const submitted = operations > 0 || options.full
+    if (submitted) this.textPass.submit(this.context.getCurrentTexture().createView())
     let rows: readonly RenderRow[] | undefined
     if (this.onFrame || this.onRowsPainted) {
       rows = options.full ? this.renderState.readRows({ packed: true }) : this.rowsToRebuild(damage)
     }
     if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
-    this.recordFrame(updates, operations)
+    if (submitted)
+      this.recordFrame(updates, operations, this.textPass.metrics.uploadedBytes - uploadedBefore)
     this.metrics.zigFrames += 1
     this.wasZigFrame = true
     this.needsFullRebuild = false
@@ -711,6 +719,7 @@ export class WebGpuTerminalRenderer {
   private recordFrame(
     updates: readonly RowInstanceUpdate[],
     instanceUploadOperations: number,
+    uploadedBytes: number,
   ): void {
     this.metrics.atlasCacheHits = this.atlas.cacheHitCount
     this.metrics.atlasCacheMisses = this.atlas.cacheMissCount
@@ -723,9 +732,7 @@ export class WebGpuTerminalRenderer {
     this.metrics.instanceUploadOperations += instanceUploadOperations
     this.metrics.rebuiltRows += updates.length
     this.metrics.submittedFrames += 1
-    for (const update of updates) {
-      this.metrics.uploadedBytes += update.cell.byteLength + update.glyph.byteLength
-    }
+    this.metrics.uploadedBytes += uploadedBytes
   }
 
   private replaceTextPass(): void {

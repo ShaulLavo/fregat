@@ -2,7 +2,7 @@ import type { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from './instances/types.js'
 import type { InstanceRows } from './instances/rows.js'
 import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from './instances/layout.js'
-import { coalesceInstanceUpdates } from './instances/uploads.js'
+import { coalesceFrameRanges, coalesceInstanceUpdates } from './instances/uploads.js'
 import { cellShader } from './shaders/cell.wgsl.js'
 import { glyphShader } from './shaders/glyph.wgsl.js'
 
@@ -107,11 +107,15 @@ export class WebGpuTextPass {
     data: { cellData: Float32Array; glyphData: Float32Array },
     updates: readonly RowInstanceUpdate[],
   ): number {
+    if (updates.length === 0) return 0
     const operationsBefore = this.metrics.uploadOperations
-    for (const update of updates) {
-      if (update.cell.byteLength > 0) this.writeRange(this.cellBuffer, data.cellData, update.cell)
-      if (update.glyph.byteLength > 0)
-        this.writeRange(this.glyphBuffer, data.glyphData, update.glyph)
+    // Persistent frame records keep clean gaps valid; compact ranges share one Dawn command.
+    for (const kind of ['cell', 'glyph'] as const) {
+      const ranges = coalesceFrameRanges(updates, kind)
+      if (ranges.length === 0) continue
+      const buffer = kind === 'cell' ? this.cellBuffer : this.glyphBuffer
+      const records = kind === 'cell' ? data.cellData : data.glyphData
+      for (const range of ranges) this.writeRange(buffer, records, range)
     }
     return this.metrics.uploadOperations - operationsBefore
   }

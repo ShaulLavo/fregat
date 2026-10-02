@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 import { RenderStateDirty } from '../../core/abi.js'
 import { createGhosttyError } from '../../core/error.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
+import type { ZigFrameBuilder } from '../../core/zig-frame.js'
 import type {
   ReadRowsOptions,
   RenderCell,
@@ -1092,3 +1093,119 @@ it.each(['onFrame', 'onRowsPainted'] as const)(
     }
   },
 )
+
+it('settles unchanged native damage and callbacks without submitting GPU work', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 16, rows: 2 })
+  const state = runtime.createRenderState(terminal)
+  const clock = new FakeClock()
+  const device = await createDevice()
+  const submit = vi.spyOn(device.queue, 'submit')
+  const onFrame = vi.fn()
+  const onRowsPainted = vi.fn()
+  terminal.write('\x1b[?25lfirst')
+  const renderer = await createRenderer({
+    deviceFactory: async () => device,
+    canvas: createCanvas(),
+    columns: 16,
+    rows: 2,
+    font: fittedFont(),
+    renderState: state,
+    schedulerClock: clock,
+    zigFrame: true,
+    onFrame,
+    onRowsPainted,
+  })
+  try {
+    clock.flushFrame()
+    submit.mockClear()
+    const submitted = renderer.metrics.submittedFrames
+    const operations = renderer.metrics.instanceUploadOperations
+    renderer.refreshRows(0, 1)
+    clock.flushFrame()
+    expect(submit).not.toHaveBeenCalled()
+    expect(renderer.metrics.submittedFrames).toBe(submitted)
+    expect(renderer.metrics.instanceUploadOperations).toBe(operations)
+    expect(onFrame).toHaveBeenCalledTimes(2)
+    expect(onRowsPainted).toHaveBeenCalledTimes(2)
+    renderer.schedule()
+    clock.flushFrame()
+    expect(onFrame).toHaveBeenCalledTimes(2)
+    terminal.write('\rfirst')
+    renderer.notifyWrite()
+    clock.flushFrame()
+    expect(submit).not.toHaveBeenCalled()
+    expect(renderer.metrics.submittedFrames).toBe(submitted)
+    expect(state.update()).toBe(RenderStateDirty.False)
+    expect(onFrame).toHaveBeenCalledTimes(3)
+  } finally {
+    submit.mockRestore()
+    renderer.dispose()
+    runtime.dispose()
+  }
+})
+
+it('uploads twelve native changed rows in two writes with the exact WASM records', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 8, rows: 12 })
+  const state = runtime.createRenderState(terminal)
+  const clock = new FakeClock()
+  const device = await createDevice()
+  const created = vi.spyOn(state, 'createFrameBuilder')
+  const buffers = vi.spyOn(device, 'createBuffer')
+  const write = vi.spyOn(device.queue, 'writeBuffer')
+  terminal.write(
+    '\x1b[?25l' + Array.from({ length: 12 }, (_, row) => `\x1b[${row + 1};1HAB`).join(''),
+  )
+  const renderer = await createRenderer({
+    canvas: createCanvas(),
+    columns: 8,
+    rows: 12,
+    font: fittedFont(),
+    renderState: state,
+    schedulerClock: clock,
+    zigFrame: true,
+    deviceFactory: async () => device,
+  })
+  try {
+    clock.flushFrame()
+    write.mockClear()
+    const before = renderer.metrics.uploadedBytes
+    terminal.write(
+      '\x1b[31;44m' + Array.from({ length: 12 }, (_, row) => `\x1b[${row + 1};5HA`).join(''),
+    )
+    renderer.notifyWrite()
+    clock.flushFrame()
+    expect(write).toHaveBeenCalledTimes(2)
+    const builder: ZigFrameBuilder = created.mock.results[0]!.value
+    const changes = builder.changedRanges()
+    expect(changes).toHaveLength(12)
+    let bytes = 0
+    for (const [index, kind] of (['cell', 'glyph'] as const).entries()) {
+      const data = kind === 'cell' ? builder.cellData : builder.glyphData
+      const first = Math.min(...changes.map((change) => change[kind].byteOffset))
+      const end = Math.max(
+        ...changes.map((change) => change[kind].byteOffset + change[kind].byteLength),
+      )
+      const call = write.mock.calls[index]!
+      expect(call[0]).toBe(buffers.mock.results[index]!.value)
+      expect(call.slice(1)).toEqual([first, data.buffer, data.byteOffset + first, end - first])
+      const uploaded = new Uint8Array(call[2] as ArrayBuffer, call[3], call[4])
+      for (const change of changes) {
+        const range = change[kind]
+        expect(
+          uploaded.subarray(range.byteOffset - first, range.byteOffset - first + range.byteLength),
+        ).toEqual(new Uint8Array(data.buffer, data.byteOffset + range.byteOffset, range.byteLength))
+      }
+      bytes += end - first
+    }
+    expect(renderer.metrics.uploadedBytes - before).toBe(bytes)
+    expect(bytes).toBeLessThan(8 * 12 * (64 + 96))
+  } finally {
+    write.mockRestore()
+    buffers.mockRestore()
+    created.mockRestore()
+    renderer.dispose()
+    runtime.dispose()
+  }
+})

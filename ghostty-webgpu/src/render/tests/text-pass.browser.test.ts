@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import type { CellStyle, RenderCell, RenderRow, RgbColor } from '../../core/types.js'
 import type { TerminalFittedFont } from '../../term/types.js'
 import { GlyphAtlas } from '../atlas/atlas.js'
@@ -387,4 +387,65 @@ it('renders identical atlas coordinates from two layers in one two-draw frame', 
   expect(grid.pass.glyphBindGroupCreationCount).toBe(1)
   grid.destroy()
   device.destroy()
+})
+
+it('uploads fragmented frame records with one exact span per buffer', async () => {
+  const device = await createDevice()
+  const created = vi.spyOn(device, 'createBuffer')
+  const pass = new WebGpuTextPass({
+    device,
+    format: 'rgba8unorm',
+    height,
+    width,
+    instanceCount: 48,
+  })
+  // Nonzero view offsets exercise the direct WASM-memory upload contract.
+  const cellData = Float32Array.from({ length: 48 * 16 + 4 }, (_, i) => i + 0.5).subarray(4)
+  const glyphData = Float32Array.from({ length: 48 * 24 + 8 }, (_, i) => i + 0.25).subarray(8)
+  const updates = Array.from({ length: 12 }, (_, row) => ({
+    cell: { byteOffset: (row * 3 + 2) * 64, byteLength: 64 },
+    glyph: { byteOffset: (row * 3 + 1) * 96, byteLength: 96 },
+    invalidatedRows: [],
+    row,
+  }))
+  const write = vi.spyOn(device.queue, 'writeBuffer')
+  try {
+    expect(pass.uploadFrame({ cellData, glyphData }, updates)).toBe(2)
+    expect(write).toHaveBeenCalledTimes(2)
+    for (const [index, data] of [cellData, glyphData].entries()) {
+      const kind = index === 0 ? 'cell' : 'glyph'
+      const call = write.mock.calls[index]!
+      const first = updates[0]![kind].byteOffset
+      const last = updates.at(-1)![kind]
+      const length = last.byteOffset + last.byteLength - first
+      expect(call[0]).toBe(created.mock.results[index]!.value)
+      expect(call[1]).toBe(first)
+      expect(call[2]).toBe(data.buffer)
+      expect(call[3]).toBe(data.byteOffset + first)
+      expect(call[4]).toBe(length)
+      const uploaded = new Uint8Array(call[2] as ArrayBuffer, call[3], call[4])
+      expect(uploaded).toEqual(new Uint8Array(data.buffer, data.byteOffset + first, length))
+      for (const update of updates) {
+        const range = update[kind]
+        expect(
+          uploaded.subarray(range.byteOffset - first, range.byteOffset - first + range.byteLength),
+        ).toEqual(new Uint8Array(data.buffer, data.byteOffset + range.byteOffset, range.byteLength))
+      }
+    }
+    expect(pass.metrics.uploadedBytes).toBe(34 * (64 + 96))
+    write.mockClear()
+    expect(pass.uploadFrame({ cellData, glyphData }, [])).toBe(0)
+    expect(write).not.toHaveBeenCalled()
+    const cellOnly = updates.map((update) => ({
+      ...update,
+      glyph: { byteOffset: 0, byteLength: 0 },
+    }))
+    expect(pass.uploadFrame({ cellData, glyphData }, cellOnly)).toBe(1)
+    expect(write).toHaveBeenCalledOnce()
+  } finally {
+    write.mockRestore()
+    created.mockRestore()
+    pass.destroy()
+    device.destroy()
+  }
 })

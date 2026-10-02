@@ -4,6 +4,7 @@ import type { GhosttyTerminal } from '../src/core/terminal.js'
 import type { WebGlTerminalRenderer } from '../src/render/webgl/renderer.js'
 import type { RowTerminalRenderer } from '../src/render/row-renderer.js'
 import type { WebGpuTerminalRenderer } from '../src/render/renderer.js'
+import type { WebGpuTextPass } from '../src/render/text-pass.js'
 
 type Category = 'parse' | 'snapshot' | 'damage' | 'instances' | 'upload' | 'commands' | 'js'
 interface Span {
@@ -145,7 +146,7 @@ export class ComparisonTracing {
 
   renderer(terminal: number, renderer: WebGpuTerminalRenderer): void {
     if (!this.enabled) return
-    const pass = field(renderer, 'textPass')
+    const pass = field(renderer, 'textPass') as WebGpuTextPass
     const device = field(renderer, 'device')
     const resources = field(pass, 'resources')
     this.ownership.push({
@@ -185,24 +186,23 @@ export class ComparisonTracing {
     this.wrap(renderer, 'rowsToRebuild', terminal, 'damage')
     this.wrap(renderer, 'rebuildRows', terminal, 'instances')
     this.wrap(renderer, 'drawZigFrame', terminal, 'js')
-    this.wrap(pass, 'upload', terminal, 'upload', (result, args) => {
-      this.count(terminal, 'buffersWritten', result as number)
-      const rows = args[1] as { cell: { byteLength: number }; glyph: { byteLength: number } }[]
-      this.count(
+    for (const method of ['upload', 'uploadFrame']) {
+      let uploadedBytes = 0
+      this.wrap(
+        pass,
+        method,
         terminal,
-        'bufferBytes',
-        rows.reduce((sum, row) => sum + row.cell.byteLength + row.glyph.byteLength, 0),
+        'upload',
+        (result) => {
+          this.count(terminal, 'buffersWritten', result as number)
+          this.count(terminal, 'bufferBytes', pass.metrics.uploadedBytes - uploadedBytes)
+        },
+        false,
+        () => {
+          uploadedBytes = pass.metrics.uploadedBytes
+        },
       )
-    })
-    this.wrap(pass, 'uploadFrame', terminal, 'upload', (result, args) => {
-      this.count(terminal, 'buffersWritten', result as number)
-      const ranges = args[1] as { cell: { byteLength: number }; glyph: { byteLength: number } }[]
-      this.count(
-        terminal,
-        'bufferBytes',
-        ranges.reduce((sum, range) => sum + range.cell.byteLength + range.glyph.byteLength, 0),
-      )
-    })
+    }
     const atlas = field(renderer, 'atlasTextures')
     this.wrap(atlas, 'sync', terminal, 'upload', (_, args) => {
       const uploads = args[0] as { extent: { width: number; height: number }; kind: string }[]

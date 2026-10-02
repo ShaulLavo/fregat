@@ -7,8 +7,13 @@ function rendererBoundary() {
   const builder = { build: () => 0 }
   const pass = {
     resources: { cellPipeline: {}, glyphPipeline: {} },
+    metrics: { uploadedBytes: 0 },
     upload: () => 0,
-    uploadFrame: () => 0,
+    uploadFrame(data) {
+      const uploadedBytes = data?.uploadedBytes ?? 0
+      pass.metrics.uploadedBytes += uploadedBytes
+      return uploadedBytes > 0 ? 2 : 0
+    },
     submit: () => {},
   }
   return {
@@ -113,4 +118,21 @@ test('Zig fallbacks count only frames submitted by the JS path', () => {
   assert.equal(total(counters, 'zigFallbackFrames'), 1)
   assert.equal(total(counters, 'zigFrames'), 0)
   assert.equal(total(counters, 'frames'), 1)
+})
+
+test('native upload tracing counts actual spans including unchanged gaps', () => {
+  const updates = Array.from({ length: 12 }, (_, row) => ({
+    cell: { byteOffset: (row * 3 + 2) * 64, byteLength: 64 },
+    glyph: { byteOffset: (row * 3 + 1) * 96, byteLength: 96 },
+  }))
+  assert.equal(
+    updates.reduce((bytes, update) => bytes + update.cell.byteLength + update.glyph.byteLength, 0),
+    1920,
+  )
+  const counters = recordedCounters((renderer) => {
+    renderer.textPass.uploadFrame({ uploadedBytes: 5440 }, updates)
+    renderer.textPass.uploadFrame({ uploadedBytes: 5440 }, updates)
+  })
+  assert.equal(total(counters, 'bufferBytes'), 10880)
+  assert.equal(total(counters, 'buffersWritten'), 4)
 })

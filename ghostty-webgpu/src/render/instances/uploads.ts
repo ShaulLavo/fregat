@@ -1,8 +1,35 @@
 import type { InstanceByteRange, RowInstanceUpdate } from './types.js'
 
+const maxFrameUploadGapBytes = 4096
+
 export interface InstanceUploadBatch {
   readonly cell: InstanceByteRange
   readonly glyph: InstanceByteRange
+}
+
+export function coalesceFrameRanges(
+  updates: readonly RowInstanceUpdate[],
+  kind: 'cell' | 'glyph',
+): readonly InstanceByteRange[] {
+  const ranges = updates
+    .map((update) => update[kind])
+    .filter((range) => range.byteLength > 0)
+    .sort((left, right) => left.byteOffset - right.byteOffset)
+  const batches: InstanceByteRange[] = []
+  for (const range of ranges) {
+    const previous = batches.at(-1)
+    const end = range.byteOffset + range.byteLength
+    // Bound extra copying: widely separated edits retain their changed-only uploads.
+    if (
+      !previous ||
+      range.byteOffset > previous.byteOffset + previous.byteLength + maxFrameUploadGapBytes
+    ) {
+      batches.push(copiedRange(range))
+      continue
+    }
+    previous.byteLength = Math.max(previous.byteLength, end - previous.byteOffset)
+  }
+  return batches
 }
 
 function copiedRange(range: InstanceByteRange): InstanceByteRange {
