@@ -57,7 +57,8 @@ export class NativePicker {
     const budget = this.options.budget()
     const child = Bun.spawn({
       cmd: [helper, 'pick', JSON.stringify(request)],
-      stdin: 'ignore',
+      // Native helpers close their chooser on stdin EOF; keep their control channel alive.
+      stdin: 'pipe',
       stdout: 'pipe',
       stderr: 'pipe',
     })

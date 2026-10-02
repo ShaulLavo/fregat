@@ -73,6 +73,17 @@ describe('native picker', () => {
     })
   })
 
+  it('keeps the helper control channel open until it reports a choice', async () => {
+    const executable = `'${process.execPath.replaceAll("'", "'\\''")}'`
+    const { file } = await helper(
+      `exec ${executable} -e 'const event = await Promise.race([Bun.stdin.text().then(() => "closed"), Bun.sleep(50).then(() => "picked")]); console.log(JSON.stringify({ event, paths: ["/native/project"] })); process.exit(0);'`,
+    )
+    expect(await picker(file).pick({ mode: 'folder' }, signal())).toEqual({
+      outcome: 'selected',
+      paths: ['/native/project'],
+    })
+  })
+
   it('is unavailable without a helper or a desktop session', async () => {
     const { file } = await helper(`echo '{"event":"picked","paths":[]}'`)
     expect(picker(null).available()).toBe(false)
