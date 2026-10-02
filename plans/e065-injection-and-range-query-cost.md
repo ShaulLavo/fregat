@@ -52,7 +52,9 @@ or additional analysis owner per split.
 Keep one revision-owned parse and ordered edits. Retain unaffected injection layers; bound
 rediscovery to changed/edited enclosing ranges with correct delimiter and nested-layer handling.
 Separate independent queries from the edit tail after their source revision is ready, preserving
-identical-key deduplication, stale-result rejection, cancellation and disposal. Measure worker
+identical-key deduplication, stale-result rejection, cancellation and disposal. The worker
+client cancels earlier range requests in the same runtime session, so concurrent distinct queries
+from split views must not cancel one another or cache one range's coverage under another's key. Measure worker
 queueing as well as analysis-tail waits before choosing the scheduling change.
 
 ## Steps
@@ -68,10 +70,13 @@ queueing as well as analysis-tail waits before choosing the scheduling change.
 
 Run `bun run bench:input:paired --baseline <packages> --candidate <packages>` from Fregat root
 using Plan 282's frozen-package procedure and supported 500,000-line `short-lines` fixture,
-covering single/multiple views. Require its unchanged correctness and blocking latency checks;
+covering single/multiple views, plus a focused or full loaded run that includes the worker-backed
+Tree-sitter configurations with Plan 282's load receipts (`--loaded` alone selects native and
+disabled only and misses this path). Require its unchanged correctness and blocking latency checks;
 report before/after discovery, query waits and post-input settlement separately.
 Targeted tests must catch missed/removed nested injections after delimiter edits, stale answers
-across edits/disposal, duplicate identical queries and distinct ranges unnecessarily queued together.
+across edits/disposal, duplicate identical queries and distinct ranges unnecessarily queued together, and two concurrent
+distinct range queries with shared cancellation enabled that must each return their own coverage.
 
 ## Risks and decisions
 
