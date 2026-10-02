@@ -15,10 +15,13 @@ belong in this monorepo. Mesh and tree-sitter-x fixes belong in their own reposi
 - [x] Verify the combined GitHub search in a browser. It renders 46 issues.
 - [x] Record durable scheduling as Mesh #106, status Idea.
 - [x] Save the default review scope in the shared agent instructions.
-- [ ] Reproduce and fix Fregat #381, the queue fixture config response.
-- [ ] Reproduce and fix Fregat #351, comparison source hashing.
-- [ ] Investigate Mesh #105 for a small command presentation fix.
-- [ ] Verify changes, commit by path, push and ship applicable changes.
+- [x] Reproduce and fix Fregat #381, the queue fixture config response.
+- [x] Reproduce and fix Fregat #351, comparison source hashing.
+- [x] Investigate Mesh #105 for a small command presentation fix.
+- [x] Reproduce and fix Fregat #377, custom-origin gallery font loading.
+- [x] Verify and push the Fregat fixes; the web release passed its live check.
+- [x] Merge Mesh #108 after its complete PR CI gate passed.
+- [ ] Install the published Mesh build after main CI and release publication.
 - [ ] Close verified fixes with evidence; leave decision candidates open.
 - [ ] Refresh issue states and record any concurrent changes before delivery.
 
@@ -38,32 +41,32 @@ allowance projection. Automatic backlog execution needs a separate explicit opt-
 The classifications below are triage judgments from the issue reports and current source
 where inspected. They are not claims that every reported failure has been reproduced.
 
-| Issue                                                                                    | Classification     | Next action and decision                                                                                                                                                   |
-| ---------------------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [381](https://github.com/ShaulLavo/fregat/issues/381) Queue fixture config response      | Small fix          | Run the actual fixture over stdio; add the consumed config response and retain unknown-method errors.                                                                      |
-| [377](https://github.com/ShaulLavo/fregat/issues/377) Gallery font CORS                  | Needs reproduction | Reproduce an explicit-port gallery capture; decide whether gallery capture needs an isolated API or the preload belongs only to the app. Preserve standalone site capture. |
-| [375](https://github.com/ShaulLavo/fregat/issues/375) First launch local or remote       | One plan           | Produce the requested design choices before implementation. Reuse installed-app filesystem identity rules.                                                                 |
-| [371](https://github.com/ShaulLavo/fregat/issues/371) Quiet-job deadlock                 | One plan           | Define lifecycle ownership for server dependencies and quiet admission; prove the reported three-job cycle in an isolated runner.                                          |
-| [368](https://github.com/ShaulLavo/fregat/issues/368) Resize callback ordering           | Needs reproduction | Combine both callbacks with one synchronous resize in the real renderer; decide supported reentrancy semantics before fixing.                                              |
-| [364](https://github.com/ShaulLavo/fregat/issues/364) Cached Bun diagnostic              | Needs reproduction | Run one fresh narrow hotkeys build. A replayed cached warning alone does not justify a production change or closure.                                                       |
-| [363](https://github.com/ShaulLavo/fregat/issues/363) Legacy Unicode benchmark crash     | Needs reproduction | Isolate the pinned legacy dependency/probe and retain honest crash evidence. Do not turn a crash into a successful benchmark result.                                       |
-| [360](https://github.com/ShaulLavo/fregat/issues/360) ZWJ emoji widths                   | Needs reproduction | Compare shared native row/grapheme decoding, measured cell widths and font availability before choosing the owner.                                                         |
-| [359](https://github.com/ShaulLavo/fregat/issues/359) Claude pool usage                  | One plan           | Coordinate with #341 and #345. Read passive per-account observations, account for missing/stale readings and avoid inference or waking the proxy.                          |
-| [358](https://github.com/ShaulLavo/fregat/issues/358) Zig atlas residency                | Needs reproduction | Exercise constrained atlas eviction and active glyph reuse in the experimental path; separate correctness from fallback efficiency.                                        |
-| [352](https://github.com/ShaulLavo/fregat/issues/352) Sustained output fixture selection | One plan           | Extend the benchmark workload contract with fixture identity, balanced pairing and the existing tick-resolution safeguards.                                                |
-| [351](https://github.com/ShaulLavo/fregat/issues/351) Source hash staging sensitivity    | Small fix          | Canonicalize source paths before hashing. Verify unchanged tracked/untracked membership and actual content changes in a disposable Git repository.                         |
-| [350](https://github.com/ShaulLavo/fregat/issues/350) Machine removal and disconnect     | One plan           | Confirm the removal consequences and persistent connection action, then implement and visually verify the settings flow.                                                   |
-| [349](https://github.com/ShaulLavo/fregat/issues/349) Prompt cache rebuild diagnostics   | Needs reproduction | First query recorded turns for repeated rebuilds beyond initial/post-idle turns. Design the notice only after measuring the pattern.                                       |
-| [348](https://github.com/ShaulLavo/fregat/issues/348) Unused allowance and spend backlog | Several plans      | Split passive allowance projection from backlog selection and explicitly opted-in execution. Depends on per-account coverage; collection alone needs no model.             |
-| [347](https://github.com/ShaulLavo/fregat/issues/347) Automatic machine placement        | One plan           | Define repository availability, eligibility, attachment pinning and load inputs; show the selected target before execution.                                                |
-| [346](https://github.com/ShaulLavo/fregat/issues/346) Session rail attention             | One plan           | Treat as a product change requiring go/no-go and a visual proof across running, waiting, unread, selected and keyboard-focused states.                                     |
-| [345](https://github.com/ShaulLavo/fregat/issues/345) Account-wide usage history         | Several plans      | Separate transcript collection/deduplication, account limit sources and UI adoption. Coordinate #341 and #359; overlapping scope is not a duplicate.                       |
-| [342](https://github.com/ShaulLavo/fregat/issues/342) Git diff row topology              | One plan           | Reproduce embedded CR/U+2028/U+2029 on the diff surface. Define the display mapping that preserves Git row identity and comments.                                          |
-| [341](https://github.com/ShaulLavo/fregat/issues/341) ChatGPT proxy account feed         | One plan           | Consume Plan 287's passive feed with account freshness and provider identity. Coordinate #345 and #359.                                                                    |
-| [340](https://github.com/ShaulLavo/fregat/issues/340) Held-out evaluation corpus         | One plan, deferred | Implementation owner is tree-sitter-x. Preserve the explicit Phase 2 deferral; select license-cleared evaluation inputs before its gate.                                   |
-| [339](https://github.com/ShaulLavo/fregat/issues/339) Markdown structural pin            | One plan, deferred | Implementation owner is tree-sitter-x. Re-pin against the chosen product revision before a Markdown pilot; this pass does not start Phase 2.                               |
-| [338](https://github.com/ShaulLavo/fregat/issues/338) Heavy slice-root ownership         | One plan           | Bind an explicit slice root to its ownership registry; use two isolated registries to prove refusal without reaping another job.                                           |
-| [337](https://github.com/ShaulLavo/fregat/issues/337) Non-cache peak memory              | One plan           | Define sampled non-reclaimable peaks and their estimate provenance; measure the accounting effect before claiming throughput gains.                                        |
+| Issue                                                                                    | Classification      | Next action and decision                                                                                                                                                   |
+| ---------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [381](https://github.com/ShaulLavo/fregat/issues/381) Queue fixture config response      | Fixed and closed    | Run the actual fixture over stdio; add the consumed config response and retain unknown-method errors.                                                                      |
+| [377](https://github.com/ShaulLavo/fregat/issues/377) Gallery font CORS                  | Small fix, verified | Reproduce an explicit-port gallery capture; decide whether gallery capture needs an isolated API or the preload belongs only to the app. Preserve standalone site capture. |
+| [375](https://github.com/ShaulLavo/fregat/issues/375) First launch local or remote       | One plan            | Produce the requested design choices before implementation. Reuse installed-app filesystem identity rules.                                                                 |
+| [371](https://github.com/ShaulLavo/fregat/issues/371) Quiet-job deadlock                 | One plan            | Define lifecycle ownership for server dependencies and quiet admission; prove the reported three-job cycle in an isolated runner.                                          |
+| [368](https://github.com/ShaulLavo/fregat/issues/368) Resize callback ordering           | Needs reproduction  | Combine both callbacks with one synchronous resize in the real renderer; decide supported reentrancy semantics before fixing.                                              |
+| [364](https://github.com/ShaulLavo/fregat/issues/364) Cached Bun diagnostic              | Needs reproduction  | Run one fresh narrow hotkeys build. A replayed cached warning alone does not justify a production change or closure.                                                       |
+| [363](https://github.com/ShaulLavo/fregat/issues/363) Legacy Unicode benchmark crash     | Needs reproduction  | Isolate the pinned legacy dependency/probe and retain honest crash evidence. Do not turn a crash into a successful benchmark result.                                       |
+| [360](https://github.com/ShaulLavo/fregat/issues/360) ZWJ emoji widths                   | Needs reproduction  | Compare shared native row/grapheme decoding, measured cell widths and font availability before choosing the owner.                                                         |
+| [359](https://github.com/ShaulLavo/fregat/issues/359) Claude pool usage                  | One plan            | Coordinate with #341 and #345. Read passive per-account observations, account for missing/stale readings and avoid inference or waking the proxy.                          |
+| [358](https://github.com/ShaulLavo/fregat/issues/358) Zig atlas residency                | Needs reproduction  | Exercise constrained atlas eviction and active glyph reuse in the experimental path; separate correctness from fallback efficiency.                                        |
+| [352](https://github.com/ShaulLavo/fregat/issues/352) Sustained output fixture selection | One plan            | Extend the benchmark workload contract with fixture identity, balanced pairing and the existing tick-resolution safeguards.                                                |
+| [351](https://github.com/ShaulLavo/fregat/issues/351) Source hash staging sensitivity    | Fixed and closed    | Canonicalize source paths before hashing. Verify unchanged tracked/untracked membership and actual content changes in a disposable Git repository.                         |
+| [350](https://github.com/ShaulLavo/fregat/issues/350) Machine removal and disconnect     | One plan            | Confirm the removal consequences and persistent connection action, then implement and visually verify the settings flow.                                                   |
+| [349](https://github.com/ShaulLavo/fregat/issues/349) Prompt cache rebuild diagnostics   | Needs reproduction  | First query recorded turns for repeated rebuilds beyond initial/post-idle turns. Design the notice only after measuring the pattern.                                       |
+| [348](https://github.com/ShaulLavo/fregat/issues/348) Unused allowance and spend backlog | Several plans       | Split passive allowance projection from backlog selection and explicitly opted-in execution. Depends on per-account coverage; collection alone needs no model.             |
+| [347](https://github.com/ShaulLavo/fregat/issues/347) Automatic machine placement        | One plan            | Define repository availability, eligibility, attachment pinning and load inputs; show the selected target before execution.                                                |
+| [346](https://github.com/ShaulLavo/fregat/issues/346) Session rail attention             | One plan            | Treat as a product change requiring go/no-go and a visual proof across running, waiting, unread, selected and keyboard-focused states.                                     |
+| [345](https://github.com/ShaulLavo/fregat/issues/345) Account-wide usage history         | Several plans       | Separate transcript collection/deduplication, account limit sources and UI adoption. Coordinate #341 and #359; overlapping scope is not a duplicate.                       |
+| [342](https://github.com/ShaulLavo/fregat/issues/342) Git diff row topology              | One plan            | Reproduce embedded CR/U+2028/U+2029 on the diff surface. Define the display mapping that preserves Git row identity and comments.                                          |
+| [341](https://github.com/ShaulLavo/fregat/issues/341) ChatGPT proxy account feed         | One plan            | Consume Plan 287's passive feed with account freshness and provider identity. Coordinate #345 and #359.                                                                    |
+| [340](https://github.com/ShaulLavo/fregat/issues/340) Held-out evaluation corpus         | One plan, deferred  | Implementation owner is tree-sitter-x. Preserve the explicit Phase 2 deferral; select license-cleared evaluation inputs before its gate.                                   |
+| [339](https://github.com/ShaulLavo/fregat/issues/339) Markdown structural pin            | One plan, deferred  | Implementation owner is tree-sitter-x. Re-pin against the chosen product revision before a Markdown pilot; this pass does not start Phase 2.                               |
+| [338](https://github.com/ShaulLavo/fregat/issues/338) Heavy slice-root ownership         | One plan            | Bind an explicit slice root to its ownership registry; use two isolated registries to prove refusal without reaping another job.                                           |
+| [337](https://github.com/ShaulLavo/fregat/issues/337) Non-cache peak memory              | One plan            | Define sampled non-reclaimable peaks and their estimate provenance; measure the accounting effect before claiming throughput gains.                                        |
 
 ## Mesh issues
 
@@ -71,7 +74,7 @@ where inspected. They are not claims that every reported failure has been reprod
 | ---------------------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [107](https://github.com/ShaulLavo/mesh/issues/107) Repeated fleet width scans     | Needs reproduction              | Measure the four-host fixture and a scaled fleet before tuning; preserve retained View allocation and geometry checks.                                                              |
 | [106](https://github.com/ShaulLavo/mesh/issues/106) Durable recurring jobs         | Several plans, Idea             | Review the feature first. Separate durable definitions, executor eligibility, coordination/cancellation and run history. The first consumer can be an ordinary issue-digest script. |
-| [105](https://github.com/ShaulLavo/mesh/issues/105) Command over-escaping          | Small-fix candidate             | Trace formatting and sanitization through catalog, dashboard and picker. Prove readable commands and safe control-character handling together.                                      |
+| [105](https://github.com/ShaulLavo/mesh/issues/105) Command over-escaping          | Fixed, merged                   | Trace formatting and sanitization through catalog, dashboard and picker. Prove readable commands and safe control-character handling together.                                      |
 | [103](https://github.com/ShaulLavo/mesh/issues/103) App URL without DNS            | Needs reproduction              | Check publication and private-name reconciliation in the deployed version. Determine whether naming, reconciliation or readiness reporting owns the failure.                        |
 | [101](https://github.com/ShaulLavo/mesh/issues/101) Mac screen/window permissions  | Closure candidate               | Appears to duplicate #100's same incident and grant requirements. Keep #100 as the feature owner and preserve any additional permission evidence when consolidating.                |
 | [100](https://github.com/ShaulLavo/mesh/issues/100) Remote screenshots and windows | Several plans                   | Resolve macOS responsible-process/TCC behavior, then owner-authorized capture/window commands and Linux support. #101 appears to overlap.                                           |
@@ -96,6 +99,37 @@ where inspected. They are not claims that every reported failure has been reprod
 | Issue                                                                       | Classification | Next action and decision                                                                                                                                                                                         |
 | --------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [58](https://github.com/ShaulLavo/singapore/issues/58) Spellcheck hardening | Several plans  | Fix in Fregat's Editor packages. Separate tokenizer bounds and worker settlement from measured underline rendering and optional multilingual support. Verify current source against the reviewed revision first. |
+
+## Fix receipts
+
+Fregat #381 and #351 are fixed in `1ce21d281` and closed with evidence comments.
+The queue protocol regression failed before the fix with `Unsupported queue fixture method
+config/read`; all 31 native-fixture tests pass afterward. The real `chat-queue` scenario
+completed all eight steps and its retained JSONL contains no config-read failure. Its
+screenshots were read back. Evidence: `/work/tmp/fregat-evidence/20261002T191853Z-scenario-chat-queue/`.
+
+The comparison provenance regression used a real disposable Git repository and failed
+before the fix when unchanged source moved from untracked to staged. Both source-hash tests
+pass afterward and run in the normal Ghostty unit-test configuration. A real comparison
+bundle also built successfully. Whole-tree gates and all workspace typechecks passed.
+The web deployment `20261002T192819Z-1ce21d28-main-dad80423` passed its live check. No server
+restart was needed for these tooling changes.
+
+Fregat #377 reproduced through a disposable custom-port proxy to the shared Vite server.
+The shared Vite origin was a healthy control; the custom origin produced the reported
+font CORS error. Gallery captures now use a throwaway API, and the same custom-origin
+capture reports no problems. A standalone static capture also passes. The isolated-server
+contract test passes. The verification script was session-scoped and is not committed.
+Before evidence: `/work/tmp/fregat-evidence/20261002T193140Z-look-dev-390x844/`.
+After evidence: `/work/tmp/fregat-evidence/20261002T193212Z-look-dev-390x844/`.
+
+Mesh #105's quote, repeated-presentation and dashboard-row regressions failed before
+its fix. `go test -race ./internal/cli ./internal/tui` and the staged/full quality gates
+passed afterward. [Mesh PR 108](https://github.com/ShaulLavo/mesh/pull/108) passed its complete
+CI gate and merged as `4b54cd9c`. The root cause was repeatedly escaping printable quotes
+and backslashes; the sanitizer now preserves graphic characters while escaping controls.
+The dashboard text fixture was rendered and its screenshot read back. Release publication
+and installation remain in progress.
 
 ## Continuing review
 
