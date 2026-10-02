@@ -340,3 +340,58 @@ test.each(['darwin', 'linux'] as const)(
     }
   },
 )
+
+test.each([
+  { platform: 'darwin', vibrancy: true, accepts: true },
+  { platform: 'darwin', vibrancy: false, accepts: false },
+  { platform: 'linux', vibrancy: true, accepts: false },
+] as const)(
+  'surface opacity reaches only the transparent $platform host ($vibrancy)',
+  async ({ platform, vibrancy, accepts }) => {
+    const stateHome = mkdtempSync(path.join(tmpdir(), 'native-window-opacity-'))
+    const fake = fakeHost()
+    let token = ''
+    const launched = await launchWebview({
+      binary: '/host',
+      url: 'http://localhost:3301/',
+      stateHome,
+      platform,
+      vibrancy,
+      budget: { dialogMs: 200, stopGraceMs: 20 },
+      startup: { limitMs: 1000, idleMs: 500 },
+      spawn: (args) => {
+        const source = readFileSync(args[2]!, 'utf8')
+        token = JSON.parse(source.match(/const token = (.*);/)![1]!)
+        fake.stdout.write('{"event":"ready"}\n')
+        return fake.process
+      },
+      onOpen: () => {},
+    })
+    const message = (body: Record<string, unknown>) =>
+      fake.stdout.write(
+        `${JSON.stringify({ event: 'message', body: { method: 'setSurfaceOpacity', origin: 'http://localhost:3301', token, ...body } })}\n`,
+      )
+    try {
+      for (const opacity of [20, 80, 0, 100]) message({ opacity })
+      message({ opacity: 20, token: 'foreign' })
+      message({ opacity: 20, origin: 'http://foreign.test' })
+      for (const opacity of [-1, 101, '20', true, null]) message({ opacity })
+      await tick()
+      expect(fake.commands.map((line) => JSON.parse(line))).toEqual(
+        accepts
+          ? [
+              { surfaceOpacity: 20 },
+              { surfaceOpacity: 80 },
+              { surfaceOpacity: 0 },
+              { surfaceOpacity: 100 },
+            ]
+          : [],
+      )
+    } finally {
+      const closing = launched.close()
+      fake.finish()
+      await closing
+      rmSync(stateHome, { recursive: true, force: true })
+    }
+  },
+)

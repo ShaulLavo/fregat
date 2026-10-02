@@ -1869,17 +1869,19 @@ test.each(['open', 'oversized'])(
   },
 )
 
-test('review README places the no-active-request prerequisite beside both stop examples', async () => {
+test('README guards every runner stop and names its owned Codex proxy restart', async () => {
   const readme = await Bun.file(join(import.meta.dirname, 'README.md')).text()
   const lines = readme.split('\n')
   const stopLines = lines.flatMap((line, index) =>
     line.includes('mesh serve stop /ai') ? [index] : [],
   )
-  expect(stopLines).toHaveLength(2)
+  expect(stopLines.length).toBeGreaterThan(0)
   for (const index of stopLines)
     expect(lines.slice(Math.max(0, index - 1), index + 1).join('\n')).toContain(
       'wait until no agents are mid-request',
     )
+  expect(readme).toContain('respawns its owned Codex proxy')
+  expect(readme).toContain('"claudePoolEntrypoints": []')
 })
 
 test.each(['missing', 'unavailable'])(

@@ -153,3 +153,14 @@ test.skipIf(process.platform !== 'darwin')(
     expect(existsSync(library!)).toBe(true)
   },
 )
+
+test('macOS leaves translucent opacity to the page and starts with a clear backdrop', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('@property(strong) NSVisualEffectView *effect;')
+  expect(mac).toMatch(/effect.hidden = YES;[\s\S]*?host.effect = effect;/)
+  expect(mac).toContain('command[@"surfaceOpacity"]')
+  expect(mac).toContain('CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()')
+  expect(mac).toContain('!isfinite(value) || value < 0 || value > 100')
+  expect(mac).toContain('self.effect.hidden = value < 100;')
+  expect(mac).toContain('dispatch_async(dispatch_get_main_queue(), ^{ [host command:command]; });')
+})
