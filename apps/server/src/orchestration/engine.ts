@@ -1785,15 +1785,14 @@ export class OrchestrationEngine {
 
     const providerRuntimeOptions =
       typeof options.providerRuntime === 'object' ? options.providerRuntime : null
-    const adapterRegistry =
-      providerRuntimeOptions?.adapterRegistry ??
-      createDefaultProviderAdapterRegistry([], { services: { cwd: process.cwd() } })
-    const providerService = providerRuntimeOptions?.providerService
-      ? providerRuntimeOptions.providerService
-      : new ProviderService({
-          adapterRegistry,
-          sessionDirectory: new ProviderSessionDirectory(this.database),
-        })
+    const providerService =
+      providerRuntimeOptions?.providerService ??
+      new ProviderService({
+        adapterRegistry:
+          providerRuntimeOptions?.adapterRegistry ??
+          createDefaultProviderAdapterRegistry([], { services: { cwd: process.cwd() } }),
+        sessionDirectory: new ProviderSessionDirectory(this.database),
+      })
     const ingestion = new ProviderRuntimeIngestion(
       (command, source) => this.enqueueProviderCommand(command, source),
       {
