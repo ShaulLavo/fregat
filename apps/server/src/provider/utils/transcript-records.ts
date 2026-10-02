@@ -7,19 +7,14 @@ import {
   reduceCodexUsage,
   codexUsageStateSchema,
 } from './imported-usage'
-import { estimateUsageCost, type RecordedModelPrice } from './model-prices'
+import {
+  estimateUsageCost,
+  recordedModelPriceSchema,
+  type RecordedModelPrice,
+} from './model-prices'
 import { initialTranscriptJsonState, transcriptJsonStateSchema } from './transcript-json'
 
 const count = v.pipe(v.number(), v.integer(), v.minValue(0))
-const rates = v.object({
-  provider: v.string(),
-  model: v.string(),
-  fetchedAt: v.pipe(v.string(), v.isoTimestamp()),
-  input: v.number(),
-  output: v.number(),
-  cacheRead: v.nullable(v.number()),
-  cacheWrite: v.nullable(v.number()),
-})
 const transcriptRecordSchema = v.object({
   billingKey: v.string(),
   turnKey: v.string(),
@@ -34,7 +29,7 @@ const transcriptRecordSchema = v.object({
   cacheWriteTokens: count,
   reasoningTokens: count,
   costUsd: v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0))),
-  price: v.nullable(rates),
+  price: v.nullable(recordedModelPriceSchema),
   reportedCostUsd: v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0))),
 })
 export type TranscriptRecord = v.InferOutput<typeof transcriptRecordSchema>
