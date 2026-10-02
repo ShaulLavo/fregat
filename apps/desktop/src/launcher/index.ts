@@ -79,6 +79,7 @@ async function start() {
   )
   const candidates = resolveBrowserCandidates(
     settings.browser,
+    settings.transparency,
     {
       home,
       platform: process.platform,

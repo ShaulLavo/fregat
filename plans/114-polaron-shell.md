@@ -119,9 +119,11 @@ Order, per OS:
    `desktop.window.degraded` event. The web picker and the web wallpaper cover what the bridge would.
 
 **Approved owner decision, 2026-10-02.** `auto` uses the Chrome-first order above on Linux and
-macOS. An explicit browser path stays first. Window transparency does not change that order;
-select `webview` explicitly for native window transparency. The Browser setting describes the
-full automatic order.
+macOS. An explicit browser path stays first. The Browser setting describes the automatic order.
+
+`window.transparency: 'window'` needs a see-through window, which only the webview host can make,
+so under `auto` it selects the webview. The default transparency is `compositor`, which retains
+Chrome-first selection.
 
 Flatpak and snap run confined. Flatpak needs `flatpak run --filesystem=<profile dir>`; snap cannot
 write hidden directories in `$HOME`, so its profile goes under `~/snap/<name>/common/platform`.
@@ -520,9 +522,10 @@ now uses):
    window left is the fallback on Linux and macOS, and a C or Objective-C host against the
    platform's own API is ~150 lines with the compiler the machine already has (macOS already builds
    `vibrancy.m`).
-5. **Transparency and engine choice.** Approved 2026-10-02: Chrome-first automatic selection
-   also applies when window transparency is selected. Native transparency requires explicit
-   `window.browser: webview`. This supersedes the 2026-09-26 automatic webview switch.
+5. **Transparency picks the engine.** Decided 2026-09-26: research recommendation — under
+   `window.browser: auto`, `window.transparency: 'window'` selects the webview, because a Chromium
+   app window cannot be see-through and the user asked for see-through. Reconfirmed 2026-10-02:
+   this explicit transparency choice retains the native webview; the default is `compositor`.
 6. **The browser profile.** Decided 2026-09-26: research recommendation — a separate
    `--user-data-dir` under `PLATFORM_HOME`. Chrome refuses remote debugging on the default profile,
    and a separate profile keeps the app's storage and permissions out of the user's browsing.
@@ -536,6 +539,6 @@ now uses):
    vibrancy and our own icon once bundled, but loses EditContext and Chrome DevTools.
    (a) Chromium first on macOS too, as on Linux. (b) Webview first on macOS, Chromium first on
    Linux and Windows. **Recommendation: (a)**: one engine on every desktop keeps the editor's
-   EditContext route and `agent:browser trace` on the engine users run, and explicit webview
-   selection gives native window transparency.
+   EditContext route and `agent:browser trace` on the engine users run, and question 5 already
+   gives the native look to anyone who turns on see-through windows.
    Decided 2026-09-26: owner — (a).

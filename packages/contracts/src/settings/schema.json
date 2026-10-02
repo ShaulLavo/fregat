@@ -1357,7 +1357,7 @@
     },
     "window.browser": {
       "default": "auto",
-      "description": "The desktop window engine: auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. webview selects the system window, and an absolute path selects a browser executable first.",
+      "description": "The desktop window engine: auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.",
       "pattern": "^(?:auto|webview|\\/[^\\0\\r\\n]+)$",
       "type": "string"
     },

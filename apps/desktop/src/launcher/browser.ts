@@ -51,10 +51,11 @@ const families = [
 
 export function resolveBrowserCandidates(
   setting: unknown,
+  transparency: unknown,
   env: BrowserEnvironment,
   fs: BrowserFileSystem,
 ): readonly WindowCandidate[] {
-  if (setting === 'webview') {
+  if (setting === 'webview' || (setting === 'auto' && transparency === 'window')) {
     return [{ kind: 'webview' }, { kind: 'tab' }]
   }
   if (typeof setting !== 'string' || (setting !== 'auto' && !validAbsolutePath(setting))) {

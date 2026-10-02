@@ -9,8 +9,13 @@ const env: BrowserEnvironment = { home: '/home/test', path: '/usr/bin:/opt/bin' 
 function filesystem(files: Record<string, string>): BrowserFileSystem {
   return { readFile: (file) => files[file], exists: (file) => file in files }
 }
-function resolve(files: Record<string, string>, setting: unknown = 'auto', environment = env) {
-  return resolveBrowserCandidates(setting, environment, filesystem(files))
+function resolve(
+  files: Record<string, string>,
+  setting: unknown = 'auto',
+  transparency = 'compositor',
+  environment = env,
+) {
+  return resolveBrowserCandidates(setting, transparency, environment, filesystem(files))
 }
 const defaultFiles = {
   '/home/test/.config/mimeapps.list':
@@ -40,8 +45,9 @@ test('auto prefers Chrome over the default, deduplicates scan and keeps native/t
   expect(result.filter((value) => value.kind === 'chromium')).toHaveLength(3)
   expect(result.slice(-2)).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
 })
-test('explicit webview selects native fallback', () => {
+test('explicit webview and automatic window transparency select native fallback', () => {
   expect(resolve(defaultFiles, 'webview')).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
+  expect(resolve(defaultFiles, 'auto', 'window')).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
 })
 test.each(['relative/browser', '', '/bad\0path', '/bad\npath', 1, null])(
   'reject malformed setting %s',
@@ -68,6 +74,7 @@ test('desktop-specific XDG config beats generic config and honours data roots', 
       '/data/applications/chrome.desktop': '[Desktop Entry]\nExec=google-chrome %U',
     },
     'auto',
+    'compositor',
     { ...env, configHome: '/config', dataHome: '/data', currentDesktop: 'Hyprland' },
   )
   expect(result[0]).toMatchObject({ executable: '/usr/bin/google-chrome', source: 'default' })
