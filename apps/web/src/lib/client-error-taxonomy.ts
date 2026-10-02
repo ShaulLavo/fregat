@@ -1,3 +1,4 @@
+import { isCancelledError } from '@tanstack/react-query'
 import { isConnectivityError } from '@workspace/client-core/transport/connectivity-error'
 import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import { isObject } from '@workspace/utils/objects'
@@ -144,7 +145,7 @@ function copyAgentReport(error: ClientError) {
 }
 
 export function reportError(error: ClientError): void {
-  if (isAbortError(error.cause)) return
+  if (isCancelledError(error.cause) || isAbortError(error.cause)) return
 
   if (!clientErrorMetadata(error.cause)) {
     reportClientError({
