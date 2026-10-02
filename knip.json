@@ -13,6 +13,7 @@
         "scripts/check-app.ts",
         "src/launcher/tests/fixtures/browser.mjs",
         "src/launcher/tests/fixtures/launch.mjs",
+        "src/launcher/tests/fixtures/log-writer.ts",
         "src/launcher/tests/fixtures/review-race-browser.mjs",
         "src/launcher/tests/fixtures/native-helper.mjs",
         "electrobun.config.ts"

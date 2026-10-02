@@ -1,4 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { readFsLogs, tailFsLogs } from 'evlog/fs'
+import { readLogs } from '../../../../../scripts/agent/logs'
+import { createLogRetention } from '../../../../../packages/observability/src/retention'
 import path from 'node:path'
 import { expect, vi } from 'vitest'
 import * as v from 'valibot'
@@ -83,6 +86,92 @@ test('flushed bootstrap events stay in state-home logs when the release root bec
   expect(await readLogEvents(path.join(logging.releaseRoot, 'logs'))).toContainEqual(
     expect.objectContaining({ action: 'desktop.service.ready', source: 'desktop' }),
   )
+})
+
+test('two process writers rotate and prune their own series without losing the other writer events', async ({
+  logging,
+}) => {
+  const directory = path.join(logging.releaseRoot, 'logs')
+  const writer = path.join(import.meta.dirname, 'fixtures/log-writer.ts')
+  const desktop = Bun.spawn([process.execPath, writer, directory, 'desktop'], {
+    stdin: 'pipe',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+  const desktopErrors = new Response(desktop.stderr).text()
+  try {
+    const ready = await desktop.stdout.getReader().read()
+    expect(new TextDecoder().decode(ready.value)).toContain('ready')
+    const server = Bun.spawn([process.execPath, writer, directory, 'be'], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    const [serverCode, serverErrors] = await Promise.all([
+      server.exited,
+      new Response(server.stderr).text(),
+    ])
+    expect(serverCode, serverErrors).toBe(0)
+    expect(await readLogEvents(directory)).toContainEqual(
+      expect.objectContaining({ action: 'desktop.before_server_rotation' }),
+    )
+    desktop.stdin.end()
+    expect(await desktop.exited, await desktopErrors).toBe(0)
+    const expected = [
+      'desktop.before_server_rotation',
+      'server.rotation.2',
+      'desktop.after_server_rotation',
+    ]
+    const events = await readLogEvents(directory)
+    expect(events.map((event) => event.action).sort()).toEqual([...expected].sort())
+    const files = (await readdir(directory)).filter((name) => name.endsWith('.jsonl'))
+    expect(files.filter((name) => name.startsWith('desktop-'))).toHaveLength(2)
+    expect(files.filter((name) => !name.startsWith('desktop-'))).toHaveLength(1)
+    const since = new Date(Date.now() - 60_000)
+    const history = []
+    for await (const event of readFsLogs({ dir: directory, since })) history.push(event.action)
+    expect(history.sort()).toEqual([...expected].sort())
+    const tailed = []
+    for await (const event of tailFsLogs({ dir: directory, since })) {
+      tailed.push(event.action)
+      if (tailed.length === expected.length) break
+    }
+    expect(tailed.sort()).toEqual([...expected].sort())
+    const cliEvents = await readLogs({ directory, since })
+    expect(cliEvents.map((event) => event.action)).toEqual(expected)
+    expect(await readLogs({ directory, since, source: 'desktop' })).toHaveLength(2)
+  } finally {
+    desktop.stdin.end()
+    desktop.kill()
+    await desktop.exited
+  }
+})
+
+test('age retention removes only its own file series', async ({ logging }) => {
+  const directory = path.join(logging.releaseRoot, 'logs')
+  await mkdir(directory, { recursive: true })
+  const names = [
+    '2020-01-01.jsonl',
+    '2020-01-01.1.jsonl',
+    'desktop-2020-01-01.jsonl',
+    'desktop-2020-01-01.1.jsonl',
+    'notes.jsonl',
+  ]
+  await Promise.all(names.map((name) => writeFile(path.join(directory, name), '{}\n')))
+  const serverRetention = createLogRetention(
+    directory,
+    () => 1,
+    () => {},
+  )
+  expect(await serverRetention()).toBe(2)
+  expect((await readdir(directory)).sort()).toEqual(names.slice(2).sort())
+  const desktopRetention = createLogRetention(
+    directory,
+    () => 1,
+    () => {},
+    'desktop-',
+  )
+  expect(await desktopRetention()).toBe(2)
+  expect(await readdir(directory)).toEqual(['notes.jsonl'])
 })
 
 for (const stage of ['release', 'early'] as const) {

@@ -19,7 +19,11 @@ export function initializeDesktopObservability(installation?: {
         OBSERVABILITY_DIR: path.join(installation.releaseRoot ?? installation.stateHome, 'logs'),
       }
     : Bun.env
-  return initializeObservabilityRuntime({ env, source: 'desktop' })
+  return initializeObservabilityRuntime({
+    env,
+    source: 'desktop',
+    filePrefix: installation ? 'desktop-' : undefined,
+  })
 }
 
 export { flushObservability as flushDesktopObservability }
