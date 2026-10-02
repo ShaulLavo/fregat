@@ -189,6 +189,35 @@ The decision gate is 17-terminal total CPU clearly below xterm (ratio well under
 CPU moving toward xterm. Retain write latency and explain any remaining gap before expanding the
 spike to the full terminal feature set. Measurements use GPU-idle, `--quiet` heavy slots.
 
+### Upload-call coalescing
+
+Status: Approved experiment. Not merging: no CPU gain, so the coalescer does not clear the owner's
+complexity bar. It coalesces cell and glyph records independently across individual gaps of at most
+4 KiB. Persistent records keep those gaps valid; distant edits retain narrow uploads. Unchanged
+native frames settle damage and callbacks without submitting GPU work. Renderer and benchmark
+byte counters record the bytes actually written, including copied gaps.
+
+- [x] Add bounded range coalescing and exact real-WebGPU/WASM record upload regressions.
+- [x] Prove unchanged frames skip submission while settling damage and callbacks.
+- [x] Pass focused Zig/frame-range, renderer, WebGPU and tracing tests; independent review passes.
+- [x] Measure before/after at 17 terminals, four paired repetitions, 1,200 output frames and 96 latency samples.
+- [x] Complete one-terminal timing: four paired repetitions, 2,700 output frames and 96 latency samples.
+- [x] Complete optimized API/Dawn attribution and retain before/after evidence.
+- [x] Collect fresh same-session WebGPU/Zig, native WebGL/JS and xterm GPU seam attribution.
+- [x] Publish [draft experiment PR #374](https://github.com/ShaulLavo/fregat/pull/374); keep the coalescer unmerged and undeployed.
+
+The 17-terminal total-CPU gate remains failed: the optimized paired median is 1.922× xterm WebGL.
+Absolute native renderer/GPU-process/total medians are 18.344/59.906/78.653 % of one core; the
+unchanged baseline is 18.293/60.168/78.263 %. This run shows no material CPU improvement. Keep
+upload-call reduction separate from CPU claims; the full move still waits for the owner’s review.
+Fresh same-session GPU-process trace intervals put the largest observed gap in command handling:
+WebGPU's `CrGpuMain` task union is about 2.45× native WebGL's, while native WebGL and xterm are
+close. Measure Linux WebGL-default treatment next; a shared WebGPU canvas remains untested.
+Per-canvas attribution and exact texture-acquisition implementation time are unobservable.
+The one-terminal input p95 regression (20.4 → 29.7 ms) belongs to the unmerged coalescer; its cause
+was not confirmed.
+Evidence is retained in `ghostty-webgpu/docs/benchmarks/linux-one-write-2026-10-02/`.
+
 ### Follow-up causes
 
 One reviewed PR per cause, largest measured share first. Each PR shows before/after on omarchy with
