@@ -1,7 +1,12 @@
 import { unwatchFile, watch, watchFile, type FSWatcher } from 'node:fs'
 import path from 'node:path'
 import { errorStringField, type SettingsLayerId } from '@workspace/contracts'
-import { recordRequestWarning, runDetached } from '../observability'
+import {
+  recordProcessInfo,
+  recordProcessWarning,
+  recordRequestWarning,
+  runDetached,
+} from '../observability'
 import {
   parseSettingsDocument,
   readSettingsFile,
@@ -10,7 +15,18 @@ import {
   type SettingsParseError,
   type SettingsTextRange,
 } from './json-document'
-import { canonicalSettingsPathSync, withSettingsWriteCoordinator } from './write-coordinator'
+import {
+  pruneSettingsFile,
+  pruneSettingsFileSync,
+  pruneSettingsText,
+  type SettingsPruneResult,
+} from './prune'
+import { hasSettingsRecoveryArtifacts } from './transaction'
+import {
+  canonicalSettingsPathSync,
+  withSettingsWriteCoordinator,
+  withSettingsWriteCoordinatorSync,
+} from './write-coordinator'
 
 /**
  * `fs.watch` fires more than once per editor save, and sometimes before the new
@@ -91,6 +107,11 @@ export type SettingsLayerReader = (
   read: () => Promise<SettingsFileContents>,
 ) => Promise<SettingsFileContents>
 
+export type SettingsPruneProtection = {
+  readonly ownerPath: string
+  readonly eligible: () => boolean
+}
+
 const EMPTY: LayerContents = {
   raw: {},
   parseErrors: [],
@@ -114,6 +135,8 @@ export class SettingsFileLayer {
 
   private contents: LayerContents = EMPTY
   private readonly reader: SettingsLayerReader | null
+  private readonly onPruned?: (keys: readonly string[]) => void
+  private readonly pruneProtection?: SettingsPruneProtection
   private watcher: FSWatcher | null = null
   private readonly directoryWatchers: FSWatcher[] = []
   private debounce: ReturnType<typeof setTimeout> | null = null
@@ -141,10 +164,18 @@ export class SettingsFileLayer {
    */
   private selfWrittenRevision: string | null = null
 
-  constructor(id: SettingsLayerId, filePath: string, reader?: SettingsLayerReader) {
+  constructor(
+    id: SettingsLayerId,
+    filePath: string,
+    reader?: SettingsLayerReader,
+    onPruned?: (keys: readonly string[]) => void,
+    pruneProtection?: SettingsPruneProtection,
+  ) {
     this.id = id
     this.filePath = filePath
     this.reader = reader ?? null
+    this.onPruned = onPruned
+    this.pruneProtection = pruneProtection
   }
 
   snapshot(): LayerContents {
@@ -157,6 +188,85 @@ export class SettingsFileLayer {
 
   loadSync(): void {
     this.apply(this.toContents(readSettingsFileSync(this.filePath)))
+  }
+
+  /** Application startup invokes cleanup separately from loading and transaction recovery. */
+  pruneUnknownSettingsSync(): LayerChange | null {
+    if (this.id !== 'user') return null
+    let keys: readonly string[] = []
+    try {
+      const candidate = pruneSettingsText(readSettingsFileSync(this.filePath).text)
+      if (!candidate) return null
+      keys = candidate.keys
+      return withSettingsWriteCoordinatorSync(this.filePath, (lease) =>
+        this.withPruneOwnerSync(() => {
+          const eligible = () => this.pruneEligible(lease.canonicalPath)
+          if (!eligible()) return null
+          const current = readSettingsFileSync(lease.canonicalPath)
+          const pruned = pruneSettingsFileSync(lease.canonicalPath, current, eligible)
+          return pruned ? this.acceptPruned(pruned) : null
+        }),
+      )
+    } catch (error) {
+      recordProcessWarning('settings.layer.prune_failed', {
+        area: 'settings',
+        operation: 'boot-prune-unknown-keys',
+        settings: { layer: this.id, file: this.filePath, keys },
+        error: {
+          code: errorStringField(error, 'code'),
+          name: error instanceof Error ? error.name : typeof error,
+        },
+      })
+      return null
+    }
+  }
+
+  async pruneUnknownSettings(): Promise<LayerChange | null> {
+    if (this.id !== 'user') return null
+    return this.coordinateWrite((context) =>
+      this.withPruneOwner(async () => {
+        if (!this.pruneEligible(context.destination)) return null
+        const current = await this.read()
+        return this.pruneCurrent({ ...context, current })
+      }),
+    )
+  }
+
+  private withPruneOwnerSync<T>(operation: () => T): T {
+    if (!this.pruneProtection) return operation()
+    return withSettingsWriteCoordinatorSync(this.pruneProtection.ownerPath, operation)
+  }
+
+  private async withPruneOwner<T>(operation: () => Promise<T>): Promise<T> {
+    if (!this.pruneProtection) return operation()
+    return withSettingsWriteCoordinator(this.pruneProtection.ownerPath, operation)
+  }
+
+  private pruneEligible(destination: string): boolean {
+    if (this.pruneProtection) return this.pruneProtection.eligible()
+    return !hasSettingsRecoveryArtifacts([destination])
+  }
+
+  private async pruneCurrent(context: LayerWriteContext): Promise<LayerChange | null> {
+    const pruned = await pruneSettingsFile(
+      context.destination,
+      context.current,
+      context.coordinatorWaitMs,
+      () => this.pruneEligible(context.destination),
+    )
+    return pruned ? this.acceptPruned(pruned) : null
+  }
+
+  private acceptPruned(pruned: SettingsPruneResult): LayerChange {
+    const { text, revision } = pruned.contents
+    const change = this.acceptCommitted(text, revision)
+    recordProcessInfo('settings.layer.pruned', {
+      area: 'settings',
+      operation: 'prune-unknown-keys',
+      settings: { layer: this.id, file: this.filePath, keys: pruned.keys },
+    })
+    this.onPruned?.(pruned.keys)
+    return change
   }
 
   /** Runs one fresh read and write transaction under the process-wide path lock. */
@@ -481,6 +591,30 @@ export class SettingsFileLayer {
     }
   }
 
+  private async reloadUser() {
+    try {
+      await this.coordinateWrite((context) =>
+        this.withPruneOwner(async () => {
+          const current = await this.read()
+          if (this.reloadQueued) return
+
+          const change = this.pruneEligible(context.destination)
+            ? await this.pruneCurrent({ ...context, current })
+            : null
+          if (change) {
+            // Publish the committed cleanup before its rename event is suppressed.
+            this.onChange?.(change)
+            return
+          }
+          this.acceptReload(current)
+        }),
+      )
+      this.clearReadFailure()
+    } catch (error) {
+      this.handleReadFailure(error)
+    }
+  }
+
   private async reloadOnce() {
     // Before the generation is captured, so a write that lands first is read as
     // the current state rather than as a change to publish.
@@ -498,7 +632,6 @@ export class SettingsFileLayer {
       this.handleReadFailure(error)
       return
     }
-    this.clearReadFailure()
 
     // An event landed while this read was pending. Its bytes may already be
     // older than the file, so let the queued read be the one that publishes.
@@ -510,6 +643,17 @@ export class SettingsFileLayer {
     // consumed the echo hash on the way, which delivers the write's own event as
     // an external edit right after it.
     if (generation !== this.generation) return
+
+    if (this.id === 'user' && pruneSettingsText(next.text)) {
+      await this.reloadUser()
+      return
+    }
+    this.clearReadFailure()
+    this.acceptReload(next)
+  }
+
+  private acceptReload(next: LayerContents) {
+    if (this.reloadQueued) return
 
     // Suppress exactly one event: the one our own rename produced.
     //

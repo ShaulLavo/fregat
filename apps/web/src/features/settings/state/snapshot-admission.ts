@@ -4,8 +4,9 @@ import { providerQueryKeys } from '@/lib/query-keys'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { fetchSettings } from '@/features/settings/utils/api'
 import { importSourcesQueryKey } from '@/features/settings/utils/query-keys'
+import { notifyPrunedSettings } from '@/features/settings/utils/notify-pruned-settings'
 
-export const settingsSnapshotAdmission = createSettingsSnapshotAdmission({
+const admission = createSettingsSnapshotAdmission({
   batch: unstable_batchedUpdates,
   fetch: (owner, signal, options) => fetchSettings(signal, clientForQueryClient(owner), options),
   invalidateProviders: (owner) => {
@@ -13,6 +14,14 @@ export const settingsSnapshotAdmission = createSettingsSnapshotAdmission({
     void owner.invalidateQueries({ queryKey: importSourcesQueryKey })
   },
 })
+
+export const settingsSnapshotAdmission = {
+  ...admission,
+  admitSettingsEvent: (...args: Parameters<typeof admission.admitSettingsEvent>) => {
+    notifyPrunedSettings(args[1].snapshot)
+    return admission.admitSettingsEvent(...args)
+  },
+}
 
 export const {
   beginSettingsSnapshotRead,

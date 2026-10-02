@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { ensureFolderPath } from '@/lib/file-server'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
@@ -167,21 +169,15 @@ test('searching a key edited from another row finds the row that edits it', () =
   expect(matchingSettingIds('models')).not.toContain('models.order')
 })
 
-test('shows a diagnostic for a key the settings file holds but cannot apply', async ({
+test('shows a diagnostic for an unknown key preserved in workspace settings', async ({
+  server,
   client,
 }) => {
   expect(client).toBeDefined()
-  // Through the raw route, the way the JSON escape hatch writes: a document
-  // holding a key this build does not register. The resolver keeps it in the
-  // file and reports it rather than applying it, and the page has to say so —
-  // otherwise a renamed key just looks like a setting that stopped working.
-  const before = await fetchSettings(undefined, getClient())
-  await getClient().settings.raw.post({
-    baseRevision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
-    target: 'user',
-    text: '{ "editor.fromANewerBuild": true }',
-    writeId: 'page-unknown-setting',
-  })
+  const workspaceFile = path.join(server.root, '.platform', 'settings.json')
+  await mkdir(path.dirname(workspaceFile), { recursive: true })
+  await writeFile(workspaceFile, '{ "editor.fromANewerBuild": true }')
+  await server.restart()
 
   renderWithProviders(<SettingsPage />)
 
