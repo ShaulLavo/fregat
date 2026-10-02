@@ -27,6 +27,21 @@ static WKWebsiteDataStore *persistent_store(NSString *directory) {
   return WKWebsiteDataStore.defaultDataStore;
 }
 
+static NSView *glass_effect(NSRect frame) {
+  if (@available(macOS 26.0, *)) {
+    Class glassClass = NSClassFromString(@"NSGlassEffectView");
+    if (!glassClass) return nil;
+    NSView *effect = [[glassClass alloc] initWithFrame:frame];
+    // The public regular style is zero; runtime KVC keeps older SDK builds working.
+    [effect setValue:@0 forKey:@"style"];
+    [effect setValue:@0 forKey:@"cornerRadius"];
+    effect.hidden = YES;
+    effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    return effect;
+  }
+  return nil;
+}
+
 static void emit(NSDictionary *event) {
   NSData *data = [NSJSONSerialization dataWithJSONObject:event options:0 error:nil];
   if (!data) return;
@@ -39,6 +54,7 @@ static void emit(NSDictionary *event) {
 @property(strong) NSWindow *window;
 @property(strong) WKWebView *view;
 @property(strong) NSVisualEffectView *effect;
+@property(strong) NSView *glassEffect;
 @property(strong) NSURL *appURL;
 @property(strong) WKUserScript *startupScript;
 @property(strong) NSOpenPanel *picker;
@@ -175,16 +191,16 @@ static void emit(NSDictionary *event) {
     id appearance = command[@"windowAppearance"];
     if (![appearance isKindOfClass:NSDictionary.class]) return;
     id opacity = appearance[@"opacity"];
-    id frost = appearance[@"frost"];
+    id material = appearance[@"material"];
     if (![opacity isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()) return;
-    if (![frost isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)frost) == CFBooleanGetTypeID()) return;
+    if (![material isKindOfClass:NSString.class] || ![@[@"none", @"frosted", @"glass"] containsObject:material]) return;
     double opacityValue = [opacity doubleValue];
-    double frostValue = [frost doubleValue];
     if (!isfinite(opacityValue) || opacityValue < 0 || opacityValue > 100) return;
-    if (!isfinite(frostValue) || frostValue < 0 || frostValue > 100) return;
-    // The page paints pane opacity; AppKit's blurred layer has independent strength.
-    self.effect.alphaValue = frostValue / 100;
-    self.effect.hidden = frostValue == 0;
+    BOOL glass = [material isEqual:@"glass"] && self.glassEffect != nil;
+    // Pane opacity is page-owned; native materials always render at full strength.
+    self.effect.alphaValue = 1;
+    self.effect.hidden = [material isEqual:@"none"] || glass;
+    self.glassEffect.hidden = !glass;
     return;
   }
   if ([command[@"eval"] isKindOfClass:NSString.class]) {
@@ -321,10 +337,14 @@ int main(int argc, char **argv) {
       host.effect = effect;
       effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
       [window.contentView addSubview:effect];
+      host.glassEffect = glass_effect(window.contentView.bounds);
+      if (host.glassEffect) [window.contentView addSubview:host.glassEffect];
     }
     WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
     configuration.websiteDataStore = dataStore;
-    host.startupScript = [[WKUserScript alloc] initWithSource:text injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
+    NSString *startupSource = [NSString stringWithFormat:@"%@\n;if (globalThis.platformBridge) globalThis.platformBridge.capabilities.windowGlass = %@;",
+        text, host.glassEffect ? @"true" : @"false"];
+    host.startupScript = [[WKUserScript alloc] initWithSource:startupSource injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
     [configuration.userContentController addScriptMessageHandler:host name:@"platformShell"];
     WKWebView *view = [[WKWebView alloc] initWithFrame:window.contentView.bounds configuration:configuration];
     host.view = view;

@@ -372,26 +372,27 @@ test.each([
         `${JSON.stringify({ event: 'message', body: { method: 'setWindowAppearance', origin: 'http://localhost:3301', token, ...body } })}\n`,
       )
     try {
-      for (const opacity of [20, 80, 0, 100]) message({ opacity, frost: 50 })
-      message({ opacity: 20, frost: 50, token: 'foreign' })
-      message({ opacity: 20, frost: 50, origin: 'http://foreign.test' })
+      for (const opacity of [20, 80, 0, 100]) message({ opacity, material: 'frosted' })
+      message({ opacity: 20, material: 'frosted', token: 'foreign' })
+      message({ opacity: 20, material: 'frosted', origin: 'http://foreign.test' })
       for (const opacity of [-1, 101, '20', true, false, null, NaN, Infinity, -Infinity])
-        message({ opacity, frost: 50 })
-      for (const frost of [0, 100]) message({ opacity: 80, frost })
-      for (const frost of [-1, 101, '50', true, false, null, NaN, Infinity, -Infinity])
-        message({ opacity: 80, frost })
+        message({ opacity, material: 'frosted' })
+      for (const material of ['none', 'glass']) message({ opacity: 80, material })
+      for (const material of [-1, 101, '50', 'Frosted', '', true, false, null, {}, []])
+        message({ opacity: 80, material })
       message({ opacity: 80 })
-      message({ frost: 50 })
+      message({ opacity: 80, frost: 50 })
+      message({ material: 'frosted' })
       await tick()
       expect(fake.commands.map((line) => JSON.parse(line))).toEqual(
         accepts
           ? [
-              { windowAppearance: { opacity: 20, frost: 50 } },
-              { windowAppearance: { opacity: 80, frost: 50 } },
-              { windowAppearance: { opacity: 0, frost: 50 } },
-              { windowAppearance: { opacity: 100, frost: 50 } },
-              { windowAppearance: { opacity: 80, frost: 0 } },
-              { windowAppearance: { opacity: 80, frost: 100 } },
+              { windowAppearance: { opacity: 20, material: 'frosted' } },
+              { windowAppearance: { opacity: 80, material: 'frosted' } },
+              { windowAppearance: { opacity: 0, material: 'frosted' } },
+              { windowAppearance: { opacity: 100, material: 'frosted' } },
+              { windowAppearance: { opacity: 80, material: 'none' } },
+              { windowAppearance: { opacity: 80, material: 'glass' } },
             ]
           : [],
       )

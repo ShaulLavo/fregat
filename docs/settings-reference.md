@@ -41,7 +41,7 @@ stays safe to read, share and export.
 | `workbench.density`                 | `"compact"`                                    | window      | Use tighter compact spacing or roomier cozy spacing throughout the app.                                                                                         |
 | `workbench.surface.continuousSeams` | `false`                                        | window      | Paint one background across panels and the resize handles between them, so the panels read as one surface. Off, the wallpaper shows in the gaps between panels. |
 | `workbench.tree.indentGuides`       | `"always"`                                     | window      | When to show indentation guides in the file tree. Guides take editor colours while the tree is hovered.                                                         |
-| `window.frost`                      | `50`                                           | window      | Native macOS desktop blur strength.                                                                                                                             |
+| `window.material`                   | `"none"`                                       | window      | None shows the desktop; Frosted blurs it; Glass adds Liquid Glass.                                                                                              |
 
 ### Details
 
@@ -52,7 +52,6 @@ stays safe to read, share and export.
 - `workbench.reduceMotion`: Applies to the terminal app: its spinners and loaders run at half speed. The web app follows the operating system's reduce-motion setting.
 - `workbench.fontFamily`: Bundled fonts ship with the app and load with no network. Installed fonts come from the server machine's fontconfig (fc-list), so a font installed there works on every device; a server without fontconfig lists none.
 - `workbench.feel`: Flat moves on fixed durations with flat controls. Seam, Brisk, Relaxed and Playful move on springs and give controls raised keys, sunken wells and squircle corners (squircles in Chromium only). Under reduced motion every feel uses fades.
-- `window.frost`: AppKit fixes blur radius.
 
 ## Chat
 
@@ -332,8 +331,8 @@ stays safe to read, share and export.
 | `window.browserStartupLimitSeconds` | `60`           | machine | Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it. _(restart)_                                                                                                                                                                               |
 | `window.nativeDialogTimeoutSeconds` | `300`          | machine | Seconds a desktop file chooser or startup message stays open before its helper closes. _(restart)_                                                                                                                                                                                                              |
 | `window.nativeHostStopGraceSeconds` | `2`            | machine | Seconds the desktop gives an owned native helper to stop before terminating it. _(restart)_                                                                                                                                                                                                                     |
-| `window.transparency`               | `"compositor"` | machine | What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame. _(restart)_                                                                                                                                           |
+| `window.transparency`               | `"compositor"` | machine | Choose window-manager transparency or a see-through native window. _(restart)_                                                                                                                                                                                                                                  |
 
 ### Details
 
-- `window.transparency`: A per-pixel transparent window switches the embedded Chromium renderer to off-screen rendering. On macOS a 1440×960 window then copies 5.5 MB through the CPU on every paint, where the opaque window produced no paint events at all. On Linux the window manager already blends an opaque window over the desktop.
+- `window.transparency`: Transparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.

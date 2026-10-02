@@ -19,7 +19,7 @@ export const nativeWindow: Scenario = {
       },
       { kind: 'set', key: 'workbench.surface.opacity', value: 80 },
       { kind: 'set', key: 'workbench.surface.blur', value: 24 },
-      { kind: 'set', key: 'window.frost', value: 50 },
+      { kind: 'set', key: 'window.material', value: 'none' },
     ])
     await page.addInitScript({
       content:
@@ -41,6 +41,7 @@ export const nativeWindow: Scenario = {
         }\n` +
         shellBridge(page.url(), 'wkwebview', 'fixture-token', 'darwin', true) +
         `
+        globalThis.platformBridge.capabilities.windowGlass = true;
         if (sessionStorage.getItem('fixture-opaque-browser') === 'true') {
           delete globalThis.platformBridge;
           delete globalThis.__platformShell;
@@ -72,6 +73,9 @@ export const nativeWindow: Scenario = {
           surfaceOpacity: getComputedStyle(document.documentElement).getPropertyValue(
             '--surface-opacity',
           ),
+          contentOpacity: getComputedStyle(document.documentElement)
+            .getPropertyValue('--content-opacity')
+            .trim(),
           surfaceBlur: getComputedStyle(document.documentElement)
             .getPropertyValue('--surface-blur')
             .trim(),
@@ -98,47 +102,73 @@ export const nativeWindow: Scenario = {
       page.evaluate(() => {
         const messages = (
           globalThis as unknown as {
-            __nativeWindowMessages: { method?: string; opacity?: number; frost?: number }[]
+            __nativeWindowMessages: { method?: string; opacity?: number; material?: string }[]
           }
         ).__nativeWindowMessages
         return messages.filter((message) => message.method === 'setWindowAppearance')
       })
-    const waitForAppearance = (opacity: number, frost: number) =>
+    const waitForAppearance = (opacity: number, material: string) =>
       page.waitForFunction(
         (expected) => {
           const messages = (
             globalThis as unknown as {
-              __nativeWindowMessages: { method?: string; opacity?: number; frost?: number }[]
+              __nativeWindowMessages: { method?: string; opacity?: number; material?: string }[]
             }
           ).__nativeWindowMessages
           const last = messages.filter((message) => message.method === 'setWindowAppearance').at(-1)
-          return last?.opacity === expected.opacity && last.frost === expected.frost
+          return last?.opacity === expected.opacity && last.material === expected.material
         },
-        { opacity, frost },
+        { opacity, material },
       )
     const firstAppearance = (await appearanceMessages())[0]
     ok(firstAppearance, 'First paint sends window appearance')
     strictEqual(firstAppearance.opacity, 80)
-    strictEqual(firstAppearance.frost, 50)
+    strictEqual(firstAppearance.material, 'none')
     await page.keyboard.press('Control+,')
-    await selectors.settingsSearch(page).fill('Window frost')
-    const frostControl = selectors.settingsNumber(page, 'Window frost')
-    await frostControl.waitFor()
-    strictEqual(await frostControl.inputValue(), '50')
-    await step('native-window-frost-default')
-    for (const frost of [0, 100, 50]) {
-      await frostControl.fill(String(frost))
-      await frostControl.press('Enter')
-      await waitForAppearance(80, frost)
-      strictEqual((await readPaint()).surfaceBlur, '0px')
-      await step(`native-window-frost-${frost}`)
+    await selectors.settingsSearch(page).fill('Window material')
+    const materialControl = selectors.settingsEnum(page, 'Window material')
+    await materialControl.waitFor()
+    const controlPaint = async () => ({
+      selected: await selectors
+        .settingsScopeIndicator(page)
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+      field: await materialControl.evaluate((element) => getComputedStyle(element).backgroundColor),
+    })
+    const originalControlPaint = await controlPaint()
+    notStrictEqual(originalControlPaint.selected, 'rgba(0, 0, 0, 0)')
+    notStrictEqual(originalControlPaint.field, 'rgba(0, 0, 0, 0)')
+    await step('native-window-material-default')
+    for (const [material, label] of [
+      ['frosted', 'Frosted'],
+      ['glass', 'Glass'],
+      ['none', 'None'],
+    ] as const) {
+      await materialControl.click()
+      await selectors.settingsEnumOption(page, label).click()
+      await waitForAppearance(80, material)
+      const materialPaint = await readPaint()
+      deepStrictEqual(
+        await controlPaint(),
+        originalControlPaint,
+        'Native material preserves selected and field control fills',
+      )
+      strictEqual(materialPaint.surfaceBlur, '0px')
+      strictEqual(materialPaint.surfaceOpacity.trim(), material === 'none' ? '80%' : '0%')
+      strictEqual(materialPaint.contentOpacity, material === 'none' ? paint.contentOpacity : '0%')
+      await selectors.settingsSearch(page).fill('Pane opacity')
+      strictEqual(
+        await selectors.settingsSlider(page, 'Pane opacity').isDisabled(),
+        material !== 'none',
+      )
+      await step(`native-window-material-${material}`)
+      await selectors.settingsSearch(page).fill('Window material')
     }
     await selectors.settingsSearch(page).fill('Pane opacity')
     const opacityControl = selectors.settingsSlider(page, 'Pane opacity')
     await opacityControl.waitFor()
     await opacityControl.focus()
     await page.keyboard.press('Home')
-    await waitForAppearance(0, 50)
+    await waitForAppearance(0, 'none')
     await step('native-window-opacity-independent')
     await evidence.json('native-window-appearance-messages.json', await appearanceMessages())
     await writeSettings(page, server.origin, [
@@ -209,8 +239,8 @@ export const nativeWindow: Scenario = {
       'rgba(0, 0, 0, 0)',
     )
     await page.keyboard.press('Control+,')
-    await selectors.settingsSearch(page).fill('Window frost')
-    strictEqual(await selectors.settingsRow(page, 'window.frost').count(), 0)
+    await selectors.settingsSearch(page).fill('Window material')
+    strictEqual(await selectors.settingsEnum(page, 'Window material').isDisabled(), true)
     await selectors.editorGroupTabs(page, 0).first().click({ button: 'right' })
     await selectors.menuItem(page, 'Close').click()
     await evidence.json('opaque-browser-paint.json', opaquePaint)
