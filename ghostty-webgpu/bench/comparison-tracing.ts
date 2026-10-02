@@ -1,6 +1,8 @@
 import type { GhosttyRenderState } from '../src/core/render-state.js'
 import type { GhosttyRuntime } from '../src/core/runtime.js'
 import type { GhosttyTerminal } from '../src/core/terminal.js'
+import type { WebGlTerminalRenderer } from '../src/render/webgl/renderer.js'
+import type { RowTerminalRenderer } from '../src/render/row-renderer.js'
 import type { WebGpuTerminalRenderer } from '../src/render/renderer.js'
 
 type Category = 'parse' | 'snapshot' | 'damage' | 'instances' | 'upload' | 'commands' | 'js'
@@ -65,6 +67,7 @@ export class ComparisonTracing {
     category: Category,
     after?: (result: unknown, args: unknown[]) => void,
     observeInactive = false,
+    before?: (args: unknown[]) => void,
   ): void {
     if (!this.enabled) return
     const original = field(object, name)
@@ -77,6 +80,7 @@ export class ComparisonTracing {
         if (observeInactive) after?.(result, args)
         return result
       }
+      before?.(args)
       const start = performance.now()
       const context = { children: 0 }
       recorder.stack.push(context)
@@ -146,6 +150,7 @@ export class ComparisonTracing {
     const resources = field(pass, 'resources')
     this.ownership.push({
       terminal,
+      backend: 'webgpu',
       scheduler: this.identity(field(renderer, 'scheduler')),
       device: this.identity(device),
       queue: this.identity(field(device, 'queue')),
@@ -199,6 +204,97 @@ export class ComparisonTracing {
     })
   }
 
+  nativeRenderer(terminal: number, renderer: WebGlTerminalRenderer | RowTerminalRenderer): void {
+    if (!this.enabled) return
+    const backend = field(renderer, 'backend')
+    this.ownership.push({
+      terminal,
+      backend,
+      scheduler: this.identity(field(renderer, 'scheduler')),
+    })
+    this.wrap(renderer, 'notifyWrite', terminal, 'js')
+    this.wrap(renderer, 'drawFrame', terminal, 'js', () => this.count(terminal, 'frames'))
+    if (backend === 'webgl2') {
+      const pass = field(field(renderer, 'state'), 'pass')
+      this.wrap(renderer, 'rowsToRebuild', terminal, 'damage')
+      this.wrap(renderer, 'rebuildRows', terminal, 'instances')
+      this.wrap(pass, 'syncAtlas', terminal, 'upload')
+      this.wrap(pass, 'upload', terminal, 'upload')
+      this.wrap(pass, 'submit', terminal, 'commands', () => this.count(terminal, 'submissions'))
+      return
+    }
+    this.wrap(renderer, 'rowsToPaint', terminal, 'damage')
+    const surface = field(renderer, 'surface')
+    if (backend === 'canvas2d') {
+      this.wrap(surface, 'paint', terminal, 'commands', () => this.count(terminal, 'rowsPainted'))
+      return
+    }
+    // Each DOM paint replaces its row node; instrument that instance's commit, including fresh rows.
+    this.wrap(surface, 'paint', terminal, 'js', undefined, false, (args) => {
+      const row = args[0] as { y: number }
+      const container = field(surface, 'container') as HTMLElement
+      const previous = container.firstElementChild?.children[row.y]
+      if (previous)
+        this.wrap(previous, 'replaceWith', terminal, 'commands', () =>
+          this.count(terminal, 'rowsPainted'),
+        )
+    })
+  }
+
+  legacy(terminal: number, instance: unknown): void {
+    if (!this.enabled) return
+    const core = field(instance, 'wasmTerm')
+    const renderer = field(instance, 'renderer')
+    this.ownership.push({
+      terminal,
+      backend: 'ghostty-web',
+      context: this.identity(field(renderer, 'ctx')),
+    })
+    this.wrap(core, 'write', terminal, 'parse')
+    this.wrap(core, 'update', terminal, 'snapshot')
+    this.wrap(core, 'getViewport', terminal, 'snapshot')
+    this.wrap(renderer, 'render', terminal, 'js', () => this.count(terminal, 'frames'))
+    this.wrap(renderer, 'renderLine', terminal, 'commands', () =>
+      this.count(terminal, 'rowsPainted'),
+    )
+  }
+
+  xtermDom(terminal: number, instance: unknown): void {
+    if (!this.enabled) return
+    const core = field(instance, '_core')
+    const service = field(core, '_renderService')
+    const renderer = field(field(service, '_renderer'), 'value')
+    this.ownership.push({
+      terminal,
+      backend: 'xterm-dom',
+      scheduler: this.identity(field(service, '_renderDebouncer')),
+    })
+    this.wrap(field(core, '_inputHandler'), 'parse', terminal, 'parse')
+    this.wrap(service, 'refreshRows', terminal, 'damage')
+    const wrapped = new WeakSet<HTMLElement>()
+    const wrapRows = () => {
+      const rows = field(renderer, '_rowElements') as HTMLElement[]
+      for (const row of rows) {
+        if (wrapped.has(row)) continue
+        wrapped.add(row)
+        this.wrap(row, 'replaceChildren', terminal, 'commands', () =>
+          this.count(terminal, 'rowsPainted'),
+        )
+      }
+    }
+    wrapRows()
+    this.wrap(
+      renderer,
+      'renderRows',
+      terminal,
+      'js',
+      () => this.count(terminal, 'frames'),
+      false,
+      wrapRows,
+    )
+    this.wrap(field(renderer, '_rowFactory'), 'createRow', terminal, 'snapshot')
+  }
+
   xterm(terminal: number, instance: unknown, addon: unknown): void {
     if (!this.enabled) return
     const core = field(instance, '_core')
@@ -209,6 +305,7 @@ export class ComparisonTracing {
     this.ownership.push({
       terminal,
       scheduler: this.identity(field(service, '_renderDebouncer')),
+      backend: 'xterm-webgl',
       context: this.identity(gl),
       programs: ['_glyphRenderer', '_rectangleRenderer'].map((name) =>
         this.identity(field(field(field(renderer, name), 'value'), '_program')),

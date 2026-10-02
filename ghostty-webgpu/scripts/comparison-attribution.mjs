@@ -6,7 +6,14 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { quantile } from './comparison-report.mjs'
 import { assertDisplay } from './comparison-trace.mjs'
-import { analysisArguments, positiveInteger } from './comparison-options.mjs'
+import {
+  analysisArguments,
+  positiveInteger,
+  frameBuilders,
+  counterparts,
+  measurementCases,
+} from './comparison-options.mjs'
+import { renderedFrame, renderOperations } from './comparison-render.mjs'
 
 export function unionMilliseconds(intervals) {
   const sorted = intervals
@@ -63,45 +70,12 @@ export function timelines(phase, clock) {
   const { records, sample } = phase
   if (!sample?.captures) return []
   const spans = records.spans
-  const frameName = spans.some((span) => span.operation === 'drawFrame')
-    ? 'drawFrame'
-    : 'renderRows'
   const presentations = clock.main.filter((event) => event.name === 'AnimationFrame::Presentation')
   const boundaries = clock.main
     .filter((event) => event.name === 'AnimationFrame::Render' && event.ph === 'b')
     .map((event) => event.ts / 1000 - clock.offset)
   return sample.captures.map((capture, index) => {
-    const started = capture.started - records.timeOrigin
-    const captured = capture.timestamp - records.timeOrigin
-    const echo = records.markers.find(
-      (marker) =>
-        marker.operation === 'echo-received' && marker.time >= started && marker.time <= captured,
-    )
-    const parse = spans.find(
-      (span) =>
-        span.terminal === 0 &&
-        span.category === 'parse' &&
-        span.start >= (echo?.time ?? started) &&
-        span.start <= captured,
-    )
-    const frame = spans
-      .filter(
-        (span) =>
-          span.terminal === 0 &&
-          span.operation === frameName &&
-          span.start >= (parse?.end ?? started) &&
-          span.start <= captured,
-      )
-      .toSorted((a, b) => a.start - b.start)[0]
-    const submit = spans
-      .filter(
-        (span) =>
-          span.terminal === 0 &&
-          span.category === 'commands' &&
-          span.start >= (frame?.start ?? started) &&
-          span.end <= (frame?.end ?? captured),
-      )
-      .at(-1)
+    const { started, captured, echo, parse, frame, boundary } = renderedFrame(records, capture)
     const animation = clock.frames
       .filter(
         (candidate) =>
@@ -120,7 +94,8 @@ export function timelines(phase, clock) {
       parseEnd: relative(parse?.end),
       frame: relative(frame?.start),
       frameEnd: relative(frame?.end),
-      submit: relative(submit?.end),
+      renderBoundary: boundary.operation,
+      renderBoundaryEnd: relative(boundary.end),
       chromePresented: presented ? relative(presented.ts / 1000 - clock.offset) : null,
       animationId: animation?.id,
       previousBoundary: relative(boundaries.filter((time) => time <= started).at(-1)),
@@ -169,9 +144,7 @@ export function frameCadence(records, clock) {
     .filter((marker) => marker.operation === 'paced-frame')
     .map((marker) => marker.detail.timestamp)
   const periods = paced.slice(1).map((time, index) => time - paced[index])
-  const renders = records.spans.filter(
-    (span) => span.operation === 'drawFrame' || span.operation === 'renderRows',
-  )
+  const renders = records.spans.filter((span) => renderOperations.includes(span.operation))
   const workByFrame = new Map()
   for (const span of renders) {
     const frame = clock.frames.findLast(
@@ -300,15 +273,37 @@ export function validateArtifact(artifact) {
     'Incomplete phase matrix',
   )
   assert(Array.isArray(artifact.qualifications), 'Incomplete display evidence')
-  const builders = args.includes('--paired-frame-builders') ? ['js', 'zig'] : [undefined]
+  const variants = artifact.variants ?? ['ghostty-webgpu', 'xterm-webgl']
+  const known = [...Object.keys(counterparts), ...new Set(Object.values(counterparts))]
   assert(
-    artifact.runs?.length === counts.length * artifact.repetitions * (builders.length + 1),
-    'Incomplete case matrix',
+    variants.length &&
+      new Set(variants).size === variants.length &&
+      variants.every((id) => known.includes(id)),
+    'Incomplete or unknown variant matrix',
   )
+  const builders =
+    artifact.frameBuilders ??
+    (args.includes('--paired-frame-builders') || args.includes('--frame-builders')
+      ? frameBuilders(args)
+      : [undefined])
+  assert(
+    builders.length &&
+      new Set(builders).size === builders.length &&
+      builders.every((builder) => builder === undefined || ['js', 'zig'].includes(builder)),
+    'Incomplete or unknown frame-builder matrix',
+  )
+  const expected = new Set()
+  for (let repetition = 0; repetition < artifact.repetitions; repetition++) {
+    for (const testCase of measurementCases(variants, ['bytes'], counts, builders, repetition))
+      expected.add(
+        `${testCase.variant}/${testCase.frameBuilder ?? ''}/${testCase.count}/${repetition}`,
+      )
+  }
+  assert(artifact.runs?.length === expected.size, 'Incomplete case matrix')
   const slots = new Set()
   for (const run of artifact.runs) {
     assert(
-      ['ghostty-webgpu', 'xterm-webgl'].includes(run.variant) &&
+      variants.includes(run.variant) &&
         (run.variant === 'ghostty-webgpu'
           ? builders.includes(run.frameBuilder)
           : run.frameBuilder === undefined) &&
@@ -320,6 +315,7 @@ export function validateArtifact(artifact) {
       'Incomplete or unexpected case',
     )
     const slot = `${run.variant}/${run.frameBuilder ?? ''}/${run.count}/${run.repetition}`
+    assert(expected.has(slot), 'Incomplete or unexpected case')
     assert(!slots.has(slot), 'Incomplete or duplicate case matrix')
     slots.add(slot)
     validateRun(run, artifact, phases)

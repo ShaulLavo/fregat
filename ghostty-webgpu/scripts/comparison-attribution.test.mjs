@@ -185,6 +185,7 @@ function completeArtifact() {
   return {
     hardware: true,
     tracing: true,
+    variants: ['ghostty-webgpu', 'xterm-webgl'],
     repetitions: 3,
     traceCounts: [17],
     tracePhases: phases,
@@ -273,4 +274,99 @@ test('paired trace validation rejects unknown treatments and cross-treatment qua
   const mismatched = pairedFrameArtifact()
   mismatched.qualifications[0].frameBuilder = 'zig'
   assert.throws(() => validateArtifact(mismatched), /Incomplete display evidence/)
+})
+
+test('attribution and latency choose the same painted frame after a deferred no-op', () => {
+  const clock = {
+    offset: 0,
+    frames: [
+      { start: 10, end: 15, id: 'noop' },
+      { start: 20, end: 30, id: 'painted' },
+    ],
+    main: [
+      { name: 'AnimationFrame::Presentation', ts: 16000, args: { id: 'noop' } },
+      { name: 'AnimationFrame::Presentation', ts: 31000, args: { id: 'painted' } },
+    ],
+  }
+  for (const [backend, operation, render] of [
+    ['canvas2d', 'paint', 'drawFrame'],
+    ['ghostty-web', 'renderLine', 'render'],
+    ['xterm-dom', 'replaceChildren', 'renderRows'],
+  ]) {
+    const phase = {
+      records: {
+        timeOrigin: 1000,
+        markers: [],
+        ownership: [{ terminal: 0, backend }],
+        spans: [
+          { terminal: 0, category: 'parse', operation: 'parse', start: 1, end: 2, self: 1 },
+          { terminal: 0, category: 'js', operation: render, start: 11, end: 14, self: 3 },
+          { terminal: 0, category: 'js', operation: render, start: 21, end: 29, self: 6 },
+          { terminal: 0, category: 'commands', operation, start: 25, end: 27, self: 2 },
+        ],
+      },
+      sample: { captures: [{ operation: 'write', started: 1000, timestamp: 1040 }] },
+    }
+    const result = timelines(phase, clock)[0]
+    assert.equal(result.animationId, 'painted')
+    assert.equal(result.frame, 21)
+    assert.equal(result.renderBoundary, operation)
+    assert.equal(result.renderBoundaryEnd, 27)
+    phase.records.spans.pop()
+    assert.throws(() => timelines(phase, clock), /committed row paint/)
+  }
+})
+
+function selectedArtifact(variants) {
+  const artifact = completeArtifact()
+  const templates = structuredClone(artifact.runs.filter((run) => run.variant === 'ghostty-webgpu'))
+  const probes = structuredClone(
+    artifact.qualifications.filter((probe) => probe.variant === 'ghostty-webgpu'),
+  )
+  artifact.variants = variants
+  artifact.runs = variants.flatMap((variant) =>
+    templates.map((run) => ({
+      ...run,
+      variant,
+      phases: run.phases.map((phase) => ({
+        ...phase,
+        label: phase.label.replace(run.variant, variant),
+      })),
+    })),
+  )
+  artifact.qualifications = variants.flatMap((variant) =>
+    probes.map((probe) => ({ ...probe, variant })),
+  )
+  return artifact
+}
+
+test('trace selected subsets and expanded native renderer matrix retain exact slots', () => {
+  for (const variants of [
+    ['ghostty-canvas', 'ghostty-web'],
+    ['ghostty-webgl', 'xterm-webgl', 'ghostty-dom', 'xterm-dom', 'ghostty-canvas', 'ghostty-web'],
+  ]) {
+    const artifact = selectedArtifact(variants)
+    artifact.frameBuilders = ['zig']
+    assert.doesNotThrow(() => validateArtifact(artifact))
+    const missing = structuredClone(artifact)
+    missing.runs.pop()
+    assert.throws(() => validateArtifact(missing), /Incomplete case matrix/)
+    const duplicate = structuredClone(artifact)
+    duplicate.runs[1] = structuredClone(duplicate.runs[0])
+    assert.throws(() => validateArtifact(duplicate), /duplicate case matrix/)
+    artifact.runs[0].frameBuilder = 'js'
+    assert.throws(() => validateArtifact(artifact), /unexpected case/)
+  }
+  const unknown = selectedArtifact(['unknown'])
+  assert.throws(() => validateArtifact(unknown), /unknown variant matrix/)
+})
+
+test('single selected WebGPU builder requires its own labelled treatment and qualification', () => {
+  const artifact = pairedFrameArtifact()
+  artifact.frameBuilders = ['zig']
+  artifact.runs = artifact.runs.filter((run) => run.frameBuilder !== 'js')
+  artifact.qualifications = artifact.qualifications.filter((probe) => probe.frameBuilder !== 'js')
+  assert.doesNotThrow(() => validateArtifact(artifact))
+  artifact.qualifications[0].frameBuilder = 'js'
+  assert.throws(() => validateArtifact(artifact), /Incomplete display evidence/)
 })

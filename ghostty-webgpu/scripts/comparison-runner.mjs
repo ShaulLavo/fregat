@@ -14,7 +14,16 @@ import {
   verifyHash,
   withDeadline,
 } from './comparison-guards.mjs'
-import { positiveInteger, selection, hardwareLaunch } from './comparison-options.mjs'
+import {
+  positiveInteger,
+  selection,
+  hardwareLaunch,
+  frameBuilders,
+  selectedVariants,
+  selectedPhases,
+  measurementCases,
+  measurementRepetitions,
+} from './comparison-options.mjs'
 import { presentationLatency } from './comparison-latency.mjs'
 import { comparisonLatencyEndpoint } from './comparison-compact.mjs'
 import { createGpuGate } from './comparison-gpu.mjs'
@@ -29,24 +38,26 @@ import {
   tracePhase,
 } from './comparison-trace.mjs'
 import { WebSocketServer } from 'ws'
-import { markdown, order, summaries } from './comparison-report.mjs'
+import { markdown, summaries } from './comparison-report.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const manifest = JSON.parse(await readFile(join(root, 'manifest.json'), 'utf8'))
 const args = process.argv.slice(2)
 const smoke = args.includes('--smoke')
 const tracing = args.includes('--trace')
-const pairedFrameBuilders = args.includes('--paired-frame-builders')
+const builders = frameBuilders(args)
+const phases = selectedPhases(args)
+assert(!(tracing && args.includes('--phases')), '--trace uses --trace-phase')
+assert(
+  !args.includes('--validate-presentation') || phases.includes('latency'),
+  '--validate-presentation requires the latency phase',
+)
 assert(!(smoke && tracing), 'Trace measurements require hardware Chromium')
 const launch = hardwareLaunch(platform(), smoke, smoke && args.includes('--smoke-headed'))
 const headless = launch.headless
 const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback)
 const output = resolve(value('--output', join(root, smoke ? 'smoke' : 'results')))
-const repetitions = positiveInteger(args, '--repetitions', manifest.settings.repetitions)
-assert(
-  Number.isInteger(repetitions) && repetitions >= 4 && repetitions % 2 === 0,
-  'Measurements require an even number of at least four repetitions',
-)
+const repetitions = measurementRepetitions(args, manifest.settings.repetitions)
 const smokeHistoryRows = Number(value('--smoke-history-rows', 64))
 assert(
   Number.isInteger(smokeHistoryRows) &&
@@ -73,9 +84,13 @@ assert(
   counts.every((count) => manifest.settings.counts.includes(count)),
   'Terminal count must be 1, 8, or 17',
 )
-let variantIds = ['ghostty-webgpu', 'xterm-webgl']
-if (smoke && !args.includes('--smoke-instrumentation'))
-  variantIds = manifest.variants.map(({ id }) => id)
+const variantIds = selectedVariants(
+  args,
+  manifest.variants.map(({ id }) => id),
+  smoke && !args.includes('--smoke-instrumentation')
+    ? manifest.variants.map(({ id }) => id)
+    : ['ghostty-webgpu', 'xterm-webgl'],
+)
 const s = manifest.settings
 const ownedComputePids = []
 const gpuGate = createGpuGate(s, { allowedComputePids: ownedComputePids })
@@ -185,13 +200,15 @@ const artifact = {
   cpuTickSeconds: tickSeconds,
   counts,
   variants: variantIds,
+  phases,
+  frameBuilders: builders,
   paths: tracing ? ['bytes'] : writePaths,
   fixtures,
   hardware: false,
   measurementBudgetMilliseconds:
     counts.length *
     (tracing ? 1 : writePaths.length) *
-    variantIds.length *
+    (variantIds.length + (variantIds.includes('ghostty-webgpu') ? builders.length - 1 : 0)) *
     (smoke ? 1 : repetitions) *
     s.caseDeadlineMilliseconds,
   startedAt: new Date().toISOString(),
@@ -535,7 +552,12 @@ async function presentedLatency(page, session, browserSession, run, label, optio
 }
 
 async function measureBody(testCase, repetition, browserSession, run, contexts) {
-  if (!tracing && !args.includes('--smoke-instrumentation') && (testCase.count === 1 || smoke))
+  if (
+    !tracing &&
+    phases.includes('parser') &&
+    !args.includes('--smoke-instrumentation') &&
+    (testCase.count === 1 || smoke)
+  )
     await parserOnly(testCase, run, contexts)
   run.phase = 'rendered/prepare'
   const context = await browser.newContext(
@@ -569,13 +591,13 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
     }
     run.phase = 'rendered/prepare'
     let empty
-    if (!smoke) empty = await memory(page, session, browserSession)
+    if (!smoke && phases.includes('memory')) empty = await memory(page, session, browserSession)
     await page.evaluate((testCase) => window.__compare.prepare(testCase), testCase)
     const info = await page.evaluate(() => window.__compare.info())
     if (!smoke && testCase.variant === 'ghostty-webgpu')
       assert(info.adapter?.fallback === false, 'Software WebGPU adapter rejected')
     run.info = info
-    if (!smoke && !tracing) {
+    if (!smoke && !tracing && phases.includes('memory')) {
       const initial = await memory(page, session, browserSession)
       run.historyLengths = await page.evaluate(() => window.__compare.history())
       const history = await memory(page, session, browserSession)
@@ -678,11 +700,13 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       assert.deepEqual(errors, [])
       return run
     }
-    run.idle = await qualifiedWindow(run, 'idle', () =>
-      measureCpu(browserSession, () => page.waitForTimeout(s.idleMilliseconds), cpuOptions),
-    )
+    if (phases.includes('idle'))
+      run.idle = await qualifiedWindow(run, 'idle', () =>
+        measureCpu(browserSession, () => page.waitForTimeout(s.idleMilliseconds), cpuOptions),
+      )
     run.phase = 'presentation-feedback latency'
-    run.latency = await presentedLatency(page, session, browserSession, run, 'latency')
+    if (phases.includes('latency'))
+      run.latency = await presentedLatency(page, session, browserSession, run, 'latency')
     if (args.includes('--validate-presentation') && repetition === 0 && testCase.count === 1)
       run.presentationValidation = await presentedLatency(
         page,
@@ -697,7 +721,9 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
         },
       )
     run.burst = {}
-    for (const { name } of manifest.fixtures.filter(({ name }) => fixtures.includes(name))) {
+    for (const { name } of manifest.fixtures.filter(
+      ({ name }) => phases.includes('burst') && fixtures.includes(name),
+    )) {
       run.phase = `burst/${name}/warmup`
       await page.evaluate((name) => window.__compare.burst(name, 3), name)
       run.phase = `burst/${name}/measured`
@@ -708,18 +734,22 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
         }),
       )
     }
-    run.phase = 'output/ascii'
-    const outputMeasurement = await qualifiedWindow(run, 'output/ascii', () =>
-      measureCpu(
-        browserSession,
-        () => page.evaluate((frames) => window.__compare.burst('ascii', frames), outputFrames),
-        cpuOptions,
-      ),
-    )
-    run.output = {
-      ...outputMeasurement.sample,
-      cpu: outputMeasurement.cpu,
-      memory: await memory(page, session, browserSession),
+    if (phases.includes('output')) {
+      run.phase = 'output/ascii/warmup'
+      await page.evaluate(() => window.__compare.burst('ascii', 3))
+      run.phase = 'output/ascii'
+      const outputMeasurement = await qualifiedWindow(run, 'output/ascii', () =>
+        measureCpu(
+          browserSession,
+          () => page.evaluate((frames) => window.__compare.burst('ascii', frames), outputFrames),
+          cpuOptions,
+        ),
+      )
+      run.output = {
+        ...outputMeasurement.sample,
+        cpu: outputMeasurement.cpu,
+        memory: phases.includes('memory') ? await memory(page, session, browserSession) : undefined,
+      }
     }
     assert.deepEqual(errors, [])
     return run
@@ -815,20 +845,12 @@ try {
         throw error
       }
     }
-    const paths = tracing ? ['bytes'] : repetition % 2 ? writePaths.toReversed() : writePaths
-    const cases = paths.flatMap((path) =>
-      counts.flatMap((count) =>
-        order(variantIds, repetition).flatMap((variant) => {
-          if (!pairedFrameBuilders || variant !== 'ghostty-webgpu')
-            return [{ variant, path, count }]
-          return order(['js', 'zig'], repetition).map((frameBuilder) => ({
-            variant,
-            path,
-            count,
-            frameBuilder,
-          }))
-        }),
-      ),
+    const cases = measurementCases(
+      variantIds,
+      tracing ? ['bytes'] : writePaths,
+      counts,
+      builders,
+      repetition,
     )
     for (const testCase of cases) {
       if (!smoke && platform() === 'darwin')

@@ -139,10 +139,19 @@ existing bridge. JavaScript retains canvas glyph rasterization and WebGPU calls.
       Full unit suite: 405 passed. WebGPU browser coverage: 16 passed, two existing Linux skips.
 - [x] Run existing unit and browser coverage plus supported-subset option-on coverage.
       Full browser suite: 183 passed, two existing Linux device-loss skips. Focused native frame: 12 passed.
-- [ ] Pull the reviewed Linux benchmark repair before hardware measurement.
-- [ ] Measure JS/Zig/xterm at 1 and 17 terminals, ASCII and SGR, paired in one browser session.
-- [ ] Attribute the replaced snapshot/instance stages and Zig build stage in a Chrome trace.
-- [ ] Complete independent review, push and open a draft PR; leave merge to the owner.
+- [x] Pull the reviewed Linux benchmark repair before hardware measurement; merge safeguards and
+      JS/Zig identity reviewed against both parents, 100 portable comparison tests passed.
+- [x] Push the spike and open [draft PR #357](https://github.com/ShaulLavo/fregat/pull/357).
+- [ ] Add native WebGL, Canvas 2D and DOM comparison variants with portable counterpart tests.
+- [ ] Measure WebGPU/Zig, native WebGL and xterm WebGL at 17 terminals, ASCII, four balanced
+      repetitions in one session; retain CPU process splits and presentation latency.
+- [ ] Attribute GPU/Viz/Dawn/WebGPU work and per-frame API counts in a separate one-off wrapper.
+- [ ] Measure native Canvas/ghostty-web and native DOM/xterm DOM at 17 terminals with the same gates.
+- [ ] Assess Zig frame compatibility with WebGL without implementing renderer changes.
+- [ ] Complete independent review and push the measurement changes; leave merge to the owner.
+
+The earlier three-repetition JS/Zig/xterm measurements are preliminary. This pass measures and
+attributes every renderer; it introduces no renderer performance fixes.
 
 The decision gate is 17-terminal total CPU clearly below xterm (ratio well under 1), with GPU-process
 CPU moving toward xterm. Retain write latency and explain any remaining gap before expanding the
