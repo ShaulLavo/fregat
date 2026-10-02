@@ -91,7 +91,8 @@ Lexical, VS Code, Vite/Rollup, kitty kittens, WezTerm, xterm.js, and our own Sin
 
 The chosen model takes CodeMirror's values and arrays, Rollup's named hooks with closure state,
 and scoped cleanup; it leaves out dependency injection, registries, string channels, reactive
-graphs, manifests and priority layers.
+graphs, manifests and priority layers. The Editor's [Plan 122](122-composable-plugins.md) uses the same
+model.
 
 ### What native Ghostty brings
 
