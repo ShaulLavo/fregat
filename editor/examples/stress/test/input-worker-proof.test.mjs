@@ -149,6 +149,52 @@ test('disposal releases syntax payloads and pending requests while keeping clean
   expect(worker.proof.disposedSessions).toBe(1)
 })
 
+test('authoritative minimap replacements release prior payloads and preserve later patches', () => {
+  const page = proofPage()
+  const worker = new page.Worker('minimap.worker.js')
+  const first = {
+    type: 'openDocument',
+    document: { textLength: 3, lines: [{ text: 'old', length: 3 }] },
+  }
+  const replacement = {
+    type: 'replaceDocument',
+    document: { textLength: 3, lines: [{ text: 'new', length: 3 }] },
+  }
+  const patch = {
+    type: 'applyEdit',
+    document: {
+      summaryPatch: {
+        textLength: 4,
+        startLine: 0,
+        deleteCount: 1,
+        lines: [{ text: 'newx', length: 4 }],
+      },
+    },
+  }
+  worker.postMessage(first)
+  worker.postMessage(replacement)
+  worker.postMessage(patch)
+  expect(worker.proof.minimapLog).toEqual([replacement, patch])
+  expect(minimapMatches(replayMinimapLines(worker.proof.minimapLog), 'newx')).toBe(true)
+  worker.postMessage(first)
+  expect(worker.proof.minimapLog).toEqual([first])
+  expect(worker.proof.sourceUpdates).toBe(4)
+})
+
+test('minimap source generations keep earlier renders stale after log compaction', () => {
+  const page = proofPage()
+  const worker = new page.Worker('minimap.worker.js')
+  worker.postMessage({ type: 'openDocument', document: { lines: [] } })
+  worker.postMessage({ type: 'render', sequence: 1 })
+  expect(worker.proof.renderAfterSource).toBe(worker.proof.sourceUpdates)
+  worker.postMessage({ type: 'replaceDocument', document: { lines: [] } })
+  expect(worker.proof.minimapLog).toHaveLength(1)
+  expect(worker.proof.renderAfterSource).toBe(1)
+  expect(worker.proof.sourceUpdates).toBe(2)
+  worker.postMessage({ type: 'render', sequence: 2 })
+  expect(worker.proof.renderAfterSource).toBe(worker.proof.sourceUpdates)
+})
+
 test('termination releases syntax and minimap histories between repetitions', () => {
   const page = proofPage()
   const syntax = new page.Worker('treeSitter.worker.js')

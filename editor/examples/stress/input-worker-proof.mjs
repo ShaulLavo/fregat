@@ -67,11 +67,14 @@ export function installInputWorkerProof(negative = null) {
     if (!message || typeof message !== 'object') return
     if (['openDocument', 'replaceDocument', 'applyEdit', 'applyEdits'].includes(message.type)) {
       proof.sourceUpdates++
+      // A full replacement supersedes prior payloads; freshness keeps its monotonic generation.
+      if (message.type === 'openDocument' || message.type === 'replaceDocument')
+        proof.minimapLog.length = 0
       proof.minimapLog.push(message)
     }
     if (message.type === 'render') {
       proof.latestRender = message.sequence
-      proof.renderAfterSource = proof.minimapLog.length
+      proof.renderAfterSource = proof.sourceUpdates
     }
   }
 

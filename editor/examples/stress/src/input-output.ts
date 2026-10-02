@@ -22,6 +22,7 @@ type MinimapProof = {
   readonly terminated: boolean
   readonly minimap: boolean
   readonly minimapLog: readonly unknown[]
+  readonly sourceUpdates: number
   readonly latestRender: number
   readonly acceptedRender: number
   readonly renderAfterSource: number
@@ -63,7 +64,7 @@ function minimapReceipts(text: string) {
     .map((worker) => ({
       current: minimapMatches(replayMinimapLines(worker.minimapLog), text),
       renderedAfterSource:
-        worker.renderAfterSource === worker.minimapLog.length &&
+        worker.renderAfterSource === worker.sourceUpdates &&
         worker.latestRender > 0 &&
         worker.acceptedRender === worker.latestRender,
     }))
