@@ -8,6 +8,7 @@ export type Credential = {
   provider: Provider
   index: string
   priority: number
+  disabled: boolean
   observation: Observation | null
 }
 export type ResetOrderOptions = {
@@ -30,8 +31,15 @@ const authFilesSchema = v.object({
     }),
   ),
 })
-const observationSchema = v.object({ resetAt: v.number(), usedPercent: v.number() })
-const stateSchema = v.record(v.string(), observationSchema)
+type StoredObservation = Observation & { disabledByLoop?: boolean }
+const stateSchema = v.record(
+  v.string(),
+  v.object({
+    resetAt: v.number(),
+    usedPercent: v.number(),
+    disabledByLoop: v.optional(v.boolean()),
+  }),
+)
 const neutralPriority = 0
 const spentPriority = -1
 const giveUpAfterFailures = 10
@@ -56,8 +64,13 @@ export function readObservation(
   signals: Readonly<Record<string, string>> | undefined,
 ): Observation | null {
   if (provider === 'codex') {
-    const resetAt = Number(signals?.['X-Codex-Primary-Reset-At'] ?? Number.NaN)
-    const usedPercent = Number(signals?.['X-Codex-Primary-Used-Percent'] ?? Number.NaN)
+    const primaryWindow = signals?.['X-Codex-Primary-Window-Minutes']
+    const secondaryWindow = signals?.['X-Codex-Secondary-Window-Minutes']
+    const window = secondaryWindow === '10080' ? 'Secondary' : 'Primary'
+    if (window === 'Primary' && primaryWindow !== undefined && primaryWindow !== '10080')
+      return null
+    const resetAt = Number(signals?.[`X-Codex-${window}-Reset-At`] ?? Number.NaN)
+    const usedPercent = Number(signals?.[`X-Codex-${window}-Used-Percent`] ?? Number.NaN)
     if (!Number.isFinite(resetAt) || !Number.isFinite(usedPercent)) return null
     return { resetAt, usedPercent }
   }
@@ -78,7 +91,10 @@ export function mergeObservations(
   for (const credential of credentials) {
     const observation = credential.observation ?? stored[credential.index]
     if (!observation || observation.resetAt <= nowSeconds) continue
-    merged[credential.index] = observation
+    merged[credential.index] = {
+      resetAt: observation.resetAt,
+      usedPercent: observation.usedPercent,
+    }
   }
   return merged
 }
@@ -122,6 +138,28 @@ function planGroup(
   return priorities
 }
 
+// Disabling a spent Codex account breaks affinity before paid credits become the next request's fuel.
+export function planDisabled(
+  credentials: readonly Credential[],
+  observations: Readonly<Record<string, Observation>>,
+  owned: ReadonlySet<string>,
+) {
+  const codex = credentials.filter((credential) => credential.provider === 'codex')
+  const weeklyAvailable = codex.some(
+    (credential) =>
+      (!credential.disabled || owned.has(credential.index)) &&
+      (observations[credential.index]?.usedPercent ?? 100) < 100,
+  )
+  const changes = new Map<string, boolean>()
+  for (const credential of codex) {
+    if (credential.disabled && !owned.has(credential.index)) continue
+    const spent = (observations[credential.index]?.usedPercent ?? 0) >= 100
+    const disabled = weeklyAvailable && spent
+    if (disabled !== credential.disabled) changes.set(credential.index, disabled)
+  }
+  return changes
+}
+
 function report(level: 'warn' | 'info', state: string, fields: Record<string, unknown>) {
   process.stderr.write(
     `${JSON.stringify({
@@ -145,7 +183,7 @@ async function readState(stateFile: string) {
   }
 }
 
-async function writeState(stateFile: string, state: Readonly<Record<string, Observation>>) {
+async function writeState(stateFile: string, state: Readonly<Record<string, StoredObservation>>) {
   const temporary = `${stateFile}.tmp`
   await writeFile(temporary, `${JSON.stringify(state)}\n`, { mode: 0o600 })
   await rename(temporary, stateFile)
@@ -173,12 +211,13 @@ async function readCredentials(options: ResetOrderOptions) {
   if (!parsed.success) return { ok: false as const, status: 'invalid-body' }
   const credentials: Credential[] = []
   for (const file of parsed.output.files) {
-    if (file.disabled || !isPooled(file.provider)) continue
+    if (!isPooled(file.provider)) continue
     credentials.push({
       name: file.name,
       provider: file.provider,
       index: file.auth_index,
       priority: file.priority ?? neutralPriority,
+      disabled: file.disabled ?? false,
       observation: readObservation(file.provider, file.quota?.signals),
     })
   }
@@ -189,12 +228,44 @@ async function applyOrder(options: ResetOrderOptions) {
   const listed = await readCredentials(options)
   if (!listed.ok) return { ok: false as const, status: listed.status }
   const stored = await readState(options.stateFile)
-  const observations = mergeObservations(listed.credentials, stored, Date.now() / 1_000)
-  if (JSON.stringify(observations) !== JSON.stringify(stored)) {
-    await writeState(options.stateFile, observations)
+  const credentials = listed.credentials.filter(
+    (credential) => !credential.disabled || stored[credential.index]?.disabledByLoop,
+  )
+  const owned = new Set(
+    credentials.filter((credential) => credential.disabled).map((credential) => credential.index),
+  )
+  const observations = mergeObservations(credentials, stored, Date.now() / 1_000)
+  const state: Record<string, StoredObservation> = { ...observations }
+  for (const index of owned) {
+    state[index] = { ...(observations[index] ?? stored[index]!), disabledByLoop: true }
   }
-  const priorities = planPriorities(listed.credentials, observations)
-  const changed = listed.credentials.filter(
+  if (JSON.stringify(state) !== JSON.stringify(stored)) await writeState(options.stateFile, state)
+  const disabled = planDisabled(credentials, observations, owned)
+  for (const credential of credentials) {
+    const next = disabled.get(credential.index)
+    if (next === undefined) continue
+    const patched = await management(options, 'auth-files/status', {
+      method: 'PATCH',
+      body: JSON.stringify({ name: credential.name, auth_index: credential.index, disabled: next }),
+    })
+    if (!patched.ok) return { ok: false as const, status: patched.status }
+    credential.disabled = next
+    if (next) state[credential.index] = { ...observations[credential.index]!, disabledByLoop: true }
+    else if (observations[credential.index])
+      state[credential.index] = observations[credential.index]!
+    else delete state[credential.index]
+    // Persist ownership after each accepted change so a later API failure cannot lose it.
+    await writeState(options.stateFile, state)
+  }
+  if (disabled.size > 0) {
+    report('info', 'availability-changed', {
+      disabled: [...disabled.values()].filter(Boolean).length,
+      enabled: [...disabled.values()].filter((value) => !value).length,
+    })
+  }
+  const enabled = credentials.filter((credential) => !credential.disabled)
+  const priorities = planPriorities(enabled, observations)
+  const changed = enabled.filter(
     (credential) => priorities.get(credential.name) !== credential.priority,
   )
   for (const credential of changed) {
@@ -207,7 +278,7 @@ async function applyOrder(options: ResetOrderOptions) {
   if (changed.length > 0) {
     report('info', 'reordered', {
       changed: changed.length,
-      order: listed.credentials
+      order: enabled
         .toSorted((a, b) => priorities.get(b.name)! - priorities.get(a.name)!)
         .map((credential) => ({
           provider: credential.provider,
@@ -239,7 +310,7 @@ export function startResetOrder(options: ResetOrderOptions) {
       if (failures === 1) {
         report('warn', 'failing', {
           status: result.status,
-          why: 'The proxy management API did not return or accept credential priorities.',
+          why: 'The proxy management API did not return or accept credential routing changes.',
           fix: 'Check that the proxy runs with management enabled and the management key file matches.',
         })
       }
