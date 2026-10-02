@@ -1,5 +1,4 @@
 import { expect, test } from 'vitest'
-import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -8,9 +7,7 @@ import { startupBudget, startupSupervisor, type StartupBudget } from '../startup
 import type { BrowserCandidate } from '../browser'
 
 async function startupFixture(mode: string) {
-  const root = await mkdtemp(
-    path.join(existsSync('/work/tmp') ? '/work/tmp' : tmpdir(), 'polaron-startup-'),
-  )
+  const root = await mkdtemp(path.join(tmpdir(), 'polaron-startup-'))
   const pidFile = path.join(root, 'pid')
   const candidate: BrowserCandidate = {
     kind: 'chromium',
@@ -49,7 +46,12 @@ async function startupFixture(mode: string) {
     launch,
     reaped,
     cleanup: async () => {
-      if (owned?.kind === 'owned') await owned.close()
+      const pid = Number(await readFile(pidFile, 'utf8').catch(() => '0'))
+      if (pid) {
+        try {
+          process.kill(pid, 'SIGTERM')
+        } catch {}
+      }
       await rm(root, { recursive: true, force: true })
     },
   }
@@ -112,14 +114,13 @@ test('the cap wins over continuing progress and over a longer idle window', () =
   expect(short.remainingMs()).toBe(0)
 })
 
-test.each(['slow-version', 'slow-attach'])(
-  'a browser still loading past the idle window during %s is owned once it answers',
+test.each(['slow-version', 'slow-install'])(
+  'a browser still loading past the idle window during %s hands off once it answers',
   async (mode) => {
     const f = await startupFixture(mode)
     try {
       const window = await f.launch(startupBudget())
-      expect(window.kind).toBe('owned')
-      if (window.kind === 'owned') await window.close()
+      expect(window.kind).toBe('handoff')
     } finally {
       await f.cleanup()
     }
@@ -174,8 +175,8 @@ test('a longer idle window cannot extend cap rejection or owned-child cleanup', 
   }
 })
 
-test('a browser that exits during the startup attach fails promptly', async () => {
-  const f = await startupFixture('exit-attach')
+test('a browser that exits during the installation fails promptly', async () => {
+  const f = await startupFixture('exit-install')
   const started = performance.now()
   try {
     await expect(f.launch(startupBudget())).rejects.toThrow()
@@ -186,19 +187,14 @@ test('a browser that exits during the startup attach fails promptly', async () =
   }
 })
 
-test('initial page preparation keeps startup progress supervision until its bridge is ready', async () => {
-  const f = await startupFixture('slow-page')
+test('installation keeps startup supervision until the app launch completes', async () => {
+  const f = await startupFixture('slow-install')
   const started = performance.now()
-  let window: Awaited<ReturnType<typeof f.launch>> | undefined
   try {
-    window = await f.launch(startupBudget())
-    expect(window.kind).toBe('owned')
+    expect((await f.launch(startupBudget())).kind).toBe('handoff')
     expect(performance.now() - started).toBeGreaterThanOrEqual(6000)
-    if (window.kind === 'owned')
-      await expect(window.cdp.request('Browser.getVersion')).resolves.toHaveProperty('product')
+    expect(await f.reaped()).toBe(false)
   } finally {
-    if (window?.kind === 'owned') await window.close()
-    expect(await f.reaped()).toBe(true)
     await f.cleanup()
   }
 }, 15_000)
@@ -206,26 +202,25 @@ test('initial page preparation keeps startup progress supervision until its brid
 test.each([
   { reason: 'startup-stalled', advancing: false, budget: { idleMs: 300, limitMs: 1500 } },
   { reason: 'startup-limit', advancing: true, budget: { idleMs: 300, limitMs: 1500 } },
-])(
-  'initial page preparation fails at $reason and reaps its owner',
-  async ({ reason, advancing, budget }) => {
-    const f = await startupFixture('silent-page')
-    let faults = 0
-    try {
-      const launch = f.launch(budget, () => ({ faults: advancing ? ++faults : 7 }))
-      await expect(launch).rejects.toMatchObject({ internal: { reason, startupPhase: 'attach' } })
-      expect(await f.reaped()).toBe(true)
-    } finally {
-      await f.cleanup()
-    }
-  },
-)
+])('installation fails at $reason and reaps its owner', async ({ reason, advancing, budget }) => {
+  const f = await startupFixture('silent-install')
+  let faults = 0
+  try {
+    const launch = f.launch(budget, () => ({ faults: advancing ? ++faults : 7 }))
+    await expect(launch).rejects.toMatchObject({
+      internal: { reason, startupPhase: 'installation' },
+    })
+    expect(await f.reaped()).toBe(true)
+  } finally {
+    await f.cleanup()
+  }
+})
 
-test('initial page protocol rejection fails launch before ownership and reaps its child', async () => {
-  const f = await startupFixture('reject-page')
+test('installation protocol rejection fails launch before ownership and reaps its child', async () => {
+  const f = await startupFixture('reject-install')
   try {
     await expect(f.launch(startupBudget())).rejects.toMatchObject({
-      internal: { reason: 'request-error', method: 'Page.enable', protocolCode: -1 },
+      internal: { reason: 'request-error', method: 'PWA.getOsAppState', protocolCode: -1 },
     })
     expect(await f.reaped()).toBe(true)
   } finally {

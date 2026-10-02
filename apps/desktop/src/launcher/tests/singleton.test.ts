@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { hasSingletonOwner } from '../singleton'
+import { hasSingletonOwner, browserExecutableMatches } from '../singleton'
 
 function probe(lock: string | undefined, command: string | undefined) {
   return hasSingletonOwner('/state/desktop/chromium', 'host', '/usr/bin/chromium', {
@@ -81,3 +81,11 @@ test.each(['/bin/true', '/tmp/custom-wrapper', '/tmp/chromium'])(
     ).toBe(false)
   },
 )
+
+test.each([
+  ['/opt/google/chrome/google-chrome', '/opt/google/chrome/chrome'],
+  ['/opt/helium/helium-browser', '/opt/helium/helium'],
+])('canonical wrapper %s matches its installed browser %s', (selected, owner) => {
+  expect(browserExecutableMatches(selected, owner)).toBe(true)
+  expect(browserExecutableMatches('/bin/true', owner)).toBe(false)
+})

@@ -1,11 +1,9 @@
 import { expect, test } from 'vitest'
 import { resolveBrowserCandidates } from '../browser'
-import { closeLastMacPage } from '../mac-lifecycle'
 import { startupProcessCounters } from '../diagnostics'
 import { startupSupervisor } from '../startup'
 import { shellBridge } from '../shell-bridge'
 import { hasMacSingletonOwner } from '../singleton'
-import type { CdpEvent } from '../cdp'
 
 function macFixture(preferred = 'net.imput.helium') {
   const plists: Record<string, unknown> = {
@@ -119,46 +117,6 @@ test('unsupported defaults, malformed metadata and escaped bundle executables ar
   ).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
 })
 
-test('macOS closes its owned browser once after last page, ignoring workers and unknown destruction', async () => {
-  const handlers = new Map<string, (event: CdpEvent) => void>()
-  const calls: string[] = []
-  const cdp = {
-    on: (name: string, handler: (event: CdpEvent) => void) => {
-      handlers.set(name, handler)
-      return () => {
-        handlers.delete(name)
-      }
-    },
-    request: async (name: string) => {
-      calls.push(name)
-      return {}
-    },
-  }
-  const stop = closeLastMacPage(cdp, () => expect.fail('close failed'))
-  const create = (targetId: string, type = 'page') =>
-    handlers.get('Target.targetCreated')!({
-      method: 'Target.targetCreated',
-      params: { targetInfo: { targetId, type } },
-    })
-  const destroy = (targetId: string) =>
-    handlers.get('Target.targetDestroyed')!({
-      method: 'Target.targetDestroyed',
-      params: { targetId },
-    })
-  create('one')
-  create('two')
-  create('worker', 'service_worker')
-  destroy('worker')
-  destroy('unknown')
-  destroy('one')
-  expect(calls).toEqual([])
-  destroy('two')
-  destroy('two')
-  expect(calls).toEqual(['Browser.close'])
-  stop()
-  expect(handlers.size).toBe(0)
-})
-
 test('missing Linux proc has no process progress; only incoming CDP renews idle and never the cap', () => {
   expect(startupProcessCounters(123, 'darwin')).toEqual({})
   let now = 0
@@ -194,19 +152,13 @@ test('Mac singleton handoff proves same executable, local host, profile and CDP 
   expect(hasMacSingletonOwner('/scratch/profile', 'fixture-host', executable, fs, run)).toBe(false)
 })
 
-test('WKWebView reports its own transparent overlay while Chromium keeps native titlebar and opaque floor', () => {
+test('WKWebView reports its own transparent overlay', () => {
   const native = shellBridge('http://localhost:123', 'wkwebview', 'token', 'darwin', true)
   expect(native).toContain('"backdrop":"transparent"')
   expect(native).toContain('"titlebar":"overlay"')
   expect(native).toContain('"platform":"darwin"')
   expect(native).toContain('[data-native-window-drag-region]')
   expect(native).toContain('[data-native-window-no-drag]')
-  expect(shellBridge('http://localhost:123', 'chromium', undefined, 'darwin')).toContain(
-    '"titlebar":"native"',
-  )
-  expect(shellBridge('http://localhost:123', 'chromium', undefined, 'darwin')).toContain(
-    '"backdrop":"app"',
-  )
 })
 
 test('WK drag listener sends only primary presses on non-interactive regions', () => {

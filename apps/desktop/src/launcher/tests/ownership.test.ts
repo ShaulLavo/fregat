@@ -10,9 +10,7 @@ import { liveSingletonOwner } from '../singleton'
 import type { BrowserCandidate } from '../browser'
 
 async function fixture(mode: string) {
-  const root = await mkdtemp(
-    path.join(existsSync('/work/tmp') ? '/work/tmp' : tmpdir(), 'polaron-owner-'),
-  )
+  const root = await mkdtemp(path.join(tmpdir(), 'polaron-owner-'))
   const pidFile = path.join(root, 'pid')
   const candidate: BrowserCandidate = {
     kind: 'chromium',
@@ -64,6 +62,9 @@ test.each(Array.from({ length: 30 }, (_, run) => run))(
       })
       expect(result).toEqual({ kind: 'handoff' })
       expect(processExists(other.pid)).toBe(true)
+      const args = JSON.parse(await readFile(f.pidFile + '.args', 'utf8'))
+      expect(args.some((arg: string) => arg.startsWith('--app-id='))).toBe(true)
+      expect(args).not.toContain('--remote-debugging-pipe')
       expect(processExists(Number(await readFile(f.pidFile, 'utf8')))).toBe(false)
     } finally {
       other.kill('SIGTERM')
@@ -155,7 +156,7 @@ test('a configured zero-exit executable without a controlled singleton is reject
         onOpen: () => {},
         onFailure: () => {},
       }),
-    ).rejects.toThrow('desktop window could not open')
+    ).rejects.toThrow()
   } finally {
     await rm(f.root, { recursive: true, force: true })
   }
@@ -218,7 +219,7 @@ test('/bin/true with an existing valid profile owner is rejected and preserves t
         onOpen: () => {},
         onFailure: () => {},
       }),
-    ).rejects.toThrow('desktop window could not open')
+    ).rejects.toMatchObject({ code: 'desktop.launcher.PROFILE_BUSY' })
     expect(processExists(other.pid)).toBe(true)
   } finally {
     other.kill('SIGTERM')

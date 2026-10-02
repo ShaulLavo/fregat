@@ -22,6 +22,10 @@ const wrapperExecutables: Record<string, readonly string[]> = {
   '/opt/thorium/thorium-browser': ['/opt/thorium/thorium'],
 }
 
+export function browserExecutableMatches(selected: string, owner: string) {
+  return owner === selected || Boolean(wrapperExecutables[selected]?.includes(owner))
+}
+
 export function hasSingletonOwner(
   profile: string,
   host: string,
@@ -33,7 +37,7 @@ export function hasSingletonOwner(
   const selected = fs.realPath(executable)
   const owner = fs.readLink(`/proc/${pid}/exe`)
   if (!selected || !owner) return false
-  if (owner !== selected && !wrapperExecutables[selected]?.includes(owner)) return false
+  if (!browserExecutableMatches(selected, owner)) return false
   const command = fs.readFile(`/proc/${pid}/cmdline`)?.split('\0').filter(Boolean)
   if (!command?.length) return false
   if (command.length > 1)
