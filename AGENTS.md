@@ -2,6 +2,8 @@
 
 ## Running A Task
 
+- The owner is remote. Plain text goes in the reply. To show or explain something visually — screenshots, video, mocks, or a small HTML page that illustrates a flow or design — embed a single image in the reply by absolute path, or run `bun run show <files…>` and send the link (it lives 24 h). Never point the owner at a local path.
+
 - Keep going when a step does not need the owner; put status notes in the same message as the next action. Stop only when blocked, or before something destructive: deleting data the owner keeps (`~/.platform`, `/work/platform-dev/home`, anything not yours in `/work`), force-pushing, or taking another session's changes out of the tree.
 - Done means: the narrowest check that could fail passes, a UI change has `look` evidence you read back, your files are committed by path and pushed, and the mesh runs it. Name anything you skipped.
 - Long runs keep their checklist in a file (the plan file, or the scratchpad) and tick items as they land.

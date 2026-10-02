@@ -85,13 +85,17 @@ export const scriptErrors = defineErrorCatalog('scripts', {
   },
 })
 
-export function createScriptError(message: string) {
+export function createScriptError(
+  message: string,
+  details: { why?: string; fix?: string; internal?: Record<string, unknown> } = {},
+) {
   return createError({
     code: scriptErrors.INVALID_INPUT.code,
     fix: scriptErrors.INVALID_INPUT.fix,
     message,
     status: scriptErrors.INVALID_INPUT.status,
     why: scriptErrors.INVALID_INPUT.why,
+    ...details,
   })
 }
 
