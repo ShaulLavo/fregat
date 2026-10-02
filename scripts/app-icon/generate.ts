@@ -2,7 +2,7 @@
  * Renders the Fregat icon set from `apps/web/public/icons/fregat.svg`, the hand-checked master.
  * The manifest icons and `fregat.icns` keep its squircle on Apple's 1024 grid; the touch and maskable
  * icons fill the square with the squircle's colour, because iOS and Android apply their own mask.
- * The browser favicon is the bare mark, recoloured for light tabs where the master's gold fades.
+ * The browser favicon is the bare mark in the master's colours, with a pale body on dark tabs.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -18,8 +18,8 @@ const master = readFileSync(path.join(dir, 'fregat.svg'), 'utf8')
 // Apple's grid draws the squircle 824 wide on a 1024 canvas.
 const GRID_BODY = 824 / 1024
 
-// Rosé Pine Dawn's rose and gold: the master's pale rose drops to 1.7:1 on a white tab strip.
-const LIGHT_TAB = { body: '#d7827e', flame: '#ea9d34' }
+// The slate body disappears on a dark tab strip, so dark tabs draw it pale.
+const DARK_TAB = { body: '#e8eef0' }
 
 // PNG-backed icns entries macOS reads; the @2x types reuse the next size up.
 const ICNS_ENTRIES = [
@@ -87,8 +87,8 @@ async function favicon(svg: string) {
   if (!bodyFill || !flameFill)
     throw createScriptError('fregat.svg mark needs <path id="body"> and <path id="flame"> fills')
   const style =
-    `#body{fill:${LIGHT_TAB.body}}#flame{fill:${LIGHT_TAB.flame}}` +
-    `@media (prefers-color-scheme:dark){#body{fill:${bodyFill}}#flame{fill:${flameFill}}}`
+    `#body{fill:${bodyFill}}#flame{fill:${flameFill}}` +
+    `@media (prefers-color-scheme:dark){#body{fill:${DARK_TAB.body}}}`
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${await markBounds(mark)}"><style>${style}</style>${mark}</svg>\n`
 }
 
