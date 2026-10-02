@@ -3,6 +3,7 @@ import { isObject } from '@workspace/utils/objects'
 import type { Client } from '@/lib/client'
 import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 import { log } from '@/lib/client-logging'
+import { clientErrors } from '@/lib/structured-errors'
 
 type FileStream = {
   readonly controller: AbortController
@@ -39,9 +40,47 @@ export function startWorkspaceEventStreams({
   let pending: FileStream | null = null
   let filesAttempt = 0
   let filesRetry: ReturnType<typeof setTimeout> | null = null
-  let rejectedFiles: readonly string[] | null = null
+  let stoppedFiles: {
+    readonly files: readonly string[]
+    readonly reason: 'exhausted' | 'rejected'
+  } | null = null
+  let projectState: 'active' | 'exhausted' | 'rejected' = 'active'
+  let desiredFiles: readonly string[] = []
+  let reportedTransportFailure = false
+  const failures = { project: 0, files: 0 }
 
   void runProjectStream()
+
+  function recordFailure(scope: StreamInterruption['scope'], error: unknown) {
+    const count = ++failures[scope]
+    if (count === 1) {
+      log.warn({
+        action: 'workspace.events.reconnecting',
+        area: 'workspace-events',
+        path: rootPath,
+        scope,
+        status: responseStatus(error),
+      })
+    }
+    // Use the existing backoff steps before surfacing a transport outage to the user.
+    return count >= RECONNECT_DELAYS_MS.length
+  }
+
+  function finishFailureSeries(
+    scope: StreamInterruption['scope'],
+    outcome: 'recovered' | 'gave_up' | 'rejected' | 'cancelled' = 'recovered',
+  ) {
+    const failedAttemptCount = failures[scope]
+    if (failedAttemptCount === 0) return
+    failures[scope] = 0
+    log.info({
+      action: `workspace.events.${outcome}`,
+      area: 'workspace-events',
+      path: rootPath,
+      scope,
+      failedAttemptCount,
+    })
+  }
 
   async function runProjectStream() {
     let attempt = 0
@@ -51,7 +90,10 @@ export function startWorkspaceEventStreams({
       project.signal.addEventListener('abort', stop)
       const error = await streamWorkspaceEvents(client, rootPath, stream.signal, (message) => {
         if (project.signal.aborted) return
-        if (message.type === 'ready') attempt = 0
+        if (message.type === 'ready') {
+          attempt = 0
+          finishFailureSeries('project')
+        }
         onMessage(message)
         // A failed watch may have dropped events; only a fresh subscription can say what changed.
         if (message.type === 'error') stream.abort()
@@ -62,10 +104,21 @@ export function startWorkspaceEventStreams({
       project.signal.removeEventListener('abort', stop)
       if (project.signal.aborted) return
       const failure = stream.signal.aborted ? undefined : error
-      // One report per outage: the retries that follow are counted, not toasted.
-      if (failure !== undefined && attempt === 0) onError(failure)
-      const retryInMs = reconnectDelay(attempt++)
+      if (isFinalRejection(failure)) {
+        projectState = 'rejected'
+        finishFailureSeries('project', 'rejected')
+        onError(failure)
+        return
+      }
+      const exhausted = recordFailure('project', failure)
+      const retryInMs = exhausted ? 0 : reconnectDelay(attempt++)
       onInterrupted({ scope: 'project', error: failure, retryInMs })
+      if (exhausted) {
+        projectState = 'exhausted'
+        finishFailureSeries('project', 'gave_up')
+        reportTransportFailure('project', failure)
+        return
+      }
       await sleep(retryInMs, project.signal)
     }
   }
@@ -82,6 +135,7 @@ export function startWorkspaceEventStreams({
       return
     }
     if (pending !== stream) return
+    finishFailureSeries('files')
     filesAttempt = 0
     const previousFiles = new Set(current?.files)
     const added = stream.files.filter((file) => !previousFiles.has(file))
@@ -98,13 +152,20 @@ export function startWorkspaceEventStreams({
     stream.controller.abort()
     if (stream === current) current = null
     if (stream === pending) pending = null
-    const retryInMs = reconnectDelay(filesAttempt++)
+    const exhausted = recordFailure('files', error)
+    const retryInMs = exhausted ? 0 : reconnectDelay(filesAttempt++)
     onInterrupted({ scope: 'files', error, retryInMs })
     cancelFilesRetry()
+    if (exhausted) {
+      stoppedFiles = { files: stream.files, reason: 'exhausted' }
+      finishFailureSeries('files', 'gave_up')
+      reportTransportFailure('files', error)
+      return
+    }
     filesRetry = setTimeout(() => {
       filesRetry = null
-      // While the tabs' own set is refused, an older set is no one's to reopen.
-      if (!current && !pending && !rejectedFiles) setFiles(stream.files)
+      // A rejected or exhausted subscription waits for its owner to re-arm it.
+      if (!current && !pending && !stoppedFiles) setFiles(stream.files)
     }, retryInMs)
   }
 
@@ -114,7 +175,8 @@ export function startWorkspaceEventStreams({
     stream.controller.abort()
     if (stream === current) current = null
     if (stream === pending) pending = null
-    rejectedFiles = stream.files
+    stoppedFiles = { files: stream.files, reason: 'rejected' }
+    finishFailureSeries('files', 'rejected')
     log.warn({
       action: 'workspace.events.files_rejected',
       area: 'workspace-events',
@@ -124,17 +186,24 @@ export function startWorkspaceEventStreams({
       status: responseStatus(error),
     })
     filesAttempt = 0
+    onError(error)
   }
 
   function setFiles(paths: readonly string[]) {
     if (project.signal.aborted) return
     const files = [...new Set(paths)].sort()
+    if (!sameFiles(desiredFiles, files)) {
+      finishFailureSeries('files', 'cancelled')
+      filesAttempt = 0
+      desiredFiles = files
+      if (projectState !== 'exhausted') reportedTransportFailure = false
+    }
     const desired = pending ?? current
     if (desired && sameFiles(desired.files, files)) return
     // A retry scheduled for an earlier set would resubscribe files no tab holds any more.
     cancelFilesRetry()
-    if (rejectedFiles && sameFiles(rejectedFiles, files)) return
-    rejectedFiles = null
+    if (stoppedFiles && sameFiles(stoppedFiles.files, files)) return
+    stoppedFiles = null
     pending?.controller.abort()
     pending = null
     if (current && sameFiles(current.files, files)) return
@@ -162,9 +231,23 @@ export function startWorkspaceEventStreams({
           rejectFiles(stream, error)
           return
         }
-        if (filesAttempt === 0) onError(error)
         interruptFiles(stream, error)
       },
+    )
+  }
+
+  function reportTransportFailure(scope: StreamInterruption['scope'], error: unknown) {
+    if (reportedTransportFailure) return
+    reportedTransportFailure = true
+    onError(
+      clientErrors.WATCH_FAILED({
+        status: responseStatus(error),
+        internal: {
+          scope,
+          failedAttemptCount: RECONNECT_DELAYS_MS.length,
+          httpStatus: responseStatus(error),
+        },
+      }),
     )
   }
 
@@ -175,8 +258,24 @@ export function startWorkspaceEventStreams({
 
   return {
     setFiles,
+    resume() {
+      if (project.signal.aborted) return
+      if (projectState === 'exhausted' || stoppedFiles?.reason === 'exhausted') {
+        reportedTransportFailure = false
+      }
+      if (projectState === 'exhausted') {
+        projectState = 'active'
+        void runProjectStream()
+      }
+      if (stoppedFiles?.reason !== 'exhausted') return
+      stoppedFiles = null
+      filesAttempt = 0
+      setFiles(desiredFiles)
+    },
     close() {
       project.abort()
+      finishFailureSeries('project', 'cancelled')
+      finishFailureSeries('files', 'cancelled')
       pending?.controller.abort()
       current?.controller.abort()
       cancelFilesRetry()
@@ -186,9 +285,6 @@ export function startWorkspaceEventStreams({
   }
 }
 
-// Sign-in, timeouts and rate limits clear with the same file set; any other 4xx is about the set.
-const RETRYABLE_CLIENT_STATUSES = new Set([401, 408, 429])
-
 function responseStatus(error: unknown) {
   if (!isObject(error) || typeof error.status !== 'number') return undefined
   return error.status
@@ -196,8 +292,7 @@ function responseStatus(error: unknown) {
 
 function isFinalRejection(error: unknown) {
   const status = responseStatus(error)
-  if (status === undefined || status < 400 || status >= 500) return false
-  return !RETRYABLE_CLIENT_STATUSES.has(status)
+  return status !== undefined && status >= 400 && status < 500
 }
 
 function reconnectDelay(attempt: number) {

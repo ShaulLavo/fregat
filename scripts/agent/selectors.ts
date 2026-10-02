@@ -41,6 +41,8 @@ export const rootSwitchRows = {
   Files: '[role="treeitem"]',
 } as const
 
+export const transientAlertSelector =
+  '[role="alert"], [data-sonner-toast], [role="status"].text-warning'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
