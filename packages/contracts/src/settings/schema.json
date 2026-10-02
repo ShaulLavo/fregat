@@ -1410,8 +1410,8 @@
     },
     "window.frost": {
       "default": 50,
-      "description": "Strength of the blurred desktop layer behind a transparent native macOS window. 0 keeps the desktop clear; 100 shows the full layer.",
-      "markdownDescription": "Strength of the blurred desktop layer behind a transparent native macOS window. 0 keeps the desktop clear; 100 shows the full layer.\n\nAppKit sets the blur radius. This percentage controls the strength of its blurred layer, independently of pane opacity. It applies to the transparent native macOS host and updates immediately.",
+      "description": "Native macOS desktop blur strength.",
+      "markdownDescription": "Native macOS desktop blur strength.\n\nAppKit fixes blur radius.",
       "maximum": 100,
       "minimum": 0,
       "type": "integer"
