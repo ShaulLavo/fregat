@@ -26,6 +26,7 @@ export async function proveNativeLauncherRelease(
     let ready = false;
     const window = await launchWebview({
       binary: ${JSON.stringify(binary)}, url: ${JSON.stringify(page.url())},
+      stateHome: ${JSON.stringify(path.join(fixture, 'native-launcher-state'))},
       signal: controller.signal, budget: nativeBudget(), startup: startupBudget(),
       initialScript: ${JSON.stringify(`window.platformDevServerUrl=${JSON.stringify(serverUrl)};sessionStorage.setItem('fregat.terminal-namespace',${JSON.stringify(prefix)});`)},
       onOpen: () => {}, onMessage: body => { if (body?.nativeProof?.ready) ready = true; }

@@ -37,6 +37,8 @@ test('renders app-owned window chrome as the only native drag region', () => {
 
 afterEach(() => {
   delete (navigator as Navigator & { windowControlsOverlay?: unknown }).windowControlsOverlay
+  delete window.platformBridge
+  document.documentElement.removeAttribute('data-native-fullscreen')
 })
 
 test('WCO geometry reserves either control edge and responds to geometry changes without a bridge', () => {
@@ -74,6 +76,39 @@ test('WCO geometry reserves either control edge and responds to geometry changes
   expect(toolbar.style.marginLeft).toBe('')
   expect(toolbar).toHaveClass('window-drag')
   expect(screen.getByRole('button', { name: 'Switch project' })).toHaveClass('window-no-drag')
+  act(() => {
+    rect = { x: 80, y: 0, width: 900, height: 32 }
+    visible = true
+    overlay.dispatchEvent(new Event('geometrychange'))
+  })
+  expect(toolbar).toHaveStyle({ marginLeft: '80px', width: '900px', height: '32px' })
+})
+
+test('native macOS traffic-light inset follows full-screen entry, rerender, and exit', () => {
+  window.platformBridge = {
+    platform: 'darwin',
+    titlebar: 'overlay',
+    backdrop: 'transparent',
+    colorScheme: null,
+  }
+  const store = createTitlebarStore()
+  const view = renderWithProviders(<TitlebarTestProvider store={store} />, {
+    command: { runtime: { workspace: store } },
+  })
+  const projectArea = () => screen.getByRole('banner', { name: 'Window toolbar' }).firstElementChild
+  expect(projectArea()).toHaveClass('pl-[4.75rem]')
+  act(() => {
+    document.documentElement.setAttribute('data-native-fullscreen', '')
+    window.dispatchEvent(new Event('platform-native-window-state'))
+  })
+  expect(projectArea()).not.toHaveClass('pl-[4.75rem]')
+  view.rerender(<TitlebarTestProvider store={store} />)
+  expect(projectArea()).not.toHaveClass('pl-[4.75rem]')
+  act(() => {
+    document.documentElement.removeAttribute('data-native-fullscreen')
+    window.dispatchEvent(new Event('platform-native-window-state'))
+  })
+  expect(projectArea()).toHaveClass('pl-[4.75rem]')
 })
 
 function TitlebarTestProvider({

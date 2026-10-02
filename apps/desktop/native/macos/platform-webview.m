@@ -1,10 +1,29 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#import <CommonCrypto/CommonDigest.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+
+static WKWebsiteDataStore *persistent_store(NSString *directory) {
+  if (@available(macOS 14.0, *)) {
+    NSString *canonicalPath = directory.stringByStandardizingPath.stringByResolvingSymlinksInPath;
+    NSData *pathData = [canonicalPath dataUsingEncoding:NSUTF8StringEncoding];
+    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256(pathData.bytes, (CC_LONG)pathData.length, digest);
+    uuid_t bytes;
+    memcpy(bytes, digest, sizeof(bytes));
+    bytes[6] = (bytes[6] & 0x0f) | 0x80;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    NSUUID *identifier = [[NSUUID alloc] initWithUUIDBytes:bytes];
+    // WebKit owns the on-disk location; the state-home path selects an isolated persistent store.
+    return [WKWebsiteDataStore dataStoreForIdentifier:identifier];
+  }
+  // macOS 11–13 has one public persistent store per application, shared across state homes.
+  return WKWebsiteDataStore.defaultDataStore;
+}
 
 static void emit(NSDictionary *event) {
   NSData *data = [NSJSONSerialization dataWithJSONObject:event options:0 error:nil];
@@ -17,6 +36,8 @@ static void emit(NSDictionary *event) {
 @interface PlatformHost : NSObject <NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate>
 @property(strong) NSWindow *window;
 @property(strong) WKWebView *view;
+@property(strong) NSURL *appURL;
+@property(strong) WKUserScript *startupScript;
 @property(strong) NSOpenPanel *picker;
 @property(strong) NSEvent *mouseDown;
 @property(strong) id mouseMonitor;
@@ -30,6 +51,49 @@ static void emit(NSDictionary *event) {
 @end
 
 @implementation PlatformHost
+- (NSString *)windowStateSource {
+  BOOL fullscreen = (self.window.styleMask & NSWindowStyleMaskFullScreen) != 0;
+  NSData *data = [NSJSONSerialization dataWithJSONObject:self.appURL.absoluteString
+      options:NSJSONWritingFragmentsAllowed error:nil];
+  NSString *appURL = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+  NSString *script = [NSString stringWithFormat:
+      @"(() => { if (location.origin !== new URL(%@).origin) return; "
+      "const apply = () => { document.documentElement.toggleAttribute('data-native-fullscreen', %@); window.dispatchEvent(new Event('platform-native-window-state')); }; "
+      "if (document.documentElement) { apply(); return; } "
+      "const observer = new MutationObserver(() => { if (!document.documentElement) return; observer.disconnect(); apply(); }); "
+      "observer.observe(document, { childList: true }); })()",
+      appURL, fullscreen ? @"true" : @"false"];
+  return script;
+}
+- (void)refreshWindowStateScript {
+  if (self.closed || !self.view || !self.appURL) return;
+  WKUserContentController *controller = self.view.configuration.userContentController;
+  [controller removeAllUserScripts];
+  [controller addUserScript:[[WKUserScript alloc] initWithSource:[self windowStateSource] injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
+  [controller addUserScript:self.startupScript];
+}
+- (void)publishWindowState {
+  if (self.closed || !self.view || !self.appURL) return;
+  [self.view evaluateJavaScript:[self windowStateSource] completionHandler:nil];
+}
+- (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
+  [self refreshWindowStateScript];
+  decisionHandler(WKNavigationActionPolicyAllow);
+}
+- (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation {
+  [self publishWindowState];
+}
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+  [self publishWindowState];
+}
+- (void)windowDidEnterFullScreen:(NSNotification *)notification {
+  [self refreshWindowStateScript];
+  [self publishWindowState];
+}
+- (void)windowDidExitFullScreen:(NSNotification *)notification {
+  [self refreshWindowStateScript];
+  [self publishWindowState];
+}
 - (void)finish {
   if (self.closed) return;
   self.closed = YES;
@@ -148,7 +212,7 @@ static void read_commands(PlatformHost *host) {
 
 int main(int argc, char **argv) {
   @autoreleasepool {
-    if (argc < 3) { fprintf(stderr, "usage: platform-webview <url> <init-script-file> [--vibrancy] | pick <options-json> | message <text-file>\n"); return 2; }
+    if (argc < 3) { fprintf(stderr, "usage: platform-webview <url> <init-script-file> --data-dir <absolute-path> [--vibrancy] | pick <options-json> | message <text-file>\n"); return 2; }
     [NSApplication sharedApplication];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     PlatformHost *host = [PlatformHost new];
@@ -195,8 +259,26 @@ int main(int argc, char **argv) {
       [host finish];
       return host.exitCode;
     }
+    NSString *dataDir = nil;
+    BOOL vibrant = NO;
+    for (int i = 3; i < argc; i++) {
+      if (strcmp(argv[i], "--data-dir") == 0 && !dataDir && i + 1 < argc) {
+        dataDir = [NSString stringWithUTF8String:argv[++i]];
+        continue;
+      }
+      if (strcmp(argv[i], "--vibrancy") == 0 && !vibrant) {
+        vibrant = YES;
+        continue;
+      }
+      fprintf(stderr, "Native window options invalid\n");
+      return 2;
+    }
+    if (!dataDir.isAbsolutePath) { fprintf(stderr, "Native window options invalid\n"); return 2; }
+    WKWebsiteDataStore *dataStore = persistent_store(dataDir);
+    if (!dataStore) { fprintf(stderr, "Native browser storage unavailable\n"); return 1; }
     NSURL *url = [NSURL URLWithString:mode];
     if (!url || !([url.scheme isEqual:@"http"] || [url.scheme isEqual:@"https"])) return 2;
+    host.appURL = url;
     NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1440, 960)
         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable | NSWindowStyleMaskFullSizeContentView
         backing:NSBackingStoreBuffered defer:NO];
@@ -206,7 +288,6 @@ int main(int argc, char **argv) {
     window.titleVisibility = NSWindowTitleHidden;
     window.titlebarAppearsTransparent = YES;
     window.releasedWhenClosed = NO;
-    BOOL vibrant = argc > 3 && strcmp(argv[3], "--vibrancy") == 0;
     if (vibrant) {
       window.opaque = NO;
       window.backgroundColor = NSColor.clearColor;
@@ -218,16 +299,18 @@ int main(int argc, char **argv) {
       [window.contentView addSubview:effect];
     }
     WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
-    // Native fallback browsing data is scoped to this window lifecycle.
-    configuration.websiteDataStore = WKWebsiteDataStore.nonPersistentDataStore;
-    [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:text injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
+    configuration.websiteDataStore = dataStore;
+    host.startupScript = [[WKUserScript alloc] initWithSource:text injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
     [configuration.userContentController addScriptMessageHandler:host name:@"platformShell"];
     WKWebView *view = [[WKWebView alloc] initWithFrame:window.contentView.bounds configuration:configuration];
     host.view = view;
     view.navigationDelegate = host;
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     if (@available(macOS 13.3, *)) view.inspectable = YES;
-    if (vibrant) [view setValue:@NO forKey:@"drawsBackground"];
+    if (vibrant) {
+      [view setValue:@NO forKey:@"drawsBackground"];
+      if (@available(macOS 12.0, *)) view.underPageBackgroundColor = NSColor.clearColor;
+    }
     [window.contentView addSubview:view];
     __weak PlatformHost *weakHost = host;
     host.mouseMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown handler:^NSEvent *(NSEvent *event) {
@@ -235,6 +318,7 @@ int main(int argc, char **argv) {
       return event;
     }];
     read_commands(host);
+    [host refreshWindowStateScript];
     [view loadRequest:[NSURLRequest requestWithURL:url]];
     [window center];
     [window makeKeyAndOrderFront:nil];

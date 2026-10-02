@@ -4,7 +4,7 @@ import { ServerUpdateStatus } from '@/features/server-update/components/status'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { TitlebarMenu } from '@/features/workbench/components/titlebar-menu'
 import { titlebarModel } from '@/features/workbench/utils/titlebar-model'
-import { hasNativeMacOverlay } from '@/lib/platform/bridge'
+import { useNativeMacOverlay } from '@/components/use-native-mac-overlay'
 import { usePanelSurface } from '@/hooks/use-panel-surface'
 import { useWindowControlsOverlay } from '@/components/use-window-controls-overlay'
 import { NATIVE_WINDOW_DRAG_CLASS } from '@/lib/platform/window-drag'
@@ -17,6 +17,7 @@ export function AppTitlebar() {
   const model = titlebarModel(rootFolder, layout, uiMode)
   const surface = usePanelSurface()
   const overlay = useWindowControlsOverlay()
+  const nativeMacOverlay = useNativeMacOverlay()
 
   // Built as an element rather than returned so the whole bar — including the
   // gaps between its controls — is the context menu's trigger.
@@ -43,7 +44,7 @@ export function AppTitlebar() {
       <div
         className={cn(
           'flex min-w-0 items-center px-(--bar-padding-x)',
-          !overlay && hasNativeMacOverlay() && 'pl-[4.75rem]',
+          !overlay && nativeMacOverlay && 'pl-[4.75rem]',
         )}
       >
         <WorkspaceProjectMenu workspaceTitle={model.workspaceTitle} />
