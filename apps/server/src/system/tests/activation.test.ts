@@ -1,4 +1,5 @@
-import { stat } from 'node:fs/promises'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import net from 'node:net'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -7,12 +8,18 @@ import { activatedSocket } from '../activation'
 // systemd's own activation harness hands the socket over exactly as a socket unit would.
 const activator = Bun.which('systemd-socket-activate')
 const children: Bun.Subprocess[] = []
+const runtimeDirectories: string[] = []
 
 afterEach(async () => {
   for (const child of children.splice(0)) {
     child.kill('SIGKILL')
     await child.exited
   }
+  await Promise.all(
+    runtimeDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  )
 })
 
 async function freePort() {
@@ -27,6 +34,8 @@ async function freePort() {
 async function activate(expectedPort?: number) {
   const port = await freePort()
   const fixture = path.join(import.meta.dirname, 'fixtures', 'activated-server.ts')
+  const runtime = await mkdtemp(path.join(tmpdir(), 'platform-activation-'))
+  runtimeDirectories.push(runtime)
   const child = Bun.spawn({
     cmd: [
       activator!,
@@ -35,6 +44,7 @@ async function activate(expectedPort?: number) {
       process.execPath,
       fixture,
       String(expectedPort ?? port),
+      runtime,
     ],
     stdout: 'ignore',
     stderr: 'pipe',
