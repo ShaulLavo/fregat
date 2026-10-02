@@ -51,7 +51,7 @@ export function AppShell({
   return (
     <div
       className={cn(
-        'bg-background text-foreground relative isolate flex flex-col',
+        'bg-background in-data-[backdrop=transparent]:bg-transparent text-foreground relative isolate flex flex-col',
         // The phone keyboard shrinks the dynamic viewport; the desktop window never does.
         phone ? 'h-dvh' : 'h-svh overflow-hidden',
       )}

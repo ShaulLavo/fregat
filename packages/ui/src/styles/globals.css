@@ -1103,7 +1103,8 @@
      painting over it would hide the thing we want. An opaque window under a
      compositor that blends it (`data-backdrop='compositor'`) still needs its
      floor: the browser paints its base color under anything we leave clear. */
-  html[data-backdrop='transparent'] {
+  html[data-backdrop='transparent'],
+  html[data-backdrop='transparent'] body {
     background-color: transparent;
   }
   body {
