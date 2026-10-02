@@ -62,6 +62,7 @@ import {
 } from './structured-errors'
 import {
   commitSettingsSecretTransactionOwned,
+  hasSettingsRecoveryArtifacts,
   recoverSettingsTransactionSync,
   settingsTransactionJournalPath,
   withSettingsSecretTransactionOwner,
@@ -174,6 +175,7 @@ export class SettingsStore {
   private secretRefs: ReadonlySet<SecretRef> = new Set()
   private secretRefsStale = false
   private recoveryBlocked = false
+  private pruningEnabled = false
   private sequence = 0
   private streamSubscribers = 0
 
@@ -186,9 +188,19 @@ export class SettingsStore {
 
     this.secretsPath = secretsPath
     this.settingsFilePaths = settingsFilePaths
-    this.user = new SettingsFileLayer('user', paths.user, options.layerReader, (keys) => {
-      this.pendingRemovedDiagnostics.push(...removedSettingsDiagnostics(keys))
-    })
+    this.user = new SettingsFileLayer(
+      'user',
+      paths.user,
+      options.layerReader,
+      (keys) => this.pendingRemovedDiagnostics.push(...removedSettingsDiagnostics(keys)),
+      {
+        ownerPath: secretsPath,
+        eligible: () =>
+          this.pruningEnabled &&
+          !this.recoveryBlocked &&
+          !hasSettingsRecoveryArtifacts(settingsFilePaths, secretsPath),
+      },
+    )
     this.workspace = paths.workspace
       ? new SettingsFileLayer('workspace', paths.workspace, options.layerReader)
       : null
@@ -208,6 +220,13 @@ export class SettingsStore {
     for (const layer of this.fileLayers()) {
       layer.watch((change) => this.publishLayerChange(change))
     }
+  }
+
+  /** Application startup cleanup is separate from read-only construction and transaction recovery. */
+  pruneUnknownUserSettingsSync(): void {
+    this.pruningEnabled = true
+    const change = this.user.pruneUnknownSettingsSync()
+    if (change) this.publishLayerChange(change)
   }
 
   snapshot(): SettingsSnapshot {

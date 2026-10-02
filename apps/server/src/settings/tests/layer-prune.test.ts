@@ -52,6 +52,7 @@ describe('user settings pruning', () => {
     const notices: (readonly string[])[] = []
     const current = layer(file, 'user', (keys) => notices.push(keys))
     current.loadSync()
+    current.pruneUnknownSettingsSync()
 
     const text = await readFile(file, 'utf8')
     expect(text).toContain('// kept setting')
@@ -65,10 +66,11 @@ describe('user settings pruning', () => {
     expect(current.snapshot().text).toBe(text)
     expect(current.snapshot().raw['editor.fontSize']).toBe(17)
     current.loadSync()
+    current.pruneUnknownSettingsSync()
     expect(notices).toHaveLength(1)
   })
 
-  it('prunes on asynchronous load through a symlink and preserves target mode', async () => {
+  it('prunes explicitly after asynchronous loading through a symlink and preserves target mode', async () => {
     const file = await tempFile()
     const alias = path.join(path.dirname(file), 'alias.json')
     await writeFile(file, '{ "editor.fontSize": 16, "obsolete": true }')
@@ -77,6 +79,7 @@ describe('user settings pruning', () => {
     const notices: (readonly string[])[] = []
     const current = layer(alias, 'user', (keys) => notices.push(keys))
     await current.load()
+    await current.pruneUnknownSettings()
 
     expect((await lstat(alias)).isSymbolicLink()).toBe(true)
     expect((await stat(file)).mode & 0o777).toBe(0o640)
@@ -91,7 +94,9 @@ describe('user settings pruning', () => {
     const notices: (readonly string[])[] = []
     const user = layer(file, 'user', (keys) => notices.push(keys))
     user.loadSync()
+    user.pruneUnknownSettingsSync()
     await user.load()
+    await user.pruneUnknownSettings()
     expect(await readFile(file, 'utf8')).toBe(malformed)
     expect(user.snapshot().parseErrors.length).toBeGreaterThan(0)
 
@@ -99,12 +104,16 @@ describe('user settings pruning', () => {
     await writeFile(file, workspaceText)
     const workspace = layer(file, 'workspace', (keys) => notices.push(keys))
     workspace.loadSync()
+    workspace.pruneUnknownSettingsSync()
     await workspace.load()
+    await workspace.pruneUnknownSettings()
     expect(await readFile(file, 'utf8')).toBe(workspaceText)
 
     await rm(file)
     user.loadSync()
+    user.pruneUnknownSettingsSync()
     await user.load()
+    await user.pruneUnknownSettings()
     expect(user.snapshot().present).toBe(false)
     await expect(stat(file)).rejects.toMatchObject({ code: 'ENOENT' })
     expect(notices).toEqual([])
@@ -132,11 +141,13 @@ describe('user settings pruning', () => {
     const current = layer(alias, 'user', (keys) => notices.push(keys))
     try {
       expect(() => current.loadSync()).not.toThrow()
+      expect(() => current.pruneUnknownSettingsSync()).not.toThrow()
       expect(current.snapshot().raw).toEqual({ 'editor.fontSize': 17, obsolete: true })
       expect(notices).toEqual([])
       expect(await readFile(file, 'utf8')).toContain('obsolete')
       await writeFile(file, '{ "editor.fontSize": 18 }')
       current.loadSync()
+      current.pruneUnknownSettingsSync()
       expect(current.snapshot().raw).toEqual({ 'editor.fontSize': 18 })
       await writeFile(file, '{ "obsolete": true }')
     } finally {
@@ -145,6 +156,7 @@ describe('user settings pruning', () => {
     }
     expect(activeSettingsWriteCoordinatorCount()).toBe(0)
     current.loadSync()
+    current.pruneUnknownSettingsSync()
     expect(current.snapshot().raw).toEqual({})
   })
 
@@ -160,6 +172,7 @@ describe('user settings pruning', () => {
       await chmod(directory, 0o500)
       try {
         expect(() => current.loadSync()).not.toThrow()
+        expect(() => current.pruneUnknownSettingsSync()).not.toThrow()
         expect(current.snapshot().raw).toEqual({ 'editor.fontSize': 17, obsolete: true })
         expect(await readFile(file, 'utf8')).toBe(text)
         expect(notices).toEqual([])
@@ -167,6 +180,7 @@ describe('user settings pruning', () => {
         await chmod(directory, 0o700)
       }
       current.loadSync()
+      current.pruneUnknownSettingsSync()
       expect(current.snapshot().raw).toEqual({ 'editor.fontSize': 17 })
       expect(notices).toEqual([['obsolete']])
     },
@@ -190,19 +204,21 @@ describe('user settings pruning', () => {
       async (_context, read) => {
         const stale = await read()
         reads += 1
-        if (reads === 2) await writeFile(file, externalText)
+        if (reads === 3) await writeFile(file, externalText)
         return stale
       },
       (keys) => notices.push(keys),
     )
     layers.push(current)
 
-    await expect(current.load()).rejects.toMatchObject({
+    await current.load()
+    const loaded = current.snapshot()
+    await expect(current.pruneUnknownSettings()).rejects.toMatchObject({
       message: settingsErrors.WRITE_CONTENDED({}).message,
     })
     expect(await readFile(file, 'utf8')).toBe(externalText)
     expect(notices).toEqual([])
-    expect(current.snapshot().present).toBe(false)
+    expect(current.snapshot()).toBe(loaded)
     expect(activeSettingsWriteCoordinatorCount()).toBe(0)
   })
 
@@ -213,6 +229,7 @@ describe('user settings pruning', () => {
     const changes: LayerChange[] = []
     const current = layer(file, 'user', (keys) => notices.push(keys))
     current.loadSync()
+    current.pruneUnknownSettingsSync()
     current.watch((change) => changes.push(change))
     await writeFile(file, '{ "editor.fontSize": 18, "obsolete": true }')
 
@@ -223,6 +240,7 @@ describe('user settings pruning', () => {
     expect(await readFile(file, 'utf8')).not.toContain('obsolete')
     // An explicit second read exercises the same bytes after the rename echo.
     await current.load()
+    await current.pruneUnknownSettings()
     expect(notices).toHaveLength(1)
     expect(changes).toHaveLength(1)
   })

@@ -45,8 +45,9 @@ export function pruneSettingsText(
 export function pruneSettingsFileSync(
   destination: string,
   current: SettingsFileContents,
+  eligible: () => boolean,
 ): SettingsPruneResult | null {
-  if (current.revision === null) return null
+  if (current.revision === null || !eligible()) return null
   const pruned = pruneSettingsText(current.text)
   if (!pruned) return null
 
@@ -55,7 +56,7 @@ export function pruneSettingsFileSync(
     durability: 'fsync-all',
     mode,
     beforeCommit: () => {
-      if (readSettingsFileSync(destination).revision !== current.revision) {
+      if (!eligible() || readSettingsFileSync(destination).revision !== current.revision) {
         throw settingsWriteContendedError(1, 0)
       }
     },
@@ -71,15 +72,19 @@ export async function pruneSettingsFile(
   destination: string,
   current: SettingsFileContents,
   coordinatorWaitMs: number,
+  eligible: () => boolean,
 ): Promise<SettingsPruneResult | null> {
-  if (current.revision === null) return null
+  if (current.revision === null || !eligible()) return null
   const pruned = pruneSettingsText(current.text)
   if (!pruned) return null
 
   const mode = (await stat(destination)).mode & 0o777
   const staged = await stageSettingsFile(destination, pruned.text, mode)
   try {
-    const outcome = await tryCommitStagedSettingsFile(staged, current.revision)
+    if (!eligible()) return null
+    const outcome = await tryCommitStagedSettingsFile(staged, current.revision, () => {
+      if (!eligible()) throw settingsWriteContendedError(1, coordinatorWaitMs)
+    })
     if (outcome.kind === 'revision-mismatch') {
       throw settingsWriteContendedError(1, coordinatorWaitMs)
     }

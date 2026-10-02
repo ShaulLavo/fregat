@@ -238,6 +238,7 @@ export async function stageSettingsFile(
 export async function tryCommitStagedSettingsFile(
   staged: StagedSettingsFile,
   expectedRevision: string | null | undefined,
+  beforeCommit?: () => void,
 ): Promise<
   | { readonly kind: 'committed'; readonly revision: string }
   | { readonly foundRevision: string | null; readonly kind: 'revision-mismatch' }
@@ -249,6 +250,7 @@ export async function tryCommitStagedSettingsFile(
     }
   }
 
+  beforeCommit?.()
   await commitAtomicWrite(staged.temporary, staged.destination, { durability: 'fsync-all' })
 
   return { kind: 'committed', revision: staged.revision }

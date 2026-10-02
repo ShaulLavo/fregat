@@ -21,6 +21,7 @@ import {
   pruneSettingsText,
   type SettingsPruneResult,
 } from './prune'
+import { hasSettingsRecoveryArtifacts } from './transaction'
 import {
   canonicalSettingsPathSync,
   withSettingsWriteCoordinator,
@@ -106,6 +107,11 @@ export type SettingsLayerReader = (
   read: () => Promise<SettingsFileContents>,
 ) => Promise<SettingsFileContents>
 
+export type SettingsPruneProtection = {
+  readonly ownerPath: string
+  readonly eligible: () => boolean
+}
+
 const EMPTY: LayerContents = {
   raw: {},
   parseErrors: [],
@@ -130,6 +136,7 @@ export class SettingsFileLayer {
   private contents: LayerContents = EMPTY
   private readonly reader: SettingsLayerReader | null
   private readonly onPruned?: (keys: readonly string[]) => void
+  private readonly pruneProtection?: SettingsPruneProtection
   private watcher: FSWatcher | null = null
   private readonly directoryWatchers: FSWatcher[] = []
   private debounce: ReturnType<typeof setTimeout> | null = null
@@ -162,11 +169,13 @@ export class SettingsFileLayer {
     filePath: string,
     reader?: SettingsLayerReader,
     onPruned?: (keys: readonly string[]) => void,
+    pruneProtection?: SettingsPruneProtection,
   ) {
     this.id = id
     this.filePath = filePath
     this.reader = reader ?? null
     this.onPruned = onPruned
+    this.pruneProtection = pruneProtection
   }
 
   snapshot(): LayerContents {
@@ -174,49 +183,68 @@ export class SettingsFileLayer {
   }
 
   async load(): Promise<void> {
-    const next = await this.read()
-    if (this.id !== 'user' || !pruneSettingsText(next.text)) {
-      this.apply(next)
-      return
-    }
-
-    await this.coordinateWrite(async (context) => {
-      const change = await this.pruneCurrent(context)
-      if (!change) this.apply(context.current)
-    })
+    this.apply(await this.read())
   }
 
   loadSync(): void {
-    const next = readSettingsFileSync(this.filePath)
-    const candidate = this.id === 'user' ? pruneSettingsText(next.text) : null
-    if (!candidate) {
-      this.apply(this.toContents(next))
-      return
-    }
+    this.apply(this.toContents(readSettingsFileSync(this.filePath)))
+  }
 
-    let readable = next
+  /** Application startup invokes cleanup separately from loading and transaction recovery. */
+  pruneUnknownSettingsSync(): LayerChange | null {
+    if (this.id !== 'user') return null
+    let keys: readonly string[] = []
     try {
-      withSettingsWriteCoordinatorSync(this.filePath, (lease) => {
-        readable = readSettingsFileSync(lease.canonicalPath)
-        const pruned = pruneSettingsFileSync(lease.canonicalPath, readable)
-        if (pruned) {
-          this.acceptPruned(pruned)
-          return
-        }
-        this.apply(this.toContents(readable))
-      })
+      const candidate = pruneSettingsText(readSettingsFileSync(this.filePath).text)
+      if (!candidate) return null
+      keys = candidate.keys
+      return withSettingsWriteCoordinatorSync(this.filePath, (lease) =>
+        this.withPruneOwnerSync(() => {
+          const eligible = () => this.pruneEligible(lease.canonicalPath)
+          if (!eligible()) return null
+          const current = readSettingsFileSync(lease.canonicalPath)
+          const pruned = pruneSettingsFileSync(lease.canonicalPath, current, eligible)
+          return pruned ? this.acceptPruned(pruned) : null
+        }),
+      )
     } catch (error) {
-      this.apply(this.toContents(readable))
       recordProcessWarning('settings.layer.prune_failed', {
         area: 'settings',
         operation: 'boot-prune-unknown-keys',
-        settings: { layer: this.id, file: this.filePath, keys: candidate.keys },
+        settings: { layer: this.id, file: this.filePath, keys },
         error: {
           code: errorStringField(error, 'code'),
           name: error instanceof Error ? error.name : typeof error,
         },
       })
+      return null
     }
+  }
+
+  async pruneUnknownSettings(): Promise<LayerChange | null> {
+    if (this.id !== 'user') return null
+    return this.coordinateWrite((context) =>
+      this.withPruneOwner(async () => {
+        if (!this.pruneEligible(context.destination)) return null
+        const current = await this.read()
+        return this.pruneCurrent({ ...context, current })
+      }),
+    )
+  }
+
+  private withPruneOwnerSync<T>(operation: () => T): T {
+    if (!this.pruneProtection) return operation()
+    return withSettingsWriteCoordinatorSync(this.pruneProtection.ownerPath, operation)
+  }
+
+  private async withPruneOwner<T>(operation: () => Promise<T>): Promise<T> {
+    if (!this.pruneProtection) return operation()
+    return withSettingsWriteCoordinator(this.pruneProtection.ownerPath, operation)
+  }
+
+  private pruneEligible(destination: string): boolean {
+    if (this.pruneProtection) return this.pruneProtection.eligible()
+    return !hasSettingsRecoveryArtifacts([destination])
   }
 
   private async pruneCurrent(context: LayerWriteContext): Promise<LayerChange | null> {
@@ -224,6 +252,7 @@ export class SettingsFileLayer {
       context.destination,
       context.current,
       context.coordinatorWaitMs,
+      () => this.pruneEligible(context.destination),
     )
     return pruned ? this.acceptPruned(pruned) : null
   }
@@ -564,17 +593,22 @@ export class SettingsFileLayer {
 
   private async reloadUser() {
     try {
-      await this.coordinateWrite(async (context) => {
-        if (this.reloadQueued) return
+      await this.coordinateWrite((context) =>
+        this.withPruneOwner(async () => {
+          const current = await this.read()
+          if (this.reloadQueued) return
 
-        const change = await this.pruneCurrent(context)
-        if (change) {
-          // Publish the committed cleanup before its rename event is suppressed.
-          this.onChange?.(change)
-          return
-        }
-        this.acceptReload(context.current)
-      })
+          const change = this.pruneEligible(context.destination)
+            ? await this.pruneCurrent({ ...context, current })
+            : null
+          if (change) {
+            // Publish the committed cleanup before its rename event is suppressed.
+            this.onChange?.(change)
+            return
+          }
+          this.acceptReload(current)
+        }),
+      )
       this.clearReadFailure()
     } catch (error) {
       this.handleReadFailure(error)
