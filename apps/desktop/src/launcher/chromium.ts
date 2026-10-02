@@ -51,7 +51,7 @@ export function chromiumBridge(url: string): string {
 }
 
 export async function attachChromium(
-  cdp: Pick<CdpClient, 'request' | 'on'>,
+  cdp: Pick<CdpClient, 'request' | 'on' | 'disconnected'>,
   url: string,
   onOpen: (context: Record<string, unknown>) => void,
   onFailure: (error: unknown) => void,
@@ -60,6 +60,7 @@ export async function attachChromium(
   const script = chromiumBridge(url)
   const sessions = new Set<string>()
   const contexts = new Map<string, Set<number>>()
+  const documents = new Map<string, ReturnType<typeof Promise.withResolvers<number>>>()
   const pendingPicks = new Map<string, Promise<string[]>>()
   const origin = new URL(url).origin
   const preparing = new Set<Promise<void>>()
@@ -74,6 +75,7 @@ export async function attachChromium(
     if (typeof session !== 'string') return
     sessions.delete(session)
     contexts.delete(session)
+    documents.delete(session)
   })
   cdp.on('Runtime.executionContextCreated', (event) => {
     const context = event.params.context
@@ -87,6 +89,7 @@ export async function attachChromium(
     const ids = contexts.get(event.sessionId) ?? new Set<number>()
     ids.add(context.id)
     contexts.set(event.sessionId, ids)
+    documents.get(event.sessionId)?.resolve(context.id)
   })
   cdp.on('Runtime.executionContextDestroyed', (event) => {
     if (event.sessionId && typeof event.params.executionContextId === 'number')
@@ -104,7 +107,9 @@ export async function attachChromium(
     }
     if (sessions.has(session)) return
     sessions.add(session)
-    const preparation = preparePage(cdp, session, target.type, script, origin)
+    const document = Promise.withResolvers<number>()
+    documents.set(session, document)
+    const preparation = preparePage(cdp, session, target.type, script, origin, document.promise)
       .catch((error: unknown) => {
         if (sessions.has(session)) fail(error)
       })
@@ -154,11 +159,12 @@ export async function attachChromium(
 }
 
 async function preparePage(
-  cdp: Pick<CdpClient, 'request'>,
+  cdp: Pick<CdpClient, 'request' | 'disconnected'>,
   session: string,
   type: unknown,
   script: string,
   origin: string,
+  document: Promise<number>,
 ) {
   if (type !== 'page') {
     await cdp.request('Runtime.runIfWaitingForDebugger', {}, session)
@@ -168,12 +174,25 @@ async function preparePage(
   await cdp.request('Runtime.enable', {}, session)
   await cdp.request('Runtime.addBinding', { name: 'platformShellCall' }, session)
   await cdp.request('Page.addScriptToEvaluateOnNewDocument', { source: script }, session)
-  await cdp.request('Runtime.evaluate', { expression: script }, session)
   await cdp.request('Browser.grantPermissions', {
     origin,
     permissions: ['clipboardReadWrite', 'notifications'],
   })
   await cdp.request('Runtime.runIfWaitingForDebugger', {}, session)
+  // A target can advertise the app URL while its current document is still about:blank.
+  const contextId = await Promise.race([
+    document,
+    cdp.disconnected.then((error) => {
+      throw error
+    }),
+  ])
+  const evaluated = await cdp.request(
+    'Runtime.evaluate',
+    { expression: script, contextId },
+    session,
+  )
+  if (evaluated.exceptionDetails)
+    throw launcherErrors.CDP_FAILED({ internal: { reason: 'app-document-bridge' } })
 }
 
 function trustedBinding(
@@ -263,7 +282,8 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
       },
     })
   // Requests sent while starting time out exactly at the startup cap; later ones keep the client default.
-  const startupCdp: Pick<CdpClient, 'request' | 'on'> = {
+  const startupCdp: Pick<CdpClient, 'request' | 'on' | 'disconnected'> = {
+    disconnected: cdp.disconnected,
     on: (method, handler) => cdp.on(method, handler),
     request: (method, params, sessionId) => {
       if (!starting) return cdp.request(method, params, sessionId)
