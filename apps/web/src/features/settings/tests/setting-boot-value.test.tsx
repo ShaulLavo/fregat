@@ -61,10 +61,13 @@ test('single-key boot reads validate mirrored values and ignore unmirrored value
   )
 })
 
-test('frost is available to first paint from confirmed boot values and validates storage', () => {
-  writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'window.frost': 25 })
-  expect(readSettingsMirror()['window.frost']).toBe(25)
-  expect(readSettingBootValue('window.frost')).toBe(25)
-  localStorage.setItem('platform.settings-boot-mirror.v1', JSON.stringify({ 'window.frost': true }))
-  expect(readSettingsMirror()['window.frost']).toBe(50)
+test('material is available to first paint from confirmed boot values and validates storage', () => {
+  writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'window.material': 'glass' })
+  expect(readSettingsMirror()['window.material']).toBe('glass')
+  expect(readSettingBootValue('window.material')).toBe('glass')
+  localStorage.setItem(
+    'platform.settings-boot-mirror.v1',
+    JSON.stringify({ 'window.material': true }),
+  )
+  expect(readSettingsMirror()['window.material']).toBe('none')
 })

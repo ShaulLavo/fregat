@@ -224,28 +224,41 @@ test.each([
       messageHandlers: { platformShell: { postMessage: (body: unknown) => messages.push(body) } },
     })
     const bridge = global.platformBridge as {
-      setWindowAppearance?: (appearance: { opacity: number; frost: number }) => void
+      capabilities: { windowGlass: boolean }
+      setWindowAppearance?: (appearance: {
+        opacity: number
+        material: 'none' | 'frosted' | 'glass'
+      }) => void
     }
+    expect(bridge.capabilities.windowGlass).toBe(false)
     if (!available) {
       expect(bridge).not.toHaveProperty('setWindowAppearance')
       expect(messages).toEqual([])
       return
     }
     expect(bridge.setWindowAppearance).toBeTypeOf('function')
-    bridge.setWindowAppearance!({ opacity: 20, frost: 50 })
-    bridge.setWindowAppearance!({ opacity: 80, frost: 0 })
+    bridge.setWindowAppearance!({ opacity: 20, material: 'frosted' })
+    bridge.setWindowAppearance!({ opacity: 80, material: 'none' })
+    bridge.setWindowAppearance!({ opacity: 80, material: 'glass' })
     expect(messages).toEqual([
       {
         method: 'setWindowAppearance',
         opacity: 20,
-        frost: 50,
+        material: 'frosted',
         origin: 'http://localhost:123',
         token: 'fixture-token',
       },
       {
         method: 'setWindowAppearance',
         opacity: 80,
-        frost: 0,
+        material: 'none',
+        origin: 'http://localhost:123',
+        token: 'fixture-token',
+      },
+      {
+        method: 'setWindowAppearance',
+        opacity: 80,
+        material: 'glass',
         origin: 'http://localhost:123',
         token: 'fixture-token',
       },

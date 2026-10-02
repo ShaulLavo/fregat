@@ -1,33 +1,67 @@
-import type { SettingId } from '@workspace/contracts'
+import type { SettingId, SettingsValues } from '@workspace/contracts'
 
-import type { ShellBackdrop } from '@/lib/platform/backdrop'
+import { documentBackdrop, type ShellBackdrop } from '@/lib/platform/backdrop'
+import { getPlatformBridge } from '@/lib/platform/bridge'
 
 export type SettingEnvironment = {
   readonly backdrop: ShellBackdrop
-  /** The retained native host can create a transparent window. */
   readonly nativeTransparency: boolean
   readonly platform?: string
   readonly windowAppearance?: boolean
+  readonly windowGlass?: boolean
+  readonly material?: SettingsValues['window.material']
 }
 
-/**
- * Whether this environment can act on a row at all.
- *
- * `window.transparency` decides how the shell creates its window, so it needs
- * both a shell to create one and a desktop that composites it over something.
- * A browser tab has no window to re-create, and the macOS shell pays offscreen
- * rendering for the transparent half — a row that writes a value nothing reads
- * is worse than no row.
- */
-export function isSettingAvailable(id: SettingId, environment: SettingEnvironment): boolean {
-  const nativeFrost =
+export function settingEnvironment(
+  material?: SettingsValues['window.material'],
+): SettingEnvironment {
+  const bridge = getPlatformBridge()
+  return {
+    backdrop: documentBackdrop(),
+    platform: bridge?.platform,
+    windowAppearance: typeof bridge?.setWindowAppearance === 'function',
+    windowGlass: bridge?.capabilities?.windowGlass,
+    nativeTransparency: bridge?.backdrop === 'transparent' || bridge?.backdrop === 'compositor',
+    material,
+  }
+}
+
+function supportsNativeMaterial(environment: SettingEnvironment): boolean {
+  return (
     environment.platform === 'darwin' &&
     environment.backdrop === 'transparent' &&
     environment.windowAppearance === true
-  if (id === 'window.frost') return nativeFrost
-  if (id === 'workbench.surface.blur') return !nativeFrost
+  )
+}
 
+/** Rows with an availability reason stay visible so the saved value can be inspected. */
+export function settingAvailabilityReason(
+  id: SettingId,
+  environment: SettingEnvironment,
+): string | null {
+  const native = supportsNativeMaterial(environment)
+  if (id === 'window.material' && !native) return 'Needs a transparent macOS app window.'
+  if (
+    (id === 'workbench.surface.opacity' || id === 'workbench.surface.contentOpacity') &&
+    native &&
+    environment.material &&
+    environment.material !== 'none'
+  ) {
+    return 'Window material controls pane opacity.'
+  }
+  return null
+}
+
+export function materialOptionReason(
+  option: string,
+  environment: SettingEnvironment,
+): string | null {
+  if (option === 'glass' && environment.windowGlass !== true) return 'Glass needs macOS 26.'
+  return null
+}
+
+export function isSettingAvailable(id: SettingId, environment: SettingEnvironment): boolean {
+  if (id === 'workbench.surface.blur') return !supportsNativeMaterial(environment)
   if (id !== 'window.transparency') return true
-
   return environment.nativeTransparency && environment.backdrop !== 'app'
 }

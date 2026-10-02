@@ -89,7 +89,7 @@ const MIRRORED_KEYS = [
   'workbench.surface.blur',
   'workbench.surface.contentOpacity',
   'workbench.surface.opacity',
-  'window.frost',
+  'window.material',
   'workbench.surface.saturation',
   'workbench.tree.indentGuides',
   'workbench.wallpaper',

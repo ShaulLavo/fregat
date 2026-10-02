@@ -53,7 +53,7 @@ export function shellBridge(
     platform: platform === 'darwin' ? 'darwin' : 'linux',
     colorScheme: null,
     titlebar: engine === 'wkwebview' ? 'overlay' : 'native',
-    capabilities: { displayCapture: false },
+    capabilities: { displayCapture: false, windowGlass: false },
   }
   return `(() => {
     if (location.origin !== ${JSON.stringify(new URL(url).origin)} || window !== window.top || globalThis.__platformShellReply) return;

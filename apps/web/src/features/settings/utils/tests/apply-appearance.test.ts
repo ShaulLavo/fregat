@@ -26,7 +26,7 @@ function fakeRoot() {
 }
 
 const appearance = (overrides: Partial<AppearanceValues> = {}): AppearanceValues => ({
-  'window.frost': DEFAULT_SETTING_VALUES['window.frost'],
+  'window.material': DEFAULT_SETTING_VALUES['window.material'],
   'editor.fontFamily': DEFAULT_SETTING_VALUES['editor.fontFamily'],
   'workbench.colorTheme': DEFAULT_SETTING_VALUES['workbench.colorTheme'],
   'workbench.density': DEFAULT_SETTING_VALUES['workbench.density'],
@@ -51,37 +51,31 @@ describe('resolveColorTheme', () => {
 })
 
 describe('applyAppearance', () => {
-  it('forwards first-paint and independent live opacity and frost after writing CSS', () => {
+  it('forwards first-paint and live opacity plus material after writing CSS', () => {
     const { properties, root } = fakeRoot()
-    const received: { opacity: number; frost: number; css: string | undefined }[] = []
+    const received: unknown[] = []
     vi.stubGlobal('window', {
       platformBridge: {
-        setWindowAppearance: ({ opacity, frost }: { opacity: number; frost: number }) =>
-          received.push({ opacity, frost, css: properties.get('--surface-opacity') }),
+        platform: 'darwin',
+        backdrop: 'transparent',
+        capabilities: { windowGlass: true },
+        setWindowAppearance: (value: unknown) =>
+          received.push({ value, css: properties.get('--surface-opacity') }),
       },
     })
     try {
-      applyAppearance(appearance({ 'workbench.surface.opacity': 20 }), root, false)
-      expect(properties.get('--surface-opacity')).toBe('20%')
-      expect(received).toEqual([{ opacity: 20, frost: 50, css: '20%' }])
-
-      applyAppearance(appearance({ 'workbench.surface.opacity': 80 }), root, false)
-      expect(properties.get('--surface-opacity')).toBe('80%')
-      applyAppearance(
-        appearance({ 'workbench.surface.opacity': 80, 'window.frost': 0 }),
-        root,
-        false,
-      )
-      applyAppearance(
-        appearance({ 'workbench.surface.opacity': 100, 'window.frost': 100 }),
-        root,
-        false,
-      )
+      for (const material of ['none', 'frosted', 'glass', 'none'] as const) {
+        applyAppearance(
+          appearance({ 'workbench.surface.opacity': 20, 'window.material': material }),
+          root,
+          false,
+        )
+      }
       expect(received).toEqual([
-        { opacity: 20, frost: 50, css: '20%' },
-        { opacity: 80, frost: 50, css: '80%' },
-        { opacity: 80, frost: 0, css: '80%' },
-        { opacity: 100, frost: 100, css: '100%' },
+        { value: { opacity: 20, material: 'none' }, css: '20%' },
+        { value: { opacity: 20, material: 'frosted' }, css: '0%' },
+        { value: { opacity: 20, material: 'glass' }, css: '0%' },
+        { value: { opacity: 20, material: 'none' }, css: '20%' },
       ])
     } finally {
       vi.unstubAllGlobals()
@@ -134,6 +128,7 @@ describe('applyAppearance', () => {
     expect(properties.get('--surface-opacity')).toBe('100%')
     expect(properties.get('--content-opacity')).toBe('90%')
     expect(properties.get('--surface-blur')).toBe('0px')
+    expect(properties.get('--control-opacity')).toBe('100%')
     expect(properties.get('--surface-saturation')).toBe('100%')
   })
 
@@ -192,26 +187,36 @@ describe('applyAppearance', () => {
 })
 
 describe('native desktop blur ownership', () => {
-  it.each([0, 50, 100])('leaves page blur off at frost %s', (frost) => {
-    const { properties, root } = fakeRoot()
-    vi.stubGlobal('window', {
-      platformBridge: {
-        platform: 'darwin',
-        backdrop: 'transparent',
-        setWindowAppearance: () => {},
-      },
-    })
-    try {
-      applyAppearance(
-        appearance({ 'workbench.surface.blur': 24, 'window.frost': frost }),
-        root,
-        false,
-      )
-      expect(properties.get('--surface-blur')).toBe('0px')
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
+  it.each(['none', 'frosted', 'glass'] as const)(
+    'leaves page blur off and delegates pane fill for %s',
+    (material) => {
+      const { properties, root } = fakeRoot()
+      vi.stubGlobal('window', {
+        platformBridge: {
+          platform: 'darwin',
+          backdrop: 'transparent',
+          setWindowAppearance: () => {},
+        },
+      })
+      try {
+        applyAppearance(
+          appearance({ 'workbench.surface.blur': 24, 'window.material': material }),
+          root,
+          false,
+        )
+        expect(properties.get('--surface-blur')).toBe('0px')
+        expect(properties.get('--control-opacity')).toBe('80%')
+        expect(properties.get('--surface-opacity')).toBe(material === 'none' ? '80%' : '0%')
+        expect(properties.get('--content-opacity')).toBe(
+          material === 'none'
+            ? `${DEFAULT_SETTING_VALUES['workbench.surface.contentOpacity']}%`
+            : '0%',
+        )
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    },
+  )
   it.each([
     undefined,
     { platform: 'linux', backdrop: 'transparent', setWindowAppearance: () => {} },

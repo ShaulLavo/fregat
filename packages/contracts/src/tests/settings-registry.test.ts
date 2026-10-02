@@ -351,34 +351,34 @@ it('keeps executable keymap presets application-scoped and restricted to impleme
   expect(v.safeParse(descriptor.schema, 'vim').success).toBe(false)
 })
 
-describe('window frost', () => {
-  it('is adjacent to transparency and defaults to a rendering-only window percentage', () => {
-    const setting = descriptorFor('window.frost')
-    expect(DEFAULT_SETTING_VALUES['window.frost']).toBe(50)
+describe('window material', () => {
+  it('is adjacent to transparency and defaults to a rendering-only window enum', () => {
+    const setting = descriptorFor('window.material')
+    expect(DEFAULT_SETTING_VALUES['window.material']).toBe('none')
     expect(setting).toMatchObject({
       scope: 'window',
       category: 'Appearance',
-      title: 'Window frost',
-      widget: 'number',
+      title: 'Window material',
+      widget: 'enum',
     })
     expect(setting.requiresRestart).not.toBe(true)
-    expect(SETTING_IDS.indexOf('window.frost')).toBe(SETTING_IDS.indexOf('window.transparency') + 1)
+    expect(SETTING_IDS.indexOf('window.material')).toBe(
+      SETTING_IDS.indexOf('window.transparency') + 1,
+    )
+    expect(isSettingId('window.frost')).toBe(false)
   })
-  it.each([0, 50, 100])('accepts %s', (value) => {
-    expect(v.safeParse(descriptorFor('window.frost').schema, value).success).toBe(true)
+  it.each(['none', 'frosted', 'glass'])('accepts %s', (value) => {
+    expect(v.safeParse(descriptorFor('window.material').schema, value).success).toBe(true)
   })
-  it.each([-1, 101, 12.5, NaN, Infinity, -Infinity, true, false, '50', null])(
-    'rejects %s',
-    (value) => {
-      expect(v.safeParse(descriptorFor('window.frost').schema, value).success).toBe(false)
-    },
-  )
+  it.each([0, 50, 100, true, false, '50', 'invalid', null])('rejects %s', (value) => {
+    expect(v.safeParse(descriptorFor('window.material').schema, value).success).toBe(false)
+  })
 })
 
-it('allows workspace rendering-only frost without changing machine transparency', () => {
+it('allows workspace rendering-only material without changing machine transparency', () => {
   const resolved = resolveSettings([
-    { id: 'workspace', raw: { 'window.frost': 25, 'window.transparency': 'window' } },
+    { id: 'workspace', raw: { 'window.material': 'frosted', 'window.transparency': 'window' } },
   ])
-  expect(resolved.values['window.frost']).toBe(25)
+  expect(resolved.values['window.material']).toBe('frosted')
   expect(resolved.values['window.transparency']).toBe('compositor')
 })

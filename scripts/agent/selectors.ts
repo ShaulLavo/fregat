@@ -739,6 +739,12 @@ export const selectors = {
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsEnum: (page: Page, title: string) =>
     page.getByRole('combobox', { name: title, exact: true }),
+  settingsEnumOption: (page: Page, title: string) =>
+    page.getByRole('option', { name: title, exact: true }),
+  settingsScopeIndicator: (page: Page) =>
+    page
+      .getByRole('tablist', { name: 'Settings scope', exact: true })
+      .locator('[data-slot="tabs-indicator"]'),
   settingsRawConflictBanner: (page: Page) =>
     page.getByText('settings.json changed somewhere else', { exact: true }),
   gitSizeLimitNotice: (page: Page) =>
