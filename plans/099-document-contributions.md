@@ -755,14 +755,20 @@ does not prove that a patch-backed session view uses the correct source coordina
 
 Plan 282 implements the paired command below with frozen historical budgets. Minimap acceptance
 is temporarily excluded pending its separately owned source-correctness fix; the frozen products
-and Platform's runtime composition stay unchanged. Native/disabled fixed-budget quiet negatives
-reject every historical negative key in their archived cold instrument. Fresh split-identity
-controls reject all 72 input and 36 frame keys; the native bounded floor rejects at 25 ms.
-Complete Shiki quiet and native same-core loaded acceptance preserve every exact historical
-negative key. Remaining loaded agreement and actual default/full wall times are in progress.
-Treat paired runs as diagnostic evidence until
-[Plan 282's follow-up validation](../docs/document-contributions/paired-input-latency.md#follow-up-validation) passes.
-Units 2–7 remain gated.
+and Platform's runtime composition stay unchanged. Archived native/disabled/Tree-sitter/Shiki
+quiet and loaded receipts retain their original instrument identities. They earn no credit for
+shared-analysis/capture changes. The retained restricted quiet Platform A/A is 0/10 per selected
+key. After proving removal of superseded minimap capture retention, corrected-identity controls
+reject 72/72 input and 36/36 frame keys and the native historical positive passes. Actual default
+completes without crashing in 855.026 seconds and passes 215/216 blocking keys. Platform
+short-lines/multiple applied undo rejects at +1.000 ms versus 0.800 ms budget; it is unclassified,
+either real #224 large-file undo cost or noise. The coordinator approves shipping this result
+with one open key. Its restricted A/A and A/B follow-up first needs reset replacement-generation
+accounting; the attempted cohort publishes no valid comparisons. Full historical agreement is
+not claimed. Expanded historical/loaded
+agreement and full timing are explicit follow-ups outside #247's bounded finish line. See
+[the current acceptance record](../docs/document-contributions/paired-input-latency.md#minimap-proof-retention-correction).
+Units 2–7 still require their separate implementation authorization.
 
 Use the existing [input latency instrument](../editor/docs/performance/input-latency.md) and
 its supported-tier ordinary-code, 500,000-short-line, and one-megabyte-line fixtures. Preserve the
@@ -773,8 +779,9 @@ Platform configuration, and supported multiple-consumer combinations. Include co
 typing bursts, large paste, sparse multi-cursor edits, undo/redo, replacement, prepared adoption,
 worker restart, delayed consumers, and long retention/disposal runs.
 
-1. Run `bun run bench:input:paired --baseline <packages> --candidate <packages>`. The default
-   matrix includes Platform's composition and affected configurations. Use `--full` for releases.
+1. Run `bun run bench:input:paired --baseline <packages> --candidate <packages>`. Quiet default
+   is Platform+native; loaded default is native+disabled. Package hashes do not expand either
+   scope. Declare attribution configurations explicitly or use `--full` for all ten.
 2. Keep the instrument and external dependencies fixed. The command records randomized,
    interleaved pairs on two warm package pages. Text, cursor, history and hidden-view state reset
    between bursts; fixture buffers attach to retained Editors and consumer owners. Setup/reset
@@ -1024,9 +1031,18 @@ changes what views and the language client receive, which is a unit 2 question.
 
 ### Declared loaded input gate
 
-The paired gate records `--loaded` when the caller supplies CPU contention. Loaded standalone
-Tree-sitter is full-matrix coverage, with every blocking margin `max(frozen, 5 ms)` and frozen/applied
-provenance per key. Quiet Tree-sitter keeps its fine margins; all other configurations keep their
-frozen margins under load. Every exact historical 20 ms negative remains required. Plan 282 owns
-the 61-key floor inventory and current-identity validation. Units 2–7 remain gated while that
-validation and actual matrix wall times are incomplete.
+The paired gate records `--loaded` when the caller supplies CPU contention. The five worker-backed
+Tree-sitter configurations (`tree-sitter`, `tree-sitter-shiki`, `tree-sitter-minimap`, `all`, `platform`)
+retain all 540 blocking keys with margin `max(frozen, 5 ms)` and frozen/applied provenance per key.
+This raises 309 margins. Quiet and advisory margins and the other loaded configurations remain
+frozen. Loaded default is native+disabled; full and focused selection cover the omitted compositions.
+Every exact historical 20 ms negative remains required for their follow-up re-proofs.
+
+The 2026-10-02 shared-analysis harness matches live document ownership: one analysis per buffer,
+independent view sessions. Fresh controls pass and restricted quiet Platform A/A is 0/10 per
+selected key. Plan 282's bounded PR finish line is these controls, that A/A and an actual passing
+quiet default within fifteen minutes. Final-identity loaded Tree/compositions/Platform re-proofs,
+remaining expanded historical agreement and the full-matrix wall time are explicit follow-ups
+outside that finish line. Earlier receipts retain their original identities and earn no final
+shared-analysis credit. Units 2–7 remain gated by their separate implementation authorization;
+shipping the benchmark does not authorize their production changes.

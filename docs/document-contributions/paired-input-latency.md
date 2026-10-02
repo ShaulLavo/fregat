@@ -1,6 +1,6 @@
 # Paired native input latency
 
-Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses historical budgets with a declared 5 ms loaded Tree-sitter blocking floor and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Validation and complete-matrix timing are in progress; those units remain gated and still require owner authorization. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
+Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses historical budgets with a declared 5 ms loaded Tree-sitter blocking floor and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Corrected-identity controls pass; actual default completes in 855.026 seconds and passes 215/216 blocking keys. The one Platform applied-undo rejection remains unclassified: either a real #224 large-file undo cost or noise. The coordinator approves shipping this result with that open key and follow-ups recorded; the runner's failing verdict stays unchanged. Full timing and expanded loaded proofs remain follow-ups. Units 2–7 still require their separate implementation authorization. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
 
 ## Run the comparison
 
@@ -556,9 +556,16 @@ The old stopped Platform comparison rejects ordinary/multiple typing applied (+1
 1.700 ms, interval [1.300, 2.800]), typing dispatch (+1.950 vs 1.700, same interval), and undo
 dispatch (+1.300 vs 1.200, interval [0.100, 1.700]). There is no blocking composition rejection.
 Exact raw paired differences are in `../composition-floor/declared-native-platform-rejections.json`.
-After fresh controls pass, ten restricted quiet Platform A/A runs will check these three keys.
-The cohort is capped at about thirty minutes and reduced to five runs if its measured cost
-requires that cut. Any rejection goes to the coordinator before default acceptance or changes.
+After fresh controls pass, ten restricted quiet Platform A/A runs check these three keys.
+The completed cohort has zero rejects out of ten for each requested key and zero across all six
+collected blocking keys. Actual cohort wall is 209.683 seconds, well within its thirty-minute cap;
+no reduction to five is needed. Each complete raw comparison is independently recomputed.
+Its diagnostic measurement is `7e0e60ea235e0017108a63698c48b05d073c197aebefd442214fb7247e1a5245`,
+with the production identity recorded separately. The only scoped changes are group selection
+and receipt coverage; production capture, AB/BA stopping, budgets, statistic and bootstrap remain.
+It is marked acceptance-ineligible and establishes reliability for those selected keys, without
+full-matrix or family-wise guarantees. Evidence is `../shared-analysis/accounted/aa-summary.json`
+and the ten `aa-run-*/paired.json.gz` artifacts.
 
 Shared-analysis query serialization is a separate product finding. Frozen `AnalysisEntry.query`
 waits for `current()` and chains each query onto its `tail`; `StructuralEntry.range` deduplicates
@@ -571,3 +578,171 @@ views each issue exactly one query. The harness's getter/poll/fence paths do not
 queries: `getState` reads snapshot/selections/status, inspect and render checks read receipts,
 source validation replays captured messages, and idle fences send only fence requests. The
 queued range work comes from Editor runtime requests. Plan 282 does not alter that product.
+
+### Shared-analysis controls and approved finish line (2026-10-02)
+
+The pre-compaction shared-analysis measurement is `4cd4f6f3f6903d78dc6ea820ede32cdcc2d3a869ba6e8e12f68d86f89cbaaf61`;
+validation is `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`;
+combined instrument is `521f225056fd5f2881e1b3c9949c93a58de872018fba22901bb1898be003cf30`.
+Evidence is `/work/tmp/plan-282/run-20261001T153544Z-sol/shared-analysis/accounted/`.
+The failed stale-count collection under the preceding shared-analysis identity earns no credit.
+
+| Final-identity receipt                 | Verdict                       | Actual seconds |
+| -------------------------------------- | ----------------------------- | -------------: |
+| Input-stage 20 ms control              | 72/72 synchronous keys reject |        172.783 |
+| Frame-stage 20 ms control              | 36/36 frame keys reject       |        168.970 |
+| Named native frame at 25 ms            | Rejects; 30 ms skipped        |        183.204 |
+| One-off collection                     | Raw schema-4 cache verified   |        524.956 |
+| Native unchanged configuration         | 108/108 blocking keys pass    |         76.939 |
+| First native CLI with fresh controls   | Pass                          |        608.682 |
+| Ten restricted quiet Platform A/A runs | 0/10 per selected key         |        209.683 |
+
+The named 25 ms frame comparison measures median 113.350 ms, interval [87.700, 163.700], against
+its unchanged `15.200000002980232` ms budget. Callback batching and phase remain variable;
+this is sensitivity evidence, without a monotonic pause-to-p95 guarantee. Native's unchanged
+historical candidate stops 32 groups at two pairs and finishes four pairs in four groups. The
+actual first CLI measures through child exit; its inner runner is 608.386 seconds. Both controls,
+the floor proof and raw native comparison are independently recomputed. The cache, controls
+summary and `validation-quiet-native-positive.json` retain full receipts. Affinity is unpinned,
+and these quiet runs start no CPU-load workers. Stress contracts pass 347 tests across twenty files;
+stress TypeScript, commit formatting/lint, repository gates and typechecks pass.
+
+The coordinator's bounded finish line requires these fresh controls, zero restricted quiet A/A
+rejects and an actual passing Platform+native default within 900 seconds. Then collection stops,
+#247 becomes ready and the coordinator arranges independent review. A rejection or overrun is
+reported with one smallest proposed fix before another proof round. The first actual default exits after 549.473 seconds with Chromium `page.evaluate: Target crashed`
+during cleanup after short-lines/multiple composition commit. No outer matrix artifact or aggregate
+verdict is published. This failed attempt establishes neither a passing default nor a fifteen-minute
+timing result. The following retention proof and authorized rerun supersede that attempt.
+
+Outside this PR's finish line: final-identity loaded Tree-sitter, Tree compositions and loaded
+Platform positive/real-negative re-proofs; remaining expanded historical agreement; and actual
+full-matrix timing against 2,700 seconds. These are explicit Plan 282 follow-ups, unconfirmed
+under the final identity. Archived quiet/loaded receipts retain their original identities and
+earn no shared-analysis acceptance credit. The loaded 5 ms floor, all 540 blocking keys and the
+standalone minimap exclusion remain unchanged. Plan 099 units 2–7 still need implementation
+authorization. No further loaded or full runs are launched for this finish line.
+
+### Minimap proof retention correction
+
+The default's renderer PID 1734023 receives SIGTRAP at 02:25:36Z; its core is recorded by
+02:25:56Z. The stripped `coredumpctl info` stack gives offsets on ThreadPoolForeg, without a
+heap-limit or CHECK message. Browser stderr was not captured. The interval's journal has no
+kernel OOM kill; the enclosing job reports 9G memory peak and 1.8G swap peak. These observations
+do not establish the renderer's fatal cause. Receipts are `default-coredump-info.txt`,
+`default-runtime-journal.txt`, `default-warm.log` and `validation-matrices-default.json` under
+`../shared-analysis/accounted/`.
+
+The concrete harness memory problem is captured-data layout: minimap proof logs retain every
+full source across fixture replacements, until worker termination. The released analysis/buffer
+list contains WeakRefs; disposing prior analysis clears its structural/highlighter entries. The
+minimap protocol has no `disposeDocument`: retained workers receive authoritative `openDocument`
+or `replaceDocument`, and their disposal already clears logs. The approved minimal correction
+keeps the latest full document and all subsequent patches, releasing its superseded prefix.
+Render freshness now uses monotonic `sourceUpdates` on capture and predicate; log compaction
+cannot make an older accepted render current. No product, budget, sampling or heap flag changes.
+
+A real Chromium diagnostic runs nine multiple-view minimap subject swaps on the unchanged
+prerequisite candidate. Both arms use the production `waitForConsumerSource` fence and forced
+GC/CDP heap reads after each subject. Current source and accepted render pass on every swap.
+
+| Same fixture, repeated cycle | Before retained heap (MiB) | After retained heap (MiB) |
+| ---------------------------- | -------------------------: | ------------------------: |
+| Short-lines, first           |                    121.992 |                   122.447 |
+| Short-lines, second          |                    186.628 |                   122.768 |
+| Short-lines, third           |                    250.516 |                   122.685 |
+| Long-line, first             |                     70.024 |                     6.150 |
+| Long-line, second            |                    134.244 |                     6.437 |
+| Long-line, third             |                    198.263 |                     6.582 |
+
+Captured full line summaries after short-lines grow 1,500,603 → 3,001,206 → 4,501,809 before;
+after they stay at exactly 1,500,000, three current 500,000-line documents. Each minimap keeps
+one full snapshot after compaction. Both final cleanups track 21 lifetime owners and retain zero,
+with zero live workers and closed contexts; final heap is about 5.11 MiB. This proves removal of
+cumulative capture retention, without independently proving that it caused the SIGTRAP. Evidence
+is `../shared-analysis/accounted/heap-proof/before.json` and `after.json`. An initial post-fix
+diagnostic omitted the production source-current fence and observed a late-source window;
+that failed probe and the initial before arm are preserved separately. The equal-fence comparison
+is the accepted heap proof. Eight focused proof tests, 349 full stress tests, stress TypeScript,
+lint, commit gates and repository typechecks pass. One inherited spread lint warning remains.
+
+Source checkpoint `b59abf6b1e42b81e7f1c4ec595eadbc1d42e8ef0` is committed and pushed.
+New measurement is `523635b39d32d14c2a539404a834a5164dab1c63fd5f686e6ab5fd68e59a8eb2`;
+validation is `4e7e4d4a62ab85c561c5d0760ed3d367127ae2d2f7e637765cc39463d4411482`;
+combined instrument is `380423a053c280713dc5cf2bef9a8edd685e1e16b10c6d74acc0d4ee8b7e36ea`.
+Fresh controls and the one authorized actual default rerun write to
+`/work/tmp/plan-282/run-20261001T153544Z-sol/shared-analysis/minimap-compacted/`.
+The coordinator retains the completed restricted A/A as directed, with its original `4cd4f6f3…`
+production identity and diagnostic stamp; it is not presented as a newly collected A/A. No extra
+A/A, loaded or full matrix runs are authorized. Fresh controls and the native quiet positive
+complete under the corrected identity:
+
+| Receipt                                    | Actual collection wall (seconds) | Result                                      |
+| ------------------------------------------ | -------------------------------: | ------------------------------------------- |
+| Injected input 20 ms                       |                          170.879 | Rejects all 72 synchronous blocking keys    |
+| Injected frame 20 ms                       |                          167.764 | Rejects all 36 frame blocking keys          |
+| Named native frame 25 ms                   |                          182.193 | Rejects the named key; 30 ms is unnecessary |
+| Native quiet historical positive           |                           70.626 | Passes all 108 blocking keys                |
+| First native CLI, including fresh controls |                          598.565 | Exits 0, independently validated            |
+
+The named ordinary/multiple/repeat frame difference is +89.000 ms against its unchanged
+15.200 ms budget, nominal 95% interval [40.400, 113.700]. The three control collections total
+520.837 seconds. Native stops 35 groups at two pairs and one at four; advisory timing does
+not affect stopping. Cache identity and raw comparisons are independently recomputed by the
+validation driver.
+
+The single actual public default completes without a renderer crash in **855.026 seconds**
+(14 minutes 15 seconds), below the 900-second target. Its complete matrix is exactly
+`platform,native`; inner reported wall is 854.668 seconds. **Acceptance fails**: Platform passes
+107/108 blocking keys in 776.693 seconds; native passes 108/108 in 71.643 seconds. Platform stops
+31 groups at two pairs and five at four; native stops 34 at two and two at four. CLI exit 1 is the
+published blocking verdict, not a missing-artifact or renderer failure.
+
+The only reject is Platform `short-lines/multiple/undo/inputToApplied`: median candidate −
+baseline p95 difference **+1.000 ms** versus unchanged **0.800000011920929 ms** budget; nominal
+95% interval **[0.20000000298023224, 2.0999999940395355]**. Four paired differences are
+`[0.9000000059604645, 0.20000000298023224, 2.0999999940395355, 1.0999999940395355]`.
+Baseline p95s are `[2.100, 1.600, 1.700, 1.600]` ms; candidate p95s are
+`[3.000, 1.800, 3.800, 2.700]` ms. This key is outside the retained three-key A/A selection.
+That cohort cannot establish reliability for this newly rejecting key. All complete raw
+comparisons and sensitivity-cache identities independently recompute. Receipts are
+`default-warm.json.gz`, `validation-matrices-default.json` and `default-summary.json` in the
+corrected-identity directory above.
+
+### Final delivery decision and one open undo key
+
+The coordinator approves shipping Plan 282 on 2026-10-02 with this result recorded honestly:
+**855.026 seconds actual default, 215/216 blocking keys pass, one unclassified rejection**.
+The runner's `passed: false`, exit 1 and exact budget remain unchanged. The open key is either
+a real #224 undo cost on large files or noise; current evidence cannot distinguish them. Full
+agreement with historical verdicts is not established.
+
+Evidence for the open key:
+
+- This quiet Platform run: multiple-view short-lines applied undo +1.000 ms versus 0.800 ms,
+  four positive paired differences and a positive nominal interval.
+- The earlier archived loaded Tree-sitter run: single-view short-lines applied undo +0.95 ms
+  versus 0.70 ms, interval [0.40, 1.40], and dispatch +0.90 ms versus 0.60 ms, interval
+  [0.30, 1.50]. Its 1,062.096-second receipt is recorded in the loaded-floor section. Different
+  load, view and measurement identity make this supporting evidence, without a causal claim.
+- Retained quiet Platform A/A: 0/10 rejects on each selected ordinary/multiple key. The clean
+  cohort excludes this short-lines key and cannot classify it. #224 changed `editChain` and
+  `documentSession`; this does not independently attribute the observed cost to either change.
+
+The authorized restricted alternating A/A and A/B undo cohort stops after **195.706 seconds**
+before publishing its first valid A/A artifact. Primary failure is the scoped diagnostic
+validator's `Incomparable selected retained objects`; the missing-artifact ENOENT is secondary.
+The reused ordinary-only count accounts for subject buffers/analyses and Editors, while the
+pending-minimap short-lines undo reset can replace its document and add buffer/analysis lifetime
+owners. Ten bursts finish, but no validated A/A or A/B comparison exists: rejects/10 and A/B median
+of medians are **unconfirmed**, not zero. Logs and the incomplete receipt are preserved under
+`undo-cohort/` in the corrected-identity directory. No repair or rerun is performed, as directed.
+
+Follow-up: count reset replacement generations in the scoped diagnostic, retaining strict
+source/render, zero-retained-object, worker and context checks; then run the restricted A/A and
+A/B cohort on this key with unchanged production statistic, budgets and stopping. A/A uses the
+same prerequisite candidate, A/B the original frozen prerequisite pair. Report rejects per arm,
+A/B median of medians and actual wall. These measurements do not justify changing a budget or
+sampling rule. Loaded Tree, compositions, loaded Platform and full-matrix wall proofs remain
+explicit follow-ups. Collection stops; #247 is handed ready to the coordinator for independent
+review, without merging.

@@ -301,11 +301,19 @@ Use the complete input suite below for budget comparisons.
 
 ## Input latency budgets
 
-The paired command uses frozen historical group budgets. Plan 282's follow-up validation and
-complete-matrix timing are in progress. Minimap acceptance is temporarily excluded pending its
-separately owned undo source-correctness fix.
-Use it for diagnostics while the [acceptance record](../../../docs/document-contributions/paired-input-latency.md#follow-up-validation)
-remains incomplete. Plan 099 units 2–7 remain gated.
+The paired command uses frozen historical group budgets. The coordinator approves shipping
+Plan 282 with its actual 855.026-second default and 215/216 blocking keys passing. The one
+Platform short-lines/multiple applied-undo rejection (+1.000 ms versus 0.800 ms budget) is
+unclassified: a real #224 large-file undo cost or noise. The runner keeps its failing verdict.
+The retained ten-run A/A has zero selected ordinary/multiple rejects; it does not cover this key.
+Corrected-identity controls reject all 72 input and 36 frame keys; the native positive passes.
+Follow-up is a restricted alternating A/A and A/B undo cohort after its scoped cleanup counts
+reset replacement generations. The first attempted cohort produces no valid comparisons.
+Full historical agreement is not claimed. Expanded final-identity loaded/historical proofs
+and full-matrix timing are explicit follow-ups. Minimap acceptance remains temporarily excluded
+pending its separately owned undo source-correctness fix. See the
+[acceptance record](../../../docs/document-contributions/paired-input-latency.md#minimap-proof-retention-correction).
+Plan 099 units 2–7 retain their implementation authorization gate.
 
 Compare complete frozen package sets with one command from the Platform or Editor root:
 
@@ -444,3 +452,14 @@ owner shared by its independent view sessions. Replacing a buffer replaces and d
 analysis after view attachment; final cleanup disposes views, analysis and consumer owners.
 This ownership correction changes measurement identity. Earlier three-analysis-owner controls
 and loaded Tree-sitter receipts stay archived; final acceptance requires fresh evidence.
+Strict lifetime accounting includes analysis: three bootstrap/single objects, five isolated
+multiple-view objects, and at least fifteen across six retained subjects. Zero retained bootstrap
+objects, listener limits, workers and context closure remain required.
+
+Minimap proof capture releases the superseded prefix on authoritative `openDocument` or
+`replaceDocument`, retaining the latest full source and all subsequent patches. Accepted-render
+freshness uses monotonic `sourceUpdates`, independent of compacted log length. Nine-subject heap
+proof keeps repeated short-lines heaps near 122.7 MiB, where the old capture climbed from 122.0
+to 250.5 MiB. This is a measurement-capture correction; frozen products, sampling and budgets
+stay unchanged. Its new measurement identity requires fresh controls before the single default
+rerun; the approved earlier A/A stays stamped with its original identity.

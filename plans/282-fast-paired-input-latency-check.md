@@ -2,7 +2,10 @@
 
 ## Status and authorization
 
-- Status: Approved; acceptance blocked. Authorized 2026-10-01 by the owner, who asked for a faster instrument with the same
+- Status: Approved; implementation ready for independent review with one unclassified undo key.
+  Actual default takes 855.026 seconds and passes 215/216 blocking keys; its failing verdict remains.
+  The coordinator approves shipping this result and its explicit follow-ups on 2026-10-02.
+  Authorized 2026-10-01 by the owner, who asked for a faster instrument with the same
   results after Plan 099 unit 0's calibration ran all night.
 - Replaces the absolute-threshold calibration as the input-latency gate for Plan 099 units 2–7
   (still gated) and any other change that can slow typing.
@@ -430,11 +433,12 @@ Status: Approved. This supersedes prior default inference and the three-analysis
       both frozen sides through the browser diagnostic in `../shared-analysis/`. Three views share
       one Tree session; Shiki retains three sessions. Both disposals leave zero runtime sessions and
       zero live workers; both contexts close. Diagnostic timings are not acceptance evidence.
-- [ ] Recompute measurement identity and collect fresh controls once. Prior controls and loaded
+- [x] Recompute measurement identity and collect fresh controls once. Prior controls and loaded
       Tree evidence remain archived, with no final-identity acceptance credit.
-- [ ] Measure actual default CLI and re-prove required quiet/loaded positive and real 20 ms
-      historical negatives under the new identity; report actual loaded Tree cost.
-- [ ] Reconcile current evidence, commit by path, push draft #247 and update its body. Do not merge.
+- [x] Measure actual default CLI under the final identity: 855.026 seconds, 215/216 blocking
+      keys pass, one unclassified short-lines undo rejection. Expanded quiet/loaded historical
+      agreement and actual loaded Tree cost move to the explicit follow-ups below.
+- [ ] Reconcile current evidence, commit by path, push #247 and update its body. Do not merge.
 
 The separate Editor finding remains out of scope: on the 500,000-line fixture injection discovery
 costs 920–1,025 ms per observed edit/parse after a 24-character burst, versus root parse 106–118 ms.
@@ -450,8 +454,91 @@ updated parsed-document layers and runs injection query matches across the docum
       minimum fifteen. Keep zero retained bootstrap objects and listener/worker/context checks.
 - [x] Audit readiness polling: getters/inspect/source replay/fences issue no range queries.
       Shared frozen analysis serializes distinct runtime-generated range queries on its tail.
-- [ ] Collect fresh controls after the accounting correction. Then run ten restricted quiet
-      Platform A/A comparisons on ordinary/multiple typing applied/dispatch and undo dispatch.
-      Cap at thirty minutes; reduce to five only if measured cost requires it. Any reject is reported
-      before changes or default acceptance. Old Platform rejected these keys by 0.200, 0.250 and
-      0.100 ms over their frozen margins; exact intervals are in the evidence document.
+- [x] Collect fresh controls after the accounting correction: input 20 ms rejects 72/72 keys,
+      frame 20 ms rejects 36/36, and the named frame key rejects 25 ms; 30 ms is skipped.
+      Total collection is 524.956 seconds. Native positive passes 108/108 in 76.939 configuration
+      seconds; first CLI including controls is 608.682 seconds. All 347 stress tests pass.
+- [x] Run ten restricted quiet Platform A/A comparisons on ordinary/multiple typing applied/dispatch
+      and undo dispatch. Each requested key is 0/10, with zero rejects across all six collected
+      blocking keys. Actual cohort wall is 209.683 seconds; no reduction to five is needed.
+      Raw comparisons are independently recomputed. The scoped diagnostic earns no full acceptance
+      credit. Old Platform rejected these keys by 0.200, 0.250 and 0.100 ms over their frozen margins.
+
+### Approved bounded finish line
+
+The coordinator cut scope on 2026-10-02: finish fresh controls, the restricted quiet Platform A/A,
+and the actual quiet default. If A/A has zero rejects and the default passes within 900 seconds,
+stop collecting, commit evidence, mark #247 ready and hand it to the coordinator for independent
+review. Any rejection or timing overrun is reported with one smallest proposed fix; another proof
+round needs authorization. This supersedes prior instructions to collect loaded/full matrices now.
+Plan 099 units 2–7 retain their separate implementation authorization gate.
+
+The pre-compaction shared-analysis measurement is `4cd4f6f3f6903d78dc6ea820ede32cdcc2d3a869ba6e8e12f68d86f89cbaaf61`;
+validation is `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`.
+Current evidence is `/work/tmp/plan-282/run-20261001T153544Z-sol/shared-analysis/accounted/`.
+Fresh native controls and the native historical positive pass; expanded historical agreement
+under this final identity remains unconfirmed. Earlier three-analysis-owner receipts stay archived.
+
+Explicit follow-ups outside #247's bounded finish line, with no further collection in this run:
+
+- [ ] Re-prove loaded Tree-sitter positive and both real 20 ms historical negative stages under
+      the final shared-analysis identity; retain same-core worker evidence and report its actual cost.
+- [ ] Re-prove Tree-sitter compositions and loaded Platform under the final identity, including
+      stage sensitivity. All 540 blocking keys and the approved 5 ms loaded floor remain required.
+- [ ] Reconcile remaining quiet/loaded historical configuration agreement under the final identity;
+      old receipts earn no new-identity credit. Standalone minimap acceptance still awaits correctness.
+- [ ] Measure the actual ten-configuration full CLI against 2,700 seconds; that target is unconfirmed.
+- [ ] Investigate Editor injection discovery and shared range-query serialization separately,
+      preserving frozen products for this benchmark.
+
+### Authoritative minimap proof reset and single rerun
+
+- [x] Preserve failed actual default: child CLI exits 1 after 549.473 seconds with renderer
+      SIGTRAP/`Target crashed`; no complete matrix artifact, verdict or passing timing result exists.
+      The core stack is stripped and Chromium fatal stderr was not captured. No kernel OOM kill
+      is recorded. Journal peak is 9G memory plus 1.8G swap; renderer cause remains unconfirmed.
+- [x] Find concrete capture retention: minimap logs keep superseded full sources until worker
+      termination. Retained fixture swaps use `replaceDocument`; this protocol has no `disposeDocument`.
+- [x] Apply the approved protocol-correct reset at authoritative open/replacement, keeping that
+      full document and subsequent patches. Freshness keys on monotonic `sourceUpdates` in both
+      capture and output predicate, so compacted length cannot validate a stale render.
+- [x] Prove heap before/after over nine real multiple-view subject swaps, using the production
+      current-source fence and CDP reads after GC. Short-lines heap grows 121.992 → 186.628 →
+      250.516 MiB before and stays 122.447 → 122.768 → 122.685 MiB after. Every source/render check
+      passes; both cleanups retain zero owners/workers and close contexts. This is a harness memory
+      proof, without establishing the SIGTRAP's fatal cause. No larger heap flag is added.
+- [x] Pass eight focused proof tests, 349 full stress tests, stress typecheck/lint, commit gates
+      and repository typechecks; commit/push source checkpoint `b59abf6b1e42b81e7f1c4ec595eadbc1d42e8ef0`.
+- [x] Collect fresh controls once under measurement `523635b39d32d14c2a539404a834a5164dab1c63fd5f686e6ab5fd68e59a8eb2`
+      and validation `4e7e4d4a62ab85c561c5d0760ed3d367127ae2d2f7e637765cc39463d4411482`.
+      Input20 rejects 72/72 in 170.879 seconds; frame20 rejects 36/36 in 167.764 seconds.
+      Named frame25 rejects at +89.000 ms versus 15.200 ms, interval [40.400, 113.700],
+      in 182.193 seconds. No frame30 run is needed. Native positive passes all 108 blocking
+      keys in 70.626 seconds; actual first CLI including controls is 598.565 seconds.
+      Independent driver recomputation passes; 35 groups stop at two pairs and one at four.
+- [x] Complete the single authorized actual default rerun: 855.026 seconds actual CLI, below
+      900 seconds, without a renderer crash. Platform passes 107/108 blocking keys in 776.693
+      seconds; native passes 108/108 in 71.643 seconds. The complete matrix is exactly platform,native.
+      Applied undo for short-lines/multiple rejects at +1.000 ms versus unchanged 0.8000000119 ms,
+      interval [0.2000000030, 2.0999999940]; four paired differences are all positive. Independent
+      comparison/cache recomputation passes. CLI exit 1 is the published rejection, preserved.
+- [x] Stop the authorized undo cohort after its scoped cleanup contract fails, at 195.706 seconds.
+      No valid first A/A artifact or A/B run exists; rejects/10 and median of medians are unconfirmed.
+      No repair or rerun is performed under the coordinator's final scope decision.
+- [ ] Follow-up: count reset replacement generations in scoped diagnostic cleanup, preserving
+      source/render, zero-retained-object, worker and context checks; then run restricted alternating
+      quiet A/A and A/B for short-lines/multiple/undo/inputToApplied with unchanged production statistic.
+- [x] Commit final evidence/follow-ups and push by path; hand #247 ready for independent review.
+      Do not merge.
+
+Final coordinator decision: ship 282 with 855.026-second default and 215/216 passing keys. The
+one rejection is unclassified: either a real #224 large-file undo cost or noise. Supporting
+receipts are this run, the earlier loaded Tree-sitter short-lines/single undo rejects (+0.95 ms
+applied and +0.90 ms dispatch), and the retained 0/10 ordinary/multiple A/A keys. Those A/A keys
+do not cover short-lines undo. Full historical agreement is not claimed; the one key and expanded
+loaded/full proofs remain explicit follow-ups. Keep `passed: false`, exit 1 and every budget.
+
+Heap evidence is `../shared-analysis/accounted/heap-proof/`; fresh controls/default rerun are under
+`../shared-analysis/minimap-compacted/`. The coordinator retains the completed restricted A/A
+under its original pre-compaction production identity, with no A/A rerun. Loaded/full proofs stay
+outside this run. A rejection, overrun or another crash is reported before any further proof round.
