@@ -7,6 +7,8 @@ import { checkoutRoot } from './paths'
 
 const cases = [
   { mode: 'healthy', code: 0, consoleCapture: true },
+  { mode: 'nested-address', code: 0, consoleCapture: true },
+  { mode: 'nested-root-address', code: 0, consoleCapture: true },
   { mode: 'delayed-startup', code: 0, consoleCapture: true },
   { mode: 'delayed-startup-error', code: 1, consoleCapture: true },
   { mode: 'startup-busy', code: 1, consoleCapture: true },
@@ -72,12 +74,16 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
       response.writeHead(204).end()
       return
     }
-    if (request.url === '/release') {
+    if (request.url === '/release' || request.url === '/platform/release') {
       releaseRequests += 1
       response.writeHead(fixture.mode === 'release503' ? 503 : 200, {
         'content-type': 'application/json',
       })
       response.end('{}')
+      return
+    }
+    if (request.url?.includes('/release')) {
+      response.writeHead(404).end()
       return
     }
     if (request.url === '/required.js' && fixture.mode === 'aborted-script') {
@@ -128,7 +134,11 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const address = server.address()
     if (!address || typeof address === 'string') expect.fail('Expected a private HTTP port')
-    const url = `http://127.0.0.1:${address.port}/`
+    const base = `http://127.0.0.1:${address.port}`
+    let url = `${base}/`
+    if (fixture.mode === 'nested-address')
+      url = `${base}/platform/~fixture/workbench/f/file.ts?tabs=@`
+    if (fixture.mode === 'nested-root-address') url = `${base}/~fixture/workbench/f/file.ts?tabs=@`
     const child = Bun.spawn(
       [
         'bun',

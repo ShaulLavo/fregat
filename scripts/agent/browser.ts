@@ -804,7 +804,8 @@ function apiBase(url: string) {
   if (parsed.port === '5173' || parsed.port === (process.env.WEB_PORT ?? '5173')) {
     return `http://localhost:${process.env.PORT ?? '3001'}/`
   }
-  return `${parsed.origin}${parsed.pathname.replace(/\/[^/]*$/, '/')}`
+  const pathname = parsed.pathname.replace(/\/~.*$/, '/')
+  return `${parsed.origin}${pathname.replace(/\/[^/]*$/, '/')}`
 }
 
 async function appendLogs(evidence: Evidence, server: IsolatedServer | undefined) {
