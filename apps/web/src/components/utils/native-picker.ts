@@ -101,7 +101,7 @@ export function notifyPickerCapabilitiesResult(queryClient: QueryClient, error: 
   toastError(
     'Could not check file chooser availability',
     {
-      description: clientErrorDescription(failure),
+      description: [failure.why, clientErrorDescription(failure)].filter(Boolean).join(' '),
     },
     failure,
   )

@@ -1144,6 +1144,7 @@ export {
 } from './agent-review'
 
 export { hostResourcesSchema, type HostResources } from './host-resources'
+export { absolutePathSchema } from './absolute-path'
 export {
   SERVER_IDENTITY_PROTOCOL_VERSION,
   machineIdSchema,

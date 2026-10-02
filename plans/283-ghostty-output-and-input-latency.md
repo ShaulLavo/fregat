@@ -3,13 +3,43 @@
 ## Status and authorization
 
 - Status: APPROVED 2026-10-01 by the owner after the comparison benchmark (PR #235): "it's probably a sign we're doing something too much."
-- Gate and evidence: `ghostty-webgpu/docs/benchmarks.md` (PR #235) and `bun run bench:compare` from Plan 281, run on the owner's MacBook (Apple M1,
-  headed Chromium, hardware GPU) over mesh host `mac`, on AC power only.
+- Gate and evidence: `bun run bench:compare` from Plan 281 on omarchy (i7-14700K, RTX 3060 Ti,
+  headless Chromium on Vulkan with a hardware WebGPU adapter), comparing native and xterm in the same session. The
+  owner's Mac is in daily use and is not part of the loop; an M1 run is optional, only when the owner offers the time.
+- Original evidence: `ghostty-webgpu/docs/benchmarks.md` (PR #235, Apple M1).
+
+## Progress
+
+- [x] Phase 1 attribution: `ghostty-webgpu/docs/perf-attribution.md` (#242).
+- [x] Fix 1, reuse WASM memory views (#245).
+- [x] Fix 2, packed damaged-row snapshot plus direct-packed DOM frame text (#255).
+- [ ] Benchmark repair on omarchy: hardware WebGPU path on Linux, GPU-idle gate (ComfyUI shares the
+      GPU), latency timed at frame presentation with a few hundred samples, pass rule = paired
+      native/xterm ratio ≤ 1 per repetition.
+- [ ] Fix 3: upload only changed rows of the instance buffer (today 76,800 bytes per terminal per
+      render; GPU-process CPU rose after #255).
+- [ ] Fix 4: streamline instance building (26.8 % ASCII / 15.6 % SGR of main-thread time; SGR grew after #255).
+- [ ] Fix 5: separate recorder overhead from library work in the JS residual (about 10 %).
+- [ ] Full omarchy run of every measure; regenerate `docs/benchmarks.md`; unblock Plan 285's measurements section.
+
+## Why the M1 targets changed
+
+The Apple M1 numbers below are history. Two measured defects made them unreliable:
+
+- Latency p95 came from 12 samples, so it was the slowest keystroke: one missed 60 Hz frame
+  (+16.7 ms) decided it, and the native-vs-xterm gap reversed between runs (46.2/32.1 → 28.8/39.8 ms).
+- Latency ended at the first CDP screencast PNG with the glyph. Its capture cadence added about
+  10 ms after a 0.5 ms render, which explains the write-p50 gap and its reversed runs.
+- Absolute CPU drifted between sessions on the same bundle (107.8 % → 70.8 % renderer CPU), so
+  only comparisons inside one session count.
 
 ## Outcome
 
 ghostty-webgpu spends no more CPU than xterm.js WebGL while output streams and answers keystrokes at
 least as fast, without giving up any of its current wins.
+
+Targets are paired ratios measured in one session: native/xterm ≤ 1 for output CPU at 17 terminals,
+input p95 and write p50 at 1 terminal, with no regression on the wins below. The original M1 run:
 
 | Measure (Mac M1, bytes path, corrected run at 6ef17840) | ghostty-webgpu | xterm WebGL | Target        |
 | ------------------------------------------------------- | -------------- | ----------- | ------------- |
@@ -56,8 +86,8 @@ full render-state copies out of wasm, atlas churn, and input-to-render ordering 
 
 ## Phase 2: fix the top causes
 
-One reviewed PR per cause, largest measured share first. Each PR shows before/after on the Mac with
-`bench:compare` (the affected measures, three repetitions, order-alternated) plus a trace that
+One reviewed PR per cause, largest measured share first. Each PR shows before/after on omarchy with
+`bench:compare` (the affected measures, three repetitions, order-alternated, inside a `--quiet` heavy slot with the GPU idle) plus a trace that
 shows the removed work. Stop when every target is met or when the remaining gap is explained and
 the owner decides it is acceptable.
 
@@ -67,13 +97,13 @@ bar); no regressions on the wins listed above; correctness tests and screenshots
 ## How to run it
 
 Phase 1: one Opus or Sol worker, investigation only. Phase 2: one worker per cause, Sol by default,
-each with an independent reviewer. Mac runs only on AC power and only when the owner is not using
-the Mac heavily; keep each measurement window under 30 minutes.
+each with an independent reviewer. Measurements run on omarchy through the heavy-job queue with
+`--quiet` and wait for an idle GPU; keep each window under 10 minutes.
 
 ## Done when
 
 - `docs/perf-attribution.md` explains where output CPU and the input p95 tail go, with traces.
-- The targets in the table are met on the Mac, or the remaining gap is documented and accepted by
+- The paired-ratio targets are met on omarchy, or the remaining gap is documented and accepted by
   the owner.
 - `docs/benchmarks.md` is regenerated from a fresh run, with no lost wins. If ghostty-webgpu now
   beats xterm.js on these measures, raise putting numbers in the main README with the owner.

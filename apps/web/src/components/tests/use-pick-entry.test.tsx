@@ -134,6 +134,10 @@ test.for(['network', 'server', 'schema'] as const)(
       error: { why: expect.any(String), fix: expect.any(String) },
     })
     const failure = view.queryClient.getQueryState(entryPickerQueryKeys.capabilities)?.error
+    const guidance = v.parse(v.object({ why: v.string(), fix: v.string() }), failure)
+    const description = v.parse(v.object({ description: v.string() }), shown).description
+    expect(description).toContain(guidance.why)
+    expect(description).toContain(guidance.fix)
     view.rerender(<PickerFixture open={false} />)
     view.rerender(<PickerFixture />)
     expect(await screen.findByRole('dialog')).toBeTruthy()

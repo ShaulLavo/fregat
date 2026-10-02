@@ -1,7 +1,8 @@
 /**
- * Renders the Fregat icon set, and the site favicon, from `apps/web/public/icons/fregat.svg`, the hand-checked master.
+ * Renders the Fregat icon set from `apps/web/public/icons/fregat.svg`, the hand-checked master.
  * The manifest icons and `fregat.icns` keep its squircle on Apple's 1024 grid; the touch and maskable
  * icons fill the square with the squircle's colour, because iOS and Android apply their own mask.
+ * The browser favicon is the bare mark in the master's colours, with a pale body on dark tabs.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -16,6 +17,9 @@ const master = readFileSync(path.join(dir, 'fregat.svg'), 'utf8')
 
 // Apple's grid draws the squircle 824 wide on a 1024 canvas.
 const GRID_BODY = 824 / 1024
+
+// The slate body disappears on a dark tab strip, so dark tabs draw it pale.
+const DARK_TAB = { body: '#e8eef0' }
 
 // PNG-backed icns entries macOS reads; the @2x types reuse the next size up.
 const ICNS_ENTRIES = [
@@ -35,14 +39,57 @@ const ICNS_ENTRIES = [
 function fullBleed(svg: string, markScale: number) {
   const shape = /<path id="shape" fill="(#[0-9a-f]{6})" d="[^"]*"\/>/.exec(svg)
   if (!shape) throw createScriptError('fregat.svg has no <path id="shape" fill="#rrggbb">')
-  const mark = /<g id="mark"[\s\S]*?<\/g>/.exec(svg)
-  if (!mark) throw createScriptError('fregat.svg has no <g id="mark">')
+  const mark = markOnly(svg)
   return svg
     .replace(shape[0], `<rect width="1024" height="1024" fill="${shape[1]}"/>`)
     .replace(
-      mark[0],
-      `<g transform="translate(512 512) scale(${markScale}) translate(-512 -512)">${mark[0]}</g>`,
+      mark,
+      `<g transform="translate(512 512) scale(${markScale}) translate(-512 -512)">${mark}</g>`,
     )
+}
+
+function markOnly(svg: string) {
+  const mark = /<g id="mark"[\s\S]*?<\/g>/.exec(svg)
+  if (!mark) throw createScriptError('fregat.svg has no <g id="mark">')
+  return mark[0]
+}
+
+// The mark's square bounds in master units, so the favicon spends its 16px on the rocket.
+async function markBounds(mark: string) {
+  const size = 1024
+  const { data, info } = await sharp(
+    Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">${mark}</svg>`),
+  )
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  let [left, top, right, bottom] = [size, size, 0, 0]
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (!data[(y * info.width + x) * info.channels + 3]) continue
+      left = Math.min(left, x)
+      top = Math.min(top, y)
+      right = Math.max(right, x + 1)
+      bottom = Math.max(bottom, y + 1)
+    }
+  }
+  if (right <= left) throw createScriptError('fregat.svg mark renders no pixels')
+  const side = Math.max(right - left, bottom - top) * 1.04
+  const cx = (left + right) / 2
+  const cy = (top + bottom) / 2
+  return [cx - side / 2, cy - side / 2, side, side].map((value) => Math.round(value)).join(' ')
+}
+
+async function favicon(svg: string) {
+  const mark = markOnly(svg)
+  const bodyFill = /id="body" fill="(#[0-9a-f]{6})"/.exec(mark)?.[1]
+  const flameFill = /id="flame" fill="(#[0-9a-f]{6})"/.exec(mark)?.[1]
+  if (!bodyFill || !flameFill)
+    throw createScriptError('fregat.svg mark needs <path id="body"> and <path id="flame"> fills')
+  const style =
+    `#body{fill:${bodyFill}}#flame{fill:${flameFill}}` +
+    `@media (prefers-color-scheme:dark){#body{fill:${DARK_TAB.body}}}`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${await markBounds(mark)}"><style>${style}</style>${mark}</svg>\n`
 }
 
 function render(svg: string, size: number) {
@@ -86,7 +133,9 @@ async function main() {
     ['fregat.icns', icns(pngs)],
   ]
   for (const [name, data] of outputs) write(path.join(dir, name), data)
-  write(path.join(root, 'apps/site/public/favicon.svg'), Buffer.from(master))
+  const tabIcon = Buffer.from(await favicon(master))
+  write(path.join(dir, 'fregat-favicon.svg'), tabIcon)
+  write(path.join(root, 'apps/site/public/favicon.svg'), tabIcon)
 }
 
 await main()
