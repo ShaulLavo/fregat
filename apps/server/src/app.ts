@@ -22,6 +22,8 @@ import {
   terminalRestartInputSchema,
   terminalKillInputSchema,
   type HealthDescriptor,
+  type MachineId,
+  type ServerService,
 } from '@workspace/contracts'
 import { homedir, hostname, tmpdir } from 'node:os'
 import path from 'node:path'
@@ -34,7 +36,12 @@ import { readEnvironmentIdentity } from './db/environment-identity'
 import { fontRoutes } from './fonts/routes'
 import { FontCatalogService } from './fonts/catalog'
 import { errorPayload, FsError, isFsError } from './fs/errors'
-import { fsRoutes } from './fs/routes'
+import { fsRoutes, nativePickerRoutes } from './fs/routes'
+import { NativePicker } from './fs/native-picker'
+import { readMachineId } from './system/machine-id'
+import { defaultNativePickerHelper, hasDesktopSession } from './system/native-helper'
+import { systemRoutes } from './system/routes'
+import { socketPeer, SystemService, type PeerAddress } from './system/service'
 import { FileSystemService, type FileSystemServiceOptions } from './fs/service'
 import { treeWatchSource } from './fs/tree-watch'
 import { gitRoutes } from './git/routes'
@@ -179,6 +186,17 @@ export type AppOptions = FileSystemServiceOptions & {
     /** Test seam: the models.dev price catalog download every price lookup can trigger. */
     priceCatalogFetcher?: (url: string, init?: RequestInit) => Promise<Response>
   }
+  /** This server's public identity and native chooser. Tests set the address and helper. */
+  system?: {
+    readonly address?: string
+    readonly webBase?: string
+    readonly service?: ServerService
+    readonly stateHome?: string
+    readonly machineId?: () => MachineId
+    readonly peer?: PeerAddress
+    readonly nativePickerHelper?: string | null
+    readonly desktop?: () => boolean
+  }
   /** Paired devices: where they are kept, the cookie naming one, and this machine's addresses. */
   devices?: {
     readonly filePath?: string
@@ -186,6 +204,9 @@ export type AppOptions = FileSystemServiceOptions & {
     readonly ownAddresses?: () => ReadonlySet<string>
   }
 }
+
+// The dev API port: a server built without an address answers for that origin.
+const DEFAULT_SYSTEM_ADDRESS = 'http://127.0.0.1:3001'
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
 const appMachines = new WeakMap<object, MachineService>()
@@ -441,6 +462,29 @@ export function createApp(options: AppOptions) {
   })
   const identity = readEnvironmentIdentity(database)
   const serverConfig = orchestrationWsServerConfig(identity)
+  const system = new SystemService({
+    address: options.system?.address ?? options.webOrigin ?? DEFAULT_SYSTEM_ADDRESS,
+    webBase: options.system?.webBase ?? '/',
+    service: options.system?.service ?? { kind: 'unmanaged', registrationId: null },
+    stateHome: options.system?.stateHome ?? platformHomePath(),
+    environmentId: identity.id,
+    machineId: options.system?.machineId ?? readMachineId,
+    peer: options.system?.peer ?? socketPeer,
+    picker: new NativePicker({
+      helper: () =>
+        options.system?.nativePickerHelper === undefined
+          ? defaultNativePickerHelper()
+          : options.system.nativePickerHelper,
+      desktop: options.system?.desktop ?? hasDesktopSession,
+      budget: () => {
+        const values = settings.snapshot().values
+        return {
+          dialogMs: values['window.nativeDialogTimeoutSeconds'] * 1000,
+          stopGraceMs: values['window.nativeHostStopGraceSeconds'] * 1000,
+        }
+      },
+    }),
+  })
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
   const agentReviews = new AgentReviewService({ checkpointDiff, git, providers: providerService })
@@ -596,6 +640,7 @@ export function createApp(options: AppOptions) {
     )
     .use(createMachineProxyRoutes({ auth, resolve: (name) => machines.resolve(name) }))
     .use(observabilityRoutes({ logs: options.logs }))
+    .use(systemRoutes(system))
     .get(
       '/health',
       () =>
@@ -672,6 +717,7 @@ export function createApp(options: AppOptions) {
       }),
     )
     .use(fsRoutes(fs))
+    .use(nativePickerRoutes(system))
     .onStart(() => {
       void providerPrices.refresh()
     })
