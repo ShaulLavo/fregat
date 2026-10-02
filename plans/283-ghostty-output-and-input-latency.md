@@ -27,6 +27,18 @@
 Superseded by the Zig frame: the JS-side fixes for changed-row uploads, instance building and the JS
 residual. The Zig frame writes only changed ranges and removes those JS stages.
 
+## Every renderer gets the same treatment
+
+Owner, 2026-10-02: WebGPU is the main path, but every renderer ghostty-webgpu ships (WebGPU, WebGL,
+canvas 2D, DOM) gets the same tuning and passes the same suites. Shared work such as the Zig frame
+serves all of them. Comparisons are like for like: ghostty WebGL against xterm WebGL, ghostty DOM
+against xterm DOM. xterm has no WebGPU renderer, and xterm 6 dropped its canvas renderer, so
+ghostty WebGPU and canvas 2D are measured against xterm WebGL (and DOM, for canvas 2D) and labelled
+that way.
+
+- [ ] Renderer matrix: benchmark variants for ghostty WebGL, canvas 2D and DOM; paired runs on
+      omarchy; attribution for every pair where ghostty is slower.
+
 ## Phase 2 design: the frame is built in Zig
 
 Approved by the owner 2026-10-02 as a re-architecture of the render pipeline. Ghostty's wasm only
