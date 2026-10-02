@@ -131,6 +131,17 @@ export function createInputConsumers(id: string, fixture: string, length: number
   }
 }
 
+export function inputConsumersForFixture(
+  previous: ReturnType<typeof createInputConsumers> | null,
+  fixture: string,
+  length: number,
+) {
+  if (!previous) return null
+  const configuration = inputConsumerConfiguration(previous.configuration.id, fixture, length)
+  if (JSON.stringify(configuration) === JSON.stringify(previous.configuration)) return previous
+  return createInputConsumers(configuration.id, fixture, length)
+}
+
 type WorkerProof = {
   readonly terminated: boolean
   readonly minimap: boolean

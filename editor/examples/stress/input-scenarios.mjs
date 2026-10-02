@@ -86,30 +86,49 @@ async function runScenarioGroup(session, fixture, views, scenario, result, helpe
 }
 
 export async function runPairedInputSuite(browser, results, helpers, seed) {
-  const schedule = []
   const sessions = {}
+  return withInputSessionCleanup(sessions, results, helpers.readMemory, () =>
+    collectPairedInputSuite(browser, results, helpers, seed, sessions),
+  )
+}
+
+async function collectPairedInputSuite(browser, results, helpers, seed, sessions) {
+  const schedule = []
   const errors = []
+  for (const side of ['baseline', 'candidate']) {
+    const session = await helpers.newPage(browser, side)
+    sessions[side] = session
+    session.page.on('pageerror', (error) => errors.push(error.message))
+    await session.context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await initializeInputSession(session, results[side], helpers.readMemory)
+    session.retainedInput = { beforeMemory: await helpers.readMemory(session.cdp) }
+    results[side].startup = []
+  }
+  for (const views of inputViewModes)
+    await runWarmView(results, helpers, sessions, views, seed, schedule)
+  if (errors.length) fail(`Browser errors: ${errors.join('; ')}`)
+  return schedule
+}
+
+export async function withInputSessionCleanup(sessions, results, readMemory, run) {
+  let value
+  let failure = null
   try {
-    for (const side of ['baseline', 'candidate']) {
-      const session = await helpers.newPage(browser, side)
-      sessions[side] = session
-      session.page.on('pageerror', (error) => errors.push(error.message))
-      await session.context.grantPermissions(['clipboard-read', 'clipboard-write'])
-      await initializeInputSession(session, results[side], helpers.readMemory)
-      session.retainedInput = { beforeMemory: await helpers.readMemory(session.cdp) }
-      results[side].startup = []
-    }
-    for (const views of inputViewModes)
-      await runWarmView(results, helpers, sessions, views, seed, schedule)
-    if (errors.length) fail(`Browser errors: ${errors.join('; ')}`)
-  } finally {
-    for (const [side, session] of Object.entries(sessions)) {
-      results[side].cleanup = await closeInputSession(session, helpers.readMemory)
+    value = await run()
+  } catch (error) {
+    failure = { error }
+  }
+  const cleanup = await Promise.allSettled(
+    Object.entries(sessions).map(async ([side, session]) => {
+      results[side].cleanup = await closeInputSession(session, readMemory)
       if (results[side].bootstrap)
         results[side].bootstrap.cleanup.contextClosed = session.page.isClosed()
-    }
-  }
-  return schedule
+    }),
+  )
+  if (failure) throw failure.error
+  const rejected = cleanup.find((entry) => entry.status === 'rejected')
+  if (rejected) throw rejected.reason
+  return value
 }
 
 async function initializeInputSession(session, result, readMemory) {
@@ -275,8 +294,8 @@ async function openInputSample(session, fixture, views, result, retained) {
 
 async function closeInputSession(session, readMemory) {
   try {
-    if (!session.retainedInput) return null
     await session.page.evaluate(() => __stress.dispose())
+    if (!session.retainedInput) return null
     await session.page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)))
     const afterMemory = await readMemory(session.cdp)
     const cleanup = {
@@ -284,7 +303,7 @@ async function closeInputSession(session, readMemory) {
       beforeListeners: session.retainedInput.beforeMemory.jsEventListeners,
       afterListeners: afterMemory.jsEventListeners,
       scope: 'configuration',
-      ownerIdentity: session.retainedInput.facts.ownerIdentity,
+      ownerIdentity: session.retainedInput.facts?.ownerIdentity ?? null,
       contextClosed: true,
     }
     if (

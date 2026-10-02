@@ -542,3 +542,34 @@ Heap evidence is `../shared-analysis/accounted/heap-proof/`; fresh controls/defa
 `../shared-analysis/minimap-compacted/`. The coordinator retains the completed restricted A/A
 under its original pre-compaction production identity, with no A/A rerun. Loaded/full proofs stay
 outside this run. A rejection, overrun or another crash is reported before any further proof round.
+
+### Independent review repairs
+
+Approved on 2026-10-02 in [the #247 review](https://github.com/ShaulLavo/fregat/pull/247#issuecomment-5945287988).
+This repair pass collects no benchmark or sensitivity controls. The 855.026-second default and
+215/216 result above retain their recorded measurement identity. They do not prove the changed
+instrument. Its expanded execution receipt changes the sensitivity key; first future use must
+regenerate controls automatically. Frozen products, budgets, statistics and archived evidence stay
+unchanged.
+
+- [x] Include installed launcher and bundler execution trees in the instrument receipt. Seed all
+      stress dev dependencies; traverse dependencies, optional native packages and peers. Preserve
+      the frozen-product receipt's existing dependency policy.
+- [x] Build each side from the captured, hashed harness bytes in a private snapshot, including
+      inherited TypeScript configuration. Keep runtime-graph checks against that snapshot.
+- [x] Re-derive retained consumers for each fixture. Replace and dispose consumer owners when
+      analysis or minimap tiers change; retain owners within a tier. Keep the shared analysis and
+      independent view sessions.
+- [x] Dispose every created page after partial setup. Missing owner facts produce a null receipt;
+      secondary cleanup failures cannot mask the collection error or skip another context.
+- [x] Add twelve targeted regressions across execution identity/builds, consumer-tier crossings
+      and partial-setup cleanup. All twelve fail before the fixes and pass after them. Logs are
+      `../shared-analysis/minimap-compacted/review-tests-before.log` and `review-tests-after.log`.
+- [x] Pass 39 targeted and adjacent tests, stress typecheck and lint. The existing
+      `src/input-output.ts` spread warning remains unchanged. Build both real frozen sides from
+      88 captured sources; both runtime graphs have zero escaped modules. These are build-only
+      checks, with no browser session or measured input. Final test and build logs are
+      `review-final-tests.log` and `review-harness-builds.log` beside the before/after logs.
+
+Delivery remains #247, with commit gates and repository typechecks required before its push.
+The repair pass does not merge or rerun benchmark collection.

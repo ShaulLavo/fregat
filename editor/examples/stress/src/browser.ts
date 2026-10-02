@@ -16,7 +16,7 @@ import { typeScript } from '@singapore-editor/tree-sitter-languages'
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/find/style.css'
 import { createInputLatencyProbe } from './inputLatency.ts'
-import { createInputConsumers } from './inputConsumers.ts'
+import { createInputConsumers, inputConsumersForFixture } from './inputConsumers.ts'
 import { readInputOutput } from './input-output.ts'
 import { fixtureFacts, generateFixture, normalizedText, type FixtureId } from './fixtures.ts'
 
@@ -194,17 +194,19 @@ function createInputEditor(index: number, highlight: boolean) {
   return editor
 }
 
-function reloadInputDocument(multiple = current().editors.length === 3) {
+async function reloadInputDocument(multiple = current().editors.length === 3) {
   inputLatency.dispose()
   const previous = current()
+  const consumers = inputConsumersForFixture(previous.consumers, fixture, source.length)
   released.push(new WeakRef(previous.buffer), new WeakRef(previous.analysis))
   const buffer = createEditorTextBuffer(expected)
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
   const editors = [...previous.editors]
   check(editors.length <= (multiple ? 3 : 1), 'Warm view count must grow once')
-  active = { ...previous, buffer, analysis, editors }
+  active = { ...previous, buffer, analysis, editors, consumers }
   for (const editor of editors) {
-    if (!previous.consumers)
+    if (consumers && consumers !== previous.consumers) editor.setPlugins(consumers.plugins)
+    if (!consumers)
       editor.setPlugins(
         fixture === 'ordinary'
           ? [typeScript(), createEditorFindPlugin()]
@@ -213,12 +215,13 @@ function reloadInputDocument(multiple = current().editors.length === 3) {
     editor.attachSession(createEditorBufferSession(buffer), {
       analysis,
       documentId: fixture,
-      languageId: previous.consumers || fixture === 'ordinary' ? 'typescript' : null,
+      languageId: consumers || fixture === 'ordinary' ? 'typescript' : null,
     })
   }
   while (editors.length < (multiple ? 3 : 1))
     editors.push(createInputEditor(editors.length, fixture === 'ordinary'))
   previous.analysis.dispose()
+  if (consumers !== previous.consumers) await previous.consumers?.dispose()
   return resetInput()
 }
 
@@ -232,7 +235,7 @@ async function warmInputSubject(
 ) {
   const retained = active !== null
   const facts = await prepare(id, seed, instrumented, frozen, retained)
-  if (retained) reloadInputDocument(multiple)
+  if (retained) await reloadInputDocument(multiple)
   else open(multiple, id === 'ordinary', consumerId === 'native' ? undefined : consumerId)
   return { ...facts, retained, ownerIdentity: current().ownerIdentity }
 }
