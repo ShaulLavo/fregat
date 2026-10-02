@@ -26,6 +26,7 @@ function fakeRoot() {
 }
 
 const appearance = (overrides: Partial<AppearanceValues> = {}): AppearanceValues => ({
+  'window.frost': DEFAULT_SETTING_VALUES['window.frost'],
   'editor.fontFamily': DEFAULT_SETTING_VALUES['editor.fontFamily'],
   'workbench.colorTheme': DEFAULT_SETTING_VALUES['workbench.colorTheme'],
   'workbench.density': DEFAULT_SETTING_VALUES['workbench.density'],
@@ -50,25 +51,37 @@ describe('resolveColorTheme', () => {
 })
 
 describe('applyAppearance', () => {
-  it('forwards first-paint and live surface opacity after writing CSS', () => {
+  it('forwards first-paint and independent live opacity and frost after writing CSS', () => {
     const { properties, root } = fakeRoot()
-    const received: { opacity: number; css: string | undefined }[] = []
+    const received: { opacity: number; frost: number; css: string | undefined }[] = []
     vi.stubGlobal('window', {
       platformBridge: {
-        setSurfaceOpacity: (opacity: number) =>
-          received.push({ opacity, css: properties.get('--surface-opacity') }),
+        setWindowAppearance: ({ opacity, frost }: { opacity: number; frost: number }) =>
+          received.push({ opacity, frost, css: properties.get('--surface-opacity') }),
       },
     })
     try {
       applyAppearance(appearance({ 'workbench.surface.opacity': 20 }), root, false)
       expect(properties.get('--surface-opacity')).toBe('20%')
-      expect(received).toEqual([{ opacity: 20, css: '20%' }])
+      expect(received).toEqual([{ opacity: 20, frost: 50, css: '20%' }])
 
       applyAppearance(appearance({ 'workbench.surface.opacity': 80 }), root, false)
       expect(properties.get('--surface-opacity')).toBe('80%')
+      applyAppearance(
+        appearance({ 'workbench.surface.opacity': 80, 'window.frost': 0 }),
+        root,
+        false,
+      )
+      applyAppearance(
+        appearance({ 'workbench.surface.opacity': 100, 'window.frost': 100 }),
+        root,
+        false,
+      )
       expect(received).toEqual([
-        { opacity: 20, css: '20%' },
-        { opacity: 80, css: '80%' },
+        { opacity: 20, frost: 50, css: '20%' },
+        { opacity: 80, frost: 50, css: '80%' },
+        { opacity: 80, frost: 0, css: '80%' },
+        { opacity: 100, frost: 100, css: '100%' },
       ])
     } finally {
       vi.unstubAllGlobals()
@@ -175,5 +188,43 @@ describe('applyAppearance', () => {
     expect(properties.get('--tree-guide-opacity')).toBe('1')
     expect(properties.get('--tree-guide-hover-opacity')).toBe('1')
     expect(properties.get('--tree-guide-active-opacity')).toBe('1')
+  })
+})
+
+describe('native desktop blur ownership', () => {
+  it.each([0, 50, 100])('leaves page blur off at frost %s', (frost) => {
+    const { properties, root } = fakeRoot()
+    vi.stubGlobal('window', {
+      platformBridge: {
+        platform: 'darwin',
+        backdrop: 'transparent',
+        setWindowAppearance: () => {},
+      },
+    })
+    try {
+      applyAppearance(
+        appearance({ 'workbench.surface.blur': 24, 'window.frost': frost }),
+        root,
+        false,
+      )
+      expect(properties.get('--surface-blur')).toBe('0px')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+  it.each([
+    undefined,
+    { platform: 'linux', backdrop: 'transparent', setWindowAppearance: () => {} },
+    { platform: 'darwin', backdrop: 'app', setWindowAppearance: () => {} },
+    { platform: 'darwin', backdrop: 'transparent' },
+  ])('keeps the page blur where native appearance is unavailable', (platformBridge) => {
+    const { properties, root } = fakeRoot()
+    vi.stubGlobal('window', { platformBridge })
+    try {
+      applyAppearance(appearance({ 'workbench.surface.blur': 24 }), root, false)
+      expect(properties.get('--surface-blur')).toBe('24px')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

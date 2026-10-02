@@ -63,17 +63,21 @@ export async function launchWebview(options: {
       onEvent: (event) => {
         if (event.event === 'message') options.onMessage?.(event.body)
         if (event.event !== 'message' || !isRecord(event.body) || event.body.token !== token) return
-        if (event.body.method === 'setSurfaceOpacity') {
-          const opacity = event.body.opacity
+        if (event.body.method === 'setWindowAppearance') {
+          const { opacity, frost } = event.body
           if (
             vibrancy &&
             event.body.origin === new URL(options.url).origin &&
             typeof opacity === 'number' &&
             Number.isFinite(opacity) &&
             opacity >= 0 &&
-            opacity <= 100
+            opacity <= 100 &&
+            typeof frost === 'number' &&
+            Number.isFinite(frost) &&
+            frost >= 0 &&
+            frost <= 100
           )
-            host.setSurfaceOpacity(opacity)
+            host.setWindowAppearance({ opacity, frost })
           return
         }
         if (event.body.method === 'drag' && event.body.origin === new URL(options.url).origin) {

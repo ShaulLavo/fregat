@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isSettingAvailable } from '../availability'
+import { isSettingAvailable, type SettingEnvironment } from '../availability'
 
 describe('isSettingAvailable', () => {
   it('hides the window transparency row where there is no window to re-create', () => {
@@ -43,4 +43,44 @@ describe('isSettingAvailable', () => {
       }),
     ).toBe(true)
   })
+})
+
+it('shows frost only in a transparent macOS host with the appearance method', () => {
+  const supported = {
+    backdrop: 'transparent',
+    nativeTransparency: true,
+    platform: 'darwin',
+    windowAppearance: true,
+  } as const
+  expect(isSettingAvailable('window.frost', supported)).toBe(true)
+  const overrides: readonly Partial<SettingEnvironment>[] = [
+    { backdrop: 'app' },
+    { backdrop: 'compositor' },
+    { platform: 'linux' },
+    { platform: 'win32' },
+    { windowAppearance: false },
+  ]
+  for (const override of overrides) {
+    expect(isSettingAvailable('window.frost', { ...supported, ...override })).toBe(false)
+  }
+  expect(
+    isSettingAvailable('window.frost', { backdrop: 'transparent', nativeTransparency: true }),
+  ).toBe(false)
+})
+
+it('hides the page blur row only where native frost owns desktop blur', () => {
+  const supported = {
+    backdrop: 'transparent',
+    nativeTransparency: true,
+    platform: 'darwin',
+    windowAppearance: true,
+  } as const
+  expect(isSettingAvailable('workbench.surface.blur', supported)).toBe(false)
+  expect(isSettingAvailable('workbench.surface.blur', { ...supported, platform: 'linux' })).toBe(
+    true,
+  )
+  expect(
+    isSettingAvailable('workbench.surface.blur', { ...supported, windowAppearance: false }),
+  ).toBe(true)
+  expect(isSettingAvailable('workbench.surface.blur', { ...supported, backdrop: 'app' })).toBe(true)
 })

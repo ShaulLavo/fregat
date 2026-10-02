@@ -1579,6 +1579,16 @@ export const SETTINGS_REGISTRY = {
     requiresRestart: true,
     keywords: ['window', 'transparency', 'vibrancy', 'compositor', 'desktop', 'wallpaper', 'blur'],
   }),
+  'window.frost': defineSetting({
+    schema: percentSchema,
+    default: 50,
+    scope: 'window',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Window frost',
+    description: 'Native macOS desktop blur strength.',
+    details: 'AppKit fixes blur radius.',
+  }),
   'prefetch.enabled': defineSetting({
     schema: v.boolean(),
     default: true,

@@ -6,6 +6,8 @@ export type SettingEnvironment = {
   readonly backdrop: ShellBackdrop
   /** The retained native host can create a transparent window. */
   readonly nativeTransparency: boolean
+  readonly platform?: string
+  readonly windowAppearance?: boolean
 }
 
 /**
@@ -18,6 +20,13 @@ export type SettingEnvironment = {
  * is worse than no row.
  */
 export function isSettingAvailable(id: SettingId, environment: SettingEnvironment): boolean {
+  const nativeFrost =
+    environment.platform === 'darwin' &&
+    environment.backdrop === 'transparent' &&
+    environment.windowAppearance === true
+  if (id === 'window.frost') return nativeFrost
+  if (id === 'workbench.surface.blur') return !nativeFrost
+
   if (id !== 'window.transparency') return true
 
   return environment.nativeTransparency && environment.backdrop !== 'app'

@@ -10,6 +10,7 @@ import {
   settingsValuesSchema,
   type SettingsValues,
 } from '../settings/keys'
+import { resolveSettings } from '../settings/resolve'
 import { defineSetting, registryProblems } from '../settings/registry'
 import {
   keybindingChordSchema,
@@ -348,4 +349,36 @@ it('keeps executable keymap presets application-scoped and restricted to impleme
   expect(v.safeParse(descriptor.schema, 'default').success).toBe(true)
   expect(v.safeParse(descriptor.schema, 'vscode').success).toBe(true)
   expect(v.safeParse(descriptor.schema, 'vim').success).toBe(false)
+})
+
+describe('window frost', () => {
+  it('is adjacent to transparency and defaults to a rendering-only window percentage', () => {
+    const setting = descriptorFor('window.frost')
+    expect(DEFAULT_SETTING_VALUES['window.frost']).toBe(50)
+    expect(setting).toMatchObject({
+      scope: 'window',
+      category: 'Appearance',
+      title: 'Window frost',
+      widget: 'number',
+    })
+    expect(setting.requiresRestart).not.toBe(true)
+    expect(SETTING_IDS.indexOf('window.frost')).toBe(SETTING_IDS.indexOf('window.transparency') + 1)
+  })
+  it.each([0, 50, 100])('accepts %s', (value) => {
+    expect(v.safeParse(descriptorFor('window.frost').schema, value).success).toBe(true)
+  })
+  it.each([-1, 101, 12.5, NaN, Infinity, -Infinity, true, false, '50', null])(
+    'rejects %s',
+    (value) => {
+      expect(v.safeParse(descriptorFor('window.frost').schema, value).success).toBe(false)
+    },
+  )
+})
+
+it('allows workspace rendering-only frost without changing machine transparency', () => {
+  const resolved = resolveSettings([
+    { id: 'workspace', raw: { 'window.frost': 25, 'window.transparency': 'window' } },
+  ])
+  expect(resolved.values['window.frost']).toBe(25)
+  expect(resolved.values['window.transparency']).toBe('compositor')
 })

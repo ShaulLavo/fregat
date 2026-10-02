@@ -7,6 +7,7 @@ import { MCP_CATEGORY, matchesMcpSearch } from '@/features/settings/utils/mcp'
 import { matchesPushSearch } from '@/features/settings/utils/push-device'
 import { matchingShortcutRows, type ShortcutRow } from '@/features/settings/utils/shortcut-rows'
 import { matchesUsageSearch } from '@/features/settings/utils/usage'
+import { getPlatformBridge } from '@/lib/platform/bridge'
 import { documentBackdrop } from '@/lib/platform/backdrop'
 import { runtimeCapabilities } from '@/lib/platform/capabilities'
 
@@ -25,8 +26,11 @@ export function formCategories(
 ) {
   // `matchingSettingIds` already searches rows rather than keys, so a key edited
   // from another row is folded into its owner here rather than dropped.
+  const bridge = getPlatformBridge()
   const environment = {
     backdrop: documentBackdrop(),
+    platform: bridge?.platform,
+    windowAppearance: typeof bridge?.setWindowAppearance === 'function',
     nativeTransparency: runtimeCapabilities().nativeTransparency,
   }
   // Settings search finds shortcuts too: a command that matches brings its list along.

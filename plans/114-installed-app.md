@@ -692,6 +692,24 @@ needs: no Bun, Git checkout or terminal step on the user's machine.
 - No supported Chromium browser: the native host, with vibrancy set by `window.transparency`.
 - Every path gives a native macOS window. Electron and a bundled engine are later (see below).
 
+### Window frost
+
+`window.frost` is an Appearance percentage, default 50: a balanced starting strength for the
+blurred desktop layer that leaves the transparent window see-through. Pane opacity and frost are
+independent: opacity is painted by the page; frost controls the AppKit effect layer's alpha,
+with 0 hiding it and 100 showing its full strength. AppKit chooses the blur radius. The native
+material exclusively owns pane frostedness in this host: page `--surface-blur` stays 0 at every
+frost value, and the inactive page-blur settings row is hidden. Other environments keep their page
+blur. Theme Studio still edits page blur for those environments; its control is unchanged. Dialog
+backdrops and the editor minimap keep their separate filtering.
+
+This rendering-only value has window scope, like pane opacity, and applies immediately. Its row
+appears only when the actual transparent macOS native bridge supports window appearance updates;
+browser windows, opaque native windows and Linux hide it. The existing appearance message carries
+both percentages and validates both before mutation. The native host starts clear until that
+message arrives. Use public AppKit properties only; property names must avoid Objective-C
+`new`, `init` and `copy` ownership families.
+
 ### Bundle layout
 
 ```text

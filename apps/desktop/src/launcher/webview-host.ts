@@ -1,5 +1,5 @@
 import { createInterface } from 'node:readline'
-import type { PlatformPickOptions } from '../shared/bridge'
+import type { PlatformPickOptions, WindowAppearance } from '../shared/bridge'
 import { recordDesktopInfo } from '../bun/observability'
 import {
   NativeHelper,
@@ -16,7 +16,7 @@ export type WebviewCommand =
   | { cancelPick: true }
   | { close: true }
   | { drag: true }
-  | { surfaceOpacity: number }
+  | { windowAppearance: WindowAppearance }
 export type WebviewEvent =
   | { event: 'ready' }
   | { event: 'message'; body: unknown }
@@ -98,8 +98,8 @@ export class WebviewHost {
   drag() {
     this.send({ drag: true })
   }
-  setSurfaceOpacity(opacity: number) {
-    this.send({ surfaceOpacity: opacity })
+  setWindowAppearance(appearance: WindowAppearance) {
+    this.send({ windowAppearance: appearance })
   }
   evaluate(script: string) {
     this.send({ eval: script })

@@ -6,6 +6,7 @@ import { getPlatformBridge } from '@/lib/platform/bridge'
 /** The keys that change how the app looks the instant they resolve. */
 export type AppearanceValues = Pick<
   SettingsValues,
+  | 'window.frost'
   | 'editor.fontFamily'
   | 'workbench.colorTheme'
   | 'workbench.density'
@@ -52,9 +53,21 @@ export function applyAppearance(values: AppearanceValues, root: Root, prefersDar
   root.setAttribute('data-feel', values['workbench.feel'])
 
   root.style.setProperty('--surface-opacity', `${values['workbench.surface.opacity']}%`)
-  getPlatformBridge()?.setSurfaceOpacity?.(values['workbench.surface.opacity'])
+  const bridge = getPlatformBridge()
+  bridge?.setWindowAppearance?.({
+    opacity: values['workbench.surface.opacity'],
+    frost: values['window.frost'],
+  })
   root.style.setProperty('--content-opacity', `${values['workbench.surface.contentOpacity']}%`)
-  root.style.setProperty('--surface-blur', `${values['workbench.surface.blur']}px`)
+  // The native material owns desktop blur; page filtering would blur pane content again.
+  const nativeBlur =
+    bridge?.platform === 'darwin' &&
+    bridge.backdrop === 'transparent' &&
+    typeof bridge.setWindowAppearance === 'function'
+  root.style.setProperty(
+    '--surface-blur',
+    nativeBlur ? '0px' : `${values['workbench.surface.blur']}px`,
+  )
   root.style.setProperty('--surface-saturation', `${values['workbench.surface.saturation']}%`)
   applyFileTreeIndentGuideVisibility(values['workbench.tree.indentGuides'], root)
 

@@ -346,7 +346,7 @@ test.each([
   { platform: 'darwin', vibrancy: false, accepts: false },
   { platform: 'linux', vibrancy: true, accepts: false },
 ] as const)(
-  'surface opacity reaches only the transparent $platform host ($vibrancy)',
+  'window appearance reaches only the transparent $platform host ($vibrancy)',
   async ({ platform, vibrancy, accepts }) => {
     const stateHome = mkdtempSync(path.join(tmpdir(), 'native-window-opacity-'))
     const fake = fakeHost()
@@ -369,21 +369,29 @@ test.each([
     })
     const message = (body: Record<string, unknown>) =>
       fake.stdout.write(
-        `${JSON.stringify({ event: 'message', body: { method: 'setSurfaceOpacity', origin: 'http://localhost:3301', token, ...body } })}\n`,
+        `${JSON.stringify({ event: 'message', body: { method: 'setWindowAppearance', origin: 'http://localhost:3301', token, ...body } })}\n`,
       )
     try {
-      for (const opacity of [20, 80, 0, 100]) message({ opacity })
-      message({ opacity: 20, token: 'foreign' })
-      message({ opacity: 20, origin: 'http://foreign.test' })
-      for (const opacity of [-1, 101, '20', true, null]) message({ opacity })
+      for (const opacity of [20, 80, 0, 100]) message({ opacity, frost: 50 })
+      message({ opacity: 20, frost: 50, token: 'foreign' })
+      message({ opacity: 20, frost: 50, origin: 'http://foreign.test' })
+      for (const opacity of [-1, 101, '20', true, false, null, NaN, Infinity, -Infinity])
+        message({ opacity, frost: 50 })
+      for (const frost of [0, 100]) message({ opacity: 80, frost })
+      for (const frost of [-1, 101, '50', true, false, null, NaN, Infinity, -Infinity])
+        message({ opacity: 80, frost })
+      message({ opacity: 80 })
+      message({ frost: 50 })
       await tick()
       expect(fake.commands.map((line) => JSON.parse(line))).toEqual(
         accepts
           ? [
-              { surfaceOpacity: 20 },
-              { surfaceOpacity: 80 },
-              { surfaceOpacity: 0 },
-              { surfaceOpacity: 100 },
+              { windowAppearance: { opacity: 20, frost: 50 } },
+              { windowAppearance: { opacity: 80, frost: 50 } },
+              { windowAppearance: { opacity: 0, frost: 50 } },
+              { windowAppearance: { opacity: 100, frost: 50 } },
+              { windowAppearance: { opacity: 80, frost: 0 } },
+              { windowAppearance: { opacity: 80, frost: 100 } },
             ]
           : [],
       )
