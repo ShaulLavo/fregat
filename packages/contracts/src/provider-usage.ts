@@ -16,17 +16,20 @@ export const providerUsageWindowSchema = v.object({
   id: trimmedNonEmptyStringSchema,
   kind: providerUsageWindowKindSchema,
   label: trimmedNonEmptyStringSchema,
-  usedPercent: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
+  usedPercent: v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100))),
   resetsAt: v.nullable(isoDateTimeSchema),
   /** How long the window runs; with `resetsAt` it gives how much of it has passed. */
   windowMinutes: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
   status: v.nullable(providerUsageWindowStatusSchema),
+  observedAt: v.optional(v.nullable(isoDateTimeSchema)),
+  source: v.optional(trimmedNonEmptyStringSchema),
+  freshness: v.optional(v.picklist(['fresh', 'stale', 'reset-passed', 'unknown'])),
 })
 
 /**
  * The latest windows of one account. Instances that share a credential home are one
  * account, so they share one entry; `accountKey` is opaque and never an identifier.
- * Windows whose reset has passed are already gone from the answer.
+ * Observed windows remain visible after their reset, with explicit freshness.
  */
 export const providerAccountUsageSchema = v.object({
   accountKey: trimmedNonEmptyStringSchema,
@@ -35,7 +38,46 @@ export const providerAccountUsageSchema = v.object({
   planType: v.nullable(trimmedNonEmptyStringSchema),
   windows: v.array(providerUsageWindowSchema),
   /** When a reading last confirmed these windows; the client tells old from current by it. */
-  checkedAt: isoDateTimeSchema,
+  checkedAt: v.nullable(isoDateTimeSchema),
+  lastSeenAt: v.optional(v.nullable(isoDateTimeSchema)),
+  source: v.optional(trimmedNonEmptyStringSchema),
+  state: v.optional(v.picklist(['ready', 'cooldown', 'disabled', 'no-data', 'unknown'])),
+  credits: v.optional(
+    v.nullable(
+      v.object({
+        balance: v.pipe(v.number(), v.minValue(0)),
+        unlimited: v.boolean(),
+      }),
+    ),
+  ),
+  routing: v.optional(
+    v.object({
+      mode: v.picklist(['single', 'rotating', 'unknown']),
+      active: v.nullable(v.boolean()),
+      lastServedAt: v.nullable(isoDateTimeSchema),
+    }),
+  ),
+  cooldown: v.optional(
+    v.nullable(
+      v.object({
+        reason: v.picklist([
+          'unknown',
+          'credential_quota',
+          'quota',
+          'cloudflare_challenge',
+          'model_not_supported',
+          'invalid_grant',
+          'unauthorized',
+          'payment_required',
+          'not_found',
+          'transient_error',
+        ]),
+        until: v.nullable(isoDateTimeSchema),
+        observedAt: isoDateTimeSchema,
+        source: v.picklist(['passive-header', 'proxy-state']),
+      }),
+    ),
+  ),
   resetCredits: v.optional(
     v.nullable(
       v.object({

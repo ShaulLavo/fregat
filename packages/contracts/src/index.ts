@@ -1179,3 +1179,5 @@ export {
   type NativePickerRequest,
   type NativePickerResult,
 } from './native-picker'
+
+export { providerUsageFeedSchema, type ProviderUsageFeed } from './provider-usage-feed'
