@@ -23,6 +23,11 @@ export const terminalCancelledStartup: Scenario = {
       await held
       await route.continue().catch(() => undefined)
     })
+    await page.addInitScript(() => {
+      for (const key of Object.keys(localStorage)) {
+        if (key.includes('terminal.display.v1')) localStorage.removeItem(key)
+      }
+    })
     try {
       await page.reload({ waitUntil: 'domcontentloaded' })
       await requested
