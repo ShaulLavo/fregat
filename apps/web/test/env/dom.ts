@@ -2,6 +2,7 @@ import { resetSettingsIntentStore } from '@workspace/client-core/settings/intent
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { activeServerOrigin } from '@/lib/client'
+// NOT-PORTABLE: Needs build:workspaces; highlighting exports only generated dist files.
 import { disposeHighlightingService } from '@/lib/highlighting/state/service'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { TEST_ENVIRONMENT_ID } from '../factories/chat'

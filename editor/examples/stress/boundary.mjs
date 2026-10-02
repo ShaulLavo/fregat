@@ -39,6 +39,7 @@ if (![...sizes, operations, warmups].every((value) => Number.isSafeInteger(value
 if (!configs.every((config) => ['plain', 'contributions', 'minimap', 'folds'].includes(config)))
   fail('Configs are plain, contributions, minimap and folds')
 
+// NOT-PORTABLE: Scratch creation requires /work/tmp.
 await mkdir('/work/tmp', { recursive: true })
 const directory = await mkdtemp('/work/tmp/editor-e033-build-')
 const core = await loadCorePackage(values['core-directory'])

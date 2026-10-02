@@ -182,6 +182,7 @@ def main():
 
 def run(args):
     inventory = read_json(args.root / "plans/126-t3code-alignment/inventory.json")
+    # NOT-PORTABLE: Requires the ignored references/t3code clone at the pinned commit.
     upstream = pinned_census(args.reference or args.root / "references/t3code", inventory)
     local = local_census(args.root)
     path = args.root / ARTIFACT

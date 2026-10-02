@@ -3,6 +3,7 @@ import { SourceMap } from 'node:module'
 import { basename, resolve } from 'node:path'
 import { fail } from './errors.mjs'
 
+// NOT-PORTABLE: Default input is an owner capture under /work/tmp.
 const directory = resolve(process.argv[2] ?? '/work/tmp/editor-long-line-profile')
 const files = (await readdir(directory)).filter((file) => file.endsWith('.cpuprofile')).sort()
 if (!files.length) fail('No CPU profiles found')

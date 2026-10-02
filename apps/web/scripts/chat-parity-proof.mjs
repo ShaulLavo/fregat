@@ -9,6 +9,7 @@ import { chromium } from 'playwright'
 const app = resolve(import.meta.dirname, '..')
 const origin = process.env.CHAT_PROOF_URL ?? 'http://127.0.0.1:3300'
 const server = process.env.CHAT_PROOF_SERVER ?? 'http://127.0.0.1:3301'
+// NOT-PORTABLE: Default proof artifacts are written under /work/tmp.
 const artifacts = process.env.CHAT_PROOF_ARTIFACTS ?? '/work/tmp/platform-chat-parity/browser'
 const bundle = resolve(artifacts, 'bundle')
 const entry = resolve(app, 'scripts/chat-scroll-proof-entry.mjs')
@@ -197,6 +198,7 @@ try {
   await page.route('https://chat-parity-images.test/remote.png', (route) =>
     route.fulfill({ path: resolve(imageDirectory, 'proof.png'), contentType: 'image/png' }),
   )
+  // NOT-PORTABLE: Requires a live :3301 server able to read the local image fixture.
   const metadataResponse = await fetch(
     `${server}/fs/stat?${new URLSearchParams({ path: imageDirectory.replace(/^\/+/, '') })}`,
     { headers: { Origin: new URL(origin).origin } },

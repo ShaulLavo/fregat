@@ -12,6 +12,7 @@ export type CaseScope = {
 
 /** The argv that runs one bench case in its own memory-capped user scope. */
 export function caseScopeCommand(scope: CaseScope) {
+  // NOT-PORTABLE: Linux benchmarks require systemd-run and a working user manager.
   if (process.platform !== 'linux') return [...scope.command]
   return [
     'systemd-run',

@@ -39,6 +39,7 @@ async function timed(run: () => Promise<unknown>) {
   return { ...outcome, ms: performance.now() - started }
 }
 
+// NOT-PORTABLE: Missing Chromium silently skips these tests, including script-only CI.
 describe.skipIf(!existsSync(chromium.executablePath()))('collecting key latency', () => {
   test('waits for samples that land after the settle pause', async () => {
     const page: Page = await samples([0, 0, 600])

@@ -153,6 +153,7 @@ async function stopFixtureLauncherProcess(
   signal: 'SIGTERM' | 'SIGKILL',
   evidence: Evidence,
 ) {
+  // NOT-PORTABLE: Requires system Chromium on PATH; ignores Playwright's installed browser.
   const executable =
     Bun.which('chromium') ?? Bun.which('google-chrome') ?? Bun.which('google-chrome-stable')
   ok(executable, 'The launcher-process proof requires a real browser')

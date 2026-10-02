@@ -10,6 +10,7 @@ const { values } = parseArgs({
   options: { output: { type: 'string' }, sizes: { type: 'string', default: '1048576,5242880' } },
 })
 if (!values.output) fail('--output is required')
+// NOT-PORTABLE: mkdtemp requires /work/tmp, which this script does not create.
 const directory = await mkdtemp('/work/tmp/editor-shiki-memory-')
 let browser
 const result = { samples: [] }

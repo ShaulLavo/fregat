@@ -51,6 +51,7 @@ test('default Electrobun and explicit Polaron entrypoints select their own nativ
   expect(dev).toMatch(/'build:native',\s*'--shell=polaron'/)
 })
 
+// NOT-PORTABLE: macOS case assumes Xcode clang and SDK without a prerequisite check.
 test.skipIf(process.platform !== 'darwin')(
   'builds the macOS Polaron executable beside the retained Electrobun library',
   () => {

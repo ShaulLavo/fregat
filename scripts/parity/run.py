@@ -80,6 +80,7 @@ def run(args):
     require(len(rows) == 1, "Missing or duplicate operation")
     row = rows[0]
     require(row.get("review") in {"source-reviewed", "runtime-verified"}, "Review the mapping before running its comparison")
+    # NOT-PORTABLE: Requires the ignored references/t3code clone at the pinned commit.
     check_mapping(row, root, args.reference or root / "references/t3code", commit)
     scenarios = [scenario for scenario in row["scenarios"] if scenario["id"] == args.scenario]
     require(len(scenarios) == 1, "Missing or duplicate scenario")

@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+// NOT-PORTABLE: Imports gitignored .hutch devkit; fresh clone needs Electrobun preparation.
 import applicationEvents from '../../../.hutch/devkit/api/sdks/main/events/ApplicationEvents'
 import { createQuitHandler } from '../quit'
 

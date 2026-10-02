@@ -4,6 +4,7 @@
 // time, which other processes cannot stretch. Three fresh Node processes per length.
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+// NOT-PORTABLE: Imports ignored textbuffer/dist without owning the prerequisite build.
 import {
   createPieceTableSnapshot,
   deleteFromPieceTable,

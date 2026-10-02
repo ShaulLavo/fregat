@@ -10,6 +10,7 @@ const { sources } = JSON.parse(await readFile(resolve(root, 'languages.json'), '
 const source = sources.mdx
 const cli = resolve(root, 'node_modules/.bin/tree-sitter')
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex')
+// NOT-PORTABLE: Scratch falls back to /work/tmp when TMPDIR is unset.
 const scratchRoot = process.env.TMPDIR ?? '/work/tmp'
 await mkdir(scratchRoot, { recursive: true })
 const scratch = await mkdtemp(resolve(scratchRoot, 'native-mdx-build-'))

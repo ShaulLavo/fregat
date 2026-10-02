@@ -2020,6 +2020,7 @@ async function seedFiles(fixture: WorkspaceEditFixture, files: Record<string, st
 
 /** A workspace parent and a journal parent on two different filesystems, when this host has them. */
 function crossDeviceDirectories() {
+  // NOT-PORTABLE: Cross-device cases require /work/tmp and skip on ordinary fresh hosts.
   const workspace = '/work/tmp'
   const journal = '/dev/shm'
   try {

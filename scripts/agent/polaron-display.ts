@@ -93,6 +93,7 @@ function control(args: string[]) {
 }
 let metadata: Record<string, unknown> = { scratch, compositor: 'Hyprland nested Wayland' }
 try {
+  // NOT-PORTABLE: Native proof requires Hyprland, DBus, GTK portals and Linux procfs.
   owned(['dbus-daemon', '--session', '--nofork', `--address=${bus}`], 'dbus')
   const compositor = owned(['Hyprland', '--config', `${scratch}/Hyprland.conf`], 'compositor')
   const deadline = Date.now() + 10_000
@@ -121,6 +122,7 @@ try {
     system,
   }
   writeFileSync(`${scratch}/polaron-proof.json`, JSON.stringify(metadata))
+  // NOT-PORTABLE: GTK portal executables are assumed at distro-specific /usr/lib paths.
   owned(['/usr/lib/xdg-desktop-portal-gtk'], 'portal-gtk')
   owned(['/usr/lib/xdg-desktop-portal'], 'portal')
   await Bun.sleep(1000)

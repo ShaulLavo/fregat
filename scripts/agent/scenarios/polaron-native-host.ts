@@ -31,6 +31,7 @@ export const polaronNativeHost: Scenario = {
     'Open real WebKitGTK fixture windows and preserve the existing shell across native host close, crash and launcher termination.',
   requiresIsolatedServer: true,
   async run(page, { step, evidence }) {
+    // NOT-PORTABLE: Requires the private Hyprland proof display and a built native host.
     const runtime = process.env.XDG_RUNTIME_DIR
     const signature = process.env.HYPRLAND_INSTANCE_SIGNATURE
     ok(runtime, 'The private display runtime is required')

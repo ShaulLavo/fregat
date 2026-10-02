@@ -3,6 +3,7 @@
 // collections, one fresh process per sample. Run with `node --expose-gc`.
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+// NOT-PORTABLE: Imports ignored textbuffer/dist without owning the prerequisite build.
 import {
   createPieceTableSnapshot,
   deleteFromPieceTable,

@@ -9,6 +9,7 @@ import { chromium } from 'playwright'
 const app = resolve(import.meta.dirname, '..')
 const origin = process.env.CHAT_PROOF_URL ?? 'http://127.0.0.1:3300'
 const server = process.env.CHAT_PROOF_SERVER ?? 'http://127.0.0.1:3301'
+// NOT-PORTABLE: Defaults to /work/tmp and requires separately installed Playwright Chromium.
 const artifacts =
   process.env.CHAT_PROOF_ARTIFACTS ?? '/work/tmp/platform-chat-parity/review-fix-browser'
 const bundle = resolve(artifacts, 'bundle')

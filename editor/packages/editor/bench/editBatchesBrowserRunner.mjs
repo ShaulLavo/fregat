@@ -41,6 +41,7 @@ const decoratedHighlightRow = 2
 const coreBuild = await rebuildPackage(values['core-directory'], '@singapore-editor/core')
 const core = await loadCorePackage(coreBuild.directory)
 const { sourceSha256, builtSha256 } = coreBuild
+// NOT-PORTABLE: Scratch creation requires /work/tmp.
 const directory = await mkdtemp('/work/tmp/e032-browser-')
 const entry = resolve(import.meta.dirname, 'editBatchesBrowser.mjs')
 const html =

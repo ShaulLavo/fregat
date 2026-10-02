@@ -31,6 +31,7 @@ describe('LSP download policy', () => {
  */
 describe('rust-analyzer resolution', () => {
   // Installed toolchains are scanned before PATH, and Bun's homedir() ignores a changed HOME.
+  // NOT-PORTABLE: Synthetic tests skip whenever real ~/.rustup/toolchains exists.
   const hasToolchains = existsSync(path.join(homedir(), '.rustup', 'toolchains'))
 
   async function resolveWith(script: string) {
@@ -39,6 +40,7 @@ describe('rust-analyzer resolution', () => {
     const savedPath = process.env.PATH
     await mkdir(bin, { recursive: true })
     await writeFile(path.join(bin, 'rust-analyzer'), script, { mode: 0o755 })
+    // NOT-PORTABLE: Fixture PATH hides sleep; the intended hanging process may exit immediately.
     process.env.PATH = bin
     try {
       const handle = await spawnRustAnalyzer(root)

@@ -38,6 +38,7 @@ export const test = base.extend<Fixtures>({
   // Vitest requires destructuring the fixture dependencies even when none are needed.
   // oxlint-disable-next-line no-empty-pattern
   root: async ({}, provide) => {
+    // NOT-PORTABLE: Selects /work/tmp when /work exists without checking writability.
     const basePath = existsSync('/work') ? '/work/tmp' : tmpdir()
     mkdirSync(basePath, { recursive: true })
     const root = await mkdtemp(path.join(basePath, 'pty-test-'))
