@@ -1,0 +1,20 @@
+{
+  "equalAuthoredHtml": true,
+  "equalPreformattedFrames": true,
+  "runtimeAssetHashChanged": true,
+  "frames": [
+    {
+      "bytes": 11387,
+      "sha256": "2d3b6b8198c77beddacba95fa5bfb283518dd6d94cd41a11afa50dc7a8e6b65f"
+    },
+    {
+      "bytes": 1016,
+      "sha256": "bee896ed5c1016ba101bec2f5392204556d8e9cae839611fe032903ce611348e"
+    },
+    {
+      "bytes": 1574,
+      "sha256": "a209a7dec4bc1f66a93ea1275b6b3162289a4c1eb7692ff5c5ee57c378380b1c"
+    }
+  ],
+  "definition": "Compare exact authored site HTML excluding module scripts whose build asset hash changes; all complete preformatted frames match original."
+}

@@ -31,51 +31,68 @@ test('unrelated presentations and absent terminal render frames fail closed', ()
   assert.throws(() => presentationLatency(phase, recorded.events))
 })
 
-test('a deferred no-submission renderer callback cannot become the glyph endpoint', () => {
-  const fixture = structuredClone(recorded)
-  const parse = fixture.phase.records.spans.find((span) => span.category === 'parse')
-  const frame = fixture.phase.records.spans.find((span) => span.operation === 'drawFrame')
-  const start = parse.end
-  const end = (parse.end + frame.start) / 2
-  fixture.phase.records.spans.unshift({
-    terminal: 0,
-    operation: 'drawFrame',
-    category: 'js',
-    start,
-    end,
-    self: end - start,
-  })
-  const marker = fixture.events.find((event) => event.name === 'compare/begin')
-  const offset = marker.ts / 1000 - marker.args.data.startTime
-  fixture.events.push(
-    {
-      name: 'AnimationFrame',
-      ph: 'b',
-      id2: { local: 'no-op' },
-      args: { id: 'no-op-frame' },
-      ts: (start + offset) * 1000,
-      pid: marker.pid,
-      tid: marker.tid,
-    },
-    {
-      name: 'AnimationFrame',
-      ph: 'e',
-      id2: { local: 'no-op' },
-      ts: (end + offset) * 1000,
-      pid: marker.pid,
-      tid: marker.tid,
-    },
-    {
-      name: 'AnimationFrame::Presentation',
-      args: { id: 'no-op-frame' },
-      ts: (end + offset + 1) * 1000,
-      pid: marker.pid,
-      tid: marker.tid,
-    },
-  )
-  const result = presentationLatency(fixture.phase, fixture.events)
-  assert.ok(Math.abs(result.write[0] - recorded.expected) < 0.001)
-  assert.notEqual(result.presentations[0].animationId, 'no-op-frame')
+test('a deferred no-op frame with feedback cannot become the glyph endpoint', () => {
+  for (const backend of ['webgpu', 'dom']) {
+    const fixture = backend === 'dom' ? paintedFixture('dom', 'paint') : structuredClone(recorded)
+    const parse = fixture.phase.records.spans.find((span) => span.category === 'parse')
+    const frame = fixture.phase.records.spans.find((span) => span.operation === 'drawFrame')
+    const start = parse.end
+    const end = (parse.end + frame.start) / 2
+    fixture.phase.records.spans.unshift(
+      {
+        terminal: 0,
+        operation: 'drawFrame',
+        category: 'js',
+        start,
+        end,
+        self: end - start,
+      },
+      {
+        terminal: 0,
+        operation: backend === 'dom' ? 'paint' : 'submit',
+        category: 'js',
+        start,
+        end,
+        self: 0,
+      },
+    )
+    const marker = fixture.events.find((event) => event.name === 'compare/begin')
+    const offset = marker.ts / 1000 - marker.args.data.startTime
+    fixture.events.push(
+      {
+        name: 'AnimationFrame',
+        ph: 'b',
+        id2: { local: 'no-op' },
+        args: { id: 'no-op-frame' },
+        ts: (start + offset) * 1000,
+        pid: marker.pid,
+        tid: marker.tid,
+      },
+      {
+        name: 'AnimationFrame',
+        ph: 'e',
+        id2: { local: 'no-op' },
+        ts: (end + offset) * 1000,
+        pid: marker.pid,
+        tid: marker.tid,
+      },
+      {
+        name: 'AnimationFrame::Presentation',
+        args: { id: 'no-op-frame' },
+        ts: (end + offset + 1) * 1000,
+        pid: marker.pid,
+        tid: marker.tid,
+      },
+    )
+    const result = presentationLatency(fixture.phase, fixture.events)
+    assert.ok(Math.abs(result.write[0] - recorded.expected) < 0.001)
+    assert.notEqual(result.presentations[0].animationId, 'no-op-frame')
+    fixture.phase.records.spans = fixture.phase.records.spans.filter((span) => span !== frame)
+    assert.throws(
+      () => presentationLatency(fixture.phase, fixture.events),
+      /submitted glyph frame|committed row paint/,
+    )
+  }
 })
 
 test('latency requires parse, GPU submission, and input echo evidence', () => {
@@ -157,7 +174,7 @@ function paintedFixture(backend, operation, frameOperation = 'drawFrame') {
 test('canvas and DOM join actual terminal paint to its own compositor frame identity', () => {
   for (const [backend, operation, frame] of [
     ['canvas2d', 'paint', 'drawFrame'],
-    ['dom', 'replaceWith', 'drawFrame'],
+    ['dom', 'paint', 'drawFrame'],
     ['ghostty-web', 'renderLine', 'render'],
     ['xterm-dom', 'replaceChildren', 'renderRows'],
     ['webgl2', 'submit', 'drawFrame'],
@@ -180,44 +197,50 @@ test('canvas and DOM join actual terminal paint to its own compositor frame iden
 test('software frames require their renderer-specific commit and reject incidental work', () => {
   for (const [backend, actual] of [
     ['canvas2d', 'paint'],
-    ['dom', 'replaceWith'],
+    ['dom', 'paint'],
     ['ghostty-web', 'renderLine'],
     ['xterm-dom', 'replaceChildren'],
   ]) {
-    for (const incidental of ['clearDirty', 'fillRect', 'createRow', 'submit']) {
+    for (const incidental of ['clearDirty', 'fillRect', 'createRow', 'submit', 'replaceWith']) {
       const fixture = paintedFixture(backend, incidental)
       assert.throws(() => presentationLatency(fixture.phase, fixture.events), /committed row paint/)
     }
     const fixture = paintedFixture(backend, actual)
     fixture.phase.records.spans.find((span) => span.operation === actual).terminal = 1
     assert.throws(() => presentationLatency(fixture.phase, fixture.events), /committed row paint/)
+    const outside = paintedFixture(backend, actual)
+    outside.phase.records.spans.find((span) => span.operation === actual).end =
+      outside.phase.records.spans.find((span) => span.operation === 'drawFrame').end + 1
+    assert.throws(() => presentationLatency(outside.phase, outside.events), /committed row paint/)
   }
 })
 
 test('last committed row, not first paint, bounds the feedback timestamp', () => {
-  const fixture = paintedFixture('canvas2d', 'paint')
-  const last = fixture.phase.records.spans.find((span) => span.operation === 'paint')
-  fixture.phase.records.spans.push({ ...last, end: (last.start + last.end) / 2 })
-  const begin = fixture.events.find((event) => event.name === 'compare/begin')
-  const offset = begin.ts / 1000 - begin.args.data.startTime
-  const feedback = fixture.events.find((event) => event.name === 'AnimationFrame::Presentation')
-  feedback.ts = ((last.start + last.end) / 2 + offset) * 1000
-  assert.throws(
-    () => presentationLatency(fixture.phase, fixture.events),
-    /terminal render boundary end/,
-  )
-  feedback.ts = (last.end + offset + 1) * 1000
-  const result = presentationLatency(fixture.phase, fixture.events)
-  assert.equal(
-    result.presentations[0].renderBoundaryEnd,
-    last.end - (result.captures[0].started - fixture.phase.records.timeOrigin),
-  )
+  for (const backend of ['canvas2d', 'dom']) {
+    const fixture = paintedFixture(backend, 'paint')
+    const last = fixture.phase.records.spans.find((span) => span.operation === 'paint')
+    fixture.phase.records.spans.push({ ...last, end: (last.start + last.end) / 2 })
+    const begin = fixture.events.find((event) => event.name === 'compare/begin')
+    const offset = begin.ts / 1000 - begin.args.data.startTime
+    const feedback = fixture.events.find((event) => event.name === 'AnimationFrame::Presentation')
+    feedback.ts = ((last.start + last.end) / 2 + offset) * 1000
+    assert.throws(
+      () => presentationLatency(fixture.phase, fixture.events),
+      /terminal render boundary end/,
+    )
+    feedback.ts = (last.end + offset + 1) * 1000
+    const result = presentationLatency(fixture.phase, fixture.events)
+    assert.equal(
+      result.presentations[0].renderBoundaryEnd,
+      last.end - (result.captures[0].started - fixture.phase.records.timeOrigin),
+    )
+  }
 })
 
 test('deferred software no-op callback cannot become a paint presentation endpoint', () => {
   for (const [backend, operation] of [
     ['canvas2d', 'paint'],
-    ['dom', 'replaceWith'],
+    ['dom', 'paint'],
     ['xterm-dom', 'replaceChildren'],
   ]) {
     const fixture = paintedFixture(backend, operation)

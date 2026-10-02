@@ -6,7 +6,7 @@ const boundaries = {
   webgl2: ['submit'],
   'xterm-webgl': ['drawElementsInstanced'],
   canvas2d: ['paint'],
-  dom: ['replaceWith'],
+  dom: ['paint'],
   'ghostty-web': ['renderLine'],
   'xterm-dom': ['replaceChildren'],
 }

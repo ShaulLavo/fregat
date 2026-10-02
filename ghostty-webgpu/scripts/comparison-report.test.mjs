@@ -890,7 +890,7 @@ test('skipped latency emits not measured while selected missing output stays inc
     assert(report.includes(`| ${metric} | not measured | not measured |`))
 })
 
-test('benchmark row tracing records actual DOM commits including newly replaced rows', () => {
+test('benchmark row tracing qualifies successful mounted frozen DOM replacement paints', () => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'location')
   Object.defineProperty(globalThis, 'location', { configurable: true, value: { search: '?trace' } })
   try {
@@ -927,12 +927,87 @@ test('benchmark row tracing records actual DOM commits including newly replaced 
     const records = tracing.end()
     assert.equal(records.spans.filter((span) => span.operation === 'drawFrame').length, 3)
     assert.equal(
-      records.spans.filter(
-        (span) => span.category === 'commands' && span.operation === 'replaceWith',
-      ).length,
+      records.spans.filter((span) => span.category === 'commands' && span.operation === 'paint')
+        .length,
       2,
     )
     assert.equal(records.ownership[0].backend, 'dom')
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'location', original)
+    else delete globalThis.location
+  }
+})
+
+test('DOM tracing gates real commits and preserves each original paint call', () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'location')
+  Object.defineProperty(globalThis, 'location', { configurable: true, value: { search: '?trace' } })
+  try {
+    for (const scenario of [
+      { result: true, mounted: true, committed: true },
+      { result: false, mounted: true, committed: false },
+      { result: undefined, mounted: true, committed: true },
+      { result: undefined, mounted: false, committed: false },
+      { result: true, mounted: false, committed: false },
+      { result: true, mounted: true, committed: false, throws: true },
+    ]) {
+      const tracing = new ComparisonTracing()
+      const row = { y: 0 }
+      const cursor = { visible: true }
+      const failure = new TypeError('Paint fixture failure')
+      let calls = 0
+      const children = scenario.mounted ? [{}] : []
+      const surface = {
+        container: { firstElementChild: { children } },
+        paint(actualRow, actualCursor) {
+          calls += 1
+          assert.equal(this, surface)
+          assert.equal(actualRow, row)
+          assert.equal(actualCursor, cursor)
+          if (scenario.throws) throw failure
+          // The baseline replaces its mounted row, so qualification must remember pre-call state.
+          children.length = 0
+          return scenario.result
+        },
+      }
+      const renderer = {
+        backend: 'dom',
+        scheduler: {},
+        surface,
+        rowsToPaint() {},
+        notifyWrite() {},
+        drawFrame() {},
+      }
+      tracing.nativeRenderer(0, renderer)
+      tracing.begin()
+      if (scenario.throws)
+        assert.throws(
+          () => surface.paint(row, cursor),
+          (error) => error === failure,
+        )
+      else assert.equal(surface.paint(row, cursor), scenario.result)
+      const records = tracing.end()
+      assert.equal(calls, 1)
+      assert.equal(records.spans.length, 1)
+      assert.equal(records.spans[0].operation, 'paint')
+      assert.equal(records.spans[0].category, scenario.committed ? 'commands' : 'js')
+      assert.equal(
+        records.counters.filter((counter) => counter.operation === 'rowPaintAttempts').length,
+        1,
+      )
+      assert.equal(
+        records.counters.filter((counter) => counter.operation === 'rowsPainted').length,
+        Number(scenario.committed),
+      )
+      assert.ok(records.spans[0].self >= 0)
+      // Outside measurement, the wrapper still preserves calls and their results.
+      if (scenario.throws)
+        assert.throws(
+          () => surface.paint(row, cursor),
+          (error) => error === failure,
+        )
+      else assert.equal(surface.paint(row, cursor), scenario.result)
+      assert.equal(calls, 2)
+    }
   } finally {
     if (original) Object.defineProperty(globalThis, 'location', original)
     else delete globalThis.location

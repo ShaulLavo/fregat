@@ -115,24 +115,31 @@ function cellStyle(
   return css + cursorDecoration(cursor, colors.foreground(resolved), font, width)
 }
 
-export function renderRowToHtml(
+export interface RowRun {
+  readonly cursor: CursorState['style'] | undefined
+  readonly style: string
+  readonly text: string
+}
+
+export function renderRowRuns(
   row: RenderRow,
   cursor: CursorState | undefined,
   font: TerminalFittedFont,
   theme: CanonicalRendererTheme,
-): string {
+): readonly RowRun[] {
   const colors = new CanvasColorCache(theme.minimumContrast)
-  const runs: string[] = []
+  const runs: RowRun[] = []
   let currentStyle = ''
   let currentText = ''
   let currentWidth = 0
-  let currentCursor: string | undefined
+  let currentCursor: CursorState['style'] | undefined
   function flush(): void {
     if (currentWidth === 0) return
-    const cursorAttribute = currentCursor ? ` data-cursor="${escapeHtml(currentCursor, true)}"` : ''
-    runs.push(
-      `<span${cursorAttribute} style="${escapeHtml(`${currentStyle}width:calc(${currentWidth} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`, true)}">${escapeHtml(currentText)}</span>`,
-    )
+    runs.push({
+      cursor: currentCursor,
+      style: `${currentStyle}width:calc(${currentWidth} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`,
+      text: currentText,
+    })
     currentText = ''
     currentWidth = 0
   }
@@ -153,6 +160,19 @@ export function renderRowToHtml(
     if (width > 1 || paintedCursor) flush()
   }
   flush()
+  return runs
+}
+
+function renderRowToHtml(
+  row: RenderRow,
+  cursor: CursorState | undefined,
+  font: TerminalFittedFont,
+  theme: CanonicalRendererTheme,
+): string {
+  const runs = renderRowRuns(row, cursor, font, theme).map((run) => {
+    const cursorAttribute = run.cursor ? ` data-cursor="${escapeHtml(run.cursor, true)}"` : ''
+    return `<span${cursorAttribute} style="${escapeHtml(run.style, true)}">${escapeHtml(run.text)}</span>`
+  })
   return `<div data-row="${row.y}" style="display:flex;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);">${runs.join('')}</div>`
 }
 

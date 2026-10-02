@@ -1,0 +1,15 @@
+{
+  "runtimeLabel": "original",
+  "runtimeBaseGitSha": "2c185da7831b3673ca0520ee648663f69d2483fe",
+  "runtimeSourcesSha256": "72e01422745310d11d9ccb92b0e4714dc369323f2a044aaaff5735687306654d",
+  "harnessSourcesSha256": "44a52d246bce2d3c9f11aa1f97a9d1f783425791889ebf56c9cf42e668789aa4",
+  "sourceSha256": "e760b19577184157c6e8702d53a09d832a0395661915bb90ffce6c6757e00289",
+  "browserBundleSha256": "c023ef0bb1cad6c3705fa34ab3b6f606536906f7a761db413fa571e3e01b76b1",
+  "runtimeFiles": {
+    "src/render/dom/html.ts": "6d888504aeb6826a4c9a06c443b4c0657ff692d9bc4c490a2e03dc839a86ad2d",
+    "src/render/dom/renderer.ts": "340569451d1a0d17df92477b90be85508937863fc79bf42f35476552c9337a8d",
+    "src/render/row-renderer.ts": "b281e3518a6fb25dbbd7644ee3c8d5ca0df12b698431eb7d1c30ea8eb306f2e0"
+  },
+  "harnessDescription": "Common mutation-gated DOM paint recorder, parser/frame/compositor endpoint and pacing unchanged.",
+  "sourceHashScope": "Standard build manifest includes runtime, benchmark harness, and tracked tests. Runtime and production harness hashes are also recorded separately."
+}

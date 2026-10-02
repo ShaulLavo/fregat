@@ -455,6 +455,7 @@ test('attribution and latency choose the same painted frame after a deferred no-
   }
   for (const [backend, operation, render] of [
     ['canvas2d', 'paint', 'drawFrame'],
+    ['dom', 'paint', 'drawFrame'],
     ['ghostty-web', 'renderLine', 'render'],
     ['xterm-dom', 'replaceChildren', 'renderRows'],
   ]) {
@@ -465,7 +466,8 @@ test('attribution and latency choose the same painted frame after a deferred no-
         ownership: [{ terminal: 0, backend }],
         spans: [
           { terminal: 0, category: 'parse', operation: 'parse', start: 1, end: 2, self: 1 },
-          { terminal: 0, category: 'js', operation: render, start: 11, end: 14, self: 3 },
+          { terminal: 0, category: 'js', operation: render, start: 11, end: 14, self: 2 },
+          { terminal: 0, category: 'js', operation, start: 12, end: 13, self: 1 },
           { terminal: 0, category: 'js', operation: render, start: 21, end: 29, self: 6 },
           { terminal: 0, category: 'commands', operation, start: 25, end: 27, self: 2 },
         ],
@@ -477,7 +479,7 @@ test('attribution and latency choose the same painted frame after a deferred no-
     assert.equal(result.frame, 21)
     assert.equal(result.renderBoundary, operation)
     assert.equal(result.renderBoundaryEnd, 27)
-    phase.records.spans.pop()
+    phase.records.spans = phase.records.spans.filter((span) => span.start < 20)
     assert.throws(() => timelines(phase, clock), /committed row paint/)
   }
 })

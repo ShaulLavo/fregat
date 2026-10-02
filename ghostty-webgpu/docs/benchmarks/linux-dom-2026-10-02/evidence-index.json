@@ -1,0 +1,50 @@
+{
+  "checkpoint": "retained-dom-v1",
+  "finalVerdict": "pending-rolling-logs",
+  "secondaryWorkload": "repeated ASCII; retained no-op rendering flatters this fixture",
+  "secondaryTargetPasses": 8,
+  "secondaryTargetTotal": 10,
+  "actualCommitFramesDiagnostic": {
+    "original": 3077,
+    "retained": 34,
+    "frameCallbacksEach": 3077,
+    "qualifiedPairedAttribution": false
+  },
+  "residuals": [
+    {
+      "count": 17,
+      "metric": "write-p50",
+      "pairedMedianRatio": 1.0250369542015318
+    },
+    {
+      "count": 1,
+      "metric": "input-p50",
+      "pairedMedianRatio": 1.0179480290004395
+    }
+  ],
+  "rawEvidenceDirectory": "/work/reports/ghostty-benchmarks/plan-283/dom-optimization-2026-10-02",
+  "correctness": {
+    "benchmarkToolingTests": 121,
+    "domBrowserTests": 11,
+    "domNodeTests": 7,
+    "serializerCases": 80,
+    "typecheck": "passed independently after browser-command type failure",
+    "packageBuild": "passed",
+    "siteBuild": "passed",
+    "look": "desktop and phone health ok; both PNGs read; site selects WebGL2, separate forced-DOM tests provide DOM proof"
+  },
+  "limitations": [
+    "Final rolling output, input and write verdict pending at counts 17 and 1",
+    "Paired attribution traces failed GPU qualification; native-only diagnostic data cannot establish a paired verdict",
+    "No physical-vsync or optical latency claim",
+    "Category clipped unions overlap; library wall and sampled leaves are not JS self CPU",
+    "Existing native ZWJ decomposition differs from xterm; issue360",
+    "Separate sampler diagnostic patch remains unaccepted and excluded"
+  ],
+  "issues": [
+    "https://github.com/ShaulLavo/fregat/issues/391",
+    "https://github.com/ShaulLavo/fregat/issues/360"
+  ],
+  "mutationBoundary": "Pre-existing mounted row and successful true candidate return or void original return; false/missing/throw cannot qualify. Original receiver, arguments, return and exactly-once call preserved.",
+  "frozenRuntimeNote": "Frozen secondary bundles remain immutable. The checkpoint removes the now-internal renderRowToHtml export after the unused-export gate found it; serializer behavior is unchanged. Fresh rolling bundles will use checkpoint source with a newly recorded runtime identity."
+}

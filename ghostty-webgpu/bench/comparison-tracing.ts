@@ -68,6 +68,7 @@ export class ComparisonTracing {
     after?: (result: unknown, args: unknown[]) => void,
     observeInactive = false,
     before?: (args: unknown[]) => void,
+    commandCommit?: (args: unknown[]) => (result: unknown) => boolean,
   ): void {
     if (!this.enabled) return
     const original = field(object, name)
@@ -81,11 +82,15 @@ export class ComparisonTracing {
         return result
       }
       before?.(args)
+      const committed = commandCommit?.(args)
       const start = performance.now()
       const context = { children: 0 }
+      let result: unknown
+      let completed = false
       recorder.stack.push(context)
       try {
-        const result = (original as Method).apply(this, args)
+        result = (original as Method).apply(this, args)
+        completed = true
         after?.(result, args)
         return result
       } finally {
@@ -96,7 +101,7 @@ export class ComparisonTracing {
         recorder.spans.push({
           terminal: typeof terminal === 'number' ? terminal : terminal(args),
           operation: name,
-          category,
+          category: committed && (!completed || !committed(result)) ? 'js' : category,
           start,
           end,
           self: end - start - context.children,
@@ -249,15 +254,17 @@ export class ComparisonTracing {
       this.wrap(surface, 'paint', terminal, 'commands', () => this.count(terminal, 'rowsPainted'))
       return
     }
-    // Each DOM paint replaces its row node; instrument that instance's commit, including fresh rows.
-    this.wrap(surface, 'paint', terminal, 'js', undefined, false, (args) => {
+    this.wrap(surface, 'paint', terminal, 'commands', undefined, false, undefined, (args) => {
+      this.count(terminal, 'rowPaintAttempts')
       const row = args[0] as { y: number }
       const container = field(surface, 'container') as HTMLElement
-      const previous = container.firstElementChild?.children[row.y]
-      if (previous)
-        this.wrap(previous, 'replaceWith', terminal, 'commands', () =>
-          this.count(terminal, 'rowsPainted'),
-        )
+      const mounted = Boolean(container.firstElementChild?.children[row.y])
+      return (result) => {
+        // Frozen replacement renderers return void; retained renderers report real mutations.
+        if (!mounted || (result !== true && result !== undefined)) return false
+        this.count(terminal, 'rowsPainted')
+        return true
+      }
     })
   }
 
