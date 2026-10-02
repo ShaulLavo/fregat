@@ -486,7 +486,7 @@ export class ProviderAdapterRegistry {
   private async create(driver: AnyProviderDriver, entry: ProviderInstanceConfig) {
     const config = driver.parseConfig(entry.config ?? driver.defaultConfig())
     const env = resolveProviderInstanceEnvironment({
-      derived: driver.environment(config),
+      derived: driver.environment(config, entry.providerInstanceId),
       overrides: entry.environment,
     })
     const handle = await driver.create({
@@ -739,6 +739,7 @@ function unavailableSnapshot(entry: ProviderInstanceConfig, reason: string): Pro
       supportsFullAccess: false,
       supportsInterrupt: false,
       supportsSessionStop: false,
+      supportsSteering: false,
       supportsStreaming: false,
       supportsUserInput: false,
     },

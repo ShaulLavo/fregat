@@ -24,6 +24,7 @@ export type AcpPeerInput = {
   args: readonly string[]
   cwd: string
   env: NodeJS.ProcessEnv
+  onClosed?: () => void
   onNotification?: (method: string, params: unknown) => void
   onRequest?: (method: string, params: unknown) => Promise<unknown>
 }
@@ -199,5 +200,6 @@ export class AcpPeer {
     }
     this.pending.clear()
     this.kill()
+    this.input.onClosed?.()
   }
 }

@@ -194,14 +194,14 @@ export async function installNativeProvider(
     readonly name: string
     readonly fixture: URL
     readonly displayLabel: string
-    readonly kind?: FixtureProviderKind
+    readonly kind?: FixtureProviderKind | 'cursor'
   },
 ) {
   const api = captureScenarioApi(page)
   const kind = input.kind ?? 'codex'
   const root = await mkdtemp(scratchPath(`fregat-${input.name}-native-`))
   // Claude's SDK runs a path without a script extension directly, as it runs the real CLI.
-  const binary = join(root, kind === 'codex' ? 'codex.mjs' : 'claude')
+  const binary = join(root, kind === 'claude' ? 'claude' : `${kind}.mjs`)
   await copyFile(input.fixture, binary)
   await chmod(binary, 0o700)
   await writeFile(join(root, 'scenario'), input.name)
@@ -217,7 +217,7 @@ export async function installNativeProvider(
         driverKind: kind,
         displayLabel: input.displayLabel,
         binaryPath: binary,
-        config: kind === 'codex' ? { home: root } : { configDir },
+        config: fixtureConfig(kind, root, configDir),
       },
     },
   ])
@@ -244,7 +244,7 @@ export async function installNativeProvider(
     binary,
     /** Claude's config folder; Codex keeps its home in `root`. */
     configDir,
-    model: { providerInstanceId, model: kind === 'codex' ? 'gpt-5.5' : CLAUDE_FIXTURE_MODEL },
+    model: { providerInstanceId, model: fixtureModel(kind) },
     providerInstanceId,
     remove,
     root,
@@ -365,7 +365,19 @@ async function firstWorktree(page: Page, orchestration: string) {
   return undefined
 }
 
+function fixtureConfig(kind: FixtureProviderKind | 'cursor', root: string, configDir: string) {
+  if (kind === 'codex') return { home: root }
+  if (kind === 'cursor') return { configHome: configDir }
+  return { configDir }
+}
+function fixtureModel(kind: FixtureProviderKind | 'cursor') {
+  if (kind === 'codex') return 'gpt-5.5'
+  if (kind === 'cursor') return 'auto'
+  return CLAUDE_FIXTURE_MODEL
+}
+
 export function isolatedNativeScenario(options: {
+  providerKind?: FixtureProviderKind | 'cursor'
   name: string
   description: string
   fixture: URL
@@ -409,6 +421,7 @@ export function isolatedNativeScenario(options: {
       const title = `${options.name} verification ${sessionId.slice(0, 8)}`
       const native = await installNativeProvider(page, base, {
         name: options.name,
+        kind: options.providerKind,
         fixture: options.fixture,
         displayLabel: title,
       })
@@ -433,7 +446,7 @@ export function isolatedNativeScenario(options: {
           worktreeTarget: newWorktreeId
             ? { kind: 'new', worktreeId: newWorktreeId, baseWorktreeId: worktree.id }
             : { kind: 'current', worktreeId: worktree.id },
-          modelSelection: { providerInstanceId, model: 'gpt-5.5' },
+          modelSelection: native.model,
         })
         const sessionWorktree = newWorktreeId
           ? await readyWorktree(page, orchestration, newWorktreeId)

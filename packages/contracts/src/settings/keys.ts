@@ -1824,6 +1824,17 @@ export const SETTINGS_REGISTRY = {
       "Server id to true or false, overriding the per-server default. Turns one server's semantic colour on or off while the feature stays on.",
     keywords: ['lsp', 'semantic', 'tokens', 'server', 'override'],
   }),
+  'providers.acpOperationTimeoutMs': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1_800_000)),
+    default: 30_000,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'ACP operation timeout',
+    description:
+      'Milliseconds an ACP agent has to initialize, change configuration or drain a cancelled turn. Active answers wait until they finish or you stop them.',
+    keywords: ['provider', 'acp', 'timeout'],
+  }),
   'providers.instances': defineSetting({
     schema: providerInstanceConfigsSchema,
     default: [],

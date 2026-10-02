@@ -1,3 +1,5 @@
+import { cursorProvider } from './cursor-provider'
+import { cursorModelCatalog } from './cursor-model-catalog'
 import { machineBalancing } from './machine-balancing'
 import { binaryFileOpen, binaryFileRemote } from './binary-file-open'
 import { ghosttySiteFit } from './ghostty-site-fit'
@@ -529,6 +531,8 @@ export const scenarios: readonly Scenario[] = [
   chatQueue,
   chatQueueAway,
   chatQueueStopUpload,
+  cursorProvider,
+  cursorModelCatalog,
   providerModelOptions,
   draftRecovery,
   asyncQuestions,

@@ -157,7 +157,9 @@ export const selectors = {
   discardDraft: (page: Page, label: string) =>
     page.getByRole('button', { name: `Discard draft: ${label}`, exact: true }),
   composerAccess: (page: Page) => page.getByRole('menuitemradio', { name: /^Full access/ }),
+  composerAskFirst: (page: Page) => page.getByRole('menuitemradio', { name: /^Ask first/ }),
   chatExactText: (page: Page, text: string) => page.getByText(text, { exact: true }),
+  chatContainingText: (page: Page, text: string) => page.getByText(text, { exact: false }),
   composerModes: (page: Page) =>
     page.getByRole('button', { name: 'Agent access and mode', exact: true }),
   composerPlan: (page: Page) => page.getByRole('menuitemradio', { name: /^Plan/ }),
@@ -253,6 +255,10 @@ export const selectors = {
       .getByRole('button', { name: label, exact: true }),
   genericApproval: (page: Page) =>
     page.getByRole('region', { name: 'Approval requested', exact: true }),
+  genericApprovalDecision: (page: Page, label: string) =>
+    page
+      .getByRole('region', { name: 'Approval requested', exact: true })
+      .getByRole('button', { name: label, exact: true }),
   commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
   commandApprovalDecision: (page: Page, label: string | RegExp) =>
     page

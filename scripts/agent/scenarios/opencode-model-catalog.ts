@@ -4,6 +4,7 @@ import * as v from 'valibot'
 import { providerListResultSchema } from '../../../packages/contracts/src/index'
 import { openCodeProcessFixture } from '../../../apps/server/test/factories/opencode-process'
 import { selectors, settleAnimations } from '../selectors'
+import { enableCatalogFixture, openDisabledCatalogSettings } from '../provider-catalog-settings'
 import { captureScenarioApi, cleanupAll } from '../scenario-cleanup'
 import { openChat } from './chat-verification'
 import {
@@ -59,16 +60,10 @@ export const opencodeModelCatalog: Scenario = {
         },
       ])
       await assertFixtureProviders(api, base, fixture.binaryPath)
-      // Load the disabled fixture setup; enabling below stays on this document.
-      await page.reload()
-      await selectors.windowToolbar(page).waitFor()
-      await page.keyboard.press('Control+,')
-      await selectors.settingsSearch(page).fill('providers')
-      await selectors.settingsProviderRow(page, providerInstanceId).waitFor()
-      const toggle = selectors.settingsSwitch(page, 'Enable OpenCode catalog fixture')
-      ok(
-        (await toggle.getAttribute('aria-checked')) === 'false',
-        'The fixture starts disabled in Settings',
+      const toggle = await openDisabledCatalogSettings(
+        page,
+        providerInstanceId,
+        'OpenCode catalog fixture',
       )
       ok(
         (await readFile(fixture.marker, 'utf8').catch(() => '')) === '',
@@ -100,26 +95,7 @@ export const opencodeModelCatalog: Scenario = {
         },
         { timeout: 20_000 },
       )
-      const settingsWrite = page.waitForResponse(
-        (response) =>
-          response.url() === `${base}/settings/write` &&
-          response.request().method() === 'POST' &&
-          response.ok(),
-      )
-      await toggle.click()
-      const written = await settingsWrite
-      ok(
-        written
-          .request()
-          .postDataJSON()
-          .operations.some(
-            (operation: { kind: string; providerInstanceId?: string; enabled?: boolean }) =>
-              operation.kind === 'provider.setEnabled' &&
-              operation.providerInstanceId === providerInstanceId &&
-              operation.enabled === true,
-          ),
-        'Settings UI submits the fixture enable operation',
-      )
+      await enableCatalogFixture(page, base, providerInstanceId, toggle)
       const response = await providerRead
       ok(
         (await toggle.getAttribute('aria-checked')) === 'true',

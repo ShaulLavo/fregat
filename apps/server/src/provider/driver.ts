@@ -51,6 +51,7 @@ type ProviderDriverCapabilities = ProviderAdapter['capabilities'] & {
 export type ProviderDriverServices = {
   readonly cwd: string
   readonly agentDiagnostics?: AgentDiagnosticsSource
+  readonly acpOperationTimeoutMs?: () => number
 }
 
 type ProviderDriverCreateInput<Config> = {
@@ -91,7 +92,10 @@ export type ProviderDriver<Config> = {
   displayName: string
   driverKind: ProviderDriverKind
   /** Env vars derived from this instance's config (its home / credential dir). */
-  environment: (config: Config) => ProviderEnvironmentVariable[]
+  environment: (
+    config: Config,
+    providerInstanceId: ProviderInstanceId,
+  ) => ProviderEnvironmentVariable[]
   /** Decodes the opaque envelope once, at registration time. Throws on garbage. */
   parseConfig: (config: unknown) => Config
 }

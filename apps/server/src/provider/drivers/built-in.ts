@@ -3,6 +3,7 @@ import path from 'node:path'
 import * as v from 'valibot'
 import {
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
+  DEFAULT_CURSOR_PROVIDER_SETTINGS,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
   providerInstanceIdSchema,
 } from '@workspace/contracts'
@@ -11,6 +12,7 @@ import { sessionIdentityErrors } from '../structured-errors'
 import { claudeDriver } from './claude'
 import { codexDriver } from './codex'
 import { mockDriver } from './mock'
+import { cursorDriver } from './cursor'
 import { opencodeDriver } from './opencode'
 
 /**
@@ -24,6 +26,7 @@ import { opencodeDriver } from './opencode'
 const BUILT_IN_PROVIDER_DRIVERS: readonly AnyProviderDriver[] = [
   codexDriver,
   claudeDriver,
+  cursorDriver,
   opencodeDriver,
 ]
 
@@ -107,6 +110,7 @@ export const DEFAULT_PROVIDER_INSTANCES: readonly ProviderInstanceConfig[] = [
     enabled: DEFAULT_CLAUDE_PROVIDER_SETTINGS.enabled,
     providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId,
   },
+  { ...DEFAULT_CURSOR_PROVIDER_SETTINGS },
   {
     displayLabel: opencodeDriver.displayName,
     driverKind: opencodeDriver.driverKind,
