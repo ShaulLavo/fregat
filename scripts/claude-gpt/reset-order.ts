@@ -1,7 +1,18 @@
 import * as v from 'valibot'
 import { rename, writeFile } from 'node:fs/promises'
+import { readCredits } from './usage-feed'
 
-export type Observation = { resetAt: number; usedPercent: number }
+type Credits = { balance: number; unlimited: boolean }
+export type Observation = {
+  resetAt: number
+  usedPercent: number
+  observedAt?: string
+  credits?: Credits | null
+}
+export type StoredObservation = (
+  | Observation
+  | { resetAt?: undefined; usedPercent?: undefined; observedAt?: string; credits: Credits | null }
+) & { disabledByLoop?: boolean }
 export type Provider = 'codex' | 'claude'
 export type Credential = {
   name: string
@@ -10,6 +21,7 @@ export type Credential = {
   priority: number
   disabled: boolean
   observation: Observation | null
+  credits?: Credits | null
 }
 export type ResetOrderOptions = {
   proxyUrl: string
@@ -27,18 +39,40 @@ const authFilesSchema = v.object({
       provider: v.string(),
       disabled: v.optional(v.boolean()),
       priority: v.optional(v.nullable(v.number())),
-      quota: v.optional(v.object({ signals: v.optional(signalsSchema) })),
+      quota: v.optional(
+        v.object({
+          observed_at: v.optional(v.string()),
+          signals: v.optional(signalsSchema),
+        }),
+      ),
     }),
   ),
 })
-type StoredObservation = Observation & { disabledByLoop?: boolean }
+const creditsSchema = v.object({
+  balance: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  unlimited: v.boolean(),
+})
+const observationSchema = v.object({
+  resetAt: v.pipe(v.number(), v.finite(), v.minValue(1), v.maxValue(253402300799)),
+  usedPercent: v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100)),
+  observedAt: v.optional(v.string()),
+  credits: v.optional(v.nullable(creditsSchema)),
+})
 const stateSchema = v.record(
   v.string(),
-  v.object({
-    resetAt: v.number(),
-    usedPercent: v.number(),
-    disabledByLoop: v.optional(v.boolean()),
-  }),
+  v.union([
+    v.object({
+      ...observationSchema.entries,
+      disabledByLoop: v.optional(v.boolean()),
+    }),
+    v.object({
+      resetAt: v.optional(v.undefined()),
+      usedPercent: v.optional(v.undefined()),
+      observedAt: v.optional(v.string()),
+      credits: v.nullable(creditsSchema),
+      disabledByLoop: v.optional(v.boolean()),
+    }),
+  ]),
 )
 const neutralPriority = 0
 const spentPriority = -1
@@ -62,6 +96,7 @@ function readSeconds(value: string | undefined) {
 export function readObservation(
   provider: Provider,
   signals: Readonly<Record<string, string>> | undefined,
+  observedAt?: string,
 ): Observation | null {
   if (provider === 'codex') {
     const primaryWindow = signals?.['X-Codex-Primary-Window-Minutes']
@@ -71,30 +106,61 @@ export function readObservation(
       return null
     const resetAt = Number(signals?.[`X-Codex-${window}-Reset-At`] ?? Number.NaN)
     const usedPercent = Number(signals?.[`X-Codex-${window}-Used-Percent`] ?? Number.NaN)
-    if (!Number.isFinite(resetAt) || !Number.isFinite(usedPercent)) return null
-    return { resetAt, usedPercent }
+    const observation: Observation = { resetAt, usedPercent }
+    if (!v.is(observationSchema, observation)) return null
+    if (observedAt !== undefined) observation.observedAt = observedAt
+    const credits = readCredits(signals)
+    if (credits !== undefined) observation.credits = credits
+    return observation
   }
   const resetAt = readSeconds(signals?.['Anthropic-Ratelimit-Unified-7d-Reset'])
   const utilization = Number(signals?.['Anthropic-Ratelimit-Unified-7d-Utilization'] ?? Number.NaN)
-  if (!Number.isFinite(resetAt) || !Number.isFinite(utilization)) return null
+  const observation: Observation = { resetAt, usedPercent: utilization * 100 }
+  if (!v.is(observationSchema, observation)) return null
   const rejected = signals?.['Anthropic-Ratelimit-Unified-7d-Status']?.toLowerCase() === 'rejected'
-  return { resetAt, usedPercent: rejected ? 100 : Math.min(100, utilization * 100) }
+  if (rejected) observation.usedPercent = 100
+  if (observedAt !== undefined) observation.observedAt = observedAt
+  return observation
 }
 
-// Proxy quota observations live in memory only, so the last one per account survives restarts here.
+// Credits-only headers retain weekly freshness; null preserves confirmed credit absence across restarts.
+export function mergeStoredObservations(
+  credentials: readonly Credential[],
+  stored: Readonly<Record<string, StoredObservation>>,
+) {
+  const merged: Record<string, StoredObservation> = {}
+  for (const credential of credentials) {
+    const previous = stored[credential.index]
+    const current = v.is(observationSchema, credential.observation) ? credential.observation : null
+    const next: Partial<Observation> & { disabledByLoop?: boolean } = { ...(current ?? previous) }
+    if (credential.disabled && previous?.disabledByLoop !== undefined)
+      next.disabledByLoop = previous.disabledByLoop
+    if (!credential.disabled) delete next.disabledByLoop
+    const observedCredits = credential.credits === undefined ? current?.credits : credential.credits
+    const credits = observedCredits === undefined ? previous?.credits : observedCredits
+    if (credits !== undefined) next.credits = credits
+    if (next.resetAt !== undefined && next.usedPercent !== undefined) {
+      merged[credential.index] = { ...next, resetAt: next.resetAt, usedPercent: next.usedPercent }
+      continue
+    }
+    if (next.credits === undefined) continue
+    const { resetAt: _resetAt, usedPercent: _usedPercent, ...metadata } = next
+    merged[credential.index] = { ...metadata, credits: next.credits }
+  }
+  return merged
+}
+
+// Expired weekly data remains on disk, while routing treats it as unknown.
 export function mergeObservations(
   credentials: readonly Credential[],
-  stored: Readonly<Record<string, Observation>>,
+  stored: Readonly<Record<string, StoredObservation>>,
   nowSeconds: number,
 ) {
   const merged: Record<string, Observation> = {}
-  for (const credential of credentials) {
-    const observation = credential.observation ?? stored[credential.index]
-    if (!observation || observation.resetAt <= nowSeconds) continue
-    merged[credential.index] = {
-      resetAt: observation.resetAt,
-      usedPercent: observation.usedPercent,
-    }
+  for (const [index, observation] of Object.entries(mergeStoredObservations(credentials, stored))) {
+    if (observation.resetAt === undefined || observation.resetAt <= nowSeconds) continue
+    const { disabledByLoop: _disabledByLoop, ...weekly } = observation
+    merged[index] = weekly
   }
   return merged
 }
@@ -224,7 +290,8 @@ async function readCredentials(options: ResetOrderOptions) {
       index: file.auth_index,
       priority: file.priority ?? neutralPriority,
       disabled: file.disabled ?? false,
-      observation: readObservation(file.provider, file.quota?.signals),
+      observation: readObservation(file.provider, file.quota?.signals, file.quota?.observed_at),
+      credits: file.provider === 'codex' ? readCredits(file.quota?.signals) : undefined,
     })
   }
   return { ok: true as const, credentials }
@@ -240,11 +307,8 @@ async function applyOrder(options: ResetOrderOptions) {
   const owned = new Set(
     credentials.filter((credential) => credential.disabled).map((credential) => credential.index),
   )
-  const observations = mergeObservations(credentials, stored, Date.now() / 1_000)
-  const state: Record<string, StoredObservation> = { ...observations }
-  for (const index of owned) {
-    state[index] = { ...(observations[index] ?? stored[index]!), disabledByLoop: true }
-  }
+  const state = mergeStoredObservations(listed.credentials, stored)
+  const observations = mergeObservations(credentials, state, Date.now() / 1_000)
   if (JSON.stringify(state) !== JSON.stringify(stored)) await writeState(options.stateFile, state)
   const disabled = planDisabled(credentials, observations, owned)
   for (const credential of credentials) {
@@ -252,7 +316,7 @@ async function applyOrder(options: ResetOrderOptions) {
     if (next === undefined) continue
     if (next) {
       // The proxy can apply a change before its response is lost; record the intent first.
-      state[credential.index] = { ...observations[credential.index]!, disabledByLoop: true }
+      state[credential.index] = { ...state[credential.index]!, disabledByLoop: true }
       await writeState(options.stateFile, state)
     }
     const patched = await management(options, 'auth-files/status', {
@@ -262,8 +326,8 @@ async function applyOrder(options: ResetOrderOptions) {
     if (!patched.ok) return { ok: false as const, status: patched.status }
     credential.disabled = next
     if (next) continue
-    if (observations[credential.index]) state[credential.index] = observations[credential.index]!
-    else delete state[credential.index]
+    const retained = state[credential.index]
+    if (retained) delete retained.disabledByLoop
     await writeState(options.stateFile, state)
   }
   if (disabled.size > 0) {

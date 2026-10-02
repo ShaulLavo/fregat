@@ -120,6 +120,7 @@ async function run() {
       usageProducer = await createUsageProducer({
         ...config.usageFeed,
         feedDirectory: config.usageFeed.directory,
+        resetOrderStateFile: config.resetOrder?.stateFile,
         proxyUrl: `http://127.0.0.1:${config.proxyPort}`,
       })
     }

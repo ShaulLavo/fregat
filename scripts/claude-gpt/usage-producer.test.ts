@@ -1,9 +1,9 @@
 import { expect, test, vi } from 'vitest'
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createUsageProducer } from './usage-producer'
-import { configuredAccounts, createUsageSnapshot } from './usage-feed'
+import { configuredAccounts, createUsageSnapshot, type UsageSnapshot } from './usage-feed'
 
 const observedAt = '2026-10-02T18:00:00.000Z'
 const cachedBody = {
@@ -82,6 +82,136 @@ test('only cached management GET is called; failures/restart retain sanitized ob
     await rm(paths.directory, { recursive: true, force: true })
   }
 })
+
+test('startup discards an invalid epoch-reset cache before publishing fresh passive data', async () => {
+  const paths = await fixture()
+  const previous = createUsageSnapshot(configuredAccounts, observedAt)
+  previous.accounts[1]!.windows = [
+    {
+      id: 'primary',
+      label: 'Primary',
+      usedPercent: null,
+      resetsAt: '1970-01-01T00:00:00.000Z',
+      windowMinutes: null,
+      status: 'unknown',
+      lastSeenAt: observedAt,
+      source: 'proxy-state',
+    },
+  ]
+  await mkdir(paths.feedDirectory)
+  const filename = join(paths.feedDirectory, 'v1.json')
+  await writeFile(filename, JSON.stringify(previous))
+  const producer = await createUsageProducer({
+    ...paths,
+    proxyUrl: 'http://127.0.0.1:18317',
+    now: () => Date.parse(observedAt),
+    fetcher: async () => Response.json(cachedBody),
+  })
+  try {
+    expect(JSON.parse(await readFile(filename, 'utf8')).accounts[1].windows).toEqual([])
+    expect(await producer.poll()).toBe(true)
+    expect(JSON.parse(await readFile(filename, 'utf8')).accounts[1].windows).toMatchObject([
+      { id: 'five_hour', usedPercent: 25, resetsAt: null },
+    ])
+  } finally {
+    await producer.stop()
+    await rm(paths.directory, { recursive: true, force: true })
+  }
+})
+
+test.each([300, 0])(
+  'publishes cached Codex windows (%i minutes) for active and disabled credentials',
+  async (minutes) => {
+    const paths = await fixture()
+    const signals = {
+      'X-Codex-Primary-Used-Percent': '23',
+      'X-Codex-Primary-Window-Minutes': '10080',
+      'X-Codex-Primary-Reset-At': String(Date.parse('2026-10-09T15:00:00Z') / 1000),
+      'X-Codex-Secondary-Used-Percent': '0',
+      'X-Codex-Secondary-Window-Minutes': String(minutes),
+      'X-Codex-Secondary-Reset-After-Seconds': minutes ? '7200' : '0',
+    }
+    const quota = { observed_at: observedAt, signals }
+    const body = {
+      observed_at: '2026-10-02T18:10:00.000Z',
+      files: [
+        {
+          provider: 'codex',
+          label: 'shaul.lavochkin',
+          status: 'active',
+          disabled: false,
+          unavailable: false,
+          quota,
+          model_quotas: { 'gpt-6.1-sol': quota },
+          cooldowns: [],
+        },
+        {
+          provider: 'codex',
+          label: 'shaul9191',
+          status: 'disabled',
+          disabled: true,
+          quota: {
+            observed_at: observedAt,
+            signals: { ...signals, 'X-Codex-Primary-Used-Percent': '100' },
+          },
+          cooldowns: [],
+        },
+      ],
+    }
+    const producer = await createUsageProducer({
+      ...paths,
+      proxyUrl: 'http://127.0.0.1:18317',
+      now: () => Date.parse(body.observed_at),
+      fetcher: async () => Response.json(body),
+    })
+    try {
+      expect(await producer.poll()).toBe(true)
+      const snapshot: UsageSnapshot = JSON.parse(
+        await readFile(join(paths.feedDirectory, 'v1.json'), 'utf8'),
+      )
+      const active = snapshot.accounts[2]!
+      expect(active.windows).toHaveLength(minutes ? 4 : 2)
+      const shortWindow = {
+        id: 'five_hour',
+        label: '5h',
+        windowMinutes: 300,
+        usedPercent: 0,
+        resetsAt: '2026-10-02T20:00:00.000Z',
+        lastSeenAt: observedAt,
+      }
+      if (minutes) {
+        expect(active.windows.find(({ id }) => id === 'five_hour')).toMatchObject(shortWindow)
+        expect(active.windows.find(({ id }) => id === 'model:gpt-6.1-sol:five_hour')).toMatchObject(
+          {
+            ...shortWindow,
+            id: 'model:gpt-6.1-sol:five_hour',
+            label: 'model gpt-6.1-sol 5h',
+          },
+        )
+      }
+      expect(active.windows.some(({ id }) => id === 'secondary' || id.endsWith(':secondary'))).toBe(
+        false,
+      )
+      expect(active.windows.find(({ id }) => id === 'weekly')).toMatchObject({
+        label: 'Weekly',
+        windowMinutes: 10080,
+        usedPercent: 23,
+        resetsAt: '2026-10-09T15:00:00.000Z',
+      })
+      expect(active.windows.find(({ id }) => id === 'model:gpt-6.1-sol:weekly')).toMatchObject({
+        windowMinutes: 10080,
+      })
+      expect(snapshot.accounts[1]).toMatchObject({ state: 'disabled', routing: { active: false } })
+      expect(snapshot.accounts[1]!.windows).toHaveLength(minutes ? 2 : 1)
+      expect(snapshot.accounts[1]!.windows.find(({ id }) => id === 'weekly')).toMatchObject({
+        usedPercent: 100,
+      })
+    } finally {
+      await producer.stop()
+      await rm(paths.directory, { recursive: true, force: true })
+    }
+  },
+)
 
 test('serialized sampler cancels shutdown and does not issue overlapping polls or readiness requests', async () => {
   const paths = await fixture()
@@ -409,3 +539,257 @@ test('safe ancestor aliases retain portable temporary-directory behavior and mis
     await rm(paths.directory, { recursive: true, force: true })
   }
 })
+
+const resetAt = Date.parse('2026-10-09T15:00:00.000Z') / 1000
+const privateIndex = 'synthetic-private-auth-index'
+const disabledBody = {
+  observed_at: '2026-10-02T18:10:00.000Z',
+  files: [
+    {
+      provider: 'codex',
+      label: 'shaul9191',
+      auth_index: privateIndex,
+      disabled: true,
+      status: 'disabled',
+      cooldowns: [],
+    },
+  ],
+}
+
+async function seedWeeklyFeed(feedDirectory: string) {
+  const previous = createUsageSnapshot(configuredAccounts, observedAt)
+  const account = previous.accounts[1]!
+  account.state = 'ready'
+  account.lastSeenAt = observedAt
+  account.windows = [
+    {
+      id: 'weekly',
+      label: 'Weekly',
+      usedPercent: 92,
+      resetsAt: '2026-10-09T15:00:00.000Z',
+      windowMinutes: 10080,
+      status: 'warning',
+      lastSeenAt: observedAt,
+      source: 'proxy-state',
+    },
+  ]
+  await mkdir(feedDirectory)
+  await writeFile(join(feedDirectory, 'v1.json'), JSON.stringify(previous))
+  return previous
+}
+
+test.each(['missing', 'empty', 'malformed', 'invalid', 'oversized'] as const)(
+  'restart with %s reset-order state retains historical weekly observations for disabled credentials',
+  async (kind) => {
+    const paths = await fixture()
+    const previous = await seedWeeklyFeed(paths.feedDirectory)
+    const resetOrderStateFile = join(paths.directory, 'synthetic-reset-order.json')
+    const invalidStates = {
+      empty: '{}',
+      malformed: '{',
+      invalid: JSON.stringify({ [privateIndex]: { resetAt: -1, usedPercent: 100 } }),
+      oversized:
+        JSON.stringify({ [privateIndex]: { resetAt, usedPercent: 100 } }) + ' '.repeat(65536),
+    }
+    if (kind !== 'missing') await writeFile(resetOrderStateFile, invalidStates[kind])
+    const producer = await createUsageProducer({
+      ...paths,
+      resetOrderStateFile,
+      proxyUrl: 'http://127.0.0.1:18317',
+      now: () => Date.parse(disabledBody.observed_at),
+      fetcher: async () => Response.json(disabledBody),
+    })
+    try {
+      expect(await producer.poll()).toBe(true)
+      const text = await readFile(join(paths.feedDirectory, 'v1.json'), 'utf8')
+      const snapshot: UsageSnapshot = JSON.parse(text)
+      expect(snapshot.accounts[1]).toMatchObject({
+        state: 'disabled',
+        source: 'proxy-state',
+        routing: { active: false },
+        windows: previous.accounts[1]!.windows,
+        lastSeenAt: observedAt,
+      })
+      expect(text).not.toContain(privateIndex)
+    } finally {
+      await producer.stop()
+      await rm(paths.directory, { recursive: true, force: true })
+    }
+  },
+)
+
+test.each([true, false])(
+  'restored reset-order weekly quota uses stored timestamp when present (%s) and file mtime otherwise',
+  async (hasObservedAt) => {
+    const paths = await fixture()
+    const resetOrderStateFile = join(paths.directory, 'synthetic-reset-order.json')
+    const policyObservedAt = '2026-10-02T17:00:00.000Z'
+    const mtime = '2026-10-02T17:30:00.000Z'
+    await writeFile(
+      resetOrderStateFile,
+      JSON.stringify({
+        [privateIndex]: {
+          resetAt,
+          usedPercent: 100,
+          disabledByLoop: true,
+          ...(hasObservedAt ? { observedAt: policyObservedAt } : {}),
+          credits: { balance: 3.25, unlimited: false },
+        },
+        'unapproved-private-index': { resetAt, usedPercent: 45 },
+      }),
+    )
+    await utimes(resetOrderStateFile, new Date(mtime), new Date(mtime))
+    const options = {
+      ...paths,
+      resetOrderStateFile,
+      proxyUrl: 'http://127.0.0.1:18317',
+      now: () => Date.parse(disabledBody.observed_at),
+      fetcher: async () => Response.json(disabledBody),
+    }
+    let producer = await createUsageProducer(options)
+    try {
+      expect(await producer.poll()).toBe(true)
+      const filename = join(paths.feedDirectory, 'v1.json')
+      const text = await readFile(filename, 'utf8')
+      const snapshot: UsageSnapshot = JSON.parse(text)
+      const lastSeenAt = hasObservedAt ? policyObservedAt : mtime
+      expect(snapshot.accounts[1]).toMatchObject({
+        state: 'disabled',
+        source: 'proxy-state',
+        lastSeenAt,
+        credits: { balance: 3.25, unlimited: false },
+        windows: [
+          {
+            id: 'weekly',
+            label: 'Weekly',
+            windowMinutes: 10080,
+            usedPercent: 100,
+            resetsAt: '2026-10-09T15:00:00.000Z',
+            lastSeenAt,
+            source: 'reset-order',
+            status: 'exhausted',
+          },
+        ],
+      })
+      expect(snapshot.accounts[2]!.windows).toEqual([])
+      expect(text).not.toMatch(
+        /synthetic-private-auth-index|unapproved-private-index|auth_index|disabledByLoop|resetAt/,
+      )
+      await producer.stop()
+      await rm(resetOrderStateFile)
+      producer = await createUsageProducer(options)
+      expect(await producer.poll()).toBe(true)
+      expect(JSON.parse(await readFile(filename, 'utf8')).accounts[1]).toEqual(snapshot.accounts[1])
+    } finally {
+      await producer.stop()
+      await rm(paths.directory, { recursive: true, force: true })
+    }
+  },
+)
+
+test('a newer policy file updates weekly quota while ambiguous credit changes remain omitted', async () => {
+  const paths = await fixture()
+  const previous = await seedWeeklyFeed(paths.feedDirectory)
+  const resetOrderStateFile = join(paths.directory, 'synthetic-reset-order.json')
+  let now = Date.parse(disabledBody.observed_at)
+  await writeFile(
+    resetOrderStateFile,
+    JSON.stringify({ [privateIndex]: { resetAt, usedPercent: 100, observedAt } }),
+  )
+  const producer = await createUsageProducer({
+    ...paths,
+    resetOrderStateFile,
+    proxyUrl: 'http://127.0.0.1:18317',
+    now: () => now,
+    fetcher: async () => Response.json(disabledBody),
+  })
+  try {
+    const filename = join(paths.feedDirectory, 'v1.json')
+    expect(JSON.parse(await readFile(filename, 'utf8')).accounts[1].windows).toEqual(
+      previous.accounts[1]!.windows,
+    )
+    expect(await producer.poll()).toBe(true)
+    const updatedAt = '2026-10-02T18:05:00.000Z'
+    await writeFile(
+      resetOrderStateFile,
+      JSON.stringify({
+        [privateIndex]: {
+          resetAt,
+          usedPercent: 100,
+          observedAt: updatedAt,
+          credits: { balance: 0, unlimited: true },
+        },
+      }),
+    )
+    now += 60000
+    expect(await producer.poll()).toBe(true)
+    const account = JSON.parse(await readFile(filename, 'utf8')).accounts[1]
+    expect(account.credits).toBeUndefined()
+    expect(account.windows).toMatchObject([
+      { usedPercent: 100, lastSeenAt: updatedAt, source: 'reset-order' },
+    ])
+  } finally {
+    await producer.stop()
+    await rm(paths.directory, { recursive: true, force: true })
+  }
+})
+
+test('credits-only reset-order state supplies sanitized credits without inventing a quota window', async () => {
+  const paths = await fixture()
+  const resetOrderStateFile = join(paths.directory, 'synthetic-reset-order.json')
+  await writeFile(
+    resetOrderStateFile,
+    JSON.stringify({ [privateIndex]: { observedAt, credits: { balance: 4.5, unlimited: false } } }),
+  )
+  const producer = await createUsageProducer({
+    ...paths,
+    resetOrderStateFile,
+    proxyUrl: 'http://127.0.0.1:18317',
+    now: () => Date.parse(disabledBody.observed_at),
+    fetcher: async () => Response.json(disabledBody),
+  })
+  try {
+    expect(await producer.poll()).toBe(true)
+    const text = await readFile(join(paths.feedDirectory, 'v1.json'), 'utf8')
+    expect(JSON.parse(text).accounts[1]).toMatchObject({
+      credits: { balance: 4.5, unlimited: false },
+      windows: [],
+    })
+    expect(text).not.toContain(privateIndex)
+  } finally {
+    await producer.stop()
+    await rm(paths.directory, { recursive: true, force: true })
+  }
+})
+
+test.each(['direct', 'alias'] as const)(
+  'physical reset-order %s rejects publication before policy overwrite or fetch',
+  async (kind) => {
+    const paths = await fixture()
+    const { symlink } = await import('node:fs/promises')
+    await mkdir(paths.feedDirectory)
+    const filename = join(paths.feedDirectory, 'v1.json')
+    const original = JSON.stringify({ [privateIndex]: { resetAt, usedPercent: 100 } })
+    await writeFile(filename, original)
+    let resetOrderStateFile = filename
+    if (kind === 'alias') {
+      resetOrderStateFile = join(paths.directory, 'synthetic-policy-alias')
+      await symlink(filename, resetOrderStateFile)
+    }
+    const fetcher = vi.fn(async () => Response.json(disabledBody))
+    try {
+      await expect(
+        createUsageProducer({
+          ...paths,
+          resetOrderStateFile,
+          proxyUrl: 'http://127.0.0.1:18317',
+          fetcher,
+        }),
+      ).rejects.toMatchObject({ code: 'usage-feed.UNSAFE_LOCATION' })
+      expect(fetcher).not.toHaveBeenCalled()
+      expect(await readFile(filename, 'utf8')).toBe(original)
+    } finally {
+      await rm(paths.directory, { recursive: true, force: true })
+    }
+  },
+)
