@@ -3,13 +3,14 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { launcherFailureFacts, reportStartFailure } from './failure'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
-import { portFromEnv, runtimeUrl } from '../../../../scripts/runtime-network'
+import { portFromEnv, requestOriginHeaders, runtimeUrl } from '../../../../scripts/runtime-network'
 import { desktopErrors } from '../bun/structured-errors'
 import {
   initializeDesktopObservability,
   flushDesktopObservability,
   recordDesktopInfo,
   recordDesktopError,
+  recordDesktopWarning,
 } from '../bun/observability'
 import { resolveBrowserCandidates } from './browser'
 import { launchInstalledWindow } from './installed-window'
@@ -89,12 +90,12 @@ async function start() {
       signal: controller.signal,
     })
     web = service.url
-    server = service.url.replace(/\/$/, '')
+    server = service.identity.address
     recordDesktopInfo('desktop.service.ready', { disposition: service.disposition })
   }
   const settings = await readSettings(server, web, {
-    signal: requestSignal(),
-    onUnreachable: (context) => recordDesktopInfo('desktop.settings.unreachable', context),
+    signal: controller.signal,
+    onWarning: (context) => recordDesktopWarning('desktop.settings.unreachable', context),
   })
   helperBudget = settings.native
   const candidates = resolveBrowserCandidates(
@@ -206,12 +207,15 @@ async function start() {
   }
 }
 
-async function waitForHttp(url: string, origin: string) {
+async function waitForHttp(url: string, webUrl: string) {
   const deadline = Date.now() + 90_000
   while (Date.now() < deadline) {
     controller.signal.throwIfAborted()
     try {
-      const response = await fetch(url, { headers: { Origin: origin }, signal: requestSignal() })
+      const response = await fetch(url, {
+        headers: requestOriginHeaders(webUrl),
+        signal: requestSignal(),
+      })
       await response.body?.cancel()
       if (response.ok) return
     } catch {
