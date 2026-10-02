@@ -193,9 +193,7 @@ test('invalid numeric signals stay unknown; missing duration never implies five 
 
 test.each([
   { minutes: undefined, resetAt: undefined },
-  { minutes: '0', resetAt: undefined },
   { minutes: undefined, resetAt: '0' },
-  { minutes: '0', resetAt: '0' },
 ])(
   'unknown duration/reset signals ($minutes, $resetAt) do not invent a reset at observation time',
   ({ minutes, resetAt }) => {
@@ -335,33 +333,35 @@ test.each(['primary', 'secondary'])(
   },
 )
 
-test.each([
-  {
-    known: 'X-Codex-Bengalfox',
-    unknown: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
-    position: 'primary',
-  },
-  {
-    known: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
-    unknown: 'X-Codex-Bengalfox',
-    position: 'primary',
-  },
-  {
-    known: 'X-Codex-Bengalfox',
-    unknown: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
-    position: 'secondary',
-  },
-  {
-    known: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
-    unknown: 'X-Codex-Bengalfox',
-    position: 'secondary',
-  },
-])(
-  'equivalent prefixes prefer the identified $position window from $known within one sample',
-  ({ known, unknown, position }) => {
+test.each(
+  [
+    {
+      known: 'X-Codex-Bengalfox',
+      unknown: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
+      position: 'primary',
+    },
+    {
+      known: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
+      unknown: 'X-Codex-Bengalfox',
+      position: 'primary',
+    },
+    {
+      known: 'X-Codex-Bengalfox',
+      unknown: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
+      position: 'secondary',
+    },
+    {
+      known: 'X-Codex-Additional-Gpt-5.3-Codex-Spark',
+      unknown: 'X-Codex-Bengalfox',
+      position: 'secondary',
+    },
+  ].flatMap((entry) => [300, 120].map((minutes) => ({ ...entry, minutes }))),
+)(
+  'equivalent prefixes prefer the identified $position window ($minutes minutes) from $known within one sample',
+  ({ known, unknown, position, minutes }) => {
     const file = proxyBody({
       ...weeklySignals,
-      [`${known}-${position}-Window-Minutes`]: '300',
+      [`${known}-${position}-Window-Minutes`]: String(minutes),
       [`${known}-${position}-Used-Percent`]: '25',
       [`${unknown}-${position}-Used-Percent`]: '12',
     }).files[0]!
@@ -375,18 +375,44 @@ test.each([
       checked,
     )!.accounts[1]!.windows
     expect(windows).toHaveLength(6)
-    expect(windows.map(({ id }) => id)).not.toContain(`bengalfox:${position}`)
-    expect(windows.map(({ id }) => id)).not.toContain(`model:gpt-6.1-sol:bengalfox:${position}`)
-    expect(windows.find(({ id }) => id === 'bengalfox:five_hour')).toMatchObject({
+    const allowance = minutes === 300 ? 'five_hour' : position
+    expect(windows.find(({ id }) => id === `bengalfox:${allowance}`)).toMatchObject({
       usedPercent: 25,
-      windowMinutes: 300,
+      windowMinutes: minutes,
     })
-    expect(windows.find(({ id }) => id === 'model:gpt-6.1-sol:bengalfox:five_hour')).toMatchObject({
+    expect(
+      windows.find(({ id }) => id === `model:gpt-6.1-sol:bengalfox:${allowance}`),
+    ).toMatchObject({
       usedPercent: 25,
-      windowMinutes: 300,
+      windowMinutes: minutes,
     })
   },
 )
+
+test('equal-age known Codex duration survives incomplete repeats; newer unknown observations remain fresh', () => {
+  const initial = normalizeProxySnapshot(
+    proxyBody({
+      'X-Codex-Primary-Window-Minutes': '120',
+      'X-Codex-Primary-Used-Percent': '25',
+    }),
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+  )!
+  const incomplete = proxyBody({ 'X-Codex-Primary-Used-Percent': '12' })
+  expect(normalizeProxySnapshot(incomplete, initial, checked)!.accounts[1]!.windows).toEqual(
+    initial.accounts[1]!.windows,
+  )
+  incomplete.files[0]!.quota.observed_at = later
+  expect(normalizeProxySnapshot(incomplete, initial, later)!.accounts[1]!.windows[0]).toMatchObject(
+    {
+      id: 'primary',
+      label: 'Quota',
+      usedPercent: 12,
+      windowMinutes: null,
+      lastSeenAt: later,
+    },
+  )
+})
 
 test('equivalent prefixes preserve distinct identified quota durations', () => {
   const file = proxyBody({
@@ -617,4 +643,165 @@ test('known websocket Spark allowance shares HTTP Bengalfox identity and preserv
   expect(updated.accounts[1]!.windows.find(({ id }) => id === 'five_hour')!.lastSeenAt).toBe(seen)
   const staleWebsocket = normalizeProxySnapshot(body, updated, later)!
   expect(staleWebsocket.accounts[1]!.windows).toEqual(updated.accounts[1]!.windows)
+})
+
+test.each(['primary', 'secondary'])(
+  'explicit zero duration removes the %s positional window in each namespace',
+  (position) => {
+    const signals = {
+      [`X-Codex-${position}-Used-Percent`]: '12',
+      [`X-Codex-Bengalfox-${position}-Used-Percent`]: '13',
+    }
+    const file = proxyBody(signals).files[0]!
+    const body = {
+      observed_at: checked,
+      files: [{ ...file, model_quotas: { 'gpt-6.1-sol': file.quota } }],
+    }
+    const initial = normalizeProxySnapshot(
+      body,
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    const absent = {
+      [`X-Codex-${position}-Window-Minutes`]: '0',
+      [`X-Codex-${position}-Used-Percent`]: '0',
+      [`X-Codex-Bengalfox-${position}-Window-Minutes`]: '0',
+      [`X-Codex-Bengalfox-${position}-Used-Percent`]: '0',
+    }
+    body.files[0]!.quota = { observed_at: later, signals: absent }
+    body.files[0]!.model_quotas['gpt-6.1-sol'] = body.files[0]!.quota
+    expect(normalizeProxySnapshot(body, initial, later)!.accounts[1]!.windows).toEqual([])
+    body.files[0]!.quota.observed_at = '2026-10-02T17:00:00Z'
+    expect(
+      normalizeProxySnapshot(body, initial, later)!.accounts[1]!.windows.filter(
+        ({ id }) => !id.startsWith('model:'),
+      ),
+    ).toEqual(initial.accounts[1]!.windows.filter(({ id }) => !id.startsWith('model:')))
+  },
+)
+
+test.each([
+  {
+    balance: '12.5',
+    has: 'true',
+    unlimited: 'false',
+    expected: { balance: 12.5, unlimited: false },
+  },
+  { balance: '0', has: 'false', unlimited: 'false', expected: undefined },
+  { balance: '0', has: '0', unlimited: 'TRUE', expected: { balance: 0, unlimited: true } },
+  { balance: '1', has: '1', unlimited: '0', expected: { balance: 1, unlimited: false } },
+  { balance: 'Infinity', has: 'true', unlimited: 'false', expected: undefined },
+  { balance: '-1', has: 'true', unlimited: 'false', expected: undefined },
+  { balance: '12', has: 'maybe', unlimited: 'false', expected: undefined },
+])(
+  'account credits validate scalar signals ($balance, $has, $unlimited)',
+  ({ balance, has, unlimited, expected }) => {
+    const snapshot = normalizeProxySnapshot(
+      proxyBody({
+        ...weeklySignals,
+        'X-Codex-Credits-Balance': balance,
+        'X-Codex-Credits-Has-Credits': has,
+        'X-Codex-Credits-Unlimited': unlimited,
+      }),
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    expect(snapshot.accounts[1]!.credits).toEqual(expected)
+    expect(restoreUsageSnapshot(snapshot, configuredAccounts)).toEqual(snapshot)
+  },
+)
+
+test('persisted policy supplies historical Weekly and credits only after approved auth-index association', () => {
+  const body = {
+    observed_at: checked,
+    files: [
+      { provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index', disabled: true },
+    ],
+  }
+  const policy = {
+    observedAt: checked,
+    observations: {
+      'synthetic-index': {
+        resetAt: 1791314592,
+        usedPercent: 100,
+        observedAt: seen,
+        credits: { balance: 12.5, unlimited: false },
+        disabledByLoop: true,
+      },
+    },
+  }
+  const snapshot = normalizeProxySnapshot(
+    body,
+    createUsageSnapshot(configuredAccounts, checked),
+    later,
+    policy,
+  )!
+  expect(snapshot.accounts[1]).toMatchObject({
+    state: 'disabled',
+    lastSeenAt: seen,
+    credits: { balance: 12.5, unlimited: false },
+    windows: [
+      {
+        id: 'weekly',
+        label: 'Weekly',
+        windowMinutes: 10080,
+        resetsAt: '2026-10-06T19:23:12.000Z',
+        usedPercent: 100,
+        status: 'exhausted',
+        source: 'reset-order',
+        lastSeenAt: seen,
+      },
+    ],
+  })
+  expect(JSON.stringify(snapshot)).not.toMatch(/synthetic-index|auth_index|disabledByLoop/)
+  body.files[0]!.label = 'unapproved'
+  expect(
+    normalizeProxySnapshot(body, createUsageSnapshot(configuredAccounts, checked), later, policy)!
+      .accounts[1]!.windows,
+  ).toEqual([])
+})
+
+test('live quota overrides persisted policy and explicit zero credits clear retained balance', () => {
+  const policy = {
+    observedAt: checked,
+    observations: {
+      'synthetic-index': {
+        resetAt: 1791314592,
+        usedPercent: 100,
+        observedAt: seen,
+        credits: { balance: 12.5, unlimited: false },
+      },
+    },
+  }
+  const noQuota = {
+    observed_at: checked,
+    files: [
+      { provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index', disabled: true },
+    ],
+  }
+  const previous = normalizeProxySnapshot(
+    noQuota,
+    createUsageSnapshot(configuredAccounts, checked),
+    checked,
+    policy,
+  )!
+  const file = proxyBody({
+    ...weeklySignals,
+    'X-Codex-Credits-Balance': '0',
+    'X-Codex-Credits-Has-Credits': 'false',
+    'X-Codex-Credits-Unlimited': 'false',
+  }).files[0]!
+  const body = {
+    observed_at: later,
+    files: [
+      { ...file, auth_index: 'synthetic-index', quota: { ...file.quota, observed_at: later } },
+    ],
+  }
+  const next = normalizeProxySnapshot(body, previous, later, policy)!
+  expect(next.accounts[1]!.credits).toBeUndefined()
+  expect(next.accounts[1]!.windows.find(({ id }) => id === 'weekly')).toMatchObject({
+    source: 'proxy-state',
+    usedPercent: 35,
+    lastSeenAt: later,
+  })
 })

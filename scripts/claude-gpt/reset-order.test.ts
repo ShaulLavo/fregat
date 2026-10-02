@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   mergeObservations,
+  mergeStoredObservations,
+  type StoredObservation,
   planPriorities,
   planDisabled,
   readObservation,
@@ -78,6 +80,185 @@ test('stored observations stand in until the restarted proxy observes the accoun
     'a.json': 2,
     'b.json': 1,
   })
+})
+
+test('weekly observations carry upstream timestamps and observed credits', () => {
+  const observedAt = '2026-10-03T08:00:00Z'
+  expect(
+    readObservation(
+      'codex',
+      {
+        'X-Codex-Primary-Window-Minutes': '10080',
+        'X-Codex-Primary-Reset-At': '12',
+        'X-Codex-Primary-Used-Percent': '94',
+        'X-Codex-Credits-Has-Credits': 'TRUE',
+        'X-Codex-Credits-Unlimited': '0',
+        'X-Codex-Credits-Balance': '62500',
+      },
+      observedAt,
+    ),
+  ).toEqual({
+    resetAt: 12,
+    usedPercent: 94,
+    observedAt,
+    credits: { balance: 62500, unlimited: false },
+  })
+  expect(
+    readObservation(
+      'claude',
+      {
+        'Anthropic-Ratelimit-Unified-7d-Reset': '12',
+        'Anthropic-Ratelimit-Unified-7d-Utilization': '0.42',
+      },
+      observedAt,
+    ),
+  ).toEqual({ resetAt: 12, usedPercent: 42, observedAt })
+})
+
+test('weekly observations omit unobserved credit balances and timestamps', () => {
+  expect(
+    readObservation('codex', {
+      'X-Codex-Primary-Reset-At': '12',
+      'X-Codex-Primary-Used-Percent': '94',
+      'X-Codex-Credits-Has-Credits': 'true',
+      'X-Codex-Credits-Unlimited': 'true',
+    }),
+  ).toEqual({ resetAt: 12, usedPercent: 94 })
+  expect(
+    readObservation(
+      'codex',
+      {
+        'X-Codex-Credits-Has-Credits': 'true',
+        'X-Codex-Credits-Unlimited': 'false',
+        'X-Codex-Credits-Balance': '25',
+      },
+      '2026-10-03T09:00:00Z',
+    ),
+  ).toBeNull()
+})
+
+test('stored metadata and legacy records survive omitted quota and disabled accounts', () => {
+  const stored = {
+    disabled: {
+      resetAt: now + 50,
+      usedPercent: 100,
+      observedAt: '2026-10-03T08:00:00Z',
+      credits: { balance: 25, unlimited: false },
+    },
+    legacy: { resetAt: now + 100, usedPercent: 20 },
+    owned: { resetAt: now + 200, usedPercent: 100, disabledByLoop: true },
+    gone: { resetAt: now + 300, usedPercent: 0 },
+  }
+  const credentials = [
+    { ...credential('disabled', null), disabled: true },
+    credential('legacy', null),
+    { ...credential('owned', null), disabled: true },
+  ]
+  expect(mergeStoredObservations(credentials, stored)).toEqual({
+    disabled: stored.disabled,
+    legacy: stored.legacy,
+    owned: stored.owned,
+  })
+})
+
+test('new weekly observations replace timestamps and retain omitted credits', () => {
+  const stored = {
+    a: {
+      resetAt: now + 50,
+      usedPercent: 20,
+      observedAt: '2026-10-03T08:00:00Z',
+      credits: { balance: 25, unlimited: false },
+      disabledByLoop: true,
+    },
+  }
+  const credentials = [
+    credential('a', {
+      resetAt: now + 70,
+      usedPercent: 40,
+      observedAt: '2026-10-03T09:00:00Z',
+    }),
+  ]
+  const state = mergeStoredObservations(credentials, stored)
+  expect(state.a).toEqual({
+    ...stored.a,
+    resetAt: now + 70,
+    usedPercent: 40,
+    observedAt: '2026-10-03T09:00:00Z',
+  })
+  expect(mergeObservations(credentials, state, now).a).toEqual({
+    resetAt: now + 70,
+    usedPercent: 40,
+    observedAt: '2026-10-03T09:00:00Z',
+    credits: stored.a.credits,
+  })
+  credentials[0]!.observation = { resetAt: now + 80, usedPercent: 50 }
+  expect(mergeStoredObservations(credentials, state).a).toEqual({
+    resetAt: now + 80,
+    usedPercent: 50,
+    credits: stored.a.credits,
+    disabledByLoop: true,
+  })
+})
+
+test('credits-only updates retain historical weekly freshness and explicitly clear credits', () => {
+  const stored = {
+    a: {
+      resetAt: now + 50,
+      usedPercent: 20,
+      observedAt: '2026-10-03T08:00:00Z',
+      credits: { balance: 25, unlimited: false },
+    },
+  }
+  const credits = { balance: 10, unlimited: true }
+  const updated = mergeStoredObservations([{ ...credential('a', null), credits }], stored)
+  expect(updated.a).toEqual({ ...stored.a, credits })
+  const cleared = mergeStoredObservations([{ ...credential('a', null), credits: null }], updated)
+  expect(cleared.a).toEqual({
+    resetAt: now + 50,
+    usedPercent: 20,
+    observedAt: stored.a.observedAt,
+  })
+})
+
+test('missing or malformed credit signals preserve the last observed credits', () => {
+  const stored = {
+    a: {
+      resetAt: now + 50,
+      usedPercent: 20,
+      observedAt: '2026-10-03T08:00:00Z',
+      credits: { balance: 25, unlimited: false },
+    },
+  }
+  expect(
+    mergeStoredObservations([{ ...credential('a', null), credits: undefined }], stored),
+  ).toEqual(stored)
+})
+
+test('credits-only accounts persist without invented weekly data and never enter routing', () => {
+  const credits = { balance: 10, unlimited: false }
+  const credentials = [{ ...credential('a', null), credits }]
+  const state = mergeStoredObservations(credentials, {})
+  expect(state).toEqual({ a: { credits } })
+  expect(mergeStoredObservations([credential('a', null)], state)).toEqual(state)
+  const observations = mergeObservations(credentials, state, now)
+  expect(observations).toEqual({})
+  expect(planPriorities(credentials, observations).get('a.json')).toBe(0)
+  expect(planDisabled(credentials, observations, new Set()).size).toBe(0)
+  expect(mergeStoredObservations([{ ...credential('a', null), credits: null }], state)).toEqual({})
+})
+
+test('expired weekly data remains persisted while routing treats it as unknown', () => {
+  const stored: Record<string, StoredObservation> = {
+    a: {
+      resetAt: now - 1,
+      usedPercent: 100,
+      observedAt: '2026-10-03T08:00:00Z',
+      credits: { balance: 25, unlimited: false },
+    },
+  }
+  const credentials = [credential('a', null)]
+  expect(mergeStoredObservations(credentials, stored)).toEqual(stored)
+  expect(mergeObservations(credentials, stored, now)).toEqual({})
 })
 
 test('equal resets order by auth index so the plan stays stable', () => {
@@ -239,12 +420,19 @@ test('the loop patches only changed priorities and records observations', async 
             auth_index: 'soon',
             provider: 'codex',
             priority: soonPriority,
-            quota: {
-              signals: {
-                'X-Codex-Primary-Reset-At': resetAt,
-                'X-Codex-Primary-Used-Percent': '10',
-              },
-            },
+            quota:
+              ticks === 1
+                ? {
+                    observed_at: '2026-10-03T09:00:00Z',
+                    signals: {
+                      'X-Codex-Primary-Reset-At': resetAt,
+                      'X-Codex-Primary-Used-Percent': '10',
+                      'X-Codex-Credits-Has-Credits': '1',
+                      'X-Codex-Credits-Unlimited': 'FALSE',
+                      'X-Codex-Credits-Balance': '25',
+                    },
+                  }
+                : undefined,
           },
           { name: 'new.json', auth_index: 'new', provider: 'codex', quota: { signals: {} } },
           {
@@ -253,13 +441,57 @@ test('the loop patches only changed priorities and records observations', async 
             provider: 'claude',
             priority: claudePriority,
             quota: {
+              observed_at: '2026-10-03T09:00:00Z',
               signals: {
                 'Anthropic-Ratelimit-Unified-7d-Reset': resetAt,
                 'Anthropic-Ratelimit-Unified-7d-Utilization': '0.25',
               },
             },
           },
-          { name: 'off.json', auth_index: 'off', provider: 'claude', disabled: true, priority: 7 },
+          {
+            name: 'off.json',
+            auth_index: 'off',
+            provider: 'codex',
+            disabled: true,
+            priority: 7,
+            quota: {
+              observed_at: '2026-10-03T10:00:00Z',
+              signals: {
+                'X-Codex-Credits-Has-Credits': 'FaLsE',
+                'X-Codex-Credits-Unlimited': '0',
+              },
+            },
+          },
+          {
+            name: 'credit-only.json',
+            auth_index: 'credit-only',
+            provider: 'codex',
+            quota: {
+              observed_at: '2026-10-03T10:00:00Z',
+              signals: {
+                'X-Codex-Credits-Has-Credits': '0',
+                'X-Codex-Credits-Unlimited': 'TrUe',
+                'X-Codex-Credits-Balance': '50',
+              },
+            },
+          },
+          { name: 'legacy.json', auth_index: 'legacy', provider: 'codex', disabled: true },
+          {
+            name: 'manual.json',
+            auth_index: 'manual',
+            provider: 'codex',
+            disabled: true,
+            quota: {
+              observed_at: '2026-10-03T09:00:00Z',
+              signals: {
+                'X-Codex-Primary-Reset-At': resetAt,
+                'X-Codex-Primary-Used-Percent': '100',
+                'X-Codex-Credits-Has-Credits': 'True',
+                'X-Codex-Credits-Unlimited': 'False',
+                'X-Codex-Credits-Balance': '5',
+              },
+            },
+          },
           { name: 'gemini.json', auth_index: 'gemini', provider: 'gemini', priority: 7 },
         ],
       })
@@ -268,6 +500,18 @@ test('the loop patches only changed priorities and records observations', async 
   const keyFile = join(scratch, 'key')
   const stateFile = join(scratch, 'state.json')
   await writeFile(keyFile, 'management-key\n')
+  const legacy = { resetAt: Number(resetAt), usedPercent: 70 }
+  await writeFile(
+    stateFile,
+    JSON.stringify({
+      off: {
+        ...legacy,
+        observedAt: '2026-10-03T08:00:00Z',
+        credits: { balance: 100, unlimited: false },
+      },
+      legacy,
+    }),
+  )
   const loop = startResetOrder({
     proxyUrl: upstream.url.toString(),
     managementKeyFile: keyFile,
@@ -281,8 +525,22 @@ test('the loop patches only changed priorities and records observations', async 
       { name: 'claude.json', priority: 1 },
     ])
     expect(await Bun.file(stateFile).json()).toEqual({
-      soon: { resetAt: Number(resetAt), usedPercent: 10 },
-      claude: { resetAt: Number(resetAt), usedPercent: 25 },
+      soon: {
+        resetAt: Number(resetAt),
+        usedPercent: 10,
+        observedAt: '2026-10-03T09:00:00Z',
+        credits: { balance: 25, unlimited: false },
+      },
+      claude: { resetAt: Number(resetAt), usedPercent: 25, observedAt: '2026-10-03T09:00:00Z' },
+      off: { ...legacy, observedAt: '2026-10-03T08:00:00Z' },
+      'credit-only': { credits: { balance: 50, unlimited: true } },
+      legacy,
+      manual: {
+        resetAt: Number(resetAt),
+        usedPercent: 100,
+        observedAt: '2026-10-03T09:00:00Z',
+        credits: { balance: 5, unlimited: false },
+      },
     })
   } finally {
     loop.stop()
@@ -356,12 +614,14 @@ test.each(['last-resort', 'reset-passed'])(
             priority: file.priority,
             id_token: { plan_type: file.plan_type },
             quota: {
+              observed_at: file.observation ? '2026-10-03T09:00:00Z' : undefined,
               signals: file.observation
                 ? {
                     'X-Codex-Primary-Window-Minutes': '10080',
                     'X-Codex-Primary-Reset-At': String(file.observation.resetAt),
                     'X-Codex-Primary-Used-Percent': String(file.observation.usedPercent),
                     'X-Codex-Credits-Has-Credits': 'True',
+                    'X-Codex-Credits-Unlimited': 'False',
                     'X-Codex-Credits-Balance': file.credits,
                     'X-Codex-Active-Limit': 'premium',
                   }
@@ -388,6 +648,11 @@ test.each(['last-resort', 'reset-passed'])(
       files[0]!.observation = null
       files[1]!.observation = null
       const stored = await Bun.file(stateFile).json()
+      expect(stored.spent).toMatchObject({
+        observedAt: '2026-10-03T09:00:00Z',
+        credits: { balance: 62500, unlimited: false },
+        disabledByLoop: true,
+      })
       if (reason === 'last-resort') stored.usable.usedPercent = 100
       if (reason === 'reset-passed') stored.spent.resetAt = Math.floor(Date.now() / 1_000) - 1
       await writeFile(stateFile, JSON.stringify(stored))
@@ -400,6 +665,11 @@ test.each(['last-resort', 'reset-passed'])(
         { name: 'spent.json', auth_index: 'spent', disabled: false },
       ])
       expect(files[2]!.disabled).toBe(true)
+      const retained = (await Bun.file(stateFile).json()).spent
+      expect(retained.observedAt).toBe(stored.spent.observedAt)
+      expect(retained.credits).toEqual(stored.spent.credits)
+      expect(retained.resetAt).toBe(stored.spent.resetAt)
+      expect(retained.disabledByLoop).toBeUndefined()
     } finally {
       loop.stop()
       upstream.stop(true)

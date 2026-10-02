@@ -36,6 +36,10 @@ const timeSchema = v.pipe(
 )
 const sourceSchema = v.picklist(['proxy-state', 'passive-header'])
 const percentSchema = v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100))
+const creditsSchema = v.strictObject({
+  balance: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  unlimited: v.boolean(),
+})
 const minutesSchema = v.pipe(v.number(), v.finite(), v.minValue(1), v.maxValue(525600))
 const windowSchema = v.strictObject({
   id: v.pipe(v.string(), v.regex(/^[a-z0-9][a-z0-9._:-]{0,127}$/)),
@@ -50,7 +54,7 @@ const windowSchema = v.strictObject({
   windowMinutes: v.nullable(minutesSchema),
   status: v.picklist(['allowed', 'warning', 'exhausted', 'unknown']),
   lastSeenAt: v.nullable(timeSchema),
-  source: sourceSchema,
+  source: v.picklist(['proxy-state', 'passive-header', 'reset-order']),
 })
 const cooldownReasons = v.picklist([
   'unknown',
@@ -86,6 +90,7 @@ const accountSchema = v.strictObject({
   }),
   windows: v.pipe(v.array(windowSchema), v.maxLength(64)),
   cooldown: v.nullable(cooldownSchema),
+  credits: v.optional(creditsSchema),
 })
 const snapshotSchema = v.strictObject({
   schemaVersion: v.literal(1),
@@ -102,6 +107,7 @@ const quotaSchema = v.object({
 })
 const proxyFileSchema = v.object({
   provider: v.string(),
+  auth_index: v.optional(v.string()),
   email: v.optional(v.string()),
   label: v.optional(v.string()),
   status: v.optional(v.string()),
@@ -124,6 +130,37 @@ const proxyFileSchema = v.object({
 })
 const proxySchema = v.object({ observed_at: timeSchema, files: v.array(proxyFileSchema) })
 type ProxyFile = v.InferOutput<typeof proxyFileSchema>
+const resetOrderObservationSchema = v.pipe(
+  v.object({
+    resetAt: v.optional(v.pipe(v.number(), v.finite(), v.minValue(1), v.maxValue(253402300799))),
+    usedPercent: v.optional(percentSchema),
+    observedAt: v.optional(timeSchema),
+    credits: v.optional(creditsSchema),
+    disabledByLoop: v.optional(v.boolean()),
+  }),
+  v.check(
+    (record) =>
+      (record.resetAt !== undefined && record.usedPercent !== undefined) ||
+      (record.resetAt === undefined &&
+        record.usedPercent === undefined &&
+        record.credits !== undefined),
+  ),
+)
+const resetOrderSchema = v.record(v.string(), resetOrderObservationSchema)
+export type ResetOrderSnapshot = {
+  observedAt: string
+  observations: Readonly<v.InferOutput<typeof resetOrderSchema>>
+}
+export function restoreResetOrderSnapshot(
+  value: unknown,
+  observedAt: string,
+): ResetOrderSnapshot | null {
+  const parsed = v.safeParse(resetOrderSchema, value)
+  const seen = timestamp(observedAt)
+  if (!parsed.success || !seen || Buffer.byteLength(JSON.stringify(value)) > maxFeedBytes)
+    return null
+  return { observedAt: seen, observations: parsed.output }
+}
 
 export function createUsageSnapshot(
   accounts: readonly UsageAccountConfig[],
@@ -187,6 +224,22 @@ function number(value: string | undefined, min: number, max: number): number | n
   const result = Number(value)
   return Number.isFinite(result) && result >= min && result <= max ? result : null
 }
+function boolean(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === 'true' || normalized === '1') return true
+  if (normalized === 'false' || normalized === '0') return false
+  return undefined
+}
+export function readCredits(signals: Signals | undefined): Account['credits'] | null {
+  if (!signals) return undefined
+  const values = lowerSignals(signals)
+  const hasCredits = boolean(values['x-codex-credits-has-credits'])
+  const unlimited = boolean(values['x-codex-credits-unlimited'])
+  if (hasCredits === undefined || unlimited === undefined) return undefined
+  if (!hasCredits && !unlimited) return null
+  const balance = number(values['x-codex-credits-balance'], 0, Number.MAX_VALUE)
+  return balance === null ? undefined : { balance, unlimited }
+}
 function reset(value: string | undefined) {
   if (value === undefined || value.trim() === '') return null
   const seconds = number(value, 0, 253402300799)
@@ -244,7 +297,7 @@ function codexWindow(
     source: 'proxy-state',
   }
 }
-type CodexObservation = { window: Window; slotId: string }
+type CodexObservation = { window: Window | null; slotId: string; observedAt: string }
 function codexWindows(
   quota: v.InferOutput<typeof quotaSchema> | undefined,
   namespace = '',
@@ -262,10 +315,16 @@ function codexWindows(
   ] as const
   for (const [prefix, extra] of prefixes) {
     for (const position of ['primary', 'secondary']) {
+      const slotId = `${namespace}${extra}${position}`
+      if (number(signals[`${prefix}-${position}-window-minutes`], 0, 525600) === 0) {
+        windows.push({ slotId, observedAt, window: null })
+        continue
+      }
       const window = codexWindow(signals, prefix, position, observedAt)
       if (!window) continue
       windows.push({
-        slotId: `${namespace}${extra}${position}`,
+        slotId,
+        observedAt,
         window: {
           ...window,
           id: `${namespace}${extra}${window.id}`,
@@ -277,13 +336,24 @@ function codexWindows(
   }
   return windows
 }
-function mergeWindows(previous: readonly Window[], incoming: readonly Window[]) {
+function mergeWindows(
+  previous: readonly Window[],
+  incoming: readonly Window[],
+  preferKnownDuration = false,
+) {
   const windows = new Map(previous.map((window) => [window.id, window]))
   for (const window of incoming) {
     const old = windows.get(window.id)
     if (
       old?.lastSeenAt &&
       (!window.lastSeenAt || Date.parse(old.lastSeenAt) > Date.parse(window.lastSeenAt))
+    )
+      continue
+    if (
+      preferKnownDuration &&
+      old?.lastSeenAt === window.lastSeenAt &&
+      old?.windowMinutes != null &&
+      window.windowMinutes === null
     )
       continue
     windows.set(window.id, window)
@@ -298,27 +368,32 @@ function mergeWindows(previous: readonly Window[], incoming: readonly Window[]) 
 }
 function mergeCodexWindows(previous: readonly Window[], incoming: readonly CodexObservation[]) {
   const prior = new Map(previous.map((window) => [window.id, window]))
-  const accepted = incoming.filter(({ window, slotId }) => {
+  const accepted = incoming.filter(({ observedAt, slotId }) => {
     const alias = prior.get(slotId)
-    if (!alias?.lastSeenAt) return true
-    if (!window.lastSeenAt) return false
-    return Date.parse(alias.lastSeenAt) <= Date.parse(window.lastSeenAt)
+    return !alias?.lastSeenAt || Date.parse(alias.lastSeenAt) <= Date.parse(observedAt)
   })
   const windows = new Map(
     mergeWindows(
       previous,
-      accepted.map(({ window }) => window),
+      accepted.flatMap(({ window }) => (window ? [window] : [])),
+      true,
     ).map((window) => [window.id, window]),
   )
   // Reconcile after merging so equivalent HTTP and websocket prefixes share aliases.
-  for (const { window, slotId } of accepted) {
-    if (window.id === slotId) continue
-    const alias = windows.get(slotId)
+  for (const { window, slotId, observedAt } of accepted) {
+    if (window?.id === slotId) continue
     if (
-      alias?.lastSeenAt &&
-      (!window.lastSeenAt || Date.parse(alias.lastSeenAt) > Date.parse(window.lastSeenAt))
+      !window &&
+      accepted.some(
+        (item) =>
+          item.slotId === slotId &&
+          item.window?.windowMinutes != null &&
+          Date.parse(item.observedAt) >= Date.parse(observedAt),
+      )
     )
       continue
+    const alias = windows.get(slotId)
+    if (alias?.lastSeenAt && Date.parse(alias.lastSeenAt) > Date.parse(observedAt)) continue
     windows.delete(slotId)
   }
   return [...windows.values()]
@@ -360,24 +435,74 @@ function proxyAccount(
   file: ProxyFile,
   observedAt: string,
   checkedAt: string,
+  policy?: ResetOrderSnapshot,
 ): Account {
   const incoming = codexWindows(file.quota)
+  const stored = file.auth_index ? policy?.observations[file.auth_index] : undefined
+  const storedSeen = stored?.observedAt ?? policy?.observedAt
+  if (
+    !incoming.some(({ window }) => window) &&
+    stored?.resetAt !== undefined &&
+    stored.usedPercent !== undefined &&
+    storedSeen
+  ) {
+    const resetsAt = new Date(stored.resetAt * 1000).toISOString()
+    const previous = account.windows.find(({ id }) => id === 'weekly')
+    const retainedAge =
+      previous?.usedPercent === stored.usedPercent && previous.resetsAt === resetsAt
+        ? previous.lastSeenAt
+        : null
+    const lastSeenAt = stored.observedAt ?? retainedAge ?? storedSeen
+    incoming.push({
+      slotId: 'weekly',
+      observedAt: lastSeenAt,
+      window: {
+        id: 'weekly',
+        label: 'Weekly',
+        usedPercent: stored.usedPercent,
+        resetsAt,
+        windowMinutes: 10080,
+        status: severity(stored.usedPercent),
+        lastSeenAt,
+        source: 'reset-order',
+      },
+    })
+  }
   for (const [model, quota] of Object.entries(file.model_quotas ?? {})) {
     if (!/^gpt-\d[a-z0-9._-]{0,48}$/.test(model)) continue
     incoming.push(...codexWindows(quota, `model:${model}:`))
   }
   const windows = mergeCodexWindows(account.windows, incoming)
+  const quotaSeen = timestamp(file.quota?.observed_at)
+  const observedCredits = quotaSeen ? readCredits(file.quota?.signals) : undefined
+  const creditIsStale =
+    quotaSeen && account.lastSeenAt && Date.parse(quotaSeen) < Date.parse(account.lastSeenAt)
+  const receivedCredits = creditIsStale ? undefined : observedCredits
+  const previousIsNewer =
+    account.lastSeenAt && storedSeen && Date.parse(account.lastSeenAt) > Date.parse(storedSeen)
+  const retainedCredits =
+    previousIsNewer && account.credits ? account.credits : (stored?.credits ?? account.credits)
+  const credits = receivedCredits === undefined ? retainedCredits : receivedCredits
+  const creditSeen =
+    receivedCredits !== undefined ? quotaSeen : credits ? (storedSeen ?? account.lastSeenAt) : null
+  const lastSeenAt = latestObservation(windows)
+  const accountSeen =
+    [lastSeenAt, creditSeen]
+      .filter((time): time is string => Boolean(time))
+      .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null
   const restriction = cooldown(file, observedAt, account.cooldown)
   const active = file.disabled || file.unavailable ? false : null
   const available = active === null && file.status === 'active' ? true : active
-  let state: Account['state'] = windows.length ? 'ready' : 'no-data'
+  let state: Account['state'] = windows.length || credits ? 'ready' : 'no-data'
   if (file.unavailable && !restriction) state = 'unknown'
   if (restriction) state = 'cooldown'
   if (file.disabled) state = 'disabled'
+  const { credits: _previousCredits, ...identity } = account
   return {
-    ...account,
+    ...identity,
+    ...(credits ? { credits } : {}),
     checkedAt,
-    lastSeenAt: latestObservation(windows),
+    lastSeenAt: accountSeen,
     windows,
     cooldown: restriction,
     state,
@@ -389,6 +514,7 @@ export function normalizeProxySnapshot(
   value: unknown,
   previous: UsageSnapshot,
   checkedAt: string,
+  policy?: ResetOrderSnapshot,
 ): UsageSnapshot | null {
   const parsed = v.safeParse(proxySchema, value)
   if (!parsed.success) return null
@@ -400,7 +526,7 @@ export function normalizeProxySnapshot(
     if (account.provider !== 'codex') return account
     const matching = parsed.output.files.filter((file) => matchesAccount(file, account, approved))
     if (matching.length !== 1) return account
-    return proxyAccount(account, matching[0]!, observedAt, checkedAt)
+    return proxyAccount(account, matching[0]!, observedAt, checkedAt, policy)
   })
   const next: UsageSnapshot = { ...previous, generatedAt: checkedAt, accounts }
   return bounded(next) ? next : null

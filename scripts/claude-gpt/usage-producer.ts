@@ -9,6 +9,7 @@ import {
   maxFeedBytes,
   normalizeProxySnapshot,
   observeClaudeHeaders,
+  restoreResetOrderSnapshot,
   restoreUsageSnapshot,
   usageAccountsSchema,
   type UsageAccountConfig,
@@ -19,6 +20,7 @@ export type UsageProducerOptions = {
   proxyUrl: string
   managementKeyFile: string
   feedDirectory: string
+  resetOrderStateFile?: string
   accounts?: readonly UsageAccountConfig[]
   intervalMs?: number
   requestTimeoutMs?: number
@@ -76,6 +78,11 @@ async function physicalPath(filename: string): Promise<string> {
     throw usageErrors.UNSAFE_LOCATION({ internal: { constraint: 'resolvable-filesystem-root' } })
   return join(await physicalPath(parent), basename(filename))
 }
+async function assertOutsideFeed(directory: string, filename: string, constraint: string) {
+  const location = relative(directory, await physicalPath(resolve(filename)))
+  const inside = location !== '..' && !location.startsWith(`..${sep}`) && !isAbsolute(location)
+  if (inside) throw usageErrors.UNSAFE_LOCATION({ internal: { constraint } })
+}
 async function prepareDirectory(options: UsageProducerOptions) {
   const url = new URL(options.proxyUrl)
   const requested = resolve(options.feedDirectory)
@@ -92,11 +99,9 @@ async function prepareDirectory(options: UsageProducerOptions) {
   }
   // Canonicalize ancestors and future paths so temporary-directory aliases stay safe.
   const directory = await physicalPath(requested)
-  const keyLocation = relative(directory, await physicalPath(resolve(options.managementKeyFile)))
-  const keyInside =
-    keyLocation !== '..' && !keyLocation.startsWith(`..${sep}`) && !isAbsolute(keyLocation)
-  if (keyInside)
-    throw usageErrors.UNSAFE_LOCATION({ internal: { constraint: 'physical-key-outside-feed' } })
+  await assertOutsideFeed(directory, options.managementKeyFile, 'physical-key-outside-feed')
+  if (options.resetOrderStateFile)
+    await assertOutsideFeed(directory, options.resetOrderStateFile, 'physical-policy-outside-feed')
   await mkdir(directory, { recursive: true, mode: 0o700 })
   const entries = await readdir(directory, { withFileTypes: true })
   const unsafe = entries.some(
@@ -109,23 +114,34 @@ async function prepareDirectory(options: UsageProducerOptions) {
     })
   return directory
 }
-async function readPrevious(filename: string, accounts: readonly UsageAccountConfig[]) {
+async function readBoundedJson(filename: string) {
   try {
     const file = await open(filename, 'r')
     try {
+      const stat = await file.stat()
+      if (!stat.isFile() || stat.size > maxFeedBytes) return null
       const buffer = Buffer.alloc(maxFeedBytes + 1)
       const { bytesRead } = await file.read(buffer)
       if (bytesRead > maxFeedBytes) return null
-      return restoreUsageSnapshot(
-        JSON.parse(buffer.subarray(0, bytesRead).toString('utf8')),
-        accounts,
-      )
+      return {
+        value: JSON.parse(buffer.subarray(0, bytesRead).toString('utf8')) as unknown,
+        observedAt: stat.mtime.toISOString(),
+      }
     } finally {
       await file.close()
     }
   } catch {
     return null
   }
+}
+async function readPrevious(filename: string, accounts: readonly UsageAccountConfig[]) {
+  const file = await readBoundedJson(filename)
+  return file ? restoreUsageSnapshot(file.value, accounts) : null
+}
+async function readResetOrder(filename: string | undefined) {
+  if (!filename) return undefined
+  const file = await readBoundedJson(filename)
+  return file ? (restoreResetOrderSnapshot(file.value, file.observedAt) ?? undefined) : undefined
 }
 async function publish(directory: string, snapshot: UsageSnapshot) {
   const text = `${JSON.stringify(snapshot)}\n`
@@ -239,8 +255,9 @@ export async function createUsageProducer(options: UsageProducerOptions) {
         return false
       }
       const body = await readBody(response, signal)
+      const resetOrder = await withAbort(readResetOrder(options.resetOrderStateFile), signal)
       if (signal.aborted) return false
-      const next = normalizeProxySnapshot(body, snapshot, isoNow())
+      const next = normalizeProxySnapshot(body, snapshot, isoNow(), resetOrder)
       if (!next) return false
       queuePublication(next)
       return await flush()
