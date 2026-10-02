@@ -16,11 +16,13 @@ export const priceSnapshotSchema = v.object({
 })
 
 export type PriceSnapshot = v.InferOutput<typeof priceSnapshotSchema>
-export type RecordedModelPrice = v.InferOutput<typeof modelRateSchema> & {
-  provider: string
-  model: string
-  fetchedAt: string
-}
+export const recordedModelPriceSchema = v.object({
+  ...modelRateSchema.entries,
+  provider: v.string(),
+  model: v.string(),
+  fetchedAt: v.pipe(v.string(), v.isoTimestamp()),
+})
+export type RecordedModelPrice = v.InferOutput<typeof recordedModelPriceSchema>
 
 const catalogSchema = v.record(v.string(), v.object({ models: v.record(v.string(), v.unknown()) }))
 const modelSchema = v.object({

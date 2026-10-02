@@ -654,3 +654,30 @@ it('documents the append-only assumption for arbitrary interior edits that prese
   await f.service.refresh()
   expect(f.service.read(query).totals.tokens).toBe(180)
 })
+
+it.each(['-1000', '1e999'])('rejects corrupt saved price rates on restart: %s', async (rate) => {
+  const f = await transcriptHistoryFixture(cleanup)
+  await writeFile(
+    join(f.transcripts, 'native.jsonl'),
+    JSON.stringify(nativeClaudeResponse('priced')) + '\n',
+  )
+  await f.service.refresh()
+  f.service.close()
+  const { Database } = await import('bun:sqlite')
+  const database = new Database(join(f.options.cacheDirectory, 'transcript-history.sqlite'))
+  const row = database.query<{ id: string; value: string }, []>('SELECT id, value FROM files').get()
+  expect(row).toBeDefined()
+  if (!row) return
+  database
+    .query('UPDATE files SET value = ? WHERE id = ?')
+    .run(row.value.replace('"input":1', '"input":' + rate), row.id)
+  database.close()
+  const restarted = new LocalTranscriptUsageService(f.options)
+  cleanup.push(async () => restarted.close())
+  await restarted.initialize()
+  expect(restarted.read(query).totals.tokens).toBe(0)
+  expect(restarted.read(query).coverage?.status).toBe('pending')
+  await restarted.refresh()
+  expect(restarted.read(query).totals.tokens).toBe(120)
+  expect(restarted.read(query).totals.costUsd).toBeCloseTo(0.00014)
+})
