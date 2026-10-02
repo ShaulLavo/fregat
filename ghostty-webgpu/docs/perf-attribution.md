@@ -272,6 +272,21 @@ original/formatted SHA-256 and parsed semantic equality. No compressed JSON dupl
 committed. Historical inventories retain their measured identities, distinct from the later
 analyzer revision and package-only CI test-discovery/native-provenance refresh.
 
+### Integration boundary
+
+The measured runtime and retained evidence are tied to `078645300`. A later normal merge of main
+`46e47cb71` brings in stable checkout hashing and GPU-qualification compaction repairs. Runtime
+`src/` and both WASM assets are unchanged; the runtime inventory remains
+`a55bde72b81dec698b8e150c5cb1484b698e6d85321f6b7903e519929b161e08`.
+The builder retains split effective-runtime/driver provenance as the authoritative identity.
+Native checkout builds separately sample the NUL-framed `checkoutSourceSha256` diagnostic before
+building; archived-runtime builds omit it before enumerating or reading checkout runtime sources.
+The merged analyzer SHA-256 is
+`72914cfef78e923f5106ce9df3676a8c922012a73ce7731b7d0f1bd56dc6fcb4`, distinct from both recorded
+and first analysis revisions. No measurement is relabeled or repeated, and retained JSON stays
+unchanged. Comparison/core/WebGL integration checks are rerun after the merge. Terminal's default-
+on WebGPU change remains a separate follow-up PR; this lane does not measure that change.
+
 ### Final repeating-ASCII timing: secondary, fixture-flattered
 
 The final differential-scroll source repeats the original paired ASCII/bytes matrix: four balanced

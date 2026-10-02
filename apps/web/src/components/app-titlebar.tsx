@@ -1,6 +1,6 @@
 import { UiModeToggle } from '@/components/ui-mode-toggle'
 import { WorkspaceProjectMenu } from '@/components/workspace-project-menu'
-import { ServerUpdateStatus } from '@/features/server-update/components/status'
+import { ServerUpdateStatus } from '@/components/server-update-status'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { TitlebarMenu } from '@/features/workbench/components/titlebar-menu'
 import { titlebarModel } from '@/features/workbench/utils/titlebar-model'

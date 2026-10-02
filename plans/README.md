@@ -11,6 +11,9 @@ execution. `IDEA` is only for a plan the owner explicitly calls an idea or is un
 readiness, cross-project conflicts and the PR reconciliation. It is a dated audit,
 not a second live status register.
 
+[October 2 issue triage](issue-triage-2026-10-02.md) records the cross-repository backlog,
+small-fix batch, reproduction needs and decisions for the owner.
+
 ## Current plan files
 
 | Plan                                                  | Topic                                                                         |

@@ -33,6 +33,7 @@ import {
   type Release,
 } from './release'
 import { log, output, run } from './run'
+import { parseMeshRoutes } from './routes'
 import { parseDeployArgs, type DeployOptions, type RestartRequest } from './args'
 import { requestRestart, requireStaged } from './restart'
 import { installUnit, notifyServer, restartInto, waitForServerRelease } from './systemd'
@@ -304,9 +305,17 @@ async function preflight() {
 // Mesh only exposes the port (its D22); the route is set up once by hand.
 async function assertMeshRoute() {
   const table = await output(['mesh', 'serve', 'ls'])
-  const route = table.split('\n').find((line) => line.trim().startsWith(`${meshRoute} `))
-  const expected = new RegExp(`^${meshRoute}\\s+${meshHost}\\s+proxy\\s+${serverPort}\\s`)
-  if (route && expected.test(route.trim())) return
+  const routes = parseMeshRoutes(table)
+  if (
+    routes.some(
+      (route) =>
+        route.route === meshRoute &&
+        route.host === meshHost &&
+        route.kind === 'proxy' &&
+        route.target === String(serverPort),
+    )
+  )
+    return
 
   throw createScriptError(
     `Mesh does not route ${meshRoute} to port ${serverPort}. Run:\n` +

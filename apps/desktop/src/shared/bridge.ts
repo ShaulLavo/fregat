@@ -7,6 +7,11 @@ export type PlatformPickOptions = {
   multiple?: boolean
 }
 
+export type WindowAppearance = {
+  readonly opacity: number
+  readonly frost: number
+}
+
 export type PlatformBridge = {
   // What is behind this window, so the web layer knows whether to draw a
   // wallpaper and a floor of its own. The shell reports what it actually
@@ -18,4 +23,5 @@ export type PlatformBridge = {
   colorScheme: ShellColorScheme
   titlebar: 'native' | 'overlay'
   pickEntry?(options: PlatformPickOptions): Promise<string[]>
+  setWindowAppearance?(appearance: WindowAppearance): void
 }

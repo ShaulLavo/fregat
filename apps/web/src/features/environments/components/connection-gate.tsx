@@ -18,9 +18,11 @@ import { StatusFrame } from '@workspace/ui/patterns/status-frame'
 export function ConnectionGate({
   origin,
   children,
+  recovery,
 }: {
   readonly origin: string
   readonly children: ReactNode
+  readonly recovery?: ReactNode
 }) {
   const connections = useEnvironmentConnections()
   const known = useEnvironmentsStore(
@@ -59,10 +61,15 @@ export function ConnectionGate({
     return (
       <StatusFrame
         action={
-          <Button onClick={() => retry.mutate()} disabled={retry.isPending || query.isFetching}>
-            {retry.isPending || query.isFetching ? <Spinner /> : null}{' '}
-            {drifted ? 'Trust the new server' : 'Retry connection'}
-          </Button>
+          <div className='flex items-center gap-(--density-gap-tight)'>
+            {connection.phase === 'protocol-mismatch' && origin === primaryServerOrigin()
+              ? recovery
+              : null}
+            <Button onClick={() => retry.mutate()} disabled={retry.isPending || query.isFetching}>
+              {retry.isPending || query.isFetching ? <Spinner /> : null}{' '}
+              {drifted ? 'Trust the new server' : 'Retry connection'}
+            </Button>
+          </div>
         }
         detail={
           refused

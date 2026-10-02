@@ -21,10 +21,32 @@ const RUN = path.join(import.meta.dirname, 'run.ts')
 export const MiB = 2 ** 20
 export const userScopes = spawnSync('systemd-run', ['--user', '--scope', '-q', 'true']).status === 0
 const boxes: Box[] = []
+const external = new Map<Box, { child: ReturnType<typeof spawn>; done: Promise<void> }[]>()
+
+/** External holders run outside the job slice; cleanup owns their entire process group. */
+export function startExternal(box: Box, command: readonly string[]) {
+  const child = spawn(command[0]!, command.slice(1), { detached: true, stdio: 'ignore' })
+  const done = new Promise<void>((resolve) => child.on('close', () => resolve()))
+  const children = external.get(box) ?? []
+  children.push({ child, done })
+  external.set(box, children)
+  return child
+}
 
 /** Removes every sandbox made since the last call; tests call it in `afterEach`. */
-export function removeSandboxes() {
+export async function removeSandboxes() {
   for (const box of boxes.splice(0)) {
+    const children = external.get(box) ?? []
+    for (const { child } of children) {
+      if (!child.pid || child.exitCode !== null || child.signalCode !== null) continue
+      try {
+        process.kill(-child.pid, 'SIGKILL')
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+      }
+    }
+    await Promise.all(children.map(({ done }) => done))
+    external.delete(box)
     spawnSync('systemctl', ['--user', 'stop', `${box.sliceRoot}.slice`])
     rmSync(box.root, { force: true, recursive: true })
   }
@@ -88,6 +110,7 @@ export type StartOptions = {
   readonly quiet?: boolean
   readonly detached?: boolean
   readonly env?: NodeJS.ProcessEnv
+  readonly preload?: string
   readonly logDir?: boolean
   readonly machine?: boolean
 }
@@ -107,6 +130,7 @@ export function start(
     '--slice-root',
     options.sliceRoot ?? box.sliceRoot,
   ]
+  if (options.preload) args.unshift('--preload', options.preload)
   if (options.logDir !== false) args.push('--log-dir', box.logs)
   if (options.machine) args.push('--proc', box.proc)
   if (options.jobClass) args.push('--class', options.jobClass)

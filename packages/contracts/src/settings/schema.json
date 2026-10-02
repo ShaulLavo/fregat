@@ -1408,6 +1408,14 @@
       "minimum": 1,
       "type": "integer"
     },
+    "window.frost": {
+      "default": 50,
+      "description": "Native macOS desktop blur strength.",
+      "markdownDescription": "Native macOS desktop blur strength.\n\nAppKit fixes blur radius.",
+      "maximum": 100,
+      "minimum": 0,
+      "type": "integer"
+    },
     "window.nativeDialogTimeoutSeconds": {
       "default": 300,
       "description": "Seconds a desktop file chooser or startup message stays open before its helper closes.",

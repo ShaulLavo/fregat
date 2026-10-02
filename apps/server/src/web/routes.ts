@@ -5,7 +5,7 @@ import { Elysia } from 'elysia'
 import { FsError } from '../fs/errors'
 import type { ServerUpdate } from '../update/service'
 import type { TerminalService } from '../terminal/service'
-import { readReleaseInfo, releaseFileFor } from './release'
+import { readReleaseDescriptor, releaseFileFor } from './release'
 import { webErrors } from './structured-errors'
 
 export type WebOptions = {
@@ -23,7 +23,7 @@ const REVALIDATE = 'no-cache'
 // release directory.
 export function webRoutes(
   options: WebOptions,
-  update: Pick<ServerUpdate, 'reread'>,
+  update: Pick<ServerUpdate, 'reread' | 'busySessions'>,
   terminal: Pick<TerminalService, 'hostInfo'>,
 ) {
   const routes = new Elysia({ name: 'web-routes' }).get('/release', ({ set }) => {
@@ -41,14 +41,21 @@ export function webRoutes(
 // Re-reads `pending` on every call, so a deploy's missed signal heals on the next poll.
 async function releaseDescriptor(
   options: WebOptions,
-  update: Pick<ServerUpdate, 'reread'>,
+  update: Pick<ServerUpdate, 'reread' | 'busySessions'>,
   terminal: Pick<TerminalService, 'hostInfo'>,
 ) {
   const [current, server] = await Promise.all([
-    readReleaseInfo(options.root ? releaseFileFor(options.root) : undefined),
-    readReleaseInfo(options.serverReleaseFile),
+    readReleaseDescriptor(options.root ? releaseFileFor(options.root) : undefined),
+    readReleaseDescriptor(options.serverReleaseFile),
   ])
-  return { ...current, server, terminalHost: terminal.hostInfo(), ...update.reread('release') }
+  return {
+    ...current.info,
+    server: server.info,
+    liveCheckRequired: current.liveCheckRequired,
+    terminalHost: terminal.hostInfo(),
+    ...update.reread('release'),
+    busy: update.busySessions(),
+  }
 }
 
 function webFile(root: string, request: Request) {

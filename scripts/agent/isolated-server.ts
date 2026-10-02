@@ -1,4 +1,14 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import type { SettingsValues } from '../../packages/contracts/src/settings/keys'
 
@@ -65,6 +75,7 @@ export async function startIsolatedServer(
   mkdirSync(home)
   mkdirSync(productionRoot)
   mkdirSync(path.join(directory, 'served', 'web'), { recursive: true })
+  const entry = isolatedReleaseEntry(directory)
   // Scenarios install their own fixture drivers; only an owner's --real-providers run keeps the
   // built-in accounts on.
   if (!realProviders || Object.keys(settings).length > 0)
@@ -104,7 +115,7 @@ export async function startIsolatedServer(
         process.execPath,
         '--preload',
         new URL('./push-boundary.ts', import.meta.url).pathname,
-        'src/index.ts',
+        entry,
       ],
       cwd: SERVER_ROOT,
       env,
@@ -119,7 +130,14 @@ export async function startIsolatedServer(
   // Plays systemd's part: a Restart exit promotes the approved release and starts the server again.
   const supervise = async (exited: Bun.Subprocess) => {
     if ((await exited.exited) !== RESTART_EXIT_CODE || stopping) return
-    promote(productionRoot, () => true)
+    const promoted = promote(productionRoot, () => true)
+    if (promoted === 'promoted') {
+      const current = realpathSync(path.join(productionRoot, 'current'))
+      copyFileSync(
+        path.join(current, 'build-config.json'),
+        path.join(directory, 'served', 'build-config.json'),
+      )
+    }
     await Bun.sleep(restartDelayMs)
     if (stopping) return
     child = spawn()
@@ -161,6 +179,19 @@ export async function startIsolatedServer(
     signal,
     stop,
   }
+}
+
+// The entry's release identity belongs to this run; imported services still use checkout source.
+function isolatedReleaseEntry(directory: string) {
+  const source = path.join(SERVER_ROOT, 'src')
+  const server = path.join(directory, 'served', 'server')
+  mkdirSync(server)
+  for (const name of readdirSync(source)) {
+    if (name === 'index.ts') copyFileSync(path.join(source, name), path.join(server, name))
+    else symlinkSync(path.join(source, name), path.join(server, name))
+  }
+  symlinkSync(path.join(SERVER_ROOT, 'node_modules'), path.join(server, 'node_modules'))
+  return path.join(server, 'index.ts')
 }
 
 /**

@@ -215,7 +215,9 @@ record layouts unchanged; additional trailing-blank heuristics wait for measurem
 - [x] Preserve compact CPU/latency evidence and attribute remaining build, listener-copy, upload and
       UI callback costs with a separate qualified rolling trace; preserve exact original JSON outside
       Git with original/formatted hashes and semantic equality in provenance.
-- [ ] Obtain independent Sol review, commit by path, push and open a PR; do not merge.
+- [x] Obtain independent Sol review, commit by path and push [PR #399](https://github.com/ShaulLavo/fregat/pull/399);
+      measured runtime/evidence are tied to `078645300`. Main integration preserves runtime source;
+      the coordinator owns merge, and default-on WebGPU follows in its own PR.
 
 ### Upload-call coalescing
 

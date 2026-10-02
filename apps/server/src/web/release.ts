@@ -11,6 +11,7 @@ type BuildConfig = {
   release?: unknown
   commit?: unknown
   dirtyFiles?: unknown
+  liveCheck?: unknown
 }
 
 const unknownRelease: ReleaseInfo = { release: null, commit: null, dirtyFiles: null }
@@ -20,13 +21,18 @@ export function releaseFileFor(directory: string) {
   return path.join(directory, '..', 'build-config.json')
 }
 
-export async function readReleaseInfo(file: string | undefined): Promise<ReleaseInfo> {
-  if (!file) return unknownRelease
+export async function readReleaseDescriptor(file: string | undefined): Promise<{
+  info: ReleaseInfo
+  liveCheckRequired: boolean
+}> {
+  const unknown = { info: unknownRelease, liveCheckRequired: true }
+  if (!file) return unknown
 
   const handle = Bun.file(file)
-  if (!(await handle.exists())) return unknownRelease
+  if (!(await handle.exists())) return unknown
 
-  return toReleaseInfo((await handle.json()) as BuildConfig)
+  const config = (await handle.json()) as BuildConfig
+  return { info: toReleaseInfo(config), liveCheckRequired: config.liveCheck !== false }
 }
 
 function toReleaseInfo(config: BuildConfig): ReleaseInfo {

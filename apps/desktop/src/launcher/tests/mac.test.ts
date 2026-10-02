@@ -199,3 +199,56 @@ test('WK drag listener sends only primary presses on non-interactive regions', (
     '"backdrop":"compositor"',
   )
 })
+
+test.each([
+  ['wkwebview', 'darwin', true, true],
+  ['wkwebview', 'darwin', false, false],
+  ['webkitgtk', 'linux', true, false],
+  ['webkitgtk', 'linux', false, false],
+] as const)(
+  '%s on %s with vibrancy %s exposes window appearance: %s',
+  (engine, platform, vibrancy, available) => {
+    const messages: unknown[] = []
+    const global: Record<string, unknown> = {}
+    const window = { top: undefined as unknown }
+    window.top = window
+    new Function(
+      'globalThis',
+      'window',
+      'location',
+      'document',
+      'addEventListener',
+      'webkit',
+      shellBridge('http://localhost:123', engine, 'fixture-token', platform, vibrancy),
+    )(global, window, { origin: 'http://localhost:123' }, { readyState: 'loading' }, () => {}, {
+      messageHandlers: { platformShell: { postMessage: (body: unknown) => messages.push(body) } },
+    })
+    const bridge = global.platformBridge as {
+      setWindowAppearance?: (appearance: { opacity: number; frost: number }) => void
+    }
+    if (!available) {
+      expect(bridge).not.toHaveProperty('setWindowAppearance')
+      expect(messages).toEqual([])
+      return
+    }
+    expect(bridge.setWindowAppearance).toBeTypeOf('function')
+    bridge.setWindowAppearance!({ opacity: 20, frost: 50 })
+    bridge.setWindowAppearance!({ opacity: 80, frost: 0 })
+    expect(messages).toEqual([
+      {
+        method: 'setWindowAppearance',
+        opacity: 20,
+        frost: 50,
+        origin: 'http://localhost:123',
+        token: 'fixture-token',
+      },
+      {
+        method: 'setWindowAppearance',
+        opacity: 80,
+        frost: 0,
+        origin: 'http://localhost:123',
+        token: 'fixture-token',
+      },
+    ])
+  },
+)

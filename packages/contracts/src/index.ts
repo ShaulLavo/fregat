@@ -1114,6 +1114,7 @@ export {
   busySessionSchema,
   busySessionStateSchema,
   liveCheckVerdictSchema,
+  sameUpdateTarget,
   serverRestartInputSchema,
   serverRestartResultSchema,
   serverUpdateErrorSchema,

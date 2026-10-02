@@ -122,6 +122,8 @@ describe('web routes', () => {
       phase: 'serving',
       pending: null,
       liveCheck: null,
+      liveCheckRequired: true,
+      busy: [],
     })
   })
 

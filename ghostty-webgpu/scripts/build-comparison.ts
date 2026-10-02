@@ -19,6 +19,7 @@ import {
   sha256 as hash,
   sourceInventory,
 } from '../bench/comparison-build'
+import { comparisonSourceHash } from './comparison-source'
 
 const root = resolve(import.meta.dirname, '..')
 const { output, ref } = comparisonBuildArguments(
@@ -30,6 +31,7 @@ await mkdir(output, { recursive: true })
 const benchmarkPatterns = ['bench', 'scripts/comparison*', 'scripts/build-comparison.ts']
 const benchmark = await sourceInventory(root, checkoutFiles(root, benchmarkPatterns))
 const runtime = await runtimeSource(root, ref)
+const checkoutSourceSha256 = await comparisonSourceHash(root, ref)
 try {
   const build = await Bun.build({
     entrypoints: [join(root, 'bench/comparison-entry.ts')],
@@ -158,6 +160,7 @@ const manifest = {
     cwd: root,
     encoding: 'utf8',
   }).trim(),
+  checkoutSourceSha256,
   sourceSha256: hash(`runtime\0${runtime.inventory.sha256}\0benchmark\0${benchmark.sha256}`),
   sourceHashFormat:
     'sha256(runtime + NUL + runtime.sha256 + NUL + benchmark + NUL + benchmark.sha256)',

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 
+import { ServerUpdateStatus } from '@/components/server-update-status'
 import { BackButton } from '@/features/phone/components/back-button'
 import { PaletteButton } from '@/features/phone/components/palette-button'
 
@@ -31,6 +32,7 @@ export function Header({
       </div>
       <div className='flex shrink-0 items-center gap-(--density-gap-tight)'>
         {actions}
+        <ServerUpdateStatus />
         <PaletteButton />
       </div>
     </PaneBar>

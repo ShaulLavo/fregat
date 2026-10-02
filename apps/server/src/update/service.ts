@@ -1,3 +1,4 @@
+import { sameUpdateTarget } from '@workspace/contracts'
 import type {
   BusySessionState,
   LiveCheckVerdict,
@@ -35,7 +36,7 @@ export type RereadTrigger = 'signal' | 'release' | 'restart'
 type ServerUpdateOptions = UpdateOptions & {
   /** The release the running bundle was loaded from. */
   serverRelease: string | null
-  gate: Pick<OrchestrationEngine, 'beginRestart'>
+  gate: Pick<OrchestrationEngine, 'beginRestart' | 'busySessions'>
 }
 
 type Listener = (state: ServerUpdateState) => void
@@ -47,6 +48,7 @@ export class ServerUpdate {
   private readonly restart: UpdateOptions['restart']
   private readonly listeners = new Set<Listener>()
   private phase: ServerUpdatePhase = 'serving'
+  private restartTarget: StagedRelease | null = null
   private pending: StagedRelease | null = null
   private liveCheck: LiveCheckVerdict | null = null
   private lane: Promise<unknown> = Promise.resolve()
@@ -69,6 +71,10 @@ export class ServerUpdate {
     return { phase: this.phase, pending: this.pending, liveCheck: this.liveCheck }
   }
 
+  busySessions() {
+    return this.gate.busySessions()
+  }
+
   subscribe(listener: Listener) {
     this.listeners.add(listener)
     return () => {
@@ -83,7 +89,7 @@ export class ServerUpdate {
     const read = readStagedRelease(this.root, this.serverRelease)
     const liveCheck = readLiveCheck(this.root)
     const changed =
-      !sameStaged(this.pending, read.staged) || !sameLiveCheck(this.liveCheck, liveCheck)
+      !sameUpdateTarget(this.pending, read.staged) || !sameLiveCheck(this.liveCheck, liveCheck)
     if (!changed) return this.state()
 
     this.pending = read.staged
@@ -105,8 +111,9 @@ export class ServerUpdate {
   requestRestart(
     interrupt: readonly SessionId[],
     clientInstance: string | null,
+    target: StagedRelease,
   ): Promise<ServerRestartResult> {
-    const task = this.lane.then(() => this.restartNow(interrupt, clientInstance))
+    const task = this.lane.then(() => this.restartNow(interrupt, clientInstance, target))
     this.lane = task.then(noop, noop)
     return task
   }
@@ -114,10 +121,16 @@ export class ServerUpdate {
   private async restartNow(
     interrupt: readonly SessionId[],
     clientInstance: string | null,
+    target: StagedRelease,
   ): Promise<ServerRestartResult> {
-    if (this.phase === 'restarting') return { restarting: true }
-
     this.reread('restart')
+    if (this.phase === 'restarting') {
+      if (!sameUpdateTarget(this.restartTarget, target))
+        throw updateErrors.STAGED_RELEASE_CHANGED({
+          internal: { approved: target, restarting: this.restartTarget },
+        })
+      return { restarting: true }
+    }
     const staged = this.pending
     const root = this.root
     if (!staged || !root) {
@@ -125,10 +138,13 @@ export class ServerUpdate {
       throw updateErrors.NO_UPDATE_STAGED({ internal: { root: this.root, reason } })
     }
 
+    if (!sameUpdateTarget(staged, target))
+      throw updateErrors.STAGED_RELEASE_CHANGED({ internal: { approved: target, pending: staged } })
+
     // Approves inside the gate: a failed write or a restaged release leaves turns startable.
     const answer = await this.gate.beginRestart(new Set(interrupt), () => {
       this.reread('restart')
-      if (!sameStaged(this.pending, staged))
+      if (!sameUpdateTarget(this.pending, staged))
         throw updateErrors.STAGED_RELEASE_CHANGED({
           internal: { approved: staged, pending: this.pending },
         })
@@ -147,6 +163,7 @@ export class ServerUpdate {
         interruptedCount: interrupted.length,
       },
     })
+    this.restartTarget = staged
     this.phase = 'restarting'
     this.publish()
     this.restart({
@@ -164,10 +181,6 @@ export class ServerUpdate {
     const state = this.state()
     for (const listener of this.listeners) listener(state)
   }
-}
-
-function sameStaged(left: StagedRelease | null, right: StagedRelease | null) {
-  return left?.release === right?.release && left?.stagedAt === right?.stagedAt
 }
 
 function sameLiveCheck(left: LiveCheckVerdict | null, right: LiveCheckVerdict | null) {

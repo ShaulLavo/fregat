@@ -5,7 +5,7 @@ import { orchestrationCommandSchema, serverRestartResultSchema } from '@workspac
 import * as v from 'valibot'
 import { onTestFinished } from 'vitest'
 
-import { closeApp, orchestrationForApp } from '../../src/app'
+import { closeApp, orchestrationForApp, updateForApp } from '../../src/app'
 import { MockProviderAdapter } from '../../src/provider/adapters/mock'
 import { ProviderAdapterRegistry } from '../../src/provider/provider-adapter-registry'
 import { testSettingsOptions } from '../../src/settings/testing'
@@ -153,7 +153,13 @@ export async function restartFixture(
       if (from !== null) headers.set('origin', from)
       const response = await app.handle(
         new Request('http://local/server/restart', {
-          body: JSON.stringify({ interrupt }),
+          body: JSON.stringify({
+            interrupt,
+            target: updateForApp(app).reread('release').pending ?? {
+              release: 'staged-release',
+              stagedAt: '2026-09-25T00:00:00.000Z',
+            },
+          }),
           headers,
           method: 'POST',
         }),

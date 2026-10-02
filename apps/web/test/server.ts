@@ -47,6 +47,7 @@ type TestServerOptions = Pick<
   | 'workspaceEditDriver'
   | 'machines'
   | 'update'
+  | 'web'
   | 'system'
   | 'systemRoot'
   | 'workspaceRoot'
@@ -72,6 +73,7 @@ export async function makeTestServer({
   workspaceEditDriver,
   machines,
   update,
+  web,
   system,
   systemRoot,
   workspaceRoot,
@@ -139,6 +141,7 @@ export async function makeTestServer({
         ...machines,
       },
       update,
+      web,
     })
 
   let app = buildApp()
