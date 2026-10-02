@@ -15,7 +15,7 @@ import { connectSecondOwner, type SecondOwner } from '../second-owner'
 export const binaryFileOpen: Scenario = {
   name: 'binary-file-open',
   description:
-    'Open binary bytes with a text extension, reveal their file, open text normally and show a missing-file error.',
+    'Open binary bytes with a text extension, show file facts, open text normally and show a missing-file error.',
   async run(page, { step }) {
     const fixture = await createGitFixture('binary-file-open')
     try {
@@ -33,12 +33,7 @@ export const binaryFileOpen: Scenario = {
       strictEqual(await selectors.editorInput(page).count(), 0)
       ok((await selectors.fileFacts(page).textContent())?.includes('8 B'))
       await step('binary-facts-no-editor')
-      await selectors.revealFileFacts(page).click()
-      strictEqual(
-        await selectors.treeItem(page, 'binary.txt').getAttribute('aria-selected'),
-        'true',
-      )
-      await step('binary-revealed')
+      strictEqual(await selectors.fileFacts(page).getByRole('button').count(), 0)
       await openFileFromTree(page, 'a.txt')
       await step('text-editor-unchanged')
       await selectors.treeItem(page, 'large.bin').click()
@@ -71,7 +66,7 @@ export const binaryFileOpen: Scenario = {
 export const binaryFileRemote: Scenario = {
   name: 'binary-file-remote',
   description:
-    'Read a binary file through its remote owner and reveal it within that owner’s workspace.',
+    'Read binary files through their remote owner and show file facts within that owner’s workspace.',
   async run(page, { step, evidence }) {
     const fixture = await createGitFixture('binary-file-remote')
     const bases = collectOrchestrationBases(page)
@@ -123,20 +118,16 @@ export const binaryFileRemote: Scenario = {
         strictEqual(new URL(request.url).searchParams.get('end'), '512')
       }
       await step('remote-oversized-binary-facts')
-      await selectors.revealFileFacts(page).click()
-      strictEqual(
-        await selectors.treeItem(page, 'remote-large.bin').getAttribute('aria-selected'),
-        'true',
-      )
+      strictEqual(await selectors.fileFacts(page).getByRole('button').count(), 0)
       ok(new URL(page.url()).pathname.startsWith(`/@${health.environmentId}/`))
       await evidence.json('remote-owner.json', {
         origin: second.origin,
         environmentId: health.environmentId,
         reads,
         sessions,
-        revealUrl: page.url(),
+        workspaceUrl: page.url(),
       })
-      await step('remote-binary-revealed')
+      await step('remote-binary-workspace-retained')
     } finally {
       if (second) await page.goto(home)
       await second?.stop()

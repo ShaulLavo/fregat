@@ -97,7 +97,6 @@ export const selectors = {
   chatFileFallback: (page: Page) =>
     page.getByText('Download this file to view its contents.', { exact: true }),
   fileFacts: (page: Page) => page.getByRole('region', { name: 'File facts' }),
-  revealFileFacts: (page: Page) => page.getByRole('button', { name: 'Reveal in files' }),
   missingFileMessage: (page: Page) =>
     page.getByText('This file no longer exists.', { exact: true }),
   pdfEngineFailure: (page: Page) =>
