@@ -91,4 +91,4 @@ product performance work remains separate.
 - [x] Prove hardware canvas presentation, then run 1/17-terminal ASCII, bytes, three paired repetitions.
 - [x] Retain compact Linux evidence, per-pair latency/CPU attribution, delayed-rAF sensitivity and endpoint limits.
 - [x] Complete independent benchmark review.
-- [ ] Complete independent review, commit by path, push, and open the benchmark PR.
+- [x] Commit by path, push, and open [benchmark PR #343](https://github.com/ShaulLavo/fregat/pull/343); leave merge and product performance work separate.
