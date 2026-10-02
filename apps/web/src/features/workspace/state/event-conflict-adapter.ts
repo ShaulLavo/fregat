@@ -134,7 +134,7 @@ function notifyFilesystemConflict(conflict: FilesystemConflict, context: Workspa
   const next = current ? refreshedConflict(current, conflict) : conflict
   context.conflictStore.getState().addConflict(next)
 
-  const toastId = toast.custom(
+  const toastId = toast(
     () =>
       createElement(FilesystemConflictToast, {
         conflict: next,
@@ -143,7 +143,7 @@ function notifyFilesystemConflict(conflict: FilesystemConflict, context: Workspa
         onOverrideRemote: () => void resolveConflict(next.id, 'remote', context),
         queryClient: context.queryClient,
       }),
-    { id: current?.toastId, dismissible: false, duration: Infinity },
+    { id: current?.toastId, duration: Infinity },
   )
   context.conflictStore.getState().updateConflict(next.id, { toastId })
   log.info({

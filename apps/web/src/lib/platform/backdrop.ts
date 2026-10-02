@@ -1,4 +1,5 @@
 import { getPlatformBridge } from '@/lib/platform/bridge'
+import { browserPlatform } from '@/lib/platform/capabilities'
 
 /**
  * What is behind the page.
@@ -66,12 +67,5 @@ export function documentBackdrop(): ShellBackdrop {
 function compositesOverDesktop(): boolean {
   if (typeof navigator === 'undefined') return false
 
-  const platform = (navigator as Navigator & { userAgentData?: { platform?: string } })
-    .userAgentData?.platform
-  if (platform) return platform === 'Linux'
-
-  // Android says "Linux" too, and a phone has no desktop behind the window.
-  if (/android/i.test(navigator.userAgent)) return false
-
-  return /linux|bsd/i.test(navigator.userAgent)
+  return browserPlatform() === 'linux'
 }

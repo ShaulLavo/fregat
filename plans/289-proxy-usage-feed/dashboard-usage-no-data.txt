@@ -1,0 +1,45 @@
+┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────      MOCKUP · illustrative AI usage ──┐
+│ MESH fleet · reachable 4 · unreachable 0 · sessions 2 live 0 cached · services 7 · ready 6 · failed 0 · 1 idle                           2026-10-02 18:53:07 │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌pc · ● reachable · up 2d ───────────────────────────── metrics 2s catalogs 1s┐ ┌macbook-air · ● reachable · up 36d 4h ──────────────── metrics 0s catalogs 0s┐ 
+│ CPU █▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  5%  RAM 14.1 / 31.1 GiB               45% │ │ CPU ████▃▁▁▁                     51%  RAM 11.6 / 16.0 GiB               73% │ 
+│ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ │ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ 
+│ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ │ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ 
+│                                                                             │ │                                ⣀                                    ⠉⠉⠉⠉⠉⠉⠉ │ 
+│ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · ⠒⠒⠒⠒⠒⠒⠒ │ │ · · · · · · · · · · · · · · ·⠉⠉█⠉⠤⠒⠉  · · · · · · · · · · · · · · · ███████ │ 
+│                              ⣀⣀⣀⣀⣀⣀⣀                                ███████ │ │                              ███████                                ███████ │ 
+│ -2m                              now  -2m                               now │ │ -2m                              now  -2m                               now │ 
+│ GPU ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  0%  VRAM 0.9 / 8.0 GiB ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ │ GPU ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  1%  BAT ▪▪▪▪▪▪▪▪▪▪  65% on battery 2h 17m │ 
+│ DISK r 27 kB/s  w 393 kB/s   6% busy  NET ↓ 290 kB/s  ↑ 996 kB/s            │ │ DISK r 16 MB/s  w 1.2 MB/s   0% busy  NET ↓ 630 kB/s  ↑ 25 kB/s             │ 
+│ CPU 66° · GPU 46° · NVMe 65° · sessions 1 live · services 7                 │ │ CPU 53° · GPU 30° · sessions 1 live · services 0                            │ 
+└─────────────────────────────────────────────────────────────────────────────┘ └─────────────────────────────────────────────────────────────────────────────┘ 
+┌vps · ● reachable · up 250d ────────────────────────── metrics 1s catalogs 1s┐ ┌pi · ● reachable · up 8h 1m ────────────────────────── metrics 2s catalogs 2s┐ 
+│ CPU ▂▄                           24%  RAM 1.7 / 3.7 GiB                 46% │ │ CPU ▁▄▂▁                         17%  RAM 0.4 / 3.7 GiB                 12% │ 
+│ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ │ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪ │ 
+│ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ │ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ 
+│                                   ⠤                                         │ │                                                                             │ 
+│ · · · · · · · · · · · · · · · · · █   · · · · · · · · · · · · · · · ⠉⠉⠉⠉⠉⠉⠉ │ │ · · · · · · · · · · · · · · · · · ·   · · · · · · · · · · · · · · · · · · · │ 
+│                              ⠒⠒⠒⠒⠉█⠤                                ███████ │ │                              ⠒⠒⠒⠒⠒⠒⠒                                ⠤⠤⠤⠤⠤⠤⠤ │ 
+│ -2m                              now  -2m                               now │ │ -2m                              now  -2m                               now │ 
+│ DISK r 0 B/s  w 8.2 kB/s     0% busy  NET ↓ 2.3 kB/s  ↑ 2.3 kB/s            │ │ DISK r 0 B/s  w 0 B/s        0% busy  NET ↓ 25 kB/s  ↑ 4.1 kB/s             │ 
+│ sessions 0 live · services 0                                                │ │ SoC 48° · sessions 0 live · services 0                                      │ 
+└─────────────────────────────────────────────────────────────────────────────┘ └─────────────────────────────────────────────────────────────────────────────┘ 
+Hosts 4 / 4 visible · 0 omitted                                                                                                                                 
+┌Sessions · live 2/2 · cached 0 ─────────────────────── ┐ ┌Services · ready 6 · failed 0 · 1 idle ── 7/7┐ ┌AI plans · 3 accounts · passive ─────────────────── ┐
+│ HOST         ID   NAME     STATE    COMMAND (launch)  │ │ HOST       SERVICE        STATE      AGE    │ │ Claude · shaul9191 · Max                    seen — │
+│ pc           E8WS serve /… running  /usr/bin/bash -l… │ │ pc         5173          ● idle       1s    │ │ 5h     No data yet                                 │
+│ macbook-air  N8PE --       detached /bin/zsh          │ │ pc         ai            ● running    1s    │ │ Waiting for normal traffic                         │
+│ showing 2 of 2 live · 2 total · 0/0 cached            │ │ pc         comfy         ● ready      1s    │ │ Weekly No data yet                                 │
+└───────────────────────────────────────────────────────┘ │ pc         life          ● ready      1s    │ │ Waiting for normal traffic                         │
+                                                          │ pc         place         ● ready      1s    │ │ Codex · shaul9191 · Pro                     seen — │
+                                                          │ pc         platform      ● ready      1s    │ │ 5h     No data yet                                 │
+                                                          │ pc         workbench     ● ready      1s    │ │ Waiting for normal traffic                         │
+                                                          └─────────────────────────────────────────────┘ │ Weekly No data yet                                 │
+                                                                                                          │ Waiting for normal traffic                         │
+                                                                                                          │         shaul.lavochkin · Pro               seen — │
+                                                                                                          │ 5h     No data yet                                 │
+                                                                                                          │ Waiting for normal traffic                         │
+                                                                                                          │ Weekly No data yet                                 │
+                                                                                                          │ Waiting for normal traffic                         │
+                                                                                                          └────────────────────────────────────────────────────┘
+metrics 2s · catalogs change-driven · history 2m · AI bars used 0–100% · │ elapsed pace                                                     frame 18:53:07 on pi

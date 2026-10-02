@@ -49,8 +49,6 @@ export function ClientUpdate() {
     const id = toast('Update available', {
       id: 'client-update',
       duration: Infinity,
-      closeButton: false,
-      dismissible: false,
       action: { label: 'Reload app', onClick: () => window.location.reload() },
     })
     return () => {

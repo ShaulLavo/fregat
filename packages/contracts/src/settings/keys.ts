@@ -5,6 +5,7 @@ import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { machinesSchema } from '../machines'
+import { absolutePathSchema } from '../absolute-path'
 import { WORKTREE_SUBMODULE_MODES } from '../git'
 import {
   keybindingOverridesSchema,
@@ -364,6 +365,64 @@ export const SETTINGS_REGISTRY = {
     description:
       'A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.',
     keywords: ['pair', 'phone', 'device', 'security', 'mesh', 'tailnet'],
+  }),
+  'server.address': defineSetting({
+    // One explicit IPv4 loopback origin: `localhost` may resolve to ::1 and miss the socket unit.
+    schema: v.pipe(
+      v.string(),
+      v.regex(/^http:\/\/127\.0\.0\.1:([1-9]\d{0,4})$/),
+      v.check((value) => Number(value.split(':')[2]) <= 65535, 'Ports end at 65535'),
+    ),
+    default: 'http://127.0.0.1:3301',
+    // Machine scope: the OS socket unit listens here, and the installed app's identity is this origin.
+    scope: 'machine',
+    widget: 'string',
+    category: 'Machines',
+    title: 'Server address',
+    description:
+      'The loopback address this machine’s Fregat server listens on, and the origin of the installed app. A changed address is a new app installation with its own browser storage.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['server', 'port', 'address', 'install', 'socket', 'loopback'],
+  }),
+  'server.releaseRoot': defineSetting({
+    // Empty resolves per platform in scripts/service/release-root.ts; a path ships in no repository.
+    schema: v.union([v.literal(''), absolutePathSchema]),
+    default: '',
+    scope: 'machine',
+    widget: 'string',
+    category: 'Machines',
+    title: 'Server release folder',
+    description:
+      'The folder holding the releases, logs and current release this machine’s Fregat server runs. Empty uses the application data folder: ~/Library/Application Support/Fregat/releases on macOS, ~/.local/share/fregat/releases on Linux.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['server', 'release', 'install', 'folder', 'update'],
+  }),
+  'server.activationTimeoutSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
+    default: 60,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Machines',
+    title: 'Server start time limit',
+    description:
+      'Seconds setup waits for this machine’s Fregat server to start and prove its identity before it reports the address as unverified.',
+    visibility: 'advanced',
+    keywords: ['server', 'install', 'setup', 'timeout', 'socket'],
+  }),
+  'server.webBase': defineSetting({
+    schema: v.pipe(v.string(), v.regex(/^\/(?:[A-Za-z0-9._~-]+\/)*$/)),
+    default: '/',
+    scope: 'machine',
+    widget: 'string',
+    category: 'Machines',
+    title: 'Server web path',
+    description:
+      'The path the installed app opens under the server address. A server that already serves this machine’s state keeps the path it serves.',
+    visibility: 'advanced',
+    requiresRestart: true,
+    keywords: ['server', 'path', 'base', 'install'],
   }),
   'git.maxDiffFileSizeMiB': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)),

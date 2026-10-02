@@ -1317,6 +1317,39 @@
       "description": "Match whole words by default.",
       "type": "boolean"
     },
+    "server.activationTimeoutSeconds": {
+      "default": 60,
+      "description": "Seconds setup waits for this machine’s Fregat server to start and prove its identity before it reports the address as unverified.",
+      "maximum": 600,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "server.address": {
+      "default": "http://127.0.0.1:3301",
+      "description": "The loopback address this machine’s Fregat server listens on, and the origin of the installed app. A changed address is a new app installation with its own browser storage.",
+      "pattern": "^http:\\/\\/127\\.0\\.0\\.1:([1-9]\\d{0,4})$",
+      "type": "string"
+    },
+    "server.releaseRoot": {
+      "anyOf": [
+        {
+          "const": ""
+        },
+        {
+          "maxLength": 4096,
+          "pattern": "^(?:\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\/]+[\\\\/][^\\\\/]+)",
+          "type": "string"
+        }
+      ],
+      "default": "",
+      "description": "The folder holding the releases, logs and current release this machine’s Fregat server runs. Empty uses the application data folder: ~/Library/Application Support/Fregat/releases on macOS, ~/.local/share/fregat/releases on Linux."
+    },
+    "server.webBase": {
+      "default": "/",
+      "description": "The path the installed app opens under the server address. A server that already serves this machine’s state keeps the path it serves.",
+      "pattern": "^\\/(?:[A-Za-z0-9._~-]+\\/)*$",
+      "type": "string"
+    },
     "spellcheck.words": {
       "additionalProperties": {
         "type": "boolean"

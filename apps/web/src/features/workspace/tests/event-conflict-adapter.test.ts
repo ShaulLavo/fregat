@@ -15,14 +15,16 @@ import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
 vi.mock('sonner', () => {
   const handlers: Array<() => unknown> = []
   return {
-    toast: Object.assign(vi.fn(), {
-      custom: vi.fn((render: () => unknown) => {
+    toast: Object.assign(
+      vi.fn((render: () => unknown) => {
         handlers.push(render)
         return handlers.length
       }),
-      dismiss: vi.fn(),
-      error: vi.fn(),
-    }),
+      {
+        dismiss: vi.fn(),
+        error: vi.fn(),
+      },
+    ),
     __handlers: handlers,
   }
 })

@@ -19,7 +19,7 @@ test.skipIf(!webkit || !compiler)(
   `builds the Linux host (${webkit && compiler ? 'native dependencies present' : `skip reason: ${skipReason()}`})`,
   () => {
     const desktopDir = path.resolve(import.meta.dirname, '../../..')
-    const output = buildNative(desktopDir, 'polaron')
+    const output = buildNative(desktopDir, 'installed')
     expect(output).toBe(path.join(desktopDir, 'native/build/platform-webview'))
     expect(existsSync(output!)).toBe(true)
   },
@@ -33,13 +33,13 @@ test.skipIf(!supported)(
     const result = Bun.spawnSync([process.execPath, script], { env })
     expect(result.exitCode).toBe(0)
     expect(result.stderr.toString()).toBe('')
-    const polaron = Bun.spawnSync([process.execPath, script, '--shell=polaron'], { env })
-    expect(polaron.exitCode).not.toBe(0)
-    expect(polaron.stderr.toString()).toContain('desktop.native.BUILD_FAILED')
+    const installed = Bun.spawnSync([process.execPath, script, '--shell=installed'], { env })
+    expect(installed.exitCode).not.toBe(0)
+    expect(installed.stderr.toString()).toContain('desktop.native.BUILD_FAILED')
   },
 )
 
-test('default Electrobun and explicit Polaron entrypoints select their own native build', async () => {
+test('default Electrobun and explicit installed-app entrypoints select their own native build', async () => {
   const desktop = path.resolve(import.meta.dirname, '../../..')
   const manifest = await Bun.file(path.join(desktop, 'package.json')).json()
   expect(manifest.scripts.dev).toBe(
@@ -48,15 +48,15 @@ test('default Electrobun and explicit Polaron entrypoints select their own nativ
   expect(manifest.scripts.build).toBe('bun run build:native && electrobun build')
   expect(manifest.scripts['build:native']).toBe('bun scripts/build-native.ts')
   const dev = await Bun.file(path.resolve(desktop, '../../scripts/desktop-dev.ts')).text()
-  expect(dev).toMatch(/'build:native',\s*'--shell=polaron'/)
+  expect(dev).toMatch(/'build:native',\s*'--shell=installed'/)
 })
 
 // NOT-PORTABLE: macOS case assumes Xcode clang and SDK without a prerequisite check.
 test.skipIf(process.platform !== 'darwin')(
-  'builds the macOS Polaron executable beside the retained Electrobun library',
+  'builds the macOS native host executable beside the retained Electrobun library',
   () => {
     const desktopDir = path.resolve(import.meta.dirname, '../../..')
-    const host = buildNative(desktopDir, 'polaron')
+    const host = buildNative(desktopDir, 'installed')
     expect(host).toBe(path.join(desktopDir, 'native/build/platform-webview'))
     expect(existsSync(host!)).toBe(true)
     const library = buildNative(desktopDir, 'electrobun')

@@ -22,7 +22,7 @@ not a second live status register.
 | [110](110-workspace-indexing.md)                      | Workspace indexing: what we index, and what should index us                   |
 | [111](111-editor-decorations.md)                      | Editor decorations: learn from CodeMirror and Lexical, then beat what we have |
 | [112](112-large-file-ceiling.md)                      | The large-file ceiling: what we can actually open, and who gets to decide     |
-| [114](114-polaron-shell.md)                           | Polaron, a desktop shell we own                                               |
+| [114](114-installed-app.md)                           | Installed app                                                                 |
 | [122](122-composable-plugins.md)                      | Composable, full-power plugins with selective execution                       |
 | [126](126-t3code-alignment.md)                        | Align Platform behavior with pinned T3 Code                                   |
 | [132](132-process-and-dev-ownership.md)               | Processes, leases and dev plumbing each get an owner                          |
@@ -132,7 +132,9 @@ not a second live status register.
 | [284](284-resource-aware-heavy-jobs.md)               | Resource-aware heavy jobs and a weak-machine (Raspberry Pi) lane              |
 | [285](285-ghostty-site-first-frame-and-real-shell.md) | The ghostty-webgpu site paints before the wasm and runs a real shell          |
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                           |
-| [287](287-proxy-usage-feed.md)                        | Passive per-account proxy usage feed and the Mesh TV panel                    |
+| [287](287-ghostty-worker-mode.md)                     | ghostty-webgpu worker mode: the terminal on an OffscreenCanvas worker         |
+| [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                          |
+| [289](289-proxy-usage-feed.md)                        | Passive AI plans feed and the Mesh TV panel                                   |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |

@@ -2,7 +2,7 @@ import { unique } from '@workspace/utils/collections'
 import { errorMessage } from '@workspace/contracts'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { closeApp, createApp, updateForApp } from './app'
+import { closeApp, createApp, systemForApp, updateForApp } from './app'
 import { DEFAULT_ALLOWED_ORIGINS } from './auth'
 import { getDefaultPlatformDatabase } from './db/client'
 import { platformHomePath } from './home'
@@ -21,7 +21,17 @@ import { defaultSecretsFilePath, defaultSettingsFilePath } from './settings/path
 import { settingsPolicyFromEnv } from './settings/policy'
 import type { RestartRecord } from './update/service'
 import { readStagedRelease } from './update/staged-release'
-import { readReleaseInfoSync, releaseFileFor } from './web/release'
+import { readReleaseInfoSync, readReleaseWebBase, releaseFileFor } from './web/release'
+import {
+  activatedSocket,
+  privateSocket,
+  restrictPrivateSocket,
+  startRelay,
+  type Relay,
+} from './system/activation'
+import { ensureIdentityKey } from './system/identity-key'
+import { serviceFromArgv, stateHomeConflictExitCode } from './system/service-descriptor'
+import { acquireStateHomeLock } from './system/state-home-lock'
 
 type StopReason = NodeJS.Signals | { reason: 'restart'; record: RestartRecord }
 
@@ -54,6 +64,14 @@ let stopping = false
 assertLoopbackHost(hostname)
 initializeObservability(Bun.env, readReleaseInfoSync(webRoot ? releaseFileFor(webRoot) : undefined))
 installCrashHandlers()
+// Before the database opens: a second server on this state home stops here, whatever its port.
+const stateHome = platformHomePath()
+const stateHomeLock = await holdStateHome()
+ensureIdentityKey(stateHome)
+const activated = activatedSocket()
+const service = serviceFromArgv(process.argv)
+const address = publicAddress(hostname, port)
+let relay: Relay | null = null
 
 export const app = createApp({
   // Cookies ignore ports: two servers on one host would otherwise sign each other's devices out.
@@ -82,29 +100,69 @@ export const app = createApp({
     restart: (record) => setImmediate(() => stop({ reason: 'restart', record })),
   },
   mcp: { endpoint: `http://${hostname === '::1' ? '[::1]' : hostname}:${port}/mcp` },
+  system: {
+    address,
+    webBase: readReleaseWebBase(webRoot ? releaseFileFor(webRoot) : undefined),
+    service,
+    stateHome,
+    // Behind the relay every request arrives on the private socket; the relay admits loopback only.
+    peer: activated ? () => '127.0.0.1' : undefined,
+  },
   web: { root: webRoot, serverReleaseFile },
   webOrigin: configuredOrigins?.[0] ?? loopbackOrigins(hostname, port)[0],
   workspaceRoot: configuredWorkspaceRoot,
 })
-// A separate statement: Bun runs this callback inside listen(), before a chained `app` exists.
-app.listen({ hostname, port }, (server) => {
-  recordProcessInfo('server.start', {
-    environmentId: readEnvironmentIdentity(getDefaultPlatformDatabase()).id,
-    homeDirectory,
-    hostname: server.hostname,
-    pendingRelease: readStagedRelease(productionRoot, serverRelease).staged?.release ?? null,
-    port: server.port,
-    productionRoot,
-    stateRoot: platformHomePath(),
-    systemRoot,
-    webRoot: webRoot ?? null,
-    workspaceRoot,
-  })
-})
+await listen()
 installShutdownHandlers()
 installUpdateHandler()
 
 export type App = typeof app
+
+async function listen() {
+  if (!activated) {
+    // A separate statement: Bun runs this callback inside listen(), before a chained `app` exists.
+    app.listen({ hostname, port }, () => recordStart())
+    return
+  }
+  // The app listens on its private socket before the relay accepts the queued first connection.
+  const upstream = privateSocket()
+  app.listen({ unix: upstream.socketPath })
+  restrictPrivateSocket(upstream)
+  relay = await startRelay(activated, { hostname, port }, upstream)
+  recordStart()
+}
+
+function recordStart() {
+  recordProcessInfo('server.start', {
+    activation: activated?.manager ?? null,
+    environmentId: readEnvironmentIdentity(getDefaultPlatformDatabase()).id,
+    homeDirectory,
+    hostname,
+    pendingRelease: readStagedRelease(productionRoot, serverRelease).staged?.release ?? null,
+    port,
+    productionRoot,
+    service: service.kind,
+    stateRoot: stateHome,
+    systemRoot,
+    webRoot: webRoot ?? null,
+    workspaceRoot,
+  })
+}
+
+async function holdStateHome() {
+  try {
+    return acquireStateHomeLock(stateHome)
+  } catch (error) {
+    recordProcessError('server.state_home_locked', { error: operatorErrorSummary(error), port })
+    await flushObservability()
+    process.exit(stateHomeConflictExitCode(process.argv))
+  }
+}
+
+function publicAddress(host: string, listenPort: number) {
+  const name = host === '::1' ? '[::1]' : host === 'localhost' ? '127.0.0.1' : host
+  return `http://${name}:${listenPort}`
+}
 
 // Installing a rejection handler replaces Bun's automatic exit, so cleanup must end in exit 1.
 function installCrashHandlers() {
@@ -134,8 +192,12 @@ async function crash() {
 
 function shutdownServer() {
   if (serverShutdown) return serverShutdown
+  // Read before closeApp: the settings store closes with the app.
+  const graceMs = systemForApp(app).stopGraceMs()
   serverShutdown = closeApp(app).then(async () => {
+    await relay?.close(graceMs)
     await app.stop(true)
+    stateHomeLock.release()
   })
   return serverShutdown
 }

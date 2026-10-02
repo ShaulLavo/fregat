@@ -3,11 +3,10 @@ import { getClient } from '@/lib/client'
 import { documentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { documentSourcePath } from '@/lib/documents/utils/capabilities'
 import { tabLabel } from '@/lib/documents/utils/labels'
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
-import type { ReactElement, ReactNode } from 'react'
-import { toast } from 'sonner'
-import { vi } from 'vitest'
+import type { ReactNode } from 'react'
+import { Toaster } from '@workspace/ui/components/sonner'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
@@ -52,37 +51,32 @@ test('Compare on the conflict toast opens the conflict editor in its own tab', a
   const view = documentStore.getState().ensureEditorView(fileTabId, file)
   act(() => createEditorBufferSession(view.buffer, view.view).applyText('const b = 2\n'))
 
-  const custom = vi.spyOn(toast, 'custom').mockImplementation(() => 'conflict-toast')
-  try {
-    const { commands } = hook.result.current
-    const documentState = documentStore.getState()
-    act(() =>
-      notifyChangedFilesystemConflict(
-        path,
-        { ...file, content: 'const a = 3\n', version: 'remote-2' },
-        {
-          client: getClient(),
-          conflictStore,
-          discardLiveEditorDocument: commands.discardLiveEditorDocument,
-          ensureUnsyncedEditorDocument: documentState.ensureUnsyncedEditorDocument,
-          fetchFile: (target, signal) => fetchFile(target, signal, getClient()),
-          forceReplaceLiveEditorDocument: documentState.forceReplaceLiveEditorDocument,
-          getLiveEditorDocument: documentState.getLiveEditorDocument,
-          queryClient,
-          renameLiveEditorDocument: commands.renameLiveEditorDocument,
-          setFileOrphaned: documentState.setFileOrphaned,
-          selectContent: commands.selectContent,
-        },
-      ),
-    )
-    const renderToast = custom.mock.calls[0]![0] as () => ReactElement
-    render(renderToast())
-    act(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Compare' }))
-    })
-  } finally {
-    custom.mockRestore()
-  }
+  render(<Toaster />)
+  const { commands } = hook.result.current
+  const documentState = documentStore.getState()
+  act(() =>
+    notifyChangedFilesystemConflict(
+      path,
+      { ...file, content: 'const a = 3\n', version: 'remote-2' },
+      {
+        client: getClient(),
+        conflictStore,
+        discardLiveEditorDocument: commands.discardLiveEditorDocument,
+        ensureUnsyncedEditorDocument: documentState.ensureUnsyncedEditorDocument,
+        fetchFile: (target, signal) => fetchFile(target, signal, getClient()),
+        forceReplaceLiveEditorDocument: documentState.forceReplaceLiveEditorDocument,
+        getLiveEditorDocument: documentState.getLiveEditorDocument,
+        queryClient,
+        renameLiveEditorDocument: commands.renameLiveEditorDocument,
+        setFileOrphaned: documentState.setFileOrphaned,
+        selectContent: commands.selectContent,
+      },
+    ),
+  )
+  fireEvent.click(await screen.findByRole('button', { name: 'Compare' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Close toast' }))
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Close toast' })).toBeNull())
+  expect(Object.values(conflictStore.getState().conflicts)).toHaveLength(1)
 
   const panels = workspaceStore.getState().workbenchPanels
   const conflictTab = allEditorTabs(panels.editorGroups).find(

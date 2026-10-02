@@ -8,29 +8,30 @@ const buildErrors = defineErrorCatalog('desktop.native', {
     message: 'The native desktop helper could not be built.',
     status: 500,
     why: 'The native helper needs a C compiler and the platform development libraries.',
-    fix: 'Install cc, pkg-config and webkit2gtk-4.1 on Linux, or the Xcode command-line tools on macOS, then run build:native --shell=polaron again.',
+    fix: 'Install cc, pkg-config and webkit2gtk-4.1 on Linux, or the Xcode command-line tools on macOS, then run build:native --shell=installed again.',
   },
 })
 
 export function buildNative(
   desktopDir = path.join(import.meta.dirname, '..'),
-  shell: 'electrobun' | 'polaron' = 'electrobun',
+  shell: 'electrobun' | 'installed' = 'electrobun',
+  arch?: 'arm64' | 'x64',
 ) {
   if (process.platform !== 'linux' && process.platform !== 'darwin') return null
   const linux = process.platform === 'linux'
-  if (linux && shell !== 'polaron') return null
+  if (linux && shell !== 'installed') return null
   const source = path.join(
     desktopDir,
     'native',
     linux
       ? 'linux/platform-webview.c'
-      : shell === 'polaron'
+      : shell === 'installed'
         ? 'macos/platform-webview.m'
         : 'vibrancy.m',
   )
   const output = path.join(
     nativeLibraryDir(desktopDir),
-    linux || shell === 'polaron' ? 'platform-webview' : NATIVE_LIBRARY_NAME,
+    linux || shell === 'installed' ? 'platform-webview' : NATIVE_LIBRARY_NAME,
   )
   if (!existsSync(source))
     throw buildErrors.BUILD_FAILED({ internal: { stage: 'source', platform: process.platform } })
@@ -54,6 +55,7 @@ export function buildNative(
         ...(shell === 'electrobun'
           ? ['-dynamiclib']
           : ['-framework', 'WebKit', '-framework', 'UniformTypeIdentifiers']),
+        ...(arch ? ['-arch', arch === 'x64' ? 'x86_64' : arch] : []),
         '-fobjc-arc',
         '-mmacosx-version-min=11.0',
         '-framework',
@@ -70,7 +72,7 @@ export function buildNative(
 if (import.meta.main) {
   const output = buildNative(
     undefined,
-    process.argv.includes('--shell=polaron') ? 'polaron' : 'electrobun',
+    process.argv.includes('--shell=installed') ? 'installed' : 'electrobun',
   )
   if (output) console.log(`[native] built ${output}`)
 }

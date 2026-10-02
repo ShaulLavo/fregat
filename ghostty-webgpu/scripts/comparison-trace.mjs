@@ -4,6 +4,7 @@ import { mkdir, readdir, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { measureCpu, withDeadline } from './comparison-guards.mjs'
 import { quantile } from './comparison-report.mjs'
+import { renderOperations } from './comparison-render.mjs'
 
 export function displaySummary(periods, metadata = {}) {
   return {
@@ -175,7 +176,7 @@ export function summarizeRecords(records) {
     Object.entries(milliseconds).map(([name, time]) => [name, (time / total) * 100]),
   )
   const frames = records.spans
-    .filter((span) => span.operation === 'drawFrame' || span.operation === 'renderRows')
+    .filter((span) => renderOperations.includes(span.operation))
     .map((span) => {
       const counts = {}
       for (const counter of records.counters) {
@@ -212,10 +213,20 @@ async function collectTrace(browserSession, completed) {
   return Buffer.concat(chunks)
 }
 
-export async function tracePhase({ page, browserSession, output, label, operation, traced, now }) {
+export async function tracePhase({
+  page,
+  browserSession,
+  output,
+  label,
+  operation,
+  traced,
+  now,
+  categories,
+}) {
   if (traced)
     await browserSession.send('Tracing.start', {
       categories:
+        categories ??
         'toplevel,devtools.timeline,blink.user_timing,v8,cc,viz,gpu,disabled-by-default-devtools.timeline,disabled-by-default-v8.cpu_profiler',
       transferMode: 'ReturnAsStream',
     })

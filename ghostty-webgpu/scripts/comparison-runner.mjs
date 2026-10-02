@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { gunzipSync } from 'node:zlib'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { platform, release, arch, cpus } from 'node:os'
@@ -12,7 +14,19 @@ import {
   verifyHash,
   withDeadline,
 } from './comparison-guards.mjs'
-import { positiveInteger } from './comparison-options.mjs'
+import {
+  positiveInteger,
+  selection,
+  hardwareLaunch,
+  frameBuilders,
+  selectedVariants,
+  selectedPhases,
+  measurementCases,
+  measurementRepetitions,
+} from './comparison-options.mjs'
+import { presentationLatency } from './comparison-latency.mjs'
+import { comparisonLatencyEndpoint } from './comparison-compact.mjs'
+import { createGpuGate } from './comparison-gpu.mjs'
 import { ink } from './comparison-pixels.mjs'
 import {
   assertDisplay,
@@ -24,22 +38,26 @@ import {
   tracePhase,
 } from './comparison-trace.mjs'
 import { WebSocketServer } from 'ws'
-import { markdown, order, summaries } from './comparison-report.mjs'
+import { markdown, summaries } from './comparison-report.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const manifest = JSON.parse(await readFile(join(root, 'manifest.json'), 'utf8'))
 const args = process.argv.slice(2)
 const smoke = args.includes('--smoke')
 const tracing = args.includes('--trace')
-assert(!(smoke && tracing), 'Trace measurements require headed hardware Chromium')
-const headless = smoke && !args.includes('--smoke-headed')
+const builders = frameBuilders(args)
+const phases = selectedPhases(args)
+assert(!(tracing && args.includes('--phases')), '--trace uses --trace-phase')
+assert(
+  !args.includes('--validate-presentation') || phases.includes('latency'),
+  '--validate-presentation requires the latency phase',
+)
+assert(!(smoke && tracing), 'Trace measurements require hardware Chromium')
+const launch = hardwareLaunch(platform(), smoke, smoke && args.includes('--smoke-headed'))
+const headless = launch.headless
 const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback)
 const output = resolve(value('--output', join(root, smoke ? 'smoke' : 'results')))
-const repetitions = positiveInteger(args, '--repetitions', manifest.settings.repetitions)
-assert(
-  Number.isInteger(repetitions) && repetitions >= 3,
-  'Measurements require at least three repetitions',
-)
+const repetitions = measurementRepetitions(args, manifest.settings.repetitions)
 const smokeHistoryRows = Number(value('--smoke-history-rows', 64))
 assert(
   Number.isInteger(smokeHistoryRows) &&
@@ -47,18 +65,35 @@ assert(
     smokeHistoryRows <= manifest.settings.scrollback,
   'Smoke history rows must be within the scrollback limit',
 )
-let counts = manifest.settings.counts
+let counts = selection(
+  args,
+  '--counts',
+  manifest.settings.counts.map(String),
+  manifest.settings.counts.map(String),
+).map(Number)
+const fixtures = selection(
+  args,
+  '--fixtures',
+  manifest.fixtures.map(({ name }) => name),
+  manifest.fixtures.map(({ name }) => name),
+)
+const writePaths = selection(args, '--paths', ['bytes', 'string'], ['bytes', 'string'])
 if (smoke) counts = [Number(value('--smoke-count', 1))]
 if (tracing && args.includes('--trace-count')) counts = [Number(value('--trace-count', 1))]
 assert(
   counts.every((count) => manifest.settings.counts.includes(count)),
   'Terminal count must be 1, 8, or 17',
 )
-const variantIds =
-  tracing || args.includes('--smoke-instrumentation')
-    ? ['ghostty-webgpu', 'xterm-webgl']
-    : manifest.variants.map(({ id }) => id)
+const variantIds = selectedVariants(
+  args,
+  manifest.variants.map(({ id }) => id),
+  smoke && !args.includes('--smoke-instrumentation')
+    ? manifest.variants.map(({ id }) => id)
+    : ['ghostty-webgpu', 'xterm-webgl'],
+)
 const s = manifest.settings
+const ownedComputePids = []
+const gpuGate = createGpuGate(s, { allowedComputePids: ownedComputePids })
 if (!smoke && platform() === 'darwin') {
   const power = execFileSync('/usr/bin/pmset', ['-g', 'batt'], { encoding: 'utf8' })
   assert(power.includes("'AC Power'"), 'waiting for AC')
@@ -69,16 +104,21 @@ if (!smoke && platform() === 'darwin') {
 }
 const latencySamples = positiveInteger(
   args,
-  '--trace-latency-samples',
-  tracing ? 48 : s.latencySamples,
+  args.includes('--trace-latency-samples') ? '--trace-latency-samples' : '--latency-samples',
+  s.latencySamples,
 )
+const outputFrames = positiveInteger(args, '--output-frames', s.outputFrames)
+const tickSeconds =
+  platform() === 'linux'
+    ? 1 / Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
+    : null
+const cpuOptions = { tickSeconds }
 const traceFrames = positiveInteger(args, '--trace-frames', 180)
-const tracePhases = args.includes('--trace-phase')
-  ? [value('--trace-phase')]
-  : ['latency', 'ascii', 'sgr']
-assert(
-  tracePhases.every((name) => ['latency', 'ascii', 'sgr'].includes(name)),
-  'Trace phase must be latency, ascii, or sgr',
+const tracePhases = selection(
+  args,
+  '--trace-phase',
+  ['latency', 'ascii', 'sgr'],
+  ['latency', 'ascii', 'sgr'],
 )
 await prepareOutput(output, { tracing })
 const temporary = join(root, 'tmp')
@@ -134,6 +174,7 @@ const browserArgs = [
   '--disable-backgrounding-occluded-windows',
   '--disable-renderer-backgrounding',
   '--max-active-webgl-contexts=32',
+  ...launch.arguments,
 ]
 let launchEnv = process.env
 if (smoke && platform() === 'linux') {
@@ -146,13 +187,30 @@ if (smoke && platform() === 'linux') {
   launchEnv = { ...process.env, VK_ICD_FILENAMES: driver, VK_DRIVER_FILES: driver }
 }
 let browser
+let browserSession
 const artifact = {
   schema: 1,
+  sessionId: randomUUID(),
   manifest,
   smoke,
   tracing,
   repetitions: smoke ? 1 : repetitions,
+  latencySamples,
+  outputFrames,
+  cpuTickSeconds: tickSeconds,
+  counts,
+  variants: variantIds,
+  phases,
+  frameBuilders: builders,
+  paths: tracing ? ['bytes'] : writePaths,
+  fixtures,
   hardware: false,
+  measurementBudgetMilliseconds:
+    counts.length *
+    (tracing ? 1 : writePaths.length) *
+    (variantIds.length + (variantIds.includes('ghostty-webgpu') ? builders.length - 1 : 0)) *
+    (smoke ? 1 : repetitions) *
+    s.caseDeadlineMilliseconds,
   startedAt: new Date().toISOString(),
   environment: {},
   runs: [],
@@ -260,22 +318,30 @@ async function captureSmoke(page, session) {
   }
 }
 
-async function latency(page, session) {
+async function latency(
+  page,
+  session,
+  { samples: count = latencySamples, delayFrames = 0, writeOnly = false } = {},
+) {
   await page.evaluate(() => window.__compare.smokeMarker())
   await page.evaluate(() => window.__compare.connectEcho())
   const frames = await capturedFrames(session)
   const samples = { write: [], input: [], captures: [], captureStream: frames.events }
   try {
-    for (let index = -2; index < latencySamples; index++) {
+    for (let index = -2; index < count; index++) {
       const color = index % 2 ? 'red' : 'green'
-      const started = await page.evaluate((color) => window.__compare.writeMarker(color), color)
+      const started = await page.evaluate(
+        ({ color, delayFrames }) => window.__compare.writeMarker(color, delayFrames),
+        { color, delayFrames },
+      )
       const shown = await frames.wait(color, started)
       if (index >= 0) {
         samples.write.push(shown.timestamp - started)
         samples.captures.push({ operation: 'write', started, ...shown })
       }
     }
-    for (let index = -2; index < latencySamples; index++) {
+    if (writeOnly) return samples
+    for (let index = -2; index < count; index++) {
       const color = index % 2 ? 'red' : 'green'
       await page.evaluate((color) => window.__compare.prepareInput(color), color)
       await page.keyboard.press('#')
@@ -337,15 +403,17 @@ async function parserOnly(testCase, run, contexts) {
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message))
     await page.goto(
-      tracing || args.includes('--smoke-instrumentation') ? `${origin}/?trace` : origin,
+      `${origin}/?${new URLSearchParams({ ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.evaluate((testCase) => window.__compare.initialize(testCase), testCase)
     run.parse = {}
     run.parserErrors = []
-    for (const { name, bytes } of manifest.fixtures) {
+    for (const { name, bytes } of manifest.fixtures.filter(({ name }) => fixtures.includes(name))) {
       run.phase = `parser/${name}`
-      const sample = await parserFixture(page, name, bytes)
+      const sample = smoke
+        ? await parserFixture(page, name, bytes)
+        : await qualifiedWindow(run, `parser/${name}`, () => parserFixture(page, name, bytes))
       run.parse[name] = sample
       if (sample.error) run.parserErrors.push({ name, error: sample.error })
       for (const check of sample.checks ?? []) {
@@ -361,13 +429,22 @@ async function parserOnly(testCase, run, contexts) {
 }
 
 async function measure(testCase, repetition, browserSession) {
-  const run = { ...testCase, repetition, executionOrder: artifact.runs.length, status: 'running' }
+  const run = {
+    ...testCase,
+    repetition,
+    pairId: `${repetition}/${testCase.path}/${testCase.count}`,
+    sessionId: artifact.sessionId,
+    executionOrder: artifact.runs.length,
+    status: 'running',
+  }
   const contexts = new Set()
-  const remaining = smoke ? 120_000 : 30 * 60_000 - (Date.now() - Date.parse(artifact.startedAt))
+  const remaining = smoke
+    ? 120_000
+    : artifact.measurementBudgetMilliseconds - (Date.now() - Date.parse(artifact.startedAt))
   try {
     const result = await withDeadline(
       () => measureBody(testCase, repetition, browserSession, run, contexts),
-      Math.min(120_000, remaining),
+      Math.min(s.caseDeadlineMilliseconds, remaining),
       () => Promise.all([...contexts].map((context) => context.close().catch(() => {}))),
       { drain: true },
     )
@@ -389,6 +466,7 @@ async function measure(testCase, repetition, browserSession) {
 async function qualifyDisplay(page, session, browserSession, run, idle = true) {
   const metadata = {
     variant: run.variant,
+    frameBuilder: run.frameBuilder,
     count: run.count,
     repetition: run.repetition,
     phase: run.phase,
@@ -421,8 +499,65 @@ async function qualifyDisplay(page, session, browserSession, run, idle = true) {
   return probe
 }
 
+async function refreshGpuOwnership() {
+  const processes = await processCpu(browserSession)
+  ownedComputePids.splice(0, ownedComputePids.length, ...processes.map(({ id }) => id))
+}
+
+async function qualifiedWindow(run, label, operation) {
+  run.gpuWindows ??= []
+  try {
+    await refreshGpuOwnership()
+    const idle = await gpuGate.waitForIdle()
+    run.gpuWindows.push({ label, idle })
+    const sampleMilliseconds = ['idle', 'output/ascii', 'latency', 'delayed-write'].includes(label)
+      ? s.gpuMeasuredSampleMilliseconds
+      : s.gpuSampleMilliseconds
+    const { value, gpu } = await gpuGate.monitorWindow(operation, { sampleMilliseconds })
+    run.gpuWindows.at(-1).window = gpu
+    const skipped = idle.skipReason ?? gpu.skipReason ?? run.gpuIdle?.skipped
+    run.gpuIdle = { qualified: true, ...(skipped ? { skipped } : {}) }
+    return value
+  } catch (error) {
+    if (error.evidence) {
+      run.gpuIdle = { qualified: false, reason: error.message }
+      run.gpuWindows.push({ label, failure: error.evidence })
+    }
+    throw error
+  }
+}
+
+async function presentedLatency(page, session, browserSession, run, label, options) {
+  const phase = await qualifiedWindow(run, label, () =>
+    tracePhase({
+      page,
+      session,
+      browserSession,
+      output,
+      label: `${run.variant}${run.frameBuilder ? `-${run.frameBuilder}` : ''}-${run.path}-${run.count}-${run.repetition}-${label}`,
+      categories:
+        'toplevel,devtools.timeline,blink.user_timing,cc,viz,gpu,disabled-by-default-devtools.timeline',
+      operation: async () => {
+        const sample = await latency(page, session, options)
+        // Feedback can arrive after the PNG; drain it before closing the trace.
+        await page.waitForTimeout(s.presentationDrainMilliseconds)
+        return sample
+      },
+      traced: true,
+    }),
+  )
+  assert(!phase.error, phase.error)
+  const trace = JSON.parse(gunzipSync(await readFile(join(output, phase.trace))).toString())
+  return { ...presentationLatency(phase, trace.traceEvents), trace: phase.trace }
+}
+
 async function measureBody(testCase, repetition, browserSession, run, contexts) {
-  if (!tracing && !args.includes('--smoke-instrumentation') && (testCase.count === 1 || smoke))
+  if (
+    !tracing &&
+    phases.includes('parser') &&
+    !args.includes('--smoke-instrumentation') &&
+    (testCase.count === 1 || smoke)
+  )
     await parserOnly(testCase, run, contexts)
   run.phase = 'rendered/prepare'
   const context = await browser.newContext(
@@ -443,7 +578,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
   })
   try {
     await page.goto(
-      tracing || args.includes('--smoke-instrumentation') ? `${origin}/?trace` : origin,
+      `${origin}/?${new URLSearchParams({ ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.bringToFront()
@@ -456,13 +591,13 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
     }
     run.phase = 'rendered/prepare'
     let empty
-    if (!smoke) empty = await memory(page, session, browserSession)
+    if (!smoke && phases.includes('memory')) empty = await memory(page, session, browserSession)
     await page.evaluate((testCase) => window.__compare.prepare(testCase), testCase)
     const info = await page.evaluate(() => window.__compare.info())
     if (!smoke && testCase.variant === 'ghostty-webgpu')
       assert(info.adapter?.fallback === false, 'Software WebGPU adapter rejected')
     run.info = info
-    if (!smoke && !tracing) {
+    if (!smoke && !tracing && phases.includes('memory')) {
       const initial = await memory(page, session, browserSession)
       run.historyLengths = await page.evaluate(() => window.__compare.history())
       const history = await memory(page, session, browserSession)
@@ -484,7 +619,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
         'Every terminal must fit the visible window',
       )
     }
-    const screenshot = `${testCase.variant}-${testCase.path}-${testCase.count}.png`
+    const screenshot = `${testCase.variant}${testCase.frameBuilder ? `-${testCase.frameBuilder}` : ''}-${testCase.path}-${testCase.count}.png`
     if (repetition === 0) {
       await page.locator('main').screenshot({ path: join(output, screenshot) })
       run.screenshot = screenshot
@@ -551,10 +686,12 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
           run.phase = `trace/${name}/${traced ? 'trace' : 'control'}/mounted-probe`
           const probe = await qualifyDisplay(page, session, browserSession, run, false)
           const refreshPeriods = probe.periods
-          const label = `${testCase.variant}-${testCase.count}-${repetition}-${name}-${traced ? 'trace' : 'control'}`
+          const label = `${testCase.variant}${testCase.frameBuilder ? `-${testCase.frameBuilder}` : ''}-${testCase.count}-${repetition}-${name}-${traced ? 'trace' : 'control'}`
           run.phases.push(
             Object.assign(
-              await tracePhase({ page, session, browserSession, output, label, operation, traced }),
+              await qualifiedWindow(run, label, () =>
+                tracePhase({ page, session, browserSession, output, label, operation, traced }),
+              ),
               { refreshPeriods },
             ),
           )
@@ -563,27 +700,56 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       assert.deepEqual(errors, [])
       return run
     }
-    run.idle = await measureCpu(browserSession, () => page.waitForTimeout(s.idleMilliseconds))
-    run.phase = 'captured-frame latency'
-    run.latency = await latency(page, session)
+    if (phases.includes('idle'))
+      run.idle = await qualifiedWindow(run, 'idle', () =>
+        measureCpu(browserSession, () => page.waitForTimeout(s.idleMilliseconds), cpuOptions),
+      )
+    run.phase = 'presentation-feedback latency'
+    if (phases.includes('latency'))
+      run.latency = await presentedLatency(page, session, browserSession, run, 'latency')
+    if (args.includes('--validate-presentation') && repetition === 0 && testCase.count === 1)
+      run.presentationValidation = await presentedLatency(
+        page,
+        session,
+        browserSession,
+        run,
+        'delayed-write',
+        {
+          samples: s.presentationValidationSamples,
+          delayFrames: s.presentationValidationDelayFrames,
+          writeOnly: true,
+        },
+      )
     run.burst = {}
-    for (const { name } of manifest.fixtures) {
+    for (const { name } of manifest.fixtures.filter(
+      ({ name }) => phases.includes('burst') && fixtures.includes(name),
+    )) {
       run.phase = `burst/${name}/warmup`
       await page.evaluate((name) => window.__compare.burst(name, 3), name)
       run.phase = `burst/${name}/measured`
-      run.burst[name] = await page.evaluate(
-        ({ name, frames }) => window.__compare.burst(name, frames),
-        { name, frames: s.burstFrames },
+      run.burst[name] = await qualifiedWindow(run, `burst/${name}`, () =>
+        page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
+          name,
+          frames: s.burstFrames,
+        }),
       )
     }
-    run.phase = 'output/ascii'
-    const outputMeasurement = await measureCpu(browserSession, () =>
-      page.evaluate((frames) => window.__compare.burst('ascii', frames), s.outputFrames),
-    )
-    run.output = {
-      ...outputMeasurement.sample,
-      cpu: outputMeasurement.cpu,
-      memory: await memory(page, session, browserSession),
+    if (phases.includes('output')) {
+      run.phase = 'output/ascii/warmup'
+      await page.evaluate(() => window.__compare.burst('ascii', 3))
+      run.phase = 'output/ascii'
+      const outputMeasurement = await qualifiedWindow(run, 'output/ascii', () =>
+        measureCpu(
+          browserSession,
+          () => page.evaluate((frames) => window.__compare.burst('ascii', frames), outputFrames),
+          cpuOptions,
+        ),
+      )
+      run.output = {
+        ...outputMeasurement.sample,
+        cpu: outputMeasurement.cpu,
+        memory: phases.includes('memory') ? await memory(page, session, browserSession) : undefined,
+      }
     }
     assert.deepEqual(errors, [])
     return run
@@ -596,7 +762,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       await writeFile(
         join(
           output,
-          `capture-failure-${testCase.variant}-${testCase.path}-${testCase.count}-${repetition}.png`,
+          `capture-failure-${testCase.variant}${testCase.frameBuilder ? `-${testCase.frameBuilder}` : ''}-${testCase.path}-${testCase.count}-${repetition}.png`,
         ),
         Buffer.from(error.captureData, 'base64'),
       )
@@ -615,7 +781,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       .screenshot({
         path: join(
           output,
-          `failure-${testCase.variant}-${testCase.path}-${testCase.count}-${repetition}.png`,
+          `failure-${testCase.variant}${testCase.frameBuilder ? `-${testCase.frameBuilder}` : ''}-${testCase.path}-${testCase.count}-${repetition}.png`,
         ),
       })
       .catch(() => {})
@@ -630,22 +796,25 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
 
 try {
   browser = await chromium.launch({
-    channel: smoke && platform() === 'linux' ? undefined : 'chromium',
+    channel: platform() === 'linux' && headless ? undefined : 'chromium',
     headless,
     args: browserArgs,
     env: launchEnv,
   })
-  const browserSession = await browser.newBrowserCDPSession()
+  browserSession = await browser.newBrowserCDPSession()
   const gpu = await browserSession.send('SystemInfo.getInfo')
   artifact.hardware = !smoke && !/unknown|swiftshader|llvmpipe|software/i.test(renderer(gpu))
-  assert(smoke || artifact.hardware, 'Headed hardware GPU required for measurements')
+  assert(smoke || artifact.hardware, 'Hardware GPU required for measurements')
   artifact.environment = {
     browser: browser.version(),
+    browserChannel: platform() === 'linux' && headless ? 'chromium-headless-shell' : 'chromium',
+    latencyEndpoint: comparisonLatencyEndpoint({ tracing, headless, platform: platform() }),
     os: `${platform()} ${release()} ${arch()}`,
     cpu: cpus()[0]?.model,
     renderer: renderer(gpu),
     gpu,
     headed: !headless,
+    headless,
     displayAwake: args.includes('--display-awake') ? 'caffeinate -d -u -t 1800' : null,
     arguments: args,
     launchArguments: browserArgs,
@@ -654,10 +823,34 @@ try {
         ? execFileSync('/usr/bin/pmset', ['-g', 'batt'], { encoding: 'utf8' })
         : null,
   }
+  artifact.environment.gpuIdleSettings = Object.fromEntries(
+    Object.entries(s).filter(([key]) => key.startsWith('gpu')),
+  )
   for (let repetition = 0; repetition < artifact.repetitions; repetition++) {
-    const paths = tracing ? ['bytes'] : repetition % 2 ? ['string', 'bytes'] : ['bytes', 'string']
-    const cases = order(variantIds, repetition).flatMap((variant) =>
-      paths.flatMap((path) => counts.map((count) => ({ variant, path, count }))),
+    if (!smoke) {
+      try {
+        await refreshGpuOwnership()
+        artifact.qualifications.push({
+          ...(await gpuGate.waitForIdle()),
+          kind: 'between-repetitions-gpu',
+          repetition,
+        })
+      } catch (error) {
+        artifact.qualifications.push({
+          ...error.evidence,
+          kind: 'between-repetitions-gpu',
+          repetition,
+          error: error.message,
+        })
+        throw error
+      }
+    }
+    const cases = measurementCases(
+      variantIds,
+      tracing ? ['bytes'] : writePaths,
+      counts,
+      builders,
+      repetition,
     )
     for (const testCase of cases) {
       if (!smoke && platform() === 'darwin')
@@ -668,8 +861,9 @@ try {
           'AC power lost; stopping measurement',
         )
       assert(
-        smoke || Date.now() - Date.parse(artifact.startedAt) < 30 * 60_000,
-        '30-minute measurement window expired',
+        smoke ||
+          Date.now() - Date.parse(artifact.startedAt) < artifact.measurementBudgetMilliseconds,
+        'Configured measurement budget expired',
       )
       console.log(
         `${smoke ? 'Correctness' : 'Measure'} ${repetition + 1}/${artifact.repetitions} ${testCase.variant}/${testCase.path}/${testCase.count}`,

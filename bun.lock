@@ -24,12 +24,13 @@
     },
     "apps/desktop": {
       "name": "desktop",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@workspace/contracts": "workspace:*",
         "@workspace/observability": "workspace:*",
         "@workspace/utils": "workspace:*",
         "evlog": "catalog:",
+        "valibot": "^1.5.0",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -972,6 +973,7 @@
     },
   },
   "patchedDependencies": {
+    "evlog@2.29.0": "patches/evlog@2.29.0.patch",
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",
   },
   "overrides": {

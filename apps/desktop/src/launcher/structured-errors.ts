@@ -13,6 +13,18 @@ export const launcherErrors = defineErrorCatalog('desktop.launcher', {
     why: 'The browser must answer the desktop control protocol over its private pipe.',
     fix: 'Update the browser or choose another executable in Window settings.',
   },
+  PWA_UNSUPPORTED: {
+    status: 400,
+    message: 'The browser cannot install the Fregat app.',
+    why: 'The selected browser does not provide web app installation commands.',
+    fix: 'Choose a browser with web app installation support or use the native window.',
+  },
+  PROFILE_BUSY: {
+    status: 409,
+    message: 'The Fregat browser profile is already open.',
+    why: 'Another launcher or browser is using this profile.',
+    fix: 'Let the current launch finish, or close the browser using this profile and launch Fregat again.',
+  },
   VERSION_UNSUPPORTED: {
     status: 400,
     message: 'The browser engine needs an update.',

@@ -8,9 +8,13 @@ import { nativeBudget, type NativeBudget, type HostSpawn } from './native-helper
 import { shellBridge, parsePickRequest } from './shell-bridge'
 import { launcherFailureFacts } from './failure'
 import type { StartupBudget } from './startup'
+import { appBundle } from './bundle'
 
 export function nativeHostBinary(root: string) {
-  return path.join(root, 'apps', 'desktop', 'native', 'build', 'platform-webview')
+  return (
+    appBundle()?.nativeHost ??
+    path.join(root, 'apps', 'desktop', 'native', 'build', 'platform-webview')
+  )
 }
 export async function launchWebview(options: {
   binary: string
@@ -83,6 +87,7 @@ export async function showStartFailure(
   error: unknown,
   options: {
     binary: string
+    logDir?: string
     signal?: AbortSignal
     budget?: NativeBudget
     spawn?: HostSpawn
@@ -92,7 +97,10 @@ export async function showStartFailure(
   try {
     const file = path.join(directory, 'message.txt')
     const failure = publicFailure(error)
-    writeFileSync(file, `${failure.message}\n\n${failure.why}\n\n${failure.fix}`, { mode: 0o600 })
+    const logs = options.logDir ? `\n\nLauncher logs are in ${options.logDir}.` : ''
+    writeFileSync(file, `${failure.message}\n\n${failure.why}\n\n${failure.fix}${logs}`, {
+      mode: 0o600,
+    })
     await runNativeDialog({
       ...options,
       budget: options.budget ?? nativeBudget(),
@@ -103,7 +111,7 @@ export async function showStartFailure(
   }
 }
 
-export async function completePick(
+async function completePick(
   id: number,
   documentId: string,
   pending: Promise<string[]>,

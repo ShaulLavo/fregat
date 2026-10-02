@@ -9,12 +9,18 @@ const LOG_FILE = /^(\d{4}-\d{2}-\d{2})(?:\.\d+)?\.jsonl$/u
  * Deletes the log files of days before the last `days` UTC days, today included. `0` keeps
  * everything. Returns how many files went.
  */
-export async function pruneExpiredLogs(dir: string, days: number, now = Date.now()) {
+export async function pruneExpiredLogs(
+  dir: string,
+  days: number,
+  now = Date.now(),
+  filePrefix: 'desktop-' | '' = '',
+) {
   if (days <= 0) return 0
   const oldestKept = utcDay(now - (days - 1) * DAY_MS)
   const names = await readdir(dir).catch(() => [])
   const expired = names.filter((name) => {
-    const day = LOG_FILE.exec(name)?.[1]
+    if (!name.startsWith(filePrefix)) return false
+    const day = LOG_FILE.exec(name.slice(filePrefix.length))?.[1]
     return day !== undefined && day < oldestKept
   })
   const results = await Promise.allSettled(expired.map((name) => unlink(path.join(dir, name))))
@@ -30,6 +36,7 @@ export function createLogRetention(
   dir: string,
   readDays: () => number,
   onFailure: (error: unknown) => void,
+  filePrefix: 'desktop-' | '' = '',
 ) {
   let prunedFor = ''
   let failing = false
@@ -38,7 +45,7 @@ export function createLogRetention(
       const days = readDays()
       const key = `${utcDay(now)}:${days}`
       if (key === prunedFor) return 0
-      const pruned = await pruneExpiredLogs(dir, days, now)
+      const pruned = await pruneExpiredLogs(dir, days, now, filePrefix)
       prunedFor = key
       failing = false
       return pruned

@@ -31,24 +31,25 @@ export function browserProfile(candidate: BrowserCandidate, stateHome: string, h
 export function chromiumArguments(
   candidate: BrowserCandidate,
   profile: string,
-  url: string,
+  app?: { appId: string; url: string },
 ): string[] {
   const prefix =
     candidate.confinement === 'flatpak'
       ? [
           candidate.args[0]!,
           `--filesystem=${profile}`,
-          '--forward-fd=3',
-          '--forward-fd=4',
+          ...(app ? [] : ['--forward-fd=3', '--forward-fd=4']),
           ...candidate.args.slice(1),
         ]
       : candidate.args
   return [
     ...prefix,
-    `--app=${url}`,
+    ...(app
+      ? [`--app-id=${app.appId}`, `--app-launch-url-for-shortcuts-menu-item=${app.url}`]
+      : ['about:blank']),
     `--user-data-dir=${profile}`,
     '--profile-directory=Platform',
-    '--remote-debugging-pipe',
+    ...(app ? [] : ['--remote-debugging-pipe']),
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-sync',

@@ -1,33 +1,45 @@
 import { accessSync, constants, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { errorMessage } from '@workspace/contracts'
 import { launcherFailureFacts, reportStartFailure } from './failure'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
-import { portFromEnv, runtimeUrl } from '../../../../scripts/runtime-network'
+import { portFromEnv, requestOriginHeaders, runtimeUrl } from '../../../../scripts/runtime-network'
 import { desktopErrors } from '../bun/structured-errors'
 import {
   initializeDesktopObservability,
   flushDesktopObservability,
   recordDesktopInfo,
   recordDesktopError,
+  recordDesktopWarning,
 } from '../bun/observability'
 import { resolveBrowserCandidates } from './browser'
-import { launchChromium } from './chromium'
+import { launchInstalledWindow } from './installed-window'
+import {
+  ensureInstalledService,
+  installationIntent,
+  installationReleaseRoot,
+} from './installation-client'
 import { launchWebview, nativeHostBinary, showStartFailure } from './native-window'
 import { nativeBudget } from './native-helper'
-import { startupBudget } from './startup'
-import { isRecord } from '@workspace/utils/objects'
 import { desktopStateHome } from './profile'
 import { launcherErrors } from './structured-errors'
+import { readInstallManifest } from './install-receipt'
+import { appBundle } from './bundle'
+import { readSettings } from './settings'
 
-const root = path.resolve(import.meta.dirname, '../../../..')
-applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
-initializeDesktopObservability()
+const bundle = appBundle()
+const root = bundle ? null : path.resolve(import.meta.dirname, '../../../..')
+if (root) applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
+const mode = Bun.argv.includes('--dev') ? 'dev' : 'production'
+const home = homedir()
+const stateHome = desktopStateHome({ PLATFORM_HOME: Bun.env.PLATFORM_HOME }, home, mode)
+let observability = initializeDesktopObservability(
+  mode === 'production' ? { stateHome } : undefined,
+)
 const controller = new AbortController()
 let window: { exited: Promise<unknown>; close(): Promise<void> } | undefined
 let helperBudget = nativeBudget()
-const binary = nativeHostBinary(root)
+const binary = bundle?.nativeHost ?? nativeHostBinary(root!)
 const stop = () => {
   controller.abort()
   void window?.close()
@@ -45,8 +57,14 @@ try {
         process.exitCode = code
       },
     })
+    await flushDesktopObservability()
     try {
-      await showStartFailure(error, { binary, signal: controller.signal, budget: helperBudget })
+      await showStartFailure(error, {
+        binary,
+        signal: controller.signal,
+        budget: helperBudget,
+        logDir: observability.config.logDir,
+      })
     } catch (messageError) {
       if (!controller.signal.aborted)
         recordDesktopError('desktop.start_message_failed', launcherFailureFacts(messageError))
@@ -64,19 +82,33 @@ async function start() {
     throw launcherErrors.LAUNCH_FAILED({
       internal: { platform: process.platform, supportedPlatforms: ['linux', 'darwin'] },
     })
-  const web = runtimeUrl(Bun.env.WEB_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'WEB_PORT', 5173))
-  const server = runtimeUrl(Bun.env.FS_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'PORT', 3001))
-  recordDesktopInfo('desktop.shared_dev.wait')
-  await waitForHttp(`${server}/health`, web)
-  await waitForHttp(web, web)
-  const settings = await readSettings(server, web)
+  let web: string
+  let server: string
+  if (mode === 'dev') {
+    web = runtimeUrl(Bun.env.WEB_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'WEB_PORT', 5173))
+    server = runtimeUrl(Bun.env.FS_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'PORT', 3001))
+    recordDesktopInfo('desktop.shared_dev.wait')
+    await waitForHttp(`${server}/health`, web)
+    await waitForHttp(web, web)
+  } else {
+    const releaseRoot = installationReleaseRoot(stateHome, home)
+    await flushDesktopObservability()
+    observability = initializeDesktopObservability({ stateHome, releaseRoot })
+    const service = await ensureInstalledService({
+      intent: installationIntent(stateHome),
+      productionRoot: releaseRoot,
+      bundledRelease: bundle?.release,
+      signal: controller.signal,
+    })
+    web = service.url
+    server = service.identity.address
+    recordDesktopInfo('desktop.service.ready', { disposition: service.disposition })
+  }
+  const settings = await readSettings(server, web, {
+    signal: controller.signal,
+    onWarning: (context) => recordDesktopWarning('desktop.settings.unreachable', context),
+  })
   helperBudget = settings.native
-  const home = homedir()
-  const stateHome = desktopStateHome(
-    { PLATFORM_HOME: Bun.env.PLATFORM_HOME },
-    home,
-    Bun.argv.includes('--dev') ? 'dev' : 'production',
-  )
   const candidates = resolveBrowserCandidates(
     settings.browser,
     settings.transparency,
@@ -99,19 +131,21 @@ async function start() {
         : { kind: candidate.kind },
     ),
   })
+  const openNative = () =>
+    launchWebview({
+      binary,
+      url: web,
+      signal: controller.signal,
+      budget: settings.native,
+      startup: settings.startup,
+      vibrancy: settings.transparency === 'window',
+      onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
+    })
   for (const candidate of candidates) {
     controller.signal.throwIfAborted()
     if (candidate.kind === 'webview') {
       try {
-        window = await launchWebview({
-          binary,
-          url: web,
-          signal: controller.signal,
-          budget: settings.native,
-          startup: settings.startup,
-          vibrancy: settings.transparency === 'window',
-          onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
-        })
+        window = await openNative()
       } catch (error) {
         if (controller.signal.aborted) throw error
         recordDesktopInfo('desktop.browser.rejected', {
@@ -145,23 +179,23 @@ async function start() {
       return
     }
     try {
-      const result = await launchChromium({
-        candidate,
-        stateHome,
-        home,
-        url: web,
-        startup: settings.startup,
-        native: { binary, budget: settings.native },
-        signal: controller.signal,
-        onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
-        onExit: (context) => recordDesktopInfo('desktop.window.closed', context),
-        onFailure: (error) =>
-          recordDesktopError('desktop.window.control_failed', {
-            outcome: 'failed',
+      const result = await launchInstalledWindow({
+        native: openNative,
+        onUnsupported: (error) =>
+          recordDesktopInfo('desktop.browser.installation_unavailable', {
             source: candidate.source,
-            confinement: candidate.confinement,
             ...launcherFailureFacts(error),
           }),
+        browser: {
+          candidate,
+          stateHome,
+          home,
+          url: web,
+          manifest: await readInstallManifest(web, requestSignal()),
+          startup: settings.startup,
+          signal: controller.signal,
+          onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
+        },
       })
       recordDesktopInfo('desktop.browser.chosen', {
         source: candidate.source,
@@ -179,48 +213,20 @@ async function start() {
         confinement: candidate.confinement,
         ...launcherFailureFacts(error),
       })
+      throw error
     }
   }
 }
 
-async function readSettings(server: string, origin: string) {
-  try {
-    const response = await fetch(`${server}/settings`, {
-      headers: { Origin: origin },
-      signal: requestSignal(),
-    })
-    const snapshot: unknown = await response.json()
-    if (!response.ok || !isRecord(snapshot) || !isRecord(snapshot.values))
-      return {
-        browser: 'auto',
-        transparency: 'compositor',
-        startup: startupBudget(),
-        native: nativeBudget(),
-      }
-    return {
-      browser: snapshot.values['window.browser'] ?? 'auto',
-      transparency: snapshot.values['window.transparency'] ?? 'compositor',
-      startup: startupBudget(snapshot.values),
-      native: nativeBudget(snapshot.values),
-    }
-  } catch (error) {
-    controller.signal.throwIfAborted()
-    recordDesktopInfo('desktop.settings.unreachable', { error: errorMessage(error) })
-    return {
-      browser: 'auto',
-      transparency: 'compositor',
-      startup: startupBudget(),
-      native: nativeBudget(),
-    }
-  }
-}
-
-async function waitForHttp(url: string, origin: string) {
+async function waitForHttp(url: string, webUrl: string) {
   const deadline = Date.now() + 90_000
   while (Date.now() < deadline) {
     controller.signal.throwIfAborted()
     try {
-      const response = await fetch(url, { headers: { Origin: origin }, signal: requestSignal() })
+      const response = await fetch(url, {
+        headers: requestOriginHeaders(webUrl),
+        signal: requestSignal(),
+      })
       await response.body?.cancel()
       if (response.ok) return
     } catch {

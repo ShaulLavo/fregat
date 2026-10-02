@@ -7,28 +7,40 @@ describe('isSettingAvailable', () => {
     // A browser on a Linux desktop is composited over the wallpaper too, but it
     // has no shell window to make transparent.
     expect(
-      isSettingAvailable('window.transparency', { backdrop: 'compositor', isShell: false }),
+      isSettingAvailable('window.transparency', {
+        backdrop: 'compositor',
+        nativeTransparency: false,
+      }),
     ).toBe(false)
-    expect(isSettingAvailable('window.transparency', { backdrop: 'app', isShell: true })).toBe(
-      false,
-    )
+    expect(
+      isSettingAvailable('window.transparency', { backdrop: 'app', nativeTransparency: true }),
+    ).toBe(false)
   })
 
   it('shows it in a shell whose desktop composites the window', () => {
     expect(
-      isSettingAvailable('window.transparency', { backdrop: 'compositor', isShell: true }),
+      isSettingAvailable('window.transparency', {
+        backdrop: 'compositor',
+        nativeTransparency: true,
+      }),
     ).toBe(true)
     expect(
-      isSettingAvailable('window.transparency', { backdrop: 'transparent', isShell: true }),
+      isSettingAvailable('window.transparency', {
+        backdrop: 'transparent',
+        nativeTransparency: true,
+      }),
     ).toBe(true)
   })
 
   it('leaves every other row alone', () => {
-    expect(isSettingAvailable('workbench.wallpaper', { backdrop: 'app', isShell: false })).toBe(
-      true,
-    )
     expect(
-      isSettingAvailable('workbench.wallpaper', { backdrop: 'compositor', isShell: true }),
+      isSettingAvailable('workbench.wallpaper', { backdrop: 'app', nativeTransparency: false }),
+    ).toBe(true)
+    expect(
+      isSettingAvailable('workbench.wallpaper', {
+        backdrop: 'compositor',
+        nativeTransparency: true,
+      }),
     ).toBe(true)
   })
 })

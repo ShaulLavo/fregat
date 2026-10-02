@@ -1144,3 +1144,37 @@ export {
 } from './agent-review'
 
 export { hostResourcesSchema, type HostResources } from './host-resources'
+export { absolutePathSchema } from './absolute-path'
+export {
+  SERVER_IDENTITY_PROTOCOL_VERSION,
+  machineIdSchema,
+  machineServiceDispositionSchema,
+  machineServiceErrorCodes,
+  machineServiceIntentSchema,
+  machineServiceResultSchema,
+  serverAddressSchema,
+  serverCapabilitiesSchema,
+  serverIdentityErrorCodes,
+  serverIdentitySchema,
+  serverServiceKindSchema,
+  serverServiceSchema,
+  webBaseSchema,
+  type MachineId,
+  type MachineServiceDisposition,
+  type MachineServiceErrorCode,
+  type MachineServiceIntent,
+  type MachineServiceResult,
+  type ServerCapabilities,
+  type ServerIdentity,
+  type ServerIdentityErrorCode,
+  type ServerService,
+  type ServerServiceKind,
+} from './server-identity'
+export {
+  nativePickerErrorCodes,
+  nativePickerRequestSchema,
+  nativePickerResultSchema,
+  type NativePickerErrorCode,
+  type NativePickerRequest,
+  type NativePickerResult,
+} from './native-picker'

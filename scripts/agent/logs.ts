@@ -48,7 +48,7 @@ export async function readLogs(filter: LogFilter): Promise<LogEvent[]> {
       events.push(event)
     }
   }
-  return events
+  return events.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
 }
 
 export function formatLogEvent(event: LogEvent): string {
@@ -82,7 +82,10 @@ async function logFilesBetween(since: Date, until: Date, directory: string) {
     name.endsWith('.jsonl'),
   )
   return names
-    .filter((name) => days.has(name.slice(0, 10)))
+    .filter((name) => {
+      const day = /^(?:desktop-)?(\d{4}-\d{2}-\d{2})(?:\.\d+)?\.jsonl$/u.exec(name)?.[1]
+      return day !== undefined && days.has(day)
+    })
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .map((name) => join(directory, name))
 }

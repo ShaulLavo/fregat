@@ -2,9 +2,7 @@ import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { act, fireEvent, waitFor } from '@testing-library/react'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
-import type { ReactElement } from 'react'
-import { toast } from 'sonner'
-import { vi } from 'vitest'
+import { Toaster } from '@workspace/ui/components/sonner'
 import { expect, test } from '../../../../test/fixtures'
 import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
@@ -72,58 +70,52 @@ for (const event of ['changed', 'renamed'] as const) {
         setFileOrphaned: state.setFileOrphaned,
         selectContent: commands.selectContent,
       }
-      const custom = vi.spyOn(toast, 'custom').mockImplementation(() => 'binary-conflict')
-      try {
-        await act(async () => {
-          if (event === 'renamed')
-            await notifyRenamedFilesystemConflict(localPath, remotePath, context)
-          if (event === 'changed') notifyChangedFilesystemConflict(localPath, remote, context)
-        })
-        expect(Object.values(conflictStore.getState().conflicts)[0]).toMatchObject({
-          remoteFile: remote,
-          remoteText: null,
-        })
-        const renderToast = custom.mock.calls[0]![0] as () => ReactElement
-        const rendered = renderWithProviders(renderToast(), { application, queryClient })
-        await act(async () => fireEvent.click(rendered.getByRole('button', { name: action })))
-        if (action === 'Compare') {
-          expect(Object.keys(documentStore.getState().liveDocumentsByKey)).toEqual([
-            fileDocumentKey(localPath),
-          ])
-          expect(local.buffer.getSnapshot()).toBe(before)
-          expect(local.buffer.materializeFullText()).toBe(localText)
-          expect(local.analysis).toBe(analysis)
-          expect(documentStore.getState().viewsByTabId[tabId('local')]).toBe(storedView)
-          expect(documentStore.getState().dirtyDocumentKeys.has(fileDocumentKey(localPath))).toBe(
-            true,
-          )
-          expect(Object.values(conflictStore.getState().conflicts)).toHaveLength(1)
-        }
-        if (action === 'Use the disk version') {
-          await waitFor(() => expect(conflictStore.getState().conflicts).toEqual({}))
-          expect(documentStore.getState().liveDocumentsByKey).toEqual({})
-          expect(documentStore.getState().viewsByTabId).toEqual({})
-          expect(documentStore.getState().dirtyDocumentKeys.size).toBe(0)
-        }
-        expect(
-          queryClient.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(remotePath)),
-        ).toMatchObject(remote)
-        const facts = renderWithProviders(
-          <TestEditorStateProvider>
-            <EditorSurfaceTabBody
-              active
-              content={documentTab(fileDocument(fileResource(remotePath)))}
-              rootPath={filesystemPath('')}
-              tabId={tabId('facts')}
-            />
-          </TestEditorStateProvider>,
-          { application, queryClient },
+      const rendered = renderWithProviders(<Toaster />, { application, queryClient })
+      await act(async () => {
+        if (event === 'renamed')
+          await notifyRenamedFilesystemConflict(localPath, remotePath, context)
+        if (event === 'changed') notifyChangedFilesystemConflict(localPath, remote, context)
+      })
+      expect(Object.values(conflictStore.getState().conflicts)[0]).toMatchObject({
+        remoteFile: remote,
+        remoteText: null,
+      })
+      fireEvent.click(await rendered.findByRole('button', { name: action }))
+      if (action === 'Compare') {
+        expect(Object.keys(documentStore.getState().liveDocumentsByKey)).toEqual([
+          fileDocumentKey(localPath),
+        ])
+        expect(local.buffer.getSnapshot()).toBe(before)
+        expect(local.buffer.materializeFullText()).toBe(localText)
+        expect(local.analysis).toBe(analysis)
+        expect(documentStore.getState().viewsByTabId[tabId('local')]).toBe(storedView)
+        expect(documentStore.getState().dirtyDocumentKeys.has(fileDocumentKey(localPath))).toBe(
+          true,
         )
-        await waitFor(() => expect(facts.getByRole('region', { name: 'File facts' })).toBeVisible())
-        expect(facts.queryByRole('textbox', { name: 'Editor input' })).toBeNull()
-      } finally {
-        custom.mockRestore()
+        expect(Object.values(conflictStore.getState().conflicts)).toHaveLength(1)
       }
+      if (action === 'Use the disk version') {
+        await waitFor(() => expect(conflictStore.getState().conflicts).toEqual({}))
+        expect(documentStore.getState().liveDocumentsByKey).toEqual({})
+        expect(documentStore.getState().viewsByTabId).toEqual({})
+        expect(documentStore.getState().dirtyDocumentKeys.size).toBe(0)
+      }
+      expect(
+        queryClient.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(remotePath)),
+      ).toMatchObject(remote)
+      const facts = renderWithProviders(
+        <TestEditorStateProvider>
+          <EditorSurfaceTabBody
+            active
+            content={documentTab(fileDocument(fileResource(remotePath)))}
+            rootPath={filesystemPath('')}
+            tabId={tabId('facts')}
+          />
+        </TestEditorStateProvider>,
+        { application, queryClient },
+      )
+      await waitFor(() => expect(facts.getByRole('region', { name: 'File facts' })).toBeVisible())
+      expect(facts.queryByRole('textbox', { name: 'Editor input' })).toBeNull()
     })
   }
 }
