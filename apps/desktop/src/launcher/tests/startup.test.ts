@@ -20,8 +20,12 @@ async function startupFixture(mode: string) {
     source: 'setting',
     family: 'fixture',
   }
-  const launch = (startup: StartupBudget, observe?: (pid: number) => Record<string, number>) =>
-    launchChromium({
+  let owned: Awaited<ReturnType<typeof launchChromium>> | undefined
+  const launch = async (
+    startup: StartupBudget,
+    observe?: (pid: number) => Record<string, number>,
+  ) => {
+    owned = await launchChromium({
       candidate,
       stateHome: root,
       home: root,
@@ -31,6 +35,8 @@ async function startupFixture(mode: string) {
       onOpen: () => {},
       onFailure: () => {},
     })
+    return owned
+  }
   const reaped = async () => {
     try {
       process.kill(Number(await readFile(pidFile, 'utf8')), 0)
@@ -39,7 +45,14 @@ async function startupFixture(mode: string) {
       return true
     }
   }
-  return { launch, reaped, cleanup: () => rm(root, { recursive: true, force: true }) }
+  return {
+    launch,
+    reaped,
+    cleanup: async () => {
+      if (owned?.kind === 'owned') await owned.close()
+      await rm(root, { recursive: true, force: true })
+    },
+  }
 }
 
 function clock() {
@@ -167,6 +180,53 @@ test('a browser that exits during the startup attach fails promptly', async () =
   try {
     await expect(f.launch(startupBudget())).rejects.toThrow()
     expect(performance.now() - started).toBeLessThan(2000)
+    expect(await f.reaped()).toBe(true)
+  } finally {
+    await f.cleanup()
+  }
+})
+
+test('initial page preparation keeps startup progress supervision until its bridge is ready', async () => {
+  const f = await startupFixture('slow-page')
+  const started = performance.now()
+  let window: Awaited<ReturnType<typeof f.launch>> | undefined
+  try {
+    window = await f.launch(startupBudget())
+    expect(window.kind).toBe('owned')
+    expect(performance.now() - started).toBeGreaterThanOrEqual(6000)
+    if (window.kind === 'owned')
+      await expect(window.cdp.request('Browser.getVersion')).resolves.toHaveProperty('product')
+  } finally {
+    if (window?.kind === 'owned') await window.close()
+    expect(await f.reaped()).toBe(true)
+    await f.cleanup()
+  }
+}, 15_000)
+
+test.each([
+  { reason: 'startup-stalled', advancing: false, budget: { idleMs: 300, limitMs: 1500 } },
+  { reason: 'startup-limit', advancing: true, budget: { idleMs: 300, limitMs: 1500 } },
+])(
+  'initial page preparation fails at $reason and reaps its owner',
+  async ({ reason, advancing, budget }) => {
+    const f = await startupFixture('silent-page')
+    let faults = 0
+    try {
+      const launch = f.launch(budget, () => ({ faults: advancing ? ++faults : 7 }))
+      await expect(launch).rejects.toMatchObject({ internal: { reason, startupPhase: 'attach' } })
+      expect(await f.reaped()).toBe(true)
+    } finally {
+      await f.cleanup()
+    }
+  },
+)
+
+test('initial page protocol rejection fails launch before ownership and reaps its child', async () => {
+  const f = await startupFixture('reject-page')
+  try {
+    await expect(f.launch(startupBudget())).rejects.toMatchObject({
+      internal: { reason: 'request-error', method: 'Page.enable', protocolCode: -1 },
+    })
     expect(await f.reaped()).toBe(true)
   } finally {
     await f.cleanup()
