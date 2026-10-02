@@ -58,6 +58,27 @@ test('snap keeps state-home namespaces isolated and flatpak grants only chosen p
     '--disable-extensions',
   )
 })
+test('production Mac Chromium keeps real keychain and system proxy arguments', () => {
+  const mac = {
+    ...candidate,
+    executable: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    family: 'chrome',
+  }
+  expect(chromiumArguments(mac, '/fixtures/profile', 'http://127.0.0.1:123/')).toEqual([
+    '--app=http://127.0.0.1:123/',
+    '--user-data-dir=/fixtures/profile',
+    '--profile-directory=Platform',
+    '--remote-debugging-pipe',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-sync',
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-default-apps',
+    '--disable-extensions',
+    '--window-size=1440,960',
+  ])
+})
 test('handlers precede discovery and bridge is installed before debugger resumes current and new pages', async () => {
   const calls: string[] = []
   const handlers = new Map<string, (event: CdpEvent) => void>()
