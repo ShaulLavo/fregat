@@ -72,10 +72,10 @@ against its closest counterpart in the same session:
 | Canvas 2D | ghostty-web (canvas2d) | xterm.js removed its canvas renderer |
 | DOM       | xterm DOM              | like with like                       |
 
-Target: each of ours at or below its counterpart. The open question for WebGPU is whether its
-remaining gap at 17 terminals (GPU-process CPU about 2.5× xterm's) is the cost of presenting a
-WebGPU canvas on this Linux setup (Dawn on Vulkan, compositor on GL, no Vulkan–GL interop), or
-something our renderers do. Comparing our WebGL with xterm's WebGL answers it.
+Target: each of ours at or below its counterpart. The controlled Linux browser reports ANGLE
+Vulkan and Skia GaneshVulkan. Its disabled Vulkan-via-GL-interop feature does not establish a
+Vulkan-to-GL presentation path. The remaining WebGPU GPU-process gap needs separate Dawn/API
+and presentation attribution; native WebGL versus xterm WebGL isolates our WebGL renderer work.
 
 ## Why the M1 targets changed
 
@@ -139,10 +139,60 @@ Rank the causes by measured share. Candidate areas to confirm or rule out: one s
 GPU submission per frame for all terminals, damage-limited uploads (rows actually changed), avoiding
 full render-state copies out of wasm, atlas churn, and input-to-render ordering inside the frame.
 
-## Phase 2: fix the top causes
+## Phase 2: Zig/WebAssembly frame spike
+
+Status: Approved. Build the supported render frame directly from Ghostty's render state in the
+existing bridge. JavaScript retains canvas glyph rasterization and WebGPU calls. The experimental
+`zigFrame` renderer option defaults off; unsupported frames use the existing JavaScript path.
+
+- [x] Add persistent WASM cell/glyph records, an atlas index, missing glyph keys and changed ranges.
+- [x] Add the opt-in WebGPU path and direct WASM-memory buffer uploads.
+- [x] Prove instance-byte parity, dirty ranges, memory growth and fallback recovery with focused tests.
+      Full unit suite: 405 passed. WebGPU browser coverage: 16 passed, two existing Linux skips.
+- [x] Run existing unit and browser coverage plus supported-subset option-on coverage.
+      Full browser suite: 183 passed, two existing Linux device-loss skips. Focused native frame: 12 passed.
+- [x] Pull the reviewed Linux benchmark repair before hardware measurement; merge safeguards and
+      JS/Zig identity reviewed against both parents, 100 portable comparison tests passed.
+- [x] Push the spike and open [draft PR #357](https://github.com/ShaulLavo/fregat/pull/357).
+- [x] Add native WebGL, Canvas 2D and DOM comparison variants with portable counterpart tests.
+      117 portable comparison tests, package typecheck and full commit gates passed at `37441317b`.
+- [x] Measure WebGPU/Zig, native WebGL and xterm WebGL at 17 terminals, ASCII, four balanced
+      repetitions in one session; retain CPU process splits and presentation latency.
+- [x] Attribute GPU/Viz/Dawn/WebGPU work and per-frame API counts in a separate one-off wrapper.
+      Positive copy/readback control verified contents; native copy/map trace coverage is unobservable.
+- [x] Measure native Canvas/ghostty-web and native DOM/xterm DOM at 17 terminals with the same gates.
+- [x] Capture separate DOM HTML/style/layout/paint/library-work attribution.
+      The successful capture qualifies the marked render window before transferring large records.
+- [x] Attribute the remaining WebGPU/Zig renderer-main gap against xterm from preserved traces.
+      Builder, retained callback row reads, warm atlas, uploads and commands are measured wrapper
+      intervals; native bridge and scheduler ancestry are sample estimates. Trace totals are perturbed.
+- [x] Repair negative-delta CPU sample overlap; regress reordered samples, nested tasks and unsampled edges.
+- [x] Assess Zig frame compatibility with WebGL without implementing renderer changes.
+- [x] Complete independent review and push the measurement evidence; leave merge to the owner.
+      194 portable comparison tests and 15 focused attribution regressions pass; independent
+      interval checks cover 1,000 reordered-sample cases. Reanalysis preserves all reported case
+      numbers and records the repaired implementation hash. Raw traces remain outside timing code.
+
+Compact controlled evidence lives in `ghostty-webgpu/docs/benchmarks/linux-zig-frame-2026-10-02/`.
+All three timing sessions completed their four balanced repetitions; CPU and latency ratios retain
+qualification. The WebGPU/Zig total-CPU gate failed (paired median 2.019× xterm WebGL); the full
+move remains open for review. Native WebGL renderer CPU is 1.837× xterm WebGL, Canvas CPU is
+0.889× ghostty-web, and DOM CPU is 1.574× xterm DOM. No renderer performance fixes landed in
+this measurement pass. The legacy Unicode diagnostic smoke crashes in its old WASM; ASCII
+hardware timing avoids that diagnostic. Atlas residency and ZWJ width observations are tracked
+in #358 and #360; an empty NVIDIA sample invalidated separate DOM attribution attempts (#362).
+
+The earlier three-repetition JS/Zig/xterm measurements are preliminary. This pass measures and
+attributes every renderer; it introduces no renderer performance fixes.
+
+The decision gate is 17-terminal total CPU clearly below xterm (ratio well under 1), with GPU-process
+CPU moving toward xterm. Retain write latency and explain any remaining gap before expanding the
+spike to the full terminal feature set. Measurements use GPU-idle, `--quiet` heavy slots.
+
+### Follow-up causes
 
 One reviewed PR per cause, largest measured share first. Each PR shows before/after on omarchy with
-`bench:compare` (the affected measures, three repetitions, order-alternated, inside a `--quiet` heavy slot with the GPU idle) plus a trace that
+`bench:compare` (the affected measures, four balanced repetitions, inside a `--quiet` heavy slot with the GPU idle) plus a trace that
 shows the removed work. Stop when every target is met or when the remaining gap is explained and
 the owner decides it is acceptable.
 
