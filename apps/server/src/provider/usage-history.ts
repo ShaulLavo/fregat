@@ -11,7 +11,7 @@ import type {
   ProviderUsageSessionTotal,
 } from '@workspace/contracts'
 import { usageTokenCount } from '@workspace/contracts'
-import { eq, gte, sql } from 'drizzle-orm'
+import { and, eq, gte, ne, sql } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
 import { providerUsageTurns as turns } from '../db/schema'
 
@@ -71,6 +71,26 @@ export class ProviderUsageHistoryReader {
         ),
       },
     }
+  }
+
+  /** Isolated generations disable native persistence in both adapters; recorded chat turns stay separate. */
+  readUtilities(
+    query: ProviderUsageHistoryQuery,
+  ): import('./utils/transcript-records').TranscriptRecord[] {
+    const since = rangeStart(this.now(), query)
+    return this.database
+      .select()
+      .from(turns)
+      .where(and(gte(turns.recordedAt, since), ne(turns.purpose, 'turn')))
+      .all()
+      .map((row) => ({
+        ...row,
+        billingKey: JSON.stringify(['fregat-utility', row.sessionId, row.turnId]),
+        turnKey: JSON.stringify([row.sessionId, row.turnId]),
+        identityKind: 'source',
+        price: row.priceSnapshot,
+        reportedCostUsd: row.priceSnapshot ? null : row.costUsd,
+      }))
   }
 
   /** One set of rates per model, only when every catalog-priced turn in the range used it. */
@@ -307,4 +327,82 @@ function sumKnownCost(groups: readonly UsageGroup[]) {
 
 function sum<Row>(rows: readonly Row[], value: (row: Row) => number) {
   return rows.reduce((total, row) => total + value(row), 0)
+}
+
+/** The transcript ledger reuses recorded-history grouping and viewer-local midnight semantics. */
+export function aggregateTranscriptHistory(
+  records: readonly import('./utils/transcript-records').TranscriptRecord[],
+  query: ProviderUsageHistoryQuery,
+  now: number,
+): ProviderUsageHistory {
+  const since = rangeStart(now, query)
+  const selected = records.filter(
+    (row) => row.recordedAt >= since && Date.parse(row.recordedAt) <= now,
+  )
+  const groups: UsageGroup[] = selected.map((row) => ({
+    ...row,
+    day: new Date(Date.parse(row.recordedAt) + query.utcOffsetMinutes * 60_000)
+      .toISOString()
+      .slice(0, 10),
+    purpose: row.purpose,
+    turns: 1,
+    costSource: transcriptCostSource(row),
+  }))
+  return {
+    days: query.days,
+    since,
+    daily: dailyRows(groups),
+    models: modelRows(groups).map((row) => ({
+      ...row,
+      rates: transcriptModelRates(selected, row),
+    })),
+    purposes: [...new Set(groups.map((row) => row.purpose))].map((purpose) => {
+      const rows = groups.filter((row) => row.purpose === purpose)
+      return {
+        purpose,
+        turns: transcriptTurnCount(selected.filter((row) => row.purpose === purpose)),
+        tokens: sum(rows, usageTokenCount),
+        costUsd: sumKnownCost(rows),
+      }
+    }),
+    totals: {
+      turns: transcriptTurnCount(selected),
+      tokens: sum(groups, usageTokenCount),
+      costUsd: sumKnownCost(groups),
+      unpricedTokens: sum(
+        groups.filter((row) => row.costSource === 'none'),
+        usageTokenCount,
+      ),
+    },
+  }
+}
+
+function transcriptModelRates(
+  records: readonly import('./utils/transcript-records').TranscriptRecord[],
+  model: ModelTotals,
+): ProviderUsageRates | null {
+  if (model.costSource !== 'catalog') return null
+  const rates = records
+    .filter((row) => modelKey(row) === modelKey(model))
+    .map((row) => {
+      if (!row.price) return null
+      const { input, output, cacheRead, cacheWrite } = row.price
+      return { input, output, cacheRead, cacheWrite }
+    })
+  if (new Set(rates.map((row) => JSON.stringify(row))).size !== 1) return null
+  return rates[0] ?? null
+}
+
+function transcriptTurnCount(
+  records: readonly import('./utils/transcript-records').TranscriptRecord[],
+) {
+  return new Set(records.map((row) => JSON.stringify([row.driverKind, row.turnKey]))).size
+}
+
+function transcriptCostSource(
+  row: import('./utils/transcript-records').TranscriptRecord,
+): ProviderUsageCostSource {
+  if (row.costUsd === null) return 'none'
+  if (row.reportedCostUsd !== null) return 'provider'
+  return 'catalog'
 }

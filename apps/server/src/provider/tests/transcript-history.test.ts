@@ -1,0 +1,514 @@
+import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, expect, it } from 'vitest'
+import { LocalTranscriptUsageService } from '../transcript-history'
+import { modelPrice } from '../utils/model-prices'
+
+const cleanup: Array<() => Promise<void>> = []
+afterEach(async () => {
+  for (const close of cleanup.splice(0)) await close()
+})
+const now = Date.parse('2026-10-03T12:00:00Z')
+const query = { days: 7 as const, utcOffsetMinutes: 0 }
+const response = (id: string, output = 20) => ({
+  type: 'assistant',
+  timestamp: '2026-10-03T10:00:00Z',
+  message: { id, model: 'test-model', usage: { input_tokens: 100, output_tokens: output } },
+})
+
+async function fixture() {
+  const root = await mkdtemp(join(tmpdir(), 'usage-transcripts-'))
+  const transcripts = join(root, 'native', 'outside-projects')
+  await mkdir(transcripts, { recursive: true })
+  const options = {
+    cacheDirectory: join(root, 'cache'),
+    hostId: 'fixture-host',
+    sources: [{ id: 'claude-native', driverKind: 'claude' as const, roots: [transcripts] }],
+    limits: { maxBytes: 1024 * 1024, maxFiles: 100, maxLineBytes: 64 * 1024, readChunkBytes: 1024 },
+    priceCatalog: {
+      lookupLocal: (driver: string, model: string) =>
+        modelPrice(
+          {
+            fetchedAt: '2026-10-01T00:00:00Z',
+            prices: {
+              'anthropic/test-model': { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 1.25 },
+            },
+          },
+          driver,
+          model,
+        ),
+    },
+    now: () => now,
+  }
+  const service = new LocalTranscriptUsageService(options)
+  await service.initialize()
+  cleanup.push(async () => {
+    service.close()
+    await rm(root, { recursive: true, force: true })
+  })
+  return { root, transcripts, options, service }
+}
+
+it('finds native usage outside Fregat projects; range reads never scan', async () => {
+  const f = await fixture()
+  await writeFile(
+    join(f.transcripts, 'session.jsonl'),
+    JSON.stringify(response('request-1')) + '\n',
+  )
+  expect(f.service.read(query).totals.tokens).toBe(0)
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(120)
+  expect(f.service.read(query).coverage).toMatchObject({
+    scope: 'local-transcripts',
+    accountAttribution: 'unverified',
+    sources: [{ status: 'ready', records: 1 }],
+  })
+  await appendFile(
+    join(f.transcripts, 'session.jsonl'),
+    JSON.stringify(response('request-2')) + '\n',
+  )
+  expect(f.service.read({ ...query, days: 30 }).totals.tokens).toBe(120)
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(240)
+})
+
+it('keeps incomplete tails out, resumes appends and takes maxima across Claude fragments and copies', async () => {
+  const f = await fixture()
+  const file = join(f.transcripts, 'main.jsonl')
+  const partial = JSON.stringify(response('request-1', 40))
+  await writeFile(file, JSON.stringify(response('request-1')) + '\n' + partial.slice(0, 40))
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(120)
+  await appendFile(file, partial.slice(40) + '\n')
+  await writeFile(join(f.transcripts, 'copy.jsonl'), partial + '\n')
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(140)
+  const cold = f.service.read(query).coverage?.bytesRead
+  await f.service.refresh()
+  expect(f.service.read(query).coverage?.bytesRead).toBe(0)
+  expect(cold).toBeGreaterThan(0)
+})
+
+it('rebuilds replaced and truncated file contributions and preserves vanished history on restart', async () => {
+  const f = await fixture()
+  const file = join(f.transcripts, 'session.jsonl')
+  await writeFile(file, JSON.stringify(response('old', 80)) + '\n')
+  await f.service.refresh()
+  await writeFile(file, JSON.stringify(response('new', 1)) + '\n')
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(101)
+  await rm(file)
+  await f.service.refresh()
+  f.service.close()
+  const restarted = new LocalTranscriptUsageService(f.options)
+  cleanup.push(async () => restarted.close())
+  await restarted.initialize()
+  expect(restarted.read(query).totals.tokens).toBe(101)
+})
+
+it('rebuckets timestamps, leaves unknown price explicit, and never adds reasoning twice', async () => {
+  const f = await fixture()
+  const event = response('unknown')
+  event.timestamp = '2026-10-02T23:30:00Z'
+  event.message.model = 'unknown-model'
+  await writeFile(join(f.transcripts, 'session.jsonl'), JSON.stringify(event) + '\n')
+  await f.service.refresh()
+  const report = f.service.read({ ...query, utcOffsetMinutes: 180 })
+  expect(report.daily[0]?.day).toBe('2026-10-03')
+  expect(report.totals).toMatchObject({ costUsd: null, tokens: 120, unpricedTokens: 120 })
+})
+
+it('uses persistent Codex cumulative baselines across append, copies and forked child rollouts', async () => {
+  const f = await fixture()
+  f.service.close()
+  const service = new LocalTranscriptUsageService({
+    ...f.options,
+    sources: [{ id: 'codex-native', driverKind: 'codex', roots: [f.transcripts] }],
+  })
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  const total = (input: number, output: number, lastInput = input, lastOutput = output) => ({
+    type: 'event_msg',
+    timestamp: '2026-10-03T11:00:00Z',
+    payload: {
+      type: 'token_count',
+      info: {
+        total_token_usage: {
+          input_tokens: input,
+          output_tokens: output,
+          cached_input_tokens: 10,
+          reasoning_output_tokens: 4,
+        },
+        last_token_usage: { input_tokens: lastInput, output_tokens: lastOutput },
+      },
+    },
+  })
+  const context = (turn_id: string) => ({
+    type: 'turn_context',
+    payload: { turn_id, model: 'gpt-test' },
+  })
+  const file = join(f.transcripts, 'parent.jsonl')
+  await writeFile(
+    file,
+    [{ type: 'session_meta', payload: { id: 'parent' } }, context('turn-1'), total(100, 20)]
+      .map((row) => JSON.stringify(row))
+      .join('\n') + '\n',
+  )
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(120)
+  await appendFile(
+    file,
+    [total(100, 20), total(140, 30, 40, 10)].map((row) => JSON.stringify(row)).join('\n') + '\n',
+  )
+  await writeFile(
+    join(f.transcripts, 'copy.jsonl'),
+    await import('node:fs/promises').then((fs) => fs.readFile(file)),
+  )
+  await mkdir(join(f.transcripts, 'subagents'))
+  await writeFile(
+    join(f.transcripts, 'subagents', 'child.jsonl'),
+    [
+      { type: 'session_meta', payload: { id: 'child', forked_from_id: 'parent' } },
+      context('turn-child'),
+      total(160, 40, 20, 10),
+      total(160, 40, 20, 10),
+    ]
+      .map((row) => JSON.stringify(row))
+      .join('\n') + '\n',
+  )
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(200)
+  expect(service.read(query).models[0]?.reasoningTokens).toBe(4)
+  expect(service.read(query).coverage?.sources[0]?.records).toBe(2)
+})
+
+it('bounds cold scans, stages rewrites atomically, and streams huge conversation fields without caching them', async () => {
+  const f = await fixture()
+  f.service.close()
+  const service = new LocalTranscriptUsageService({
+    ...f.options,
+    limits: { ...f.options.limits, maxBytes: 512, maxLineBytes: 512, readChunkBytes: 97 },
+  })
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  const line = response('large')
+  const file = join(f.transcripts, 'large.jsonl')
+  await writeFile(
+    file,
+    JSON.stringify({
+      ...line,
+      message: { ...line.message, content: 'PRIVATE-CONTENT-'.repeat(2000) },
+    }) + '\n',
+  )
+  for (let index = 0; index < 80 && service.read(query).totals.tokens === 0; index++) {
+    await service.refresh()
+    expect(service.read(query).coverage?.bytesRead).toBeLessThanOrEqual(512)
+  }
+  expect(service.read(query).totals.tokens).toBe(120)
+  const { Database } = await import('bun:sqlite')
+  const database = new Database(join(f.options.cacheDirectory, 'transcript-history.sqlite'))
+  expect(
+    database
+      .query<{ value: string }, []>('SELECT value FROM files')
+      .all()
+      .map((row) => row.value)
+      .join(''),
+  ).not.toContain('PRIVATE-CONTENT')
+  database.close()
+  await writeFile(
+    file,
+    JSON.stringify({
+      ...response('replacement', 80),
+      message: { ...response('replacement', 80).message, content: 'replacement'.repeat(2000) },
+    }) + '\n',
+  )
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(120)
+  for (let index = 0; index < 80 && service.read(query).totals.tokens !== 180; index++)
+    await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(180)
+})
+
+it('restarts partial projection safely, invalidates corrupt/parser-version cache and reports malformed input', async () => {
+  const f = await fixture()
+  const file = join(f.transcripts, 'session.jsonl')
+  const text = JSON.stringify(response('request-1'))
+  await writeFile(file, text.slice(0, 80))
+  await f.service.refresh()
+  f.service.close()
+  const restarted = new LocalTranscriptUsageService(f.options)
+  cleanup.push(async () => restarted.close())
+  await restarted.initialize()
+  await appendFile(file, text.slice(80) + '\n{invalid-json}\n')
+  await restarted.refresh()
+  expect(restarted.read(query).totals.tokens).toBe(120)
+  expect(restarted.read(query).coverage?.sources[0]).toMatchObject({
+    status: 'partial',
+    malformedLines: 1,
+  })
+  restarted.close()
+  const { Database } = await import('bun:sqlite')
+  const database = new Database(join(f.options.cacheDirectory, 'transcript-history.sqlite'))
+  database.query('UPDATE files SET value = ?').run('{"version":0}')
+  database.close()
+  const invalidated = new LocalTranscriptUsageService(f.options)
+  cleanup.push(async () => invalidated.close())
+  await invalidated.initialize()
+  expect(invalidated.read(query).totals.tokens).toBe(0)
+  await invalidated.refresh()
+  expect(invalidated.read(query).totals.tokens).toBe(120)
+})
+
+it('retains source-scoped unknown identities, exposes absent roots, and rolls back cancelled scans', async () => {
+  const f = await fixture()
+  const event = response('')
+  await writeFile(join(f.transcripts, 'unknown.jsonl'), JSON.stringify(event) + '\n')
+  await writeFile(join(f.transcripts, 'other.jsonl'), JSON.stringify(event) + '\n')
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(240)
+  expect(f.service.read(query).coverage?.sources[0]?.unidentifiedRecords).toBe(2)
+  const abort = new AbortController()
+  abort.abort()
+  await expect(f.service.refresh({ signal: abort.signal })).rejects.toThrow()
+  expect(f.service.read(query).totals.tokens).toBe(240)
+  f.service.close()
+  const absent = new LocalTranscriptUsageService({
+    ...f.options,
+    sources: [{ id: 'absent', driverKind: 'claude', roots: [join(f.root, 'not-installed')] }],
+  })
+  cleanup.push(async () => absent.close())
+  await absent.initialize()
+  await absent.refresh()
+  expect(absent.read(query).coverage?.sources[0]?.status).toBe('absent')
+})
+
+it('keeps ephemeral Fregat utilities once while excluding recorder turns already covered by transcripts', async () => {
+  const f = await fixture()
+  const { Database } = await import('bun:sqlite')
+  const { drizzle } = await import('drizzle-orm/bun-sqlite')
+  const schema = await import('../../db/schema')
+  const { initializePlatformDatabase } = await import('../../db/initialize')
+  const { ProviderUsageHistoryReader } = await import('../usage-history')
+  const sqlite = new Database(':memory:')
+  const database = drizzle({ client: sqlite, schema })
+  initializePlatformDatabase(database)
+  cleanup.push(async () => sqlite.close())
+  const common = {
+    accountKey: null,
+    driverKind: 'claude',
+    providerInstanceId: 'claude',
+    sessionId: 'fregat-session',
+    model: 'test-model',
+    recordedAt: '2026-10-03T10:00:00.000Z',
+    inputTokens: 100,
+    outputTokens: 20,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    reasoningTokens: 0,
+    costUsd: 0.01,
+  }
+  database
+    .insert(schema.providerUsageTurns)
+    .values([
+      { ...common, purpose: 'turn', turnId: 'chat-turn' },
+      { ...common, purpose: 'title', turnId: 'utility-title' },
+    ])
+    .run()
+  await writeFile(
+    join(f.transcripts, 'native.jsonl'),
+    JSON.stringify(response('native-chat-response')) + '\n',
+  )
+  f.service.close()
+  const service = new LocalTranscriptUsageService({
+    ...f.options,
+    utilityHistory: new ProviderUsageHistoryReader(database, { now: () => now }),
+  })
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(240)
+  expect(service.read(query).purposes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ purpose: 'title', turns: 1 }),
+      expect.objectContaining({ purpose: 'turn', turns: 1 }),
+    ]),
+  )
+  expect(service.read(query).coverage?.sources).toContainEqual(
+    expect.objectContaining({ sourceKind: 'fregat-utility', records: 1 }),
+  )
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(240)
+})
+
+it('projects local catalog prices without making provider or pricing network calls', async () => {
+  const f = await fixture()
+  const { Database } = await import('bun:sqlite')
+  const { drizzle } = await import('drizzle-orm/bun-sqlite')
+  const schema = await import('../../db/schema')
+  const { initializePlatformDatabase } = await import('../../db/initialize')
+  const { ProviderPriceCatalog } = await import('../price-catalog')
+  const sqlite = new Database(':memory:')
+  const database = drizzle({ client: sqlite, schema })
+  initializePlatformDatabase(database)
+  let calls = 0
+  const catalog = new ProviderPriceCatalog(database, async () => {
+    calls++
+    return new Response(null, { status: 503 })
+  })
+  cleanup.push(async () => {
+    catalog.close()
+    sqlite.close()
+  })
+  f.service.close()
+  const service = new LocalTranscriptUsageService({ ...f.options, priceCatalog: catalog })
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  await writeFile(join(f.transcripts, 'native.jsonl'), JSON.stringify(response('request')) + '\n')
+  await service.refresh()
+  for (const days of [7, 30, 90] as const) service.read({ ...query, days })
+  expect(calls).toBe(0)
+})
+
+it('recreates a corrupt SQLite cache and rebuilds only from local transcripts', async () => {
+  const f = await fixture()
+  await writeFile(join(f.transcripts, 'native.jsonl'), JSON.stringify(response('native')) + '\n')
+  f.service.close()
+  await writeFile(join(f.options.cacheDirectory, 'transcript-history.sqlite'), 'broken sqlite')
+  const service = new LocalTranscriptUsageService(f.options)
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  expect(service.read(query).totals.tokens).toBe(0)
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(120)
+})
+
+it('detects same-size replacement and changed prefixes on a growing file', async () => {
+  const f = await fixture()
+  const file = join(f.transcripts, 'native.jsonl')
+  await writeFile(file, JSON.stringify(response('old')) + '\n')
+  await f.service.refresh()
+  await rm(file)
+  await writeFile(file, JSON.stringify(response('new')) + '\n')
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(120)
+  await writeFile(
+    file,
+    JSON.stringify(response('changed', 80)) + '\n' + JSON.stringify(response('next')) + '\n',
+  )
+  await f.service.refresh()
+  expect(f.service.read(query).totals.tokens).toBe(300)
+})
+
+it('keeps recorded price provenance, including unknown prices, across appends and restart', async () => {
+  const f = await fixture()
+  f.service.close()
+  let priced = false
+  const options = {
+    ...f.options,
+    priceCatalog: {
+      lookupLocal: (driver: string, model: string) =>
+        priced ? f.options.priceCatalog.lookupLocal(driver, model) : null,
+    },
+  }
+  const service = new LocalTranscriptUsageService(options)
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  const file = join(f.transcripts, 'native.jsonl')
+  await writeFile(file, JSON.stringify(response('unknown')) + '\n')
+  await service.refresh()
+  priced = true
+  await appendFile(
+    file,
+    JSON.stringify(response('unknown', 40)) + '\n' + JSON.stringify(response('priced')) + '\n',
+  )
+  await service.refresh()
+  const report = service.read(query)
+  expect(report.totals.unpricedTokens).toBe(140)
+  expect(report.totals.costUsd).toBeCloseTo(0.00014)
+  service.close()
+  priced = false
+  const restarted = new LocalTranscriptUsageService(options)
+  cleanup.push(async () => restarted.close())
+  await restarted.initialize()
+  expect(restarted.read(query).totals).toEqual(report.totals)
+})
+
+it('resumes UTF-8 codepoint boundaries across bounded passes and process restart', async () => {
+  const f = await fixture()
+  f.service.close()
+  const text = JSON.stringify(response('native-🚀')) + '\n'
+  const budget = Buffer.byteLength(text.slice(0, text.indexOf('🚀'))) + 1
+  const options = {
+    ...f.options,
+    limits: { ...f.options.limits, maxBytes: budget, readChunkBytes: budget },
+  }
+  const service = new LocalTranscriptUsageService(options)
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  await writeFile(join(f.transcripts, 'native.jsonl'), text)
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(0)
+  service.close()
+  const restarted = new LocalTranscriptUsageService(options)
+  cleanup.push(async () => restarted.close())
+  await restarted.initialize()
+  for (let index = 0; index < 5 && !restarted.read(query).totals.tokens; index++)
+    await restarted.refresh()
+  expect(restarted.read(query).totals.tokens).toBe(120)
+  await restarted.refresh()
+  expect(restarted.read(query).coverage?.bytesRead).toBe(0)
+})
+
+it('coalesces concurrent refreshes and rolls back cancellation after actual file work', async () => {
+  const f = await fixture()
+  const file = join(f.transcripts, 'native.jsonl')
+  await writeFile(file, JSON.stringify(response('initial')) + '\n')
+  const results = await Promise.all([f.service.refresh(), f.service.refresh(), f.service.refresh()])
+  expect(results[0]).toBe(results[1])
+  expect(results[1]).toBe(results[2])
+  f.service.close()
+  const abort = new AbortController()
+  let seen = 0
+  const service = new LocalTranscriptUsageService({
+    ...f.options,
+    priceCatalog: {
+      lookupLocal: (driver: string, model: string) => {
+        seen++
+        abort.abort()
+        return f.options.priceCatalog.lookupLocal(driver, model)
+      },
+    },
+  })
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  const before = service.read(query)
+  await appendFile(file, JSON.stringify(response('cancelled')) + '\n')
+  await expect(service.refresh({ signal: abort.signal })).rejects.toThrow()
+  expect(seen).toBe(1)
+  expect(service.read(query)).toEqual(before)
+  await service.refresh()
+  expect(service.read(query).totals.tokens).toBe(240)
+})
+
+it('reports oversized selected metadata and enforces viewer-local range boundaries', async () => {
+  const f = await fixture()
+  const old = response('old')
+  old.timestamp = '2026-09-27T02:59:59Z'
+  const boundary = response('boundary')
+  boundary.timestamp = '2026-09-27T03:00:00Z'
+  const future = response('future')
+  future.timestamp = '2026-10-03T12:00:01Z'
+  await writeFile(
+    join(f.transcripts, 'native.jsonl'),
+    [old, boundary, future, response('x'.repeat(70000))]
+      .map((row) => JSON.stringify(row))
+      .join('\n') + '\n',
+  )
+  await f.service.refresh()
+  expect(f.service.read({ ...query, utcOffsetMinutes: -180 }).totals.tokens).toBe(120)
+  expect(f.service.read(query).coverage?.sources[0]).toMatchObject({
+    status: 'partial',
+    oversizedLines: 1,
+  })
+})
