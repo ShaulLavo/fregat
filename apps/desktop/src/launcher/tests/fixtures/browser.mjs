@@ -42,12 +42,27 @@ for await (const chunk of Bun.file(3).stream()) {
     buffered = buffered.slice(end + 1)
     if (mode === 'exit-attach' && message.method === 'Target.setDiscoverTargets') process.exit(3)
     if (mode === 'slow-attach' && message.method === 'Target.setAutoAttach') busy(6000)
-    if (mode.endsWith('-page') && message.method === 'Target.setAutoAttach')
+    if (message.method === 'Target.setAutoAttach')
       writeSync(
         4,
         JSON.stringify({
           method: 'Target.attachedToTarget',
           params: { sessionId: 'initial', targetInfo: { type: 'page' } },
+        }) + '\0',
+      )
+    if (message.method === 'Runtime.enable')
+      writeSync(
+        4,
+        JSON.stringify({
+          method: 'Runtime.executionContextCreated',
+          sessionId: message.sessionId,
+          params: {
+            context: {
+              id: 1,
+              origin: mode === 'uncommitted-page' ? '://' : 'http://localhost:123',
+              auxData: { isDefault: true },
+            },
+          },
         }) + '\0',
       )
     if (mode === 'slow-page' && message.method === 'Page.enable') busy(6000)

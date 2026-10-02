@@ -83,6 +83,7 @@ test('handlers precede discovery and bridge is installed before debugger resumes
   const calls: string[] = []
   const handlers = new Map<string, (event: CdpEvent) => void>()
   const cdp = {
+    disconnected: new Promise<unknown>(() => {}),
     on: (method: string, callback: (event: CdpEvent) => void) => {
       calls.push(`on:${method}`)
       handlers.set(method, callback)
@@ -90,6 +91,14 @@ test('handlers precede discovery and bridge is installed before debugger resumes
     },
     request: async (method: string, _params: Record<string, unknown> = {}, session?: string) => {
       calls.push(`${session || 'browser'}:${method}`)
+      if (method === 'Runtime.enable')
+        handlers.get('Runtime.executionContextCreated')!({
+          method: 'Runtime.executionContextCreated',
+          sessionId: session,
+          params: {
+            context: { id: 1, origin: 'http://localhost:123', auxData: { isDefault: true } },
+          },
+        })
       if (method === 'Target.setAutoAttach')
         handlers.get('Target.attachedToTarget')!({
           method: 'Target.attachedToTarget',
@@ -121,8 +130,8 @@ test('handlers precede discovery and bridge is installed before debugger resumes
         'Runtime.enable',
         'Runtime.addBinding',
         'Page.addScriptToEvaluateOnNewDocument',
-        'Runtime.evaluate',
         'Runtime.runIfWaitingForDebugger',
+        'Runtime.evaluate',
       ].map((method) => session + ':' + method),
     )
   }
@@ -140,11 +149,27 @@ test('telemetry accepts only the attached app origin default execution context',
   const handlers = new Map<string, (event: CdpEvent) => void>()
   const opened: unknown[] = []
   const cdp = {
+    disconnected: new Promise<unknown>(() => {}),
     on: (method: string, handler: (event: CdpEvent) => void) => {
       handlers.set(method, handler)
       return () => {}
     },
-    request: async () => ({}),
+    request: async (method: string) => {
+      if (method === 'Target.setAutoAttach')
+        handlers.get('Target.attachedToTarget')!({
+          method: 'Target.attachedToTarget',
+          params: { sessionId: 'initial', targetInfo: { type: 'page' } },
+        })
+      if (method === 'Runtime.enable')
+        handlers.get('Runtime.executionContextCreated')!({
+          method: 'Runtime.executionContextCreated',
+          sessionId: 'initial',
+          params: {
+            context: { id: 1, origin: 'http://localhost:123', auxData: { isDefault: true } },
+          },
+        })
+      return {}
+    },
   }
   await attachChromium(
     cdp,
@@ -188,11 +213,25 @@ test('duplicate CDP session binding reports share one native picker request', as
   let picks = 0
   let replies = 0
   const cdp = {
+    disconnected: new Promise<unknown>(() => {}),
     on: (method: string, callback: (event: CdpEvent) => void) => {
       handlers.set(method, callback)
       return () => {}
     },
     request: async (method: string, params: Record<string, unknown> = {}) => {
+      if (method === 'Target.setAutoAttach')
+        handlers.get('Target.attachedToTarget')!({
+          method: 'Target.attachedToTarget',
+          params: { sessionId: 'initial', targetInfo: { type: 'page' } },
+        })
+      if (method === 'Runtime.enable')
+        handlers.get('Runtime.executionContextCreated')!({
+          method: 'Runtime.executionContextCreated',
+          sessionId: 'initial',
+          params: {
+            context: { id: 1, origin: 'http://localhost:123', auxData: { isDefault: true } },
+          },
+        })
       if (
         method === 'Runtime.evaluate' &&
         String(params.expression).includes('__platformShellReply?.')
@@ -249,18 +288,28 @@ test('startup enrolls pages attached while preparing and later failures keep the
   const second = Promise.withResolvers<Record<string, unknown>>()
   const later = Promise.withResolvers<Record<string, unknown>>()
   const failures: unknown[] = []
+  const reported = Promise.withResolvers<void>()
   const attach = (sessionId: string) =>
     handlers.get('Target.attachedToTarget')!({
       method: 'Target.attachedToTarget',
       params: { sessionId, targetInfo: { type: 'page' } },
     })
   const cdp = {
+    disconnected: new Promise<unknown>(() => {}),
     on: (method: string, callback: (event: CdpEvent) => void) => {
       handlers.set(method, callback)
       return () => {}
     },
     request: async (method: string, _params: Record<string, unknown> = {}, session?: string) => {
       if (method === 'Target.setAutoAttach') attach('first')
+      if (method === 'Runtime.enable')
+        handlers.get('Runtime.executionContextCreated')!({
+          method: 'Runtime.executionContextCreated',
+          sessionId: session,
+          params: {
+            context: { id: 1, origin: 'http://localhost:123', auxData: { isDefault: true } },
+          },
+        })
       if (method !== 'Page.enable') return {}
       if (session === 'first') return first.promise
       if (session === 'second') return second.promise
@@ -272,7 +321,10 @@ test('startup enrolls pages attached while preparing and later failures keep the
     cdp,
     'http://localhost:123/',
     () => {},
-    (error) => failures.push(error),
+    (error) => {
+      failures.push(error)
+      reported.resolve()
+    },
   ).then(() => {
     ready = true
   })
@@ -287,6 +339,208 @@ test('startup enrolls pages attached while preparing and later failures keep the
   expect(ready).toBe(true)
   attach('later')
   later.reject('fixture later failure')
-  for (let i = 0; i < 4; i++) await Promise.resolve()
+  await reported.promise
   expect(failures).toEqual(['fixture later failure'])
+})
+
+test('startup waits for the committed app document after resuming an initial blank page', async () => {
+  const handlers = new Map<string, (event: CdpEvent) => void>()
+  const resumed = Promise.withResolvers<void>()
+  const cdp = {
+    disconnected: new Promise<unknown>(() => {}),
+    on: (method: string, callback: (event: CdpEvent) => void) => {
+      handlers.set(method, callback)
+      return () => {}
+    },
+    request: async (method: string) => {
+      if (method === 'Target.setAutoAttach')
+        handlers.get('Target.attachedToTarget')!({
+          method: 'Target.attachedToTarget',
+          params: { sessionId: 'initial', targetInfo: { type: 'page' } },
+        })
+      if (method === 'Runtime.enable')
+        handlers.get('Runtime.executionContextCreated')!({
+          method: 'Runtime.executionContextCreated',
+          sessionId: 'initial',
+          params: { context: { id: 1, origin: '://', auxData: { isDefault: true } } },
+        })
+      if (method === 'Runtime.runIfWaitingForDebugger') resumed.resolve()
+      return {}
+    },
+  }
+  let ready = false
+  const startup = attachChromium(
+    cdp,
+    'http://localhost:123/',
+    () => {},
+    () => {},
+  ).then(() => {
+    ready = true
+  })
+  await resumed.promise
+  for (let i = 0; i < 20; i++) await Promise.resolve()
+  expect(ready).toBe(false)
+  handlers.get('Runtime.executionContextCreated')!({
+    method: 'Runtime.executionContextCreated',
+    sessionId: 'initial',
+    params: { context: { id: 2, origin: 'http://localhost:123', auxData: { isDefault: true } } },
+  })
+  await startup
+  expect(ready).toBe(true)
+})
+
+test.each(['destroyed', 'cleared', 'during-evaluation'])(
+  'readiness follows a replaced app context: %s',
+  async (replacement) => {
+    const handlers = new Map<string, (event: CdpEvent) => void>()
+    const evaluated: number[] = []
+    const emit = (method: string, params: Record<string, unknown>) =>
+      handlers.get(method)!({ method, sessionId: 'initial', params })
+    const context = (id: number) =>
+      emit('Runtime.executionContextCreated', {
+        context: { id, origin: 'http://localhost:123', auxData: { isDefault: true } },
+      })
+    const replace = () => {
+      emit(
+        replacement === 'destroyed'
+          ? 'Runtime.executionContextDestroyed'
+          : 'Runtime.executionContextsCleared',
+        { executionContextId: 1 },
+      )
+      context(2)
+    }
+    const cdp = {
+      disconnected: new Promise<unknown>(() => {}),
+      on: (method: string, callback: (event: CdpEvent) => void) => {
+        handlers.set(method, callback)
+        return () => {}
+      },
+      request: async (method: string, params: Record<string, unknown> = {}) => {
+        if (method === 'Target.setAutoAttach')
+          emit('Target.attachedToTarget', {
+            sessionId: 'initial',
+            targetInfo: { type: 'page', targetId: 'page' },
+          })
+        if (method === 'Runtime.enable') context(1)
+        if (method === 'Runtime.addBinding' && replacement !== 'during-evaluation') replace()
+        if (method === 'Runtime.evaluate') {
+          evaluated.push(params.contextId as number)
+          if (replacement === 'during-evaluation' && params.contextId === 1) {
+            replace()
+            throw 'destroyed context'
+          }
+        }
+        return {}
+      },
+    }
+    await attachChromium(
+      cdp,
+      'http://localhost:123/',
+      () => {},
+      () => {},
+    )
+    expect(evaluated).toEqual(replacement === 'during-evaluation' ? [1, 2] : [2])
+  },
+)
+
+test.each(['Target.detachedFromTarget', 'Target.targetDestroyed'])(
+  'a removed blank page releases the startup barrier: %s',
+  async (removal) => {
+    const handlers = new Map<string, (event: CdpEvent) => void>()
+    const removed = Promise.withResolvers<void>()
+    const failures: unknown[] = []
+    const cdp = {
+      disconnected: new Promise<unknown>(() => {}),
+      on: (method: string, callback: (event: CdpEvent) => void) => {
+        handlers.set(method, callback)
+        return () => {}
+      },
+      request: async (
+        method: string,
+        _params: Record<string, unknown> = {},
+        sessionId?: string,
+      ) => {
+        if (method === 'Target.setAutoAttach') {
+          for (const id of ['healthy', 'blank'])
+            handlers.get('Target.attachedToTarget')!({
+              method: 'Target.attachedToTarget',
+              params: { sessionId: id, targetInfo: { type: 'page', targetId: id } },
+            })
+        }
+        if (method === 'Runtime.enable' && sessionId === 'healthy')
+          handlers.get('Runtime.executionContextCreated')!({
+            method: 'Runtime.executionContextCreated',
+            sessionId,
+            params: {
+              context: { id: 1, origin: 'http://localhost:123', auxData: { isDefault: true } },
+            },
+          })
+        if (method === 'Runtime.runIfWaitingForDebugger' && sessionId === 'blank') {
+          handlers.get(removal)?.({
+            method: removal,
+            params: { sessionId: 'blank', targetId: 'blank' },
+          })
+          removed.resolve()
+        }
+        return {}
+      },
+    }
+    let ready = false
+    const startup = attachChromium(
+      cdp,
+      'http://localhost:123/',
+      () => {},
+      (error) => failures.push(error),
+    ).then(() => {
+      ready = true
+    })
+    await removed.promise
+    for (let i = 0; i < 40; i++) await Promise.resolve()
+    expect(ready).toBe(true)
+    await startup
+    expect(failures).toEqual([])
+  },
+)
+
+test('removing the only uncommitted page preserves startup supervision until disconnect', async () => {
+  const handlers = new Map<string, (event: CdpEvent) => void>()
+  const disconnected = Promise.withResolvers<unknown>()
+  const removed = Promise.withResolvers<void>()
+  const cdp = {
+    disconnected: disconnected.promise,
+    on: (method: string, callback: (event: CdpEvent) => void) => {
+      handlers.set(method, callback)
+      return () => {}
+    },
+    request: async (method: string) => {
+      if (method === 'Target.setAutoAttach')
+        handlers.get('Target.attachedToTarget')!({
+          method: 'Target.attachedToTarget',
+          params: { sessionId: 'blank', targetInfo: { type: 'page', targetId: 'blank' } },
+        })
+      if (method === 'Runtime.runIfWaitingForDebugger') {
+        handlers.get('Target.detachedFromTarget')!({
+          method: 'Target.detachedFromTarget',
+          params: { sessionId: 'blank' },
+        })
+        removed.resolve()
+      }
+      return {}
+    },
+  }
+  let ready = false
+  const startup = attachChromium(
+    cdp,
+    'http://localhost:123/',
+    () => {},
+    () => {},
+  ).then(() => {
+    ready = true
+  })
+  await removed.promise
+  for (let i = 0; i < 40; i++) await Promise.resolve()
+  expect(ready).toBe(false)
+  const reason = { internal: { reason: 'startup-limit' } }
+  disconnected.resolve(reason)
+  await expect(startup).rejects.toBe(reason)
 })

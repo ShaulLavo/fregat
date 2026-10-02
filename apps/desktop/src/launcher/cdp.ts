@@ -25,6 +25,8 @@ export class CdpClient {
   private writtenBytes = 0
   private frames = 0
   private reader: ReadableStreamDefaultReader<Uint8Array>
+  private disconnect = Promise.withResolvers<unknown>()
+  readonly disconnected = this.disconnect.promise
   readonly done: Promise<void>
 
   private transport: CdpTransport
@@ -78,6 +80,7 @@ export class CdpClient {
   close(error: unknown = this.failure('closed')) {
     if (this.closed) return
     this.closed = true
+    this.disconnect.resolve(error)
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer)
       pending.reject(error)

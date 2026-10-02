@@ -44,13 +44,13 @@ async function evaluate(
   )
   return (result.result as { value?: unknown }).value
 }
-async function until(check: () => Promise<boolean>) {
+async function until(condition: string, check: () => Promise<boolean>) {
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
     if (await check()) return
     await Bun.sleep(50)
   }
-  expect.fail('Fixture browser condition timed out')
+  expect.fail(`Fixture browser condition timed out: ${condition}`)
 }
 
 test.skipIf(!executable)(
@@ -129,7 +129,8 @@ test.skipIf(!executable)(
         ...browserProcessFacts(browserProcess!.id, executable!, []),
       })
       const sessions = new Map<string, string>()
-      await until(async () => {
+      step = 'initial-window-bridge'
+      await until(step, async () => {
         const targets = await pages(owner.cdp)
         if (!targets[0]) return false
         return Boolean(
@@ -158,9 +159,9 @@ test.skipIf(!executable)(
       )
       step = 'new-window'
       await owner.cdp.request('Target.createTarget', { url, newWindow: true })
-      await until(async () => (await pages(owner.cdp)).length === 2)
+      await until('second-window-count', async () => (await pages(owner.cdp)).length === 2)
       for (const target of await pages(owner.cdp)) {
-        await until(async () =>
+        await until(`${step}-bridge:${target.targetId}`, async () =>
           Boolean(
             await evaluate(
               owner.cdp,
@@ -184,9 +185,9 @@ test.skipIf(!executable)(
           onFailure: (error) => failures.push(error),
         })
         expect(second.kind).toBe('handoff')
-        await until(async () => (await pages(owner.cdp)).length === 3)
+        await until('singleton-window-count', async () => (await pages(owner.cdp)).length === 3)
         for (const target of await pages(owner.cdp)) {
-          await until(async () =>
+          await until(`${step}-bridge:${target.targetId}`, async () =>
             Boolean(
               await evaluate(
                 owner.cdp,
@@ -199,7 +200,7 @@ test.skipIf(!executable)(
         }
       }
       step = 'telemetry'
-      await until(async () => telemetry.length > 0)
+      await until('frame-telemetry', async () => telemetry.length > 0)
       expect(telemetry[0]).toMatchObject({ engine: 'chromium' })
       expect(telemetry[0]!.rafPerSecond).toBeGreaterThan(0)
       if (native) {
@@ -278,13 +279,33 @@ test.skipIf(!executable)(
         )
       }
     } catch (error) {
+      const owner = first?.kind === 'owned' ? first : undefined
+      const targets = owner ? await pages(owner.cdp).catch(() => []) : []
+      const documents = owner
+        ? await Promise.all(
+            targets.map(async (target) => ({
+              ...target,
+              document: await evaluate(
+                owner.cdp,
+                new Map(),
+                target.targetId,
+                '({ href: location.href, readyState: document.readyState, titlebar: globalThis.platformBridge?.titlebar, picker: typeof globalThis.platformBridge?.pickEntry })',
+              ).catch(() => 'unavailable'),
+            })),
+          )
+        : []
       console.error(
         'smoke failure',
-        step,
-        exits,
-        step,
-        (error as { internal?: unknown }).internal,
-        failures.map((failure) => (failure as { internal?: unknown }).internal),
+        JSON.stringify({
+          condition: step,
+          message: (error as { message?: string }).message,
+          exits,
+          documents,
+          telemetry,
+          transport: owner?.cdp.snapshot(),
+          internal: (error as { internal?: unknown }).internal,
+          failures: failures.map((failure) => (failure as { internal?: unknown }).internal),
+        }),
       )
       throw error
     } finally {
@@ -292,6 +313,115 @@ test.skipIf(!executable)(
       if (second?.kind === 'owned') await second.close()
       if (first?.kind === 'owned') await first.close()
       server.stop(true)
+      await rm(scratch, { recursive: true, force: true })
+    }
+  },
+  smokeTimeoutMs,
+)
+
+test.skipIf(!executable)(
+  'real Chromium waits for the held app response and returns a bridged document',
+  async () => {
+    const scratch = await mkdtemp(
+      path.join(existsSync('/work/tmp') ? '/work/tmp' : tmpdir(), 'polaron-readiness-'),
+    )
+    const response = Promise.withResolvers<Response>()
+    const requested = Promise.withResolvers<void>()
+    let owner: ChromiumWindow | undefined
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch: () => {
+        requested.resolve()
+        return response.promise.then((fixture) => fixture.clone())
+      },
+    })
+    const launch = launchChromium({
+      candidate: {
+        kind: 'chromium',
+        executable: executable!,
+        args: ['--headless', '--no-sandbox'],
+        confinement: 'none',
+        source: 'setting',
+        family: 'chromium',
+      },
+      stateHome: scratch,
+      home: scratch,
+      url: `http://127.0.0.1:${server.port}/`,
+      startup: startupBudget(),
+      onOpen: () => {},
+      onFailure: () => {},
+    }).then((window) => {
+      owner = window
+      return window
+    })
+    try {
+      expect(
+        await Promise.race([launch.then(() => 'ready'), requested.promise.then(() => 'requested')]),
+      ).toBe('requested')
+      expect(owner).toBeUndefined()
+      response.resolve(new Response(fixtureHtml, { headers: { 'Content-Type': 'text/html' } }))
+      const window = await launch
+      expect(window.kind).toBe('owned')
+      if (window.kind !== 'owned') return
+      const target = (await pages(window.cdp))[0]!
+      expect(
+        await evaluate(
+          window.cdp,
+          new Map(),
+          target.targetId,
+          'location.href !== "about:blank" && globalThis.platformBridge?.titlebar === "native" && typeof globalThis.platformBridge.pickEntry === "function"',
+        ),
+      ).toBe(true)
+    } finally {
+      response.resolve(new Response(fixtureHtml))
+      await launch.catch(() => {})
+      if (owner?.kind === 'owned') await owner.close()
+      server.stop(true)
+      await rm(scratch, { recursive: true, force: true })
+    }
+  },
+  smokeTimeoutMs,
+)
+
+test(
+  'an initial document that never commits fails at the startup cap and reaps its browser',
+  async () => {
+    const scratch = await mkdtemp(
+      path.join(existsSync('/work/tmp') ? '/work/tmp' : tmpdir(), 'polaron-uncommitted-'),
+    )
+    const pidFile = path.join(scratch, 'pid')
+    let observations = 0
+    try {
+      await expect(
+        launchChromium({
+          candidate: {
+            kind: 'chromium',
+            executable: process.execPath,
+            args: [
+              path.join(import.meta.dirname, 'fixtures/browser.mjs'),
+              'uncommitted-page',
+              pidFile,
+            ],
+            confinement: 'none',
+            source: 'setting',
+            family: 'chromium',
+          },
+          stateHome: scratch,
+          home: scratch,
+          url: 'http://localhost:123/',
+          startup: startupBudget({
+            'window.browserStartupIdleSeconds': 1,
+            'window.browserStartupLimitSeconds': 1,
+          }),
+          observe: () => ({ cpuTicks: ++observations }),
+          onOpen: () => {},
+          onFailure: () => {},
+        }),
+      ).rejects.toMatchObject({ internal: { reason: 'startup-limit', startupPhase: 'attach' } })
+      const pid = Number(await readFile(pidFile, 'utf8'))
+      expect(() => process.kill(pid, 0)).toThrow()
+    } finally {
       await rm(scratch, { recursive: true, force: true })
     }
   },
