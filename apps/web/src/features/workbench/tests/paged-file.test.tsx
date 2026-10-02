@@ -145,8 +145,12 @@ test('a changed source invalidates cached pages and every view', async ({ server
   await writeFile(target, 'line\n'.repeat(2 * 1024 * 1024))
   const opened = renderHookWithProviders(() => usePagedFile('changing-pages.txt', 0, 0))
   await waitFor(() => expect(opened.result.current.index.isSuccess).toBe(true), { timeout: 10_000 })
+  await waitFor(() => expect(opened.result.current.page.isSuccess).toBe(true))
   const resource = opened.result.current.resource.data!
   const secondView = resource.document.createView()
+  // A foreground reply can retain page zero after the index has evicted its earlier copy.
+  expect((await resource.view.readLines(0, 1)).rows[0]?.text).toBe('line')
+  expect(resource.document.stats.cachedBytes).toBeGreaterThan(0)
   await writeFile(target, 'changed\n')
   await expect(resource.view.readLines(0, 1)).rejects.toMatchObject({
     code: 'PAGED_DOCUMENT_STALE',
