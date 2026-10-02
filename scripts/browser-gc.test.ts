@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { stripVTControlCharacters } from 'node:util'
 import { chromium } from 'playwright'
 import { expect, test } from 'vitest'
 
@@ -99,7 +100,7 @@ async function runBrowser(root: string): Promise<string> {
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
   ])
-  const output = `${stdout}\n${stderr}`
+  const output = stripVTControlCharacters(`${stdout}\n${stderr}`)
   expect(code, output).toBe(1)
   return output
 }
