@@ -39,7 +39,7 @@ export function settingsEditorDiagnostics(
   }
 
   return diagnostics.flatMap((diagnostic) => {
-    if (diagnostic.layer !== target) return []
+    if (diagnostic.layer !== target || diagnostic.kind === 'removed-key') return []
 
     const range = file.keyRanges[diagnostic.id]
     if (!range) return []

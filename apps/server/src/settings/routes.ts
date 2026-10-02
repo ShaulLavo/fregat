@@ -35,7 +35,7 @@ const OPERATION_KINDS = new Set<string>(SETTINGS_OPERATION_KINDS)
  */
 export function settingsRoutes(settings: SettingsStore) {
   return new Elysia({ name: 'settings-routes' })
-    .get('/settings', () => settings.snapshot(), { response: settingsSnapshotSchema })
+    .get('/settings', () => settings.snapshotForClient(), { response: settingsSnapshotSchema })
     .post(
       '/settings/write',
       ({ body, request }) => {

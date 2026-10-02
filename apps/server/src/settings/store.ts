@@ -11,6 +11,7 @@ import {
   resolveSettings,
   SETTING_IDS,
   type SettingId,
+  type SettingsDiagnostic,
   type SettingsEvent,
   type SettingsLayer,
   type SettingsLayerId,
@@ -45,6 +46,7 @@ import {
   type SettingsLayerReader,
 } from './layer'
 import { settingsPaths, type SettingsPathOptions } from './paths'
+import { removedSettingsDiagnostics } from './retired'
 import {
   applyProviderSecrets,
   extractRawProviderSecrets,
@@ -166,12 +168,14 @@ export class SettingsStore {
   private readonly workspace: SettingsFileLayer | null
   private readonly writeHooks: SettingsWriteHooks
 
+  private readonly pendingRemovedDiagnostics: SettingsDiagnostic[] = []
   private cachedSnapshot: SettingsSnapshot | null = null
   private resolved: SettingsValues | null = null
   private secretRefs: ReadonlySet<SecretRef> = new Set()
   private secretRefsStale = false
   private recoveryBlocked = false
   private sequence = 0
+  private streamSubscribers = 0
 
   constructor(options: SettingsStoreOptions) {
     const paths = settingsPaths(options)
@@ -182,7 +186,9 @@ export class SettingsStore {
 
     this.secretsPath = secretsPath
     this.settingsFilePaths = settingsFilePaths
-    this.user = new SettingsFileLayer('user', paths.user, options.layerReader)
+    this.user = new SettingsFileLayer('user', paths.user, options.layerReader, (keys) => {
+      this.pendingRemovedDiagnostics.push(...removedSettingsDiagnostics(keys))
+    })
     this.workspace = paths.workspace
       ? new SettingsFileLayer('workspace', paths.workspace, options.layerReader)
       : null
@@ -224,6 +230,16 @@ export class SettingsStore {
     }
 
     return this.cachedSnapshot
+  }
+
+  snapshotForClient(): SettingsSnapshot {
+    const snapshot = this.snapshot()
+    if (this.pendingRemovedDiagnostics.length === 0) return snapshot
+
+    return {
+      ...snapshot,
+      diagnostics: [...snapshot.diagnostics, ...this.pendingRemovedDiagnostics.splice(0)],
+    }
   }
 
   async providerInstancesForSpawn(): Promise<SettingsValues[typeof PROVIDER_INSTANCES]> {
@@ -337,12 +353,14 @@ export class SettingsStore {
     this.assertOperational()
     const queue = new AsyncQueue<SettingsEvent>({ signal })
     const stop = this.onChange((event) => queue.push(event))
+    this.streamSubscribers += 1
 
     try {
       yield* queue
     } finally {
       queue.close()
       stop()
+      this.streamSubscribers -= 1
     }
   }
 
@@ -988,7 +1006,7 @@ export class SettingsStore {
     const event: SettingsEvent = {
       changedSettingIds,
       originMutationId,
-      snapshot: this.snapshot(),
+      snapshot: this.streamSubscribers > 0 ? this.snapshotForClient() : this.snapshot(),
     }
 
     for (const listener of this.listeners) this.notifyListener(listener, event)

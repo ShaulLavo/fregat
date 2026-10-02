@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import {
   applyEdits,
+  createScanner,
   getNodeValue,
   modify,
   parseTree,
@@ -99,23 +100,82 @@ function topLevelKeyRanges(root: JsonNode | undefined): Record<string, SettingsT
   return ranges
 }
 
-/**
- * Applies edits to the document text, preserving everything it does not touch.
- *
- * Text in, text out — never a re-serialized parse result. Parsing, mutating and
- * re-stringifying would drop comments, reorder keys, and silently delete any key
- * this build does not know about, which is the opposite of the round-trip
- * guarantee the provider config already makes.
- */
+/** Text edits preserve untouched properties and comments; re-serialization would lose them. */
 export function editSettingsText(text: string, edits: readonly DocumentEdit[]): string {
   let next = text.trim() === '' ? '{}\n' : text
 
   for (const edit of edits) {
     const value = Object.hasOwn(edit, 'value') ? edit.value : undefined
-    next = applyEdits(next, modify(next, [edit.key], value, { formattingOptions: FORMATTING }))
+    next =
+      value === undefined
+        ? removeSettingsProperty(next, edit.key)
+        : applyEdits(next, modify(next, [edit.key], value, { formattingOptions: FORMATTING }))
   }
 
   return next
+}
+
+function removeSettingsProperty(text: string, key: string): string {
+  const errors: ParseError[] = []
+  const root = parseTree(text, errors, PARSE_OPTIONS)
+  if (errors.length > 0 || root?.type !== 'object') return text
+
+  const properties = root.children ?? []
+  const index = properties.findIndex((property) => property.children?.[0]?.value === key)
+  const property = properties[index]
+  if (!property) return text
+
+  const propertyEnd = property.offset + property.length
+  const followingComma = commaAfter(text, propertyEnd)
+  const hasTrailingComment =
+    followingComma !== null && !/^[\t \r\n]*$/.test(text.slice(propertyEnd, followingComma))
+  const range = propertyRemovalRange(text, property, hasTrailingComment ? null : followingComma)
+  const edits = [{ ...range, content: '' }]
+  if (followingComma !== null) {
+    if (hasTrailingComment) edits.push({ offset: followingComma, length: 1, content: '' })
+    return applyEdits(text, edits)
+  }
+
+  const previous = properties[index - 1]
+  if (!previous) return applyEdits(text, edits)
+  const precedingComma = commaAfter(text, previous.offset + previous.length)
+  if (precedingComma === null) return applyEdits(text, edits)
+
+  // Keep intervening comments; only a trivia-free compact gap joins the removal.
+  if (/^[\t ]*$/.test(text.slice(precedingComma + 1, range.offset))) {
+    edits[0] = {
+      offset: precedingComma,
+      length: range.offset + range.length - precedingComma,
+      content: '',
+    }
+    return applyEdits(text, edits)
+  }
+  edits.push({ offset: precedingComma, length: 1, content: '' })
+  return applyEdits(text, edits)
+}
+
+function commaAfter(text: string, offset: number): number | null {
+  const scanner = createScanner(text, true)
+  scanner.setPosition(offset)
+  scanner.scan()
+  const tokenOffset = scanner.getTokenOffset()
+  return text[tokenOffset] === ',' ? tokenOffset : null
+}
+
+function propertyRemovalRange(
+  text: string,
+  property: JsonNode,
+  followingComma: number | null,
+): SettingsTextRange {
+  const end = followingComma === null ? property.offset + property.length : followingComma + 1
+  const lineStart = text.lastIndexOf('\n', property.offset - 1) + 1
+  const newline = /^[\t ]*(?:\r\n|\n)/.exec(text.slice(end))
+  if (newline && /^[\t ]*$/.test(text.slice(lineStart, property.offset))) {
+    return { offset: lineStart, length: end + newline[0].length - lineStart }
+  }
+
+  const spaces = followingComma === null ? '' : (/^[\t ]*/.exec(text.slice(end))?.[0] ?? '')
+  return { offset: property.offset, length: end + spaces.length - property.offset }
 }
 
 /**
