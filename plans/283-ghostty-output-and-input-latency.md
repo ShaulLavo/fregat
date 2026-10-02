@@ -13,10 +13,10 @@
 - [x] Phase 1 attribution: `ghostty-webgpu/docs/perf-attribution.md` (#242).
 - [x] Fix 1, reuse WASM memory views (#245).
 - [x] Fix 2, packed damaged-row snapshot plus direct-packed DOM frame text (#255).
-- [ ] Benchmark repair on omarchy (#343): hardware WebGPU on Linux headless-shell, GPU-idle gate
-      (ComfyUI shares the GPU), latency at the presentation of the submitting frame with 240
-      samples, pass rule = paired native/xterm ratio ≤ 1. Review fixes in progress: CPU rows
-      resolved above the 10 ms tick, visible gate skips, regenerable compact evidence.
+- [x] Benchmark repair on omarchy (#343): hardware WebGPU on Linux headless-shell, GPU-idle gate,
+      latency at the presentation of the submitting frame, paired native/xterm ratios, CPU rows
+      unresolved below the 10 ms tick. Sustained-output CPU is ASCII-only until #352.
+      Result at 17 terminals: output CPU native/xterm 2.10 renderer, 2.29 total.
 - [ ] Frame built in Zig, spike: ASCII and SGR colors, measured against main and xterm.
 - [ ] Frame built in Zig, full move: wide characters, graphemes, cursor, selection, links; delete the
       JS snapshot and instance builders.
