@@ -5,6 +5,7 @@ import {
   normalizeProxySnapshot,
   observeClaudeHeaders,
   restoreUsageSnapshot,
+  restoreResetOrderSnapshot,
 } from './usage-feed'
 
 const seen = '2026-10-02T18:00:00.000Z'
@@ -804,4 +805,43 @@ test('live quota overrides persisted policy and explicit zero credits clear reta
     usedPercent: 35,
     lastSeenAt: later,
   })
+})
+
+test.each([null, { balance: 0, unlimited: false }])(
+  'persisted no-credit observation %j clears seeded credits while disabled quota is omitted',
+  (credits) => {
+    const previous = createUsageSnapshot(configuredAccounts, checked)
+    previous.accounts[1]!.credits = { balance: 12.5, unlimited: false }
+    previous.accounts[1]!.lastSeenAt = seen
+    const policy = restoreResetOrderSnapshot(
+      { 'synthetic-index': { resetAt: 1791314592, usedPercent: 100, observedAt: seen, credits } },
+      later,
+    )
+    expect(policy).not.toBeNull()
+    const body = {
+      observed_at: later,
+      files: [
+        { provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index', disabled: true },
+      ],
+    }
+    const next = normalizeProxySnapshot(body, previous, later, policy!)!
+    expect(next.accounts[1]!.credits).toBeUndefined()
+    expect(next.accounts[1]!.windows).toMatchObject([
+      { id: 'weekly', usedPercent: 100, lastSeenAt: seen },
+    ])
+  },
+)
+
+test('credits-only explicit absence survives policy restoration without inventing quota', () => {
+  const policy = restoreResetOrderSnapshot({ 'synthetic-index': { credits: null } }, later)
+  expect(policy).not.toBeNull()
+  const previous = createUsageSnapshot(configuredAccounts, checked)
+  previous.accounts[1]!.credits = { balance: 12.5, unlimited: false }
+  const body = {
+    observed_at: later,
+    files: [{ provider: 'codex', label: 'shaul9191', auth_index: 'synthetic-index' }],
+  }
+  const next = normalizeProxySnapshot(body, previous, later, policy!)!
+  expect(next.accounts[1]!.credits).toBeUndefined()
+  expect(next.accounts[1]!.windows).toEqual([])
 })

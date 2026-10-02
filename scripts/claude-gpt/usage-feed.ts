@@ -135,7 +135,7 @@ const resetOrderObservationSchema = v.pipe(
     resetAt: v.optional(v.pipe(v.number(), v.finite(), v.minValue(1), v.maxValue(253402300799))),
     usedPercent: v.optional(percentSchema),
     observedAt: v.optional(timeSchema),
-    credits: v.optional(creditsSchema),
+    credits: v.optional(v.nullable(creditsSchema)),
     disabledByLoop: v.optional(v.boolean()),
   }),
   v.check(
@@ -480,9 +480,11 @@ function proxyAccount(
   const receivedCredits = creditIsStale ? undefined : observedCredits
   const previousIsNewer =
     account.lastSeenAt && storedSeen && Date.parse(account.lastSeenAt) > Date.parse(storedSeen)
-  const retainedCredits =
-    previousIsNewer && account.credits ? account.credits : (stored?.credits ?? account.credits)
-  const credits = receivedCredits === undefined ? retainedCredits : receivedCredits
+  const storedCredits = stored?.credits === undefined ? account.credits : stored.credits
+  const retainedCredits = previousIsNewer && account.credits ? account.credits : storedCredits
+  const knownCredits = receivedCredits === undefined ? retainedCredits : receivedCredits
+  const credits =
+    knownCredits && (knownCredits.balance > 0 || knownCredits.unlimited) ? knownCredits : null
   const creditSeen =
     receivedCredits !== undefined ? quotaSeen : credits ? (storedSeen ?? account.lastSeenAt) : null
   const lastSeenAt = latestObservation(windows)

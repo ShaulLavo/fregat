@@ -217,7 +217,9 @@ test('credits-only updates retain historical weekly freshness and explicitly cle
     resetAt: now + 50,
     usedPercent: 20,
     observedAt: stored.a.observedAt,
+    credits: null,
   })
+  expect(mergeStoredObservations([credential('a', null)], cleared)).toEqual(cleared)
 })
 
 test('missing or malformed credit signals preserve the last observed credits', () => {
@@ -244,7 +246,84 @@ test('credits-only accounts persist without invented weekly data and never enter
   expect(observations).toEqual({})
   expect(planPriorities(credentials, observations).get('a.json')).toBe(0)
   expect(planDisabled(credentials, observations, new Set()).size).toBe(0)
-  expect(mergeStoredObservations([{ ...credential('a', null), credits: null }], state)).toEqual({})
+  const cleared = mergeStoredObservations([{ ...credential('a', null), credits: null }], state)
+  expect(cleared).toEqual({ a: { credits: null } })
+  expect(mergeStoredObservations([credential('a', null)], cleared)).toEqual(cleared)
+  expect(mergeObservations(credentials, cleared, now)).toEqual({})
+})
+
+test('confirmed credit absence replaces positive credits and survives fresh weekly headers', () => {
+  const stored = {
+    a: { resetAt: now + 50, usedPercent: 20, credits: { balance: 25, unlimited: false } },
+  }
+  const cleared = mergeStoredObservations([{ ...credential('a', null), credits: null }], stored)
+  const restored = JSON.parse(JSON.stringify(cleared)) as Record<string, StoredObservation>
+  const observation = readObservation('codex', {
+    'X-Codex-Primary-Reset-At': String(now + 50),
+    'X-Codex-Primary-Used-Percent': '20',
+    'X-Codex-Credits-Has-Credits': 'false',
+    'X-Codex-Credits-Unlimited': 'false',
+  })
+  expect(mergeStoredObservations([credential('a', observation)], stored)).toEqual(cleared)
+  expect(restored.a).toEqual({ resetAt: now + 50, usedPercent: 20, credits: null })
+  expect(
+    mergeStoredObservations([credential('a', { resetAt: now + 70, usedPercent: 40 })], restored),
+  ).toEqual({ a: { resetAt: now + 70, usedPercent: 40, credits: null } })
+})
+
+test('the loop retains confirmed credit absence after restart with omitted quota', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'reset-order-'))
+  const keyFile = join(scratch, 'key')
+  const stateFile = join(scratch, 'state.json')
+  const stored = {
+    weekly: {
+      resetAt: Math.floor(Date.now() / 1_000) + 3_600,
+      usedPercent: 20,
+      observedAt: '2026-10-03T08:00:00Z',
+      credits: null,
+    },
+    'credits-only': { credits: null },
+  }
+  await writeFile(keyFile, 'management-key\n')
+  await writeFile(stateFile, JSON.stringify(stored))
+  let reads = 0
+  const logs: Record<string, unknown>[] = []
+  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+    logs.push(JSON.parse(String(chunk)))
+    return true
+  })
+  const upstream = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      expect(request.method).toBe('GET')
+      reads++
+      return Response.json({
+        files: ['weekly', 'credits-only'].map((index) => ({
+          name: `${index}.json`,
+          auth_index: index,
+          provider: 'codex',
+          disabled: true,
+        })),
+      })
+    },
+  })
+  const loop = startResetOrder({
+    proxyUrl: upstream.url.toString(),
+    managementKeyFile: keyFile,
+    stateFile,
+    intervalMs: 10,
+  })
+  try {
+    await expect.poll(() => reads).toBeGreaterThanOrEqual(3)
+    expect(logs).toEqual([])
+    expect(await Bun.file(stateFile).json()).toEqual(stored)
+  } finally {
+    loop.stop()
+    upstream.stop(true)
+    stderr.mockRestore()
+    await rm(scratch, { recursive: true, force: true })
+  }
 })
 
 test('expired weekly data remains persisted while routing treats it as unknown', () => {
@@ -532,7 +611,7 @@ test('the loop patches only changed priorities and records observations', async 
         credits: { balance: 25, unlimited: false },
       },
       claude: { resetAt: Number(resetAt), usedPercent: 25, observedAt: '2026-10-03T09:00:00Z' },
-      off: { ...legacy, observedAt: '2026-10-03T08:00:00Z' },
+      off: { ...legacy, observedAt: '2026-10-03T08:00:00Z', credits: null },
       'credit-only': { credits: { balance: 50, unlimited: true } },
       legacy,
       manual: {

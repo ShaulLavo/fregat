@@ -7,11 +7,11 @@ export type Observation = {
   resetAt: number
   usedPercent: number
   observedAt?: string
-  credits?: Credits
+  credits?: Credits | null
 }
 export type StoredObservation = (
   | Observation
-  | { resetAt?: undefined; usedPercent?: undefined; observedAt?: string; credits: Credits }
+  | { resetAt?: undefined; usedPercent?: undefined; observedAt?: string; credits: Credits | null }
 ) & { disabledByLoop?: boolean }
 export type Provider = 'codex' | 'claude'
 export type Credential = {
@@ -59,14 +59,14 @@ const stateSchema = v.record(
       resetAt: v.number(),
       usedPercent: v.number(),
       observedAt: v.optional(v.string()),
-      credits: v.optional(creditsSchema),
+      credits: v.optional(v.nullable(creditsSchema)),
       disabledByLoop: v.optional(v.boolean()),
     }),
     v.object({
       resetAt: v.optional(v.undefined()),
       usedPercent: v.optional(v.undefined()),
       observedAt: v.optional(v.string()),
-      credits: creditsSchema,
+      credits: v.nullable(creditsSchema),
       disabledByLoop: v.optional(v.boolean()),
     }),
   ]),
@@ -107,7 +107,7 @@ export function readObservation(
     const observation: Observation = { resetAt, usedPercent }
     if (observedAt !== undefined) observation.observedAt = observedAt
     const credits = readCredits(signals)
-    if (credits) observation.credits = credits
+    if (credits !== undefined) observation.credits = credits
     return observation
   }
   const resetAt = readSeconds(signals?.['Anthropic-Ratelimit-Unified-7d-Reset'])
@@ -122,7 +122,7 @@ export function readObservation(
   return observation
 }
 
-// Credits-only headers update credit state without refreshing the stored weekly observation.
+// Credits-only headers retain weekly freshness; null preserves confirmed credit absence across restarts.
 export function mergeStoredObservations(
   credentials: readonly Credential[],
   stored: Readonly<Record<string, StoredObservation>>,
@@ -133,17 +133,14 @@ export function mergeStoredObservations(
     const current = credential.observation
     const next: Partial<Observation> & { disabledByLoop?: boolean } = { ...(current ?? previous) }
     if (previous?.disabledByLoop !== undefined) next.disabledByLoop = previous.disabledByLoop
-    const credits =
-      credential.credits === undefined
-        ? (current?.credits ?? previous?.credits)
-        : credential.credits
-    if (credits) next.credits = credits
-    if (credits === null) delete next.credits
+    const observedCredits = credential.credits === undefined ? current?.credits : credential.credits
+    const credits = observedCredits === undefined ? previous?.credits : observedCredits
+    if (credits !== undefined) next.credits = credits
     if (next.resetAt !== undefined && next.usedPercent !== undefined) {
       merged[credential.index] = { ...next, resetAt: next.resetAt, usedPercent: next.usedPercent }
       continue
     }
-    if (!next.credits) continue
+    if (next.credits === undefined) continue
     const { resetAt: _resetAt, usedPercent: _usedPercent, ...metadata } = next
     merged[credential.index] = { ...metadata, credits: next.credits }
   }
