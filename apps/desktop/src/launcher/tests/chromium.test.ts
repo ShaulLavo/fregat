@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { defaultDevStateHome } from '../../../../../scripts/state-home'
 import { assertChromiumVersion, attachChromium, chromiumBridge } from '../chromium'
 import type { CdpEvent } from '../cdp'
 import { browserProfile, chromiumArguments, desktopStateHome } from '../profile'
@@ -29,7 +30,11 @@ test('dev, production and explicit fixture homes isolate browser profiles', () =
     desktopStateHome({ PLATFORM_HOME: '/fixtures/test' }, '/home/test', 'dev'),
   ]
   expect(new Set(roots.map((root) => browserProfile(candidate, root, '/home/test'))).size).toBe(3)
-  expect(roots).toEqual(['/work/platform-dev/home', '/home/test/.platform', '/fixtures/test'])
+  expect(roots).toEqual([
+    defaultDevStateHome('/home/test'),
+    '/home/test/.platform',
+    '/fixtures/test',
+  ])
 })
 test('snap keeps state-home namespaces isolated and flatpak grants only chosen profile', () => {
   const snap = { ...candidate, executable: '/snap/bin/chromium', confinement: 'snap' as const }
