@@ -13,6 +13,31 @@ export type UnitValues = {
   port: number
 }
 
+const MARKER = 'fregat-registration'
+
+/** The values a registration was rendered from, so uninstall can re-render and compare it. */
+function marker(values: UnitValues) {
+  return `${MARKER} ${Buffer.from(JSON.stringify(values)).toString('base64url')}`
+}
+
+/**
+ * The values a file this setup wrote was rendered from, or null for anything else. Only an exact
+ * re-render matches, so a hand-edited or foreign file is never mistaken for ours.
+ */
+export function registrationValues(
+  content: string,
+  render: (values: UnitValues) => string,
+): UnitValues | null {
+  const encoded = new RegExp(`${MARKER} ([A-Za-z0-9_-]+)`).exec(content)?.[1]
+  if (!encoded) return null
+  try {
+    const values = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as UnitValues
+    return render(values) === content ? values : null
+  } catch {
+    return null
+  }
+}
+
 /** systemd expands `%` specifiers and splits on spaces; quote and escape every value. */
 function systemdQuote(value: string) {
   return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%')}"`
@@ -34,7 +59,8 @@ function environment(values: UnitValues) {
 }
 
 export function renderSystemdSocket(values: UnitValues) {
-  return `[Unit]
+  return `# ${marker(values)}
+[Unit]
 Description=Fregat server socket
 
 [Socket]
@@ -53,7 +79,8 @@ export function renderSystemdService(values: UnitValues) {
   const env = Object.entries(environment(values))
     .map(([key, value]) => `Environment=${systemdQuote(`${key}=${value}`)}`)
     .join('\n')
-  return `[Unit]
+  return `# ${marker(values)}
+[Unit]
 Description=Fregat server
 Requires=${SOCKET_UNIT}
 After=${SOCKET_UNIT}
@@ -98,6 +125,7 @@ export function renderLaunchAgent(values: UnitValues) {
     .join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- ${marker(values)} -->
 <plist version="1.0">
   <dict>
     <key>Label</key>${plistString(LAUNCHD_LABEL)}
@@ -124,7 +152,7 @@ ${env}
         <key>SockFamily</key>${plistString('IPv4')}
       </dict>
     </dict>
-    <!-- A crash or Restart (exit 75) starts again; a clean exit waits for the next connection. -->
+    <!-- A crash or Restart (exit 75) starts again; a clean exit, including a state-home conflict, waits for the next connection. -->
     <key>KeepAlive</key>
     <dict>
       <key>SuccessfulExit</key><false/>

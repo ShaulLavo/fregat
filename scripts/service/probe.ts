@@ -7,7 +7,7 @@ import {
 import * as v from 'valibot'
 import {
   IDENTITY_PROOF_HEADER,
-  identityProof,
+  proofMatches,
   readIdentityKey,
 } from '../../apps/server/src/system/identity-key'
 
@@ -63,7 +63,7 @@ async function classify(
     return {
       kind: 'fregat',
       identity: identity.output,
-      proven: key !== null && proof === identityProof(key, nonce),
+      proven: key !== null && proofMatches(key, nonce, proof),
     }
   }
   // A Fregat server that refuses identity to this request says so in its own error envelope.

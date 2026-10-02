@@ -156,6 +156,30 @@ describe('ensureMachineService', () => {
     ).rejects.toMatchObject({ code: 'service.IDENTITY_UNVERIFIED', internal: { reason: 'proof' } })
   })
 
+  it('waits out a listener that fails its first identity request', async () => {
+    const context = await setup()
+    fregatServer({ port: context.port, stateHome: context.stateHome })
+    let calls = 0
+    const flaky: typeof fetch = Object.assign(
+      (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        calls++
+        if (calls === 1) return Promise.reject(new TypeError('connection reset'))
+        return fetch(input, init)
+      },
+      { preconnect: fetch.preconnect },
+    )
+    const { host, commands } = recordingHost(context.root, 'linux')
+    const result = await ensureMachineService(intent(context.address, context.stateHome), {
+      productionRoot: context.productionRoot,
+      host,
+      readinessMs: 5000,
+      fetch: flaky,
+    })
+    expect(result.disposition).toBe('reused')
+    expect(calls).toBeGreaterThan(1)
+    expect(commands).toEqual([])
+  })
+
   it('names the other program holding the address and leaves it running', async () => {
     const context = await setup()
     const program = otherProgram(context.port)
@@ -282,28 +306,85 @@ describe('ensureMachineService', () => {
   })
 })
 
+async function installed(platform: NodeJS.Platform = 'linux') {
+  const context = await setup(platform)
+  let server: ReturnType<typeof fregatServer> | undefined
+  const recorded = recordingHost(context.root, platform, (argv) => {
+    if (argv.includes('enable') || argv[1] === 'bootstrap')
+      server = fregatServer({ port: context.port, stateHome: context.stateHome })
+    if (argv[1] === 'print') return { code: 113 }
+  })
+  await ensureMachineService(intent(context.address, context.stateHome), {
+    productionRoot: context.productionRoot,
+    host: recorded.host,
+    readinessMs: 5000,
+  })
+  recorded.commands.length = 0
+  return { ...context, ...recorded, stopServer: () => server?.stop(true) }
+}
+
 describe('removeMachineService', () => {
-  it('unregisters the socket and service and keeps the state', async () => {
-    const context = await setup()
-    const { host, commands } = recordingHost(context.root, 'linux', (argv) => {
-      if (argv.includes('enable'))
-        fregatServer({ port: context.port, stateHome: context.stateHome })
-    })
-    await ensureMachineService(intent(context.address, context.stateHome), {
-      productionRoot: context.productionRoot,
-      host,
-      readinessMs: 5000,
-    })
-    commands.length = 0
-    expect(await removeMachineService({ host })).toEqual({ removed: true })
-    expect(commands).toEqual([
+  it('unregisters its own running socket and service and keeps the state', async () => {
+    const context = await installed()
+    expect(await removeMachineService({ host: context.host })).toEqual({ removed: true })
+    expect(context.commands).toEqual([
       ['systemctl', '--user', 'disable', '--now', 'fregat-server.socket', 'fregat-server.service'],
       ['systemctl', '--user', 'daemon-reload'],
     ])
-    expect(
-      existsSync(path.join(context.root, 'config', 'systemd', 'user', 'fregat-server.socket')),
-    ).toBe(false)
+    const units = path.join(context.root, 'config', 'systemd', 'user')
+    expect(existsSync(path.join(units, 'fregat-server.socket'))).toBe(false)
     expect(existsSync(context.stateHome)).toBe(true)
-    expect(await removeMachineService({ host })).toEqual({ removed: false })
+    expect(await removeMachineService({ host: context.host })).toEqual({ removed: false })
+  })
+
+  it('unregisters its own LaunchAgent', async () => {
+    const context = await installed('darwin')
+    expect(await removeMachineService({ host: context.host })).toEqual({ removed: true })
+    expect(context.commands).toEqual([['launchctl', 'bootout', 'gui/501/dev.fregat.server']])
+  })
+
+  it.each(['linux', 'darwin'] as const)(
+    'leaves a registration it did not write alone on %s',
+    async (platform) => {
+      const context = await setup(platform)
+      const { host, commands } = recordingHost(context.root, platform)
+      const file =
+        platform === 'darwin'
+          ? path.join(context.root, 'home', 'Library', 'LaunchAgents', 'dev.fregat.server.plist')
+          : path.join(context.root, 'config', 'systemd', 'user', 'fregat-server.socket')
+      mkdirSync(path.dirname(file), { recursive: true })
+      writeFileSync(file, 'someone else’s registration\n')
+      await expect(removeMachineService({ host })).rejects.toMatchObject({
+        code: 'service.REGISTRATION_NOT_OURS',
+        internal: { file: path.basename(file), reason: 'contents' },
+      })
+      expect(commands).toEqual([])
+      expect(readFileSync(file, 'utf8')).toBe('someone else’s registration\n')
+    },
+  )
+
+  it('leaves its registration alone while another program answers at its address', async () => {
+    const context = await installed()
+    // Same files, but the address now belongs to a stranger: the listener cannot prove itself.
+    await context.stopServer()
+    otherProgram(context.port)
+    await expect(removeMachineService({ host: context.host })).rejects.toMatchObject({
+      code: 'service.REGISTRATION_NOT_OURS',
+      internal: { reason: 'listener' },
+    })
+    expect(context.commands).toEqual([])
+  })
+
+  it('keeps the files when the service manager refuses to stop the unit', async () => {
+    const context = await installed()
+    const refusing = recordingHost(context.root, 'linux', (argv) =>
+      argv.includes('disable') ? { code: 1 } : undefined,
+    )
+    await expect(removeMachineService({ host: refusing.host })).rejects.toMatchObject({
+      code: 'service.REGISTRATION_FAILED',
+      internal: { stage: 'disable' },
+    })
+    const units = path.join(context.root, 'config', 'systemd', 'user')
+    expect(existsSync(path.join(units, 'fregat-server.service'))).toBe(true)
   })
 })

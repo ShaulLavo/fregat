@@ -16,6 +16,7 @@ import { serviceErrors } from './structured-errors'
 import {
   LAUNCHD_LABEL,
   registrationFiles,
+  registrationValues,
   renderLaunchAgent,
   renderSystemdService,
   renderSystemdSocket,
@@ -59,6 +60,9 @@ export async function ensureMachineService(
   try {
     const context = { ...parsed, stateHome, host, deadline, options }
     const first = await probe(context)
+    // A listener that cannot answer yet (starting, a reset connection) gets the same bounded wait.
+    if (first.kind === 'unverified')
+      return { identity: await awaitReady(context, first), disposition: 'reused' }
     if (first.kind !== 'free')
       return { identity: await verified(context, first), disposition: 'reused' }
     await register(context)
@@ -114,8 +118,11 @@ function identityMismatch(context: Context, identity: ServerIdentity) {
 }
 
 /** The first request activates the service; a slow start is waited out, never retried blind. */
-async function awaitReady(context: Context): Promise<ServerIdentity> {
-  let outcome: ProbeOutcome = { kind: 'free' }
+async function awaitReady(
+  context: Context,
+  last: ProbeOutcome = { kind: 'free' },
+): Promise<ServerIdentity> {
+  let outcome = last
   while (Date.now() < context.deadline) {
     context.options.signal?.throwIfAborted()
     outcome = await probe(context)
@@ -198,26 +205,74 @@ async function setupLock(
 }
 
 /**
- * The explicit machine-server uninstall: unregisters the recorded socket and service or launchd
- * agent and removes the files setup wrote. State, logs and releases stay.
+ * The explicit machine-server uninstall. It touches only a registration setup wrote (an exact
+ * re-render of its recorded values) whose address is free or proves the recorded state home.
+ * State, logs and releases stay.
  */
 export async function removeMachineService(
-  options: { host?: ServiceHost; signal?: AbortSignal } = {},
+  options: { host?: ServiceHost; signal?: AbortSignal; readinessMs?: number } = {},
 ) {
   const host = options.host ?? realServiceHost()
   options.signal?.throwIfAborted()
   const files = registrationFiles(host)
-  if (files.kind === 'launchd') {
-    if (host.readFile(files.plist) === null) return { removed: false }
-    await host.run(['launchctl', 'bootout', `gui/${host.uid}/${LAUNCHD_LABEL}`])
-    host.removeFile(files.plist)
+  const owned =
+    files.kind === 'launchd'
+      ? [{ file: files.plist, render: renderLaunchAgent }]
+      : [
+          { file: files.socket, render: renderSystemdSocket },
+          { file: files.service, render: renderSystemdService },
+        ]
+  const present = owned.filter(({ file }) => host.readFile(file) !== null)
+  if (present.length === 0) return { removed: false }
+  const values = present.map(({ file, render }) => {
+    const found = registrationValues(host.readFile(file) ?? '', render)
+    if (!found)
+      throw serviceErrors.REGISTRATION_NOT_OURS({
+        internal: { file: path.basename(file), reason: 'contents' },
+      })
+    return found
+  })
+  const [recorded] = values
+  if (!recorded) return { removed: false }
+  const readinessMs =
+    options.readinessMs ?? descriptorFor('server.activationTimeoutSeconds').default * 1000
+  const lock = await setupLock(recorded.stateHome, Date.now() + readinessMs, options.signal)
+  try {
+    await requireOwnListener(recorded, readinessMs, options.signal)
+    if (files.kind === 'launchd') {
+      await required(host, ['launchctl', 'bootout', `gui/${host.uid}/${LAUNCHD_LABEL}`], 'bootout')
+    } else {
+      await required(
+        host,
+        ['systemctl', '--user', 'disable', '--now', SOCKET_UNIT, SERVICE_UNIT],
+        'disable',
+      )
+    }
+    for (const { file } of present) host.removeFile(file)
+    if (files.kind === 'systemd')
+      await required(host, ['systemctl', '--user', 'daemon-reload'], 'daemon-reload')
     return { removed: true }
+  } finally {
+    lock.release()
   }
-  if (host.readFile(files.socket) === null && host.readFile(files.service) === null)
-    return { removed: false }
-  await host.run(['systemctl', '--user', 'disable', '--now', SOCKET_UNIT, SERVICE_UNIT])
-  host.removeFile(files.socket)
-  host.removeFile(files.service)
-  await required(host, ['systemctl', '--user', 'daemon-reload'], 'daemon-reload')
-  return { removed: true }
+}
+
+/** A free address, or a server proving the recorded state home; anything else is not ours to stop. */
+async function requireOwnListener(values: UnitValues, timeoutMs: number, signal?: AbortSignal) {
+  const outcome = await probeAddress({
+    address: `http://127.0.0.1:${values.port}`,
+    stateHome: values.stateHome,
+    timeoutMs,
+    signal,
+  })
+  if (outcome.kind === 'free') return
+  if (
+    outcome.kind === 'fregat' &&
+    outcome.proven &&
+    outcome.identity.stateHome === values.stateHome
+  )
+    return
+  throw serviceErrors.REGISTRATION_NOT_OURS({
+    internal: { reason: 'listener', outcome: outcome.kind, port: values.port },
+  })
 }

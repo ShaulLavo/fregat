@@ -25,6 +25,12 @@ export const serviceErrors = defineErrorCatalog('service', {
     why: 'Setup writes a launchd agent or systemd user socket and service, and that step did not complete.',
     fix: 'Check that a release exists in the server release folder, and remove a Fregat registration left by another installation with the server uninstall, then run setup again.',
   },
+  REGISTRATION_NOT_OURS: {
+    status: 409,
+    message: 'A Fregat server registration this setup did not write is in place',
+    why: 'Uninstall removes only a registration whose files setup wrote and whose running server proves this state folder.',
+    fix: 'Check the named file and remove that registration with the tool that installed it.',
+  },
   UNSUPPORTED_PLATFORM: {
     status: 501,
     message: 'Fregat installs its server service on macOS and Linux',
