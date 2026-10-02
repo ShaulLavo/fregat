@@ -2,6 +2,62 @@
 
 Status: Phase 1 measured and review repairs completed on 2026-10-01. A corrected 17-terminal ASCII CPU rerun supplements the original attribution matrix. Phase 2 implements packed damaged-row snapshots and measures main versus treatment on the Apple M1 at 1 and 17 terminals, ASCII and SGR. The initial matrix has mixed CPU results. A single direct-packed DOM frame follow-up improves CPU in all fresh 17-terminal ASCII/SGR pairs; substantial baseline drift between matrices remains unexplained. The PR stays draft for review. Phase 1's input/echo conclusions remain separate.
 
+## Linux hardware comparison instrument
+
+The Linux runner measures native WebGPU and xterm WebGL in the same Chromium headless-shell session over secure loopback HTTP. It enables Vulkan with `--enable-features=Vulkan --use-angle=vulkan --ignore-gpu-blocklist`, records CDP GPU feature status and the WebGPU adapter, and rejects software/fallback adapters. Adapter acquisition retries up to three times, 100 ms apart. macOS retains headed Chromium and its AC-power/caffeinate checks. Full Chromium headless on the RTX 3060 Ti exposed the NVIDIA adapter but captured a black WebGPU canvas; the same minimal red-canvas diagnostic visibly rendered on headless-shell. This harness selection requires no terminal-library change.
+
+Latency now ends at `AnimationFrame::Presentation` for the exact animation-frame identity containing the terminal's actual GPU submission. Selection requires the operation's parse span, input echo receipt for keystrokes, and `submit` or `drawElementsInstanced` inside the render span. A deferred draw callback with no submission cannot qualify. The first colored-glyph PNG remains a correctness check and capture-timing diagnostic. Missing presentation feedback fails the case; there is no PNG timestamp fallback. Normal latency tracing omits the V8 CPU profiler, and each operation collects 240 samples per repetition.
+
+**Linux headless-shell measures keydown/write to compositor presentation acknowledgement, on-demand, not physical vsync.** Its renderer rAF period is approximately 16.665 ms, while presentation feedback follows submission asynchronously. Physical-display frame drops and optical latency remain unmeasured. The optional `--validate-presentation` phase inserts one rAF before write and retains 24 delayed samples, allowing renderer-frame sensitivity to be checked separately. These values must not be compared directly with the historical captured-PNG Mac values below.
+
+NVIDIA qualification waits for three consecutive samples at or below 5% utilization before each window and between repetitions, with a 30-second give-up. During measurement it rejects utilization above 80% or foreign compute residency above 1024 MiB. The benchmark browser's CDP process IDs are excluded from foreign residency; total GPU utilization still includes benchmark load. The 80% bound allows the native 17-terminal burst's observed 44% load and xterm's 26% during calibration. Every window retains before/during/after samples at a 250 ms interval and a 2-second command timeout. Missing NVIDIA tooling/devices or other platforms retain explicit skip reasons. Resident memory is a conservative activity proxy, and subinterval bursts may be missed. All thresholds are named fixture settings.
+
+Native/xterm cases run adjacent and alternate order across three repetitions. CPU renderer/total and input p50/p95/write p50 targets use the **median of individual native/xterm pair ratios**, with target ≤ 1. Each pair requires matching browser-session UUID, pair ID, repetition, path and count. Missing, duplicate, failed or GPU-disqualified partners yield incomplete targets. Absolute values are context; ratios of independently aggregated medians are not the pass rule. Raw traces, glyph checks, window GPU samples and individual pair values remain in the run artifacts.
+
+### Qualified Linux proof, 2026-10-02
+
+Both quiet windows completed all six cases, on Chromium headless-shell 153.0.8010.12, RTX 3060 Ti / NVIDIA 610.57.4 / Vulkan, with the same benchmark source hash. Each window owns a separate browser-session UUID; every pair is within one session. ASCII/bytes, counts 1 and 17, three repetitions, 240 input and 240 write samples per renderer/repetition. All adapters are non-fallback, all GPU windows qualified, and all page-error arrays are empty. Maximum observed utilization was 17% at count 1 and 66% at count 17. The four correctness screenshots were read back; ASCII, SGR, CJK and overwrite are visible throughout, with the existing native/xterm emoji shaping difference.
+
+Compact evidence retains all latency arrays, CPU denominators/process splits, individual ratios, adapter/feature status, GPU-window ranges, hashes and representative input traces: [1 terminal](benchmarks/linux-nvidia/2026-10-02-comparison-1.json), [17 terminals](benchmarks/linux-nvidia/2026-10-02-comparison-17.json). Raw traces and per-sample GPU observations are retained in the execution evidence directory `/work/tmp/plan-283-linux/qualified-{1,17}/`.
+
+| Median individual native/xterm ratio (target ≤ 1) | 1 terminal | 17 terminals |
+| ------------------------------------------------- | ---------: | -----------: |
+| Output renderer CPU                               |      0.985 |        0.728 |
+| Output total CPU                                  |      1.422 |        1.233 |
+| Input p50                                         |      2.971 |        0.961 |
+| Input p95                                         |      1.156 |        1.041 |
+| Write p50                                         |      0.986 |        1.136 |
+| Idle renderer CPU                                 |      1.000 |        1.000 |
+| Idle total CPU                                    |      1.000 |            ∞ |
+
+Idle CPU has zero/quantized samples: zero/zero is 1 and positive/zero is infinity by convention. These short idle windows cannot establish a meaningful near-zero CPU advantage. Ratios above 1 remain failed targets; this instrument pass makes no product-speedup claim.
+
+Count 1 absolute latency, milliseconds:
+
+| Pair | Renderer | Input p50 | Input p95 | Write p50 |
+| ---- | -------- | --------: | --------: | --------: |
+| 1    | native   |    20.020 |    25.190 |    14.277 |
+| 1    | xterm    |     4.813 |    21.783 |    14.383 |
+| 2    | native   |    14.464 |    28.678 |    13.606 |
+| 2    | xterm    |     4.869 |    23.192 |    14.044 |
+| 3    | native   |     6.046 |    28.546 |    12.736 |
+| 3    | xterm    |     4.790 |    25.486 |    12.915 |
+
+Count 1 output CPU, percent of one core:
+
+| Pair | Renderer | Renderer process | GPU process | Browser | Other |  Total |
+| ---- | -------- | ---------------: | ----------: | ------: | ----: | -----: |
+| 1    | native   |            5.652 |       7.537 |       0 |     0 | 13.189 |
+| 1    | xterm    |            6.609 |       2.832 |       0 |     0 |  9.441 |
+| 2    | native   |            8.516 |       6.624 |       0 |     0 | 15.139 |
+| 2    | xterm    |            5.650 |       1.883 |       0 |     0 |  7.533 |
+| 3    | native   |            5.562 |       6.489 |       0 |     0 | 12.052 |
+| 3    | xterm    |            5.649 |       2.824 |       0 |     0 |  8.473 |
+
+The higher count 1 total is mostly GPU-process CPU, which is distinct from GPU hardware execution time. Native input p50 varies substantially across pairs. The pair 1 median-nearest input samples show native keydown → echo receipt +0.569 ms → parse end +0.590 → render start +15.721 → submission end +15.915 → presentation ack +20.017. xterm shows +0 → +0.407 → +0.475 → +1.028 → +1.075 → +4.813. Their submission-to-ack intervals are similar (4.10 versus 3.74 ms); this sample's gap lies in parse-to-render waiting. This locates the interval but does not establish why the renderer-frame phases differed or a general scheduling defect.
+
+The deliberately delayed write phase raises native write p50 from 14.277 to 27.913 ms (+13.636), and xterm from 14.383 to 31.868 ms (+17.485), with 24 delayed samples each. Both respond to an extra renderer rAF (period 16.665 ms); differing baseline/delayed phase distributions prevent an exact-period delta claim. Headless feedback remains on-demand and supplies no physical-display latency evidence.
+
 ## Conclusions and target reproducibility
 
 The corrected baseline is [benchmarks.md](benchmarks.md), from Fregat PR #235. This investigation preserves the CPU disadvantage at 17 terminals, identifies renderer-side snapshot/instance work, and does **not** reproduce the one-terminal input-p95 disadvantage.

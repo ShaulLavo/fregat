@@ -107,3 +107,18 @@ each with an independent reviewer. Measurements run on omarchy through the heavy
   the owner.
 - `docs/benchmarks.md` is regenerated from a fresh run, with no lost wins. If ghostty-webgpu now
   beats xterm.js on these measures, raise putting numbers in the main README with the owner.
+
+## Linux comparison qualification
+
+Status: Approved. This benchmark-only pass removes the Mac dependency for native/xterm comparisons;
+product performance work remains separate.
+
+- [x] Add Linux headless hardware launch and bounded harness adapter acquisition.
+- [x] Qualify GPU idleness before windows and repetitions, sample during windows, retain give-up evidence.
+- [x] Use terminal-frame presentation feedback for latency; retain PNG glyph checks and increase samples to 240.
+- [x] Alternate adjacent native/xterm cases with explicit pair identities; evaluate median paired ratios ≤ 1.
+- [x] Add portable option, gate, recorded-endpoint, and paired-ratio tests.
+- [x] Prove hardware canvas presentation, then run 1/17-terminal ASCII, bytes, three paired repetitions.
+- [x] Retain compact Linux evidence, per-pair latency/CPU attribution, delayed-rAF sensitivity and endpoint limits.
+- [x] Complete independent benchmark review.
+- [x] Commit by path, push, and open [benchmark PR #343](https://github.com/ShaulLavo/fregat/pull/343); leave merge and product performance work separate.

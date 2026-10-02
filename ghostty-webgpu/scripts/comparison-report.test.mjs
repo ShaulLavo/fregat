@@ -4,12 +4,21 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { droppedFrames, markdown, order, quantile, summaries } from './comparison-report.mjs'
+import {
+  droppedFrames,
+  markdown,
+  order,
+  pairedRatios,
+  quantile,
+  summaries,
+} from './comparison-report.mjs'
 import { cpuSample, verifyHash, withDeadline } from './comparison-guards.mjs'
 // Package metadata is pinned by resolver provenance; keep the tooling suites under this entry.
 import './comparison-trace.test.mjs'
 import './comparison-attribution.test.mjs'
 import './comparison-options.test.mjs'
+import './comparison-gpu.test.mjs'
+import './comparison-latency.test.mjs'
 import {
   expectedScreen,
   inputChunks,
@@ -359,4 +368,200 @@ test('portable reports link beside their artifact and checked-in reports use des
   const published = markdown(artifact, review, 'benchmarks/mac-m1')
   assert(published.includes('[comparison.json](benchmarks/mac-m1/comparison.json)'))
   assert(published.includes('[screen](benchmarks/mac-m1/screen.png)'))
+})
+
+function pairedArtifact() {
+  const runs = [0, 1, 2].flatMap((repetition) =>
+    ['ghostty-webgpu', 'xterm-webgl'].map((variant) => {
+      const value =
+        variant === 'ghostty-webgpu' ? [1, 10, 100][repetition] : [2, 100, 101][repetition]
+      const cpu = {
+        percentOfOneCore: value,
+        secondsByType: { renderer: value / 100 },
+        milliseconds: 1000,
+      }
+      return {
+        variant,
+        repetition,
+        pairId: `session/${repetition}`,
+        sessionId: 'browser-session',
+        path: 'bytes',
+        count: 1,
+        latency: { input: [value, value], write: [value, value] },
+        idle: { cpu },
+        output: { cpu },
+      }
+    }),
+  )
+  return {
+    runs,
+    variants: ['ghostty-webgpu', 'xterm-webgl'],
+    paths: ['bytes'],
+    counts: [1],
+    repetitions: 3,
+    hardware: true,
+    environment: {},
+    manifest: {
+      versions: {},
+      settings: { counts: [1] },
+      variants: [{ id: 'ghostty-webgpu' }, { id: 'xterm-webgl' }],
+    },
+  }
+}
+
+test('paired ratios use per-repetition divisions, retain absolutes, and accept equality', () => {
+  const artifact = pairedArtifact()
+  const rows = pairedRatios(artifact)
+  assert.equal(rows.length, 7)
+  assert.deepEqual(
+    rows.map(({ metric }) => metric),
+    [
+      'idle/cpu/renderer',
+      'idle/cpu/total',
+      'output/cpu/renderer',
+      'output/cpu/total',
+      'input/p50',
+      'input/p95',
+      'write/p50',
+    ],
+  )
+  for (const row of rows) {
+    assert.equal(row.status, 'pass')
+    assert.equal(row.target, 1)
+    assert.equal(row.median, 0.5)
+    assert.deepEqual(
+      row.pairs.map(({ ratio }) => ratio),
+      [0.5, 0.1, 100 / 101],
+    )
+    assert.equal(row.pairs[1].native, 10)
+    assert.equal(row.pairs[1].xterm, 100)
+  }
+  for (const run of artifact.runs) run.latency.write = [5]
+  assert.equal(pairedRatios(artifact).find(({ metric }) => metric === 'write/p50').status, 'pass')
+})
+
+test('pairing rejects mismatched IDs, repetition, path, count, duplicate and missing partners', () => {
+  for (const change of [
+    (run) => {
+      run.pairId = 'different-session'
+    },
+    (run) => {
+      delete run.pairId
+    },
+    (run) => {
+      run.repetition = 8
+    },
+    (run) => {
+      run.path = 'string'
+    },
+    (run) => {
+      run.count = 8
+    },
+  ]) {
+    const artifact = pairedArtifact()
+    change(artifact.runs[1])
+    const row = pairedRatios(artifact).find(
+      ({ metric, path, count }) => metric === 'write/p50' && path === 'bytes' && count === 1,
+    )
+    assert.equal(row.repetitions, 2)
+    assert.equal(row.status, 'incomplete')
+  }
+  for (const duplicate of [true, false]) {
+    const artifact = pairedArtifact()
+    if (duplicate) artifact.runs.push(structuredClone(artifact.runs[1]))
+    if (!duplicate) artifact.runs.splice(1, 1)
+    assert(
+      pairedRatios(artifact).every((row) => row.status === 'incomplete' && row.repetitions === 2),
+    )
+  }
+})
+
+test('GPU-idle rejection excludes the whole run and leaves passing pairs incomplete', () => {
+  const artifact = pairedArtifact()
+  const run = artifact.runs[0]
+  run.gpuIdle = { qualified: false }
+  run.parse = { ascii: { bytes: 1_000_000, milliseconds: 10, validation: { qualified: true } } }
+  assert.deepEqual(summaries({ runs: [run] }), [])
+  assert(
+    pairedRatios(artifact).every((row) => row.status === 'incomplete' && row.repetitions === 2),
+  )
+  run.gpuIdle.qualified = true
+  assert(pairedRatios(artifact).every((row) => row.status === 'pass'))
+})
+
+test('missing CPU attribution and missing latency affect only their own metric', () => {
+  const artifact = pairedArtifact()
+  delete artifact.runs[0].idle.cpu.secondsByType
+  delete artifact.runs[0].latency.input
+  const rows = pairedRatios(artifact)
+  assert.equal(rows.find(({ metric }) => metric === 'idle/cpu/renderer').status, 'incomplete')
+  assert.equal(rows.find(({ metric }) => metric === 'input/p50').status, 'incomplete')
+  assert.equal(rows.find(({ metric }) => metric === 'input/p95').status, 'incomplete')
+  assert.equal(rows.find(({ metric }) => metric === 'idle/cpu/total').status, 'pass')
+  assert.equal(rows.find(({ metric }) => metric === 'write/p50').status, 'pass')
+})
+
+test('zero baseline is a tie only at zero and positive work fails against zero', () => {
+  const artifact = pairedArtifact()
+  for (const run of artifact.runs) run.latency.write = [0]
+  let row = pairedRatios(artifact).find(({ metric }) => metric === 'write/p50')
+  assert.equal(row.median, 1)
+  assert.equal(row.status, 'pass')
+  for (const run of artifact.runs.filter(({ variant }) => variant === 'ghostty-webgpu'))
+    run.latency.write = [1]
+  row = pairedRatios(artifact).find(({ metric }) => metric === 'write/p50')
+  assert.equal(row.median, Infinity)
+  assert.equal(row.status, 'fail')
+  artifact.runs[0].error = 'failed'
+  assert(pairedRatios(artifact).every((entry) => entry.status === 'incomplete'))
+})
+
+test('paired report exposes each condition status, median and individual ratio', () => {
+  const artifact = pairedArtifact()
+  artifact.runs[0].gpuIdle = { qualified: false }
+  const report = markdown(artifact)
+  assert(report.includes('## Paired pass rule'))
+  assert(report.includes('| 1 | bytes | xterm-webgl | write/p50 | 0.55 | ≤ 1 | 2/3 | incomplete |'))
+  assert(report.includes('| session/1 | 2 | 10.00 ms | 100.00 ms | 0.10 |'))
+})
+
+test('selected configuration retains wholly missing conditions as incomplete', () => {
+  const artifact = pairedArtifact()
+  artifact.variants = ['ghostty-webgpu', 'xterm-webgl']
+  artifact.paths = ['bytes', 'string']
+  artifact.counts = [1, 8]
+  const rows = pairedRatios(artifact)
+  assert.equal(rows.length, 28)
+  assert(
+    rows
+      .filter(({ path, count }) => path === 'string' || count === 8)
+      .every(
+        ({ status, repetitions, median }) =>
+          status === 'incomplete' && repetitions === 0 && median === null,
+      ),
+  )
+  artifact.runs = []
+  assert.equal(pairedRatios(artifact).length, 28)
+  assert(pairedRatios(artifact).every(({ status }) => status === 'incomplete'))
+})
+
+test('artifacts without explicit selected configuration skip paired evaluation', () => {
+  for (const field of ['variants', 'paths', 'counts']) {
+    const artifact = pairedArtifact()
+    delete artifact[field]
+    assert.deepEqual(pairedRatios(artifact), [])
+    assert(
+      markdown(artifact).includes(
+        'This artifact predates the selected variants, paths, or counts fields. Paired evaluation is skipped.',
+      ),
+    )
+  }
+})
+
+test('matching pair IDs in distinct browser sessions cannot become a performance pair', () => {
+  const artifact = pairedArtifact()
+  artifact.runs.find((run) => run.variant === 'xterm-webgl').sessionId = 'another-browser'
+  assert(
+    pairedRatios(artifact).every((row) => row.status === 'incomplete' && row.repetitions === 2),
+  )
 })
