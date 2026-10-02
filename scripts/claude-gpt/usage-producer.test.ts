@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createUsageProducer } from './usage-producer'
-import { configuredAccounts, createUsageSnapshot } from './usage-feed'
+import { configuredAccounts, createUsageSnapshot, type UsageSnapshot } from './usage-feed'
 
 const observedAt = '2026-10-02T18:00:00.000Z'
 const cachedBody = {
@@ -82,6 +82,96 @@ test('only cached management GET is called; failures/restart retain sanitized ob
     await rm(paths.directory, { recursive: true, force: true })
   }
 })
+
+test.each([300, 0])(
+  'publishes cached Codex windows (%i minutes) for active and disabled credentials',
+  async (minutes) => {
+    const paths = await fixture()
+    const signals = {
+      'X-Codex-Primary-Used-Percent': '23',
+      'X-Codex-Primary-Window-Minutes': '10080',
+      'X-Codex-Primary-Reset-At': String(Date.parse('2026-10-09T15:00:00Z') / 1000),
+      'X-Codex-Secondary-Used-Percent': '0',
+      'X-Codex-Secondary-Window-Minutes': String(minutes),
+      'X-Codex-Secondary-Reset-After-Seconds': minutes ? '7200' : '0',
+    }
+    const quota = { observed_at: observedAt, signals }
+    const body = {
+      observed_at: '2026-10-02T18:10:00.000Z',
+      files: [
+        {
+          provider: 'codex',
+          label: 'shaul.lavochkin',
+          status: 'active',
+          disabled: false,
+          unavailable: false,
+          quota,
+          model_quotas: { 'gpt-6.1-sol': quota },
+          cooldowns: [],
+        },
+        {
+          provider: 'codex',
+          label: 'shaul9191',
+          status: 'disabled',
+          disabled: true,
+          quota: {
+            observed_at: observedAt,
+            signals: { ...signals, 'X-Codex-Primary-Used-Percent': '100' },
+          },
+          cooldowns: [],
+        },
+      ],
+    }
+    const producer = await createUsageProducer({
+      ...paths,
+      proxyUrl: 'http://127.0.0.1:18317',
+      now: () => Date.parse(body.observed_at),
+      fetcher: async () => Response.json(body),
+    })
+    try {
+      expect(await producer.poll()).toBe(true)
+      const snapshot: UsageSnapshot = JSON.parse(
+        await readFile(join(paths.feedDirectory, 'v1.json'), 'utf8'),
+      )
+      const active = snapshot.accounts[2]!
+      expect(active.windows).toHaveLength(4)
+      const windowId = minutes ? 'five_hour' : 'secondary'
+      const shortWindow = {
+        id: windowId,
+        label: minutes ? '5h' : 'Quota',
+        windowMinutes: minutes || null,
+        usedPercent: 0,
+        resetsAt: minutes ? '2026-10-02T20:00:00.000Z' : null,
+        lastSeenAt: observedAt,
+      }
+      expect(active.windows.find(({ id }) => id === windowId)).toMatchObject(shortWindow)
+      expect(active.windows.find(({ id }) => id === 'weekly')).toMatchObject({
+        label: 'Weekly',
+        windowMinutes: 10080,
+        usedPercent: 23,
+        resetsAt: '2026-10-09T15:00:00.000Z',
+      })
+      expect(active.windows.find(({ id }) => id === `model:gpt-6.1-sol:${windowId}`)).toMatchObject(
+        {
+          ...shortWindow,
+          id: `model:gpt-6.1-sol:${windowId}`,
+          label: `model gpt-6.1-sol ${shortWindow.label}`,
+        },
+      )
+      expect(active.windows.find(({ id }) => id === 'model:gpt-6.1-sol:weekly')).toMatchObject({
+        windowMinutes: 10080,
+      })
+      expect(snapshot.accounts[1]).toMatchObject({ state: 'disabled', routing: { active: false } })
+      expect(snapshot.accounts[1]!.windows).toHaveLength(2)
+      expect(snapshot.accounts[1]!.windows.find(({ id }) => id === 'weekly')).toMatchObject({
+        usedPercent: 100,
+      })
+    } finally {
+      await producer.stop()
+      await rm(paths.directory, { recursive: true, force: true })
+    }
+  },
+)
 
 test('serialized sampler cancels shutdown and does not issue overlapping polls or readiness requests', async () => {
   const paths = await fixture()

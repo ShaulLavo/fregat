@@ -59,41 +59,53 @@ test('known Claude Max and both Codex Pro accounts exist before traffic', () => 
   }
 })
 
-test('duration identifies swapped primary Weekly and secondary 5h; reset uses observation time', () => {
-  const snapshot = normalizeProxySnapshot(
-    proxyBody(),
-    createUsageSnapshot(configuredAccounts, checked),
-    checked,
-  )!
-  const account = snapshot.accounts[1]!
-  expect(account).toMatchObject({
-    plan: 'pro',
-    checkedAt: checked,
-    lastSeenAt: seen,
-    state: 'ready',
-    routing: { mode: 'rotating', active: true, lastServedAt: null },
-  })
-  expect(account.windows.map(({ id }) => id)).toEqual(['five_hour', 'weekly'])
-  expect(account.windows.find(({ id }) => id === 'weekly')).toMatchObject({
-    label: 'Weekly',
-    usedPercent: 35,
-    windowMinutes: 10080,
-    resetsAt: '2026-10-02T19:00:00.000Z',
-    lastSeenAt: seen,
-  })
-  expect(account.windows.find(({ id }) => id === 'five_hour')).toMatchObject({
-    label: '5h',
-    usedPercent: 80,
-    windowMinutes: 300,
-    status: 'warning',
-  })
-  const polled = normalizeProxySnapshot(proxyBody(), snapshot, later)!
-  expect(polled.accounts[1]!.lastSeenAt).toBe(seen)
-  expect(polled.accounts[1]!.windows).toEqual(account.windows)
-  expect(JSON.stringify(snapshot)).not.toMatch(
-    /example.invalid|private-|credentials|X-Codex|recent_requests/,
-  )
-})
+test.each(['primary', 'secondary'])(
+  'duration identifies Weekly in %s; reset uses observation time',
+  (weeklyPosition) => {
+    const shortPosition = weeklyPosition === 'primary' ? 'secondary' : 'primary'
+    const body = proxyBody({
+      [`X-Codex-${weeklyPosition}-Window-Minutes`]: '10080',
+      [`X-Codex-${weeklyPosition}-Used-Percent`]: '35',
+      [`X-Codex-${weeklyPosition}-Reset-After-Seconds`]: '3600',
+      [`X-Codex-${shortPosition}-Window-Minutes`]: '300',
+      [`X-Codex-${shortPosition}-Used-Percent`]: '80',
+      [`X-Codex-${shortPosition}-Reset-At`]: '1790967600',
+    })
+    const snapshot = normalizeProxySnapshot(
+      body,
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    const account = snapshot.accounts[1]!
+    expect(account).toMatchObject({
+      plan: 'pro',
+      checkedAt: checked,
+      lastSeenAt: seen,
+      state: 'ready',
+      routing: { mode: 'rotating', active: true, lastServedAt: null },
+    })
+    expect(account.windows.map(({ id }) => id)).toEqual(['five_hour', 'weekly'])
+    expect(account.windows.find(({ id }) => id === 'weekly')).toMatchObject({
+      label: 'Weekly',
+      usedPercent: 35,
+      windowMinutes: 10080,
+      resetsAt: '2026-10-02T19:00:00.000Z',
+      lastSeenAt: seen,
+    })
+    expect(account.windows.find(({ id }) => id === 'five_hour')).toMatchObject({
+      label: '5h',
+      usedPercent: 80,
+      windowMinutes: 300,
+      status: 'warning',
+    })
+    const polled = normalizeProxySnapshot(body, snapshot, later)!
+    expect(polled.accounts[1]!.lastSeenAt).toBe(seen)
+    expect(polled.accounts[1]!.windows).toEqual(account.windows)
+    expect(JSON.stringify(snapshot)).not.toMatch(
+      /example.invalid|private-|credentials|X-Codex|recent_requests/,
+    )
+  },
+)
 
 test('matches approved local-part labels, ignores unknown accounts and ambiguous duplicates', () => {
   const body = proxyBody()
@@ -140,6 +152,7 @@ test('model quota owns its age; unfamiliar duration remains distinct and no sign
   expect(
     snapshot.accounts[1]!.windows.find(({ id }) => id === 'model:gpt-6.1-sol:primary'),
   ).toMatchObject({
+    label: 'model gpt-6.1-sol 120m',
     windowMinutes: 120,
     lastSeenAt: '2026-10-02T17:00:00.000Z',
     resetsAt: '2026-10-02T17:30:00.000Z',
@@ -171,11 +184,70 @@ test('invalid numeric signals stay unknown; missing duration never implies five 
   )!
   expect(missingLength.accounts[1]!.windows[0]).toMatchObject({
     id: 'primary',
+    label: 'Quota',
     usedPercent: 12,
     windowMinutes: null,
     resetsAt: null,
   })
 })
+
+test.each([
+  { minutes: undefined, resetAt: undefined },
+  { minutes: '0', resetAt: undefined },
+  { minutes: undefined, resetAt: '0' },
+  { minutes: '0', resetAt: '0' },
+])(
+  'unknown duration/reset signals ($minutes, $resetAt) do not invent a reset at observation time',
+  ({ minutes, resetAt }) => {
+    const signals: Record<string, string> = {
+      'X-Codex-Secondary-Used-Percent': '0',
+      'X-Codex-Secondary-Reset-After-Seconds': '0',
+    }
+    if (minutes !== undefined) signals['X-Codex-Secondary-Window-Minutes'] = minutes
+    if (resetAt !== undefined) signals['X-Codex-Secondary-Reset-At'] = resetAt
+    const snapshot = normalizeProxySnapshot(
+      proxyBody(signals),
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    expect(snapshot.accounts[1]!.windows).toEqual([
+      {
+        id: 'secondary',
+        label: 'Quota',
+        usedPercent: 0,
+        windowMinutes: null,
+        resetsAt: null,
+        status: 'allowed',
+        lastSeenAt: seen,
+        source: 'proxy-state',
+      },
+    ])
+  },
+)
+
+test.each([
+  { minutes: '300', resetAt: undefined, seconds: '0', expected: seen },
+  { minutes: '300', resetAt: '1790967600', seconds: '0', expected: '2026-10-02T19:00:00.000Z' },
+  { minutes: undefined, resetAt: '1790967600', seconds: '0', expected: '2026-10-02T19:00:00.000Z' },
+  { minutes: undefined, resetAt: '0', seconds: '3600', expected: '2026-10-02T19:00:00.000Z' },
+  { minutes: undefined, resetAt: undefined, seconds: '3600', expected: '2026-10-02T19:00:00.000Z' },
+])(
+  'Codex reset evidence stays independent of duration ($minutes, $resetAt, $seconds)',
+  ({ minutes, resetAt, seconds, expected }) => {
+    const signals: Record<string, string> = {
+      'X-Codex-Primary-Used-Percent': '0',
+      'X-Codex-Primary-Reset-After-Seconds': seconds,
+    }
+    if (minutes !== undefined) signals['X-Codex-Primary-Window-Minutes'] = minutes
+    if (resetAt !== undefined) signals['X-Codex-Primary-Reset-At'] = resetAt
+    const snapshot = normalizeProxySnapshot(
+      proxyBody(signals),
+      createUsageSnapshot(configuredAccounts, checked),
+      checked,
+    )!
+    expect(snapshot.accounts[1]!.windows[0]!.resetsAt).toBe(expected)
+  },
+)
 
 test('generic cooldown never invents percentages; model restrictions do not become account cooldown', () => {
   const body = {

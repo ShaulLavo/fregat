@@ -207,7 +207,15 @@ function lowerSignals(signals: Signals) {
 function slot(minutes: number | null, position: string) {
   if (minutes === 300) return { id: 'five_hour', label: '5h' }
   if (minutes === 10080) return { id: 'weekly', label: 'Weekly' }
-  return { id: position, label: position === 'primary' ? 'Primary' : 'Secondary' }
+  return { id: position, label: minutes === null ? 'Quota' : `${minutes}m` }
+}
+function codexReset(signals: Signals, key: string, observedAt: string, minutes: number | null) {
+  const absolute = reset(signals[`${key}-reset-at`])
+  if (absolute && Date.parse(absolute) > 0) return absolute
+  const seconds = number(signals[`${key}-reset-after-seconds`], 0, 31536000)
+  // A zero relative reset cannot establish a deadline for an unidentified window.
+  if (seconds === null || (seconds === 0 && minutes === null)) return null
+  return relativeReset(String(seconds), observedAt)
 }
 function codexWindow(
   signals: Signals,
@@ -217,10 +225,8 @@ function codexWindow(
 ): Window | null {
   const key = `${prefix}-${position}`
   const usedPercent = number(signals[`${key}-used-percent`], 0, 100)
-  const resetsAt =
-    reset(signals[`${key}-reset-at`]) ??
-    relativeReset(signals[`${key}-reset-after-seconds`], observedAt)
   const windowMinutes = number(signals[`${key}-window-minutes`], 1, 525600)
+  const resetsAt = codexReset(signals, key, observedAt, windowMinutes)
   const statusValue = signals[`${key}-limit-reached`] === 'true' ? 'exhausted' : undefined
   if (usedPercent === null && resetsAt === null && statusValue === undefined) return null
   return {
