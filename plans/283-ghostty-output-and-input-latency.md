@@ -47,6 +47,24 @@ whole renderer on an `OffscreenCanvas`) so huge output never blocks the page. It
 another core without reducing it, needs cross-origin isolation and a threads build of Ghostty, and
 can add a hop to input; consider it only if a huge-output scenario shows the main thread blocked.
 
+## Every renderer gets the same treatment
+
+Owner, 2026-10-02: ghostty-webgpu is on a performance mission, and every renderer it ships is tuned
+like the main WebGPU path: WebGPU, WebGL, Canvas 2D and DOM (`src/render/`). Each is measured
+against its closest counterpart in the same session:
+
+| Ours      | Counterpart            | Note                                 |
+| --------- | ---------------------- | ------------------------------------ |
+| WebGPU    | xterm WebGL            | xterm.js has no WebGPU renderer      |
+| WebGL     | xterm WebGL            | like with like                       |
+| Canvas 2D | ghostty-web (canvas2d) | xterm.js removed its canvas renderer |
+| DOM       | xterm DOM              | like with like                       |
+
+Target: each of ours at or below its counterpart. The open question for WebGPU is whether its
+remaining gap at 17 terminals (GPU-process CPU about 2.5× xterm's) is the cost of presenting a
+WebGPU canvas on this Linux setup (Dawn on Vulkan, compositor on GL, no Vulkan–GL interop), or
+something our renderers do. Comparing our WebGL with xterm's WebGL answers it.
+
 ## Why the M1 targets changed
 
 The Apple M1 numbers below are history. Two measured defects made them unreliable:
