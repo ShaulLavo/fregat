@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#import <QuartzCore/QuartzCore.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <stdio.h>
@@ -302,6 +303,9 @@ int main(int argc, char **argv) {
     if (vibrant) {
       window.opaque = NO;
       window.backgroundColor = NSColor.clearColor;
+      window.contentView.wantsLayer = YES;
+      window.contentView.layer.opaque = NO;
+      window.contentView.layer.backgroundColor = NSColor.clearColor.CGColor;
       NSVisualEffectView *effect = [[NSVisualEffectView alloc] initWithFrame:window.contentView.bounds];
       effect.material = NSVisualEffectMaterialUnderWindowBackground;
       effect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
@@ -321,8 +325,11 @@ int main(int argc, char **argv) {
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     if (@available(macOS 13.3, *)) view.inspectable = YES;
     if (vibrant) {
+      // Clearing WebKit's background can leave its root layer's initial opaque hint.
       [view setValue:@NO forKey:@"drawsBackground"];
       if (@available(macOS 12.0, *)) view.underPageBackgroundColor = NSColor.clearColor;
+      view.layer.opaque = NO;
+      view.layer.backgroundColor = NSColor.clearColor.CGColor;
     }
     [window.contentView addSubview:view];
     __weak PlatformHost *weakHost = host;

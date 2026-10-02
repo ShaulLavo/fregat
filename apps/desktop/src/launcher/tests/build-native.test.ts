@@ -61,6 +61,28 @@ test('macOS publishes actual fullscreen state to the app document', async () => 
   expect(mac).toMatch(/windowDidExitFullScreen:[\s\S]*?\[self publishWindowState\]/)
 })
 
+test('macOS clears content and WebKit root layer opacity only in vibrant mode', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('#import <QuartzCore/QuartzCore.h>')
+  const vibrantBlocks = [...mac.matchAll(/if \(vibrant\) \{([\s\S]*?)\n    \}/g)]
+  expect(vibrantBlocks).toHaveLength(2)
+  expect(vibrantBlocks[0]?.[1]).toMatch(
+    /window\.opaque = NO;[\s\S]*?window\.contentView\.wantsLayer = YES;\s*window\.contentView\.layer\.opaque = NO;\s*window\.contentView\.layer\.backgroundColor = NSColor\.clearColor\.CGColor;/,
+  )
+  expect(vibrantBlocks[1]?.[1]).toMatch(
+    /\[view setValue:@NO forKey:@"drawsBackground"\];\s*if \(@available\(macOS 12\.0, \*\)\) view\.underPageBackgroundColor = NSColor\.clearColor;\s*view\.layer\.opaque = NO;\s*view\.layer\.backgroundColor = NSColor\.clearColor\.CGColor;/,
+  )
+  for (const statement of [
+    'window.contentView.wantsLayer = YES;',
+    'window.contentView.layer.opaque = NO;',
+    'window.contentView.layer.backgroundColor = NSColor.clearColor.CGColor;',
+    'view.layer.opaque = NO;',
+    'view.layer.backgroundColor = NSColor.clearColor.CGColor;',
+  ]) {
+    expect(mac.split(statement)).toHaveLength(2)
+  }
+})
+
 test('macOS host getters and methods avoid implicit ARC ownership families', async () => {
   const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
   const properties = mac.matchAll(/@property\([^)]*\)[^;]*?\b([A-Za-z_]\w*)\s*;/g)
