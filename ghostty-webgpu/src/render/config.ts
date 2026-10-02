@@ -5,6 +5,7 @@ import {
   type RendererTheme,
 } from './instances/types.js'
 import type { RenderSchedulerClock } from './scheduler.js'
+import { SharedRenderClock } from './shared-clock.js'
 
 export interface RendererGridInput {
   readonly columns: number
@@ -42,13 +43,19 @@ function fontSettingsEqual(left: TerminalFittedFont, right: TerminalFittedFont):
   )
 }
 
+const browserClocks = new WeakMap<Window, RenderSchedulerClock>()
+
 export function browserRenderClock(): RenderSchedulerClock {
-  return {
+  const cached = browserClocks.get(window)
+  if (cached) return cached
+  const clock = new SharedRenderClock({
     cancelFrame: (handle) => window.cancelAnimationFrame(handle),
     clearTimer: (handle) => window.clearTimeout(handle),
     requestFrame: (callback) => window.requestAnimationFrame(callback),
     setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
-  }
+  })
+  browserClocks.set(window, clock)
+  return clock
 }
 
 export function copyFittedFont(font: TerminalFittedFont): TerminalFittedFont {

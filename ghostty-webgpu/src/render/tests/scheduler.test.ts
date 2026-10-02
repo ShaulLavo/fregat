@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { browserRenderClock } from '../config.js'
 import { RenderScheduler, type RenderFrameState, type RenderSchedulerClock } from '../scheduler.js'
+import { SharedRenderClock } from '../shared-clock.js'
 
 class FakeClock implements RenderSchedulerClock {
   private nextHandle = 1
@@ -45,7 +47,7 @@ class FakeClock implements RenderSchedulerClock {
   }
 }
 
-function createScheduler(clock: FakeClock, frames: RenderFrameState[]): RenderScheduler {
+function createScheduler(clock: RenderSchedulerClock, frames: RenderFrameState[]): RenderScheduler {
   return new RenderScheduler({
     blinkIntervalMs: 500,
     clock,
@@ -172,5 +174,227 @@ describe('RenderScheduler', () => {
     expect(clock.timers).toHaveLength(0)
     expect(scheduler.hasPendingFrame).toBe(false)
     expect(scheduler.hasPendingTimer).toBe(false)
+  })
+})
+
+describe('SharedRenderClock', () => {
+  it('delivers seventeen pending terminals through one frame and stays idle afterward', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: RenderFrameState[] = []
+    const schedulers = Array.from({ length: 17 }, () => createScheduler(clock, frames))
+    for (const scheduler of schedulers) {
+      scheduler.schedule()
+      scheduler.schedule()
+    }
+
+    expect(source.frames).toHaveLength(1)
+    source.takeFrame()()
+    expect(frames).toHaveLength(17)
+    expect(schedulers.every((scheduler) => !scheduler.hasPendingFrame)).toBe(true)
+    expect(source.frames).toHaveLength(0)
+  })
+
+  it('keeps synchronous flush and disposal independent of the remaining terminals', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: RenderFrameState[] = []
+    const first = createScheduler(clock, frames)
+    const second = createScheduler(clock, frames)
+    first.schedule()
+    second.schedule()
+    first.flush()
+    first.dispose()
+
+    expect(frames).toHaveLength(1)
+    expect(source.frames).toHaveLength(1)
+    source.takeFrame()()
+    expect(frames).toHaveLength(2)
+    second.schedule()
+    second.dispose()
+    expect(source.frames).toHaveLength(0)
+  })
+
+  it('removes a peer disposed during delivery and defers newly scheduled work', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: string[] = []
+    const removed = new RenderScheduler({ clock, onFrame: () => frames.push('removed') })
+    const next = new RenderScheduler({ clock, onFrame: () => frames.push('next') })
+    const first = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        frames.push('first')
+        removed.dispose()
+        next.schedule()
+      },
+    })
+    first.schedule()
+    removed.schedule()
+    source.takeFrame()()
+    expect(frames).toEqual(['first'])
+    expect(source.frames).toHaveLength(1)
+    source.takeFrame()()
+    expect(frames).toEqual(['first', 'next'])
+    expect(source.frames).toHaveLength(0)
+  })
+
+  it('flushes a peer mid-frame without delivering its queued callback again', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: string[] = []
+    const peer = new RenderScheduler({ clock, onFrame: () => frames.push('peer') })
+    const first = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        frames.push('first')
+        peer.flush()
+        peer.schedule()
+      },
+    })
+    first.schedule()
+    peer.schedule()
+    source.takeFrame()()
+    expect(frames).toEqual(['first', 'peer'])
+    expect(source.frames).toHaveLength(1)
+    source.takeFrame()()
+    expect(frames).toEqual(['first', 'peer', 'peer'])
+  })
+
+  it('moves self-scheduled work to the next frame and coalesces an already pending peer', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: string[] = []
+    const peer = new RenderScheduler({ clock, onFrame: () => frames.push('peer') })
+    const first = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        frames.push('first')
+        first.schedule()
+        peer.schedule()
+      },
+    })
+    first.schedule()
+    peer.schedule()
+    source.takeFrame()()
+    expect(frames).toEqual(['first', 'peer'])
+    expect(source.frames).toHaveLength(1)
+    first.dispose()
+    expect(source.frames).toHaveLength(0)
+  })
+
+  it('ignores a canceled native callback after new work has joined the clock', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: RenderFrameState[] = []
+    const scheduler = createScheduler(clock, frames)
+    scheduler.schedule()
+    const stale = source.takeFrame()
+    scheduler.setDocumentVisible(false)
+    scheduler.setDocumentVisible(true)
+    stale()
+    expect(frames).toHaveLength(0)
+    expect(source.frames).toHaveLength(1)
+    source.takeFrame()()
+    expect(frames).toHaveLength(1)
+  })
+
+  it('cancels hidden-document frames and blink timers, then resumes one shared frame', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: RenderFrameState[] = []
+    const schedulers = Array.from({ length: 3 }, () => createScheduler(clock, frames))
+    for (const scheduler of schedulers) {
+      scheduler.setFocused(true)
+      scheduler.setCursorBlinkEnabled(true)
+    }
+    expect(source.timers).toHaveLength(3)
+    source.takeFrame()()
+    source.takeTimer()()
+    expect(schedulers[0]!.cursorVisible).toBe(false)
+    for (const scheduler of schedulers) scheduler.setDocumentVisible(false)
+    expect(source.frames).toHaveLength(0)
+    expect(source.timers).toHaveLength(0)
+    for (const scheduler of schedulers) {
+      scheduler.schedule()
+      scheduler.flush()
+    }
+    expect(frames).toHaveLength(3)
+    for (const scheduler of schedulers) scheduler.setDocumentVisible(true)
+    expect(source.frames).toHaveLength(1)
+    source.takeFrame()()
+    expect(frames.slice(3)).toEqual(Array.from({ length: 3 }, () => ({ cursorVisible: true })))
+    for (const scheduler of schedulers) scheduler.dispose()
+    expect(source.timers).toHaveLength(0)
+  })
+
+  it('removes hidden peers from the running frame', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: string[] = []
+    const peer = new RenderScheduler({ clock, onFrame: () => frames.push('peer') })
+    const first = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        frames.push('first')
+        peer.setDocumentVisible(false)
+      },
+    })
+    first.schedule()
+    peer.schedule()
+    source.takeFrame()()
+    expect(frames).toEqual(['first'])
+    expect(peer.hasPendingFrame).toBe(false)
+    expect(source.frames).toHaveLength(0)
+  })
+
+  it('reports a callback failure without stranding its peers or the next frame', () => {
+    const source = new FakeClock()
+    const clock = new SharedRenderClock(source)
+    const frames: RenderFrameState[] = []
+    const error = new Error('callback failure')
+    const reported: VoidFunction[] = []
+    const report = vi
+      .spyOn(globalThis, 'queueMicrotask')
+      .mockImplementation((fn) => reported.push(fn))
+    try {
+      const failed = new RenderScheduler({
+        clock,
+        onFrame: () => {
+          throw error
+        },
+      })
+      const peer = createScheduler(clock, frames)
+      failed.schedule()
+      peer.schedule()
+      source.takeFrame()()
+      expect(frames).toHaveLength(1)
+      expect(reported).toHaveLength(1)
+      expect(reported[0]).toThrow(error)
+      peer.schedule()
+      source.takeFrame()()
+      expect(frames).toHaveLength(2)
+    } finally {
+      report.mockRestore()
+    }
+  })
+
+  it('uses the same default clock for a Window and isolates other Windows', () => {
+    const firstWindow = {
+      cancelAnimationFrame: vi.fn(),
+      clearTimeout: vi.fn(),
+      requestAnimationFrame: vi.fn(() => 1),
+      setTimeout: vi.fn(() => 1),
+    }
+    const secondWindow = { ...firstWindow }
+    vi.stubGlobal('window', firstWindow)
+    try {
+      const first = browserRenderClock()
+      expect(browserRenderClock()).toBe(first)
+      vi.stubGlobal('window', secondWindow)
+      expect(browserRenderClock()).not.toBe(first)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
