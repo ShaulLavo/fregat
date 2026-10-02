@@ -1181,3 +1181,9 @@ export {
 } from './native-picker'
 
 export { providerUsageFeedSchema, type ProviderUsageFeed } from './provider-usage-feed'
+export {
+  providerUsageHistoryCoverageSchema,
+  providerUsageHistorySourceSchema,
+  type ProviderUsageHistoryCoverage,
+  type ProviderUsageHistorySource,
+} from './provider-usage-history'
