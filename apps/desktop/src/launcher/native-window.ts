@@ -18,29 +18,47 @@ export async function launchWebview(options: {
   signal?: AbortSignal
   budget: NativeBudget
   startup: StartupBudget
+  platform?: NodeJS.Platform
+  vibrancy?: boolean
   initialScript?: string
   spawn?: HostSpawn
   onMessage?(body: unknown): void
   onOpen(context: Record<string, unknown>): void
 }) {
+  const platform = options.platform ?? process.platform
+  const vibrancy = platform === 'darwin' && options.vibrancy === true
   const directory = mkdtempSync(path.join(tmpdir(), 'platform-webview-'))
   const script = path.join(directory, 'init.js')
   const token = randomUUID()
   writeFileSync(
     script,
-    (options.initialScript ?? '') + '\n' + shellBridge(options.url, 'webkitgtk', token),
+    (options.initialScript ?? '') +
+      '\n' +
+      shellBridge(
+        options.url,
+        platform === 'darwin' ? 'wkwebview' : 'webkitgtk',
+        token,
+        platform,
+        vibrancy,
+      ),
     { mode: 0o600 },
   )
   let host: WebviewHost
   try {
     host = new WebviewHost({
       ...options,
+      platform,
+      vibrancy,
       initScriptPath: script,
       recordOpen: options.onOpen,
       cleanupOwnedWindow: () => rmSync(directory, { recursive: true, force: true }),
       onEvent: (event) => {
         if (event.event === 'message') options.onMessage?.(event.body)
         if (event.event !== 'message' || !isRecord(event.body) || event.body.token !== token) return
+        if (event.body.method === 'drag' && event.body.origin === new URL(options.url).origin) {
+          host.drag()
+          return
+        }
         const request = parsePickRequest(event.body, new URL(options.url).origin)
         if (!request) return
         void completePick(request.id, request.documentId, host.pick(request.options), reply)

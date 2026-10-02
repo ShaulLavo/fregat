@@ -50,7 +50,9 @@ test('frames split and coalesced JSON lines, writes escaped eval, and records fr
   host.evaluate('console.log("a\\nb")')
   expect(JSON.parse(fake.commands[0]!)).toEqual({ eval: 'console.log("a\\nb")' })
   await tick()
-  expect(records).toEqual([{ engine: 'webkitgtk', rafPerSecond: 61 }])
+  expect(records).toEqual([
+    { engine: process.platform === 'darwin' ? 'wkwebview' : 'webkitgtk', rafPerSecond: 61 },
+  ])
   expect(host.capabilities.displayCapture).toBe(false)
   host.close()
   host.close()

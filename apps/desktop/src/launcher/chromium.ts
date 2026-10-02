@@ -1,3 +1,4 @@
+import { closeLastMacPage } from './mac-lifecycle'
 import { mkdirSync } from 'node:fs'
 import type { BrowserCandidate } from './browser'
 import { CdpClient, cdpPipe, type CdpEvent } from './cdp'
@@ -9,7 +10,7 @@ import {
   browserDiagnostics,
   browserProcessFacts,
   drainBrowserDiagnostics,
-  processCounters,
+  startupProcessCounters,
 } from './diagnostics'
 import { startupSupervisor, type StartupBudget, type StartupCounters } from './startup'
 import type { PlatformPickOptions } from '../shared/bridge'
@@ -250,6 +251,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
       internal: {
         reason,
         startupPhase,
+        startupObservation: process.platform === 'linux' ? 'process-and-cdp' : 'cdp-only',
         spawnMs,
         waitedMs: Math.round(supervisor.elapsedMs()),
         ...diagnostics.snapshot(),
@@ -273,7 +275,7 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
         })
     },
   }
-  const observe = options.observe ?? ((pid: number) => processCounters(pid))
+  const observe = options.observe ?? ((pid: number) => startupProcessCounters(pid))
   const startupMonitor = setInterval(
     () => {
       const verdict = supervisor.check({
@@ -335,6 +337,11 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     connected = true
     startupPhase = 'attach'
     assertChromiumVersion(first.version.product)
+    if (process.platform === 'darwin')
+      closeLastMacPage(cdp, (error) => {
+        options.onFailure(error)
+        void close()
+      })
     await attachChromium(
       startupCdp,
       options.url,

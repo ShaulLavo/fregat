@@ -36,12 +36,23 @@ export function parsePickRequest(
     },
   }
 }
-export function shellBridge(url: string, engine: 'chromium' | 'webkitgtk', token?: string): string {
+export function shellBridge(
+  url: string,
+  engine: 'chromium' | 'webkitgtk' | 'wkwebview',
+  token?: string,
+  platform: NodeJS.Platform = process.platform,
+  vibrancy = false,
+): string {
   const bridge: PlatformBridge = {
-    backdrop: 'compositor',
-    platform: 'linux',
+    backdrop:
+      engine === 'wkwebview' && vibrancy
+        ? 'transparent'
+        : platform === 'darwin'
+          ? 'app'
+          : 'compositor',
+    platform: platform === 'darwin' ? 'darwin' : 'linux',
     colorScheme: null,
-    titlebar: 'native',
+    titlebar: engine === 'wkwebview' ? 'overlay' : 'native',
     capabilities: { displayCapture: engine === 'chromium' },
   }
   const transport =
@@ -72,6 +83,11 @@ export function shellBridge(url: string, engine: 'chromium' | 'webkitgtk', token
       catch (error) { pending.delete(id); reject(error); }
     });
     addEventListener('pagehide', () => { for (const request of pending.values()) request.reject(new DOMException('The window closed.', 'AbortError')); pending.clear(); }, { once: true });
+    if (bridge.titlebar === 'overlay') addEventListener('mousedown', event => {
+      if (event.button !== 0 || !(event.target instanceof Element)) return;
+      if (!event.target.closest('[data-native-window-drag-region]') || event.target.closest('.electrobun-webkit-app-region-no-drag, [data-native-window-no-drag], button, input, textarea, select, a, [role=button], [contenteditable]')) return;
+      send({ method: 'drag', origin: location.origin, token });
+    });
     globalThis.__platformShell = bridge;
     globalThis.platformBridge = bridge;
     const measure = () => setTimeout(() => {

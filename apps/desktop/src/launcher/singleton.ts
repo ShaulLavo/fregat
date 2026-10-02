@@ -1,6 +1,7 @@
 import { readFileSync, readlinkSync, realpathSync } from 'node:fs'
 import { hostname } from 'node:os'
 import path from 'node:path'
+import { runMacCommand, type MacCommand } from './mac-browser'
 
 type SingletonFileSystem = {
   readLink(file: string): string | undefined
@@ -27,8 +28,7 @@ export function hasSingletonOwner(
   executable: string,
   fs: SingletonFileSystem,
 ): boolean {
-  const lock = fs.readLink(path.join(profile, 'SingletonLock'))
-  const pid = lock?.startsWith(host + '-') ? lock.slice(host.length + 1) : undefined
+  const pid = singletonPid(profile, host, fs)
   if (!pid || !/^[1-9]\d*$/.test(pid)) return false
   const selected = fs.realPath(executable)
   const owner = fs.readLink(`/proc/${pid}/exe`)
@@ -50,7 +50,7 @@ export function hasSingletonOwner(
 
 // Chromium arbitrates the singleton; this read-only proof never grants cleanup ownership.
 export function liveSingletonOwner(profile: string, executable: string): boolean {
-  return hasSingletonOwner(profile, hostname(), executable, {
+  const fs: SingletonFileSystem = {
     readLink: (file) => {
       try {
         return readlinkSync(file)
@@ -72,5 +72,30 @@ export function liveSingletonOwner(profile: string, executable: string): boolean
         return undefined
       }
     },
-  })
+  }
+  return process.platform === 'darwin'
+    ? hasMacSingletonOwner(profile, hostname(), executable, fs, runMacCommand)
+    : hasSingletonOwner(profile, hostname(), executable, fs)
+}
+
+function singletonPid(profile: string, host: string, fs: SingletonFileSystem) {
+  const lock = fs.readLink(path.join(profile, 'SingletonLock'))
+  return lock?.startsWith(host + '-') ? lock.slice(host.length + 1) : undefined
+}
+
+export function hasMacSingletonOwner(
+  profile: string,
+  host: string,
+  executable: string,
+  fs: SingletonFileSystem,
+  run: MacCommand,
+): boolean {
+  const pid = singletonPid(profile, host, fs)
+  if (!pid || !/^[1-9]\d*$/.test(pid)) return false
+  const selected = fs.realPath(executable)
+  if (!selected) return false
+  const command = run(['/bin/ps', '-p', pid, '-o', 'command='])?.trim()
+  const signature = ` --user-data-dir=${profile} --profile-directory=Platform --remote-debugging-pipe`
+  if (!command?.startsWith(selected + ' ')) return false
+  return command.includes(signature + ' ') || command.endsWith(signature)
 }

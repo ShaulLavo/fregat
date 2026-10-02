@@ -13,6 +13,20 @@ const busy = (ms) => {
   const until = performance.now() + ms
   while (performance.now() < until);
 }
+if (mode === 'cdp-progress') {
+  setInterval(
+    () =>
+      writeSync(
+        4,
+        JSON.stringify({
+          method: 'Target.targetCreated',
+          params: { targetInfo: { type: 'worker', targetId: 'fixture' } },
+        }) + '\0',
+      ),
+    50,
+  )
+  await Bun.sleep(30_000)
+}
 if (mode === 'progress-forever') while (true) busy(1000)
 if (mode === 'slow-version') busy(6000)
 if (mode === 'silent') {

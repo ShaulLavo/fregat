@@ -15,6 +15,7 @@ export type WebviewCommand =
   | { pick: PlatformPickOptions }
   | { cancelPick: true }
   | { close: true }
+  | { drag: true }
 export type WebviewEvent =
   | { event: 'ready' }
   | { event: 'message'; body: unknown }
@@ -39,6 +40,8 @@ function parseWebviewEvent(line: string): WebviewEvent {
 }
 export type WebviewHostOptions = {
   binary: string
+  platform?: NodeJS.Platform
+  vibrancy?: boolean
   url: string
   initScriptPath: string
   spawn?: HostSpawn
@@ -66,7 +69,12 @@ export class WebviewHost {
     const ready = Promise.withResolvers<void>()
     this.ready = ready.promise
     this.helper = new NativeHelper(
-      [options.binary, options.url, options.initScriptPath],
+      [
+        options.binary,
+        options.url,
+        options.initScriptPath,
+        ...(options.vibrancy ? ['--vibrancy'] : []),
+      ],
       this.budget.stopGraceMs,
       options.signal,
       options.spawn,
@@ -82,6 +90,9 @@ export class WebviewHost {
     this.exited = this.waitForExit(options, ready, reading)
     void this.ready.catch(() => {})
     void this.exited.catch(() => {})
+  }
+  drag() {
+    this.send({ drag: true })
   }
   evaluate(script: string) {
     this.send({ eval: script })
@@ -172,7 +183,10 @@ export class WebviewHost {
     )
       return
     this.recordedOpen = true
-    const context = { engine: 'webkitgtk', rafPerSecond: body.platformHostRaf }
+    const context = {
+      engine: (options.platform ?? process.platform) === 'darwin' ? 'wkwebview' : 'webkitgtk',
+      rafPerSecond: body.platformHostRaf,
+    }
     if (options.recordOpen) options.recordOpen(context)
     else recordDesktopInfo('desktop.window.open', context)
   }
