@@ -37,6 +37,8 @@ async function fixture(mode: string, initialManifest?: string) {
       url: `http://localhost:123/?subject=${subject}`,
       manifest,
       startup: { idleMs: 1000, limitMs: 4000 },
+      // Arbitration is independent of fixture CPU scheduling; startup tests cover idle sampling.
+      observe: () => ({ progress: performance.now() }),
       onOpen: () => {},
     })
   const cleanup = async () => {
