@@ -221,13 +221,32 @@ describe('WASM frame ownership and row bounds', () => {
     const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
     const state = runtime.createRenderState(terminal)
     state.update()
-    const allocate = vi.spyOn(runtime.memory, 'allocate')
+    const memory = runtime.memory
+    const allocate = memory.allocate.bind(memory)
+    const free = memory.free.bind(memory)
+    let maskBase = 0
+    let allocations = 0
+    vi.spyOn(memory, 'allocate').mockImplementation((length) => {
+      allocations += 1
+      if (allocations !== 7) return allocate(length)
+      // Keep both mask-boundary canaries inside a test-owned allocation.
+      maskBase = allocate(length + 2)
+      return maskBase + 1
+    })
+    vi.spyOn(memory, 'free').mockImplementation((pointer, length) => {
+      if (pointer === maskBase + 1) return free(maskBase, length + 2)
+      free(pointer, length)
+    })
     builder = state.createFrameBuilder(8, 2)
-    const mask = allocate.mock.results[6]!.value as number
-    const canary = runtime.memory.allocate(1024)
+    const mask = maskBase + 1
+    const canary = memory.allocate(1024)
     try {
-      runtime.memory.bytes.fill(173, canary, canary + 1024)
-      readyFrame({ ...options, full, overlayRows: new Set([0, canary - mask + 999]) })
+      memory.bytes[mask - 1] = 173
+      memory.bytes[mask + 2] = 173
+      memory.bytes.fill(173, canary, canary + 1024)
+      readyFrame({ ...options, full, overlayRows: new Set([-1, 0, 2, canary - mask + 999]) })
+      expect(memory.bytes[mask - 1]).toBe(173)
+      expect(memory.bytes[mask + 2]).toBe(173)
       expect(runtime.memory.bytes.slice(canary, canary + 1024)).toEqual(
         new Uint8Array(1024).fill(173),
       )
@@ -244,10 +263,18 @@ describe('WASM frame ownership and row bounds', () => {
       const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
       const state = runtime.createRenderState(terminal)
       state.update()
+      const allocate = vi.spyOn(runtime.memory, 'allocate')
       builder = state.createFrameBuilder(8, 2)
+      const expectedFrees = allocate.mock.calls.map(([length], index) => [
+        allocate.mock.results[index]!.value as number,
+        length,
+      ])
+      expect(expectedFrees).toHaveLength(8)
+      const free = vi.spyOn(runtime.memory, 'free')
       if (owner === 'builder') builder.dispose()
       if (owner === 'state') state.dispose()
       if (owner === 'runtime') runtime.dispose()
+      if (owner !== 'builder') free.mockClear()
       const operations = [
         () => builder!.cellData,
         () => builder!.glyphData,
@@ -259,7 +286,8 @@ describe('WASM frame ownership and row bounds', () => {
       ]
       for (const operation of operations) expect(operation).toThrow(/disposed/)
       builder.dispose()
-      const free = vi.spyOn(runtime.memory, 'free')
+      expect(free.mock.calls).toEqual(expectedFrees)
+      free.mockClear()
       builder.dispose()
       expect(free).not.toHaveBeenCalled()
     },

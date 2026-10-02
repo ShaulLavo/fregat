@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 import { RenderStateDirty } from '../../core/abi.js'
+import { createGhosttyError } from '../../core/error.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type {
   ReadRowsOptions,
@@ -992,6 +993,99 @@ it.each(['onFrame', 'onRowsPainted'] as const)(
       clock.flushFrame()
       expect(renderer.metrics.zigFrames).toBe(5)
       expect(onPaint.mock.calls).toHaveLength(5)
+    } finally {
+      renderer.dispose()
+      runtime.dispose()
+    }
+  },
+)
+
+it('recovers after a Zig builder replacement allocation fails', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
+  const state = runtime.createRenderState(terminal)
+  const clock = new FakeClock()
+  terminal.write('first')
+  const renderer = await createRenderer({
+    canvas: new OffscreenCanvas(1, 1),
+    columns: 8,
+    rows: 2,
+    font: fittedFont(),
+    renderState: state,
+    schedulerClock: clock,
+    zigFrame: true,
+  })
+  try {
+    clock.flushFrame()
+    terminal.resize({ columns: 9, rows: 2 })
+    const allocate = runtime.memory.allocate.bind(runtime.memory)
+    const injected = createGhosttyError('ghostty_wasm_alloc', 'Injected allocation failure')
+    let calls = 0
+    const failing = vi.spyOn(runtime.memory, 'allocate').mockImplementation((length) => {
+      calls += 1
+      if (calls === 3) throw injected
+      return allocate(length)
+    })
+    expect(() => renderer.resize({ columns: 9, rows: 2 })).toThrow(injected)
+    failing.mockRestore()
+    expect(() => renderer.clearTextureAtlas()).not.toThrow()
+    terminal.resize({ columns: 8, rows: 2 })
+    renderer.resize({ columns: 8, rows: 2 })
+    expect(renderer.metrics.zigFrames).toBe(2)
+    terminal.resize({ columns: 9, rows: 2 })
+    renderer.resize({ columns: 9, rows: 2 })
+    expect(renderer.metrics.zigFrames).toBe(3)
+  } finally {
+    renderer.dispose()
+    runtime.dispose()
+  }
+})
+
+it.each(['onFrame', 'onRowsPainted'] as const)(
+  'preserves native terminal damage created by a Zig %s callback',
+  async (callback) => {
+    const runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
+    const state = runtime.createRenderState(terminal)
+    const clock = new FakeClock()
+    terminal.write('\x1b[?25lfirst')
+    let write = false
+    const textByRow = new Map<number, string>()
+    const onPaint = (frame: RendererFrameSnapshot | readonly RenderRow[]) => {
+      const rows = 'rows' in frame ? frame.rows : frame
+      for (const row of rows) {
+        const text = 'text' in row ? row.text : row.cells.map((cell) => cell.text).join('')
+        textByRow.set(row.y, text.trimEnd())
+      }
+      if (!write) return
+      write = false
+      terminal.write('\x1b[2;1Hsecond\x1b[1;6H')
+      state.update()
+      renderer.notifyWrite()
+    }
+    const renderer = await createRenderer({
+      canvas: new OffscreenCanvas(1, 1),
+      columns: 8,
+      rows: 2,
+      font: fittedFont(),
+      renderState: state,
+      schedulerClock: clock,
+      zigFrame: true,
+      [callback]: onPaint,
+    })
+    try {
+      clock.flushFrame()
+      expect(textByRow.get(0)).toBe('first')
+      expect(textByRow.get(1)).toBe('')
+      write = true
+      terminal.write('\x1b[1;1Halter')
+      renderer.notifyWrite()
+      clock.flushFrame()
+      clock.flushFrame()
+      expect(renderer.metrics.zigFrames).toBe(3)
+      expect(textByRow.get(0)).toBe('alter')
+      expect(textByRow.get(1)).toBe('second')
+      expect(state.dirty).toBe(RenderStateDirty.False)
     } finally {
       renderer.dispose()
       runtime.dispose()

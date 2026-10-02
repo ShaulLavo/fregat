@@ -529,6 +529,7 @@ export class WebGpuTerminalRenderer {
       return true
     let builder = this.zigBuilder
     if (!builder || builder.columns !== this.grid.columns || builder.rows !== this.grid.rows) {
+      this.zigBuilder = undefined
       builder?.dispose()
       builder = this.renderState.createFrameBuilder(this.grid.columns, this.grid.rows)
       this.zigBuilder = builder
