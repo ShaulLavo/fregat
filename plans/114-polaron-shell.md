@@ -22,6 +22,235 @@
 - **Baseline**: `c0566d48` (Electrobun 2.0.1, plan 073 landed 2026-09-13); researched on
   `6561ca5a`
 
+## Installed Fregat application
+
+**Status: Approved direction, 2026-10-02. Implementation waits for the owner's review of this
+design.** Chrome-first selection ships separately. Gate 4 remains parked. The browser-installed
+app must provide the same functionality when opened by Polaron, the Dock, Cmd-Tab/taskbar,
+the OS application launcher, or its browser-created shortcut. A direct OS launch has no
+Polaron process, CDP connection, injected script, or `window.platformBridge`.
+
+The owner rejected a launcher-only bridge with reduced functionality on Dock launch. The
+installed-browser path therefore moves desktop behavior into the web client, browser manifest,
+and the selected machine's server. Native webview/Electrobun code remains while its existing
+gates require it. The sections below this design document the current shell and earlier proofs;
+this section supersedes their CDP-injected bridge as the installed-browser target architecture.
+
+### Approved outcomes
+
+- Automatic browser selection tries Chrome, supported OS-default Chromium, the remaining
+  Chromium scan, native webview, then a default-browser tab. Explicit settings stay first.
+- Fregat installs automatically with its own name, icon, and OS application identity. The owner
+  performs no installation step. The browser owns its installed registration and OS shortcuts.
+- The launcher selects the browser, ensures installation, and requests launch. Runtime app
+  features work with zero injected globals and no running launcher. Do not intercept or replace
+  the browser-created Dock/OS shortcut.
+- One existing installed client is focused on repeat launch, preserving its editor, terminal,
+  draft, and ongoing work. New address URLs are delivered to the app's normal router.
+- Closing the app preserves mesh services, terminals, other browser profiles, and other apps.
+  A launcher exiting after successful launch has no authority to terminate those services or a
+  browser started by the Dock.
+
+### Installed identity and manifest
+
+Use `apps/web/public/manifest.webmanifest` with stable relative `id: "./"`, `name: "Fregat"`,
+`short_name: "Fregat"`, existing relative start URL/scope, and `display: "standalone"`. Relative
+identity resolves against the manifest/start URL and preserves the `/platform/` production base.
+Query strings, workspace selection, and navigation do not change the manifest identity.
+Dev and production origins remain distinct registrations and profiles; choose their visible
+naming deliberately before installing both on the same machine.
+
+Add `display_override: ["window-controls-overlay", "standalone"]` and
+`launch_handler: { "client_mode": "focus-existing" }`. Keep the existing 192/512 PNG icons.
+Produce a genuine 1024 PNG from the app's source artwork if the Mac icon proof needs it;
+upscaling the 512 icon does not add detail. Verify the browser-generated Mac app icon, Linux
+desktop icon, Dock/Cmd-Tab/taskbar name, and window title rather than assuming that a successful
+protocol command establishes OS identity. App identity is separate from the ordinary document
+title and favicon.
+
+`focus-existing` is a browser policy for launches of this installed app identity in this profile.
+It is not a machine-wide lock across other browsers or profiles. Register a `launchQueue`
+consumer in the web client, validate same-origin/in-scope launch URLs, then dispatch through
+the existing route/navigation owner. Existing clients are focused without automatic navigation;
+the consumer must apply an incoming address intentionally. Do not create a competing module
+singleton or a BroadcastChannel window-election system.
+
+### Complete desktop bridge inventory and replacements
+
+The contract in `apps/desktop/src/shared/bridge.ts` has one callable operation, `pickEntry`, and
+five metadata fields. The preload transport also carries `drag` and frame telemetry. None of
+these may be required from CDP in an installed browser app.
+
+| Current contract                                                       | Consumers                                                                                                                                                            | Installed-app replacement                                                                                                                                                                                                     | Capability and loss                                                                                                                                                                                                                                |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pickEntry({ mode, accept, startingPath, multiple }) -> paths`         | `apps/web/src/components/use-pick-entry.tsx`; path hydration in `components/utils/picked-path.ts` and `lib/file-server.ts`                                           | An authenticated selected-machine server mutation runs that host's existing native picker helper and returns its backend paths. Consume capability/query state through TanStack and hydrate with the existing filesystem API. | Preserves absolute backend path identity on a local desktop server. A remote server's dialog appears on that remote host, so it cannot substitute for the viewing machine's native chooser. Resolve the remote policy below before implementation. |
+| `backdrop`                                                             | `apps/web/src/lib/platform/backdrop.ts`, `boot-appearance.ts`, `main.tsx`                                                                                            | Browser/platform detection plus the existing opaque app/compositor backdrop policy. WCO only changes titlebar geometry.                                                                                                       | Browser PWAs have no per-pixel transparent window or macOS vibrancy API. Native transparency remains a capability of the explicit native host. This loss applies equally to every installed-app launch.                                            |
+| `platform`                                                             | `apps/web/src/lib/platform/bridge.ts` (`isMacDesktop`); indirectly `components/app-titlebar.tsx`, backdrop resolution                                                | Use browser client-platform information for OS conventions and actual WCO geometry for control placement. Never infer the viewing OS from a remote server.                                                                    | Preserves OS conventions without a launch-time handoff. Client hints may be absent; retain the existing safe browser platform fallback.                                                                                                            |
+| `colorScheme`                                                          | `apps/web/src/features/settings/state/system-color-mode.ts`                                                                                                          | `matchMedia('(prefers-color-scheme: dark)')` and its change event, on every launch path.                                                                                                                                      | Chromium already reads the OS preference. The WebKitGTK/X11 override remains local to the retained native-webview path.                                                                                                                            |
+| `titlebar: native/overlay`                                             | `apps/web/src/lib/platform/bridge.ts`, `components/app-titlebar.tsx`                                                                                                 | `navigator.windowControlsOverlay.visible`, `getTitlebarAreaRect()`, `geometrychange`, and CSS `titlebar-area-*` environment variables.                                                                                        | Reserve the reported free titlebar rectangle, on either side as the browser/OS requires. Overlay availability and the user's titlebar toggle are browser-owned; standalone browser chrome remains movable when overlay is off.                     |
+| `capabilities.displayCapture`                                          | `apps/web/src/features/chat/utils/screenshot-capture.ts`                                                                                                             | Feature-detect browser `getDisplayMedia` and handle user cancellation/refusal.                                                                                                                                                | Captures through the browser chooser, with its secure-context/gesture restrictions. No capture-permission bypass or shell override. Native hosts may retain their explicit unsupported capability.                                                 |
+| `getPlatformBridge()`, `isDesktop()`, `isMacDesktop()`                 | `apps/web/src/lib/platform/bridge.ts`; titlebar; `features/settings/utils/form-categories.ts`, `features/settings/utils/availability.ts`; desktop flag in `main.tsx` | Separate installed display mode, WCO geometry, browser capabilities, and server-native-picker capability. Installed-app settings and observability use those actual capabilities.                                             | An installed app is still a desktop app without an injected global. Do not hide applicable settings because bridge lookup returns null; describe unsupported native transparency as a capability constraint.                                       |
+| Injected `drag` transport and Electrobun drag classes                  | `apps/desktop/src/launcher/shell-bridge.ts`; `apps/web/src/lib/platform/window-drag.ts`; `components/app-titlebar.tsx` and other drag-region controls                | Shared UI WCO drag/no-drag utilities using `app-region: drag` and Chromium's supported `-webkit-app-region` spelling. Interactive controls opt out.                                                                           | Removes the injected `mousedown` handler from the installed-browser path. Browser/OS chrome handles dragging with WCO off. There is no web API for arbitrary window movement.                                                                      |
+| `__platformShellReply`, request token/document id, `platformShellCall` | `shell-bridge.ts`, `chromium.ts`; replies to `use-pick-entry.tsx`                                                                                                    | Ordinary authenticated server mutation/result, with native-helper cancellation and timeout owned by that server operation.                                                                                                    | No runtime binding, preload promise map, or document token in the browser path. Retained native hosts keep their own transport until their gates complete.                                                                                         |
+| Injected `rafPerSecond` / `platformHostRaf`                            | `shell-bridge.ts`, `chromium.ts`, `desktop.window.open` logging                                                                                                      | Measure in the web application's normal startup observability, tagging installed display mode and actual browser capabilities.                                                                                                | Direct Dock launch produces the same startup measurement. Sampling must remain bounded and avoid duplicate events.                                                                                                                                 |
+
+There is no close, resize, maximize, tray, notification, or deep-link method in `PlatformBridge`.
+Browser notifications (`features/chat-mode/state/notification-host.ts`), focus, audio, and
+screenshot capture already use web APIs. Keep their permission/error handling. The retained
+native host's own close/drag messages are not additional browser bridge methods.
+
+### Native picker and filesystem identity
+
+**Chosen local-desktop design.** Move native helper ownership from the Chromium launcher to the
+machine server. Publish its capability only when the helper exists and a usable desktop session
+is available. Requests validate options at the API boundary, serialize one chooser per desktop
+host, and use the registered native-dialog timeout/stop-grace settings. The response carries
+paths on that machine and settles the mutation/query state before resolving. User cancellation
+returns an empty selection; helper failure returns structured public guidance. A disconnected
+requester must cancel its owned chooser without stopping any shared service.
+
+The endpoint needs the same authenticated client/session authorization as filesystem operations,
+origin/CSRF protection, and a bounded request lifecycle. An arbitrary website must never be able
+to open a native chooser through the local server. A generic remote URL is insufficient evidence
+that the server's desktop is the browser's desktop. Select the machine explicitly and distinguish
+local-desktop capability from remote filesystem access.
+
+**Why File System Access is not a drop-in replacement.** `showDirectoryPicker` and
+`showOpenFilePicker` return opaque browser handles, not absolute host paths. Fregat's workspace,
+git, terminal, LSP, and filesystem APIs consume backend paths. A directory handle's name or
+relative `resolve()` result cannot identify such a path. File System Access also needs a secure
+context and a live user gesture; a deferred effect loses that gesture. Supporting browser-local
+handles as first-class workspaces would be a separate filesystem/provider redesign, outside this
+bounded shell change. Do not invent a path from a handle or upload a folder as a substitute.
+
+**Owner decision required before implementation.** For a browser on a different machine from its
+selected server, choose the existing server-filesystem picker on both launch paths, or require an
+authenticated API on the viewing host that can run its native chooser. The latter introduces a
+local service prerequisite, not a Dock-launch hook. Until that choice and connection model are
+approved, local native-picker parity is designed and remote native-picker parity is unconfirmed.
+
+### PWA installation and launch control
+
+Use the existing CDP pipe only for installation/launch control, never for runtime bridge
+injection, window dragging, chooser calls, permission grants, or lifecycle correctness.
+
+1. Resolve the effective browser profile and stable absolute manifest identity for the app URL.
+   Start or connect only to a browser under that selected profile. An explicit browser setting
+   keeps precedence; use Chrome-first ordering for automatic selection.
+2. Call `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. In the
+   observed protocol an unknown valid manifest id is `InvalidParams` (`-32602`), not an
+   `installed: false` field. Validate the identity before interpreting that response.
+3. For an uninstalled identity, call
+   `PWA.install({ manifestId, installUrlOrBundleUrl: installUrl })` and check OS state again.
+   A failed installation is a failed launch with structured guidance; never suppress arbitrary
+   install failures as an unsupported-domain case. Repeat launch converges after a partial install.
+4. Call `PWA.launch({ manifestId, url })`; the manifest's launch policy chooses the client.
+   `PWA.launch` returns a tab target id, which is not necessarily the page target id. Installation
+   readiness is OS state plus an app document, not the former injected-bridge attach barrier.
+5. Release launch-control resources without terminating a successfully launched app or a browser
+   owned by another entry point. App window close and relaunch behavior belongs to the browser.
+   Direct Dock launch follows the same manifest and app logic with no controller at all.
+
+`PWA.openCurrentPageInApp({ manifestId })` is a page-target method and was probed as an alternative.
+The chosen target is `PWA.launch` because reparenting a bootstrap `--app` page adds a spare browser
+New Tab on Linux and retains unnecessary attach/promotion logic. That earlier experiment does
+not ship.
+
+**Engineering proof needed before code.** A Dock-started browser already owns the profile and
+was not started with the private CDP pipe. A second process singleton handoff cannot retroactively
+add that pipe to the existing browser. Prove the browser's normal installed-app launch command
+(`--app-id` for the installed identity) for this handoff, or another browser-supported launch
+route, with an already running Dock client. It must focus the existing installed client and
+preserve URL delivery. Do not scan or mutate browser databases, intercept Dock launch, require
+runtime debugging for app functionality, or kill the Dock's browser to regain CDP control.
+Installation repair after uninstall while that browser is running also needs a bounded proof.
+
+**Unsupported browsers.** `-32601` means a PWA method/domain is unavailable. Log that fact once at
+info. The former `--app` fallback remains current behavior until this design is implemented.
+It cannot satisfy installed OS identity and `focus-existing` parity. There is also no equivalent
+web single-window guarantee when the browser ignores `launch_handler`. Owner approval must
+explicitly choose whether to retain a named degraded fallback or require a capable installed-app
+browser and proceed to the native host. Do not describe that fallback as full installed-app parity.
+
+### Service ownership and reachability
+
+A Dock shortcut opens the manifest's stable start URL directly. The API and web route must therefore
+be reachable independently of the launcher. Preserve mesh-owned service startup; do not spawn a
+second server from the web app or launcher. For production, prove the `/platform/` route can wake
+the service from idle and restore the selected machine/workspace. For local development, prove the
+Vite/API mesh routes from a cold state. A closed server, a missing mesh route, or an untrusted HTTP
+origin is an availability failure, not something CDP injection can solve.
+
+Do not rewrite an installed app's identity on each deployment. A loopback production origin and a
+mesh production origin would be distinct installed apps; settle the intended production URL before
+registration. The current launcher waits for loopback development URLs, while production is
+served at `/platform/` on the mesh. Stable production origin, local chooser access, and the
+already-running-browser handoff are explicit gates, not hidden dependencies on the launcher.
+
+### Execution gates after design approval
+
+- [x] Ship Chrome-first discovery separately with failing-before/passing-after selection tests,
+      Browser setting copy, and generated settings artifacts.
+- [x] Inventory every bridge member, transport message, and web consumer. Name replacements,
+      unsupported capabilities, and remote/native-picker constraints here.
+- [ ] Owner reviews this design, production origin, remote chooser policy, and incapable-browser
+      fallback. Installed-app implementation remains paused until that review.
+- [ ] Prototype cold installation, repeat installation, Dock-first then launcher launch, user
+      uninstall then repair, launch URL delivery, and CDP release using disposable profiles. Confirm
+      Chrome 154 and Helium 154 separately. No real accounts or default browsing profiles.
+- [ ] Move local native picker ownership into a capability-gated authenticated server mutation,
+      with tests for cancellation, serialized calls, authorization, unavailable desktop, and path
+      hydration. Test zero injected globals on both Dock and launcher surfaces.
+- [ ] Add WCO drag/no-drag primitives, geometry subscription and launchQueue consumer. Test
+      control hit areas, overlay on/off, incoming URL selection, and focusing one live client without
+      disrupting terminals or drafts. Remove installed-browser bridge consumers in the same pass.
+- [ ] Update manifest identity/name/display/launch policy and verify actual browser OS integration.
+      Keep native-host bridge code only while the existing native gates require it.
+- [ ] Run portable fake-browser regressions and real Linux browser proof. Read visual evidence.
+      After merge, the coordinator performs the Mac check below. Gate 4 stays parked until its
+      separate owner acceptance is complete.
+
+### Protocol evidence and limits
+
+The 2026-10-02 Linux experiment used Helium 0.18.1.1, reporting `Chrome/154.0.8037.57` over the
+production CDP pipe. In a disposable profile it observed unknown app state, installed Fregat,
+queried its OS state, opened the current page in the app, and launched it. A subsequent production
+launcher experiment observed installed state after browser restart and standalone display mode.
+It also exposed the spare New Tab and duplicate page-session promotion failure of the rejected
+injection/reparenting approach. Those experiments are evidence for the protocol, not delivery of
+this bridge-independent design.
+
+Evidence is retained at `/work/tmp/fregat-evidence/polaron-installed-app-20261002/`.
+Google Chrome 154 is not installed on this Linux host; Chromium here is 152. Chrome 154 runtime
+behavior and Mac OS registration remain unconfirmed. Headless proof cannot establish Dock,
+Cmd-Tab/taskbar identity, WCO drag, chooser visibility, or real-keychain behavior.
+
+Protocol parameters and unknown-app semantics were checked against the
+[DevTools protocol](https://github.com/ChromeDevTools/devtools-protocol/blob/master/json/browser_protocol.json)
+and [Chromium PWA handler](https://github.com/chromium/chromium/blob/main/chrome/browser/devtools/protocol/pwa_handler.cc).
+The [WCO reference](https://developer.mozilla.org/en-US/docs/Web/API/Window_Controls_Overlay_API),
+[launch-handler reference](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/launch_handler),
+and [File System Access reference](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access)
+document the platform constraints above. The protocol is experimental; pin observed versions in
+each implementation proof.
+
+### Coordinator's Mac acceptance after implementation merges
+
+Use the logged-in desktop and real keychain, a disposable Fregat profile, and no real accounts.
+The worker does not run on the owner's Mac. Check Chrome-first auto with Helium as OS default,
+explicit Helium selection, and no-Chrome selection independently.
+
+Install once and inspect the generated Fregat app name/icon in Dock, Cmd-Tab and Finder/Launchpad.
+Close the launcher completely; open Fregat through the browser-created Dock entry and native app
+launcher. Confirm normal boot, editor/terminal/draft retention on repeat launch, launchQueue URL
+handling, native chooser selection/cancellation, and zero dependency on injected globals.
+Repeat with Dock first and then Polaron, and Polaron first and then Dock. Each path must focus one
+installed client. Test WCO enabled and disabled, system theme changes, opaque backdrop, titlebar
+geometry, drag/no-drag hit areas, browser notification permission, and browser screen capture.
+Close the final Fregat window and prove mesh services, existing terminals, and another browser
+profile survive. Restart from the Dock with mesh routes idle. Test the selected remote-machine
+chooser policy separately; a dialog opening on an unseen remote desktop is a failure.
+
 ## Why
 
 Plan 073 kept Electrobun for one property: the shell's `process.execPath` is Bun, so
