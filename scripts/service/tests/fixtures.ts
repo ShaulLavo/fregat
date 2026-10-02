@@ -48,12 +48,15 @@ export function fregatServer(options: {
   /** The state home whose key signs the proof; another one forges it. */
   keyHome?: string
   environmentId?: string
+  /** Runs as each request arrives, before the answer. */
+  onRequest?: () => void
 }) {
   const key = ensureIdentityKey(options.keyHome ?? options.stateHome)
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: options.port,
     fetch(request) {
+      options.onRequest?.()
       const url = new URL(request.url)
       const challenge = url.searchParams.get('challenge') ?? ''
       return Response.json(

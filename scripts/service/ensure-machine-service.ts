@@ -221,15 +221,15 @@ export async function removeMachineService(
     const owned = ownedRegistration(host, files)
     if (!owned) return { removed: false }
     await requireOwnListener(owned.values, readinessMs, options.signal)
-    // The lock keeps setup out; a hand edit since the check still stops the removal.
-    if (owned.present.some(({ file, content }) => host.readFile(file) !== content))
+    // The lock keeps setup out; any file appearing, vanishing or changing since the check stops it.
+    if (owned.snapshot.some(({ file, content }) => host.readFile(file) !== content))
       throw serviceErrors.REGISTRATION_NOT_OURS({ internal: { reason: 'changed' } })
     if (files.kind === 'launchd')
       await required(host, ['launchctl', 'bootout', `gui/${host.uid}/${LAUNCHD_LABEL}`], 'bootout')
     else
       await required(
         host,
-        ['systemctl', '--user', 'disable', '--now', SOCKET_UNIT, SERVICE_UNIT],
+        ['systemctl', '--user', 'disable', '--now', ...owned.present.map(({ unit }) => unit)],
         'disable',
       )
     for (const { file } of owned.present) host.removeFile(file)
@@ -245,15 +245,19 @@ export async function removeMachineService(
 function ownedRegistration(host: ServiceHost, files: ReturnType<typeof registrationFiles>) {
   const candidates =
     files.kind === 'launchd'
-      ? [{ file: files.plist, render: renderLaunchAgent }]
+      ? [{ file: files.plist, render: renderLaunchAgent, unit: LAUNCHD_LABEL }]
       : [
-          { file: files.socket, render: renderSystemdSocket },
-          { file: files.service, render: renderSystemdService },
+          { file: files.socket, render: renderSystemdSocket, unit: SOCKET_UNIT },
+          { file: files.service, render: renderSystemdService, unit: SERVICE_UNIT },
         ]
-  const present = candidates.flatMap(({ file, render }) => {
-    const content = host.readFile(file)
-    return content === null ? [] : [{ file, render, content }]
-  })
+  // Every fixed path, absent ones included, so a file appearing later is a change too.
+  const snapshot = candidates.map((candidate) => ({
+    ...candidate,
+    content: host.readFile(candidate.file),
+  }))
+  const present = snapshot.flatMap(({ content, ...candidate }) =>
+    content === null ? [] : [{ ...candidate, content }],
+  )
   if (present.length === 0) return null
   const recorded = present.map(({ file, render, content }) => {
     const values = registrationValues(content, render)
@@ -266,7 +270,7 @@ function ownedRegistration(host: ServiceHost, files: ReturnType<typeof registrat
   const [values] = recorded
   if (!values || recorded.some((other) => JSON.stringify(other) !== JSON.stringify(values)))
     throw serviceErrors.REGISTRATION_NOT_OURS({ internal: { reason: 'mismatch' } })
-  return { values, present }
+  return { values, present, snapshot }
 }
 
 /** A free address, or a server proving the recorded state home; anything else is not ours to stop. */

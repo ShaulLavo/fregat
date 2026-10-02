@@ -445,4 +445,31 @@ describe('removeMachineService', () => {
     expect(a.commands).toEqual([])
     expect(readFileSync(files.service, 'utf8')).toBe(renderSystemdService(values))
   })
+
+  // Only the socket was verified; a foreign service appearing during the probe must not be stopped.
+  it('aborts when a registration file appears after the check', async () => {
+    const context = await setup()
+    const { host, commands } = recordingHost(context.root, 'linux')
+    const files = registrationFiles(host)
+    if (files.kind !== 'systemd') throw new Error('expected systemd files')
+    const values = {
+      bun: host.bun,
+      releaseRoot: context.productionRoot,
+      stateHome: context.stateHome,
+      port: context.port,
+    }
+    mkdirSync(path.dirname(files.socket), { recursive: true })
+    writeFileSync(files.socket, renderSystemdSocket(values))
+    fregatServer({
+      port: context.port,
+      stateHome: context.stateHome,
+      onRequest: () => writeFileSync(files.service, 'someone else’s service\n'),
+    })
+    await expect(removeMachineService({ host, readinessMs: 5000 })).rejects.toMatchObject({
+      code: 'service.REGISTRATION_NOT_OURS',
+      internal: { reason: 'changed' },
+    })
+    expect(commands).toEqual([])
+    expect(readFileSync(files.service, 'utf8')).toBe('someone else’s service\n')
+  })
 })
