@@ -1,28 +1,15 @@
-import { elapsedMs } from '@workspace/utils/timing'
-import { useQueryClient } from '@tanstack/react-query'
-import type { Client } from '@/lib/client'
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import { createClientInvariantError } from '@/lib/structured-errors'
-
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
 import type { FilePickerMode } from '@/features/file-picker/utils/model'
+import type { PickedFsEntry } from '@/lib/file-system-types'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import {
-  clientErrorDescription,
-  clientErrorMessage,
-  toClientError,
-} from '@/lib/client-error-taxonomy'
-import { statPath } from '@/lib/file-server'
-import {
-  isDirectoryEntry,
-  isFileEntry,
-  isPickedFsEntry,
-  type PickedFsEntry,
-} from '@/lib/file-system-types'
-import { getPlatformBridge, type PlatformBridge } from '@/lib/platform/bridge'
-import { basenameFromOsPath, clientPathFromOsPath } from '@/components/utils/picked-path'
-import { createWideEventScope } from '@/lib/wide-event-scope'
-import type { WideEventScope } from '@workspace/observability/scope'
-import { useEffect } from 'react'
+  nativePickerCapabilitiesOptions,
+  nativeSelectionOptions,
+} from '@/components/utils/native-picker'
+import { runMutation } from '@/lib/mutations/run'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { toastError } from '@/lib/toast-error'
 
 type UsePickEntryOptions = {
@@ -34,8 +21,6 @@ type UsePickEntryOptions = {
   onPick: (entry: PickedFsEntry) => void
 }
 
-let nativePickPromise: Promise<string | null> | null = null
-
 export function usePickEntry({
   accept,
   mode = 'folder',
@@ -44,36 +29,52 @@ export function usePickEntry({
   onOpenChange,
   onPick,
 }: UsePickEntryOptions) {
-  const bridge = getPlatformBridge()
-  const client = clientForQueryClient(useQueryClient())
+  const queryClient = useQueryClient()
+  const client = clientForQueryClient(queryClient)
+  const capabilities = useQuery({ ...nativePickerCapabilitiesOptions(client), enabled: open })
+  const [fallback, setFallback] = useState(false)
+  const native = capabilities.data?.nativePicker === true && !fallback
+  const startingPath = value?.path
+  const picked = useEffectEvent((entry: PickedFsEntry | null) => {
+    if (entry) onPick(entry)
+    onOpenChange(false)
+  })
+  const failed = useEffectEvent((error: unknown) => {
+    const failure = toClientError(error)
+    toastError(
+      'Could not open file chooser',
+      { description: clientErrorDescription(failure) },
+      failure,
+    )
+    setFallback(true)
+  })
 
   useEffect(() => {
-    const pickEntry = bridge?.pickEntry
-    if (!pickEntry) return
-    if (!open) return
-
-    let active = true
-    const pickPromise = startNativePick({
-      accept,
-      pickEntry,
-      mode,
-      value,
-    })
-    void handleNativePickResult(pickPromise, {
-      client,
-      isActive: () => active,
-      mode,
-      onOpenChange,
-      onPick,
-    })
-
-    return () => {
-      active = false
+    if (!open) {
+      setFallback(false)
+      return
     }
-  }, [accept, bridge, client, mode, onOpenChange, onPick, open, value])
+    if (!native) return
+    const controller = new AbortController()
+    // The StrictMode rehearsal disposes its effect before this starts a chooser.
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return
+      void runMutation(queryClient, nativeSelectionOptions(queryClient), {
+        request: { accept, mode, startingPath },
+        signal: controller.signal,
+      }).then(
+        (entry) => {
+          if (!controller.signal.aborted) picked(entry)
+        },
+        (error: unknown) => {
+          if (!controller.signal.aborted) failed(error)
+        },
+      )
+    })
+    return () => controller.abort()
+  }, [accept, mode, native, open, queryClient, startingPath])
 
-  if (bridge?.pickEntry || !open) return null
-
+  if (!open || native || (capabilities.isPending && !fallback)) return null
   return (
     <DeferredFilePickerDialog
       accept={accept}
@@ -84,140 +85,4 @@ export function usePickEntry({
       value={value}
     />
   )
-}
-
-type PickNativeEntryOptions = {
-  accept?: readonly string[]
-  pickEntry: NonNullable<PlatformBridge['pickEntry']>
-  mode: FilePickerMode
-  value: PickedFsEntry | null
-}
-
-type NativePickResultHandlers = {
-  client: Client
-  isActive: () => boolean
-  mode: FilePickerMode
-  onOpenChange: (open: boolean) => void
-  onPick: (entry: PickedFsEntry) => void
-}
-
-function startNativePick(options: PickNativeEntryOptions) {
-  nativePickPromise ??= pickNativeEntry(options).finally(() => {
-    nativePickPromise = null
-  })
-
-  return nativePickPromise
-}
-
-async function handleNativePickResult(
-  pickPromise: Promise<string | null>,
-  { client, isActive, mode, onOpenChange, onPick }: NativePickResultHandlers,
-) {
-  const startedAt = performance.now()
-  const scope = createWideEventScope({
-    action: 'platform.native_picker.summary',
-    area: 'platform',
-    mode,
-  })
-  const controller = new AbortController()
-  const path = await selectedNativePath(pickPromise, isActive, scope)
-  if (!isActive()) {
-    scope.end({ aborted: true, durationMs: elapsedMs(startedAt) })
-    return
-  }
-  if (!path) {
-    if (scope.count('picker.errorCount') === 0) scope.set({ outcome: 'cancelled' })
-    scope.end({ durationMs: elapsedMs(startedAt) })
-    onOpenChange(false)
-    return
-  }
-
-  try {
-    scope.increment('picker.selectedCount')
-    scope.set({ path })
-    const entry = await hydratePickedEntry(path, controller.signal, client)
-    if (!isActive()) {
-      scope.end({ aborted: true, durationMs: elapsedMs(startedAt) })
-      return
-    }
-
-    assertEntryMatchesMode(entry, mode)
-    scope.increment('picker.hydratedCount')
-    scope.set({ entryType: entry.type, outcome: 'ok' })
-    onPick(entry)
-  } catch (error) {
-    if (!isActive()) return
-
-    scope.increment('picker.errorCount')
-    scope.warn('Native picker entry hydration failed.', { error })
-    scope.set({ outcome: 'error' })
-    toastError('Could not open selected path', {
-      description: clientErrorMessage(error),
-    })
-  } finally {
-    scope.end({ durationMs: elapsedMs(startedAt) })
-    if (isActive()) onOpenChange(false)
-  }
-}
-
-async function selectedNativePath(
-  pickPromise: Promise<string | null>,
-  isActive: () => boolean,
-  scope: WideEventScope,
-): Promise<string | null> {
-  try {
-    return await pickPromise
-  } catch (error) {
-    if (isActive()) {
-      scope.increment('picker.errorCount')
-      const failure = toClientError(error)
-      scope.warn('Native picker failed.', { message: failure.message })
-      toastError(
-        'Could not open file chooser',
-        { description: clientErrorDescription(failure) },
-        failure,
-      )
-      scope.set({ outcome: 'error' })
-    }
-
-    return null
-  }
-}
-
-async function pickNativeEntry({
-  accept,
-  pickEntry,
-  mode,
-  value,
-}: PickNativeEntryOptions): Promise<string | null> {
-  const paths = await pickEntry({ accept, mode, startingPath: value?.path })
-  const path = paths[0]
-  if (!path) return null
-
-  return path
-}
-
-function assertEntryMatchesMode(entry: PickedFsEntry, mode: FilePickerMode) {
-  if (mode === 'folder' && isDirectoryEntry(entry)) return
-  if (mode === 'file' && isFileEntry(entry)) return
-
-  throw createClientInvariantError(
-    mode === 'folder' ? 'Picked path is not a folder.' : 'Picked path is not a file.',
-  )
-}
-
-async function hydratePickedEntry(
-  path: string,
-  signal: AbortSignal,
-  client: Client,
-): Promise<PickedFsEntry> {
-  const statInput = clientPathFromOsPath(path)
-  const entry = {
-    ...(await statPath(statInput, signal, client)),
-    name: basenameFromOsPath(path),
-  }
-
-  if (isPickedFsEntry(entry)) return entry
-
-  throw createClientInvariantError(`Picked path is not a file or directory: ${path}`)
 }

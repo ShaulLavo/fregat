@@ -7,12 +7,8 @@ export function getPlatformBridge(): PlatformBridge | null {
   return window.platformBridge ?? null
 }
 
-export function isDesktop() {
-  return getPlatformBridge() !== null
-}
-
-/** Only macOS puts window controls over our titlebar; everywhere else the bar owns its left edge. */
-export function isMacDesktop() {
+/** The retained native host reserves its own macOS controls when browser geometry is absent. */
+export function hasNativeMacOverlay() {
   const bridge = getPlatformBridge()
   return bridge?.platform === 'darwin' && bridge.titlebar === 'overlay'
 }

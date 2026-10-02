@@ -1,3 +1,4 @@
+import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
 import { cursorModelCatalog } from './cursor-model-catalog'
 import { machineBalancing } from './machine-balancing'
@@ -446,6 +447,7 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  installedApp,
   binaryFileOpen,
   binaryFileRemote,
   ghosttySiteFit,
