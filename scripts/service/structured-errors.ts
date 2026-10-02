@@ -39,8 +39,8 @@ export const serviceErrors = defineErrorCatalog('service', {
   },
   SETUP_BUSY: {
     status: 409,
-    message: 'Another Fregat setup is installing this server',
-    why: 'Setup for one state folder runs one at a time so two installers never overwrite each other.',
-    fix: 'Wait for the other setup to finish, then run setup again.',
+    message: 'Another Fregat setup or uninstall is changing the server registration',
+    why: 'Setup and uninstall run one at a time on this account, so two never change the registration at once.',
+    fix: 'Wait for the other one to finish, then run it again.',
   },
 })

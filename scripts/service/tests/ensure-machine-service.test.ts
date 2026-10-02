@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ensureMachineService, removeMachineService } from '../ensure-machine-service'
-import { renderSystemdService, renderSystemdSocket } from '../units'
+import { registrationFiles, renderSystemdService, renderSystemdSocket } from '../units'
+import { tryFileLock } from '../../../apps/server/src/system/file-lock'
 import {
   cleanup,
   ENVIRONMENT_ID,
@@ -386,5 +387,62 @@ describe('removeMachineService', () => {
     })
     const units = path.join(context.root, 'config', 'systemd', 'user')
     expect(existsSync(path.join(units, 'fregat-server.service'))).toBe(true)
+  })
+
+  // Two exact renders, each valid alone, for different installations.
+  it('leaves a socket and service from different installations alone', async () => {
+    const a = await setup()
+    const bStateHome = path.join(a.root, 'state-b')
+    mkdirSync(bStateHome)
+    const bPort = await freePort()
+    fregatServer({ port: bPort, stateHome: bStateHome })
+    const { host, commands } = recordingHost(a.root, 'linux')
+    const files = registrationFiles(host)
+    if (files.kind !== 'systemd') throw new Error('expected systemd files')
+    const values = { bun: host.bun, releaseRoot: a.productionRoot }
+    mkdirSync(path.dirname(files.socket), { recursive: true })
+    writeFileSync(
+      files.socket,
+      renderSystemdSocket({ ...values, stateHome: a.stateHome, port: a.port }),
+    )
+    const serviceB = renderSystemdService({ ...values, stateHome: bStateHome, port: bPort })
+    writeFileSync(files.service, serviceB)
+    await expect(removeMachineService({ host, readinessMs: 2000 })).rejects.toMatchObject({
+      code: 'service.REGISTRATION_NOT_OURS',
+      internal: { reason: 'mismatch' },
+    })
+    expect(commands).toEqual([])
+    expect(readFileSync(files.service, 'utf8')).toBe(serviceB)
+  })
+
+  // The files change while uninstall waits for setup's lock; it must judge what is there then.
+  it('judges the registration present once it holds the lock', async () => {
+    const a = await installed()
+    const files = registrationFiles(a.host)
+    if (files.kind !== 'systemd') throw new Error('expected systemd files')
+    await a.stopServer()
+    const bStateHome = path.join(a.root, 'state-b')
+    mkdirSync(bStateHome)
+    const bPort = await freePort()
+    otherProgram(bPort)
+    const lock = tryFileLock(registrationFiles(a.host).lock)
+    if (!lock) throw new Error('lock unavailable')
+    const removal = removeMachineService({ host: a.host, readinessMs: 5000 })
+    await Bun.sleep(200)
+    const values = {
+      bun: a.host.bun,
+      releaseRoot: a.productionRoot,
+      stateHome: bStateHome,
+      port: bPort,
+    }
+    writeFileSync(files.socket, renderSystemdSocket(values))
+    writeFileSync(files.service, renderSystemdService(values))
+    lock.release()
+    await expect(removal).rejects.toMatchObject({
+      code: 'service.REGISTRATION_NOT_OURS',
+      internal: { reason: 'listener' },
+    })
+    expect(a.commands).toEqual([])
+    expect(readFileSync(files.service, 'utf8')).toBe(renderSystemdService(values))
   })
 })

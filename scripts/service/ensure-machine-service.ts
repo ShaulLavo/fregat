@@ -56,7 +56,7 @@ export async function ensureMachineService(
   const readinessMs =
     options.readinessMs ?? descriptorFor('server.activationTimeoutSeconds').default * 1000
   const deadline = Date.now() + readinessMs
-  const lock = await setupLock(stateHome, deadline, options.signal)
+  const lock = await registrationLock(registrationFiles(host).lock, deadline, options.signal)
   try {
     const context = { ...parsed, stateHome, host, deadline, options }
     const first = await probe(context)
@@ -188,12 +188,11 @@ async function required(host: ServiceHost, argv: readonly string[], stage: strin
     throw serviceErrors.REGISTRATION_FAILED({ internal: { stage, exitCode: result.code } })
 }
 
-async function setupLock(
-  stateHome: string,
+async function registrationLock(
+  file: string,
   deadline: number,
   signal?: AbortSignal,
 ): Promise<FileLock> {
-  const file = path.join(stateHome, 'service-setup.lock')
   for (;;) {
     signal?.throwIfAborted()
     const lock = tryFileLock(file)
@@ -205,9 +204,9 @@ async function setupLock(
 }
 
 /**
- * The explicit machine-server uninstall. It touches only a registration setup wrote (an exact
- * re-render of its recorded values) whose address is free or proves the recorded state home.
- * State, logs and releases stay.
+ * The explicit machine-server uninstall. Under the registration lock setup also takes, every
+ * present file must be an exact re-render of one shared set of recorded values, and the address
+ * must be free or answer with that state home's proof. State, logs and releases stay.
  */
 export async function removeMachineService(
   options: { host?: ServiceHost; signal?: AbortSignal; readinessMs?: number } = {},
@@ -215,46 +214,59 @@ export async function removeMachineService(
   const host = options.host ?? realServiceHost()
   options.signal?.throwIfAborted()
   const files = registrationFiles(host)
-  const owned =
-    files.kind === 'launchd'
-      ? [{ file: files.plist, render: renderLaunchAgent }]
-      : [
-          { file: files.socket, render: renderSystemdSocket },
-          { file: files.service, render: renderSystemdService },
-        ]
-  const present = owned.filter(({ file }) => host.readFile(file) !== null)
-  if (present.length === 0) return { removed: false }
-  const values = present.map(({ file, render }) => {
-    const found = registrationValues(host.readFile(file) ?? '', render)
-    if (!found)
-      throw serviceErrors.REGISTRATION_NOT_OURS({
-        internal: { file: path.basename(file), reason: 'contents' },
-      })
-    return found
-  })
-  const [recorded] = values
-  if (!recorded) return { removed: false }
   const readinessMs =
     options.readinessMs ?? descriptorFor('server.activationTimeoutSeconds').default * 1000
-  const lock = await setupLock(recorded.stateHome, Date.now() + readinessMs, options.signal)
+  const lock = await registrationLock(files.lock, Date.now() + readinessMs, options.signal)
   try {
-    await requireOwnListener(recorded, readinessMs, options.signal)
-    if (files.kind === 'launchd') {
+    const owned = ownedRegistration(host, files)
+    if (!owned) return { removed: false }
+    await requireOwnListener(owned.values, readinessMs, options.signal)
+    // The lock keeps setup out; a hand edit since the check still stops the removal.
+    if (owned.present.some(({ file, content }) => host.readFile(file) !== content))
+      throw serviceErrors.REGISTRATION_NOT_OURS({ internal: { reason: 'changed' } })
+    if (files.kind === 'launchd')
       await required(host, ['launchctl', 'bootout', `gui/${host.uid}/${LAUNCHD_LABEL}`], 'bootout')
-    } else {
+    else
       await required(
         host,
         ['systemctl', '--user', 'disable', '--now', SOCKET_UNIT, SERVICE_UNIT],
         'disable',
       )
-    }
-    for (const { file } of present) host.removeFile(file)
+    for (const { file } of owned.present) host.removeFile(file)
     if (files.kind === 'systemd')
       await required(host, ['systemctl', '--user', 'daemon-reload'], 'daemon-reload')
     return { removed: true }
   } finally {
     lock.release()
   }
+}
+
+/** The registration files present now, all rendered from the same recorded values, or null. */
+function ownedRegistration(host: ServiceHost, files: ReturnType<typeof registrationFiles>) {
+  const candidates =
+    files.kind === 'launchd'
+      ? [{ file: files.plist, render: renderLaunchAgent }]
+      : [
+          { file: files.socket, render: renderSystemdSocket },
+          { file: files.service, render: renderSystemdService },
+        ]
+  const present = candidates.flatMap(({ file, render }) => {
+    const content = host.readFile(file)
+    return content === null ? [] : [{ file, render, content }]
+  })
+  if (present.length === 0) return null
+  const recorded = present.map(({ file, render, content }) => {
+    const values = registrationValues(content, render)
+    if (!values)
+      throw serviceErrors.REGISTRATION_NOT_OURS({
+        internal: { file: path.basename(file), reason: 'contents' },
+      })
+    return values
+  })
+  const [values] = recorded
+  if (!values || recorded.some((other) => JSON.stringify(other) !== JSON.stringify(values)))
+    throw serviceErrors.REGISTRATION_NOT_OURS({ internal: { reason: 'mismatch' } })
+  return { values, present }
 }
 
 /** A free address, or a server proving the recorded state home; anything else is not ours to stop. */

@@ -171,16 +171,20 @@ export function registrationFiles(host: {
   home: string
   env: Readonly<Record<string, string | undefined>>
 }) {
+  // One lock for the fixed registration names, whatever state home a setup or uninstall serves.
   if (host.platform === 'darwin')
     return {
       kind: 'launchd' as const,
       plist: path.join(host.home, 'Library', 'LaunchAgents', `${LAUNCHD_LABEL}.plist`),
+      lock: path.join(host.home, 'Library', 'Application Support', 'Fregat', 'registration.lock'),
     }
   const config = host.env.XDG_CONFIG_HOME || path.join(host.home, '.config')
   const directory = path.join(config, 'systemd', 'user')
+  const state = host.env.XDG_STATE_HOME || path.join(host.home, '.local', 'state')
   return {
     kind: 'systemd' as const,
     socket: path.join(directory, SOCKET_UNIT),
     service: path.join(directory, SERVICE_UNIT),
+    lock: path.join(state, 'fregat', 'registration.lock'),
   }
 }
