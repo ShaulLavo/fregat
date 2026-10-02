@@ -45,6 +45,8 @@ export function machineProxyHeaders(request: Request, webOrigin: string) {
     if (name.startsWith('sec-websocket-')) headers.delete(name)
   }
   headers.set('origin', webOrigin)
+  // The hop marker the target's locality check reads: a loopback tunnel must not look local.
+  headers.set('via', '1.1 fregat')
   return headers
 }
 

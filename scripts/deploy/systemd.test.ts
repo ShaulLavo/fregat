@@ -28,7 +28,11 @@ test('the unit checks for approved promotion before startup and treats Restart a
   const lines = unit.split('\n')
   const pre = lines.indexOf('ExecStartPre=-/opt/bun /srv/platform/bin/promote.ts /srv/platform')
   expect(pre).toBeGreaterThan(-1)
-  expect(lines.indexOf('ExecStart=/opt/bun /srv/platform/current/server/index.js')).toBe(pre + 1)
+  expect(
+    lines.indexOf(
+      'ExecStart=/opt/bun /srv/platform/current/server/index.js --service=systemd-service:platform-prod.service',
+    ),
+  ).toBe(pre + 1)
   expect(lines).toContain('SuccessExitStatus=143 75')
   expect(lines).toContain('RestartForceExitStatus=75')
   expect(lines).toContain('RestartSec=250ms')
