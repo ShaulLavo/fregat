@@ -42,7 +42,8 @@ async function wheel(deltaY: number) {
   await commands.treeWheel(center(scroller()), deltaY)
 }
 
-async function scrollSettled() {
+async function scrollSettled(expectedStickyPath: string) {
+  await vi.waitFor(() => expect(stickyPaths()).toContain(expectedStickyPath))
   await vi.waitFor(
     () =>
       expect(
@@ -87,7 +88,7 @@ describe('sticky folders', () => {
       const { model } = await mountParityTree()
       await expandPaths(model, ['src/', 'src/lib/'])
       await wheel(12 * ROW_HEIGHT)
-      await scrollSettled()
+      await scrollSettled('src/lib/')
       const overlay = stickyRow('src/lib/').getBoundingClientRect()
       const x = overlay.left + 100
       const flowAt = (y: number) =>
@@ -119,7 +120,7 @@ describe('sticky folders', () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['src/', 'src/lib/'])
     await wheel(12 * ROW_HEIGHT)
-    await scrollSettled()
+    await scrollSettled('src/lib/')
     const before = scroller().scrollTop
     await commands.treeWheel(center(stickyRow('src/lib/')), ROW_HEIGHT)
     await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThan(before))
@@ -129,8 +130,7 @@ describe('sticky folders', () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['src/', 'src/lib/'])
     await wheel(12 * ROW_HEIGHT)
-    await scrollSettled()
-    await vi.waitFor(() => expect(stickyPaths()).toContain('src/lib/'))
+    await scrollSettled('src/lib/')
     await mouse('click', center(stickyRow('src/lib/')))
     await vi.waitFor(() => expect(focusedRowPath()).toBe('src/lib/'))
     const flow = row('src/lib/').getBoundingClientRect()
