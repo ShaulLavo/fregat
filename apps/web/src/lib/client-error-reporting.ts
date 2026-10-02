@@ -1,3 +1,4 @@
+import { isCancelledError } from '@tanstack/react-query'
 import { createDiagnosticSanitizer, sanitizeRecord } from '@workspace/observability/sanitize'
 import { isObject } from '@workspace/utils/objects'
 import { errorNumberField, errorStringField } from '@workspace/contracts'
@@ -36,6 +37,8 @@ function errorInternal(error: Error) {
 }
 
 export function reportClientError(report: ClientErrorReport): void {
+  if (isCancelledError(report.cause)) return
+
   const safeReport = safeClientErrorReport(report)
 
   const level = report.category === 'connectivity' ? 'warn' : 'error'

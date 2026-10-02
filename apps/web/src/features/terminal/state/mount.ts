@@ -1,3 +1,4 @@
+import { isCancelledError } from '@tanstack/react-query'
 import { initializeGhostty } from '@/features/terminal/state/runtime'
 import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { createReplayGate } from '@/features/terminal/state/replay'
@@ -171,7 +172,7 @@ export function mountTerminal({
   }
 
   void open().catch((error: unknown) => {
-    if (cancelled || signal.aborted) return
+    if (cancelled || signal.aborted || isCancelledError(error)) return
 
     onFailed(errorMessage(error, 'Could not open the terminal.'))
     reportError(toClientError(error))
