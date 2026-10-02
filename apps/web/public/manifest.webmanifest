@@ -1,40 +1,23 @@
 {
+  "id": "./",
   "name": "Fregat",
   "short_name": "Fregat",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "launch_handler": { "client_mode": "focus-existing" },
   "background_color": "#c4c3c3",
   "theme_color": "#c4c3c3",
   "icons": [
-    {
-      "src": "icons/fregat.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
+    { "src": "icons/fregat.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     {
       "src": "icons/icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     }
-  ],
-  "id": "./",
-  "display_override": ["window-controls-overlay", "standalone"],
-  "launch_handler": {
-    "client_mode": "focus-existing"
-  }
+  ]
 }
