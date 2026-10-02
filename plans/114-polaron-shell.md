@@ -38,8 +38,9 @@ this section supersedes their CDP-injected bridge as the installed-browser targe
 
 ### Approved outcomes
 
-- Automatic browser selection tries Chrome, supported OS-default Chromium, the remaining
-  Chromium scan, native webview, then a default-browser tab. Explicit settings stay first.
+- With default compositor transparency, automatic browser selection tries Chrome, supported
+  OS-default Chromium, the remaining Chromium scan, native webview, then a default-browser tab.
+  Explicit settings stay first. Automatic window transparency retains the native webview.
 - Fregat installs automatically with its own name, icon, and OS application identity. The owner
   performs no installation step. The browser owns its installed registration and OS shortcuts.
 - The launcher selects the browser, ensures installation, and requests launch. Runtime app
