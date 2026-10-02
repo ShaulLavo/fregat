@@ -186,7 +186,11 @@ test('deadline includes streaming body reads and cancels a hung reader', async (
 
 test('timer samples only within running lifecycle and no faster than sixty seconds', async () => {
   const paths = await fixture()
-  const fetcher = vi.fn(async () => Response.json(cachedBody))
+  let sampled = Promise.withResolvers<void>()
+  const fetcher = vi.fn(async () => {
+    sampled.resolve()
+    return Response.json(cachedBody)
+  })
   const producer = await createUsageProducer({
     ...paths,
     proxyUrl: 'http://127.0.0.1:18317',
@@ -195,14 +199,18 @@ test('timer samples only within running lifecycle and no faster than sixty secon
   vi.useFakeTimers()
   try {
     producer.start()
-    await vi.advanceTimersByTimeAsync(0)
-    await expect.poll(() => fetcher.mock.calls.length).toBe(1)
+    vi.advanceTimersByTime(0)
+    await sampled.promise
     await producer.poll()
     await producer.flush()
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    sampled = Promise.withResolvers<void>()
     await vi.advanceTimersByTimeAsync(59999)
+    expect(await producer.poll()).toBe(false)
     expect(fetcher).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(1)
-    await expect.poll(() => fetcher.mock.calls.length).toBe(2)
+    await sampled.promise
+    expect(fetcher).toHaveBeenCalledTimes(2)
     await producer.stop()
     await vi.advanceTimersByTimeAsync(120000)
     expect(fetcher).toHaveBeenCalledTimes(2)
