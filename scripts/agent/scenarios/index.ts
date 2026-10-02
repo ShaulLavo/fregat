@@ -311,6 +311,7 @@ import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
 import { settingsOpen, settingsOpenNavigation } from './settings-open'
 import { serverRestart } from './server-restart'
+import { watcherRestart } from './watcher-restart'
 import { settingsDefaults } from './settings-defaults'
 import { settingsFocus } from './settings-focus'
 import { settingsAppearanceRows } from './settings-appearance-rows'
@@ -759,6 +760,7 @@ export const scenarios: readonly Scenario[] = [
   projectMenu,
   workspaceSwitch,
   serverRestart,
+  watcherRestart,
   sidebarSettingsButton,
   fontPicker,
   fontPickerHover,
