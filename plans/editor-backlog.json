@@ -777,6 +777,19 @@
       "dependsOn": [],
       "topics": ["One highlight pipeline for tokens and range highlights"],
       "baseline": "6d8269f39eb40e38d0e8b1de90f353923396bc8c"
+    },
+    {
+      "id": "E065",
+      "file": "e065-injection-and-range-query-cost.md",
+      "title": "Bound injection discovery and independent range-query scheduling",
+      "status": "Approved",
+      "owner": "Editor",
+      "kind": "Research",
+      "priority": "P1",
+      "effort": "M",
+      "dependsOn": ["E001"],
+      "topics": ["Input latency as an enforced budget"],
+      "baseline": "7d06ab6f52370b3f8bc116bd0491ffe47c1c2107"
     }
   ]
 }
