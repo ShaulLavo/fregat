@@ -76,6 +76,7 @@
     "settings:reference:check": "bun scripts/generate-settings-reference.ts --check",
     "settings:schema": "bun scripts/generate-settings-schema.ts",
     "settings:schema:check": "bun scripts/generate-settings-schema.ts --check",
+    "app-icon:generate": "bun scripts/app-icon/generate.ts",
     "icons:generate": "bun scripts/icons/generate.ts",
     "icons:generate:check": "bun scripts/icons/generate.ts --check",
     "themes:palette-css": "bun scripts/themes/generate-palette-css.ts",
