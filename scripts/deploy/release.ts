@@ -2,13 +2,9 @@ import {
   cpSync,
   existsSync,
   linkSync,
-  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
-  readlinkSync,
-  realpathSync,
-  renameSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -17,7 +13,11 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { checkoutRoot, currentLink, pendingLink, releasesRoot, webBase } from './config'
+import { checkoutRoot, currentLink, pendingLink, productionRoot, webBase } from './config'
+import * as operations from './release-operations'
+import { replaceLink } from './release-operations'
+export type { Release } from './release-operations'
+import type { Release } from './release-operations'
 import { log, output, run } from './run'
 import { stampWebRelease } from './web-release'
 import { createScriptError } from '../structured-errors'
@@ -33,14 +33,6 @@ export type Checkout = {
   branch: string
   dirtyFiles: string[]
   editorCommit: string | null
-}
-
-export type Release = {
-  name: string
-  directory: string
-  web: string
-  server: string
-  previous: string | null
 }
 
 export type BuildConfig = Checkout & {
@@ -103,46 +95,27 @@ export function porcelainPaths(status: string) {
   return paths
 }
 
-export function createRelease(checkout: Checkout, slug: string): Release {
-  const stamp = new Date().toISOString().replaceAll(/[-:]|\.\d+/g, '')
-  const name = `${stamp}-${checkout.commit.slice(0, 8)}-${slug}`
-  const directory = path.join(releasesRoot, name)
-  mkdirSync(directory, { recursive: true })
-  return {
-    name,
-    directory,
-    web: path.join(directory, 'web'),
-    server: path.join(directory, 'server'),
-    previous: currentRelease(),
-  }
+export function createRelease(checkout: Checkout, slug: string) {
+  return operations.createRelease(productionRoot, checkout.commit, slug)
 }
 
 export function currentRelease() {
-  if (!existsSync(currentLink)) return null
-
-  return realpathSync(currentLink)
+  return operations.currentRelease(productionRoot)
 }
 
-/** The staged release, or null when nothing is staged or the link dangles. */
 export function pendingRelease() {
-  if (!existsSync(pendingLink)) return null
-
-  return realpathSync(pendingLink)
+  return operations.pendingRelease(productionRoot)
 }
 
 export function stagePending(release: Release) {
   const replaced = pendingRelease()
-  replaceLink(pendingLink, release.directory)
+  operations.stagePending(productionRoot, release)
   const note = replaced ? `, replacing ${path.basename(replaced)}` : ''
   log('stage', `${pendingLink} → ${release.name}${note}`)
 }
 
-/** Drops the staged release; returns its name, or null when nothing was staged. */
 export function removePending() {
-  if (!lstatSync(pendingLink, { throwIfNoEntry: false })?.isSymbolicLink()) return null
-  const name = path.basename(readlinkSync(pendingLink))
-  rmSync(pendingLink, { force: true })
-  return name
+  return operations.removePending(productionRoot)
 }
 
 export async function buildWeb(release: Release, base = webBase) {
@@ -360,22 +333,13 @@ export async function bootCandidate(release: Release) {
 }
 
 export function swapCurrent(release: Release) {
-  replaceLink(currentLink, release.directory)
+  operations.swapCurrent(productionRoot, release)
   log('swap', `${currentLink} → ${release.name}`)
 }
 
 export function pointCurrentAt(directory: string) {
-  replaceLink(currentLink, directory)
+  operations.pointCurrentAt(productionRoot, directory)
   log('swap', `${currentLink} → ${path.basename(directory)}`)
-}
-
-// Swapped atomically: the link is written beside the target and renamed over it.
-// The staging name is per process, so concurrent deploys cannot delete each other's.
-function replaceLink(link: string, target: string) {
-  const staging = `${link}.next-${process.pid}`
-  rmSync(staging, { force: true })
-  symlinkSync(target, staging)
-  renameSync(staging, link)
 }
 
 function html(web: string) {

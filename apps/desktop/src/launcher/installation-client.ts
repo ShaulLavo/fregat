@@ -10,7 +10,13 @@ import {
   type MachineServiceResult,
 } from '@workspace/contracts'
 import { readHomeSetting } from '../../../../scripts/home-setting'
+import { ensureMachineService } from '../../../../scripts/service/ensure-machine-service'
+import {
+  installBundledRelease,
+  rollbackBundledInstall,
+} from '../../../../scripts/service/bundled-release'
 import { machineReleaseRoot } from '../../../../scripts/service/release-root'
+import { acquireSetupLock } from '../../../../scripts/service/setup-lock'
 
 const installationErrors = defineErrorCatalog('desktop.installation', {
   SERVICE_UNAVAILABLE: {
@@ -29,7 +35,7 @@ const installationErrors = defineErrorCatalog('desktop.installation', {
 
 export type EnsureMachineService = (
   intent: MachineServiceIntent,
-  options: { productionRoot: string; signal?: AbortSignal },
+  options: { productionRoot: string; signal?: AbortSignal; readinessMs?: number },
 ) => Promise<MachineServiceResult>
 
 export function installationReleaseRoot(stateHome: string, home: string) {
@@ -101,15 +107,75 @@ export async function ensureInstalledService(options: {
   productionRoot: string | undefined
   signal: AbortSignal
   ensure?: EnsureMachineService
+  bundledRelease?: string
 }) {
   options.signal.throwIfAborted()
   if (!options.productionRoot)
     throw installationErrors.SERVICE_UNAVAILABLE({ internal: { stage: 'release-root' } })
-  const ensure = options.ensure ?? (await loadServiceSetup())
+  const readinessMs =
+    readHomeSetting(options.intent.stateHome, 'server.activationTimeoutSeconds') * 1000
+  const lock = await acquireSetupLock(
+    path.join(options.productionRoot, 'release-activation.lock'),
+    Date.now() + readinessMs,
+    options.signal,
+  )
+  try {
+    return await installAndActivate({
+      ...options,
+      productionRoot: options.productionRoot,
+      readinessMs,
+    })
+  } finally {
+    lock.release()
+  }
+}
+
+async function installAndActivate(options: {
+  intent: MachineServiceIntent
+  productionRoot: string
+  signal: AbortSignal
+  ensure?: EnsureMachineService
+  bundledRelease?: string
+  readinessMs: number
+}) {
+  const installed = options.bundledRelease
+    ? installBundledRelease(options.bundledRelease, options.productionRoot, options.intent, {
+        readinessMs: options.readinessMs,
+      })
+    : null
+  let result: MachineServiceResult
+  try {
+    result = await verifiedService(
+      {
+        intent: options.intent,
+        productionRoot: options.productionRoot,
+        signal: options.signal,
+        readinessMs: options.readinessMs,
+      },
+      options.ensure ?? ensureMachineService,
+    )
+  } catch (error) {
+    if (installed) rollbackBundledInstall(options.productionRoot, installed)
+    throw error
+  }
+  rememberInstallation(options.intent, result)
+  return { ...result, url: new URL(result.identity.webBase, result.identity.address).href }
+}
+
+async function verifiedService(
+  options: {
+    intent: MachineServiceIntent
+    productionRoot: string
+    signal: AbortSignal
+    readinessMs: number
+  },
+  ensure: EnsureMachineService,
+) {
   const intent = options.intent
   const returned = await ensure(intent, {
     productionRoot: options.productionRoot,
     signal: options.signal,
+    readinessMs: options.readinessMs,
   })
   const parsed = v.safeParse(machineServiceResultSchema, returned)
   if (!parsed.success)
@@ -128,22 +194,5 @@ export async function ensureInstalledService(options: {
   }
   if (Object.values(matches).some((match) => !match))
     throw installationErrors.IDENTITY_CONFLICT({ internal: { matches } })
-  rememberInstallation(intent, result)
-  return { ...result, url: new URL(identity.webBase, identity.address).href }
-}
-
-async function loadServiceSetup(): Promise<EnsureMachineService> {
-  // The service implementation is published independently of the portable setup contract.
-  const entry = path.resolve(
-    import.meta.dirname,
-    '../../../../scripts/service/ensure-machine-service.ts',
-  )
-  try {
-    const module = await import(entry)
-    if (typeof module.ensureMachineService === 'function') return module.ensureMachineService
-  } catch (error) {
-    const code = (error as { code?: string }).code
-    if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'MODULE_NOT_FOUND') throw error
-  }
-  throw installationErrors.SERVICE_UNAVAILABLE({ internal: { stage: 'setup-entry' } })
+  return result
 }

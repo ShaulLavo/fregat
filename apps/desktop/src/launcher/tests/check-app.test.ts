@@ -27,7 +27,6 @@ const files = [
   'Contents/Resources/Fregat.icns',
   'Contents/Resources/release/build-config.json',
   'Contents/Resources/release/bin/promote.js',
-  'Contents/Resources/release/bin/promote.ts',
   'Contents/Resources/release/web/index.html',
   'Contents/Resources/release/web/assets/editor.wasm',
   'Contents/Resources/release/server/index.js',

@@ -10,7 +10,7 @@ export type ServiceHost = {
   uid: number
   home: string
   env: Readonly<Record<string, string | undefined>>
-  /** The Bun executable the service runs. */
+  /** Bun, or the compiled launcher used as Bun through BUN_BE_BUN. */
   bun: string
   run: (argv: readonly string[]) => Promise<CommandResult>
   readFile: (file: string) => string | null

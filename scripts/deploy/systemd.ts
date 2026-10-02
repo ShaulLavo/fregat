@@ -6,13 +6,13 @@ import {
   installedPromote,
   meshOrigin,
   productionRoot,
-  promoteSource,
   serverPort,
   serverUnit,
   tuiOrigin,
   unitTemplate,
 } from './config'
 import { log, output, run } from './run'
+import { buildPromoterSource } from './promoter-source'
 import {
   launchLiveCheck,
   releaseBody as probeRelease,
@@ -39,7 +39,7 @@ export type ReleaseBody = {
 
 /** Installs the promotion step and the rendered unit; a changed unit applies at the next restart. */
 export async function installUnit() {
-  installPromote()
+  await installPromote()
   const rendered = renderUnit()
   const installed = existsSync(installedUnit) ? readFileSync(installedUnit, 'utf8') : null
   const dropIns = existsSync(dropInDirectory)
@@ -54,8 +54,8 @@ export async function installUnit() {
   log('systemd', `installed ${installedUnit}; it applies at the next restart`)
 }
 
-function installPromote() {
-  const source = readFileSync(promoteSource, 'utf8')
+async function installPromote() {
+  const source = await buildPromoterSource()
   const installed = existsSync(installedPromote) ? readFileSync(installedPromote, 'utf8') : null
   if (installed === source) return
 

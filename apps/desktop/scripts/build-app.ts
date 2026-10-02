@@ -19,6 +19,7 @@ import {
   type Release,
 } from '../../../scripts/deploy/release'
 import { createScriptError } from '../../../scripts/structured-errors'
+import { buildPromoterSource } from '../../../scripts/deploy/promoter-source'
 
 const root = path.resolve(import.meta.dirname, '../../..')
 const desktop = path.join(root, 'apps/desktop')
@@ -43,14 +44,8 @@ export async function buildApp(arch: 'arm64' | 'x64' = process.arch === 'arm64' 
   mkdirSync(macos, { recursive: true })
   mkdirSync(directory, { recursive: true })
   try {
-    const promotion = await Bun.build({
-      target: 'bun',
-      entrypoints: [path.join(root, 'scripts/deploy/systemd/promote.ts')],
-      outdir: path.join(directory, 'bin'),
-      naming: 'promote.js',
-    })
-    if (!promotion.success)
-      throw createScriptError(`Promotion bundling failed: ${promotion.logs.join('\n')}`)
+    mkdirSync(path.join(directory, 'bin'), { recursive: true })
+    writeFileSync(path.join(directory, 'bin/promote.js'), await buildPromoterSource())
     await command([
       'bun',
       'build',
@@ -78,11 +73,6 @@ export async function buildApp(arch: 'arm64' | 'x64' = process.arch === 'arm64' 
     copyFileSync(
       path.join(macos, 'platform-webview'),
       path.join(release.server, 'native/platform-webview'),
-    )
-    mkdirSync(path.join(directory, 'bin'), { recursive: true })
-    copyFileSync(
-      path.join(root, 'scripts/deploy/systemd/promote.ts'),
-      path.join(directory, 'bin/promote.ts'),
     )
     writeBuildConfig(release, {
       ...checkout,

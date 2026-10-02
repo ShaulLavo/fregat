@@ -19,6 +19,12 @@ export const serviceErrors = defineErrorCatalog('service', {
     why: 'Setup reuses a listener only after it answers with the identity key from this state folder, and it did not within the start time limit.',
     fix: 'Check the Fregat server logs for a failed start, or raise Settings › Machines › Server start time limit, then run setup again.',
   },
+  RECOVERY_RESTART_FAILED: {
+    status: 502,
+    message: 'The service manager rejected the recovery restart',
+    why: 'Readiness failed and the restart into the previous release was rejected. The running release remains selected.',
+    fix: 'Check the machine service logs and service manager, then restart Fregat to retry recovery.',
+  },
   REGISTRATION_FAILED: {
     status: 500,
     message: 'The Fregat server could not be registered with the service manager',

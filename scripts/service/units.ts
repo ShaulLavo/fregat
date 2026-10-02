@@ -48,6 +48,7 @@ function environment(values: UnitValues) {
   return {
     NODE_ENV: 'production',
     BUN_ENV: 'production',
+    ...(path.basename(values.bun) === 'bun' ? {} : { BUN_BE_BUN: '1' }),
     FS_HOST: '127.0.0.1',
     PORT: String(values.port),
     WEB_ROOT: path.join(root, 'current', 'web'),
@@ -92,8 +93,10 @@ StartLimitBurst=5
 Type=simple
 WorkingDirectory=${root.replaceAll('%', '%%')}
 # Consumes an explicit restart approval before promoting; crashes keep the served release.
-ExecStartPre=-${bun} ${systemdQuote(path.join(root, 'bin', 'promote.ts'))} ${systemdQuote(root)}
+ExecStartPre=-${bun} ${systemdQuote(path.join(root, 'bin', 'promote.js'))} ${systemdQuote(root)}
 ExecStart=${bun} ${systemdQuote(path.join(root, 'current', 'server', 'index.js'))} --service=systemd-socket:${SOCKET_UNIT}
+# Readiness runs after the server starts; ExecStartPre children are stopped before ExecStart.
+ExecStartPost=-${bun} ${systemdQuote(path.join(root, 'bin', 'promote.js'))} readiness ${systemdQuote(root)} $MAINPID
 Restart=on-failure
 RestartSec=250ms
 # 143: Bun's exit on SIGTERM. 75: the server's exit after Restart. 78: another server owns the state.
@@ -119,7 +122,7 @@ function plistString(value: string) {
 export function renderLaunchAgent(values: UnitValues) {
   const root = values.releaseRoot
   // $0 and $1 carry the paths, so no path is ever parsed as shell text.
-  const script = `"$0" "$1/bin/promote.ts" "$1"; exec "$0" "$1/current/server/index.js" --launchd-socket=${LAUNCHD_SOCKET} --service=launchd:${LAUNCHD_LABEL}`
+  const script = `"$0" "$1/bin/promote.js" "$1"; "$0" "$1/bin/promote.js" readiness "$1" "$$" & exec "$0" "$1/current/server/index.js" --launchd-socket=${LAUNCHD_SOCKET} --service=launchd:${LAUNCHD_LABEL}`
   const env = Object.entries(environment(values))
     .map(([key, value]) => `      <key>${xml(key)}</key>${plistString(value)}`)
     .join('\n')
