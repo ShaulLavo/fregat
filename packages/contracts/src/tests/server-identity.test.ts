@@ -56,9 +56,35 @@ describe('native picker', () => {
     expect(v.safeParse(nativePickerRequestSchema, request).success).toBe(true)
   })
 
+  it.each(['/tmp', 'C:\\Users\\person', 'D:/work', '\\\\server\\share\\folder'])(
+    'accepts the absolute starting path %s',
+    (startingPath) => {
+      expect(v.safeParse(nativePickerRequestSchema, { mode: 'folder', startingPath }).success).toBe(
+        true,
+      )
+    },
+  )
+
+  it.each(['tmp', 'C:Users', '\\\\server', '/tmp/a\0b'])(
+    'refuses the starting path %j',
+    (startingPath) => {
+      expect(v.safeParse(nativePickerRequestSchema, { mode: 'folder', startingPath }).success).toBe(
+        false,
+      )
+    },
+  )
+
+  it('accepts a media range', () => {
+    expect(
+      v.safeParse(nativePickerRequestSchema, { mode: 'file', accept: ['image/*'] }).success,
+    ).toBe(true)
+  })
+
   it.each([
     ['a relative starting path', { mode: 'folder', startingPath: 'tmp' }],
     ['a glob in accept', { mode: 'file', accept: ['*.ts'] }],
+    ['a malformed wildcard MIME type', { mode: 'file', accept: ['image/p*ng'] }],
+    ['a wildcard type', { mode: 'file', accept: ['*/*'] }],
     ['an unknown mode', { mode: 'save' }],
   ])('refuses %s', (_, request) => {
     expect(v.safeParse(nativePickerRequestSchema, request).success).toBe(false)

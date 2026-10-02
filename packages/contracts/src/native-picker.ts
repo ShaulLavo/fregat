@@ -1,16 +1,19 @@
 import * as v from 'valibot'
+import { absolutePathSchema } from './server-identity'
 
-/** A file extension with its dot (`.ts`) or a MIME type (`image/png`). */
+/** A file extension with its dot (`.ts`), a MIME type (`image/png`) or a media range (`image/*`). */
 const acceptEntrySchema = v.pipe(
   v.string(),
-  v.regex(/^(?:\.[A-Za-z0-9_+-]{1,32}|[a-z0-9.+-]{1,64}\/[A-Za-z0-9.+*-]{1,128})$/),
+  v.regex(
+    /^(?:\.[A-Za-z0-9_+-]{1,32}|[a-z0-9][a-z0-9.+-]{0,63}\/(?:\*|[A-Za-z0-9][A-Za-z0-9.+-]{0,127}))$/,
+  ),
 )
 
 /** `POST /fs/native-picker`. `startingPath` is an absolute path on the server's machine. */
 export const nativePickerRequestSchema = v.object({
   mode: v.picklist(['folder', 'file']),
   accept: v.optional(v.pipe(v.array(acceptEntrySchema), v.maxLength(64))),
-  startingPath: v.optional(v.pipe(v.string(), v.startsWith('/'), v.maxLength(4096))),
+  startingPath: v.optional(absolutePathSchema),
   multiple: v.optional(v.boolean()),
 })
 
@@ -18,7 +21,7 @@ export const nativePickerRequestSchema = v.object({
 export const nativePickerResultSchema = v.variant('outcome', [
   v.object({
     outcome: v.literal('selected'),
-    paths: v.pipe(v.array(v.pipe(v.string(), v.startsWith('/'))), v.minLength(1)),
+    paths: v.pipe(v.array(absolutePathSchema), v.minLength(1)),
   }),
   v.object({ outcome: v.literal('cancelled'), paths: v.pipe(v.array(v.string()), v.length(0)) }),
 ])
