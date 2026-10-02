@@ -102,8 +102,7 @@ export function readObservation(
     const primaryWindow = signals?.['X-Codex-Primary-Window-Minutes']
     const secondaryWindow = signals?.['X-Codex-Secondary-Window-Minutes']
     const window = secondaryWindow === '10080' ? 'Secondary' : 'Primary'
-    if (window === 'Primary' && primaryWindow !== undefined && primaryWindow !== '10080')
-      return null
+    if (window === 'Primary' && primaryWindow !== '10080') return null
     const resetAt = Number(signals?.[`X-Codex-${window}-Reset-At`] ?? Number.NaN)
     const usedPercent = Number(signals?.[`X-Codex-${window}-Used-Percent`] ?? Number.NaN)
     const observation: Observation = { resetAt, usedPercent }
