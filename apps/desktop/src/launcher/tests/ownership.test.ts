@@ -91,7 +91,8 @@ test.each(['old-version', 'exit-failure', 'silent'])(
         stateHome: f.root,
         home: f.root,
         url: 'http://localhost:123/',
-        startup: startupBudget(),
+        // Ownership checks must finish even when process counters keep renewing the idle window.
+        startup: { idleMs: 500, limitMs: 1500 },
         onOpen: () => {},
         onFailure: () => {},
       })
