@@ -55,13 +55,18 @@ const codexRowSchema = v.looseObject({
       type: v.optional(v.string()),
       forked_from_id: v.optional(v.nullable(v.string())),
       source: v.optional(
-        v.looseObject({
-          subagent: v.optional(
-            v.looseObject({
-              thread_spawn: v.optional(v.looseObject({ parent_thread_id: v.optional(v.string()) })),
-            }),
-          ),
-        }),
+        v.union([
+          v.string(),
+          v.looseObject({
+            subagent: v.optional(
+              v.looseObject({
+                thread_spawn: v.optional(
+                  v.looseObject({ parent_thread_id: v.optional(v.string()) }),
+                ),
+              }),
+            ),
+          }),
+        ]),
       ),
     }),
   ),
@@ -179,6 +184,12 @@ function addClaudeResponse(
   })
 }
 
+export function claudePromptIdentity(input: unknown): string | null {
+  const row = v.safeParse(claudeRowSchema, input)
+  if (!row.success || !isClaudePrompt(row.output)) return null
+  return row.output.uuid ?? null
+}
+
 /** The same rows history import turns into user messages: typed text, not tool results. */
 function isClaudePrompt(row: ClaudeRow) {
   if (row.type !== 'user' || row.isMeta || row.isCompactSummary) return false
@@ -251,7 +262,9 @@ export function reduceCodexUsage(
   const row = parsed.output
   if (row.type === 'session_meta') {
     state.forked ??= Boolean(
-      row.payload?.forked_from_id || row.payload?.source?.subagent?.thread_spawn?.parent_thread_id,
+      row.payload?.forked_from_id ||
+      (typeof row.payload?.source === 'object' &&
+        row.payload.source.subagent?.thread_spawn?.parent_thread_id),
     )
     return null
   }

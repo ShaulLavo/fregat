@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import { usageTokenCount, providerUsagePurposeSchema } from '@workspace/contracts'
 import {
   claudeTranscriptUsage,
+  claudePromptIdentity,
   initialCodexUsageState,
   reduceCodexUsage,
   codexUsageStateSchema,
@@ -40,6 +41,7 @@ export type TranscriptRecord = v.InferOutput<typeof transcriptRecordSchema>
 export const transcriptReducerSchema = v.object({
   records: v.record(v.string(), transcriptRecordSchema),
   codex: codexUsageStateSchema,
+  claudeTurn: v.nullable(v.string()),
   projector: transcriptJsonStateSchema,
   lines: count,
   malformedLines: count,
@@ -54,6 +56,7 @@ export function initialTranscriptReducer(): TranscriptReducer {
   return {
     records: {},
     codex: initialCodexUsageState(),
+    claudeTurn: null,
     projector: initialTranscriptJsonState(),
     lines: 0,
     malformedLines: 0,
@@ -69,6 +72,7 @@ export function reduceTranscriptRecord(
   catalog: LocalPriceCatalog,
   sourceScope: string,
 ) {
+  if (driverKind === 'claude') state.claudeTurn = claudePromptIdentity(value) ?? state.claudeTurn
   const projected = sourceScopedUsage(value, driverKind, sourceScope, state.lines)
   const entries =
     driverKind === 'claude'
@@ -80,7 +84,7 @@ export function reduceTranscriptRecord(
     const previous = state.records[key]
     const record: TranscriptRecord = {
       ...entry,
-      turnKey: driverKind === 'claude' ? entry.billingKey : entry.turnKey,
+      turnKey: driverKind === 'claude' ? (state.claudeTurn ?? entry.billingKey) : entry.turnKey,
       driverKind,
       identityKind:
         projected.unknownIdentity || entry.billingKey.startsWith('source:') ? 'source' : 'native',
@@ -111,6 +115,8 @@ function combineRecord(current: TranscriptRecord, previous: TranscriptRecord, mo
   }
   if (previous.reportedCostUsd !== null)
     current.reportedCostUsd = Math.max(current.reportedCostUsd ?? 0, previous.reportedCostUsd)
+  if (current.turnKey === current.billingKey && previous.turnKey !== previous.billingKey)
+    current.turnKey = previous.turnKey
   if (previous.recordedAt > current.recordedAt) current.recordedAt = previous.recordedAt
 }
 
