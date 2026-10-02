@@ -84,7 +84,28 @@ Rank the causes by measured share. Candidate areas to confirm or rule out: one s
 GPU submission per frame for all terminals, damage-limited uploads (rows actually changed), avoiding
 full render-state copies out of wasm, atlas churn, and input-to-render ordering inside the frame.
 
-## Phase 2: fix the top causes
+## Phase 2: Zig/WebAssembly frame spike
+
+Status: Approved. Build the supported render frame directly from Ghostty's render state in the
+existing bridge. JavaScript retains canvas glyph rasterization and WebGPU calls. The experimental
+`zigFrame` renderer option defaults off; unsupported frames use the existing JavaScript path.
+
+- [x] Add persistent WASM cell/glyph records, an atlas index, missing glyph keys and changed ranges.
+- [x] Add the opt-in WebGPU path and direct WASM-memory buffer uploads.
+- [x] Prove instance-byte parity, dirty ranges, memory growth and fallback recovery with focused tests.
+      Full unit suite: 405 passed. WebGPU browser coverage: 16 passed, two existing Linux skips.
+- [x] Run existing unit and browser coverage plus supported-subset option-on coverage.
+      Full browser suite: 183 passed, two existing Linux device-loss skips. Focused native frame: 12 passed.
+- [ ] Pull the reviewed Linux benchmark repair before hardware measurement.
+- [ ] Measure JS/Zig/xterm at 1 and 17 terminals, ASCII and SGR, paired in one browser session.
+- [ ] Attribute the replaced snapshot/instance stages and Zig build stage in a Chrome trace.
+- [ ] Complete independent review, push and open a draft PR; leave merge to the owner.
+
+The decision gate is 17-terminal total CPU clearly below xterm (ratio well under 1), with GPU-process
+CPU moving toward xterm. Retain write latency and explain any remaining gap before expanding the
+spike to the full terminal feature set. Measurements use GPU-idle, `--quiet` heavy slots.
+
+### Follow-up causes
 
 One reviewed PR per cause, largest measured share first. Each PR shows before/after on omarchy with
 `bench:compare` (the affected measures, three repetitions, order-alternated, inside a `--quiet` heavy slot with the GPU idle) plus a trace that

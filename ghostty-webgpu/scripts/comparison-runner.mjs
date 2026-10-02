@@ -35,6 +35,7 @@ const manifest = JSON.parse(await readFile(join(root, 'manifest.json'), 'utf8'))
 const args = process.argv.slice(2)
 const smoke = args.includes('--smoke')
 const tracing = args.includes('--trace')
+const pairedFrameBuilders = args.includes('--paired-frame-builders')
 assert(!(smoke && tracing), 'Trace measurements require hardware Chromium')
 const launch = hardwareLaunch(platform(), smoke, smoke && args.includes('--smoke-headed'))
 const headless = launch.headless
@@ -92,12 +93,11 @@ const latencySamples = positiveInteger(
 )
 const outputFrames = positiveInteger(args, '--output-frames', s.outputFrames)
 const traceFrames = positiveInteger(args, '--trace-frames', 180)
-const tracePhases = args.includes('--trace-phase')
-  ? [value('--trace-phase')]
-  : ['latency', 'ascii', 'sgr']
-assert(
-  tracePhases.every((name) => ['latency', 'ascii', 'sgr'].includes(name)),
-  'Trace phase must be latency, ascii, or sgr',
+const tracePhases = selection(
+  args,
+  '--trace-phase',
+  ['latency', 'ascii', 'sgr'],
+  ['latency', 'ascii', 'sgr'],
 )
 await prepareOutput(output, { tracing })
 const temporary = join(root, 'tmp')
@@ -372,7 +372,7 @@ async function parserOnly(testCase, run, contexts) {
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message))
     await page.goto(
-      !smoke || args.includes('--smoke-instrumentation') ? `${origin}/?trace` : origin,
+      `${origin}/?${new URLSearchParams({ ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.evaluate((testCase) => window.__compare.initialize(testCase), testCase)
@@ -496,7 +496,7 @@ async function presentedLatency(page, session, browserSession, run, label, optio
       session,
       browserSession,
       output,
-      label: `${run.variant}-${run.path}-${run.count}-${run.repetition}-${label}`,
+      label: `${run.variant}${run.frameBuilder ? `-${run.frameBuilder}` : ''}-${run.path}-${run.count}-${run.repetition}-${label}`,
       categories:
         'toplevel,devtools.timeline,blink.user_timing,cc,viz,gpu,disabled-by-default-devtools.timeline',
       operation: async () => {
@@ -535,7 +535,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
   })
   try {
     await page.goto(
-      !smoke || args.includes('--smoke-instrumentation') ? `${origin}/?trace` : origin,
+      `${origin}/?${new URLSearchParams({ ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.bringToFront()
@@ -576,7 +576,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
         'Every terminal must fit the visible window',
       )
     }
-    const screenshot = `${testCase.variant}-${testCase.path}-${testCase.count}.png`
+    const screenshot = `${testCase.variant}${testCase.frameBuilder ? `-${testCase.frameBuilder}` : ''}-${testCase.path}-${testCase.count}.png`
     if (repetition === 0) {
       await page.locator('main').screenshot({ path: join(output, screenshot) })
       run.screenshot = screenshot
@@ -643,7 +643,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
           run.phase = `trace/${name}/${traced ? 'trace' : 'control'}/mounted-probe`
           const probe = await qualifyDisplay(page, session, browserSession, run, false)
           const refreshPeriods = probe.periods
-          const label = `${testCase.variant}-${testCase.count}-${repetition}-${name}-${traced ? 'trace' : 'control'}`
+          const label = `${testCase.variant}${testCase.frameBuilder ? `-${testCase.frameBuilder}` : ''}-${testCase.count}-${repetition}-${name}-${traced ? 'trace' : 'control'}`
           run.phases.push(
             Object.assign(
               await qualifiedWindow(run, label, () =>
@@ -798,7 +798,16 @@ try {
     const paths = tracing ? ['bytes'] : repetition % 2 ? writePaths.toReversed() : writePaths
     const cases = paths.flatMap((path) =>
       counts.flatMap((count) =>
-        order(variantIds, repetition).map((variant) => ({ variant, path, count })),
+        order(variantIds, repetition).flatMap((variant) => {
+          if (!pairedFrameBuilders || variant !== 'ghostty-webgpu')
+            return [{ variant, path, count }]
+          return order(['js', 'zig'], repetition).map((frameBuilder) => ({
+            variant,
+            path,
+            count,
+            frameBuilder,
+          }))
+        }),
       ),
     )
     for (const testCase of cases) {

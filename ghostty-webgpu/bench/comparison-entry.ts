@@ -37,6 +37,7 @@ interface Driver {
   focus(): void
   onData(listener: (data: string | Uint8Array) => void): void
   dispose(): void
+  frameMetrics?(): import('../src/render/renderer.js').RendererMetrics | undefined
 }
 
 const tracing = new ComparisonTracing()
@@ -117,6 +118,7 @@ async function createNative(host: HTMLElement): Promise<Driver> {
     background: { r: 0, g: 0, b: 0 },
     foreground: { r: 255, g: 255, b: 255 },
   })
+  let mountedRenderer: WebGpuTerminalRenderer | undefined
   const terminal = createGhosttyWebGpuTerminalFromSession(session, {
     autoFit: false,
     accessibility: false,
@@ -138,9 +140,11 @@ async function createNative(host: HTMLElement): Promise<Driver> {
       const device = await adapter.requestDevice()
       const renderer = await WebGpuTerminalRenderer.create({
         ...options,
+        zigFrame: new URLSearchParams(location.search).has('zig'),
         deviceFactory: async () => device,
       })
       tracing.renderer(drivers.length, renderer)
+      mountedRenderer = renderer
       return renderer
     },
   })
@@ -154,6 +158,7 @@ async function createNative(host: HTMLElement): Promise<Driver> {
       terminal.write(data)
     },
     text: () => terminal.visibleLines(),
+    frameMetrics: () => (mountedRenderer ? { ...mountedRenderer.metrics } : undefined),
     history: () => terminal.lineCount() - settings.rows,
     focus: () => terminal.focus(),
     onData: (listener) => {
@@ -636,6 +641,7 @@ window.__compare = {
       height: canvas.height,
     })),
     texts: drivers.map((driver) => driver.text()),
+    frameMetrics: drivers.map((driver) => driver.frameMetrics?.()),
   }),
   fixtureNames,
   cancelRefresh: refresh.cancel,

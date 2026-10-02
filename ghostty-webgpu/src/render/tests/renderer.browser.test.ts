@@ -806,3 +806,110 @@ it('consumes the real libghostty-vt damage contract in a browser', async () => {
   runtime.dispose()
   canvas.remove()
 })
+
+it('paints experimental WASM ASCII frames without JS row reads and falls back for Unicode', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 24, rows: 3 })
+  const state = runtime.createRenderState(terminal)
+  terminal.write(
+    '\x1b[?25l\x1b[31;44mANSI\x1b[0m plain changed\r\n\x1b[38;5;202mindexed\r\n\x1b[38;2;10;80;200mRGB',
+  )
+  const readRows = vi.spyOn(state, 'readRows')
+  const nativeClock = new FakeClock()
+  const jsClock = new FakeClock()
+  const native = await createRenderer({
+    canvas: createCanvas(),
+    columns: 24,
+    rows: 3,
+    font: fittedFont(),
+    renderState: state,
+    schedulerClock: nativeClock,
+    zigFrame: true,
+  })
+  const js = await createRenderer({
+    canvas: createCanvas(),
+    columns: 24,
+    rows: 3,
+    font: fittedFont(),
+    renderState: state,
+    schedulerClock: jsClock,
+  })
+  try {
+    nativeClock.flushFrame()
+    expect(native.metrics.zigFrames).toBe(1)
+    expect(native.metrics.jsFallbackFrames).toBe(0)
+    expect(readRows).not.toHaveBeenCalled()
+    jsClock.flushFrame()
+    const [nativePixels, jsPixels] = await Promise.all([native.capturePixels(), js.capturePixels()])
+    expect(nativePixels).toEqual(jsPixels)
+    readRows.mockClear()
+    const uploaded = native.metrics.uploadedBytes
+    terminal.write('\x1b[2;1Hchanged')
+    native.notifyWrite()
+    nativeClock.flushFrame()
+    expect(native.metrics.zigFrames).toBe(2)
+    expect(native.metrics.uploadedBytes - uploaded).toBeGreaterThan(0)
+    expect(native.metrics.uploadedBytes - uploaded).toBeLessThanOrEqual(24 * (64 + 96))
+    expect(readRows).not.toHaveBeenCalled()
+    js.refreshRows(0, 2)
+    jsClock.flushFrame()
+    const [changedNativePixels, changedJsPixels] = await Promise.all([
+      native.capturePixels(),
+      js.capturePixels(),
+    ])
+    expect(changedNativePixels).toEqual(changedJsPixels)
+    terminal.write('\x1b[3;1H界')
+    native.notifyWrite()
+    nativeClock.flushFrame()
+    expect(native.metrics.jsFallbackFrames).toBe(1)
+    expect(readRows).toHaveBeenCalled()
+    terminal.write('\x1b[3;1H\x1b[2KASCII')
+    readRows.mockClear()
+    native.notifyWrite()
+    nativeClock.flushFrame()
+    expect(native.metrics.zigFrames).toBe(3)
+    expect(native.metrics.jsFallbackFrames).toBe(1)
+    expect(readRows).not.toHaveBeenCalled()
+  } finally {
+    native.dispose()
+    js.dispose()
+    runtime.dispose()
+  }
+})
+
+it('keeps native frame callbacks current for DOM text and cursor consumers', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 16, rows: 2 })
+  const state = runtime.createRenderState(terminal)
+  const clock = new FakeClock()
+  const onFrame = vi.fn()
+  const onRowsPainted = vi.fn()
+  terminal.write('first')
+  const renderer = await createRenderer({
+    canvas: createCanvas(),
+    columns: 16,
+    rows: 2,
+    font: fittedFont(),
+    renderState: state,
+    schedulerClock: clock,
+    zigFrame: true,
+    onFrame,
+    onRowsPainted,
+  })
+  try {
+    clock.flushFrame()
+    expect(onFrame.mock.calls.at(-1)![0].rows[0].text.trimEnd()).toBe('first')
+    expect(onFrame.mock.calls.at(-1)![0].cursor.viewport.x).toBe(5)
+    expect(onRowsPainted).toHaveBeenCalledTimes(1)
+    terminal.write('\rsecond')
+    renderer.notifyWrite()
+    clock.flushFrame()
+    expect(onFrame.mock.calls.at(-1)![0].rows[0].text.trimEnd()).toBe('second')
+    expect(onFrame.mock.calls.at(-1)![0].cursor.viewport.x).toBe(6)
+    expect(renderer.metrics.zigFrames).toBe(2)
+    expect(renderer.metrics.jsFallbackFrames).toBe(0)
+  } finally {
+    renderer.dispose()
+    runtime.dispose()
+  }
+})

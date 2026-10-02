@@ -1,5 +1,6 @@
 import { PNG } from 'pngjs'
 import { ink } from './comparison-pixels.mjs'
+import { ComparisonTracing } from '../bench/comparison-tracing.ts'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
@@ -104,6 +105,70 @@ test('results take medians across repetitions and preserve negative memory noise
   assert.equal(rows.find(({ metric }) => metric === 'write/p50').median, 2.5)
   assert.equal(rows.find(({ metric }) => metric === 'memory/terminal').median, -10 / 1048576)
   assert.equal(rows.find(({ metric }) => metric === 'parse/ascii').repetitions, 3)
+})
+
+test('paired frame-builder summaries keep JS and Zig treatments separate', () => {
+  const runs = ['js', 'zig'].map((frameBuilder, index) => ({
+    variant: 'ghostty-webgpu',
+    frameBuilder,
+    path: 'bytes',
+    count: 17,
+    latency: { write: [index + 1] },
+  }))
+  const rows = summaries({ runs })
+  assert.equal(rows.find((row) => row.variant === 'ghostty-webgpu-js').median, 1)
+  assert.equal(rows.find((row) => row.variant === 'ghostty-webgpu-zig').median, 2)
+})
+
+test('builders created before recording acquire their own measured boundary', () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'location')
+  Object.defineProperty(globalThis, 'location', { configurable: true, value: { search: '?trace' } })
+  try {
+    const tracing = new ComparisonTracing()
+    const factory = { create: () => ({ build: () => 42 }) }
+    tracing.wrap(
+      factory,
+      'create',
+      0,
+      'js',
+      (builder) => {
+        tracing.wrap(builder, 'build', 0, 'instances')
+      },
+      true,
+    )
+    const builder = factory.create()
+    tracing.begin()
+    assert.equal(builder.build(), 42)
+    const result = tracing.end()
+    assert.deepEqual(
+      result.spans.map((span) => [span.operation, span.category]),
+      [['build', 'instances']],
+    )
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'location', original)
+    else delete globalThis.location
+  }
+})
+
+test('paired frame-builder report exposes both native absolute measurements', () => {
+  const artifact = pairedArtifact()
+  const baselineRows = pairedRatios(artifact)
+  artifact.runs = artifact.runs.flatMap((run) =>
+    run.variant === 'ghostty-webgpu'
+      ? ['js', 'zig'].map((frameBuilder) => ({ ...run, frameBuilder }))
+      : [run],
+  )
+  const report = markdown(artifact)
+  assert(report.includes('| Measure | ghostty-webgpu-js | ghostty-webgpu-zig | xterm-webgl |'))
+  const nativeRows = pairedRatios(artifact)
+  assert.equal(nativeRows.length, baselineRows.length * 2)
+  for (const builder of ['js', 'zig'])
+    assert.deepEqual(
+      nativeRows
+        .filter((row) => row.frameBuilder === builder)
+        .map(({ frameBuilder: _, ...row }) => row),
+      baselineRows,
+    )
 })
 
 test('software smoke never produces a results document', () => {

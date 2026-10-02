@@ -31,10 +31,10 @@ export function summaries(artifact) {
   const groups = new Map()
   const add = (run, metric, value, unit) => {
     if (!Number.isFinite(value)) return
-    const key = [run.variant, run.path, run.count, metric].join('/')
+    const key = [run.variant, run.frameBuilder ?? '', run.path, run.count, metric].join('/')
     if (!groups.has(key))
       groups.set(key, {
-        variant: run.variant,
+        variant: run.frameBuilder ? `${run.variant}-${run.frameBuilder}` : run.variant,
         path: run.path,
         count: run.count,
         metric,
@@ -227,6 +227,16 @@ function hasPairConfiguration(artifact) {
 }
 
 export function pairedRatios(artifact) {
+  const builders = [...new Set(artifact.runs.map((run) => run.frameBuilder).filter(Boolean))]
+  if (builders.length)
+    return builders.flatMap((frameBuilder) =>
+      pairedRatios({
+        ...artifact,
+        runs: artifact.runs
+          .filter((run) => !run.frameBuilder || run.frameBuilder === frameBuilder)
+          .map(({ frameBuilder: _, ...run }) => run),
+      }).map((row) => ({ ...row, frameBuilder })),
+    )
   if (!hasPairConfiguration(artifact)) return []
   const groups = new Map()
   for (const run of artifact.runs) {
@@ -282,7 +292,7 @@ function pairedMarkdown(artifact) {
   ]
   for (const row of rows)
     lines.push(
-      `| ${row.count} | ${row.path} | ${row.variant} | ${row.metric} | ${row.median === null ? 'unmeasured' : number(row.median)} | ≤ 1 | ${row.repetitions}/${artifact.repetitions} | ${row.status} |`,
+      `| ${row.count} | ${row.path} | ${row.frameBuilder ? `${row.frameBuilder} / ` : ''}${row.variant} | ${row.metric} | ${row.median === null ? 'unmeasured' : number(row.median)} | ≤ 1 | ${row.repetitions}/${artifact.repetitions} | ${row.status} |`,
     )
   lines.push(
     '',
@@ -294,7 +304,7 @@ function pairedMarkdown(artifact) {
   for (const row of rows) {
     for (const pair of row.pairs)
       lines.push(
-        `| ${row.count} | ${row.path} | ${row.variant} | ${row.metric} | ${pair.pairId.replaceAll('|', '\\|').replaceAll('\n', ' ')} | ${pair.repetition + 1} | ${number(pair.native)} ${row.unit} | ${number(pair.xterm)} ${row.unit} | ${number(pair.ratio)} |`,
+        `| ${row.count} | ${row.path} | ${row.frameBuilder ? `${row.frameBuilder} / ` : ''}${row.variant} | ${row.metric} | ${pair.pairId.replaceAll('|', '\\|').replaceAll('\n', ' ')} | ${pair.repetition + 1} | ${number(pair.native)} ${row.unit} | ${number(pair.xterm)} ${row.unit} | ${number(pair.ratio)} |`,
       )
   }
   return lines
@@ -390,7 +400,13 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     '## Results',
     '',
   ]
-  const variants = artifact.variants ?? artifact.manifest.variants.map(({ id }) => id)
+  const selectedVariants = artifact.variants ?? artifact.manifest.variants.map(({ id }) => id)
+  const builders = [...new Set(artifact.runs.map((run) => run.frameBuilder).filter(Boolean))]
+  const variants = selectedVariants.flatMap((id) =>
+    id === 'ghostty-webgpu' && builders.length
+      ? builders.map((builder) => `${id}-${builder}`)
+      : [id],
+  )
   const cases = (artifact.counts ?? artifact.manifest.settings.counts).flatMap((count) =>
     (artifact.paths ?? ['bytes', 'string']).map((path) => ({ count, path })),
   )

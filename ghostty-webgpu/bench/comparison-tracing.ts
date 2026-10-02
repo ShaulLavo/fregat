@@ -64,6 +64,7 @@ export class ComparisonTracing {
     terminal: number | ((args: unknown[]) => number),
     category: Category,
     after?: (result: unknown, args: unknown[]) => void,
+    observeInactive = false,
   ): void {
     if (!this.enabled) return
     const original = field(object, name)
@@ -71,7 +72,11 @@ export class ComparisonTracing {
     // oxlint-disable-next-line typescript/no-this-alias -- Preserve the wrapped method's receiver.
     const recorder = this
     Reflect.set(object as object, name, function (this: unknown, ...args: unknown[]) {
-      if (!recorder.active) return (original as Method).apply(this, args)
+      if (!recorder.active) {
+        const result = (original as Method).apply(this, args)
+        if (observeInactive) after?.(result, args)
+        return result
+      }
       const start = performance.now()
       const context = { children: 0 }
       recorder.stack.push(context)
@@ -122,6 +127,16 @@ export class ComparisonTracing {
       )
     })
     this.wrap(state, 'acknowledge', terminal, 'damage')
+    this.wrap(
+      state,
+      'createFrameBuilder',
+      terminal,
+      'js',
+      (builder) => {
+        this.wrap(builder, 'build', terminal, 'instances', () => this.count(terminal, 'zigBuilds'))
+      },
+      true,
+    )
   }
 
   renderer(terminal: number, renderer: WebGpuTerminalRenderer): void {
@@ -142,6 +157,9 @@ export class ComparisonTracing {
     this.wrap(renderer, 'drawFrame', terminal, 'js', () => this.count(terminal, 'frames'))
     this.wrap(renderer, 'rowsToRebuild', terminal, 'damage')
     this.wrap(renderer, 'rebuildRows', terminal, 'instances')
+    this.wrap(renderer, 'drawZigFrame', terminal, 'js', (supported) => {
+      this.count(terminal, supported ? 'zigFrames' : 'zigFallbackFrames')
+    })
     this.wrap(pass, 'upload', terminal, 'upload', (result, args) => {
       this.count(terminal, 'buffersWritten', result as number)
       const rows = args[1] as { cell: { byteLength: number }; glyph: { byteLength: number } }[]
@@ -149,6 +167,15 @@ export class ComparisonTracing {
         terminal,
         'bufferBytes',
         rows.reduce((sum, row) => sum + row.cell.byteLength + row.glyph.byteLength, 0),
+      )
+    })
+    this.wrap(pass, 'uploadFrame', terminal, 'upload', (result, args) => {
+      this.count(terminal, 'buffersWritten', result as number)
+      const ranges = args[1] as { cell: { byteLength: number }; glyph: { byteLength: number } }[]
+      this.count(
+        terminal,
+        'bufferBytes',
+        ranges.reduce((sum, range) => sum + range.cell.byteLength + range.glyph.byteLength, 0),
       )
     })
     const atlas = field(renderer, 'atlasTextures')
