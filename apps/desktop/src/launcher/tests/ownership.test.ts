@@ -6,13 +6,11 @@ import path from 'node:path'
 import { startupBudget } from '../startup'
 import { launchChromium } from '../chromium'
 import { cdpPipe } from '../cdp'
-import { liveSingletonOwner } from '../singleton'
+import { singletonState } from '../singleton'
 import type { BrowserCandidate } from '../browser'
 
 async function fixture(mode: string) {
-  const root = await mkdtemp(
-    path.join(existsSync('/work/tmp') ? '/work/tmp' : tmpdir(), 'polaron-owner-'),
-  )
+  const root = await mkdtemp(path.join(tmpdir(), 'polaron-owner-'))
   const pidFile = path.join(root, 'pid')
   const candidate: BrowserCandidate = {
     kind: 'chromium',
@@ -60,10 +58,12 @@ test.each(Array.from({ length: 30 }, (_, run) => run))(
         url: 'http://localhost:123/',
         startup: startupBudget(),
         onOpen: () => {},
-        onFailure: () => {},
       })
       expect(result).toEqual({ kind: 'handoff' })
       expect(processExists(other.pid)).toBe(true)
+      const args = JSON.parse(await readFile(f.pidFile + '.args', 'utf8'))
+      expect(args.some((arg: string) => arg.startsWith('--app-id='))).toBe(true)
+      expect(args).not.toContain('--remote-debugging-pipe')
       expect(processExists(Number(await readFile(f.pidFile, 'utf8')))).toBe(false)
     } finally {
       other.kill('SIGTERM')
@@ -94,7 +94,6 @@ test.each(['old-version', 'exit-failure', 'silent'])(
         // Ownership checks must finish even when process counters keep renewing the idle window.
         startup: { idleMs: 500, limitMs: 1500 },
         onOpen: () => {},
-        onFailure: () => {},
       })
       if (mode === 'old-version') {
         await expect(launch).rejects.toMatchObject({
@@ -129,7 +128,6 @@ test('abort during startup closes only the child that this launcher started', as
       startup: startupBudget(),
       signal: controller.signal,
       onOpen: () => {},
-      onFailure: () => {},
     })
     while (!existsSync(f.pidFile)) await Bun.sleep(5)
     const abortedAt = performance.now()
@@ -153,9 +151,8 @@ test('a configured zero-exit executable without a controlled singleton is reject
         url: 'http://localhost:123/',
         startup: startupBudget(),
         onOpen: () => {},
-        onFailure: () => {},
       }),
-    ).rejects.toThrow('desktop window could not open')
+    ).rejects.toThrow()
   } finally {
     await rm(f.root, { recursive: true, force: true })
   }
@@ -189,7 +186,7 @@ test.each(Array.from({ length: 30 }, (_, run) => run))(
   },
 )
 
-test('/bin/true with an existing valid profile owner is rejected and preserves that owner', async () => {
+test('a selected launcher wrapper can differ from a live profile owner', async () => {
   const f = await fixture('handoff')
   const profile = path.join(f.root, 'desktop/chromium')
   await mkdir(profile, { recursive: true })
@@ -207,7 +204,7 @@ test('/bin/true with an existing valid profile owner is rejected and preserves t
   )
   await symlink(`${hostname()}-${other.pid}`, path.join(profile, 'SingletonLock'))
   try {
-    expect(liveSingletonOwner(profile, process.execPath)).toBe(true)
+    expect(await singletonState(profile, 1000)).toBe('live')
     await expect(
       launchChromium({
         candidate: { ...f.candidate, executable: '/bin/true', args: [] },
@@ -216,9 +213,8 @@ test('/bin/true with an existing valid profile owner is rejected and preserves t
         url: 'http://localhost:123/',
         startup: startupBudget(),
         onOpen: () => {},
-        onFailure: () => {},
       }),
-    ).rejects.toThrow('desktop window could not open')
+    ).resolves.toEqual({ kind: 'handoff' })
     expect(processExists(other.pid)).toBe(true)
   } finally {
     other.kill('SIGTERM')

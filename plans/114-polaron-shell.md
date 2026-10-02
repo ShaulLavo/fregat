@@ -136,39 +136,72 @@ cancellation, timeouts and backend path hydration on local connections.
 
 ### PWA installation and launch control
 
-Use the existing CDP pipe only for installation/launch control, never for runtime bridge
-injection, window dragging, chooser calls, permission grants, or lifecycle correctness.
+**Approved launch-control adjustment (2026-10-02).** The private pipe belongs to a temporary
+installation controller. Both headless and headed Helium exit when that pipe closes. The user
+app therefore launches through the browser's installed-app command after the controller exits.
+No runtime bridge, debugging connection, chooser binding or permission grant reaches that app.
 
 1. Resolve the effective browser profile and stable absolute manifest identity for the app URL.
-   Start or connect only to a browser under that selected profile. An explicit browser setting
-   keeps precedence; use Chrome-first ordering for automatic selection.
-2. Call `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. In the
-   observed protocol an unknown valid manifest id is `InvalidParams` (`-32602`), not an
-   `installed: false` field. Validate the identity before interpreting that response.
+   An explicit browser setting keeps precedence; automatic selection uses Chrome-first ordering.
+   Hold a launcher-owned `flock` file beside that profile through installation, controller exit and
+   app handoff. A second launcher waits within the same startup cap, then rechecks the singleton;
+   it never forwards its URL to another launcher's installation controller. The kernel releases
+   ownership when a launcher exits or dies, and the lock file's inode remains for other waiters.
+   A live profile routes directly through the browser singleton and never starts a controller.
+   Probe `SingletonSocket` with Chromium's matching cookie links before and after connecting;
+   send no launch data on the probe. If the socket cannot be checked, a `SingletonLock` naming a
+   live local hostname-pid owner suffices. Ownership never depends on argv or executable paths,
+   so a Dock app-shim owner or a confined browser can use the same dedicated profile.
+2. An idle profile goes straight to the registered app when its verified receipt matches the
+   current served manifest id, resolved start URL and SHA256 of the manifest bytes, and Chrome's
+   per-app resource directory exists. The directory is
+   `<user-data-dir>/Platform/Web Applications/Manifest Resources/<appId>`: Chromium 154's
+   `GetManifestResourcesDirectoryForApp` and `kWebAppDirname` define it, and
+   `WebAppIconManager::DeleteData` recursively removes it on uninstall. This read-only directory
+   check detects uninstall without opening a controller or reading a browser database. A missing
+   receipt, changed manifest or missing directory runs setup. A failed direct app launch invalidates
+   its receipt and retries setup while idle within the remaining startup cap; an exhausted cap
+   leaves setup for the next idle launch. Singleton presence proves ownership, never an app window.
+   Setup starts a temporary browser with the existing CDP pipe and calls
+   `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. An unknown
+   app returns `InvalidParams` (`-32602`) with the unknown-app reason. Other parameter failures
+   remain operational errors; there is no `installed: false` field.
 3. For an uninstalled identity, call
    `PWA.install({ manifestId, installUrlOrBundleUrl: installUrl })` and check OS state again.
-   A failed installation is a failed launch with structured guidance; never suppress arbitrary
-   install failures as an unsupported-domain case. Repeat launch converges after a partial install.
-4. Call `PWA.launch({ manifestId, url })`; the manifest's launch policy chooses the client.
-   `PWA.launch` returns a tab target id, which is not necessarily the page target id. Installation
-   readiness is OS state plus an app document, not the former injected-bridge attach barrier.
-5. Release launch-control resources without terminating a successfully launched app or a browser
-   owned by another entry point. App window close and relaunch behavior belongs to the browser.
-   Direct Dock launch follows the same manifest and app logic with no controller at all.
+   A failed installation is a failed launch with structured guidance. Repeat idle setup converges
+   after a partial install or uninstall. Installation repair runs only while the profile is idle.
+4. Before closing the controller, query `Target.getTargets` and collect its HTTP(S) page URLs;
+   the dedicated controller's bootstrap is `about:blank`, and workers are excluded. De-duplicate
+   those app-window URLs with the launcher's URL. Close the pipe, await exit, then replay every
+   collected URL through the same installed `--app-id`, computed once from the original install
+   URL. Target navigation changes only the launch URL, including nested paths. This preserves OS
+   shortcut launches that bypass the launcher lock during setup. If an OS app wins the singleton after the idle check, the controller exits
+   through singleton handoff or EOF; recheck ownership and forward the launcher's URL to that
+   live browser. Skip installation this run and leave repair to the next idle launch.
+   Compute Chromium's app id from the canonical manifest URL using two SHA256 hashes of raw bytes,
+   then encode the first 128 bits as letters a–p. This uses Chromium's public identity algorithm;
+   no browser database is read or changed.
+5. Launch `--app-id=<id>` on the same profile, with the incoming address carried by
+   `--app-launch-url-for-shortcuts-menu-item`. Use no CDP flag. The browser's installed manifest
+   owns client focus and the web `launchQueue` consumer owns URL delivery. Repeated launcher and
+   Dock launches use the same browser singleton, including a Dock-first launch with no receipt.
+   Launcher exit or cancellation after handoff leaves the user app and shared server running.
 
-`PWA.openCurrentPageInApp({ manifestId })` is a page-target method and was probed as an alternative.
-The chosen target is `PWA.launch` because reparenting a bootstrap `--app` page adds a spare browser
-New Tab on Linux and retains unnecessary attach/promotion logic. That earlier experiment does
-not ship.
+`PWA.launch` and `PWA.openCurrentPageInApp` remain protocol experiments. Neither ships as the
+user-window launch route because releasing their controller pipe terminates that browser.
+Reparenting a bootstrap `--app` page also retained a spare New Tab and unnecessary promotion code.
 
-**Engineering proof needed before code.** A Dock-started browser already owns the profile and
-was not started with the private CDP pipe. A second process singleton handoff cannot retroactively
-add that pipe to the existing browser. Prove the browser's normal installed-app launch command
-(`--app-id` for the installed identity) for this handoff, or another browser-supported launch
-route, with an already running Dock client. It must focus the existing installed client and
-preserve URL delivery. Do not scan or mutate browser databases, intercept Dock launch, require
-runtime debugging for app functionality, or kill the Dock's browser to regain CDP control.
-Installation repair after uninstall while that browser is running also needs a bounded proof.
+**Linux proof and limits.** Disposable Helium 154 and Chromium 152 profiles proved registration,
+repeat state queries and uninstall/reinstall through the pipe. A private Hyprland session proved
+that the Helium controller exits before a browser-owned app launches, that a second `--app-id`
+focuses the existing sole window, and that its last-window close works. The nested display's known
+gray render leaves app title/icon and launchQueue URL delivery unconfirmed. Evidence is retained
+at `/work/tmp/fregat-evidence/u1-installed-client-20261002/`; private compositor and DBus teardown
+records are linked there. Chrome and macOS remain coordinator acceptance work.
+
+A Dock-started browser cannot acquire a retroactive private pipe. Do not scan browser databases,
+intercept Dock launch, require runtime debugging, or kill that browser to regain installation
+control. Uninstall during a live session requires closing that profile before repair.
 
 **Approved owner decision (2026-10-02): native-host fallback.** When the selected browser
 cannot install apps because the PWA domain or install support is absent, or no Chromium-family

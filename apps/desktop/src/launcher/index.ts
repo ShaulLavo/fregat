@@ -13,13 +13,19 @@ import {
   recordDesktopError,
 } from '../bun/observability'
 import { resolveBrowserCandidates } from './browser'
-import { launchChromium } from './chromium'
+import { launchInstalledWindow } from './installed-window'
+import {
+  ensureInstalledService,
+  installationIntent,
+  installationReleaseRoot,
+} from './installation-client'
 import { launchWebview, nativeHostBinary, showStartFailure } from './native-window'
 import { nativeBudget } from './native-helper'
 import { startupBudget } from './startup'
 import { isRecord } from '@workspace/utils/objects'
 import { desktopStateHome } from './profile'
 import { launcherErrors } from './structured-errors'
+import { readInstallManifest } from './install-receipt'
 
 const root = path.resolve(import.meta.dirname, '../../../..')
 applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
@@ -64,19 +70,29 @@ async function start() {
     throw launcherErrors.LAUNCH_FAILED({
       internal: { platform: process.platform, supportedPlatforms: ['linux', 'darwin'] },
     })
-  const web = runtimeUrl(Bun.env.WEB_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'WEB_PORT', 5173))
-  const server = runtimeUrl(Bun.env.FS_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'PORT', 3001))
-  recordDesktopInfo('desktop.shared_dev.wait')
-  await waitForHttp(`${server}/health`, web)
-  await waitForHttp(web, web)
+  const mode = Bun.argv.includes('--dev') ? 'dev' : 'production'
+  const home = homedir()
+  const stateHome = desktopStateHome({ PLATFORM_HOME: Bun.env.PLATFORM_HOME }, home, mode)
+  let web: string
+  let server: string
+  if (mode === 'dev') {
+    web = runtimeUrl(Bun.env.WEB_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'WEB_PORT', 5173))
+    server = runtimeUrl(Bun.env.FS_HOST ?? '127.0.0.1', portFromEnv(Bun.env, 'PORT', 3001))
+    recordDesktopInfo('desktop.shared_dev.wait')
+    await waitForHttp(`${server}/health`, web)
+    await waitForHttp(web, web)
+  } else {
+    const service = await ensureInstalledService({
+      intent: installationIntent(stateHome),
+      productionRoot: installationReleaseRoot(stateHome, home),
+      signal: controller.signal,
+    })
+    web = service.url
+    server = service.url.replace(/\/$/, '')
+    recordDesktopInfo('desktop.service.ready', { disposition: service.disposition })
+  }
   const settings = await readSettings(server, web)
   helperBudget = settings.native
-  const home = homedir()
-  const stateHome = desktopStateHome(
-    { PLATFORM_HOME: Bun.env.PLATFORM_HOME },
-    home,
-    Bun.argv.includes('--dev') ? 'dev' : 'production',
-  )
   const candidates = resolveBrowserCandidates(
     settings.browser,
     settings.transparency,
@@ -99,19 +115,21 @@ async function start() {
         : { kind: candidate.kind },
     ),
   })
+  const openNative = () =>
+    launchWebview({
+      binary,
+      url: web,
+      signal: controller.signal,
+      budget: settings.native,
+      startup: settings.startup,
+      vibrancy: settings.transparency === 'window',
+      onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
+    })
   for (const candidate of candidates) {
     controller.signal.throwIfAborted()
     if (candidate.kind === 'webview') {
       try {
-        window = await launchWebview({
-          binary,
-          url: web,
-          signal: controller.signal,
-          budget: settings.native,
-          startup: settings.startup,
-          vibrancy: settings.transparency === 'window',
-          onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
-        })
+        window = await openNative()
       } catch (error) {
         if (controller.signal.aborted) throw error
         recordDesktopInfo('desktop.browser.rejected', {
@@ -145,23 +163,23 @@ async function start() {
       return
     }
     try {
-      const result = await launchChromium({
-        candidate,
-        stateHome,
-        home,
-        url: web,
-        startup: settings.startup,
-        native: { binary, budget: settings.native },
-        signal: controller.signal,
-        onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
-        onExit: (context) => recordDesktopInfo('desktop.window.closed', context),
-        onFailure: (error) =>
-          recordDesktopError('desktop.window.control_failed', {
-            outcome: 'failed',
+      const result = await launchInstalledWindow({
+        native: openNative,
+        onUnsupported: (error) =>
+          recordDesktopInfo('desktop.browser.installation_unavailable', {
             source: candidate.source,
-            confinement: candidate.confinement,
             ...launcherFailureFacts(error),
           }),
+        browser: {
+          candidate,
+          stateHome,
+          home,
+          url: web,
+          manifest: await readInstallManifest(web, requestSignal()),
+          startup: settings.startup,
+          signal: controller.signal,
+          onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
+        },
       })
       recordDesktopInfo('desktop.browser.chosen', {
         source: candidate.source,
@@ -179,6 +197,7 @@ async function start() {
         confinement: candidate.confinement,
         ...launcherFailureFacts(error),
       })
+      throw error
     }
   }
 }

@@ -103,7 +103,7 @@ export async function showStartFailure(
   }
 }
 
-export async function completePick(
+async function completePick(
   id: number,
   documentId: string,
   pending: Promise<string[]>,

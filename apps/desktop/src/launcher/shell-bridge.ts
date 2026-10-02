@@ -38,7 +38,7 @@ export function parsePickRequest(
 }
 export function shellBridge(
   url: string,
-  engine: 'chromium' | 'webkitgtk' | 'wkwebview',
+  engine: 'webkitgtk' | 'wkwebview',
   token?: string,
   platform: NodeJS.Platform = process.platform,
   vibrancy = false,
@@ -53,16 +53,12 @@ export function shellBridge(
     platform: platform === 'darwin' ? 'darwin' : 'linux',
     colorScheme: null,
     titlebar: engine === 'wkwebview' ? 'overlay' : 'native',
-    capabilities: { displayCapture: engine === 'chromium' },
+    capabilities: { displayCapture: false },
   }
-  const transport =
-    engine === 'chromium'
-      ? 'globalThis.platformShellCall(JSON.stringify(body))'
-      : 'webkit.messageHandlers.platformShell.postMessage(body)'
   return `(() => {
     if (location.origin !== ${JSON.stringify(new URL(url).origin)} || window !== window.top || globalThis.__platformShellReply) return;
     const bridge = ${JSON.stringify(bridge)};
-    const send = body => { ${transport}; };
+    const send = body => { webkit.messageHandlers.platformShell.postMessage(body); };
     const token = ${JSON.stringify(token)};
     const documentId = crypto.randomUUID();
     const pending = new Map();
