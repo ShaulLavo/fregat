@@ -1,9 +1,16 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { TerminalScrollbar } from '../../core/types.js'
+import { GlyphAtlas } from '../../render/atlas/atlas.js'
+import type { CanvasGlyphRasterizer } from '../../render/atlas/canvas-rasterizer.js'
+import { AtlasGpuTextures } from '../../render/atlas/gpu-textures.js'
+import { WebGpuTerminalRenderer } from '../../render/renderer.js'
+import type { RenderScheduler } from '../../render/scheduler.js'
+import type { WebGpuTextPass } from '../../render/text-pass.js'
 import type {
   RendererFrameSnapshot,
   RendererGridSize,
+  RendererTextFrameSnapshot,
   WebGpuTerminalRendererOptions,
 } from '../../render/renderer.js'
 import type { ProvidedLink } from '../../term/links.js'
@@ -14,6 +21,7 @@ import {
   type TerminalAccessibilityController,
 } from '../accessibility.js'
 import { createDomClipboardPolicyAdapter } from '../clipboard.js'
+import { fitTerminalFont } from '../fit.js'
 import { createDomLinkController, type DomLinkController } from '../links.js'
 import type { CommittedPointerLayout } from '../pointer.js'
 import { createTerminalScrollbar, type TerminalScrollbarClock } from '../scrollbar.js'
@@ -76,7 +84,7 @@ class FrameRenderer implements GhosttyWebGpuRenderer {
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly onFrame: WebGpuTerminalRendererOptions['onFrame'],
+    private readonly onTextFrame: WebGpuTerminalRendererOptions['onTextFrame'],
     initial: Pick<WebGpuTerminalRendererOptions, 'columns' | 'font' | 'rows'>,
   ) {
     this.font = initial.font
@@ -92,7 +100,7 @@ class FrameRenderer implements GhosttyWebGpuRenderer {
 
   emit(snapshot: RendererFrameSnapshot): void {
     this.emittedFrames += 1
-    this.onFrame?.(snapshot)
+    this.onTextFrame?.(snapshot)
   }
 
   notifyScroll(): void {}
@@ -340,7 +348,7 @@ async function createIntegratedHarness(
     rendererFactory: async (rendererOptions) => {
       const canvas = rendererOptions.canvas
       if (!(canvas instanceof HTMLCanvasElement)) throw new TypeError('Expected an HTML canvas')
-      renderer = new FrameRenderer(canvas, rendererOptions.onFrame, rendererOptions)
+      renderer = new FrameRenderer(canvas, rendererOptions.onTextFrame, rendererOptions)
       return renderer
     },
     runtime: { kind: 'borrowed', runtime },
@@ -350,6 +358,107 @@ async function createIntegratedHarness(
   await settleTerminal(terminal)
   if (!renderer) throw new Error('Integrated renderer was not created')
   return { host, renderer, terminal }
+}
+
+async function createObservedWebGpuHarness(options: GhosttyWebGpuTerminalOptions = {}): Promise<{
+  readonly host: HTMLDivElement
+  readonly renderer: WebGpuTerminalRenderer
+  readonly snapshots: readonly RendererTextFrameSnapshot[]
+  readonly terminal: Terminal
+  readRowsCalls(): number
+  readTextRowsCalls(): number
+  updateCalls(): number
+}> {
+  const host = appendRoot(420, 140)
+  const snapshots: RendererTextFrameSnapshot[] = []
+  let renderer: WebGpuTerminalRenderer | undefined
+  let readRowsCalls = () => 0
+  let readTextRowsCalls = () => 0
+  let updateCalls = () => 0
+  const terminal = await Terminal.create({
+    ...options,
+    accessibility: options.accessibility ?? false,
+    appearance: {
+      ...options.appearance,
+      cursor: { blink: false, ...options.appearance?.cursor },
+      grid: { columns: 30, rows: 4, ...options.appearance?.grid },
+    },
+    rendererFactory: async (rendererOptions) => {
+      const readRows = vi.spyOn(rendererOptions.renderState, 'readRows')
+      const readTextRows = vi.spyOn(rendererOptions.renderState, 'readTextRows')
+      const update = vi.spyOn(rendererOptions.renderState, 'update')
+      readRowsCalls = () => readRows.mock.calls.length
+      readTextRowsCalls = () => readTextRows.mock.calls.length
+      updateCalls = () => update.mock.calls.length
+      cleanups.push(() => {
+        readRows.mockRestore()
+        readTextRows.mockRestore()
+        update.mockRestore()
+      })
+      renderer = await WebGpuTerminalRenderer.create({
+        ...rendererOptions,
+        onTextFrame: (snapshot) => {
+          snapshots.push(snapshot)
+          rendererOptions.onTextFrame?.(snapshot)
+        },
+      })
+      return renderer
+    },
+    runtime: { kind: 'borrowed', runtime },
+    zigFrame: options.zigFrame ?? true,
+  })
+  cleanups.push(() => terminal.dispose())
+  const font = fitTerminalFont(document, terminal.appearance.font, window.devicePixelRatio)
+  const grid = terminal.appearance.grid
+  host.style.width = `${Math.ceil(font.cssCellWidth * grid.columns + 12)}px`
+  host.style.height = `${Math.ceil(font.cssCellHeight * grid.rows)}px`
+  await terminal.open(host)
+  await settleTerminal(terminal)
+  if (!renderer) throw new Error('WebGPU renderer was not created')
+  return { host, renderer, snapshots, terminal, readRowsCalls, readTextRowsCalls, updateCalls }
+}
+
+function measuredFrame(lines: readonly string[]): {
+  readonly reads: Record<
+    'cells' | 'continuations' | 'cursor' | 'renderCells' | 'text' | 'y',
+    number
+  >
+  readonly snapshot: RendererFrameSnapshot
+} {
+  const source = frame(lines)
+  const reads = { cells: 0, continuations: 0, cursor: 0, renderCells: 0, text: 0, y: 0 }
+  const rows = source.rows.map((row) =>
+    Object.freeze({
+      get cells() {
+        reads.cells += 1
+        return row.cells
+      },
+      get continuations() {
+        reads.continuations += 1
+        return row.continuations
+      },
+      get renderCells() {
+        reads.renderCells += 1
+        return row.renderCells
+      },
+      get text() {
+        reads.text += 1
+        return row.text
+      },
+      get y() {
+        reads.y += 1
+        return row.y
+      },
+    }),
+  )
+  const snapshot = Object.freeze({
+    get cursor() {
+      reads.cursor += 1
+      return source.cursor
+    },
+    rows: Object.freeze(rows),
+  })
+  return { reads, snapshot }
 }
 
 function terminalCellPoint(
@@ -1030,8 +1139,458 @@ describe('terminal clipboard policy in Chromium', () => {
   })
 })
 
+describe('terminal frame consumer demand in Chromium', () => {
+  it('serves accessibility-on output with owned text rows and reads styled cells only for public snapshots', async () => {
+    const harness = await createObservedWebGpuHarness({ accessibility: {} })
+    const styled = `${escape}[1;38;2;12;34;56mABC${escape}[0m`
+    harness.terminal.write(styled)
+    await settleTerminal(harness.terminal)
+
+    expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
+    expect(harness.renderer.metrics.jsFallbackFrames).toBe(0)
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBeGreaterThan(0)
+    expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('ABC')
+    expect(harness.snapshots.at(-1)?.rows.every((row) => !('renderCells' in row))).toBe(true)
+    const textFrame = harness.snapshots.at(-1)!
+    const retainedTextRows = structuredClone(textFrame.rows)
+    const textReads = harness.readTextRowsCalls()
+    expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('ABC')
+    expect(harness.readTextRowsCalls()).toBe(textReads)
+    const full = harness.terminal.frameSnapshot()!
+    expect(harness.readRowsCalls()).toBe(1)
+    expect(full.rows[0]?.renderCells[0]).toMatchObject({
+      text: 'A',
+      foreground: { r: 12, g: 34, b: 56 },
+      style: { bold: true },
+    })
+    expect(full.rows[0]?.continuations.slice(0, 3)).toEqual([false, false, false])
+
+    harness.terminal.write(`${escape}[2J${escape}[Hnew output`)
+    await settleTerminal(harness.terminal)
+    expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('new output')
+    expect(harness.readRowsCalls()).toBe(1)
+    expect(harness.readTextRowsCalls()).toBeGreaterThan(textReads)
+    harness.terminal.dispose()
+
+    expect(textFrame.rows).toEqual(retainedTextRows)
+    expect(full.rows[0]?.text.trimEnd()).toBe('ABC')
+    expect(full.rows[0]?.renderCells[0]?.foreground).toEqual({ r: 12, g: 34, b: 56 })
+  })
+
+  it('keeps idle Zig frames row-free while positioning the cursor and publishing changed row IDs', async () => {
+    const harness = await createObservedWebGpuHarness()
+    const changedRows: Array<readonly number[]> = []
+    harness.terminal.onFrame((event) => changedRows.push(event.rows))
+
+    harness.terminal.write('first\r\nsecond')
+    await settleTerminal(harness.terminal)
+
+    expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
+    expect(harness.renderer.metrics.jsFallbackFrames).toBe(0)
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(0)
+    expect(harness.snapshots.length).toBeGreaterThan(0)
+    expect(harness.snapshots.every((snapshot) => snapshot.rows.length === 0)).toBe(true)
+    expect(changedRows.at(-1)).toEqual([0, 1])
+    expect(Object.isFrozen(changedRows.at(-1))).toBe(true)
+    expect(harness.snapshots.at(-1)?.cursor.viewport).toMatchObject({ x: 6, y: 1 })
+    expect(Number.parseFloat(harness.terminal.textarea!.style.left)).toBe(
+      6 * harness.terminal.appearance.grid.cellWidth,
+    )
+    expect(Number.parseFloat(harness.terminal.textarea!.style.top)).toBe(
+      harness.terminal.appearance.grid.cellHeight,
+    )
+
+    const firstChangedRows = changedRows.at(-1)
+    harness.terminal.write(`${escape}[1;1HX`)
+    await settleTerminal(harness.terminal)
+
+    expect(changedRows.at(-1)).toEqual([0, 1])
+    expect(firstChangedRows).toEqual([0, 1])
+    expect(harness.readRowsCalls()).toBe(0)
+  })
+
+  it('lazily owns styled snapshot rows and keeps pre-paint reads on the previously painted content', async () => {
+    const harness = await createObservedWebGpuHarness()
+    const styled = `${escape}[1;3;4;38;2;12;34;56;48;2;65;43;21mA界B${escape}[0m`
+    const reference = await createSession({ appearance: { grid: { columns: 30, rows: 4 } } })
+    reference.write(styled)
+    reference.renderState.update()
+    const expectedCells = reference.renderState.readRows().map((row) => row.cells)
+    harness.terminal.write(styled)
+    await settleTerminal(harness.terminal)
+    expect(harness.renderer.metrics.jsFallbackFrames).toBe(1)
+    const renderingReads = harness.readRowsCalls()
+    const updates = harness.updateCalls()
+
+    harness.terminal.write(`${escape}[2J${escape}[Hreplacement`)
+    const visible = harness.terminal.visibleLines()
+    const retained = harness.terminal.frameSnapshot()!
+    const retainedRows = structuredClone(retained.rows)
+
+    expect(harness.updateCalls()).toBe(updates)
+    expect(harness.readRowsCalls()).toBe(renderingReads + 1)
+    expect(harness.readTextRowsCalls()).toBe(1)
+    expect(visible[0]?.trimEnd()).toBe('A界B')
+    expect(retained.rows.map((row) => row.renderCells)).toEqual(expectedCells)
+    expect(retained.rows[0]?.continuations.slice(0, 4)).toEqual([false, false, true, false])
+    expect(retained.rows[0]?.renderCells[0]).toMatchObject({
+      background: { r: 65, g: 43, b: 21 },
+      foreground: { r: 12, g: 34, b: 56 },
+      style: { bold: true, italic: true, underline: 1 },
+      text: 'A',
+    })
+    expect(Object.isFrozen(retained.rows[0]?.renderCells[0]?.style)).toBe(true)
+
+    await settleTerminal(harness.terminal)
+    expect(harness.readRowsCalls()).toBe(renderingReads + 1)
+    expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('replacement')
+    expect(harness.readRowsCalls()).toBe(renderingReads + 1)
+    expect(harness.readTextRowsCalls()).toBe(2)
+    harness.terminal.write(`${escape}[2J${escape}[Hlater`)
+    await settleTerminal(harness.terminal)
+    expect(harness.terminal.frameSnapshot()?.rows[0]?.text.trimEnd()).toBe('later')
+    harness.terminal.dispose()
+
+    expect(retained.rows).toEqual(retainedRows)
+    expect(visible[0]?.trimEnd()).toBe('A界B')
+  })
+
+  it.each([false, true])(
+    'commits atlas-eviction recovery in one paint before lazy snapshots read the captured state (zigFrame: %s)',
+    async (zigFrame) => {
+      const harness = await createObservedWebGpuHarness({ zigFrame })
+      const renderer = harness.renderer
+      const rasterizer = Reflect.get(renderer, 'rasterizer') as CanvasGlyphRasterizer
+      const bitmaps = Array.from('ABCDE界', (text) => {
+        const bitmap = rasterizer.rasterize({
+          cellSpan: text === '界' ? 2 : 1,
+          foreground: harness.terminal.appearance.rendererTheme.foreground,
+          italic: false,
+          text,
+          weight: 'normal',
+        })
+        if (!bitmap) throw new TypeError('Expected a visible atlas glyph')
+        return bitmap
+      })
+      const initialWidth = bitmaps.slice(0, 4).reduce((width, bitmap) => width + bitmap.width, 5)
+      const retryWidth = bitmaps[0]!.width + bitmaps[4]!.width + 3
+      const atlas = new GlyphAtlas({
+        maxLayersPerKind: 1,
+        pageHeight: Math.max(...bitmaps.map((bitmap) => bitmap.height)) + 2,
+        pageWidth: Math.max(initialWidth, retryWidth),
+      })
+      const previousTextures = Reflect.get(renderer, 'atlasTextures') as AtlasGpuTextures
+      const textures = new AtlasGpuTextures(
+        Reflect.get(renderer, 'device') as GPUDevice,
+        atlas.textureLayout,
+      )
+      Reflect.set(renderer, 'atlas', atlas)
+      Reflect.set(renderer, 'atlasTextures', textures)
+      const textPass = Reflect.get(renderer, 'textPass') as WebGpuTextPass
+      textPass.syncAtlas(textures)
+      previousTextures.destroy()
+      const scheduler = Reflect.get(renderer, 'scheduler') as RenderScheduler
+      harness.terminal.write('AAA\r\nBCD')
+      scheduler.flush()
+      expect(atlas.evictionCount).toBe(0)
+      if (zigFrame) expect(renderer.metrics.zigFrames).toBeGreaterThan(0)
+      const paintedFrames = harness.snapshots.length
+      const submittedFrames = renderer.metrics.submittedFrames
+
+      harness.terminal.write(`${escape}[2;1HEEE`)
+      scheduler.flush()
+
+      expect(atlas.evictionCount).toBeGreaterThan(0)
+      expect(renderer.metrics.submittedFrames).toBe(submittedFrames + 1)
+      expect(harness.snapshots.length).toBe(paintedFrames + 1)
+      expect(harness.terminal.hasPendingFrame).toBe(false)
+      const snapshot = harness.terminal.frameSnapshot()!
+      expect(snapshot.rows.slice(0, 2).map((row) => row.text.trimEnd())).toEqual(['AAA', 'EEE'])
+      expect(snapshot.cursor.viewport).toMatchObject({ x: 3, y: 1 })
+      expect(
+        harness.terminal
+          .visibleLines()
+          .slice(0, 2)
+          .map((text) => text.trimEnd()),
+      ).toEqual(['AAA', 'EEE'])
+      expect(atlas.rowsWithStaleReferences()).toEqual([])
+      const rebuiltRows = renderer.metrics.rebuiltRows
+      const styledReads = harness.readRowsCalls()
+      const zigFrames = renderer.metrics.zigFrames
+      harness.terminal.write(`${escape}[1;1H界ABCDE`)
+      expect(() => scheduler.flush()).toThrow('The glyph atlas cannot retain the visible viewport')
+      expect(harness.readRowsCalls()).toBeGreaterThan(styledReads)
+      expect(renderer.metrics.submittedFrames).toBe(submittedFrames + 1)
+      expect(harness.terminal.frameSnapshot()).toBe(snapshot)
+      expect(
+        harness.terminal
+          .visibleLines()
+          .slice(0, 2)
+          .map((text) => text.trimEnd()),
+      ).toEqual(['AAA', 'EEE'])
+
+      harness.terminal.write(`${escape}[1;1HC${escape}[K`)
+      scheduler.flush()
+
+      expect(renderer.metrics.submittedFrames).toBe(submittedFrames + 2)
+      expect(renderer.metrics.zigFrames).toBe(zigFrame ? zigFrames + 1 : zigFrames)
+      expect(renderer.metrics.rebuiltRows - rebuiltRows).toBe(harness.terminal.appearance.grid.rows)
+      expect(
+        harness.terminal
+          .visibleLines()
+          .slice(0, 2)
+          .map((text) => text.trimEnd()),
+      ).toEqual(['C', 'EEE'])
+      expect(harness.terminal.frameSnapshot()?.cursor.viewport).toMatchObject({ x: 1, y: 0 })
+      expect(atlas.rowsWithStaleReferences()).toEqual([])
+      const recoveryPixels = await renderer.capturePixels()
+      renderer.clearTextureAtlas()
+      scheduler.flush()
+      expect(await renderer.capturePixels()).toEqual(recoveryPixels)
+    },
+  )
+
+  it('retains acquired styled rows and cursor when native state advances without a successful paint', async () => {
+    const harness = await createObservedWebGpuHarness()
+    const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
+    harness.terminal.write(`${escape}[1;38;2;12;34;56mold${escape}[0m`)
+    await settleTerminal(harness.terminal)
+    const retained = harness.terminal.frameSnapshot()!
+    const visible = harness.terminal.visibleLines()
+    const rowReads = harness.readRowsCalls()
+    const textReads = harness.readTextRowsCalls()
+    const version = session.renderState.snapshotVersion!
+
+    harness.terminal.write(`${escape}[2J${escape}[Hnew output\r\nnext`)
+    session.renderState.update()
+
+    expect(session.renderState.snapshotVersion).toBeGreaterThan(version)
+    expect(harness.terminal.frameSnapshot()).toBe(retained)
+    expect(harness.terminal.visibleLines()).toEqual(visible)
+    expect(retained.rows[0]?.text.trimEnd()).toBe('old')
+    expect(retained.rows[0]?.renderCells[0]?.style?.bold).toBe(true)
+    expect(retained.cursor.viewport).toMatchObject({ x: 3, y: 0 })
+    expect(harness.readRowsCalls()).toBe(rowReads)
+    expect(harness.readTextRowsCalls()).toBe(textReads)
+    expect(harness.terminal.captureViewport()).toBeUndefined()
+    await settleTerminal(harness.terminal)
+
+    const current = harness.terminal.frameSnapshot()!
+    expect(current.rows[0]?.text.trimEnd()).toBe('new output')
+    expect(current.rows[1]?.text.trimEnd()).toBe('next')
+    expect(current.cursor.viewport).toMatchObject({ x: 4, y: 1 })
+    expect(retained.rows[0]?.text.trimEnd()).toBe('old')
+  })
+
+  it('declines lazy hydration when unpainted native state has replaced the last captured state', async () => {
+    const harness = await createObservedWebGpuHarness()
+    const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
+    harness.terminal.write('old')
+    await settleTerminal(harness.terminal)
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(0)
+
+    harness.terminal.write(`${escape}[2J${escape}[Hnew output`)
+    session.renderState.update()
+
+    expect(harness.terminal.frameSnapshot()).toBeUndefined()
+    expect(harness.terminal.visibleLines()).toEqual([])
+    expect(harness.terminal.captureViewport()).toBeUndefined()
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(0)
+    await settleTerminal(harness.terminal)
+
+    expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('new output')
+    expect(harness.terminal.frameSnapshot()?.cursor.viewport).toMatchObject({ x: 10, y: 0 })
+  })
+
+  it('hydrates accessibility immediately from the last painted idle frame and releases demand when disabled', async () => {
+    const harness = await createObservedWebGpuHarness()
+    harness.terminal.write('accessible now')
+    await settleTerminal(harness.terminal)
+    expect(harness.readRowsCalls()).toBe(0)
+    const updates = harness.updateCalls()
+
+    expect(harness.terminal.setAccessibilityEnabled(true)).toBe(true)
+    expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('accessible now')
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(1)
+    expect(harness.updateCalls()).toBe(updates)
+
+    harness.terminal.write('!')
+    await settleTerminal(harness.terminal)
+    expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('accessible now!')
+    expect(harness.snapshots.at(-1)?.rows).toHaveLength(4)
+    expect(harness.terminal.setAccessibilityEnabled(false)).toBe(true)
+    const reads = harness.readTextRowsCalls()
+    harness.terminal.write('?')
+    await settleTerminal(harness.terminal)
+
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(reads)
+    expect(harness.snapshots.at(-1)?.rows).toEqual([])
+  })
+
+  it('resolves the latest output on first hover after uninterested frames and stops reading on pointer leave', async () => {
+    const harness = await createObservedWebGpuHarness()
+    harness.terminal.write('https://old.test')
+    await settleTerminal(harness.terminal)
+    harness.terminal.write(`${escape}[2J${escape}[Hhttps://fresh.test`)
+    await settleTerminal(harness.terminal)
+    expect(harness.readRowsCalls()).toBe(0)
+
+    moveTerminalPointer(harness.terminal, 5, 0)
+    await waitForUi(
+      () =>
+        harness.host.querySelector('[role="link"]')?.getAttribute('aria-label') ===
+        'https://fresh.test',
+      'First hover did not hydrate the current idle viewport',
+    )
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(1)
+    harness.terminal.write(`${escape}[2J${escape}[Hhttps://hover.test`)
+    await settleTerminal(harness.terminal)
+    await waitForUi(
+      () =>
+        harness.host.querySelector('[role="link"]')?.getAttribute('aria-label') ===
+        'https://hover.test',
+      'Active hover did not track the next output frame',
+    )
+    expect(harness.snapshots.at(-1)?.rows).toHaveLength(4)
+    harness.terminal.canvas!.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }))
+    const reads = harness.readTextRowsCalls()
+    harness.terminal.write(`${escape}[2J${escape}[Hhttps://idle-again.test`)
+    await settleTerminal(harness.terminal)
+
+    expect(harness.host.querySelector('[role="link"]')).toBeNull()
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(reads)
+    expect(harness.snapshots.at(-1)?.rows).toEqual([])
+  })
+
+  it('repaints a revision-advancing fit and permits link discovery after its new frame', async () => {
+    const harness = await createObservedWebGpuHarness()
+    const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
+    harness.terminal.write('https://resize.test')
+    await settleTerminal(harness.terminal)
+    const revision = session.revision
+    const paintedFrames = harness.snapshots.length
+    const columns = harness.terminal.appearance.grid.columns
+    const font = fitTerminalFont(
+      document,
+      harness.terminal.appearance.font,
+      window.devicePixelRatio,
+    )
+
+    harness.host.style.width = `${Math.ceil(font.cssCellWidth * (columns + 5) + 12)}px`
+    await waitForUi(() => session.revision > revision, 'Fit did not advance the session revision')
+    await settleTerminal(harness.terminal)
+
+    expect(harness.terminal.appearance.grid.columns).toBe(columns + 5)
+    expect(harness.snapshots.length).toBeGreaterThan(paintedFrames)
+    await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
+    expect(harness.host.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+      'https://resize.test',
+    )
+  })
+
+  it('rejects keyboard discovery from an old painted link while replacement output awaits paint', async () => {
+    const harness = await createObservedWebGpuHarness()
+    harness.terminal.write('https://old.test')
+    await settleTerminal(harness.terminal)
+    const updates = harness.updateCalls()
+    expect(harness.readTextRowsCalls()).toBe(0)
+
+    harness.terminal.write(`${escape}[2J${escape}[Hreplacement without links`)
+    await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
+
+    expect(harness.host.querySelector('[role="link"]')).toBeNull()
+    expect(harness.readRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(0)
+    expect(harness.updateCalls()).toBe(updates)
+    await settleTerminal(harness.terminal)
+    await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
+    expect(harness.host.querySelector('[role="link"]')).toBeNull()
+
+    harness.terminal.write(`${escape}[2J${escape}[Hhttps://new.test`)
+    await settleTerminal(harness.terminal)
+    await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
+    expect(harness.host.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+      'https://new.test',
+    )
+  })
+
+  it('preserves async keyboard discovery and the focused overlay through equivalent painted frames', async () => {
+    const harness = await createObservedWebGpuHarness()
+    const pending = deferred<readonly ProvidedLink<Event>[] | undefined>()
+    let providerCalls = 0
+    harness.terminal.registerLinkProvider({
+      provideLinks: () => {
+        providerCalls += 1
+        return pending.promise
+      },
+    })
+    harness.terminal.write('discover me')
+    await settleTerminal(harness.terminal)
+    expect(harness.readRowsCalls()).toBe(0)
+
+    const discovery = harness.terminal.focusNextLink()
+    expect(harness.terminal.diagnostics.hasPendingLinkResolution).toBe(true)
+    harness.terminal.refresh(0, 0)
+    await settleTerminal(harness.terminal)
+    expect(harness.snapshots.at(-1)?.rows).toHaveLength(4)
+    expect(harness.terminal.diagnostics.hasPendingLinkResolution).toBe(true)
+    pending.resolve([{ activate: () => {}, range: { start: 0, end: 10 }, text: 'discovered link' }])
+    await expect(discovery).resolves.toBe(true)
+    const overlay = harness.host.querySelector<HTMLElement>('[role="link"]')!
+    expect(overlay.getAttribute('aria-label')).toBe('discovered link')
+    expect(harness.host.ownerDocument.activeElement).toBe(overlay)
+    expect(providerCalls).toBe(1)
+
+    harness.terminal.refresh(0, 0)
+    await settleTerminal(harness.terminal)
+
+    expect(harness.host.querySelector('[role="link"]')).toBe(overlay)
+    expect(harness.host.ownerDocument.activeElement).toBe(overlay)
+    expect(providerCalls).toBe(1)
+    expect(harness.terminal.diagnostics.hasPendingLinkResolution).toBe(false)
+  })
+
+  it('measures cursor-only caret reads, text-only accessibility, and link cells without styled cell access', async () => {
+    const idle = await createIntegratedHarness({ accessibility: false })
+    const idleFrame = measuredFrame(['https://measured.test'])
+    idle.renderer.emit(idleFrame.snapshot)
+    expect(idleFrame.reads.cursor).toBeGreaterThan(0)
+    expect(idleFrame.reads).toMatchObject({
+      cells: 0,
+      continuations: 0,
+      renderCells: 0,
+      text: 0,
+      y: 0,
+    })
+
+    const accessible = await createIntegratedHarness()
+    const accessibleFrame = measuredFrame(['https://measured.test'])
+    accessible.renderer.emit(accessibleFrame.snapshot)
+    expect(accessibleFrame.reads.text).toBeGreaterThan(0)
+    expect(accessibleFrame.reads.y).toBeGreaterThan(0)
+    expect(accessibleFrame.reads).toMatchObject({ cells: 0, continuations: 0, renderCells: 0 })
+
+    moveTerminalPointer(idle.terminal, 5, 0)
+    await waitForUi(
+      () => idle.host.querySelector('[role="link"]') !== null,
+      'Measured frame did not resolve on pointer demand',
+    )
+    expect(idleFrame.reads.cells).toBeGreaterThan(0)
+    expect(idleFrame.reads.continuations).toBeGreaterThan(0)
+    expect(idleFrame.reads.renderCells).toBe(0)
+  })
+})
+
 describe('integrated terminal UI host', () => {
-  it('replays a renderer frame that arrives before the first fit commit', async () => {
+  it('accepts a pre-fit frame and resolves links after the post-fit repaint', async () => {
     const context = document.createElement('canvas').getContext('2d')
     if (!context) throw new TypeError('Expected a 2D canvas context')
     const pixelRatio = window.devicePixelRatio
@@ -1049,8 +1608,8 @@ describe('integrated terminal UI host', () => {
       rendererFactory: async (options) => {
         const canvas = options.canvas
         if (!(canvas instanceof HTMLCanvasElement)) throw new TypeError('Expected an HTML canvas')
-        options.onFrame?.(frame([text, '', '', '']))
-        renderer = new FrameRenderer(canvas, options.onFrame, options)
+        options.onTextFrame?.(frame([text, '', '', '']))
+        renderer = new FrameRenderer(canvas, options.onTextFrame, options)
         return renderer
       },
       runtime: { kind: 'borrowed', runtime },
@@ -1059,10 +1618,15 @@ describe('integrated terminal UI host', () => {
 
     await terminal.open(host)
     await settleTerminal(terminal)
+    renderer!.emit(
+      frame(
+        Array.from({ length: terminal.appearance.grid.rows }, (_, row) => (row === 0 ? text : '')),
+      ),
+    )
     moveTerminalPointer(terminal, 5, 0)
     await waitForUi(
       () => host.querySelector('[role="link"]')?.getAttribute('aria-label') === text,
-      'Early frame was not replayed after fit committed',
+      'Post-fit frame did not resolve the visible link',
     )
 
     expect(renderer).toBeDefined()
@@ -1331,7 +1895,7 @@ describe('integrated terminal UI host', () => {
       rendererFactory: async (options) => {
         const canvas = options.canvas
         if (!(canvas instanceof HTMLCanvasElement)) throw new TypeError('Expected an HTML canvas')
-        return new FrameRenderer(canvas, options.onFrame, options)
+        return new FrameRenderer(canvas, options.onTextFrame, options)
       },
       runtime: { kind: 'borrowed', runtime },
     })
@@ -1378,7 +1942,7 @@ describe('integrated terminal UI host', () => {
       rendererFactory: async (options) => {
         const canvas = options.canvas
         if (!(canvas instanceof HTMLCanvasElement)) throw new TypeError('Expected an HTML canvas')
-        renderer = new FrameRenderer(canvas, options.onFrame, options)
+        renderer = new FrameRenderer(canvas, options.onTextFrame, options)
         return renderer
       },
       runtime: { kind: 'borrowed', runtime },

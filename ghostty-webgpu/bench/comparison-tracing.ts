@@ -132,6 +132,11 @@ export class ComparisonTracing {
         rows.reduce((sum, row) => sum + (row.packed?.length ?? row.cells.length), 0),
       )
     })
+    this.wrap(state, 'readTextRows', terminal, 'snapshot', (result) => {
+      const rows = result as readonly unknown[]
+      this.count(terminal, 'textRowsCopied', rows.length)
+      this.count(terminal, 'textCellsCopied', rows.length * core.size.columns)
+    })
     this.wrap(state, 'acknowledge', terminal, 'damage')
     this.wrap(
       state,

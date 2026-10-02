@@ -148,3 +148,13 @@ test('even repetitions remain at least four and selected native/counterpart orde
   assert.deepEqual(native(0), ['js', 'zig'])
   assert.deepEqual(native(1), ['zig', 'js'])
 })
+
+test('accessibility mode pairs native mirrors with xterm screen-reader mode', async () => {
+  const { accessibilityMode } = await import('./comparison-options.mjs')
+  assert.equal(accessibilityMode([]), 'off')
+  assert.equal(accessibilityMode(['--accessibility', 'on']), 'on')
+  assert.equal(accessibilityMode(['--accessibility', 'off']), 'off')
+  assert.throws(() => accessibilityMode(['--accessibility', 'maybe']))
+  assert.throws(() => accessibilityMode(['--accessibility', 'on,off']))
+  assert.throws(() => accessibilityMode(['--accessibility']))
+})

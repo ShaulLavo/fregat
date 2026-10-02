@@ -119,3 +119,9 @@ export function measurementRepetitions(args, fallback) {
   )
   return repetitions
 }
+
+export function accessibilityMode(args) {
+  const modes = selection(args, '--accessibility', ['off'], ['on', 'off'])
+  assert.equal(modes.length, 1, '--accessibility needs one mode')
+  return modes[0]
+}
