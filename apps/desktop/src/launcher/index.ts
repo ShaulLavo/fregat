@@ -1,7 +1,6 @@
 import { accessSync, constants, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { errorMessage } from '@workspace/contracts'
 import { launcherFailureFacts, reportStartFailure } from './failure'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
 import { portFromEnv, runtimeUrl } from '../../../../scripts/runtime-network'
@@ -21,12 +20,11 @@ import {
 } from './installation-client'
 import { launchWebview, nativeHostBinary, showStartFailure } from './native-window'
 import { nativeBudget } from './native-helper'
-import { startupBudget } from './startup'
-import { isRecord } from '@workspace/utils/objects'
 import { desktopStateHome } from './profile'
 import { launcherErrors } from './structured-errors'
 import { readInstallManifest } from './install-receipt'
 import { appBundle } from './bundle'
+import { readSettings } from './settings'
 
 const bundle = appBundle()
 const root = bundle ? null : path.resolve(import.meta.dirname, '../../../..')
@@ -94,7 +92,10 @@ async function start() {
     server = service.url.replace(/\/$/, '')
     recordDesktopInfo('desktop.service.ready', { disposition: service.disposition })
   }
-  const settings = await readSettings(server, web)
+  const settings = await readSettings(server, web, {
+    signal: requestSignal(),
+    onUnreachable: (context) => recordDesktopInfo('desktop.settings.unreachable', context),
+  })
   helperBudget = settings.native
   const candidates = resolveBrowserCandidates(
     settings.browser,
@@ -201,38 +202,6 @@ async function start() {
         ...launcherFailureFacts(error),
       })
       throw error
-    }
-  }
-}
-
-async function readSettings(server: string, origin: string) {
-  try {
-    const response = await fetch(`${server}/settings`, {
-      headers: { Origin: origin },
-      signal: requestSignal(),
-    })
-    const snapshot: unknown = await response.json()
-    if (!response.ok || !isRecord(snapshot) || !isRecord(snapshot.values))
-      return {
-        browser: 'auto',
-        transparency: 'compositor',
-        startup: startupBudget(),
-        native: nativeBudget(),
-      }
-    return {
-      browser: snapshot.values['window.browser'] ?? 'auto',
-      transparency: snapshot.values['window.transparency'] ?? 'compositor',
-      startup: startupBudget(snapshot.values),
-      native: nativeBudget(snapshot.values),
-    }
-  } catch (error) {
-    controller.signal.throwIfAborted()
-    recordDesktopInfo('desktop.settings.unreachable', { error: errorMessage(error) })
-    return {
-      browser: 'auto',
-      transparency: 'compositor',
-      startup: startupBudget(),
-      native: nativeBudget(),
     }
   }
 }
