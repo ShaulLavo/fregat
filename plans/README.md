@@ -133,6 +133,7 @@ not a second live status register.
 | [285](285-ghostty-site-first-frame-and-real-shell.md) | The ghostty-webgpu site paints before the wasm and runs a real shell          |
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                           |
 | [287](287-ghostty-worker-mode.md)                     | ghostty-webgpu worker mode: the terminal on an OffscreenCanvas worker         |
+| [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                          |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
