@@ -1,3 +1,4 @@
+import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
 import { cursorModelCatalog } from './cursor-model-catalog'
 import { machineBalancing } from './machine-balancing'
@@ -241,9 +242,8 @@ import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
 import { themeStudioPreview } from './theme-studio-preview'
-import { polaronWebPicker } from './polaron-web-picker'
-import { polaronNativeHost } from './polaron-native-host'
-import { polaronChromiumNativePicker } from './polaron-chromium-native-picker'
+import { webPicker } from './web-picker'
+import { nativeHost } from './native-host'
 import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
 import { filePickerLocations } from './file-picker-locations'
@@ -446,6 +446,7 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  installedApp,
   binaryFileOpen,
   binaryFileRemote,
   ghosttySiteFit,
@@ -662,9 +663,8 @@ export const scenarios: readonly Scenario[] = [
   filePickerBrowse,
   filePickerLocations,
   filePickerAppearance,
-  polaronWebPicker,
-  polaronNativeHost,
-  polaronChromiumNativePicker,
+  webPicker,
+  nativeHost,
   filePickerSelection,
   themeStudioPreview,
   themeStudioAsync,

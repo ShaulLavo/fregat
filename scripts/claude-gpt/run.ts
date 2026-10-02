@@ -1,5 +1,6 @@
 import * as v from 'valibot'
 import { createGateway, type GatewayOptions } from './gateway'
+import { startResetOrder } from './reset-order'
 
 const portSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65535))
 export const configSchema = v.pipe(
@@ -9,6 +10,7 @@ export const configSchema = v.pipe(
     proxyPort: portSchema,
     gatewayPort: portSchema,
     apiKey: v.pipe(v.string(), v.nonEmpty()),
+    resetOrder: v.optional(v.object({ managementKeyFile: v.string(), stateFile: v.string() })),
   }),
   v.check(
     (config) => config.gatewayPort !== config.proxyPort,
@@ -65,16 +67,24 @@ async function run() {
   const stopping = Promise.withResolvers<number>()
   const stop = () => stopping.resolve(0)
   let server: ReturnType<typeof startGateway> | undefined
+  let resetOrder: ReturnType<typeof startResetOrder> | undefined
   let exitCode = 1
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)
   try {
     // Claude forwarding can start while the GPT registry loads or remains unavailable.
     server = startGateway(gatewayOptions(config))
+    if (config.resetOrder) {
+      resetOrder = startResetOrder({
+        proxyUrl: `http://127.0.0.1:${config.proxyPort}`,
+        ...config.resetOrder,
+      })
+    }
     exitCode = await Promise.race([proxy.exited, stopping.promise])
   } finally {
     process.off('SIGTERM', stop)
     process.off('SIGINT', stop)
+    resetOrder?.stop()
     server?.stop(true)
     if (!(await stopProxy(proxy))) exitCode = 1
   }

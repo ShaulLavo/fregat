@@ -30,10 +30,12 @@ export type TestServer = {
   root: string
   workspaceEditJournalRoot: string
   origin: string
-  restart: (options?: {
-    providerRuntime?: boolean
-    providerAdapter?: MockProviderAdapter
-  }) => Promise<void>
+  restart: (
+    options?: Pick<AppOptions, 'system' | 'systemRoot' | 'workspaceRoot'> & {
+      providerRuntime?: boolean
+      providerAdapter?: MockProviderAdapter
+    },
+  ) => Promise<void>
   cleanup: () => Promise<void>
 }
 
@@ -41,7 +43,13 @@ export type TestServer = {
 // app routes, valibot contracts, and filesystem are the genuine article.
 type TestServerOptions = Pick<
   AppOptions,
-  'workspaceEditClock' | 'workspaceEditDriver' | 'machines' | 'update'
+  | 'workspaceEditClock'
+  | 'workspaceEditDriver'
+  | 'machines'
+  | 'update'
+  | 'system'
+  | 'systemRoot'
+  | 'workspaceRoot'
 > & {
   persistentDatabase?: boolean
   providerRuntime?: boolean
@@ -64,6 +72,9 @@ export async function makeTestServer({
   workspaceEditDriver,
   machines,
   update,
+  system,
+  systemRoot,
+  workspaceRoot,
 }: TestServerOptions = {}): Promise<TestServer> {
   const root = await mkdtemp(path.join(tmpdir(), 'web-itest-'))
   const workspaceEditJournalRoot = path.join(root, '.platform-test', 'workspace-edit-journals')
@@ -79,7 +90,8 @@ export async function makeTestServer({
     createApp({
       auth: { allowedOrigins: [TEST_ORIGIN] },
       homeDirectory: root,
-      systemRoot: root,
+      systemRoot: systemRoot ?? root,
+      system,
       // Keep the real parser/cache/route path, but pin its cache inside this
       // fixture. MSW supplies the external downloads page.
       fonts: new FontCatalogService({
@@ -119,7 +131,7 @@ export async function makeTestServer({
       workspaceEditClock,
       workspaceEditDriver,
       workspaceEditJournalRoot,
-      workspaceRoot: root,
+      workspaceRoot: workspaceRoot ?? root,
       machines: {
         tailnetStatusCommand: async () => '{"BackendState":"Stopped"}',
         // Tests run the server from source; they stand for a production primary with no release.
@@ -138,6 +150,9 @@ export async function makeTestServer({
       await closeApp(app)
       providerRuntime = options.providerRuntime ?? providerRuntime
       providerAdapter = options.providerAdapter ?? providerAdapter
+      system = options.system ?? system
+      systemRoot = options.systemRoot ?? systemRoot
+      workspaceRoot = options.workspaceRoot ?? workspaceRoot
       app = buildApp()
     },
     cleanup: () => cleanupTestServer(app, root, database),

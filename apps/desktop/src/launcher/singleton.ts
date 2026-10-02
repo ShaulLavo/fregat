@@ -1,101 +1,82 @@
-import { readFileSync, readlinkSync, realpathSync } from 'node:fs'
+import { readlinkSync } from 'node:fs'
+import { createConnection } from 'node:net'
 import { hostname } from 'node:os'
 import path from 'node:path'
-import { runMacCommand, type MacCommand } from './mac-browser'
 
-type SingletonFileSystem = {
-  readLink(file: string): string | undefined
-  readFile(file: string): string | undefined
-  realPath(file: string): string | undefined
-}
-
-const wrapperExecutables: Record<string, readonly string[]> = {
-  '/usr/bin/chromium': ['/usr/lib/chromium/chromium'],
-  '/usr/bin/chromium-browser': ['/usr/lib/chromium-browser/chromium-browser'],
-  '/opt/google/chrome/google-chrome': ['/opt/google/chrome/chrome'],
-  '/opt/brave.com/brave/brave-browser': ['/opt/brave.com/brave/brave'],
-  '/usr/bin/brave': ['/opt/brave-bin/brave'],
-  '/usr/bin/brave-browser': ['/opt/brave-bin/brave', '/opt/brave.com/brave/brave'],
-  '/opt/microsoft/msedge/microsoft-edge': ['/opt/microsoft/msedge/msedge'],
-  '/opt/vivaldi/vivaldi': ['/opt/vivaldi/vivaldi-bin'],
-  '/opt/helium/helium-browser': ['/opt/helium/helium'],
-  '/opt/thorium/thorium-browser': ['/opt/thorium/thorium'],
-}
-
-export function hasSingletonOwner(
+export async function singletonState(
   profile: string,
-  host: string,
-  executable: string,
-  fs: SingletonFileSystem,
-): boolean {
-  const pid = singletonPid(profile, host, fs)
-  if (!pid || !/^[1-9]\d*$/.test(pid)) return false
-  const selected = fs.realPath(executable)
-  const owner = fs.readLink(`/proc/${pid}/exe`)
-  if (!selected || !owner) return false
-  if (owner !== selected && !wrapperExecutables[selected]?.includes(owner)) return false
-  const command = fs.readFile(`/proc/${pid}/cmdline`)?.split('\0').filter(Boolean)
-  if (!command?.length) return false
-  if (command.length > 1)
-    return command.some(
-      (token, index) =>
-        token === `--user-data-dir=${profile}` &&
-        command[index + 1] === '--profile-directory=Platform' &&
-        command[index + 2] === '--remote-debugging-pipe',
-    )
-  // Chromium rewrites argv into one process-title string on Linux.
-  const signature = ` --user-data-dir=${profile} --profile-directory=Platform --remote-debugging-pipe`
-  return command[0]!.includes(signature + ' ') || command[0]!.endsWith(signature)
-}
-
-// Chromium arbitrates the singleton; this read-only proof never grants cleanup ownership.
-export function liveSingletonOwner(profile: string, executable: string): boolean {
-  const fs: SingletonFileSystem = {
-    readLink: (file) => {
-      try {
-        return readlinkSync(file)
-      } catch {
-        return undefined
-      }
-    },
-    readFile: (file) => {
-      try {
-        return readFileSync(file, 'utf8')
-      } catch {
-        return undefined
-      }
-    },
-    realPath: (file) => {
-      try {
-        return realpathSync(file)
-      } catch {
-        return undefined
-      }
-    },
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<'live' | 'idle' | 'unverified'> {
+  signal?.throwIfAborted()
+  const socket = singletonSocket(profile)
+  if (
+    socket &&
+    cookieMatches(socket) &&
+    (await acceptsConnection(socket.path, timeoutMs, signal)) &&
+    cookieMatches(socket)
+  )
+    return 'live'
+  signal?.throwIfAborted()
+  let lock: string
+  try {
+    lock = readlinkSync(path.join(profile, 'SingletonLock'))
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'idle' : 'unverified'
   }
-  return process.platform === 'darwin'
-    ? hasMacSingletonOwner(profile, hostname(), executable, fs, runMacCommand)
-    : hasSingletonOwner(profile, hostname(), executable, fs)
+  const prefix = hostname() + '-'
+  if (!lock.startsWith(prefix)) return 'unverified'
+  const pid = lock.slice(prefix.length)
+  if (!/^[1-9]\d*$/.test(pid) || !Number.isSafeInteger(Number(pid))) return 'unverified'
+  try {
+    process.kill(Number(pid), 0)
+    return 'live'
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ESRCH') return 'idle'
+    return code === 'EPERM' ? 'live' : 'unverified'
+  }
 }
 
-function singletonPid(profile: string, host: string, fs: SingletonFileSystem) {
-  const lock = fs.readLink(path.join(profile, 'SingletonLock'))
-  return lock?.startsWith(host + '-') ? lock.slice(host.length + 1) : undefined
+type SingletonSocket = { path: string; cookie?: { local: string; remote: string } }
+
+function singletonSocket(profile: string): SingletonSocket | undefined {
+  const file = path.join(profile, 'SingletonSocket')
+  try {
+    const target = path.resolve(profile, readlinkSync(file))
+    return {
+      path: target,
+      cookie: {
+        local: path.join(profile, 'SingletonCookie'),
+        remote: path.join(path.dirname(target), 'SingletonCookie'),
+      },
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EINVAL') return { path: file }
+    return undefined
+  }
 }
 
-export function hasMacSingletonOwner(
-  profile: string,
-  host: string,
-  executable: string,
-  fs: SingletonFileSystem,
-  run: MacCommand,
-): boolean {
-  const pid = singletonPid(profile, host, fs)
-  if (!pid || !/^[1-9]\d*$/.test(pid)) return false
-  const selected = fs.realPath(executable)
-  if (!selected) return false
-  const command = run(['/bin/ps', '-p', pid, '-o', 'command='])?.trim()
-  const signature = ` --user-data-dir=${profile} --profile-directory=Platform --remote-debugging-pipe`
-  if (!command?.startsWith(selected + ' ')) return false
-  return command.includes(signature + ' ') || command.endsWith(signature)
+function cookieMatches(socket: SingletonSocket) {
+  if (!socket.cookie) return true
+  try {
+    return readlinkSync(socket.cookie.local) === readlinkSync(socket.cookie.remote)
+  } catch {
+    return false
+  }
+}
+
+function acceptsConnection(file: string, timeoutMs: number, signal?: AbortSignal) {
+  if (timeoutMs <= 0) return Promise.resolve(false)
+  return new Promise<boolean>((resolve) => {
+    // A connection followed by EOF probes the owner without sending any launch request.
+    const socket = createConnection({ path: file, signal })
+    const finish = (connected: boolean) => {
+      socket.destroy()
+      resolve(connected)
+    }
+    socket.once('connect', () => finish(true))
+    socket.once('error', () => finish(false))
+    socket.setTimeout(timeoutMs, () => finish(false))
+  })
 }

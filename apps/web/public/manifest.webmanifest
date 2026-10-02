@@ -1,9 +1,12 @@
 {
-  "name": "fregat",
-  "short_name": "fregat",
+  "id": "./",
+  "name": "Fregat",
+  "short_name": "Fregat",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "launch_handler": { "client_mode": "focus-existing" },
   "background_color": "#c4c3c3",
   "theme_color": "#c4c3c3",
   "icons": [

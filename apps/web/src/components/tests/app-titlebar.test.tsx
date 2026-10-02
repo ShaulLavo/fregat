@@ -2,7 +2,8 @@ import { testWorkspaceAddress } from '../../../test/factories/workspace-address'
 import { testTabContent } from '../../../test/factories/document-targets'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
-import { screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
+import { afterEach } from 'vitest'
 
 import { AppTitlebar } from '@/components/app-titlebar'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../test/factories/editor-state-provider'
@@ -32,6 +33,47 @@ test('renders app-owned window chrome as the only native drag region', () => {
   expect(screen.getByText('repo')).toBeVisible()
   // The document title moved to the editor breadcrumbs; the titlebar names only the workspace.
   expect(screen.queryByText('app.tsx')).toBeNull()
+})
+
+afterEach(() => {
+  delete (navigator as Navigator & { windowControlsOverlay?: unknown }).windowControlsOverlay
+})
+
+test('WCO geometry reserves either control edge and responds to geometry changes without a bridge', () => {
+  const overlay = new EventTarget()
+  let rect = { x: 80, y: 0, width: 900, height: 32 }
+  let visible = true
+  Object.defineProperty(navigator, 'windowControlsOverlay', {
+    configurable: true,
+    value: Object.assign(overlay, {
+      get visible() {
+        return visible
+      },
+      getTitlebarAreaRect: () => rect,
+    }),
+  })
+  // Define a live getter after Object.assign so visibility changes remain observable.
+  Object.defineProperty(overlay, 'visible', { get: () => visible })
+  const store = createTitlebarStore()
+  renderWithProviders(<TitlebarTestProvider store={store} />, {
+    command: { runtime: { workspace: store } },
+  })
+  const toolbar = screen.getByRole('banner', { name: 'Window toolbar' })
+  expect(window.platformBridge).toBeUndefined()
+  expect(toolbar).toHaveStyle({ marginLeft: '80px', width: '900px', height: '32px' })
+  act(() => {
+    rect = { x: 0, y: 0, width: 840, height: 40 }
+    overlay.dispatchEvent(new Event('geometrychange'))
+  })
+  expect(toolbar).toHaveStyle({ marginLeft: '0px', width: '840px', height: '40px' })
+  act(() => {
+    visible = false
+    overlay.dispatchEvent(new Event('geometrychange'))
+  })
+  expect(toolbar.style.width).toBe('')
+  expect(toolbar.style.marginLeft).toBe('')
+  expect(toolbar).toHaveClass('window-drag')
+  expect(screen.getByRole('button', { name: 'Switch project' })).toHaveClass('window-no-drag')
 })
 
 function TitlebarTestProvider({

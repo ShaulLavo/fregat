@@ -145,7 +145,7 @@ export function removePending() {
   return name
 }
 
-export async function buildWeb(release: Release) {
+export async function buildWeb(release: Release, base = webBase) {
   log('web', 'build workspaces')
   await runOrFail(
     ['bun', 'run', 'build:workspaces'],
@@ -160,7 +160,7 @@ export async function buildWeb(release: Release) {
   )
   log('web', `vite build → ${release.web}`)
   await runOrFail(
-    ['bun', '--bun', 'vite', 'build', '--base', webBase, '--outDir', release.web],
+    ['bun', '--bun', 'vite', 'build', '--base', base, '--outDir', release.web],
     webPackage,
     path.join(release.directory, 'web-build.log'),
   )
@@ -209,7 +209,11 @@ function readRetired(web: string): Record<string, number> {
   }
 }
 
-export async function buildServer(release: Release) {
+export async function buildServer(
+  release: Release,
+  dependencies: 'checkout' | 'installed' = 'checkout',
+  cpu = process.arch,
+) {
   log('server', 'build')
   await runOrFail(
     ['bun', 'run', 'build'],
@@ -219,14 +223,28 @@ export async function buildServer(release: Release) {
   cpSync(path.join(serverPackage, 'dist'), release.server, { recursive: true })
   bundleNativePicker(release)
   await writeRuntimeManifest(release.server, path.join(checkoutRoot, 'bun.lock'))
-  linkServerDependencies(release)
+  if (dependencies === 'checkout') {
+    linkServerDependencies(release)
+    return
+  }
+  writeFileSync(
+    path.join(release.server, 'runtime', 'bunfig.toml'),
+    '[install]\nglobalStore = false\n',
+  )
+  await runOrFail(
+    ['bun', 'install', '--production', '--frozen-lockfile', '--cpu', cpu],
+    path.join(release.server, 'runtime'),
+    path.join(release.directory, 'runtime-install.log'),
+  )
+  symlinkSync('runtime/node_modules', path.join(release.server, 'node_modules'))
+  symlinkSync('server/runtime/node_modules', path.join(release.directory, 'node_modules'))
 }
 
 // The server finds the chooser helper at server/native/; a host without the toolchain ships none
 // and the server reports no native chooser, so the deploy itself still succeeds.
 function bundleNativePicker(release: Release) {
   try {
-    const built = buildNative(path.join(checkoutRoot, 'apps/desktop'), 'polaron')
+    const built = buildNative(path.join(checkoutRoot, 'apps/desktop'), 'installed')
     if (!built) return log('server', 'native chooser helper: none for this platform')
     mkdirSync(path.join(release.server, 'native'), { recursive: true })
     cpSync(built, path.join(release.server, 'native', 'platform-webview'))

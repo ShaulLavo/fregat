@@ -5,6 +5,13 @@ import { join, dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { pairedRatios, quantile } from './comparison-report.mjs'
 
+export function comparisonLatencyEndpoint({ tracing, headless, platform }) {
+  if (tracing) return 'keydown/write to first screencast PNG containing the intended colored glyph'
+  if (platform === 'linux' && headless)
+    return 'keydown/write to compositor presentation ack (headless-shell, on-demand, not vsync)'
+  return 'keydown/write to Chrome presentation feedback (terminal submission frame)'
+}
+
 function cpu(value) {
   if (!value) return undefined
   const {
@@ -178,6 +185,7 @@ export async function compactEvidence(artifact, directory) {
         label: entry.label,
         idle: gpu(entry.idle),
         window: gpu(entry.window),
+        failure: entry.failure,
       })),
     })),
     representativeInputTimelines: directory

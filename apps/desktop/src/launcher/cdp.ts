@@ -129,6 +129,8 @@ export class CdpClient {
           this.failure('request-error', {
             id: message.id,
             method: pending.method,
+            // Classify known protocol facts without retaining browser messages containing URLs.
+            protocolReason: protocolReason(message.error.message),
             protocolCode:
               typeof message.error.code === 'number' && Number.isFinite(message.error.code)
                 ? message.error.code
@@ -162,6 +164,13 @@ export class CdpClient {
   private failure(reason: string, facts: Record<string, unknown> = {}) {
     return launcherErrors.CDP_FAILED({ internal: { reason, ...facts } })
   }
+}
+
+function protocolReason(message: unknown) {
+  if (typeof message !== 'string') return 'other'
+  if (message.startsWith('Unknown web-app manifest id ')) return 'unknown-app'
+  if (message === 'Webapps are not available in current profile.') return 'pwa-unavailable'
+  return 'other'
 }
 
 export function cdpPipe(writeFd: number, readFd: number) {

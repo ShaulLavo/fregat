@@ -1,4 +1,4 @@
-# Plan 114: Polaron, a desktop shell we own
+# Plan 114: Installed app
 
 > **Executor instructions**: Read this plan completely, then read `AGENTS.md` and root `PLAN.md`.
 > The gates are ordered so Electrobun keeps working until Gate 4; do not delete anything earlier.
@@ -13,6 +13,7 @@
   preserves mesh ownership. Host/browser measurements below remain historical research.
   2026-10-02: Wave 2 engineering proofs delivered; Mac desktop real-keychain/visual acceptance
   and Gate 4 are PARKED. Plan 114 remains partial and Electrobun remains the default.
+  2026-10-02: installed Chrome app delivered (#332–#335); `Fregat.app` on macOS approved (A1–A3).
 - **Priority**: P2 — the shell works today (plan 073), but every week on Electrobun is a week of
   someone else's toolchain
 - **Effort**: M — about 500 lines of TypeScript in the launcher and ~150 lines of C or Objective-C
@@ -26,9 +27,9 @@
 
 **Status: Approved owner design, 2026-10-02. Implementation starts after this plan PR merges.**
 Chrome-first selection has merged separately. Gate 4 remains parked. The browser-installed
-app must provide the same functionality when opened by Polaron, the Dock, Cmd-Tab/taskbar,
+app must provide the same functionality when opened by the desktop launcher, the Dock, Cmd-Tab/taskbar,
 the OS application launcher, or its browser-created shortcut. A direct OS launch has no
-Polaron process, CDP connection, injected script, or `window.platformBridge`.
+launcher process, CDP connection, injected script, or `window.platformBridge`.
 
 The owner rejected a launcher-only bridge with reduced functionality on Dock launch. The
 installed-browser path therefore moves desktop behavior into the web client, browser manifest,
@@ -136,39 +137,72 @@ cancellation, timeouts and backend path hydration on local connections.
 
 ### PWA installation and launch control
 
-Use the existing CDP pipe only for installation/launch control, never for runtime bridge
-injection, window dragging, chooser calls, permission grants, or lifecycle correctness.
+**Approved launch-control adjustment (2026-10-02).** The private pipe belongs to a temporary
+installation controller. Both headless and headed Helium exit when that pipe closes. The user
+app therefore launches through the browser's installed-app command after the controller exits.
+No runtime bridge, debugging connection, chooser binding or permission grant reaches that app.
 
 1. Resolve the effective browser profile and stable absolute manifest identity for the app URL.
-   Start or connect only to a browser under that selected profile. An explicit browser setting
-   keeps precedence; use Chrome-first ordering for automatic selection.
-2. Call `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. In the
-   observed protocol an unknown valid manifest id is `InvalidParams` (`-32602`), not an
-   `installed: false` field. Validate the identity before interpreting that response.
+   An explicit browser setting keeps precedence; automatic selection uses Chrome-first ordering.
+   Hold a launcher-owned `flock` file beside that profile through installation, controller exit and
+   app handoff. A second launcher waits within the same startup cap, then rechecks the singleton;
+   it never forwards its URL to another launcher's installation controller. The kernel releases
+   ownership when a launcher exits or dies, and the lock file's inode remains for other waiters.
+   A live profile routes directly through the browser singleton and never starts a controller.
+   Probe `SingletonSocket` with Chromium's matching cookie links before and after connecting;
+   send no launch data on the probe. If the socket cannot be checked, a `SingletonLock` naming a
+   live local hostname-pid owner suffices. Ownership never depends on argv or executable paths,
+   so a Dock app-shim owner or a confined browser can use the same dedicated profile.
+2. An idle profile goes straight to the registered app when its verified receipt matches the
+   current served manifest id, resolved start URL and SHA256 of the manifest bytes, and Chrome's
+   per-app resource directory exists. The directory is
+   `<user-data-dir>/Platform/Web Applications/Manifest Resources/<appId>`: Chromium 154's
+   `GetManifestResourcesDirectoryForApp` and `kWebAppDirname` define it, and
+   `WebAppIconManager::DeleteData` recursively removes it on uninstall. This read-only directory
+   check detects uninstall without opening a controller or reading a browser database. A missing
+   receipt, changed manifest or missing directory runs setup. A failed direct app launch invalidates
+   its receipt and retries setup while idle within the remaining startup cap; an exhausted cap
+   leaves setup for the next idle launch. Singleton presence proves ownership, never an app window.
+   Setup starts a temporary browser with the existing CDP pipe and calls
+   `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. An unknown
+   app returns `InvalidParams` (`-32602`) with the unknown-app reason. Other parameter failures
+   remain operational errors; there is no `installed: false` field.
 3. For an uninstalled identity, call
    `PWA.install({ manifestId, installUrlOrBundleUrl: installUrl })` and check OS state again.
-   A failed installation is a failed launch with structured guidance; never suppress arbitrary
-   install failures as an unsupported-domain case. Repeat launch converges after a partial install.
-4. Call `PWA.launch({ manifestId, url })`; the manifest's launch policy chooses the client.
-   `PWA.launch` returns a tab target id, which is not necessarily the page target id. Installation
-   readiness is OS state plus an app document, not the former injected-bridge attach barrier.
-5. Release launch-control resources without terminating a successfully launched app or a browser
-   owned by another entry point. App window close and relaunch behavior belongs to the browser.
-   Direct Dock launch follows the same manifest and app logic with no controller at all.
+   A failed installation is a failed launch with structured guidance. Repeat idle setup converges
+   after a partial install or uninstall. Installation repair runs only while the profile is idle.
+4. Before closing the controller, query `Target.getTargets` and collect its HTTP(S) page URLs;
+   the dedicated controller's bootstrap is `about:blank`, and workers are excluded. De-duplicate
+   those app-window URLs with the launcher's URL. Close the pipe, await exit, then replay every
+   collected URL through the same installed `--app-id`, computed once from the original install
+   URL. Target navigation changes only the launch URL, including nested paths. This preserves OS
+   shortcut launches that bypass the launcher lock during setup. If an OS app wins the singleton after the idle check, the controller exits
+   through singleton handoff or EOF; recheck ownership and forward the launcher's URL to that
+   live browser. Skip installation this run and leave repair to the next idle launch.
+   Compute Chromium's app id from the canonical manifest URL using two SHA256 hashes of raw bytes,
+   then encode the first 128 bits as letters a–p. This uses Chromium's public identity algorithm;
+   no browser database is read or changed.
+5. Launch `--app-id=<id>` on the same profile, with the incoming address carried by
+   `--app-launch-url-for-shortcuts-menu-item`. Use no CDP flag. The browser's installed manifest
+   owns client focus and the web `launchQueue` consumer owns URL delivery. Repeated launcher and
+   Dock launches use the same browser singleton, including a Dock-first launch with no receipt.
+   Launcher exit or cancellation after handoff leaves the user app and shared server running.
 
-`PWA.openCurrentPageInApp({ manifestId })` is a page-target method and was probed as an alternative.
-The chosen target is `PWA.launch` because reparenting a bootstrap `--app` page adds a spare browser
-New Tab on Linux and retains unnecessary attach/promotion logic. That earlier experiment does
-not ship.
+`PWA.launch` and `PWA.openCurrentPageInApp` remain protocol experiments. Neither ships as the
+user-window launch route because releasing their controller pipe terminates that browser.
+Reparenting a bootstrap `--app` page also retained a spare New Tab and unnecessary promotion code.
 
-**Engineering proof needed before code.** A Dock-started browser already owns the profile and
-was not started with the private CDP pipe. A second process singleton handoff cannot retroactively
-add that pipe to the existing browser. Prove the browser's normal installed-app launch command
-(`--app-id` for the installed identity) for this handoff, or another browser-supported launch
-route, with an already running Dock client. It must focus the existing installed client and
-preserve URL delivery. Do not scan or mutate browser databases, intercept Dock launch, require
-runtime debugging for app functionality, or kill the Dock's browser to regain CDP control.
-Installation repair after uninstall while that browser is running also needs a bounded proof.
+**Linux proof and limits.** Disposable Helium 154 and Chromium 152 profiles proved registration,
+repeat state queries and uninstall/reinstall through the pipe. A private Hyprland session proved
+that the Helium controller exits before a browser-owned app launches, that a second `--app-id`
+focuses the existing sole window, and that its last-window close works. The nested display's known
+gray render leaves app title/icon and launchQueue URL delivery unconfirmed. Evidence is retained
+at `/work/tmp/fregat-evidence/u1-installed-client-20261002/`; private compositor and DBus teardown
+records are linked there. Chrome and macOS remain coordinator acceptance work.
+
+A Dock-started browser cannot acquire a retroactive private pipe. Do not scan browser databases,
+intercept Dock launch, require runtime debugging, or kill that browser to regain installation
+control. Uninstall during a live session requires closing that profile before repair.
 
 **Approved owner decision (2026-10-02): native-host fallback.** When the selected browser
 cannot install apps because the PWA domain or install support is absent, or no Chromium-family
@@ -188,7 +222,7 @@ capability acceptance must establish the required launch behavior before deliver
 ### Server availability without user steps
 
 A Dock shortcut opens the manifest's stable start URL directly. The page cannot start a local
-process, so the installer/first Polaron setup must register or reuse the machine server before
+process, so the installer/first launcher setup must register or reuse the machine server before
 installing the PWA. This is one-time setup, performed automatically. Subsequent browser launches
 need only a connection to the stable endpoint; they do not run the launcher or an installation
 script. Setup itself is idempotent and verifies the service, origin and served release before
@@ -609,7 +643,7 @@ It also exposed the spare New Tab and duplicate page-session promotion failure o
 injection/reparenting approach. Those experiments are evidence for the protocol, not delivery of
 this bridge-independent design.
 
-Evidence is retained at `/work/tmp/fregat-evidence/polaron-installed-app-20261002/`.
+Evidence is retained at `/work/tmp/fregat-evidence/*installed-app-20261002/` (the dated installed-app proof directory).
 Google Chrome 154 is not installed on this Linux host; Chromium here is 152. Chrome 154 runtime
 behavior and Mac OS registration remain unconfirmed. Headless proof cannot establish Dock,
 Cmd-Tab/taskbar identity, WCO drag, chooser visibility, or real-keychain behavior.
@@ -633,12 +667,105 @@ Install once and inspect the generated Fregat app name/icon in Dock, Cmd-Tab and
 Close the launcher completely; open Fregat through the browser-created Dock entry and native app
 launcher. Confirm normal boot, editor/terminal/draft retention on repeat launch, launchQueue URL
 handling, native chooser selection/cancellation, and zero dependency on injected globals.
-Repeat with Dock first and then Polaron, and Polaron first and then Dock. Each path must focus one
+Repeat with Dock first and then the desktop launcher, and the desktop launcher first and then Dock. Each path must focus one
 installed client. Test WCO enabled and disabled, system theme changes, opaque backdrop, titlebar
 geometry, drag/no-drag hit areas, browser notification permission, and browser screen capture.
 Close the final Fregat window and prove mesh services, existing terminals, and another browser
 profile survive. Restart from the Dock with mesh routes idle. Test remote-machine selection with the in-app server-filesystem picker and local-machine
 native selection separately; a dialog opening on an unseen remote desktop is a failure.
+
+## Fregat.app on macOS
+
+**Status: Approved 2026-10-02.** One double-clickable `Fregat.app` that carries everything it
+needs: no Bun, Git checkout or terminal step on the user's machine.
+
+### Window choice
+
+- `window.browser=auto` with `window.transparency=compositor` (the default): the installed Chrome
+  app from the section above, preferring Chrome. Chrome owns the window and its Dock identity;
+  `Fregat.app` hands off and exits.
+- `window.browser=auto` with `window.transparency=window`: Fregat's own window, the
+  `platform-webview` WKWebView host with vibrancy. The owner accepts WebKit's rendering here; no
+  WebKit performance study is needed.
+- `window.browser=webview` selects the native host explicitly; an explicit browser executable takes
+  precedence over automatic selection.
+- No supported Chromium browser: the native host, with vibrancy set by `window.transparency`.
+- Every path gives a native macOS window. Electron and a bundled engine are later (see below).
+
+### Bundle layout
+
+```text
+Fregat.app/Contents/
+  Info.plist             CFBundleIdentifier dev.shaulavo.fregat, LSUIElement true
+  MacOS/fregat           `bun build --compile` of apps/desktop/src/launcher/index.ts
+  MacOS/platform-webview the native host; runs from MacOS/ so it shares the bundle identity
+  Resources/release/     a self-contained release (below)
+  Resources/Fregat.icns  from scripts/app-icon (fregat.svg)
+```
+
+`LSUIElement` keeps the launcher out of the Dock on the Chrome path. The native host already calls
+`setActivationPolicy:Regular` (`platform-webview.m`), so the native path shows Fregat in the Dock and
+Cmd-Tab under the bundle's name and icon.
+
+**Self-contained release.** Today `buildServer()` links `server/node_modules` and the release-root
+`node_modules` into the build checkout. `Resources/release/` instead holds the server and worker
+bundles, web assets, `build-config.json`, `bin/promote.ts`, and the darwin runtime dependencies
+installed from the generated manifest and lock. Every dependency link resolves inside the payload.
+
+**One runtime.** The LaunchAgent runs `promote.ts` and `current/server/index.js` with the service
+host's `bun`, which is `process.execPath`: in a compiled launcher that names `MacOS/fregat`. A1
+proves the compiled executable runs scripts as Bun with `BUN_BE_BUN=1` and the service unit sets
+it; if that fails, A1 ships `MacOS/bun` and the service host points there. Either way no system Bun
+is needed.
+
+**Bundle-relative resources.** The launcher resolves resources from its executable inside the
+bundle: the native host from `Contents/MacOS/platform-webview` (today
+`apps/desktop/native/build/`), the release from `Contents/Resources/release`. The service setup
+(`ensure-machine-service.ts`, today a computed dynamic import in `installation-client.ts`) is
+imported statically so it compiles in, and the promotion source it reads becomes an embedded asset.
+The checkout-root derivation in `launcher/index.ts` stays for development runs only.
+
+### First launch and updates
+
+1. The launcher resolves `server.releaseRoot` (default `~/Library/Application Support/Fregat/releases`).
+2. When `current` is missing, or its commit differs from `Resources/release`, it copies the bundled
+   release into `releases/` and links it: first install promotes directly, an update stages
+   `pending` and follows the existing restart approval. No file inside a running release changes.
+3. `ensureMachineService(intent, { productionRoot })` registers the LaunchAgent and socket against
+   that release root, then the launcher opens the window for the chosen path. A Dock relaunch with
+   the server stopped wakes it through the socket.
+
+`scripts/deploy/release.ts` takes its root from `scripts/deploy/config.ts`, fixed to
+`/work/platform-production`, and `createRelease`, `stagePending` and `swapCurrent` take no root. A2
+extracts root-parameterized release creation, staging and atomic link operations; the app passes
+its `server.releaseRoot`, and `bun run deploy` keeps `/work/platform-production` and its mesh live
+check. The app's promotion skips the systemd and checkout live check and runs the server's own
+readiness probe (`GET /system/identity`).
+
+### Build
+
+`bun run app:mac` builds the bundle on macOS into the build directory: compile the launcher, build
+the native host, assemble the self-contained release, generate the icon, write `Info.plist`, then
+ad-hoc `codesign`. Developer ID signing, notarization and a DMG wait for a public release. CI builds
+the bundle on the macOS runner and checks its layout, `Info.plist`, and that no file or link in it
+points outside the bundle; it does not open a window.
+
+### Units
+
+- **A1 — bundle builder**: `apps/desktop/scripts/build-app.ts`, `app:mac` script, icon and plist,
+  self-contained release payload, the runtime proof (`BUN_BE_BUN` or `MacOS/bun`), bundle-relative
+  resource resolution in the launcher, CI layout check. Done when the built app, moved to a path
+  with spaces and with the checkout renamed away, launches the server through the LaunchAgent.
+- **A2 — bundled first launch**: root-parameterized release operations extracted from
+  `scripts/deploy/release.ts`, seeding or staging `Resources/release` under `server.releaseRoot`,
+  the static service-setup import and embedded promotion source, then `ensureMachineService` and the
+  window. Tests run against a temp release root with the real release code. A2 owns
+  `scripts/deploy/` and `scripts/service/`; A1 owns `apps/desktop/scripts/` and the launcher's
+  resource resolution.
+- **A3 — owner Mac acceptance over mesh**: the checks in "Coordinator's Mac acceptance" above, run
+  from the built `Fregat.app`, plus: a clean `~/Library/Application Support/Fregat`, Dock launch with
+  the server stopped, transparency on and off, and the native-window path through the Browser setting
+  `webview` (Chrome stays installed).
 
 ## Why
 
@@ -661,7 +788,7 @@ What the 2.x migration cost, measured on 2026-09-13 and 2026-09-25:
 Today the desktop waits for the mesh-managed API and Vite URLs, opens a window, installs
 `window.platformBridge`, answers `pickEntry`, and flushes observability on quit. It does not
 spawn or stop those shared servers. On macOS it attaches vibrancy behind a transparent window.
-Polaron preserves shared-server ownership. The approved installed-app design above extends the
+The launcher preserves shared-server ownership. The approved installed-app design above extends the
 packaging follow-up with OS activation and a single server per machine/state home, never an
 app-window-owned server.
 
@@ -797,12 +924,12 @@ launch from a pre-existing instance; a second launcher cannot tear down the firs
 Plan 132 transfers its Electrobun vibrancy pointer workaround to Gate 3. The replacement native
 host owns its window directly; verify that path on macOS instead of patching obsolete Electrobun
 window discovery. Plan 126's desktop capability matrix consumes these host results. Its unrelated
-chat/provider batches do not wait on Polaron.
+chat/provider batches do not wait on the desktop launcher.
 
 ## Gates
 
 Electrobun keeps working until Gate 4. The new launcher runs beside it as
-`bun run desktop:dev -- --shell=polaron` until then.
+`bun run desktop:dev -- --shell=installed` until then.
 
 ### Gate 1 — Chromium launcher on Linux (M)
 
@@ -846,7 +973,7 @@ Owner: `apps/desktop/src/launcher/*` (new), `scripts/desktop-dev.ts`,
    isolation. There is no current `childLeaseFile` to move. Do not reintroduce a shared-server
    lease or take ownership of another launcher through a stale profile record.
 
-**Exit**: `bun run desktop:dev -- --shell=polaron` opens Platform in the default Chromium-family
+**Exit**: `bun run desktop:dev -- --shell=installed` opens Platform in the default Chromium-family
 browser as an app window, picks a folder through the web picker, and quits on window close with
 no leftover process. Idle numbers in this plan (the prototype measured 2 CPU ticks in 12 s, 0.17%
 of one core, and 514 MB PSS for the whole Chromium group plus launcher, app on the welcome screen).
@@ -947,7 +1074,7 @@ executor; the command asks for it and has no dependency on the removed verificat
 ```sh
 printf 'Canonical Fregat checkout on this Mac: '
 IFS= read -r FREGAT_CHECKOUT
-cd "$FREGAT_CHECKOUT" && PLATFORM_HOME="$HOME/Library/Application Support/Fregat/PolaronAcceptance" ~/.bun/bin/bun desktop:dev -- --shell=polaron
+cd "$FREGAT_CHECKOUT" && PLATFORM_HOME="$HOME/Library/Application Support/Fregat/InstalledAppAcceptance" ~/.bun/bin/bun desktop:dev -- --shell=installed
 ```
 
 Prerequisites: the checkout's shared API/Vite URLs are configured and reachable; its `.env` leaves
@@ -986,7 +1113,7 @@ visual/Cmd-Q/drag/picker observation before Gate 3 acceptance.
 
 ### Gate 4 — Delete Electrobun (S–M)
 
-**Status: PARKED — root decision 2026-10-02.** The owner must observe Polaron Chromium from
+**Status: PARKED — root decision 2026-10-02.** The owner must observe Fregat Chromium launcher from
 the Mac desktop with the real keychain, plus both paths' visual/Cmd-Q/drag/picker checks above.
 Electrobun remains the default and fallback until that acceptance; the scratch mock-keychain proof
 and closing the Wave 2 engineering track do not authorize deletion or a default-shell switch.
@@ -1009,8 +1136,10 @@ Removal still needs explicit root approval.
 
 ## Later, deliberately
 
-- **Packaging and signing.** A Bun binary, the launcher bundle, the server bundle, the web build
-  and one host binary per OS. No CEF. DMG, AppImage, notarization when there is a release to make.
+- **Signing and Linux packaging.** `Fregat.app` above covers macOS packaging. Developer ID
+  signing, notarization, a DMG and an AppImage wait for a public release.
+- **An own-engine app.** Electron, or a Bun-based equivalent that bundles Chromium, comes after
+  `Fregat.app` ships; both window paths above stay until then.
 - **Windows.** Edge is preinstalled, so the Chromium path covers it. EEA users can uninstall Edge
   since 2024; a WebView2 host would be the third host if that ever matters.
 - **Updater.** None exists today and none is planned by this plan.
@@ -1150,9 +1279,8 @@ now uses):
    and a separate profile keeps the app's storage and permissions out of the user's browsing.
 7. **When nothing is installed.** Decided 2026-09-26: research recommendation — open the default
    browser in a tab. It is "whatever the system has", and the web layer already works in a tab.
-8. **Name.** Decided 2026-09-26: research recommendation — the code stays in `apps/desktop`; the
-   host binary is `platform-webview`. "Polaron" stays the plan's name and appears nowhere a user
-   looks.
+8. **Name.** Decided 2026-10-02: the installed-app path is part of Fregat. The code stays
+   in `apps/desktop`; the host binary is `platform-webview`.
 9. **macOS default path.** The Chromium window on macOS draws the browser's titlebar above ours,
    shows the browser's dock icon, and has no vibrancy; the webview window keeps `hiddenInset`,
    vibrancy and our own icon once bundled, but loses EditContext and Chrome DevTools.

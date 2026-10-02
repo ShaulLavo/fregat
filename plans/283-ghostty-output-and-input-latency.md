@@ -13,14 +13,57 @@
 - [x] Phase 1 attribution: `ghostty-webgpu/docs/perf-attribution.md` (#242).
 - [x] Fix 1, reuse WASM memory views (#245).
 - [x] Fix 2, packed damaged-row snapshot plus direct-packed DOM frame text (#255).
-- [ ] Benchmark repair on omarchy: hardware WebGPU path on Linux, GPU-idle gate (ComfyUI shares the
-      GPU), latency timed at frame presentation with a few hundred samples, pass rule = paired
-      native/xterm ratio ≤ 1 per repetition.
-- [ ] Fix 3: upload only changed rows of the instance buffer (today 76,800 bytes per terminal per
-      render; GPU-process CPU rose after #255).
-- [ ] Fix 4: streamline instance building (26.8 % ASCII / 15.6 % SGR of main-thread time; SGR grew after #255).
-- [ ] Fix 5: separate recorder overhead from library work in the JS residual (about 10 %).
+- [x] Benchmark repair on omarchy (#343): hardware WebGPU on Linux headless-shell, GPU-idle gate,
+      latency at the presentation of the submitting frame, paired native/xterm ratios, CPU rows
+      unresolved below the 10 ms tick. Sustained-output CPU is ASCII-only until #352.
+      Result at 17 terminals: output CPU native/xterm 2.10 renderer, 2.29 total.
+- [ ] Frame built in Zig, spike: ASCII and SGR colors, measured against main and xterm.
+- [ ] Frame built in Zig, full move: wide characters, graphemes, cursor, selection, links; delete the
+      JS snapshot and instance builders.
+- [ ] Input: render on the frame that parses the echo (native starts drawing ~15 ms after parse at
+      1 terminal; xterm ~0.5 ms).
 - [ ] Full omarchy run of every measure; regenerate `docs/benchmarks.md`; unblock Plan 285's measurements section.
+
+Superseded by the Zig frame: the JS-side fixes for changed-row uploads, instance building and the JS
+residual. The Zig frame writes only changed ranges and removes those JS stages.
+
+## Phase 2 design: the frame is built in Zig
+
+Approved by the owner 2026-10-02 as a re-architecture of the render pipeline. Ghostty's wasm only
+parses and keeps terminal state (1.3 % of main-thread time at 17 terminals); copying cells out (49 %)
+and building instances in JS (27 %) were our glue. WebAssembly cannot call WebGPU, so the split is:
+
+- Zig (`bridge.wasm`): walk Ghostty's render state for dirty rows, look up glyphs in an atlas index
+  it owns, write instance records into a persistent buffer in wasm memory, and return the changed
+  byte ranges and the glyphs missing from the atlas. One call per frame.
+- JS: rasterize missing glyphs with canvas (rare; zero atlas uploads in steady output), register
+  them back, `queue.writeBuffer` only the changed ranges straight from wasm memory, encode one
+  pass, submit. Fonts stay in the browser for system fonts, emoji and fallback.
+- Gate: the spike must bring 17-terminal total CPU clearly below xterm and GPU-process CPU toward
+  xterm's, or the full move stops for review.
+
+Later option, not in this plan's scope: run the terminal in a worker (shared wasm memory or the
+whole renderer on an `OffscreenCanvas`) so huge output never blocks the page. It moves work to
+another core without reducing it, needs cross-origin isolation and a threads build of Ghostty, and
+can add a hop to input; consider it only if a huge-output scenario shows the main thread blocked.
+
+## Every renderer gets the same treatment
+
+Owner, 2026-10-02: ghostty-webgpu is on a performance mission, and every renderer it ships is tuned
+like the main WebGPU path: WebGPU, WebGL, Canvas 2D and DOM (`src/render/`). Each is measured
+against its closest counterpart in the same session:
+
+| Ours      | Counterpart            | Note                                 |
+| --------- | ---------------------- | ------------------------------------ |
+| WebGPU    | xterm WebGL            | xterm.js has no WebGPU renderer      |
+| WebGL     | xterm WebGL            | like with like                       |
+| Canvas 2D | ghostty-web (canvas2d) | xterm.js removed its canvas renderer |
+| DOM       | xterm DOM              | like with like                       |
+
+Target: each of ours at or below its counterpart. The open question for WebGPU is whether its
+remaining gap at 17 terminals (GPU-process CPU about 2.5× xterm's) is the cost of presenting a
+WebGPU canvas on this Linux setup (Dawn on Vulkan, compositor on GL, no Vulkan–GL interop), or
+something our renderers do. Comparing our WebGL with xterm's WebGL answers it.
 
 ## Why the M1 targets changed
 

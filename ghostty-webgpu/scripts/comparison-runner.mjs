@@ -16,6 +16,7 @@ import {
 } from './comparison-guards.mjs'
 import { positiveInteger, selection, hardwareLaunch } from './comparison-options.mjs'
 import { presentationLatency } from './comparison-latency.mjs'
+import { comparisonLatencyEndpoint } from './comparison-compact.mjs'
 import { createGpuGate } from './comparison-gpu.mjs'
 import { ink } from './comparison-pixels.mjs'
 import {
@@ -777,10 +778,7 @@ try {
   artifact.environment = {
     browser: browser.version(),
     browserChannel: platform() === 'linux' && headless ? 'chromium-headless-shell' : 'chromium',
-    latencyEndpoint:
-      platform() === 'linux' && headless
-        ? 'keydown/write to compositor presentation ack (headless-shell, on-demand, not vsync)'
-        : 'keydown/write to Chrome presentation feedback (terminal submission frame)',
+    latencyEndpoint: comparisonLatencyEndpoint({ tracing, headless, platform: platform() }),
     os: `${platform()} ${release()} ${arch()}`,
     cpu: cpus()[0]?.model,
     renderer: renderer(gpu),

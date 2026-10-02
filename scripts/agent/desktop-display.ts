@@ -9,7 +9,7 @@ import {
 import path from 'node:path'
 import { scriptErrors } from '../structured-errors'
 import { scratchPath } from './paths'
-import { outerWaylandDisplay } from './polaron-display-env'
+import { outerWaylandDisplay } from './desktop-display-env'
 
 // This fixture owns a nested compositor and session bus; it never controls the outer display.
 const outerDisplay = outerWaylandDisplay(process.env)
@@ -41,7 +41,7 @@ const env = {
   DBUS_SESSION_BUS_ADDRESS: bus,
   GSETTINGS_BACKEND: 'memory',
   NO_AT_BRIDGE: '1',
-  XDG_CURRENT_DESKTOP: 'PolaronProof',
+  XDG_CURRENT_DESKTOP: 'DesktopProof',
   HYPRLAND_INSTANCE_SIGNATURE: '',
   WAYLAND_DISPLAY: outerDisplay,
   AQ_DRM_DEVICES: '/dev/null',
@@ -121,7 +121,7 @@ try {
     monitors,
     system,
   }
-  writeFileSync(`${scratch}/polaron-proof.json`, JSON.stringify(metadata))
+  writeFileSync(`${scratch}/desktop-proof.json`, JSON.stringify(metadata))
   // NOT-PORTABLE: GTK portal executables are assumed at distro-specific /usr/lib paths.
   owned(['/usr/lib/xdg-desktop-portal-gtk'], 'portal-gtk')
   owned(['/usr/lib/xdg-desktop-portal'], 'portal')

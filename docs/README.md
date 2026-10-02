@@ -31,7 +31,7 @@ the revision it inspected; it is not a second implementation queue or proof of t
 - [Web development](development.md)
 - [TUI guide](../apps/tui/README.md) and [TUI design](../plans/tui-plan.md)
 - [Native macOS roadmap](../plans/native-plan-of-plans.md) and [editor core](native-editor-core-design.md)
-- [Desktop shell work](../plans/114-polaron-shell.md)
+- [Desktop shell work](../plans/114-installed-app.md)
 
 ## Research and evidence
 

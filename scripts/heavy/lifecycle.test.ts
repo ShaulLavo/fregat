@@ -15,8 +15,8 @@ import {
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { liveSlices, sliceMemory, sliceState } from './admission'
-import { reapSlice } from './job'
+import { bootSeconds, liveSlices, sliceMemory, sliceState } from './admission'
+import { reapSlice, stopTimeoutSeconds } from './job'
 import { sliceRootFor, tryLock, unlock } from './lock'
 import { enqueue, live, release } from './queue'
 import {
@@ -503,7 +503,11 @@ describe.skipIf(!userScopes)('reaping a dead entry on another root', () => {
     const box = lifecycleBox(65536)
     const other = sandbox().sliceRoot
     const pidFile = path.join(box.root, 'pid')
-    const owner = start(box, 'owner', sleeper(pidFile), { jobClass: 'light', sliceRoot: other })
+    const owner = start(box, 'owner', sleeper(pidFile), {
+      jobClass: 'light',
+      machine: true,
+      sliceRoot: other,
+    })
     await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true)
     const [entry] = readdirSync(path.join(box.state, 'jobs')).filter((name) =>
       name.endsWith('.json'),
@@ -513,7 +517,7 @@ describe.skipIf(!userScopes)('reaping a dead entry on another root', () => {
       path.join(box.state, 'jobs', 'stale-renamed.json'),
     )
 
-    const next = await heavy(box, 'next', ['true'], { jobClass: 'light' })
+    const next = await heavy(box, 'next', ['true'], { jobClass: 'light', machine: true })
     expect(next.stderr).not.toContain('stopping')
     expect(alive(pidIn(pidFile))).toBe(true)
     owner.child.kill('SIGTERM')
@@ -555,6 +559,7 @@ describe.skipIf(!userScopes)('reaping a dead entry on another root', () => {
     const pidFile = path.join(box.root, 'pid')
     const orphaned = start(box, 'orphaned', sleeper(pidFile), {
       jobClass: 'light',
+      machine: true,
       sliceRoot: other,
     })
     await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true)
@@ -569,12 +574,16 @@ describe.skipIf(!userScopes)('reaping a dead entry on another root', () => {
       'systemctl',
       `case "$2 $*" in kill*${other}-*|stop*${other}-*|revert*${other}-*) exit 1;; esac\nexec ${SYSTEMCTL} "$@"`,
     )
-    const first = await heavy(box, 'first', ['true'], { env: failing, jobClass: 'light' })
+    const first = await heavy(box, 'first', ['true'], {
+      env: failing,
+      jobClass: 'light',
+      machine: true,
+    })
     expect(first.stderr).toContain(`stopping ${other}-`)
     expect(alive(pidIn(pidFile))).toBe(true)
     expect(entries()).toHaveLength(1)
 
-    const second = await heavy(box, 'second', ['true'], { jobClass: 'light' })
+    const second = await heavy(box, 'second', ['true'], { jobClass: 'light', machine: true })
     expect(second.code).toBe(0)
     expect(alive(pidIn(pidFile))).toBe(false)
     expect(entries()).toEqual([])
@@ -649,6 +658,7 @@ describe.skipIf(!userScopes)('reaping a dead entry on another root', () => {
     const pidFile = path.join(box.root, 'pid')
     const orphaned = start(box, 'orphaned', sleeper(pidFile), {
       jobClass: 'light',
+      machine: true,
       sliceRoot: other,
     })
     await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true)
@@ -658,25 +668,51 @@ describe.skipIf(!userScopes)('reaping a dead entry on another root', () => {
       'systemctl',
       `case "$2 $*" in kill*${other}-*|stop*${other}-*|revert*${other}-*) exit 1;; esac\nexec ${SYSTEMCTL} "$@"`,
     )
-    const pass = async (label: string) =>
-      (await heavy(box, label, ['true'], { env: failing, jobClass: 'light' })).stderr
+    const pass = async (label: string) => {
+      const result = await heavy(box, label, ['true'], {
+        env: failing,
+        jobClass: 'light',
+        machine: true,
+      })
+      expect(result.code).toBe(0)
+      return result.stderr
+    }
 
     const first = await pass('first')
     expect(first).toContain(`stopping ${other}-`)
     expect(first).toMatch(/warn: \S+ is still running/)
+    expect(first.match(/warn:/g)).toHaveLength(1)
+    expect(first).not.toMatch(/error:/)
+    const markers = path.join(box.state, 'reaping')
+    const slices = readdirSync(markers)
+    expect(slices).toHaveLength(1)
+    const [slice] = slices
+    expect(slice).toMatch(new RegExp(`^${other}-[0-9a-f]+\\.slice$`))
+    const marker = path.join(markers, slice!)
+    expect(readFileSync(marker, 'utf8')).toMatch(/^\d+(?:\.\d+)? warned$/)
+    // Keep this pass before the deadline even if the runner pauses during admission.
+    const beforeTimeout = `${bootSeconds() + 120} warned`
+    writeFileSync(marker, beforeTimeout)
     const second = await pass('second')
     expect(second).not.toContain('stopping')
     expect(second).not.toMatch(/warn:|error:/)
-    // Past the orphan's stop timeout (grace 1 s + 3 s) the failure is an error, once.
-    await new Promise((resolve) => setTimeout(resolve, 4_500))
+    expect(readFileSync(marker, 'utf8')).toBe(beforeTimeout)
+    // Age the persisted series past its deadline without waiting on a wall-clock timer.
+    const since = bootSeconds() - stopTimeoutSeconds(1) - 1
+    writeFileSync(marker, `${since} warned`)
     const third = await pass('third')
     expect(third).toMatch(new RegExp(`error: ${other}-[0-9a-f]+\\.slice .*systemctl --user stop`))
+    expect(third.match(/error:/g)).toHaveLength(1)
+    expect(third).not.toMatch(/stopping|warn:/)
+    expect(readFileSync(marker, 'utf8')).toBe(`${since} error`)
     const fourth = await pass('fourth')
     expect(fourth).not.toMatch(/stopping|warn:|error:/)
+    expect(readFileSync(marker, 'utf8')).toBe(`${since} error`)
     expect(alive(pidIn(pidFile))).toBe(true)
 
-    const healthy = await heavy(box, 'healthy', ['true'], { jobClass: 'light' })
+    const healthy = await heavy(box, 'healthy', ['true'], { jobClass: 'light', machine: true })
     expect(healthy.code).toBe(0)
+    expect(existsSync(marker)).toBe(false)
     expect(alive(pidIn(pidFile))).toBe(false)
     expect(readdirSync(path.join(box.state, 'jobs')).filter((n) => !n.startsWith('.'))).toEqual([])
   }, 60_000)

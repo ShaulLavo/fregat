@@ -8,9 +8,13 @@ import { nativeBudget, type NativeBudget, type HostSpawn } from './native-helper
 import { shellBridge, parsePickRequest } from './shell-bridge'
 import { launcherFailureFacts } from './failure'
 import type { StartupBudget } from './startup'
+import { appBundle } from './bundle'
 
 export function nativeHostBinary(root: string) {
-  return path.join(root, 'apps', 'desktop', 'native', 'build', 'platform-webview')
+  return (
+    appBundle()?.nativeHost ??
+    path.join(root, 'apps', 'desktop', 'native', 'build', 'platform-webview')
+  )
 }
 export async function launchWebview(options: {
   binary: string
@@ -103,7 +107,7 @@ export async function showStartFailure(
   }
 }
 
-export async function completePick(
+async function completePick(
   id: number,
   documentId: string,
   pending: Promise<string[]>,
