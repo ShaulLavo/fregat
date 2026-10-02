@@ -30,7 +30,6 @@ async function startupFixture(mode: string) {
       startup,
       observe,
       onOpen: () => {},
-      onFailure: () => {},
     })
     return owned
   }

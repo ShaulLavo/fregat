@@ -175,17 +175,8 @@ async function start() {
           home,
           url: web,
           startup: settings.startup,
-          native: { binary, budget: settings.native },
           signal: controller.signal,
           onOpen: (context) => recordDesktopInfo('desktop.window.open', context),
-          onExit: (context) => recordDesktopInfo('desktop.window.closed', context),
-          onFailure: (error) =>
-            recordDesktopError('desktop.window.control_failed', {
-              outcome: 'failed',
-              source: candidate.source,
-              confinement: candidate.confinement,
-              ...launcherFailureFacts(error),
-            }),
         },
       })
       recordDesktopInfo('desktop.browser.chosen', {

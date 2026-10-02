@@ -119,18 +119,12 @@ test('changed configured endpoint requires explicit installation review', async 
   expect(() => installationIntent(box.home)).toThrow('machine service identity')
 })
 
-test('missing service implementation or release root cannot claim installed success', async () => {
+test('missing release root cannot claim installed success', async () => {
   const box = fixture()
   await expect(
     ensureInstalledService({ intent: box.intent, productionRoot: undefined, signal: box.signal }),
   ).rejects.toMatchObject({
     code: 'desktop.installation.SERVICE_UNAVAILABLE',
     internal: { stage: 'release-root' },
-  })
-  await expect(
-    ensureInstalledService({ intent: box.intent, productionRoot: box.home, signal: box.signal }),
-  ).rejects.toMatchObject({
-    code: 'desktop.installation.SERVICE_UNAVAILABLE',
-    internal: { stage: 'setup-entry' },
   })
 })

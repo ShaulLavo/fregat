@@ -16,6 +16,5 @@ await launchChromium({
   url: 'http://localhost:123/',
   startup: { idleMs: 500, limitMs: 2000 },
   onOpen: () => {},
-  onFailure: () => {},
 })
 await Bun.write(path.join(root, 'returned'), 'handoff')

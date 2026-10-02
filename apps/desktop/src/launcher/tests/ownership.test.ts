@@ -58,7 +58,6 @@ test.each(Array.from({ length: 30 }, (_, run) => run))(
         url: 'http://localhost:123/',
         startup: startupBudget(),
         onOpen: () => {},
-        onFailure: () => {},
       })
       expect(result).toEqual({ kind: 'handoff' })
       expect(processExists(other.pid)).toBe(true)
@@ -95,7 +94,6 @@ test.each(['old-version', 'exit-failure', 'silent'])(
         // Ownership checks must finish even when process counters keep renewing the idle window.
         startup: { idleMs: 500, limitMs: 1500 },
         onOpen: () => {},
-        onFailure: () => {},
       })
       if (mode === 'old-version') {
         await expect(launch).rejects.toMatchObject({
@@ -130,7 +128,6 @@ test('abort during startup closes only the child that this launcher started', as
       startup: startupBudget(),
       signal: controller.signal,
       onOpen: () => {},
-      onFailure: () => {},
     })
     while (!existsSync(f.pidFile)) await Bun.sleep(5)
     const abortedAt = performance.now()
@@ -154,7 +151,6 @@ test('a configured zero-exit executable without a controlled singleton is reject
         url: 'http://localhost:123/',
         startup: startupBudget(),
         onOpen: () => {},
-        onFailure: () => {},
       }),
     ).rejects.toThrow()
   } finally {
@@ -217,7 +213,6 @@ test('/bin/true with an existing valid profile owner is rejected and preserves t
         url: 'http://localhost:123/',
         startup: startupBudget(),
         onOpen: () => {},
-        onFailure: () => {},
       }),
     ).rejects.toMatchObject({ code: 'desktop.launcher.PROFILE_BUSY' })
     expect(processExists(other.pid)).toBe(true)

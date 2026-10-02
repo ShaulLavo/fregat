@@ -17,21 +17,17 @@ import {
   startupProcessCounters,
 } from './diagnostics'
 import { startupSupervisor, type StartupBudget, type StartupCounters } from './startup'
-import type { NativeBudget } from './native-helper'
 
 type ChromiumOptions = {
   candidate: BrowserCandidate
   stateHome: string
   home: string
   url: string
-  native?: { binary: string; budget: NativeBudget }
   startup: StartupBudget
   // Tests replace the /proc sampler to drive progress deterministically.
   observe?: (pid: number) => StartupCounters
   signal?: AbortSignal
   onOpen(context: Record<string, unknown>): void
-  onFailure(error: unknown): void
-  onExit?(context: { exitCode: number; signal: string | null }): void
 }
 export type ChromiumWindow = { kind: 'handoff' }
 

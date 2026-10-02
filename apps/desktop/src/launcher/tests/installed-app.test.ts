@@ -43,7 +43,6 @@ test.each(['pwa-unknown', 'pwa-installed'])(
         url: 'http://localhost:123/platform/?workspace=one',
         startup: { idleMs: 500, limitMs: 2000 },
         onOpen: () => {},
-        onFailure: () => {},
       })
       expect(window).toEqual({ kind: 'handoff' })
       const requests = (await readFile(f.pidFile + '.requests', 'utf8'))
@@ -113,7 +112,6 @@ test.each(['pwa-unsupported', 'pwa-install-unsupported', 'pwa-unavailable'])(
           url: 'http://localhost:123/',
           startup: { idleMs: 500, limitMs: 2000 },
           onOpen: () => {},
-          onFailure: () => {},
         }),
       ).rejects.toMatchObject({ code: 'desktop.launcher.PWA_UNSUPPORTED' })
       const pid = Number(await readFile(f.pidFile, 'utf8'))
@@ -137,7 +135,6 @@ test.each(['pwa-invalid-params', 'pwa-install-failed', 'pwa-verify-failed'])(
           url: 'http://localhost:123/',
           startup: { idleMs: 500, limitMs: 2000 },
           onOpen: () => {},
-          onFailure: () => {},
         }),
       ).rejects.toMatchObject({
         code: 'desktop.launcher.CDP_FAILED',
@@ -167,7 +164,6 @@ test.each(['pwa-unsupported', 'pwa-install-unsupported', 'pwa-unavailable', 'pwa
           url: 'http://localhost:123/',
           startup: { idleMs: 500, limitMs: 2000 },
           onOpen: () => {},
-          onFailure: () => {},
         },
         native: async () => {
           opened.push('native')
@@ -207,7 +203,6 @@ test('releasing the bootstrap connection preserves the app when Chromium exits o
         url: 'http://localhost:123/',
         startup: { idleMs: 500, limitMs: 2000 },
         onOpen: () => {},
-        onFailure: () => {},
       }),
     ).toEqual({ kind: 'handoff' })
     await Bun.sleep(100)
