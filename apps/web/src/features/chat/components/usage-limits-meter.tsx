@@ -74,7 +74,13 @@ export function UsageLimitsMeter({
                   />
                   {compact ? null : (
                     <span className='text-2xs tabular-nums'>
-                      <TickerNumber value={Math.round(tightest.usedPercent)} />%
+                      {tightest.usedPercent === null ? (
+                        'Unknown'
+                      ) : (
+                        <>
+                          <TickerNumber value={Math.round(tightest.usedPercent)} />%
+                        </>
+                      )}
                     </span>
                   )}
                 </Button>
