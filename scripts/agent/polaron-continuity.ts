@@ -61,7 +61,18 @@ export async function observePolaronTerminal(page: Page) {
     await page.keyboard.press('Enter')
     await until(() => output.includes(`${label}_retained`))
   }
+  let nativeReady: number | undefined
   return {
+    async afterNative(label: string, action: () => Promise<void>) {
+      if (nativeReady === undefined) {
+        await command('POLARON_NATIVE_BEFORE', true)
+        nativeReady = readyCount
+      }
+      await action()
+      ok(page.context().browser()?.isConnected(), 'The existing app survives native host exit')
+      await command(`POLARON_AFTER_${label}`)
+      strictEqual(readyCount, nativeReady, 'The existing native-proof shell stays connected')
+    },
     async prove(fixture: string, evidence: Evidence, step: (label: string) => Promise<void>) {
       await command('POLARON_BEFORE', true)
       const beforeReady = readyCount
@@ -168,7 +179,7 @@ async function stopFixtureLauncherProcess(
     const browser = await launchChromium({
       candidate: { kind: 'chromium', executable: ${JSON.stringify(executable)}, args: ${JSON.stringify(process.env.DISPLAY || process.env.WAYLAND_DISPLAY ? [] : ['--headless', '--no-sandbox'])}, confinement: 'none', source: 'setting', family: 'chromium' },
       stateHome: ${JSON.stringify(stateHome)}, home: ${JSON.stringify(stateHome)},
-      url: ${JSON.stringify(new URL('/manifest.webmanifest', page.url()).href)},
+      url: ${JSON.stringify(new URL('/licenses/index.html', page.url()).href)},
       startup: ${JSON.stringify(startupBudget())},
       signal: controller.signal, onOpen: () => {}, onFailure: () => {}
     });

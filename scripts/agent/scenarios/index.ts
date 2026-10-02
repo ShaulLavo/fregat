@@ -241,6 +241,8 @@ import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
 import { themeStudioPreview } from './theme-studio-preview'
 import { polaronWebPicker } from './polaron-web-picker'
+import { polaronNativeHost } from './polaron-native-host'
+import { polaronChromiumNativePicker } from './polaron-chromium-native-picker'
 import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
 import { filePickerLocations } from './file-picker-locations'
@@ -659,6 +661,8 @@ export const scenarios: readonly Scenario[] = [
   filePickerLocations,
   filePickerAppearance,
   polaronWebPicker,
+  polaronNativeHost,
+  polaronChromiumNativePicker,
   filePickerSelection,
   themeStudioPreview,
   themeStudioAsync,

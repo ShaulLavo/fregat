@@ -1759,3 +1759,12 @@ export const ghosttySiteSelectors = {
   stat: '#stat',
   window: '#window',
 } as const
+
+export const polaronNativeSelectors = {
+  settledPickerError: `Promise.all(Array.from(document.querySelectorAll('[data-sonner-toast]')).flatMap(toast => toast.getAnimations({subtree:true})).map(animation => animation.finished.catch(() => {}))).then(() => true)`,
+  openProjectMenu: `document.querySelector('button[aria-label="Switch project"]')?.click()`,
+  openFolderMenu: `Array.from(document.querySelectorAll('[role="menuitem"]')).find(row => row.textContent?.trim() === 'Open folder…')?.click()`,
+  pickerError: `document.body.innerText.includes('The file chooser closed after its time limit.')`,
+  bridgeFacts: `({picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture,titlebar:globalThis.platformBridge?.titlebar})`,
+  readiness: `({ready:Boolean(document.querySelector('[aria-label="Window toolbar"]') && document.querySelector('[aria-label="Folder tree"] [role="treeitem"][aria-label="a.txt"]')),picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture})`,
+} as const

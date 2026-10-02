@@ -1,8 +1,10 @@
+import { getPlatformBridge } from '@/lib/platform/bridge'
 import { clientErrors } from '@/lib/structured-errors'
 
 const FRAME_TIMEOUT_MS = 10_000
 
 export function screenCaptureSupported(mediaDevices: MediaDevices | undefined) {
+  if (getPlatformBridge()?.capabilities?.displayCapture === false) return false
   return typeof mediaDevices?.getDisplayMedia === 'function'
 }
 
