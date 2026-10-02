@@ -164,6 +164,7 @@ export class PagedDocument {
     this.assertLive()
     if (this.#state === 'ready' && line >= this.#lines)
       throw failure('The line is outside the document')
+    await this.validateSource(signal)
     const checkpoint = this.checkpointForLine(line)
     const window = new LineWindow(
       line,
@@ -185,6 +186,7 @@ export class PagedDocument {
       throw failure('The copy exceeds the paged range limit')
     await this.waitUntilIndexed(Number.POSITIVE_INFINITY, signal)
     if (end > this.#units) throw failure('The copy range is outside the document')
+    await this.validateSource(signal)
     const checkpoint = this.checkpointForOffset(start)
     let offset = checkpoint.utf16Offset
     let result = ''
@@ -313,6 +315,22 @@ export class PagedDocument {
       this.#pages.set(start, bytes)
       this.#peakCache = Math.max(this.#peakCache, this.cachedBytes())
       return bytes
+    } finally {
+      this.#active--
+      this.#waiters.shift()?.run()
+    }
+  }
+
+  private async validateSource(signal: AbortSignal) {
+    const combined = AbortSignal.any([signal, this.#lifetime.signal])
+    await this.acquire(combined)
+    try {
+      // Cached bytes cannot observe a disk change; one empty range validates each view operation.
+      const result = await this.readSource(0, 0, combined)
+      combined.throwIfAborted()
+      if (result.revision !== this.#source.revision) this.invalidate()
+      if (result.bytes.byteLength !== 0)
+        throw failure('The range source returned bytes for an empty range')
     } finally {
       this.#active--
       this.#waiters.shift()?.run()

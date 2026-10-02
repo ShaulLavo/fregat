@@ -8,6 +8,8 @@ what `PagedDocument` expects from its source and what a host has to handle. back
 
 ranges are half-open byte ranges. every response must match the opening revision and the exact requested byte count. a changed revision invalidates every view and clears retained pages. after a change or a session expiry, create a new source and document. never splice revisions into a live one.
 
+each view read or copy validates the opening revision once with `readBytes(0, 0, signal)` before consuming retained pages. empty ranges return zero bytes and the current revision; a live file source checks identity and availability for them too. validation shares the range concurrency limit. remote sources pay one round trip per operation while cached page payloads stay local.
+
 if the source rejects a read because its revision or session is gone, throw `new PagedSourceInvalidatedError(cause)`. the document becomes stale, aborts pending work and clears cached pages and checkpoints. other source failures propagate to the caller. a late failure from an aborted request leaves the document intact.
 
 ## positions
