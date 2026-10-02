@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { withWorkspace } from './release/fixture.mjs'
@@ -80,4 +82,70 @@ test('rejects formatter drift while allowing family-specific generated-file excl
     expect(result.status).not.toBe(0)
     expect(result.stderr).toContain('semi must match the root formatter')
   })
+})
+
+test('root and standalone terminal install Node types ahead of ancestor packages', async () => {
+  const checkout = fileURLToPath(new URL('../', import.meta.url))
+  const require = createRequire(join(checkout, 'package.json'))
+  const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc')
+
+  for (const workspace of ['.', 'ghostty-webgpu']) {
+    const manifestPath = join(checkout, workspace, 'package.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    expect(manifest.devDependencies['@types/node']).toBe('26.6.3')
+    const localRequire = createRequire(manifestPath)
+    const nodeTypes = dirname(localRequire.resolve('@types/node/package.json'))
+
+    await withWorkspace(async ({ root }) => {
+      const ancestor = join(root, 'node_modules/@types/node')
+      const project = join(root, 'repo')
+      await mkdir(ancestor, { recursive: true })
+      await mkdir(project)
+      await writeFile(join(ancestor, 'index.d.ts'), 'declare const ancestorTypes: unique symbol')
+      await writeFile(
+        join(project, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            target: 'ES2023',
+            module: 'ESNext',
+            moduleResolution: 'bundler',
+            types: ['node'],
+            skipLibCheck: true,
+            noEmit: true,
+          },
+          files: ['index.ts'],
+        }),
+      )
+      await writeFile(
+        join(project, 'index.ts'),
+        "const bytes: Uint8Array = Buffer.from('checkout')",
+      )
+      const args = [compiler, '-p', join(project, 'tsconfig.json'), '--traceResolution']
+      const before = spawnSync('node', args, { cwd: project, encoding: 'utf8' })
+      expect(before.status).not.toBe(0)
+      expect(before.stdout).toContain(join(ancestor, 'index.d.ts'))
+      expect(before.stdout).toContain("Cannot find name 'Buffer'")
+
+      const typesRoot = join(project, 'node_modules/@types')
+      await mkdir(typesRoot, { recursive: true })
+      await symlink(nodeTypes, join(typesRoot, 'node'), 'junction')
+      const after = spawnSync('node', args, { cwd: project, encoding: 'utf8' })
+      expect(after.status, after.stdout + after.stderr).toBe(0)
+      expect(after.stdout).toContain(join(nodeTypes, 'index.d.ts'))
+      expect(after.stdout).not.toContain(join(ancestor, 'index.d.ts'))
+    })
+  }
+})
+
+test('terminal native input closure agrees with its package dependencies', () => {
+  const terminal = fileURLToPath(new URL('../ghostty-webgpu/', import.meta.url))
+  const verifier = fileURLToPath(
+    new URL('../ghostty-webgpu/scripts/verify-config-resolver-artifacts.ts', import.meta.url),
+  )
+  const result = spawnSync('bun', [verifier, '--state', 'either'], {
+    cwd: terminal,
+    encoding: 'utf8',
+  })
+  expect(result.status, result.stdout + result.stderr).toBe(0)
+  expect(['bootstrap', 'assembled']).toContain(result.stdout.trim())
 })
