@@ -5,6 +5,7 @@ import {
   devPorts,
   portFromEnv,
   runtimeUrl,
+  requestOriginHeaders,
   selectAvailablePort,
 } from './runtime-network'
 
@@ -62,5 +63,17 @@ test('puts the mesh upstream ports beside the public dev ports', () => {
   expect(devPorts({ WEB_PORT: '4000', PORT: '4001' })).toMatchObject({
     webUpstream: 14000,
     apiUpstream: 14001,
+  })
+})
+
+test('request origins omit web paths, slashes, credentials, queries and fragments', () => {
+  expect(requestOriginHeaders('http://127.0.0.1:3301/')).toEqual({
+    Origin: 'http://127.0.0.1:3301',
+  })
+  expect(requestOriginHeaders('https://example.test/platform/')).toEqual({
+    Origin: 'https://example.test',
+  })
+  expect(requestOriginHeaders('http://user:password@[::1]:3301/platform/?query=1#chat')).toEqual({
+    Origin: 'http://[::1]:3301',
   })
 })

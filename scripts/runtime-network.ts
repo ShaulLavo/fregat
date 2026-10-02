@@ -64,6 +64,10 @@ export function devPorts(env: RuntimeEnv) {
   }
 }
 
+export function requestOriginHeaders(webUrl: string) {
+  return { Origin: new URL(webUrl).origin }
+}
+
 export function runtimeUrl(host: string, port: number) {
   return `http://${urlHost(host)}:${port}`
 }

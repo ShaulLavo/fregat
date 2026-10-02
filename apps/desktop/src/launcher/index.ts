@@ -1,16 +1,16 @@
 import { accessSync, constants, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { errorMessage } from '@workspace/contracts'
 import { launcherFailureFacts, reportStartFailure } from './failure'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
-import { portFromEnv, runtimeUrl } from '../../../../scripts/runtime-network'
+import { portFromEnv, requestOriginHeaders, runtimeUrl } from '../../../../scripts/runtime-network'
 import { desktopErrors } from '../bun/structured-errors'
 import {
   initializeDesktopObservability,
   flushDesktopObservability,
   recordDesktopInfo,
   recordDesktopError,
+  recordDesktopWarning,
 } from '../bun/observability'
 import { resolveBrowserCandidates } from './browser'
 import { launchInstalledWindow } from './installed-window'
@@ -21,12 +21,11 @@ import {
 } from './installation-client'
 import { launchWebview, nativeHostBinary, showStartFailure } from './native-window'
 import { nativeBudget } from './native-helper'
-import { startupBudget } from './startup'
-import { isRecord } from '@workspace/utils/objects'
 import { desktopStateHome } from './profile'
 import { launcherErrors } from './structured-errors'
 import { readInstallManifest } from './install-receipt'
 import { appBundle } from './bundle'
+import { readSettings } from './settings'
 
 const bundle = appBundle()
 const root = bundle ? null : path.resolve(import.meta.dirname, '../../../..')
@@ -91,10 +90,13 @@ async function start() {
       signal: controller.signal,
     })
     web = service.url
-    server = service.url.replace(/\/$/, '')
+    server = service.identity.address
     recordDesktopInfo('desktop.service.ready', { disposition: service.disposition })
   }
-  const settings = await readSettings(server, web)
+  const settings = await readSettings(server, web, {
+    signal: controller.signal,
+    onWarning: (context) => recordDesktopWarning('desktop.settings.unreachable', context),
+  })
   helperBudget = settings.native
   const candidates = resolveBrowserCandidates(
     settings.browser,
@@ -205,44 +207,15 @@ async function start() {
   }
 }
 
-async function readSettings(server: string, origin: string) {
-  try {
-    const response = await fetch(`${server}/settings`, {
-      headers: { Origin: origin },
-      signal: requestSignal(),
-    })
-    const snapshot: unknown = await response.json()
-    if (!response.ok || !isRecord(snapshot) || !isRecord(snapshot.values))
-      return {
-        browser: 'auto',
-        transparency: 'compositor',
-        startup: startupBudget(),
-        native: nativeBudget(),
-      }
-    return {
-      browser: snapshot.values['window.browser'] ?? 'auto',
-      transparency: snapshot.values['window.transparency'] ?? 'compositor',
-      startup: startupBudget(snapshot.values),
-      native: nativeBudget(snapshot.values),
-    }
-  } catch (error) {
-    controller.signal.throwIfAborted()
-    recordDesktopInfo('desktop.settings.unreachable', { error: errorMessage(error) })
-    return {
-      browser: 'auto',
-      transparency: 'compositor',
-      startup: startupBudget(),
-      native: nativeBudget(),
-    }
-  }
-}
-
-async function waitForHttp(url: string, origin: string) {
+async function waitForHttp(url: string, webUrl: string) {
   const deadline = Date.now() + 90_000
   while (Date.now() < deadline) {
     controller.signal.throwIfAborted()
     try {
-      const response = await fetch(url, { headers: { Origin: origin }, signal: requestSignal() })
+      const response = await fetch(url, {
+        headers: requestOriginHeaders(webUrl),
+        signal: requestSignal(),
+      })
       await response.body?.cancel()
       if (response.ok) return
     } catch {

@@ -1,4 +1,4 @@
-import { isNonEmptyString as isString } from '@workspace/utils/objects'
+import { isNonEmptyString as isString, isRecord } from '@workspace/utils/objects'
 import { errorMessage } from '@workspace/contracts'
 import { createDesktopError, desktopErrors } from './structured-errors'
 
@@ -8,7 +8,7 @@ import Electrobun, { BrowserView, BrowserWindow, Utils } from 'electrobun/main'
 import { EvlogError } from 'evlog'
 import type { SettingsValues } from '@workspace/contracts'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
-import { portFromEnv, runtimeUrl } from '../../../../scripts/runtime-network'
+import { portFromEnv, requestOriginHeaders, runtimeUrl } from '../../../../scripts/runtime-network'
 import type { DesktopRPC } from '../shared/rpc'
 import type { PlatformPickOptions } from '../shared/bridge'
 import {
@@ -26,6 +26,7 @@ import {
   initializeDesktopObservability,
   recordDesktopError,
   recordDesktopInfo,
+  recordDesktopWarning,
 } from './observability'
 import { attachWindowVibrancy } from './vibrancy'
 import { createQuitHandler } from './quit'
@@ -42,7 +43,6 @@ const WEB_URL = runtimeUrl(WEB_HOST, WEB_PORT)
 const SERVER_HOST = Bun.env.FS_HOST ?? '127.0.0.1'
 const SERVER_PORT = portFromEnv(Bun.env, 'PORT', 3001)
 const SERVER_URL = runtimeUrl(SERVER_HOST, SERVER_PORT)
-const SERVER_PROBE_ORIGIN = WEB_URL
 // Covers mesh's one-minute ready timeout for a cold start of the shared dev server.
 const DEV_SERVER_WAIT_MS = 90_000
 
@@ -145,18 +145,27 @@ async function resolveBackdrop(): Promise<ShellBackdrop> {
  * costs the opt-in, never the window.
  */
 async function readWindowTransparency(): Promise<WindowTransparency> {
+  let status: number | undefined
+  let reason = 'fetch-failed'
   try {
     const response = await fetch(`${SERVER_URL}/settings`, {
-      headers: { Origin: SERVER_PROBE_ORIGIN },
+      headers: requestOriginHeaders(WEB_URL),
     })
-    if (!response.ok) return 'compositor'
-
-    const snapshot = (await response.json()) as { values?: Partial<SettingsValues> }
-    return snapshot.values?.[TRANSPARENCY_KEY] === 'window' ? 'window' : 'compositor'
-  } catch (error) {
-    recordDesktopError('desktop.settings.unreachable', { error: errorMessage(error) })
-    return 'compositor'
+    status = response.status
+    if (!response.ok) {
+      reason = 'http-failure'
+    } else {
+      reason = 'invalid-json'
+      const snapshot: unknown = await response.json()
+      if (isRecord(snapshot) && isRecord(snapshot.values))
+        return snapshot.values[TRANSPARENCY_KEY] === 'window' ? 'window' : 'compositor'
+      reason = 'invalid-response'
+    }
+  } catch {
+    reason = status === undefined ? 'fetch-failed' : 'invalid-json'
   }
+  recordDesktopWarning('desktop.settings.unreachable', { status, reason })
+  return 'compositor'
 }
 
 async function pickEntry(options: PlatformPickOptions) {
@@ -216,7 +225,7 @@ async function isHttpReady(url: string) {
 function requestHeadersForProbe(url: string) {
   if (!url.startsWith(SERVER_URL)) return undefined
 
-  return { Origin: SERVER_PROBE_ORIGIN }
+  return requestOriginHeaders(WEB_URL)
 }
 
 function startFailureContext(error: unknown) {

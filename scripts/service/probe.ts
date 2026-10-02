@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import net from 'node:net'
+import { requestOriginHeaders } from '../runtime-network'
 import {
   serverIdentitySchema,
   type ServerIdentity,
@@ -43,7 +44,7 @@ export async function probeAddress(
   let response: Response
   try {
     response = await fetcher(`${probe.address}/system/identity?challenge=${nonce}`, {
-      headers: { origin: probe.address },
+      headers: requestOriginHeaders(probe.address),
       redirect: 'manual',
       signal,
     })
