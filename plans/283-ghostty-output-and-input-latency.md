@@ -142,8 +142,9 @@ full render-state copies out of wasm, atlas churn, and input-to-render ordering 
 ## Phase 2: Zig/WebAssembly frame spike
 
 Status: Approved. Build the supported render frame directly from Ghostty's render state in the
-existing bridge. JavaScript retains canvas glyph rasterization and WebGPU calls. The experimental
-`zigFrame` renderer option defaults off; unsupported frames use the existing JavaScript path.
+existing bridge. JavaScript retains canvas glyph rasterization and GPU calls. The `zigFrame`
+renderer option defaults on for WebGL and off for WebGPU; unsupported frames use the existing
+whole-frame JavaScript path.
 
 - [x] Add persistent WASM cell/glyph records, an atlas index, missing glyph keys and changed ranges.
 - [x] Add the opt-in WebGPU path and direct WASM-memory buffer uploads.
@@ -188,6 +189,33 @@ attributes every renderer; it introduces no renderer performance fixes.
 The decision gate is 17-terminal total CPU clearly below xterm (ratio well under 1), with GPU-process
 CPU moving toward xterm. Retain write latency and explain any remaining gap before expanding the
 spike to the full terminal feature set. Measurements use GPU-idle, `--quiet` heavy slots.
+
+### WebGL consumes the Zig frame
+
+Status: Approved. Reuse the existing 64-byte cell and 96-byte glyph records directly in WebGL,
+with changed-range uploads and the existing whole-frame JavaScript fallback. Keep shader and
+record layouts unchanged; additional trailing-blank heuristics wait for measurement.
+
+- [x] Make WebGL's supported-subset native producer the default, preserving omitted host options.
+- [x] Upload nonempty changed ranges from fresh WASM views with byte-correct destination offsets.
+- [x] Rebuild fully on producer changes, grid/context changes and atlas invalidation.
+- [x] Share missing-glyph registration and retain atlas residency independently of viewport row 0.
+- [x] Pass real-WebGL JS/native pixel parity, host-default and lifecycle regressions.
+- [x] Measure baseline `2c185da78` and treatment against xterm in separate frozen-bundle sessions at
+      17 terminals (1,200 output frames) and one terminal (2,700), four balanced pairs and 96 samples.
+- [x] Keep scroll rebuilds differential; measure identical rows, distinct lines and blank tails.
+- [x] Decompose initial and final write latency through parse, build, upload, submit and presentation;
+      independently reconcile all 3,072 final sample ledgers and retain the one-terminal p50 increase.
+- [x] Push fixture-only commit `23add5884`; prove 2,700 advancing viewport changes and UTF-8 identity.
+- [x] Repair archived JS-only recorder setup, pass 137 focused driver tests and untimed baseline smoke;
+      independently audit shared-driver builds, assets and byte-identical repeated baseline.
+- [x] Commit a hashed rolling real-Git-history fixture, prove advancing frames and viewport changes,
+      and measure before/final at 17 and one terminal. All final CPU pairs pass; paired total ratios
+      are 0.934160 and 0.899272. Repeating ASCII remains fixture-flattered secondary evidence.
+- [x] Preserve compact CPU/latency evidence and attribute remaining build, listener-copy, upload and
+      UI callback costs with a separate qualified rolling trace; preserve exact original JSON outside
+      Git with original/formatted hashes and semantic equality in provenance.
+- [ ] Obtain independent Sol review, commit by path, push and open a PR; do not merge.
 
 ### Upload-call coalescing
 
