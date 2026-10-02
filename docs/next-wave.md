@@ -1,6 +1,8 @@
 # Wave 2 closeout
 
-## Wave 2 closeout (reconciled 2026-09-28)
+## Wave 2 closeout (reconciled 2026-10-02)
+
+Status: Closed, 2026-10-02. Remaining items are owner-only checks and the parked follow-ups listed below.
 
 The owner identified 099, 156, 179, 114, 126 and 132 as the remaining wave 2 closeout queue.
 This record supersedes the original lane ordering for those plans. It is a scheduling
@@ -10,14 +12,14 @@ permission from a documentation update; preserve explicit gates and owner-only c
 Default sequence: **179 → 099 → 114 → 126 → 156**. Independent work can move earlier;
 only the dependencies in this table require serialization.
 
-| Plan | Remaining wave 2 delivery                                                                                 | Actual dependencies and follow-ups                                                                                                                                                                  |
-| ---- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 132  | Delivered 2026-09-30: typechecks, native Vite updates, memory/cold-start proof and capture ownership      | Mac vibrancy ownership is transferred to 114 Gate 3.                                                                                                                                                |
-| 179  | Delivered 2026-09-30 in PR #204: P0 instruments, P3 Mermaid, P5 CSS, P6 isolation rule                    | P1/P2/P4 landed earlier. 156 consumes the isolation policy. Physical Mac/iPhone rendering is unconfirmed.                                                                                           |
-| 099  | Unit 1 delivered in PR #203. Unit 0 is partial (5/10) in PR #224; 282 replaces the unfinished calibration | Unit 1 includes 198's retained-analysis subscriber. Units 2–7 retain their explicit gate; no repeat SAB deletion.                                                                                   |
-| 114  | Gates 1–4: Chromium, native fallback, macOS, Electrobun removal                                           | Preserve mesh ownership; Mac verification precedes removal. Consumes 132 ownership reconciliation, not an obsolete server lease.                                                                    |
-| 126  | Bounded proofs merged in PR #210; remaining A–F/J residues                                                | A/D/F and parts of C/J delivered. Desktop cases use 114; independent chat/provider work can move earlier. G/H/I retain follow-up scope, with H pairing and I agent review already partly delivered. |
-| 156  | P0 binary guard, P1 PDF, P2 CSV                                                                           | Existing file identity/buffers and 179 policy suffice. P3–P6 are format/review/editing follow-ups; P7 DOCX source editing stays parked on Markdown and fidelity decisions.                          |
+| Plan | Remaining wave 2 delivery                                                                                                                                                                                                                                                                                                                           | Actual dependencies and follow-ups                                                                                                                                                                                                                                                                                                            |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 132  | Delivered 2026-09-30: typechecks, native Vite updates, memory/cold-start proof and capture ownership                                                                                                                                                                                                                                                | Mac vibrancy ownership is transferred to 114 Gate 3.                                                                                                                                                                                                                                                                                          |
+| 179  | Delivered 2026-09-30 in PR #204: P0 instruments, P3 Mermaid, P5 CSS, P6 isolation rule                                                                                                                                                                                                                                                              | P1/P2/P4 landed earlier. 156 consumes the isolation policy. Physical Mac/iPhone rendering is unconfirmed.                                                                                                                                                                                                                                     |
+| 099  | Unit 1 delivered in PR #203. Unit 0 is partial (5/10) in PR #224; 282 replaces the unfinished calibration                                                                                                                                                                                                                                           | Unit 1 includes 198's retained-analysis subscriber. Units 2–7 retain their explicit gate; no repeat SAB deletion.                                                                                                                                                                                                                             |
+| 114  | Gate 1 Chromium #270; Gate 2 native fallback #310; Gate 3 partial macOS #316 and Chromium-on-Mac proof #319; readiness fixes #313/#324                                                                                                                                                                                                              | Engineering proofs delivered. Gate 3 desktop acceptance remains owner-only; Gate 4 Electrobun removal is PARKED pending the owner’s Mac desktop check and explicit approval. Electrobun stays the default and fallback.                                                                                                                       |
+| 126  | Residual batches delivered: harness #265/#276/#274/#288/#296; rail/recovery #275/#284; roster #268; terminal #264; provider transport/catalog #263/#273/#292/#294/#308, Cursor #290 and startup-registry fix #312; machine capacity/preferences #272; forge discussion/review/activity #267/#293/#305; project overrides/usage #266/#283; docs #315 | Bounded delivery closes the wave scope. G/I follow-ons, Grok, Antigravity and owner-parked H-scopes stay open. Account, credit and device acceptance remains owner-only. Response-loss departure reporting, LIFE-06 state-loss, subproject identity/schema and browser annotation retain their gates; ghost-draft causality remains unproved. |
+| 156  | P0 binary guard #269; P1 PDF #280; P2 CSV #286; paged stale-read fix #311; docs #309                                                                                                                                                                                                                                                                | P0–P2 delivered and live. P3+ and Office/DOCX remain Approved follow-ups under the format, review, editing and fidelity gates. Existing document identity, buffers and isolation policy remain the owners.                                                                                                                                    |
 
 The owner superseded the former “198 first after wave 2” rule on 2026-09-28. Reconcile its
 landed analysis code alongside 099. Schedule remaining 198 guarantees before the consumers that
@@ -30,10 +32,39 @@ Closeout checklist:
 
 - [x] Refresh the six plan statuses and remove known completed implementation from their queues.
 - [x] Replace historical ordering with current ownership/dependency boundaries.
-- [ ] Execute remaining authorized units and record focused checks plus applicable live evidence.
-      132 and 179 are delivered; the foundations wave below is closed. 114, most of 126 and
-      156 P0–P2 have not started.
-- [ ] Reconcile owner-only checks and explicit follow-ups before declaring wave 2 complete.
+- [x] Execute remaining authorized units and record focused checks plus applicable live evidence.
+      Engineering deliveries, focused verification and applicable live evidence are recorded in
+      the linked plans. Desktop acceptance and account/device checks remain owner-only.
+- [x] Reconcile owner-only checks and explicit follow-ups before declaring wave 2 complete.
+
+### Owner-only checks
+
+- 114: From Terminal in the logged-in Mac desktop, run the real-Keychain Polaron Chromium
+  [acceptance command](../plans/114-polaron-shell.md#gate-3--macos-m).
+  Look for Fregat content, the desktop bridge and a working picker in the native-titlebar
+  Chromium window. The SSH mock-Keychain proof leaves this desktop acceptance open.
+- 114: Check Mac visuals on Chromium and the transparent WKWebView fallback. Look for the
+  opaque native Chromium titlebar and, on the fallback, overlay traffic lights and vibrancy.
+  On both paths, test Cmd-Q, window drag and native picker select/cancel; look for correct
+  window behavior, the selected path or clean cancellation, and shared services/terminals
+  remaining alive after quit.
+- 114: Run headed Chromium on the Linux desktop and exercise native chooser select/cancel.
+  Look for painted Fregat content and a selected path or clean cancellation.
+- 114: Launch Polaron again while its first window is open to test genuine singleton handoff.
+  Look for the existing window receiving focus and one surviving desktop owner.
+- 126: Smoke Cursor, OpenCode, Claude and Codex with real accounts. Look for successful
+  authentication, model discovery and a completed turn with the supported driver capabilities.
+- 126: Redeem a real reset credit and exercise the device checks in the
+  [acceptance ledger](../plans/126-t3code-alignment/status-2026-09-28.md).
+  Look for the updated credit state and the expected device/browser behavior.
+- 179/132: Check physical Mac/iPhone rendering and input. Look for correct content, responsive
+  input and the recorded Mac vibrancy behavior.
+
+### Test portability follow-up
+
+Committed tests and verification scripts must run from a fresh clone on any machine and in CI,
+under [AGENTS.md → Testing](../AGENTS.md#testing). The 98 known non-portable spots carry
+`NOT-PORTABLE:` markers; `rg 'NOT-PORTABLE:'` lists the remaining fixes.
 
 ## Foundations wave, 2026-09-30
 
