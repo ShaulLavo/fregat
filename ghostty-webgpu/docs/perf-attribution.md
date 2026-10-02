@@ -22,7 +22,7 @@ The review-repair runs completed all eight cases per quiet window on Chromium he
 
 All adapters are non-fallback, all GPU windows and all four between-repetition GPU qualifications per count passed, no qualification was skipped, and all page-error arrays are empty. Maximum observed GPU utilization was 16% at count 1 and 67% at count 17. The four correctness screenshots were read back; ASCII, SGR, CJK and overwrite are visible throughout, with the existing native/xterm emoji shaping difference.
 
-Compact evidence retains all latency arrays, CPU denominators/process splits and tick size, individual ratios and statuses, adapter/feature status, GPU-window ranges/settings, all qualification records, hashes and representative input traces: [1 terminal](benchmarks/linux-nvidia/2026-10-02-comparison-1.json), [17 terminals](benchmarks/linux-nvidia/2026-10-02-comparison-17.json). Raw traces and per-sample GPU observations remain in `/work/tmp/plan-283-linux/review-clean-{1,17}/`. Source SHA256: `73d0eee02e631cf302f5f28e983bb7835908fe03509975b87c4ec5f3f69a7e23`.
+Compact evidence retains all latency arrays, CPU denominators/process splits and tick size, individual ratios and statuses, adapter/feature status, GPU-window ranges/settings, all qualification records, hashes and representative input traces: [1 terminal](benchmarks/linux-nvidia/2026-10-02-comparison-1.json), [17 terminals](benchmarks/linux-nvidia/2026-10-02-comparison-17.json). Raw traces and per-sample GPU observations remain in `/work/tmp/plan-283-linux/review-clean-{1,17}/`. Source SHA256 at bundle creation: `73d0eee02e631cf302f5f28e983bb7835908fe03509975b87c4ec5f3f69a7e23`. The builder hashes the `git ls-files --cached --others` listing in emitted order: staging the new compactor moves its entry and changes that aggregate hash without changing source bytes. Replaying the original order reproduces this hash; every shipped runtime script was also independently byte-hash compared with the committed source.
 
 | Median individual native/xterm ratio (target ≤ 1) |        1 terminal |      17 terminals |
 | ------------------------------------------------- | ----------------: | ----------------: |
@@ -40,14 +40,14 @@ Count 1 absolute latency, milliseconds:
 
 | Pair | Renderer | Input p50 | Input p95 | Write p50 |
 | ---- | -------- | --------: | --------: | --------: |
-| 1    | native   |     5.407 |    23.489 |    13.878 |
-| 1    | xterm    |     4.740 |    20.309 |    15.370 |
-| 2    | native   |     5.009 |    22.020 |    15.308 |
-| 2    | xterm    |     4.816 |    20.969 |    13.922 |
-| 3    | native   |     5.056 |    22.647 |    13.131 |
-| 3    | xterm    |     4.851 |    20.725 |    12.500 |
-| 4    | native   |     5.284 |    27.000 |    16.133 |
-| 4    | xterm    |     5.050 |    26.374 |     7.569 |
+| 1    | native   |     5.407 |    25.416 |    13.878 |
+| 1    | xterm    |     4.740 |    20.494 |    15.370 |
+| 2    | native   |     5.009 |    22.225 |    15.308 |
+| 2    | xterm    |     4.816 |    21.612 |    13.922 |
+| 3    | native   |     5.056 |    23.000 |    13.131 |
+| 3    | xterm    |     4.851 |    21.181 |    12.500 |
+| 4    | native   |     5.284 |    27.758 |    16.133 |
+| 4    | xterm    |     5.050 |    27.201 |     7.569 |
 
 Count 1 output CPU, percent of one core:
 
