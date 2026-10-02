@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { absolutePathSchema } from './server-identity'
+import { absolutePathSchema } from './absolute-path'
 
 /** A file extension with its dot (`.ts`), a MIME type (`image/png`) or a media range (`image/*`). */
 const acceptEntrySchema = v.pipe(
