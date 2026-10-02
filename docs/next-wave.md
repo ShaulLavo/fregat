@@ -39,8 +39,8 @@ Closeout checklist:
 
 ### Owner-only checks
 
-- 114: From Terminal in the logged-in Mac desktop, run the real-Keychain Polaron Chromium
-  [acceptance command](../plans/114-polaron-shell.md#gate-3--macos-m).
+- 114: From Terminal in the logged-in Mac desktop, run the real-Keychain Fregat Chromium launcher
+  [acceptance command](../plans/114-installed-app.md#gate-3--macos-m).
   Look for Fregat content, the desktop bridge and a working picker in the native-titlebar
   Chromium window. The SSH mock-Keychain proof leaves this desktop acceptance open.
 - 114: Check Mac visuals on Chromium and the transparent WKWebView fallback. Look for the
@@ -50,7 +50,7 @@ Closeout checklist:
   remaining alive after quit.
 - 114: Run headed Chromium on the Linux desktop and exercise native chooser select/cancel.
   Look for painted Fregat content and a selected path or clean cancellation.
-- 114: Launch Polaron again while its first window is open to test genuine singleton handoff.
+- 114: Launch the desktop launcher again while its first window is open to test genuine singleton handoff.
   Look for the existing window receiving focus and one surviving desktop owner.
 - 126: Smoke Cursor, OpenCode, Claude and Codex with real accounts. Look for successful
   authentication, model discovery and a completed turn with the supported driver capabilities.
@@ -186,7 +186,7 @@ read `/platform/release` before citing its current state.
   099 unit 0 stays partial and units 2–7 retain their replacement proof and explicit owner gate.
 - [198](../plans/198-document-owned-editor-analysis.md): full browser, pixel-level and
   memory/WASM acceptance. Its landed publication subscriber is not a second analysis owner.
-- [126](../plans/126-t3code-alignment.md), [114](../plans/114-polaron-shell.md) and
+- [126](../plans/126-t3code-alignment.md), [114](../plans/114-installed-app.md) and
   [156](../plans/156-documents-in-the-editor.md): their existing row ledgers, desktop/Mac,
   state-loss, live-account and format/editing gates remain unchanged.
 - [#234](https://github.com/ShaulLavo/fregat/pull/234): open Tree-sitter capture decoding

@@ -10,7 +10,7 @@ import { singletonState } from '../singleton'
 import type { BrowserCandidate } from '../browser'
 
 async function fixture(mode: string) {
-  const root = await mkdtemp(path.join(tmpdir(), 'polaron-owner-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'launcher-owner-'))
   const pidFile = path.join(root, 'pid')
   const candidate: BrowserCandidate = {
     kind: 'chromium',

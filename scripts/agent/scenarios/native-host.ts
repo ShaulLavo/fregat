@@ -19,14 +19,14 @@ import {
   fixtureGit,
   releaseFixture,
 } from '../fixture-workspace'
-import { proveNativeLauncherRelease } from '../polaron-process'
-import { observePolaronTerminal } from '../polaron-continuity'
-import { isPrivateDisplayRuntime } from '../polaron-display-env'
-import { polaronNativeSelectors } from '../selectors'
+import { proveNativeLauncherRelease } from '../native-launcher-release'
+import { observeTerminalContinuity } from '../terminal-continuity'
+import { isPrivateDisplayRuntime } from '../desktop-display-env'
+import { nativeHostSelectors } from '../selectors'
 import type { Scenario } from './index'
 
-export const polaronNativeHost: Scenario = {
-  name: 'polaron-native-host',
+export const nativeHost: Scenario = {
+  name: 'native-host',
   description:
     'Open real WebKitGTK fixture windows and preserve the existing shell across native host close, crash and launcher termination.',
   requiresIsolatedServer: true,
@@ -39,15 +39,15 @@ export const polaronNativeHost: Scenario = {
       isPrivateDisplayRuntime(runtime) && signature,
       'Native captures need a proof-owned display runtime and instance',
     )
-    const metadata = JSON.parse(readFileSync(path.join(runtime, 'polaron-proof.json'), 'utf8'))
+    const metadata = JSON.parse(readFileSync(path.join(runtime, 'desktop-proof.json'), 'utf8'))
     strictEqual(metadata.signature, signature)
     ok(
       existsSync(path.join(runtime, 'hypr', signature, '.socket.sock')),
       'The selected control socket belongs to the proof',
     )
     await evidence.json('native-display.json', metadata)
-    const fixture = await createGitFixture('polaron-native')
-    const continuity = await observePolaronTerminal(page)
+    const fixture = await createGitFixture('native-host')
+    const continuity = await observeTerminalContinuity(page)
     const native = nativeHostBinary(path.resolve(import.meta.dirname, '../../..'))
     let current: Awaited<ReturnType<typeof launchWebview>> | undefined
     try {
@@ -81,7 +81,7 @@ export const polaronNativeHost: Scenario = {
         const deadline = Date.now() + 20_000
         while (Date.now() < deadline) {
           current.host.evaluate(
-            `webkit.messageHandlers.platformShell.postMessage({nativeProof:(${polaronNativeSelectors.readiness})})`,
+            `webkit.messageHandlers.platformShell.postMessage({nativeProof:(${nativeHostSelectors.readiness})})`,
           )
           await page.waitForTimeout(100)
           if (facts && (facts as { ready: boolean }).ready && frames.length) break
@@ -110,7 +110,7 @@ export const polaronNativeHost: Scenario = {
             await reopened
             facts = undefined
             window.host.evaluate(
-              `webkit.messageHandlers.platformShell.postMessage({nativeProof:(${polaronNativeSelectors.readiness})})`,
+              `webkit.messageHandlers.platformShell.postMessage({nativeProof:(${nativeHostSelectors.readiness})})`,
             )
             const timeoutDeadline = Date.now() + 5000
             while (!facts && Date.now() < timeoutDeadline) await page.waitForTimeout(50)

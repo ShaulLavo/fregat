@@ -22,7 +22,7 @@ not a second live status register.
 | [110](110-workspace-indexing.md)                      | Workspace indexing: what we index, and what should index us                   |
 | [111](111-editor-decorations.md)                      | Editor decorations: learn from CodeMirror and Lexical, then beat what we have |
 | [112](112-large-file-ceiling.md)                      | The large-file ceiling: what we can actually open, and who gets to decide     |
-| [114](114-polaron-shell.md)                           | Polaron, a desktop shell we own                                               |
+| [114](114-installed-app.md)                           | Installed app                                                                 |
 | [122](122-composable-plugins.md)                      | Composable, full-power plugins with selective execution                       |
 | [126](126-t3code-alignment.md)                        | Align Platform behavior with pinned T3 Code                                   |
 | [132](132-process-and-dev-ownership.md)               | Processes, leases and dev plumbing each get an owner                          |

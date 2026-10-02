@@ -14,7 +14,7 @@ export const nativeErrors = defineErrorCatalog('desktop.webview', {
     status: 500,
     message: 'The desktop native helper stopped.',
     why: 'The native helper could not start or complete its window protocol.',
-    fix: 'Run desktop build:native --shell=polaron and check the desktop logs before opening the window again.',
+    fix: 'Run desktop build:native --shell=installed and check the desktop logs before opening the window again.',
   },
 })
 export type NativeBudget = { dialogMs: number; stopGraceMs: number }

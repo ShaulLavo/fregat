@@ -1,4 +1,4 @@
-# Plan 114: Polaron, a desktop shell we own
+# Plan 114: Installed app
 
 > **Executor instructions**: Read this plan completely, then read `AGENTS.md` and root `PLAN.md`.
 > The gates are ordered so Electrobun keeps working until Gate 4; do not delete anything earlier.
@@ -26,9 +26,9 @@
 
 **Status: Approved owner design, 2026-10-02. Implementation starts after this plan PR merges.**
 Chrome-first selection has merged separately. Gate 4 remains parked. The browser-installed
-app must provide the same functionality when opened by Polaron, the Dock, Cmd-Tab/taskbar,
+app must provide the same functionality when opened by the desktop launcher, the Dock, Cmd-Tab/taskbar,
 the OS application launcher, or its browser-created shortcut. A direct OS launch has no
-Polaron process, CDP connection, injected script, or `window.platformBridge`.
+launcher process, CDP connection, injected script, or `window.platformBridge`.
 
 The owner rejected a launcher-only bridge with reduced functionality on Dock launch. The
 installed-browser path therefore moves desktop behavior into the web client, browser manifest,
@@ -221,7 +221,7 @@ capability acceptance must establish the required launch behavior before deliver
 ### Server availability without user steps
 
 A Dock shortcut opens the manifest's stable start URL directly. The page cannot start a local
-process, so the installer/first Polaron setup must register or reuse the machine server before
+process, so the installer/first launcher setup must register or reuse the machine server before
 installing the PWA. This is one-time setup, performed automatically. Subsequent browser launches
 need only a connection to the stable endpoint; they do not run the launcher or an installation
 script. Setup itself is idempotent and verifies the service, origin and served release before
@@ -642,7 +642,7 @@ It also exposed the spare New Tab and duplicate page-session promotion failure o
 injection/reparenting approach. Those experiments are evidence for the protocol, not delivery of
 this bridge-independent design.
 
-Evidence is retained at `/work/tmp/fregat-evidence/polaron-installed-app-20261002/`.
+Evidence is retained at `/work/tmp/fregat-evidence/*installed-app-20261002/` (the dated installed-app proof directory).
 Google Chrome 154 is not installed on this Linux host; Chromium here is 152. Chrome 154 runtime
 behavior and Mac OS registration remain unconfirmed. Headless proof cannot establish Dock,
 Cmd-Tab/taskbar identity, WCO drag, chooser visibility, or real-keychain behavior.
@@ -666,7 +666,7 @@ Install once and inspect the generated Fregat app name/icon in Dock, Cmd-Tab and
 Close the launcher completely; open Fregat through the browser-created Dock entry and native app
 launcher. Confirm normal boot, editor/terminal/draft retention on repeat launch, launchQueue URL
 handling, native chooser selection/cancellation, and zero dependency on injected globals.
-Repeat with Dock first and then Polaron, and Polaron first and then Dock. Each path must focus one
+Repeat with Dock first and then the desktop launcher, and the desktop launcher first and then Dock. Each path must focus one
 installed client. Test WCO enabled and disabled, system theme changes, opaque backdrop, titlebar
 geometry, drag/no-drag hit areas, browser notification permission, and browser screen capture.
 Close the final Fregat window and prove mesh services, existing terminals, and another browser
@@ -694,7 +694,7 @@ What the 2.x migration cost, measured on 2026-09-13 and 2026-09-25:
 Today the desktop waits for the mesh-managed API and Vite URLs, opens a window, installs
 `window.platformBridge`, answers `pickEntry`, and flushes observability on quit. It does not
 spawn or stop those shared servers. On macOS it attaches vibrancy behind a transparent window.
-Polaron preserves shared-server ownership. The approved installed-app design above extends the
+The launcher preserves shared-server ownership. The approved installed-app design above extends the
 packaging follow-up with OS activation and a single server per machine/state home, never an
 app-window-owned server.
 
@@ -830,12 +830,12 @@ launch from a pre-existing instance; a second launcher cannot tear down the firs
 Plan 132 transfers its Electrobun vibrancy pointer workaround to Gate 3. The replacement native
 host owns its window directly; verify that path on macOS instead of patching obsolete Electrobun
 window discovery. Plan 126's desktop capability matrix consumes these host results. Its unrelated
-chat/provider batches do not wait on Polaron.
+chat/provider batches do not wait on the desktop launcher.
 
 ## Gates
 
 Electrobun keeps working until Gate 4. The new launcher runs beside it as
-`bun run desktop:dev -- --shell=polaron` until then.
+`bun run desktop:dev -- --shell=installed` until then.
 
 ### Gate 1 — Chromium launcher on Linux (M)
 
@@ -879,7 +879,7 @@ Owner: `apps/desktop/src/launcher/*` (new), `scripts/desktop-dev.ts`,
    isolation. There is no current `childLeaseFile` to move. Do not reintroduce a shared-server
    lease or take ownership of another launcher through a stale profile record.
 
-**Exit**: `bun run desktop:dev -- --shell=polaron` opens Platform in the default Chromium-family
+**Exit**: `bun run desktop:dev -- --shell=installed` opens Platform in the default Chromium-family
 browser as an app window, picks a folder through the web picker, and quits on window close with
 no leftover process. Idle numbers in this plan (the prototype measured 2 CPU ticks in 12 s, 0.17%
 of one core, and 514 MB PSS for the whole Chromium group plus launcher, app on the welcome screen).
@@ -980,7 +980,7 @@ executor; the command asks for it and has no dependency on the removed verificat
 ```sh
 printf 'Canonical Fregat checkout on this Mac: '
 IFS= read -r FREGAT_CHECKOUT
-cd "$FREGAT_CHECKOUT" && PLATFORM_HOME="$HOME/Library/Application Support/Fregat/PolaronAcceptance" ~/.bun/bin/bun desktop:dev -- --shell=polaron
+cd "$FREGAT_CHECKOUT" && PLATFORM_HOME="$HOME/Library/Application Support/Fregat/InstalledAppAcceptance" ~/.bun/bin/bun desktop:dev -- --shell=installed
 ```
 
 Prerequisites: the checkout's shared API/Vite URLs are configured and reachable; its `.env` leaves
@@ -1019,7 +1019,7 @@ visual/Cmd-Q/drag/picker observation before Gate 3 acceptance.
 
 ### Gate 4 — Delete Electrobun (S–M)
 
-**Status: PARKED — root decision 2026-10-02.** The owner must observe Polaron Chromium from
+**Status: PARKED — root decision 2026-10-02.** The owner must observe Fregat Chromium launcher from
 the Mac desktop with the real keychain, plus both paths' visual/Cmd-Q/drag/picker checks above.
 Electrobun remains the default and fallback until that acceptance; the scratch mock-keychain proof
 and closing the Wave 2 engineering track do not authorize deletion or a default-shell switch.
@@ -1183,9 +1183,8 @@ now uses):
    and a separate profile keeps the app's storage and permissions out of the user's browsing.
 7. **When nothing is installed.** Decided 2026-09-26: research recommendation — open the default
    browser in a tab. It is "whatever the system has", and the web layer already works in a tab.
-8. **Name.** Decided 2026-09-26: research recommendation — the code stays in `apps/desktop`; the
-   host binary is `platform-webview`. "Polaron" stays the plan's name and appears nowhere a user
-   looks.
+8. **Name.** Decided 2026-10-02: the installed-app path is part of Fregat. The code stays
+   in `apps/desktop`; the host binary is `platform-webview`.
 9. **macOS default path.** The Chromium window on macOS draws the browser's titlebar above ours,
    shows the browser's dock icon, and has no vibrancy; the webview window keeps `hiddenInset`,
    vibrancy and our own icon once bundled, but loses EditContext and Chrome DevTools.

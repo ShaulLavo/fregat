@@ -70,7 +70,7 @@
       "entry": [
         "check-editor-backlog.mjs",
         "agent/browser.ts",
-        "agent/polaron-display.ts",
+        "agent/desktop-display.ts",
         "claude-gpt/run.ts",
         "large-file/bench.ts",
         "heavy/pi/launch.ts",

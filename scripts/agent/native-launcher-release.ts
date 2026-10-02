@@ -3,7 +3,7 @@ import path from 'node:path'
 import { ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Evidence } from './evidence'
-import { polaronNativeSelectors } from './selectors'
+import { nativeHostSelectors } from './selectors'
 import { startupBudget } from '../../apps/desktop/src/launcher/startup'
 
 export async function proveNativeLauncherRelease(
@@ -33,7 +33,7 @@ export async function proveNativeLauncherRelease(
     try {
       const deadline = Date.now() + startupBudget().limitMs;
       while (!ready && Date.now() < deadline) {
-        window.host.evaluate(${JSON.stringify(`webkit.messageHandlers.platformShell.postMessage({nativeProof:(${polaronNativeSelectors.readiness})})`)});
+        window.host.evaluate(${JSON.stringify(`webkit.messageHandlers.platformShell.postMessage({nativeProof:(${nativeHostSelectors.readiness})})`)});
         await Bun.sleep(100);
       }
       if (!ready) process.exitCode = 2;
