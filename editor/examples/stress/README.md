@@ -316,10 +316,12 @@ bash /work/tmp/wave-heavy/run.sh p282-candidate -- env PATH="$PATH" \
   --candidate /work/tmp/plan-282/candidate
 ```
 
-The default matrix runs Platform's composition plus configurations inferred from changed package
-hashes, including combined consumers. Core and text-buffer changes select all ten configurations.
-Declare affected configurations with `--configurations tree-sitter,minimap`. Use `--full`
-for all ten configurations. A focused `--only native,disabled` run is diagnostic.
+The quiet default runs Platform's shipping composition and native input. The loaded default
+runs native and disabled input. Package changes do not expand these defaults. Platform already
+includes Tree-sitter, Shiki and minimap; individual compositions supply attribution in `--full`,
+which runs all ten configurations. `--configurations shiki` extends a default explicitly;
+worker-backed Tree-sitter compositions require loaded full or focused verification.
+A focused `--only native,disabled` run is diagnostic.
 
 Before freezing either package set, verify `/work` is mounted and has free space. Build the public
 packages through the heavy-job wrapper. From the Editor root, freeze each product revision:
@@ -403,7 +405,8 @@ One disposed ordinary-code bootstrap initializes Playwright worlds and page-scop
 raw receipt must show zero retained Editors/buffers; final listeners cannot exceed that receipt's
 count. The old cold runner also initialized these globals in its first unrecorded warmup. There
 is no listener allowance. Consumer/source readiness has a bounded 120-second deadline; disposal
-keeps its separate 30-second deadline. Frozen latency budgets are unchanged.
+keeps its separate 30-second deadline. Quiet margins stay frozen; declared loaded Tree-sitter uses
+the blocking floor described below.
 
 `--pending-minimap-source` records the authorized temporary minimap exception. It excludes the
 standalone minimap configuration from aggregate acceptance and relaxes only the final minimap
@@ -420,13 +423,24 @@ calibration and proof commands have been removed. Historical evidence stays unch
 ### Declared loaded comparisons
 
 `--loaded` records externally applied CPU contention. Supply and retain the load-worker evidence
-alongside the report; the runner starts no CPU workers. Loaded default matrices omit standalone
-Tree-sitter. `--full --loaded` includes it, and `--only tree-sitter --loaded` is focused verification.
-Its blocking margins are `max(frozen margin, 5 ms)`; per-key output records both margins and the
-reason. All keys remain blocking. Quiet Tree-sitter and every other loaded configuration use their
-frozen margins. Real 20 ms input and frame negatives must still reject every required key.
+alongside the report; the runner starts no CPU workers. Loaded default is native+disabled. The five
+worker-backed Tree-sitter configurations `tree-sitter`, `tree-sitter-shiki`, `tree-sitter-minimap`,
+`all` and `platform` are measured with `--full --loaded`; `--only` selects focused verification.
+Their blocking margins are `max(frozen margin, 5 ms)`; per-key output records frozen and applied
+margins, reason and historical provenance. All 540 keys across these configurations remain
+blocking, with 309 raised margins. Advisory timing, quiet comparisons and the other five loaded
+configurations keep frozen margins. Native's ordinary-only Tree-sitter keeps native margins.
+Platform remains in quiet default and loaded full. Real 20 ms input and frame negatives must
+still reject every required key.
 
 The two-pair stopping guard uses the applied blocking margins and preserves its strict span check.
 A load declaration changes the workload receipt and cannot be mixed between paired sides.
-See root [Plan 282](../../../plans/282-fast-paired-input-latency-check.md) for the evidence and
-61 affected Tree-sitter margins.
+See root [Plan 282](../../../plans/282-fast-paired-input-latency-check.md) for the exact margin audit
+and acceptance evidence. Pre-input and post-input readiness require the current source and its
+accepted render; a reset can publish its source after the prior render has been accepted.
+
+The harness mirrors Platform document ownership: every buffer has one public document-analysis
+owner shared by its independent view sessions. Replacing a buffer replaces and disposes its
+analysis after view attachment; final cleanup disposes views, analysis and consumer owners.
+This ownership correction changes measurement identity. Earlier three-analysis-owner controls
+and loaded Tree-sitter receipts stay archived; final acceptance requires fresh evidence.

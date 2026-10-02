@@ -10,7 +10,6 @@ import {
   inputPairOrder,
   pairedInterval,
   sensitivityPassed,
-  touchedConfigurations,
   inputMatrixConfigurations,
 } from '../input-paired.mjs'
 import {
@@ -1331,62 +1330,14 @@ describe('paired input latency', () => {
     expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/instrument source/)
   })
 
-  it('derives the default composition from changed package identities', () => {
-    const packages = ['core', 'tree-sitter', 'minimap'].map((name) => ({
-      name: `@singapore-editor/${name}`,
-      sourceHash: 'a',
-      buildHash: 'a',
-    }))
-    const baseline = { manifest: { packages } }
-    expect(touchedConfigurations(baseline, baseline)).toEqual(['platform'])
-    const candidate = {
-      manifest: { packages: packages.map((entry) => ({ ...entry, sourceHash: 'b' })) },
-    }
-    expect(touchedConfigurations(baseline, candidate)).toEqual([
+  it('uses the shipping composition and native quiet default', () => {
+    expect(inputMatrixConfigurations()).toEqual(['platform', 'native'])
+    expect(inputMatrixConfigurations({ declared: ['native', 'shiki', 'shiki'] })).toEqual([
       'platform',
       'native',
-      'disabled',
-      'tree-sitter',
       'shiki',
-      'minimap',
-      'tree-sitter-shiki',
-      'tree-sitter-minimap',
-      'shiki-minimap',
-      'all',
     ])
   })
-  it.each([
-    [
-      'textbuffer',
-      [
-        'platform',
-        'native',
-        'disabled',
-        'tree-sitter',
-        'shiki',
-        'minimap',
-        'tree-sitter-shiki',
-        'tree-sitter-minimap',
-        'shiki-minimap',
-        'all',
-      ],
-    ],
-    [
-      'tree-sitter-languages',
-      ['platform', 'native', 'tree-sitter', 'tree-sitter-shiki', 'tree-sitter-minimap', 'all'],
-    ],
-    ['minimap', ['platform', 'minimap', 'tree-sitter-minimap', 'shiki-minimap', 'all']],
-    ['find', ['platform', 'native']],
-  ])(
-    'includes every consuming composition for changed %s bytes and removed packages',
-    (name, expected) => {
-      const entry = { name: `@singapore-editor/${name}`, sourceHash: 'a', buildHash: 'a' }
-      const baseline = { manifest: { packages: [entry] } }
-      const candidate = { manifest: { packages: [{ ...entry, buildHash: 'b' }] } }
-      expect(touchedConfigurations(baseline, candidate)).toEqual(expected)
-      expect(touchedConfigurations(baseline, { manifest: { packages: [] } })).toEqual(expected)
-    },
-  )
 })
 
 function warmResult() {
@@ -1648,28 +1599,27 @@ describe('declared loaded Tree-sitter policy', () => {
   })
 
   it('includes loaded worker-backed Tree-sitter only in full or focused verification', () => {
-    const baseline = {
-      manifest: { packages: [{ name: '@singapore-editor/core', sourceHash: 'a', buildHash: 'a' }] },
-    }
-    const candidate = {
-      manifest: { packages: [{ name: '@singapore-editor/core', sourceHash: 'b', buildHash: 'b' }] },
-    }
-    const quiet = inputMatrixConfigurations(baseline, candidate)
-    const loaded = inputMatrixConfigurations(baseline, candidate, { loadProfile: 'loaded' })
-    expect(quiet).toHaveLength(10)
-    expect(quiet).toContain('platform')
-    expect(loaded).toEqual(['native', 'disabled', 'shiki', 'minimap', 'shiki-minimap'])
+    expect(inputMatrixConfigurations({ loadProfile: 'loaded' })).toEqual(['native', 'disabled'])
+    expect(inputMatrixConfigurations({ loadProfile: 'loaded', full: true })).toEqual([
+      'native',
+      'disabled',
+      'tree-sitter',
+      'shiki',
+      'minimap',
+      'tree-sitter-shiki',
+      'tree-sitter-minimap',
+      'shiki-minimap',
+      'all',
+      'platform',
+    ])
     expect(
-      inputMatrixConfigurations(baseline, candidate, { loadProfile: 'loaded', full: true }),
-    ).toEqual(quiet.filter((configuration) => configuration !== 'platform').concat('platform'))
-    expect(
-      inputMatrixConfigurations(baseline, candidate, {
+      inputMatrixConfigurations({
         loadProfile: 'loaded',
         declared: ['tree-sitter', 'tree-sitter-shiki', 'tree-sitter-minimap', 'all', 'native'],
       }),
-    ).toEqual(['native'])
+    ).toEqual(['native', 'disabled'])
     expect(
-      inputMatrixConfigurations(baseline, candidate, {
+      inputMatrixConfigurations({
         loadProfile: 'loaded',
         only: true,
         declared: ['tree-sitter', 'tree-sitter-shiki', 'tree-sitter-minimap', 'all', 'platform'],

@@ -45,10 +45,11 @@ input delay fails. It does not need exclusive CPUs or a quiet machine to stay co
    30 ms blocks sensitivity. All other keys keep the 20 ms sensitivity requirement. Their raw results are cached together
    by measurement/dependency hash, recording their validation hash, and both verdicts are recomputed on reuse. Output-only predicate changes preserve controls and rerun acceptance for affected configurations. Input-handler delay
    is only partially visible in quantized warm frame timing; each stage tests delay in that stage.
-4. **Matrix.** Default: Platform's real composition plus the configurations the change touches
-   (declared by the caller or derived from changed packages). Full: all 10 configurations, for
-   releases and for validating this instrument. Declared loaded default runs omit standalone
-   Tree-sitter; `--full --loaded` includes it, and `--only tree-sitter --loaded` verifies it directly.
+4. **Matrix.** Quiet default: Platform's shipping composition plus native. Loaded default:
+   native plus disabled. Full: all ten configurations, including compositions for attribution.
+   Package hashes do not expand default scope. Declared configurations extend the default;
+   loaded worker-backed Tree-sitter configurations require full or focused verification.
+   The five loaded worker-backed configurations retain the approved 5 ms blocking floor.
 5. **Fixtures.** Ordinary code, 500,000 short lines and the one-megabyte line, capped at Platform's
    supported tier (analysis pauses above `editor.largeFile.analysisLimitMiCodeUnits`). Larger
    fixtures move to an opt-in stress mode.
@@ -318,9 +319,11 @@ remain in the comparison artifacts.
 
 - [x] Explicit profile, loaded default selection and 61-key budget provenance implemented.
 - [x] Narrow policy/paired receipt suite: 132 tests pass.
-- [ ] Commit and push the counterbalance/policy checkpoint.
-- [ ] Fresh controls under the new measurement identity; preserve the earlier controls.
-- [ ] Loaded Tree-sitter positive, 20 ms input negative and 20 ms frame negative, each as its own heavy job.
+- [x] Commit and push the counterbalance/policy checkpoint: `13fd5b8be6b1ca5424bb1bcc47883d450aaef652`.
+- [x] Fresh controls under the new measurement identity: input 72/72 and frame 36/36 reject at 20 ms; the named frame key rejects at 25 ms, so 30 ms is skipped. Collection costs 522.928 seconds. Native positive passes all 108 blocking keys in 73.727 configuration seconds; its first CLI including controls costs 604.707 seconds. Earlier controls remain archived.
+- [x] Loaded Tree-sitter positive as its own heavy job: all 108 blocking keys pass, 61 applied floors. Actual CLI 1,001.178 seconds; inner 1,000.660 seconds; configuration 989.817 seconds. Eight workers stay live through 35 receipts, then are stopped/awaited; direct remaining PID list is empty. Evidence: `../loaded-floor/tree-positive-summary.json`.
+- [x] Loaded Tree-sitter 20 ms input negative as its own heavy job: 72/72 synchronous and 42/42 historical input-stage keys reject directly. Actual CLI 1,975.166 seconds; inner 1,974.592; configuration 1,963.592. All eight workers stay live through 67 receipts, then stop and are awaited; direct remaining PID list is empty. Evidence: `../loaded-floor/tree-input-summary.json`.
+- [x] Loaded Tree-sitter 20 ms frame negative as its own heavy job: 36/36 frame and 5/5 exact historical frame-stage keys reject directly. Actual CLI 1,908.500 seconds; inner 1,908.009; configuration 1,897.511. All eight workers stay live through 65 receipts, then stop and are awaited; direct remaining PID list is empty. Combined stages preserve 47/47 historical negatives. Evidence: `../loaded-floor/tree-frame-summary.json`.
 - [ ] Quiet fine-budget agreement and remaining Shiki/minimap loaded checks.
 - [ ] Actual inferred default, declared-composition option and full CLI wall times.
 
@@ -328,3 +331,113 @@ Raw failure and threshold audits live under
 `/work/tmp/plan-282/run-20261001T153544Z-sol/counterbalanced/` in
 `tree-loaded-failure-summary.json` and `proposed-loaded-tree-demotions.json`. The unlaunched cohort
 preparation remains under `undo-cohort/` and earns no measurement or acceptance credit.
+
+The checkpoint passes all commit hooks, including root gates and repository-wide typechecks.
+The first attempt used the build job class and its 4 GiB ceiling killed the web typecheck with
+exit 137. Retrying in the existing suite class passed; no class limits or settings changed.
+Standalone-floor measurement identity is `5e2248eadf511656241334bc7c7e832272a3b72c4fa0f3c838a1656fab7c3307`,
+with validation `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`. Fresh controls
+and stage-isolated validation write to `../loaded-floor/` beside the archived counterbalanced receipts.
+
+### Approved composition follow-up
+
+After the current standalone Tree-sitter positive and both negative stages, extend the declared
+loaded policy to `tree-sitter-shiki`, `tree-sitter-minimap`, `all` and `platform`. Every blocking
+budget in these configurations becomes `max(frozen budget, 5 ms)` under `--loaded`. Quiet budgets
+and advisory timing stay unchanged. Each composition inherits native's historical budgets, so
+this raises 62 of its 108 blocking margins, including 17 sub-ms margins. Together with standalone
+Tree-sitter, the rule raises 309 margins across five configurations. All 540 keys remain blocking.
+The exact key audit is `../loaded-floor/composition-floor-audit.json`.
+
+These five configurations leave the loaded default and remain in loaded full. Platform remains
+in the quiet default with frozen budgets. This supersedes mandatory Platform inclusion only for
+the loaded default. The reason is the Tree-sitter readiness cost and unresolved sub-ms undo noise
+under contention. Standalone loaded Tree-sitter runs have cost about 18 minutes. Compositions
+retain its worker-backed readiness work; their individual costs still need measurement. Native's
+ordinary-only Tree-sitter remains the native configuration and keeps its frozen budgets.
+
+The #224 prerequisite pair changes core, find and LSP-plugin products. Actual quiet inference
+therefore selects all ten configurations, matching full membership. Its 15-minute default target
+applies to this case. The selected configurations are recorded in
+`../loaded-floor/matrix-selection.json`. If the actual default exceeds the target, run proposed
+cuts and report their measured savings. A runtime product-dependency audit must precede any
+claim that selecting only configurations with differing products cuts work; every configuration
+consumes the changed core export.
+
+- [x] Complete the current three standalone Tree-sitter stages without changing their measurement sources. The three actual CLI runs total 4,884.844 seconds (81.4 minutes); these focused stages are separate from matrix timing.
+- [x] Extend loaded floor and default omission to the four compositions. A shared worker-backed topology predicate owns both scopes; native stays exempt. The narrow suite passes 140 tests, including 62 raised margins and 17 sub-ms margins per added composition, exact quiet/advisory preservation, inherited provenance and synthetic 20 ms stage rejection.
+- [x] Collect fresh controls for the resulting measurement identity and preserve earlier identities. Consolidated identity `3c9a18ed…` passes both real 20 ms stage controls and the named 25 ms check; details follow below.
+- [ ] Verify composition 20 ms input/frame negatives when they run in loaded full.
+- [ ] Measure the actual quiet inferred default on #224; if over 15 minutes, measure cut variants and their savings.
+
+### Composition and reset-readiness checkpoint
+
+The first actual quiet inferred-default command stopped before completing Platform's first group.
+At `platform/ordinary/single/typing`, pre-input readiness accepted the minimap's prior render
+while a reset source update was still pending. The document was 4,469 UTF-16 units; minimap source
+still held the preceding 24 typed characters, 4,493 units. No outer matrix artifact was produced,
+so this attempt provides no completed matrix wall time or acceptance result.
+
+A focused reproduction on both frozen sides establishes late convergence. Bootstrap and warm
+subject receipts are current. Warmup succeeds, then the first measured reset reports source
+stale with render sequence 37 accepted. The next observation records source updates 3→4 and
+accepted render 37→46, with exact source equality restored. Baseline and candidate converge in
+0.639 and 0.649 diagnostic seconds. These observation intervals establish convergence; they are
+not a fixed wait added to measurement. Evidence is `../loaded-floor/platform-minimap-reproduction.json`
+and its log. Frozen products and the admitted short-lines undo exception are unchanged.
+
+Pre-input readiness now uses the same current-source and accepted-render receipt as post-input.
+The focused regression run completes warmup and four repetitions on each side, with every reset,
+opened and settled source current, in 12.824 seconds. Both contexts close. Evidence is
+`../loaded-floor/platform-minimap-readiness-verification.json`; it is a diagnostic, not a full
+configuration or matrix acceptance run.
+
+The shared worker-backed topology predicate also implements the approved five-configuration
+loaded floor/default omission. Measurement is now
+`3c9a18ed47822568315cc513dd51b54d16cfd12a8091742fb5a7f2f168dcb203`, validation stays
+`9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`, and combined instrument is
+`f4126d66e9d2da847266c5c1ba761ae21f559f463875be8ea287abf580101fa0`. Earlier controls retain their
+original identities. New controls and validation write to `../composition-floor/`.
+
+- [x] Reproduce the ordinary Platform reset mismatch on both frozen sides and establish late convergence.
+- [x] Preserve exact equality and wait for the consumer's current source/render receipt before input.
+- [x] Verify warmup and four repetitions per side on the affected surface; no broader minimap waiver.
+- [x] Test loaded composition scope, budget provenance and quiet/advisory preservation: 140 tests pass.
+- [x] Collect and recompute fresh real-delay controls for the consolidated identity: input 72/72 and frame 36/36 reject at 20 ms; named frame rejects 25 ms and skips 30 ms. Collection 525.431 seconds. Native positive passes 108/108 in 80.075 configuration seconds; actual first CLI 610.989 seconds (inner 610.696). Thirty-one groups stop at two pairs, five finish four. Checkpoint hooks ran alongside this one-off collection; these timings are observations, not quiet-machine speed comparisons. The interrupted two-minute tool attempt earns no credit and retains separate partial logs.
+- [x] Rerun actual quiet inferred default after fresh controls pass. The coordinator stopped it after three completed configurations, already over 15 minutes. Platform, native and disabled each pass 108/108 blocking keys in 694.244, 77.516 and 84.219 configuration seconds. Tree-sitter is partial. Last log activity is 1,247.493 seconds after launch, not a completed matrix CLI wall time. No outer matrix or full verdict exists. Owned driver/CLI/load-worker process lookup is empty. Evidence is `../composition-floor/default-stopped.json` and the three complete per-configuration raw artifacts. Source remains pushed at `26b4c99b195c4424240e3e75dd755911c001e762`.
+- [x] Account for Platform wall phases, including warmups: pre-input readiness/open 251.219 seconds, post-input settlement 206.172, priming/screenshots 83.919, pre-sample forced GC 73.476, input/paint 37.755, release 0.954, startup 35.988, remainder 4.761. Supported short-lines inner owner settlement explains most readiness time; exact source replay is a smaller residual.
+- [ ] Identify which readiness fence, timer or real consumer work accounts for the owner waits; report the cause before changing measurement sources.
+- [ ] Measure the actual declared Platform+native CLI as the candidate default after the readiness investigation. Platform exercises the shipping composition; other compositions provide attribution in full. Report measured scope costs without projecting a completed ten-configuration total.
+- [ ] Measure full and remaining approved cut variants when their cost is justified; report actual timings, not projections.
+- [ ] Complete final-identity quiet/loaded historical agreement and composition sensitivity.
+
+## Shared document analysis and final defaults (2026-10-02)
+
+Status: Approved. This supersedes prior default inference and the three-analysis-owner harness.
+
+- [x] Report the wait cause before changing measurement: Tree client tasks drain worker
+      edit/parse/query work; final worker fence is 0.2–0.4 ms. Injection discovery dominates.
+- [x] Audit real splits: independent view sessions share the live document's analysis owner.
+      The harness omitted that option and created three Tree runtime sessions.
+- [x] Stop the old declared Platform+native run. Platform rejects in 583.851 configuration
+      seconds; native is partial. No complete matrix or CLI wall total exists. Preserve its receipts.
+- [x] Share one public analysis owner per buffer across all attachSession calls; retain independent
+      buffer/view sessions; replace/dispose analysis with the buffer and dispose it after views close.
+- [x] Set quiet default Platform+native and loaded default native+disabled. Full retains ten
+      configurations. Remove package-hash inference. Keep the loaded 5 ms floor unchanged.
+- [x] Run narrow policy tests (136 pass) and stress TypeScript (pass).
+- [x] Verify one Tree runtime owner, independent cursors, current source/render and cleanup on
+      both frozen sides through the browser diagnostic in `../shared-analysis/`. Three views share
+      one Tree session; Shiki retains three sessions. Both disposals leave zero runtime sessions and
+      zero live workers; both contexts close. Diagnostic timings are not acceptance evidence.
+- [ ] Recompute measurement identity and collect fresh controls once. Prior controls and loaded
+      Tree evidence remain archived, with no final-identity acceptance credit.
+- [ ] Measure actual default CLI and re-prove required quiet/loaded positive and real 20 ms
+      historical negatives under the new identity; report actual loaded Tree cost.
+- [ ] Reconcile current evidence, commit by path, push draft #247 and update its body. Do not merge.
+
+The separate Editor finding remains out of scope: on the 500,000-line fixture injection discovery
+costs 920–1,025 ms per observed edit/parse after a 24-character burst, versus root parse 106–118 ms.
+This does not independently measure a one-character keystroke. Frozen `editDocument` constructs
+updated parsed-document layers and runs injection query matches across the document; see
+`../composition-floor/platform-fence-details.json` and the evidence document's product finding.

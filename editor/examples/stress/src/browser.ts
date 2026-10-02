@@ -1,4 +1,9 @@
-import { Editor, type EditorInitialPaintEvent } from '@singapore-editor/core/editor'
+import {
+  Editor,
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+  type EditorInitialPaintEvent,
+} from '@singapore-editor/core/editor'
 import {
   createEditorBufferSession,
   createEditorTextBuffer,
@@ -31,6 +36,7 @@ type Paint = EditorInitialPaintEvent & { readonly at: number }
 type Active = {
   readonly ownerIdentity: string
   readonly buffer: EditorTextBuffer
+  readonly analysis: EditorDocumentAnalysis
   readonly editors: readonly Editor[]
   readonly inputAbort: AbortController
   readonly consumers: ReturnType<typeof createInputConsumers> | null
@@ -153,10 +159,11 @@ function createHost(index: number): HTMLElement {
 function open(multiple: boolean, highlight: boolean, consumerId?: string) {
   start = performance.now()
   const buffer = createEditorTextBuffer(source)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
   const editors: Editor[] = []
   const inputAbort = new AbortController()
   const consumers = consumerId ? createInputConsumers(consumerId, fixture, source.length) : null
-  active = { buffer, editors, inputAbort, consumers, ownerIdentity: crypto.randomUUID() }
+  active = { buffer, analysis, editors, inputAbort, consumers, ownerIdentity: crypto.randomUUID() }
   for (let index = 0; index < (multiple ? 3 : 1); index++)
     editors.push(createInputEditor(index, highlight))
   editors[0]!
@@ -166,7 +173,7 @@ function open(multiple: boolean, highlight: boolean, consumerId?: string) {
 }
 
 function createInputEditor(index: number, highlight: boolean) {
-  const { consumers, buffer } = current()
+  const { consumers, buffer, analysis } = current()
   const editor = new Editor(createHost(index), {
     lineHeight: 20,
     plugins:
@@ -180,6 +187,7 @@ function createInputEditor(index: number, highlight: boolean) {
     },
   })
   editor.attachSession(createEditorBufferSession(buffer), {
+    analysis,
     documentId: fixture,
     languageId: consumers || highlight ? 'typescript' : null,
   })
@@ -189,11 +197,12 @@ function createInputEditor(index: number, highlight: boolean) {
 function reloadInputDocument(multiple = current().editors.length === 3) {
   inputLatency.dispose()
   const previous = current()
-  released.push(new WeakRef(previous.buffer))
+  released.push(new WeakRef(previous.buffer), new WeakRef(previous.analysis))
   const buffer = createEditorTextBuffer(expected)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
   const editors = [...previous.editors]
   check(editors.length <= (multiple ? 3 : 1), 'Warm view count must grow once')
-  active = { ...previous, buffer, editors }
+  active = { ...previous, buffer, analysis, editors }
   for (const editor of editors) {
     if (!previous.consumers)
       editor.setPlugins(
@@ -202,12 +211,14 @@ function reloadInputDocument(multiple = current().editors.length === 3) {
           : [createEditorFindPlugin()],
       )
     editor.attachSession(createEditorBufferSession(buffer), {
+      analysis,
       documentId: fixture,
       languageId: previous.consumers || fixture === 'ordinary' ? 'typescript' : null,
     })
   }
   while (editors.length < (multiple ? 3 : 1))
     editors.push(createInputEditor(editors.length, fixture === 'ordinary'))
+  previous.analysis.dispose()
   return resetInput()
 }
 
@@ -380,9 +391,12 @@ async function dispose() {
   const consumers = active?.consumers
   if (active) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    released.push(...[active.buffer, ...active.editors].map((value) => new WeakRef(value)))
+    released.push(
+      ...[active.buffer, active.analysis, ...active.editors].map((value) => new WeakRef(value)),
+    )
     active.inputAbort.abort()
     for (const editor of active.editors) editor.dispose()
+    active.analysis.dispose()
   }
   active = null
   for (const frame of frames) cancelAnimationFrame(frame)

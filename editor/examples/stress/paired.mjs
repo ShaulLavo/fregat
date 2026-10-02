@@ -79,7 +79,7 @@ if (values.only && (values.full || values.configurations)) fail('--only requires
 const declared = (values.only ?? values.configurations)?.split(',')
 if (declared?.some((id) => !inputConsumerIds.includes(id))) fail('Unknown input configuration')
 const loadProfile = values.loaded ? 'loaded' : 'quiet'
-const configurations = inputMatrixConfigurations(baseline, candidate, {
+const configurations = inputMatrixConfigurations({
   only: values.only,
   full: values.full,
   declared,

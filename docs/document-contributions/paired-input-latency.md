@@ -1,6 +1,6 @@
 # Paired native input latency
 
-Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses fixed historical budgets and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Validation and complete-matrix timing are in progress; those units remain gated and still require owner authorization. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
+Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses historical budgets with a declared 5 ms loaded Tree-sitter blocking floor and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Validation and complete-matrix timing are in progress; those units remain gated and still require owner authorization. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
 
 ## Run the comparison
 
@@ -13,7 +13,12 @@ bash /work/tmp/wave-heavy/run.sh p282-candidate -- env PATH="$PATH" \
   --candidate /work/tmp/plan-282/candidate
 ```
 
-The default matrix includes `platform` and every consuming configuration inferred from changed package source or build hashes. Core or text-buffer changes select all ten configurations; Tree-sitter, minimap, and find changes include every composition that enables that consumer. Package removal also participates in inference. `--configurations tree-sitter,minimap` declares affected configurations explicitly. `--full` runs all ten configurations. `--only native,disabled` selects a focused diagnostic matrix and does not establish Platform acceptance.
+Quiet default is `platform,native`; loaded default is `native,disabled`. Package hashes do not
+expand either scope. Platform includes the shipping Tree-sitter/Shiki/minimap composition.
+`--full` measures all ten configurations for attribution. `--configurations shiki` extends the
+default explicitly; worker-backed Tree-sitter requires loaded full or focused verification.
+`--only native,disabled` is focused diagnostic coverage and does not establish Platform acceptance.
+`--loaded` records externally applied CPU contention; the runner starts no CPU workers.
 
 Freeze matching `src`, `dist`, manifests, and external dependencies with `editor/examples/stress/package-set.mjs`. The [stress README](../../editor/examples/stress/README.md#input-latency-budgets) describes package freezing. The runner verifies source and build hashes, external receipts, and the bundled page and worker graph before collecting input.
 
@@ -23,25 +28,25 @@ Each configuration has 36 fixture, view, and scenario groups. Each group reports
 
 For each repetition, the statistic is candidate p95 minus baseline p95. The reported difference is the median of these paired differences. A deterministic percentile bootstrap resamples whole repetitions 10,000 times and reports a 95% confidence interval. Input operations within one repetition remain together.
 
-A blocking measure fails when its median paired difference exceeds its fixed budget and the confidence interval is entirely positive. `input-budgets.json` declares the exact `noiseMarginMs` values frozen by the accepted historical native, disabled, Tree-sitter, Shiki, and minimap calibrations. Baseline variability cannot widen these budgets. Each metric records its reference configuration, calibration artifact, SHA-256, and historical instrument hash. These fixed budgets require no new calibration or holdout runs.
+A blocking measure fails when its median paired difference exceeds its applied budget and the confidence interval is entirely positive. `input-budgets.json` declares the exact `noiseMarginMs` values frozen by the accepted historical native, disabled, Tree-sitter, Shiki, and minimap calibrations. The five loaded worker-backed Tree-sitter configurations apply `max(frozen margin, 5 ms)` to blocking keys. Quiet, advisory and other configurations retain their frozen margins. Baseline variability cannot change either rule. Each metric records its reference configuration, calibration artifact, SHA-256, and historical instrument hash. These fixed budgets require no new calibration or holdout runs.
 
 The five combined and Platform configurations have no accepted historical calibration. They explicitly inherit all 144 frozen native budgets. Their full-matrix results establish new coverage under that declared reference; they cannot establish historical acceptance agreement. Incomplete or unadmitted archived calibrations are not used to fill missing keys. An unknown configuration or measure fails before interpretation.
 
-Every report contains the raw baseline and candidate samples, paired differences, fixed budgets, confidence intervals, and schedule. Advisory timing never fails acceptance. Correctness checks remain required, subject only to the explicit pending-minimap exception below.
+Every report contains the raw baseline and candidate samples, paired differences, frozen/applied budgets and reasons, confidence intervals, and schedule. Advisory timing never fails acceptance. Correctness checks remain required, subject only to the explicit pending-minimap exception below.
 
 The paired path waits for actual consumer source and render receipts outside the captured input intervals. Undo priming also waits for the seeded worker source before input starts. A fixed 450 ms seed delay left a parse pending on the supported short-lines fixture; both frozen products then exposed a stale source on the final undo. The isolated Tree-sitter probe and its complete quiet comparison pass with seeded-source readiness, with the product bytes unchanged. The inherited absolute runner retains its original fixed waits.
 
-The default maximum is four measured pairs after one warmup pair. Each group has its own deterministic order, derived from its seed, fixture/view/scenario key and block index. Every consecutive two-pair block runs each side first once. Earlier groups' adaptive counts cannot change a later group's order. After the first complete block, a group stops only when both paired p95 differences for every blocking measure lie within ± its frozen budget, and their two-point interval span is no larger than that budget. This strict guard also ensures the unchanged acceptance predicate passes on those two pairs. Otherwise the group completes a second block. Advisory screenshot timing does not affect stopping. The comparator revalidates every declared two-pair stop and every key-local order against the raw samples. Sensitivity and delayed candidates use this same rule.
+The default maximum is four measured pairs after one warmup pair. Each group has its own deterministic order, derived from its seed, fixture/view/scenario key and block index. Every consecutive two-pair block runs each side first once. Earlier groups' adaptive counts cannot change a later group's order. After the first complete block, a group stops only when both paired p95 differences for every blocking measure lie within ± its applied budget, and their two-point interval span is no larger than that budget. This strict guard also ensures the unchanged acceptance predicate passes on those two pairs. Otherwise the group completes a second block. Advisory screenshot timing does not affect stopping. The comparator revalidates every declared two-pair stop and every key-local order against the raw samples. Sensitivity and delayed candidates use this same rule.
 
 Two- and four-pair bootstraps are coarse. The reported 95% intervals are nominal descriptive repetition-cluster intervals. Conditional early stopping has no adjusted sequential 95% coverage guarantee, and passing does not establish statistical equivalence. `--fixed-repetitions` disables stopping; requesting more than four repetitions also uses fixed sampling. Fixed sampling requires at least four pairs and complete even-sized blocks. More independent pairs improve resolution near a budget.
 
-Each configuration retains two warm package pages in one Chromium browser. Every group runs one unrecorded warmup on its actual measured fixture. Between bursts, the Editor's public operations restore exact text, cursor, history and hidden-view state. `attachSession` swaps fixture buffers while retaining Editors and consumer owners. Native Tree-sitter remains enabled only on ordinary code. Initial setup, subsequent fixture attachment, reset and settlement durations are recorded outside the input intervals. Final configuration cleanup checks all released buffers and retained Editors; page contexts close after the configuration.
+Each configuration retains two warm package pages in one Chromium browser. Every group runs one unrecorded warmup on its actual measured fixture. Between bursts, the Editor's public operations restore exact text, cursor, history and hidden-view state. `attachSession` swaps fixture buffers while retaining Editors and consumer owners. One document-analysis owner is shared by the independent view sessions and replaced/disposed with its buffer. Native Tree-sitter remains enabled only on ordinary code. Initial setup, subsequent fixture attachment, reset and settlement durations are recorded outside the input intervals. Final configuration cleanup checks all released buffers and retained Editors; page contexts close after the configuration.
 
 One initial ordinary-code lifecycle warms Playwright's two execution worlds and page-scoped worker owners. Its raw bootstrap receipt must show zero retained Editors/buffers, hosts, frames and tracked workers. The final listener count cannot exceed this disposed initialization receipt's count. A known-good probe observed 13 listeners before locator initialization, 26 afterward, and 28 after the first native Editor disposal. The second disposal stayed at 28. CDP identified the remaining two as Worker message/error listeners. No numerical listener allowance is added.
 
 ## Sensitivity and fixtures
 
-The first run of a measurement instrument collects two named native candidate/candidate controls. A 20 ms pause before Editor handling must reject all 72 input-stage keys. A separate 20 ms pause inside each rAF callback must reject 35 frame-stage keys. Native `ordinary/multiple/repeat/inputToFrame` keeps its frozen 15.2 ms budget and records a separate detection-floor proof: test 25 ms, then 30 ms only if needed, and stop at the first rejection. A failure at 30 ms blocks the cache. Both full raw comparisons are stored under `/work/tmp/plan-282/sensitivity/<measurement-hash>.json.gz`. Later runs recompute both verdicts. All captured intervals remain blocking with their original budgets.
+The first run of a measurement instrument collects two named native candidate/candidate controls. A 20 ms pause before Editor handling must reject all 72 input-stage keys. A separate 20 ms pause inside each rAF callback must reject 35 frame-stage keys. Native `ordinary/multiple/repeat/inputToFrame` keeps its frozen 15.2 ms budget and records a separate detection-floor proof: test 25 ms, then 30 ms only if needed, and stop at the first rejection. A failure at 30 ms blocks the cache. Both full raw comparisons are stored under `/work/tmp/plan-282/sensitivity/<measurement-hash>.json.gz`. Later runs recompute both verdicts. Every native control interval remains blocking with its original budget.
 
 The instrument has two identities. The **measurement hash** covers every source except the two explicitly validation-only modules, plus external dependency bytes, Chromium version and runner version. It includes capture/marks/injection, sampling/order/stopping, bootstrap/statistics, budgets, fixtures/operations, consumer policy, readiness fences, worker interception and browser/runner launch. Unknown files belong to measurement. The **validation hash** covers `input-output.mjs` and `src/input-output.ts`: output/source correctness predicates and their post-interval receipt readers. A combined instrument hash records both identities in raw runs.
 
@@ -71,9 +76,9 @@ Headless Chromium frame timing is an observable, not physical display latency. W
 
 Archived warm evidence for instrument `5929738e…` is under `/work/tmp/plan-282/run-20261001T153544Z-sol/floor-controls/`. New split-identity runs use `../split-controls/`. The frozen products and all budgets are unchanged. The owner selected separate controls for the input and frame stages on 2026-10-01. All 108 measures remain blocking.
 
-### Counterbalanced controls and reliability
+### Archived counterbalanced controls and reliability
 
-Current measurement identity is `022dcd886d279cba935eeaa2178c918738ec8859aa978ee77cf8186f84ba33f2`; validation remains `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`. Combined instrument is `dc37728b0a8ee28472b8a811439e1d0a98f2c6b6e90cc107fcf19fd04edb34b0`. The fresh raw cache is `../counterbalanced/sensitivity/022dcd886d279cba935eeaa2178c918738ec8859aa978ee77cf8186f84ba33f2.json.gz`. Earlier controls keep their original identities.
+Archived measurement identity is `022dcd886d279cba935eeaa2178c918738ec8859aa978ee77cf8186f84ba33f2`; validation remains `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`. Combined instrument is `dc37728b0a8ee28472b8a811439e1d0a98f2c6b6e90cc107fcf19fd04edb34b0`. The fresh raw cache is `../counterbalanced/sensitivity/022dcd886d279cba935eeaa2178c918738ec8859aa978ee77cf8186f84ba33f2.json.gz`. Earlier controls keep their original identities.
 
 | Wall-time receipt                                         |      Previous split policy (s) | Counterbalanced policy (s) |
 | --------------------------------------------------------- | -----------------------------: | -------------------------: |
@@ -86,7 +91,7 @@ Current measurement identity is `022dcd886d279cba935eeaa2178c918738ec8859aa978ee
 | Actual default matrix                                     | Unmeasured for the warm policy |                    Pending |
 | Actual full matrix                                        |                     Unmeasured |                    Pending |
 
-The one-off control cost rises by 105.297 seconds (24.1%). This is a measured collection-cost change. It is not a default/full matrix measurement. All 36 groups in every fresh stage control complete four pairs. The unchanged native run stops 35 groups at two pairs and completes four pairs for one group. Advisory timing remains excluded. All 334 stress tests, stress typecheck/lint and root gates pass; lint retains one inherited spread warning. Loaded reliability passes its zero-rejection gate. All nine selected keys reject zero times out of ten. All 21 blocking keys collected also have zero rejects. Forty restricted CLI runs total 666.212 seconds; 21 groups stop at two pairs and 49 complete four. The separately hashed diagnostic is `43577589069e62ee572ca9d73751df25dba50a0027e01f88b34fa444908f7e73`, with the current production identity recorded in every run. It collects or reuses no sensitivity controls and earns no full-matrix acceptance credit. All 103 load receipts show eight live same-core workers, which are stopped and awaited; the final PID check is empty. Evidence is `../counterbalanced/reliability/final-summary.json`. Ten runs per key are an empirical gate, without a family-wise error guarantee across all 108 keys. Full loaded Tree-sitter and its two 20 ms negative stages have resumed; matrix timings remain pending.
+The one-off control cost rises by 105.297 seconds (24.1%). This is a measured collection-cost change. It is not a default/full matrix measurement. All 36 groups in every fresh stage control complete four pairs. The unchanged native run stops 35 groups at two pairs and completes four pairs for one group. Advisory timing remains excluded. All 334 stress tests, stress typecheck/lint and root gates pass; lint retains one inherited spread warning. Loaded reliability passes its zero-rejection gate. All nine selected keys reject zero times out of ten. All 21 blocking keys collected also have zero rejects. Forty restricted CLI runs total 666.212 seconds; 21 groups stop at two pairs and 49 complete four. The separately hashed diagnostic is `43577589069e62ee572ca9d73751df25dba50a0027e01f88b34fa444908f7e73`, with the current production identity recorded in every run. It collects or reuses no sensitivity controls and earns no full-matrix acceptance credit. All 103 load receipts show eight live same-core workers, which are stopped and awaited; the final PID check is empty. Evidence is `../counterbalanced/reliability/final-summary.json`. Ten runs per key are an empirical gate, without a family-wise error guarantee across all 108 keys. The subsequent full loaded Tree-sitter positive rejected two newly observed short-lines/single undo keys. Its negatives stopped before collection; the declared loaded-floor section below records the revised gate. Matrix timings remain pending.
 
 | Loaded A/A selected key                          | Rejects / runs |
 | ------------------------------------------------ | -------------: |
@@ -162,7 +167,7 @@ A direct product audit confirms that the required historical baseline/candidate 
 
 The 1,126.549 seconds includes 240 bursts, comprising 168 measured and 72 warmup samples. Opening readiness consumes 517.270 seconds, final consumer/source settlement 417.573 seconds, priming/source readiness/screenshots 102.904 seconds, and input/paint 36.821 seconds. Fixture attachment is 35.684 seconds, bootstrap 1.632, memory/release 3.464, other configuration overhead 1.688, and outer CLI setup 9.512. Short-lines/multiple alone contributes 463.848 seconds opening and 328.065 seconds final settlement; its undo group totals 280.451 seconds. Measured reset calls themselves total 1.970 seconds. These are repeated readiness fences, with no terminal readiness timeout or CLI retry. The accounting includes warmups and is saved in `../split-controls/tree-sitter-loaded-wall-accounting.json`.
 
-Actual default and full warm matrix wall times remain pending. The default still includes Platform plus declared/inferred affected configurations; full still executes all ten configurations. The owner requested measured default-composition options after the diagnosis because loaded Tree-sitter alone exceeds 15 minutes. No smaller gating matrix has been adopted.
+Actual default and full warm matrix wall times remain pending. At this archived checkpoint the default still included Platform plus declared/inferred affected configurations; full executed all ten configurations. The owner requested measured default-composition options after the diagnosis because loaded Tree-sitter alone exceeds 15 minutes. The smaller defaults are subsequently adopted in the shared-analysis checkpoint below.
 
 The quiet Tree-sitter unchanged comparison passed in 746.498 seconds, including 741.339 seconds inside the configuration. Its measured short-lines/multiple samples spent 425.123 seconds across both sides. Opening readiness consumed 225.517 seconds and final settlement 160.973 seconds; captured input and paint consumed 4.797 seconds. Reset itself took 0.441 seconds. These sums exclude warmups and fixture attachment. Frozen `syncText` already applies the minimal replacement, and source epochs remain fixed during these bursts. Three retained view sessions perform the supported-tier syntax work. Retaining owners removes construction cost, but it cannot remove source-current settlement or change the frozen syntax products.
 
@@ -328,6 +333,8 @@ verification were skipped.
 
 ### Declared loaded Tree-sitter policy, 2026-10-02
 
+Standalone-floor measurement identity is `5e2248eadf511656241334bc7c7e832272a3b72c4fa0f3c838a1656fab7c3307`; validation remains `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`. Combined instrument is `50bfd3256776ead9960a495cc09b7d1be6b92d110c4c3fbe3b2c4aa5be84c51e`. New evidence is under `../loaded-floor/`.
+
 The new `--loaded` declaration records external CPU contention. Loaded default selection omits
 standalone Tree-sitter; full and focused verification include it. Its blocking budgets become
 `max(frozen budget, 5 ms)`, with frozen/applied values, reason and original provenance on every
@@ -349,5 +356,187 @@ was prepared but never launched after its estimated 110–170-minute cost was re
 rule was rejected because its 20 demotions included 17 historical negatives. All 47 historical
 negative keys remain blocking and must reject their real 20 ms stage delay under the new floor.
 
-Plan 282 lists all 61 affected margins and the evidence. Fresh controls, current-identity agreement
-and default/full matrix wall times remain pending; earlier receipts earn no current-identity credit.
+Plan 282 lists all 61 affected margins and the evidence. Fresh native controls pass under this
+identity. The real input delay rejects 72/72 synchronous keys at 20 ms; the real frame delay rejects
+36/36 frame keys at 20 ms. The named frame key also rejects at 25 ms, so 30 ms is skipped. Its
+20 ms frame median is 87.8 ms, interval [68.3, 89.8], against the unchanged 15.2 ms budget.
+The 25 ms median is 125.6 ms, interval [88.3, 163.0]. These are observed effects, without a
+monotonic pause-to-p95 guarantee.
+
+| Current measurement                           | Wall time |
+| --------------------------------------------- | --------: |
+| Input 20 ms control                           | 172.291 s |
+| Frame 20 ms control                           | 167.741 s |
+| Named 25 ms frame check                       | 182.896 s |
+| One-off control collection total              | 522.928 s |
+| Native positive configuration                 |  73.727 s |
+| First native CLI including controls and setup | 604.707 s |
+
+The current control collection costs 18.928 seconds less than the archived counterbalanced run,
+3.5%. No sampling rule changed between those runs, so this is a timing observation, not a claimed
+speedup. The native positive passes all 108 blocking keys. Thirty-four groups stop at two pairs;
+two complete four. The CLI wall time measures the child command through exit; the inner runner
+reports 604.346 seconds. Raw cache verification recomputes all comparisons. Evidence is
+`../loaded-floor/fresh-controls-summary.json` and `validation-quiet-native-positive.json`.
+The loaded standalone Tree-sitter positive passes all 108 blocking keys with 61 applied floors.
+Actual CLI wall time is 1,001.178 seconds, inner 1,000.660, configuration 989.817. Thirty-five
+groups stop at two pairs and one completes four. All eight same-core load workers stay live
+through 35 receipts, then are stopped and awaited; the direct remaining PID list is empty.
+Evidence is `../loaded-floor/tree-positive-summary.json`. Its real 20 ms input negative rejects
+72/72 synchronous keys and 42/42 exact historical input-stage keys. Actual CLI wall time is
+1,975.166 seconds, inner 1,974.592, configuration 1,963.592. All eight workers stay live through
+67 receipts, then stop and are awaited; direct remaining PID list is empty. Evidence is
+`../loaded-floor/tree-input-summary.json`. The delayed groups finish four pairs, accounting for
+more collection work than the positive. The real 20 ms frame negative rejects 36/36 frame keys
+and all five exact historical frame-stage keys. Actual CLI wall time is 1,908.500 seconds, inner
+1,908.009, configuration 1,897.511. All eight workers stay live through 65 receipts, then stop
+and are awaited; the direct remaining PID list is empty. Evidence is
+`../loaded-floor/tree-frame-summary.json`. Together the two negative stages preserve 47/47 exact
+historical negatives directly at 20 ms, including the 17 keys in the earlier sub-ms audit.
+The three actual CLI stages total 4,884.844 seconds (81.4 minutes). Remaining current-identity
+agreement and default/full matrix wall times are pending; earlier receipts earn no current-identity
+credit.
+
+The approved next policy extends loaded floor/default omission to `tree-sitter-shiki`,
+`tree-sitter-minimap`, `all` and `platform` after the current standalone stages. Each inherits
+native budgets and raises 62 blocking margins, including 17 sub-ms margins. All 540 keys across
+the five configurations remain blocking, with 309 raised margins. Platform remains in quiet
+default with frozen budgets and in loaded full. Omitting it from loaded default supersedes its
+previous mandatory loaded inclusion because it carries Tree-sitter readiness work and sub-ms
+contention noise. Standalone runs have cost about 18 minutes; individual composition costs are
+unmeasured. Source changes will require fresh sensitivity controls under a new identity.
+
+The frozen prerequisite #224 pair changes executable core products used by every configuration.
+Its actual quiet default therefore selects all ten configurations. The 15-minute target applies
+to this matrix, and a miss requires measured cut variants. Selecting only configurations with
+differing products removes none. The runtime-dependency audit records the public import chain
+and changed executable hashes; raw runtime graph receipts contain module counts and an escape
+audit, not per-module paths. Evidence is `../loaded-floor/runtime-product-dependency-audit.json`.
+
+### Composition floor and pre-input source readiness
+
+The composition policy is implemented for all five worker-backed Tree-sitter configurations.
+Loaded default is now native, disabled, Shiki, minimap and Shiki/minimap for the #224 core pair.
+Quiet default and full membership remain all ten. The narrow paired/policy suite passes 140 tests.
+
+The first actual inferred-default attempt failed before completing its first Platform group.
+Its pre-input ordinary typing receipt saw a current document of 4,469 UTF-16 units while minimap
+held 4,493 units, including the prior burst's 24 characters. This is outside the short-lines undo
+exception, and the exact equality check was preserved. A focused baseline/candidate reproduction
+shows late convergence: source updates advance 3→4 and accepted render 37→46; exact equality then
+returns. The harness had accepted the previous render before reset published its current source.
+The diagnostic takes 11.279 seconds, with observed post-failure convergence in 0.639/0.649 seconds.
+Raw evidence is `../loaded-floor/platform-minimap-reproduction.json` and its log.
+
+Pre-input readiness now waits on the same current-source and accepted-render receipt as post-input.
+There is no fixed reset wait or new exception. Focused verification runs warmup plus four
+repetitions on each frozen side; every reset, opened and settled source is current, and both
+contexts close. It takes 12.824 diagnostic seconds. Evidence is
+`../loaded-floor/platform-minimap-readiness-verification.json`. The failed default produced no
+outer artifact and supplies no completed matrix wall time or acceptance verdict.
+
+Consolidated measurement identity is
+`3c9a18ed47822568315cc513dd51b54d16cfd12a8091742fb5a7f2f168dcb203`; validation remains
+`9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`, combined instrument is
+`f4126d66e9d2da847266c5c1ba761ae21f559f463875be8ea287abf580101fa0`. Source checkpoint
+`26b4c99b195c4424240e3e75dd755911c001e762` is pushed to draft PR #247. All commit hooks pass;
+recomputing identity after their fixes confirms unchanged measurement and validation hashes.
+
+Fresh controls pass under `../composition-floor/`. Input 20 ms rejects 72/72 synchronous keys in
+171.980 collection seconds; frame 20 ms rejects 36/36 frame keys in 169.471 seconds. The named
+frame key rejects 25 ms in 183.980 seconds, so 30 ms is skipped. Its 25 ms paired median is
+114.05 ms, interval [88.3, 138.2], against the unchanged 15.2 ms budget. Control collection totals
+525.431 seconds. Quiet native positive passes all 108 blocking keys in 80.075 configuration
+seconds; 31 groups stop at two pairs and five complete four. Actual first CLI wall time is
+610.989 seconds, inner 610.696. The source checkpoint's hooks ran alongside this one-off
+collection, so these costs are observations rather than quiet-machine speed comparisons.
+A preceding tool run stopped at its two-minute background limit and earned no sensitivity or
+acceptance credit; its partial logs are preserved with `interrupted-time-limit` names. Final
+cache verification recomputes all raw comparisons. Evidence is `fresh-controls-summary.json`,
+`fresh-controls-details.json` and `validation-quiet-native-positive.json` in `../composition-floor/`.
+
+After complete cache, receipt and source-identity verification, the actual quiet inferred default
+started at 2026-10-02T00:51:56.382Z. It used the #224 prerequisite pair, all ten inferred
+configurations, no configuration override, unpinned affinity and no intentional CPU workers.
+The coordinator stopped it after three completed configurations, already over 15 minutes.
+Platform, native and disabled each pass all 108 blocking keys in 694.244, 77.516 and 84.219
+configuration seconds. Tree-sitter is partial. Last log activity is 1,247.493 seconds after
+launch; this is a stopped-run observation, not a completed CLI wall time. No outer matrix or
+full verdict exists. Owned driver/CLI/load-worker process lookup is empty. Evidence is
+`../composition-floor/default-stopped.json` and the complete per-configuration raw artifacts.
+Earlier controls and Tree-sitter acceptance retain their original measurement identities and
+earn no consolidated-identity acceptance credit.
+
+Platform's 694.244 seconds includes 236 samples, 72 of them warmups. Phase accounting gives
+251.219 seconds pre-input open/readiness, 206.172 post-input settlement, 83.919 priming/screenshots,
+73.476 forced pre-sample GC, 37.755 input/paint, 0.954 release, 35.988 fixture startup and 4.761
+remainder. Native's corresponding totals are 2.142, 0.0003, 37.295, 2.901, 32.333, 0.310, 0.484
+and 2.051 seconds. Both have 164 measured samples and cover the same keys. For measured
+short-lines/multiple samples, inner consumer owner settlement accounts for 136.852 of 142.022
+opening seconds and 86.963 of 90.641 post-input seconds. Thus the dominant readiness cost is
+inside owner settlement; full-source proof replay is a smaller residual. Evidence is
+`default-complete-phase-accounting.json` and `platform-readiness-owner-vs-wall.json`.
+
+The approved next sequence is to identify what those owner waits block on and report the cause
+before changing measurement code, then measure the actual declared Platform+native CLI as the
+candidate default. Platform includes the shipping Tree-sitter/Shiki/minimap composition; the
+other compositions supply attribution in full. No timing for that candidate scope is projected
+from individual configuration costs.
+
+#### Readiness cause and harness fidelity
+
+Diagnostic-only compiled timing hooks separate the stages on both frozen sides. Measured
+short-lines/multiple/typing opening spends 2.50–2.58 seconds waiting for Tree-sitter client tasks;
+post-input spends 3.62–3.92 seconds. The worker's final idle-fence request takes 0.2–0.4 ms.
+Shiki fences total 0.1–0.4 ms, the two follow-up delays total about 100 ms, and minimap acceptance
+adds at most 16 ms in warmup. The multi-second cost drains real worker edit/parse requests,
+not a debounce, idle callback or long polling interval. Compiled timing hooks are diagnostic,
+not acceptance evidence. Production measurement sources and frozen products are unchanged.
+Both contexts close and frozen hashes are revalidated. Evidence is
+`../composition-floor/platform-readiness-profile.json` and `platform-fence-details.json`.
+
+A real-app ownership audit identifies a harness fidelity mismatch. Split commands copy a tab.
+`workspace-document-service.ts` creates one analysis owner on the live document and a separate
+view per tab; its view projection carries that same analysis owner. `components/editor.tsx`
+passes the shared analysis through the React adapter's `attachSession` options. The adapter
+caches a separate buffer session for each buffer/view pair. In contrast, stress `src/browser.ts`
+attaches separate buffer sessions without a shared analysis option, creating three independent
+Tree-sitter runtime sessions. Matching the app requires one analysis owner per harness buffer,
+passed to every view, while keeping view sessions independent. This changes measurement
+identity and must be consolidated before fresh controls and final scope timing.
+
+#### Editor product finding: full-document injection discovery
+
+On the supported 500,000-line `//` fixture, each frozen Tree-sitter session's reset edit/parse
+costs 689–820 ms, including 621–743 ms in full-document injection discovery and only 30–40 ms
+in root parsing. A 24-character typing burst's delivered edit/parse costs 1,061–1,222 ms,
+including 920–1,025 ms in injection discovery and 106–118 ms in root parsing. Each of the
+three harness sessions repeats this work. Range-query compute costs another 111–114 ms;
+its larger wall time includes queuing behind those parses. These observations measure a
+coalesced burst, not one second per individual keystroke.
+
+The frozen worker's `editDocument` builds updated parsed-document layers through injection
+discovery before returning the edit acknowledgement; timing is recorded as
+`treeSitter.injectionDiscovery`. Locations are the prerequisite products' `tree-sitter/dist/assets/
+treeSitter.worker-BpGck7-d.js`, around `editDocument` (line 4218), the updated-layer construction,
+and injection query matches (lines 4807–4813). Evidence is
+`/work/tmp/plan-282/run-20261001T153544Z-sol/composition-floor/platform-fence-details.json`
+and `platform-fence-details-summary.json`. This is separately owned Editor work; Plan 282
+will preserve the frozen product bytes.
+
+### Shared-analysis and default-scope checkpoint
+
+The coordinator approved one analysis owner per harness buffer, independent view sessions,
+quiet default Platform+native and loaded default native+disabled on 2026-10-02. The old
+`3c9a18ed…` declared Platform+native run was stopped before a complete matrix: its Platform
+configuration rejects in 583.851 seconds and native is partial. There is no completed CLI wall
+receipt or aggregate verdict. Evidence is `../composition-floor/declared-native-stopped.json`.
+That run, earlier sensitivity controls and loaded Tree-sitter evidence earn no acceptance credit
+for the changed measurement. Fresh controls are collected once after the consolidated edits.
+The loaded 5 ms floor remains unchanged. Full timing remains unconfirmed.
+
+The ownership/default-policy unit suite passes 136 tests and stress TypeScript passes. A compiled
+diagnostic passes on both frozen products: three independent views share one Tree runtime
+session; Shiki retains three sessions. Source/render receipts pass, replacement keeps one Tree
+session, final disposal leaves zero runtime sessions and live workers, and both contexts close.
+Evidence is under `/work/tmp/plan-282/run-20261001T153544Z-sol/shared-analysis/`.

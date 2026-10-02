@@ -1,10 +1,6 @@
 import { createHash } from 'node:crypto'
 import { fail } from './errors.mjs'
-import {
-  inputConsumerIds,
-  inputConsumerConfiguration,
-  inputHasWorkerTreeSitter,
-} from './input-configurations.mjs'
+import { inputConsumerIds, inputHasWorkerTreeSitter } from './input-configurations.mjs'
 import { assertInputComparable, inputScenarios, inputViewModes } from './input-results.mjs'
 import { canStopInputPairs } from './input-pair-stopping.mjs'
 import { inputBudget } from './input-budgets.mjs'
@@ -210,44 +206,12 @@ export function sensitivityPassed(check, stage = 'input', frameFloor) {
   )
 }
 
-export function touchedConfigurations(baseline, candidate) {
-  const before = new Map(baseline.manifest.packages.map((entry) => [entry.name, entry]))
-  const after = new Map(candidate.manifest.packages.map((entry) => [entry.name, entry]))
-  const changed = new Set(
-    [...new Set([...before.keys(), ...after.keys()])]
-      .filter((name) => {
-        const prior = before.get(name)
-        const next = after.get(name)
-        return (
-          !prior ||
-          !next ||
-          prior.sourceHash !== next.sourceHash ||
-          prior.buildHash !== next.buildHash
-        )
-      })
-      .map((name) => name.split('/').at(-1)),
-  )
-  if (changed.has('core') || changed.has('textbuffer'))
-    return ['platform', ...inputConsumerIds.filter((id) => id !== 'platform')]
-  const affected = inputConsumerIds.filter((id) => {
-    const consumers = inputConsumerConfiguration(id, 'ordinary', 1)
-    if (
-      (changed.has('tree-sitter') || changed.has('tree-sitter-languages')) &&
-      consumers.treeSitter
-    )
-      return true
-    if (changed.has('minimap') && consumers.minimap) return true
-    return changed.has('find') && consumers.find
-  })
-  return ['platform', ...affected.filter((id) => id !== 'platform')]
-}
-
-export function inputMatrixConfigurations(baseline, candidate, options = {}) {
+export function inputMatrixConfigurations(options = {}) {
   if (options.only) return [...new Set(options.declared)]
   if (options.full) return [...inputConsumerIds]
-  const configurations = [
-    ...new Set(['platform', ...(options.declared ?? touchedConfigurations(baseline, candidate))]),
-  ]
+  const defaults =
+    options.loadProfile === 'loaded' ? ['native', 'disabled'] : ['platform', 'native']
+  const configurations = [...new Set([...defaults, ...(options.declared ?? [])])]
   return configurations.filter(
     (configuration) => options.loadProfile !== 'loaded' || !inputHasWorkerTreeSitter(configuration),
   )
