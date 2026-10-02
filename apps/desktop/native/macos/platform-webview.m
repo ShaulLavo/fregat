@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <math.h>
 
+// Keep the behind-window effect visible at negligible alpha so live wallpaper keeps updating.
+static const CGFloat liveDesktopAlpha = 0.0001;
+
 static WKWebsiteDataStore *persistent_store(NSString *directory) {
   if (@available(macOS 14.0, *)) {
     NSString *canonicalPath = directory.stringByStandardizingPath.stringByResolvingSymlinksInPath;
@@ -197,9 +200,9 @@ static void emit(NSDictionary *event) {
     double opacityValue = [opacity doubleValue];
     if (!isfinite(opacityValue) || opacityValue < 0 || opacityValue > 100) return;
     BOOL glass = [material isEqual:@"glass"] && self.glassEffect != nil;
-    // Pane opacity is page-owned; native materials always render at full strength.
-    self.effect.alphaValue = 1;
-    self.effect.hidden = [material isEqual:@"none"] || glass;
+    // Pane opacity is page-owned; selected native materials render at full strength.
+    self.effect.alphaValue = [material isEqual:@"none"] ? liveDesktopAlpha : 1;
+    self.effect.hidden = glass;
     self.glassEffect.hidden = !glass;
     return;
   }
@@ -333,7 +336,8 @@ int main(int argc, char **argv) {
       effect.material = NSVisualEffectMaterialUnderWindowBackground;
       effect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
       effect.state = NSVisualEffectStateActive;
-      effect.hidden = YES;
+      effect.alphaValue = liveDesktopAlpha;
+      effect.hidden = NO;
       host.effect = effect;
       effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
       [window.contentView addSubview:effect];
