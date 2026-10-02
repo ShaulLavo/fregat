@@ -16,6 +16,7 @@ it.each(TREE_SITTER_LANGUAGE_CONTRIBUTIONS)(
   'admits $id queries against the shipped WASM',
   async (contribution) => {
     const entry = manifest.languages.find((entry: { id: string }) => entry.id === contribution.id)
+    // NOT-PORTABLE: Grammar assets assume package-local node_modules rather than resolution.
     const path = resolve(root, entry.wasm.startsWith('.') ? 'src' : 'node_modules', entry.wasm)
     const language = await Language.load(await readFile(path))
     const assets = await contribution.load!()

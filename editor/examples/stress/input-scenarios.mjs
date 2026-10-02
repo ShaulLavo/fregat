@@ -213,6 +213,7 @@ export async function runSample(
         }),
       }),
     )
+    // NOT-PORTABLE: Failure screenshots are written under /work/tmp/editor-e002.
     await page.screenshot({ path: '/work/tmp/editor-e002/failure.png' }).catch(() => {})
     throw error
   } finally {

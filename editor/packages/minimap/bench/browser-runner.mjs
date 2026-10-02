@@ -9,6 +9,7 @@ import { fail } from '../../../examples/stress/errors.mjs'
 
 const bench = dirname(fileURLToPath(import.meta.url))
 const repository = resolve(bench, '../../..')
+// NOT-PORTABLE: Default output is /work/tmp/minimap-benchmark.
 const { values } = parseArgs({
   options: {
     label: { type: 'string', default: 'before' },

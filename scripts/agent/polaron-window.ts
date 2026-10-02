@@ -15,6 +15,7 @@ export async function openPolaronFixtureWindow(
   evidence: Evidence,
   options: { headless?: boolean; native?: { binary: string; budget: NativeBudget } } = {},
 ) {
+  // NOT-PORTABLE: Requires system Chromium on PATH; ignores Playwright's installed browser.
   const executable =
     Bun.which('chromium') ?? Bun.which('google-chrome') ?? Bun.which('google-chrome-stable')
   ok(executable, 'A real Chromium executable is required for launcher continuity proof')

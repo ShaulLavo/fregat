@@ -18,6 +18,7 @@ const baseline = await rebuildPackage(values['baseline-core-directory'], '@singa
 const candidate = await rebuildPackage(values['candidate-core-directory'], '@singapore-editor/core')
 assert.notEqual(baseline.sourceSha256, candidate.sourceSha256, 'Use distinct source revisions')
 assert.notEqual(baseline.builtSha256, candidate.builtSha256, 'Use distinct output revisions')
+// NOT-PORTABLE: Scratch creation requires /work/tmp.
 const directory = await mkdtemp('/work/tmp/e032-build-proof-')
 try {
   await cp(join(baseline.directory, 'src'), join(directory, 'src'), { recursive: true })

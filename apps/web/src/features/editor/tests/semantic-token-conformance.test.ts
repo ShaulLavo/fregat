@@ -155,6 +155,7 @@ describe('semantic tokens end to end', () => {
 
     const source = 'pub const MAX: usize = 10;\npub fn value(n: usize) -> usize { n + MAX }\n'
     const session = await tokenSession(binary, source)
+    // NOT-PORTABLE: Installed optional LSP servers can time out and skip token assertions.
     if (!session) return skip('rust-analyzer did not answer a token request in time')
 
     const { data, legend } = session

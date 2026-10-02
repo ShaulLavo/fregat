@@ -147,6 +147,7 @@ function parseOptions(args) {
   ])
     if (!parsed[key]) throw createBenchmarkError(`Missing --${key}`)
   const outputDir = resolve(parsed['output-dir'])
+  // NOT-PORTABLE: Requires /work/tmp output and preconfigured live primary/remote environments.
   if (!outputDir.startsWith('/work/tmp/'))
     throw createBenchmarkError('Output must be inside /work/tmp')
   return {

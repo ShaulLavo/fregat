@@ -12,6 +12,7 @@ export const gitChanges: Scenario = {
     const toggle = selectors.changesToggle(page)
     if ((await toggle.isVisible()) && (await toggle.getAttribute('aria-expanded')) === 'false')
       await toggle.click()
+    // NOT-PORTABLE: Requires changed files in the opened checkout; a fresh clone is clean.
     await selectors.worktreeFiles(page).first().waitFor()
     const tree = selectors.gitChangeTree(page)
     strictEqual(
@@ -145,6 +146,7 @@ export const sessionRail: Scenario = {
     await selectors.chatNewSession(page).waitFor()
     await step('session-rail')
     const row = selectors.sessionRows(page).first()
+    // NOT-PORTABLE: Fresh state has no sessions, so session navigation silently passes.
     if (!(await row.isVisible())) return
     await row.click()
     await step('selected-session')
@@ -432,6 +434,7 @@ const VIRTUALIZATION_MIN_FILES = 40
 async function expectVirtualizedRows(page: Page) {
   const label = (await selectors.gitChangesTab(page).textContent()) ?? ''
   const total = Number(label.replace(/\D+/gu, ''))
+  // NOT-PORTABLE: Fewer than 40 existing changes silently skips virtualization coverage.
   if (!Number.isFinite(total) || total < VIRTUALIZATION_MIN_FILES) return
 
   const mounted = await selectors.worktreeFiles(page).count()

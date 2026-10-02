@@ -28,6 +28,7 @@ if (values.child) await sample()
 else run()
 
 async function sample() {
+  // NOT-PORTABLE: Imports ignored textbuffer/dist without owning the prerequisite build.
   const api = await import('../../packages/textbuffer/dist/index.js')
   const { reclaimPieceTableText } = await import('../../packages/textbuffer/dist/reclamation.js')
   global.gc()

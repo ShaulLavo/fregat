@@ -113,6 +113,7 @@ function parseOptions(args) {
     if (key === '--densities') parsed.densities = value.split(',')
     if (key === '--schemes') parsed.schemes = value.split(',')
   }
+  // NOT-PORTABLE: Requires /work/tmp output and a hand-created live environment fixture.
   if (!parsed.fixture || !parsed.outputDir?.startsWith('/work/tmp/'))
     throw createBenchmarkError('Required: --fixture JSON --output-dir /work/tmp/DIRECTORY')
   if (parsed.densities.some((density) => !['compact', 'cozy'].includes(density)))

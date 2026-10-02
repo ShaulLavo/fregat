@@ -5,6 +5,7 @@ import { performance } from 'node:perf_hooks'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
+// NOT-PORTABLE: Scratch defaults to /work/tmp.
 const { values } = parseArgs({
   options: {
     child: { type: 'string' },

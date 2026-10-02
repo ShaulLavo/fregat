@@ -12,6 +12,7 @@ import { createManifest } from './fixtures.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const repository = resolve(root, '../..')
+// NOT-PORTABLE: Default output and scratch creation use /work/tmp.
 const { values } = parseArgs({
   options: {
     output: { type: 'string', default: '/work/tmp/editor-e004/result.json' },

@@ -44,6 +44,7 @@ class Terminal:
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             os.chdir(directory)
+            # NOT-PORTABLE: Hardcoded /bin/bash is absent on some POSIX hosts.
             os.execve("/bin/bash", ["bash", "--noprofile", "--norc", "-i"], environment)
         self.resize(32, 110)
 

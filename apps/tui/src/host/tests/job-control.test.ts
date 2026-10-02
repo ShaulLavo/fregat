@@ -7,6 +7,7 @@ test
   .each(['direct', 'launcher', 'launcher-term', 'shared-shell'])(
   '%s launch preserves foreground job control and terminal modes',
   async (mode) => {
+    // NOT-PORTABLE: Requires python3 and /bin/bash; only Windows is excluded.
     const directory = path.resolve(import.meta.dirname, '../../..')
     const result = Bun.spawn({
       cmd: [

@@ -16,6 +16,7 @@ import {
  * several shipped rules match the same span, and a fixture can only ever contain the overlaps its
  * author already thought of — running the real queries is what catches the ones nobody enumerated.
  */
+// NOT-PORTABLE: Query and dependency paths assume package cwd and local node_modules.
 const queriesDir = `${process.cwd()}/src/queries/`
 const modulesDir = `${process.cwd()}/node_modules/`
 

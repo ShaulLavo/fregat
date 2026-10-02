@@ -148,6 +148,7 @@
 
 - Every committed test and verification script runs from a fresh clone on any machine and in CI: no hard-coded home directories, user names, host names, absolute `/work` or `/Users` paths, or tools that only exist on one machine. Paths come from the checkout root, the OS temp dir, or a setting.
 - A test that needs a platform or tool CI lacks skips itself with a stated reason when it's absent, and still passes where it's present. A check that only makes sense on one specific machine (an owner's Mac over SSH, a live account) is a one-off proof: run it from a scratch directory, keep the evidence in the evidence directory, and don't commit the script.
+- A known non-portable spot carries a `NOT-PORTABLE: <what breaks on another machine>` comment until it's fixed; `rg 'NOT-PORTABLE:'` lists them. New code doesn't add markers; it follows the rule above.
 - Live-agent testing in the running app is allowed without asking: use the cheapest available model and only a few ad hoc prompts. Never automate these runs or add them to loops, CI, or deploy checks.
 - Run only a test that could catch a specific plausible failure, and the narrowest one.
 - Vitest. Apps run `bun --bun vitest` (Bun APIs need `--bun`); runtime-neutral `packages/*` run plain `vitest`. Projects: `node`, `dom` (happy-dom, never jsdom), `browser` (`*.browser.tsx`, Playwright, plain Node, own `vitest.browser.config.ts` because `define` leaks across projects in one config).

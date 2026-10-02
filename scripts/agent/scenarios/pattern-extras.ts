@@ -113,6 +113,7 @@ export const chatChangedFiles: Scenario = {
     if ((await selectors.expandChangedFiles(page).count()) > 0)
       await selectors.expandChangedFiles(page).first().click()
     const tree = selectors.changedFilesTree(page).first()
+    // NOT-PORTABLE: Fresh state has no checkpoint tree, so this scenario skips its assertions.
     if (!(await tree.isVisible())) {
       await step('no-existing-checkpoint-tree')
       return

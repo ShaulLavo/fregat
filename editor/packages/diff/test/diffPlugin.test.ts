@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+// NOT-PORTABLE: Direct tests require built sibling workspace packages.
 import { VirtualizedTextView } from '@singapore-editor/core/testing'
 import { Editor } from '@singapore-editor/core/editor'
 import { createVisibleEditor } from './support/visibleEditor'

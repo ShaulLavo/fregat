@@ -6,6 +6,7 @@ import path from 'node:path'
 const LOCK_SH = 1
 const LOCK_EX = 2
 const LOCK_NB = 4
+// NOT-PORTABLE: Eager libc.so.6 loading prevents test collection on macOS and musl Linux.
 const libc = dlopen('libc.so.6', {
   flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 },
 })

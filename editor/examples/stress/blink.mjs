@@ -26,6 +26,7 @@ const rounds = Number(values.rounds)
 const variants = ['css', 'interval', 'none']
 const ticksPerSecond = Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }))
 
+// NOT-PORTABLE: Scratch creation requires /work/tmp.
 await mkdir('/work/tmp', { recursive: true })
 const directory = await mkdtemp('/work/tmp/editor-e036-blink-')
 const core = await loadCorePackage(values['core-directory'])

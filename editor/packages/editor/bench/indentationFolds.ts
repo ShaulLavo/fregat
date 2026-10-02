@@ -115,6 +115,7 @@ console.log(
 
 function benchmarkOutputPath(args: readonly string[]): string {
   const index = args.indexOf('--output')
+  // NOT-PORTABLE: Default output is /work/tmp/editor-e034.
   if (index < 0) return '/work/tmp/editor-e034/index-benchmark.json'
   const path = args[index + 1]
   if (path && !path.startsWith('--')) return path
