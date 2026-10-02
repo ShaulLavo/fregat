@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { absolutePathSchema } from './absolute-path'
 import { environmentIdSchema } from './chat-ids'
 
 /** Bumped when the identity or capabilities shape changes incompatibly. */
@@ -6,14 +7,6 @@ export const SERVER_IDENTITY_PROTOCOL_VERSION = 1
 
 /** An app-specific hash of the OS machine id: equal on every state home of one machine. */
 export const machineIdSchema = v.pipe(v.string(), v.regex(/^[0-9a-f]{32}$/), v.brand('MachineId'))
-
-/** POSIX `/x`, drive `C:\x` or `C:/x`, or UNC `\\host\share`. Drive-relative `C:x` and NUL are refused. */
-export const absolutePathSchema = v.pipe(
-  v.string(),
-  v.maxLength(4096),
-  v.regex(/^(?:\/|[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)/, 'An absolute path'),
-  v.check((value) => !value.includes('\0'), 'A path holds no NUL byte'),
-)
 
 /** The stable public listener as a bare origin, e.g. `http://127.0.0.1:3301`. */
 export const serverAddressSchema = v.pipe(

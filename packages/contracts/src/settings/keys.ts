@@ -5,7 +5,7 @@ import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { machinesSchema } from '../machines'
-import { absolutePathSchema } from '../server-identity'
+import { absolutePathSchema } from '../absolute-path'
 import { WORKTREE_SUBMODULE_MODES } from '../git'
 import {
   keybindingOverridesSchema,
