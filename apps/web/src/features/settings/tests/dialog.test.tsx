@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
@@ -15,13 +15,10 @@ test('an open dialog shows the real settings page', async ({ client }) => {
   expect(client).toBeDefined()
   renderWithProviders(<SettingsDialog open onOpenChange={() => {}} />)
 
-  expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeDefined()
-  // The dialog is the folderless shell now: same page, reachable when there is
-  // no tab strip to put a Settings tab in, and with a way back out.
-  // The page is a lazy chunk: under a full parallel run its import alone can outlast the default
-  // one-second wait. Once it is in, the rest of the page is already there.
+  const dialog = within(await screen.findByRole('dialog', { name: 'Settings' }))
+  // Allow the lazy page to load, then assert a setting mounted with its first screen.
   expect(
-    await screen.findByLabelText('Search settings', undefined, { timeout: 10_000 }),
+    await dialog.findByLabelText('Search settings', undefined, { timeout: 10_000 }),
   ).toBeDefined()
-  expect(await screen.findByRole('button', { name: 'Open studio' })).toBeDefined()
+  expect(dialog.getByRole('switch', { name: 'Plan mode controls' })).toBeDefined()
 })
