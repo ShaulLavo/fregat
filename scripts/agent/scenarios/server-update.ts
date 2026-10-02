@@ -13,7 +13,7 @@ import { isolatedNativeScenario, nativeLog } from './native-provider-verificatio
 
 const NAME = 'server-update'
 const DESCRIPTION =
-  'A staged release shows "Update available"; Restart names a running session, Cancel keeps it, an accepted restart shows "Restarting…", and a failed live check shows the failed check. Desktop and phone clients offer manual Refresh when their web release changes.'
+  'A single Update app control opens affected-session details, waits for a running turn to finish, and keeps failed live-check guidance. Page-only releases use Reload app on desktop and phone.'
 const STAGED = '20260925T120000Z-scenario-staged'
 const LIVE = '20260925T120500Z-scenario-live'
 const restartRoute = /\/server\/restart$/
@@ -39,7 +39,23 @@ async function completeTurn(root: string) {
 /** Links `pending` the way `deploy --server` does, then signals the server the way it does. */
 export async function stageRelease(server: IsolatedServer) {
   const release = join(server.productionRoot, 'releases', STAGED)
-  await mkdir(release, { recursive: true })
+  await mkdir(join(release, 'server'), { recursive: true })
+  await mkdir(join(release, 'web'))
+  // The source supervisor serves these identities while promotion validates the release layout.
+  await writeFile(join(release, 'server', 'index.js'), 'export {}\n')
+  await writeFile(
+    join(release, 'web', 'index.html'),
+    '<!doctype html><title>Update fixture</title>',
+  )
+  await symlink(join(checkoutRoot, 'node_modules'), join(release, 'node_modules'))
+  await symlink(
+    join(checkoutRoot, 'apps/server/node_modules'),
+    join(release, 'server/node_modules'),
+  )
+  await writeFile(
+    join(release, 'build-config.json'),
+    JSON.stringify({ release: STAGED, source: checkoutRoot, liveCheck: false }),
+  )
   await symlink(release, join(server.productionRoot, 'pending'))
   server.signal('SIGUSR2')
 }
@@ -77,36 +93,35 @@ async function drive(
 ) {
   const { step, root, orchestration, sessionId } = context
   await stageRelease(server)
-  await selectors.serverUpdateRestart(page).waitFor()
+  await selectors.serverUpdateApply(page).waitFor()
   const staged = await selectors.serverUpdate(page).innerText()
-  ok(staged.includes('Update available'), `The status item must announce the update: ${staged}`)
+  ok(staged.trim() === 'Update app', `The status item names the action: ${staged}`)
   await step('update-available')
 
   await selectors.chatMessage(page).fill('QUEUE_START')
   await selectors.chatSend(page).click()
   await waitForNativeEvent(root, 'turn/start', 'The native turn must start')
-  await selectors.serverUpdateRestart(page).click()
-  await selectors.restartDialog(page).waitFor()
+  await selectors.serverUpdateApply(page).click()
+  await selectors.updatePopover(page).waitFor()
   const session = (await readShell(page, orchestration)).sessions.find(
     (item) => item.id === sessionId,
   )
   ok(session, 'The running session is in the shell snapshot')
-  await selectors.restartDialogSession(page, session.title).waitFor()
+  await selectors.updateSession(page, session.title).waitFor()
   await step('restart-confirmation')
 
-  await selectors.restartDialogCancel(page).click()
-  await selectors.restartDialog(page).waitFor({ state: 'hidden' })
-  ok(await selectors.chatStop(page).isVisible(), 'Cancel must leave the running turn alone')
-  await completeTurn(root)
-  await selectors.chatStop(page).waitFor({ state: 'hidden' })
+  await selectors.updateWhenDone(page).click()
+  await selectors.updatePopover(page).waitFor({ state: 'hidden' })
+  ok(await selectors.chatStop(page).isVisible(), 'Update when done leaves the running turn alone')
 
-  // An idle server would really exit, and nothing supervises the throwaway one.
+  // Keep this interaction proof connected; server-restart exercises the real exit.
   await page.route(restartRoute, (route) =>
     route.fulfill({ contentType: 'application/json', json: { restarting: true } }),
   )
   try {
-    await selectors.serverUpdateRestart(page).click()
-    await selectors.serverUpdateRestarting(page).waitFor()
+    await completeTurn(root)
+    await selectors.chatStop(page).waitFor({ state: 'hidden' })
+    await selectors.serverUpdating(page).waitFor()
     await step('restarting')
   } finally {
     await page.unroute(restartRoute)
@@ -141,6 +156,11 @@ export const serverUpdate: Scenario = {
       step: (name) => context.step(`desktop-${name}`),
     })
     await page.setViewportSize({ width: 390, height: 844 })
+    await selectors.phoneShell(page).waitFor()
+    if (await selectors.phoneBack(page).isVisible()) {
+      await selectors.phoneBack(page).click()
+      await selectors.phoneLevel(page, 'sessions').waitFor()
+    }
     await verifyClientUpdate(page, {
       ...context,
       step: (name) => context.step(`phone-${name}`),

@@ -4,19 +4,27 @@ import path from 'node:path'
 
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { onTestFinished } from 'vitest'
+import { beforeEach, onTestFinished } from 'vitest'
 import { orchestrationServerConfig } from '@workspace/client-core/test/orchestration-server-config'
 import { MockProviderAdapter, orchestrationForApp, updateForApp } from 'server/testing'
 
-import { createInProcessClient, createObservedInProcessClient } from '../../../../test/client'
+import { createObservedInProcessClient } from '../../../../test/client'
 import { TEST_ENVIRONMENT_ID } from '../../../../test/factories/chat'
 import { installTestClient } from '../../../../test/factories/client-binding'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 import { makeTestServer } from '../../../../test/server'
-import { ServerUpdateStatus } from '@/features/server-update/components/status'
+import { ServerUpdateStatus } from '@/components/server-update-status'
+import { updateIntentStore } from '@/features/server-update/state/intent'
 import { primaryServerOrigin } from '@/lib/client'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { serverUpdateQueryKeys } from '@/features/server-update/utils/query-keys'
 import { resetServerConnectionStore, useEnvironmentsStore } from '@/lib/environments/state/store'
+
+beforeEach(() => {
+  updateIntentStore.getState().setIntent({ kind: 'idle' })
+  primaryQueryClient().removeQueries({ queryKey: serverUpdateQueryKeys.release() })
+})
 
 type RestartRecord = { interrupted: { sessionId: string }[] }
 
@@ -51,7 +59,13 @@ async function busyServer() {
     }),
     update: { root: production, restart: (record) => exits.push(record) },
   })
-  const restoreClient = installTestClient(createInProcessClient(server))
+  const requests: unknown[] = []
+  const restoreClient = installTestClient(
+    createObservedInProcessClient(server, async (request) => {
+      if (new URL(request.url).pathname === '/server/restart')
+        requests.push(await request.clone().json())
+    }),
+  )
   onTestFinished(async () => {
     held.resolve()
     restoreClient()
@@ -99,50 +113,85 @@ async function busyServer() {
   useEnvironmentsStore
     .getState()
     .recordServerUpdate(primaryServerOrigin(), updateForApp(server.app).state())
-  return { exits, startTurn }
+  return {
+    exits,
+    requests,
+    startTurn,
+    async finishTurns() {
+      held.resolve()
+      await engine.providerRuntimeIdle()
+    },
+  }
 }
 
-test('Restart names the running session, Cancel keeps it, and confirming restarts the server', async () => {
+test('Update app lists busy sessions, closing keeps them, and Update now interrupts the accepted list', async () => {
   const { exits, startTurn } = await busyServer()
   const user = userEvent.setup()
   renderWithProviders(<ServerUpdateStatus />)
 
-  expect(await screen.findByText('Update available')).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Restart' }))
-  const dialog = await screen.findByRole('alertdialog', { name: 'Restart server' })
+  expect(await screen.findByRole('button', { name: 'Update app' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Update app' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Update now?' })
   expect(within(dialog).getByText('Fix the parser')).toBeInTheDocument()
   expect(within(dialog).getByText('Running')).toBeInTheDocument()
-  expect(
-    within(dialog).getByText(
-      'Restarting interrupts 1 session. Queued messages start on the new server.',
-    ),
-  ).toBeInTheDocument()
+  expect(within(dialog).getByText('Updating now interrupts 1 session.')).toBeInTheDocument()
   expect(exits).toEqual([])
 
-  await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
-  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(exits).toEqual([])
 
-  await user.click(screen.getByRole('button', { name: 'Restart' }))
-  const again = await screen.findByRole('alertdialog', { name: 'Restart server' })
+  await user.click(screen.getByRole('button', { name: 'Update app' }))
+  const again = await screen.findByRole('dialog', { name: 'Update now?' })
   await startTurn(LATE_SESSION_ID, 'Write the docs')
-  await user.click(within(again).getByRole('button', { name: 'Restart' }))
+  await user.click(within(again).getByRole('button', { name: 'Update now' }))
 
   // A session that became busy after the first answer comes back in the same dialog.
   expect(await within(again).findByText('Write the docs')).toBeInTheDocument()
   expect(within(again).getByText('Fix the parser')).toBeInTheDocument()
   expect(exits).toEqual([])
 
-  await user.click(within(again).getByRole('button', { name: 'Restart' }))
-  expect(await screen.findByText('Restarting…')).toBeInTheDocument()
+  await user.click(within(again).getByRole('button', { name: 'Update now' }))
+  expect(await screen.findByText('Updating…')).toBeInTheDocument()
   expect(exits).toHaveLength(1)
   expect(exits[0]?.interrupted.map((session) => session.sessionId).toSorted()).toEqual(
     [SESSION_ID, LATE_SESSION_ID].toSorted(),
   )
-  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(screen.queryByRole('dialog')).toBeNull()
 })
 
-test('A dropped Restart request shows Restarting… only while the socket is off the instance it asked', async () => {
+test('Update when done waits for authoritative busy state to clear without interrupting', async () => {
+  const { exits, requests, finishTurns } = await busyServer()
+  const user = userEvent.setup()
+  renderWithProviders(<ServerUpdateStatus />)
+
+  await user.click(await screen.findByRole('button', { name: 'Update app' }))
+  const popover = await screen.findByRole('dialog', { name: 'Update now?' })
+  expect(within(popover).getByText('Fix the parser')).toBeInTheDocument()
+  await user.click(within(popover).getByRole('button', { name: 'Update when done' }))
+  expect(exits).toEqual([])
+
+  const requestCount = requests.length
+  // Re-reading the same busy snapshot cannot turn waiting into forced interruption.
+  await act(async () => {
+    await primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+  })
+  expect(exits).toEqual([])
+
+  expect(requests).toHaveLength(requestCount)
+
+  await finishTurns()
+  await act(async () => {
+    await primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+  })
+  await waitFor(() => expect(exits).toHaveLength(1))
+  expect(exits[0]?.interrupted).toEqual([])
+  expect(requests).toHaveLength(requestCount + 1)
+  expect(requests.at(-1)).toMatchObject({ interrupt: [] })
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+test('A dropped update request shows Updating… only while the socket is off the instance it asked', async () => {
   const production = await stagedProduction()
   const server = await makeTestServer({
     environmentId: TEST_ENVIRONMENT_ID,
@@ -173,16 +222,18 @@ test('A dropped Restart request shows Restarting… only while the socket is off
   const user = userEvent.setup()
   renderWithProviders(<ServerUpdateStatus />)
 
-  await user.click(await screen.findByRole('button', { name: 'Restart' }))
+  await user.click(await screen.findByRole('button', { name: 'Update app' }))
   await waitFor(() => expect(attempts).toBe(1))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Restart' })).toBeEnabled())
-  expect(screen.queryByText('Restarting…')).toBeNull()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Update app' })).toBeEnabled())
+  expect(screen.queryByText('Updating…')).toBeNull()
 
   act(() => useEnvironmentsStore.getState().markDisconnected(origin))
-  expect(await screen.findByText('Restarting…')).toBeInTheDocument()
+  expect(await screen.findByText('Updating…')).toBeInTheDocument()
 
   // Reconnecting to the same process proves nothing restarted.
   act(() => useEnvironmentsStore.getState().recordHandshake(origin, connected))
-  expect(await screen.findByText('Update available')).toBeInTheDocument()
-  expect(screen.queryByText('Restarting…')).toBeNull()
+  expect(await screen.findByRole('button', { name: 'Update app' })).toBeInTheDocument()
+  expect(screen.queryByText('Updating…')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Update app' }))
+  await waitFor(() => expect(attempts).toBe(2))
 })

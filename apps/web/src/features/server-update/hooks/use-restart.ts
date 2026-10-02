@@ -1,5 +1,6 @@
+import { serverUpdateQueryKeys } from '@/features/server-update/utils/query-keys'
 import { useMutation } from '@tanstack/react-query'
-import type { ServerRestartResult, SessionId } from '@workspace/contracts'
+import type { ServerRestartResult, ServerRestartInput } from '@workspace/contracts'
 
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { clientForQueryClient, primaryQueryClient } from '@/lib/environments/state/query-clients'
@@ -16,11 +17,14 @@ export function useRestart() {
       mutationKey: serverUpdateMutationKeys.restart(),
       scope: { id: SERVER_RESTART_SCOPE },
       retry: false,
-      mutationFn: async (interrupt: SessionId[]): Promise<ServerRestartResult> =>
-        unwrapEdenResponse(
-          await clientForQueryClient(queryClient).server.restart.post({ interrupt }),
+      mutationFn: async (input: ServerRestartInput): Promise<ServerRestartResult> => {
+        const result = unwrapEdenResponse(
+          await clientForQueryClient(queryClient).server.restart.post(input),
           { requireData: true },
-        ),
+        )
+        await queryClient.invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+        return result
+      },
     },
     queryClient,
   )

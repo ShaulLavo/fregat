@@ -1,6 +1,7 @@
 import * as v from 'valibot'
 
-import { meshOrigin, serverPort } from './config'
+import { readStagedRelease } from '../../apps/server/src/update/staged-release'
+import { meshOrigin, serverPort, productionRoot } from './config'
 import { log } from './run'
 import { errorMessage } from '../../packages/contracts/src/error-fields'
 import type { SessionId } from '../../packages/contracts/src/chat-ids'
@@ -9,6 +10,7 @@ import {
   serverUpdateErrorSchema,
   type BusySession,
   type ServerRestartResult,
+  type StagedRelease,
 } from '../../packages/contracts/src/server-update'
 import { scriptErrors } from '../structured-errors'
 
@@ -40,7 +42,8 @@ export function requireStaged(staged: string | null, productionRoot: string) {
  * Sends the Restart button's request until the server accepts it. Busy sessions are waited
  * out, or interrupted with `interrupt`; the server exits into the staged release on accept.
  */
-export async function requestRestart(options: RestartOptions, control = liveRestartControl) {
+export async function requestRestart(options: RestartOptions, supplied?: RestartControl) {
+  const control = supplied ?? liveRestartControl()
   const deadline = control.now() + options.waitMs
   let interrupting: readonly SessionId[] = []
   let shown = false
@@ -100,16 +103,23 @@ function busyFailure(busy: readonly BusySession[], waitMs: number) {
   })
 }
 
-const liveRestartControl: RestartControl = {
-  request: postRestart,
-  now: Date.now,
-  sleep: (ms) => Bun.sleep(ms),
-  print: (text) => console.log(text),
+function liveRestartControl(): RestartControl {
+  const { staged: target } = readStagedRelease(productionRoot, null)
+  if (!target) throw scriptErrors.NOTHING_STAGED({ internal: { productionRoot } })
+  return {
+    request: (interrupt) => postRestart(target, interrupt),
+    now: Date.now,
+    sleep: (ms) => Bun.sleep(ms),
+    print: (text) => console.log(text),
+  }
 }
 
 // The auth guard is an exact origin allowlist on a loopback socket (auth.ts). Sending the
 // app's own origin makes this the same request the Restart button sends.
-async function postRestart(interrupt: readonly SessionId[]): Promise<ServerRestartResult> {
+async function postRestart(
+  target: StagedRelease,
+  interrupt: readonly SessionId[],
+): Promise<ServerRestartResult> {
   log('restart', `POST /server/restart (interrupting ${interrupt.length})`)
   const response = await fetch(`http://127.0.0.1:${serverPort}/server/restart`, {
     method: 'POST',
@@ -118,7 +128,7 @@ async function postRestart(interrupt: readonly SessionId[]): Promise<ServerResta
       origin: meshOrigin,
       'x-client-instance': 'deploy-cli',
     },
-    body: JSON.stringify({ interrupt }),
+    body: JSON.stringify({ interrupt, target }),
     signal: AbortSignal.timeout(30_000),
   }).catch((error: unknown) => {
     throw scriptErrors.RESTART_REQUEST_FAILED({

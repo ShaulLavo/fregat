@@ -605,7 +605,7 @@ export class OrchestrationEngine {
     })
   }
 
-  private busySessions() {
+  busySessions() {
     const busy: BusySession[] = []
     for (const session of this.readModel.sessions.values()) {
       if (session.deletedAt) continue

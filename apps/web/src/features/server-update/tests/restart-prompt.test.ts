@@ -5,7 +5,6 @@ import { liveCheckToastId } from '@/features/server-update/utils/live-check-toas
 import {
   busySessionTitle,
   busyStateLabel,
-  restartDescription,
   waitingNote,
 } from '@/features/server-update/utils/restart-prompt'
 
@@ -17,15 +16,6 @@ function busy(state: BusySession['state'], title = 'Fix the parser'): BusySessio
     state,
   }
 }
-
-test('the confirmation counts the sessions it interrupts and says where queued messages go', () => {
-  expect(restartDescription([busy('running')])).toBe(
-    'Restarting interrupts 1 session. Queued messages start on the new server.',
-  )
-  expect(restartDescription([busy('running'), busy('starting', 'Other')])).toBe(
-    'Restarting interrupts 2 sessions. Queued messages start on the new server.',
-  )
-})
 
 test('the waiting note appears only for a session holding an approval or question', () => {
   expect(waitingNote([busy('running'), busy('background', 'Other')])).toBeNull()
