@@ -16,7 +16,6 @@ import {
 const releaseFiles = [
   'build-config.json',
   'bin/promote.js',
-  'bin/promote.ts',
   'web/index.html',
   'server/index.js',
   'server/claude-discovery-worker.ts',
