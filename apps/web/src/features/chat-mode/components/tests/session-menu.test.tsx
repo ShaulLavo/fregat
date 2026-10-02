@@ -1,6 +1,6 @@
 import { commandIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
@@ -98,7 +98,12 @@ test('timer wake appears at its deadline and acknowledgment retains server snooz
     .finally(() => vi.useRealTimers())
   await h.refresh()
   renderRailHarness(h)
-  await screen.findByText('Woke')
+  // The badge and shelf use separate timers; moving shelves replaces the menu's anchor row.
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole('region', { name: 'Active' })).getByTitle('First'),
+    ).toHaveTextContent('Woke'),
+  )
   await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTitle('First') })
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Acknowledge wake' }))
   await waitFor(() => expect(screen.queryByText('Woke')).toBeNull())
