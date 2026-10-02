@@ -203,6 +203,7 @@ import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
+import { terminalCancelledStartup } from './terminal-cancelled-startup'
 import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
@@ -620,6 +621,7 @@ export const scenarios: readonly Scenario[] = [
   editorLinkedPackage,
   editorOfflineResync,
   terminalBackground,
+  terminalCancelledStartup,
   terminalOfflineHost,
   terminalRenderer,
   terminalRendererWebgl,

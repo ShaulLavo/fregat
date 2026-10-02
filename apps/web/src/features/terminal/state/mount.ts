@@ -22,6 +22,7 @@ import {
   type TerminalScrollbar,
 } from 'ghostty-webgpu'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
+import { startPageSubscription } from '@/lib/state/page-subscription'
 import { connectTerminalSocket } from '@/lib/server-sockets'
 import { sendTerminalClientMessage } from '@/features/terminal/utils/socket'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
@@ -171,18 +172,38 @@ export function mountTerminal({
     })
   }
 
-  void open().catch((error: unknown) => {
-    if (cancelled || signal.aborted || isCancelledError(error)) return
+  let pageActive = true
+  let retryOpen = false
+  const startOpen = () => {
+    retryOpen = false
+    void open().catch((error: unknown) => {
+      if (cancelled || signal.aborted) return
+      if (isCancelledError(error)) {
+        retryOpen = true
+        if (pageActive) startOpen()
+        return
+      }
 
-    onFailed(errorMessage(error, 'Could not open the terminal.'))
-    reportError(toClientError(error))
+      onFailed(errorMessage(error, 'Could not open the terminal.'))
+      reportError(toClientError(error))
+    })
+  }
+  // A restored page retains this mount; its imperative checkout query has no observers.
+  const stopPageSubscription = startPageSubscription(() => {
+    pageActive = true
+    if (retryOpen && !cancelled && !signal.aborted) startOpen()
+    return () => {
+      pageActive = false
+    }
   })
+  startOpen()
 
   return () => {
     flushCapture()
     removeFlush()
     frameDisposable?.dispose()
     cancelled = true
+    stopPageSubscription()
     unregisterSession?.()
     dataDisposable?.dispose()
     resizeDisposable?.dispose()

@@ -66,6 +66,8 @@ function startServer(serverUrl: URL, browserPort: string, runtimeRoot: string) {
       FS_METADATA_DB: ':memory:',
       FS_HOST: hostname,
       FS_SYSTEM_ROOT: fixtureRoot,
+      // The directory fixture must not inherit the enclosing checkout’s Git repository.
+      GIT_CEILING_DIRECTORIES: path.dirname(fixtureRoot),
       FS_WATCH: 'false',
       FS_WORKSPACE_ROOT: fixtureRoot,
       PORT: serverUrl.port,

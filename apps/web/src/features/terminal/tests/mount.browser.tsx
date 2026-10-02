@@ -11,10 +11,10 @@ test.each([false, true])(
   { timeout: 20_000 },
   async (earlyRestore) => {
     const client = primaryQueryClient()
-    const queryKey = terminalQueryKeys.checkout('')
+    const queryKey = terminalQueryKeys.checkout('.')
     client.removeQueries({ queryKey })
     const pending = client.query({
-      ...terminalCheckoutQueryOptions(''),
+      ...terminalCheckoutQueryOptions('.'),
       queryFn: ({ signal }) => {
         signal.throwIfAborted()
         return new Promise<never>(() => undefined)
@@ -32,7 +32,7 @@ test.each([false, true])(
       client: getClient(),
       signal: controller.signal,
       host,
-      rootPath: '',
+      rootPath: '.',
       scrollback: 100,
       sessionId: `cancelled-open-${earlyRestore}`,
       onConnectedChange: vi.fn(),
@@ -54,13 +54,16 @@ test.each([false, true])(
         window.dispatchEvent(new Event('pageshow'))
       }
 
-      await expect.poll(() => onReady.mock.calls.length, { timeout: 10_000 }).toBe(1)
+      await expect
+        .poll(() => onReady.mock.calls.length + onFailed.mock.calls.length, { timeout: 10_000 })
+        .toBe(1)
+      expect(onFailed.mock.calls).toEqual([])
+      expect(onReady).toHaveBeenCalledOnce()
       expect(host.querySelector('canvas')).not.toBeNull()
       expect(onFailed).not.toHaveBeenCalled()
       window.dispatchEvent(new Event('pageshow'))
       expect(onReady).toHaveBeenCalledOnce()
     } finally {
-      console.info('terminal restore result', { ready: onReady.mock.calls.length, failures: onFailed.mock.calls, checkout: client.getQueryState(queryKey) })
       controller.abort()
       unmount()
       host.remove()
