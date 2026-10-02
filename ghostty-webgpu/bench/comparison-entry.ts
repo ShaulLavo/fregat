@@ -151,7 +151,10 @@ async function createNative(host: HTMLElement): Promise<Driver> {
         }
         const factory = factories[current.variant as keyof typeof factories]
         if (!factory) throw new Error('Explicit native renderer required')
-        const renderer = await factory.create(options)
+        const renderer = await factory.create({
+          ...options,
+          zigFrame: new URLSearchParams(location.search).has('zig'),
+        })
         tracing.nativeRenderer(drivers.length, renderer)
         mountedRenderer = renderer
         return renderer

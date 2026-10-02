@@ -67,7 +67,7 @@ test('variant selection adds only the native renderer counterparts', async () =>
     assert.throws(() => selectedVariants(['--variants', value], available, fallback))
 })
 
-test('WebGPU frame-builder selection supports one path and rejects conflicting selectors', async () => {
+test('GPU frame-builder selection supports one path and rejects conflicting selectors', async () => {
   const { frameBuilders } = await import('./comparison-options.mjs')
   assert.deepEqual(frameBuilders([]), ['js'])
   assert.deepEqual(frameBuilders(['--paired-frame-builders']), ['js', 'zig'])
@@ -127,8 +127,11 @@ test('even repetitions remain at least four and selected native/counterpart orde
           const selected = cases.filter((entry) => entry.count === count && entry.path === path)
           assert.equal(selected.length, variants.length)
           assert.deepEqual(
-            selected.filter((entry) => entry.frameBuilder).map((entry) => entry.variant),
-            ['ghostty-webgpu'],
+            selected
+              .filter((entry) => entry.frameBuilder)
+              .map((entry) => entry.variant)
+              .sort(),
+            ['ghostty-webgl', 'ghostty-webgpu'],
           )
           for (const [native, counterpart] of Object.entries(counterparts)) {
             if (
@@ -141,12 +144,24 @@ test('even repetitions remain at least four and selected native/counterpart orde
     }
     for (const count of Object.values(before)) assert.equal(count, repetitions * 2)
   }
-  const native = (repetition) =>
-    measurementCases(['ghostty-webgpu', 'xterm-webgl'], ['bytes'], [17], ['js', 'zig'], repetition)
-      .filter((entry) => entry.variant === 'ghostty-webgpu')
-      .map((entry) => entry.frameBuilder)
-  assert.deepEqual(native(0), ['js', 'zig'])
-  assert.deepEqual(native(1), ['zig', 'js'])
+  for (const variant of ['ghostty-webgpu', 'ghostty-webgl']) {
+    const native = (repetition) =>
+      measurementCases([variant, 'xterm-webgl'], ['bytes'], [17], ['js', 'zig'], repetition)
+        .filter((entry) => entry.variant === variant)
+        .map((entry) => entry.frameBuilder)
+    assert.deepEqual(native(0), ['js', 'zig'])
+    assert.deepEqual(native(1), ['zig', 'js'])
+  }
+  assert.equal(
+    measurementCases(
+      ['ghostty-webgpu', 'ghostty-webgl', 'xterm-webgl'],
+      ['bytes'],
+      [1, 17],
+      ['js', 'zig'],
+      0,
+    ).length,
+    10,
+  )
 })
 
 test('accessibility mode pairs native mirrors with xterm screen-reader mode', async () => {

@@ -103,7 +103,7 @@ export function measurementCases(variants, paths, counts, builders, repetition) 
     return repetition % 2 ? rotated.reverse() : rotated
   }
   const treatments = ordered(variants).flatMap((variant) => {
-    if (variant !== 'ghostty-webgpu') return [{ variant }]
+    if (variant !== 'ghostty-webgpu' && variant !== 'ghostty-webgl') return [{ variant }]
     return ordered(builders).map((frameBuilder) => ({ variant, frameBuilder }))
   })
   return (repetition % 2 ? paths.toReversed() : paths).flatMap((path) =>
