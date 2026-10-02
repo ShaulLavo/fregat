@@ -13,11 +13,6 @@ export function busyStateLabel(state: BusySessionState): string {
   return BUSY_STATE_LABELS[state]
 }
 
-export function restartDescription(busy: readonly BusySession[]): string {
-  const sessions = busy.length === 1 ? '1 session' : `${busy.length} sessions`
-  return `Restarting interrupts ${sessions}. Queued messages start on the new server.`
-}
-
 /** Restarting drops an open approval or question, so the dialog says so when one is open. */
 export function waitingNote(busy: readonly BusySession[]): string | null {
   const waiting = busy.filter((session) => session.state === 'waiting').length
@@ -30,8 +25,4 @@ export function waitingNote(busy: readonly BusySession[]): string | null {
 export function busySessionTitle(session: BusySession): string {
   if (!session.projectTitle) return session.title
   return `${session.title} · ${session.projectTitle}`
-}
-
-export function restartTooltip(release: string): string {
-  return `Restarts the server to run ${release}.`
 }

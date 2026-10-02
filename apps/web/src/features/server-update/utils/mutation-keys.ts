@@ -1,4 +1,5 @@
 export const serverUpdateMutationKeys = {
+  reload: () => ['server-update', 'reload'] as const,
   restart: () => ['server-update', 'restart'] as const,
 }
 

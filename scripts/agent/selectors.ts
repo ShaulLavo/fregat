@@ -931,23 +931,24 @@ export const selectors = {
   rewindFiles: (page: Page) =>
     page.getByRole('button', { name: 'Rewind chat and files', exact: true }),
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
-  clientUpdateRefresh: (page: Page) =>
-    page.getByRole('button', { name: 'Reload app', exact: true }),
+  clientUpdateReload: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
-  serverUpdateRestarting: (page: Page) => page.locator('[data-server-update="restarting"]'),
-  serverUpdateRestart: (page: Page) =>
-    page.locator('[data-server-update]').getByRole('button', { name: 'Restart', exact: true }),
-  // Scoped to the dialog: the rail lists the same session titles.
-  restartDialog: (page: Page) => page.getByRole('alertdialog', { name: 'Restart server' }),
-  restartDialogSession: (page: Page, title: string) =>
+  serverUpdating: (page: Page) => page.getByRole('button', { name: 'Updating…', exact: true }),
+  serverUpdateRetry: (page: Page) =>
+    page.getByRole('button', { name: 'Retry update', exact: true }),
+  serverUpdateTooltip: (page: Page) =>
+    page.locator('[data-slot="tooltip-content"]').filter({ hasText: 'Retry update' }),
+  serverUpdateApply: (page: Page) =>
+    page.locator('[data-server-update]').getByRole('button', { name: 'Update app', exact: true }),
+  updatePopover: (page: Page) => page.getByRole('dialog', { name: 'Update now?' }),
+  updateSession: (page: Page, title: string) =>
     page
-      .getByRole('alertdialog', { name: 'Restart server' })
+      .getByRole('dialog', { name: 'Update now?' })
       .getByRole('listitem')
       .filter({ hasText: title }),
-  restartDialogCancel: (page: Page) =>
-    page
-      .getByRole('alertdialog', { name: 'Restart server' })
-      .getByRole('button', { name: 'Cancel', exact: true }),
+  updateWhenDone: (page: Page) =>
+    page.getByRole('button', { name: 'Update when done', exact: true }),
+  updateNow: (page: Page) => page.getByRole('button', { name: 'Update now', exact: true }),
   chatComposerFileInput: (page: Page) =>
     page
       .getByRole('button', { name: 'Attach', exact: true })

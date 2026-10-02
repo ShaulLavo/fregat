@@ -1,9 +1,10 @@
+import { ServerUpdateStatus } from '@/components/server-update-status'
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@workspace/ui/components/tooltip'
 import { TooltipLayer } from '@workspace/ui/patterns/tooltip-layer'
 
-import { ClientUpdate } from '@/features/server-update/components/client-update'
+import { ReloadSafetyContext } from '@/lib/reload-safety'
 import { Toaster } from '@workspace/ui/components/sonner'
 import { ConnectionGate } from '@/features/environments/components/connection-gate'
 import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
@@ -23,21 +24,22 @@ export function ActiveEnvironmentApplication({ children }: { readonly children: 
     <QueryClientProvider key={active.origin} client={active.queryClient}>
       <ErrorActionProvider>
         <Toaster />
-        <ClientUpdate />
-        <ConnectionGate origin={active.origin}>
-          <LanguageServerMatchProvider>
-            <AppearanceProvider>
-              <EditorColorThemeProvider>
-                <TooltipProvider>
-                  <EditorStateProvider runtime={active.editor}>{children}</EditorStateProvider>
-                  <TooltipLayer />
-                  <FeedbackLayer />
-                  <FileIconSprite />
-                </TooltipProvider>
-              </EditorColorThemeProvider>
-            </AppearanceProvider>
-          </LanguageServerMatchProvider>
-        </ConnectionGate>
+        <ReloadSafetyContext value={application.reloadSafety}>
+          <TooltipProvider>
+            <ConnectionGate origin={active.origin} recovery={<ServerUpdateStatus />}>
+              <LanguageServerMatchProvider>
+                <AppearanceProvider>
+                  <EditorColorThemeProvider>
+                    <EditorStateProvider runtime={active.editor}>{children}</EditorStateProvider>
+                    <TooltipLayer />
+                    <FeedbackLayer />
+                    <FileIconSprite />
+                  </EditorColorThemeProvider>
+                </AppearanceProvider>
+              </LanguageServerMatchProvider>
+            </ConnectionGate>
+          </TooltipProvider>
+        </ReloadSafetyContext>
       </ErrorActionProvider>
     </QueryClientProvider>
   )

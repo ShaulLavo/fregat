@@ -4,6 +4,7 @@ export const DEV_TABS = [
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'handles', label: 'Handles' },
   { id: 'icons', label: 'Icons' },
+  { id: 'updates', label: 'Updates' },
 ] as const
 
 export type DevTabId = (typeof DEV_TABS)[number]['id']
