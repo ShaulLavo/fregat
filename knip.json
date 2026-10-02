@@ -9,6 +9,8 @@
         "src/bun/index.ts",
         "src/preload/index.ts",
         "src/launcher/index.ts",
+        "scripts/build-app.ts",
+        "scripts/check-app.ts",
         "src/launcher/tests/fixtures/browser.mjs",
         "src/launcher/tests/fixtures/launch.mjs",
         "src/launcher/tests/fixtures/review-race-browser.mjs",

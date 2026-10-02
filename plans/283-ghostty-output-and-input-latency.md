@@ -13,10 +13,10 @@
 - [x] Phase 1 attribution: `ghostty-webgpu/docs/perf-attribution.md` (#242).
 - [x] Fix 1, reuse WASM memory views (#245).
 - [x] Fix 2, packed damaged-row snapshot plus direct-packed DOM frame text (#255).
-- [ ] Benchmark repair on omarchy (#343): hardware WebGPU on Linux headless-shell, GPU-idle gate
-      (ComfyUI shares the GPU), latency at the presentation of the submitting frame with 240
-      samples, pass rule = paired native/xterm ratio ≤ 1. Review fixes in progress: CPU rows
-      resolved above the 10 ms tick, visible gate skips, regenerable compact evidence.
+- [x] Benchmark repair on omarchy (#343): hardware WebGPU on Linux headless-shell, GPU-idle gate,
+      latency at the presentation of the submitting frame, paired native/xterm ratios, CPU rows
+      unresolved below the 10 ms tick. Sustained-output CPU is ASCII-only until #352.
+      Result at 17 terminals: output CPU native/xterm 2.10 renderer, 2.29 total.
 - [ ] Frame built in Zig, spike: ASCII and SGR colors, measured against main and xterm.
 - [ ] Frame built in Zig, full move: wide characters, graphemes, cursor, selection, links; delete the
       JS snapshot and instance builders.
@@ -132,3 +132,27 @@ each with an independent reviewer. Measurements run on omarchy through the heavy
   the owner.
 - `docs/benchmarks.md` is regenerated from a fresh run, with no lost wins. If ghostty-webgpu now
   beats xterm.js on these measures, raise putting numbers in the main README with the owner.
+
+## Linux comparison qualification
+
+Status: Approved. This benchmark-only pass removes the Mac dependency for native/xterm comparisons;
+product performance work remains separate.
+
+- [x] Add Linux headless hardware launch and bounded harness adapter acquisition.
+- [x] Qualify GPU idleness before windows and repetitions, sample during windows, retain give-up evidence.
+- [x] Use terminal-frame presentation feedback for latency; retain PNG glyph checks and increase samples to 240.
+- [x] Alternate adjacent native/xterm cases with explicit pair identities; evaluate median paired ratios ≤ 1.
+- [x] Add portable option, gate, recorded-endpoint, and paired-ratio tests.
+- [x] Prove hardware canvas presentation, then run 1/17-terminal ASCII, bytes, three paired repetitions.
+- [x] Retain compact Linux evidence, per-pair latency/CPU attribution, delayed-rAF sensitivity and endpoint limits.
+- [x] Complete independent benchmark review.
+- [x] Commit by path, push, and open [benchmark PR #343](https://github.com/ShaulLavo/fregat/pull/343); leave merge and product performance work separate.
+
+### PR #343 review repairs
+
+- [x] Record Linux CPU tick size; require at least 100 ticks per side and a difference exceeding one tick.
+- [x] Preserve skipped GPU qualification in run/paired output and reject newly appearing foreign compute PIDs.
+- [x] Commit portable evidence compaction that retains between-repetition qualifications and null/reason ratios.
+- [x] Balance four pairs, guard presentation-after-submission, add a recorded Linux fixture, slow measured-window GPU sampling and retry idle timeouts.
+- [x] Rerun counts 1 and 17 in separate idle-GPU quiet windows: 2700/1800 output frames respectively, four pairs and 96 latency samples per operation.
+- [x] Refresh compact evidence, attribution and PR numbers; commit by path, push and reply without merging.
