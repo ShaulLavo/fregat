@@ -57,10 +57,15 @@ export function presentationLatency(phase, events) {
     )
     assert(animation?.id !== undefined, 'Terminal submission requires a containing animation frame')
     const presented = feedback.find((event) => event.args?.id === animation.id)
-    const milliseconds = presented ? presented.ts / 1000 - clock.offset - selected.started : null
+    const presentationTime = presented ? presented.ts / 1000 - clock.offset : null
+    const milliseconds = presentationTime === null ? null : presentationTime - selected.started
     assert(
       Number.isFinite(milliseconds) && milliseconds > 0,
       'Terminal frame requires positive Chrome presentation feedback; capture timing is not a fallback',
+    )
+    assert(
+      presentationTime >= selected.submit.end,
+      'Terminal presentation feedback must occur at or after its GPU submission end',
     )
     samples[capture.operation].push(milliseconds)
     return {

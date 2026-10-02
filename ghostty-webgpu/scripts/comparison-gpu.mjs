@@ -133,8 +133,13 @@ export function createGpuGate(
   validateSettings(settings)
   let skipReason = platform === 'linux' ? null : 'NVIDIA qualification is available on Linux'
   let sampledSuccessfully = false
+  let idleBaseline = null
 
-  async function acquire(evidence, timeoutMilliseconds = settings.gpuCommandTimeoutMilliseconds) {
+  async function acquire(
+    evidence,
+    timeoutMilliseconds = settings.gpuCommandTimeoutMilliseconds,
+    retryTimeout = false,
+  ) {
     try {
       const reading = await sample(timeoutMilliseconds)
       evidence.samples.push(reading)
@@ -149,13 +154,22 @@ export function createGpuGate(
         evidence.skipReason = skipReason
         return null
       }
-      evidence.status = 'failed'
-      evidence.reason = 'NVIDIA GPU sampling failed'
-      evidence.samplingError = {
+      const samplingError = {
         name: error.name,
         code: error.code ?? null,
         message: error.message,
       }
+      const timedOut =
+        error.code === 'ETIMEDOUT' ||
+        (error.killed && (error.signal === 'SIGTERM' || error.signal === 'SIGKILL'))
+      if (retryTimeout && timedOut) {
+        evidence.samplingTimeouts ??= []
+        evidence.samplingTimeouts.push(samplingError)
+        return undefined
+      }
+      evidence.status = 'failed'
+      evidence.reason = 'NVIDIA GPU sampling failed'
+      evidence.samplingError = samplingError
       throw new GpuQualificationError(evidence.reason, evidence)
     }
   }
@@ -186,15 +200,18 @@ export function createGpuGate(
     const result = evidence('idle')
     if (skipReason) return result
     const started = now()
+    idleBaseline = null
     let consecutive = 0
     while (now() - started < settings.gpuIdleWaitMilliseconds) {
       const remaining = settings.gpuIdleWaitMilliseconds - (now() - started)
       const reading = await acquire(
         result,
         Math.min(remaining, settings.gpuCommandTimeoutMilliseconds),
+        true,
       )
-      if (!reading) return result
+      if (reading === null) return result
       const idle =
+        reading !== undefined &&
         reading.utilizationPercent <= settings.gpuIdleUtilizationPercent &&
         reading.computeMemoryMiB <= settings.gpuComputeMemoryMiB
       consecutive = idle ? consecutive + 1 : 0
@@ -203,6 +220,7 @@ export function createGpuGate(
         consecutive >= settings.gpuIdleConsecutiveSamples &&
         result.waitMilliseconds <= settings.gpuIdleWaitMilliseconds
       ) {
+        idleBaseline = reading
         result.status = 'qualified'
         result.qualified = true
         return result
@@ -215,20 +233,40 @@ export function createGpuGate(
     }
     result.status = 'failed'
     result.reason = 'NVIDIA GPU idle wait expired'
+    if (result.samplingTimeouts?.length) result.samplingError = result.samplingTimeouts.at(-1)
     result.waitMilliseconds = now() - started
     throw new GpuQualificationError(result.reason, result)
   }
 
-  async function monitorWindow(operation) {
+  async function monitorWindow(
+    operation,
+    { sampleMilliseconds = settings.gpuSampleMilliseconds } = {},
+  ) {
+    assert(
+      Number.isFinite(sampleMilliseconds) && sampleMilliseconds > 0,
+      'Positive sampleMilliseconds required',
+    )
     const result = evidence('window')
+    result.settings.gpuSampleMilliseconds = sampleMilliseconds
     if (skipReason) return { value: await operation(), gpu: result }
     const first = await acquire(result)
     if (!first) return { value: await operation(), gpu: result }
-    assertCompute(first, result)
+    const baseline = idleBaseline ?? first
+    const foreignPids = new Set(
+      baseline.processes.filter((entry) => !entry.allowed).map((entry) => entry.pid),
+    )
+    result.baselineForeignComputePids = [...foreignPids]
+    assertCompute(first, result, foreignPids)
     let stopped = false
     const controller = new AbortController()
     // Attach the rejection handler before running the window so sampler failures are retained.
-    const monitoring = monitor(result, () => stopped, controller.signal).catch((error) => error)
+    const monitoring = monitor(
+      result,
+      () => stopped,
+      controller.signal,
+      foreignPids,
+      sampleMilliseconds,
+    ).catch((error) => error)
     let value
     let operationFailure
     let monitoringFailure
@@ -244,15 +282,20 @@ export function createGpuGate(
     if (monitoringFailure) throw monitoringFailure
     if (operationFailure) throw operationFailure.error
     const last = await acquire(result)
-    if (last) assertCompute(last, result)
+    if (last) assertCompute(last, result, foreignPids)
     if (result.status !== 'skipped') result.status = 'qualified'
     result.qualified = true
     return { value, gpu: result }
   }
 
-  function assertCompute(reading, result) {
+  function assertCompute(reading, result, foreignPids) {
     const busy = reading.utilizationPercent > settings.gpuWindowUtilizationPercent
-    const foreign = reading.computeMemoryMiB > settings.gpuComputeMemoryMiB
+    const newForeignPids = reading.processes
+      .filter((entry) => !entry.allowed && !foreignPids.has(entry.pid))
+      .map((entry) => entry.pid)
+    const foreign =
+      reading.computeMemoryMiB > settings.gpuComputeMemoryMiB || newForeignPids.length > 0
+    if (newForeignPids.length > 0) result.newForeignComputePids = [...new Set(newForeignPids)]
     if (!busy && !foreign) return
     result.status = 'failed'
     result.qualified = false
@@ -262,10 +305,10 @@ export function createGpuGate(
     throw new GpuQualificationError(result.reason, result)
   }
 
-  async function monitor(result, stopped, signal) {
+  async function monitor(result, stopped, signal, foreignPids, sampleMilliseconds) {
     while (!stopped()) {
       try {
-        await sleep(settings.gpuSampleMilliseconds, undefined, { signal })
+        await sleep(sampleMilliseconds, undefined, { signal })
       } catch (error) {
         if (signal.aborted) return
         throw error
@@ -273,7 +316,7 @@ export function createGpuGate(
       if (stopped()) return
       const reading = await acquire(result)
       if (!reading) return
-      assertCompute(reading, result)
+      assertCompute(reading, result, foreignPids)
     }
   }
 

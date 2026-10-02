@@ -6,57 +6,71 @@ Status: Phase 1 measured and review repairs completed on 2026-10-01. A corrected
 
 The Linux runner measures native WebGPU and xterm WebGL in the same Chromium headless-shell session over secure loopback HTTP. It enables Vulkan with `--enable-features=Vulkan --use-angle=vulkan --ignore-gpu-blocklist`, records CDP GPU feature status and the WebGPU adapter, and rejects software/fallback adapters. Adapter acquisition retries up to three times, 100 ms apart. macOS retains headed Chromium and its AC-power/caffeinate checks. Full Chromium headless on the RTX 3060 Ti exposed the NVIDIA adapter but captured a black WebGPU canvas; the same minimal red-canvas diagnostic visibly rendered on headless-shell. This harness selection requires no terminal-library change.
 
-Latency now ends at `AnimationFrame::Presentation` for the exact animation-frame identity containing the terminal's actual GPU submission. Selection requires the operation's parse span, input echo receipt for keystrokes, and `submit` or `drawElementsInstanced` inside the render span. A deferred draw callback with no submission cannot qualify. The first colored-glyph PNG remains a correctness check and capture-timing diagnostic. Missing presentation feedback fails the case; there is no PNG timestamp fallback. Normal latency tracing omits the V8 CPU profiler, and each operation collects 240 samples per repetition.
+Latency now ends at `AnimationFrame::Presentation` for the exact animation-frame identity containing the terminal's actual GPU submission. Selection requires the operation's parse span, input echo receipt for keystrokes, and `submit` or `drawElementsInstanced` inside the render span. A deferred draw callback with no submission cannot qualify. The first colored-glyph PNG remains a correctness check and capture-timing diagnostic. Missing presentation feedback fails the case; there is no PNG timestamp fallback. Normal latency tracing omits the V8 CPU profiler, and the review-repair hardware runs collect 96 samples per operation and repetition.
 
 **Linux headless-shell measures keydown/write to compositor presentation acknowledgement, on-demand, not physical vsync.** Its renderer rAF period is approximately 16.665 ms, while presentation feedback follows submission asynchronously. Physical-display frame drops and optical latency remain unmeasured. The optional `--validate-presentation` phase inserts one rAF before write and retains 24 delayed samples, allowing renderer-frame sensitivity to be checked separately. These values must not be compared directly with the historical captured-PNG Mac values below.
 
-NVIDIA qualification waits for three consecutive samples at or below 5% utilization before each window and between repetitions, with a 30-second give-up. During measurement it rejects utilization above 80% or foreign compute residency above 1024 MiB. The benchmark browser's CDP process IDs are excluded from foreign residency; total GPU utilization still includes benchmark load. The 80% bound allows the native 17-terminal burst's observed 44% load and xterm's 26% during calibration. Every window retains before/during/after samples at a 250 ms interval and a 2-second command timeout. Missing NVIDIA tooling/devices or other platforms retain explicit skip reasons. Resident memory is a conservative activity proxy, and subinterval bursts may be missed. All thresholds are named fixture settings.
+NVIDIA qualification waits for three consecutive samples at or below 5% utilization before each window and between repetitions, with a 30-second give-up. Timed-out idle samples retry within that budget and reset the consecutive-sample count. During measurement it rejects utilization above 80%, foreign compute residency above 1024 MiB, or any new foreign compute PID relative to the final qualified idle sample. The benchmark browser's CDP process IDs are excluded from foreign residency; total GPU utilization includes benchmark load. Before/after samples are mandatory. Idle qualification and short parser/burst windows use 250 ms polling; CPU and latency windows use 1000 ms polling to reduce sampler perturbation. Commands have a 2-second timeout, bounded by the remaining idle-wait budget. Missing NVIDIA tooling/devices or other platforms retain explicit skip reasons in runs, paired rows and markdown. Resident memory is a conservative activity proxy, and subinterval bursts may be missed. All thresholds are named fixture settings.
 
-Native/xterm cases run adjacent and alternate order across three repetitions. CPU renderer/total and input p50/p95/write p50 targets use the **median of individual native/xterm pair ratios**, with target ≤ 1. Each pair requires matching browser-session UUID, pair ID, repetition, path and count. Missing, duplicate, failed or GPU-disqualified partners yield incomplete targets. Absolute values are context; ratios of independently aggregated medians are not the pass rule. Raw traces, glyph checks, window GPU samples and individual pair values remain in the run artifacts.
+Native/xterm cases run adjacent across four balanced repetitions (native/xterm, xterm/native, xterm/native, native/xterm). CPU renderer/total and input p50/p95/write p50 targets use the **median of individual native/xterm pair ratios**, with target ≤ 1. Each pair requires matching browser-session UUID, pair ID, repetition, path and count. Missing, duplicate, failed or GPU-disqualified partners yield incomplete targets. CPU time resolution is recorded from Linux `CLK_TCK` (10 ms on this host). A CPU pair and its row are **unresolved** if either side has fewer than 100 ticks or sides differ by at most one tick. Zero/zero never passes; unbounded ratios are JSON null with an explicit reason. Absolute values are context; ratios of independently aggregated medians are not the pass rule. Raw traces, glyph checks, window GPU samples and individual pair values remain in the run artifacts.
+
+Tracing instrumentation is loaded in **every hardware run**, including CPU and burst windows. Inactive pass-through wrappers and their call counts differ between native and xterm. These values are distinct from earlier non-instrumented runs; no wrapper-overhead correction is applied.
 
 ### Qualified Linux proof, 2026-10-02
 
-Both quiet windows completed all six cases, on Chromium headless-shell 153.0.8010.12, RTX 3060 Ti / NVIDIA 610.57.4 / Vulkan, with the same benchmark source hash. Each window owns a separate browser-session UUID; every pair is within one session. ASCII/bytes, counts 1 and 17, three repetitions, 240 input and 240 write samples per renderer/repetition. All adapters are non-fallback, all GPU windows qualified, and all page-error arrays are empty. Maximum observed utilization was 17% at count 1 and 66% at count 17. The four correctness screenshots were read back; ASCII, SGR, CJK and overwrite are visible throughout, with the existing native/xterm emoji shaping difference.
+The review-repair runs completed all eight cases per quiet window on Chromium headless-shell 153.0.8010.12, RTX 3060 Ti / NVIDIA 610.57.4 / Vulkan, with identical benchmark source and bundle hashes. Each count has a separate browser-session UUID; every pair stays within one session. ASCII/bytes, counts 1 and 17, four balanced repetitions, 96 input and 96 write samples per renderer/repetition. Count 1 uses 2700 paced output frames (approximately 45 seconds); count 17 uses 1800 (approximately 30 seconds). The reduced latency sample count keeps each complete quiet run below ten minutes: 585.124 seconds at count 1 and 468.535 at count 17. Output renderer samples contain 118–201 and 454–993 CPU ticks respectively; tick size is 10 ms. The earlier short-window CPU ratios are superseded.
 
-Compact evidence retains all latency arrays, CPU denominators/process splits, individual ratios, adapter/feature status, GPU-window ranges, hashes and representative input traces: [1 terminal](benchmarks/linux-nvidia/2026-10-02-comparison-1.json), [17 terminals](benchmarks/linux-nvidia/2026-10-02-comparison-17.json). Raw traces and per-sample GPU observations are retained in the execution evidence directory `/work/tmp/plan-283-linux/qualified-{1,17}/`.
+All adapters are non-fallback, all GPU windows and all four between-repetition GPU qualifications per count passed, no qualification was skipped, and all page-error arrays are empty. Maximum observed GPU utilization was 16% at count 1 and 67% at count 17. The four correctness screenshots were read back; ASCII, SGR, CJK and overwrite are visible throughout, with the existing native/xterm emoji shaping difference.
 
-| Median individual native/xterm ratio (target ≤ 1) | 1 terminal | 17 terminals |
-| ------------------------------------------------- | ---------: | -----------: |
-| Output renderer CPU                               |      0.985 |        0.728 |
-| Output total CPU                                  |      1.422 |        1.233 |
-| Input p50                                         |      2.971 |        0.961 |
-| Input p95                                         |      1.156 |        1.041 |
-| Write p50                                         |      0.986 |        1.136 |
-| Idle renderer CPU                                 |      1.000 |        1.000 |
-| Idle total CPU                                    |      1.000 |            ∞ |
+Compact evidence retains all latency arrays, CPU denominators/process splits and tick size, individual ratios and statuses, adapter/feature status, GPU-window ranges/settings, all qualification records, hashes and representative input traces: [1 terminal](benchmarks/linux-nvidia/2026-10-02-comparison-1.json), [17 terminals](benchmarks/linux-nvidia/2026-10-02-comparison-17.json). Raw traces and per-sample GPU observations remain in `/work/tmp/plan-283-linux/review-clean-{1,17}/`. Source SHA256 at bundle creation: `73d0eee02e631cf302f5f28e983bb7835908fe03509975b87c4ec5f3f69a7e23`. The builder hashes the `git ls-files --cached --others` listing in emitted order: staging the new compactor moves its entry and changes that aggregate hash without changing source bytes. Replaying the original order reproduces this hash; every shipped runtime script was also independently byte-hash compared with the committed source.
 
-Idle CPU has zero/quantized samples: zero/zero is 1 and positive/zero is infinity by convention. These short idle windows cannot establish a meaningful near-zero CPU advantage. Ratios above 1 remain failed targets; this instrument pass makes no product-speedup claim.
+| Median individual native/xterm ratio (target ≤ 1) |        1 terminal |      17 terminals |
+| ------------------------------------------------- | ----------------: | ----------------: |
+| Idle renderer CPU                                 | null — unresolved | null — unresolved |
+| Idle total CPU                                    | null — unresolved | null — unresolved |
+| Output renderer CPU                               |      1.552 — fail |      2.101 — fail |
+| Output total CPU                                  |      2.097 — fail |      2.294 — fail |
+| Input p50                                         |      1.044 — fail |      0.960 — pass |
+| Input p95                                         |      1.057 — fail |      0.965 — pass |
+| Write p50                                         |      1.075 — fail |      1.071 — fail |
+
+Idle CPU remains **unresolved** because the samples are below the minimum tick count. Zero/zero has a null ratio with a reason and never passes. Resolved ratios above 1 remain failed targets; this instrument pass makes no product-speedup claim. These longer-window measurements change the output CPU conclusions from the superseded low-resolution run. Every serialized aggregate ratio and status was independently recomputed from the compact evidence.
 
 Count 1 absolute latency, milliseconds:
 
 | Pair | Renderer | Input p50 | Input p95 | Write p50 |
 | ---- | -------- | --------: | --------: | --------: |
-| 1    | native   |    20.020 |    25.190 |    14.277 |
-| 1    | xterm    |     4.813 |    21.783 |    14.383 |
-| 2    | native   |    14.464 |    28.678 |    13.606 |
-| 2    | xterm    |     4.869 |    23.192 |    14.044 |
-| 3    | native   |     6.046 |    28.546 |    12.736 |
-| 3    | xterm    |     4.790 |    25.486 |    12.915 |
+| 1    | native   |     5.407 |    25.416 |    13.878 |
+| 1    | xterm    |     4.740 |    20.494 |    15.370 |
+| 2    | native   |     5.009 |    22.225 |    15.308 |
+| 2    | xterm    |     4.816 |    21.612 |    13.922 |
+| 3    | native   |     5.056 |    23.000 |    13.131 |
+| 3    | xterm    |     4.851 |    21.181 |    12.500 |
+| 4    | native   |     5.284 |    27.758 |    16.133 |
+| 4    | xterm    |     5.050 |    27.201 |     7.569 |
 
 Count 1 output CPU, percent of one core:
 
-| Pair | Renderer | Renderer process | GPU process | Browser | Other |  Total |
-| ---- | -------- | ---------------: | ----------: | ------: | ----: | -----: |
-| 1    | native   |            5.652 |       7.537 |       0 |     0 | 13.189 |
-| 1    | xterm    |            6.609 |       2.832 |       0 |     0 |  9.441 |
-| 2    | native   |            8.516 |       6.624 |       0 |     0 | 15.139 |
-| 2    | xterm    |            5.650 |       1.883 |       0 |     0 |  7.533 |
-| 3    | native   |            5.562 |       6.489 |       0 |     0 | 12.052 |
-| 3    | xterm    |            5.649 |       2.824 |       0 |     0 |  8.473 |
+| Pair | Renderer | Renderer process | GPU process | Browser |  Other |  Total |
+| ---- | -------- | ---------------: | ----------: | ------: | -----: | -----: |
+| 1    | native   |            4.016 |       6.012 |   0.000 |  0.000 | 10.028 |
+| 1    | xterm    |            2.618 |       2.108 |   0.000 |  0.022 |  4.749 |
+| 2    | native   |            4.461 |       6.236 |   0.022 | -0.000 | 10.719 |
+| 2    | xterm    |            2.841 |       2.264 |   0.000 |  0.000 |  5.104 |
+| 3    | native   |            4.305 |       5.991 |   0.022 | -0.000 | 10.318 |
+| 3    | xterm    |            2.707 |       2.219 |   0.000 | -0.000 |  4.926 |
+| 4    | native   |            4.082 |       5.747 |   0.000 | -0.000 |  9.829 |
+| 4    | xterm    |            2.685 |       2.086 |   0.022 | -0.000 |  4.793 |
 
-The higher count 1 total is mostly GPU-process CPU, which is distinct from GPU hardware execution time. Native input p50 varies substantially across pairs. The pair 1 median-nearest input samples show native keydown → echo receipt +0.569 ms → parse end +0.590 → render start +15.721 → submission end +15.915 → presentation ack +20.017. xterm shows +0 → +0.407 → +0.475 → +1.028 → +1.075 → +4.813. Their submission-to-ack intervals are similar (4.10 versus 3.74 ms); this sample's gap lies in parse-to-render waiting. This locates the interval but does not establish why the renderer-frame phases differed or a general scheduling defect.
+GPU-process CPU is CPU consumption, distinct from GPU hardware execution time. The pair 1 median-nearest input samples show native keydown → echo receipt +0.443 ms → parse end +0.485 → render start +0.731 → submission end +0.885 → presentation ack +5.391. xterm shows +0 → +0.425 → +0.490 → +0.953 → +1.005 → +4.735. Submission-to-ack is 4.506 versus 3.730 ms. Both parse-to-render intervals are submillisecond; this sample does not support the earlier large parse-to-render-wait narrative. A representative sample locates intervals and establishes no general scheduling cause.
 
-The deliberately delayed write phase raises native write p50 from 14.277 to 27.913 ms (+13.636), and xterm from 14.383 to 31.868 ms (+17.485), with 24 delayed samples each. Both respond to an extra renderer rAF (period 16.665 ms); differing baseline/delayed phase distributions prevent an exact-period delta claim. Headless feedback remains on-demand and supplies no physical-display latency evidence.
+The deliberately delayed write phase raises native write p50 from 13.878 to 28.965 ms (+15.087), and xterm from 15.370 to 30.984 ms (+15.615), with 24 delayed samples each versus 96 ordinary samples. Both respond to an extra renderer rAF (period approximately 16.665 ms); differing baseline/delayed phase distributions prevent an exact-period delta claim. Headless feedback remains on-demand and supplies no physical-display latency evidence.
+
+Reproduce each count from the portable bundle through an exclusive quiet benchmark window, selecting `--counts 1 --output-frames 2700` or `--counts 17 --output-frames 1800`, plus `--paths bytes --fixtures ascii --repetitions 4 --latency-samples 96`. Count 1 also selects `--validate-presentation`. Generate compact evidence with committed code:
+
+`node ghostty-webgpu/scripts/comparison-compact.mjs <run-directory>/comparison.json <compact-output.json>`
+
+The compact generator retains preparation failures and missing metrics, so incomplete runs remain incomplete. Unbounded ratios serialize as null with a reason. No macOS rerun or product deployment accompanies these benchmark-only repairs.
 
 ## Conclusions and target reproducibility
 

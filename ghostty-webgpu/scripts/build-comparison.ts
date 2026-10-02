@@ -50,6 +50,7 @@ for (const [name, path] of Object.entries(assets)) {
 for (const name of [
   'comparison-runner.mjs',
   'comparison-report.mjs',
+  'comparison-compact.mjs',
   'comparison-pixels.mjs',
   'comparison-guards.mjs',
   'comparison-trace.mjs',

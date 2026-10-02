@@ -125,11 +125,22 @@ const pairedMetrics = [
       metric: `${state}/cpu/renderer`,
       unit: '% core',
       read: (run) => rendererCpu(run[state]?.cpu),
+      cpu: (run) => ({
+        sample: run[state]?.cpu,
+        seconds: run[state]?.cpu?.secondsByType?.renderer,
+      }),
     },
     {
       metric: `${state}/cpu/total`,
       unit: '% core',
       read: (run) => run[state]?.cpu?.percentOfOneCore,
+      cpu: (run) => ({
+        sample: run[state]?.cpu,
+        seconds: Object.values(run[state]?.cpu?.secondsByType ?? {}).reduce(
+          (sum, seconds) => sum + seconds,
+          0,
+        ),
+      }),
     },
   ]),
   ...[
@@ -156,7 +167,7 @@ function pairKey(run) {
   return JSON.stringify([run.sessionId, run.pairId, run.repetition, run.path, run.count])
 }
 
-function pairedValues(native, other, read) {
+function pairedValues(native, other, { read, cpu }, minimumCpuTicks) {
   if (
     native.error ||
     other.error ||
@@ -167,9 +178,26 @@ function pairedValues(native, other, read) {
   const nativeValue = read(native)
   const xtermValue = read(other)
   if (![nativeValue, xtermValue].every((value) => Number.isFinite(value) && value >= 0)) return null
-  let ratio = 1
-  if (xtermValue > 0) ratio = nativeValue / xtermValue
-  if (xtermValue === 0 && nativeValue > 0) ratio = Infinity
+  const ratio = xtermValue > 0 ? nativeValue / xtermValue : null
+  let ratioReason
+  if (ratio === null)
+    ratioReason = nativeValue === 0 ? 'both sides are zero' : 'xterm baseline is zero'
+  const gpuSkipped = [native.gpuIdle?.skipped, other.gpuIdle?.skipped].filter(Boolean)
+  let reason = ratioReason
+  let ticks
+  if (cpu) {
+    const samples = [cpu(native), cpu(other)]
+    ticks = samples.map(({ sample, seconds }) =>
+      sample?.tickSeconds > 0 ? Math.round(seconds / sample.tickSeconds) : null,
+    )
+    if (ticks.includes(null)) reason = 'CPU tick resolution is unrecorded'
+    else if (ticks.some((value) => value < minimumCpuTicks))
+      reason = `CPU sample has fewer than ${minimumCpuTicks} ticks per side`
+    else if (Math.abs(ticks[0] - ticks[1]) <= 1) reason = 'CPU sides differ by at most one tick'
+  }
+  let status = ratio <= 1 ? 'pass' : 'fail'
+  if (reason) status = 'unresolved'
+  if (!cpu && nativeValue > 0 && xtermValue === 0) status = 'fail'
   return {
     pairId: native.pairId,
     sessionId: native.sessionId,
@@ -177,24 +205,36 @@ function pairedValues(native, other, read) {
     native: nativeValue,
     xterm: xtermValue,
     ratio,
+    ratioReason,
+    ticks,
+    status,
+    reason,
+    gpuSkipped,
   }
 }
 
 function ratioMedian(pairs) {
   if (!pairs.length) return null
-  const sorted = pairs.map(({ ratio }) => ratio).sort((a, b) => a - b)
+  const sorted = pairs
+    .map(
+      ({ ratio, ratioReason }) =>
+        ratio ?? (ratioReason === 'xterm baseline is zero' ? Infinity : NaN),
+    )
+    .sort((a, b) => a - b)
+  if (sorted.some(Number.isNaN)) return null
   const middle = Math.floor(sorted.length / 2)
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
 }
 
-function pairedRow(groups, condition, variant, { metric, unit, read }, repetitions) {
+function pairedRow(groups, condition, variant, definition, repetitions, minimumCpuTicks) {
+  const { metric, unit } = definition
   const pairs = []
   for (const group of groups.values()) {
     const native = group.get('ghostty-webgpu')
     const other = group.get(variant)
     if (native?.length !== 1 || other?.length !== 1) continue
     if (native[0].path !== condition.path || native[0].count !== condition.count) continue
-    const pair = pairedValues(native[0], other[0], read)
+    const pair = pairedValues(native[0], other[0], definition, minimumCpuTicks)
     if (pair) pairs.push(pair)
   }
   pairs.sort((a, b) => a.repetition - b.repetition)
@@ -205,6 +245,11 @@ function pairedRow(groups, condition, variant, { metric, unit, read }, repetitio
   const median = ratioMedian(pairs)
   let status = 'incomplete'
   if (complete) status = median <= 1 ? 'pass' : 'fail'
+  if (complete && pairs.some((pair) => pair.status === 'unresolved')) status = 'unresolved'
+  let medianReason
+  if (median === Infinity) medianReason = 'unbounded: xterm baseline is zero'
+  if (median === null) medianReason = 'ratio unavailable'
+  const gpuSkipped = [...new Set(pairs.flatMap((pair) => pair.gpuSkipped))]
   return {
     ...condition,
     variant,
@@ -212,9 +257,11 @@ function pairedRow(groups, condition, variant, { metric, unit, read }, repetitio
     unit,
     target: 1,
     pairs,
-    median,
+    median: Number.isFinite(median) ? median : null,
+    medianReason,
     repetitions: pairs.length,
     status,
+    gpuSkipped,
   }
 }
 
@@ -263,14 +310,21 @@ export function pairedRatios(artifact) {
     for (const variant of variants)
       rows.push(
         ...pairedMetrics.map((metric) =>
-          pairedRow(groups, condition, variant, metric, artifact.repetitions),
+          pairedRow(
+            groups,
+            condition,
+            variant,
+            metric,
+            artifact.repetitions,
+            artifact.manifest.settings.minimumCpuTicks ?? 100,
+          ),
         ),
       )
   }
   return rows
 }
 
-const number = (value) => value.toFixed(2)
+const number = (value) => (value === null ? 'unbounded/unavailable' : value.toFixed(2))
 
 function pairedMarkdown(artifact) {
   if (!hasPairConfiguration(artifact))
@@ -285,26 +339,26 @@ function pairedMarkdown(artifact) {
     '## Paired pass rule',
     '',
     'Targets are native/xterm ratios ≤ 1 for renderer CPU, total Chromium CPU, input p50/p95, and write p50 in every path/count condition. Each pair shares its browser session ID, pair ID, repetition, path, and terminal count. The median of the individual pair ratios determines pass or fail; absolute measurements provide context.',
-    'Every configured repetition must have exactly one qualified native and xterm run. Missing IDs, duplicate runs, failures, missing metrics, and rejected GPU-idle runs leave the condition incomplete. A zero/zero pair is a tie (1); positive/zero is an infinite ratio.',
+    'Every configured repetition must have exactly one qualified native and xterm run. Missing IDs, duplicate runs, failures, missing metrics, and rejected GPU-idle runs leave the condition incomplete. CPU pairs are unresolved when either side has fewer than the configured minimum ticks or sides differ by at most one tick. Zero/zero never passes. Unbounded ratios are null with a reason. Skipped GPU qualification is explicitly labeled.',
     '',
     '| Terminals | Path | Against | Measure | Median ratio | Target | Pairs | Status |',
     '| ---: | --- | --- | --- | ---: | ---: | ---: | --- |',
   ]
   for (const row of rows)
     lines.push(
-      `| ${row.count} | ${row.path} | ${row.frameBuilder ? `${row.frameBuilder} / ` : ''}${row.variant} | ${row.metric} | ${row.median === null ? 'unmeasured' : number(row.median)} | ≤ 1 | ${row.repetitions}/${artifact.repetitions} | ${row.status} |`,
+      `| ${row.count} | ${row.path} | ${row.frameBuilder ? `${row.frameBuilder} / ` : ''}${row.variant} | ${row.metric} | ${row.median === null ? row.medianReason : number(row.median)} | ≤ 1 | ${row.repetitions}/${artifact.repetitions} | ${row.status}${row.gpuSkipped.length ? ` (GPU unqualified: ${row.gpuSkipped.join('; ')})` : ''} |`,
     )
   lines.push(
     '',
     '### Individual pairs',
     '',
-    '| Terminals | Path | Against | Measure | Pair ID | Repetition | Native | xterm | Ratio |',
-    '| ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |',
+    '| Terminals | Path | Against | Measure | Pair ID | Repetition | Native | xterm | Ratio | Resolution |',
+    '| ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |',
   )
   for (const row of rows) {
     for (const pair of row.pairs)
       lines.push(
-        `| ${row.count} | ${row.path} | ${row.frameBuilder ? `${row.frameBuilder} / ` : ''}${row.variant} | ${row.metric} | ${pair.pairId.replaceAll('|', '\\|').replaceAll('\n', ' ')} | ${pair.repetition + 1} | ${number(pair.native)} ${row.unit} | ${number(pair.xterm)} ${row.unit} | ${number(pair.ratio)} |`,
+        `| ${row.count} | ${row.path} | ${row.frameBuilder ? `${row.frameBuilder} / ` : ''}${row.variant} | ${row.metric} | ${pair.pairId.replaceAll('|', '\\|').replaceAll('\n', ' ')} | ${pair.repetition + 1} | ${number(pair.native)} ${row.unit} | ${number(pair.xterm)} ${row.unit} | ${number(pair.ratio)} | ${pair.status}${pair.reason ? `: ${pair.reason}` : ''}${pair.ticks ? ` (${pair.ticks.join('/')} ticks)` : ''} |`,
       )
   }
   return lines
@@ -321,6 +375,7 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     '# Terminal comparison benchmarks',
     '',
     'Generated from the checked-in JSON artifact. Lower is better except parse throughput.',
+    'Tracing instrumentation is loaded in every hardware run, including CPU and burst windows; inactive wrappers differ by renderer. These measurements are distinct from historical uninstrumented runs.',
     '',
     '## Run it',
     '',
@@ -330,7 +385,7 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     'On the target machine, enter that bundle and run `npm install --ignore-scripts`,',
     '`npx playwright install chromium`, then `node comparison-runner.mjs --smoke`.',
     'Run `node comparison-runner.mjs --output results` on AC power for measurements.',
-    'Linux hardware runs use Vulkan Chromium headless-shell; macOS hardware runs open headed Chromium windows. Set aside up to 30 minutes.',
+    'Linux hardware runs use Vulkan Chromium headless-shell; macOS hardware runs open headed Chromium windows. Select one count and path per quiet window; the configured matrix has a bounded budget of ten minutes per case.',
     'Regenerate the checked-in report with `node scripts/comparison-report.mjs docs/benchmarks/mac-m1/comparison.json docs/benchmarks.md docs/benchmarks/mac-m1/review.json`.',
     '',
     '## Environment',
