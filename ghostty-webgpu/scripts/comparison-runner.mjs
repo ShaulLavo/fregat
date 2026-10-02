@@ -762,7 +762,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       await writeFile(
         join(
           output,
-          `capture-failure-${testCase.variant}-${testCase.path}-${testCase.count}-${repetition}.png`,
+          `capture-failure-${testCase.variant}${testCase.frameBuilder ? `-${testCase.frameBuilder}` : ''}-${testCase.path}-${testCase.count}-${repetition}.png`,
         ),
         Buffer.from(error.captureData, 'base64'),
       )
@@ -781,7 +781,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       .screenshot({
         path: join(
           output,
-          `failure-${testCase.variant}-${testCase.path}-${testCase.count}-${repetition}.png`,
+          `failure-${testCase.variant}${testCase.frameBuilder ? `-${testCase.frameBuilder}` : ''}-${testCase.path}-${testCase.count}-${repetition}.png`,
         ),
       })
       .catch(() => {})

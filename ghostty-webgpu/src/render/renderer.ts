@@ -394,6 +394,9 @@ export class WebGpuTerminalRenderer {
     const next = normalizeRendererGrid(grid)
     if (this.gridEquals(next)) return
     this.releaseRemovedRows(next.rows)
+    for (const row of this.overlayRows) {
+      if (row >= next.rows) this.overlayRows.delete(row)
+    }
     this.grid = next
     this.resizeCanvas()
     this.instances = this.createInstances()
@@ -553,12 +556,9 @@ export class WebGpuTerminalRenderer {
     this.atlasTextures.sync(this.atlas.consumeUploads())
     const operations = this.textPass.uploadFrame(builder, updates)
     this.textPass.submit(this.context.getCurrentTexture().createView())
+    let rows: readonly RenderRow[] | undefined
     if (this.onFrame || this.onRowsPainted) {
-      const rows = options.full
-        ? this.renderState.readRows({ packed: true })
-        : this.rowsToRebuild(damage)
-      this.emitFrame(rows)
-      this.onRowsPainted?.(rows)
+      rows = options.full ? this.renderState.readRows({ packed: true }) : this.rowsToRebuild(damage)
     }
     if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
     this.recordFrame(updates, operations)
@@ -566,6 +566,10 @@ export class WebGpuTerminalRenderer {
     this.wasZigFrame = true
     this.needsFullRebuild = false
     this.overlayRows.clear()
+    if (rows) {
+      this.emitFrame(rows)
+      this.onRowsPainted?.(rows)
+    }
     return true
   }
 

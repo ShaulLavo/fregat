@@ -214,6 +214,7 @@ export class GhosttyRenderState {
       this.cells.handle,
       columns,
       rows,
+      () => this.ensureActive(),
     )
   }
 

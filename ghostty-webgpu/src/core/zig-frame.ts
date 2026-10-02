@@ -1,4 +1,4 @@
-import { assertGhosttyResult } from './error.js'
+import { assertGhosttyResult, createGhosttyError } from './error.js'
 import type { GhosttyRuntime } from './runtime.js'
 import type { RgbColor } from './types.js'
 import type { AtlasGlyph } from '../render/atlas/types.js'
@@ -35,6 +35,7 @@ export class ZigFrameBuilder {
   private readonly missing: number
   private readonly mask: number
   private readonly entry: number
+  private disposed = false
 
   constructor(
     private readonly runtime: GhosttyRuntime,
@@ -43,33 +44,40 @@ export class ZigFrameBuilder {
     private readonly cells: number,
     readonly columns: number,
     readonly rows: number,
+    private readonly ensureOwnerActive: () => void,
   ) {
-    this.frame = this.allocate(frameBytes)
-    this.cellPointer = this.allocate(columns * rows * 64)
-    this.glyphPointer = this.allocate(columns * rows * 96)
-    this.index = this.allocate(glyphIndexBytes)
-    this.ranges = this.allocate(rows * 16)
-    this.missing = this.allocate(512 * 4)
-    this.mask = this.allocate(rows)
-    this.entry = this.allocate(48)
-    const values = [
-      columns,
-      rows,
-      this.cellPointer,
-      this.glyphPointer,
-      this.index,
-      this.ranges,
-      rows,
-      0,
-      this.missing,
-      512,
-      0,
-      0,
-    ]
-    for (const [offset, value] of values.entries()) this.setUint(offset * 4, value)
+    try {
+      this.frame = this.allocate(frameBytes)
+      this.cellPointer = this.allocate(columns * rows * 64)
+      this.glyphPointer = this.allocate(columns * rows * 96)
+      this.index = this.allocate(glyphIndexBytes)
+      this.ranges = this.allocate(rows * 16)
+      this.missing = this.allocate(512 * 4)
+      this.mask = this.allocate(rows)
+      this.entry = this.allocate(48)
+      const values = [
+        columns,
+        rows,
+        this.cellPointer,
+        this.glyphPointer,
+        this.index,
+        this.ranges,
+        rows,
+        0,
+        this.missing,
+        512,
+        0,
+        0,
+      ]
+      for (const [offset, value] of values.entries()) this.setUint(offset * 4, value)
+    } catch (cause) {
+      this.dispose()
+      throw cause
+    }
   }
 
   get cellData(): Float32Array {
+    this.ensureActive()
     return new Float32Array(
       this.runtime.memory.bytes.buffer,
       this.cellPointer,
@@ -78,6 +86,7 @@ export class ZigFrameBuilder {
   }
 
   get glyphData(): Float32Array {
+    this.ensureActive()
     return new Float32Array(
       this.runtime.memory.bytes.buffer,
       this.glyphPointer,
@@ -86,14 +95,19 @@ export class ZigFrameBuilder {
   }
 
   get missingGlyphs(): readonly number[] {
+    this.ensureActive()
     const count = this.runtime.memory.view.getUint32(this.frame + 40, true)
     return Array.from(new Uint32Array(this.runtime.memory.bytes.buffer, this.missing, count))
   }
 
   build(options: ZigFrameOptions): number {
+    this.ensureActive()
     const { memory } = this.runtime
     memory.bytes.fill(0, this.mask, this.mask + this.rows)
-    for (const row of options.overlayRows) memory.bytes[this.mask + row] = 1
+    for (const row of options.overlayRows) {
+      if (!Number.isInteger(row) || row < 0 || row >= this.rows) continue
+      memory.bytes[this.mask + row] = 1
+    }
     const view = memory.view
     view.setFloat32(this.frame + 48, options.cellWidth, true)
     view.setFloat32(this.frame + 52, options.cellHeight, true)
@@ -127,6 +141,7 @@ export class ZigFrameBuilder {
   }
 
   changedRanges(): readonly RowInstanceUpdate[] {
+    this.ensureActive()
     const view = this.runtime.memory.view
     const count = view.getUint32(this.frame + 28, true)
     const result: RowInstanceUpdate[] = []
@@ -147,6 +162,7 @@ export class ZigFrameBuilder {
   }
 
   registerGlyph(key: number, glyph: AtlasGlyph | undefined): void {
+    this.ensureActive()
     const data = new Float32Array(this.runtime.memory.bytes.buffer, this.entry, 12)
     data.fill(0)
     if (glyph)
@@ -169,13 +185,22 @@ export class ZigFrameBuilder {
   }
 
   clearGlyphs(): void {
+    this.ensureActive()
     this.runtime.bridge.clearGlyphs(this.index)
   }
 
   dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
     for (const allocation of this.allocations)
       this.runtime.memory.free(allocation.pointer, allocation.length)
     this.allocations.length = 0
+  }
+
+  private ensureActive(): void {
+    this.ensureOwnerActive()
+    if (!this.disposed) return
+    throw createGhosttyError('frame_builder', 'The frame builder has been disposed')
   }
 
   private allocate(length: number): number {

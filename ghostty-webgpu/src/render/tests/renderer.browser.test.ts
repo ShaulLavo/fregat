@@ -913,3 +913,88 @@ it('keeps native frame callbacks current for DOM text and cursor consumers', asy
     runtime.dispose()
   }
 })
+
+it('drops queued Zig overlay rows when the grid shrinks before painting', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 8, rows: 128 })
+  const state = runtime.createRenderState(terminal)
+  const clock = new FakeClock()
+  terminal.write('first')
+  const renderer = await createRenderer({
+    canvas: createCanvas(),
+    columns: 8,
+    rows: 128,
+    font: fittedFont(),
+    renderState: state,
+    schedulerClock: clock,
+    zigFrame: true,
+  })
+  try {
+    clock.flushFrame()
+    renderer.refreshRows(127, 127)
+    terminal.resize({ columns: 8, rows: 2 })
+    const createBuilder = state.createFrameBuilder.bind(state)
+    vi.spyOn(state, 'createFrameBuilder').mockImplementation((columns, rows) => {
+      const builder = createBuilder(columns, rows)
+      const build = builder.build.bind(builder)
+      vi.spyOn(builder, 'build').mockImplementation((options) => {
+        expect([...options.overlayRows].every((row) => row >= 0 && row < rows)).toBe(true)
+        return build(options)
+      })
+      return builder
+    })
+    renderer.resize({ columns: 8, rows: 2 })
+    expect(renderer.metrics.zigFrames).toBe(2)
+  } finally {
+    renderer.dispose()
+    runtime.dispose()
+  }
+})
+
+it.each(['onFrame', 'onRowsPainted'] as const)(
+  'retains theme and row invalidation requested by a Zig %s callback',
+  async (callback) => {
+    const runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
+    const state = runtime.createRenderState(terminal)
+    const clock = new FakeClock()
+    terminal.write('first')
+    let invalidate: (() => void) | undefined
+    const onPaint = vi.fn(() => {
+      const action = invalidate
+      invalidate = undefined
+      action?.()
+    })
+    const renderer = await createRenderer({
+      canvas: new OffscreenCanvas(1, 1),
+      columns: 8,
+      rows: 2,
+      font: fittedFont(),
+      renderState: state,
+      schedulerClock: clock,
+      zigFrame: true,
+      [callback]: onPaint,
+    })
+    try {
+      clock.flushFrame()
+      const before = await renderer.capturePixels()
+      expect(before.some((value) => value !== 0)).toBe(true)
+      invalidate = () => renderer.setTheme({ foreground: { r: 80, g: 40, b: 20 } })
+      renderer.refreshRows(0, 1)
+      clock.flushFrame()
+      expect(state.dirty).toBe(RenderStateDirty.False)
+      clock.flushFrame()
+      expect(renderer.metrics.zigFrames).toBe(3)
+      expect(await renderer.capturePixels()).not.toEqual(before)
+      invalidate = () => renderer.refreshRows(1, 1)
+      renderer.refreshRows(0, 0)
+      clock.flushFrame()
+      clock.flushFrame()
+      expect(renderer.metrics.zigFrames).toBe(5)
+      expect(onPaint.mock.calls).toHaveLength(5)
+    } finally {
+      renderer.dispose()
+      runtime.dispose()
+    }
+  },
+)

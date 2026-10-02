@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createGhosttyError } from '../error.js'
 import { GhosttyRuntime } from '../runtime.js'
 import type { ZigFrameBuilder, ZigFrameOptions } from '../zig-frame.js'
 import type { AtlasGlyph } from '../../render/atlas/types.js'
@@ -13,6 +14,7 @@ afterEach(() => {
   builder = undefined
   runtime?.dispose()
   runtime = undefined
+  vi.restoreAllMocks()
 })
 
 const bitmap = {
@@ -211,4 +213,81 @@ describe('WASM frame differential parity', () => {
     state.update()
     expect(builder.build({ ...options, full: false })).toBe(1)
   })
+})
+
+describe('WASM frame ownership and row bounds', () => {
+  it.each([true, false])('ignores overlay rows outside the mask (full=%s)', async (full) => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
+    const state = runtime.createRenderState(terminal)
+    state.update()
+    const allocate = vi.spyOn(runtime.memory, 'allocate')
+    builder = state.createFrameBuilder(8, 2)
+    const mask = allocate.mock.results[6]!.value as number
+    const canary = runtime.memory.allocate(1024)
+    try {
+      runtime.memory.bytes.fill(173, canary, canary + 1024)
+      readyFrame({ ...options, full, overlayRows: new Set([0, canary - mask + 999]) })
+      expect(runtime.memory.bytes.slice(canary, canary + 1024)).toEqual(
+        new Uint8Array(1024).fill(173),
+      )
+      expect(runtime.memory.bytes[mask]).toBe(1)
+    } finally {
+      runtime.memory.free(canary, 1024)
+    }
+  })
+
+  it.each(['builder', 'state', 'runtime'] as const)(
+    'rejects every operation after %s disposal',
+    async (owner) => {
+      runtime = await GhosttyRuntime.create()
+      const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
+      const state = runtime.createRenderState(terminal)
+      state.update()
+      builder = state.createFrameBuilder(8, 2)
+      if (owner === 'builder') builder.dispose()
+      if (owner === 'state') state.dispose()
+      if (owner === 'runtime') runtime.dispose()
+      const operations = [
+        () => builder!.cellData,
+        () => builder!.glyphData,
+        () => builder!.missingGlyphs,
+        () => builder!.changedRanges(),
+        () => builder!.build(options),
+        () => builder!.registerGlyph(65, glyph),
+        () => builder!.clearGlyphs(),
+      ]
+      for (const operation of operations) expect(operation).toThrow(/disposed/)
+      builder.dispose()
+      const free = vi.spyOn(runtime.memory, 'free')
+      builder.dispose()
+      expect(free).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each([2, 3, 4, 5, 6, 7, 8])(
+    'frees partial allocations when allocation %s fails',
+    async (failure) => {
+      runtime = await GhosttyRuntime.create()
+      const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
+      const state = runtime.createRenderState(terminal)
+      const memory = runtime.memory
+      const allocations: { pointer: number; length: number }[] = []
+      const allocate = memory.allocate.bind(memory)
+      const injected = createGhosttyError('ghostty_wasm_alloc', 'Injected allocation failure')
+      const spy = vi.spyOn(memory, 'allocate').mockImplementation((length) => {
+        if (allocations.length === failure - 1) throw injected
+        const pointer = allocate(length)
+        allocations.push({ pointer, length })
+        return pointer
+      })
+      const free = vi.spyOn(memory, 'free')
+      expect(() => state.createFrameBuilder(8, 2)).toThrow(injected)
+      expect(free.mock.calls).toEqual(allocations.map(({ pointer, length }) => [pointer, length]))
+      spy.mockRestore()
+      builder = state.createFrameBuilder(8, 2)
+      state.update()
+      readyFrame()
+    },
+  )
 })

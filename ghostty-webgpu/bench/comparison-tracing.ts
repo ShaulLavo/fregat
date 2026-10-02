@@ -159,12 +159,32 @@ export class ComparisonTracing {
       ),
     })
     this.wrap(renderer, 'notifyWrite', terminal, 'js')
-    this.wrap(renderer, 'drawFrame', terminal, 'js', () => this.count(terminal, 'frames'))
+    let submittedFrames = 0
+    let zigFrames = 0
+    let fallbackFrames = 0
+    this.wrap(
+      renderer,
+      'drawFrame',
+      terminal,
+      'js',
+      () => {
+        const submitted = renderer.metrics.submittedFrames - submittedFrames
+        const zig = renderer.metrics.zigFrames - zigFrames
+        const fallback = renderer.metrics.jsFallbackFrames - fallbackFrames
+        if (submitted > 0) this.count(terminal, 'frames', submitted)
+        if (zig > 0) this.count(terminal, 'zigFrames', zig)
+        if (fallback > 0) this.count(terminal, 'zigFallbackFrames', fallback)
+      },
+      false,
+      () => {
+        submittedFrames = renderer.metrics.submittedFrames
+        zigFrames = renderer.metrics.zigFrames
+        fallbackFrames = renderer.metrics.jsFallbackFrames
+      },
+    )
     this.wrap(renderer, 'rowsToRebuild', terminal, 'damage')
     this.wrap(renderer, 'rebuildRows', terminal, 'instances')
-    this.wrap(renderer, 'drawZigFrame', terminal, 'js', (supported) => {
-      this.count(terminal, supported ? 'zigFrames' : 'zigFallbackFrames')
-    })
+    this.wrap(renderer, 'drawZigFrame', terminal, 'js')
     this.wrap(pass, 'upload', terminal, 'upload', (result, args) => {
       this.count(terminal, 'buffersWritten', result as number)
       const rows = args[1] as { cell: { byteLength: number }; glyph: { byteLength: number } }[]
