@@ -4,7 +4,7 @@ import { observabilityEnvFromFile } from '../packages/observability/src/env-file
 import { readHomeSetting } from './home-setting'
 import { requireFreeDevPorts } from './port-holders'
 import { devPorts } from './runtime-network'
-import { devStateHome } from './state-home'
+import { defaultDevStateHome } from './state-home'
 import { scriptErrors, scriptFailureText } from './structured-errors'
 
 const IDLE_SETTING = 'developer.devServerIdleMinutes'
@@ -31,7 +31,7 @@ async function serve() {
     const all = [ports.web, ports.api, ports.webUpstream, ports.apiUpstream]
     await requireFreeDevPorts('127.0.0.1', all, route)
   }
-  const idle = readHomeSetting(env.PLATFORM_HOME ?? devStateHome, IDLE_SETTING)
+  const idle = readHomeSetting(env.PLATFORM_HOME ?? defaultDevStateHome(), IDLE_SETTING)
   await mesh([
     'serve',
     hostname(),

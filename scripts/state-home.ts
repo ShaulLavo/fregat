@@ -1,4 +1,5 @@
 import {
+  accessSync,
   constants,
   copyFileSync,
   cpSync,
@@ -7,6 +8,7 @@ import {
   mkdirSync,
   readdirSync,
   realpathSync,
+  statSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
@@ -15,7 +17,24 @@ import path from 'node:path'
 export const productionStateHome = path.join(homedir(), '.platform')
 
 /** The dev server's state home, kept apart from production (`PLATFORM_HOME`). */
-export const devStateHome = '/work/platform-dev/home'
+export function defaultDevStateHome(
+  home = homedir(),
+  isWritable = writableDirectory,
+  workRoot = '/work',
+) {
+  if (isWritable(workRoot)) return path.join(workRoot, 'platform-dev', 'home')
+  return path.join(home, '.platform-dev')
+}
+
+function writableDirectory(root: string) {
+  try {
+    if (!statSync(root).isDirectory()) return false
+    accessSync(root, constants.W_OK | constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
 
 /**
  * Seeds a dev home once, from production: settings, secrets, palettes and theme

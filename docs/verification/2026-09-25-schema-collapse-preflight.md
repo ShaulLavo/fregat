@@ -29,7 +29,7 @@ No rows were read.
 | Owner       | Database path                                | Evidence                                                                                               |
 | ----------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Production  | `/home/shaul/.platform/fs-metadata.sqlite`   | `platform-prod.service` has this file and its WAL open; `PLATFORM_HOME` and `FS_METADATA_DB` are unset |
-| Development | `/work/platform-dev/home/fs-metadata.sqlite` | File exists; `scripts/state-home.ts` supplies this default                                             |
+| Development | `/work/platform-dev/home/fs-metadata.sqlite` | File exists on this host; the dev default uses writable `/work`, else `~/.platform-dev`                |
 
 Each database may also have the exact adjacent paths ending in `-wal` and `-shm`.
 `/work/platform-production/home/fs-metadata.sqlite` does not exist and is not the production

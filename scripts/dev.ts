@@ -3,7 +3,7 @@ import path from 'node:path'
 import { observabilityEnvFromFile } from '../packages/observability/src/env-file'
 import { requireFreeDevPorts } from './port-holders'
 import { allowedOriginsForWebPort, devPorts, runtimeUrl } from './runtime-network'
-import { devStateHome, seedDevStateHome } from './state-home'
+import { defaultDevStateHome, seedDevStateHome } from './state-home'
 import { scriptFailureText } from './structured-errors'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -78,7 +78,7 @@ function configureRuntime(runtime: Runtime) {
 
 /** Dev never opens production's `~/.platform`; see `scripts/state-home.ts`. */
 function configureStateHome(dryRun: boolean) {
-  env.PLATFORM_HOME ??= devStateHome
+  env.PLATFORM_HOME ??= defaultDevStateHome()
   if (!dryRun && seedDevStateHome(env.PLATFORM_HOME))
     console.log(`[dev] Seeded ${env.PLATFORM_HOME}`)
   console.log(`[dev] State: ${env.PLATFORM_HOME}`)

@@ -25,7 +25,7 @@ import { isolateProductTerminals } from './product-terminal'
 import { captureBrowserRenderer } from './browser-renderer'
 import { startIsolatedServer, type IsolatedServer } from './isolated-server'
 import { providerAccessRefusal } from './provider-access'
-import { devStateHome } from '../state-home'
+import { defaultDevStateHome } from '../state-home'
 import { checkoutRoot, evidenceRoot } from './paths'
 import { ENGINES, launchBrowser, type Engine } from './browser-launch'
 
@@ -221,7 +221,7 @@ function runVerb(
   options: Options,
   sharedDev: boolean,
 ) {
-  if (sharedDev) process.env.PLATFORM_HOME ??= devStateHome
+  if (sharedDev) process.env.PLATFORM_HOME ??= defaultDevStateHome()
   if (verb === 'look') return look(options)
   if (verb === 'scenario' && scenario) return runScenario(scenario, options)
   if (verb === 'trace' && scenario) return traceScenario(scenario, options)

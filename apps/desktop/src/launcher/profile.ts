@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { devStateHome } from '../../../../scripts/state-home'
+import { defaultDevStateHome } from '../../../../scripts/state-home'
 import type { BrowserCandidate } from './browser'
 
 export function desktopStateHome(
@@ -9,7 +9,8 @@ export function desktopStateHome(
   mode: 'dev' | 'production',
 ) {
   return path.resolve(
-    env.PLATFORM_HOME || (mode === 'dev' ? devStateHome : path.join(home, '.platform')),
+    env.PLATFORM_HOME ||
+      (mode === 'dev' ? defaultDevStateHome(home) : path.join(home, '.platform')),
   )
 }
 
