@@ -150,39 +150,42 @@ test.each(['pwa-invalid-params', 'pwa-install-failed', 'pwa-verify-failed'])(
   },
 )
 
-test.each(['pwa-unsupported', 'pwa-install-unsupported', 'pwa-unavailable', 'pwa-install-failed'])(
-  '%s selects the native host only for unavailable installation capability',
-  async (mode) => {
-    const f = await fixture(mode)
-    const opened: string[] = []
-    try {
-      const launch = launchInstalledWindow({
-        browser: {
-          candidate: f.candidate,
-          stateHome: f.root,
-          home: f.root,
-          url: 'http://localhost:123/',
-          startup: { idleMs: 500, limitMs: 2000 },
-          onOpen: () => {},
-        },
-        native: async () => {
-          opened.push('native')
-          return { kind: 'native' }
-        },
-        onUnsupported: () => opened.push('unsupported'),
-      })
-      if (mode === 'pwa-install-failed') {
-        await expect(launch).rejects.toMatchObject({ code: 'desktop.launcher.CDP_FAILED' })
-        expect(opened).toEqual([])
-        return
-      }
-      await expect(launch).resolves.toEqual({ kind: 'native' })
-      expect(opened).toEqual(['unsupported', 'native'])
-    } finally {
-      await cleanup(f.root, f.pidFile)
+test.each([
+  'old-version',
+  'pwa-unsupported',
+  'pwa-install-unsupported',
+  'pwa-unavailable',
+  'pwa-install-failed',
+])('%s selects the native host only for unavailable installation capability', async (mode) => {
+  const f = await fixture(mode)
+  const opened: string[] = []
+  try {
+    const launch = launchInstalledWindow({
+      browser: {
+        candidate: f.candidate,
+        stateHome: f.root,
+        home: f.root,
+        url: 'http://localhost:123/',
+        startup: { idleMs: 500, limitMs: 2000 },
+        onOpen: () => {},
+      },
+      native: async () => {
+        opened.push('native')
+        return { kind: 'native' }
+      },
+      onUnsupported: () => opened.push('unsupported'),
+    })
+    if (mode === 'pwa-install-failed') {
+      await expect(launch).rejects.toMatchObject({ code: 'desktop.launcher.CDP_FAILED' })
+      expect(opened).toEqual([])
+      return
     }
-  },
-)
+    await expect(launch).resolves.toEqual({ kind: 'native' })
+    expect(opened).toEqual(['unsupported', 'native'])
+  } finally {
+    await cleanup(f.root, f.pidFile)
+  }
+})
 
 test('manifest-relative identity ignores query and hash while keeping the application base', () => {
   expect(installedIdentity('http://localhost:123/platform/?workspace=two#chat')).toEqual(

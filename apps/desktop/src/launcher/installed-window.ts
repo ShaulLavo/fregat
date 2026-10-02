@@ -8,7 +8,12 @@ export async function launchInstalledWindow<T>(options: {
   try {
     return await launchChromium(options.browser)
   } catch (error) {
-    if ((error as { code?: string }).code !== 'desktop.launcher.PWA_UNSUPPORTED') throw error
+    const code = (error as { code?: string }).code
+    if (
+      code !== 'desktop.launcher.PWA_UNSUPPORTED' &&
+      code !== 'desktop.launcher.VERSION_UNSUPPORTED'
+    )
+      throw error
     options.onUnsupported(error)
     return options.native()
   }
