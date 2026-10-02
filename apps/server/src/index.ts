@@ -2,7 +2,7 @@ import { unique } from '@workspace/utils/collections'
 import { errorMessage } from '@workspace/contracts'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { closeApp, createApp, updateForApp } from './app'
+import { closeApp, createApp, systemForApp, updateForApp } from './app'
 import { DEFAULT_ALLOWED_ORIGINS } from './auth'
 import { getDefaultPlatformDatabase } from './db/client'
 import { platformHomePath } from './home'
@@ -30,7 +30,7 @@ import {
   type Relay,
 } from './system/activation'
 import { ensureIdentityKey } from './system/identity-key'
-import { serviceFromArgv } from './system/service-descriptor'
+import { serviceFromArgv, stateHomeConflictExitCode } from './system/service-descriptor'
 import { acquireStateHomeLock } from './system/state-home-lock'
 
 type StopReason = NodeJS.Signals | { reason: 'restart'; record: RestartRecord }
@@ -155,8 +155,7 @@ async function holdStateHome() {
   } catch (error) {
     recordProcessError('server.state_home_locked', { error: operatorErrorSummary(error), port })
     await flushObservability()
-    // EX_CONFIG: the unit's RestartPreventExitStatus, so it does not loop into the same refusal.
-    process.exit(78)
+    process.exit(stateHomeConflictExitCode(process.argv))
   }
 }
 
@@ -193,8 +192,10 @@ async function crash() {
 
 function shutdownServer() {
   if (serverShutdown) return serverShutdown
+  // Read before closeApp: the settings store closes with the app.
+  const graceMs = systemForApp(app).stopGraceMs()
   serverShutdown = closeApp(app).then(async () => {
-    await relay?.close()
+    await relay?.close(graceMs)
     await app.stop(true)
     stateHomeLock.release()
   })

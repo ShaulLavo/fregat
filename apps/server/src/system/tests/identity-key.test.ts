@@ -1,8 +1,8 @@
-import { mkdtemp, rm, stat, writeFile, chmod } from 'node:fs/promises'
+import { chmod, lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ensureIdentityKey, identityProof, readIdentityKey } from '../identity-key'
+import { ensureIdentityKey, identityProof, proofMatches, readIdentityKey } from '../identity-key'
 
 const homes: string[] = []
 afterEach(async () => {
@@ -37,5 +37,36 @@ describe('identity key', () => {
     expect(identityProof(key, 'nonce')).toBe(identityProof(key, 'nonce'))
     expect(identityProof(key, 'nonce')).not.toBe(identityProof(other, 'nonce'))
     expect(identityProof(key, 'nonce')).not.toBe(identityProof(key, 'other'))
+  })
+  it('replaces a key other users can read with a fresh owner-only one', async () => {
+    const home = await stateHome()
+    const file = path.join(home, 'identity.key')
+    await writeFile(file, Buffer.alloc(32, 1))
+    await chmod(file, 0o644)
+    const key = ensureIdentityKey(home)
+    expect(key).not.toEqual(Buffer.alloc(32, 1))
+    expect((await stat(file)).mode & 0o777).toBe(0o600)
+    expect(readIdentityKey(home)).toEqual(key)
+  })
+
+  it('replaces a linked key without writing through the link', async () => {
+    const home = await stateHome()
+    const target = path.join(await stateHome(), 'elsewhere')
+    await writeFile(target, 'untouched')
+    await symlink(target, path.join(home, 'identity.key'))
+    expect(readIdentityKey(home)).toBeNull()
+    const key = ensureIdentityKey(home)
+    expect((await lstat(path.join(home, 'identity.key'))).isFile()).toBe(true)
+    expect(await readFile(target, 'utf8')).toBe('untouched')
+    expect(readIdentityKey(home)).toEqual(key)
+  })
+
+  it('compares proofs in constant time and refuses malformed ones', async () => {
+    const key = ensureIdentityKey(await stateHome())
+    const proof = identityProof(key, 'nonce')
+    expect(proofMatches(key, 'nonce', proof)).toBe(true)
+    expect(proofMatches(key, 'nonce', proof.slice(1))).toBe(false)
+    expect(proofMatches(key, 'nonce', null)).toBe(false)
+    expect(proofMatches(key, 'other', proof)).toBe(false)
   })
 })

@@ -59,7 +59,8 @@ function launchdSocket(name: string) {
   return fd
 }
 
-export type Relay = { close: () => Promise<void> }
+/** `close` stops accepting, lets live connections finish for `graceMs`, then cuts them. */
+export type Relay = { close: (graceMs: number) => Promise<void> }
 
 /** Where the app listens behind the relay: an owner-only socket in an owner-only directory. */
 export type PrivateSocket = { directory: string; socketPath: string }
@@ -113,10 +114,12 @@ export async function startRelay(
     })
   }
   return {
-    close: async () => {
+    close: async (graceMs) => {
       // The service manager keeps the listening socket; this only stops accepting here.
-      await new Promise<void>((resolve) => relay.close(() => resolve()))
+      const closed = new Promise<void>((resolve) => relay.close(() => resolve()))
+      await Promise.race([closed, Bun.sleep(graceMs)])
       for (const connection of connections) connection.destroy()
+      await closed
       rmSync(upstream.directory, { recursive: true, force: true })
     },
   }

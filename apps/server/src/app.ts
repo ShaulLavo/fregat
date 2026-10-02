@@ -223,6 +223,14 @@ export function orchestrationForApp(app: object) {
   return engine
 }
 
+const appSystems = new WeakMap<object, SystemService>()
+
+export function systemForApp(app: object) {
+  const system = appSystems.get(app)
+  if (!system) throw createInternalError('App has no system service')
+  return system
+}
+
 const appUpdates = new WeakMap<object, ServerUpdate>()
 
 export function updateForApp(app: object) {
@@ -462,6 +470,7 @@ export function createApp(options: AppOptions) {
   })
   const identity = readEnvironmentIdentity(database)
   const serverConfig = orchestrationWsServerConfig(identity)
+  const stopGraceMs = () => settings.snapshot().values['window.nativeHostStopGraceSeconds'] * 1000
   const system = new SystemService({
     address: options.system?.address ?? options.webOrigin ?? DEFAULT_SYSTEM_ADDRESS,
     webBase: options.system?.webBase ?? '/',
@@ -476,14 +485,12 @@ export function createApp(options: AppOptions) {
           ? defaultNativePickerHelper()
           : options.system.nativePickerHelper,
       desktop: options.system?.desktop ?? hasDesktopSession,
-      budget: () => {
-        const values = settings.snapshot().values
-        return {
-          dialogMs: values['window.nativeDialogTimeoutSeconds'] * 1000,
-          stopGraceMs: values['window.nativeHostStopGraceSeconds'] * 1000,
-        }
-      },
+      budget: () => ({
+        dialogMs: settings.snapshot().values['window.nativeDialogTimeoutSeconds'] * 1000,
+        stopGraceMs: stopGraceMs(),
+      }),
     }),
+    stopGraceMs,
   })
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
@@ -732,6 +739,7 @@ export function createApp(options: AppOptions) {
   appOrchestration.set(configured, orchestration)
   appUpdates.set(configured, update)
   appMachines.set(configured, machines)
+  appSystems.set(configured, system)
   return configured
 }
 

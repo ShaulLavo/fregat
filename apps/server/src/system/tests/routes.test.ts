@@ -22,7 +22,6 @@ import { closeTestApps, createTestApp } from '../../../test/server'
 import { testSettingsOptions } from '../../settings/testing'
 import { ensureIdentityKey, IDENTITY_PROOF_HEADER, identityProof } from '../identity-key'
 
-const ADDRESS = 'http://127.0.0.1:3301'
 const MACHINE_ID = '0123456789abcdef0123456789abcdef'
 const roots: string[] = []
 const servers: Array<{ stop: (force?: boolean) => unknown }> = []
@@ -37,6 +36,14 @@ async function scratch() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-system-'))
   roots.push(root)
   return root
+}
+
+async function freePort() {
+  const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response() })
+  const port = server.port
+  await server.stop(true)
+  if (!port) throw new Error('no free port')
+  return port
 }
 
 async function helperScript(body: string) {
@@ -54,11 +61,14 @@ async function listening(options: { helper?: string | null; desktop?: boolean } 
   // Setup compares canonical paths, so the server resolves the link it was given.
   const linked = path.join(root, 'linked-state')
   await symlink(stateHome, linked)
+  // The address is the listener's own origin, as Host and Origin name it.
+  const port = await freePort()
+  const address = `http://127.0.0.1:${port}`
   const app = createTestApp({
-    auth: { allowedOrigins: [ADDRESS, 'http://localhost:5173'] },
+    auth: { allowedOrigins: [address, 'http://localhost:5173'] },
     settings: testSettingsOptions(root),
     system: {
-      address: ADDRESS,
+      address,
       webBase: '/',
       service: { kind: 'systemd-socket', registrationId: 'fregat-server.socket' },
       stateHome: linked,
@@ -67,16 +77,15 @@ async function listening(options: { helper?: string | null; desktop?: boolean } 
       desktop: () => options.desktop ?? true,
     },
   })
-  app.listen({ hostname: '127.0.0.1', port: 0 })
+  app.listen({ hostname: '127.0.0.1', port })
   const server = app.server
   if (!server?.port) throw new Error('test server did not listen')
   // The Bun listener only: closeTestApps runs the app's cleanup once, after this stops.
   servers.push(server)
-  const port = server.port
   return { base: `http://127.0.0.1:${port}`, stateHome: linked, canonical: stateHome }
 }
 
-function get(base: string, route: string, headers: Record<string, string> = { origin: ADDRESS }) {
+function get(base: string, route: string, headers: Record<string, string> = { origin: base }) {
   return fetch(`${base}${route}`, { headers })
 }
 
@@ -88,7 +97,7 @@ function pick(
 ) {
   return fetch(`${base}/fs/native-picker`, {
     method: 'POST',
-    headers: { origin: ADDRESS, 'content-type': 'application/json', ...headers },
+    headers: { origin: base, 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
     signal,
   })
@@ -108,7 +117,7 @@ describe('system identity', () => {
     expect(identity).toMatchObject({
       product: 'fregat',
       machineId: MACHINE_ID,
-      address: ADDRESS,
+      address: base,
       webBase: '/',
       stateHome: await realpath(canonical),
       service: { kind: 'systemd-socket', registrationId: 'fregat-server.socket' },
@@ -121,15 +130,12 @@ describe('system identity', () => {
   })
 
   it.each([
-    [
-      'mesh forwarding of this machine’s own browser',
-      { origin: ADDRESS, 'x-forwarded-for': '127.0.0.1' },
-    ],
-    ['a proxy hop', { origin: ADDRESS, via: '1.1 fregat' }],
+    ['mesh forwarding of this machine’s own browser', { 'x-forwarded-for': '127.0.0.1' }],
+    ['a proxy hop', { via: '1.1 fregat' }],
     ['another allowed origin', { origin: 'http://localhost:5173' }],
-  ])('refuses %s', async (_, headers) => {
+  ])('refuses %s', async (_, extra: Record<string, string>) => {
     const { base } = await listening()
-    const response = await get(base, '/system/identity', headers)
+    const response = await get(base, '/system/identity', { origin: base, ...extra })
     expect(response.status).toBe(403)
     expect(await code(response)).toBe('system.NOT_LOCAL')
   })
@@ -145,10 +151,24 @@ describe('system capabilities', () => {
     )
     expect(local).toMatchObject({ machineId: MACHINE_ID, nativePicker: true })
     const forwarded = await get(base, '/system/capabilities', {
-      origin: ADDRESS,
+      origin: base,
       'x-forwarded-for': '127.0.0.1',
     })
     expect(v.parse(serverCapabilitiesSchema, await forwarded.json()).nativePicker).toBe(false)
+  })
+
+  // What Chromium sends for the installed page's same-origin fetch: no Origin on a GET.
+  it('offers the chooser to a same-origin browser read without Origin', async () => {
+    const { file } = await helperScript(`echo '{"event":"picked","paths":[]}'`)
+    const { base } = await listening({ helper: file })
+    const browser = { 'sec-fetch-site': 'same-origin', referer: `${base}/` }
+    const local = await get(base, '/system/capabilities', browser)
+    expect(v.parse(serverCapabilitiesSchema, await local.json()).nativePicker).toBe(true)
+    const crossSite = await get(base, '/system/capabilities', {
+      'sec-fetch-site': 'cross-site',
+      referer: 'https://evil.example/',
+    })
+    expect(crossSite.status).not.toBe(200)
   })
 
   it('reports no chooser without a desktop session', async () => {

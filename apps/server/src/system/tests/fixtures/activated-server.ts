@@ -38,4 +38,7 @@ Bun.serve({
   },
 })
 restrictPrivateSocket(socket)
-await startRelay(activated, { hostname: '127.0.0.1', port }, socket)
+const relay = await startRelay(activated, { hostname: '127.0.0.1', port }, socket)
+process.once('SIGTERM', () => {
+  void relay.close(300).then(() => process.exit(0))
+})

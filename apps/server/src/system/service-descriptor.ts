@@ -20,3 +20,12 @@ export function serviceFromArgv(argv: readonly string[]): ServerService {
     })
   return parsed.output
 }
+
+/**
+ * Another server owns the state home. systemd's units list 78 in RestartPreventExitStatus; launchd
+ * relaunches every nonzero exit under KeepAlive.SuccessfulExit=false, so there it exits cleanly
+ * and the socket waits for the next connection.
+ */
+export function stateHomeConflictExitCode(argv: readonly string[]) {
+  return argv.some((arg) => arg.startsWith('--launchd-socket=')) ? 0 : 78
+}

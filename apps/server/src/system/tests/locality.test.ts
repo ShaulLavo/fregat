@@ -3,14 +3,21 @@ import { machineProxyHeaders } from '../../machines/proxy-http'
 import { isLocal, localityFacts } from '../locality'
 
 const INSTALL_ORIGIN = 'http://127.0.0.1:3301'
-const origins = [INSTALL_ORIGIN]
+const origins = INSTALL_ORIGIN
 
-function isLocalRequest(request: Request, peer: string | null, localOrigins: readonly string[]) {
-  return isLocal(localityFacts(request, peer, localOrigins))
+function isLocalRequest(
+  request: Request,
+  peer: string | null,
+  address: string,
+  method: 'read' | 'write' = 'write',
+) {
+  return isLocal(localityFacts(request, peer, address), method)
 }
 
 function request(headers: Record<string, string>) {
-  return new Request(`${INSTALL_ORIGIN}/system/capabilities`, { headers })
+  return new Request(`${INSTALL_ORIGIN}/system/capabilities`, {
+    headers: { host: '127.0.0.1:3301', ...headers },
+  })
 }
 
 describe('request locality', () => {
@@ -49,5 +56,24 @@ describe('request locality', () => {
     })
     expect(relayed.headers.get('origin')).toBe(INSTALL_ORIGIN)
     expect(isLocalRequest(relayed, '127.0.0.1', origins)).toBe(false)
+  })
+  // Browsers omit Origin on a same-origin GET; Sec-Fetch-Site still names the initiator.
+  it('counts a same-origin browser read without Origin as local', () => {
+    const read = request({ 'sec-fetch-site': 'same-origin' })
+    expect(isLocalRequest(read, '127.0.0.1', origins, 'read')).toBe(true)
+    expect(
+      isLocalRequest(request({ 'sec-fetch-site': 'none' }), '127.0.0.1', origins, 'read'),
+    ).toBe(true)
+    expect(isLocalRequest(read, '127.0.0.1', origins, 'write')).toBe(false)
+  })
+
+  it('counts a cross-site read or a foreign Host as remote', () => {
+    for (const site of ['cross-site', 'same-site'])
+      expect(
+        isLocalRequest(request({ 'sec-fetch-site': site }), '127.0.0.1', origins, 'read'),
+      ).toBe(false)
+    const rebound = request({ origin: INSTALL_ORIGIN, host: 'attacker.example:3301' })
+    expect(isLocalRequest(rebound, '127.0.0.1', origins, 'read')).toBe(false)
+    expect(isLocalRequest(rebound, '127.0.0.1', origins, 'write')).toBe(false)
   })
 })

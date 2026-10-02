@@ -27,6 +27,8 @@ export type SystemOptions = {
   machineId: () => MachineId
   peer: PeerAddress
   picker: NativePicker
+  /** How long owned processes and relayed connections get to finish before they are cut. */
+  stopGraceMs: () => number
 }
 
 export const socketPeer: PeerAddress = (request, server) =>
@@ -41,12 +43,16 @@ export class SystemService {
   }
 
   locality(request: Request, server: Server<unknown> | null) {
-    return localityFacts(request, this.options.peer(request, server), [this.options.address])
+    return localityFacts(request, this.options.peer(request, server), this.options.address)
   }
 
   requireLocal(request: Request, server: Server<unknown> | null) {
     const facts = this.locality(request, server)
-    if (!isLocal(facts)) throw systemErrors.NOT_LOCAL({ internal: facts })
+    if (!isLocal(facts, 'read')) throw systemErrors.NOT_LOCAL({ internal: facts })
+  }
+
+  stopGraceMs() {
+    return this.options.stopGraceMs()
   }
 
   identity(): ServerIdentity {
@@ -72,13 +78,14 @@ export class SystemService {
     return {
       machineId: this.options.machineId(),
       environmentId: this.options.environmentId,
-      nativePicker: isLocal(this.locality(request, server)) && this.options.picker.available(),
+      nativePicker:
+        isLocal(this.locality(request, server), 'read') && this.options.picker.available(),
     }
   }
 
   pickNative(request: Request, server: Server<unknown> | null, body: unknown) {
     const facts = this.locality(request, server)
-    if (!isLocal(facts)) throw systemErrors.NATIVE_PICKER_NOT_LOCAL({ internal: facts })
+    if (!isLocal(facts, 'write')) throw systemErrors.NATIVE_PICKER_NOT_LOCAL({ internal: facts })
     return this.options.picker.pick(body, request.signal)
   }
 }
