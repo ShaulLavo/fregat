@@ -13,16 +13,20 @@
 ## Outcome
 
 ghostty-webgpu's core is the terminal: native VT semantics, input, selection, damage tracking,
-scheduling and the WebGPU renderer. Everything a host can do without, ships as an extension that
-the host loads by hand: `terminal.loadExtension(new LineEditor())`. The first extension is a
+scheduling and the WebGPU renderer. Everything a host can do without ships as an extension: a
+plain value the host lists, `Terminal.create({ extensions: [fit(), links(), readline()] })`. The
+first extension is a
 readline-style line editor that turns the site's Shell tab into a shell that edits like bash. The
 features that are in core today but do not belong there move out one by one, and Platform loads
-the ones it uses explicitly. A third party can write an extension against the public API alone.
+the ones it uses explicitly. Native Ghostty features that matter on the web (search, shell
+navigation, progress, notifications) arrive as extensions on top of semantics libghostty-vt
+already has. A third party can write an extension against the public API alone.
 
 ## Research
 
 Clones in `references/` (gitignored): `xterm.js` (c58ea36), `local-echo` (8d0b7f5),
-`xterm-readline` (0268a50, the maintained repo is strtok/xterm-readline), `ghostty-web` (1858a59).
+`xterm-readline` (0268a50, the maintained repo is strtok/xterm-readline), `ghostty-web` (1858a59),
+`ghostty` (83edd49; our wasm pins c8554f2).
 
 ### xterm.js addons
 
@@ -61,6 +65,52 @@ Clones in `references/` (gitignored): `xterm.js` (c58ea36), `local-echo` (8d0b7f
   output coordination. Fix what both get wrong: grapheme clusters, cancellation, Ctrl+C, and
   output arriving while a line is being edited.
 
+### Extension models compared
+
+The owner asked for a model better and simpler than xterm's. Surveyed: CodeMirror 6, ProseMirror,
+Lexical, VS Code, Vite/Rollup, kitty kittens, WezTerm, xterm.js, and our own Singapore Editor.
+
+- **Singapore's model is the one to avoid.** It runs two lifecycle systems side by side
+  (`install/activate/update/deactivate/dispose` in `editor/packages/editor/src/plugins.ts` and
+  scoped setup in `createPlugin.ts`), asks authors to learn about ten concepts (dependencies,
+  providers, registrations, scopes, state, channels, derived values, watchers, phases, render
+  ownership), dedupes by object identity while documenting names, keys typed channels by strings
+  with no runtime check, and real plugins keep state per factory so one plugin cannot safely serve
+  two editors (`editor/packages/diff/src/editorDiffPlugin.ts`). Its one good idea is scoped
+  cleanup.
+- **xterm.js** is small but weak on ownership: mutable addon instances, a manager that overwrites
+  the addon's `dispose`, no rollback when `activate` throws, no guard against reusing an instance.
+- **CodeMirror 6** composes best: extensions are values and arrays, and each facet declares how
+  contributions combine. Its full machinery (facets, fields, effects, compartments, five
+  precedence buckets) is more than a terminal needs.
+- **Vite/Rollup**: a factory returns named hooks and keeps state in its closure. Easy to read.
+- **VS Code** and **Lexical**'s newer extension layer add manifests, activation events and
+  dependency graphs: built for app ecosystems, too heavy here.
+- **kitty kittens** and **WezTerm**: good for standalone commands and config, weak for resident
+  extensions (no deregistration, reload loses state).
+
+The chosen model takes CodeMirror's values and arrays, Rollup's named hooks with closure state,
+and scoped cleanup; it leaves out dependency injection, registries, string channels, reactive
+graphs, manifests and priority layers.
+
+### What native Ghostty brings
+
+From the macOS app, apprt and VT layer (`references/ghostty`):
+
+- libghostty-vt already parses and stores OSC 133 semantic prompts, OSC 7 cwd, title, OSC 9/777
+  notifications, OSC 9;4 progress, OSC 52 clipboard (reads too) and the kitty keyboard protocol.
+  Our bridge (`src/core/bridge.ts`, `src/core/types.ts:101–109`) exposes title, bell and clipboard
+  writes, but not prompt marks, cwd, notifications or progress.
+- Upstream since our pin adds semantic-prompt callbacks and a C search API with cell ranges; the
+  pin has the lower-level Zig search pieces only.
+- Kitty graphics is disabled for `wasm32-freestanding`, our target (`src/terminal/build_options.zig:155–165`);
+  Sixel is not implemented. Images are not available without upstream work.
+- App-level, not for a library: quick terminal, splits and tabs, the command palette UI, secure
+  keyboard entry, closed-surface undo, the `+` CLI actions.
+- Lessons: one parser owns the state and extensions read it, never reparse output; operations are
+  typed commands separate from the keys or menus that trigger them; config is data; search,
+  output selection and links need ranges that survive scrolling and reflow.
+
 ## What exists today
 
 Production lines: core ~4,700, term ~2,500, DOM ~6,200, render ~5,300, config resolver ~2,000.
@@ -73,7 +123,7 @@ error, frame, resize, scroll, selection, title.
 | Native selection, pointer and mouse arbitration, keyboard/IME/paste                         | `core/selection.ts`, `dom/pointer.ts`, `dom/selection.ts`, `dom/input.ts` | Core: one owner arbitrates gestures and keys                                           |
 | Scheduler, row renderer, atlas, WebGPU backend                                              | `src/render/`                                                             | Core                                                                                   |
 | Renderer fallback coordinator                                                               | `render/selector.ts`, `render/fallback.ts`                                | Core, loading backends lazily                                                          |
-| WebGL, Canvas2D, DOM backends                                                               | `render/webgl`, `render/canvas`, `render/dom`                             | Lazy backend modules (Phase 3)                                                         |
+| WebGL, Canvas2D, DOM backends                                                               | `render/webgl`, `render/canvas`, `render/dom`                             | Lazy backend modules (Phase 4)                                                         |
 | Links (URL, OSC 8, providers)                                                               | `dom/links.ts` (546), `term/links.ts` (469)                               | Extension                                                                              |
 | Automatic fit                                                                               | `dom/fit.ts` (563)                                                        | Split: measurement and atomic geometry commit stay; observers and auto-sizing move out |
 | Scrollbar                                                                                   | `dom/scrollbar.ts` (540)                                                  | Extension                                                                              |
@@ -97,33 +147,80 @@ without the Editor's composition machinery.
 
 ## Phase 0: the extension contract and core hooks
 
+An extension is a value with a name and a `setup` function. `setup` runs once per terminal it
+attaches to, keeps its state in its closure, and returns what it plugs into plus an optional API
+for the host.
+
 ```ts
-interface TerminalExtension {
-  activate(context: TerminalExtensionContext): void
-  dispose(): void
+interface Extension<Api = void> {
+  readonly name: string
+  setup(scope: ExtensionScope): Contributions<Api>
 }
-terminal.loadExtension(extension): TerminalExtensionHandle   // handle.dispose() unloads it
+
+interface Contributions<Api> {
+  readonly input?: (event: TerminalInputEvent) => 'claim' | 'pass'
+  readonly events?: Partial<TerminalEventHandlers> // resize, frame, title, bell, prompt, cwd, …
+  readonly osc?: Readonly<Record<number, OscHandler>>
+  readonly links?: LinkProvider
+  readonly commands?: Readonly<Record<string, TerminalCommand>>
+  readonly api?: Api
+}
+
+// A host lists extensions up front; arrays are presets and flatten in order.
+const terminal = await Terminal.create({ extensions: [browserPreset(), links(fileLinks)] })
+
+// Or attaches one later and gets back its typed API.
+const line = terminal.use(readline({ history }))
+const text = await line.api.read({ prompt: '$ ', signal })
+line.dispose()
 ```
 
-- The context hands out the public `Terminal` plus registration helpers whose disposables the
-  terminal owns, so an extension cannot leak a listener past its own disposal.
-- Load order is call order; disposal is reverse order and idempotent. If `activate` throws, every
-  registration it made so far is disposed and the error reaches the host's `error` event.
-- One instance attaches to one terminal. Extensions that depend on each other receive each
-  other's instances from the host; there is no registry or resolver.
-- Core hooks this phase adds, each with a test that an extension uses it without private access:
-  - **Input claim.** `context.claimInput(handler)` sees each user key, paste and IME commit
-    before it is encoded for the PTY and returns `claim` or `pass`; handlers run newest first.
-    `onData` today mixes user input with protocol replies (`term/session.ts:1562–1617`); split
-    them so replies never reach an input handler.
-  - **Live geometry.** Synchronous grid size, cursor position and cell metrics from the session,
-    not the last painted frame.
-  - **Cell width.** `terminal.measure(text)` returns the cell width libghostty-vt gives a string,
-    by grapheme cluster, honoring mode 2027, so no extension re-derives Unicode width.
-  - **Write.** `terminal.write` stays the only output path; extensions coordinate output through
-    their own API (Phase 1's `printAbove`), never by wrapping `write`.
-- Done when: a test extension claims input, reads geometry, measures `👩‍💻` and CJK text, and
-  disposes cleanly on terminal dispose and on its own; activation failure rolls back.
+A minimal extension:
+
+```ts
+const bellLog: Extension = {
+  name: 'bell-log',
+  setup: () => ({ events: { bell: () => console.log('bell') } }),
+}
+```
+
+Rules, all of them:
+
+1. One lifecycle: `setup` once per attachment, disposal once. Disposing the terminal disposes its
+   extensions in reverse order.
+2. Arrays are presets. Order is the order listed, then the order of later `use` calls. For input,
+   the first extension that claims an event wins.
+3. Core sets the combine rule per contribution: `input` is first-claim-wins, `events` broadcast,
+   `osc` is one handler per number (a second claim is rejected at attach time), `links` are ordered
+   providers with core resolving the hit, a renderer is single-owner.
+4. No dependency injection. An extension that needs another receives its API from the host.
+   `name` is for diagnostics only.
+5. The scope owns resources: contributions are removed automatically, and `scope.own(cleanup)`
+   covers observers, timers and native handles. If `setup` throws, everything it registered is
+   undone and the error reaches the host's `error` event.
+6. `terminal.use` returns `{ api, dispose }`. Disposing aborts the extension's pending work;
+   attaching again starts fresh state.
+7. One extension value may attach to many terminals, never twice to the same one.
+
+Handler lists are compiled when the set of extensions changes, so a keystroke with no `input`
+contribution costs nothing extra and `frame` handlers run only when something subscribed.
+Benchmarks before and after confirm the keystroke and frame paths did not slow down.
+
+Core hooks this phase adds, each with a test extension that uses it without private access:
+
+- **Input.** User keys, pastes and IME commits pass through `input` contributions before encoding.
+  `onData` today mixes user input with protocol replies (`term/session.ts:1562–1617`); split them
+  so replies never reach an input handler.
+- **Live geometry.** Synchronous grid size, cursor position and cell metrics from the session,
+  not the last painted frame.
+- **Cell width.** `terminal.measure(text)` returns libghostty-vt's cell width for a string, by
+  grapheme cluster and honoring mode 2027, so no extension re-derives Unicode width.
+- **Output.** `terminal.write` stays the only output path; extensions coordinate output through
+  their own API (the line editor's `printAbove`), never by wrapping `write`.
+
+Done when: test extensions claim input, read geometry, measure `👩‍💻` and CJK text, register an
+OSC handler and a duplicate (rejected), and dispose cleanly on terminal dispose and on their own;
+a throwing `setup` leaves nothing behind; keystroke and frame benchmarks show no regression.
 
 ## Phase 1: the line editor
 
@@ -132,10 +229,9 @@ A separate package beside the core (name decided with the owner; working name
 like the site's just-bash Shell.
 
 ```ts
-const editor = new LineEditor({ history, complete, isComplete })
-terminal.loadExtension(editor)
-const line = await editor.read({ prompt: 'ghost:~$ ', signal }) // resolves on Enter
-editor.printAbove('output that arrived while the user typed\n')
+const editor = terminal.use(readline({ history, complete, isComplete }))
+const line = await editor.api.read({ prompt: 'ghost:~$ ', signal }) // resolves on Enter
+editor.api.printAbove('output that arrived while the user typed\n')
 ```
 
 - Model, keymap and rendering are separate modules. The model is the line as grapheme clusters;
@@ -184,7 +280,30 @@ shows no regression on the hardware adapter for anything near the frame path.
 Ship a `defaultExtensions()` preset (fit, scrollbar, links, accessibility, clipboard) for hosts
 that want today's behavior in one call; Platform and the site load what they use explicitly.
 
-## Phase 3: lazy renderer backends
+## Phase 3: native Ghostty features as extensions
+
+Each needs a core hook that exposes semantics libghostty-vt already has; the extension adds the
+behavior on top. In order of value to web users:
+
+1. **Find.** Search the screen and scrollback, highlight matches, step through them. Needs
+   cell-range results and decorations in core: port the upstream search API forward from our pin
+   (or bump the pin) rather than searching text in TypeScript.
+2. **Shell navigation.** Jump to the previous or next prompt, select or copy a command's output,
+   mark failed commands, using OSC 133 marks. Needs prompt-mark events and the
+   select-output operation exposed by core.
+3. **Paste protection.** Confirm multi-line or unsafe pastes before they reach the shell.
+4. **Progress.** OSC 9;4 states as events a host can show as a bar or spinner.
+5. **Notifications and bell.** OSC 9/777 and BEL as browser notifications or a visual bell, with
+   the host deciding permission and rate.
+6. **Inspector.** A diagnostics panel for cells, modes and a bounded recording of input and output,
+   for playgrounds and bug reports.
+7. **Themes.** Load Ghostty theme files and follow the system light/dark setting.
+
+Core also gains typed terminal commands (scroll, select, copy, clear, jump to prompt) that hotkeys,
+menus and palettes call, separate from any key binding. Kitty graphics waits on upstream support
+for our wasm target; it is out of scope here.
+
+## Phase 4: lazy renderer backends
 
 WebGL, Canvas2D and DOM backends become modules the core fallback coordinator imports only when
 the chain reaches them. Core keeps the coordinator, abort handling, state replay and canvas
@@ -192,17 +311,18 @@ replacement; WebGPU stays in core. Done when a WebGPU visitor downloads none of 
 code (measured bundle size before and after in this plan) and the fallback, context-loss and
 no-Canvas tests still pass.
 
-## Phase 4: an ecosystem others can join
+## Phase 5: an ecosystem others can join
 
 - `docs/extensions.md`: the contract, the hooks, lifecycle rules, and a minimal example.
 - An extension template folder with its own tests.
 - The site lists the extensions with one line each.
-- Candidate next extensions, not scheduled: search (needs cell-range mapping and decorations in
-  core), serialize, image protocols, OSC 9 progress, attach (WebSocket PTY), a damage recorder.
+- Candidate next extensions, not scheduled: serialize, attach (WebSocket PTY), ligatures, a
+  resize overlay, a damage recorder, images once upstream supports our target.
 
 ## Order and gates
 
-0 → 1 → 2 (steps in order, each its own PR) → 3 → 4. Phase 1 can merge before Phase 2 starts.
+0 → 1 → 2 (steps in order, each its own PR) → 3 → 4 → 5. Phase 1 can merge before Phase 2
+starts; Phase 3 items can start once Phase 0 lands.
 Every PR gets an independent review before merge. The release carrying Phases 0–2 waits for the
 owner's minor or major version approval; until then extension packages are workspace-only and the
 site and Platform consume them from the monorepo.
@@ -215,8 +335,10 @@ site and Platform consume them from the monorepo.
 
 ## Done when
 
-- `loadExtension` and the Phase 0 hooks are public and documented.
+- `Terminal.create({ extensions })`, `terminal.use` and the Phase 0 hooks are public and
+  documented.
 - The site's Shell runs on the line editor extension and edits like bash on phone and desktop.
 - Links, fit, scrollbar, accessibility, clipboard, hotkeys, saved viewport and HTML export live
   outside core, Platform loads them explicitly, and core no longer contains them.
+- Find and shell navigation ship as extensions on core semantics.
 - Fallback renderers load only when needed.
