@@ -205,7 +205,7 @@ function validateWarmLifecycle(result) {
   )
   same(cleanup.scope, 'configuration', 'cleanup scope')
   text(cleanup.ownerIdentity, 'warm owner identity')
-  integer(cleanup.trackedObjects, 'tracked configuration objects', 9)
+  integer(cleanup.trackedObjects, 'tracked configuration objects', 15)
   validateCleanup({ cleanup, views: 'multiple' }, 'configuration', cleanup.trackedObjects)
   if (!Array.isArray(result.startup)) fail('Missing warm startup receipts')
   same(
@@ -239,7 +239,7 @@ function validateInputBootstrap(result) {
     hosts: 0,
     pendingFrames: 0,
     retainedObjects: 0,
-    trackedObjects: 2,
+    trackedObjects: 3,
     contextClosed: true,
   }))
     same(cleanup[key], expected, `bootstrap cleanup ${key}`)
@@ -285,7 +285,7 @@ function validateWarmReset(sample, result, fixture) {
 function validateCleanup(sample, key, trackedOverride = null) {
   record(sample.cleanup, `cleanup ${key}`)
   const cleanup = sample.cleanup
-  const trackedObjects = trackedOverride ?? (sample.views === 'multiple' ? 4 : 2)
+  const trackedObjects = trackedOverride ?? (sample.views === 'multiple' ? 5 : 3)
   if (
     cleanup.active !== false ||
     cleanup.hosts !== 0 ||

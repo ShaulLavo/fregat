@@ -540,3 +540,34 @@ diagnostic passes on both frozen products: three independent views share one Tre
 session; Shiki retains three sessions. Source/render receipts pass, replacement keeps one Tree
 session, final disposal leaves zero runtime sessions and live workers, and both contexts close.
 Evidence is under `/work/tmp/plan-282/run-20261001T153544Z-sol/shared-analysis/`.
+
+#### Strict shared-analysis accounting and quiet reliability gate
+
+The first new-identity collection fails before publishing controls: its bootstrap validator still
+expected two tracked objects (buffer and Editor), while disposal correctly tracks three including
+shared analysis. Both sides execute the same ownership path. Isolated multiple tracks five
+objects; a full six-subject warm lifetime tracks at least fifteen (six buffers, six analyses and
+three retained Editors). These exact counts are corrected, with regression tests that reject
+missing/extra bootstrap owners and a fourteen-object final receipt. Zero retained bootstrap
+objects, listener limits, worker cleanup and context closure remain strict. The failed attempt
+stays archived; it publishes no sensitivity cache and earns no final acceptance credit.
+
+The old stopped Platform comparison rejects ordinary/multiple typing applied (+1.900 ms vs
+1.700 ms, interval [1.300, 2.800]), typing dispatch (+1.950 vs 1.700, same interval), and undo
+dispatch (+1.300 vs 1.200, interval [0.100, 1.700]). There is no blocking composition rejection.
+Exact raw paired differences are in `../composition-floor/declared-native-platform-rejections.json`.
+After fresh controls pass, ten restricted quiet Platform A/A runs will check these three keys.
+The cohort is capped at about thirty minutes and reduced to five runs if its measured cost
+requires that cut. Any rejection goes to the coordinator before default acceptance or changes.
+
+Shared-analysis query serialization is a separate product finding. Frozen `AnalysisEntry.query`
+waits for `current()` and chains each query onto its `tail`; `StructuralEntry.range` deduplicates
+identical revision/range keys, while distinct keys use that queue. Stored shared-owner diagnostics
+show thirty fence/follow-up cycles per measured reset+typing sample, with Tree pending 1→1
+through most cycles and 1.50 seconds in follow-up yields. Earlier independent owners need two
+follow-up checks (~100 ms). New post-input settlement is 4.85–5.23 seconds. Exact new query
+identities and compute attribution were not captured; these receipts do not prove that three
+views each issue exactly one query. The harness's getter/poll/fence paths do not issue range
+queries: `getState` reads snapshot/selections/status, inspect and render checks read receipts,
+source validation replays captured messages, and idle fences send only fence requests. The
+queued range work comes from Editor runtime requests. Plan 282 does not alter that product.

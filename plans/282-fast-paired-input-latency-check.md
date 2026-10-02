@@ -441,3 +441,17 @@ costs 920–1,025 ms per observed edit/parse after a 24-character burst, versus 
 This does not independently measure a one-character keystroke. Frozen `editDocument` constructs
 updated parsed-document layers and runs injection query matches across the document; see
 `../composition-floor/platform-fence-details.json` and the evidence document's product finding.
+
+### Strict accounting and restricted quiet Platform reliability
+
+- [x] Diagnose the failed first control collection: bootstrap expected two objects after the
+      shared-analysis harness began tracking three. There is no valid sensitivity cache.
+- [x] Correct strict ownership counts: bootstrap/single three, isolated multiple five, full warm
+      minimum fifteen. Keep zero retained bootstrap objects and listener/worker/context checks.
+- [x] Audit readiness polling: getters/inspect/source replay/fences issue no range queries.
+      Shared frozen analysis serializes distinct runtime-generated range queries on its tail.
+- [ ] Collect fresh controls after the accounting correction. Then run ten restricted quiet
+      Platform A/A comparisons on ordinary/multiple typing applied/dispatch and undo dispatch.
+      Cap at thirty minutes; reduce to five only if measured cost requires it. Any reject is reported
+      before changes or default acceptance. Old Platform rejected these keys by 0.200, 0.250 and
+      0.100 ms over their frozen margins; exact intervals are in the evidence document.

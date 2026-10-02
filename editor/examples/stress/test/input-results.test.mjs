@@ -86,7 +86,7 @@ function scenarioSamples(fixture, views, scenario, duration) {
       hosts: 0,
       pendingFrames: 0,
       retainedObjects: 0,
-      trackedObjects: views === 'multiple' ? 4 : 2,
+      trackedObjects: views === 'multiple' ? 5 : 3,
       contextClosed: true,
       beforeListeners: 10,
       afterListeners: 5,
@@ -339,7 +339,7 @@ describe('input latency result contract', () => {
     [
       'wrong tracked count',
       (run) => {
-        run.samples[0].cleanup.trackedObjects = 3
+        run.samples[0].cleanup.trackedObjects = 4
       },
       /cleanup/,
     ],
@@ -666,7 +666,7 @@ describe('input latency result contract', () => {
     [
       'retained objects exceed tracked count',
       (run) => {
-        run.samples[0].cleanup.retainedObjects = 3
+        run.samples[0].cleanup.retainedObjects = 4
       },
       /cleanup/,
     ],
@@ -1352,7 +1352,7 @@ function warmResult() {
     ...run.samples[0].cleanup,
     scope: 'configuration',
     ownerIdentity: 'warm-owner',
-    trackedObjects: 9,
+    trackedObjects: 15,
   }
   run.startup = inputViewModes.flatMap((views) =>
     run.manifest.fixtures.map((fixture) => ({
@@ -1385,6 +1385,16 @@ function warmResult() {
 describe('warm configuration lifecycle', () => {
   it('requires complete startup, reset and final disposal receipts', () => {
     expect(validateInputResult(warmResult())).toBeTruthy()
+  })
+  it.each([2, 4])('rejects bootstrap ownership count %s', (trackedObjects) => {
+    const run = warmResult()
+    run.bootstrap.cleanup.trackedObjects = trackedObjects
+    expect(() => validateInputResult(run)).toThrow(/bootstrap cleanup trackedObjects/)
+  })
+  it('rejects a missing shared analysis in final ownership accounting', () => {
+    const run = warmResult()
+    run.cleanup.trackedObjects = 14
+    expect(() => validateInputResult(run)).toThrow(/tracked configuration objects/)
   })
   it('rejects a missing initialization receipt', () => {
     const run = warmResult()
