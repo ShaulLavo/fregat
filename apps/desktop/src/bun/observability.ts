@@ -1,3 +1,4 @@
+import path from 'node:path'
 import {
   flushObservability,
   initializeObservabilityRuntime,
@@ -6,11 +7,19 @@ import {
   recordObservabilityWarning,
 } from '@workspace/observability'
 
-export function initializeDesktopObservability() {
-  return initializeObservabilityRuntime({
-    env: Bun.env,
-    source: 'desktop',
-  })
+export function initializeDesktopObservability(installation?: {
+  stateHome: string
+  releaseRoot?: string
+}) {
+  // Before the release root is known, installed launcher logs live under the state home.
+  const env = installation
+    ? {
+        ...Bun.env,
+        NODE_ENV: 'production',
+        OBSERVABILITY_DIR: path.join(installation.releaseRoot ?? installation.stateHome, 'logs'),
+      }
+    : Bun.env
+  return initializeObservabilityRuntime({ env, source: 'desktop' })
 }
 
 export { flushObservability as flushDesktopObservability }
@@ -31,5 +40,6 @@ function desktopContext(context: Record<string, unknown>) {
   return {
     area: 'desktop',
     ...context,
+    source: 'desktop',
   }
 }
