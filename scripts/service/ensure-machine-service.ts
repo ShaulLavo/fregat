@@ -1,0 +1,223 @@
+import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
+import path from 'node:path'
+import {
+  machineServiceIntentSchema,
+  type MachineServiceIntent,
+  type MachineServiceResult,
+  type ServerIdentity,
+} from '../../packages/contracts/src/server-identity'
+import { descriptorFor } from '../../packages/contracts/src/settings/keys'
+import * as v from 'valibot'
+import { tryFileLock, type FileLock } from '../../apps/server/src/system/file-lock'
+import { realServiceHost, type ServiceHost } from './host'
+import { portHolder } from './holder'
+import { probeAddress, type ProbeOutcome } from './probe'
+import { serviceErrors } from './structured-errors'
+import {
+  LAUNCHD_LABEL,
+  registrationFiles,
+  renderLaunchAgent,
+  renderSystemdService,
+  renderSystemdSocket,
+  SERVICE_UNIT,
+  SOCKET_UNIT,
+  type UnitValues,
+} from './units'
+
+export type EnsureMachineServiceOptions = {
+  /** The resolved `server.releaseRoot` (see `machineReleaseRoot`); it must hold `current/`. */
+  productionRoot: string
+  /** Defaults to the `server.activationTimeoutSeconds` registry default. */
+  readinessMs?: number
+  signal?: AbortSignal
+  host?: ServiceHost
+  fetch?: typeof fetch
+}
+
+const PROMOTE_SOURCE = path.join(import.meta.dirname, '..', 'deploy', 'systemd', 'promote.ts')
+const RETRY_MS = 100
+
+/**
+ * One-time setup: reuse the server already serving this state home at the fixed address, or
+ * register the OS socket and service and wait until the activated server proves its identity.
+ * Anything else at the address is a structured conflict, and the listener is left untouched.
+ */
+export async function ensureMachineService(
+  intent: MachineServiceIntent,
+  options: EnsureMachineServiceOptions,
+): Promise<MachineServiceResult> {
+  const host = options.host ?? realServiceHost()
+  if (host.platform !== 'linux' && host.platform !== 'darwin')
+    throw serviceErrors.UNSUPPORTED_PLATFORM({ internal: { platform: host.platform } })
+  const parsed = v.parse(machineServiceIntentSchema, intent)
+  mkdirSync(parsed.stateHome, { recursive: true, mode: 0o700 })
+  const stateHome = realpathSync(parsed.stateHome)
+  const readinessMs =
+    options.readinessMs ?? descriptorFor('server.activationTimeoutSeconds').default * 1000
+  const deadline = Date.now() + readinessMs
+  const lock = await setupLock(stateHome, deadline, options.signal)
+  try {
+    const context = { ...parsed, stateHome, host, deadline, options }
+    const first = await probe(context)
+    if (first.kind !== 'free')
+      return { identity: await verified(context, first), disposition: 'reused' }
+    await register(context)
+    return { identity: await awaitReady(context), disposition: 'registered' }
+  } finally {
+    lock.release()
+  }
+}
+
+type Context = MachineServiceIntent & {
+  host: ServiceHost
+  deadline: number
+  options: EnsureMachineServiceOptions
+}
+
+function probe(context: Context) {
+  return probeAddress(
+    {
+      address: context.address,
+      stateHome: context.stateHome,
+      timeoutMs: Math.max(1, context.deadline - Date.now()),
+      signal: context.options.signal,
+    },
+    context.options.fetch,
+  )
+}
+
+async function verified(context: Context, outcome: ProbeOutcome): Promise<ServerIdentity> {
+  if (outcome.kind === 'free' || outcome.kind === 'unverified')
+    throw serviceErrors.IDENTITY_UNVERIFIED({
+      internal: { reason: outcome.kind === 'free' ? 'not-listening' : outcome.reason },
+    })
+  if (outcome.kind === 'other') {
+    const port = Number(new URL(context.address).port)
+    throw serviceErrors.ADDRESS_HELD_BY_OTHER_PROGRAM({
+      internal: { status: outcome.status, holder: await portHolder(context.host, port) },
+    })
+  }
+  const mismatch = identityMismatch(context, outcome.identity)
+  if (mismatch) throw serviceErrors.ADDRESS_HELD_BY_OTHER_FREGAT({ internal: { mismatch } })
+  if (!outcome.proven) throw serviceErrors.IDENTITY_UNVERIFIED({ internal: { reason: 'proof' } })
+  return outcome.identity
+}
+
+function identityMismatch(context: Context, identity: ServerIdentity) {
+  if (identity.stateHome !== context.stateHome) return 'state-home'
+  if (identity.address !== context.address) return 'address'
+  if (!context.expected) return null
+  if (identity.machineId !== context.expected.machineId) return 'machine'
+  if (context.expected.environmentId && identity.environmentId !== context.expected.environmentId)
+    return 'environment'
+  return null
+}
+
+/** The first request activates the service; a slow start is waited out, never retried blind. */
+async function awaitReady(context: Context): Promise<ServerIdentity> {
+  let outcome: ProbeOutcome = { kind: 'free' }
+  while (Date.now() < context.deadline) {
+    context.options.signal?.throwIfAborted()
+    outcome = await probe(context)
+    if (outcome.kind !== 'free' && outcome.kind !== 'unverified') break
+    await Bun.sleep(RETRY_MS)
+  }
+  return verified(context, outcome)
+}
+
+async function register(context: Context) {
+  const { host } = context
+  const root = context.options.productionRoot
+  if (!existsSync(path.join(root, 'current', 'server', 'index.js')))
+    throw serviceErrors.REGISTRATION_FAILED({
+      internal: { stage: 'release', hasRoot: existsSync(root) },
+    })
+  installPromote(host, root)
+  const values: UnitValues = {
+    bun: host.bun,
+    releaseRoot: root,
+    stateHome: context.stateHome,
+    port: Number(new URL(context.address).port),
+  }
+  const files = registrationFiles(host)
+  if (files.kind === 'launchd') {
+    writeOwned(host, files.plist, renderLaunchAgent(values))
+    await bootstrapLaunchAgent(host, files.plist)
+    return
+  }
+  writeOwned(host, files.socket, renderSystemdSocket(values))
+  writeOwned(host, files.service, renderSystemdService(values))
+  await required(host, ['systemctl', '--user', 'daemon-reload'], 'daemon-reload')
+  await required(host, ['systemctl', '--user', 'enable', '--now', SOCKET_UNIT], 'enable')
+}
+
+/** Writes a registration file this setup renders; another installation's file is not replaced. */
+function writeOwned(host: ServiceHost, file: string, content: string) {
+  const existing = host.readFile(file)
+  if (existing === content) return
+  if (existing !== null)
+    throw serviceErrors.REGISTRATION_FAILED({
+      internal: { stage: 'existing-registration', file: path.basename(file) },
+    })
+  host.writeFile(file, content)
+}
+
+function installPromote(host: ServiceHost, root: string) {
+  const target = path.join(root, 'bin', 'promote.ts')
+  const source = readFileSync(PROMOTE_SOURCE, 'utf8')
+  if (host.readFile(target) !== source) host.writeFile(target, source)
+}
+
+async function bootstrapLaunchAgent(host: ServiceHost, plist: string) {
+  const domain = `gui/${host.uid}`
+  const loaded = await host.run(['launchctl', 'print', `${domain}/${LAUNCHD_LABEL}`])
+  if (loaded.code === 0) return
+  await required(host, ['launchctl', 'bootstrap', domain, plist], 'bootstrap')
+}
+
+async function required(host: ServiceHost, argv: readonly string[], stage: string) {
+  const result = await host.run(argv)
+  if (result.code !== 0)
+    throw serviceErrors.REGISTRATION_FAILED({ internal: { stage, exitCode: result.code } })
+}
+
+async function setupLock(
+  stateHome: string,
+  deadline: number,
+  signal?: AbortSignal,
+): Promise<FileLock> {
+  const file = path.join(stateHome, 'service-setup.lock')
+  for (;;) {
+    signal?.throwIfAborted()
+    const lock = tryFileLock(file)
+    if (lock) return lock
+    if (Date.now() >= deadline)
+      throw serviceErrors.SETUP_BUSY({ internal: { waitedForDeadline: true } })
+    await Bun.sleep(RETRY_MS)
+  }
+}
+
+/**
+ * The explicit machine-server uninstall: unregisters the recorded socket and service or launchd
+ * agent and removes the files setup wrote. State, logs and releases stay.
+ */
+export async function removeMachineService(
+  options: { host?: ServiceHost; signal?: AbortSignal } = {},
+) {
+  const host = options.host ?? realServiceHost()
+  options.signal?.throwIfAborted()
+  const files = registrationFiles(host)
+  if (files.kind === 'launchd') {
+    if (host.readFile(files.plist) === null) return { removed: false }
+    await host.run(['launchctl', 'bootout', `gui/${host.uid}/${LAUNCHD_LABEL}`])
+    host.removeFile(files.plist)
+    return { removed: true }
+  }
+  if (host.readFile(files.socket) === null && host.readFile(files.service) === null)
+    return { removed: false }
+  await host.run(['systemctl', '--user', 'disable', '--now', SOCKET_UNIT, SERVICE_UNIT])
+  host.removeFile(files.socket)
+  host.removeFile(files.service)
+  await required(host, ['systemctl', '--user', 'daemon-reload'], 'daemon-reload')
+  return { removed: true }
+}

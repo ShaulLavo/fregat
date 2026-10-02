@@ -11,7 +11,7 @@ Type=simple
 WorkingDirectory={{PRODUCTION_ROOT}}
 # Consumes an explicit restart approval before promoting; crashes keep the served release.
 ExecStartPre=-{{BUN}} {{PRODUCTION_ROOT}}/bin/promote.ts {{PRODUCTION_ROOT}}
-ExecStart={{BUN}} {{PRODUCTION_ROOT}}/current/server/index.js
+ExecStart={{BUN}} {{PRODUCTION_ROOT}}/current/server/index.js --service=systemd-service:platform-prod.service
 Restart=on-failure
 # Restart (exit 75) comes back at once; a crash loop backs off to 10s.
 RestartSec=250ms
