@@ -139,3 +139,13 @@ test('multibyte UTF-8 split inside a character survives pipe chunk boundaries', 
   await expect(request).resolves.toEqual({ text: '雪' })
   f.client.close()
 })
+
+test('disconnect publishes the original failure even without a pending request', async () => {
+  const f = fixture()
+  const reason = { internal: { reason: 'startup-limit' } }
+  f.client.close(reason)
+  expect(await f.client.disconnected).toBe(reason)
+  f.client.close()
+  expect(await f.client.disconnected).toBe(reason)
+  expect(f.closes()).toBe(1)
+})

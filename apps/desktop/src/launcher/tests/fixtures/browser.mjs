@@ -50,6 +50,21 @@ for await (const chunk of Bun.file(3).stream()) {
           params: { sessionId: 'initial', targetInfo: { type: 'page' } },
         }) + '\0',
       )
+    if (mode.endsWith('-page') && message.method === 'Runtime.enable')
+      writeSync(
+        4,
+        JSON.stringify({
+          method: 'Runtime.executionContextCreated',
+          sessionId: message.sessionId,
+          params: {
+            context: {
+              id: 1,
+              origin: mode === 'uncommitted-page' ? '://' : 'http://localhost:123',
+              auxData: { isDefault: true },
+            },
+          },
+        }) + '\0',
+      )
     if (mode === 'slow-page' && message.method === 'Page.enable') busy(6000)
     if (mode === 'reject-page' && message.method === 'Page.enable') {
       writeSync(4, JSON.stringify({ id: message.id, error: { code: -1 } }) + '\0')
