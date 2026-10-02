@@ -13,7 +13,7 @@ mesh serve ls
 mesh serve stop /ai
 ```
 
-`http://127.0.0.1:8318` is the local Claude dispatcher. `http://127.0.0.1:8317` and `https://omarchy.mesh.shaulavo.dev/ai` expose CLIProxyAPI, authenticated by its generated client key. The dispatcher stays local. CLIProxyAPI management, discovery, and the management panel are disabled.
+`http://127.0.0.1:8318` is the local Claude dispatcher. `http://127.0.0.1:8317` and `https://omarchy.mesh.shaulavo.dev/ai` expose CLIProxyAPI, authenticated by its generated client key. The dispatcher stays local. CLIProxyAPI's management API and panel are enabled on loopback only (`allow-remote: false`); the key lives in `/work/cli-proxy-api/management-key`.
 
 ## Local gateway boundary
 
@@ -47,7 +47,17 @@ cli-proxy-login
 
 The command prints an OpenAI device sign-in URL and a short code. Open the URL from any browser, enter the code, and choose the other ChatGPT account. Device login works remotely without a localhost callback or SSH tunnel. These separately authorized credentials belong to CLIProxyAPI and it refreshes them itself. Each independent account joins the pool. Account logins are kept by the proxy. The helper uses `-no-browser`, so it prints remote sign-in instructions without launching a browser on the host.
 
-Round-robin routing distributes new conversations. Session affinity retains an account within a conversation; GPT subagents can receive separate account bindings. An unavailable account can fail over to another account. Account limits and model access remain the provider's limits.
+## Routing
+
+The proxy routes with `routing.strategy: fill-first`: a new conversation goes to the ready account with the highest `priority`. The runner sets those priorities so the account whose weekly window resets soonest is used first, and quota that would vanish at reset goes before quota with days left. Every minute `reset-order.ts` reads `GET /v0/management/auth-files`, takes each Codex account's `X-Codex-Primary-Reset-At` and `X-Codex-Primary-Used-Percent` quota signals, and patches `priority` through `PATCH /v0/management/auth-files/fields` when an account's value changes:
+
+- Accounts with quota left get `N` down to `1`, soonest reset highest, ties broken by auth index.
+- Accounts with no current observation keep the default `0`. An observation whose reset time has passed counts as none.
+- Spent accounts (100% used, reset still ahead) get `-1`, so a lapsed cooldown cannot put them ahead of usable quota.
+
+The proxy keeps quota observations in memory only, so the runner stores the last one per account (keyed by auth index) in `reset-order.json` and uses it until the restarted proxy observes that account again. The priorities themselves persist in the auth files. Exhausted and cooling-down accounts are skipped by the proxy's own cooldowns whatever their priority. The `resetOrder` block in `runtime.json` (`managementKeyFile`, `stateFile`) turns this on; without it routing stays on the configured priorities. A failure series logs one `warn`, an `info` with the count on recovery, and after ten failed minutes a `gave-up` warning that stops the loop until the next start.
+
+Session affinity retains an account within a conversation, and its bindings outrank priority; GPT subagents can receive separate account bindings (`session-affinity-subagents: true`). An unavailable account can fail over to another account. Account limits and model access remain the provider's limits.
 
 Anthropic documents custom model IDs but excludes non-Claude gateway models from official support. This integration is experimental. Custom `ANTHROPIC_BASE_URL` sessions also disable Claude Remote Control. GPT runs with Claude's agent harness; Codex-specific tooling and session recovery belong to Codex itself.
 
