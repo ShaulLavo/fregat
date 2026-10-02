@@ -8,9 +8,11 @@
 
 - **State**: RESEARCH DONE 2026-09-26 — reworked around the owner's order (installed Chromium in
   `--app` mode first, system webview second). Chromium path prototyped end to end on Linux; native
-  webview hosts prototyped in C (Linux) and Objective-C (macOS). No Rust. Wave 2 remains open.
+  webview hosts prototyped in C (Linux) and Objective-C (macOS). No Rust.
   Reconciled 2026-09-28: Gate 1 follows the remaining Plan 132 development-plumbing work and
   preserves mesh ownership. Host/browser measurements below remain historical research.
+  2026-10-02: Wave 2 engineering proofs delivered; Mac desktop real-keychain/visual acceptance
+  and Gate 4 are PARKED. Plan 114 remains partial and Electrobun remains the default.
 - **Priority**: P2 — the shell works today (plan 073), but every week on Electrobun is a week of
   someone else's toolchain
 - **Effort**: M — about 500 lines of TypeScript in the launcher and ~150 lines of C or Objective-C
@@ -269,23 +271,72 @@ On macOS, only incoming CDP bytes renew startup idle: no Linux `/proc` progress 
 Silent and CPU-busy fixtures stalled and were reaped; incoming-CDP progress reached the absolute
 startup cap and was reaped. Registered production idle/cap settings are unchanged.
 
-**Chromium runtime gap — next implementation unit, Approved.** Helium and Chrome discovery and
-CDP version/target inspection work, but their fixture page never fetched the endpoint. The target
-URL points at the fixture while the actual DOM remains `about:blank`, with an empty title and
-`readyState: complete`. The same result occurs with plain headless, production `--app`, and the
-root's exact shell baseline (Chrome, `--headless=new`, fresh profile,
-`--remote-debugging-port=0`, fixture URL; zero fixture requests). Chromium bridge, last-page
-shutdown and live singleton handoff remain unconfirmed. This is implementation work, separate
-from owner-only checks. Do not change production flags, timeouts or host settings to mask it.
+**Approved G3b outcome — 2026-10-02: Chromium engineering proof passed; owner acceptance PARKED.**
+The earlier root exact baseline and production `--app` launches stayed at `about:blank` while
+CDP target metadata showed the fixture URL. Ordered diagnosis established known-good CDP
+arithmetic and successful `data:` and `file:` DOM navigation. Same-session fixture `curl` passed
+for explicit `127.0.0.1`, `localhost` and `::1` bindings; fresh Chrome HTTP navigations stalled
+on every binding. This disproves the broader claim that non-GUI Chromium cannot load pages.
 
-Next unit begins with same-session fixture `curl`, then `data:`/`file:` navigation, then explicit
-`localhost`/`127.0.0.1`/`::1` bindings, then read-only non-GUI SSH launchd/Local Network privacy
-inspection. It preserves scratch isolation and service ownership and changes no security settings.
+Read-only own-process launchd observation placed the launch in the SSH resource coalition.
+Diagnostic `--no-proxy-server` and `--proxy-bypass-list=<-loopback>` both retained the stall.
+Scratch netlog showed DIRECT proxy resolution and successful fixture TCP connections, followed
+by `URL_REQUEST_START_JOB`, completed first-party-set metadata and `COMPUTED_PRIVACY_MODE`,
+with no HTTP send before cleanup cancellation. An owned Chrome stack sample showed
+`SecItemAdd` → `defaultKeychainUI` → `makeLoginAuthUI` → `AuthorizationCopyRights` blocked,
+with other keychain mutex waiters. No keychain item was inspected, unlocked or changed by the
+executor; no privacy/security setting, launchd service or owner profile was changed.
 
-Owner-only checks remain compositor/vibrancy pixels, Cmd-Q, drag and interactive picker selection.
-No rendering-rate or visual acceptance claim is made. Evidence is in
-`/work/tmp/fregat-evidence/114-g3-macos-20261002/`; the whole Chromium/native probe fails its
-Chromium DOM assertion, while the native, budget and cleanup records above pass individually.
+A same-scratch-profile bare headless control still stalled; adding only `--use-mock-keychain`
+loaded the real fixture DOM/title/body and generated HTTP requests. The first comparison attempt
+read a stale `DevToolsActivePort` and failed its debugger connection; that record is retained.
+The corrected harness removes its own stale port file before launching the next controlled process.
+This is causal behavioral evidence for the SSH keychain interaction, not a real-keychain acceptance
+claim or a reason to weaken production Chromium arguments.
+
+`apps/desktop/scripts/verify-chromium-macos.ts` requires Darwin, the approved scratch prefix and
+an isolated scratch `HOME`; its mock keychain requires explicit `--mock-keychain`. With that
+scratch-only switch, **Chrome and Helium both passed actual `--app` / production CDP-pipe**
+fixture DOM and bridge checks, a new bridged window, live same-profile singleton handoff to a
+third bridged page, and last-page shutdown. The fixture remained reachable after each owned
+browser exited. This is separate from the bare WebSocket diagnostic baseline. A regression locks
+production Mac arguments to their existing real-keychain/system-proxy list. Startup budgets,
+Linux attachment/GL behavior, shared mesh ownership and the Electrobun default are unchanged.
+Native/build/parent-cleanup proofs from the preceding unit were retained without repeating them.
+
+Evidence: `/work/tmp/fregat-evidence/114-g3b-macos-20261002/` contains ordered navigation,
+loopback, proxy, keychain comparison (including the failed stale-port attempt), netlog, verified
+owned-process stack samples and `app-pipe-runtime.jsonl`. The preceding native evidence remains
+at `/work/tmp/fregat-evidence/114-g3-macos-20261002/`. Owned windows and fixture endpoints
+were closed; scratch-linked process and PID absence are checked before removing the one remote
+scratch. No rendering-rate or visual acceptance claim is made, and no deployment is part of this unit.
+
+**Owner-only acceptance, Approved and parked.** The Wave 2 engineering track is closed with these
+acceptance gates parked; Plan 114 as a whole remains partial. Run the real-keychain Chromium path
+from **Terminal in the logged-in `shaul-mac` desktop**, using an existing canonical Fregat checkout
+with dependencies/compiler already available. The canonical Mac checkout path is unknown to this
+executor; the command asks for it and has no dependency on the removed verification scratch:
+
+```sh
+printf 'Canonical Fregat checkout on this Mac: '
+IFS= read -r FREGAT_CHECKOUT
+cd "$FREGAT_CHECKOUT" && PLATFORM_HOME="$HOME/Library/Application Support/Fregat/PolaronAcceptance" ~/.bun/bin/bun desktop:dev -- --shell=polaron
+```
+
+Prerequisites: the checkout's shared API/Vite URLs are configured and reachable; its `.env` leaves
+`PLATFORM_HOME` unset or points to that Mac-writable acceptance home (`.env` overrides shell
+values). Browser is `auto` or the installed Chrome/Helium executable, and Transparency is
+**Window manager** (`compositor`). This uses the real macOS keychain with unchanged production
+flags. Expected: Fregat content in an opaque Chromium app window with its **native browser
+titlebar**, the desktop bridge and working picker. Launch again to verify singleton handoff;
+close the last page, test Cmd-Q, drag the native titlebar and make an interactive picker selection.
+Quitting must leave the configured shared services and terminals alive. A failure before content
+loads remains a real-keychain acceptance failure; the SSH mock-keychain pass does not waive it.
+
+The separate fallback check uses **Transparent window** (`window`) and expects WKWebView's
+overlay traffic-light layout, vibrancy pixels, its drag region and interactive picker. Chromium's
+opaque/native-titlebar acceptance makes no vibrancy promise. Both paths still need the owner's
+visual/Cmd-Q/drag/picker observation before Gate 3 acceptance.
 
 1. Detection, macOS half: LaunchServices default, bundle table, `Info.plist` executable.
 2. Chromium lifecycle: on `Target.targetDestroyed` of the last page, `Browser.close` (measured on
@@ -308,8 +359,11 @@ Chromium DOM assertion, while the native, budget and cleanup records above pass 
 
 ### Gate 4 — Delete Electrobun (S–M)
 
-**Status: PARKED.** Chromium on macOS must pass Gate 3 before removal, and removal needs explicit
-root approval. The partial native delivery does not authorize changing the default shell.
+**Status: PARKED — root decision 2026-10-02.** The owner must observe Polaron Chromium from
+the Mac desktop with the real keychain, plus both paths' visual/Cmd-Q/drag/picker checks above.
+Electrobun remains the default and fallback until that acceptance; the scratch mock-keychain proof
+and closing the Wave 2 engineering track do not authorize deletion or a default-shell switch.
+Removal still needs explicit root approval.
 
 1. Remove `src/bun/index.ts`, `src/preload` (its Electroview transport), `src/shared/rpc.ts`,
    `electrobun.config.ts`, the package, the tsconfig paths, vitest scoping, the `.hutch` ignores

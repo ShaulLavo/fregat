@@ -8,8 +8,13 @@ import { cdpPipe } from '../src/launcher/cdp'
 import { launcherFailureFacts } from '../src/launcher/failure'
 import { startupProcessCounters } from '../src/launcher/diagnostics'
 import { launchWebview } from '../src/launcher/native-window'
-import { runMacCommand } from '../src/launcher/mac-browser'
+import { macProcessAlive as alive } from './mac-process'
 import { runNativeDialog } from '../src/launcher/webview-host'
+
+if (process.argv.includes('--chromium-only')) {
+  await import('./verify-chromium-macos')
+  process.exit(0)
+}
 
 // Run only in the approved scratch directory; all services and browsing state belong to this probe.
 assert.equal(process.platform, 'darwin')
@@ -38,8 +43,6 @@ const emit = (event: Record<string, unknown>) => {
   events.push(event)
   console.log(JSON.stringify(event))
 }
-const alive = (pid: number) =>
-  Boolean(runMacCommand(['/bin/ps', '-p', String(pid), '-o', 'pid='])?.trim())
 const until = async (check: () => Promise<boolean>, limitMs = 5000) => {
   const end = Date.now() + limitMs
   while (Date.now() < end) {
