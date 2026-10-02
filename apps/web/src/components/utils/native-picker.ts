@@ -1,6 +1,7 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 import { safeParse } from 'valibot'
 import {
+  errorSummary,
   nativePickerResultSchema,
   serverCapabilitiesSchema,
   type NativePickerRequest,
@@ -21,7 +22,13 @@ import {
 } from '@/lib/file-system-types'
 import { getPlatformBridge } from '@/lib/platform/bridge'
 import { filePickerKeys, fileSystemKeys } from '@/lib/query-keys'
-import { observeClientOperation } from '@/lib/client-logging'
+import { log, observeClientOperation } from '@/lib/client-logging'
+import {
+  clientErrorDescription,
+  toClientError,
+  type ClientError,
+} from '@/lib/client-error-taxonomy'
+import { toastError } from '@/lib/toast-error'
 import { createClientInvariantError, createRpcError } from '@/lib/structured-errors'
 
 // The contract-only dependency publishes schemas before the server adds these Eden routes.
@@ -30,7 +37,7 @@ type PickerClient = {
     capabilities: {
       get(options: {
         fetch: { signal: AbortSignal }
-      }): Promise<{ data: ServerCapabilities | null; error: unknown }>
+      }): Promise<{ data: ServerCapabilities | null; error: unknown; status: number }>
     }
   }
   fs: {
@@ -53,7 +60,12 @@ export function nativePickerCapabilitiesOptions(client: Client) {
     retry: false,
     staleTime: 0,
     queryFn: async ({ signal }) => {
-      const response = await pickerClient(client).system.capabilities.get({ fetch: { signal } })
+      const response = await pickerClient(client)
+        .system.capabilities.get({ fetch: { signal } })
+        .catch((error: unknown) => {
+          throw createRpcError(error)
+        })
+      if (response.status === 404 || response.status === 501) return null
       if (response.error) throw createRpcError(response.error)
       const parsed = safeParse(serverCapabilitiesSchema, response.data)
       if (!parsed.success)
@@ -61,6 +73,38 @@ export function nativePickerCapabilitiesOptions(client: Client) {
       return parsed.output
     },
   })
+}
+
+export function notifyPickerCapabilitiesResult(queryClient: QueryClient, error: unknown) {
+  const queryKey = entryPickerQueryKeys.capabilityNotice
+  if (!error) {
+    queryClient.removeQueries({ queryKey, exact: true })
+    return
+  }
+  const failure = toClientError(error)
+  const previous = queryClient.getQueryData<ClientError>(queryKey)
+  // Keep one notice for a failure series across opens and concurrent picker consumers.
+  if (
+    previous?.code === failure.code &&
+    previous?.message === failure.message &&
+    previous?.why === failure.why &&
+    previous?.fix === failure.fix
+  )
+    return
+  queryClient.setQueryData(queryKey, failure)
+  log.warn({
+    action: 'platform.picker_capabilities.summary',
+    area: 'platform',
+    outcome: 'fallback',
+    error: errorSummary(error, { guidance: true }),
+  })
+  toastError(
+    'Could not check file chooser availability',
+    {
+      description: clientErrorDescription(failure),
+    },
+    failure,
+  )
 }
 
 export function nativeSelectionOptions(queryClient: QueryClient) {
@@ -87,7 +131,7 @@ export function nativeSelectionOptions(queryClient: QueryClient) {
           signal.throwIfAborted()
           const capabilities = await queryClient.query(nativePickerCapabilitiesOptions(client))
           signal.throwIfAborted()
-          if (!capabilities.nativePicker)
+          if (!capabilities?.nativePicker)
             throw createClientInvariantError(
               'The server filesystem picker is available for this connection.',
             )

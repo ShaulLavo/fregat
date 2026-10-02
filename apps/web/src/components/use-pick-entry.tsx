@@ -6,6 +6,7 @@ import type { PickedFsEntry } from '@/lib/file-system-types'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import {
   nativePickerCapabilitiesOptions,
+  notifyPickerCapabilitiesResult,
   nativeSelectionOptions,
 } from '@/components/utils/native-picker'
 import { runMutation } from '@/lib/mutations/run'
@@ -33,7 +34,7 @@ export function usePickEntry({
   const client = clientForQueryClient(queryClient)
   const capabilities = useQuery({ ...nativePickerCapabilitiesOptions(client), enabled: open })
   const [fallback, setFallback] = useState(false)
-  const native = capabilities.data?.nativePicker === true && !fallback
+  const native = capabilities.isSuccess && capabilities.data?.nativePicker === true && !fallback
   const startingPath = value?.path
   const picked = useEffectEvent((entry: PickedFsEntry | null) => {
     if (entry) onPick(entry)
@@ -48,6 +49,11 @@ export function usePickEntry({
     )
     setFallback(true)
   })
+
+  useEffect(() => {
+    if (!open || capabilities.isPending) return
+    notifyPickerCapabilitiesResult(queryClient, capabilities.error)
+  }, [open, capabilities.isPending, capabilities.error, queryClient])
 
   useEffect(() => {
     if (!open) {
