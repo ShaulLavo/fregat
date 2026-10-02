@@ -159,8 +159,13 @@ export function sliceMemory(root: string, slice: string) {
  * What a running slice may still claim of `bound` (its estimate, or an orphan's ceiling): the
  * bound less what it uses. A slice with no cgroup yet is charged the whole bound.
  */
-export function chargeOf(root: string, slice: string, bound: number) {
-  const stat = sliceStat(root, slice)
+export function chargeOf(
+  root: string,
+  slice: string,
+  bound: number,
+  readStat: typeof sliceStat = sliceStat,
+) {
+  const stat = readStat(root, slice)
   if (stat === null) return bound
   // si_mem_available() counts the file LRU and reclaimable slab as available; the rest of
   // memory.current (anon, shmem, other kernel memory) is already missing from MemAvailable.
