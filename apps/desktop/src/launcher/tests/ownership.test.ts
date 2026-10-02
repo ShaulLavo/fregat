@@ -6,7 +6,7 @@ import path from 'node:path'
 import { startupBudget } from '../startup'
 import { launchChromium } from '../chromium'
 import { cdpPipe } from '../cdp'
-import { liveSingletonOwner } from '../singleton'
+import { singletonState } from '../singleton'
 import type { BrowserCandidate } from '../browser'
 
 async function fixture(mode: string) {
@@ -186,7 +186,7 @@ test.each(Array.from({ length: 30 }, (_, run) => run))(
   },
 )
 
-test('/bin/true with an existing valid profile owner is rejected and preserves that owner', async () => {
+test('a selected launcher wrapper can differ from a live profile owner', async () => {
   const f = await fixture('handoff')
   const profile = path.join(f.root, 'desktop/chromium')
   await mkdir(profile, { recursive: true })
@@ -204,7 +204,7 @@ test('/bin/true with an existing valid profile owner is rejected and preserves t
   )
   await symlink(`${hostname()}-${other.pid}`, path.join(profile, 'SingletonLock'))
   try {
-    expect(liveSingletonOwner(profile, process.execPath)).toBe(true)
+    expect(await singletonState(profile, 1000)).toBe('live')
     await expect(
       launchChromium({
         candidate: { ...f.candidate, executable: '/bin/true', args: [] },
@@ -214,7 +214,7 @@ test('/bin/true with an existing valid profile owner is rejected and preserves t
         startup: startupBudget(),
         onOpen: () => {},
       }),
-    ).rejects.toMatchObject({ code: 'desktop.launcher.PROFILE_BUSY' })
+    ).resolves.toEqual({ kind: 'handoff' })
     expect(processExists(other.pid)).toBe(true)
   } finally {
     other.kill('SIGTERM')

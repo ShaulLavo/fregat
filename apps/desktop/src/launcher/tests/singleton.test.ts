@@ -1,91 +1,77 @@
 import { expect, test } from 'vitest'
-import { hasSingletonOwner, browserExecutableMatches } from '../singleton'
+import { mkdtemp, mkdir, rm, symlink } from 'node:fs/promises'
+import { createServer } from 'node:net'
+import { hostname, tmpdir } from 'node:os'
+import path from 'node:path'
+import { singletonState } from '../singleton'
 
-function probe(lock: string | undefined, command: string | undefined) {
-  return hasSingletonOwner('/state/desktop/chromium', 'host', '/usr/bin/chromium', {
-    readLink: (file) => (file === '/proc/42/exe' ? '/usr/lib/chromium/chromium' : lock),
-    realPath: (file) => file,
-    readFile: (file) => (file === '/proc/42/cmdline' ? command : undefined),
-  })
+// Chromium's POSIX singleton and flock require Linux or macOS.
+const posixTest = test.skipIf(process.platform !== 'linux' && process.platform !== 'darwin')
+
+async function fixture() {
+  const root = await mkdtemp(path.join(tmpdir(), 'fregat-singleton-'))
+  const profile = path.join(root, 'profile')
+  await mkdir(profile)
+  return { root, profile }
 }
-const command =
-  '/usr/lib/chromium/chromium\0--user-data-dir=/state/desktop/chromium\0--profile-directory=Platform\0--remote-debugging-pipe\0'
 
-test('only a live local CDP process for the exact profile confirms handoff', () => {
-  expect(probe('host-42', command)).toBe(true)
-})
-test.each([undefined, 'foreign-42', 'host-not-pid', 'host-0', 'host-../42', 'host-43'])(
-  'stale/malformed/foreign singleton %s grants no ownership',
-  (lock) => {
-    expect(probe(lock, command)).toBe(false)
-  },
-)
-test.each([
-  undefined,
-  '/bin/true\0',
-  '--user-data-dir=/other\0--remote-debugging-pipe\0',
-  '--user-data-dir=/state/desktop/chromium\0',
-])('foreign/uncontrolled process cannot confirm a handoff', (value) => {
-  expect(probe('host-42', value)).toBe(false)
-})
-
-test.each([
-  '--user-data-dir=/state/desktop/chromium\0--profile-directory=Other\0--remote-debugging-pipe',
-  '--user-data-dir=/state/desktop/chromium\0--remote-debugging-pipe',
-  '--user-data-dir=/state/desktop/chromium\0--extra\0--profile-directory=Platform\0--remote-debugging-pipe',
-  '--user-data-dir=/state/desktop/chromium\0--profile-directory=Platform\0--extra\0--remote-debugging-pipe',
-  '--user-data-dir=/state/desktop/chromium-extra\0--profile-directory=Platform\0--remote-debugging-pipe',
-  '--user-data-dir=/state/desktop/chromium\0--profile-directory=Platform\0--remote-debugging-pipe-extra',
-])('split argv requires the same exact contiguous launcher signature %s', (signature) => {
-  expect(probe('host-42', `/usr/lib/chromium/chromium\0${signature}\0`)).toBe(false)
-})
-
-test.each(Array.from({ length: 30 }, (_, run) => run))(
-  'joined Chromium process title confirms exact launcher profile run %i',
-  () => {
-    const title =
-      '/usr/lib/chromium/chromium --app=http://localhost/ --user-data-dir=/state/desktop/chromium --profile-directory=Platform --remote-debugging-pipe --no-first-run\0'
-    expect(probe('host-42', title)).toBe(true)
-    expect(title.split('\0').includes('--user-data-dir=/state/desktop/chromium')).toBe(false)
-  },
-)
-test.each([
-  '/usr/bin/chromium --user-data-dir=/state/desktop/chromium-extra --profile-directory=Platform --remote-debugging-pipe\0',
-  '/usr/bin/chromium --user-data-dir=/state/desktop/chromium extra --profile-directory=Platform --remote-debugging-pipe\0',
-  '/usr/bin/chromium --user-data-dir=/state/desktop/chromium --profile-directory=Other --remote-debugging-pipe\0',
-  '/usr/bin/chromium --user-data-dir=/state/desktop/chromium --profile-directory=Platform --remote-debugging-pipe-extra\0',
-])('joined process titles require the exact contiguous launcher signature %s', (title) => {
-  expect(probe('host-42', title)).toBe(false)
-})
-test('joined process titles retain exact profiles containing spaces', () => {
-  const profile = '/state home/desktop/chromium'
-  expect(
-    hasSingletonOwner(profile, 'host', '/usr/bin/chromium', {
-      readLink: (file) => (file === '/proc/42/exe' ? '/usr/lib/chromium/chromium' : 'host-42'),
-      realPath: (file) => file,
-      readFile: () =>
-        `/usr/bin/chromium --user-data-dir=${profile} --profile-directory=Platform --remote-debugging-pipe\0`,
-    }),
-  ).toBe(true)
-})
-
-test.each(['/bin/true', '/tmp/custom-wrapper', '/tmp/chromium'])(
-  'an existing Chromium owner cannot validate unrelated selected executable %s',
-  (executable) => {
-    expect(
-      hasSingletonOwner('/state/desktop/chromium', 'host', executable, {
-        readLink: (file) => (file === '/proc/42/exe' ? '/usr/lib/chromium/chromium' : 'host-42'),
-        readFile: () => command,
-        realPath: (file) => file,
-      }),
-    ).toBe(false)
+posixTest.each(['missing', 'live', 'dead', 'foreign', 'malformed'])(
+  'profile singleton %s has a bounded read-only state',
+  async (kind) => {
+    const box = await fixture()
+    const child = Bun.spawn([process.execPath, '-e', 'process.exit(0)'], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+    await child.exited
+    const targets: Record<string, string> = {
+      live: `${hostname()}-${process.pid}`,
+      dead: `${hostname()}-${child.pid}`,
+      foreign: 'foreign-host-1',
+      malformed: `${hostname()}-not-pid`,
+    }
+    try {
+      if (kind !== 'missing') await symlink(targets[kind]!, path.join(box.profile, 'SingletonLock'))
+      const expected: Record<string, string> = {
+        missing: 'idle',
+        live: 'live',
+        dead: 'idle',
+        foreign: 'unverified',
+        malformed: 'unverified',
+      }
+      expect(await singletonState(box.profile, 1000)).toBe(expected[kind])
+    } finally {
+      await rm(box.root, { recursive: true, force: true })
+    }
   },
 )
 
-test.each([
-  ['/opt/google/chrome/google-chrome', '/opt/google/chrome/chrome'],
-  ['/opt/helium/helium-browser', '/opt/helium/helium'],
-])('canonical wrapper %s matches its installed browser %s', (selected, owner) => {
-  expect(browserExecutableMatches(selected, owner)).toBe(true)
-  expect(browserExecutableMatches('/bin/true', owner)).toBe(false)
-})
+posixTest.each(['matching', 'mismatched', 'missing', 'direct'])(
+  'socket cookie %s follows Chromium singleton rules and transmits no launch data',
+  async (kind) => {
+    const box = await fixture()
+    const file =
+      kind === 'direct' ? path.join(box.profile, 'SingletonSocket') : path.join(box.root, 'socket')
+    const received: Array<Buffer | string> = []
+    const server = createServer((socket) => {
+      socket.on('data', (value) => received.push(value))
+      socket.on('end', () => socket.end())
+    })
+    await new Promise<void>((resolve) => server.listen(file, resolve))
+    try {
+      await symlink('foreign-host-1', path.join(box.profile, 'SingletonLock'))
+      if (kind !== 'direct') await symlink(file, path.join(box.profile, 'SingletonSocket'))
+      if (kind !== 'missing') await symlink('cookie', path.join(box.profile, 'SingletonCookie'))
+      await symlink(
+        kind === 'mismatched' ? 'other' : 'cookie',
+        path.join(box.root, 'SingletonCookie'),
+      )
+      expect(await singletonState(box.profile, 1000)).toBe(
+        kind === 'matching' || kind === 'direct' ? 'live' : 'unverified',
+      )
+      expect(received).toEqual([])
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(box.root, { recursive: true, force: true })
+    }
+  },
+)

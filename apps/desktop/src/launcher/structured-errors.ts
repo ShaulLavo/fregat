@@ -22,8 +22,8 @@ export const launcherErrors = defineErrorCatalog('desktop.launcher', {
   PROFILE_BUSY: {
     status: 409,
     message: 'The Fregat browser profile is already open.',
-    why: 'The running profile belongs to a different browser executable.',
-    fix: 'Quit the browser using the Fregat profile and launch Fregat with the selected browser.',
+    why: 'Another launcher or browser is using this profile.',
+    fix: 'Let the current launch finish, or close the browser using this profile and launch Fregat again.',
   },
   VERSION_UNSUPPORTED: {
     status: 400,

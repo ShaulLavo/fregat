@@ -143,7 +143,15 @@ No runtime bridge, debugging connection, chooser binding or permission grant rea
 
 1. Resolve the effective browser profile and stable absolute manifest identity for the app URL.
    An explicit browser setting keeps precedence; automatic selection uses Chrome-first ordering.
+   Hold a launcher-owned `flock` file beside that profile through installation, controller exit and
+   app handoff. A second launcher waits within the same startup cap, then rechecks the singleton;
+   it never forwards its URL to another launcher's installation controller. The kernel releases
+   ownership when a launcher exits or dies, and the lock file's inode remains for other waiters.
    A live profile routes directly through the browser singleton and never starts a controller.
+   Probe `SingletonSocket` with Chromium's matching cookie links before and after connecting;
+   send no launch data on the probe. If the socket cannot be checked, a `SingletonLock` naming a
+   live local hostname-pid owner suffices. Ownership never depends on argv or executable paths,
+   so a Dock app-shim owner or a confined browser can use the same dedicated profile.
 2. On an idle profile, start a temporary browser with the existing CDP pipe. Call
    `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. An unknown
    app returns `InvalidParams` (`-32602`) with the unknown-app reason. Other parameter failures

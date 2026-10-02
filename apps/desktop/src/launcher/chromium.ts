@@ -1,13 +1,9 @@
 import { mkdirSync } from 'node:fs'
 import type { BrowserCandidate } from './browser'
 import { CdpClient, cdpPipe } from './cdp'
-import {
-  browserProfile,
-  browserProfileBusy,
-  browserProfileOwner,
-  chromiumArguments,
-} from './profile'
-import { liveSingletonOwner } from './singleton'
+import { browserProfile, chromiumArguments } from './profile'
+import { singletonState } from './singleton'
+import { acquireProfileLock } from './profile-lock'
 import { installedIdentity, ensureInstalledApp } from './installed-app'
 import { launcherErrors } from './structured-errors'
 import {
@@ -42,7 +38,31 @@ export function assertChromiumVersion(product: unknown) {
 export async function launchChromium(options: ChromiumOptions): Promise<ChromiumWindow> {
   const profile = browserProfile(options.candidate, options.stateHome, options.home)
   mkdirSync(profile, { recursive: true })
-  if (browserProfileBusy(profile)) return launchInstalledBrowser(options, profile, true)
+  const cap = startupSupervisor(options.startup, () => performance.now())
+  const release = await acquireProfileLock({
+    profile,
+    remainingMs: cap.remainingMs,
+    pollMs: Math.min(options.startup.idleMs, options.startup.limitMs) / 20,
+    signal: options.signal,
+  })
+  try {
+    const owner = await singletonState(profile, cap.remainingMs(), options.signal)
+    if (owner === 'unverified')
+      throw launcherErrors.PROFILE_BUSY({ internal: { reason: 'unverified-profile-owner' } })
+    if (cap.remainingMs() <= 0)
+      throw launcherErrors.PROFILE_BUSY({ internal: { reason: 'launcher-lock-limit' } })
+    const remaining = { ...options, startup: { ...options.startup, limitMs: cap.remainingMs() } }
+    if (owner === 'live') return await launchInstalledBrowser(remaining, profile, true)
+    return await installAndLaunch(remaining, profile)
+  } finally {
+    release()
+  }
+}
+
+async function installAndLaunch(
+  options: ChromiumOptions,
+  profile: string,
+): Promise<ChromiumWindow> {
   const supervisor = startupSupervisor(options.startup, () => performance.now())
   const child = Bun.spawn({
     cmd: [options.candidate.executable, ...chromiumArguments(options.candidate, profile)],
@@ -151,12 +171,6 @@ async function launchInstalledBrowser(
   profile: string,
   running: boolean,
 ): Promise<ChromiumWindow> {
-  if (
-    running &&
-    !liveSingletonOwner(profile, options.candidate.executable) &&
-    !browserProfileOwner(profile, options.candidate.executable)
-  )
-    throw launcherErrors.PROFILE_BUSY({ internal: { reason: 'unverified-profile-owner' } })
   options.signal?.throwIfAborted()
   const child = Bun.spawn({
     cmd: [
@@ -170,36 +184,49 @@ async function launchInstalledBrowser(
   })
   const supervisor = startupSupervisor(options.startup, () => performance.now())
   const observe = options.observe ?? startupProcessCounters
-  while (child.exitCode === null) {
+  try {
+    while (child.exitCode === null) {
+      options.signal?.throwIfAborted()
+      if (
+        !running &&
+        (await singletonState(profile, supervisor.remainingMs(), options.signal)) === 'live'
+      ) {
+        child.unref()
+        return { kind: 'handoff' }
+      }
+      const verdict = supervisor.check(observe(child.pid))
+      if (verdict !== 'progressing') {
+        child.kill('SIGTERM')
+        await waitForBrowserExit(child, 2000)
+        if (child.exitCode === null) child.kill('SIGKILL')
+        await child.exited
+        throw launcherErrors.LAUNCH_FAILED({
+          internal: { reason: verdict, startupPhase: 'installed-window' },
+        })
+      }
+      await Bun.sleep(Math.min(options.startup.idleMs, options.startup.limitMs) / 20)
+    }
+    const code = await child.exited
     if (
-      (!running && browserProfileBusy(profile)) ||
-      browserProfileOwner(profile, options.candidate.executable, child.pid)
-    ) {
-      child.unref()
-      return { kind: 'handoff' }
-    }
-    const verdict = supervisor.check(observe(child.pid))
-    if (verdict !== 'progressing') {
-      child.kill('SIGTERM')
-      await waitForBrowserExit(child, 2000)
-      if (child.exitCode === null) child.kill('SIGKILL')
-      await child.exited
+      code !== 0 ||
+      (await singletonState(profile, supervisor.remainingMs(), options.signal)) !== 'live'
+    )
       throw launcherErrors.LAUNCH_FAILED({
-        internal: { reason: verdict, startupPhase: 'installed-window' },
+        internal: { reason: 'installed-handoff', exitCode: code },
       })
-    }
-    await Bun.sleep(Math.min(options.startup.idleMs, options.startup.limitMs) / 20)
+    return { kind: 'handoff' }
+  } catch (error) {
+    await stopBrowserProcess(child)
+    throw error
   }
-  const code = await child.exited
-  if (code !== 0 || !browserProfileBusy(profile))
-    throw launcherErrors.LAUNCH_FAILED({
-      internal: { reason: 'installed-handoff', exitCode: code },
-    })
-  return { kind: 'handoff' }
 }
 
 async function stopOwnedBrowser(cdp: CdpClient, child: ReturnType<typeof Bun.spawn>) {
   cdp.close()
+  await stopBrowserProcess(child)
+}
+
+async function stopBrowserProcess(child: ReturnType<typeof Bun.spawn>) {
   if (child.exitCode !== null) return
   child.kill('SIGTERM')
   await waitForBrowserExit(child, 2000)

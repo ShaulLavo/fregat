@@ -3,7 +3,6 @@ import { resolveBrowserCandidates } from '../browser'
 import { startupProcessCounters } from '../diagnostics'
 import { startupSupervisor } from '../startup'
 import { shellBridge } from '../shell-bridge'
-import { hasMacSingletonOwner } from '../singleton'
 
 function macFixture(preferred = 'net.imput.helium') {
   const plists: Record<string, unknown> = {
@@ -132,24 +131,6 @@ test('missing Linux proc has no process progress; only incoming CDP renews idle 
   expect(check(2)).toBe('startup-stalled')
   now = 300
   expect(check(3)).toBe('startup-limit')
-})
-
-test('Mac singleton handoff proves same executable, local host, profile and CDP ownership without signalling', () => {
-  let command =
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --app=http://localhost --user-data-dir=/scratch/profile --profile-directory=Platform --remote-debugging-pipe'
-  const fs = {
-    readLink: () => 'fixture-host-123',
-    realPath: (file: string) => file,
-    readFile: () => undefined,
-  }
-  const executable = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-  const run = () => command
-  expect(hasMacSingletonOwner('/scratch/profile', 'fixture-host', executable, fs, run)).toBe(true)
-  expect(hasMacSingletonOwner('/other', 'fixture-host', executable, fs, run)).toBe(false)
-  expect(hasMacSingletonOwner('/scratch/profile', 'other-host', executable, fs, run)).toBe(false)
-  command =
-    '/other/browser --user-data-dir=/scratch/profile --profile-directory=Platform --remote-debugging-pipe'
-  expect(hasMacSingletonOwner('/scratch/profile', 'fixture-host', executable, fs, run)).toBe(false)
 })
 
 test('WKWebView reports its own transparent overlay', () => {

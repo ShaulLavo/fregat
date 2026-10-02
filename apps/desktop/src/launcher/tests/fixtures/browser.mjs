@@ -1,19 +1,66 @@
-import { appendFileSync, symlinkSync, writeSync } from 'node:fs'
+import {
+  appendFileSync,
+  existsSync,
+  readlinkSync,
+  readFileSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+  writeSync,
+} from 'node:fs'
 import { hostname } from 'node:os'
 import path from 'node:path'
 
 const mode = process.argv[2]
 await Bun.write(process.argv[3], String(process.pid))
 const app = process.argv.some((arg) => arg.startsWith('--app-id='))
+const race = mode.startsWith('race-')
+const profile = process.argv
+  .find((arg) => arg.startsWith('--user-data-dir='))
+  ?.slice('--user-data-dir='.length)
+const lock = profile && path.join(profile, 'SingletonLock')
+const role = profile && path.join(profile, 'FixtureRole')
+const identity = `${hostname()}-${process.pid}`
+const cleanupLock = () => {
+  try {
+    if (readlinkSync(lock) !== identity) return
+    unlinkSync(lock)
+    if (race) unlinkSync(role)
+  } catch {}
+}
+if (race) {
+  appendFileSync(process.argv[3] + '.pids', String(process.pid) + '\n')
+  try {
+    const owner = readlinkSync(lock)
+    process.kill(Number(owner.slice(hostname().length + 1)), 0)
+    let target = 'controller'
+    try {
+      target = readFileSync(role, 'utf8')
+    } catch {}
+    appendFileSync(
+      process.argv[3] + '.forwarded',
+      JSON.stringify({ target, app, args: process.argv }) + '\n',
+    )
+    if (app && target === 'app')
+      appendFileSync(process.argv[3] + '.deliveries', JSON.stringify(process.argv) + '\n')
+    process.exit(0)
+  } catch {
+    try {
+      unlinkSync(lock)
+    } catch {}
+  }
+  symlinkSync(identity, lock)
+  writeFileSync(role, app ? 'app' : 'controller')
+  process.on('SIGTERM', () => {
+    cleanupLock()
+    process.exit(0)
+  })
+}
 if (app) {
   await Bun.write(process.argv[3] + '.args', JSON.stringify(process.argv.slice(4)))
   if (mode === 'handoff') process.exit(0)
-  const profile = process.argv
-    .find((arg) => arg.startsWith('--user-data-dir='))
-    .split('=')
-    .slice(1)
-    .join('=')
-  symlinkSync(`${hostname()}-${process.pid}`, path.join(profile, 'SingletonLock'))
+  if (!race) symlinkSync(identity, lock)
+  if (race) appendFileSync(process.argv[3] + '.deliveries', JSON.stringify(process.argv) + '\n')
   setInterval(() => {}, 1000)
   await new Promise(() => {})
 }
@@ -29,7 +76,9 @@ if (mode === 'silent') {
   await Bun.sleep(30_000)
   process.exit(0)
 }
-let installed = !['pwa-unknown', 'pwa-install-failed', 'pwa-verify-failed'].includes(mode)
+let installed = race
+  ? existsSync(process.argv[3] + '.installed')
+  : !['pwa-unknown', 'pwa-install-failed', 'pwa-verify-failed'].includes(mode)
 let buffered = ''
 for await (const chunk of Bun.file(3).stream()) {
   buffered += new TextDecoder().decode(chunk)
@@ -39,6 +88,10 @@ for await (const chunk of Bun.file(3).stream()) {
     buffered = buffered.slice(end + 1)
     appendFileSync(process.argv[3] + '.requests', JSON.stringify(message) + '\n')
     if (message.method.startsWith('PWA.')) {
+      if (mode === 'race-paused' && message.method === 'PWA.getOsAppState' && !installed) {
+        await Bun.write(process.argv[3] + '.paused', 'ready')
+        while (!existsSync(process.argv[3] + '.release')) await Bun.sleep(5)
+      }
       if (mode === 'exit-install' && message.method === 'PWA.getOsAppState') process.exit(3)
       if (mode === 'slow-install' && message.method === 'PWA.getOsAppState') busy(6000)
       if (mode === 'silent-install' && message.method === 'PWA.getOsAppState') {
@@ -70,8 +123,10 @@ for await (const chunk of Bun.file(3).stream()) {
             message: 'Unknown web-app manifest id ' + message.params.manifestId,
           }
         else result = { badgeCount: 0, fileHandlers: [] }
-      } else if (message.method === 'PWA.install') installed = true
-      else if (message.method === 'PWA.launch') {
+      } else if (message.method === 'PWA.install') {
+        installed = true
+        if (race) await Bun.write(process.argv[3] + '.installed', 'yes')
+      } else if (message.method === 'PWA.launch') {
         result = { targetId: 'installed-app' }
       }
       writeSync(
@@ -92,3 +147,5 @@ appendFileSync(
   process.argv[3] + '.requests',
   JSON.stringify({ method: 'fixture.pipeClosed' }) + '\n',
 )
+
+if (race) cleanupLock()
