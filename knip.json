@@ -19,6 +19,7 @@
         "src/provider/claude-discovery-worker.ts",
         "src/fs/watch-worker.ts",
         "src/fs/tests/fixtures/crashing-watch-worker.ts",
+        "src/system/tests/fixtures/activated-server.ts",
         "test/factories/claude-ipc.cjs",
         "src/installation/remote-support.ts",
         "src/terminal-host/main.ts",

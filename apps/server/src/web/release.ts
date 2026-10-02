@@ -51,3 +51,15 @@ export function readReleaseInfoSync(file: string | undefined): ReleaseInfo {
     return unknownRelease
   }
 }
+
+/** The path the release's web build was made for; a checkout run serves from `/`. */
+export function readReleaseWebBase(file: string | undefined): string {
+  if (!file) return '/'
+  try {
+    const config: unknown = JSON.parse(readFileSync(file, 'utf8'))
+    if (typeof config !== 'object' || config === null || !('webBase' in config)) return '/'
+    return typeof config.webBase === 'string' ? config.webBase : '/'
+  } catch {
+    return '/'
+  }
+}
