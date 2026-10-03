@@ -3,9 +3,9 @@ import { spawnSync } from 'node:child_process'
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { instrumentAllocations } from '../../scripts/ghostty-extension-allocations.ts'
+import { instrumentAllocations } from './ghostty-extension-allocations.ts'
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../ghostty-webgpu')
 const output = resolve(process.argv[2]!)
 await mkdir(output)
 const source = await readFile(join(packageRoot, 'src/extensions/manager.ts'), 'utf8')
