@@ -235,7 +235,8 @@ writeFileSync(${JSON.stringify(result)}, JSON.stringify({
         VITEST_MAX_WORKERS: '4',
         PLAYWRIGHT_BROWSERS_PATH: path.join(box.root, 'browser-payloads'),
         GHOSTTY_BROWSER_ENGINE: 'chromium',
-        GHOSTTY_BROWSER_HARDWARE: '0',
+        // Config-only resolution uses the supported hardware branch without launching a browser.
+        GHOSTTY_BROWSER_HARDWARE: '1',
       },
       stdout: 'pipe',
       stderr: 'pipe',

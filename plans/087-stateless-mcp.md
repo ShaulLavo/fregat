@@ -280,7 +280,10 @@ cancel, permission denial, input continuation, and integration failure remain di
   disabled integrations, permission revocation, and remote SSH routing.
 
 Exit: record the SDK/provider versions, wire traces with secrets removed, focused checks, and live
-provider evidence. Plan 088 remains dependency-blocked until M0–M4 pass.
+provider evidence. Plan 088 requires M0 provider interoperability, M1's native endpoint
+scope/authentication and the relevant M4 conformance/isolation receipts. M2/M3 moved to
+[174](174-external-mcp-servers.md); their external-client management does not gate native
+intelligence. Existing milestone authorization and live-provider checks remain unchanged.
 
 ## Verify plausible failures
 
@@ -303,13 +306,18 @@ verification reuses the running development server. Do not start another dev ser
 
 ## Completion checklist
 
-- [ ] M0–M4 have recorded evidence and no provider bypass.
-- [ ] Inbound and outbound paths use the pinned stateless revision.
-- [ ] Management, resources, prompts, approvals, OAuth client flows, and lifecycle are usable.
-- [ ] Native and external tools preserve machine/worktree ownership and authentication.
+- [ ] Native scope M0/M1 and relevant M4 checks have recorded evidence and no provider bypass;
+      transferred M2/M3 delivery is tracked in 174.
+- [ ] Native inbound tool paths use the pinned stateless revision.
+- [ ] Native endpoint authentication, scoped catalog, request lifecycle and denial/cancellation are usable.
+- [ ] Native tools preserve machine/worktree ownership and authentication.
 - [ ] Settings reference is regenerated with `bun run settings:reference` when registry entries land.
 - [ ] Documentation records supported versions and configurations; no legacy compatibility path was added.
 - [ ] Remote acceptance proves authenticated MCP tool calls over the verified federation transport.
+
+Outbound revision, external management, resources, prompts, approvals and OAuth client flows
+are transferred delivery requirements in [174](174-external-mcp-servers.md). Their historical
+M2/M3 descriptions above remain as evidence; they are outside this native completion checklist.
 
 ## Research findings (2026-09-25)
 

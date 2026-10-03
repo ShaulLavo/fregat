@@ -7,8 +7,8 @@
   line editor is gonna be one of the first ones."
 - Owns: `ghostty-webgpu/` (core and new extension packages), its site, and Platform's terminal
   feature (`apps/web/src/features/terminal/`), the package's only consumer.
-- Versions: agents bump patch only (`~/.agents/AGENTS.md`). Phases 0 and 2 change the public API;
-  the release that ships them is a minor or major bump and waits for the owner's approval.
+- Versions: patch bumps only, including public API changes, under the owner's 2026-10-03
+  package-version decision. Update all consumers in the same delivery unit.
 
 ## Outcome
 
@@ -344,15 +344,14 @@ no-Canvas tests still pass.
 
 0 → 1 → 2 (steps in order, each its own PR) → 3 → 4 → 5. Phase 1 can merge before Phase 2
 starts; Phase 3 items can start once Phase 0 lands.
-Every PR gets an independent review before merge. The release carrying Phases 0–2 waits for the
-owner's minor or major version approval; until then extension packages are workspace-only and the
-site and Platform consume them from the monorepo.
+Every PR gets an independent review before merge. Phases 0–2 ship with patch bumps and
+matching site/Platform consumers. Standalone package publication keeps the applicable
+[Plan 207](207-one-repo-with-mirrors.md) installation and publication gates.
 
 ## Owner questions
 
 - Package names: scoped (`@ghostty-webgpu/line-editor`, needs the npm scope) or flat
   (`ghostty-webgpu-line-editor`).
-- The version for the release that ships the new contract (minor or major).
 
 ## Done when
 
