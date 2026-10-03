@@ -623,7 +623,7 @@ kill -STOP $$
     }
   }, 30_000)
 
-  test('a launcher delayed beyond the runtime budget retains fd 6 and arms its deadline only after reaching the slice', async () => {
+  test('a launcher delayed beyond the quiet deadline retains fd 6 until scope entry rejects its expired payload', async () => {
     const box = deadlineBox()
     const blocked = path.join(box.root, 'blocked')
     const go = path.join(box.root, 'go')
@@ -674,11 +674,13 @@ kill -STOP $$
       expect(existsSync(marker)).toBe(false)
       expect(serviceState(watchdogOf(slice))).toBe('not-found')
       writeFileSync(go, '')
-      await expect.poll(() => existsSync(marker), { timeout: 10_000 }).toBe(true)
-      expect(unitActive(watchdogOf(slice))).toBe(true)
       await expect
-        .poll(() => sliceState(box.sliceRoot, slice!), { timeout: 6_000 })
-        .not.toBe('running')
+        .poll(() => live(box.state, 'jobs').map((entry) => entry.id), { timeout: 6_000 })
+        .not.toContain(owner!.id)
+      expect(existsSync(marker)).toBe(false)
+      expect(serviceState(watchdogOf(slice))).toBe('not-found')
+      expect(sliceState(box.sliceRoot, slice)).not.toBe('running')
+      expect(slotsFree(box)).toBe(true)
       const reaper = start(box, 'after-delayed', ['touch', successorMarker], {
         jobClass: 'light',
         machine: true,
