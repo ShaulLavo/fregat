@@ -692,23 +692,41 @@ needs: no Bun, Git checkout or terminal step on the user's machine.
 - No supported Chromium browser: the native host, with vibrancy set by `window.transparency`.
 - Every path gives a native macOS window. Electron and a bundled engine are later (see below).
 
-### Window frost
+### Window material
 
-`window.frost` is an Appearance percentage, default 50: a balanced starting strength for the
-blurred desktop layer that leaves the transparent window see-through. Pane opacity and frost are
-independent: opacity is painted by the page; frost controls the AppKit effect layer's alpha,
-with 0 hiding it and 100 showing its full strength. AppKit chooses the blur radius. The native
-material exclusively owns pane frostedness in this host: page `--surface-blur` stays 0 at every
-frost value, and the inactive page-blur settings row is hidden. Other environments keep their page
-blur. Theme Studio still edits page blur for those environments; its control is unchanged. Dialog
-backdrops and the editor minimap keep their separate filtering.
+**Status: Approved 2026-10-03.** `window.material` is an Appearance choice with three values,
+default `none`. The Mac feedback established that fading AppKit's fixed tint and blur reads as
+another opacity control, especially when the page adds its pane fill. The material now owns the
+whole native surface when selected.
 
-This rendering-only value has window scope, like pane opacity, and applies immediately. Its row
-appears only when the actual transparent macOS native bridge supports window appearance updates;
-browser windows, opaque native windows and Linux hide it. The existing appearance message carries
-both percentages and validates both before mutation. The native host starts clear until that
-message arrives. Use public AppKit properties only; property names must avoid Objective-C
-`new`, `init` and `copy` ownership families.
+- `none` keeps the active behind-window `NSVisualEffectView` in the hierarchy at alpha `0.0001`.
+  A positive alpha requests live desktop compositing while its blur and tint contribution is
+  negligible. The desktop shows through the page's panes at `workbench.surface.opacity`.
+- `frosted` shows the full-strength public `NSVisualEffectView` material. Page panes paint no fill.
+- `glass` shows the public macOS 26 `NSGlassEffectView`. Runtime class lookup behind a macOS 26
+  availability guard allows builds with older SDKs. Older systems use the frosted material;
+  settings explain that Glass needs macOS 26. Page panes paint no fill.
+
+Pane opacity stays visible and is marked not applicable while a material owns the transparent
+native surface. Page pane blur stays off in this host for every material. Browser and Linux
+surfaces retain their existing opacity and blur behavior; window material is not applicable
+there. Content wells also clear their fill while a material is active. Selected controls and
+muted fields retain their saved opacity. Dialog backdrops and the editor minimap retain their
+separate filtering.
+
+The rendering-only choice has window scope and switches live through the existing combined
+appearance message, carrying opacity and material. The host starts clear until that message
+arrives. The previous percentage setting and its callers are removed. Public AppKit properties
+only; property names avoid Objective-C `new`, `init` and `copy` ownership families.
+
+Mac acceptance uses Dark mode on macOS 26.4. Switch None, Frosted, Glass and back to None in a
+transparent native window. Check that each material owns the entire pane surface, pane opacity
+is marked not applicable for Frosted and Glass, and None restores the saved opacity. Repeat
+with a light desktop behind the window, then reload. With a live video wallpaper, None must
+keep playback continuous while the desktop stays sharp and untinted, including with the window
+inactive and after switching back from Frosted or Glass. On macOS before 26, Glass must explain the
+requirement and render the frosted fallback. The Fregat.app CI job proves native compilation;
+Linux verification proves the bridge and page behavior with an isolated host fixture.
 
 ### Bundle layout
 

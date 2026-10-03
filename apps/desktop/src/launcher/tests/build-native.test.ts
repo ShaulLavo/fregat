@@ -176,21 +176,57 @@ test.skipIf(process.platform !== 'darwin')(
   },
 )
 
+test('macOS keeps a negligible behind-window material visible to the compositor for None', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  const alpha = mac.match(/static const CGFloat liveDesktopAlpha = ([\d.]+);/)
+  expect(alpha).not.toBeNull()
+  expect(Number(alpha?.[1])).toBeGreaterThan(0)
+  expect(Number(alpha?.[1])).toBeLessThanOrEqual(0.0001)
+  expect(mac).toMatch(
+    /effect\.blendingMode = NSVisualEffectBlendingModeBehindWindow;\s*effect\.state = NSVisualEffectStateActive;\s*effect\.alphaValue = liveDesktopAlpha;\s*effect\.hidden = NO;\s*host\.effect = effect;/,
+  )
+  expect(mac).toContain(
+    'self.effect.alphaValue = [material isEqual:@"none"] ? liveDesktopAlpha : 1;',
+  )
+  expect(mac).toContain('self.effect.hidden = glass;')
+  expect(mac).toContain('self.glassEffect.hidden = !glass;')
+  expect(mac).not.toMatch(/(?:self|host)\.effect\s*=\s*nil|removeFromSuperview/)
+  expect(mac).not.toMatch(/(?:self\.)?effect\.hidden = .*none/)
+  expect(mac).toMatch(
+    /\[window\.contentView addSubview:effect\];[\s\S]*?\[window\.contentView addSubview:view\];/,
+  )
+})
+
 test('macOS leaves translucent opacity to the page and starts with a clear backdrop', async () => {
   const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
   expect(mac).toContain('@property(strong) NSVisualEffectView *effect;')
-  expect(mac).toMatch(/effect.hidden = YES;[\s\S]*?host.effect = effect;/)
+  expect(mac).toMatch(
+    /effect.alphaValue = liveDesktopAlpha;\s*effect.hidden = NO;\s*host.effect = effect;/,
+  )
   expect(mac).toContain('command[@"windowAppearance"]')
   expect(mac).toContain('CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()')
   expect(mac).toContain('!isfinite(opacityValue) || opacityValue < 0 || opacityValue > 100')
-  expect(mac).toContain('!isfinite(frostValue) || frostValue < 0 || frostValue > 100')
-  expect(mac).toContain('CFGetTypeID((__bridge CFTypeRef)frost) == CFBooleanGetTypeID()')
-  expect(mac).toMatch(
-    /if \(!isfinite\(frostValue\)[^\n]+return;\s*\/\/[^\n]+\s*self\.effect\.alphaValue/,
+  expect(mac).toContain('appearance[@"material"]')
+  expect(mac).not.toContain('appearance[@"frost"]')
+  expect(mac).toContain(
+    'self.effect.alphaValue = [material isEqual:@"none"] ? liveDesktopAlpha : 1;',
   )
-  expect(mac).toContain('self.effect.alphaValue = frostValue / 100;')
-  expect(mac).toContain('self.effect.hidden = frostValue == 0;')
-  expect(mac).not.toMatch(/self\.effect\.hidden = .*opacity|self\.effect\.hidden = value < 100/)
+  expect(mac).toContain('@available(macOS 26.0, *)')
+  expect(mac).toContain('NSClassFromString(@"NSGlassEffectView")')
+  expect(mac).toContain('[effect setValue:@0 forKey:@"style"]')
+  expect(mac).toContain('[effect setValue:@0 forKey:@"cornerRadius"]')
+  expect(mac).toContain('![@[@"none", @"frosted", @"glass"] containsObject:material]')
+  expect(mac).toContain('BOOL glass = [material isEqual:@"glass"] && self.glassEffect != nil;')
+  expect(mac).toContain('self.effect.hidden = glass;')
+  expect(mac).toContain('self.glassEffect.hidden = !glass;')
+  expect(mac).toContain('text, host.glassEffect ? @"true" : @"false"')
+  expect(mac).toMatch(
+    /\[window\.contentView addSubview:effect\];[\s\S]*?\[window\.contentView addSubview:host\.glassEffect\];[\s\S]*?\[window\.contentView addSubview:view\];/,
+  )
+  expect(mac).not.toMatch(/\bNSGlassEffectView\s*\*/)
+  expect(mac).toContain('platformBridge.capabilities.windowGlass')
+  expect(mac).not.toContain('__platformWindowGlass')
+  expect(mac).not.toMatch(/self\.(?:effect|glassEffect)\.hidden = .*opacity/)
   expect(mac).not.toMatch(/@property[^;]*\b(?:new|init|copy)\w*\s*;/)
   expect(mac).toContain('dispatch_async(dispatch_get_main_queue(), ^{ [host command:command]; });')
 })

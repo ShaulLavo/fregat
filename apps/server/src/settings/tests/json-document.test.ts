@@ -105,6 +105,52 @@ describe('editSettingsText', () => {
     expect(after).not.toContain('fontSize')
   })
 
+  it('preserves the comment and formatting of a retained key following a deletion', () => {
+    const before = '{\n  "obsolete": 1,\n  // keep this comment\n  "editor.fontSize": 15\n}\n'
+    const expected = '{\n  // keep this comment\n  "editor.fontSize": 15\n}\n'
+    expect(editSettingsText(before, [{ key: 'obsolete' }])).toBe(expected)
+  })
+
+  it.each([
+    ['{ "obsolete":1, "editor.fontSize":15 }', '{ "editor.fontSize":15 }'],
+    ['{ "editor.fontSize":15, "obsolete":1 }', '{ "editor.fontSize":15 }'],
+    ['{ "a":1, "obsolete":2, "b":3 }', '{ "a":1, "b":3 }'],
+    [
+      '{ "obsolete":1, /* retained */ "editor.fontSize":15 }',
+      '{ /* retained */ "editor.fontSize":15 }',
+    ],
+    [
+      '{ "editor.fontSize":15, /* retained */ "obsolete":1 }',
+      '{ "editor.fontSize":15 /* retained */  }',
+    ],
+    [
+      '{ "obsolete":1 /* retained */, "editor.fontSize":15 }',
+      '{  /* retained */ "editor.fontSize":15 }',
+    ],
+  ])('keeps compact JSONC intact when removing a property from %s', (before, expected) => {
+    const after = editSettingsText(before, [{ key: 'obsolete' }])
+    expect(after).toBe(expected)
+    expect(parseSettingsDocument(after).parseErrors).toEqual([])
+  })
+
+  it('preserves custom indentation, CRLF and a retained trailing comma', () => {
+    const before = '{\r\n\t"obsolete": 1,\r\n\t// kept\r\n\t"editor.fontSize":15,\r\n}\r\n'
+    const expected = '{\r\n\t// kept\r\n\t"editor.fontSize":15,\r\n}\r\n'
+    expect(editSettingsText(before, [{ key: 'obsolete' }])).toBe(expected)
+  })
+
+  it('removes a final property line without reformatting its preceding property', () => {
+    const before = '{\r\n    "editor.fontSize":15,\r\n    // retained\r\n    "obsolete": 1\r\n}\r\n'
+    const expected = '{\r\n    "editor.fontSize":15\r\n    // retained\r\n}\r\n'
+    expect(editSettingsText(before, [{ key: 'obsolete' }])).toBe(expected)
+  })
+
+  it('removes every requested duplicate spelling without reformatting retained bytes', () => {
+    const before = '{ "obsolete":1, "obsolete":2, "editor.fontSize":15 }'
+    const edits = [{ key: 'obsolete' }, { key: 'obsolete' }]
+    expect(editSettingsText(before, edits)).toBe('{ "editor.fontSize":15 }')
+  })
+
   it('seeds an empty document rather than producing invalid JSON', () => {
     const after = editSettingsText('', [{ key: 'editor.fontSize', value: 18 }])
 

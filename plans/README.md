@@ -14,6 +14,9 @@ not a second live status register.
 [October 2 issue triage](issue-triage-2026-10-02.md) records the cross-repository backlog,
 small-fix batch, reproduction needs and decisions for the owner.
 
+[October 3 plan conversion](issue-plan-conversion-2026-10-03.md) records approved backlog
+work transferred into execution plans, the original issue links, and remaining investigations.
+
 ## Current plan files
 
 | Plan                                                  | Topic                                                                         |
@@ -138,6 +141,35 @@ small-fix batch, reproduction needs and decisions for the owner.
 | [287](287-ghostty-worker-mode.md)                     | ghostty-webgpu worker mode: the terminal on an OffscreenCanvas worker         |
 | [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                          |
 | [289](289-proxy-usage-feed.md)                        | Passive AI plans feed and the Mesh TV panel                                   |
+| [290](290-mesh-device-authorization.md)               | Approve devices before Mesh control                                           |
+| [291](291-mesh-private-services.md)                   | Private temporary apps and reusable floating pill                             |
+| [292](292-mesh-zerotier.md)                           | ZeroTier adoption after authentication                                        |
+| [293](293-mesh-durable-job-state.md)                  | Durable job definitions and run records                                       |
+| [294](294-mesh-job-coordination.md)                   | Scheduled execution and failover                                              |
+| [295](295-cross-repository-issue-collection.md)       | Ordinary GitHub issue collection and reports                                  |
+| [296](296-mesh-update-recovery.md)                    | Stranded update recovery and Darwin evidence                                  |
+| [297](297-mesh-installer-path.md)                     | Reliable installed executable and shell guidance                              |
+| [298](298-mesh-download-dns-recovery.md)              | Bounded DNS recovery during update discovery                                  |
+| [299](299-mesh-session-removal.md)                    | Immediate removal after acknowledged kill                                     |
+| [300](300-mesh-machine-identity.md)                   | Machine-owned names and dashboard identity                                    |
+| [301](301-mesh-gui-inspection.md)                     | Screen capture, windows, and permission ownership                             |
+| [302](302-mesh-private-app-observability.md)          | Private app logs, readiness, and URL diagnostics                              |
+| [303](303-spellcheck-correctness.md)                  | Validate shipped spellcheck correctness                                       |
+| [304](304-spellcheck-rendering-cost.md)               | Measured incremental spelling underlines                                      |
+| [305](305-spellcheck-language-support.md)             | Explicit spelling languages and dictionary loading                            |
+| [306](306-bun-json-worker.md)                         | JSON syntax data in the Bun worker                                            |
+| [307](307-diff-row-topology.md)                       | Aligned side-by-side diff rows                                                |
+| [308](308-account-usage-feed.md)                      | Bounded Fregat usage cache and Mesh feed                                      |
+| [309](309-account-usage-history.md)                   | Deduplicated transcript usage history                                         |
+| [310](310-allowance-visibility.md)                    | Unused allowance and owner-started backlog work                               |
+| [311](311-automatic-machine-placement.md)             | Visible and overridable automatic placement                                   |
+| [312](312-heavy-slice-ownership.md)                   | One state owner per heavy-job slice root                                      |
+| [313](313-heavy-quiet-lifecycle.md)                   | Bounded quiet admission and server lifecycle                                  |
+| [314](314-heavy-non-cache-memory.md)                  | Comparable non-cache memory estimates                                         |
+| [315](315-local-remote-onboarding.md)                 | Local and remote first-launch choices                                         |
+| [316](316-session-attention.md)                       | Session rail attention states                                                 |
+| [317](317-tree-sitter-phase-two-prerequisites.md)     | Deferred parser pins and held-out corpus                                      |
+| [318](318-machine-connection-controls.md)             | Persistent connection state and confirmed removal                             |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |

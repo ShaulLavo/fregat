@@ -6,6 +6,12 @@
 - Repositories: `ShaulLavo/fregat`, `ShaulLavo/mesh`.
 - Decision: Zero extra provider requests. Read cached Codex observations from CLIProxyAPI and capture Claude quota headers on ordinary gateway traffic. Coordinator deploys separately.
 
+## Superseding owner decision (2026-10-03)
+
+[Plan 308](308-account-usage-feed.md) now owns usage production in Fregat: bounded occasional provider requests, passive/native sources, persistent cache, Settings UI and the Mesh-compatible read-only endpoint. The owner explicitly permits occasional requests and keeps Claude pooling forbidden. Mesh retains this plan's approved v1 consumer and TV design. Its shipped parser and panel are reused through a URL cut-over.
+
+The gateway producer below records prior delivery, not the current execution prerequisite. After Fregat deploy and coordinator-confirmed TV cut-over, Plan 308 retires its source. Only the coordinator removes the live `/ai-usage` route, edits installed `runtime.json`, restarts the gateway and deletes its old feed directory. Implementation never touches the Pi or installed gateway.
+
 ## Outcome and fixed boundary
 
 The TV dashboard shows **AI plans**, grouped by provider, with independently labeled 5h and Weekly windows per account. Claude `shaul9191` is Max. Codex `shaul9191` and `shaul.lavochkin` are both Pro. Future providers add groups without provider-specific layout branches. Keep unknown and no-data visible; never sum account allowances.
