@@ -2,8 +2,9 @@ import { afterEach, onTestFinished } from 'vitest'
 import { toast } from 'sonner'
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { entryPickerQueryKeys } from '@/components/utils/query-keys'
+import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { createObservedInProcessClient } from '../../../test/client'
 import { installTestClient } from '../../../test/factories/client-binding'
@@ -11,7 +12,7 @@ import { recordClientLog } from '../../../test/factories/client-log'
 import { serverCapabilities } from '../../../test/factories/server-capabilities'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { expect, test } from '../../../test/fixtures'
-import { renderWithProviders } from '../../../test/render'
+import { holdDeferredDialog, renderWithProviders } from '../../../test/render'
 import { usePickEntry } from '../use-pick-entry'
 
 afterEach(() => {
@@ -53,18 +54,38 @@ test('closed picker defers its runtime and capabilities until it opens', async (
   })
 })
 
-test('Chromium bridge without native picker opens the web folder picker', async ({ client }) => {
-  void client
-  window.platformBridge = {
-    backdrop: 'compositor',
-    platform: 'linux',
-    colorScheme: null,
-    titlebar: 'native',
-  }
-  renderWithProviders(<PickerFixture />)
-  expect(await screen.findByRole('dialog')).toBeTruthy()
-  expect(await screen.findByRole('heading', { name: 'Open folder' })).toBeTruthy()
-})
+test.for(['loading', 'loaded'] as const)(
+  'Chromium bridge without native picker opens the web folder picker with a %s dialog',
+  async (phase, { client }) => {
+    void client
+    const release =
+      phase === 'loading'
+        ? holdDeferredDialog(
+            filePickerDialogQueryOptions.queryKey,
+            () => import('@/components/file-picker-dialog'),
+          )
+        : undefined
+    if (release) onTestFinished(release)
+    if (phase === 'loaded') await resourceQueryClient.query(filePickerDialogQueryOptions)
+    window.platformBridge = {
+      backdrop: 'compositor',
+      platform: 'linux',
+      colorScheme: null,
+      titlebar: 'native',
+    }
+    renderWithProviders(<PickerFixture />)
+    if (release) {
+      const loading = await screen.findByRole('dialog', { name: 'Open folder' })
+      expect(within(loading).getByRole('heading', { name: 'Open folder' })).toBeTruthy()
+      await act(async () => {
+        release()
+        await resourceQueryClient.query(filePickerDialogQueryOptions)
+      })
+    }
+    const loaded = await screen.findByRole('dialog', { name: 'Choose folder' })
+    expect(within(loaded).getByRole('heading', { name: 'Choose folder' })).toBeTruthy()
+  },
+)
 
 test('unverified locality uses the server-filesystem picker even with a native host', async ({
   client,
