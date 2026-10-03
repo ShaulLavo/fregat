@@ -1,0 +1,42 @@
+name: Standalone package graph
+description: Exports and verifies one mirror with an independent dependency installation.
+
+inputs:
+  family:
+    description: Mirror folder to export.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Export exact mirror folder
+      id: export
+      shell: bash
+      env:
+        FAMILY: ${{ inputs.family }}
+      run: |
+        case "$FAMILY" in
+          editor|ghostty-webgpu|hotkeys) ;;
+          *) echo 'Unknown mirror family' >&2; exit 1 ;;
+        esac
+        mirror=$(mktemp -d "$RUNNER_TEMP/mirror-$FAMILY-XXXXXX")
+        git archive "HEAD:$FAMILY" | tar -x -C "$mirror"
+        echo "directory=$mirror" >> "$GITHUB_OUTPUT"
+    - name: Install and verify standalone package graph
+      shell: bash
+      working-directory: ${{ steps.export.outputs.directory }}
+      run: bun install && bun run build && bun run typecheck && bun run lint && bun run format:check
+    - name: Check standalone tree-sitter runtime
+      if: ${{ inputs.family == 'editor' }}
+      shell: bash
+      working-directory: ${{ steps.export.outputs.directory }}
+      run: bun run --cwd packages/tree-sitter test:runtime
+    - name: Check hoisted standalone tree-sitter runtime
+      if: ${{ inputs.family == 'editor' }}
+      shell: bash
+      run: |
+        mirror=$(mktemp -d "$RUNNER_TEMP/mirror-editor-hoisted-XXXXXX")
+        git archive HEAD:editor | tar -x -C "$mirror"
+        cd "$mirror"
+        bun install --linker=hoisted
+        bun run --cwd packages/tree-sitter test:runtime

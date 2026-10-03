@@ -2,6 +2,22 @@ name: Workspace libraries
 
 on:
   workflow_call:
+    inputs:
+      editor:
+        type: boolean
+        default: true
+      ghostty:
+        type: boolean
+        default: true
+      standalone_editor:
+        type: boolean
+        default: true
+      standalone_ghostty:
+        type: boolean
+        default: true
+      standalone_hotkeys:
+        type: boolean
+        default: true
   workflow_dispatch:
 
 permissions:
@@ -10,6 +26,7 @@ permissions:
 jobs:
   editor:
     name: Editor tests
+    if: ${{ github.event_name == 'workflow_dispatch' || inputs.editor }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -34,6 +51,7 @@ jobs:
 
   ghostty:
     name: Ghostty tests
+    if: ${{ github.event_name == 'workflow_dispatch' || inputs.ghostty }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -70,13 +88,10 @@ jobs:
         run: bun run --cwd ghostty-webgpu test:package:host
 
   standalone:
-    name: Standalone ${{ matrix.family }}
+    name: Standalone packages
+    if: ${{ github.event_name == 'workflow_dispatch' || inputs.standalone_editor || inputs.standalone_ghostty || inputs.standalone_hotkeys }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        family: [editor, ghostty-webgpu, hotkeys]
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -85,24 +100,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Export exact mirror folder
-        env:
-          FAMILY: ${{ matrix.family }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/mirror"
-          git archive "HEAD:$FAMILY" | tar -x -C "$RUNNER_TEMP/mirror"
-      - name: Install and verify standalone package graph
-        working-directory: ${{ runner.temp }}/mirror
-        run: bun install && bun run build && bun run typecheck && bun run lint && bun run format:check
-      - name: Check standalone tree-sitter runtime
-        if: ${{ matrix.family == 'editor' }}
-        working-directory: ${{ runner.temp }}/mirror
-        run: bun run --cwd packages/tree-sitter test:runtime
-      - name: Check hoisted standalone tree-sitter runtime
-        if: ${{ matrix.family == 'editor' }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/mirror-hoisted"
-          git archive HEAD:editor | tar -x -C "$RUNNER_TEMP/mirror-hoisted"
-          cd "$RUNNER_TEMP/mirror-hoisted"
-          bun install --linker=hoisted
-          bun run --cwd packages/tree-sitter test:runtime
+      - name: Standalone Editor
+        if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || inputs.standalone_editor) }}
+        uses: ./.github/actions/standalone
+        with:
+          family: editor
+      - name: Standalone Ghostty
+        if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || inputs.standalone_ghostty) }}
+        uses: ./.github/actions/standalone
+        with:
+          family: ghostty-webgpu
+      - name: Standalone Hotkeys
+        if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || inputs.standalone_hotkeys) }}
+        uses: ./.github/actions/standalone
+        with:
+          family: hotkeys
