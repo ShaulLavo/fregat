@@ -367,6 +367,7 @@ async function createObservedRendererHarness(
   options: GhosttyWebGpuTerminalOptions = {},
   backend: 'webgpu' | 'webgl2' = 'webgpu',
   beforeCleanUpdate?: () => void,
+  afterCleanUpdate?: () => void,
 ): Promise<{
   readonly host: HTMLDivElement
   readonly renderer: WebGpuTerminalRenderer | WebGlTerminalRenderer
@@ -407,6 +408,7 @@ async function createObservedRendererHarness(
         onCleanUpdate: () => {
           beforeCleanUpdate?.()
           rendererOptions.onCleanUpdate?.()
+          afterCleanUpdate?.()
         },
         onTextFrame: (snapshot) => {
           snapshots.push(snapshot)
@@ -1657,6 +1659,102 @@ describe('terminal frame consumer demand in Chromium', () => {
       await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
       expect(harness.host.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
         'https://fresh.test',
+      )
+    },
+  )
+
+  it.each(['webgpu', 'webgl2'] as const)(
+    'rejects synchronous stale link acquisition during a deferred nested clean-update flush (%s)',
+    async (backend) => {
+      let queued: (() => void) | undefined
+      let inspect: (() => void) | undefined
+      const harness = await createObservedRendererHarness(
+        {},
+        backend,
+        () => queued?.(),
+        () => inspect?.(),
+      )
+      const scheduler = Reflect.get(harness.renderer, 'scheduler') as RenderScheduler
+      const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
+      const links = Reflect.get(harness.terminal, 'links') as DomLinkController
+      const linkOptions = Reflect.get(links, 'options') as {
+        getFrame(): RendererTextFrameSnapshot | undefined
+      }
+      harness.terminal.write('https://old.test')
+      scheduler.flush()
+      const version = session.renderState.snapshotVersion
+      const updates = harness.updateCalls()
+      let acquired: RendererTextFrameSnapshot | undefined
+      let pending: boolean | undefined
+      let observedVersion: number | undefined
+      queued = () => {
+        queued = undefined
+        harness.terminal.write(`${escape}[2J${escape}[Hreplacement without links`)
+        scheduler.flush()
+      }
+      inspect = () => {
+        inspect = undefined
+        pending = harness.terminal.hasPendingFrame
+        observedVersion = session.renderState.snapshotVersion
+        acquired = linkOptions.getFrame()
+      }
+
+      harness.terminal.write('\u0007')
+      scheduler.flush()
+
+      expect(observedVersion).toBe(version)
+      expect({ pending, text: acquired?.rows[0]?.text.trimEnd() }).toEqual({
+        pending: true,
+        text: undefined,
+      })
+      expect(acquired).toBeUndefined()
+      expect(harness.updateCalls()).toBe(updates + 2)
+      expect(harness.terminal.hasPendingFrame).toBe(false)
+      expect(harness.readTextRowsCalls()).toBe(0)
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
+      harness.terminal.write(`${escape}[2J${escape}[Hhttps://fresh.test`)
+      scheduler.flush()
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
+      expect(harness.host.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+        'https://fresh.test',
+      )
+    },
+  )
+
+  it.each(['webgpu', 'webgl2'] as const)(
+    'keeps a reentrant replacement write unsettled when clean-update callback hides the document (%s)',
+    async (backend) => {
+      let queued: (() => void) | undefined
+      const harness = await createObservedRendererHarness({}, backend, () => queued?.())
+      const scheduler = Reflect.get(harness.renderer, 'scheduler') as RenderScheduler
+      const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
+      harness.terminal.write('https://old.test')
+      scheduler.flush()
+      const updates = harness.updateCalls()
+      const version = session.renderState.snapshotVersion
+      queued = () => {
+        queued = undefined
+        harness.terminal.write(`${escape}[2J${escape}[Hhttps://replacement.test`)
+        harness.renderer.setDocumentVisible(false)
+      }
+
+      harness.terminal.write('\u0007')
+      scheduler.flush()
+
+      expect(harness.updateCalls()).toBe(updates + 1)
+      expect(session.renderState.snapshotVersion).toBe(version)
+      expect(harness.terminal.hasPendingFrame).toBe(false)
+      const discovery = await harness.terminal.focusNextLink()
+      expect({
+        discovery,
+        label: harness.host.querySelector('[role="link"]')?.getAttribute('aria-label'),
+        textReads: harness.readTextRowsCalls(),
+      }).toEqual({ discovery: false, label: undefined, textReads: 0 })
+      harness.renderer.setDocumentVisible(true)
+      scheduler.flush()
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
+      expect(harness.host.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+        'https://replacement.test',
       )
     },
   )

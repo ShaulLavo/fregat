@@ -3,8 +3,8 @@
 ## Status and authorization
 
 - Status: PHASES 1–5 IMPLEMENTED (meter 2026-09-24; per-turn recording, the usage page and
-  backfill 2026-09-25; Phase 5 on fixtures, scenario 2026-09-26). Owner check pending: the one live
-  redemption. Delete this plan after it.
+  backfill 2026-09-25; Phase 5 on fixtures, scenario 2026-09-26). Phase 6 Approved; Phase 7
+  Approved pending suitable cache observations. Owner check pending: the one live redemption.
 - Priority: P1 for the meter, P2 for the usage page and history.
 - Effort: S for Phase 1, M overall. Reset-credit redemption (Phase 5) is L and gated.
 - Risk: LOW for display. HIGH only for Phase 5, which spends an account resource.
@@ -322,3 +322,44 @@ turns without a recorded cost remain unknown; no price is invented for historica
 Settings retains the searchable Usage report without a dummy registry key. Unknown-only totals,
 days and purposes stay null, while mixed totals disclose excluded tokens. The browser scenario
 checks provider, catalog and unknown rows and the removal of price inputs.
+
+## Phase 6: Recent session cache counters (Approved, #349)
+
+Source: [Fregat #349](https://github.com/ShaulLavo/fregat/issues/349). The owner authorized the
+remaining issue implementation on 2026-10-03. The bounded baseline at `1fcf1a7f8` found ten
+recorded live Codex chat turns in five production sessions, with positive cache reads and zero
+stored writes. Development had no recorded chat turns. This sample cannot establish a rebuild
+run: the Codex adapter discarded its optional write counter, and historical snapshots retained
+numeric defaults without counter presence.
+
+Preserve observed read/write values, including reported zero and unknown, in the existing usage
+baseline and contribution snapshots. Keep token/cost arithmetic and retained rows intact. Recent
+session reads aggregate this diagnostic metadata and join existing turn request/start/completion
+timestamps. Missing historical presence or turn metadata stays unknown. Show the five recent
+recorded chat turns in the existing context usage details, through the existing session TanStack
+query. Label any share precisely as writes divided by reported cache reads plus writes.
+
+- [ ] Preserve future provider cache counter presence and value through recorder restart and
+      contribution aggregation, including optional Codex counters and incomplete Claude auxiliary use.
+- [ ] Query recent chat turns with their identities, models, usage observation times, and retained
+      turn timestamps. Keep utility generation totals in existing billing totals and out of this display.
+- [ ] Show reported reads/writes and dates, with explicit unknown values. Verify actual fixture
+      provider/recorder/API/UI behavior and read back the browser screenshot.
+- [ ] Deliver an independently reviewed PR related to #349. This partial delivery keeps #349 open.
+
+## Phase 7: Calibrate repeated cache-write detection (Approved, awaiting observations)
+
+- [ ] Measure a bounded set of identifiable provider observations whose read/write counters and
+      prompt/request grouping are known. Compare expected first-turn creation with later repeated
+      writes; account for auxiliary requests before selecting a detector.
+- [ ] Set the recent-turn window and warning threshold from that evidence. A share of cache reads
+      plus writes alone does not establish how much of the context was rebuilt.
+- [ ] Add one diagnostic field to the existing turn wide event and the requested warning only when
+      the records support that classification. A first turn alone never triggers a repeated-write warning.
+- [ ] Show a cause only when retained facts establish it. A recorded model change may be named as
+      a change; an idle duration does not prove cache expiry without provider-specific TTL evidence.
+      Proxy account switches and system/tool changes remain unknown until observed identities exist.
+
+No phase creates inference turns, launches agents automatically, adds a usage datastore, rewrites
+retained owner data, or reads credentials to manufacture attribution. Plans 308/309 continue to own
+account collection and native transcript history; this work stays in session diagnostics.

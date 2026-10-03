@@ -251,7 +251,7 @@ const createFromSessionInternal = Symbol('createFromSessionInternal')
 
 export class Terminal {
   private accessibility?: TerminalAccessibilityController
-  private readonly zigFrame?: boolean
+  private readonly zigFrame: boolean
   private readonly accessibilityOptions?: false | GhosttyWebGpuTerminalAccessibilityOptions
   private readonly autoFit: boolean
   private readonly cleanup = new CleanupStack()
@@ -290,7 +290,7 @@ export class Terminal {
     private readonly session: TerminalSession<Event>,
     options: GhosttyWebGpuTerminalFromSessionOptions,
   ) {
-    this.zigFrame = options.zigFrame
+    this.zigFrame = options.zigFrame ?? true
     this.accessibilityOptions = options.accessibility
     this.autoFit = options.autoFit !== false
     this.copySelection = options.copySelection
@@ -1140,7 +1140,13 @@ export class Terminal {
   }
 
   private handleCleanUpdate(): void {
-    if (!this.lastFrame || !this.canReadPaintedState || this.renderer?.hasPendingFrame) return
+    if (
+      !this.lastFrame ||
+      !this.canReadPaintedState ||
+      this.renderer?.canPaint !== true ||
+      this.renderer.hasPendingFrame
+    )
+      return
     this.lastFrameRevision = this.session.revision
   }
 

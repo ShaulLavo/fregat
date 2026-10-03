@@ -324,6 +324,10 @@ export class WebGpuTerminalRenderer {
     }
   }
 
+  get canPaint(): boolean {
+    return this.scheduler.canPaint
+  }
+
   get hasPendingFrame(): boolean {
     return this.scheduler.hasPendingFrame
   }

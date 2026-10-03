@@ -92,6 +92,10 @@ export class RowTerminalRenderer {
     this.scheduler.schedule()
   }
 
+  get canPaint(): boolean {
+    return this.scheduler.canPaint
+  }
+
   get hasPendingFrame(): boolean {
     return this.scheduler.hasPendingFrame
   }
