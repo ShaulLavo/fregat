@@ -63,5 +63,6 @@ export function materialOptionReason(
 export function isSettingAvailable(id: SettingId, environment: SettingEnvironment): boolean {
   if (id === 'workbench.surface.blur') return !supportsNativeMaterial(environment)
   if (id !== 'window.transparency') return true
+  if (environment.platform === 'darwin') return true
   return environment.nativeTransparency && environment.backdrop !== 'app'
 }
