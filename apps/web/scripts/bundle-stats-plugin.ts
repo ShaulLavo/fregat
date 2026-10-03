@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { gzipSync } from 'node:zlib'
 import type { Plugin } from 'vite'
-import { packageNotices } from '../../../scripts/licenses/notices'
+import { packageNotices } from '../../../scripts/licenses/notices.ts'
 
 type BundleStatsModule = {
   readonly id: string
