@@ -17,6 +17,8 @@ export const PINS_FILE = path.join(import.meta.dirname, 'first-load-pins.json')
 const TOTAL_MARGIN = 0.01
 // settings registry descriptions ship in first-load; see #595
 const PHONE_METADATA_ALLOWANCE = 50
+// Installation-target metadata and validation add 72 measured phone gzip bytes.
+const PHONE_INSTALLATION_ALLOWANCE = 72
 /** Per owner: the larger of 5% or 2 KB gzip, so a tiny owner is not pinned to the byte. */
 const OWNER_MARGIN = 0.05
 const OWNER_FLOOR = 2_048
@@ -58,7 +60,7 @@ export function checkFirstLoad(report: GateReport, pins: Pins): GateResult {
   const phone = totalAgainst(
     pins.phoneScriptGzip,
     Math.max(report.phoneFirstLoad.scriptGzip, report.phoneSessionFirstLoad.scriptGzip),
-    PHONE_METADATA_ALLOWANCE,
+    PHONE_METADATA_ALLOWANCE + PHONE_INSTALLATION_ALLOWANCE,
   )
   const owners = report.owners.flatMap((row) => ownerGrowth(row, pins.owners[row.owner] ?? 0))
   // A grown owner explains a grown total; the total is named only when no owner is.
