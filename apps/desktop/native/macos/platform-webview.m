@@ -75,13 +75,15 @@ static void emit(NSDictionary *event) {
 @implementation PlatformHost
 - (void)mountContentView:(NSView *)view {
   NSView *content = self.window.contentView;
+  // Glass draws a light rim at its bounds; keep it beyond the content layer's clip.
+  CGFloat outset = view == self.glassEffect ? 4 : 0;
   view.translatesAutoresizingMaskIntoConstraints = NO;
   [content addSubview:view];
   [NSLayoutConstraint activateConstraints:@[
-    [view.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
-    [view.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
-    [view.topAnchor constraintEqualToAnchor:content.topAnchor],
-    [view.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
+    [view.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:-outset],
+    [view.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:outset],
+    [view.topAnchor constraintEqualToAnchor:content.topAnchor constant:-outset],
+    [view.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:outset],
   ]];
 }
 - (NSString *)windowStateSource {
@@ -367,6 +369,7 @@ int main(int argc, char **argv) {
       window.contentView.wantsLayer = YES;
       window.contentView.layer.opaque = NO;
       window.contentView.layer.backgroundColor = NSColor.clearColor.CGColor;
+      window.contentView.layer.masksToBounds = YES;
       NSVisualEffectView *effect = [[NSVisualEffectView alloc] initWithFrame:window.contentView.bounds];
       effect.material = NSVisualEffectMaterialUnderWindowBackground;
       effect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
