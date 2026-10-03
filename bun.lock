@@ -129,7 +129,7 @@
     },
     "apps/web": {
       "name": "web",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/modifiers": "^9.0.0",
@@ -697,6 +697,19 @@
         "ws": "8.22.0",
       },
     },
+    "ghostty-webgpu-line-editor": {
+      "name": "ghostty-webgpu-line-editor",
+      "version": "0.0.1",
+      "dependencies": {
+        "evlog": "2.29.0",
+      },
+      "devDependencies": {
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "7.0.2",
+        "vitest": "5.0.2",
+      },
+    },
     "ghostty-webgpu/demo": {
       "name": "ghostty-webgpu-demo",
       "dependencies": {
@@ -949,7 +962,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },
@@ -2609,6 +2622,8 @@
     "ghostty-webgpu": ["ghostty-webgpu@workspace:ghostty-webgpu"],
 
     "ghostty-webgpu-demo": ["ghostty-webgpu-demo@workspace:ghostty-webgpu/demo"],
+
+    "ghostty-webgpu-line-editor": ["ghostty-webgpu-line-editor@workspace:ghostty-webgpu-line-editor"],
 
     "ghostty-webgpu-site": ["ghostty-webgpu-site@workspace:ghostty-webgpu/site"],
 
