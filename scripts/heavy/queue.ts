@@ -34,6 +34,8 @@ export type Entry = {
   readonly quietAdmissionUntil?: number
   /** The expected wall deadline in boot seconds; ownership and slice cleanup gate admission. */
   readonly quietUntil?: number
+  /** Absolute payload deadline in boot seconds; its producer's pinned shim enforces it. */
+  readonly quietDeadline?: number
   readonly cwd: string
   readonly pid: number
   /** When it joined the queue, then when it started. */
