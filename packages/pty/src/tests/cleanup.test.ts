@@ -1,8 +1,11 @@
 import { expect, terminalDescriptors, test, withTerminalCleanup } from '../../test/fixtures'
 
 for (const fails of [false, true]) {
-  test(`settles deferred native descriptor cleanup after a ${fails ? 'failed' : 'successful'} scope`, async () => {
+  test(`settles deferred native descriptor cleanup after a ${fails ? 'failed' : 'successful'} scope`, async ({
+    skip,
+  }) => {
     const before = terminalDescriptors()
+    if (before === null) skip('Native PTY descriptor inspection requires Linux or macOS')
     let terminal: Bun.Terminal | undefined
     let closeTimer: ReturnType<typeof setTimeout> | undefined
     const failure = new TypeError('Fixture scope failed')
@@ -26,8 +29,9 @@ for (const fails of [false, true]) {
   })
 }
 
-test('rejects a scope that leaves native PTY descriptors open', async () => {
+test('rejects a scope that leaves native PTY descriptors open', async ({ skip }) => {
   const before = terminalDescriptors()
+  if (before === null) skip('Native PTY descriptor inspection requires Linux or macOS')
   let terminal: Bun.Terminal | undefined
 
   try {
