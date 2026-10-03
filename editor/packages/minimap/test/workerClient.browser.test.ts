@@ -31,6 +31,7 @@ describe.skipIf(!canUseMinimapWorker())('MinimapWorkerClient', () => {
     expect(host.slider.style.display).toMatch(/block|none/)
 
     client.dispose()
+    expect(client.inspectWorker().lifecycle).toBe('disposed')
     host.root.remove()
     host.colorScope.remove()
   })
@@ -118,7 +119,8 @@ describe.skipIf(typeof Worker === 'undefined')('MinimapWorkerOwner disposal', ()
         [
           `
       onmessage = () => {
-        postMessage({ type: 'layout', sequence: 0, layout: null });
+        postMessage({ type: 'rendered', sequence: 1, sliderNeeded: false,
+          sliderTop: 0, sliderHeight: 0, shadowVisible: false });
         ${mode === 'busy' ? 'while (true) {}' : ''}
       };
     `,
