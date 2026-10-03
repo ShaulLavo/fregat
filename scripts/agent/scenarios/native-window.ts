@@ -3,6 +3,7 @@ import { writeSettings } from './native-provider-verification'
 import { shellBridge } from '../../../apps/desktop/src/launcher/shell-bridge'
 import { selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
+import { captureWindowEdges } from '../window-edges'
 
 export const nativeWindow: Scenario = {
   name: 'native-window',
@@ -102,7 +103,7 @@ export const nativeWindow: Scenario = {
     const assertClearEdges = async (label: string) => {
       const edges = await readEdges()
       await evidence.json(`${label}-edges.json`, edges)
-      await page.screenshot({ path: evidence.file(`${label}-edges.png`), omitBackground: true })
+      await captureWindowEdges(page, evidence, label)
       for (const [edge, elements] of Object.entries(edges)) {
         for (const element of elements) {
           deepStrictEqual(element.border, ['0px', '0px', '0px', '0px'], `${edge} border`)
@@ -213,6 +214,25 @@ export const nativeWindow: Scenario = {
       const materialPaint = await readPaint()
       await focusShell()
       await assertClearEdges(`native-${material}-focused`)
+      await page.evaluate(() => {
+        document.documentElement.setAttribute('data-native-fullscreen', '')
+        window.dispatchEvent(new Event('platform-native-window-state'))
+      })
+      await page.waitForFunction(
+        (selector) =>
+          !document.querySelector(selector)?.firstElementChild?.classList.contains('pl-[4.75rem]'),
+        selectors.desktopFirstScreenSelector,
+      )
+      await assertClearEdges(`native-${material}-fullscreen`)
+      await page.evaluate(() => {
+        document.documentElement.removeAttribute('data-native-fullscreen')
+        window.dispatchEvent(new Event('platform-native-window-state'))
+      })
+      await page.waitForFunction(
+        (selector) =>
+          document.querySelector(selector)?.firstElementChild?.classList.contains('pl-[4.75rem]'),
+        selectors.desktopFirstScreenSelector,
+      )
       deepStrictEqual(
         await controlPaint(),
         originalControlPaint,
@@ -249,11 +269,18 @@ export const nativeWindow: Scenario = {
     strictEqual(await selectors.settingsRow(page, 'workbench.surface.blur').count(), 0)
     await selectors.editorGroupTabs(page, 0).first().click({ button: 'right' })
     await selectors.menuItem(page, 'Close').click()
-    await page.evaluate(() => {
-      sessionStorage.setItem('fixture-native-fullscreen', 'true')
-      document.documentElement.setAttribute('data-native-fullscreen', '')
-      window.dispatchEvent(new Event('platform-native-window-state'))
-    })
+    strictEqual(
+      await page.evaluate((selector) => {
+        sessionStorage.setItem('fixture-native-fullscreen', 'true')
+        document.documentElement.setAttribute('data-native-fullscreen', '')
+        window.dispatchEvent(new Event('platform-native-window-state'))
+        return document
+          .querySelector(selector)
+          ?.firstElementChild?.classList.contains('pl-[4.75rem]')
+      }, selectors.desktopFirstScreenSelector),
+      false,
+      'Full-screen entry removes the inset within the signal task',
+    )
     await page.waitForFunction(
       (selector) =>
         !document.querySelector(selector)?.firstElementChild?.classList.contains('pl-[4.75rem]'),
@@ -275,11 +302,18 @@ export const nativeWindow: Scenario = {
     )
     deepStrictEqual(await readPaint(), paint, 'Reload preserves the clear window underlay')
     await step('native-fullscreen-reloaded-inset-removed')
-    await page.evaluate(() => {
-      sessionStorage.removeItem('fixture-native-fullscreen')
-      document.documentElement.removeAttribute('data-native-fullscreen')
-      window.dispatchEvent(new Event('platform-native-window-state'))
-    })
+    strictEqual(
+      await page.evaluate((selector) => {
+        sessionStorage.removeItem('fixture-native-fullscreen')
+        document.documentElement.removeAttribute('data-native-fullscreen')
+        window.dispatchEvent(new Event('platform-native-window-state'))
+        return document
+          .querySelector(selector)
+          ?.firstElementChild?.classList.contains('pl-[4.75rem]')
+      }, selectors.desktopFirstScreenSelector),
+      true,
+      'Full-screen exit restores the inset within the signal task',
+    )
     await page.waitForFunction(
       (selector) =>
         document.querySelector(selector)?.firstElementChild?.classList.contains('pl-[4.75rem]'),
