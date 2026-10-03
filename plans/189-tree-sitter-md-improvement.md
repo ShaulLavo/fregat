@@ -90,6 +90,6 @@ historical baselines, not current bundle costs.
 ## Order
 
 After Plan 176's release and integration gates, run these passes against the shipped baseline.
-Coordinate shared resolver/runtime files when scheduling work. The wave placement remains in
-[docs/next-wave.md](../docs/next-wave.md); Plan 176 owns integration blockers and this plan owns
+Coordinate shared resolver/runtime files when scheduling work. Current scheduling remains in
+[PLAN.md](../PLAN.md); Plan 176 owns integration blockers and this plan owns
 subsequent improvements.

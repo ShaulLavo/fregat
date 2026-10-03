@@ -6,7 +6,7 @@ linked checkouts, checks and deployment. [AGENTS.md](../AGENTS.md) is the curren
 ## Work in progress
 
 - [Execution roadmap](../PLAN.md) and [plan index](../plans/README.md)
-- [Wave 2 closeout](next-wave.md)
+- [Wave register](../plans/waves.md)
 - [Native client roadmap](../plans/native-plan-of-plans.md)
 - [Remaining defect-audit questions](defect-audit-follow-ups.md)
 
@@ -35,6 +35,8 @@ the revision it inspected; it is not a second implementation queue or proof of t
 
 ## Research and evidence
 
+- [Async runtime research and architecture](async-runtime/README.md): workers, three libraries, alternatives and measurement grounding
+
 - [UI research index](ui-research/README.md), [document library survey](documents/library-survey.md)
 - [Document consumer baseline](document-contributions/baseline-and-inventory.md)
 - [Markdown measurements](markdown-parser/measurements.md), [large-file measurements](large-file-ceiling/README.md)
@@ -42,7 +44,9 @@ the revision it inspected; it is not a second implementation queue or proof of t
 - [Dependency licences](dependency-licences.md), [provider prompt audit](prompt-audit.md)
 - [Verification records](verification/) and [T3 alignment evidence](../plans/126-t3code-alignment/)
 
-The [completion-wave record](completion-wave.md) retains historical owner decisions. Retired
+The [completion-wave record](completion-wave.md) and [wave 2/foundations closeout](next-wave.md)
+retain historical owner decisions and delivery evidence. Current batch membership lives in the
+[wave register](../plans/waves.md). Retired
 plans and root scratch documents remain in git history; current references link to their exact
 revision where the original measurements or decisions still matter.
 

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import * as v from 'valibot'
 import {
+  errorStringField,
   providerAccountUsageSchema,
   providerDriverKindSchema,
   providerUsageFeedSchema,
@@ -14,6 +15,8 @@ import {
   type ProviderUsageResult,
 } from '@workspace/contracts'
 import { writeFileAtomicSync } from '../fs/atomic-write'
+import { isEvlogError } from '../observability/structured-errors'
+import { sessionIdentityErrors } from './structured-errors'
 import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
@@ -21,6 +24,9 @@ import {
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderAdapter, ProviderRuntimeEvent } from './types'
 import { readClaudeUsageCache, readClaudeUsageIdentity } from './usage-claude-cache'
+import { readNativeUsageMetadata, type NativeUsageMetadata } from './utils/usage-native-metadata'
+import { proxyUsageIdentity, usageIdentityContext } from './utils/usage-codex-identity'
+import { mergeProvenUsageAccounts } from './utils/usage-account-merge'
 import {
   codexWindowPresentation,
   mergeUsageWindows,
@@ -35,6 +41,7 @@ type AccountTarget = {
   driverKind: ProviderDriverKind
   providerInstanceIds: ProviderInstanceId[]
   claudeCachePath: string | null
+  codexAuthPath: string | null
   credentialFingerprint?: string | null
 }
 type StoredAccount = {
@@ -44,6 +51,7 @@ type StoredAccount = {
   unsupported: boolean
   identityFingerprint?: string | null
   credentialFingerprint?: string | null
+  identityProof?: string | null
 }
 export type UsageRefreshPolicy = {
   minIntervalMs: number
@@ -63,6 +71,7 @@ const cacheSchema = v.object({
       attemptedAt: v.nullable(v.pipe(v.number(), v.finite())),
       failed: v.boolean(),
       unsupported: v.boolean(),
+      identityProof: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)))),
       identityFingerprint: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)))),
       credentialFingerprint: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)))),
     }),
@@ -71,12 +80,31 @@ const cacheSchema = v.object({
   proxyAttemptedAt: v.nullable(v.pipe(v.number(), v.finite())),
   proxyFailed: v.boolean(),
   proxySourceKey: v.nullable(v.string()),
+  identityContextHash: v.optional(v.string()),
+  proxyProofsCurrent: v.optional(v.boolean()),
+  proxyIdentityProofs: v.optional(
+    v.record(v.string(), v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/))),
+  ),
 })
+
+type UsageStoreOptions = {
+  now?: () => number
+  cacheFile?: string
+  policy?: () => UsageRefreshPolicy
+  readProxy?: (identityContext: string) => Promise<ProviderAccountUsage[]>
+  proxyInstanceIds?: () => ProviderInstanceId[]
+  proxyConfigured?: () => boolean
+  proxySourceKey?: () => string | null
+}
 
 /** Reads never start collection. A lifecycle-owned schedule persists sanitized observations. */
 export class ProviderUsageStore {
   private readonly accounts = new Map<string, StoredAccount>()
   private readonly probes = new Map<string, Promise<boolean>>()
+  private readonly collectionSkips = new Map<
+    string,
+    Partial<Record<'cooldown' | 'already-in-flight', number>>
+  >()
   private readonly suspended = new Map<string, number>()
   private proxyAccounts: ProviderAccountUsage[] = []
   private proxyAttemptedAt: number | null = null
@@ -89,35 +117,23 @@ export class ProviderUsageStore {
   private failedWrites = 0
   private suppressedWrites = 0
   private proxySourceKey: string | null = null
+  private proxyGeneration = 0
+  private proxyIdentityGeneration = -1
+  private readonly proxyIdentityProofs = new Map<string, string>()
+  private readonly identityContext: string
+  private readonly identityContextHash: string
   private readonly now: () => number
   private readonly policy: () => UsageRefreshPolicy
   private readonly registry: UsageAccounts
-  private readonly options: {
-    now?: () => number
-    cacheFile?: string
-    policy?: () => UsageRefreshPolicy
-    readProxy?: () => Promise<ProviderAccountUsage[]>
-    proxyInstanceIds?: () => ProviderInstanceId[]
-    proxyConfigured?: () => boolean
-    proxySourceKey?: () => string | null
-  }
+  private readonly options: UsageStoreOptions
 
-  constructor(
-    registry: UsageAccounts,
-    options: {
-      now?: () => number
-      cacheFile?: string
-      policy?: () => UsageRefreshPolicy
-      readProxy?: () => Promise<ProviderAccountUsage[]>
-      proxyInstanceIds?: () => ProviderInstanceId[]
-      proxyConfigured?: () => boolean
-      proxySourceKey?: () => string | null
-    } = {},
-  ) {
+  constructor(registry: UsageAccounts, options: UsageStoreOptions = {}) {
     this.registry = registry
     this.options = options
     this.now = options.now ?? Date.now
     this.policy = options.policy ?? (() => DEFAULT_POLICY)
+    this.identityContext = usageIdentityContext(options.cacheFile)
+    this.identityContextHash = createHash('sha256').update(this.identityContext).digest('hex')
     this.proxySourceKey = this.sourceKey()
     this.hydrate()
   }
@@ -133,13 +149,15 @@ export class ProviderUsageStore {
 
   reconfigure() {
     const key = this.sourceKey()
-    if (key !== this.proxySourceKey) {
+    this.proxyGeneration += 1
+    if (key !== null && key !== this.proxySourceKey) {
       this.proxySourceKey = key
       this.proxyAccounts = []
+      this.proxyIdentityProofs.clear()
       this.proxyAttemptedAt = null
       this.proxyFailed = false
-      this.persist()
     }
+    this.persist()
     if (!this.timer || this.closed) return
     clearTimeout(this.timer)
     this.timer = null
@@ -157,6 +175,7 @@ export class ProviderUsageStore {
     this.timer = null
     await Promise.allSettled([...this.probes.values(), this.proxyProbe])
     this.persist(true)
+    this.collectionSkips.clear()
   }
 
   accept(event: ProviderRuntimeEvent) {
@@ -173,8 +192,23 @@ export class ProviderUsageStore {
     this.persist()
   }
 
+  /** Mutations validate the credential-bound observation before logical account projection. */
+  readNativeAccount(accountKey: string): ProviderAccountUsage | null {
+    const target = this.targets().find((entry) => entry.accountKey === accountKey)
+    return target ? this.snapshot(target) : null
+  }
+
   async read(): Promise<ProviderUsageResult> {
-    const native = this.targets().map((target) => this.snapshot(target))
+    const targets = this.targets()
+    const native = targets.map((target) => this.snapshot(target))
+    const identities = new Map(
+      this.proxyIdentityGeneration === this.proxyGeneration ? this.proxyIdentityProofs : [],
+    )
+    for (const target of targets) {
+      const stored = this.accounts.get(target.accountKey)
+      if (stored?.credentialFingerprint === target.credentialFingerprint && stored?.identityProof)
+        identities.set(target.accountKey, stored.identityProof)
+    }
     const mappings = this.proxyMappings()
     const configured = this.options.proxyConfigured?.() ?? Boolean(this.options.readProxy)
     const proxy =
@@ -195,14 +229,17 @@ export class ProviderUsageStore {
           ]
         : this.proxyAccounts
     return {
-      accounts: [
-        ...native,
-        ...(configured
-          ? proxy.map((account) =>
-              this.withFreshness({ ...account, providerInstanceIds: mappings }),
-            )
-          : []),
-      ],
+      accounts: mergeProvenUsageAccounts(
+        [
+          ...native,
+          ...(configured
+            ? proxy.map((account) =>
+                this.withFreshness({ ...account, providerInstanceIds: mappings }),
+              )
+            : []),
+        ],
+        identities,
+      ),
     }
   }
 
@@ -215,11 +252,11 @@ export class ProviderUsageStore {
         id: safeFeedText(account.accountKey),
         provider: safeFeedText(account.driverKind),
         label: feedAccountLabel(account, index),
-        plan: safeFeedText(account.planType ?? 'Unknown'),
+        plan: feedPlanLabel(account),
         checkedAt: account.checkedAt,
         lastSeenAt: account.lastSeenAt ?? account.checkedAt,
         state: account.state ?? 'unknown',
-        source: account.source === 'rate-limit-event' ? 'passive-header' : 'proxy-state',
+        source: feedAccountSource(account),
         routing: account.routing ?? { mode: 'unknown', active: null, lastServedAt: null },
         windows: account.windows.map((window) => ({
           ...feedWindowPresentation(account, window),
@@ -228,7 +265,7 @@ export class ProviderUsageStore {
           windowMinutes: window.windowMinutes,
           status: feedWindowStatus(window),
           lastSeenAt: window.observedAt ?? null,
-          source: safeFeedText(window.source ?? account.source ?? 'unknown'),
+          source: feedWindowSource(account, window),
         })),
         cooldown: account.cooldown ?? null,
         ...(account.credits ? { credits: account.credits } : {}),
@@ -296,6 +333,7 @@ export class ProviderUsageStore {
         driverKind: account.driverKind,
         providerInstanceIds: [],
         claudeCachePath: account.claudeCachePath ?? null,
+        codexAuthPath: account.codexAuthPath ?? null,
         credentialFingerprint: account.credentialFingerprint,
       }
       target.providerInstanceIds.push(providerInstanceId)
@@ -308,7 +346,10 @@ export class ProviderUsageStore {
   private collect(target: AccountTarget, force: boolean): Promise<boolean> {
     if (!force && this.suspended.has(target.accountKey)) return Promise.resolve(false)
     const pending = this.probes.get(target.accountKey)
-    if (pending) return pending
+    if (pending) {
+      this.countCollectionSkip(target.accountKey, 'already-in-flight')
+      return pending
+    }
     const previous = this.accounts.get(target.accountKey)
     const wait = previous?.failed ? this.policy().failureCooldownMs : this.policy().minIntervalMs
     if (
@@ -316,11 +357,19 @@ export class ProviderUsageStore {
       previous?.credentialFingerprint === target.credentialFingerprint &&
       previous?.attemptedAt != null &&
       this.now() - previous.attemptedAt < wait
-    )
+    ) {
+      this.countCollectionSkip(target.accountKey, 'cooldown')
       return Promise.resolve(false)
+    }
     const probe = this.probe(target, force).finally(() => this.probes.delete(target.accountKey))
     this.probes.set(target.accountKey, probe)
     return probe
+  }
+
+  private countCollectionSkip(accountKey: string, reason: 'cooldown' | 'already-in-flight') {
+    const counts = this.collectionSkips.get(accountKey) ?? {}
+    counts[reason] = (counts[reason] ?? 0) + 1
+    this.collectionSkips.set(accountKey, counts)
   }
 
   private async probe(target: AccountTarget, force: boolean) {
@@ -329,28 +378,52 @@ export class ProviderUsageStore {
     this.adoptCredentials(target)
     this.markAttempt(target, wasFailed)
     this.persist()
-    const source =
-      target.driverKind === 'codex' ? 'codex-account-rate-limits' : 'claude-sdk-control'
+    let source = target.driverKind === 'codex' ? 'codex-account-rate-limits' : 'claude-sdk-control'
+    let outcome = 'failed'
+    let cacheAgeMs: number | undefined
+    let sdkCalls = 0
+    let failure: { code?: string; why?: string } | undefined
     try {
       const identity = target.claudeCachePath
         ? await readClaudeUsageIdentity(target.claudeCachePath)
         : undefined
       this.adoptIdentity(target, identity)
+      const metadataPath = target.codexAuthPath ?? target.claudeCachePath
+      const metadata =
+        metadataPath && (target.driverKind === 'claude' || target.driverKind === 'codex')
+          ? await readNativeUsageMetadata(
+              metadataPath,
+              target.driverKind === 'claude' ? 'claude' : 'codex',
+              this.identityContext,
+            )
+          : { identityProof: null }
+      this.applyMetadata(target, metadata)
       const cached = target.claudeCachePath
         ? await readClaudeUsageCache(target.claudeCachePath, this.now())
         : null
       if (cached) {
         this.applyProbe(target, cached.probe, cached.observedAt, 'claude-local-cache')
-        if (!force && this.now() - Date.parse(cached.observedAt) < this.policy().minIntervalMs) {
+        cacheAgeMs = this.now() - Date.parse(cached.observedAt)
+        if (
+          !force &&
+          cacheAgeMs < Math.min(this.policy().minIntervalMs, this.policy().staleAfterMs)
+        ) {
+          outcome = 'cache-hit'
+          source = 'claude-local-cache'
           this.markAttempt(target, false)
           this.persist()
           return true
         }
       }
-      if (!target.adapter?.readUsage) return false
+      if (!target.adapter?.readUsage) {
+        outcome = 'no-readUsage'
+        return false
+      }
+      sdkCalls = 1
       const result = await target.adapter.readUsage()
       const current = this.registry.usageAccount(target.providerInstanceIds[0]!)
       if (current && current.credentialFingerprint !== target.credentialFingerprint) {
+        outcome = 'generation-discard'
         this.adoptCredentials({ ...target, credentialFingerprint: current.credentialFingerprint })
         this.persist()
         return false
@@ -362,30 +435,52 @@ export class ProviderUsageStore {
         : undefined
       this.adoptIdentity(target, currentIdentity)
       if (identity !== undefined && currentIdentity !== undefined && identity !== currentIdentity) {
+        outcome = 'generation-discard'
         this.persist()
         return false
       }
       this.applyProbe(target, result, new Date(startedAt).toISOString(), source)
+      this.applyMetadata(target, metadata)
       this.markAttempt(target, false)
       this.persist()
-      recordChatPipelineInfo('chat.pipeline.provider_usage.probe', {
-        driverKind: target.driverKind,
-        durationMs: this.now() - startedAt,
-        outcome: result.kind,
-        source,
-      })
+      outcome = result.kind
       return result.kind === 'reading'
-    } catch {
+    } catch (error) {
       this.markAttempt(target, true)
       this.persist()
-      if (!wasFailed)
-        recordChatPipelineWarning('chat.pipeline.provider_usage.probe_failed', {
-          driverKind: target.driverKind,
-          durationMs: this.now() - startedAt,
-          source,
-        })
+      const structured = isEvlogError(error)
+        ? error
+        : sessionIdentityErrors.USAGE_PROBE_FAILED({ internal: { driverKind: target.driverKind } })
+      failure = {
+        code: errorStringField(structured, 'code'),
+        why: errorStringField(structured, 'why'),
+      }
       return false
+    } finally {
+      const collectionSkips = this.collectionSkips.get(target.accountKey)
+      this.collectionSkips.delete(target.accountKey)
+      const fields = {
+        ...(collectionSkips ? { collectionSkips } : {}),
+        driverKind: target.driverKind,
+        durationMs: this.now() - startedAt,
+        outcome,
+        source,
+        sdkCalls,
+        ...(cacheAgeMs === undefined ? {} : { cacheAgeMs }),
+        ...failure,
+      }
+      // Polling gates run before this attempt; one settled outcome explains every actual probe.
+      if (failure && !wasFailed)
+        recordChatPipelineWarning('chat.pipeline.provider_usage.probe_failed', fields)
+      else recordChatPipelineInfo('chat.pipeline.provider_usage.probe', fields)
     }
+  }
+
+  private applyMetadata(target: AccountTarget, metadata: NativeUsageMetadata) {
+    const stored = this.accounts.get(target.accountKey)
+    if (!stored) return
+    stored.identityProof = metadata.identityProof
+    if (metadata.label) stored.snapshot.label = metadata.label
   }
 
   private adoptCredentials(target: AccountTarget) {
@@ -396,6 +491,7 @@ export class ProviderUsageStore {
       snapshot: this.empty(target),
       unsupported: false,
       credentialFingerprint: target.credentialFingerprint,
+      identityProof: null,
     })
   }
 
@@ -497,6 +593,7 @@ export class ProviderUsageStore {
         lastSeenAt: checkedAt,
         source: newer ? source : previous.source,
         planType: newer ? (update.planType ?? previous.planType) : previous.planType,
+        label: newer ? (update.label ?? previous.label) : previous.label,
         windows: mergeUsageWindows(previous.windows, updates),
         credits:
           newer && update.credits !== undefined ? update.credits : (previous.credits ?? null),
@@ -557,23 +654,32 @@ export class ProviderUsageStore {
     const wait = this.proxyFailed ? this.policy().failureCooldownMs : this.policy().minIntervalMs
     if (this.proxyAttemptedAt !== null && this.now() - this.proxyAttemptedAt < wait) return
     const sourceKey = this.sourceKey()
+    const generation = this.proxyGeneration
     this.proxyAttemptedAt = this.now()
     this.persist()
     this.proxyProbe = this.options
-      .readProxy()
+      .readProxy(this.identityContext)
       .then((accounts) => {
-        if (sourceKey !== this.sourceKey()) return
+        if (sourceKey !== this.sourceKey() || generation !== this.proxyGeneration) return
         const valid = accounts.filter((account) => validCachedAccount(account, this.now()))
-        this.proxyAccounts = valid.map((account) =>
-          retainProxyObservations(
-            this.proxyAccounts.find((previous) => previous.accountKey === account.accountKey),
-            account,
-          ),
-        )
+        const proofs = new Map<string, string>()
+        this.proxyAccounts = valid.map((account) => {
+          const proof = proxyUsageIdentity(account)
+          const previousProof = this.proxyIdentityProofs.get(account.accountKey) ?? null
+          if (proof) proofs.set(account.accountKey, proof)
+          const previous =
+            proof === previousProof
+              ? this.proxyAccounts.find((entry) => entry.accountKey === account.accountKey)
+              : undefined
+          return retainProxyObservations(previous, account)
+        })
+        this.proxyIdentityProofs.clear()
+        for (const [key, proof] of proofs) this.proxyIdentityProofs.set(key, proof)
+        this.proxyIdentityGeneration = generation
         this.proxyFailed = false
       })
       .catch(() => {
-        if (sourceKey !== this.sourceKey()) return
+        if (sourceKey !== this.sourceKey() || generation !== this.proxyGeneration) return
         if (!this.proxyFailed)
           recordChatPipelineWarning('chat.pipeline.provider_usage.proxy_failed', {
             outcome: 'cache-retained',
@@ -586,7 +692,7 @@ export class ProviderUsageStore {
           this.reconfigure()
           return
         }
-        this.proxyAttemptedAt = this.now()
+        if (generation === this.proxyGeneration) this.proxyAttemptedAt = this.now()
       })
     return this.proxyProbe
   }
@@ -596,12 +702,23 @@ export class ProviderUsageStore {
     try {
       if (statSync(this.options.cacheFile).size > 1024 * 1024) return
       const cache = v.parse(cacheSchema, JSON.parse(readFileSync(this.options.cacheFile, 'utf8')))
+      const validContext = cache.identityContextHash === this.identityContextHash
       for (const account of cache.accounts) {
         if (account.attemptedAt !== null && account.attemptedAt > this.now()) continue
         if (validCachedAccount(account.snapshot, this.now()))
-          this.accounts.set(account.snapshot.accountKey, account)
+          this.accounts.set(account.snapshot.accountKey, {
+            ...account,
+            identityProof: validContext ? account.identityProof : null,
+          })
       }
-      if (cache.proxySourceKey !== this.proxySourceKey) return
+      if (this.proxySourceKey !== null && cache.proxySourceKey !== this.proxySourceKey) return
+      this.proxySourceKey = cache.proxySourceKey
+      if (validContext) {
+        for (const [key, proof] of Object.entries(cache.proxyIdentityProofs ?? {}))
+          this.proxyIdentityProofs.set(key, proof)
+        if (cache.proxyProofsCurrent && this.sourceKey() !== null)
+          this.proxyIdentityGeneration = this.proxyGeneration
+      }
       this.proxyAccounts = cache.proxyAccounts.filter((account) =>
         validCachedAccount(account, this.now()),
       )
@@ -629,6 +746,9 @@ export class ProviderUsageStore {
       proxyAttemptedAt: this.proxyAttemptedAt,
       proxyFailed: this.proxyFailed,
       proxySourceKey: this.proxySourceKey,
+      identityContextHash: this.identityContextHash,
+      proxyProofsCurrent: this.proxyIdentityGeneration === this.proxyGeneration,
+      proxyIdentityProofs: Object.fromEntries(this.proxyIdentityProofs),
     }
     try {
       mkdirSync(path.dirname(this.options.cacheFile), { recursive: true })
@@ -667,10 +787,28 @@ function windowFreshness(
   return nowMs - Date.parse(observedAt) >= staleAfterMs ? 'stale' : 'fresh'
 }
 
+// Mesh v1 renders these two live-source classes; detailed provenance stays in our API/cache.
+function feedAccountSource(account: ProviderAccountUsage): 'passive-header' | 'proxy-state' {
+  return account.source === 'cli-proxy-management' ? 'proxy-state' : 'passive-header'
+}
+
+function feedWindowSource(
+  account: ProviderAccountUsage,
+  window: ProviderAccountUsage['windows'][number],
+): 'passive-header' | 'proxy-state' {
+  if (window.source === 'codex-account-rate-limits' || window.source === 'rate-limit-event')
+    return 'passive-header'
+  return feedAccountSource(account)
+}
+
 function feedAccountLabel(account: ProviderAccountUsage, index: number) {
-  if (account.source === 'cli-proxy-management')
-    return account.label ? `Proxy · ${account.label}` : `Proxy account ${index + 1}`
+  if (account.label) return account.label
   return `${account.driverKind === 'claude' ? 'Claude' : 'Codex'} account ${index + 1}`
+}
+
+function feedPlanLabel(account: ProviderAccountUsage) {
+  const plan = account.planType ?? 'Unknown'
+  return safeFeedText(account.driverKind === 'claude' ? plan.replace(/^claude_/, '') : plan)
 }
 
 function feedWindowPresentation(
@@ -679,20 +817,28 @@ function feedWindowPresentation(
 ) {
   if (
     account.driverKind !== 'codex' ||
-    account.source === 'cli-proxy-management' ||
-    !isCodexPosition(window.id)
+    (account.source !== 'cli-proxy-management' && !isCodexPosition(window.id))
   )
     return { id: safeFeedText(window.id), label: safeFeedText(window.label) }
   const { kind, label } = codexWindowPresentation(window.windowMinutes)
+  const namespace = window.id.slice(0, window.id.lastIndexOf(':') + 1)
+  const position = window.id.slice(namespace.length)
   const sharedKind = account.windows.some(
     (peer) =>
       peer.id !== window.id &&
-      isCodexPosition(peer.id) &&
+      peer.id.slice(0, peer.id.lastIndexOf(':') + 1) === namespace &&
       codexWindowPresentation(peer.windowMinutes).kind === kind,
   )
-  // Positions remain merge keys; the feed names genuine durations, including retained reads.
-  const id = kind === 'other' || sharedKind ? `${kind}:${window.id}` : kind
-  return { id, label }
+  // Positions remain merge keys; duration names are scoped only in the exported feed.
+  const suffix = kind === 'other' || sharedKind ? `${kind}:${position}` : kind
+  const scope = namespace
+    .replace(/^model:/, '')
+    .replaceAll(':', ' ')
+    .trim()
+  return {
+    id: safeFeedText(`${namespace}${suffix}`),
+    label: safeFeedText(scope ? `${scope} ${label}` : label),
+  }
 }
 
 function isCodexPosition(id: string) {
