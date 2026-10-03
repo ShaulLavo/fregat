@@ -15,6 +15,8 @@ import type { OwnerRow } from './bundle-owners'
 export const PINS_FILE = path.join(import.meta.dirname, 'first-load-pins.json')
 /** Growth the total may take before the gate fails. */
 const TOTAL_MARGIN = 0.01
+// settings registry descriptions ship in first-load; see #595
+const PHONE_METADATA_ALLOWANCE = 50
 /** Per owner: the larger of 5% or 2 KB gzip, so a tiny owner is not pinned to the byte. */
 const OWNER_MARGIN = 0.05
 const OWNER_FLOOR = 2_048
@@ -56,6 +58,7 @@ export function checkFirstLoad(report: GateReport, pins: Pins): GateResult {
   const phone = totalAgainst(
     pins.phoneScriptGzip,
     Math.max(report.phoneFirstLoad.scriptGzip, report.phoneSessionFirstLoad.scriptGzip),
+    PHONE_METADATA_ALLOWANCE,
   )
   const owners = report.owners.flatMap((row) => ownerGrowth(row, pins.owners[row.owner] ?? 0))
   // A grown owner explains a grown total; the total is named only when no owner is.
@@ -67,8 +70,8 @@ export function checkFirstLoad(report: GateReport, pins: Pins): GateResult {
   return { total, phone, failures, passed }
 }
 
-function totalAgainst(pinned: number, now: number): Total {
-  return { pinned, now, limit: Math.round(pinned * (1 + TOTAL_MARGIN)) }
+function totalAgainst(pinned: number, now: number, allowance = 0): Total {
+  return { pinned, now, limit: Math.round(pinned * (1 + TOTAL_MARGIN)) + allowance }
 }
 
 function totalFailure(owner: string, total: Total): GateFailure {
