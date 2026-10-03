@@ -184,7 +184,7 @@ function accountSnapshot(
   const observed = windows.flatMap(({ observedAt }) => (observedAt ? [observedAt] : []))
   if (credits && creditsAt) observed.push(creditsAt)
   const lastSeenAt = observed.sort().at(-1) ?? null
-  const cooling = cooldown !== null || credentialCooldown(file, now)
+  const cooling = cooldown !== null
   let state: ProviderAccountUsage['state'] = lastSeenAt ? 'ready' : 'no-data'
   if (file.unavailable === true && !cooling) state = 'unknown'
   if (cooling) state = 'cooldown'
@@ -204,6 +204,7 @@ function accountSnapshot(
     checkedAt: lastSeenAt,
     lastSeenAt,
     state,
+    stateObservedAt: new Date(now).toISOString(),
     source: 'cli-proxy-management',
     credits,
     ...(cooldown ? { cooldown } : {}),
@@ -248,8 +249,8 @@ function observedCooldown(
   for (const item of candidates) {
     const value = object(item)
     if (value?.scope !== 'credential') continue
-    const observedAt = timestamp(value.observed_at, now) ?? managementObservedAt
-    if (!observedAt) continue
+    const observedAt =
+      timestamp(value.observed_at, now) ?? managementObservedAt ?? new Date(now).toISOString()
     let until = timestamp(value.retry_at, Number.MAX_VALUE)
     const seconds = value.remaining_seconds
     if (
@@ -272,19 +273,15 @@ function observedCooldown(
     }
     if (!selected || (until ?? '') > (selected.until ?? '')) selected = candidate
   }
-  return selected
-}
-
-function credentialCooldown(file: JsonObject, now: number): boolean {
-  const retry = timestamp(file.next_retry_after, Number.MAX_VALUE)
-  if (retry && Date.parse(retry) > now) return true
-  if (!Array.isArray(file.cooldowns)) return false
-  return file.cooldowns.some((value) => {
-    const cooldown = object(value)
-    if (cooldown?.scope !== 'credential') return false
-    const until = timestamp(cooldown.retry_at, Number.MAX_VALUE)
-    return until !== null && Date.parse(until) > now
-  })
+  if (selected) return selected
+  const until = timestamp(file.next_retry_after, Number.MAX_VALUE)
+  if (!until || Date.parse(until) <= now) return null
+  return {
+    reason: 'unknown',
+    until,
+    observedAt: new Date(now).toISOString(),
+    source: 'proxy-state',
+  }
 }
 
 function cachedCredits(

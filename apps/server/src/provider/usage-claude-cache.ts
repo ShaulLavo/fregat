@@ -1,3 +1,4 @@
+import type { SDKControlGetUsageResponse } from '@anthropic-ai/claude-agent-sdk'
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import * as v from 'valibot'
@@ -31,8 +32,8 @@ export async function readClaudeUsageCache(
       cache.fetchedAtMs > nowMs
     )
       return null
-    const known: Record<string, { utilization: number; resets_at: string | null }> = {}
-    for (const id of ['five_hour', 'seven_day', 'seven_day_opus', 'seven_day_sonnet']) {
+    const known: NonNullable<SDKControlGetUsageResponse['rate_limits']> = {}
+    for (const id of ['five_hour', 'seven_day', 'seven_day_opus', 'seven_day_sonnet'] as const) {
       const window = v.safeParse(
         v.object({
           utilization: v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100)),
@@ -42,6 +43,16 @@ export async function readClaudeUsageCache(
       )
       if (window.success) known[id] = window.output
     }
+    const extra = v.safeParse(
+      v.object({
+        is_enabled: v.boolean(),
+        monthly_limit: v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0))),
+        used_credits: v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0))),
+        utilization: v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100))),
+      }),
+      cache.utilization.extra_usage,
+    )
+    if (extra.success) known.extra_usage = extra.output
     const { probe } = claudeUsageProbe({
       rate_limits_available: true,
       rate_limits: known,

@@ -84,6 +84,9 @@ export class ProviderUsageStore {
   private timer: ReturnType<typeof setTimeout> | null = null
   private closed = false
   private generation = 0
+  private writeRetryAt = 0
+  private failedWrites = 0
+  private suppressedWrites = 0
   private proxySourceKey: string | null = null
   private readonly now: () => number
   private readonly policy: () => UsageRefreshPolicy
@@ -152,7 +155,7 @@ export class ProviderUsageStore {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
     await Promise.allSettled([...this.probes.values(), this.proxyProbe])
-    this.persist()
+    this.persist(true)
   }
 
   accept(event: ProviderRuntimeEvent) {
@@ -176,8 +179,9 @@ export class ProviderUsageStore {
 
   async read(): Promise<ProviderUsageResult> {
     const native = this.targets().map((target) => this.snapshot(target))
-    const mappings = this.options.proxyInstanceIds?.() ?? []
-    const configured = this.options.proxyConfigured?.() ?? Boolean(this.options.readProxy)
+    const mappings = this.proxyMappings()
+    const configured =
+      (this.options.proxyConfigured?.() ?? Boolean(this.options.readProxy)) || mappings.length > 0
     const proxy =
       configured && this.proxyAccounts.length === 0
         ? [
@@ -229,7 +233,7 @@ export class ProviderUsageStore {
           resetsAt: window.resetsAt,
           windowMinutes: window.windowMinutes,
           status: feedWindowStatus(window),
-          lastSeenAt: window.observedAt ?? account.checkedAt,
+          lastSeenAt: window.observedAt ?? null,
           source: safeFeedText(window.source ?? account.source ?? 'unknown'),
         })),
         cooldown: account.cooldown ?? null,
@@ -278,9 +282,16 @@ export class ProviderUsageStore {
     }
   }
 
+  private proxyMappings() {
+    return [...new Set(this.options.proxyInstanceIds?.() ?? [])].filter((id) => {
+      const account = this.registry.usageAccount(id)
+      return account?.enabled && account.driverKind === 'codex'
+    })
+  }
+
   private targets() {
     const targets = new Map<string, AccountTarget>()
-    const mapped = new Set(this.options.proxyInstanceIds?.() ?? [])
+    const mapped = new Set(this.proxyMappings())
     for (const providerInstanceId of this.registry.listInstances()) {
       if (mapped.has(providerInstanceId)) continue
       const account = this.registry.usageAccount(providerInstanceId)
@@ -496,7 +507,8 @@ export class ProviderUsageStore {
         source: newer ? source : previous.source,
         planType: newer ? (update.planType ?? previous.planType) : previous.planType,
         windows: mergeUsageWindows(previous.windows, updates),
-        credits: newer ? (update.credits ?? previous.credits ?? null) : (previous.credits ?? null),
+        credits:
+          newer && update.credits !== undefined ? update.credits : (previous.credits ?? null),
       },
     })
   }
@@ -529,7 +541,7 @@ export class ProviderUsageStore {
 
   private withFreshness(account: ProviderAccountUsage): ProviderAccountUsage {
     const windows = account.windows.map((window) => {
-      const observedAt = window.observedAt ?? account.checkedAt
+      const observedAt = window.observedAt ?? null
       return {
         ...window,
         observedAt,
@@ -612,8 +624,12 @@ export class ProviderUsageStore {
     }
   }
 
-  private persist() {
+  private persist(force = false) {
     if (!this.options.cacheFile) return
+    if (!force && this.now() < this.writeRetryAt) {
+      this.suppressedWrites += 1
+      return
+    }
     const active = new Set(this.targets().map((target) => target.accountKey))
     const cache = {
       version: 1,
@@ -629,10 +645,22 @@ export class ProviderUsageStore {
         durability: 'fsync-file',
         mode: 0o600,
       })
+      if (this.failedWrites)
+        recordChatPipelineInfo('chat.pipeline.provider_usage.cache_write_recovered', {
+          failedAttempts: this.failedWrites,
+          suppressedWrites: this.suppressedWrites,
+        })
+      this.failedWrites = 0
+      this.suppressedWrites = 0
+      this.writeRetryAt = 0
     } catch {
-      recordChatPipelineWarning('chat.pipeline.provider_usage.cache_write_failed', {
-        outcome: 'memory-retained',
-      })
+      this.failedWrites += 1
+      this.writeRetryAt = this.now() + this.policy().failureCooldownMs
+      if (this.failedWrites === 1)
+        recordChatPipelineWarning('chat.pipeline.provider_usage.cache_write_failed', {
+          outcome: 'memory-retained',
+          retryAfterMs: this.policy().failureCooldownMs,
+        })
     }
   }
 }
@@ -687,6 +715,7 @@ function validCachedAccount(account: ProviderAccountUsage, nowMs: number) {
   if (account.planType && Buffer.byteLength(account.planType) > 128) return false
   if (account.checkedAt && !validObservedAt(account.checkedAt, nowMs)) return false
   if (account.lastSeenAt && !validObservedAt(account.lastSeenAt, nowMs)) return false
+  if (account.stateObservedAt && !validObservedAt(account.stateObservedAt, nowMs)) return false
   if (account.routing?.lastServedAt && !validObservedAt(account.routing.lastServedAt, nowMs))
     return false
   if (
@@ -696,9 +725,7 @@ function validCachedAccount(account: ProviderAccountUsage, nowMs: number) {
   )
     return false
   if (account.credits && !Number.isFinite(account.credits.balance)) return false
-  return account.windows.every((window) =>
-    validWindow(window, window.observedAt ?? account.checkedAt, nowMs),
-  )
+  return account.windows.every((window) => validWindow(window, window.observedAt ?? null, nowMs))
 }
 
 function validWindow(
@@ -714,7 +741,7 @@ function validWindow(
   )
     return false
   if (window.resetsAt && !validTimestamp(window.resetsAt)) return false
-  return validObservedAt(observedAt, nowMs)
+  return observedAt === null ? window.usedPercent === null : validObservedAt(observedAt, nowMs)
 }
 
 function retainProxyObservations(
@@ -725,6 +752,10 @@ function retainProxyObservations(
   const newer =
     !previous.checkedAt ||
     (account.checkedAt && Date.parse(account.checkedAt) >= Date.parse(previous.checkedAt))
+  const previousStateAt = previous.stateObservedAt ?? previous.checkedAt
+  const stateAt = account.stateObservedAt ?? account.checkedAt
+  const newerState =
+    !previousStateAt || Boolean(stateAt && Date.parse(stateAt) >= Date.parse(previousStateAt))
   const updates = account.windows.filter((window) => {
     const known = previous.windows.find((entry) => entry.id === window.id)
     if (!known?.observedAt) return true
@@ -736,9 +767,14 @@ function retainProxyObservations(
         Date.parse(window.resetsAt) >= Date.parse(known.resetsAt)),
     )
   })
+  const control = newerState ? account : previous
   return {
     ...previous,
     ...(newer ? account : {}),
+    state: control.state,
+    stateObservedAt: control.stateObservedAt,
+    routing: control.routing,
+    cooldown: control.cooldown ?? null,
     windows: mergeUsageWindows(previous.windows, updates),
   }
 }
@@ -750,6 +786,8 @@ function accountState(
   staleAfterMs: number,
 ): NonNullable<ProviderAccountUsage['state']> {
   if (account.state === 'disabled') return 'disabled'
+  if (account.source === 'cli-proxy-management' && account.state === 'unknown') return 'unknown'
+  if (account.state === 'cooldown' && !account.cooldown) return 'unknown'
   if (account.state === 'cooldown' && account.cooldown) {
     const current = account.cooldown.until
       ? Date.parse(account.cooldown.until) > nowMs
@@ -788,8 +826,9 @@ function boundFeed(feed: ProviderUsageFeed): ProviderUsageFeed {
       break
     }
     // The strict v1 contract has no omission field; partial allowance remains unknown.
+    const state = feed.accounts[index]!.state
     account.state =
-      account.windows.length !== windows.length ? 'unknown' : feed.accounts[index]!.state
+      account.windows.length !== windows.length && state === 'ready' ? 'unknown' : state
   }
   return bounded
 }

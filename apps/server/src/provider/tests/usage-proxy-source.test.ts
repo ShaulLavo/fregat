@@ -248,6 +248,75 @@ test('reports cooldown while leaving serving attribution unknown', async () => {
   expect(accounts[1]?.routing?.lastServedAt).toBeNull()
 })
 
+test.each([
+  { next_retry_after: '2026-10-03T12:30:00Z' },
+  {
+    cooldowns: [{ scope: 'credential', retry_at: '2026-10-03T12:30:00Z', reason: 'quota' }],
+  },
+])('observes live cooldown state independently of historical quota: %j', async (state) => {
+  const accounts = await readProxyUsage({
+    url: URL,
+    secret: SECRET,
+    now: () => NOW,
+    fetch: async () =>
+      Response.json({
+        files: [
+          {
+            id: 'a',
+            provider: 'codex',
+            ...state,
+            quota: { observed_at: SEEN, signals: { 'x-codex-primary-used-percent': '25' } },
+          },
+        ],
+      }),
+  })
+  expect(accounts[0]).toMatchObject({
+    state: 'cooldown',
+    stateObservedAt: new Date(NOW).toISOString(),
+    checkedAt: SEEN,
+    lastSeenAt: SEEN,
+    windows: [{ observedAt: SEEN, usedPercent: 25 }],
+    cooldown: {
+      reason: 'cooldowns' in state ? 'quota' : 'unknown',
+      until: '2026-10-03T12:30:00.000Z',
+      observedAt: new Date(NOW).toISOString(),
+      source: 'proxy-state',
+    },
+    routing: { active: false },
+  })
+})
+
+test('observes unavailable management state at request start without restamping quotas', async () => {
+  let clock = NOW
+  const accounts = await readProxyUsage({
+    url: URL,
+    secret: SECRET,
+    now: () => clock,
+    fetch: async () => {
+      clock += 60_000
+      return Response.json({
+        files: [
+          {
+            id: 'a',
+            provider: 'codex',
+            unavailable: true,
+            quota: { observed_at: SEEN, signals: { 'x-codex-primary-used-percent': '25' } },
+          },
+        ],
+      })
+    },
+  })
+  expect(accounts[0]).toMatchObject({
+    state: 'unknown',
+    stateObservedAt: new Date(NOW).toISOString(),
+    checkedAt: SEEN,
+    lastSeenAt: SEEN,
+    windows: [{ observedAt: SEEN }],
+    routing: { active: false },
+  })
+  expect(accounts[0]?.cooldown).toBeUndefined()
+})
+
 test('repeated cache inspection leaves the observation and relative reset unchanged', async () => {
   const fetch = async () =>
     Response.json({

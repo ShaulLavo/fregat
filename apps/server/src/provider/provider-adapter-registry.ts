@@ -242,8 +242,8 @@ export class ProviderAdapterRegistry {
       enabled: instance.config.enabled !== false,
       credentialFingerprint: credentialFingerprint(instance.credentialPaths),
       claudeCachePath:
-        instance.config.driverKind === 'claude'
-          ? claudeUsageCachePath(instance.env.CLAUDE_CONFIG_DIR)
+        instance.config.driverKind === 'claude' && instance.credentialPaths.length > 0
+          ? claudeUsageCachePath(instance.env)
           : null,
     }
   }
@@ -253,8 +253,9 @@ export class ProviderAdapterRegistry {
       string,
       { id: string; driverKind: 'claude' | 'codex'; roots: string[] }
     >()
-    for (const { config, env } of this.instances.values()) {
+    for (const { config, credentialPaths, env } of this.instances.values()) {
       if (
+        credentialPaths.length === 0 ||
         config.enabled === false ||
         (config.driverKind !== 'claude' && config.driverKind !== 'codex')
       )
@@ -262,8 +263,8 @@ export class ProviderAdapterRegistry {
       const driverKind = config.driverKind === 'claude' ? 'claude' : 'codex'
       const home =
         driverKind === 'claude'
-          ? (env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), '.claude'))
-          : (env.CODEX_HOME ?? path.join(homedir(), '.codex'))
+          ? (env.CLAUDE_CONFIG_DIR ?? path.join(env.HOME ?? homedir(), '.claude'))
+          : (env.CODEX_HOME ?? path.join(env.HOME ?? homedir(), '.codex'))
       const roots =
         driverKind === 'claude'
           ? [path.resolve(home, 'projects')]
@@ -796,9 +797,11 @@ function compareProviderSnapshots(left: ProviderSnapshot, right: ProviderSnapsho
   )
 }
 
-function claudeUsageCachePath(configDir: string | undefined) {
-  if (!configDir || path.resolve(configDir) === path.join(homedir(), '.claude'))
-    return path.join(homedir(), '.claude.json')
+function claudeUsageCachePath(env: NodeJS.ProcessEnv) {
+  const home = env.HOME ?? homedir()
+  const configDir = env.CLAUDE_CONFIG_DIR
+  if (!configDir || path.resolve(configDir) === path.join(home, '.claude'))
+    return path.join(home, '.claude.json')
   return path.join(configDir, '.claude.json')
 }
 

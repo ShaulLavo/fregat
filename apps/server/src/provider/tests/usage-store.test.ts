@@ -5,6 +5,7 @@ import {
   providerDriverKindSchema,
   providerInstanceIdSchema,
   sessionIdSchema,
+  type ProviderAccountUsage,
   type ProviderInstanceId,
   type ProviderUsageWindow,
 } from '@workspace/contracts'
@@ -15,6 +16,15 @@ import { MOCK_DRIVER_KIND, mockDriver } from '../drivers/mock'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import type { ProviderRuntimeEvent } from '../types'
 import { ProviderUsageStore } from '../usage-store'
+import { readProxyUsage } from '../usage-proxy-source'
+import { SettingsStore } from '../../settings/store'
+import { testSettingsOptions } from '../../settings/testing'
+import { readFsLogs } from 'evlog/fs'
+import {
+  flushObservability,
+  initializeObservability,
+  resetObservabilityForTests,
+} from '../../observability/runtime'
 import type { ProviderUsageProbe, ProviderUsageReading } from '../utils/usage-windows'
 
 const WORK = v.parse(providerInstanceIdSchema, 'mock-work')
@@ -24,13 +34,343 @@ const HOME = path.join('/nonexistent', 'usage-store')
 const START_MS = Date.parse('2026-09-24T10:00:00.000Z')
 const registries: ProviderAdapterRegistry[] = []
 const roots: string[] = []
+const settingsStores: SettingsStore[] = []
 
 afterEach(async () => {
+  await resetObservabilityForTests()
+  for (const settings of settingsStores.splice(0)) settings.close()
   await Promise.all(registries.splice(0).map((registry) => registry.dispose()))
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
 describe('provider usage store', () => {
+  it('updates proxy restrictions independently of retained quota ages and clears recovered cooldowns', async () => {
+    const f = await usageFixture()
+    const base = (await f.store.read()).accounts[0]!
+    const at = new Date(START_MS).toISOString()
+    let snapshot: ProviderAccountUsage = {
+      ...base,
+      accountKey: `proxy:${'a'.repeat(64)}`,
+      source: 'cli-proxy-management',
+      state: 'ready',
+      stateObservedAt: at,
+      checkedAt: at,
+      lastSeenAt: at,
+      windows: [{ ...window('primary', 30), observedAt: at }],
+      routing: { mode: 'rotating', active: true, lastServedAt: null },
+    }
+    const root = await mkdtemp(path.join(tmpdir(), 'usage-control-state-'))
+    roots.push(root)
+    const cacheFile = path.join(root, 'accounts.json')
+    const options = { now: () => f.clock.ms, cacheFile, readProxy: async () => [snapshot] }
+    const store = new ProviderUsageStore(f.registry, options)
+    await store.refresh()
+    f.clock.ms += 300_000
+    snapshot = {
+      ...snapshot,
+      state: 'disabled',
+      stateObservedAt: new Date(f.clock.ms).toISOString(),
+      checkedAt: null,
+      lastSeenAt: null,
+      windows: [],
+      routing: { mode: 'rotating', active: false, lastServedAt: null },
+    }
+    await store.refresh()
+    expect((await store.read()).accounts.at(-1)).toMatchObject({
+      state: 'disabled',
+      checkedAt: at,
+      windows: [{ observedAt: at, usedPercent: 30 }],
+      routing: { active: false },
+    })
+    f.clock.ms += 300_000
+    const cooldown = {
+      reason: 'quota' as const,
+      until: new Date(f.clock.ms + 600_000).toISOString(),
+      observedAt: new Date(f.clock.ms).toISOString(),
+      source: 'proxy-state' as const,
+    }
+    snapshot = { ...snapshot, state: 'cooldown', stateObservedAt: cooldown.observedAt, cooldown }
+    await store.refresh()
+    expect((await store.feed()).accounts.at(-1)).toMatchObject({
+      state: 'cooldown',
+      checkedAt: at,
+      cooldown,
+      windows: [{ lastSeenAt: at }],
+    })
+    f.clock.ms += 300_000
+    snapshot = {
+      ...snapshot,
+      state: 'ready',
+      stateObservedAt: new Date(f.clock.ms).toISOString(),
+      cooldown: undefined,
+    }
+    await store.refresh()
+    expect((await store.read()).accounts.at(-1)).toMatchObject({ cooldown: null, checkedAt: at })
+    await store.close()
+    const restarted = new ProviderUsageStore(f.registry, options)
+    expect((await restarted.read()).accounts.at(-1)).toMatchObject({
+      cooldown: null,
+      checkedAt: at,
+      windows: [{ observedAt: at }],
+    })
+    await restarted.close()
+  })
+
+  it('does not overwrite newer control restrictions with newer quota carrying older control evidence', async () => {
+    const f = await usageFixture()
+    const base = (await f.store.read()).accounts[0]!
+    const at = new Date(START_MS).toISOString()
+    let snapshot: ProviderAccountUsage = {
+      ...base,
+      accountKey: `proxy:${'a'.repeat(64)}`,
+      source: 'cli-proxy-management',
+      state: 'disabled',
+      stateObservedAt: at,
+      checkedAt: at,
+      windows: [{ ...window('primary', 20), observedAt: at }],
+      routing: { mode: 'rotating', active: false, lastServedAt: null },
+    }
+    const store = new ProviderUsageStore(f.registry, {
+      now: () => f.clock.ms,
+      readProxy: async () => [snapshot],
+    })
+    await store.refresh()
+    f.clock.ms += 300_000
+    const next = new Date(f.clock.ms).toISOString()
+    snapshot = {
+      ...snapshot,
+      state: 'ready',
+      stateObservedAt: new Date(START_MS - 1000).toISOString(),
+      checkedAt: next,
+      windows: [{ ...window('primary', 30), observedAt: next }],
+      routing: { mode: 'rotating', active: true, lastServedAt: null },
+    }
+    await store.refresh()
+    expect((await store.feed()).accounts.at(-1)).toMatchObject({
+      state: 'disabled',
+      checkedAt: next,
+      routing: { active: false },
+      windows: [{ usedPercent: 30, lastSeenAt: next }],
+    })
+    await store.close()
+  })
+
+  it.each(['retry', 'unavailable'] as const)(
+    'keeps actual proxy %s restrictions over fresh quota windows',
+    async (restriction) => {
+      const f = await usageFixture()
+      const store = new ProviderUsageStore(f.registry, {
+        now: () => f.clock.ms,
+        readProxy: () =>
+          readProxyUsage({
+            url: 'http://127.0.0.1:18317',
+            secret: 'fixture-secret',
+            now: () => f.clock.ms,
+            fetch: async () =>
+              Response.json({
+                files: [
+                  {
+                    id: 'private-fixture',
+                    provider: 'codex',
+                    status: 'active',
+                    ...(restriction === 'retry'
+                      ? { next_retry_after: new Date(START_MS + 600_000).toISOString() }
+                      : { unavailable: true }),
+                    quota: {
+                      observed_at: new Date(START_MS).toISOString(),
+                      signals: {
+                        'x-codex-primary-used-percent': '25',
+                        'x-codex-primary-window-minutes': '300',
+                      },
+                    },
+                  },
+                ],
+              }),
+          }),
+      })
+      await store.refresh()
+      expect((await store.feed()).accounts.at(-1)).toMatchObject({
+        state: restriction === 'retry' ? 'cooldown' : 'unknown',
+        routing: { active: false },
+        windows: [{ usedPercent: 25, lastSeenAt: new Date(START_MS).toISOString() }],
+      })
+      await store.close()
+    },
+  )
+
+  it('clears explicit null credits while preserving omitted sparse native credits across restart', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'usage-credit-clear-'))
+    roots.push(root)
+    const f = await nativeClaudeFixture('codex')
+    const cacheFile = path.join(root, 'accounts.json')
+    const store = new ProviderUsageStore(f.registry, { now: () => f.clock.ms, cacheFile })
+    let credits: { balance: number; unlimited: boolean } | null | undefined = {
+      balance: 12,
+      unlimited: false,
+    }
+    stubUsage(f.registry, WORK, async () => ({
+      kind: 'reading',
+      update: { planType: 'max', windows: [], ...(credits === undefined ? {} : { credits }) },
+    }))
+    await store.refresh()
+    credits = undefined
+    f.clock.ms += 300_000
+    await store.refresh()
+    expect((await store.feed()).accounts[0]!.credits).toEqual({ balance: 12, unlimited: false })
+    credits = null
+    f.clock.ms += 300_000
+    await store.refresh()
+    expect((await store.read()).accounts[0]!.credits).toBeNull()
+    expect((await store.feed()).accounts[0]!.credits).toBeUndefined()
+    await store.close()
+    const restarted = new ProviderUsageStore(f.registry, { now: () => f.clock.ms, cacheFile })
+    expect((await restarted.read()).accounts[0]!.credits).toBeNull()
+    expect((await restarted.feed()).accounts[0]!.credits).toBeUndefined()
+    await restarted.close()
+  })
+
+  it('ignores cross-driver, disabled and removed proxy memberships without suppressing native Claude', async () => {
+    const f = await nativeClaudeFixture()
+    const root = await mkdtemp(path.join(tmpdir(), 'usage-mapping-settings-'))
+    roots.push(root)
+    const settings = new SettingsStore(testSettingsOptions(root))
+    settingsStores.push(settings)
+    await settings.write({
+      mutationId: 'cross-driver-proxy-map',
+      target: 'user',
+      operations: [
+        {
+          kind: 'set',
+          key: 'providers.proxyUsageProviderInstanceIds',
+          value: [WORK, PERSONAL, WORK_AGAIN],
+        },
+      ],
+    })
+    const codex = { ...mockDriver, driverKind: v.parse(providerDriverKindSchema, 'codex') }
+    const registry = new ProviderAdapterRegistry({
+      services: { cwd: process.cwd() },
+      drivers: [{ ...mockDriver, driverKind: v.parse(providerDriverKindSchema, 'claude') }, codex],
+    })
+    registries.push(registry)
+    const entries = [
+      {
+        providerInstanceId: WORK,
+        driverKind: v.parse(providerDriverKindSchema, 'claude'),
+        config: { credentialsPath: path.join(root, 'claude', 'credentials.json') },
+        environment: [{ name: 'CLAUDE_CONFIG_DIR', value: path.join(root, 'claude') }],
+      },
+      {
+        providerInstanceId: PERSONAL,
+        driverKind: codex.driverKind,
+        config: { credentialsPath: path.join(HOME, 'codex.json') },
+      },
+    ]
+    await registry.reconcile(entries)
+    const calls = stubUsage(registry, WORK, async () => reading([window('five_hour', 20)]))
+    const codexCalls = stubUsage(registry, PERSONAL, async () => reading([window('primary', 40)]))
+    const store = new ProviderUsageStore(registry, {
+      now: () => f.clock.ms,
+      proxyConfigured: () => true,
+      proxyInstanceIds: () => settings.snapshot().values['providers.proxyUsageProviderInstanceIds'],
+      cacheFile: path.join(root, 'usage.json'),
+    })
+    await store.refresh()
+    expect(calls.count).toBe(1)
+    expect(codexCalls.count).toBe(0)
+    expect((await store.read()).accounts.at(-1)!.providerInstanceIds).toEqual([PERSONAL])
+    expect((await store.read()).accounts[0]).toMatchObject({
+      driverKind: 'claude',
+      providerInstanceIds: [WORK],
+      windows: [{ usedPercent: 20 }],
+    })
+    await registry.reconcile([{ ...entries[0]! }, { ...entries[1]!, enabled: false }])
+    expect((await store.read()).accounts.at(-1)!.providerInstanceIds).toEqual([])
+    await registry.reconcile([entries[0]!])
+    expect((await store.read()).accounts.at(-1)!.providerInstanceIds).toEqual([])
+    await store.close()
+    const restarted = new ProviderUsageStore(registry, {
+      now: () => f.clock.ms,
+      cacheFile: path.join(root, 'usage.json'),
+      proxyConfigured: () => true,
+      proxyInstanceIds: () => settings.snapshot().values['providers.proxyUsageProviderInstanceIds'],
+    })
+    expect((await restarted.read()).accounts.at(-1)!.providerInstanceIds).toEqual([])
+    expect((await restarted.read()).accounts[0]!.driverKind).toBe('claude')
+    await restarted.close()
+  })
+
+  it('does not manufacture independent window age from account checkedAt', async () => {
+    const f = await usageFixture()
+    const base = (await f.store.read()).accounts[0]!
+    const store = new ProviderUsageStore(f.registry, {
+      now: () => f.clock.ms,
+      readProxy: async () => [
+        {
+          ...base,
+          accountKey: `proxy:${'a'.repeat(64)}`,
+          source: 'cli-proxy-management',
+          checkedAt: new Date(START_MS).toISOString(),
+          windows: [
+            { ...window('status-only', 0), usedPercent: null, status: 'warning', observedAt: null },
+          ],
+        },
+      ],
+    })
+    await store.refresh()
+    expect((await store.read()).accounts.at(-1)!.windows).toEqual([
+      expect.objectContaining({ observedAt: null, freshness: 'unknown' }),
+    ])
+    expect((await store.feed()).accounts.at(-1)!.windows).toEqual([
+      expect.objectContaining({ lastSeenAt: null, status: 'unknown' }),
+    ])
+    await store.close()
+  })
+
+  it('backs off cache writes, warns once per failed series and reports recovery counts', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'usage-write-series-'))
+    roots.push(root)
+    const logDir = path.join(root, 'logs')
+    initializeObservability({
+      OBSERVABILITY_CONSOLE: 'false',
+      OBSERVABILITY_DIR: logDir,
+      OBSERVABILITY_ENABLED: 'true',
+      OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+      NODE_ENV: 'production',
+    })
+    const blocker = path.join(root, 'blocked')
+    await writeFile(blocker, 'fixture blocks cache directory')
+    const f = await usageFixture()
+    const cacheFile = path.join(blocker, 'accounts.json')
+    const store = new ProviderUsageStore(f.registry, { now: () => f.clock.ms, cacheFile })
+    for (let count = 0; count < 5; count += 1)
+      store.accept(limitsEvent(WORK, [window('five_hour', count)]))
+    f.clock.ms += 600_000
+    store.accept(limitsEvent(WORK, [window('five_hour', 10)]))
+    await flushObservability()
+    const events = []
+    for await (const event of readFsLogs({ dir: logDir })) events.push(event)
+    expect(
+      events.filter((event) => event.action === 'chat.pipeline.provider_usage.cache_write_failed'),
+    ).toHaveLength(1)
+    await rm(blocker)
+    // Recovery waits for the same configured failure cooldown, then persists latest memory.
+    store.accept(limitsEvent(WORK, [window('five_hour', 11)]))
+    f.clock.ms += 600_000
+    store.accept(limitsEvent(WORK, [window('five_hour', 12)]))
+    await flushObservability()
+    const recovered = []
+    for await (const event of readFsLogs({ dir: logDir })) recovered.push(event)
+    expect(
+      recovered.filter(
+        (event) => event.action === 'chat.pipeline.provider_usage.cache_write_recovered',
+      ),
+    ).toEqual([expect.objectContaining({ failedAttempts: 2, suppressedWrites: 5 })])
+    expect(
+      JSON.parse(await readFile(cacheFile, 'utf8')).accounts[0].snapshot.windows[0].usedPercent,
+    ).toBe(12)
+    await store.close()
+  })
+
   it('does not carry a previous proxy-source failure cooldown into its replacement', async () => {
     const f = await usageFixture()
     let source = 'http://127.0.0.1:18317'
@@ -457,7 +797,7 @@ describe('provider usage store', () => {
   })
 
   it('uses an explicit proxy allowance mapping without guessing account identity or probing native', async () => {
-    const f = await usageFixture()
+    const f = await nativeClaudeFixture('codex')
     const calls = stubUsage(f.registry, WORK, async () => reading([window('five_hour', 10)]))
     const mapped = new ProviderUsageStore(f.registry, {
       proxyInstanceIds: () => [WORK, WORK_AGAIN],
@@ -470,11 +810,25 @@ describe('provider usage store', () => {
     expect(accounts.find((account) => account.accountKey === 'local-proxy-source')).toMatchObject({
       state: 'no-data',
       checkedAt: null,
-      providerInstanceIds: [WORK, WORK_AGAIN],
+      providerInstanceIds: [WORK],
       routing: { mode: 'unknown', active: null },
     })
     expect(accounts.some((account) => account.windows.length)).toBe(false)
     await mapped.close()
+    const unconfigured = new ProviderUsageStore(f.registry, {
+      proxyInstanceIds: () => [WORK],
+      proxyConfigured: () => false,
+    })
+    await unconfigured.refresh()
+    expect((await unconfigured.read()).accounts).toEqual([
+      expect.objectContaining({
+        accountKey: 'local-proxy-source',
+        state: 'no-data',
+        providerInstanceIds: [WORK],
+      }),
+    ])
+    expect(calls.count).toBe(0)
+    await unconfigured.close()
   })
 })
 
