@@ -678,6 +678,7 @@ export const selectors = {
   fontPickerGroup: (page: Page, name: 'Recent' | 'Suggested') =>
     page.locator('[data-slot="combobox-group-label"]', { hasText: name }),
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
+  navigationError: (page: Page) => page.getByRole('alert').filter({ hasText: 'Fix with AI' }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
   mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
