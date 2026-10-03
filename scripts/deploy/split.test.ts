@@ -15,6 +15,23 @@ test('portable release and installation have separate commands', () => {
   expect(scripts).not.toHaveProperty('release:packages')
 })
 
+test.each([
+  [
+    'docs/verification/2026-09-19-chat-follow-up.md',
+    'bun run deploy --server --slug=chat-follow-up',
+  ],
+  [
+    'docs/verification/2026-09-19-editor-splits.md',
+    "bun run deploy --slug=editor-splits --reason='Add editor split views'",
+  ],
+  [
+    'plans/207-one-repo-with-mirrors.md',
+    '[x] Deploy PR #199 with `bun run deploy --server --restart`',
+  ],
+])('historical execution receipt %s preserves its executed command', (file, command) => {
+  expect(readFileSync(path.join(root, file), 'utf8')).toContain(command)
+})
+
 test('release help works with an empty HOME and no machine installation', () => {
   const scratch = mkdtempSync(path.join(tmpdir(), 'fregat-release-help-'))
   const home = path.join(scratch, 'home')

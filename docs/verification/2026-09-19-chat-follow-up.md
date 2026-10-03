@@ -18,6 +18,6 @@ The reusable `chat-follow-up` scenario creates its own session and closes only t
 
 55 focused adapter, steering, latest-turn, and session-projection tests passed. Server typecheck, changed-file lint and formatting, and diff whitespace checks passed. The scripts-wide typecheck remains blocked by unrelated DOM typing errors in existing editor, theme, and terminal scenarios; it reported none in the new chat scenario.
 
-`bun run install-release --server --slug=chat-follow-up` built and verified the candidate, restarted the production service, and passed the mesh live check. `/platform/release` confirmed both web and server on `20260919T192636Z-e4ee5f1d-chat-follow-up`.
+`bun run deploy --server --slug=chat-follow-up` built and verified the candidate, restarted the production service, and passed the mesh live check. `/platform/release` confirmed both web and server on `20260919T192636Z-e4ee5f1d-chat-follow-up`.
 
 This repair ports the reference's turn-lifecycle and resume behavior. Platform still uses native `turn/steer` for corrections; t3code sends busy follow-ups through `turn/start`.

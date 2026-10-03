@@ -43,10 +43,12 @@ export function localCommand({
   slice,
   graceSeconds,
   runtimeLimitSeconds = null,
+  runtimeDeadline,
 }: Launch & {
   readonly slice: string
   readonly graceSeconds: number
   readonly runtimeLimitSeconds?: number | null
+  readonly runtimeDeadline?: number
 }) {
   return [
     'systemd-run',
@@ -82,6 +84,9 @@ export function localCommand({
     ...(runtimeLimitSeconds === null
       ? []
       : ['--runtime', String(runtimeLimitSeconds), '--startup', String(DEADLINE_START_SECONDS)]),
+    ...(runtimeDeadline === undefined
+      ? []
+      : ['--deadline', String(Math.floor(runtimeDeadline * 100))]),
     accountingFile,
     ...command,
   ]
@@ -146,6 +151,8 @@ export type JobSpec =
       readonly entryLock: number
       /** Finite runtime enforced by systemd on the scope and the whole slice; null for none. */
       readonly runtimeLimitSeconds: number | null
+      /** Absolute boot-time deadline, also checked inside the scope before payload execution. */
+      readonly runtimeDeadline?: number
     })
   | (JobBase & { readonly host: 'pi'; readonly maxWallSec?: number })
 
@@ -236,6 +243,7 @@ function launchCommand(job: JobSpec, unit: string, accountingFile: string) {
     ...launch,
     graceSeconds: job.graceSeconds,
     runtimeLimitSeconds: job.runtimeLimitSeconds,
+    runtimeDeadline: job.runtimeDeadline,
     slice: jobSlice(job),
   })
 }

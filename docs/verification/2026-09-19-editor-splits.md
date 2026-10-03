@@ -33,6 +33,6 @@ Fold lifetime support also changes the linked `/work/projects/Editor/packages/ed
 
 ## Deployment
 
-Release `20260919T194711Z-e4ee5f1d-editor-splits` is served at [the mesh deployment](https://omarchy.mesh.shaulavo.dev/platform/). `bun run install-release --slug=editor-splits --reason='Add editor split views'` passed candidate verification and the live browser check. `/platform/release` confirmed the release. The server bundle was reused without restarting the service.
+Release `20260919T194711Z-e4ee5f1d-editor-splits` is served at [the mesh deployment](https://omarchy.mesh.shaulavo.dev/platform/). `bun run deploy --slug=editor-splits --reason='Add editor split views'` passed candidate verification and the live browser check. `/platform/release` confirmed the release. The server bundle was reused without restarting the service.
 
 The production `editor-split-folds` scenario passed all six phases, including copy, nested split, duplicate collapse, and drag to the top edge. Both independent fold states survived. Screenshots were inspected, the fixture stayed unchanged and was removed, and the operation window had no warn-level logs. Evidence: `/work/tmp/fregat-evidence/20260919T194731Z-scenario-editor-split-folds/`. The deployment check is `/work/platform-production/releases/20260919T194711Z-e4ee5f1d-editor-splits/live-check.json`.

@@ -212,7 +212,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 - [x] Update repository rules and current scripts to the canonical source folders. Retain
       `/work/projects/Editor` and `/work/projects/ghostty-webgpu` as references without changing
       permissions, deleting data or editing global memory outside this checkout.
-- [x] Deploy PR #199 with `bun run install-release --server --restart` and confirm the live check.
+- [x] Deploy PR #199 with `bun run deploy --server --restart` and confirm the live check.
 
 ## Source-integration validation
 
