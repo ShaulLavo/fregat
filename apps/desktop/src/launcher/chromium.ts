@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs'
+import { EvlogError } from 'evlog'
 import type { BrowserCandidate } from './browser'
 import { CdpClient, cdpPipe } from './cdp'
 import { browserProfile, chromiumArguments } from './profile'
@@ -38,7 +39,7 @@ export type ChromiumWindow = { kind: 'handoff' }
 
 export function assertChromiumVersion(product: unknown) {
   const major = typeof product === 'string' ? /^Chrome\/(\d+)\./.exec(product)?.[1] : undefined
-  if (major && Number(major) >= 126) return
+  if (major && Number(major) >= 126) return Number(major)
   throw launcherErrors.VERSION_UNSUPPORTED({
     internal: { reportedMajor: major ? Number(major) : null, requiredMajor: 126 },
   })
@@ -71,7 +72,12 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     if (hasVerifiedInstall(profile, receipt)) {
       try {
         const result = await launchInstalledBrowser(remaining, profile, false)
-        options.onOpen({ engine: 'chromium', installed: true, installation: 'receipt' })
+        options.onOpen({
+          engine: 'chromium',
+          installed: true,
+          installation: 'receipt',
+          displayMode: 'standalone',
+        })
         return result
       } catch (error) {
         options.signal?.throwIfAborted()
@@ -105,6 +111,7 @@ async function installAndLaunch(
     () => {},
   )
   let startupPhase = 'version'
+  let browserMajor: number | undefined
   const cdp = cdpPipe(child.stdio[3] as number, child.stdio[4] as number)
   let closing: Promise<void> | undefined
   let handedOff = false
@@ -169,7 +176,7 @@ async function installAndLaunch(
       })
     }
     startupPhase = 'installation'
-    assertChromiumVersion(first.version.product)
+    browserMajor = assertChromiumVersion(first.version.product)
     await ensureInstalledApp(startupCdp, options.url)
     const urls = await controllerAppUrls(startupCdp, options.url)
     rememberVerifiedInstall(profile, installReceipt(options.url, options.manifest))
@@ -194,9 +201,26 @@ async function installAndLaunch(
       running = true
       handedOff = true
     }
-    options.onOpen({ engine: 'chromium', installed: true, product: first.version.product })
+    options.onOpen({
+      engine: 'chromium',
+      installed: true,
+      product: first.version.product,
+      controllerMode: 'headless',
+      installationPage: 'static',
+      displayMode: 'standalone',
+    })
     return { kind: 'handoff' }
   } catch (error) {
+    if (EvlogError.isEvlogError(error) && error.internal)
+      Object.assign(error.internal, {
+        startupPhase,
+        browserMajor,
+        browserFamily: options.candidate.family,
+        controllerMode: 'headless',
+        waitedMs: Math.round(supervisor.elapsedMs()),
+        ...diagnostics.snapshot(),
+        transport: cdp.snapshot(),
+      })
     if (!handedOff) await close()
     options.signal?.throwIfAborted()
     const internal = (error as { internal?: { reason?: string } }).internal
