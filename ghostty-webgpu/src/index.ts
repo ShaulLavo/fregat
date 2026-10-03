@@ -60,6 +60,7 @@ export type {
   TerminalFontMeasurement,
 } from './dom/fit.js'
 export type { TerminalPointerOwner } from './dom/pointer.js'
+export type { TerminalApi, TerminalResult } from './dom/terminal-api.js'
 export type { TerminalScrollbarClock } from './dom/scrollbar.js'
 export type {
   GhosttyWebGpuFrameHandler,
@@ -165,3 +166,5 @@ export type { TerminalViewportOptions, TerminalViewportPaint } from './dom/viewp
 export { DomTerminalRenderer, renderFrameToHtml } from './render/dom/renderer.js'
 export type { RenderFrameHtmlOptions } from './render/dom/renderer.js'
 export { snapshotRenderState } from './render/frame.js'
+
+export type { TerminalSubmittedFrame, TerminalSubmittedRow } from './dom/submitted-frame.js'
