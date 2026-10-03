@@ -87,6 +87,29 @@ fixture('publishes a single HTML folder directly with its relative assets', ({ r
   })
 })
 
+fixture('publishes an HTML page with the files it names as one site', ({ root }) => {
+  const page = path.join(root, 'mock.html')
+  writeFileSync(page, '<script src="./main.js"></script><img src="logo.png">')
+  writeFileSync(path.join(root, 'main.js'), 'script fixture')
+  writeFileSync(path.join(root, 'logo.png'), 'image fixture')
+  showFiles([page, path.join(root, 'main.js'), path.join(root, 'logo.png')], {
+    run: (args) => {
+      const uploaded = args[3]!
+      expect(readFileSync(path.join(uploaded, 'index.html'), 'utf8')).toContain('./main.js')
+      expect(readFileSync(path.join(uploaded, 'main.js'), 'utf8')).toBe('script fixture')
+      expect(readFileSync(path.join(uploaded, 'logo.png'), 'utf8')).toBe('image fixture')
+      return {
+        exitCode: 0,
+        stderr: '',
+        stdout: JSON.stringify({
+          url: 'https://show.example',
+          app: { visibility: 'private', expiresAt: '2030-01-01T00:00:00Z' },
+        }),
+      }
+    },
+  })
+})
+
 fixture('reports missing files and mesh failures with stderr', ({ root }) => {
   expect(() => showFiles([])).toThrow('Choose files')
   expect(() => showFiles([path.join(root, 'missing.png')])).toThrow('missing or unavailable')
