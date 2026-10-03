@@ -1,10 +1,22 @@
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { chromium } from 'playwright'
 import { expect, test } from 'vitest'
 
 const repository = path.resolve(import.meta.dirname, '..')
 const require = createRequire(path.join(repository, 'editor/package.json'))
 const { createLogger, loadConfigFromFile } = await import(require.resolve('vite'))
+
+const ghosttyNeedsSwiftShader =
+  process.platform === 'linux' &&
+  process.env.GHOSTTY_BROWSER_HARDWARE !== '1' &&
+  (process.env.GHOSTTY_BROWSER_ENGINE ?? 'chromium') === 'chromium'
+const swiftShaderDriver = path.join(
+  path.dirname(chromium.executablePath()),
+  'vk_swiftshader_icd.json',
+)
+const missingSwiftShader = ghosttyNeedsSwiftShader && !existsSync(swiftShaderDriver)
 
 const configurations = [
   'apps/server/vitest.config.ts',
@@ -18,9 +30,13 @@ const configurations = [
 ]
 
 for (const loader of ['bundle', 'native'] as const) {
-  test.each(configurations)(
+  test.for(configurations)(
     '%s loads with ' + loader + ' without native compatibility warnings',
-    async (relative) => {
+    async (relative, { skip }) => {
+      if (relative === 'ghostty-webgpu/vitest.browser.config.ts' && missingSwiftShader)
+        skip(
+          'Ghostty Chromium config loading requires the installed Playwright SwiftShader Vulkan driver',
+        )
       const configFile = path.join(repository, relative)
       const warnings: string[] = []
       const logger = createLogger()
