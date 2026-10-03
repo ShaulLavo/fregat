@@ -1,4 +1,4 @@
-import { appendFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import * as v from 'valibot'
@@ -7,9 +7,11 @@ import {
   providerInstanceIdSchema,
   providerUsageHistorySchema,
 } from '@workspace/contracts'
-import { afterEach, expect, test, vi } from 'vitest'
-import { createTestApp, closeTestApps } from '../../../test/server'
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest'
+import { createTestApp, createTestDatabase, closeTestApps } from '../../../test/server'
 import { appUsageHistory } from '../../app'
+import { providerUsageTurns } from '../../db/schema'
+import { systemErrors } from '../../system/structured-errors'
 import { testSettingsOptions } from '../../settings/testing'
 import { nativeClaudeResponse } from '../../testing/transcript-usage'
 import { MockProviderAdapter } from '../adapters/mock'
@@ -270,4 +272,87 @@ test('synthetic native drivers declare paths before becoming transcript or cache
 
   expect.soft(registry.usageAccount(instance)?.claudeCachePath).toBeNull()
   expect(registry.transcriptUsageSources()).toEqual([])
+})
+
+test('history reads retain recorded supplements before native initialization and after an identity failure', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'usage-history-pending-'))
+  roots.push(root)
+  const database = createTestDatabase()
+  const common = {
+    accountKey: null,
+    driverKind: 'claude',
+    providerInstanceId: 'recorded-claude',
+    sessionId: 'recorded-session',
+    model: 'recorded-model',
+    recordedAt: new Date().toISOString(),
+    inputTokens: 100,
+    outputTokens: 20,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    reasoningTokens: 0,
+    costUsd: 0.01,
+  }
+  let identityReads = 0
+  const failure = systemErrors.MACHINE_ID_UNAVAILABLE({
+    internal: { platform: 'darwin', exitCode: 1 },
+  })
+  const app = createTestApp({
+    homeDirectory: root,
+    workspaceRoot: root,
+    systemRoot: root,
+    metadataDatabase: database,
+    settings: testSettingsOptions(root),
+    themes: { root: path.join(root, 'themes') },
+    system: {
+      stateHome: path.join(root, 'state'),
+      machineId: () => {
+        identityReads += 1
+        throw failure
+      },
+    },
+    orchestration: { database: database.db, providerRuntime: false },
+    auth: { allowedOrigins: ['http://localhost:5173'] },
+    watch: false,
+  })
+  database.db
+    .insert(providerUsageTurns)
+    .values([
+      { ...common, purpose: 'turn', turnId: 'native-covered-chat' },
+      { ...common, purpose: 'title', turnId: 'recorded-title' },
+      { ...common, driverKind: 'opencode', purpose: 'turn', turnId: 'uncovered-chat' },
+    ])
+    .run()
+  const upstream = vi.spyOn(globalThis, 'fetch')
+  onTestFinished(() => upstream.mockRestore())
+  const beforeResponse = await app.handle(
+    new Request('http://localhost/providers/usage/history?days=7&utcOffsetMinutes=0', {
+      headers: { Origin: 'http://localhost:5173' },
+    }),
+  )
+  expect(beforeResponse.status).toBe(200)
+  const before = v.parse(providerUsageHistorySchema, await beforeResponse.json())
+  expect(before.totals).toMatchObject({ tokens: 240, turns: 2, costUsd: 0.02 })
+  expect(before.purposes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ purpose: 'title', turns: 1 }),
+      expect.objectContaining({ purpose: 'turn', turns: 1 }),
+    ]),
+  )
+  expect(before.coverage).toMatchObject({ status: 'pending', scannedAt: null, sources: [] })
+  expect(identityReads).toBe(0)
+  const collector = appUsageHistory(app)
+  expect(collector.read({ days: 30, utcOffsetMinutes: 180 }).totals).toEqual(before.totals)
+  expect(identityReads).toBe(0)
+  await expect(collector.initialize()).rejects.toBe(failure)
+  expect(identityReads).toBe(1)
+  const after = collector.read({ days: 7, utcOffsetMinutes: 0 })
+  expect(after.totals).toEqual(before.totals)
+  expect(after.coverage).toEqual(before.coverage)
+  expect(identityReads).toBe(1)
+  expect(upstream).not.toHaveBeenCalled()
+  await expect(
+    readFile(path.join(root, 'state', 'usage', 'transcript-history.sqlite')),
+  ).rejects.toMatchObject({ code: 'ENOENT' })
+  await collector.close()
+  expect(identityReads).toBe(1)
 })

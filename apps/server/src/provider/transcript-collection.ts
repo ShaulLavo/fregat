@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/query-core'
 import type { ProviderUsageHistoryCoverage, ProviderUsageHistoryQuery } from '@workspace/contracts'
 import { recordProcessInfo, recordProcessWarning } from '../observability/runtime'
 import { LocalTranscriptUsageService, type LocalTranscriptUsageOptions } from './transcript-history'
-import { aggregateTranscriptHistory } from './usage-history'
+import { aggregateTranscriptHistory, type ProviderUsageHistoryReader } from './usage-history'
 
 /** Owns the local scan schedule; route reads only project the retained service. */
 export class ProviderTranscriptCollection {
@@ -15,10 +15,16 @@ export class ProviderTranscriptCollection {
   private failedPasses = 0
   private readonly options: () => LocalTranscriptUsageOptions
   private readonly intervalMs: () => number
+  private readonly recordedHistory: ProviderUsageHistoryReader | undefined
 
-  constructor(options: () => LocalTranscriptUsageOptions, intervalMs: () => number) {
+  constructor(
+    options: () => LocalTranscriptUsageOptions,
+    intervalMs: () => number,
+    recordedHistory?: ProviderUsageHistoryReader,
+  ) {
     this.options = options
     this.intervalMs = intervalMs
+    this.recordedHistory = recordedHistory
   }
 
   read(query: ProviderUsageHistoryQuery) {
@@ -32,7 +38,12 @@ export class ProviderTranscriptCollection {
       bytesRead: 0,
       sources: [],
     }
-    return { ...aggregateTranscriptHistory([], query, Date.now()), coverage }
+    // Recorder supplements stay readable before native identity and scan initialization.
+    const records = [
+      ...(this.recordedHistory?.readUtilities(query) ?? []),
+      ...(this.recordedHistory?.readUncoveredSessions(query) ?? []),
+    ]
+    return { ...aggregateTranscriptHistory(records, query, Date.now()), coverage }
   }
 
   async initialize() {
