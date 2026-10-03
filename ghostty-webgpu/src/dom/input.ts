@@ -31,6 +31,8 @@ type InputSession = Pick<
 type LifecycleSession = Pick<TerminalSession<unknown>, 'setFocused'>
 
 export interface DomInputControllerOptions {
+  readonly claimKey?: (event: KeyboardEvent) => boolean
+  readonly claimText?: (type: 'paste' | 'text' | 'composition', data: TerminalInputData) => boolean
   readonly copySelection?: GhosttyWebGpuTerminalCopy
   readonly hooks?: GhosttyWebGpuTerminalInputHooks
   readonly onError: (cause: unknown, operation: string) => void
@@ -279,11 +281,19 @@ const pastePressPolicy = Object.freeze({ preventDefault: false, stopPropagation:
 const pasteRepeatPolicy = Object.freeze({ preventDefault: true, stopPropagation: false })
 const refusedKeyPolicy = Object.freeze({ preventDefault: false, stopPropagation: false })
 
+type CompositionState =
+  | { readonly phase: 'idle' }
+  | { readonly phase: 'cancelled'; readonly value: string }
+  | { readonly phase: 'active'; readonly value: string; readonly committed: boolean }
+  | { readonly phase: 'awaiting' | 'ended'; readonly value: string }
+
 class BrowserInputController implements DomInputController {
   private readonly abortController = new AbortController()
-  private committedDuringComposition = false
-  private composing = false
-  private compositionValue = ''
+  private composition: CompositionState = { phase: 'idle' }
+
+  private get composing(): boolean {
+    return this.composition.phase === 'active'
+  }
   private readonly composingKeyPresses = new Set<string>()
   private readonly deferredMacCommandPresses = new Map<string, KeyboardEvent>()
   private disposed = false
@@ -336,41 +346,78 @@ class BrowserInputController implements DomInputController {
 
   private readonly handleCompositionStart = (): void => {
     if (this.disposed) return
-    this.committedDuringComposition = false
-    this.composing = true
+    this.composition = { phase: 'active', value: '', committed: false }
     this.setCompositionValue('')
   }
 
   private readonly handleCompositionEnd = (event: CompositionEvent): void => {
     if (this.disposed) return
-    this.composing = false
-    if (this.committedDuringComposition) {
-      this.committedDuringComposition = false
-      this.setCompositionValue('')
+    if (this.composition.phase === 'cancelled') {
+      if (event.data) this.composition = { phase: 'cancelled', value: event.data }
       return
     }
-    const value = this.compositionValue
+    if (this.composition.phase !== 'active') return
+    const { committed, value } = this.composition
+    this.composition = { phase: 'idle' }
     this.setCompositionValue('')
-    if (value.length === 0 || value !== event.data) return
-    // UI Events updates the control before compositionend when this is the final commit.
+    if (committed) return
+    if (event.data.length === 0) {
+      this.composition = { phase: 'cancelled', value }
+      this.options.textarea.value = ''
+      return
+    }
+    if (value.length === 0 || value !== event.data) {
+      this.composition = { phase: 'awaiting', value: event.data }
+      this.options.textarea.value = ''
+      return
+    }
+    // Browsers may deliver the same final input after compositionend.
+    this.composition = { phase: 'ended', value }
     this.options.textarea.value = ''
-    this.invokeSession('input', value)
+    this.invokeSession('composition', value)
   }
 
   private readonly handleInput = (event: Event): void => {
     if (this.disposed) return
     const input = event as InputEvent
+    if (
+      this.composition.phase === 'cancelled' &&
+      (input.isComposing ||
+        input.inputType.includes('Composition') ||
+        (input.inputType === 'insertText' &&
+          this.inputValue(input.data) === this.composition.value))
+    ) {
+      this.options.textarea.value = ''
+      return
+    }
     if (input.isComposing) {
       this.setCompositionValue(this.inputValue(input.data))
       return
     }
     const value = this.takeInputValue(input.data)
     if (value.length === 0) return
-    if (this.composing) {
-      this.committedDuringComposition = true
-      this.setCompositionValue('')
+    if (this.composition.phase === 'ended') {
+      const duplicate =
+        value === this.composition.value &&
+        (input.inputType.includes('Composition') || input.inputType === 'insertText')
+      this.composition = { phase: 'idle' }
+      if (duplicate) return
     }
-    const operation = isPasteInput(input.inputType) ? 'paste' : 'input'
+    if (this.composition.phase === 'awaiting') {
+      const commit = value === this.composition.value
+      this.composition = { phase: 'idle' }
+      if (commit) {
+        this.invokeSession('composition', value)
+        return
+      }
+    }
+    if (this.composition.phase === 'active') {
+      this.composition = { phase: 'active', value: '', committed: true }
+      this.setCompositionValue('')
+      this.invokeSession('composition', value)
+      return
+    }
+    const operation = isPasteInput(input.inputType) ? 'paste' : 'text'
     this.invokeSession(operation, value)
   }
 
@@ -385,7 +432,23 @@ class BrowserInputController implements DomInputController {
 
   private readonly handleKey = (event: KeyboardEvent): void => {
     if (this.disposed) return
+    if (
+      event.type === 'keydown' &&
+      !isComposingKey(event, false) &&
+      this.composition.phase !== 'active'
+    ) {
+      this.composition = { phase: 'idle' }
+    }
     this.updateModifierTracking(event)
+    if (this.options.claimKey?.(event)) {
+      if (event.type === 'keydown' && !event.repeat) {
+        this.suppressedShortcuts.set(event.code, pasteRepeatPolicy)
+      }
+      if (event.type === 'keyup') this.suppressedShortcuts.delete(event.code)
+      this.deferredMacCommandPresses.clear()
+      event.preventDefault()
+      return
+    }
     const suppressedBeforeCustomHandler = this.suppressedShortcuts.has(event.code)
     const customAllowed = this.allowCustomKey(event)
     if (suppressedBeforeCustomHandler && this.consumeSuppressedShortcut(event)) {
@@ -430,7 +493,9 @@ class BrowserInputController implements DomInputController {
   }
 
   private setCompositionValue(value: string): void {
-    this.compositionValue = value
+    if (this.composition.phase === 'active') {
+      this.composition = { ...this.composition, value }
+    }
     try {
       this.options.onPreedit?.(value)
     } catch (cause) {
@@ -439,10 +504,11 @@ class BrowserInputController implements DomInputController {
   }
 
   private invokeSession(
-    operation: 'input' | 'paste',
+    operation: 'text' | 'paste' | 'composition',
     value: TerminalInputData,
   ): TerminalInputResult {
     if (this.isInputDisabled()) return new Uint8Array()
+    if (this.options.claimText?.(operation, value)) return new Uint8Array()
     this.beforeUserInput()
     try {
       if (operation === 'paste') return this.options.session.paste(value)
@@ -561,7 +627,7 @@ class BrowserInputController implements DomInputController {
       getSelection: () => session.getSelection(),
       hasSelection: () => session.selectionCoordinates() !== undefined,
       paste: (data: TerminalInputData) => this.invokeSession('paste', data),
-      sendInput: (data: TerminalInputData) => this.invokeSession('input', data),
+      sendInput: (data: TerminalInputData) => this.invokeSession('text', data),
     })
   }
 
@@ -652,8 +718,9 @@ class BrowserInputController implements DomInputController {
   }
 
   resetTransientState(): void {
-    this.committedDuringComposition = false
-    this.composing = false
+    if (this.composition.phase !== 'idle') {
+      this.composition = { phase: 'cancelled', value: this.composition.value }
+    }
     this.setCompositionValue('')
     this.composingKeyPresses.clear()
     this.deferredMacCommandPresses.clear()

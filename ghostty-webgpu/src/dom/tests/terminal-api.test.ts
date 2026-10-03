@@ -43,6 +43,8 @@ describe('shared terminal return convention', () => {
   it('preserves host methods and inherent asynchronous methods in both entries', () => {
     expectTypeOf<ReturnType<TerminalApi['on']>>().toEqualTypeOf<ReturnType<Terminal['on']>>()
     expectTypeOf<ReturnType<TerminalApi['focus']>>().toEqualTypeOf<void>()
+    expectTypeOf<TerminalApi<'async'>['use']>().toEqualTypeOf<TerminalApi<'sync'>['use']>()
+    expectTypeOf<TerminalApi['use']>().toEqualTypeOf<Terminal['use']>()
     expectTypeOf<TerminalApi['element']>().toEqualTypeOf<Terminal['element']>()
     expectTypeOf<ReturnType<TerminalApi['visibleLines']>>().toEqualTypeOf<readonly string[]>()
     expectTypeOf<ReturnType<TerminalApi['open']>>().toEqualTypeOf<Promise<void>>()
