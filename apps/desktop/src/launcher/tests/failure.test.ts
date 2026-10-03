@@ -76,6 +76,37 @@ test('pre-window failure writes public guidance and structured facts to stderr/l
   })
 })
 
+test('dev-server failure guides contributors through the ordinary Bun development path', () => {
+  const failure = launcherErrors.DEV_SERVER_UNREACHABLE({ internal: { waitedMs: 90_000 } })
+  expect(failure.status).toBe(503)
+  expect(failure.why).toContain('configured development URL')
+  expect(failure.fix).toContain('`bun run dev`')
+  expect(failure.fix).toContain('development environment')
+  expect(failure.fix).toContain('WEB_HOST, WEB_PORT, FS_HOST and PORT')
+  expect(`${failure.why} ${failure.fix}`).not.toMatch(/mesh|dev:serve/i)
+})
+
+test('dev-server failure reports safe timeout facts without a URL-valued message parameter', () => {
+  const failure = launcherErrors.DEV_SERVER_UNREACHABLE({ internal: { waitedMs: 90_000 } })
+  const logs: unknown[] = []
+  const stderr: string[] = []
+  const exits: number[] = []
+  reportStartFailure(failure, {
+    log: (facts) => logs.push(facts),
+    stderr: (line) => stderr.push(line),
+    exit: (code) => exits.push(code),
+  })
+  const facts = launcherFailureFacts(failure)
+  expect(facts).toMatchObject({
+    error: 'The development server did not answer.',
+    code: 'desktop.launcher.DEV_SERVER_UNREACHABLE',
+    internal: { waitedMs: 90_000 },
+  })
+  expect(logs).toEqual([facts])
+  expect(JSON.parse(stderr[0]!)).toEqual({ event: 'desktop.start_failed', ...facts })
+  expect(exits).toEqual([1])
+})
+
 test('unstructured failures cannot leak process arguments through the public failure surface', () => {
   const facts = launcherFailureFacts({ message: '/private/path --secret=value' })
   expect(facts).toMatchObject({
