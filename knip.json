@@ -22,6 +22,7 @@
         "src/fs/watch-worker.ts",
         "src/fs/tests/fixtures/crashing-watch-worker.ts",
         "src/system/tests/fixtures/activated-server.ts",
+        "src/system/tests/fixtures/file-lock-write-failure.ts",
         "test/factories/claude-ipc.cjs",
         "src/installation/remote-support.ts",
         "src/terminal-host/main.ts",
@@ -70,7 +71,6 @@
         "check-editor-backlog.mjs",
         "agent/browser.ts",
         "agent/desktop-display.ts",
-        "claude-gpt/run.ts",
         "large-file/bench.ts",
         "heavy/pi/launch.ts",
         "heavy/pi/run.ts",
@@ -119,7 +119,7 @@
         "parity/snooze.ts",
         "parity/wake.ts"
       ],
-      "ignoreBinaries": ["flock", "ssh-keygen", "systemd-run", "taskset"]
+      "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
       "ignoreDependencies": ["typescript-api"]
@@ -302,6 +302,10 @@
     "ghostty-webgpu": {
       "entry": ["src/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
+    },
+    "ghostty-webgpu-line-editor": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
     },
     "ghostty-webgpu/demo": {
       "entry": ["src/client.ts"],

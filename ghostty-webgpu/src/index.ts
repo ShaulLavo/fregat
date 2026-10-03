@@ -181,3 +181,4 @@ export type {
   TerminalInputHandler,
 } from './extensions/types.js'
 export type { TerminalGeneratedInput, TerminalInputModes } from './dom/types.js'
+export type { TerminalSubmittedFrame, TerminalSubmittedRow } from './dom/submitted-frame.js'

@@ -22,6 +22,7 @@ import type {
   TerminalMutationResult,
   TerminalTheme,
 } from '../term/types.js'
+import type { TerminalSubmittedFrame } from './submitted-frame.js'
 import type {
   GhosttyWebGpuTerminalDiagnostics,
   GhosttyWebGpuTerminalEventType,
@@ -48,6 +49,7 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   readonly hasPendingLinkResolution: boolean
   readonly hasPendingTimer: boolean
   readonly lifecycle: GhosttyWebGpuTerminalLifecycle
+  readonly submittedFrame: TerminalSubmittedFrame | undefined
   readonly textarea: HTMLTextAreaElement | undefined
 
   use<Api = void>(extension: Extension<Api>): ExtensionHandle<Api>
