@@ -269,6 +269,71 @@ describe('extension attachment', () => {
     expect(() => manager.use(inert('after-shutdown'))).toThrow('disposed')
   })
 
+  it.each(['OSC', 'command', 'OSC and command'])(
+    'rejects a reentrant provider getter that acquires the outer %s ownership',
+    (conflict) => {
+      const cleanup = vi.fn()
+      const observer = vi.fn()
+      const command = vi.fn()
+      const provideLinks = vi.fn(() => undefined)
+      let inner: ExtensionHandle | undefined
+      let signal: AbortSignal | undefined
+      const getter = vi.fn(() => {
+        inner = manager.use({
+          name: 'inner',
+          setup: () => ({ osc: { 7400: observer }, commands: { run: command } }),
+        })
+        return provideLinks
+      })
+      const provider = {
+        get provideLinks() {
+          return getter()
+        },
+      }
+      expect(() =>
+        manager.use({
+          name: 'outer',
+          setup: (scope) => {
+            signal = scope.signal
+            scope.own(cleanup)
+            return {
+              input: () => 'claim',
+              events: { title: vi.fn() },
+              links: provider,
+              osc: conflict === 'command' ? undefined : { 7400: vi.fn() },
+              commands: conflict === 'OSC' ? undefined : { run: vi.fn() },
+            }
+          },
+        }),
+      ).toThrow('already has an owner')
+      expect(getter).toHaveBeenCalledOnce()
+      expect(cleanup).toHaveBeenCalledOnce()
+      expect(signal?.aborted).toBe(true)
+      expect(manager.hasInput).toBe(false)
+      expect(manager.hasEvent('title')).toBe(false)
+      const links = vi.fn()
+      manager.visitLinks(links)
+      expect(links).not.toHaveBeenCalled()
+      const payload = {
+        number: 7400,
+        payload: 'inner',
+        terminator: 'st' as const,
+        truncated: false,
+      }
+      manager.observeOsc(7400, () => payload)
+      expect(observer).toHaveBeenCalledExactlyOnceWith(payload)
+      expect(manager.command('run')).toBe(command)
+      manager.command('run')!()
+      expect(command).toHaveBeenCalledOnce()
+      expect(errors).toHaveLength(1)
+      expect(errors[0]?.operation).toBe('extension.setup')
+      expect(inner).toBeDefined()
+      inner!.dispose()
+      expect(manager.hasOsc(7400)).toBe(false)
+      expect(manager.command('run')).toBeUndefined()
+    },
+  )
+
   it('does not publish hooks after a contribution getter disposes the manager', () => {
     expect(() =>
       manager.use({

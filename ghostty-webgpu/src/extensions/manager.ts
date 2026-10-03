@@ -331,11 +331,12 @@ export class ExtensionManager {
     const osc = oscHooks ? Object.entries(oscHooks) : []
     const commands = commandHooks ? Object.entries(commandHooks) : []
     const events = eventHooks ? Object.entries(eventHooks) : []
-    this.validateOsc(osc)
-    this.validateCommands(commands)
     for (const [, handler] of events) validateFunction(handler, 'Event')
     if (input) validateFunction(input, 'Input')
     if (links) validateFunction(links.provideLinks, 'Links')
+    // Contribution getters can attach another owner; check conflicts after all property reads.
+    this.validateOsc(osc)
+    this.validateCommands(commands)
     this.ensureActive()
     if (attachment.disposed)
       throw createGhosttyError('extension.use', 'Extension was disposed during setup')
