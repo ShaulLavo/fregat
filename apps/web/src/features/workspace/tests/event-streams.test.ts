@@ -7,13 +7,15 @@ import { startWorkspaceEventStreams } from '@/features/workspace/state/event-str
 import { toClientError } from '@/lib/client-error-taxonomy'
 import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 import { test, expect } from '../../../../test/fixtures'
+import type { TestServer } from '../../../../test/server'
 import { createCuttableEventsClient, createObservedInProcessClient } from '../../../../test/client'
 import type { StreamInterruption } from '@/features/workspace/state/event-streams'
 
 const events: Record<string, unknown>[] = []
 let serverReadyInSetup = false
-beforeEach(({ task }) => {
-  serverReadyInSetup = 'server' in task.context
+// Cold server imports belong to setup, so the test timeout measures stream behavior.
+beforeEach<{ server: TestServer }>(({ server }) => {
+  serverReadyInSetup = Boolean(server.app)
   events.length = 0
   vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
   vi.stubEnv('VITE_CLIENT_LOG_LEVEL', 'info')
