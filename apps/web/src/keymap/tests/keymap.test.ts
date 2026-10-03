@@ -154,3 +154,16 @@ test('same-depth users win, targeted unbind keeps a different command, and null 
     ).report,
   ).toContainEqual(expect.objectContaining({ reason: 'unbound', command: 'workspace.saveFile' }))
 })
+
+test('unsupported upstream Save keys stay in inventory while valid save bindings remain active', () => {
+  for (const preset of ['ours', 'zed'] as const) {
+    const result = presetPlatformKeyBindings('linux', preset)
+    expect(result.bindings.some((binding) => binding.keys === 'SAVE')).toBe(false)
+    expect(result.unmapped).toContainEqual(
+      expect.objectContaining({ keys: 'SAVE', command: 'workspace::Save' }),
+    )
+    expect(result.bindings).toContainEqual(
+      expect.objectContaining({ keys: 'Mod+S', command: 'workspace.saveFile' }),
+    )
+  }
+})

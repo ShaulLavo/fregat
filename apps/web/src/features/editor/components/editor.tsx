@@ -278,8 +278,16 @@ export function Editor({
     [mountedPath, mountedEditors],
   )
   const settingsSurface = currentTarget.kind === 'settings-json'
+  const preparingMarkdown =
+    analysisAllowed &&
+    markdownPreview &&
+    syntaxHighlightingEnabled &&
+    liveDocument !== null &&
+    formattedDocument !== key &&
+    !provisional
   const focusTarget = useEditorFocusTarget({
     controller,
+    enabled: !preparingMarkdown,
     writable: editability === 'editable',
     id: {
       key,
@@ -338,14 +346,6 @@ export function Editor({
     controller,
     document: liveDocument,
   })
-
-  const preparingMarkdown =
-    analysisAllowed &&
-    markdownPreview &&
-    syntaxHighlightingEnabled &&
-    liveDocument !== null &&
-    formattedDocument !== key &&
-    !provisional
 
   // The notice is a row under the frame, so it never covers the last lines of the document.
   return (

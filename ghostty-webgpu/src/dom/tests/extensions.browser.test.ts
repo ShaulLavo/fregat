@@ -135,6 +135,46 @@ describe('public extension activation', () => {
     expect(output).toEqual([])
   })
 
+  it.each([
+    { name: 'isComposing', init: { key: 'n', code: 'KeyN', isComposing: true } },
+    { name: 'Dead', init: { key: 'Dead', code: 'KeyD' } },
+    { name: 'Process', init: { key: 'Process', code: 'KeyP' } },
+    { name: 'keyCode229', init: { key: 'n', code: 'KeyN', keyCode: 229 } },
+    { name: 'active composition', init: { key: 'n', code: 'KeyN' }, active: true },
+  ])(
+    'offers original $name keys before native composition suppression',
+    async ({ init, active }) => {
+      const seen: KeyboardEvent[] = []
+      let claim = false
+      const terminal = await openTerminal({
+        extensions: [
+          {
+            name: 'original-ime',
+            setup: () => ({
+              input: (input) => {
+                if (input.type !== 'key' || !('event' in input)) return 'pass'
+                seen.push(input.event)
+                return claim ? 'claim' : 'pass'
+              },
+            }),
+          },
+        ],
+      })
+      const output: string[] = []
+      terminal.onData((data) => output.push(decoder.decode(data)))
+      if (active) terminal.textarea!.dispatchEvent(new CompositionEvent('compositionstart'))
+      for (const ownership of [false, true]) {
+        claim = ownership
+        const event = new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true })
+        terminal.textarea!.dispatchEvent(event)
+        expect(seen.at(-1)).toBe(event)
+        expect(event.defaultPrevented).toBe(ownership)
+      }
+      expect(seen).toHaveLength(2)
+      expect(output).toEqual([])
+    },
+  )
+
   it('returns a typed synchronous API with per-terminal identity and reverse cleanup', async () => {
     const order: string[] = []
     const signals: AbortSignal[] = []

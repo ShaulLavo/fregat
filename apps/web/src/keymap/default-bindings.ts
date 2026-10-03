@@ -17,7 +17,12 @@ import {
   type EditorKeymapPack,
 } from '@singapore-editor/core/keymap'
 import { detectPlatform, type KeymapEntry } from '@fregat/hotkeys'
-import { chordKeys, parsedChord, type PlatformName } from '@workspace/client-core/commands/chord'
+import {
+  chordKeys,
+  isBindableChord,
+  parsedChord,
+  type PlatformName,
+} from '@workspace/client-core/commands/chord'
 import type { KeybindingPreset } from '@workspace/client-core/commands/metadata'
 
 import ours from '@/keymap/presets/ours.json'
@@ -119,13 +124,22 @@ export function presetPlatformKeyBindings(
       )
       continue
     }
-    if (!row.command || !row.context || !isPlatformCommandId(row.command)) {
+    if (
+      !row.command ||
+      !row.context ||
+      !isPlatformCommandId(row.command) ||
+      !isBindableChord(row.keys)
+    ) {
       unmapped.push({
         platform,
         context: row.context ?? row.upstreamContext,
         command: row.upstreamCommand,
         keys: row.keys,
-        reason: row.reason ?? 'The command is unavailable in this client.',
+        reason:
+          row.reason ??
+          (isBindableChord(row.keys)
+            ? 'The command is unavailable in this client.'
+            : 'The key is unavailable in this client.'),
       })
       continue
     }
