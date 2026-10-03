@@ -19,13 +19,14 @@ function headlessFlag(argument) {
   return /^--headless(?:=.*)?$/.test(argument) || argument === '--ozone-platform=headless'
 }
 
-function observedEnvironment(product, tokens, requestedHeadless, executable) {
+function observedEnvironment(browserVersion, tokens, requestedHeadless, executable) {
   const unknown = tokens.some(
     (arg) =>
       headlessFlag(arg) && !/^(?:--headless(?:=new|=old)?|--ozone-platform=headless)$/.test(arg),
   )
   const headless =
-    product.startsWith('HeadlessChrome/') ||
+    browserVersion.product.startsWith('HeadlessChrome/') ||
+    /\bHeadlessChrome\//.test(browserVersion.userAgent ?? '') ||
     tokens.some(headlessFlag) ||
     /(?:^|\/)(?:chrome-headless-shell|headless_shell)(?: \(deleted\))?$/.test(executable ?? '')
   let launchMode = headless ? 'headless' : 'headed'
@@ -302,7 +303,7 @@ export async function observeOwnedBrowserProvenance({
     )
   const { tokens, ...evidence } = observation
   const environment = observedEnvironment(
-    browserVersion.product,
+    browserVersion,
     tokens,
     requestedHeadless,
     observation.observedExecutable,
@@ -315,6 +316,11 @@ export async function observeOwnedBrowserProvenance({
     observedParentPid: observation.before.parentPid,
     observedProfile,
     originalExecveArguments: null,
+    observedFlagTokens: tokens.filter((argument) => argument.startsWith('--')),
+    observedFlagTokensQualification:
+      observation.observedArguments === null
+        ? 'Exact whitespace tokens in observed OS rendering; original argv boundaries are unavailable'
+        : 'Exact NUL-delimited current OS fields; original execve arguments are unobserved',
     profileRepresentation:
       observation.observedArguments === null
         ? 'Whitespace-delimited observed profile token; original argument boundaries are unavailable'
@@ -330,7 +336,7 @@ export async function observeOwnedBrowserProvenance({
       'Requested launch provenance; observed process command line retained independently',
     environment,
     launchModeSource:
-      'Actual Browser.getVersion product, observed OS headless flags and Linux executable; requested mode is compared independently',
+      'Actual Browser.getVersion product/userAgent, observed OS headless flags and Linux executable; requested mode is compared independently',
     acceptanceModeGuard: acceptance ? 'passed-headed' : 'not-requested',
     cdpBrowserCommandLine: {
       status: 'NOT_QUERIED_AUTOMATION_DEPENDENT',

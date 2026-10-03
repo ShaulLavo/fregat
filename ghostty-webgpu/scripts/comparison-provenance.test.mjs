@@ -613,3 +613,41 @@ test('rendered profile whitespace ambiguity fails closed without returning a tru
     /profile boundary is ambiguous/,
   )
 })
+
+test('observed flag tokens come from OS evidence with explicit representation qualification', async () => {
+  const extra = '--use-angle=gl'
+  const argv = ['browser', '--user-data-dir=' + taskRoot + '/tmp/p', ...requested, extra]
+  for (const options of [
+    { argv },
+    { argv, raw: Buffer.from(argv.join(' ') + '\0') },
+    { argv, platform: 'darwin' },
+  ]) {
+    const result = await boundary(options).observe()
+    assert.deepEqual(result.observedFlagTokens, argv.slice(1))
+    assert(!result.requestedArguments.includes(extra))
+    assert.equal(result.originalExecveArguments, null)
+    const qualification = result.observedFlagTokensQualification
+    if (result.observedArguments === null) {
+      assert.match(qualification, /whitespace tokens.*original argv boundaries.*unavailable/)
+      continue
+    }
+    assert.match(qualification, /NUL-delimited current OS fields/)
+  }
+})
+
+for (const platform of ['linux', 'darwin']) {
+  test(`${platform} actual HeadlessChrome user agent rejects acceptance even with a Chrome product`, async () => {
+    const version = { product, userAgent: 'Mozilla/5.0 HeadlessChrome/154.0.8037.93 Safari/537.36' }
+    const external = boundary({ platform, version })
+    await assert.rejects(
+      external.observe({ acceptance: true, requestedHeadless: false }),
+      (error) => {
+        assert.equal(error.code, 'BROWSER_ACCEPTANCE_REQUIRES_HEADED')
+        assert.equal(error.evidence.environment.headless, true)
+        assert.equal(error.evidence.environment.launchMode, 'contradictory')
+        assert.deepEqual(error.evidence.browserVersion, version)
+        return true
+      },
+    )
+  })
+}
