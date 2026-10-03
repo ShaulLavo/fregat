@@ -40,20 +40,30 @@ const MODEL_B = modelRef('claude', 'sonnet')
 
 describe('settings mutation schemas', () => {
   it('covers every live scalar, including the committed post-plan additions', () => {
-    // Named by what makes a key NOT scalar: it has a bespoke mutation operation
-    // because one `set` cannot express an edit to it. Every other widget writes
-    // its whole value at once, whatever shape that value has — `code-theme` is a
-    // theme-id string, `palette` a palette id, `wallpaper` a per-mode object, and
-    // all three go through the scalar path.
-    //
-    // Listed as the complement on purpose. An allowlist of scalar widgets has to
-    // be edited every time a widget is added, and it silently went stale twice:
-    // this assertion and the `arrayContaining` below it had been contradicting
-    // each other since `workbench.palette` stopped being an enum. Adding a widget
-    // that genuinely needs its own operations is the rare case, and the one worth
-    // stopping on.
-    const bespokeWidgets = new Set(['complex', 'keybindings', 'machines', 'models', 'providers'])
-    const expected = SETTING_IDS.filter((id) => !bespokeWidgets.has(descriptorFor(id).widget))
+    // Widgets choose an editor; only keys with domain mutations leave the scalar path.
+    const bespokeSettings = new Set([
+      'environments.machines',
+      'lsp.servers',
+      'lsp.languageServers',
+      'lsp.semanticTokens.servers',
+      'providers.instances',
+      'models.hidden',
+      'models.order',
+      'models.favorites',
+      'keybindings.overrides',
+      'chat.projectResponseStreamingModes',
+      'chat.textGenerationModel',
+      'chat.projectTextGenerationModels',
+      'chat.projectGroupingOverrides',
+      'chat.projectAutoSettle',
+      'git.projectAutoPull',
+      'git.projectWorktreeSubmodules',
+      'git.projectWorktreeCleanupOnDelete',
+      'workbench.theme.customizations',
+      'spellcheck.words',
+      'developer.heavyJobClasses',
+    ])
+    const expected = SETTING_IDS.filter((id) => !bespokeSettings.has(id))
 
     expect(SCALAR_SETTING_IDS).toEqual(expected)
     expect(SCALAR_SETTING_IDS).toEqual(
@@ -65,6 +75,23 @@ describe('settings mutation schemas', () => {
         'editor.codeTheme.light',
       ]),
     )
+  })
+
+  it('validates and applies a whole proxy source selection through scalar mutations', () => {
+    const input = {
+      kind: 'set',
+      key: 'providers.proxyUsageProviderInstanceIds',
+      value: ['codex-proxy-a', 'codex-proxy-b'],
+    } as const
+    expect(descriptorFor(input.key).widget).toBe('complex')
+    expect(parseRequest([input]).success).toBe(true)
+    const result = applyIdempotently(
+      { 'providers.proxyUsageProviderInstanceIds': ['codex-proxy-old'] },
+      operation(input),
+    )
+    expect(result.raw).toEqual({ 'providers.proxyUsageProviderInstanceIds': input.value })
+    expect(result.touchedSettingIds).toEqual(['providers.proxyUsageProviderInstanceIds'])
+    expect(parseRequest([{ ...input, value: 'codex-proxy-a' }]).success).toBe(false)
   })
 
   it('validates and applies whole-record machine preferences through scalar mutations', () => {
