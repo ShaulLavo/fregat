@@ -176,6 +176,7 @@ work transferred into execution plans, the original issue links, and remaining i
 | [319](319-agent-ui-mcp.md)                            | Agents reveal and drive the Fregat UI over MCP                                  |
 | [320](320-compile-time-data.md)                       | Compile-time defaults, themes, bidi and search; conditional icon investigation  |
 | [327](327-virtualization-and-two-axis-tables.md)      | Two-axis tables and measured editor, search and shared-list virtualization work |
+| [335](335-stroke-icons.md)                            | Stroke icons only, Hugeicons by default, morphing icons, icon packs later       |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                             |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
