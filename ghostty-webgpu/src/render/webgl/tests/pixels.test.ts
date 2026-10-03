@@ -31,6 +31,16 @@ describe('pixel equality', () => {
     const actual = new Uint8Array(65536)
     const expected = new Uint8Array(actual.length)
     actual[index] = 255
-    expect(() => expectPixelsEqual(actual, expected)).toThrow()
+    expect(() => expectPixelsEqual(actual, expected)).toThrowError(
+      expect.objectContaining({ actual: index, expected: -1 }),
+    )
+  })
+
+  it('reports the first difference when several bytes differ', () => {
+    const actual = new Uint8Array([0, 0, 127, 255])
+    const expected = new Uint8Array([0, 0, 0, 0])
+    expect(() => expectPixelsEqual(actual, expected)).toThrowError(
+      expect.objectContaining({ actual: 2, expected: -1 }),
+    )
   })
 })
