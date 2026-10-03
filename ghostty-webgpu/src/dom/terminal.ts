@@ -547,7 +547,6 @@ export class Terminal {
     const result = this.session.write(data)
     if (this.stateValue !== 'open') return result
     this.accessibility?.notifyOutput()
-    this.updateScrollbar()
     this.renderer?.notifyWrite()
     return result
   }
@@ -558,7 +557,6 @@ export class Terminal {
     const result = this.session.writeln(data)
     if (this.stateValue !== 'open') return result
     this.accessibility?.notifyOutput()
-    this.updateScrollbar()
     this.renderer?.notifyWrite()
     return result
   }
