@@ -67,6 +67,7 @@ export function SettingsPage({
   const settingsOwner = useSettingsOwner()
   const {
     document,
+    defaultsError,
     projection,
     showJson,
     scope,
@@ -131,6 +132,8 @@ export function SettingsPage({
     focusTargetRef(element)
   }
 
+  if (defaultsError)
+    return <StatusMessage tone='destructive'>Defaults could not be loaded.</StatusMessage>
   if (document.isError && !document.data)
     return <StatusMessage tone='destructive'>Settings could not be loaded.</StatusMessage>
   if (!document.data || !projection) return <PageLoading showJson={showJson} />

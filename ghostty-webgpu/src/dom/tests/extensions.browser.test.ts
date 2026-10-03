@@ -876,6 +876,41 @@ describe('public worker extension integration', () => {
     await absent
   })
 
+  it('delivers submitted worker frames to an extension without a public frame listener', async () => {
+    const terminal = await createWorkerTerminal()
+    await terminal.open(workerContainer())
+    const extensionRevisions: number[] = []
+    const publicRevisions: number[] = []
+    const handle = await terminal.use({
+      name: 'worker frame observer',
+      setup: () => ({
+        events: {
+          frame: () => extensionRevisions.push(terminal.submittedFrame!.nativeRevision),
+        },
+      }),
+    })
+    const control = terminal.onFrame(() =>
+      publicRevisions.push(terminal.submittedFrame!.nativeRevision),
+    )
+    const first = await terminal.writeAndReadGeometry('control')
+    await vi.waitFor(() => {
+      expect(publicRevisions).toContain(first.revision)
+      expect(extensionRevisions).toContain(first.revision)
+    })
+    control.dispose()
+    const extensionOnly = await terminal.writeAndReadGeometry('extension only')
+    await vi.waitFor(() => expect(extensionRevisions).toContain(extensionOnly.revision))
+    handle.dispose()
+    const received = extensionRevisions.length
+    const detachedControl = terminal.onFrame(() =>
+      publicRevisions.push(terminal.submittedFrame!.nativeRevision),
+    )
+    const detached = await terminal.writeAndReadGeometry('detached')
+    await vi.waitFor(() => expect(publicRevisions).toContain(detached.revision))
+    expect(extensionRevisions).toHaveLength(received)
+    detachedControl.dispose()
+  })
+
   it('claims original worker input synchronously before forwarding and preserves later keyless text', async () => {
     const terminal = await createWorkerTerminal()
     await terminal.open(workerContainer())

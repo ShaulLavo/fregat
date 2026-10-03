@@ -772,7 +772,11 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.accessibility = this.createAccessibility(elements)
     const snapshot = this.readFrame()
     if (snapshot && this.execution.submittedFrame)
-      this.accessibility.update(snapshot, this.execution.submittedFrame.scrollbar)
+      this.accessibility.update(
+        snapshot,
+        this.execution.submittedFrame.scrollbar,
+        this.execution.kind === 'sync' ? undefined : this.execution.submittedOutput,
+      )
     return true
   }
 
@@ -1298,7 +1302,10 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private handleFrame(snapshot: RendererTextFrameSnapshot): void {
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     this.updateFrameUi(this.execution.kind === 'sync' ? this.execution.submit(snapshot) : snapshot)
-    if (this.execution.kind === 'async' && this.emitters.frame.hasListeners)
+    if (
+      this.execution.kind === 'async' &&
+      (this.emitters.frame.hasListeners || this.extensions?.hasEvent('frame'))
+    )
       this.emitHostEvent('frame', {
         rows: this.execution.submittedFrame?.rowPatches.map((row) => row.y) ?? [],
       })
@@ -1315,7 +1322,11 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       else this.invalidateLinks()
     })
     this.runUiOperation('frame.accessibility', () =>
-      this.accessibility?.update(snapshot, scrollbar),
+      this.accessibility?.update(
+        snapshot,
+        scrollbar,
+        this.execution.kind === 'sync' ? undefined : this.execution.submittedOutput,
+      ),
     )
     this.runUiOperation('frame.scrollbar', () => this.scrollbar?.update(scrollbar))
   }
