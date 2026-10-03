@@ -3,36 +3,21 @@ import type { ProviderInstanceId, SessionId } from '@workspace/contracts'
 import { useEffect } from 'react'
 
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import { providerUsageQueryOptions } from '@/features/chat/utils/provider-usage-query'
+import { providerUsageQueryOptions } from '@/lib/provider-usage'
 import { providerUsageKeys } from '@/features/chat/utils/query-keys'
-import { accountUsageFor, usageRefetchIntervalMs } from '@/features/chat/utils/usage-meter'
+import { accountsUsageFor } from '@/lib/provider-usage'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 
-/**
- * The plan windows of the account behind `providerInstanceId`. Providers report them
- * during a turn, so a running turn polls and a settled one refetches at once.
- */
+// The mapped account group follows bounded cache reads even while the composer is idle.
 export function useProviderUsage(
   providerInstanceId: ProviderInstanceId | null | undefined,
   sessionId: SessionId | null,
 ) {
   const queryClient = useQueryClient()
-  const running = useActiveChatProjection(
-    (state) => selectChatSessionById(state, sessionId)?.latestTurn?.state === 'running',
-  )
   const settledAt = useActiveChatProjection(
     (state) => selectChatSessionById(state, sessionId)?.latestTurn?.completedAt ?? null,
   )
-  const { data } = useQuery({
-    ...providerUsageQueryOptions(),
-    // A long turn can reach a limit halfway; the store answers from memory between probes.
-    refetchInterval: (query) =>
-      running
-        ? usageRefetchIntervalMs(
-            accountUsageFor(query.state.data, providerInstanceId)?.windows ?? [],
-          )
-        : false,
-  })
+  const { data, dataUpdatedAt } = useQuery(providerUsageQueryOptions())
 
   useEffect(() => {
     if (!settledAt) return
@@ -44,5 +29,5 @@ export function useProviderUsage(
     )
   }, [queryClient, settledAt])
 
-  return accountUsageFor(data, providerInstanceId)
+  return { accounts: accountsUsageFor(data, providerInstanceId), receivedAtMs: dataUpdatedAt }
 }

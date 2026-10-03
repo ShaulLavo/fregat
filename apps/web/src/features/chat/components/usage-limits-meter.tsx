@@ -6,44 +6,31 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { cn } from '@workspace/ui/lib/utils'
 import { useState } from 'react'
 
-import { TickerNumber } from '@/components/ticker-number'
-import { useCoarseNow } from '@/features/chat/hooks/use-coarse-now'
+import { ProviderAccountUsageDetails } from '@/components/provider-account-usage-details'
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { useCoarseNow } from '@/hooks/use-coarse-now'
+import { usageAccountLabel } from '@/lib/provider-usage'
 import { useCommandBus } from '@/keymap/hooks/use-command-bus'
-import {
-  formatPlanType,
-  liveUsageWindows,
-  tightestUsageWindow,
-  USAGE_TONE_TEXT,
-  usageCheckedLabel,
-  usageWindowLabel,
-  usageWindowTone,
-} from '@/features/chat/utils/usage-meter'
-import { UsageWindowRow } from './usage-window-row'
+import { composerUsageReadout } from '@/features/chat/utils/usage-meter'
 import { ResetCreditAction } from './reset-credit-action'
 
-/**
- * How much of the account's plan is left, beside the context ring and deliberately
- * unlike it: a gauge for the account, a ring for the conversation. The trigger shows
- * the window that will stop the agent first; the popover lists every window.
- */
+/** A source-mapped group keeps rotating accounts independent and selection explicit. */
 export function UsageLimitsMeter({
-  account,
+  accounts,
+  receivedAtMs = 0,
   compact = false,
 }: {
-  readonly account: ProviderAccountUsage
-  /** Narrow composer: the gauge alone, with the readout left to the popover. */
+  readonly accounts: readonly ProviderAccountUsage[]
+  readonly receivedAtMs?: number
   readonly compact?: boolean
 }) {
-  const nowMs = useCoarseNow()
+  // A query receipt can be newer than the shared minute sample, without changing source timestamps.
+  const nowMs = Math.max(useCoarseNow(), receivedAtMs)
+  const staleAfterMs = useSettingValue('providers.usageStaleAfterSeconds') * 1000
   const bus = useCommandBus()
   const [open, setOpen] = useState(false)
-  const windows = liveUsageWindows(account.windows, nowMs)
-  const tightest = tightestUsageWindow(windows)
-  if (!tightest) return null
-
-  const tone = usageWindowTone(tightest)
-  const label = usageWindowLabel(tightest, nowMs)
-
+  const readout = composerUsageReadout(accounts, nowMs, staleAfterMs)
+  const label = `Account allowances · ${readout}`
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <Tooltip>
@@ -53,13 +40,10 @@ export function UsageLimitsMeter({
               render={
                 <Button
                   aria-label={label}
-                  // Compact: the same square as the composer's other icon controls.
                   className={cn(
                     'cursor-pointer font-normal',
                     !compact && 'h-auto gap-1 px-1 py-0.5',
-                    USAGE_TONE_TEXT[tone],
                   )}
-                  data-tone={tone}
                   data-usage-meter
                   size={compact ? 'icon-sm' : 'sm'}
                   type='button'
@@ -67,21 +51,10 @@ export function UsageLimitsMeter({
                 >
                   <GaugeIcon
                     aria-hidden
-                    className={cn(
-                      'shrink-0',
-                      compact ? 'size-(--icon-size-sm)' : 'size-(--icon-size)',
-                    )}
+                    className={compact ? 'size-(--icon-size-sm)' : 'size-(--icon-size)'}
                   />
                   {compact ? null : (
-                    <span className='text-2xs tabular-nums'>
-                      {tightest.usedPercent === null ? (
-                        'Unknown'
-                      ) : (
-                        <>
-                          <TickerNumber value={Math.round(tightest.usedPercent)} />%
-                        </>
-                      )}
-                    </span>
+                    <span className='text-2xs font-mono tabular-nums'>{readout}</span>
                   )}
                 </Button>
               }
@@ -90,37 +63,46 @@ export function UsageLimitsMeter({
         />
         <TooltipContent>{label}</TooltipContent>
       </Tooltip>
-      <PopoverContent align='end' className='w-64 text-xs' data-usage-popover side='top'>
-        <div className='flex items-baseline justify-between gap-3'>
-          <span className='text-muted-foreground font-medium'>Plan usage</span>
-          {account.planType ? (
-            <span className='text-muted-foreground'>{formatPlanType(account.planType)}</span>
-          ) : null}
-        </div>
-        <ul className='mt-2 flex flex-col gap-2.5'>
-          {windows.map((window) => (
-            <UsageWindowRow key={window.id} nowMs={nowMs} window={window} />
-          ))}
-        </ul>
-        <ResetCreditAction account={account} />
-        <div className='mt-2.5 flex items-center justify-between gap-2'>
-          <p className='text-muted-foreground text-2xs tabular-nums' data-usage-checked>
-            {usageCheckedLabel(account.checkedAt, nowMs)}
+      <PopoverContent
+        align='end'
+        className='scroll-fade scroll-gutter flex max-h-[70vh] w-72 flex-col gap-2 overflow-y-auto overscroll-contain text-xs'
+        data-usage-popover
+        side='top'
+      >
+        <p className='text-xs font-medium'>Account allowances</p>
+        {accounts.length === 0 ? (
+          <p className='text-muted-foreground text-2xs'>
+            Account mapping unavailable. Selection unknown.
           </p>
-          <Button
-            onClick={() => {
-              setOpen(false)
-              bus.dispatch('workspace.showUsage', {
-                source: { kind: 'programmatic', caller: 'usage-meter' },
-              })
-            }}
-            size='sm'
-            type='button'
-            variant='ghost'
-          >
-            View usage
-          </Button>
-        </div>
+        ) : null}
+        {accounts.length > 1 ? (
+          <p className='text-muted-foreground text-2xs'>
+            Configured usage-source group. Allowances apply independently.
+          </p>
+        ) : null}
+        {accounts.map((account, index) => (
+          <div className='flex flex-col gap-1' key={account.accountKey}>
+            <ProviderAccountUsageDetails
+              account={account}
+              label={usageAccountLabel(account, index)}
+              nowMs={nowMs}
+            />
+            <ResetCreditAction account={account} />
+          </div>
+        ))}
+        <Button
+          onClick={() => {
+            setOpen(false)
+            bus.dispatch('workspace.showUsage', {
+              source: { kind: 'programmatic', caller: 'usage-meter' },
+            })
+          }}
+          size='sm'
+          type='button'
+          variant='ghost'
+        >
+          View usage
+        </Button>
       </PopoverContent>
     </Popover>
   )
