@@ -1,3 +1,4 @@
+import { detectPlatform } from '@fregat/hotkeys'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { RendererTheme } from '../../render/instances/types.js'
@@ -158,9 +159,8 @@ function dispatchComposition(target: HTMLTextAreaElement, type: string, data = '
   target.dispatchEvent(new CompositionEvent(type, { bubbles: true, data }))
 }
 
-function primaryModifier(view: Window = window): Pick<KeyboardEventInit, 'ctrlKey' | 'metaKey'> {
-  const apple = /^(Mac|iPhone|iPad|iPod)/iu.test(view.navigator.platform)
-  return apple ? { metaKey: true } : { ctrlKey: true }
+function primaryModifier(): Pick<KeyboardEventInit, 'ctrlKey' | 'metaKey'> {
+  return detectPlatform() === 'mac' ? { metaKey: true } : { ctrlKey: true }
 }
 
 async function animationFrames(count = 2): Promise<void> {

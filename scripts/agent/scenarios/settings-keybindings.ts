@@ -1,3 +1,4 @@
+import { readCaches } from '../cache-snapshot'
 import { deepEqual, equal, ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import * as v from 'valibot'
@@ -31,6 +32,7 @@ export const settingsKeybindings: Scenario = {
   name: 'settings-keybindings',
   description:
     'Contextual recording, preset clear/reset, reservations and targeted unbinds, with desktop and phone evidence from isolated settings.',
+  inspect: (page) => page.evaluate(readCaches),
   async run(page, { step }) {
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.keyboard.press('ControlOrMeta+,')
@@ -123,9 +125,14 @@ export const settingsKeybindings: Scenario = {
     await step('desktop-targeted-delete')
 
     await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(new URL('/', page.url()).href, { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'New session', exact: true }).waitFor()
+    await page.keyboard.press('ControlOrMeta+,')
+    await selectors.settingsSearch(page).fill('keyboard')
+    await selectors.shortcutsList(page).waitFor()
     await selectors.shortcutsSearch(page).fill(COMMAND)
     const narrow = selectors.shortcutRow(page, COMMAND).first()
-    await narrow.scrollIntoViewIfNeeded()
+    await narrow.waitFor()
     const height = (await narrow.boundingBox())?.height ?? 0
     ok(height >= 40, `Narrow row is a touch target at ${height}px`)
     await step('narrow-contextual-list')

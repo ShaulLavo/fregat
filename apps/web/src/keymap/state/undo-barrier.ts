@@ -40,15 +40,22 @@ export function createUndoBarrierPlugin(notify: () => void): EditorPlugin {
     name: 'platform.undo-barrier',
     activate(context) {
       const notified = new WeakSet<Event>()
-      return context.registerCommandContribution({
-        createContribution(commands) {
-          return commands.registerCommand('undo', ({ event }) => {
-            if (event?.type === 'keydown' && !notified.has(event)) {
-              notified.add(event)
-              notify()
-            }
-            return false
+      return context.registerViewContribution({
+        createContribution(view) {
+          const keymap = view.registerKeymapNode({
+            element: view.scrollElement,
+            context: '',
+            commands: {
+              undo: ({ source: event }) => {
+                if (event?.type === 'keydown' && !notified.has(event)) {
+                  notified.add(event)
+                  notify()
+                }
+                return false
+              },
+            },
           })
+          return { update: () => {}, dispose: () => keymap.dispose() }
         },
       })
     },

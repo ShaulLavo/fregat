@@ -370,7 +370,7 @@ class BrowserInputController implements DomInputController {
   private readonly handleKey = (event: KeyboardEvent): void => {
     if (this.disposed) return
     this.updateModifierTracking(event)
-    if (!isComposingKey(event, this.composing) && this.options.claimKey?.(event)) {
+    if (this.options.claimKey?.(event)) {
       if (event.type === 'keydown' && !event.repeat) {
         this.suppressedShortcuts.set(event.code, pasteRepeatPolicy)
       }
