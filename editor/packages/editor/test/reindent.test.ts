@@ -1,4 +1,4 @@
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createStringTextSnapshot } from '../src/documentTextSnapshot'
@@ -11,13 +11,7 @@ import {
 } from '../src/editor/reindent'
 import type { TextEdit } from '../src/tokens'
 import { Editor } from '../src/editor/Editor'
-import {
-  defaultEditorKeyBindings,
-  defaultEditorKeymapLayers,
-  editorCommandPackForCommand,
-  filterEditorKeymapLayersByCommandPacks,
-  readonlySafeEditorCommandPacks,
-} from '../src/editor/keymap'
+import { defaultKeyBindings, commandCategory, readonlyCommands } from './factories/keymap'
 import { registerEditorLanguageConfiguration } from '../src/editor/languageConfiguration'
 import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import type { ResolvedSelection } from '../src/selections'
@@ -85,25 +79,15 @@ function pressOn(editor: Editor, keyName: string, chord: Chord): void {
   )
 }
 
-/** The commands a host still binds once it has narrowed the keymap for a document nobody may edit. */
-function readonlyCommands(platform: 'mac' | 'windows' | 'linux'): readonly EditorCommandId[] {
-  return filterEditorKeymapLayersByCommandPacks(
-    defaultEditorKeymapLayers(platform),
-    readonlySafeEditorCommandPacks,
-  ).flatMap((layer) => layer.bindings.map((binding) => binding.command))
-}
-
 describe('reindent command wiring', () => {
   // A pack is what carries a binding into a layer and the dispatch predicate is what routes the id,
   // so a command missing from either is one no keystroke reaches.
   it.each(REINDENT_COMMAND_IDS)('gives %s a pack, a chord and a route', (command) => {
-    expect(editorCommandPackForCommand(command)).toBe('advanced-editing')
+    expect(commandCategory(command)).toBe('advanced-editing')
     expect(isEditorDocumentSelectionEditCommand(command)).toBe(true)
 
     for (const platform of ['mac', 'windows', 'linux'] as const) {
-      expect(defaultEditorKeyBindings(platform).map((binding) => binding.command)).toContain(
-        command,
-      )
+      expect(defaultKeyBindings(platform).map((binding) => binding.command)).toContain(command)
       // Rewriting indentation is an edit, so narrowing a keymap to what a reader may press drops it.
       expect(readonlyCommands(platform)).not.toContain(command)
     }

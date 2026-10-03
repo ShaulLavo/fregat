@@ -1,0 +1,7028 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`baseEditorKeymap carries an explicit predicate for every row > baseEditorKeymap 1`] = `
+{
+  "linux": [
+    {
+      "command": "cursorDocumentEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "End",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorDocumentStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Home",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLineEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "End",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLineStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Home",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDocumentEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDocumentStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageDown",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageUp",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLineEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLineStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "A",
+          "mod": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "redo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Y",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "redo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Z",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "undo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Z",
+          "mod": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "outdentSelection",
+      "context": "Editor && !EditorWidget && !tabFocusMode",
+      "keys": [
+        {
+          "key": "Tab",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "indentSelection",
+      "context": "Editor && !EditorWidget && !tabFocusMode",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteForward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Delete",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteBackward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Backspace",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Delete",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Backspace",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "insertNewlineAndIndent",
+      "context": "Editor && !EditorWidget && mode != single_line",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "insertNewlineAndIndent",
+      "context": "Editor && !EditorWidget && mode != single_line",
+      "keys": [
+        "Shift+Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "copy",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+C",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "cut",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+X",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "paste",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+V",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Mod+F",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor > (FindWidget && !ReplaceInput)",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Shift+Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "replaceOne",
+      "context": "Editor > ReplaceInput",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "lsp.rename.accept",
+      "context": "Editor > RenameWidget",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "lsp.rename.cancel",
+      "context": "Editor > RenameWidget",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.hide",
+      "context": "Editor > Tooltip",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.hide",
+      "context": "Editor > HoverVisible",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "markdown.openLink",
+      "context": "Editor > MarkdownLink",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollUp",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "ArrowUp",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollDown",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "ArrowDown",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.pageUp",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "PageUp",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.pageDown",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "PageDown",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollStart",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "Home",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollEnd",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "End",
+      ],
+      "source": "default",
+    },
+  ],
+  "mac": [
+    {
+      "command": "cursorDocumentEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "meta": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorDocumentStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "meta": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLineEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "meta": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLineStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "meta": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLineEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "End",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLineStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Home",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDocumentEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDocumentStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageDown",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageUp",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLineEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLineStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLineEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLineStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "A",
+          "mod": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "redo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Z",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "undo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Z",
+          "mod": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "outdentSelection",
+      "context": "Editor && !EditorWidget && !tabFocusMode",
+      "keys": [
+        {
+          "key": "Tab",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "indentSelection",
+      "context": "Editor && !EditorWidget && !tabFocusMode",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteForward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Delete",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteBackward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Backspace",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Delete",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Backspace",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "insertNewlineAndIndent",
+      "context": "Editor && !EditorWidget && mode != single_line",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "insertNewlineAndIndent",
+      "context": "Editor && !EditorWidget && mode != single_line",
+      "keys": [
+        "Shift+Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "copy",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+C",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "cut",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+X",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "paste",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+V",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Mod+F",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor > (FindWidget && !ReplaceInput)",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Shift+Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "replaceOne",
+      "context": "Editor > ReplaceInput",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "lsp.rename.accept",
+      "context": "Editor > RenameWidget",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "lsp.rename.cancel",
+      "context": "Editor > RenameWidget",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.hide",
+      "context": "Editor > Tooltip",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.hide",
+      "context": "Editor > HoverVisible",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "markdown.openLink",
+      "context": "Editor > MarkdownLink",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollUp",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "ArrowUp",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollDown",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "ArrowDown",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.pageUp",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "PageUp",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.pageDown",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "PageDown",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollStart",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "Home",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollEnd",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "End",
+      ],
+      "source": "default",
+    },
+  ],
+  "windows": [
+    {
+      "command": "cursorDocumentEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "End",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorDocumentStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Home",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLineEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "End",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLineStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Home",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "cursorLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDocumentEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDocumentStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageDown",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "PageUp",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLineEnd",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLineStart",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "selectAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "A",
+          "mod": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "redo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Y",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "redo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Z",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "undo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Z",
+          "mod": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "outdentSelection",
+      "context": "Editor && !EditorWidget && !tabFocusMode",
+      "keys": [
+        {
+          "key": "Tab",
+          "shift": true,
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "indentSelection",
+      "context": "Editor && !EditorWidget && !tabFocusMode",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteForward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Delete",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteBackward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Backspace",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteWordRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Delete",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "deleteWordLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Backspace",
+        },
+      ],
+      "source": "default",
+    },
+    {
+      "command": "insertNewlineAndIndent",
+      "context": "Editor && !EditorWidget && mode != single_line",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "insertNewlineAndIndent",
+      "context": "Editor && !EditorWidget && mode != single_line",
+      "keys": [
+        "Shift+Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "copy",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+C",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "cut",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+X",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "paste",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        "Mod+V",
+      ],
+      "preventDefault": false,
+      "source": "default",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Mod+F",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor > (FindWidget && !ReplaceInput)",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor > FindWidget",
+      "keys": [
+        "Shift+Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "replaceOne",
+      "context": "Editor > ReplaceInput",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "lsp.rename.accept",
+      "context": "Editor > RenameWidget",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "lsp.rename.cancel",
+      "context": "Editor > RenameWidget",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.hide",
+      "context": "Editor > Tooltip",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.hide",
+      "context": "Editor > HoverVisible",
+      "keys": [
+        "Escape",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "markdown.openLink",
+      "context": "Editor > MarkdownLink",
+      "keys": [
+        "Enter",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollUp",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "ArrowUp",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollDown",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "ArrowDown",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.pageUp",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "PageUp",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.pageDown",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "PageDown",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollStart",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "Home",
+      ],
+      "source": "default",
+    },
+    {
+      "command": "tooltip.scrollEnd",
+      "context": "Editor > (TooltipBody && !TooltipControl)",
+      "keys": [
+        "End",
+      ],
+      "source": "default",
+    },
+  ],
+}
+`;
+
+exports[`markdownPack carries an explicit predicate for every row > markdownPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "markdown.link",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "K",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.italic",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "I",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.bold",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "B",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.indentListItem",
+      "context": "Editor && !EditorWidget && markdown && writable && !tabFocusMode && !inlineSuggestionVisible && !suggestWidgetVisible",
+      "keys": [
+        "Tab",
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.outdentListItem",
+      "context": "Editor && !EditorWidget && markdown && writable && !tabFocusMode && !inlineSuggestionVisible && !suggestWidgetVisible",
+      "keys": [
+        "Shift+Tab",
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "markdown.link",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "key": "K",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.italic",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "key": "I",
+          "meta": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.bold",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "key": "B",
+          "meta": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.indentListItem",
+      "context": "Editor && !EditorWidget && markdown && writable && !tabFocusMode && !inlineSuggestionVisible && !suggestWidgetVisible",
+      "keys": [
+        "Tab",
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.outdentListItem",
+      "context": "Editor && !EditorWidget && markdown && writable && !tabFocusMode && !inlineSuggestionVisible && !suggestWidgetVisible",
+      "keys": [
+        "Shift+Tab",
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "markdown.link",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "K",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.italic",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "I",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.bold",
+      "context": "Editor && !EditorWidget && markdown",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "B",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.indentListItem",
+      "context": "Editor && !EditorWidget && markdown && writable && !tabFocusMode && !inlineSuggestionVisible && !suggestWidgetVisible",
+      "keys": [
+        "Tab",
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "markdown.outdentListItem",
+      "context": "Editor && !EditorWidget && markdown && writable && !tabFocusMode && !inlineSuggestionVisible && !suggestWidgetVisible",
+      "keys": [
+        "Shift+Tab",
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`readonlyDiffPack carries an explicit predicate for every row > readonlyDiffPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "cursorDocumentEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "End",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorDocumentStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Home",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLineEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "End",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLineStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "Home",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "alt": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDocumentEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDocumentStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLineEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLineStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRightSelect",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeftSelect",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectWordRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectWordLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.shrink",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.expand",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectAll",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "A",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "togglePreserveCase",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "P",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindInSelection",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "L",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindRegex",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "R",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindWholeWord",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "W",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindCaseSensitive",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "C",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "F3",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "F3",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "find",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "F",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "clearSecondarySelections",
+      "context": "Editor && !EditorWidget && !findVisible && mode == diff",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "cursorDocumentEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "meta": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorDocumentStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "meta": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLineEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "meta": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLineStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "meta": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLineEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "End",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLineStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "Home",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDocumentEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDocumentStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLineEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLineStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "meta": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLineEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLineStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRightSelect",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeftSelect",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectWordRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectWordLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.shrink",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.expand",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectAll",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "A",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "togglePreserveCase",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "P",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindInSelection",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "L",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindRegex",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "R",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindWholeWord",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "W",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindCaseSensitive",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "C",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "G",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "G",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "find",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "F",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "clearSecondarySelections",
+      "context": "Editor && !EditorWidget && !findVisible && mode == diff",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "cursorDocumentEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "End",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorDocumentStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Home",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLineEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "End",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLineStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "Home",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "alt": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDocumentEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDocumentStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPageDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPageUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "PageUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectDown",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectUp",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLineEnd",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "End",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLineStart",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "Home",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRightSelect",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeftSelect",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectWordRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectWordLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectRight",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectLeft",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.shrink",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.expand",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectAll",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "A",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "togglePreserveCase",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "P",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindInSelection",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "L",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindRegex",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "R",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindWholeWord",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "W",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindCaseSensitive",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "alt": true,
+          "key": "C",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "F3",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "F3",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "find",
+      "context": "Editor && !EditorWidget && mode == diff",
+      "keys": [
+        {
+          "key": "F",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "clearSecondarySelections",
+      "context": "Editor && !EditorWidget && !findVisible && mode == diff",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor && !EditorWidget && findVisible && mode == diff",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`suggestPack carries an explicit predicate for every row > suggestPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "showPrevParameterHint",
+      "context": "Editor && !EditorWidget && parameterHintsVisible && parameterHintsMultipleSignatures",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "showNextParameterHint",
+      "context": "Editor && !EditorWidget && parameterHintsVisible && parameterHintsMultipleSignatures",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeParameterHints",
+      "context": "Editor && !EditorWidget && parameterHintsVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "hideSuggestWidget",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Tab",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Enter",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Enter",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPrevPageSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectNextPageSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPrevSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectNextSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.triggerSuggest",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Space",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "showPrevParameterHint",
+      "context": "Editor && !EditorWidget && parameterHintsVisible && parameterHintsMultipleSignatures",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "showNextParameterHint",
+      "context": "Editor && !EditorWidget && parameterHintsVisible && parameterHintsMultipleSignatures",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeParameterHints",
+      "context": "Editor && !EditorWidget && parameterHintsVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "hideSuggestWidget",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Tab",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Enter",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Enter",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPrevPageSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectNextPageSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPrevSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectNextSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.triggerSuggest",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Space",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "showPrevParameterHint",
+      "context": "Editor && !EditorWidget && parameterHintsVisible && parameterHintsMultipleSignatures",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "showNextParameterHint",
+      "context": "Editor && !EditorWidget && parameterHintsVisible && parameterHintsMultipleSignatures",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeParameterHints",
+      "context": "Editor && !EditorWidget && parameterHintsVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "hideSuggestWidget",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Tab",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Enter",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "acceptSelectedSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "Enter",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPrevPageSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "PageUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectNextPageSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "PageDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectPrevSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectNextSuggestion",
+      "context": "Editor && !EditorWidget && suggestWidgetVisible",
+      "keys": [
+        {
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.triggerSuggest",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "Space",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeAdvancedEditingPack carries an explicit predicate for every row > vscodeAdvancedEditingPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "editor.action.reindentlines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "I",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.reindentselectedlines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "I",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.outdentLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "[",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.indentLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "]",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.blockComment",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "A",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.commentLine",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "/",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertLineAfter",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Enter",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertLineBefore",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Enter",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.moveLinesDownAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.moveLinesUpAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.copyLinesDownAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.copyLinesUpAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.deleteLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "deleteWordPartRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "Delete",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "deleteWordPartLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "Backspace",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.trimTrailingWhitespace",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "X",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.commentLine",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "C",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "editor.action.reindentlines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "I",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.reindentselectedlines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "I",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.outdentLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "[",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.indentLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "]",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.blockComment",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "A",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.commentLine",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "/",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertLineAfter",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Enter",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertLineBefore",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Enter",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.moveLinesDownAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.moveLinesUpAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.copyLinesDownAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.copyLinesUpAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.deleteLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "deleteWordPartRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "Delete",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "deleteWordPartLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "Backspace",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.trimTrailingWhitespace",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "X",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.commentLine",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "C",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "editor.action.reindentlines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "I",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.reindentselectedlines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "I",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.outdentLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "[",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.indentLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "]",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.blockComment",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "A",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.commentLine",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "/",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertLineAfter",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Enter",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertLineBefore",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "Enter",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.moveLinesDownAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.moveLinesUpAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.copyLinesDownAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.copyLinesUpAction",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.deleteLines",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "deleteWordPartRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "Delete",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "deleteWordPartLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "Backspace",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.trimTrailingWhitespace",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "X",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.commentLine",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "C",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeEditingPack carries an explicit predicate for every row > vscodeEditingPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "cursorRedo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "U",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorUndo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "U",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "jumpForward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "preventDefault": true,
+      "source": "pack",
+    },
+    {
+      "command": "jumpBack",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "preventDefault": true,
+      "source": "pack",
+    },
+    {
+      "command": "replaceAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Enter",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findReplace",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "H",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.toggleTabFocusMode",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "M",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "cursorRedo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "U",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorUndo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "U",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "jumpForward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "-",
+          "shift": true,
+        },
+      ],
+      "preventDefault": true,
+      "source": "pack",
+    },
+    {
+      "command": "jumpBack",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "-",
+        },
+      ],
+      "preventDefault": true,
+      "source": "pack",
+    },
+    {
+      "command": "replaceAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Enter",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findReplace",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "F",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.toggleTabFocusMode",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "M",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "cursorRedo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "U",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorUndo",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "U",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "jumpForward",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "preventDefault": true,
+      "source": "pack",
+    },
+    {
+      "command": "jumpBack",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "preventDefault": true,
+      "source": "pack",
+    },
+    {
+      "command": "replaceAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Enter",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findReplace",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "H",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.toggleTabFocusMode",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "M",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeFindPack carries an explicit predicate for every row > vscodeFindPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "togglePreserveCase",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "P",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindInSelection",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "L",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindRegex",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "R",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindWholeWord",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "W",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindCaseSensitive",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "C",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F3",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F3",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "find",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "togglePreserveCase",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "P",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindInSelection",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "L",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindRegex",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "R",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindWholeWord",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "W",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindCaseSensitive",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "C",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "G",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "G",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "find",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "togglePreserveCase",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "P",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindInSelection",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "L",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindRegex",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "R",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindWholeWord",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "W",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "toggleFindCaseSensitive",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "C",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findPrevious",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F3",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "findNext",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F3",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "find",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "closeFind",
+      "context": "Editor && !EditorWidget && findVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeFoldingPack carries an explicit predicate for every row > vscodeFoldingPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "editor.createFoldingRangeFromSelection",
+      "context": "Editor && !EditorWidget && hasSelection",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": ",",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel7",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "7",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel6",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "6",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel5",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "5",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel4",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "4",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel3",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "3",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel2",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "2",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel1",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "1",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfoldAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "J",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "0",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.removeManualFoldingRanges",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": ".",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfoldRecursively",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "]",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldRecursively",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "[",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfold",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "]",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.fold",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "[",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "editor.createFoldingRangeFromSelection",
+      "context": "Editor && !EditorWidget && hasSelection",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": ",",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel7",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "7",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel6",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "6",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel5",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "5",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel4",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "4",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel3",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "3",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel2",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "2",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel1",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "1",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfoldAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "J",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "0",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.removeManualFoldingRanges",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": ".",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfoldRecursively",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "]",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldRecursively",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "[",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfold",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "]",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.fold",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "[",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "editor.createFoldingRangeFromSelection",
+      "context": "Editor && !EditorWidget && hasSelection",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": ",",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel7",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "7",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel6",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "6",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel5",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "5",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel4",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "4",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel3",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "3",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel2",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "2",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldLevel1",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "1",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfoldAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "J",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "0",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.removeManualFoldingRanges",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": ".",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfoldRecursively",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "]",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.foldRecursively",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "[",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.unfold",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "]",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.fold",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "[",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeInlineSuggestPack carries an explicit predicate for every row > vscodeInlineSuggestPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "editor.action.inlineSuggest.commit",
+      "context": "Editor && !EditorWidget && !tabFocusMode && inlineSuggestionVisible",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "editor.action.inlineSuggest.acceptNextWord",
+      "context": "Editor && !EditorWidget && inlineSuggestionVisible",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.inlineSuggest.commit",
+      "context": "Editor && !EditorWidget && !tabFocusMode && inlineSuggestionVisible",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "editor.action.inlineSuggest.commit",
+      "context": "Editor && !EditorWidget && !tabFocusMode && inlineSuggestionVisible",
+      "keys": [
+        {
+          "key": "Tab",
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeLspEditingPack carries an explicit predicate for every row > vscodeLspEditingPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "editor.action.rename",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F2",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.autoFix",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": ".",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.formatDocument",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "F",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "editor.action.rename",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F2",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.autoFix",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": ".",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.formatDocument",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "F",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "editor.action.rename",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F2",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.autoFix",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": ".",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.formatDocument",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "F",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeLspNavigationPack carries an explicit predicate for every row > vscodeLspNavigationPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "editor.action.goToDefinition",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.marker.prev",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F8",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.marker.next",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F8",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.revealDefinitionAside",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.goToImplementation",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.peekDefinition",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.goToReferences",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.showHover",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "I",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "editor.action.goToDefinition",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.marker.prev",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F8",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.marker.next",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F8",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.revealDefinitionAside",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.goToImplementation",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.peekDefinition",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.goToReferences",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.showHover",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "I",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "editor.action.goToDefinition",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.marker.prev",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F8",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.marker.next",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F8",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.revealDefinitionAside",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.goToImplementation",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.peekDefinition",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "F12",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.goToReferences",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F12",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.showHover",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "key": "I",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeMultiCursorPack carries an explicit predicate for every row > vscodeMultiCursorPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "clearSecondarySelections",
+      "context": "Editor && !EditorWidget && !findVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.changeAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F2",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.selectHighlights",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "L",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertCursorBelow",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertCursorAbove",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertCursorBelow",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertCursorAbove",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectAllMatches",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Enter",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "addNextOccurrence",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "D",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "clearSecondarySelections",
+      "context": "Editor && !EditorWidget && !findVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.changeAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F2",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.selectHighlights",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "L",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertCursorBelow",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertCursorAbove",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectAllMatches",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Enter",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "addNextOccurrence",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "D",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "clearSecondarySelections",
+      "context": "Editor && !EditorWidget && !findVisible",
+      "keys": [
+        {
+          "key": "Escape",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.changeAll",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "F2",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.selectHighlights",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "L",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertCursorBelow",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.insertCursorAbove",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "selectAllMatches",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Enter",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "addNextOccurrence",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "D",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeNavigationPack carries an explicit predicate for every row > vscodeNavigationPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "cursorWordPartRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.toggleWordWrap",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Z",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.jumpToBracket",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "\\",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "cursorWordPartRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.toggleWordWrap",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Z",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.jumpToBracket",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "\\",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "cursorWordPartRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.toggleWordWrap",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "Z",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.jumpToBracket",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "\\",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;
+
+exports[`vscodeSelectionPack carries an explicit predicate for every row > vscodeSelectionPack 1`] = `
+{
+  "linux": [
+    {
+      "command": "cursorColumnSelectPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowDown",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "ArrowUp",
+          "mod": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "alt": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRightSelect",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeftSelect",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.shrink",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.expand",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "mac": [
+    {
+      "command": "cursorColumnSelectPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRightSelect",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeftSelect",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.shrink",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.expand",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "ctrl": true,
+          "key": "ArrowRight",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+  "windows": [
+    {
+      "command": "cursorColumnSelectPageDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectPageUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "PageUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectDown",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowDown",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectUp",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowUp",
+          "mod": true,
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectRight",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "alt": true,
+          "key": "ArrowRight",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorColumnSelectLeft",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "key": "K",
+          "mod": true,
+        },
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartRightSelect",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "cursorWordPartLeftSelect",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "ctrl": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.shrink",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowLeft",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+    {
+      "command": "editor.action.smartSelect.expand",
+      "context": "Editor && !EditorWidget",
+      "keys": [
+        {
+          "alt": true,
+          "key": "ArrowRight",
+          "shift": true,
+        },
+      ],
+      "source": "pack",
+    },
+  ],
+}
+`;

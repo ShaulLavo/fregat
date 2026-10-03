@@ -33,7 +33,7 @@ both plugins read the markdown grammar's parse, so `markdown()` has to be there 
 
 `createMarkdownPreviewPlugin({ openLink })` lets the host open link targets through its own navigation. `languageIds` widens it past plain `markdown`
 
-`createMarkdownAuthoringPlugin()` adds commands for bold, italic, links, lists, tasks, quotes and code. Mod+B, Mod+I and Mod+Shift+K are bound by default, and Tab indents list items
+`createMarkdownAuthoringPlugin()` adds commands for bold, italic, links, lists, tasks, quotes and code. Import `markdownPack` from `@singapore-editor/core/keymap` and pass `keymap: { packs: [...defaultEditorPacks, markdownPack] }` to enable Mod+B, Mod+I, Mod+Shift+K and list indentation with Tab
 
 ## more
 
