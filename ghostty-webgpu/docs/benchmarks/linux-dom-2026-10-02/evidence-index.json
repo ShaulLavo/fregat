@@ -1,6 +1,8 @@
 {
-  "checkpoint": "retained-dom-v1",
-  "finalVerdict": "pending-rolling-logs",
+  "checkpoint": "retained-dom-v3-source-v2-qualified-v3-host-blocked",
+  "finalVerdict": "pending-fresh-reviewed-main-integrated-v3-windows",
+  "v1RollingTargetPasses": 4,
+  "v1RollingTargetTotal": 10,
   "secondaryWorkload": "repeated ASCII; retained no-op rendering flatters this fixture",
   "secondaryTargetPasses": 8,
   "secondaryTargetTotal": 10,
@@ -10,7 +12,7 @@
     "frameCallbacksEach": 3077,
     "qualifiedPairedAttribution": false
   },
-  "residuals": [
+  "secondaryResiduals": [
     {
       "count": 17,
       "metric": "write-p50",
@@ -24,27 +26,442 @@
   ],
   "rawEvidenceDirectory": "/work/reports/ghostty-benchmarks/plan-283/dom-optimization-2026-10-02",
   "correctness": {
-    "benchmarkToolingTests": 121,
+    "benchmarkToolingTests": 142,
     "domBrowserTests": 11,
     "domNodeTests": 7,
     "serializerCases": 80,
     "typecheck": "passed independently after browser-command type failure",
     "packageBuild": "passed",
     "siteBuild": "passed",
-    "look": "desktop and phone health ok; both PNGs read; site selects WebGL2, separate forced-DOM tests provide DOM proof"
+    "look": "desktop and phone health ok; both PNGs read; site selects WebGL2, separate forced-DOM tests provide DOM proof",
+    "benchmarkPreservationPngNote": "Final matrix PNGs are standard ASCII/color/wide/accent/overwrite preservation probes, not the measured rolling output. Separate real-core 32-frame rolling PNGs establish rolling appearance parity."
   },
   "limitations": [
-    "Final rolling output, input and write verdict pending at counts 17 and 1",
+    "V2 realistic rolling verdict is three passes, six failures and one unresolved target; seven targets remain unmet. Count1 renderer point median1.0388832885 is descriptive because a one-tick pair leaves the metric unresolved. V1 passed four of ten. Pending v3/host proofs are not an all-target acceptance or exhausted-options claim.",
     "Paired attribution traces failed GPU qualification; native-only diagnostic data cannot establish a paired verdict",
     "No physical-vsync or optical latency claim",
     "Category clipped unions overlap; library wall and sampled leaves are not JS self CPU",
     "Existing native ZWJ decomposition differs from xterm; issue360",
-    "Separate sampler diagnostic patch remains unaccepted and excluded"
+    "Strict sampler implementation and receipt persistence are independently approved and delivered separately in PR397; frozen rolling bundles explicitly include that approved integration dependency",
+    "Actual NVIDIA/NVML or parent-event-loop cause of trace command deadlines remains unconfirmed; failed historical trace artifacts remain failed"
   ],
+  "v1IndependentAudit": {
+    "qualificationAndEndpointReview": "approved; overall performance changes requested because six targets miss",
+    "auditSha256": "b01d042cb0dc4c7cdf60286386cbee7f1320942fe0c4cf1884025b9e671c56c1",
+    "rawRunsChecked": 32,
+    "pairedMetricRowsReproduced": 20,
+    "exactPresentationEndpointIdentitiesChecked": 6144,
+    "inputSamplesChecked": 3072,
+    "endpoint": "AnimationFrame::Presentation with same-sample echo, parse, successful mutation boundary and containing animation-frame identity; no capture or nearest fallback",
+    "maximumRawSummaryResidualMicroseconds": 7,
+    "nativeParseMaximumMilliseconds": {
+      "17": 0.014,
+      "1": 0.015
+    },
+    "nativeFrameStartToPaintMaximumMilliseconds": {
+      "17": 0.359,
+      "1": 0.296
+    },
+    "nativeWholeDrawFrameMaximumMilliseconds": {
+      "17": 0.958,
+      "1": 0.771
+    },
+    "p95TailDominantSegment": "Among top five input samples per native run, send-to-echo dominates 18 of 20 at count17 and 19 of 20 at count1",
+    "count1HighMedianMode": "Repetitions2/3 native p50 witnesses have 14.010\u201315.635ms parse-to-frame waits, 0.132\u20130.205ms frame-to-paint, and parse <=0.007ms",
+    "limitations": "Disjoint same-sample segments explain the witnesses; overlapping drawFrame intervals and separate segment medians are not additive. Boundary-to-Presentation does not isolate CSS. No network, driver or event-loop causal claim; near-threshold count17 CPU passes are protocol medians, not confidence guarantees."
+  },
+  "v2FrozenCandidate": {
+    "checkpoint": "ac6415312a666059d134a39a0cd08acb32837118",
+    "pairingReview": "approved source/runtime pairing and independently approved matrix qualification/endpoints; three passes/six failures/one unresolved",
+    "manifestSha256": "05fe7cc79c162733337d645c3bd0befec4d5512748b51ebf422417ae2d5d5e3f",
+    "runtimeSourcesSha256": "0f6e673c115afce416be4c023485c57500535fec9955b93577b6e53bb5d1aa1f",
+    "sourceSha256": "ab736ae48c879a4bbd4a200d07a1449e4b60df2e94ee773216926acfe3c40274",
+    "browserBundleSha256": "100456afe5dd2382b2aeadbb186903d3d3c92dc026b3445099e61141d1f8fa35",
+    "harnessSourcesSha256": "874d1b00ed041ed427eceec7536765c59860809d57d5b37637bee00acb58151f",
+    "scope": "Row-local preceding-cell appearance reuse for narrow noncursor cells, resetting at cursor and wide boundaries; renderer and row ownership unchanged",
+    "exactHtmlByteParityCases": 1376,
+    "identicalAdjacentCellForegroundCalls": {
+      "before": 24,
+      "after": 2
+    },
+    "projectionNodeTests": 31,
+    "ordinaryGpuCommandTimeoutMilliseconds": 2000,
+    "traceBudgetAdopted": false,
+    "highAlternationLimitation": "Preliminary Bun-only projection cost increased for highly alternating cells; no browser acceptance follows from microbenchmarks"
+  },
+  "traceBudgetConfirmation": {
+    "diagnosticOnly": true,
+    "performanceQualified": false,
+    "outcome": "single-prespecified-confirmation-completed-qualified",
+    "followupPullRequest": "https://github.com/ShaulLavo/fregat/pull/401",
+    "startedAt": "2026-10-02T23:13:18.182Z",
+    "finishedAt": "2026-10-02T23:18:00.289Z",
+    "completeRuns": 8,
+    "balancedPairs": 4,
+    "controlAndTraceRecords": 16,
+    "gpuWindowFailures": 0,
+    "ordinaryCommandTimeoutMilliseconds": 2000,
+    "traceAndPairedControlCommandTimeoutMilliseconds": 10000,
+    "qualificationPersistenceEqual": true,
+    "maximumAggregateSamplingElapsedMilliseconds": 3990.5775010000216,
+    "aggregateSamplesAbove2000": 4,
+    "limitation": "Archived original ASCII browser/runtime with four reviewed host assets replaced. Successful samples retain parsed data and aggregate timing, not individual successful command receipts. No NVIDIA/NVML or parent-event-loop cause inference, retry, ordinary performance acceptance, or rehabilitation of earlier failed artifacts.",
+    "independentReview": "Approved qualification/budget persistence only: eight runs, four pairs, sixteen windows and every strict GPU constraint recomputed. Diagnostic-only; no performance or causal acceptance."
+  },
   "issues": [
     "https://github.com/ShaulLavo/fregat/issues/391",
     "https://github.com/ShaulLavo/fregat/issues/360"
   ],
   "mutationBoundary": "Pre-existing mounted row and successful true candidate return or void original return; false/missing/throw cannot qualify. Original receiver, arguments, return and exactly-once call preserved.",
-  "frozenRuntimeNote": "Frozen secondary bundles remain immutable. The checkpoint removes the now-internal renderRowToHtml export after the unused-export gate found it; serializer behavior is unchanged. Fresh rolling bundles will use checkpoint source with a newly recorded runtime identity."
+  "rollingHeadline": {
+    "status": "original-v1-v2-chains-complete-all-six-qualified",
+    "order": [
+      "original17",
+      "original1",
+      "retained-v1-17",
+      "retained-v1-1",
+      "retained-v2-17",
+      "retained-v2-1"
+    ],
+    "phases": ["output", "latency"],
+    "path": "bytes",
+    "outputFixture": "rolling-logs",
+    "latencyWorkload": "Marker/loopback echo latency runs before rolling output; these are presentation endpoints for the latency fixture, not typing during a continuing log stream",
+    "fixtures": ["rolling-logs"],
+    "latencySamples": 96,
+    "balancedPairsPerCount": 4,
+    "outputFrames": {
+      "17": 1200,
+      "1": 2700
+    },
+    "gpuCommandTimeoutMilliseconds": 2000,
+    "harnessSourcesSha256": "874d1b00ed041ed427eceec7536765c59860809d57d5b37637bee00acb58151f",
+    "corpusSha256": "5b962d02c1255260d6a332719dacc083515893ed355d0aa3695f40541fc08834",
+    "corpusBytes": 1059649,
+    "completeUtf8Chunks": 259,
+    "qualification": "All original/v1/v2 matrices finished with eight complete runs, four balanced pairs and zero GPU-window failures each; no rerun/exclusion. Independent v2 qualification and exact endpoints approved; performance remains three passes/six failures/one unresolved. The two separate historical v3 ordinary invocations failed sampler qualification and provide no performance verdict.",
+    "actualOutputBytesPerTerminal": {
+      "17": 4910340,
+      "1": 11047050
+    },
+    "actualFixtureVerifiedInEveryOutputRun": true,
+    "chunkSizes": "258 complete-UTF8 chunks of 4096 bytes and one 2881-byte tail; deterministic wrapping and offset reset for each burst",
+    "genericReportMethodCaveat": "Generated generic method text does not name the selected output fixture and its at-least-4KiB burst wording does not describe the shorter final rolling chunk; actual flags, fixture metadata and per-run output receipts above are authoritative",
+    "v1Residuals": [
+      {
+        "count": 17,
+        "metric": "input/p50",
+        "pairedMedianRatio": 1.0122551739787689
+      },
+      {
+        "count": 17,
+        "metric": "input/p95",
+        "pairedMedianRatio": 1.0697405266270779
+      },
+      {
+        "count": 1,
+        "metric": "output/cpu/renderer",
+        "pairedMedianRatio": 1.1549609428477947
+      },
+      {
+        "count": 1,
+        "metric": "output/cpu/total",
+        "pairedMedianRatio": 1.1406611349979199
+      },
+      {
+        "count": 1,
+        "metric": "input/p50",
+        "pairedMedianRatio": 2.3452758881673805
+      },
+      {
+        "count": 1,
+        "metric": "input/p95",
+        "pairedMedianRatio": 1.1551796980974194
+      }
+    ],
+    "pairedOutlierNote": "Retained1 input p50 pair ratios are 1.042924, 0.801137, 4.047082 and 3.647628; native repetition2/3 medians are 20.083505/20.244515ms versus xterm4.962466/5.550049ms. Retained17 input p50 pair range is 0.992841 to 3.355733. All samples remain included; no deterministic input-gain claim.",
+    "v2SummarySha256": "71da3229b4b037bcfa69ad67f6d372852f5ecb9e65b0a4b1c29531b94c194058",
+    "v2PairedMedianTable": [
+      {
+        "metric": "output/cpu/renderer",
+        "original-17": 1.2890954629976572,
+        "original-1": 1.282039653589475,
+        "retained-v1-17": 0.9993458987274733,
+        "retained-v1-1": 1.1549609428477947,
+        "retained-v2-17": 0.8303034995713976,
+        "retained-v2-1": 1.0388832885177839
+      },
+      {
+        "metric": "output/cpu/total",
+        "original-17": 1.2431419069098992,
+        "original-1": 1.216481733846376,
+        "retained-v1-17": 0.993099823337869,
+        "retained-v1-1": 1.1406611349979199,
+        "retained-v2-17": 0.8385729094878653,
+        "retained-v2-1": 1.0340525130654148
+      },
+      {
+        "metric": "input/p50",
+        "original-17": 0.9993100270978492,
+        "original-1": 1.0161596933151684,
+        "retained-v1-17": 1.0122551739787689,
+        "retained-v1-1": 2.3452758881673805,
+        "retained-v2-17": 1.0682417720376065,
+        "retained-v2-1": 1.0772491176101844
+      },
+      {
+        "metric": "input/p95",
+        "original-17": 1.0078432239411736,
+        "original-1": 0.9901779912267379,
+        "retained-v1-17": 1.0697405266270779,
+        "retained-v1-1": 1.1551796980974194,
+        "retained-v2-17": 1.117092384180672,
+        "retained-v2-1": 1.0588787094649916
+      },
+      {
+        "metric": "write/p50",
+        "original-17": 1.2558937824801817,
+        "original-1": 1.0548073309344832,
+        "retained-v1-17": 0.9654637782601484,
+        "retained-v1-1": 0.9274419951928057,
+        "retained-v2-17": 0.9394757491534336,
+        "retained-v2-1": 1.016750943207122
+      }
+    ],
+    "v2Residuals": [
+      {
+        "count": 17,
+        "metric": "input/p50",
+        "pairedMedianRatio": 1.0682417720376065,
+        "status": "fail"
+      },
+      {
+        "count": 17,
+        "metric": "input/p95",
+        "pairedMedianRatio": 1.117092384180672,
+        "status": "fail"
+      },
+      {
+        "count": 1,
+        "metric": "output/cpu/renderer",
+        "pairedMedianRatio": 1.0388832885177839,
+        "status": "unresolved"
+      },
+      {
+        "count": 1,
+        "metric": "output/cpu/total",
+        "pairedMedianRatio": 1.0340525130654148,
+        "status": "fail"
+      },
+      {
+        "count": 1,
+        "metric": "input/p50",
+        "pairedMedianRatio": 1.0772491176101844,
+        "status": "fail"
+      },
+      {
+        "count": 1,
+        "metric": "input/p95",
+        "pairedMedianRatio": 1.0588787094649916,
+        "status": "fail"
+      },
+      {
+        "count": 1,
+        "metric": "write/p50",
+        "pairedMedianRatio": 1.016750943207122,
+        "status": "fail"
+      }
+    ],
+    "v2UnresolvedPair": "Count1 renderer CPU repetition2 has316 versus315 ticks; pair and metric remain unresolved and included. Descriptive point median1.0388832885 does not establish a resolved failure or pass.",
+    "v2PairedOutlierNote": "Native count1 repetition0 input p50 is20.213980ms versusxterm5.928029ms; native count17 repetition1 is20.540932ms versusxterm5.240461ms. Xterm17 repetition3 also has19.439510ms p50. All samples retained; no deterministic input gain or causal claim.",
+    "v2CollectorCorrection": "Original author summary preserved raw unresolved row/pair but selected aggregate verdicts by point median. A separately named reviewed-summary collector uses the exact compact metric status; three passes/six failures/one unresolved, with all original receipts retained.",
+    "v2ReviewedSummarySha256": "a88e6bedd40bb22ca03cd39776d4ec97de72fa177cf38d5fadc012ad8bd9a360"
+  },
+  "rollingMutationDiagnostic": {
+    "performanceQualified": false,
+    "framesRequested": 32,
+    "callbacksIncludingClearAndSettlement": 33,
+    "originalCommittingFrames": 33,
+    "retainedCommittingFrames": 33,
+    "originalRowPaints": 396,
+    "retainedRowPaints": 395,
+    "finalTextAndFixtureParity": true,
+    "pngByteParitySha256": {
+      "ascii": "5e72c64b446e73848fd7232c4606b0f8441aa6e0c2a30e29b00a9bf9fc74f108",
+      "rolling-logs": "de3d893fa04f77c7ee03e8a60aae67c93efdd9395b9cf5bfc5e6ee508a3cb64e"
+    },
+    "pngReadback": "original and retained rolling screenshots read; equal final text and fixture identities asserted; both saved PNG pairs directly hashed and byte-identical"
+  },
+  "frozenRuntimeNote": "Frozen secondary and rolling bundles remain immutable. Fresh rolling bundles include the checkpoint's private-export cleanup, with original runtime72e01422745310d11d9ccb92b0e4714dc369323f2a044aaaff5735687306654d and retained runtime6d5000e0b4e22118c7c1f809858d15095525ecb0d72f1a6bb63c99133325bd31. Their common harness, assets, settings and corpus/chunk identities are independently pairing-approved.",
+  "v2RollingTargetPasses": 3,
+  "v2RollingTargetTotal": 10,
+  "existingRafRequestDiagnostic": {
+    "diagnosticOnly": true,
+    "performanceQualified": false,
+    "auditSha256": "447062417f9178e8e68ec7ccd77f0dfbd87e1807ba4e0e8d708cd7120ce4b8a9",
+    "scope": "Four already-reviewed median-member samples; exact official animation ID and exact RAF callback request/fire identity. No new recordings, endpoint change or nearest-presentation fallback. Raw parser end matches reviewed witness within20us; this is observational validation, not qualification relaxation.",
+    "witnesses": [
+      {
+        "directory": "original-rolling-common-1",
+        "repetition": 0,
+        "inputIndex": 46,
+        "animationId": "c013a079be231b14",
+        "callbackIdentity": {
+          "frame": "3796D977339E05F1F8DC3D036C19C428",
+          "id": 551
+        },
+        "parseEndToRequestMilliseconds": 0.02,
+        "requestToFireMilliseconds": 15.066,
+        "fireToDrawMilliseconds": 0.025
+      },
+      {
+        "directory": "original-rolling-common-1",
+        "repetition": 0,
+        "inputIndex": 64,
+        "animationId": "c013a079be231e1f",
+        "callbackIdentity": {
+          "frame": "3796D977339E05F1F8DC3D036C19C428",
+          "id": 623
+        },
+        "parseEndToRequestMilliseconds": 0.026,
+        "requestToFireMilliseconds": 14.751,
+        "fireToDrawMilliseconds": 0.014
+      },
+      {
+        "directory": "retained-v1-rolling-common-1",
+        "repetition": 3,
+        "inputIndex": 42,
+        "animationId": "9e0bd57d1a3b0c5b",
+        "callbackIdentity": {
+          "frame": "A12D32033925471A24619DC349CCF468",
+          "id": 533
+        },
+        "parseEndToRequestMilliseconds": 0.028,
+        "requestToFireMilliseconds": 15.118,
+        "fireToDrawMilliseconds": 0.034
+      },
+      {
+        "directory": "retained-v1-rolling-common-1",
+        "repetition": 3,
+        "inputIndex": 35,
+        "animationId": "9e0bd57d1a3b0249",
+        "callbackIdentity": {
+          "frame": "A12D32033925471A24619DC349CCF468",
+          "id": 505
+        },
+        "parseEndToRequestMilliseconds": 0.019,
+        "requestToFireMilliseconds": 15.577,
+        "fireToDrawMilliseconds": 0.038
+      }
+    ],
+    "limitation": "Exact requests precede notifyWrite. Source confirms session.write synchronously emits renderRequest and schedules before terminal.write calls notifyWrite; scroll notification can also schedule. Exact requesting subscriber is not uniquely identified per witness. Four official RAF joins confirm request-to-fire waits, with no driver/CSS/network/host-event-loop cause or approved scheduler change.",
+    "independentAuditSha256": "41133770df5704afe28631360409ae47923f8b1d9d70e4a40663fbb8a51ee7ea",
+    "independentScriptSha256": "9ea2639bc6c155a103ac163d779196f8051d4293a49b1cb7cee71cc341a41332"
+  },
+  "v2RollingTargetFailures": 6,
+  "v2RollingTargetUnresolved": 1,
+  "hostTimestampDiagnosticPreparation": {
+    "status": "observer3-source-review-pending-capture-held-known-sampler-defect",
+    "diagnosticOnly": true,
+    "performanceQualified": false,
+    "manifestSha256": "34212f9ae4f638d4338d302ce73a621d8502871156bc2a2619a9a25682413894",
+    "runnerSha256": "0f7830111d47bf7eca5729735dc88eb0592991a58c55b389ad80ced417c1a7e7",
+    "observerRevision": 3,
+    "runtimeAndBrowser": "exact-frozen-v2-unchanged",
+    "finiteProofSha256": "e2c0ec47a6ee61e298440466c88aa4c1eeead9cd0da40f0978727247781a4fb7",
+    "finiteCases": [
+      "fresh",
+      "prior-closing",
+      "foreign-late-message",
+      "foreign-late-silent",
+      "extra-new-at-connect",
+      "pre-loop-message",
+      "partial-input-failure",
+      "connect-failure",
+      "samples-option"
+    ],
+    "binding": "Only unique newly created connection above entry watermark, immediately after original awaited connectEcho. Existing prior closing connection never owns new phase. Unexpected/foreign/concurrent connection or pre-loop message fails matching.",
+    "previousArchives": "All preserved unrun. Observer1 single-pair recipe violates production minimum; observer2 selected prior/absent connection at entry; first observer3 lacked silent concurrent guard.",
+    "clockPolicy": "Browser coarsening and inter-bracket drift UNBOUNDED; reject ALL precise cross-clock ordering/overlap. Same-clock host durations/source associations only.",
+    "limitations": "No capture. Known fractional sampler defect blocks invocation even if observer source approved. Any corrected diagnostic host archive requires distinct exact identity/review/admission. Synthetic finite clock initially rounded timestamp below start; proof fixture only changed to binary-exact125ms steps; failed receipts preserved. No transport/PNG/browser performance claim."
+  },
+  "v2IndependentAudit": {
+    "status": "qualification-and-endpoints-approved-performance-targets-unmet",
+    "auditSha256": "e45f1daec5c46ee7ef280d2c546f8cbcb89c56cf6c3f0bdc7f358d7dfa88a874",
+    "scriptSha256": "fbeecb96ab99d75fd308434b589534e622f65121cf3e9b18be1e5681aaec63b0",
+    "completeRuns": 16,
+    "gpuWindows": 32,
+    "presentationEndpointIdentities": 3072,
+    "inputSamples": 1536,
+    "maximumRawSummaryResidualMicroseconds": 9,
+    "nativeParseMaximumMilliseconds": {
+      "17": 0.021,
+      "1": 0.014
+    },
+    "nativeFrameStartToPaintMaximumMilliseconds": {
+      "17": 0.32,
+      "1": 0.264
+    },
+    "nativeWholeDrawFrameMaximumMilliseconds": {
+      "17": 0.981,
+      "1": 0.925
+    },
+    "selectedInputTails": {
+      "sendToEchoDominant": 74,
+      "parseToFrameDominant": 6,
+      "total": 80
+    },
+    "limitation": "Whole drawFrame overlaps existing segments and cannot be added. Selected high tails and existing RAF waits identify observations, not CSS/network/driver/host-event-loop causality. Unresolved one-tick pair remains unresolved."
+  },
+  "v3FrozenCandidate": {
+    "runtimeLabel": "retained-v3-rolling",
+    "runtimeBaseGitSha": "2c185da7831b3673ca0520ee648663f69d2483fe",
+    "runtimeSourcesSha256": "718d99be7245c2f628935c7462f8d8afb869fa4e9acdba94e3b902837fe9a7e1",
+    "harnessSourcesSha256": "874d1b00ed041ed427eceec7536765c59860809d57d5b37637bee00acb58151f",
+    "sourceSha256": "b646123a8f00f0ff713f4dbc8c19e07d4f53c9df74a6b12b8f5d6156646e92b4",
+    "browserBundleSha256": "e8e29665c3735b2611bd0227cda7025bf68b81c5f63019497ef3ad913f8fdd41",
+    "runtimeFiles": {
+      "src/render/dom/html.ts": "bec0b0453dcb8dd2b4d211201bfe804d44432040b67015b1970ac04a2201dba6",
+      "src/render/dom/renderer.ts": "90433b19a0195dbe7ba20a0b3b1c2915799521f0f9c37ba64f9e66f46fe0144b",
+      "src/render/row-renderer.ts": "b281e3518a6fb25dbbd7644ee3c8d5ca0df12b698431eb7d1c30ea8eb306f2e0"
+    },
+    "harnessDescription": "Common mutation-gated DOM paint recorder, parser/frame/compositor endpoint and pacing unchanged.",
+    "sourceHashScope": "Standard build manifest includes runtime, benchmark harness, and tracked tests. Runtime and production harness hashes are also recorded separately.",
+    "checkpoint": "31cecad849cb8c44241e4555a76234a8c8bcf700",
+    "manifestSha256": "42d07d733979be8085c9b98ca1cba32856a10bb94226096c9fbc7f46a9de3fe1",
+    "independentPairing": "approved exact ordinary common bundle; source/freeze only",
+    "independentPairingAuditSha256": "6a5d6c8d05417330ead3744fe6a19d98de612aaf379c255faabac1b26b578397",
+    "sourceProof": {
+      "authorHtmlCases": 1376,
+      "independentHtmlCases": 1280,
+      "nodeTests": 32,
+      "adjacent12ForegroundCalls": {
+        "v2": 2,
+        "v3": 1
+      },
+      "alternating12ForegroundCalls": {
+        "v2": 24,
+        "v3": 12
+      }
+    },
+    "freezeReceiptLimitation": "Initial wrapper validator mistakenly compared v3 with itself after successful single build. Failed receipt kept. Separate correct v2-to-v3 validation and independent pairing passed without rebuild or capture.",
+    "performance": "Both initial ordinary rolling invocations incomplete/unqualified; no speed or target inference; separate reviewed main-integrated fresh windows pending."
+  },
+  "v3HistoricalFailedWindows": {
+    "status": "failed-qualification-host-fractional-subprocess-timeout",
+    "ordinaryGpuCommandTimeoutMilliseconds": 2000,
+    "traceBudgetAdopted": false,
+    "retries": 0,
+    "exclusions": 0,
+    "completePairs": 0,
+    "count17FailedCases": 2,
+    "count1RunRecords": 0,
+    "count17RawSha256": "fe0c6663f49a02dd21d4489d778cc82b0aeb1a6eea2f17cf7dc431faee260ec4",
+    "count17QualificationSha256": "d7082a59f687662b7e4f485e77da946642b4ae6ecdf37b80988d995fe864ce97",
+    "count1RawSha256": "dd9e47ce8b9a8f54937013408ec26d1af301c86910a643617d3085c4a00d97b3",
+    "count1QualificationSha256": "9588e9c22332aadb27d659b9fc2496cb0f50483104f1da24c38b2cc9b32304cb",
+    "followupPullRequest": "https://github.com/ShaulLavo/fregat/pull/421",
+    "issueComment": "https://github.com/ShaulLavo/fregat/issues/391#issuecomment-5963870547",
+    "limitation": "Node rejected final fractional remaining timeout option; empty receipts do not indicate successful NVIDIA empty output. Earlier busy idle samples do not establish cause. Preserve failed bundles/results permanently. New main changes shared row renderer and harness; no old-to-new DOM-only absolute attribution."
+  }
 }
