@@ -1,8 +1,8 @@
 import { unique } from '@workspace/utils/collections'
 import net from 'node:net'
 
-import { TUI_CLIENT_ORIGIN } from '../packages/contracts/src/client-origins'
-import { createScriptError } from './structured-errors'
+import { TUI_CLIENT_ORIGIN } from '../packages/contracts/src/client-origins.ts'
+import { createScriptError } from './structured-errors.ts'
 
 const MAX_PORT_ATTEMPTS = 100
 

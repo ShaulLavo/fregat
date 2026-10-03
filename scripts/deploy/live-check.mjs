@@ -1,4 +1,4 @@
-// Headless check of the deployed page through the mesh. Run by scripts/deploy/mesh.ts, or after a
+// Headless check of the deployed page through the mesh. Run by scripts/install-release.ts, or after a
 // restart by the promotion step; exits non-zero on a failure the previous release's check lacked.
 import { execFile } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -35,8 +35,8 @@ if (
   !['http:', 'https:'].includes(target.protocol) ||
   target.username ||
   target.password ||
-  target.search ||
-  target.hash
+  values.target.includes('?') ||
+  values.target.includes('#')
 ) {
   console.error(
     '[live] The target must be an HTTP or HTTPS page URL without credentials, query or fragment.',

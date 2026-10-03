@@ -117,7 +117,7 @@ test.each(
     const release: Release = { name: 'candidate', directory, web, server, previous: null }
 
     await expect(verifyCandidateFiles(release, base)).rejects.toThrow(
-      `server/${missing} is missing; deploy with --server to rebuild the server`,
+      `server/${missing} is missing; install with --server to rebuild the server`,
     )
     writeFileSync(path.join(server, missing), '')
     await expect(verifyCandidateFiles(release, base)).resolves.toBeUndefined()

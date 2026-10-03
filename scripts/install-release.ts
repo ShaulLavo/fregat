@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, statSync, symlinkSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -13,54 +13,58 @@ import {
   serverPort,
   serverUnit,
   webBase,
-} from './config'
+} from './deploy/config'
 import {
   bootCandidate,
   carryAssets,
   buildServer,
   buildWeb,
   copyServer,
+  readBuildConfig,
+  readCheckout,
+  verifyCandidateFiles,
+  writeBuildConfig,
+  type Release,
+} from './deploy/release'
+import {
   createRelease,
   currentRelease,
   pendingRelease,
   pointCurrentAt,
-  readBuildConfig,
-  readCheckout,
   removePending,
   stagePending,
   swapCurrent,
-  verifyCandidateFiles,
-  writeBuildConfig,
-  type Release,
-} from './release'
-import { log, output, run } from './run'
-import { parseMeshRoutes } from './routes'
-import { parseDeployArgs, type DeployOptions, type RestartRequest } from './args'
-import { requestRestart, requireStaged } from './restart'
-import { installUnit, notifyServer, restartInto, waitForServerRelease } from './systemd'
+} from './deploy/install-layout'
+import { stampWebRelease } from './deploy/web-release'
+import { log, output, run } from './deploy/run'
+import { parseMeshRoutes } from './deploy/routes'
+import { parseInstallArgs, type InstallOptions, type RestartRequest } from './deploy/args'
+import { requestRestart, requireStaged } from './deploy/restart'
+import { installUnit, notifyServer, restartInto, waitForServerRelease } from './deploy/systemd'
 import {
   liveCheckCommand,
   liveCheckUnitName,
   signalServer,
   type LiveCheckTarget,
-} from './systemd/promote'
-import { readHomeSetting } from '../home-setting'
-import { productionStateHome } from '../state-home'
-import { createScriptError, scriptFailureText } from '../structured-errors'
+} from './deploy/systemd/promote'
+import { readHomeSetting } from './home-setting'
+import { productionStateHome } from './state-home'
+import { createScriptError, scriptFailureText } from './structured-errors'
 
-const usage = `Usage: bun run deploy [options]
+const usage = `Usage: bun run install-release [options]
 
   Mesh + user-systemd integration. Requires developer.deployTarget in production settings.
 
-  --server            Build the server too and stage the release. The app shows "Update available";
+  --from=<directory>  Install a built release with a matching --base. Add --server to use its server.
+  --server            Build or install the server and stage the release. The app shows "Update available";
                       the server restarts when someone clicks Restart, or at once with --restart.
+                      Without --server, reuse the running server bundle and go live at once,
+                      or reuse a pending server and go live with it at Restart.
   --restart           Restart into the staged release: the Restart button's request, which waits
                       for busy sessions up to developer.deployRestartWaitMinutes. Alone, it builds
-                      nothing and restarts into what an earlier --server deploy staged.
+                      nothing and restarts into what an earlier --server installation staged.
   --interrupt         With --restart, end busy turns and restart now. Needed inside a Platform chat,
                       whose own turn counts as busy.
-                      Without it the release reuses the running server bundle and goes live at once,
-                      or, while a server release is staged, builds on it and goes live at Restart.
   --slug=<name>       Release name suffix. Defaults to the branch name.
   --reason=<text>     Recorded in build-config.json.
   --skip-live-check   Skip the headless browser check against ${meshUrl}, after a restart too.
@@ -71,25 +75,46 @@ const usage = `Usage: bun run deploy [options]
 const MIN_FREE_BYTES = 2 * 1024 ** 3
 const LIVE_CHECK_WAIT_MS = 240_000
 
-try {
-  await main()
-} catch (error) {
-  console.error(scriptFailureText(error))
-  process.exit(1)
+type InstallControl = {
+  preflight: typeof preflight
+  installUnit: typeof installUnit
+  notifyServer: typeof notifyServer
+  requestRestart: typeof requestRestart
+  waitForServerRelease: typeof waitForServerRelease
+  signalServer: typeof signalServer
+  restartInto: typeof restartInto
 }
 
-async function main() {
-  const command = parseDeployArgs(Bun.argv.slice(2))
+const liveControl: InstallControl = {
+  preflight,
+  installUnit,
+  notifyServer,
+  requestRestart,
+  waitForServerRelease,
+  signalServer,
+  restartInto,
+}
+
+export async function main(args = Bun.argv.slice(2), control = liveControl) {
+  const command = parseInstallArgs(args)
   if (command.kind === 'help') return console.log(usage)
   requireDeployTarget()
-  if (command.kind === 'rollback') return rollback(!command.liveCheck)
-  if (command.kind === 'restart') return restartStaged(command.request, command.liveCheck)
-
-  await deploy(command.options)
+  if (command.kind === 'rollback') return rollback(!command.liveCheck, control)
+  if (command.kind === 'restart') return restartStaged(command.request, command.liveCheck, control)
+  await install(command.options, control)
 }
 
-async function deploy(options: DeployOptions) {
-  await preflight()
+if (import.meta.main) {
+  try {
+    await main()
+  } catch (error) {
+    console.error(scriptFailureText(error))
+    process.exit(1)
+  }
+}
+
+async function install(options: InstallOptions, control: InstallControl) {
+  await control.preflight()
   const staged = pendingRelease()
   const checkout = await readCheckout()
   const release = createRelease(checkout, slugFor(options.slug, checkout.branch))
@@ -97,14 +122,26 @@ async function deploy(options: DeployOptions) {
   if (checkout.dirtyFiles.length > 0)
     log('release', `checkout is dirty (${checkout.dirtyFiles.length} files)`)
 
-  await buildWeb(release)
+  const built = options.from ? readBuildConfig(path.resolve(options.from)) : null
+  if (options.from && (!built || built.webBase !== webBase))
+    throw createScriptError('The built release must match this installation base.', {
+      fix: `Run bun run release --base=${webBase} --output=<directory>, then install-release --from=<directory>.`,
+    })
+  if (options.from) {
+    cpSync(path.join(path.resolve(options.from), 'web'), release.web, { recursive: true })
+    stampWebRelease(release.web, release.name)
+  } else await buildWeb(release, webBase)
+
   if (release.previous) {
     const carried = carryAssets(path.join(release.previous, 'web'), release.web)
     log('web', `carried ${carried} hashed assets from ${path.basename(release.previous)}`)
   }
-  const serverSource = await provideServer(release, options.server, staged)
+  const serverSource =
+    options.from && options.server
+      ? copyBuiltServer(release, path.resolve(options.from))
+      : await provideServer(release, options.server, staged)
   writeBuildConfig(release, {
-    ...checkout,
+    ...(built ?? checkout),
     release: release.directory,
     source: checkoutRoot,
     webBase,
@@ -117,27 +154,32 @@ async function deploy(options: DeployOptions) {
   })
 
   log('verify', 'candidate files')
-  await verifyCandidateFiles(release)
+  await verifyCandidateFiles(release, webBase)
   log('verify', 'booting the candidate server')
-  await bootCandidate(release)
+  await bootCandidate(release, webBase)
 
-  await installUnit()
+  await control.installUnit()
   assertUnmoved(release, staged)
   if (options.server || staged) {
-    await stage(release, options.server ? null : staged, options)
+    await stage(release, options.server ? null : staged, options, control)
     return
   }
 
   swapCurrent(release)
-  await checkInPlace(liveTarget(release.directory, release.previous), options.liveCheck)
-  console.log(`\n[deploy] ${release.name} is live at ${meshUrl}`)
+  await checkInPlace(liveTarget(release.directory, release.previous), options.liveCheck, control)
+  console.log(`\n[install-release] ${release.name} is live at ${meshUrl}`)
 }
 
-async function stage(release: Release, carrier: string | null, options: DeployOptions) {
+async function stage(
+  release: Release,
+  carrier: string | null,
+  options: InstallOptions,
+  control: InstallControl,
+) {
   stagePending(release)
-  const outcome = await notifyServer(release.name)
+  const outcome = await control.notifyServer(release.name)
   if (outcome === 'staged' && options.restart) {
-    await restartStaged(options.restart, options.liveCheck)
+    await restartStaged(options.restart, options.liveCheck, control)
     return
   }
   if (outcome === 'staged') {
@@ -145,40 +187,51 @@ async function stage(release: Release, carrier: string | null, options: DeployOp
       ? ` (on the staged server ${path.basename(carrier)}; it goes live at Restart)`
       : ''
     console.log(
-      `\n[deploy] ${release.name} staged${on}. ` +
+      `\n[install-release] ${release.name} staged${on}. ` +
         'The app shows "Update available"; the server restarts when someone clicks Restart.\n' +
-        `[deploy] Did it land: curl -s http://127.0.0.1:${serverPort}/release | jq '.server.release, .pending'`,
+        `[install-release] Did it land: curl -s http://127.0.0.1:${serverPort}/release | jq '.server.release, .pending'`,
     )
     return
   }
   log('systemd', `${serverUnit} ${outcome} into ${release.name}`)
   if (options.liveCheck) await awaitLiveCheck(liveTarget(release.directory, release.previous))
-  console.log(`\n[deploy] ${release.name} is live at ${meshUrl}`)
+  console.log(`\n[install-release] ${release.name} is live at ${meshUrl}`)
 }
 
 /** Restarts into the staged release through the server's own restart route, then checks it. */
-async function restartStaged(request: RestartRequest, liveCheckEnabled: boolean) {
+async function restartStaged(
+  request: RestartRequest,
+  liveCheckEnabled: boolean,
+  control: InstallControl,
+) {
   const staged = requireStaged(pendingRelease(), productionRoot)
   const target = liveTarget(staged, currentRelease())
   const waitMinutes = readHomeSetting(productionStateHome, 'developer.deployRestartWaitMinutes')
   log('restart', `restarting ${serverUnit} into ${target.name}`)
-  await requestRestart({
+  await control.requestRestart({
     interrupt: request.interrupt,
     waitMs: waitMinutes * 60_000,
     insidePlatform: Bun.env.PLATFORM_PRODUCTION_ROOT === productionRoot,
   })
-  await waitForServerRelease(target.name)
+  await control.waitForServerRelease(target.name)
   // Promotion starts the check unless the release was deployed with --skip-live-check.
   if (liveCheckEnabled && readBuildConfig(staged)?.liveCheck !== false) await awaitLiveCheck(target)
-  console.log(`\n[deploy] ${target.name} is live at ${meshUrl}`)
+  console.log(`\n[install-release] ${target.name} is live at ${target.meshUrl}`)
 }
 
 function assertUnmoved(release: Release, staged: string | null) {
   if (pendingRelease() === staged && currentRelease() === release.previous) return
 
   throw createScriptError(
-    'Another release was staged or promoted while this deploy ran. Run the deploy again.',
+    'Another release was staged or promoted during installation. Run install-release again.',
   )
+}
+
+function copyBuiltServer(release: Release, from: string) {
+  cpSync(path.join(from, 'server'), release.server, { recursive: true, verbatimSymlinks: true })
+  if (existsSync(path.join(release.server, 'runtime/node_modules')))
+    symlinkSync('server/runtime/node_modules', path.join(release.directory, 'node_modules'))
+  return release.directory
 }
 
 async function provideServer(release: Release, build: boolean, staged: string | null) {
@@ -189,7 +242,9 @@ async function provideServer(release: Release, build: boolean, staged: string | 
   const base = staged ?? release.previous
   const running = base && serverReleaseOf(base)
   if (!running)
-    throw createScriptError('No deployed server to reuse. Run with --server for the first deploy.')
+    throw createScriptError(
+      'No installed server to reuse. Run with --server for the first installation.',
+    )
 
   copyServer(release, running)
   return running
@@ -205,11 +260,11 @@ function serverReleaseOf(directory: string): string | null {
   return serverReleaseOf(config.server)
 }
 
-async function rollback(skipLiveCheck: boolean) {
+async function rollback(skipLiveCheck: boolean, control: InstallControl) {
   const dropped = removePending()
   if (dropped) log('rollback', `dropped the staged ${dropped}`)
   const current = currentRelease()
-  if (!current) throw createScriptError('Nothing is deployed.')
+  if (!current) throw createScriptError('No release is installed.')
   const previous = readBuildConfig(current)?.previousRelease
   if (!previous || !existsSync(previous))
     throw createScriptError(`${current} records no previous release.`)
@@ -217,9 +272,9 @@ async function rollback(skipLiveCheck: boolean) {
   const target = liveTarget(previous, readBuildConfig(previous)?.previousRelease ?? null)
   const restart = serverReleaseOf(previous) !== serverReleaseOf(current)
   pointCurrentAt(previous)
-  if (!restart) await checkInPlace(target, !skipLiveCheck)
-  else if (await restartInto(target, !skipLiveCheck)) await awaitLiveCheck(target)
-  console.log(`\n[deploy] rolled back to ${target.name} at ${meshUrl}`)
+  if (!restart) await checkInPlace(target, !skipLiveCheck, control)
+  else if (await control.restartInto(target, !skipLiveCheck)) await awaitLiveCheck(target)
+  console.log(`\n[install-release] rolled back to ${target.name} at ${target.meshUrl}`)
 }
 
 function liveTarget(directory: string, previous: string | null): LiveCheckTarget {
@@ -233,14 +288,14 @@ function liveTarget(directory: string, previous: string | null): LiveCheckTarget
 }
 
 // The server re-reads the verdict on the signal and shows it to open tabs, failed ones too.
-async function checkInPlace(target: LiveCheckTarget, enabled: boolean) {
+async function checkInPlace(target: LiveCheckTarget, enabled: boolean, control: InstallControl) {
   const passed = !enabled || (await liveCheck(target))
-  await signalServer(serverPort)
+  await control.signalServer(serverPort)
   if (!passed) throw liveCheckFailure(target, false)
 }
 
 async function liveCheck(target: LiveCheckTarget) {
-  log('live', `checking ${meshUrl}`)
+  log('live', `checking ${target.meshUrl}`)
   const command = liveCheckCommand(target, productionRoot, 0)
   const result = await run(command.argv, {
     cwd: command.cwd,
@@ -291,14 +346,14 @@ function liveCheckFailure(target: LiveCheckTarget, restarted: boolean) {
   const restartHint = restarted ? ' (the previous server will be restarted)' : ''
   return createScriptError(
     `Live check failed for ${target.name}. See ${path.join(target.directory, 'live-check.json')}.\n` +
-      `Roll back${restartHint}: bun run deploy --rollback`,
+      `Roll back${restartHint}: bun run install-release --rollback`,
   )
 }
 
 async function preflight() {
   if (!existsSync(productionRoot) || !statSync(productionRoot).isDirectory()) {
     throw createScriptError(
-      `${productionRoot} is missing. Prepare the configured production directory before deploying.`,
+      `${productionRoot} is missing. Prepare the configured production directory before installing a release.`,
     )
   }
   const available = Number(
@@ -337,7 +392,7 @@ async function assertMeshRoute() {
 }
 
 function slugFor(slug: string | undefined, branch: string) {
-  const raw = slug ?? branch ?? 'deploy'
+  const raw = slug ?? branch ?? 'release'
   const clean = raw
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')

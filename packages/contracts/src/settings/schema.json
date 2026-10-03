@@ -260,8 +260,7 @@
     },
     "developer.deployRestartWaitMinutes": {
       "default": 30,
-      "description": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.",
-      "markdownDescription": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.\n\nThirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.",
+      "description": "Minutes install-release --restart waits for busy sessions before giving up. --interrupt ends those turns and restarts immediately.",
       "maximum": 1440,
       "minimum": 1,
       "type": "integer"
@@ -271,19 +270,18 @@
         {
           "properties": {
             "meshHost": {
-              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+              "pattern": "^[a-zA-Z\\d][\\w.-]*(?![\\s\\S])",
               "type": "string"
             },
             "meshOrigin": {
               "type": "string"
             },
             "meshRoute": {
-              "pattern": "^\\/(?:[a-zA-Z0-9_-]+(?:\\/[a-zA-Z0-9_-]+)*\\/?|)$",
+              "pattern": "^\\/(?:[\\w-]+\\/)*[\\w-]*(?![\\s\\S])",
               "type": "string"
             },
             "productionRoot": {
-              "maxLength": 4096,
-              "pattern": "^\\/[^\\s%\"'$\\\\\\0]*$",
+              "pattern": "^(?!\\/+$)(?!.*\\/\\.\\.?(?:\\/|$))\\/[^\\s%\"'$\\\\\\0]{1,4095}(?![\\s\\S])",
               "type": "string"
             }
           },
@@ -295,7 +293,7 @@
         }
       ],
       "default": null,
-      "description": "Local Mesh and systemd deployment target: productionRoot, meshHost, meshOrigin and meshRoute. Configure this machine before running deploy or pair. Null disables these commands."
+      "description": "Local release installation and pairing through Mesh and systemd."
     },
     "developer.devServerIdleMinutes": {
       "default": 15,

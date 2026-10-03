@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
@@ -23,42 +23,88 @@ test.each([
   expect(result.stderr.toString()).toContain('The target must be an HTTP or HTTPS page URL')
 })
 
-test('restart readiness polls the configured origin and route', async () => {
-  const directory = mkdtempSync(path.join(tmpdir(), 'deploy-live-target-'))
-  const requests: string[] = []
-  const server = Bun.serve({
-    hostname: '127.0.0.1',
-    port: 0,
-    fetch(request) {
-      requests.push(new URL(request.url).pathname)
-      return Response.json({ server: { release: 'old' } })
-    },
-  })
-  const target = `http://127.0.0.1:${server.port}/demo/`
-  try {
-    const process = Bun.spawn(
-      [
-        'node',
-        script,
-        `--target=${target}`,
-        '--release=new',
-        '--wait-for-server=1',
-        `--out=${directory}`,
-      ],
-      { stdout: 'pipe', stderr: 'pipe' },
-    )
-    const [code, stderr] = await Promise.all([process.exited, new Response(process.stderr).text()])
-    expect(code, stderr).toBe(1)
-    expect(requests).toEqual(['/demo/release'])
-    expect(JSON.parse(readFileSync(path.join(directory, 'live-check.json'), 'utf8'))).toMatchObject(
-      {
-        target,
+test.each(['?', '#'])(
+  'a standalone live check rejects an empty %s delimiter before effects',
+  async (delimiter) => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'deploy-empty-delimiter-'))
+    const requests: string[] = []
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        requests.push(request.url)
+        return Response.json({ server: { release: 'old' } })
+      },
+    })
+    try {
+      const child = Bun.spawn(
+        [
+          'node',
+          script,
+          `--target=http://127.0.0.1:${server.port}/demo/${delimiter}`,
+          '--release=new',
+          '--wait-for-server=1',
+          `--out=${directory}`,
+        ],
+        { stdout: 'pipe', stderr: 'pipe' },
+      )
+      const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()])
+      expect(code, stderr).toBe(1)
+      expect(stderr, JSON.stringify(requests)).toContain(
+        'The target must be an HTTP or HTTPS page URL',
+      )
+      expect(requests).toEqual([])
+      expect(existsSync(path.join(directory, 'live-check.json'))).toBe(false)
+    } finally {
+      await server.stop(true)
+      rmSync(directory, { recursive: true, force: true })
+    }
+  },
+)
+
+test.each(['/demo/', '/demo', '/', '/demo%3F%23/'])(
+  'restart readiness polls the configured origin and route %s',
+  async (route) => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'deploy-live-target-'))
+    const requests: string[] = []
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        requests.push(new URL(request.url).pathname)
+        return Response.json({ server: { release: 'old' } })
+      },
+    })
+    const target = `http://127.0.0.1:${server.port}${route}`
+    const base = `${target.replace(/\/$/, '')}/`
+    try {
+      const process = Bun.spawn(
+        [
+          'node',
+          script,
+          `--target=${target}`,
+          '--release=new',
+          '--wait-for-server=1',
+          `--out=${directory}`,
+        ],
+        { stdout: 'pipe', stderr: 'pipe' },
+      )
+      const [code, stderr] = await Promise.all([
+        process.exited,
+        new Response(process.stderr).text(),
+      ])
+      expect(code, stderr).toBe(1)
+      expect(requests).toEqual([new URL(`${base}release`).pathname])
+      expect(
+        JSON.parse(readFileSync(path.join(directory, 'live-check.json'), 'utf8')),
+      ).toMatchObject({
+        target: base,
         status: 'failed',
         failures: ['server did not report new within 1ms'],
-      },
-    )
-  } finally {
-    await server.stop(true)
-    rmSync(directory, { recursive: true, force: true })
-  }
-})
+      })
+    } finally {
+      await server.stop(true)
+      rmSync(directory, { recursive: true, force: true })
+    }
+  },
+)

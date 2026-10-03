@@ -44,7 +44,7 @@ Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun r
 
 The family folders are mirrored to their standalone repositories. Make library changes here and follow `editor/AGENTS.md` and `ghostty-webgpu/AGENTS.md` for their package rules.
 
-## the shared dev server
+## optional Mesh dev server
 
 on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh route named `:5173`. mesh holds 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds vite and the api on `127.0.0.1`. the first connection starts it and holds requests until both ports answer; an open tab counts as use, and once nothing has been connected for `developer.devServerIdleMinutes` (15 by default) mesh stops it. rerun `dev:serve` after changing that setting
 
@@ -56,11 +56,24 @@ The launcher selects an installed Chromium app (Chrome first under automatic sel
 
 `bun run app:mac` builds a self-contained `Fregat.app` on macOS. Production clients share one machine server per state home. Installation reuses a matching service or registers the OS-activated service; closing or uninstalling the browser app keeps that service, mesh routes and terminals. [Plan 114](../plans/114-installed-app.md) records the approved installation, picker and native-window contracts.
 
-## shipping it
+## portable release build
 
-`bun run deploy` is an optional Linux integration with Mesh and user systemd. Install, dev and build work with the project prerequisites; deployment additionally needs `mesh`, `systemctl`, `df`, Node and Playwright Chromium. This integration owns `platform-prod.service` on loopback port 3301. Use it on the machine serving your target. Keep that service identity and port unchanged.
+`bun run release --output=<new-directory>` builds a self-contained release for the current OS and architecture. Omit `--output` for a unique directory under the OS temporary directory. It uses the documented Bun/build prerequisites, compiles workspaces, web and server, installs the pinned runtime dependency closure, includes `bin/bun`, and verifies the artifacts. Its `web/`, `server/`, relative runtime dependency links and bundled Bun move together. Building never reads machine installation settings, contacts Mesh, changes a service or writes application state.
 
-Configure `developer.deployTarget` in that machine's production settings (`~/.platform/settings.json`). Add the key to the existing JSON object, preserving other settings. The default is `null`; deploy, restart, rollback and pair stop before side effects until a valid target is configured.
+`--base=/` is the default application route. Pass a route such as `--base=/fregat/` when building for an installation at that route. The web build records this base; installing it requires the same configured route. `--reason=<text>` records the purpose in `build-config.json`. Use a new output directory; the command preserves existing directories and removes only its own incomplete output on failure. Git, a shell and optional provider tools remain host prerequisites when using those features. The bundled runtime is platform-specific.
+
+```bash
+bun install --frozen-lockfile
+bun run release --output=./fregat-release --base=/fregat/
+```
+
+Package publishing is separate: `bun run release:packages` is the Package releases workflow's Changesets publishing step.
+
+## optional local release installation
+
+`bun run install-release` is an optional Linux integration with Mesh and user systemd. It builds first by default; `--from=<release-directory>` installs a previously built release. Installation additionally needs `mesh`, `systemctl`, `df`, Node and Playwright Chromium. This integration owns `platform-prod.service` on loopback port 3301. Run it on the machine serving the configured target.
+
+Configure `developer.deployTarget` in that machine's production settings (`~/.platform/settings.json`). Add the key to the existing JSON object, preserving other settings. The default is `null`; install-release, restart, rollback and pair refuse before effects with guidance for setting the target.
 
 ```json
 {
@@ -73,12 +86,21 @@ Configure `developer.deployTarget` in that machine's production settings (`~/.pl
 }
 ```
 
-Choose a dedicated, mounted production directory with at least 2 GiB free and an absolute Unix path without relative segments, whitespace, quotes, backslashes or systemd `$`/`%` substitutions. Create it yourself with your user's ownership. The origin is an HTTP or HTTPS origin with no path, trailing slash or credentials. The route is `/` or slash-separated alphanumeric, underscore and hyphen segments. A trailing slash is accepted. Register the matching proxy once with `mesh serve <meshHost> 3301 --at <meshRoute> --isolate`. Deploy verifies this route and renders the service's root and allowed origin from the configured target.
+Choose a dedicated, mounted production directory with at least 2 GiB free and an absolute Unix path with fully resolved segments and systemd-safe characters. Whitespace, quotes, backslashes and systemd `$`/`%` substitutions are rejected. Prepare it with your user's ownership. Use a canonical HTTP or HTTPS origin and `/` or slash-separated alphanumeric, underscore and hyphen route segments. A trailing slash is accepted. Register the matching proxy once with `mesh serve <meshHost> 3301 --at <meshRoute> --isolate`. Installation verifies the route and renders the service's root and allowed origin from the configured target.
 
-The built release records the configured page URL. Both immediate and post-restart checks use that release's URL for navigation, release polling, health evidence and observation. A standalone check requires `node scripts/deploy/live-check.mjs --target=<deployed-page-url>`. `bun run pair` prints a link for the same configured target.
+```bash
+# First installation: use the built server and stage it for startup/restart.
+bun run install-release --from=./fregat-release --server --restart
+# Build and install web changes, reusing the current server.
+bun run install-release
+# Build a server update, then request the existing Restart workflow.
+bun run install-release --server --restart
+```
 
-When adopting this configuration for an existing installation, record its current production root, Mesh host, origin and route before the next deployment. The command does not migrate files or reconfigure a running service. Library imports without a deployment target resolve local paths under `~/.platform/production`; deploying still requires an explicit target.
+Web-only installation reuses the running server bundle, verifies the candidate, swaps the current link and checks the live page while open terminals and sessions continue. When a server release is already pending, web changes reuse that pending server and go live with it at Restart. `--from` follows the same policy: add `--server` to install the built server; omit it to reuse the existing server. A first installation needs `--server`.
 
-`bun run deploy` builds the web app, verifies the candidate, swaps a symlink and runs a headless check against the live url. nothing restarts, so open terminals and agent sessions survive it. server changes need `bun run deploy --server`, which stages the release; the app shows "Update available" and the server restarts when someone clicks Restart. `bun run deploy --server --restart` sends that request itself: it waits for running sessions to finish (`developer.deployRestartWaitMinutes`, 30 by default), then restarts and waits for the live check. `--interrupt` ends busy turns and restarts at once, which a deploy run from inside a Platform chat needs because its own turn counts as busy. a restart ends every live session, so do not reach for `--server` on web-only work
+`--server` alone stages the release and the app shows "Update available". `--restart` sends the Restart button's request, waits for busy sessions up to `developer.deployRestartWaitMinutes` (30 minutes by default), promotes and waits for the live check. Alone it builds nothing and restarts into the already staged release. `--interrupt` ends busy turns and restarts immediately; an installation run inside a Platform chat needs it because its own turn counts as busy. `--rollback` drops pending, moves current back one release and restarts when the server differs. `--skip-live-check` skips immediate and post-restart browser checks.
 
-`bun run deploy --rollback` moves back one release. `GET <meshRoute>/release` answers whether a change actually landed, reporting the served release, its commit, and the dirty-file count it was built from.
+The installed release records its configured page URL. Immediate, restart and rollback checks and their messages use the checked release's recorded URL for navigation, release polling, health evidence and observation. A standalone check requires `node scripts/deploy/live-check.mjs --target=<deployed-page-url>`. `bun run pair` prints a link for the configured target. The release endpoint under the configured application base reports the served release, commit, dirty-file count, pending update, phase and live-check result.
+
+Adopting this setting for an existing installation requires recording its current root, host, origin and route before the next installation or pairing command. The command preserves the service identity, loopback port and existing release workflow. Portable release building needs none of these installation settings.

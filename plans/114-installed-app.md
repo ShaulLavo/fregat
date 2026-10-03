@@ -161,12 +161,17 @@ No runtime bridge, debugging connection, chooser binding or permission grant rea
    receipt, changed manifest or missing directory runs setup. A failed direct app launch invalidates
    its receipt and retries setup while idle within the remaining startup cap; an exhausted cap
    leaves setup for the next idle launch. Singleton presence proves ownership, never an app window.
-   Setup starts a temporary browser with the existing CDP pipe and calls
+   Setup starts a headless temporary browser with the existing CDP pipe and calls
    `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. An unknown
    app returns `InvalidParams` (`-32602`) with the unknown-app reason. Other parameter failures
    remain operational errors; there is no `installed: false` field.
 3. For an uninstalled identity, call
-   `PWA.install({ manifestId, installUrlOrBundleUrl: installUrl })` and check OS state again.
+   `PWA.install({ manifestId, installUrlOrBundleUrl: installPageUrl })` and check OS state again.
+   `installPageUrl` resolves `install.html` under the app base. This static document links the
+   manifest without starting the app or restoring a saved address during Chrome's metadata fetch.
+   Set `PWA.changeAppUserSettings({ manifestId, displayMode: "standalone" })` before recording a
+   verified receipt, including for an existing installation. Chrome's installation API defaults
+   the user launch mode to browser. Receipts include the configured standalone display mode.
    A failed installation is a failed launch with structured guidance. Repeat idle setup converges
    after a partial install or uninstall. Installation repair runs only while the profile is idle.
 4. Before closing the controller, query `Target.getTargets` and collect its HTTP(S) page URLs;
@@ -197,6 +202,16 @@ focuses the existing sole window, and that its last-window close works. The nest
 gray render leaves app title/icon and launchQueue URL delivery unconfirmed. Evidence is retained
 at `/work/tmp/fregat-evidence/u1-installed-client-20261002/`; private compositor and DBus teardown
 records are linked there. Chrome and macOS remain coordinator acceptance work.
+
+**Mac startup regression proof — 2026-10-03.** Chrome 154 rejected installation from the app
+root after a disposable profile had saved its workbench address. The same profile installed
+successfully from the static metadata page. Headless setup produced no bootstrap window.
+The installed window was inspected through macOS accessibility and a screenshot: Fregat owned
+the menu and window, with no browser tabs or address bar. Protocol tests cover the static install
+URL, standalone mode, preserved installation reasons and receipt invalidation. A deliberate
+real-browser failure produced `install-info-unavailable` in the launcher's JSONL with browser
+major, setup phase, elapsed time and pipe counters. Earlier successful protocol-only installation
+checks did not establish these visible launch properties.
 
 A Dock-started browser cannot acquire a retroactive private pipe. Do not scan browser databases,
 intercept Dock launch, require runtime debugging, or kill that browser to regain installation
@@ -242,7 +257,7 @@ Choose the install target once and persist that choice as installation intent.
 | Install mode               | Stable installed start URL                                                                   | Server ownership                                             |
 | -------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | Local packaged desktop     | `http://127.0.0.1:3301/` by default, a single origin serving the packaged web client and API | Per-user launchd/systemd socket-activated installation       |
-| Existing remote production | `https://omarchy.mesh.shaulavo.dev/platform/` today                                          | The remote host's existing production service and mesh route |
+| Existing remote production | Configured remote production URL                                                             | The remote host's existing production service and mesh route |
 | Development                | The existing registered Vite/API mesh routes, with a separate browser profile                | Existing `scripts/dev-serve.ts` registration                 |
 
 The local desktop port becomes a machine-scoped registry entry, with 3301 as the initial default.
@@ -425,7 +440,7 @@ the shared server, then explicit server unregister/reinstall with state retained
 
 #### Existing mesh infrastructure and remote mode
 
-`scripts/deploy/systemd/platform-prod.service`, rendered through `scripts/deploy/mesh.ts`, already
+`scripts/deploy/systemd/platform-prod.service`, rendered through `scripts/install-release.ts`, already
 runs the production server on 3301 with restart/backoff, `WEB_ROOT`, structured log configuration,
 `ExecStartPre` promotion and `current` releases. It is a user service enabled under `default.target`,
 not currently a socket-activated service. The mesh `/platform` route provides the stable HTTPS
@@ -772,7 +787,7 @@ The checkout-root derivation in `launcher/index.ts` stays for development runs o
 `scripts/deploy/release.ts` takes its root from `scripts/deploy/config.ts`, fixed to
 `/work/platform-production`, and `createRelease`, `stagePending` and `swapCurrent` take no root. A2
 extracts root-parameterized release creation, staging and atomic link operations; the app passes
-its `server.releaseRoot`, and `bun run deploy` keeps `/work/platform-production` and its mesh live
+its `server.releaseRoot`, and `bun run install-release` keeps `/work/platform-production` and its mesh live
 check. The app's promotion skips the systemd and checkout live check and runs the server's own
 readiness probe (`GET /system/identity`).
 
@@ -1132,8 +1147,8 @@ owner's real-keychain proof. The current development command is `bun run desktop
 4. The page's titlebar drag: replace the Electrobun class names in `lib/platform/window-drag.ts`
    with a `mousedown` listener on `[data-native-window-drag-region]` that the preload installs when
    `titlebar === 'overlay'`, posting `drag`.
-5. Verify on `shaul-mac`: Chromium path (Helium, the default there, and Chrome), webview path with
-   `window.transparency: 'window'`, Cmd-Q, and that quitting leaves shared servers/terminals alive.
+5. Verify on an authorized macOS host: Chromium and webview paths, `window.transparency: 'window'`,
+   Cmd-Q, and that quitting leaves shared servers and terminals alive.
 
 **Exit**: the Gate 1 and 2 checklists pass on the Mac in both paths.
 

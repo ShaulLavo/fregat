@@ -80,7 +80,7 @@ Use fixture providers and fixture language servers. Add scenario selectors in
 `scripts/agent/selectors.ts`, run `bun run agent:browser scenario <name>` for the named scenario above, then
 `bun run agent:browser look`; read screenshots back and record the evidence directory. Run `bun run gates`
 and the relevant typecheck. Commit by path, push, and deploy the completed implementation with
-`bun run deploy`, adding `--server --restart` when server code changes.
+`bun run install-release`, adding `--server --restart` when server code changes.
 
 ## Out of scope
 

@@ -10,13 +10,18 @@ const target = readHomeSetting(productionStateHome, 'developer.deployTarget')
 export function requireDeployTarget() {
   if (target) return target
   throw createScriptError(
-    `Configure developer.deployTarget in ${path.join(productionStateHome, 'settings.json')} before running deploy or pair. See docs/development.md.`,
+    'A valid developer.deployTarget is required to install a release or pair this machine.',
+    {
+      why: 'This machine has no valid local installation target.',
+      fix: `Set developer.deployTarget in ${path.join(productionStateHome, 'settings.json')} with productionRoot, meshHost, meshOrigin and meshRoute. See docs/development.md.`,
+      internal: { configured: false },
+    },
   )
 }
 
-export const checkoutRoot = path.resolve(import.meta.dirname, '../..')
+export { checkoutRoot } from '../checkout-root'
 // Layout: releases/<stamp>-<commit>-<slug>/ holds web/, server/, build-config.json and live-check.json.
-// current -> the served release. pending -> a release `deploy --server` staged; the unit's
+// current -> the served release. pending -> a release `install-release --server` staged; the unit's
 // ExecStartPre (bin/promote.ts, installed from systemd/promote.ts) renames it over current on the
 // next start, which only a Restart click, a crash or `systemctl start` causes. Both are symlinks.
 export const productionRoot = target?.productionRoot ?? path.join(productionStateHome, 'production')

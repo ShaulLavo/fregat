@@ -1361,26 +1361,22 @@ export const SETTINGS_REGISTRY = {
     scope: 'machine',
     widget: 'complex',
     category: 'Developer',
-    title: 'Deployment target',
-    description:
-      'Local Mesh and systemd deployment target: productionRoot, meshHost, meshOrigin and meshRoute. Configure this machine before running deploy or pair. Null disables these commands.',
+    title: 'Installation target',
+    description: 'Local release installation and pairing through Mesh and systemd.',
     visibility: 'advanced',
-    keywords: ['developer', 'deploy', 'mesh', 'production', 'target'],
   }),
   'developer.deployRestartWaitMinutes': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1440)),
     // Long enough for a typical agent turn to finish; a session busy for longer is stuck or
     // background work, which the caller should interrupt on purpose.
     default: 30,
-    // Machine scope: `bun run deploy --restart` reads it from this machine's production home.
+    // Machine scope: `bun run install-release --restart` reads it from this machine's production home.
     scope: 'machine',
     widget: 'number',
     category: 'Developer',
-    title: 'Deploy restart wait',
-    details:
-      'Thirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.',
+    title: 'Restart wait',
     description:
-      'Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.',
+      'Minutes install-release --restart waits for busy sessions before giving up. --interrupt ends those turns and restarts immediately.',
     visibility: 'advanced',
     keywords: ['developer', 'deploy', 'restart', 'update', 'busy', 'wait'],
   }),

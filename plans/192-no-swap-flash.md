@@ -6,7 +6,7 @@
   `useHeldUntilReady`; the file picker preview is fixed on `picker-locations`. The rest is below.
 - Origin: owner, 2026-09-26: "the preview flashes we need some rule to make it less annoying and the
   app has 100 examples like this".
-- Size: M. Web only: `bun run deploy`. Each row ships on its own.
+- Size: M. Web only: `bun run install-release`. Each row ships on its own.
 
 ## The rule
 

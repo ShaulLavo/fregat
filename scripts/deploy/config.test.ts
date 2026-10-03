@@ -54,6 +54,12 @@ test.each(['/demo', '/demo/', '/'])(
 test.each([
   { productionRoot: 'relative' },
   { productionRoot: '/' },
+  { productionRoot: '//' },
+  { productionRoot: '/./prod' },
+  { productionRoot: '/../prod' },
+  { productionRoot: '/srv/./prod' },
+  { productionRoot: '/srv/..' },
+  { productionRoot: '/srv/.' },
   { productionRoot: '/srv/../' },
   { productionRoot: '/srv/with space' },
   { productionRoot: '/srv/%h' },
@@ -77,10 +83,32 @@ test.each([
   expect(descriptor.default).toBeNull()
 })
 
+test.each(['/srv/.hidden', '/srv/..hidden', '/srv//production', '/srv/production/'])(
+  'accepts a dedicated production directory %s',
+  (productionRoot) => {
+    expect(
+      v.safeParse(SETTINGS_REGISTRY['developer.deployTarget'].schema, {
+        ...target,
+        productionRoot,
+      }).success,
+    ).toBe(true)
+  },
+)
+
+test('the production directory preserves its 4096-character bound', () => {
+  const schema = SETTINGS_REGISTRY['developer.deployTarget'].schema
+  expect(v.safeParse(schema, { ...target, productionRoot: '/' + 'a'.repeat(4095) }).success).toBe(
+    true,
+  )
+  expect(v.safeParse(schema, { ...target, productionRoot: '/' + 'a'.repeat(4096) }).success).toBe(
+    false,
+  )
+})
+
 test.each(
   [
     ...[[], ['--server'], ['--restart'], ['--rollback']].map((args) => ({
-      script: 'mesh.ts',
+      script: '../install-release.ts',
       args,
     })),
     { script: '../pair.ts', args: [] },
@@ -88,7 +116,9 @@ test.each(
 )(
   '$script $args stops before effects with an invalid target: $invalid',
   ({ script, args, invalid }) => {
-    const home = mkdtempSync(path.join(tmpdir(), 'deploy-unconfigured-'))
+    const root = mkdtempSync(path.join(tmpdir(), 'deploy-unconfigured-'))
+    const home = path.join(root, 'home')
+    mkdirSync(home)
     try {
       const settings = JSON.stringify({
         'developer.deployTarget': { ...target, meshOrigin: 'https://contributor.example/path' },
@@ -99,13 +129,20 @@ test.each(
       }
       const result = Bun.spawnSync(
         [process.execPath, path.join(import.meta.dirname, script), ...args],
-        { env: { ...process.env, HOME: home } },
+        {
+          env: {
+            ...process.env,
+            HOME: home,
+            // Runtime compilation writes a cache independently of deployment's state effects.
+            BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(root, 'runtime-cache'),
+          },
+        },
       )
       expect(result.exitCode).toBe(1)
-      expect(result.stderr.toString()).toContain('Configure developer.deployTarget')
+      expect(result.stderr.toString()).toContain('developer.deployTarget')
       expect(readdirSync(home)).toEqual(invalid ? ['.platform'] : [])
     } finally {
-      rmSync(home, { recursive: true, force: true })
+      rmSync(root, { recursive: true, force: true })
     }
   },
 )

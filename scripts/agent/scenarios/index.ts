@@ -1,3 +1,4 @@
+import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
 import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
@@ -203,6 +204,7 @@ import { pushSessionNotice } from './push-session-notice'
 import { chatClaudeCatalog } from './chat-claude-catalog'
 import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
+import { workspaceLinkError } from './workspace-link-error'
 import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalOfflineHost } from './terminal-offline-host'
@@ -452,6 +454,7 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  releaseInstallationSettings,
   nativeWindow,
   installedApp,
   binaryFileOpen,
@@ -572,6 +575,7 @@ export const scenarios: readonly Scenario[] = [
   chatClaudeCatalog,
   chatDraftContextStrip,
   machineConnectError,
+  workspaceLinkError,
   machineProtocolMismatch,
   wallpaperIconHints,
   gitChanges,
