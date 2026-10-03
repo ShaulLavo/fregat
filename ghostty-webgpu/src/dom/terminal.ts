@@ -1,6 +1,8 @@
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
 import type {
   ReadLinesOptions,
+  TerminalGeometry,
+  TerminalTextMeasurement,
   TerminalLine,
   TerminalScrollbar,
   TerminalSelectionFormatOptions,
@@ -461,6 +463,28 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   get submittedFrame(): TerminalSubmittedFrame | undefined {
     this.ensureActive()
     return this.execution.submittedFrame
+  }
+
+  geometry(): TerminalResult<Mode, TerminalGeometry> {
+    this.ensureActive()
+    return this.result(this.execution.geometry())
+  }
+
+  measure(text: string): TerminalResult<Mode, number> {
+    this.ensureActive()
+    return this.result(this.execution.measure(text))
+  }
+
+  measureTexts(texts: readonly string[]): TerminalResult<Mode, TerminalTextMeasurement> {
+    this.ensureActive()
+    return this.result(this.execution.measureTexts(texts))
+  }
+
+  writeAndReadGeometry(data: TerminalInputData): TerminalResult<Mode, TerminalGeometry> {
+    this.ensureActive()
+    const geometry = this.execution.writeAndReadGeometry(data)
+    this.renderer?.notifyWrite()
+    return this.result(geometry)
   }
 
   frameSnapshot(): TerminalResult<Mode, RendererFrameSnapshot | undefined> {

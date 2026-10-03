@@ -14,6 +14,7 @@ import {
   type WorkerFontFace,
 } from './index.js'
 import type { TerminalMutationResult } from '../term/types.js'
+import type { TerminalGeometry, TerminalTextMeasurement } from '../core/types.js'
 
 it('exports the concrete worker factory and its asynchronous authority contract', () => {
   expect(typeof Terminal.create).toBe('function')
@@ -22,6 +23,15 @@ it('exports the concrete worker factory and its asynchronous authority contract'
   expectTypeOf<Terminal>().toExtend<TerminalApi<'async'>>()
   expectTypeOf<ReturnType<Terminal['write']>>().toEqualTypeOf<
     TerminalResult<'async', TerminalMutationResult>
+  >()
+  expectTypeOf<ReturnType<Terminal['geometry']>>().toEqualTypeOf<Promise<TerminalGeometry>>()
+  expectTypeOf<ReturnType<Terminal['measure']>>().toEqualTypeOf<Promise<number>>()
+  expectTypeOf<ReturnType<Terminal['measureTexts']>>().toEqualTypeOf<
+    Promise<TerminalTextMeasurement>
+  >()
+  expectTypeOf<Parameters<Terminal['measureTexts']>[0]>().toEqualTypeOf<readonly string[]>()
+  expectTypeOf<ReturnType<Terminal['writeAndReadGeometry']>>().toEqualTypeOf<
+    Promise<TerminalGeometry>
   >()
   expectTypeOf<ReturnType<Terminal['dispose']>>().toEqualTypeOf<Promise<void>>()
   expectTypeOf<Terminal['submittedFrame']>().toEqualTypeOf<TerminalSubmittedFrame | undefined>()

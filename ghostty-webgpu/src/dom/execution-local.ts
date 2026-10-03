@@ -176,6 +176,18 @@ export class LocalTerminalExecution {
   registerLinkProvider(provider: LinkProvider<Event>) {
     return this.session.registerLinkProvider(provider)
   }
+  geometry() {
+    return this.session.geometry()
+  }
+  measure(text: string) {
+    return this.session.measure(text)
+  }
+  measureTexts(texts: readonly string[]) {
+    return this.session.measureTexts(texts)
+  }
+  writeAndReadGeometry(data: TerminalInputData) {
+    return this.session.writeAndReadGeometry(data)
+  }
   write(data: TerminalInputData) {
     return this.session.write(data)
   }

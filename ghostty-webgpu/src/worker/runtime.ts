@@ -346,6 +346,17 @@ export class TerminalWorkerRuntime {
         this.renderer?.setCursorBlinkEnabled(native.appearance.cursor.blink)
         return result
       }
+      case 'geometry':
+        return native.geometry()
+      case 'measure':
+        return native.measure(...request.args)
+      case 'measureTexts':
+        return native.measureTexts(...request.args)
+      case 'writeAndReadGeometry': {
+        const geometry = native.writeAndReadGeometry(...request.args)
+        this.renderer?.notifyWrite()
+        return geometry
+      }
       case 'write': {
         const result = native.write(...request.args)
         this.renderer?.notifyWrite()

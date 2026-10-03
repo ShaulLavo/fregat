@@ -55,12 +55,21 @@ export async function resolveWorkspaceAddress(
   const stored = metadata.findWorkspaceAddress(paths.workspaceRootReal, id)
   if (!stored) throw new FsError('WORKSPACE_ADDRESS_NOT_FOUND')
 
-  const { canonicalPath, entry } = await canonicalDirectory(
-    paths,
-    paths.toRealRelative(stored.canonicalPath),
-  )
+  const { canonicalPath, entry } = await resolveSavedDirectory(paths, stored.canonicalPath)
   if (canonicalPath !== stored.canonicalPath) throw new FsError('WORKSPACE_ADDRESS_NOT_FOUND')
   return address(id, canonicalPath, entry.path)
+}
+
+async function resolveSavedDirectory(paths: WorkspacePaths, canonicalPath: string) {
+  try {
+    return await canonicalDirectory(paths, paths.toRealRelative(canonicalPath))
+  } catch (error) {
+    if (!isFsError(error) || error.code !== 'NOT_FOUND') throw error
+    throw new FsError('NOT_FOUND', 'The saved workspace folder could not be found.', error, {
+      why: 'The folder saved in this workspace link is missing from this machine.',
+      fix: 'Choose folder to open its current location, or select another workspace.',
+    })
+  }
 }
 
 async function canonicalDirectory(paths: WorkspacePaths, input: string) {

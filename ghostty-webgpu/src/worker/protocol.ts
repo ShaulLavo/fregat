@@ -52,6 +52,10 @@ interface WorkerSubmission extends WorkerWatermarks {
 
 type NativeCommands = Pick<
   LocalTerminalExecution,
+  | 'geometry'
+  | 'measure'
+  | 'measureTexts'
+  | 'writeAndReadGeometry'
   | 'write'
   | 'writeln'
   | 'sendInput'
@@ -142,6 +146,10 @@ export interface TerminalOutputAck extends WorkerIdentity {
 }
 
 export const workerCommandNames: ReadonlySet<string> = new Set([
+  'geometry',
+  'measure',
+  'measureTexts',
+  'writeAndReadGeometry',
   'write',
   'writeln',
   'sendInput',

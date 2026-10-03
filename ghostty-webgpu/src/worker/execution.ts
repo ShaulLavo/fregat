@@ -51,6 +51,11 @@ export class WorkerTerminalExecution {
   private frameListener?: (snapshot: RendererTextFrameSnapshot) => void
 
   private constructor(options: WorkerExecutionOptions) {
+    if (options.backend !== 'auto' && options.backend !== 'webgpu' && options.backend !== 'webgl')
+      throw workerError('capability', 'backend', {
+        requestedType: typeof options.backend,
+        supported: 'auto|webgpu|webgl',
+      })
     if (
       typeof Worker === 'undefined' ||
       typeof MessageChannel === 'undefined' ||
@@ -261,6 +266,18 @@ export class WorkerTerminalExecution {
     return this.request('fence', [])
   }
 
+  geometry() {
+    return this.request('geometry', [])
+  }
+  measure(...args: Parameters<LocalTerminalExecution['measure']>) {
+    return this.request('measure', args)
+  }
+  measureTexts(...args: Parameters<LocalTerminalExecution['measureTexts']>) {
+    return this.request('measureTexts', args)
+  }
+  writeAndReadGeometry(...args: Parameters<LocalTerminalExecution['writeAndReadGeometry']>) {
+    return this.request('writeAndReadGeometry', args)
+  }
   write(...args: Parameters<LocalTerminalExecution['write']>) {
     return this.request('write', args)
   }

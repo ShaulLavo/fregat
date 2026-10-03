@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import { CdpClient } from '../cdp'
+import { launcherFailureFacts } from '../failure'
 
 function fixture() {
   let input!: ReadableStreamDefaultController<Uint8Array>
@@ -55,7 +56,9 @@ test('events include flattened session id and unsubscribe removes subscriber', a
 })
 test('protocol errors reject only their request and future requests still work', async () => {
   const f = fixture()
-  const failure = expect(f.client.request('Bad')).rejects.toThrow('control connection')
+  const failure = expect(f.client.request('Bad')).rejects.toMatchObject({
+    code: 'desktop.launcher.CDP_COMMAND_FAILED',
+  })
   f.send('{"id":1,"error":{"code":-1,"message":"private external content"}}\0')
   await failure
   const next = f.client.request('Good')
@@ -63,6 +66,48 @@ test('protocol errors reject only their request and future requests still work',
   await expect(next).resolves.toEqual({})
   f.client.close()
 })
+
+test.each([
+  [
+    "Couldn't fetch install info for http://private.test/ from http://private.test/",
+    'install-info-unavailable',
+  ],
+  [
+    'Expected manifest id http://private.test/ does not match input url or app id private',
+    'manifest-mismatch',
+  ],
+  [
+    'Failed to install http://private.test/ from http://private.test/: kWriteDataFailed',
+    'install-failed',
+  ],
+  ['Invalid manifest id: http://private.test/', 'invalid-manifest-id'],
+])(
+  'installation rejection classifies %s without retaining private content',
+  async (message, protocolReason) => {
+    const f = fixture()
+    try {
+      const failure = f.client.request('PWA.install').catch((error: unknown) => error)
+      f.send(JSON.stringify({ id: 1, error: { code: -32600, message } }) + '\0')
+      const error = await failure
+      expect(error).toMatchObject({
+        code: 'desktop.launcher.CDP_COMMAND_FAILED',
+        internal: {
+          reason: 'request-error',
+          method: 'PWA.install',
+          protocolCode: -32600,
+          protocolReason,
+        },
+      })
+      const facts = launcherFailureFacts(error)
+      expect(facts.internal?.installResult).toBe(
+        message.endsWith('kWriteDataFailed') ? 'kWriteDataFailed' : null,
+      )
+      expect(JSON.stringify(facts)).not.toContain('private')
+    } finally {
+      f.client.close()
+    }
+  },
+)
 test.each(['oops\0', '[]\0', '{"method":1}\0', '{"method":"Event","params":[]}\0'])(
   'malformed frame closes pending requests %s',
   async (frame) => {

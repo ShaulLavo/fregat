@@ -126,7 +126,12 @@ async function start() {
   recordDesktopInfo('desktop.browser.detect', {
     candidates: candidates.map((candidate) =>
       candidate.kind === 'chromium'
-        ? { kind: candidate.kind, source: candidate.source, confinement: candidate.confinement }
+        ? {
+            kind: candidate.kind,
+            family: candidate.family,
+            source: candidate.source,
+            confinement: candidate.confinement,
+          }
         : { kind: candidate.kind },
     ),
   })
@@ -234,7 +239,7 @@ async function waitForHttp(url: string, webUrl: string) {
     }
     await Bun.sleep(250)
   }
-  throw launcherErrors.DEV_SERVER_UNREACHABLE({ url, internal: { waitedMs: 90_000 } })
+  throw launcherErrors.DEV_SERVER_UNREACHABLE({ internal: { waitedMs: 90_000 } })
 }
 
 function requestSignal() {

@@ -607,3 +607,72 @@ it.each(['older-empty', 'current-empty', 'released', 'reset', 'dispose'] as cons
     }
   },
 )
+
+describe.each(['main', 'webgl', 'webgpu'] as const)('%s actual-owner integration', (mode) => {
+  it('measures readonly text with atomic live geometry through the packaged entry', async () => {
+    const terminal = await create(mode)
+    await terminal.open(container())
+    await terminal.write('\x1b[?2027h')
+    const initial = terminal.geometry()
+    expect(initial instanceof Promise).toBe(mode !== 'main')
+    expect((await initial).cursor).toMatchObject({ x: 0, y: 0 })
+    const texts = Object.freeze(['abc', '中', '\u2764\ufe0f', 'e\u0301'])
+    const measured = terminal.measureTexts(texts)
+    expect(measured instanceof Promise).toBe(mode !== 'main')
+    const batch = await measured
+    expect(batch.texts.map((text) => text.cells)).toEqual([3, 2, 2, 1])
+    expect(batch.geometry).toEqual(await terminal.geometry())
+    expect(Object.isFrozen(batch)).toBe(true)
+    expect(Object.isFrozen(batch.texts)).toBe(true)
+    expect(Object.isFrozen(batch.geometry.cursor)).toBe(true)
+    expect(await terminal.measure('中')).toBe(2)
+    await terminal.write('\x1b[?2027l')
+    const legacy = await terminal.measureTexts(texts)
+    expect(legacy.geometry.graphemeClustering).toBe(false)
+    expect(legacy.texts[2]?.cells).toBe(1)
+    await terminal.write('\x1b[?2027h')
+    expect(await terminal.measure('\u2764\ufe0f')).toBe(2)
+    expect(Array.isArray(terminal.visibleLines())).toBe(true)
+  })
+
+  it('captures atomic prompt geometry before public observer reentry', async () => {
+    const terminal = await create(mode)
+    await terminal.open(container())
+    const order: string[] = []
+    let reentry: ReturnType<TerminalApi['write']> | undefined
+    let observed: ReturnType<TerminalApi['geometry']> | undefined
+    terminal.on('title', () => {
+      order.push('observer')
+      observed = terminal.geometry()
+      reentry = terminal.write('later')
+    })
+    const bytes = new TextEncoder().encode('\x1b[32m中> \x1b[0m\x1b]0;prompt\x07')
+    const operation = terminal.writeAndReadGeometry(bytes)
+    expect(operation instanceof Promise).toBe(mode !== 'main')
+    bytes.fill(0)
+    const origin = await operation
+    order.push('return')
+    expect(order).toEqual(['observer', 'return'])
+    expect(bytes.buffer.byteLength).toBeGreaterThan(0)
+    expect(origin.cursor).toMatchObject({ x: 4, y: 0, pendingWrap: false })
+    expect((await observed)?.cursor.x).toBe(4)
+    await reentry
+    const later = await terminal.geometry()
+    expect(later.cursor.x).toBe(9)
+    expect(origin.revision).toBeLessThan(later.revision)
+    expect(Object.isFrozen(origin)).toBe(true)
+    expect(Object.isFrozen(origin.cursor)).toBe(true)
+  })
+})
+
+it('rejects an unsupported Canvas worker backend with a structured capability failure', async () => {
+  // JavaScript callers can supply a backend outside the declaration union.
+  await expect(
+    WorkerTerminal.create({
+      assets,
+      backend: 'canvas' as 'webgl',
+      workerUrl,
+      fonts: [{ family, source: { url: fontUrl } }],
+    }),
+  ).rejects.toMatchObject({ code: 'capability', operation: 'backend' })
+})

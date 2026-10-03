@@ -681,12 +681,7 @@ class BrowserInputController implements DomInputController {
       this.forwardedKeyPresses.delete(event.code)
       return
     }
-    if (event.repeat) return
-    if (bytes.length === 0) {
-      this.forwardedKeyPresses.delete(event.code)
-      return
-    }
-    this.forwardedKeyPresses.set(event.code, event)
+    if (!event.repeat && bytes.length > 0) this.forwardedKeyPresses.set(event.code, event)
   }
 
   private notifyKey(event: KeyboardEvent, bytes: TerminalInputResult): void {
