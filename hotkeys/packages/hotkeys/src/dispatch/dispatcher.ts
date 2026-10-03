@@ -40,7 +40,7 @@ export type FocusNode<Source> = {
   readonly parent: FocusNode<Source> | null
   readonly context: () => KeyContext
   readonly setContext: (context: FocusNodeContext) => void
-  /** Adds a handler; returns its removal. */
+  /** Adds a handler registration; returns that registration's removal. */
   readonly handle: (command: string, handler: CommandHandler<Source>) => () => void
   readonly focus: () => void
   /** Detaches the node; focus inside it moves to its parent. */
@@ -72,6 +72,8 @@ export type Dispatcher<Source> = {
   readonly createNode: (options?: FocusNodeOptions<Source>) => FocusNode<Source>
   readonly focus: (node: FocusNode<Source> | null) => void
   readonly focused: () => FocusNode<Source> | null
+  /** Whether the active dispatcher owns the node and its complete ancestor path. */
+  readonly hasNode: (node: FocusNode<Source>) => boolean
   /** Contexts from the outermost node to the focused one. */
   readonly contextStack: () => readonly KeyContext[]
   readonly setKeymap: (entries: readonly KeymapEntry[]) => void
@@ -79,6 +81,12 @@ export type Dispatcher<Source> = {
   readonly handleKey: (input: KeyInput, source: Source, inScope?: boolean) => boolean
   /** Runs a command along the focus path without a key. */
   readonly dispatchCommand: (command: string, args?: unknown) => boolean
+  /** Runs a command on an owned node's path without changing focus. */
+  readonly dispatchCommandFrom: (
+    node: FocusNode<Source>,
+    command: string,
+    args?: unknown,
+  ) => boolean
   readonly pending: () => PendingChordLabel | null
   readonly wantsCapture: () => boolean
   readonly capturesKey: (input: KeyInput) => boolean
@@ -87,10 +95,11 @@ export type Dispatcher<Source> = {
   readonly dispose: () => void
 }
 
+type HandlerRegistration<Source> = { readonly handler: CommandHandler<Source> }
 type NodeState<Source> = {
   node: FocusNode<Source>
   context: KeyContext
-  handlers: Map<string, Set<CommandHandler<Source>>>
+  handlers: Map<string, Set<HandlerRegistration<Source>>>
   removed: boolean
 }
 type Captured<Source> = {
@@ -114,6 +123,7 @@ export function createDispatcher<Source = unknown>(
   const platform = options.platform ?? detectPlatform()
   const states = new Map<FocusNode<Source>, NodeState<Source>>()
   let focusedNode: FocusNode<Source> | null = null
+  let disposed = false
   let nextId = 1
   let keymap = compileKeymap(options.keymap ?? [], platform)
   const { isAvailable } = options
@@ -152,10 +162,21 @@ export function createDispatcher<Source = unknown>(
     return focusIdentity
   }
 
-  function focusPath(): NodeState<Source>[] {
+  function focusPath(start: FocusNode<Source> | null = focusedNode): NodeState<Source>[] {
     const path: NodeState<Source>[] = []
-    for (let node = focusedNode; node; node = node.parent) path.push(states.get(node)!)
+    for (let node = start; node; node = node.parent) {
+      const state = states.get(node)
+      if (!state) return []
+      path.push(state)
+    }
     return path.reverse()
+  }
+  function hasNode(node: FocusNode<Source>): boolean {
+    if (disposed) return false
+    for (let current: FocusNode<Source> | null = node; current; current = current.parent) {
+      if (!states.has(current)) return false
+    }
+    return true
   }
   function capture(): Captured<Source> {
     const path = focusPath()
@@ -183,12 +204,18 @@ export function createDispatcher<Source = unknown>(
     input: KeyInput | null,
     source: Source | null,
   ): boolean {
-    for (let index = path.length - 1; index >= 0; index -= 1) {
-      const state = path[index]!
-      const handlers = state.handlers.get(command)
-      if (!handlers || state.removed) continue
-      for (const handler of handlers) {
-        if (handler({ command, args, node: state.node, input, source }) !== false) return true
+    if (disposed) return false
+    const notifications = path.map((state) => ({
+      state,
+      registrations: [...(state.handlers.get(command) ?? [])],
+    }))
+    for (let index = notifications.length - 1; index >= 0; index -= 1) {
+      const { state, registrations } = notifications[index]!
+      for (const registration of registrations) {
+        if (disposed) return false
+        if (!hasNode(state.node) || !state.handlers.get(command)?.has(registration)) continue
+        if (registration.handler({ command, args, node: state.node, input, source }) !== false)
+          return true
       }
     }
     return false
@@ -221,9 +248,10 @@ export function createDispatcher<Source = unknown>(
   function addHandler(state: NodeState<Source>, command: string, handler: CommandHandler<Source>) {
     let handlers = state.handlers.get(command)
     if (!handlers) state.handlers.set(command, (handlers = new Set()))
-    handlers.add(handler)
+    const registration = { handler }
+    handlers.add(registration)
     return () => {
-      handlers.delete(handler)
+      handlers.delete(registration)
     }
   }
   function removeNode(state: NodeState<Source>) {
@@ -237,7 +265,7 @@ export function createDispatcher<Source = unknown>(
     return node
   }
   function focus(node: FocusNode<Source> | null) {
-    if (node && !states.has(node)) return
+    if (node && !hasNode(node)) return
     focusedNode = node
   }
   function handleKey(input: KeyInput, source: Source, inScope = true): boolean {
@@ -256,16 +284,22 @@ export function createDispatcher<Source = unknown>(
     createNode,
     focus,
     focused: () => focusedNode,
+    hasNode,
     contextStack: () => capture().stack,
     setKeymap,
     handleKey,
     dispatchCommand: (command, args) => runCommand(focusPath(), command, args, null, null),
+    dispatchCommandFrom: (node, command, args) =>
+      runCommand(focusPath(node), command, args, null, null),
     pending: runtime.pending,
     wantsCapture: runtime.wantsCapture,
     capturesKey: runtime.capturesKey,
     releaseAll: runtime.releaseAll,
     cancel: runtime.cancel,
-    dispose: runtime.dispose,
+    dispose: () => {
+      disposed = true
+      runtime.dispose()
+    },
   }
 }
 
