@@ -12,10 +12,10 @@ measurement are recorded below.
 
 ## Why
 
-The editor preloads every Shiki grammar and every theme after first paint
-(`EDITOR_SHIKI_PRELOAD_LANGUAGES` in
-[`shiki-languages.ts`](../apps/web/src/features/editor/utils/shiki-languages.ts), consumed by
-`features/editor/state/syntax-highlighting.ts`). A TypeScript project needs about four grammars.
+The original inspection found every Shiki grammar and theme preloaded after first paint
+through the former `EDITOR_SHIKI_PRELOAD_LANGUAGES` constant in `shiki-languages.ts`.
+The current [shared highlighting service](../apps/web/src/lib/highlighting/state/service.ts)
+owns preload inputs; preserve delivered census work when taking the remaining matrix. A TypeScript project needs about four grammars.
 VS Code loads a grammar on the first file of that language; the goal is to be earlier than that
 without being exhaustive.
 

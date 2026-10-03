@@ -3,7 +3,8 @@
 ## Status and authorization
 
 - Status: APPROVED 2026-09-29, requested by the owner: "implement everything Zed has".
-- Triage: ZT-19, size M. Depends on Plan 206, Plan 209.
+- Triage: ZT-19, size M. Depends on Plan 206 and the relevant Plan 209 region/focus/key contracts;
+  independent columns and new dock units need their separately authorized, delivered layout owners.
 - Inputs: `/work/reports/keymap-wave/zed-feature-triage.md`, its `.json`, and
   `/work/reports/keymap-wave/206-zed-translation.json`. Zed evidence is pinned to `933d8d93`.
 
@@ -40,6 +41,14 @@ active tools; [apps/web/src/features/workbench/utils/layout.ts](../apps/web/src/
 Plan 209 establishes independent session/project-tool columns; the current layout has no
 independent right-dock owner.
 
+## Scoped workspace dependency
+
+Reconcile existing region navigation independently. New independent columns and right-dock
+commands require 209's reviewed region/focus/key decisions and authorized delivered owners.
+D2 gates optional compact-terminal relocation; D5 gates changed column/mode keys. Keep handlers
+unavailable until their region exists. This plan does not authorize constructing 209's shell or
+waiting for every unrelated workspace unit before improving current navigation.
+
 ## Design
 
 Implement visibility, open-set history and resize operations in Plan 209's layout owner. Give
@@ -62,21 +71,24 @@ local shortcut listeners or inline command chords.
 
 ## Steps
 
-- [ ] Complete Plan 209 region assignments; add failing independent visibility, open-set restore and focus-return fixtures.
-- [ ] Implement typed layout operations and pixel resize/reset with clamping and persisted view state.
-- [ ] Register all thirteen actions, owning contexts and preset payloads; reuse project navigation coordination.
+- [ ] Inventory current regions and implement their navigation against existing owners. For each new region unit, require its reviewed Plan 209 assignment and authorized delivered host before adding visibility, open-set restore and focus-return fixtures.
+- [ ] Implement typed layout operations and pixel resize/reset for the unit's available regions, with clamping and persisted view state.
+- [ ] Register the unit's actions, owning contexts and preset payloads; reuse project navigation coordination. Keep actions for unavailable regions disabled, and track remaining actions toward all thirteen.
 - [ ] Add `zed-dock-sidebar-commands` with a retained fixture terminal and at least two project entries.
 - [ ] Run the acceptance checks, record screenshot evidence, then commit, push and deploy the implementation.
 
 ## Acceptance
 
-Focused layout tests cover active/open target selection, px/zero fallback, bounds, default
-reset and remembered open-set restoration. `zed-dock-sidebar-commands` independently toggles
-session/tools/right regions, navigates projects, resizes active/all visible docks and resets them.
+Each unit proves navigation and operations against its available regions; its receipt lists
+region/action coverage and remaining gated units. Focused layout tests cover active/open target
+selection, px/zero fallback, bounds, default reset and remembered open-set restoration when
+those operations are delivered. Full-plan acceptance remains open until
+`zed-dock-sidebar-commands` independently toggles session/tools/right regions, navigates projects,
+resizes active/all visible docks and resets them.
 Hiding the focused dock returns focus to the retained pane; terminal fixture identity and input
 remain intact when reopened. Reopening preserves persisted size and visibility intent.
 
-Run heavy checks through `bash /work/tmp/wave-heavy/run.sh "<label>" -- env PATH="$PATH" <cmd>`.
+Run heavy checks through the current heavy wrapper in [AGENTS.md](../AGENTS.md#dev-gates-verification).
 Use fixture providers and fixture language servers. Add scenario selectors in
 `scripts/agent/selectors.ts`, run `bun run agent:browser scenario <name>` for the named scenario above, then
 `bun run agent:browser look`; read screenshots back and record the evidence directory. Run `bun run gates`
