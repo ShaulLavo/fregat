@@ -140,6 +140,7 @@ test('WKWebView reports its own transparent overlay', () => {
   expect(native).toContain('"platform":"darwin"')
   expect(native).toContain('[data-native-window-drag-region]')
   expect(native).toContain('[data-native-window-no-drag]')
+  expect(native).toContain('.window-no-drag')
 })
 
 test('WK drag listener sends only primary presses on non-interactive regions', () => {

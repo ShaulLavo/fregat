@@ -1430,9 +1430,9 @@
     },
     "window.transparency": {
       "default": "compositor",
-      "description": "Choose window-manager transparency or a see-through native window.",
+      "description": "Choose window-manager transparency or a see-through native window using the system webview.",
       "enum": ["compositor", "window"],
-      "markdownDescription": "Choose window-manager transparency or a see-through native window.\n\nTransparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.",
+      "markdownDescription": "Choose window-manager transparency or a see-through native window using the system webview.\n\nTransparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.",
       "type": "string"
     },
     "workbench.colorTheme": {

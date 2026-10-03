@@ -1,38 +1,29 @@
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { defineErrorCatalog } from 'evlog'
-import { NATIVE_LIBRARY_NAME, nativeLibraryDir } from '../src/bun/native-paths'
 
 const buildErrors = defineErrorCatalog('desktop.native', {
   BUILD_FAILED: {
     message: 'The native desktop helper could not be built.',
     status: 500,
     why: 'The native helper needs a C compiler and the platform development libraries.',
-    fix: 'Install cc, pkg-config and webkit2gtk-4.1 on Linux, or the Xcode command-line tools on macOS, then run build:native --shell=installed again.',
+    fix: 'Install cc, pkg-config and webkit2gtk-4.1 on Linux, or the Xcode command-line tools on macOS, then run build:native again.',
   },
 })
 
 export function buildNative(
   desktopDir = path.join(import.meta.dirname, '..'),
-  shell: 'electrobun' | 'installed' = 'electrobun',
   arch?: 'arm64' | 'x64',
 ) {
   if (process.platform !== 'linux' && process.platform !== 'darwin') return null
   const linux = process.platform === 'linux'
-  if (linux && shell !== 'installed') return null
   const source = path.join(
     desktopDir,
     'native',
-    linux
-      ? 'linux/platform-webview.c'
-      : shell === 'installed'
-        ? 'macos/platform-webview.m'
-        : 'vibrancy.m',
+    linux ? 'linux/platform-webview.c' : 'macos/platform-webview.m',
   )
-  const output = path.join(
-    nativeLibraryDir(desktopDir),
-    linux || shell === 'installed' ? 'platform-webview' : NATIVE_LIBRARY_NAME,
-  )
+  const outputDir = path.join(desktopDir, 'native', 'build')
+  const output = path.join(outputDir, 'platform-webview')
   if (!existsSync(source))
     throw buildErrors.BUILD_FAILED({ internal: { stage: 'source', platform: process.platform } })
   const compiler = linux ? 'cc' : 'clang'
@@ -52,15 +43,17 @@ export function buildNative(
   const args = linux
     ? []
     : [
-        ...(shell === 'electrobun'
-          ? ['-dynamiclib']
-          : ['-framework', 'WebKit', '-framework', 'UniformTypeIdentifiers']),
+        '-framework',
+        'WebKit',
+        '-framework',
+        'UniformTypeIdentifiers',
         ...(arch ? ['-arch', arch === 'x64' ? 'x86_64' : arch] : []),
         '-fobjc-arc',
         '-mmacosx-version-min=11.0',
         '-framework',
         'Cocoa',
       ]
+  mkdirSync(outputDir, { recursive: true })
   const result = Bun.spawnSync([compiler, ...args, '-O2', '-o', output, source, ...flags])
   if (result.exitCode !== 0) {
     process.stderr.write(result.stderr)
@@ -70,9 +63,6 @@ export function buildNative(
 }
 
 if (import.meta.main) {
-  const output = buildNative(
-    undefined,
-    process.argv.includes('--shell=installed') ? 'installed' : 'electrobun',
-  )
+  const output = buildNative()
   if (output) console.log(`[native] built ${output}`)
 }

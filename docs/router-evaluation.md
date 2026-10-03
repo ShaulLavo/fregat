@@ -96,7 +96,7 @@ Provide custom `parseSearch` and `stringifySearch` for the existing readable tab
 - Copy from current captured state using the same registered route builder and search codec, avoiding stale debounced location data.
 - Keep panel-only changes as replacements, with the existing panel state attached to destination entries. The later panel-history product decision remains deferred.
 
-T3 Code is a useful reference for typed route navigation, not a mandate to copy every configuration. Its Electron shell uses hash history. Platform's current desktop shell opens an HTTP `WEB_URL` in `apps/desktop/src/bun/index.ts:166`; retain browser history unless that serving model changes.
+T3 Code is a useful reference for typed route navigation, not a mandate to copy every configuration. Its Electron shell uses hash history. Platform's launcher (`apps/desktop/src/launcher/index.ts`) opens an HTTP URL in the installed app or native host; retain browser history unless that serving model changes.
 
 ## Files that change and code that can disappear
 
