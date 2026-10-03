@@ -5,7 +5,7 @@ import {
   type DragMoveEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import { restrictToWindowEdges } from '@dnd-kit/modifiers'
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
 import { useEditorGroupActions } from '@/features/editor/hooks/use-editor-group-actions'

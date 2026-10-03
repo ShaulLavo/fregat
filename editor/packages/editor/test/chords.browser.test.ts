@@ -1,10 +1,9 @@
 import { afterEach, expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
 import { Editor } from '../src/editor/Editor'
-import type { EditorKeymapOptions } from '../src/editor/keymap'
+import type { EditorKeymapOptions } from '../src/keymap/presets'
 import { createEditorFindPlugin } from '../../find/src/plugin'
 import '../src/style.css'
-
 declare module 'vitest/browser' {
   interface BrowserCommands {
     proofKeyPress: (key: string) => Promise<void>
@@ -19,13 +18,19 @@ afterEach(async () => {
   for (const editor of editors.splice(0)) editor.dispose()
   for (const element of elements.splice(0)) element.remove()
 })
-function create(keymap?: EditorKeymapOptions, readOnly = false, find = false) {
+function create(
+  keymap?: EditorKeymapOptions,
+  readOnly = false,
+  find = false,
+  inputRoute?: 'textarea' | 'edit-context',
+) {
   const container = document.createElement('div')
   container.style.cssText = 'width:600px;height:160px'
   document.body.append(container)
   elements.push(container)
   const editor = new Editor(container, {
     keymap,
+    inputRoute,
     plugins: find ? [createEditorFindPlugin()] : [],
     editability: readOnly ? 'readonly' : 'editable',
   })
@@ -36,15 +41,12 @@ function create(keymap?: EditorKeymapOptions, readOnly = false, find = false) {
   return editor
 }
 const custom: EditorKeymapOptions = {
-  defaultBindings: false,
-  layers: [
-    { id: 'custom', bindings: [{ chord: ['Control+K', 'Control+C'], command: 'selectAll' }] },
-  ],
+  packs: [],
+  bindings: [{ keys: ['Control+K', 'Control+C'], command: 'selectAll' }],
 }
 async function press(key: string) {
   await commands.proofKeyPress(key)
 }
-
 test('ordinary options execute once with trusted input and no inserted strokes', async () => {
   const editor = create(custom)
   let executions = 0
@@ -69,8 +71,7 @@ test('ordinary options execute once with trusted input and no inserted strokes',
   expect(editor.getKeymapContext().hasSelection).toBe(true)
   expect(editor.materializeFullText()).toBe('alpha beta')
 })
-
-test('held prefix, completion, and mismatch remain owned until release', async () => {
+test('held prefix and completion stay owned while a mismatch resumes text input', async () => {
   const editor = create(custom)
   await commands.proofKeyDown('Control')
   await commands.proofKeyDown('k')
@@ -88,14 +89,16 @@ test('held prefix, completion, and mismatch remain owned until release', async (
   await press('Control+k')
   await commands.proofKeyDown('x')
   await commands.proofKeyDown('x')
-  expect(editor.materializeFullText()).toBe('alpha beta')
+  expect(editor.materializeFullText()).toBe('xxalpha beta')
 })
-
-test('disable retains held ownership; re-enable installs one matcher', async () => {
+test('unbinding retains held ownership; replacement installs one matcher', async () => {
   const editor = create(custom)
   await commands.proofKeyDown('Control')
   await commands.proofKeyDown('k')
-  editor.setKeymap({ ...custom, enabled: false })
+  editor.setKeymap({
+    packs: [],
+    bindings: [{ keys: 'Control+K Control+C', command: null, context: 'Editor' }],
+  })
   await commands.proofKeyUp('Control')
   await commands.proofKeyDown('k')
   expect(editor.materializeFullText()).toBe('alpha beta')
@@ -107,7 +110,6 @@ test('disable retains held ownership; re-enable installs one matcher', async () 
   await press('Control+c')
   expect(editor.getKeymapContext().hasSelection).toBe(true)
 })
-
 test('focus changes and pointer cancellation cannot complete another editor sequence', async () => {
   const first = create(custom)
   const second = create(custom)
@@ -125,18 +127,12 @@ test('focus changes and pointer cancellation cannot complete another editor sequ
   await press('Control+c')
   expect(first.getKeymapContext().hasSelection).toBe(false)
 })
-
 test('binding replacement cancels pending and disposal removes listeners', async () => {
   const editor = create(custom)
   await press('Control+k')
   editor.setKeymap({
-    defaultBindings: false,
-    layers: [
-      {
-        id: 'replacement',
-        bindings: [{ chord: ['Control+K', 'Control+D'], command: 'selectAll' }],
-      },
-    ],
+    packs: [],
+    bindings: [{ keys: ['Control+K', 'Control+D'], command: 'selectAll' }],
   })
   await press('Control+c')
   expect(editor.getKeymapContext().hasSelection).toBe(false)
@@ -152,12 +148,17 @@ test('binding replacement cancels pending and disposal removes listeners', async
   await press('x')
   expect(input.value).toBe('x')
 })
-
-test('real timeout does not release a held prefix into text', async () => {
-  const editor = create(custom)
+test('a bound prefix times out without releasing a held key into text', async () => {
+  const editor = create({
+    packs: [],
+    bindings: [
+      { keys: 'Control+K', command: 'cursorRight' },
+      { keys: 'Control+K Control+C', command: 'selectAll' },
+    ],
+  })
   await commands.proofKeyDown('Control')
   await commands.proofKeyDown('k')
-  await new Promise((resolve) => setTimeout(resolve, 5100))
+  await new Promise((resolve) => setTimeout(resolve, 1100))
   await commands.proofKeyUp('Control')
   await commands.proofKeyDown('k')
   await commands.proofKeyUp('k')
@@ -165,7 +166,6 @@ test('real timeout does not release a held prefix into text', async () => {
   expect(editor.getKeymapContext().hasSelection).toBe(false)
   expect(editor.materializeFullText()).toBe('alpha beta')
 }, 10000)
-
 test('Tab moves real focus and read-only navigation survives', async () => {
   const editor = create()
   const next = document.createElement('button')
@@ -181,7 +181,6 @@ test('Tab moves real focus and read-only navigation survives', async () => {
   expect(reader.materializeFullText()).toBe('alpha beta')
   expect(reader.getKeymapContext().writable).toBe(false)
 })
-
 test('default fold chord hides real document rows', async () => {
   const editor = create()
   editor.setText('first\nsecond\nthird\nfourth')
@@ -195,7 +194,6 @@ test('default fold chord hides real document rows', async () => {
   expect(after).not.toBe(before)
   expect(after).not.toContain('second')
 })
-
 test('local find input handles trusted editing and Escape before idle editor shortcuts', async () => {
   const editor = create(undefined, false, true)
   await press('Control+f')
@@ -210,12 +208,26 @@ test('local find input handles trusted editing and Escape before idle editor sho
   await press('Escape')
   expect(editor.getKeymapContext().findVisible).toBe(false)
 })
-
-test('disabled shortcuts preserve trusted native cut and paste', async () => {
-  const editor = create({ enabled: false })
+test('minimal base preserves trusted native cut and paste', async () => {
+  const editor = create({ packs: [] })
   editor.setSelection(0, 5)
   await press('Control+x')
   await expect.poll(() => editor.materializeFullText()).toBe(' beta')
   await press('Control+v')
   await expect.poll(() => editor.materializeFullText()).toBe('alpha beta')
 })
+
+for (const route of ['textarea', 'edit-context'] as const) {
+  test(`a printable prefix replays into the ${route} input`, async () => {
+    const editor = create(
+      { packs: [], bindings: [{ keys: 'g g', command: 'selectAll', context: 'Editor' }] },
+      false,
+      false,
+      route,
+    )
+    await press('g')
+    expect(editor.materializeFullText()).toBe('alpha beta')
+    await press('x')
+    expect(editor.materializeFullText()).toBe('gxalpha beta')
+  })
+}

@@ -7,13 +7,9 @@ import { swiftShaderArgs, swiftShaderEnv } from './swiftshader-launch'
 
 const root = process.env.GHOSTTY_PACKAGE_ROOT ?? join(import.meta.dirname, '..')
 const require = createRequire(join(root, 'package.json'))
-const hotkeys = require.resolve('@tanstack/hotkeys')
+const hotkeys = require.resolve('@fregat/hotkeys')
 const dependencies = [
-  { prefix: '/node_modules/@tanstack/hotkeys/dist/', directory: dirname(hotkeys) },
-  {
-    prefix: '/node_modules/@tanstack/store/dist/',
-    directory: dirname(createRequire(hotkeys).resolve('@tanstack/store')),
-  },
+  { prefix: '/node_modules/@fregat/hotkeys/dist/', directory: dirname(hotkeys) },
 ]
 const origin = 'http://127.0.0.1:41799'
 const backends = ['webgpu', 'webgl2', 'canvas2d'] as const
@@ -26,8 +22,7 @@ for (const backend of requested) {
 }
 const selected = backends.filter((backend) => requested.length === 0 || requested.includes(backend))
 const imports = {
-  '@tanstack/hotkeys': '/node_modules/@tanstack/hotkeys/dist/index.js',
-  '@tanstack/store': '/node_modules/@tanstack/store/dist/index.js',
+  '@fregat/hotkeys': '/node_modules/@fregat/hotkeys/dist/index.js',
 }
 const hardware = process.env.GHOSTTY_BROWSER_HARDWARE === '1'
 const args = ['--enable-unsafe-webgpu']

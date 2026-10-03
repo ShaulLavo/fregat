@@ -166,7 +166,7 @@ describe('tooltip content', () => {
     const code = section?.querySelector<HTMLAnchorElement>('a[href]')
     expect(code?.textContent).toBe('(no-unused-expressions)')
     expect(code?.previousSibling?.textContent).toBe('oxc')
-    const related = section?.querySelector<HTMLAnchorElement>('a[role="button"]')
+    const related = section?.querySelector<HTMLButtonElement>('button[type="button"]')
     expect(related?.textContent).toBe('other.ts(4, 2): ')
     related?.click()
     expect(open).toHaveBeenCalledOnce()

@@ -72,21 +72,16 @@ export type {
   GhosttyWebGpuRendererFactory,
   GhosttyWebGpuTerminalAccessibilityOptions,
   GhosttyWebGpuTerminalAppearanceApi,
-  GhosttyWebGpuTerminalCopy,
   GhosttyWebGpuTerminalDiagnostics,
   GhosttyWebGpuTerminalEventMap,
   GhosttyWebGpuTerminalEventType,
   GhosttyWebGpuTerminalLifecycle,
   GhosttyWebGpuTerminalListener,
-  GhosttyWebGpuTerminalKeyboardOptions,
   GhosttyWebGpuTerminalOptions,
   GhosttyWebGpuTerminalResizeEvent,
   GhosttyWebGpuTerminalScrollbarOptions,
   GhosttyWebGpuTerminalSubscription,
   GhosttyWebGpuThemeProjection,
-  TerminalHotkeyBinding,
-  TerminalHotkeyContext,
-  TerminalHotkeyDecision,
 } from './dom/types.js'
 export type {
   RendererFrameCell,
@@ -171,4 +166,19 @@ export { DomTerminalRenderer, renderFrameToHtml } from './render/dom/renderer.js
 export type { RenderFrameHtmlOptions } from './render/dom/renderer.js'
 export { snapshotRenderState } from './render/frame.js'
 
+export { hotkeys } from './extensions/hotkeys/extension.js'
+export { terminalDefaultPack, terminalShellKeysPack } from './extensions/hotkeys/packs.js'
+export type { TerminalHotkeysOptions, TerminalHotkeyApi } from './extensions/hotkeys/extension.js'
+export type { TerminalClipboard, TerminalCommandId } from './extensions/hotkeys/commands.js'
+export type { TerminalHotkeyOwnership } from './extensions/hotkeys/focus.js'
+export type {
+  Extension,
+  ExtensionHandle,
+  ExtensionInput,
+  ExtensionScope,
+  Contributions,
+  TerminalInputEvent,
+  TerminalInputHandler,
+} from './extensions/types.js'
+export type { TerminalGeneratedInput, TerminalInputModes } from './dom/types.js'
 export type { TerminalSubmittedFrame, TerminalSubmittedRow } from './dom/submitted-frame.js'

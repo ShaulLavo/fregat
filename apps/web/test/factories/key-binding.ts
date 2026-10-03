@@ -1,12 +1,8 @@
+import { presetBinding } from '@/keymap/default-bindings'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 import type { PlatformKeyBinding } from '@/keymap/types'
-import {
-  chordKeys,
-  isBindableChord,
-  parsedChord,
-  type PlatformName,
-} from '@workspace/client-core/commands/chord'
+import { isBindableChord, type PlatformName } from '@workspace/client-core/commands/chord'
 
 type BindingOptions = Partial<Omit<PlatformKeyBinding, 'keys' | 'chord'>> & {
   readonly platform?: PlatformName
@@ -17,13 +13,16 @@ export function binding(keys: string, options: BindingOptions = {}): PlatformKey
     throw createClientInvariantError(`Invalid test keybinding: ${keys}`)
   }
   const { platform = 'linux', ...overrides } = options
-  const chord = parsedChord(keys, platform)
   return {
-    chord,
-    command: 'workspace.saveFile',
-    keys: chordKeys(chord, platform),
-    pane: 'any',
-    source: 'default',
+    ...presetBinding(
+      overrides.entry ?? {
+        keys,
+        command: 'command' in overrides ? (overrides.command ?? null) : 'workspace.saveFile',
+        context: overrides.context ?? 'Workspace',
+        source: overrides.source ?? 'default',
+      },
+      platform,
+    ),
     ...overrides,
   }
 }

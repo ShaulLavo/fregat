@@ -128,7 +128,12 @@ function operationSettingIds(value: unknown): SettingId[] {
     return [value.key]
   }
   if (value.kind === 'reset' && Array.isArray(value.keys)) return value.keys.filter(isSettingId)
-  if (value.kind === 'keybinding.set' || value.kind === 'keybinding.remove') {
+  if (
+    value.kind === 'keybinding.set' ||
+    value.kind === 'keybinding.remove' ||
+    value.kind === 'keybinding.append' ||
+    value.kind === 'keybinding.delete'
+  ) {
     return ['keybindings.overrides']
   }
   if (value.kind === 'model.setHidden') return ['models.hidden']
@@ -145,8 +150,14 @@ function operationSettingIds(value: unknown): SettingId[] {
 
 function operationAffectedDomainIds(value: unknown): string[] {
   if (!isRecord(value)) return []
-  if (value.kind === 'keybinding.set' || value.kind === 'keybinding.remove') {
-    const command = safeDomainPart(value.command)
+  if (
+    value.kind === 'keybinding.set' ||
+    value.kind === 'keybinding.remove' ||
+    value.kind === 'keybinding.append' ||
+    value.kind === 'keybinding.delete'
+  ) {
+    const entry = isRecord(value.entry) ? value.entry : undefined
+    const command = safeDomainPart(value.command ?? entry?.command ?? entry?.unbind)
     return command ? [`command:${command}`] : []
   }
   if (value.kind === 'model.setHidden' || value.kind === 'model.setFavorite') {

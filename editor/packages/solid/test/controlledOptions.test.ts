@@ -61,10 +61,10 @@ const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
     applied: ['hidden'],
   },
   keymap: {
-    initial: { enabled: true },
-    next: { enabled: false, defaultBindings: true },
+    initial: {},
+    next: { packs: [] },
     method: 'setKeymap',
-    applied: [{ enabled: false, defaultBindings: true }],
+    applied: [{ packs: [] }],
   },
   lineHeight: { initial: 18, next: 36, method: 'setLineHeight', applied: [36] },
   rangeDecorations: {

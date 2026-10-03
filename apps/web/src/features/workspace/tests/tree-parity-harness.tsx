@@ -1,7 +1,8 @@
 /** @jsxImportSource react */
 import '@workspace/ui/globals.css'
 import { flushSync } from 'react-dom'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
+import { createTreeTestRoot } from '../../../../test/factories/tree-command-root'
 import { expect, vi } from 'vitest'
 import { commands } from 'vitest/browser'
 
@@ -134,7 +135,7 @@ export async function mountParityTree(
   container.style.height = `${height}px`
   container.style.width = '360px'
   document.body.append(container)
-  root = createRoot(container)
+  root = createTreeTestRoot(container)
   flushSync(() => {
     root?.render(
       <TreeHost

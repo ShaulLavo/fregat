@@ -1,24 +1,15 @@
-import type { EditorKeymapOptions } from '@singapore-editor/core/keymap'
+import { EDITOR_COMMANDS } from '@singapore-editor/core/keymap'
 import type { EditorCommandId } from '@singapore-editor/core/editor'
 import type { PlatformCommandId } from '@/keymap/types'
 
-export const HOSTED_EDITOR_KEYMAP = { enabled: false } satisfies EditorKeymapOptions
-
-const EDITOR_COMMAND_PREFIX = 'editor.'
-type EditorAdapterPlatformCommandId = `editor.${EditorCommandId}`
-
-function isEditorPlatformCommandId(
-  command: EditorAdapterPlatformCommandId | PlatformCommandId | null,
-): command is EditorAdapterPlatformCommandId {
-  if (!command) return false
-
-  return command.startsWith(EDITOR_COMMAND_PREFIX)
+export function editorPlatformCommandId(command: string): string {
+  return command.startsWith('editor.') ? command : `editor.${command}`
 }
 
-export function editorCommandIdFromPlatform(
-  command: EditorAdapterPlatformCommandId | PlatformCommandId | null,
-): EditorCommandId | null {
-  if (!isEditorPlatformCommandId(command)) return null
+const editorIds = new Map(EDITOR_COMMANDS.map(({ id }) => [editorPlatformCommandId(id), id]))
 
-  return command.slice(EDITOR_COMMAND_PREFIX.length) as EditorCommandId
+export function editorCommandIdFromPlatform(
+  command: PlatformCommandId | string | null,
+): EditorCommandId | null {
+  return command ? (editorIds.get(command) ?? null) : null
 }

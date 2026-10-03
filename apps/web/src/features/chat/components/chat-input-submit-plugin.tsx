@@ -1,3 +1,4 @@
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import {
   COMMAND_PRIORITY_HIGH,
@@ -9,7 +10,7 @@ import {
 import { useEffect } from 'react'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
-import { composerEnterIntent, type SendShortcut } from '@/features/chat/utils/enter-intent'
+import { composerEnterIntent } from '@/features/chat/utils/enter-intent'
 import { $readChatInputTextSnapshot } from '@/features/chat/utils/input-editor-actions'
 
 /**
@@ -32,6 +33,30 @@ export function ChatInputSubmitPlugin({
   const [editor] = useLexicalComposerContext()
   const sendShortcut = useSettingValue('chat.sendShortcut')
 
+  useKeymapNode({
+    area: 'chat',
+    context: 'Composer',
+    element: () => editor.getRootElement(),
+    commands: {
+      'chat.sendMessage': ({ source }) => {
+        if (disabled || commandMenuOpen || editor.isComposing() || !editor.isEditable())
+          return false
+        const intent = source
+          ? composerEnterIntent({
+              modifierKey: source.metaKey || source.ctrlKey,
+              prompt: editor.getEditorState().read(() => $readChatInputTextSnapshot().text),
+              sendShortcut,
+              shiftKey: source.shiftKey,
+              touch: touchKeyboard(),
+            })
+          : 'send'
+        if (intent === 'newline') return false
+        void onSubmitRequest(intent === 'alternate')
+        return true
+      },
+    },
+  })
+
   useEffect(() => {
     const unregisterEnter = editor.registerCommand(
       KEY_ENTER_COMMAND,
@@ -41,8 +66,6 @@ export function ChatInputSubmitPlugin({
           disabled,
           event,
           onCommandMenuCommit,
-          onSubmitRequest,
-          sendShortcut,
         }),
       COMMAND_PRIORITY_HIGH,
     )
@@ -68,15 +91,7 @@ export function ChatInputSubmitPlugin({
       unregisterArrowDown()
       unregisterArrowUp()
     }
-  }, [
-    commandMenuOpen,
-    disabled,
-    editor,
-    onCommandMenuCommit,
-    onCommandMenuMove,
-    onSubmitRequest,
-    sendShortcut,
-  ])
+  }, [commandMenuOpen, disabled, editor, onCommandMenuCommit, onCommandMenuMove])
 
   return null
 }
@@ -86,41 +101,21 @@ function handleEnterCommand({
   disabled,
   event,
   onCommandMenuCommit,
-  onSubmitRequest,
-  sendShortcut,
 }: {
   commandMenuOpen: boolean
   disabled: boolean
   event: KeyboardEvent | null
   onCommandMenuCommit: () => boolean
-  onSubmitRequest: (alternate?: boolean) => Promise<boolean>
-  sendShortcut: SendShortcut
 }) {
   if (disabled) return false
   if (event && isImeCompositionEnter(event)) {
-    // The keystroke belongs to the IME, which is committing a composition —
-    // sending here would ship a half-composed message. Swallowed rather than
-    // prevented: the IME still needs its own default to land the characters.
+    // IME Enter commits text and still needs its native default.
     event.stopPropagation()
     return true
   }
   if (!event?.shiftKey && handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit))
     return true
-  const intent = composerEnterIntent({
-    modifierKey: Boolean(event?.metaKey || event?.ctrlKey),
-    prompt: $readChatInputTextSnapshot().text,
-    sendShortcut,
-    shiftKey: Boolean(event?.shiftKey),
-    touch: touchKeyboard(),
-  })
-  // Unhandled, so the editor's own Enter adds the line.
-  if (intent === 'newline') return false
-
-  event?.preventDefault()
-  event?.stopPropagation()
-  void onSubmitRequest(intent === 'alternate')
-
-  return true
+  return false
 }
 
 /**

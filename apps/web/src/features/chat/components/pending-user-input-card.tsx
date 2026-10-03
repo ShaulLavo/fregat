@@ -41,7 +41,26 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
   const responding = response.kind === 'submitting' || response.kind === 'accepted'
   const activeIndex = Math.min(stepIndex, questions.length - 1)
   const question = questions[activeIndex]
-  useQuestionDigits(
+  function selectOption(optionValue: string) {
+    if (!question) return
+    const next = {
+      ...drafts,
+      [question.id]: toggleUserInputOption(question, drafts[question.id], optionValue),
+    }
+
+    setDrafts(next)
+    // Multi-select waits for Next; single-select advances to the next unanswered question.
+    if (question.answerKind === 'multi-select') return
+
+    setStepIndex(
+      firstUnansweredUserInputIndex(
+        questions,
+        questionDraftsWithAttachments(questions, next, attachments.byQuestion, attachments.blocked),
+      ),
+    )
+  }
+
+  const questionRef = useQuestionDigits(
     question,
     !responding && disabledReason === null && question?.answerKind !== 'text',
     selectOption,
@@ -59,25 +78,6 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
   const showOptions = question.answerKind !== 'text' && question.options.length > 0
   const showTextField = !showOptions || question.allowOther
   const canAdvance = isUserInputDraftComplete([question], answeredDrafts)
-
-  function selectOption(optionValue: string) {
-    const next = {
-      ...drafts,
-      [question.id]: toggleUserInputOption(question, drafts[question.id], optionValue),
-    }
-
-    setDrafts(next)
-    // One pick answers a single-select outright, so jump to whatever is still
-    // open. A multi-select is still being built — it waits for Next.
-    if (question.answerKind === 'multi-select') return
-
-    setStepIndex(
-      firstUnansweredUserInputIndex(
-        questions,
-        questionDraftsWithAttachments(questions, next, attachments.byQuestion, attachments.blocked),
-      ),
-    )
-  }
 
   function changeCustomAnswer(customAnswer: string) {
     setDrafts({
@@ -104,6 +104,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
 
   return (
     <div
+      ref={questionRef}
       aria-label='Agent question'
       className='shrink-0 px-(--density-control-padding-x) pb-(--density-section-gap)'
       role='region'

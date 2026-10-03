@@ -1,6 +1,6 @@
 import { groupedCommandItems, quickAccessQuery } from '@workspace/client-core/commands/palette'
 import type { CommandBus } from '@/commands/state/bus'
-import type { TerminalBinding } from '@/commands/utils/bindings'
+import { commandShortcut, type TerminalBinding } from '@/commands/utils/bindings'
 
 export function paletteOptions(
   captured: ReturnType<CommandBus['capture']>,
@@ -20,13 +20,13 @@ export function paletteOptions(
       ...(row.command.aliases ?? []),
     ],
     reason: row.status === 'disabled' ? row.reason : null,
-    shortcut: bindings.find((binding) => binding.command === row.command.id)?.keys,
+    shortcut: commandShortcut(bindings, row.command.id),
   }))
   const search = quickAccessQuery(query).trim().toLocaleLowerCase()
   const groups = groupedCommandItems(commands, query, search ? [] : recents)
   const options = groups.flatMap(([group, rows]) =>
     rows.map((row) => ({
-      name: row.shortcut ? `${row.title}  ${row.shortcut}` : row.title,
+      name: row.shortcut !== 'unassigned' ? `${row.title}  ${row.shortcut}` : row.title,
       description: row.reason ?? group,
       value: row,
     })),

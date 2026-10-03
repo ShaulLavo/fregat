@@ -112,6 +112,9 @@ export class LocalTerminalExecution {
   get scrollbar() {
     return this.session.scrollbar
   }
+  get alternateScreen() {
+    return this.session.alternateScreen
+  }
   get revision() {
     return this.session.revision
   }

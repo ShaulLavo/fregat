@@ -18,16 +18,11 @@ export function isSearchOpenSeedKey(event: TreeKeyboardEventLike): boolean {
   )
 }
 
-export function isSpaceSelectionKey(event: TreeKeyboardEventLike): boolean {
-  return event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar'
-}
-
 export function canKeyUseStickyKeyboardState(
   event: TreeKeyboardEventLike,
   contextMenuEnabled: boolean,
 ): boolean {
   if (contextMenuEnabled && isContextMenuOpenKey(event)) return true
-  if ((event.ctrlKey || event.metaKey) && isSpaceSelectionKey(event)) return true
 
   return (
     event.key === 'ArrowDown' ||

@@ -19,6 +19,12 @@
     "type": "git",
     "url": "git+https://github.com/ShaulLavo/ghostty-webgpu.git"
   },
+  "workspaces": {
+    "packages": [],
+    "catalog": {
+      "@fregat/hotkeys": "https://github.com/ShaulLavo/fregat/releases/download/hotkeys-0.0.2-68d8aaf6f631-260650623e7e/fregat-hotkeys-0.0.2-68d8aaf6f631-260650623e7e.tgz"
+    }
+  },
   "files": [
     "dist",
     "types",
@@ -112,7 +118,7 @@
     "site:dev": "bun run --cwd site dev"
   },
   "dependencies": {
-    "@tanstack/hotkeys": "0.10.0",
+    "@fregat/hotkeys": "catalog:",
     "@webgpu/types": "0.1.74"
   },
   "devDependencies": {

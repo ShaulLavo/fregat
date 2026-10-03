@@ -1,3 +1,4 @@
+import type { EditorKeymapNodeOptions } from './editor/hotkeys'
 import type { EditorRowPresentation } from './rowPresentation'
 import type { EditorPointHit, EditorMarkerHit } from './pointQueries'
 import type { TextContent } from './textContent'
@@ -558,6 +559,7 @@ export type EditorViewContributionContext = {
    * Names state this contribution owns for key bindings' `when` conditions, such as a widget being
    * open. Read at the moment a key is matched, so it is never stale; unregistered, it reads false.
    */
+  registerKeymapNode(options: EditorKeymapNodeOptions): EditorDisposable
   registerKeymapContextKey(key: string, read: () => boolean): EditorDisposable
   getFeature<T>(token: EditorCapabilityToken<T>): T | null
   /**
@@ -967,6 +969,7 @@ export type EditorGutterContribution = {
 }
 
 export type EditorInlineReplacementContext = {
+  readonly registerKeymapNode?: EditorViewContributionContext['registerKeymapNode']
   readonly records?: EditorSyntaxRecords
   readonly textSnapshot: TextReadSnapshot
   readonly languageId: EditorSyntaxLanguageId | null
@@ -1047,18 +1050,6 @@ export type EditorPluginContext = {
   registerSelectionRangeProvider(provider: EditorSelectionRangeProvider): EditorDisposable
 }
 
-/** What a key participant does with a key: takes it, or hands it to the keymaps and text input. */
-export type EditorKeyDecision = 'consume' | 'delegate'
-
-/**
- * Asked for each unmodified or Shift-only key before either keymap sees it; Ctrl, Cmd and Alt chords
- * go to the host's keymap. Never asked during a composition.
- */
-export type EditorKeyParticipant = (
-  event: KeyboardEvent,
-  context: Readonly<Record<string, boolean>>,
-) => EditorKeyDecision
-
 /** How the caret is drawn in one view. */
 export type EditorCursorStyle = 'line' | 'block' | 'underline'
 
@@ -1072,7 +1063,6 @@ export type EditorInternalViewContributionContext = EditorViewContributionContex
     timingName: string,
     selection?: EditorSelectionRange | readonly EditorSelectionRange[],
   ): void
-  registerKeyParticipant(participant: EditorKeyParticipant): EditorDisposable
   /** While `accepts` answers false, typed, composed, pasted and dropped text is refused. */
   registerTextGate(accepts: () => boolean): EditorDisposable
   setCursorStyle(style: EditorCursorStyle): void
@@ -1126,6 +1116,7 @@ export type EditorPluginHostEvents = {
   onDecorationContributionProviderRemoved?(provider: EditorDecorationContributionProvider): void
   onCommandContributionProviderAdded?(provider: EditorCommandContributionProvider): void
   onCommandContributionProviderRemoved?(provider: EditorCommandContributionProvider): void
+  onContributedCommandsChanged?(): void
   onCapabilityContributionProviderAdded?(provider: EditorCapabilityContributionProvider): void
   onCapabilityContributionProviderRemoved?(provider: EditorCapabilityContributionProvider): void
   onEditContributionProviderAdded?(provider: EditorEditContributionProvider): void
@@ -1627,6 +1618,7 @@ export class EditorPluginHost implements EditorDisposable {
 
     installedPlugin.active = true
     installedPlugin.activationDisposable = activation.disposable
+    if (plugin.commands?.length) this.events.onContributedCommandsChanged?.()
     return true
   }
 
@@ -1754,6 +1746,7 @@ export class EditorPluginHost implements EditorDisposable {
     installedPlugin.activationDisposable = null
     installedPlugin.registrations.active?.dispose()
     installedPlugin.registrations.active = null
+    if (plugin.commands?.length) this.events.onContributedCommandsChanged?.()
     this.events.onPluginDisposed?.(pluginName(plugin))
   }
 

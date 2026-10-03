@@ -6,12 +6,17 @@ import { useCommandFocus } from '@/commands/hooks/use-command-focus'
 import { Select } from '@/components/select'
 import { Dialog } from '@/components/dialog'
 import type { Theme } from '@/theme/utils/theme'
+import { commandShortcut } from '@/commands/utils/bindings'
 
 export function ShortcutHelp({ theme, onClose }: { theme: Theme; onClose: () => void }) {
   const commands = useCommands()
   const { height } = useTerminalDimensions()
   const bound = commands.bindings.filter(
-    (binding) => commands.bus.capture().inspect(binding.command).status !== 'unavailable',
+    (binding) =>
+      binding.command !== null &&
+      !binding.unbind &&
+      commands.bus.capture().inspect(binding.command).status !== 'unavailable' &&
+      commandShortcut(commands.bindings, binding.command).split(' / ').includes(binding.keys),
   )
   useCommandFocus(
     {
@@ -36,7 +41,7 @@ export function ShortcutHelp({ theme, onClose }: { theme: Theme; onClose: () => 
       <Select
         id='shortcut-help'
         options={bound.map((binding) => ({
-          name: `${binding.keys.padEnd(18)} ${commandById(binding.command)?.title ?? binding.command}`,
+          name: `${binding.keys.padEnd(18)} ${binding.command ? (commandById(binding.command)?.title ?? binding.command) : ''}`,
           description: `${binding.source} · ${binding.pane ?? 'global'}`,
         }))}
         height={Math.max(1, height - 12)}

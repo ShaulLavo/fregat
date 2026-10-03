@@ -46,6 +46,26 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
+    "@singapore-editor/core#build": {
+      "dependsOn": ["^build", "@fregat/hotkeys#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
+    },
+    "@singapore-editor/panes#build": {
+      "dependsOn": ["^build", "@fregat/hotkeys#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
+    },
+    "ghostty-webgpu#build": {
+      "dependsOn": ["^build", "@fregat/hotkeys#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
+    },
+    "@workspace/contracts#build": {
+      "dependsOn": ["^build", "@fregat/hotkeys#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
+    },
     "ghostty-webgpu-site#build": {
       "dependsOn": ["^build", "ghostty-webgpu#build"]
     },

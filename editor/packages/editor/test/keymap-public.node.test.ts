@@ -1,23 +1,19 @@
 import { expect, test } from 'vitest'
+import * as packs from '../src/keymap/presets'
 import * as keymap from '@singapore-editor/core/keymap'
-import { defaultEditorKeyBindings, vscodeEditorKeyBindings } from '../src/keymap/presets'
 
-test('built public keymap entry imports without DOM and contains distinct complete packs', () => {
-  expect(typeof document).toBe('undefined')
-  expect(keymap.createKeymapRuntime).toBeTypeOf('function')
-  for (const platform of ['mac', 'windows', 'linux'] as const) {
-    const defaults = keymap.defaultEditorKeyBindings(platform)
-    const vscode = keymap.vscodeEditorKeyBindings(platform)
-    expect(defaults).toEqual(defaultEditorKeyBindings(platform))
-    expect(vscode).toEqual(vscodeEditorKeyBindings(platform))
-    expect(defaults).not.toEqual(vscode)
-    expect(defaults.some((binding) => binding.chord.length === 2)).toBe(true)
-    expect(keymap.editorCommandPackForCommand('editor.action.showHover')).toBe('lsp-navigation')
-    expect(
-      defaults.every(
-        (binding) =>
-          !keymap.editorCommandMutates(binding.command) || binding.when?.includes('writable'),
-      ),
-    ).toBe(true)
-  }
+test('the public keymap entry exposes named data and command metadata', () => {
+  expect(keymap.markdownPack).toEqual(packs.markdownPack)
+  expect(keymap.vscodeEditingPack).toEqual(packs.vscodeEditingPack)
+  expect(keymap.defaultEditorPacks).not.toContainEqual(keymap.markdownPack)
+  expect(keymap).not.toHaveProperty('createKeymapRuntime')
+  expect(keymap).not.toHaveProperty('buildKeymapTrie')
 })
+for (const [name, pack] of Object.entries(packs)) {
+  if (!pack || typeof pack !== 'object' || !('linux' in pack)) continue
+  test(`${name} carries an explicit predicate for every row`, () => {
+    for (const platform of ['linux', 'mac', 'windows'] as const)
+      expect(pack[platform].every((binding) => Boolean(binding.context))).toBe(true)
+    expect(pack).toMatchSnapshot(name)
+  })
+}

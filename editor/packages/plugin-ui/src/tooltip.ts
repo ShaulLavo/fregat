@@ -1,3 +1,5 @@
+import { createEditorWidgetKeymap } from '@singapore-editor/core/extensions'
+import type { EditorViewContributionContext } from '@singapore-editor/core/extensions'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 
 import { createAnchoredSurface, type AnchoredSurfacePlacement } from './anchoredSurface'
@@ -103,6 +105,7 @@ export type TooltipShowOptions = {
 }
 
 export type TooltipOptions = {
+  readonly registerKeymapNode?: EditorViewContributionContext['registerKeymapNode']
   readonly document: Document
   readonly themeSource: HTMLElement
   readonly reentryElement: HTMLElement
@@ -288,27 +291,35 @@ export function createTooltipController(options: TooltipOptions): TooltipControl
     pointerDown = false
   }
 
-  const handleTooltipKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      hide()
-      return
-    }
-    if (isInteractiveKeyboardTarget(event.target)) return
-
+  const scroll = (key: string): boolean => {
     const body = tooltipBody(tooltip)
-    if (!body) return
-    if (!scrollTooltipBody(body, event.key)) return
-
-    event.preventDefault()
-    event.stopPropagation()
+    return body ? scrollTooltipBody(body, key) : false
   }
-
+  const standalone = options.registerKeymapNode ? null : createEditorWidgetKeymap(tooltip)
+  const register = options.registerKeymapNode ?? standalone!.registerKeymapNode
+  const hotkeys = register({
+    element: tooltip,
+    context: () => ({
+      identifiers: [
+        'EditorWidget',
+        'Tooltip',
+        'TooltipBody',
+        ...(isInteractiveKeyboardTarget(document.activeElement) ? ['TooltipControl'] : []),
+      ],
+    }),
+    commands: {
+      'tooltip.hide': hide,
+      'tooltip.scrollUp': () => scroll('ArrowUp'),
+      'tooltip.scrollDown': () => scroll('ArrowDown'),
+      'tooltip.pageUp': () => scroll('PageUp'),
+      'tooltip.pageDown': () => scroll('PageDown'),
+      'tooltip.scrollStart': () => scroll('Home'),
+      'tooltip.scrollEnd': () => scroll('End'),
+    },
+  })
   tooltip.addEventListener('pointerenter', handleTooltipPointerEnter)
   tooltip.addEventListener('pointerleave', handleTooltipPointerLeave)
   tooltip.addEventListener('pointerdown', handleTooltipPointerDown)
-  tooltip.addEventListener('keydown', handleTooltipKeyDown)
   document.addEventListener('pointermove', handleDocumentPointerMove)
   document.addEventListener('pointerup', handleDocumentPointerUp)
   document.addEventListener('pointercancel', handleDocumentPointerUp)
@@ -321,7 +332,8 @@ export function createTooltipController(options: TooltipOptions): TooltipControl
     tooltip.removeEventListener('pointerenter', handleTooltipPointerEnter)
     tooltip.removeEventListener('pointerleave', handleTooltipPointerLeave)
     tooltip.removeEventListener('pointerdown', handleTooltipPointerDown)
-    tooltip.removeEventListener('keydown', handleTooltipKeyDown)
+    hotkeys.dispose()
+    standalone?.dispose()
     document.removeEventListener('pointermove', handleDocumentPointerMove)
     document.removeEventListener('pointerup', handleDocumentPointerUp)
     document.removeEventListener('pointercancel', handleDocumentPointerUp)
@@ -714,10 +726,9 @@ function noteDetails(document: Document, note: TooltipNote): HTMLElement | null 
 function relatedRow(document: Document, link: TooltipNoteLink): HTMLElement {
   const row = document.createElement('div')
   row.style.marginTop = '8px'
-  const anchor = document.createElement('a')
+  const anchor = document.createElement('button')
+  anchor.type = 'button'
   anchor.textContent = link.label
-  anchor.setAttribute('role', 'button')
-  anchor.tabIndex = 0
   styleNoteLink(anchor)
   const open = (event: Event): void => {
     event.preventDefault()
@@ -725,16 +736,21 @@ function relatedRow(document: Document, link: TooltipNoteLink): HTMLElement {
     link.open()
   }
   anchor.addEventListener('click', open)
-  anchor.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') open(event)
-  })
   const text = document.createElement('span')
   text.textContent = link.text
   row.append(anchor, text)
   return row
 }
 
-function styleNoteLink(anchor: HTMLAnchorElement): void {
+function styleNoteLink(anchor: HTMLElement): void {
+  if (anchor instanceof HTMLButtonElement)
+    Object.assign(anchor.style, {
+      background: 'transparent',
+      border: '0',
+      padding: '0',
+      font: 'inherit',
+      textAlign: 'inherit',
+    })
   anchor.style.color = 'var(--editor-caret-color, #93c5fd)'
   anchor.style.textDecoration = 'underline'
   anchor.style.cursor = 'pointer'

@@ -74,8 +74,8 @@ function settingOperations(
   const current = snapshot.layers.find((entry) => entry.id === target)?.raw[id]
   if (id === 'lsp.servers' || id === 'lsp.languageServers' || id === 'lsp.semanticTokens.servers')
     return null
-  if (id === 'environments.machines') return keyedOperations(current, value, 'machine')
-  if (id === 'keybindings.overrides') return keyedOperations(current, value, 'keybinding')
+  if (id === 'environments.machines') return machineOperations(current, value)
+  if (id === 'keybindings.overrides') return null
   if (id === 'models.order') return [operation({ kind: 'model.setOrder', order: value })]
   if (id === 'models.hidden') return modelMembershipOperations(current, value, 'hidden')
   if (id === 'models.favorites') return modelMembershipOperations(current, value, 'favorite')
@@ -135,29 +135,16 @@ function operation(input: unknown): SettingsOperation {
   return v.parse(settingsOperationSchema, input)
 }
 
-function keyedOperations(previous: unknown, next: unknown, kind: 'machine' | 'keybinding') {
+function machineOperations(previous: unknown, next: unknown) {
   const current = v.parse(v.optional(v.record(v.string(), v.unknown()), {}), previous)
   const values = v.parse(v.record(v.string(), v.unknown()), next)
   const removed = Object.keys(current).filter((key) => !(key in values))
   const changed = Object.entries(values).filter(
     ([key, value]) => JSON.stringify(current[key]) !== JSON.stringify(value),
   )
-  const removals = removed.map((key) =>
-    operation(
-      kind === 'machine'
-        ? { kind: 'machine.remove', name: key }
-        : { kind: 'keybinding.remove', command: key },
-    ),
-  )
   return [
-    ...removals,
-    ...changed.map(([key, value]) =>
-      operation(
-        kind === 'machine'
-          ? { kind: 'machine.set', name: key, machine: value }
-          : { kind: 'keybinding.set', command: key, keys: value },
-      ),
-    ),
+    ...removed.map((name) => operation({ kind: 'machine.remove', name })),
+    ...changed.map(([name, machine]) => operation({ kind: 'machine.set', name, machine })),
   ]
 }
 

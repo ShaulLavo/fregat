@@ -1,4 +1,4 @@
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import { use, useSyncExternalStore } from 'react'
 
 import { KeyBindingsContext } from '@/keymap/providers/bindings-context'

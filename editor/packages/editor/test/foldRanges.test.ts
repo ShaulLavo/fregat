@@ -3,7 +3,7 @@ import {
   createFoldGutterContribution,
   createLineGutterContribution,
 } from '../../gutters/src/index.ts'
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import type { Editor, EditorOptions } from '../src/editor'
 import type { EditorPerformanceDiagnostic } from '../src/editor/performanceDiagnostics'
 import { IndentationFoldIndex } from '../src/editor/indentationFoldIndex'

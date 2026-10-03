@@ -1,9 +1,9 @@
 import type { EditorCommandId } from '@singapore-editor/core/editor'
 import { EDITOR_COMMANDS, editorCommandDeclaration } from '@singapore-editor/core/keymap'
-import { defineEditorMetadata, type CommandKeyDefault } from './metadata'
+import { defineEditorMetadata } from './metadata'
 
 // The Editor declares each command's name, what it is for and whether it changes the document;
-// what stays here is Platform's policy: which commands the palette leaves out, and terminal keys.
+// what stays here is Platform's policy: which commands the palette leaves out.
 const hiddenInPalette = new Set<EditorCommandId>([
   'editor.action.goToImplementation',
   'editor.action.goToTypeDefinition',
@@ -51,7 +51,6 @@ const hiddenInPalette = new Set<EditorCommandId>([
   'cursorDocumentEnd',
   'selectDocumentStart',
   'selectDocumentEnd',
-  'editor.action.goToDefinition',
   'editor.action.inlineSuggest.commit',
   'editor.action.inlineSuggest.acceptNextWord',
   'deleteWordPartLeft',
@@ -75,14 +74,6 @@ const hiddenInPalette = new Set<EditorCommandId>([
   'showPrevParameterHint',
 ])
 
-const terminalKeys: Partial<Record<EditorCommandId, readonly CommandKeyDefault[]>> = {
-  find: [{ chord: ['Control+F'], platforms: ['tui'] }],
-  findNext: [{ chord: ['F3'], platforms: ['tui'] }],
-  findPrevious: [{ chord: ['Shift+F3'], platforms: ['tui'] }],
-  goToDefinition: [{ chord: ['F12'], platforms: ['tui'] }],
-  'editor.action.showHover': [{ chord: ['Control+K', 'H'], platforms: ['tui'] }],
-}
-
 function metadataFor<const Id extends EditorCommandId>(id: Id) {
   const declaration = editorCommandDeclaration(id)
   return defineEditorMetadata({
@@ -91,8 +82,9 @@ function metadataFor<const Id extends EditorCommandId>(id: Id) {
     ...(declaration.description ? { description: declaration.description } : {}),
     undoCategory: declaration.mutates ? 'text-edit' : 'view-only',
     ...(declaration.vscodeCommandIds ? { vscodeCommandIds: declaration.vscodeCommandIds } : {}),
-    ...(terminalKeys[id] ? { keys: terminalKeys[id] } : {}),
-    ...(hiddenInPalette.has(id) ? { hiddenInPalette: true } : {}),
+    ...(hiddenInPalette.has(id) || declaration.category === 'widget'
+      ? { hiddenInPalette: true }
+      : {}),
   })
 }
 

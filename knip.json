@@ -51,7 +51,6 @@
         "scripts/chat-scroll-proof.mjs",
         "scripts/chat-scroll-proof-entry.mjs",
         "scripts/chat-snapshot-benchmark.ts",
-        "scripts/keymap-baseline.mjs",
         "scripts/verify-federated-environments.mjs",
         "scripts/verify-web-design.mjs",
         "scripts/syntax-coverage.ts",

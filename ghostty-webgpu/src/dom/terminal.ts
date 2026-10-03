@@ -1,3 +1,5 @@
+import { ExtensionManager } from '../extensions/manager.js'
+import type { Extension, ExtensionHandle, TerminalInputEvent } from '../extensions/types.js'
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
 import type {
   ReadLinesOptions,
@@ -36,7 +38,7 @@ import {
   createTerminalAccessibility,
   type TerminalAccessibilityController,
 } from './accessibility.js'
-import { createDomClipboardPolicyAdapter, writeUserSelectionToClipboard } from './clipboard.js'
+import { createDomClipboardPolicyAdapter } from './clipboard.js'
 import {
   createTerminalElements,
   type TerminalElements,
@@ -78,6 +80,8 @@ import type {
   GhosttyWebGpuTerminalPointerHooks,
   GhosttyWebGpuTerminalScrollbarOptions,
   GhosttyWebGpuTerminalSubscription,
+  TerminalInputModes,
+  TerminalGeneratedInput,
 } from './types.js'
 
 type HostEmitters = {
@@ -92,6 +96,7 @@ function createHostEmitters(): HostEmitters {
   const error = new EventEmitter<GhosttyWebGpuTerminalEventMap['error']>()
   const sink = (operation: string) => (cause: unknown) => error.emit({ cause, operation })
   return {
+    open: new EventEmitter(sink('event.open')),
     appearance: new EventEmitter(sink('event.appearance')),
     bell: new EventEmitter(sink('event.bell')),
     data: new EventEmitter(sink('event.data')),
@@ -105,6 +110,7 @@ function createHostEmitters(): HostEmitters {
 }
 
 function disposeHostEmitters(emitters: HostEmitters): void {
+  emitters.open.dispose()
   emitters.appearance.dispose()
   emitters.bell.dispose()
   emitters.data.dispose()
@@ -239,12 +245,12 @@ export class Terminal implements TerminalApi<'sync'> {
   private readonly accessibilityOptions?: false | GhosttyWebGpuTerminalAccessibilityOptions
   private readonly autoFit: boolean
   private readonly cleanup = new CleanupStack()
-  private readonly copySelection
   private elementsValue?: TerminalElements
   private readonly emitters = createHostEmitters()
   private fit?: TerminalFitController
   private fittedFont?: TerminalFittedFont
   private readonly fitEnvironment?: Partial<TerminalFitEnvironment>
+  private extensions?: ExtensionManager
   private generation = 0
   private input?: DomInputController
   private readonly inputHooks?: GhosttyWebGpuTerminalInputHooks
@@ -273,7 +279,6 @@ export class Terminal implements TerminalApi<'sync'> {
   ) {
     this.accessibilityOptions = options.accessibility
     this.autoFit = options.autoFit !== false
-    this.copySelection = options.copySelection
     this.fitEnvironment = options.fitEnvironment
     this.inputHooks = options.inputHooks
     this.keyboard = options.keyboard
@@ -295,6 +300,50 @@ export class Terminal implements TerminalApi<'sync'> {
         policy: options.clipboardWrite,
       }),
     )
+    try {
+      if (options.extensions?.length) this.extensionManager().install(options.extensions)
+    } catch (cause) {
+      this.dispose()
+      throw cause
+    }
+  }
+
+  use<Api = void>(extension: Extension<Api>): ExtensionHandle<Api> {
+    this.ensureActive()
+    return this.extensionManager().use(extension)
+  }
+
+  private extensionManager(): ExtensionManager {
+    this.extensions ??= new ExtensionManager({
+      terminal: this,
+      reservedOsc: new Set([0, 2, 8, 52, 133]),
+      onError: (cause, operation) => this.emitters.error.emit({ cause, operation }),
+    })
+    return this.extensions
+  }
+
+  private claimInput(input: TerminalInputEvent): boolean {
+    if (!this.extensions?.hasInput) return false
+    return this.extensions.dispatchInput(input) || this.stateValue !== 'open'
+  }
+
+  private readonly claimDomKey = (event: KeyboardEvent): boolean =>
+    this.claimInput({ type: 'key', event })
+
+  private readonly claimText = (
+    type: 'paste' | 'text' | 'composition',
+    data: TerminalInputData,
+  ): boolean => {
+    if (type === 'composition') return this.claimInput({ type, text: data as string })
+    return this.claimInput({ type, data })
+  }
+
+  get inputModes(): TerminalInputModes {
+    this.ensureActive()
+    return {
+      alternateScreen: this.execution.alternateScreen,
+      mouseReporting: this.execution.pointer.mouseTracking(),
+    }
   }
 
   static async create(options: GhosttyWebGpuTerminalOptions = {}): Promise<Terminal> {
@@ -397,7 +446,7 @@ export class Terminal implements TerminalApi<'sync'> {
       this.subscribeToSession()
       this.installAccessibility(elements)
       this.installScrollbar(elements)
-      this.installInput(elements, parent)
+      this.installInput(elements)
       this.inputHooks?.inputReady?.()
       this.installFit(elements)
       this.cleanup.add(() => this.disposeCanvasControllers())
@@ -405,6 +454,7 @@ export class Terminal implements TerminalApi<'sync'> {
       this.installLinks(elements)
       this.replayLastFrame()
       this.stateValue = 'open'
+      this.emitHostEvent('open', elements.root)
       this.flushPendingEvents()
     } catch (cause) {
       if (renderer)
@@ -542,17 +592,27 @@ export class Terminal implements TerminalApi<'sync'> {
 
   sendInput(data: TerminalInputData): TerminalInputResult {
     this.ensureOpen()
+    if (this.claimText('text', data)) return new Uint8Array()
     return this.execution.sendInput(data)
   }
 
   paste(data: TerminalInputData): TerminalInputResult {
     this.ensureOpen()
+    if (this.claimText('paste', data)) return new Uint8Array()
     return this.execution.paste(data)
   }
 
   key(input: TerminalKeyInput): TerminalInputResult {
     this.ensureOpen()
+    if (this.claimInput({ type: 'key', input })) return new Uint8Array()
     return this.execution.key(input)
+  }
+
+  sendGeneratedInput(input: TerminalGeneratedInput): TerminalInputResult {
+    this.ensureOpen()
+    if (input.type === 'key') return this.execution.key(input.input)
+    if (input.type === 'paste') return this.execution.paste(input.data)
+    return this.execution.sendInput(input.type === 'composition' ? input.text : input.data)
   }
 
   focus(): void {
@@ -688,6 +748,7 @@ export class Terminal implements TerminalApi<'sync'> {
     this.stateValue = 'disposing'
     this.nextGeneration()
     this.pendingEvents.length = 0
+    this.extensions?.dispose()
     this.cleanup.dispose((cause) => this.emitters.error.emit({ cause, operation: 'dispose' }))
     this.accessibility = undefined
     this.fit = undefined
@@ -874,19 +935,16 @@ export class Terminal implements TerminalApi<'sync'> {
     })
   }
 
-  private installInput(elements: TerminalElements, parent: HTMLElement): void {
+  private installInput(elements: TerminalElements): void {
     let input: DomInputController | undefined
     if (this.keyboard !== false) {
-      const view = owningWindow(parent)
-      const copySelection =
-        this.copySelection ?? ((text: string) => writeUserSelectionToClipboard(view, text))
       input = createDomInputController({
-        copySelection,
+        claimKey: this.claimDomKey,
+        claimText: this.claimText,
         hooks: this.inputHooks,
         onError: (cause, operation) => this.reportError(cause, `input.${operation}`),
         onPreedit: (value) => this.updatePreedit(value),
         session: this.execution.input,
-        shortcuts: this.keyboard?.shortcuts,
         signal: elements.signal,
         textarea: elements.textarea,
       })
@@ -1303,6 +1361,8 @@ export class Terminal implements TerminalApi<'sync'> {
     const emitter = this.emitters[type] as EventEmitter<GhosttyWebGpuTerminalEventMap[TType]>
     if (this.stateValue === 'open') {
       emitter.emit(event)
+      if (this.stateValue === 'open' && this.extensions?.hasEvent(type))
+        this.extensions.emit(type, () => event)
       return
     }
     if (this.stateValue !== 'opening') return

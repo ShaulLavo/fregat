@@ -116,3 +116,5 @@ returned sample retains the prompt write's revision and cursor.
 - [font geometry and Canvas comparison](docs/font-geometry.md)
 - [live demo](https://shaullavo.github.io/ghostty-webgpu/), built from [site/](site/) with `bun run site:dev`
 - [optional native ghostty config](docs/config-resolver.md)
+
+Terminal bindings and hosted focus setup use the [hotkeys extension](docs/hotkeys.md).

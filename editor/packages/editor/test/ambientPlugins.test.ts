@@ -7,6 +7,7 @@ import {
 } from '../src/plugins'
 import { createVisibleEditor } from './factories/visibleEditor'
 import type { Editor } from '../src/editor/Editor'
+import { createPlugin } from '../src/createPlugin'
 
 const editors: Editor[] = []
 
@@ -16,6 +17,46 @@ afterEach(() => {
 })
 
 const DEMAND = createEditorLanguageFeatureToken<object>('test.ambientDemand')
+
+test('ambient command ownership follows live provider demand', () => {
+  const run = vi.fn(() => true)
+  const registration = registerAmbientEditorPlugin({
+    demand: DEMAND,
+    load: () =>
+      createPlugin({
+        name: 'test.ambient',
+        commands: [{ id: 'test.ambient.command', title: 'Run ambient command', mutates: false }],
+        view: (scope) => scope.handle('test.ambient.command', run),
+      }),
+  })
+  try {
+    const editor = mount()
+    editor.setText('alpha')
+    editor.setKeymap({
+      packs: [],
+      bindings: [{ keys: 'Control+L', command: 'test.ambient.command' }],
+    })
+    const press = () => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'l',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      editor.getInputElement().dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    expect(press()).toBe(false)
+    const demand = editor.addPlugin(demanding())
+    expect(press()).toBe(true)
+    expect(run).toHaveBeenCalledOnce()
+    demand.dispose()
+    expect(press()).toBe(false)
+    expect(run).toHaveBeenCalledOnce()
+  } finally {
+    registration.dispose()
+  }
+})
 
 /** A plugin that registers one provider for the demanded token while it is installed. */
 function demanding(): EditorPlugin {

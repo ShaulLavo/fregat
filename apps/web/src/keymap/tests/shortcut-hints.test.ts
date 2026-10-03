@@ -2,7 +2,8 @@ import { describe } from 'vitest'
 import { expect, test } from '../../../test/fixtures'
 
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
-import { resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
+import { binding } from '../../../test/factories/key-binding'
+import { displayPlatformKeyBindings, resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
 import {
   heldModifiersAfter,
   NO_HELD_MODIFIERS,
@@ -19,7 +20,12 @@ function keyEvent(type: 'keydown' | 'keyup', key: string, flags: Partial<Keyboar
 }
 
 describe('shortcutHintLabel', () => {
-  const platform = defaultPlatformKeyBindings('linux')
+  const platform = [
+    binding('Mod+1', { command: 'workspace.selectItem1' }),
+    binding('Mod+3', { command: 'workspace.selectItem3' }),
+    binding('Mod+4', { command: 'workspace.selectItem4' }),
+    binding('Mod+Alt+3', { command: 'workspace.sidebarPanel3' }),
+  ]
 
   test('Mod alone badges items, Mod+Alt badges panels, anything else badges neither', () => {
     const label = (
@@ -38,13 +44,23 @@ describe('shortcutHintLabel', () => {
   test('follows an override and hides for an unbound or two-stroke one', () => {
     const rebound = resolvedPlatformKeyBindings(
       platform,
-      { 'workspace.selectItem1': ['Alt+Q'] },
+      [
+        { keys: 'Mod+1', unbind: 'workspace.selectItem1', context: 'Workspace' },
+        { keys: 'Alt+Q', command: 'workspace.selectItem1' },
+      ],
       'linux',
     )
-    expect(shortcutHintLabel(rebound, 'workspace.selectItem1', ctrl, 'linux')).toBeNull()
     expect(
       shortcutHintLabel(
-        rebound,
+        displayPlatformKeyBindings(rebound, 'linux'),
+        'workspace.selectItem1',
+        ctrl,
+        'linux',
+      ),
+    ).toBeNull()
+    expect(
+      shortcutHintLabel(
+        displayPlatformKeyBindings(rebound, 'linux'),
         'workspace.selectItem1',
         { ...NO_HELD_MODIFIERS, alt: true },
         'linux',
@@ -53,17 +69,34 @@ describe('shortcutHintLabel', () => {
 
     const unbound = resolvedPlatformKeyBindings(
       platform,
-      { 'workspace.selectItem1': null },
+      [{ keys: 'Mod+1', unbind: 'workspace.selectItem1', context: 'Workspace' }],
       'linux',
     )
-    expect(shortcutHintLabel(unbound, 'workspace.selectItem1', ctrl, 'linux')).toBeNull()
+    expect(
+      shortcutHintLabel(
+        displayPlatformKeyBindings(unbound, 'linux'),
+        'workspace.selectItem1',
+        ctrl,
+        'linux',
+      ),
+    ).toBeNull()
 
     const chord = resolvedPlatformKeyBindings(
       platform,
-      { 'workspace.selectItem1': ['Mod+K 1'] },
+      [
+        { keys: 'Mod+1', unbind: 'workspace.selectItem1', context: 'Workspace' },
+        { keys: 'Mod+K 1', command: 'workspace.selectItem1' },
+      ],
       'linux',
     )
-    expect(shortcutHintLabel(chord, 'workspace.selectItem1', ctrl, 'linux')).toBeNull()
+    expect(
+      shortcutHintLabel(
+        displayPlatformKeyBindings(chord, 'linux'),
+        'workspace.selectItem1',
+        ctrl,
+        'linux',
+      ),
+    ).toBeNull()
   })
 
   test('VS Code mode badges items under its own modifiers', () => {
@@ -86,7 +119,11 @@ describe('shortcutHintLabel', () => {
   test('names the effective shortcuts for assistive tech', () => {
     expect(ariaKeyShortcuts(platform, 'workspace.selectItem4', 'linux')).toBe('Control+4')
     expect(
-      ariaKeyShortcuts(defaultPlatformKeyBindings('mac'), 'workspace.sidebarPanel2', 'mac'),
+      ariaKeyShortcuts(
+        [binding('Mod+Alt+2', { command: 'workspace.sidebarPanel2', platform: 'mac' })],
+        'workspace.sidebarPanel2',
+        'mac',
+      ),
     ).toBe('Meta+Alt+2')
   })
 })
