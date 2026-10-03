@@ -1,8 +1,8 @@
+import { presentSetting } from '@workspace/contracts/settings/documentation'
 import { MachinePreferences } from '@/features/settings/components/machine-preferences'
 import { NotificationModeWidget } from '@/features/settings/components/widgets/notification-mode-widget'
 import { ThemeWidget } from '@/features/settings/components/widgets/theme-widget'
 import {
-  descriptorFor,
   shownColorMode,
   SCALAR_SETTING_IDS,
   settingControl,
@@ -56,7 +56,7 @@ export function SettingRow({
   /** The parent's row is right above this one, so the indent reads as belonging to it. */
   underParent?: boolean
 }) {
-  const descriptor = descriptorFor(id)
+  const descriptor = presentSetting(id)
   const scope = writableSettingsScope(useSettingsScope())
   const { setSetting } = useSettingsActions()
   const inspection = settingInspection(id, snapshot, scope)

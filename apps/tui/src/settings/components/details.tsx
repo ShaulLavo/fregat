@@ -1,10 +1,6 @@
+import { presentSetting } from '@workspace/contracts/settings/documentation'
 import { settingDependencyNote, settingRowTitle } from '@workspace/client-core/settings/humanize'
-import {
-  descriptorFor,
-  layerAllowsScope,
-  type SettingId,
-  type SettingsWriteTarget,
-} from '@workspace/contracts'
+import { layerAllowsScope, type SettingId, type SettingsWriteTarget } from '@workspace/contracts'
 
 import { settingDetails, type SettingsDisplaySnapshot } from '@/settings/utils/rows'
 import type { Theme } from '@/theme/utils/theme'
@@ -32,12 +28,12 @@ export function Details({ id, snapshot, theme, focused, target }: DetailsProps) 
         <text fg={theme.primary}>
           <strong>{settingRowTitle(id)}</strong>
         </text>
-        <text fg={theme.mutedForeground}>{descriptorFor(id).description}</text>
+        <text fg={theme.mutedForeground}>{presentSetting(id).description}</text>
         {settingDetails(id, snapshot).map((entry) => (
           <box key={entry.id} flexDirection='column' gap={1}>
             <text fg={theme.info}>{entry.id}</text>
             <text fg={theme.mutedForeground}>{entry.scope} scope</text>
-            {!layerAllowsScope(target, descriptorFor(entry.id).scope) && (
+            {!layerAllowsScope(target, presentSetting(entry.id).scope) && (
               <text fg={theme.warning}>This setting can only be changed in user settings.</text>
             )}
             {snapshot.layers
@@ -50,11 +46,11 @@ export function Details({ id, snapshot, theme, focused, target }: DetailsProps) 
                     : ''}
                 </text>
               ))}
-            {descriptorFor(entry.id).requiresRestart && (
+            {presentSetting(entry.id).requiresRestart && (
               <text fg={theme.warning}>Requires restart</text>
             )}
-            {descriptorFor(entry.id).readOnlyReason && (
-              <text fg={theme.warning}>{descriptorFor(entry.id).readOnlyReason}</text>
+            {presentSetting(entry.id).readOnlyReason && (
+              <text fg={theme.warning}>{presentSetting(entry.id).readOnlyReason}</text>
             )}
             {settingDependencyNote(entry.id, snapshot.values) && (
               <text fg={theme.mutedForeground}>

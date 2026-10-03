@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from '@workspace/ui/components/alert'
 import type { SettingsDiagnostic } from '@workspace/contracts'
-import { settingsDiagnosticLabel } from '@workspace/client-core/settings/humanize'
+import { settingsDiagnosticLabel } from '@workspace/client-core/settings/diagnostic-label'
 
 export function DiagnosticGroup({
   diagnostics,

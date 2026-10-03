@@ -1,23 +1,18 @@
+import type { SettingsLayerFile } from '@workspace/contracts'
 import {
   DEFAULT_SETTINGS_DOCUMENT_REVISION,
   defaultSettingsDocument,
-  type SettingsLayerFile,
-} from '@workspace/contracts'
-
-let cached: SettingsLayerFile | null = null
+} from '@workspace/contracts/settings/defaults-document'
 
 /**
  * The defaults document in the shape of a layer file, so the JSON view seeds it
- * the way it seeds the user and workspace files. Rendered once: the registry is
- * code and cannot change while the page is open.
+ * the way it seeds the user and workspace files. The defaults query retains it.
  */
 export function defaultsLayerFile(): SettingsLayerFile {
-  cached ??= {
+  return {
     text: defaultSettingsDocument(),
     revision: DEFAULT_SETTINGS_DOCUMENT_REVISION,
     parseErrors: [],
     keyRanges: {},
   }
-
-  return cached
 }
