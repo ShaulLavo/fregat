@@ -1,3 +1,5 @@
+import { detectPlatform } from '@fregat/hotkeys'
+import userEvent from '@testing-library/user-event'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
@@ -59,4 +61,54 @@ test('a large paste rejected at the attachment limit is retained inline', async 
   await waitFor(() =>
     expect(screen.getByRole('textbox', { name: 'Paste composer' }).textContent).toBe(text),
   )
+})
+
+test('Mod+Shift+V keeps a large paste inline and preserves native paste', async () => {
+  let editor: LexicalEditor | null = null
+  const text = 'y'.repeat(40 * 1024)
+  let attached = 0
+  renderWithProviders(
+    <LexicalComposer
+      initialConfig={{
+        namespace: 'paste-inline',
+        onError: (error) => {
+          throw error
+        },
+      }}
+    >
+      <PlainTextPlugin
+        contentEditable={<ContentEditable aria-label='Inline paste composer' />}
+        ErrorBoundary={LexicalErrorBoundary}
+      />
+      <ChatInputDraftPlugin
+        disabled={false}
+        draftKey='paste-inline'
+        rootPath='/repo'
+        onEditorReady={(value) => {
+          editor = value
+        }}
+        onTriggerChange={() => {}}
+      />
+      <ChatInputPasteFoldPlugin
+        onFiles={async () => {
+          attached += 1
+          return true
+        }}
+      />
+    </LexicalComposer>,
+  )
+  await waitFor(() => expect(editor).not.toBeNull())
+  act(() => screen.getByRole('textbox', { name: 'Inline paste composer' }).focus())
+  const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
+  await userEvent.keyboard(`{${modifier}>}{Shift>}v{/Shift}{/${modifier}}`)
+  const clipboardData = new DataTransfer()
+  clipboardData.setData('text/plain', text)
+  const event = new ClipboardEvent('paste', { clipboardData, cancelable: true })
+  act(() => {
+    editor!.dispatchCommand(PASTE_COMMAND, event)
+  })
+  await waitFor(() =>
+    expect(screen.getByRole('textbox', { name: 'Inline paste composer' }).textContent).toBe(text),
+  )
+  expect(attached).toBe(0)
 })

@@ -1,4 +1,4 @@
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { presetPlatformKeyBindings } from '@/keymap/default-bindings'
@@ -9,7 +9,8 @@ export function useShortcutRows() {
   const overrides = useSettingValue('keybindings.overrides')
   const preset = useSettingValue('keybindings.preset')
   const platform = detectPlatform()
-  const defaults = presetPlatformKeyBindings(platform, preset)
+  const shellKeys = useSettingValue('terminal.shellKeys')
+  const defaults = presetPlatformKeyBindings(platform, preset, shellKeys)
 
   return {
     defaults,

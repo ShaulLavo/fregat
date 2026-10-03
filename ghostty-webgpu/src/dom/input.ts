@@ -7,21 +7,8 @@ import type {
   TerminalModifierSide,
   TerminalModifiers,
 } from '../term/types.js'
-import {
-  compileHotkey,
-  compileTerminalHotkeyBindings,
-  hotkeyPlatformForWindow,
-  type CompiledDomHotkey,
-  type CompiledTerminalHotkeyBindings,
-  type DomHotkeyPlatform,
-} from './hotkeys.js'
-import type {
-  GhosttyWebGpuTerminalCopy,
-  GhosttyWebGpuTerminalInputHooks,
-  TerminalHotkeyBinding,
-  TerminalHotkeyContext,
-  TerminalHotkeyDecision,
-} from './types.js'
+import { detectPlatform, type KeymapPlatform } from '@fregat/hotkeys'
+import type { GhosttyWebGpuTerminalInputHooks } from './types.js'
 
 type InputSession = Pick<
   TerminalSession<unknown>,
@@ -31,13 +18,13 @@ type InputSession = Pick<
 type LifecycleSession = Pick<TerminalSession<unknown>, 'setFocused'>
 
 export interface DomInputControllerOptions {
-  readonly copySelection?: GhosttyWebGpuTerminalCopy
+  readonly claimKey?: (event: KeyboardEvent) => boolean
+  readonly claimText?: (type: 'paste' | 'text' | 'composition', data: TerminalInputData) => boolean
   readonly hooks?: GhosttyWebGpuTerminalInputHooks
   readonly onError: (cause: unknown, operation: string) => void
   readonly onPreedit?: (value: string) => void
-  readonly platform?: DomHotkeyPlatform
+  readonly platform?: KeymapPlatform
   readonly session: InputSession
-  readonly shortcuts?: false | readonly TerminalHotkeyBinding[]
   readonly signal: AbortSignal
   readonly textarea: HTMLTextAreaElement
 }
@@ -226,48 +213,10 @@ function isPasteInput(inputType: string): boolean {
   return inputType === 'insertFromPaste' || inputType === 'insertFromDrop'
 }
 
-function reportPromiseRejection(
-  result: PromiseLike<void> | void,
-  onError: (cause: unknown, operation: string) => void,
-): void {
-  if (!result || typeof result.then !== 'function') return
-  void Promise.resolve(result).catch((cause: unknown) => onError(cause, 'copy'))
-}
-
 function inputWindow(textarea: HTMLTextAreaElement): Window {
   const view = textarea.ownerDocument.defaultView
   if (view) return view
   throw new TypeError('Terminal input requires a textarea owned by a window')
-}
-
-function defaultCopyDecision(
-  context: TerminalHotkeyContext,
-  copy: GhosttyWebGpuTerminalCopy | undefined,
-  onError: DomInputControllerOptions['onError'],
-): TerminalHotkeyDecision {
-  if (!copy || !context.hasSelection()) return 'passthrough'
-  const text = context.getSelection()
-  if (text === undefined) return 'passthrough'
-  reportPromiseRejection(copy(text), onError)
-  return 'claim'
-}
-
-function defaultShortcutBindings(
-  options: DomInputControllerOptions,
-  platform: DomHotkeyPlatform,
-): readonly TerminalHotkeyBinding[] {
-  if (options.shortcuts === false) return []
-  if (options.shortcuts) return options.shortcuts
-  if (platform !== 'mac') return []
-  return Object.freeze([
-    Object.freeze({
-      hotkey: 'Mod+C',
-      id: 'copy-selection',
-      onTrigger: (context: TerminalHotkeyContext) =>
-        defaultCopyDecision(context, options.copySelection, options.onError),
-      stopPropagation: false,
-    }),
-  ])
 }
 
 function applyShortcutPolicy(event: KeyboardEvent, policy: SuppressedShortcutPolicy): void {
@@ -279,29 +228,31 @@ const pastePressPolicy = Object.freeze({ preventDefault: false, stopPropagation:
 const pasteRepeatPolicy = Object.freeze({ preventDefault: true, stopPropagation: false })
 const refusedKeyPolicy = Object.freeze({ preventDefault: false, stopPropagation: false })
 
+type CompositionState =
+  | { readonly phase: 'idle' }
+  | { readonly phase: 'cancelled' }
+  | { readonly phase: 'active'; readonly value: string; readonly committed: boolean }
+  | { readonly phase: 'awaiting' | 'ended'; readonly value: string }
+
 class BrowserInputController implements DomInputController {
   private readonly abortController = new AbortController()
-  private committedDuringComposition = false
-  private composing = false
-  private compositionValue = ''
+  private composition: CompositionState = { phase: 'idle' }
+
+  private get composing(): boolean {
+    return this.composition.phase === 'active'
+  }
   private readonly composingKeyPresses = new Set<string>()
   private readonly deferredMacCommandPresses = new Map<string, KeyboardEvent>()
   private disposed = false
   private readonly forwardedMacCommandPresses = new Set<string>()
-  private readonly hotkeys: CompiledTerminalHotkeyBindings
-  private readonly pasteShortcut: CompiledDomHotkey
-  private readonly platform: DomHotkeyPlatform
+  private readonly platform: KeymapPlatform
   private readonly publishedKeyPresses = new Set<string>()
+  private readonly forwardedKeyPresses = new Set<string>()
   private readonly pressedModifierCodes = new Set<string>()
   private readonly suppressedShortcuts = new Map<string, SuppressedShortcutPolicy>()
 
   constructor(private readonly options: DomInputControllerOptions) {
-    this.platform = options.platform ?? hotkeyPlatformForWindow(inputWindow(options.textarea))
-    this.pasteShortcut = compileHotkey('Mod+V', this.platform)
-    this.hotkeys = compileTerminalHotkeyBindings(defaultShortcutBindings(options, this.platform), {
-      onError: options.onError,
-      platform: this.platform,
-    })
+    this.platform = options.platform ?? detectPlatform()
     try {
       this.installListeners()
     } catch (cause) {
@@ -336,41 +287,74 @@ class BrowserInputController implements DomInputController {
 
   private readonly handleCompositionStart = (): void => {
     if (this.disposed) return
-    this.committedDuringComposition = false
-    this.composing = true
+    this.composition = { phase: 'active', value: '', committed: false }
     this.setCompositionValue('')
   }
 
   private readonly handleCompositionEnd = (event: CompositionEvent): void => {
     if (this.disposed) return
-    this.composing = false
-    if (this.committedDuringComposition) {
-      this.committedDuringComposition = false
-      this.setCompositionValue('')
+    if (this.composition.phase === 'cancelled') return
+    if (this.composition.phase !== 'active') return
+    const { committed, value } = this.composition
+    this.composition = { phase: 'idle' }
+    this.setCompositionValue('')
+    if (committed) return
+    if (event.data.length === 0) {
+      this.composition = { phase: 'cancelled' }
+      this.options.textarea.value = ''
       return
     }
-    const value = this.compositionValue
-    this.setCompositionValue('')
-    if (value.length === 0 || value !== event.data) return
-    // UI Events updates the control before compositionend when this is the final commit.
+    if (value.length === 0 || value !== event.data) {
+      this.composition = { phase: 'awaiting', value: event.data }
+      this.options.textarea.value = ''
+      return
+    }
+    // Browsers may deliver the same final input after compositionend.
+    this.composition = { phase: 'ended', value }
     this.options.textarea.value = ''
-    this.invokeSession('input', value)
+    this.invokeSession('composition', value)
   }
 
   private readonly handleInput = (event: Event): void => {
     if (this.disposed) return
     const input = event as InputEvent
+    const compositionInput = input.isComposing || input.inputType.includes('Composition')
+    if (
+      !compositionInput &&
+      (this.composition.phase === 'ended' || this.composition.phase === 'cancelled')
+    ) {
+      this.composition = { phase: 'idle' }
+    }
+    if (this.composition.phase === 'cancelled') {
+      this.options.textarea.value = ''
+      return
+    }
     if (input.isComposing) {
       this.setCompositionValue(this.inputValue(input.data))
       return
     }
     const value = this.takeInputValue(input.data)
     if (value.length === 0) return
-    if (this.composing) {
-      this.committedDuringComposition = true
-      this.setCompositionValue('')
+    if (this.composition.phase === 'ended') {
+      const duplicate = value === this.composition.value
+      this.composition = { phase: 'idle' }
+      if (duplicate) return
     }
-    const operation = isPasteInput(input.inputType) ? 'paste' : 'input'
+    if (this.composition.phase === 'awaiting') {
+      const commit = value === this.composition.value
+      this.composition = { phase: 'idle' }
+      if (commit) {
+        this.invokeSession('composition', value)
+        return
+      }
+    }
+    if (this.composition.phase === 'active') {
+      this.composition = { phase: 'active', value: '', committed: true }
+      this.setCompositionValue('')
+      this.invokeSession('composition', value)
+      return
+    }
+    const operation = isPasteInput(input.inputType) ? 'paste' : 'text'
     this.invokeSession(operation, value)
   }
 
@@ -386,13 +370,16 @@ class BrowserInputController implements DomInputController {
   private readonly handleKey = (event: KeyboardEvent): void => {
     if (this.disposed) return
     this.updateModifierTracking(event)
-    const suppressedBeforeCustomHandler = this.suppressedShortcuts.has(event.code)
-    const customAllowed = this.allowCustomKey(event)
-    if (suppressedBeforeCustomHandler && this.consumeSuppressedShortcut(event)) {
+    if (!isComposingKey(event, this.composing) && this.options.claimKey?.(event)) {
+      if (event.type === 'keydown' && !event.repeat) {
+        this.suppressedShortcuts.set(event.code, pasteRepeatPolicy)
+      }
+      if (event.type === 'keyup') this.suppressedShortcuts.delete(event.code)
       this.deferredMacCommandPresses.clear()
+      event.preventDefault()
       return
     }
-    if (!customAllowed) {
+    if (this.consumeSuppressedShortcut(event)) {
       this.deferredMacCommandPresses.clear()
       return
     }
@@ -414,6 +401,8 @@ class BrowserInputController implements DomInputController {
       return
     }
     if (this.deferMacCommandPress(event)) return
+    // Releases belong to physical presses this native input owner previously forwarded.
+    if (event.type === 'keyup' && !this.forwardedKeyPresses.has(event.code)) return
     this.forwardDeferredMacCommandPresses(event)
     this.encodeKey(event)
   }
@@ -430,7 +419,9 @@ class BrowserInputController implements DomInputController {
   }
 
   private setCompositionValue(value: string): void {
-    this.compositionValue = value
+    if (this.composition.phase === 'active') {
+      this.composition = { ...this.composition, value }
+    }
     try {
       this.options.onPreedit?.(value)
     } catch (cause) {
@@ -439,10 +430,11 @@ class BrowserInputController implements DomInputController {
   }
 
   private invokeSession(
-    operation: 'input' | 'paste',
+    operation: 'text' | 'paste' | 'composition',
     value: TerminalInputData,
   ): TerminalInputResult {
     if (this.isInputDisabled()) return new Uint8Array()
+    if (this.options.claimText?.(operation, value)) return new Uint8Array()
     this.beforeUserInput()
     try {
       if (operation === 'paste') return this.options.session.paste(value)
@@ -451,27 +443,6 @@ class BrowserInputController implements DomInputController {
       this.options.onError(cause, operation)
       return new Uint8Array()
     }
-  }
-
-  private allowCustomKey(event: KeyboardEvent): boolean {
-    const handler = this.options.hooks?.customKeyEvent
-    if (!handler) return true
-    try {
-      if (handler(event)) return true
-      this.suppressInitialKey(event)
-      return false
-    } catch (cause) {
-      this.clearFailedKeyLifecycle(event)
-      throw cause
-    }
-  }
-
-  private clearFailedKeyLifecycle(event: KeyboardEvent): void {
-    this.composingKeyPresses.delete(event.code)
-    this.deferredMacCommandPresses.clear()
-    this.pressedModifierCodes.delete(event.code)
-    this.publishedKeyPresses.delete(event.code)
-    this.suppressedShortcuts.delete(event.code)
   }
 
   private blockDisabledKey(event: KeyboardEvent): boolean {
@@ -535,13 +506,10 @@ class BrowserInputController implements DomInputController {
     if (event.type !== 'keydown') return false
     if (isComposingKey(event, this.composing)) return false
     if (event.getModifierState('AltGraph')) return false
-    if (this.pasteShortcut.matches(event)) {
-      this.claimShortcut(event, pastePressPolicy, pasteRepeatPolicy)
-      return true
-    }
-    const claim = this.hotkeys.arbitrate(this.hotkeyContext(event))
-    if (!claim) return false
-    this.claimShortcut(event, claim, claim)
+    // ClipboardEvent/input carries browser paste; its physical key must not also encode.
+    const modifier = this.platform === 'mac' ? event.metaKey : event.ctrlKey
+    if (!modifier || event.altKey || event.shiftKey || event.code !== 'KeyV') return false
+    this.claimShortcut(event, pastePressPolicy, pasteRepeatPolicy)
     return true
   }
 
@@ -552,17 +520,6 @@ class BrowserInputController implements DomInputController {
   ): void {
     this.suppressedShortcuts.set(event.code, repeatPolicy)
     applyShortcutPolicy(event, pressPolicy)
-  }
-
-  private hotkeyContext(event: KeyboardEvent): TerminalHotkeyContext {
-    const session = this.options.session
-    return Object.freeze({
-      event,
-      getSelection: () => session.getSelection(),
-      hasSelection: () => session.selectionCoordinates() !== undefined,
-      paste: (data: TerminalInputData) => this.invokeSession('paste', data),
-      sendInput: (data: TerminalInputData) => this.invokeSession('input', data),
-    })
   }
 
   private deferMacCommandPress(event: KeyboardEvent): boolean {
@@ -613,8 +570,12 @@ class BrowserInputController implements DomInputController {
       )
       if (event.type === 'keydown' && !event.repeat) {
         if (input.composing) this.composingKeyPresses.add(event.code)
-        if (!input.composing) this.composingKeyPresses.delete(event.code)
+        if (!input.composing) {
+          this.composingKeyPresses.delete(event.code)
+          this.forwardedKeyPresses.add(event.code)
+        }
       }
+      if (event.type === 'keyup') this.forwardedKeyPresses.delete(event.code)
       const bytes = this.options.session.key(input, {
         onEncoded: (data) => this.notifyKey(event, data),
       })
@@ -652,14 +613,16 @@ class BrowserInputController implements DomInputController {
   }
 
   resetTransientState(): void {
-    this.committedDuringComposition = false
-    this.composing = false
+    if (this.composition.phase !== 'idle') {
+      this.composition = { phase: 'cancelled' }
+    }
     this.setCompositionValue('')
     this.composingKeyPresses.clear()
     this.deferredMacCommandPresses.clear()
     this.forwardedMacCommandPresses.clear()
     this.pressedModifierCodes.clear()
     this.publishedKeyPresses.clear()
+    this.forwardedKeyPresses.clear()
     this.suppressedShortcuts.clear()
     this.options.textarea.value = ''
   }

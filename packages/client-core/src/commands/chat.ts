@@ -1,8 +1,6 @@
 import { defineMetadata } from './metadata'
-import type { KeyChord } from '@singapore-editor/core/keymap'
 
-function chat<const Id extends string>(id: Id, title: string, key?: KeyChord[0]) {
-  const chord: KeyChord = ['Control+K', key ?? 'C']
+function chat<const Id extends string>(id: Id, title: string) {
   return defineMetadata({
     id,
     title,
@@ -11,13 +9,7 @@ function chat<const Id extends string>(id: Id, title: string, key?: KeyChord[0])
     target: 'workspace',
     undoCategory: 'workspace-operation',
     when: ['chatMode'],
-    keys: key ? [{ chord, platforms: ['tui'] }] : [],
   })
-}
-
-function rail<const Id extends string>(id: Id, title: string, key: KeyChord[0]) {
-  const chord: KeyChord = [key]
-  return defineMetadata({ ...chat(id, title), keys: [{ chord, platforms: ['tui'], pane: 'chat' }] })
 }
 
 export const chatCommandMetadata = {
@@ -27,14 +19,14 @@ export const chatCommandMetadata = {
   'chat.nextPrompt': chat('chat.nextPrompt', 'Next prompt'),
   'chat.openPromptInbox': chat('chat.openPromptInbox', 'Open prompt inbox'),
   'chat.pasteImage': chat('chat.pasteImage', 'Paste clipboard image'),
-  'chat.focusInput': chat('chat.focusInput', 'Focus prompt', 'C'),
+  'chat.focusInput': chat('chat.focusInput', 'Focus prompt'),
   'chat.sendMessage': chat('chat.sendMessage', 'Send prompt'),
   'chat.stop': chat('chat.stop', 'Stop response'),
   'chat.exportTranscript': chat('chat.exportTranscript', 'Export transcript'),
   'chat.stashPrompt': chat('chat.stashPrompt', 'Stash prompt'),
   'chat.popStash': chat('chat.popStash', 'Restore stashed prompt'),
   'chat.attachFiles': chat('chat.attachFiles', 'Attach files'),
-  'chat.openModelPicker': chat('chat.openModelPicker', 'Choose model', 'M'),
+  'chat.openModelPicker': chat('chat.openModelPicker', 'Choose model'),
   'chat.chooseWorktreeMode': chat('chat.chooseWorktreeMode', 'Choose session worktree'),
   'chat.chooseCheckout': chat('chat.chooseCheckout', 'Choose existing checkout'),
   'chat.manageWorktrees': chat('chat.manageWorktrees', 'Manage project worktrees'),
@@ -56,11 +48,11 @@ export const chatCommandMetadata = {
     'chat.implementPlanInNewSession',
     'Implement plan in a new session',
   ),
-  'agent.railNext': rail('agent.railNext', 'Next rail row', 'J'),
-  'agent.railPrevious': rail('agent.railPrevious', 'Previous rail row', 'K'),
+  'agent.railNext': chat('agent.railNext', 'Next rail row'),
+  'agent.railPrevious': chat('agent.railPrevious', 'Previous rail row'),
   'agent.railOpen': chat('agent.railOpen', 'Open selected session'),
-  'agent.railFilter': rail('agent.railFilter', 'Filter sessions', '/'),
-  'agent.railMenu': rail('agent.railMenu', 'Session actions', 'Shift+F10'),
+  'agent.railFilter': chat('agent.railFilter', 'Filter sessions'),
+  'agent.railMenu': chat('agent.railMenu', 'Session actions'),
   'agent.addProject': chat('agent.addProject', 'Add project'),
   'agent.rename': chat('agent.rename', 'Rename selected item'),
   'agent.archive': chat('agent.archive', 'Archive selected sessions'),
@@ -68,8 +60,8 @@ export const chatCommandMetadata = {
   'agent.toggleArchived': chat('agent.toggleArchived', 'Show archived sessions'),
   'agent.scopeProject': chat('agent.scopeProject', 'Filter to selected project'),
   'agent.clearScope': chat('agent.clearScope', 'Show all projects'),
-  'agent.mark': rail('agent.mark', 'Mark selected session', 'M'),
-  'agent.markRange': rail('agent.markRange', 'Mark session range', 'Shift+M'),
+  'agent.mark': chat('agent.mark', 'Mark selected session'),
+  'agent.markRange': chat('agent.markRange', 'Mark session range'),
   'agent.selectAll': chat('agent.selectAll', 'Mark all sessions'),
   'agent.clearMarks': chat('agent.clearMarks', 'Clear marked sessions'),
   'agent.moveUp': chat('agent.moveUp', 'Move selected item up'),

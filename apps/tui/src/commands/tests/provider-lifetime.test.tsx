@@ -24,7 +24,7 @@ test.for([{ closes: 'unmount' }, { closes: 'abort' }])(
             },
           },
         }}
-        overrides={{}}
+        overrides={[]}
         onExecuted={() => {
           completed = true
         }}

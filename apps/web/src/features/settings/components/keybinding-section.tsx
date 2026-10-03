@@ -23,7 +23,6 @@ import { useShortcutRows } from '@/features/settings/hooks/use-shortcut-rows'
 import { SettingsScrollerContext } from '@/features/settings/providers/scroller-context'
 import { noteKeyboardEvent } from '@/features/settings/state/keyboard-seen'
 import { useSettingsSearch } from '@/features/settings/state/search-store'
-import { shortcutConflicts } from '@/features/settings/utils/shortcut-conflicts'
 import { shortcutReport } from '@/features/settings/utils/shortcut-report'
 import {
   matchingShortcutRows,
@@ -31,12 +30,15 @@ import {
   shortcutFilterMatches,
   shortcutRows,
   shortcutListWith,
+  shortcutPreview,
   shortcutRowsWithChord,
   type ShortcutFilter,
   type ShortcutRow as ShortcutRowModel,
 } from '@/features/settings/utils/shortcut-rows'
 import { keyBindingResolution } from '@/keymap/active-bindings'
-import type { PlatformCommandId } from '@/keymap/types'
+import { applySettingsOperations, keybindingOverridesSchema } from '@workspace/contracts'
+import * as v from 'valibot'
+import { ShortcutEntries } from '@/features/settings/components/shortcut-entries'
 
 /** A row's recorder (replacing its chord, or adding one to its command) or its menu. */
 type Overlay = {
@@ -45,11 +47,7 @@ type Overlay = {
   readonly anchor: HTMLElement
 }
 
-/**
- * Every command and its keys, in the settings page's own scroller: a sticky toolbar, then one
- * windowed list. Rows record on Enter or double-click and open their menu on right-click, or on a
- * tap where the page is narrow.
- */
+/** The windowed command list shares the Settings scroller and its sticky toolbar. */
 export function KeybindingSection() {
   const { defaults, overrides, platform, preset, rows } = useShortcutRows()
   const { setKeybinding } = useSettingsActions()
@@ -81,7 +79,7 @@ export function KeybindingSection() {
   const visible = searched.filter((row) => shortcutFilterMatches(row, filter))
   const overlayRow = overlay ? rows.find((row) => row.id === overlay.rowId) : undefined
   const recordMode = overlay && overlay.kind !== 'menu' ? overlay.kind : null
-  const { report, unmapped, omitted } = {
+  const { report, unmapped } = {
     ...defaults,
     report: keyBindingResolution(defaults.bindings, overrides, platform).report,
   }
@@ -113,7 +111,10 @@ export function KeybindingSection() {
       if (!row || !anchor) return
       if (event.key === 'Delete' && row.keys !== null) {
         event.preventDefault()
-        setKeybinding(row.command, shortcutListWith(row, { remove: true }))
+        setKeybinding(row.command, shortcutListWith(row, { remove: true }), {
+          context: row.context,
+          defaultKeys: row.defaultKeys,
+        })
       }
       if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
         event.preventDefault()
@@ -129,17 +130,29 @@ export function KeybindingSection() {
     typeahead: true,
   })
 
-  function nextList(row: ShortcutRowModel, mode: 'change' | 'add', keys: string) {
+  function nextList(row: ShortcutRowModel, mode: 'change' | 'add', keys: string, context?: string) {
+    if (context !== row.context) return [keys]
     return shortcutListWith(row, mode === 'add' ? { add: keys } : { replace: keys })
   }
 
-  function preview(command: PlatformCommandId, list: readonly string[], keys: string) {
+  function preview(row: ShortcutRowModel, list: readonly string[], keys: string, context?: string) {
+    const next = applySettingsOperations({ 'keybindings.overrides': overrides }, [
+      {
+        kind: 'keybinding.set',
+        command: row.command,
+        keys: list,
+        context,
+        defaultKeys: defaults.bindings
+          .filter((entry) => entry.command === row.command && entry.context === context)
+          .map((entry) => entry.keys),
+      },
+    ]).raw
     const candidate = keyBindingResolution(
       defaults.bindings,
-      { ...overrides, [command]: list },
+      v.parse(keybindingOverridesSchema, next['keybindings.overrides'] ?? []),
       platform,
     )
-    return { ...shortcutConflicts(candidate.lostChords, command, keys), kept: kept(keys) }
+    return { ...shortcutPreview(candidate.report, row.command, keys), kept: kept(keys) }
   }
 
   return (
@@ -152,13 +165,13 @@ export function KeybindingSection() {
       </p>
       <ShortcutsToolbar
         counts={shortcutFilterCounts(searched)}
-        customized={Object.keys(overrides).length > 0}
+        customized={overrides.length > 0}
         filter={filter}
         onFilter={setFilter}
         onSearch={setSearch}
         platform={platform}
         ref={toolbarRef}
-        report={shortcutReport(report, unmapped, omitted)}
+        report={shortcutReport(report, unmapped)}
         search={search}
       />
       <div {...listbox.containerProps} aria-label='Keyboard shortcuts' className='focus-ring-inset'>
@@ -203,19 +216,28 @@ export function KeybindingSection() {
           scrollRef={scrollRef ?? undefined}
         />
       </div>
-      {preset === 'vscode' ? <UnmappedShortcuts platform={platform} unmapped={unmapped} /> : null}
+      <ShortcutEntries overrides={overrides} report={report} />
+      <UnmappedShortcuts platform={platform} preset={preset} unmapped={unmapped} />
       {recordMode && overlay && overlayRow ? (
         <ShortcutRecorder
           adding={recordMode === 'add'}
           anchor={overlay.anchor}
           onClose={() => setOverlay(null)}
-          onSave={(keys) => {
+          context={overlayRow.context}
+          onSave={(keys, context) => {
             setOverlay(null)
-            setKeybinding(overlayRow.command, nextList(overlayRow, recordMode, keys))
+            setKeybinding(overlayRow.command, nextList(overlayRow, recordMode, keys, context), {
+              context,
+              defaultKeys: defaults.bindings
+                .filter(
+                  (entry) => entry.command === overlayRow.command && entry.context === context,
+                )
+                .map((entry) => entry.keys),
+            })
           }}
           platform={platform}
-          preview={(keys) =>
-            preview(overlayRow.command, nextList(overlayRow, recordMode, keys), keys)
+          preview={(keys, context) =>
+            preview(overlayRow, nextList(overlayRow, recordMode, keys, context), keys, context)
           }
           title={overlayRow.title}
         />

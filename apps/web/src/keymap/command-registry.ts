@@ -16,17 +16,6 @@ export function platformCommandSpec(command: PlatformCommandId): CommandSpec | n
   return platformCommandSpecById.get(command) ?? null
 }
 
-export function commandHotkeyMeta(command: PlatformCommandId) {
-  const spec = platformCommandSpec(command)
-  if (!spec) return undefined
-  if (!spec.description) return { name: spec.title }
-
-  return {
-    description: spec.description,
-    name: spec.title,
-  }
-}
-
 const platformCommandSpecById = new Map(platformCommandSpecs.map((spec) => [spec.id, spec]))
 
 /** The palette's view of a command: what it is called, not what it does. */

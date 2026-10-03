@@ -1,183 +1,139 @@
-import { equal, ok } from 'node:assert/strict'
+import { deepEqual, equal, ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
+import * as v from 'valibot'
+import {
+  keybindingOverridesSchema,
+  type KeybindingOverrides,
+} from '../../../packages/contracts/src/settings'
 import { readSetting, writeUserOperations } from '../preserve-settings'
 import { selectors } from '../selectors'
 import type { Scenario } from './index'
 
-async function override(page: Page, command: string) {
-  const overrides = await readSetting(page, 'keybindings.overrides')
-  ok(overrides && typeof overrides === 'object')
-
-  return (overrides as Record<string, unknown>)[command]
+async function overrides(page: Page): Promise<KeybindingOverrides> {
+  return v.parse(
+    keybindingOverridesSchema,
+    (await readSetting(page, 'keybindings.overrides')) ?? [],
+  )
 }
 
-async function waitForOverride(page: Page, command: string, expected: unknown) {
+async function waitForBindings(page: Page, expected: KeybindingOverrides) {
   for (let attempt = 0; attempt < 40; attempt++) {
-    if ((await override(page, command)) === expected) return
+    if (JSON.stringify(await overrides(page)) === JSON.stringify(expected)) return
     await page.waitForTimeout(100)
   }
-  equal(await override(page, command), expected, `${command} override`)
+  deepEqual(await overrides(page), expected, 'Authored contextual bindings')
 }
 
-async function waitForList(page: Page, command: string, expected: readonly string[]) {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    if (JSON.stringify(await override(page, command)) === JSON.stringify(expected)) return
-    await page.waitForTimeout(100)
-  }
-  equal(JSON.stringify(await override(page, command)), JSON.stringify(expected), `${command} list`)
-}
-
-async function showOnly(page: Page, query: string) {
-  await selectors.shortcutsSearch(page).fill(query)
-}
+const COMMAND = 'workspace.saveFile'
+const CONTEXT = 'Terminal && mode == alternate'
 
 export const settingsKeybindings: Scenario = {
   name: 'settings-keybindings',
   description:
-    'The shortcuts editor at 1440 and 390: search, filters, Record keys, recording with a conflict shown before saving, the row menu, and settings.json after each write. Writes only the throwaway server.',
+    'Contextual recording, preset clear/reset, reservations and targeted unbinds, with desktop and phone evidence from isolated settings.',
   async run(page, { step }) {
     await page.setViewportSize({ width: 1440, height: 1000 })
-    await page.keyboard.press('Control+,')
+    await page.keyboard.press('ControlOrMeta+,')
     await selectors.settingsSearch(page).fill('keyboard')
     await selectors.shortcutsList(page).waitFor()
-    ok(
-      (await selectors.shortcutsList(page).locator('[data-slot="virtual-list"]').count()) === 0,
-      'The list flows in the page scroller',
-    )
-    await step('desktop-list')
-
-    await showOnly(page, 'Go to line')
-    await selectors.shortcutRow(page, 'workspace.goToLine').dblclick()
-    await selectors.shortcutRecorder(page, 'Go to line').press('Control+Alt+K')
-    await step('desktop-recording')
-    equal(await override(page, 'workspace.goToLine'), undefined, 'Nothing is written before Enter')
-    await selectors.shortcutRecorder(page, 'Go to line').press('Enter')
-    await waitForList(page, 'workspace.goToLine', ['Mod+Alt+K'])
-
-    await showOnly(page, 'Save')
-    await selectors.shortcutRow(page, 'workspace.saveFile').dblclick()
-    await selectors.shortcutRecorder(page, 'Save').press('Control+Alt+K')
-    await page.getByText('Used by 1 command', { exact: true }).waitFor()
-    await step('desktop-conflict-before-save')
-    await selectors.shortcutRecorder(page, 'Save').press('Escape')
-    await selectors.shortcutRecorder(page, 'Save').press('Escape')
-    equal(
-      await override(page, 'workspace.saveFile'),
-      undefined,
-      'A cancelled recording writes nothing',
-    )
-
-    await selectors.shortcutsSearch(page).fill('')
-    await selectors.shortcutRecordKeys(page).click()
-    await selectors.shortcutsSearch(page).press('Control+Alt+K')
-    await selectors.shortcutRow(page, 'workspace.goToLine').waitFor()
-    equal(
-      await selectors.shortcutsList(page).getByRole('option').count(),
-      1,
-      'Record keys finds one row',
-    )
-    await step('desktop-record-keys-search')
-    await selectors.shortcutRecordKeys(page).click()
-
-    await selectors.shortcutFilter(page, 'Custom').click()
-    await selectors.shortcutRow(page, 'workspace.goToLine').waitFor()
-    await step('desktop-custom-filter')
-    await selectors.shortcutRow(page, 'workspace.goToLine').click({ button: 'right' })
-    await selectors.shortcutMenuItem(page, /^Reset to default/).click()
-    await waitForOverride(page, 'workspace.goToLine', undefined)
-    await selectors.shortcutFilter(page, 'All').click()
+    const titles = await selectors.shortcutPresetTabs(page).getByRole('tab').allTextContents()
+    deepEqual(titles, ['Ours', 'Zed', 'VS Code'])
+    await step('desktop-presets')
 
     await writeUserOperations(page, [
-      { kind: 'keybinding.set', command: 'workspace.saveFile', keys: ['Mod+Alt+J'] },
-      { kind: 'keybinding.set', command: 'workspace.togglePanel', keys: ['Mod+Alt+K'] },
+      { kind: 'keybinding.set', command: COMMAND, keys: ['F6'], context: 'Workspace' },
     ])
-    await showOnly(page, 'Save')
-    await selectors.shortcutRow(page, 'workspace.saveFile').click({ button: 'right' })
-    await selectors.shortcutMenuItem(page, /^Change shortcut/).click()
-    await selectors.shortcutRecorder(page, 'Save').press('Control+Alt+K')
-    await page.getByText(/Taken by Toggle panel/).waitFor()
-    ok(await page.getByRole('button', { name: 'Save', exact: true }).isDisabled())
+    await selectors.shortcutsSearch(page).fill(COMMAND)
+    await selectors.shortcutRow(page, COMMAND, 'F6', 'Workspace').dblclick()
+    await selectors.shortcutContext(page).fill('Editor &&')
+    await selectors.shortcutRecorder(page, 'Save').press('ControlOrMeta+Alt+J')
+    ok(await selectors.shortcutSave(page).isDisabled(), 'Invalid predicate disables Save')
+    await selectors.shortcutContext(page).fill(CONTEXT)
+    await waitForBindings(page, [{ keys: 'F6', command: COMMAND, context: 'Workspace' }])
+    await step('desktop-context-before-save')
     await selectors.shortcutRecorder(page, 'Save').press('Enter')
-    await waitForList(page, 'workspace.saveFile', ['Mod+Alt+J'])
-    await step('desktop-losing-override')
-    await selectors.shortcutRecorder(page, 'Save').press('Escape')
-    await selectors.shortcutRecorder(page, 'Save').press('Escape')
+    await waitForBindings(page, [
+      { keys: 'F6', command: COMMAND, context: 'Workspace' },
+      { keys: 'Mod+Alt+J', command: COMMAND, context: CONTEXT },
+    ])
+    const contextual = selectors.shortcutRow(page, COMMAND, 'Mod+Alt+J', CONTEXT)
+    await contextual.waitFor()
+    ok((await contextual.getAttribute('title'))?.includes(CONTEXT), 'Full predicate is recoverable')
+    await step('desktop-context-saved')
+    await contextual.click({ button: 'right' })
+    await selectors.shortcutMenuItem(page, /^Reset to default/).click()
+    await waitForBindings(page, [{ keys: 'F6', command: COMMAND, context: 'Workspace' }])
+    await step('desktop-exact-context-reset')
     await writeUserOperations(page, [{ kind: 'reset', keys: ['keybindings.overrides'] }])
 
-    await showOnly(page, 'workspace.toggleCheckpointChange')
-    await selectors.shortcutRow(page, 'workspace.toggleCheckpointChange').dblclick()
-    const checkpointRecorder = selectors.shortcutRecorder(page, 'Undo or redo an agent file change')
-    await checkpointRecorder.press('Control+Z')
-    await page.getByText('Used by 1 command', { exact: true }).waitFor()
-    await page.getByText('Undo session action', { exact: true }).waitFor()
-    await step('desktop-partial-pane-warning')
-    await checkpointRecorder.press('Enter')
-    await waitForList(page, 'workspace.toggleCheckpointChange', ['Mod+Z'])
-    await showOnly(page, 'Undo session action')
-    await selectors.shortcutFilter(page, 'Conflicts').click()
-    await selectors
-      .shortcutRow(page, 'workspace.undoSessionAction', 'Mod+Z')
-      .getByText('Taken in Git')
-      .waitFor()
-    await step('desktop-partial-pane-conflicts')
-    await writeUserOperations(page, [{ kind: 'reset', keys: ['keybindings.overrides'] }])
-    await selectors.shortcutFilter(page, 'All').click()
-
-    // Several shortcuts per command: add F7 beside the palette's defaults, run it by both, remove it.
-    await showOnly(page, 'Show command palette')
-    await selectors
-      .shortcutRow(page, 'workspace.showCommandPalette', 'F1')
-      .click({ button: 'right' })
-    await selectors.shortcutMenuItem(page, /^Add another shortcut/).click()
-    await selectors.shortcutRecorder(page, 'Show command palette').press('F7')
-    await selectors.shortcutRecorder(page, 'Show command palette').press('Enter')
-    await waitForList(page, 'workspace.showCommandPalette', ['Mod+Shift+P', 'F1', 'F7'])
-    await selectors.shortcutRow(page, 'workspace.showCommandPalette', 'F7').waitFor()
-    await step('desktop-second-shortcut')
-    for (const chord of ['F7', 'F1']) {
-      // Bare F-keys go to a focused text field, and Escape hands focus back to the page search.
-      await selectors.shortcutsList(page).focus()
-      await page.keyboard.press(chord)
-      await selectors.paletteInput(page).waitFor()
-      await page.keyboard.press('Escape')
-      await selectors.paletteInput(page).waitFor({ state: 'hidden' })
+    const preset = selectors.shortcutPresetRow(page, COMMAND)
+    await preset.waitFor()
+    const keys = await preset.getAttribute('data-shortcut-keys')
+    const context = await preset.getAttribute('data-shortcut-context')
+    ok(keys && context !== null, 'Preset key and authored context are observable')
+    await preset.click({ button: 'right' })
+    await selectors.shortcutMenuItem(page, /^Remove shortcut/).click()
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const entries = await overrides(page)
+      if (
+        entries.some(
+          (entry) =>
+            'unbind' in entry &&
+            entry.unbind === COMMAND &&
+            entry.keys === keys &&
+            entry.context === (context || undefined),
+        )
+      )
+        break
+      await page.waitForTimeout(100)
     }
-    await selectors
-      .shortcutRow(page, 'workspace.showCommandPalette', 'F7')
-      .click({ button: 'right' })
-    await selectors.shortcutMenuItem(page, /^Remove shortcut/).click()
-    await waitForList(page, 'workspace.showCommandPalette', ['Mod+Shift+P', 'F1'])
+    ok(
+      (await overrides(page)).some(
+        (entry) =>
+          'unbind' in entry &&
+          entry.unbind === COMMAND &&
+          entry.keys === keys &&
+          entry.context === (context || undefined),
+      ),
+      'Remove targets the preset pair in its exact context',
+    )
+    await step('desktop-preset-cleared')
+    await selectors.shortcutRow(page, COMMAND, keys, context).click({ button: 'right' })
+    await selectors.shortcutMenuItem(page, /^Reset to default/).click()
+    await waitForBindings(page, [])
+    await step('desktop-preset-restored')
 
-    // A phone opens Settings as the full-screen dialog of a fresh window.
-    await page.addInitScript(() => {
-      localStorage.clear()
-      sessionStorage.clear()
-    })
-    const home = new URL(page.url())
-    home.pathname = `${home.pathname.split('/~')[0]}/`
-    home.search = ''
-    home.hash = ''
+    await selectors.shortcutEntries(page).click()
+    await selectors.shortcutEntryKeys(page).fill('F8')
+    await selectors.shortcutEntryContext(page).fill('Terminal')
+    await selectors.shortcutEntryAdd(page).click()
+    await waitForBindings(page, [{ keys: 'F8', command: null, context: 'Terminal' }])
+    await selectors.shortcutEntryKind(page).click()
+    await selectors.shortcutEntryUnbindOption(page).click()
+    await selectors.shortcutEntryKeys(page).fill('F9')
+    await selectors.shortcutEntryCommand(page).fill('future::command')
+    await selectors.shortcutEntryAdd(page).click()
+    await waitForBindings(page, [
+      { keys: 'F8', command: null, context: 'Terminal' },
+      { keys: 'F9', unbind: 'future::command', context: 'Terminal' },
+    ])
+    await step('desktop-authored-order')
+    await selectors.shortcutEntryDelete(page, 0).click()
+    await waitForBindings(page, [{ keys: 'F9', unbind: 'future::command', context: 'Terminal' }])
+    await step('desktop-targeted-delete')
+
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto(home.href, { waitUntil: 'domcontentloaded' })
-    await selectors.chooseFolder(page).waitFor()
-    await page.keyboard.press('Control+,')
-    await selectors.settingsDialog(page).waitFor()
-    // Settings search finds the command and brings the shortcut list with it.
-    await selectors.settingsSearch(page).fill('Save')
-    await selectors.shortcutsList(page).waitFor()
-    await showOnly(page, 'Save')
-    const saveRow = selectors.shortcutRow(page, 'workspace.saveFile')
-    await saveRow.waitFor()
-    const height = (await saveRow.boundingBox())?.height ?? 0
-    ok(height >= 40, `A narrow row is a touch target (${height}px)`)
-    await step('narrow-list')
-    await saveRow.click()
-    await selectors.shortcutMenuItem(page, /^Remove shortcut/).waitFor()
-    await step('narrow-row-menu')
-    await selectors.shortcutMenuItem(page, /^Remove shortcut/).click()
-    await waitForList(page, 'workspace.saveFile', [])
-    await step('narrow-removed')
-
+    await selectors.shortcutsSearch(page).fill(COMMAND)
+    const narrow = selectors.shortcutRow(page, COMMAND).first()
+    await narrow.scrollIntoViewIfNeeded()
+    const height = (await narrow.boundingBox())?.height ?? 0
+    ok(height >= 40, `Narrow row is a touch target at ${height}px`)
+    await step('narrow-contextual-list')
+    await narrow.click()
+    await selectors.shortcutMenuItem(page, /^Change shortcut|^Add shortcut/).waitFor()
+    await step('narrow-row-actions')
+    await page.keyboard.press('Escape')
     await writeUserOperations(page, [{ kind: 'reset', keys: ['keybindings.overrides'] }])
+    equal((await overrides(page)).length, 0)
   },
 }

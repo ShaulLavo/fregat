@@ -20,7 +20,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { cn } from '@workspace/ui/lib/utils'
-import type { Terminal, TerminalScrollbar } from 'ghostty-webgpu'
+import { hotkeys, type Terminal, type TerminalScrollbar } from 'ghostty-webgpu'
+import { detectPlatform } from '@fregat/hotkeys'
 import {
   useEffect,
   useEffectEvent,
@@ -39,7 +40,8 @@ import { registeredFocusTarget } from '@/lib/focus/state/service'
 
 import { TerminalMenu } from '@/features/terminal/components/menu'
 import { useTerminalCommandInbox } from '@/features/terminal/hooks/use-command-inbox'
-import { useTerminalKeybindings } from '@/features/terminal/hooks/use-keybindings'
+import { useCommand } from '@/keymap/hooks/use-command'
+import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { useTerminalLinks } from '@/features/terminal/hooks/use-links'
 import { readTerminalMenuTarget, type TerminalMenuTarget } from '@/features/terminal/utils/commands'
 import { isFocusOutsideElement } from '@/features/terminal/utils/focus-target'
@@ -66,6 +68,7 @@ export function TerminalPanel({
   const queryClient = useQueryClient()
   const origin = originForQueryClient(queryClient)
   const focus = useFocusService()
+  const { keymap } = useCommand()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusAfterRemountRef = useRef<string | null>(null)
   const scrollbackLengthRef = useRef(0)
@@ -109,7 +112,6 @@ export function TerminalPanel({
     message: string
   } | null>(null)
   const registerTerminalLinks = useTerminalLinks(rootPath)
-  useTerminalKeybindings(hostRef)
   useTerminalCommandInbox({
     active: active && socketConnected && !machineUnavailable,
     sendInputRef,
@@ -145,6 +147,15 @@ export function TerminalPanel({
       if (identity !== terminalMountIdentity) return
       terminalRef.current = terminal
       sendInputRef.current = sendInput
+      terminal.use(
+        hotkeys({
+          mode: 'hosted',
+          dispatcher: keymap.hotkeys,
+          parent: keymap.parentFor('terminal'),
+          platform: detectPlatform(),
+          onError: (cause, operation) => reportError({ ...toClientError(cause), operation }),
+        }),
+      )
       // At handover rather than at construction: ghostty resolves long after the
       // mount effect started, and this is an effect event, so it sees the
       // current settings rather than the ones the mount began with.

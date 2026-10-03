@@ -49,9 +49,7 @@ test('command groups rank strong command matches above earlier weak fuzzy groups
 test('includes both strokes in a chord shortcut hint', () => {
   const bindings = resolvedPlatformKeyBindings(
     defaultPlatformKeyBindings('linux'),
-    {
-      'workspace.showSettings': ['Mod+K Mod+S'],
-    },
+    [{ command: 'workspace.showSettings', keys: 'Mod+K Mod+S', context: 'Workspace' }],
     'linux',
   )
   const items = commandPaletteItems(platformCommandSpecs, bindings)

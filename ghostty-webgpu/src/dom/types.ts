@@ -1,4 +1,4 @@
-import type { RegisterableHotkey } from '@tanstack/hotkeys'
+import type { ExtensionInput } from '../extensions/types.js'
 import type { EventSubscription } from '../term/events.js'
 import type { LinkResolverOptions } from '../term/links.js'
 import type {
@@ -10,7 +10,6 @@ import type {
   TerminalFittedFont,
   TerminalFontSettings,
   TerminalInputData,
-  TerminalInputResult,
   TerminalMutationResult,
   TerminalRendererTheme,
   TerminalScrollEvent,
@@ -45,6 +44,7 @@ export interface GhosttyWebGpuTerminalResizeEvent {
 }
 
 export interface GhosttyWebGpuTerminalEventMap {
+  readonly open: HTMLDivElement
   readonly appearance: TerminalAppearance
   readonly bell: void
   readonly data: Uint8Array
@@ -64,28 +64,14 @@ export type GhosttyWebGpuTerminalListener<TType extends GhosttyWebGpuTerminalEve
 
 export type GhosttyWebGpuTerminalSubscription = EventSubscription
 
-export type GhosttyWebGpuTerminalCopy = (text: string) => PromiseLike<void> | void
+export type TerminalGeneratedInput =
+  | { readonly type: 'key'; readonly input: import('../term/types.js').TerminalKeyInput }
+  | { readonly type: 'text' | 'paste'; readonly data: TerminalInputData }
+  | { readonly type: 'composition'; readonly text: string }
 
-export type TerminalHotkeyDecision = 'claim' | 'passthrough'
-
-export interface TerminalHotkeyContext {
-  readonly event: KeyboardEvent
-  readonly getSelection: () => string | undefined
-  readonly hasSelection: () => boolean
-  readonly paste: (data: TerminalInputData) => TerminalInputResult
-  readonly sendInput: (data: TerminalInputData) => TerminalInputResult
-}
-
-export interface TerminalHotkeyBinding {
-  readonly hotkey: RegisterableHotkey
-  readonly id: string
-  readonly onTrigger: (context: TerminalHotkeyContext) => TerminalHotkeyDecision
-  readonly preventDefault?: boolean
-  readonly stopPropagation?: boolean
-}
-
-export interface GhosttyWebGpuTerminalKeyboardOptions {
-  readonly shortcuts?: false | readonly TerminalHotkeyBinding[]
+export interface TerminalInputModes {
+  readonly alternateScreen: boolean
+  readonly mouseReporting: boolean
 }
 
 export interface GhosttyWebGpuTerminalDiagnostics {
@@ -140,9 +126,9 @@ export interface GhosttyWebGpuTerminalOptions {
   readonly accessibility?: false | GhosttyWebGpuTerminalAccessibilityOptions
   readonly appearance?: TerminalAppearanceOptions
   readonly clipboardWrite?: DomClipboardWritePolicy
-  readonly copySelection?: GhosttyWebGpuTerminalCopy
   readonly fitEnvironment?: Partial<TerminalFitEnvironment>
-  readonly keyboard?: false | GhosttyWebGpuTerminalKeyboardOptions
+  readonly keyboard?: boolean
+  readonly extensions?: readonly ExtensionInput[]
   readonly linkActivationModifier?: (event: MouseEvent) => boolean
   readonly links?: LinkResolverOptions<Event>
   readonly padding?: TerminalElementPaddingInput
@@ -153,7 +139,6 @@ export interface GhosttyWebGpuTerminalOptions {
 
 export interface GhosttyWebGpuTerminalInputHooks {
   beforeUserInput?(): void
-  customKeyEvent?(event: KeyboardEvent): boolean
   inputReady?(): void
   inputDisabled?(): boolean
   macOptionIsMeta?(): boolean

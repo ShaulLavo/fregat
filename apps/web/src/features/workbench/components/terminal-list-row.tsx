@@ -3,7 +3,7 @@ import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TerminalIcon } from '@phosphor-icons/react'
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react'
 
 import { InlineRenameInput } from '@workspace/ui/patterns/inline-rename-input'
 import { terminalTabMenu } from '@/features/workbench/utils/terminal-tab-menu'
@@ -16,6 +16,9 @@ const MIDDLE_MOUSE_BUTTON = 1
 
 export function TerminalListRow({
   active,
+  editing,
+  onStartEditing,
+  onStopEditing,
   rowProps,
   tab,
   onActivate,
@@ -23,13 +26,15 @@ export function TerminalListRow({
   onRename,
 }: {
   readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
+  readonly editing: boolean
+  readonly onStartEditing: () => void
+  readonly onStopEditing: () => void
   readonly active: boolean
   readonly tab: TerminalTabRecord
   readonly onActivate: (tabId: string) => void
   readonly onClose: (tabId: string) => void
   readonly onRename: (tabId: string, name: string) => void
 }) {
-  const [editing, setEditing] = useState(false)
   const label = terminalTabLabel(tab)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const restoreFocusRef = useRef(false)
@@ -40,13 +45,13 @@ export function TerminalListRow({
   })
   const menu = terminalTabMenu({
     kill: () => onClose(tab.id),
-    rename: () => setEditing(true),
+    rename: onStartEditing,
   })
 
   // The field took focus from the row; hand it back when the field goes.
   function stopEditing() {
     restoreFocusRef.current = true
-    setEditing(false)
+    onStopEditing()
   }
   useEffect(() => {
     if (editing || !restoreFocusRef.current) return
@@ -55,19 +60,7 @@ export function TerminalListRow({
     buttonRef.current?.closest<HTMLElement>('[role=tablist]')?.focus()
   }, [editing])
 
-  // Other keys still reach dnd-kit so Space picks the row up for keyboard reordering.
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === 'F2') {
-      event.preventDefault()
-      setEditing(true)
-      return
-    }
-    if (event.key === 'Delete') {
-      event.preventDefault()
-      onClose(tab.id)
-      return
-    }
-
     listeners?.onKeyDown?.(event)
   }
 
@@ -131,7 +124,7 @@ export function TerminalListRow({
         rowProps.onClick(event)
         onActivate(tab.id)
       }}
-      onDoubleClick={() => setEditing(true)}
+      onDoubleClick={onStartEditing}
       onKeyDown={handleKeyDown}
     >
       <TerminalIcon className='size-(--icon-size-sm) shrink-0' />

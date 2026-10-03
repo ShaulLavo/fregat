@@ -1,13 +1,16 @@
-import { Editor, type EditorCommandId } from '@singapore-editor/core'
+import { Editor, type EditorCommandId, type EditorPlugin } from '@singapore-editor/core'
+import type { WindowKeymap } from '@/keymap/state/window-keymap'
 import type { FocusService } from '@/lib/focus/state/service'
 
 export function createKeymapEditor(
   focus: FocusService,
+  keymap: WindowKeymap,
   options: {
     readonly key: string
     readonly text?: string
     readonly writable?: boolean
     readonly surface?: 'document' | 'settings' | 'diff' | 'search-result'
+    readonly plugins?: readonly EditorPlugin[]
   },
 ) {
   const container = document.createElement('section')
@@ -16,7 +19,10 @@ export function createKeymapEditor(
   const editor = new Editor(container, {
     defaultText: options.text ?? 'first line\nsecond line\nthird line',
     editability: options.writable === false ? 'readonly' : 'editable',
-    keymap: { enabled: false },
+    plugins: options.plugins,
+    hotkeys: keymap.hotkeys,
+    hotkeysParent: keymap.parentFor('editor'),
+    keymapContext: { mode: options.writable === false ? 'diff' : 'full', extension: 'ts' },
   })
   const dispatched: EditorCommandId[] = []
   const registration = focus.register({

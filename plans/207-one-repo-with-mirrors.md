@@ -32,13 +32,23 @@ The owner requested complete source migration, tooling alignment and CI verifica
 2026-09-30, with all npm setup and publication deferred until that work is finished. The
 execution checklist is [migration completion](207-migration-completion.md).
 
-Source import and npm publication are separate delivery units. Before 204/205 add a
-cross-family hotkeys dependency, prove that the exact mirrored Editor/ghostty folder
-installs and builds without sibling workspaces. `workspace:*` rewriting during npm publish
-does not prove standalone mirror installation. Select and test a dependency arrangement
-that supports both root workspaces and exact mirrors; publish the required hotkeys version
-before mirroring a consumer commit that needs it. Record the first-publication and trusted
-publisher gates without blocking unrelated source-import work on every package release.
+Source import, Git mirroring and npm publication are separate delivery units. The owner
+renewed npm deferral on 2026-10-03. Local development and root CI use the neighboring hotkeys
+workspace; neither needs an npm login or publication. A mirror copies one family folder, so
+its standalone installation needs a separately available dependency source.
+
+Before 204/205 mirror a hotkeys consumer, prove that the exact Editor/ghostty family folder
+installs and builds without sibling workspaces. Consumer manifests use `catalog:`: Fregat's
+root catalog selects the local exact-version workspace; each standalone family catalog selects
+an immutable package artifact built from reviewed hotkeys source. Record its source commit,
+version and digest, and test cold installation of both actual migrated families. An npm version
+can replace that artifact in the separately scheduled publication phase.
+
+The 2026-10-03 Bun 1.4.2 structural proof selected the local workspace with zero artifact
+requests, then installed each isolated family fixture with one artifact fetch and a passing
+runtime smoke check. This qualifies the resolution arrangement; the final migrated-family
+install/build gate remains required. Receipt:
+`/work/reports/command-foundation-2026-10-03/publication/catalog-resolution-proof.json`.
 
 ## Why
 
@@ -254,5 +264,5 @@ recursion cap on imported history. No force push was used.
 Release `20260930T072758Z-f1b47731-main` passed the live check. Editor, language-service and
 terminal browser evidence was inspected in `/work/tmp/monorepo-completion/browser/`.
 The [completion checklist](207-migration-completion.md) records the remaining automatic
-mirror correction check. npm remains disabled and deferred; plans 204–206 remain subsequent
-feature work, including cross-family consumers that need the first hotkeys publication.
+mirror correction check. npm remains disabled and deferred. Plans 204–206 use local workspaces
+inside Fregat and qualify the separate standalone dependency source before mirroring consumers.

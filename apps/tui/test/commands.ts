@@ -34,7 +34,7 @@ export function createCommandHarness(options: {
   const keymap = createKeymapSession({
     bus,
     focus,
-    bindings: options.bindings ?? effectiveTerminalBindings({}).bindings,
+    bindings: options.bindings ?? effectiveTerminalBindings([]).bindings,
     onPendingChange: (value) => {
       state.pending = value
     },

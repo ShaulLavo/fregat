@@ -1,7 +1,8 @@
 # Shared keymap historical baseline
 
 Historical baseline recorded on 2026-09-05, before implementation.
-See [delivery](delivery.md) for the completed runtime and Platform migration.
+See [architecture](architecture.md) for current ownership. This historical measurement
+describes the runtime replaced by Plans 204–206; its original artifacts remain in Git history.
 
 ## Dependency pairing
 

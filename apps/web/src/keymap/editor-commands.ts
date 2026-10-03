@@ -22,7 +22,7 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react'
 
-export const editorCommands = [
+const decoratedCommands = [
   { ...editorCommandMetadata['markdown.bold'] },
   { ...editorCommandMetadata['markdown.italic'] },
   { ...editorCommandMetadata['markdown.strikethrough'] },
@@ -73,7 +73,7 @@ export const editorCommands = [
   { ...editorCommandMetadata['merge-conflict.next'], icon: ArrowDownIcon },
   { ...editorCommandMetadata['merge-conflict.previous'], icon: ArrowUpIcon },
   { ...editorCommandMetadata['merge-conflict.compare'], icon: ColumnsIcon },
-  { ...editorCommandMetadata['goToDefinition'], icon: ArrowSquareOutIcon },
+  { ...editorCommandMetadata['editor.action.goToDefinition'], icon: ArrowSquareOutIcon },
   { ...editorCommandMetadata['editor.action.goToImplementation'] },
   { ...editorCommandMetadata['editor.action.goToTypeDefinition'] },
   { ...editorCommandMetadata['editor.action.peekDefinition'] },
@@ -196,7 +196,6 @@ export const editorCommands = [
   { ...editorCommandMetadata['jumpForward'] },
   { ...editorCommandMetadata['cursorUndo'] },
   { ...editorCommandMetadata['cursorRedo'] },
-  { ...editorCommandMetadata['editor.action.goToDefinition'] },
   { ...editorCommandMetadata['editor.action.marker.next'] },
   { ...editorCommandMetadata['editor.action.marker.prev'] },
   { ...editorCommandMetadata['editor.action.smartSelect.expand'] },
@@ -242,4 +241,11 @@ export const editorCommands = [
   { ...editorCommandMetadata['editor.foldLevel5'] },
   { ...editorCommandMetadata['editor.foldLevel6'] },
   { ...editorCommandMetadata['editor.foldLevel7'] },
+]
+
+const decoratedIds = new Set<string>(decoratedCommands.map(({ id }) => id))
+
+export const editorCommands = [
+  ...decoratedCommands,
+  ...Object.values(editorCommandMetadata).filter(({ id }) => !decoratedIds.has(id)),
 ]

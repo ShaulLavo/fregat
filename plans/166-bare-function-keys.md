@@ -6,10 +6,11 @@ Unmodified F1–F12 reach app commands while a text field has focus, including s
 the palette input, and the chat composer. Function keys insert no characters. After Escape
 closes the palette and restores settings search, F1 opens the palette again.
 
-This also applies to a command rebound to a bare function key whose default binding yields
-to text entry, such as session undo. Every other key retains its existing text-field behavior,
-including letters, navigation keys, modified function keys, and keys beyond F12. Editor command
-targeting and availability checks still apply.
+Plan 206 expresses text-entry availability with context predicates in the preset and authored
+override rows. This also applies to a command rebound to a bare function key whose default
+binding yields to text entry, such as session undo. Every other key retains its existing
+text-field behavior, including letters, navigation keys, modified function keys and keys beyond
+F12. Command targeting, availability and read-only mutation checks remain execution policy.
 
 Verification: the keymap hook tests cover F1–F12 and unchanged yielding behavior; the browser
 command-focus tests cover input, textarea, contenteditable, and native Editor typing and F1.

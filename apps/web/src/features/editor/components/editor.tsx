@@ -1,9 +1,11 @@
 import { useDocumentFeatureTier } from '@/features/editor/hooks/use-document-feature-tier'
+import { useUndoBarrierPlugin } from '@/features/editor/hooks/use-undo-barrier-plugin'
+import { fileExtension } from '@/lib/path-formatters'
 import { LargeFileNotice } from '@/features/editor/components/large-file-notice'
 import { useMarkdownView } from '@/lib/markdown-mode/hooks/use-markdown-view'
 import { useMarkdownLinkOpener } from '@/features/editor/hooks/use-markdown-link-opener'
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
-import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
+import { useCommand } from '@/keymap/hooks/use-command'
 import { useEditor } from '@singapore-editor/react'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
@@ -102,11 +104,13 @@ export function Editor({
   onStatusSourceChange,
   onTextChange,
 }: EditorProps) {
+  const { keymap } = useCommand()
   const [provisional, setProvisional] = useState(false)
   const [formattedDocument, setFormattedDocument] = useState<string | null>(null)
   const unavailable = useUnavailableEnvironment()
   const currentTarget = liveDocument?.target ?? target
   const key = liveDocument?.key ?? documentKey(target)
+  const undoBarrierPlugin = useUndoBarrierPlugin(key)
   const resource = filesystemResource(currentTarget)
   const filePath = languageServerTarget?.matchPath ?? documentSourcePath(currentTarget) ?? ''
   const editability = unavailable || !liveDocument ? 'readonly' : liveDocument.editability
@@ -202,6 +206,7 @@ export function Editor({
     state.textMenuRequest?.tabId === tabId ? state.textMenuRequest.count : null,
   )
   const plugins = [
+    undoBarrierPlugin,
     ...criticalEditorCorePlugins,
     unicodeHighlights.plugin,
     ...(analysisAllowed && spellcheckPlugin ? [spellcheckPlugin] : []),
@@ -241,7 +246,9 @@ export function Editor({
     ...typography,
     gutterLeadingInset: gutterInset,
     inputRoute,
-    keymap: HOSTED_EDITOR_KEYMAP,
+    keymapContext: { mode: 'full', extension: fileExtension(filePath) },
+    hotkeys: keymap.hotkeys,
+    hotkeysParent: keymap.parentFor(currentTarget.kind === 'settings-json' ? 'settings' : 'editor'),
     onChange: (_state, change) => {
       if (!liveDocument || !change || change.kind === 'selection' || change.kind === 'none') return
 

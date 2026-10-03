@@ -37,7 +37,7 @@ const registry = {
     category: 'Terminal',
     description: 'Shell binary.',
   }),
-  'keybindings.overrides': defineSetting({
+  'fixture.record': defineSetting({
     schema: v.record(v.string(), v.nullable(v.string())),
     default: {},
     scope: 'window',
@@ -147,13 +147,13 @@ describe('settings resolution', () => {
   it('merges a record key across layers instead of replacing it', () => {
     const { values } = resolveSettings(
       [
-        layer('user', { 'keybindings.overrides': { 'a.one': 'Mod+1', 'a.two': 'Mod+2' } }),
-        layer('workspace', { 'keybindings.overrides': { 'a.two': 'Mod+9', 'a.three': null } }),
+        layer('user', { 'fixture.record': { 'a.one': 'Mod+1', 'a.two': 'Mod+2' } }),
+        layer('workspace', { 'fixture.record': { 'a.two': 'Mod+9', 'a.three': null } }),
       ],
       { registry },
     )
 
-    expect(values['keybindings.overrides']).toEqual({
+    expect(values['fixture.record']).toEqual({
       'a.one': 'Mod+1',
       'a.two': 'Mod+9',
       'a.three': null,
@@ -163,13 +163,13 @@ describe('settings resolution', () => {
   it('lets policy replace a record key outright rather than merging into it', () => {
     const { values } = resolveSettings(
       [
-        layer('user', { 'keybindings.overrides': { 'a.one': 'Mod+1' } }),
-        layer('policy', { 'keybindings.overrides': { 'a.locked': 'Mod+L' } }),
+        layer('user', { 'fixture.record': { 'a.one': 'Mod+1' } }),
+        layer('policy', { 'fixture.record': { 'a.locked': 'Mod+L' } }),
       ],
       { registry },
     )
 
-    expect(values['keybindings.overrides']).toEqual({ 'a.locked': 'Mod+L' })
+    expect(values['fixture.record']).toEqual({ 'a.locked': 'Mod+L' })
   })
 
   it('names the ids a policy layer controls', () => {
@@ -181,62 +181,60 @@ describe('settings resolution', () => {
 
 describe('resolution identity', () => {
   it('hands back the previous value when a key resolves to an equal one', () => {
-    const first = resolveSettings(
-      [layer('user', { 'keybindings.overrides': { 'a.one': 'Mod+1' } })],
-      { registry },
-    )
+    const first = resolveSettings([layer('user', { 'fixture.record': { 'a.one': 'Mod+1' } })], {
+      registry,
+    })
     // A distinct object holding equal content — what a file reload produces even
     // when the bytes did not change. `v.parse` allocates a fresh record for it,
     // so the only way this can be reference-equal is the previous-value reuse.
-    const second = resolveSettings(
-      [layer('user', { 'keybindings.overrides': { 'a.one': 'Mod+1' } })],
-      { registry, previous: first.values },
-    )
+    const second = resolveSettings([layer('user', { 'fixture.record': { 'a.one': 'Mod+1' } })], {
+      registry,
+      previous: first.values,
+    })
 
-    expect(second.values['keybindings.overrides']).not.toEqual({})
-    expect(second.values['keybindings.overrides']).toBe(first.values['keybindings.overrides'])
+    expect(second.values['fixture.record']).not.toEqual({})
+    expect(second.values['fixture.record']).toBe(first.values['fixture.record'])
   })
 
   it('reuses across a change to an unrelated key', () => {
     const first = resolveSettings(
-      [layer('user', { 'keybindings.overrides': { 'a.one': 'Mod+1' }, 'editor.fontSize': 15 })],
+      [layer('user', { 'fixture.record': { 'a.one': 'Mod+1' }, 'editor.fontSize': 15 })],
       { registry },
     )
     const second = resolveSettings(
-      [layer('user', { 'keybindings.overrides': { 'a.one': 'Mod+1' }, 'editor.fontSize': 20 })],
+      [layer('user', { 'fixture.record': { 'a.one': 'Mod+1' }, 'editor.fontSize': 20 })],
       { registry, previous: first.values },
     )
 
     expect(second.values['editor.fontSize']).toBe(20)
     // The whole point: dragging one slider must not hand every keymap consumer a
     // new object and re-register the binding table.
-    expect(second.values['keybindings.overrides']).toBe(first.values['keybindings.overrides'])
+    expect(second.values['fixture.record']).toBe(first.values['fixture.record'])
   })
 
   it('returns a fresh value once the key actually changes', () => {
-    const first = resolveSettings(
-      [layer('user', { 'keybindings.overrides': { 'a.one': 'Mod+1' } })],
-      { registry },
-    )
-    const second = resolveSettings(
-      [layer('user', { 'keybindings.overrides': { 'a.one': 'Mod+2' } })],
-      { registry, previous: first.values },
-    )
+    const first = resolveSettings([layer('user', { 'fixture.record': { 'a.one': 'Mod+1' } })], {
+      registry,
+    })
+    const second = resolveSettings([layer('user', { 'fixture.record': { 'a.one': 'Mod+2' } })], {
+      registry,
+      previous: first.values,
+    })
 
-    expect(second.values['keybindings.overrides']).not.toBe(first.values['keybindings.overrides'])
-    expect(second.values['keybindings.overrides']).toEqual({ 'a.one': 'Mod+2' })
+    expect(second.values['fixture.record']).not.toBe(first.values['fixture.record'])
+    expect(second.values['fixture.record']).toEqual({ 'a.one': 'Mod+2' })
   })
 
   it('does not merge when only one layer contributes a record key', () => {
     const overrides = { 'a.one': 'Mod+1' }
-    const { values } = resolveSettings([layer('user', { 'keybindings.overrides': overrides })], {
+    const { values } = resolveSettings([layer('user', { 'fixture.record': overrides })], {
       registry,
     })
 
     // The merge path would build a new record by spreading; the single-contributor
     // path returns the parsed value straight through. Both produce equal content,
     // so this pins the behaviour rather than the allocation.
-    expect(values['keybindings.overrides']).toEqual(overrides)
+    expect(values['fixture.record']).toEqual(overrides)
   })
 })
 
@@ -303,10 +301,16 @@ describe('the shipping registry', () => {
 
   it('accepts a real keybinding override from the user file', () => {
     const { values, diagnostics } = resolveSettings([
-      layer('user', { 'keybindings.overrides': { 'workspace.saveFile': ['Mod+Alt+S'] } }),
+      layer('user', {
+        'keybindings.overrides': [
+          { keys: 'Mod+Alt+S', command: 'workspace.saveFile', context: 'Editor' },
+        ],
+      }),
     ])
 
-    expect(values['keybindings.overrides']).toEqual({ 'workspace.saveFile': ['Mod+Alt+S'] })
+    expect(values['keybindings.overrides']).toEqual([
+      { keys: 'Mod+Alt+S', command: 'workspace.saveFile', context: 'Editor' },
+    ])
     expect(diagnostics).toEqual([])
   })
 })

@@ -77,11 +77,3 @@ export function createDomClipboardPolicyAdapter(
   if (!policy) return undefined
   return (write) => normalizeDecision(policy(write), options.onError)
 }
-
-export function writeUserSelectionToClipboard(view: Window, text: string): Promise<void> {
-  const clipboard = view.navigator.clipboard
-  if (!clipboard || typeof clipboard.writeText !== 'function') {
-    return Promise.reject(new TypeError('The Clipboard API is unavailable'))
-  }
-  return clipboard.writeText(text)
-}

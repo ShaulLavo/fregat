@@ -1,5 +1,5 @@
 import { getClient } from '@/lib/client'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach } from 'vitest'
 
@@ -34,7 +34,8 @@ function row(command: string, keys?: string) {
     `[data-shortcut-command="${command}"]${chord}`,
   )
   expect(element).not.toBeNull()
-  return element as HTMLElement
+  if (!element) expect.fail('Missing shortcut row')
+  return element
 }
 
 async function showOnly(query: string) {
@@ -57,277 +58,119 @@ function press(
   })
 }
 
-test('lists commands by title, with their keys, where and source', async ({ client }) => {
+test('records a context before writing, then resets only that context', async ({ client }) => {
   expect(client).toBeDefined()
+  await saveSettings(
+    {
+      mutationId: 'ui-other-context',
+      target: 'user',
+      operations: [
+        {
+          kind: 'keybinding.set',
+          command: 'workspace.saveFile',
+          keys: ['F6', 'F7'],
+          context: 'Workspace',
+        },
+      ],
+    },
+    client,
+  )
   renderWithProviders(<KeybindingSection />)
-  await showOnly('Show command palette')
-
-  const palette = row('workspace.showCommandPalette', 'Mod+Shift+P')
-  expect(palette).toHaveTextContent('Show command palette')
-  expect(palette).toHaveTextContent('Everywhere')
-  expect(palette).toHaveTextContent('Default')
-  // F1 is its second chord, on a row of its own.
-  expect(row('workspace.showCommandPalette', 'F1')).toHaveTextContent('Default')
-})
-
-test('the search box narrows the list and says so when nothing matches', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('sidebar')
-
-  expect(screen.getByText('Toggle sidebar')).toBeDefined()
-  expect(document.querySelector('[data-shortcut-command="workspace.saveFile"]')).toBeNull()
-
-  await userEvent.clear(screen.getByLabelText(SEARCH))
-  await showOnly('zzznope')
-  expect(screen.getByText('No commands match this search.')).toBeDefined()
-})
-
-test('recording writes nothing until Enter, then Reset takes the override out', async ({
-  client,
-}) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('Save')
-
-  fireEvent.doubleClick(row('workspace.saveFile'))
+  await showOnly('workspace.saveFile')
+  await waitFor(() =>
+    expect(document.querySelector('[data-shortcut-command="workspace.saveFile"]')).not.toBeNull(),
+  )
+  fireEvent.doubleClick(row('workspace.saveFile', 'F6'))
   const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
+  const predicate = screen.getByLabelText('Shortcut context')
+  await userEvent.clear(predicate)
+  await userEvent.type(predicate, 'Terminal && mode == alternate')
   press(recorder, 'j', { ctrl: true, alt: true })
-  expect(await overrides()).not.toHaveProperty('workspace.saveFile')
-
+  expect(
+    (await overrides()).filter((entry) => entry.context === 'Terminal && mode == alternate'),
+  ).toEqual([])
   press(recorder, 'Enter')
   await waitFor(async () =>
-    expect((await overrides())['workspace.saveFile']).toEqual(['Mod+Alt+J']),
+    expect(await overrides()).toEqual(
+      expect.arrayContaining([
+        { keys: 'F6', command: 'workspace.saveFile', context: 'Workspace' },
+        { keys: 'F7', command: 'workspace.saveFile', context: 'Workspace' },
+        {
+          keys: 'Mod+Alt+J',
+          command: 'workspace.saveFile',
+          context: 'Terminal && mode == alternate',
+        },
+      ]),
+    ),
   )
-
-  fireEvent.contextMenu(row('workspace.saveFile'))
+  const customized = document.querySelector<HTMLElement>(
+    '[data-shortcut-command="workspace.saveFile"][data-shortcut-keys="Mod+Alt+J"]',
+  )
+  if (!customized) expect.fail('Missing saved contextual shortcut')
+  fireEvent.contextMenu(customized)
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset to default' }))
-  await waitFor(async () => expect(await overrides()).not.toHaveProperty('workspace.saveFile'))
-})
-
-test('shows the command a chord would take before saving it', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('Save')
-
-  fireEvent.doubleClick(row('workspace.saveFile'))
-  const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
-  press(recorder, 'p', { ctrl: true })
-
-  expect(await screen.findByText('Used by 1 command')).toBeDefined()
-  expect(screen.getByText('Saving takes the shortcut from it.')).toBeDefined()
-  expect(await overrides()).not.toHaveProperty('workspace.saveFile')
-})
-
-test('records two strokes, and Escape clears before it closes', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('Save')
-
-  fireEvent.doubleClick(row('workspace.saveFile'))
-  const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
-  press(recorder, 'x', { ctrl: true })
-  press(recorder, 'Escape')
-  expect(recorder).toHaveTextContent('Press the keys')
-  press(recorder, 'k', { ctrl: true })
-  press(recorder, 's', { ctrl: true })
-  press(recorder, 'Enter')
-
   await waitFor(async () =>
-    expect((await overrides())['workspace.saveFile']).toEqual(['Mod+K Mod+S']),
-  )
-})
-
-test('Remove shortcut on the last chord writes an empty list, shown as Removed', async ({
-  client,
-}) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('Save')
-
-  fireEvent.contextMenu(row('workspace.saveFile'))
-  await userEvent.click(await screen.findByRole('menuitem', { name: /^Remove shortcut/ }))
-
-  await waitFor(async () => expect((await overrides())['workspace.saveFile']).toEqual([]))
-  await waitFor(() => expect(row('workspace.saveFile')).toHaveTextContent('Removed'))
-})
-
-test('Add another shortcut keeps the command’s chords and appends one', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('Show command palette')
-
-  fireEvent.contextMenu(row('workspace.showCommandPalette', 'F1'))
-  await userEvent.click(await screen.findByRole('menuitem', { name: 'Add another shortcut' }))
-  const recorder = await screen.findByRole('textbox', {
-    name: 'Press the new shortcut for Show command palette',
-  })
-  press(recorder, 'F7')
-  press(recorder, 'Enter')
-
-  await waitFor(async () =>
-    expect((await overrides())['workspace.showCommandPalette']).toEqual([
-      'Mod+Shift+P',
-      'F1',
-      'F7',
+    expect(await overrides()).toEqual([
+      { keys: 'F6', command: 'workspace.saveFile', context: 'Workspace' },
+      { keys: 'F7', command: 'workspace.saveFile', context: 'Workspace' },
     ]),
   )
-  await waitFor(() => expect(row('workspace.showCommandPalette', 'F7')).toHaveTextContent('Custom'))
-})
-
-test('Remove shortcut on one of two chords keeps the other', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('Show command palette')
-
-  fireEvent.contextMenu(row('workspace.showCommandPalette', 'F1'))
-  await userEvent.click(await screen.findByRole('menuitem', { name: /^Remove shortcut/ }))
-
-  await waitFor(async () =>
-    expect((await overrides())['workspace.showCommandPalette']).toEqual(['Mod+Shift+P']),
-  )
-})
-
-test('an untouched row offers nothing to reset', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('Save')
-
-  fireEvent.contextMenu(row('workspace.saveFile'))
-  const reset = await screen.findByRole('menuitem', { name: 'Reset to default' })
-  expect(reset).toHaveAttribute('aria-disabled', 'true')
-})
-
-test('the Custom filter counts and shows changed commands', async ({ client }) => {
-  expect(client).toBeDefined()
-  await saveSettings(
-    {
-      mutationId: 'shortcuts-custom-filter',
-      operations: [{ command: 'workspace.saveFile', keys: ['Mod+Alt+J'], kind: 'keybinding.set' }],
-      target: 'user',
-    },
-    getClient(),
-  )
-  renderWithProviders(<KeybindingSection />)
-
-  const custom = await screen.findByRole('tab', { name: /Custom/ })
-  await waitFor(() => expect(custom).toHaveTextContent('1'))
-  await userEvent.click(custom)
-  const list = screen.getByRole('listbox', { name: 'Keyboard shortcuts' })
-  await waitFor(() => expect(within(list).getAllByRole('option')).toHaveLength(1))
-  expect(row('workspace.saveFile')).toHaveTextContent('Custom')
-})
-
-test('VS Code mode lists the bindings it cannot carry', async ({ client }) => {
-  expect(client).toBeDefined()
-  await saveSettings(
-    {
-      mutationId: 'shortcuts-vscode-preset',
-      operations: [{ kind: 'set', key: 'keybindings.preset', value: 'vscode' }],
-      target: 'user',
-    },
-    getClient(),
-  )
-  renderWithProviders(<KeybindingSection />)
-
-  await userEvent.click(await screen.findByText('VS Code shortcuts not available here'))
-  expect(await screen.findByText('workbench.action.quickOpenPreviousEditor')).toBeDefined()
-})
-
-for (const action of ['Change shortcut', 'Add shortcut']) {
-  test(`${action} from the row menu keeps the recorder open`, async ({ client }) => {
-    expect(client).toBeDefined()
-    if (action === 'Add shortcut') {
-      await saveSettings(
-        {
-          mutationId: 'shortcuts-menu-unbind',
-          operations: [{ command: 'workspace.saveFile', keys: null, kind: 'keybinding.set' }],
-          target: 'user',
-        },
-        getClient(),
-      )
-    }
-    renderWithProviders(<KeybindingSection />)
-    await showOnly('Save')
-    fireEvent.contextMenu(row('workspace.saveFile'))
-    await userEvent.click(await screen.findByRole('menuitem', { name: new RegExp(action) }))
-    const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
-    press(recorder, 'j', { ctrl: true, alt: true })
-    press(recorder, 'Enter')
-    await waitFor(async () =>
-      expect((await overrides())['workspace.saveFile']).toEqual(['Mod+Alt+J']),
-    )
+  fireEvent.doubleClick(row('workspace.saveFile', 'F6'))
+  await userEvent.clear(await screen.findByLabelText('Shortcut context'))
+  const rootRecorder = screen.getByRole('textbox', {
+    name: 'Press the new shortcut for Save',
   })
-}
-
-test('refuses a recorded chord shadowed by a later override', async ({ client }) => {
-  expect(client).toBeDefined()
-  await saveSettings(
-    {
-      mutationId: 'shortcuts-earlier-override',
-      operations: [
-        { command: 'workspace.saveFile', keys: ['Mod+Alt+J'], kind: 'keybinding.set' },
-        { command: 'workspace.togglePanel', keys: ['Mod+Alt+K'], kind: 'keybinding.set' },
-      ],
-      target: 'user',
-    },
-    getClient(),
+  press(rootRecorder, 'F8')
+  press(rootRecorder, 'Enter')
+  await waitFor(async () =>
+    expect(await overrides()).toEqual([
+      { keys: 'F6', command: 'workspace.saveFile', context: 'Workspace' },
+      { keys: 'F7', command: 'workspace.saveFile', context: 'Workspace' },
+      { keys: 'F8', command: 'workspace.saveFile' },
+    ]),
   )
+})
+
+test('refuses malformed recorder context and allows saving a valid one', async ({ client }) => {
+  expect(client).toBeDefined()
   renderWithProviders(<KeybindingSection />)
-  await showOnly('Save')
+  await showOnly('workspace.saveFile')
   fireEvent.doubleClick(row('workspace.saveFile'))
   const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
-  press(recorder, 'k', { ctrl: true, alt: true })
-  expect(await screen.findByText(/Taken by Toggle panel/)).toBeDefined()
-  expect(screen.getByRole('button', { name: /^Save$/ })).toBeDisabled()
-  press(recorder, 'Enter')
-  expect(recorder).toBeInTheDocument()
-  expect((await overrides())['workspace.saveFile']).toEqual(['Mod+Alt+J'])
+  press(recorder, 'j', { ctrl: true, alt: true })
+  await userEvent.clear(screen.getByLabelText('Shortcut context'))
+  await userEvent.type(screen.getByLabelText('Shortcut context'), 'Editor &&')
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  expect(await overrides()).toEqual([])
 })
 
-test('warns before taking a chord in one pane and keeps that loss in Conflicts', async ({
+test('adds a null reservation, a targeted unbind and deletes one authored entry', async ({
   client,
 }) => {
   expect(client).toBeDefined()
   renderWithProviders(<KeybindingSection />)
-  await showOnly('workspace.toggleCheckpointChange')
-  fireEvent.doubleClick(row('workspace.toggleCheckpointChange'))
-  const recorder = await screen.findByRole('textbox', { name: /Press the new shortcut for/ })
-  press(recorder, 'z', { ctrl: true })
-  expect(await screen.findByText('Used by 1 command')).toBeDefined()
-  expect(screen.getByText('Undo session action')).toBeDefined()
-  expect(within(screen.getByRole('dialog')).getByText('Git', { exact: true })).toBeDefined()
-  press(recorder, 'Enter')
+  await userEvent.click(await screen.findByText(/Authored bindings and reservations/))
+  await userEvent.type(screen.getByLabelText('Authored binding keys'), 'F8')
+  await userEvent.type(screen.getByLabelText('Authored binding context'), 'Terminal')
+  await userEvent.click(screen.getByRole('button', { name: 'Add entry' }))
   await waitFor(async () =>
-    expect((await overrides())['workspace.toggleCheckpointChange']).toEqual(['Mod+Z']),
+    expect(await overrides()).toEqual([{ keys: 'F8', command: null, context: 'Terminal' }]),
   )
-  await userEvent.clear(screen.getByLabelText(SEARCH))
-  await showOnly('Undo session action')
-  await userEvent.click(screen.getByRole('tab', { name: /Conflicts/ }))
-  const undo = row('workspace.undoSessionAction')
-  expect(undo).toHaveTextContent('Taken in Git')
-  expect(undo.querySelector('.line-through')).toBeNull()
-})
-
-test('adding an unrelated chord does not repeat an existing chord conflict', async ({ client }) => {
-  expect(client).toBeDefined()
-  await saveSettings(
-    {
-      mutationId: 'shortcuts-existing-clash',
-      target: 'user',
-      operations: [{ command: 'workspace.saveFile', keys: ['Mod+P'], kind: 'keybinding.set' }],
-    },
-    getClient(),
-  )
-  renderWithProviders(<KeybindingSection />)
-  await showOnly('Save')
-  fireEvent.contextMenu(row('workspace.saveFile'))
-  await userEvent.click(await screen.findByRole('menuitem', { name: 'Add another shortcut' }))
-  const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
-  press(recorder, 'j', { ctrl: true, alt: true })
-  expect(screen.queryByText(/Used by/)).toBeNull()
-  press(recorder, 'Enter')
+  await userEvent.click(screen.getByLabelText('Binding entry kind'))
+  await userEvent.click(await screen.findByRole('option', { name: 'Unbind command' }))
+  await userEvent.type(screen.getByLabelText('Authored binding keys'), 'F9')
+  await userEvent.type(screen.getByLabelText('Command to unbind'), 'future.command')
+  await userEvent.click(screen.getByRole('button', { name: 'Add entry' }))
   await waitFor(async () =>
-    expect((await overrides())['workspace.saveFile']).toEqual(['Mod+P', 'Mod+Alt+J']),
+    expect(await overrides()).toEqual([
+      { keys: 'F8', command: null, context: 'Terminal' },
+      { keys: 'F9', unbind: 'future.command', context: 'Terminal' },
+    ]),
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Delete authored binding 1' }))
+  await waitFor(async () =>
+    expect(await overrides()).toEqual([
+      { keys: 'F9', unbind: 'future.command', context: 'Terminal' },
+    ]),
   )
 })

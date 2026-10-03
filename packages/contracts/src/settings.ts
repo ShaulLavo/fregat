@@ -5,12 +5,12 @@
  * registry of dotted keys now, and each of these is one key's `schema`.
  */
 import * as v from 'valibot'
+import { parseContextPredicate } from '@fregat/hotkeys'
 import { providerInstanceIdSchema } from './chat-ids'
 import { trimmedNonEmptyStringSchema } from './chat-model'
 import { providerDriverKindSchema } from './orchestration-runtime'
 
 const ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/
-const KEYBINDING_COMMAND_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_.-]*$/
 
 export const lspFeatureRanksOverrideSchema = v.strictObject({
   completion: v.optional(lspFeatureRankOverrideSchema()),
@@ -99,11 +99,7 @@ export const modelRefListSchema = v.pipe(
   v.check(hasUniqueModelRefs, 'model references must be unique within a list'),
 )
 
-export const keybindingCommandIdSchema = v.pipe(
-  trimmedNonEmptyStringSchema,
-  v.maxLength(120),
-  v.regex(KEYBINDING_COMMAND_ID_PATTERN),
-)
+export const keybindingCommandIdSchema = v.pipe(trimmedNonEmptyStringSchema, v.maxLength(120))
 
 export const MAX_KEYBINDING_CHORD_STROKES = 2
 
@@ -119,12 +115,40 @@ export const keybindingChordSchema = v.pipe(
 /** Most shortcuts one command carries; a longer list is a file written by hand in error. */
 export const MAX_KEYBINDINGS_PER_COMMAND = 8
 
-/** A command's complete shortcut list. `null` or `[]` unbinds it; an absent command keeps its defaults. */
 export const keybindingListSchema = v.nullable(
   v.pipe(v.array(keybindingChordSchema), v.maxLength(MAX_KEYBINDINGS_PER_COMMAND)),
 )
 
-export const keybindingOverridesSchema = v.record(keybindingCommandIdSchema, keybindingListSchema)
+export const keybindingContextSchema = v.pipe(
+  trimmedNonEmptyStringSchema,
+  v.maxLength(512),
+  v.check(isKeybindingContext, 'context must be a valid keymap predicate'),
+)
+
+export const keybindingOverrideSchema = v.union([
+  v.strictObject({
+    keys: keybindingChordSchema,
+    command: v.nullable(keybindingCommandIdSchema),
+    context: v.optional(keybindingContextSchema),
+  }),
+  v.strictObject({
+    keys: keybindingChordSchema,
+    unbind: keybindingCommandIdSchema,
+    context: v.optional(keybindingContextSchema),
+  }),
+])
+
+export const keybindingOverridesSchema = v.array(keybindingOverrideSchema)
+export type KeybindingOverride = Readonly<v.InferOutput<typeof keybindingOverrideSchema>>
+
+function isKeybindingContext(context: string): boolean {
+  try {
+    parseContextPredicate(context)
+    return true
+  } catch {
+    return false
+  }
+}
 
 /**
  * One entry of the LSP server override table.
@@ -186,7 +210,7 @@ export type ProviderEnvironmentVariable = v.InferOutput<typeof providerEnvironme
 export type ProviderInstanceConfig = v.InferOutput<typeof providerInstanceConfigSchema>
 export type ModelRef = v.InferOutput<typeof modelRefSchema>
 /** Readonly, so a stored value and a candidate list built by the page both fit. */
-export type KeybindingOverrides = Readonly<Record<string, readonly string[] | null>>
+export type KeybindingOverrides = readonly KeybindingOverride[]
 
 function lspFeatureRankOverrideSchema() {
   return v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))

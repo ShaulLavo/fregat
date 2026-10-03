@@ -1,24 +1,24 @@
 import {
-  buildKeymapTrie,
-  trieStep,
-  type KeymapBinding,
-  type KeymapNode,
-} from '@singapore-editor/core/keymap'
-import {
-  CHORD_TIMEOUT_MS,
-  parseKeyStroke,
-  parsedChord,
-  type KeyStroke,
-} from '@workspace/client-core/commands/chord'
-
+  createDispatcher,
+  keyInputFromTerminalKey,
+  terminalKeyEffects,
+  parseHotkey,
+  type CompiledBinding,
+  type FocusNode,
+  type KeymapEntry,
+} from '@fregat/hotkeys'
 import type { CommandBus } from '@/commands/state/bus'
 import type { FocusRegistry } from '@/commands/state/focus'
-import { activeBindings } from '@workspace/client-core/commands/bindings'
-import { type TerminalBinding } from '@/commands/utils/bindings'
-import { terminalKeyboardEvent, type TerminalKeyEvent } from '@/commands/utils/keyboard'
+import type { TerminalBinding } from '@/commands/utils/bindings'
+import { terminalBindingContext } from '@/commands/utils/bindings'
+import type { TerminalKeyEvent } from '@/commands/utils/keyboard'
+import { normalizedChord, CHORD_TIMEOUT_MS } from '@workspace/client-core/commands/chord'
+import type { CommandId } from '@workspace/client-core/commands/catalog'
 
-type Candidate = TerminalBinding & { readonly firesWhileTyping: boolean }
-export type PendingChord = { readonly keys: string; readonly commands: readonly TerminalBinding[] }
+export type PendingChord = {
+  readonly keys: string
+  readonly commands: readonly (TerminalBinding & { readonly command: CommandId })[]
+}
 type Options = {
   readonly bus: CommandBus
   readonly focus: FocusRegistry
@@ -28,78 +28,103 @@ type Options = {
 
 export function createKeymapSession(options: Options) {
   let bindings = options.bindings
-  let trie = makeTrie(bindings, options.focus)
-  let pending: { readonly node: KeymapNode<Candidate>; readonly keys: string } | null = null
-  let timer: ReturnType<typeof setTimeout> | undefined
-  let disposed = false
+  let captured: ReturnType<CommandBus['capture']> | null = null
   let keyCapture: { readonly handle: (event: TerminalKeyEvent) => void } | null = null
-  const unsubscribe = options.focus.subscribe(() => {
-    cancel()
-    trie = makeTrie(bindings, options.focus)
+  let disposed = false
+  const dispatcher = createDispatcher<TerminalKeyEvent>({
+    platform: 'linux',
+    timeoutMs: CHORD_TIMEOUT_MS,
+    keymap: bindings.map(toEntry),
+    effects: terminalKeyEffects,
+    isAvailable,
+    onPendingChange(pending) {
+      options.onPendingChange(
+        pending
+          ? {
+              keys: pending.keys,
+              commands: bindings.filter(
+                (binding): binding is TerminalBinding & { readonly command: CommandId } =>
+                  binding.command !== null &&
+                  !binding.unbind &&
+                  normalizedChord(binding.keys, 'linux').startsWith(`${pending.keys} `),
+              ),
+            }
+          : null,
+      )
+    },
   })
-
-  function cancel() {
-    if (!pending) return false
-    pending = null
-    clearTimeout(timer)
-    options.onPendingChange(null)
-    return true
-  }
-
-  function arm(node: KeymapNode<Candidate>, keys: string, commands: readonly TerminalBinding[]) {
-    pending = { node, keys }
-    clearTimeout(timer)
-    timer = setTimeout(cancel, CHORD_TIMEOUT_MS)
-    options.onPendingChange({ keys, commands })
-  }
-
-  function handle(event: TerminalKeyEvent) {
-    if (disposed || event.defaultPrevented || event.eventType === 'release') return false
-    if (keyCapture) {
-      keyCapture.handle(event)
-      return swallow(event)
-    }
-    if (pending && (event.name === 'escape' || event.repeated)) {
-      if (!event.repeated) cancel()
-      return swallow(event)
-    }
-    const fromChord = pending !== null
-    const edge = trieStep(pending?.node ?? trie, terminalKeyboardEvent(event))
-    if (!edge) return finishUnmatched(event, fromChord)
-    const commands = options.bus.capture('keybinding')
-    const textEntry = options.focus.getSnapshot().current?.capabilities.textEntry === true
-    const available = (candidate: KeymapBinding<Candidate>) =>
-      (!textEntry || candidate.payload.firesWhileTyping) &&
-      commands.inspect(candidate.payload.command).status === 'ready'
-    const eligible = edge.node.candidates.filter(available)
-    for (const candidate of eligible) {
-      if (!commands.dispatch(candidate.payload.command).claimed) continue
-      cancel()
-      return swallow(event)
-    }
-    if (eligible.length) return finishUnmatched(event, fromChord)
-    const descendants = edge.node.descendants.filter(available)
-    if (!descendants.length || event.repeated) return finishUnmatched(event, fromChord)
-    const keys = pending ? `${pending.keys} ${edge.keys}` : edge.keys
-    arm(
-      edge.node,
-      keys,
-      descendants.map((candidate) => candidate.payload),
+  const root = dispatcher.createNode({ context: 'Workspace' })
+  const nodes = new Map<string, FocusNode<TerminalKeyEvent>>()
+  const commands = new Set<string>()
+  for (const binding of bindings) registerCommand(binding)
+  function registerCommand(binding: TerminalBinding) {
+    const command = binding.command
+    if (command === null || commands.has(command)) return
+    commands.add(command)
+    root.handle(
+      command,
+      () => (captured ?? options.bus.capture('keybinding')).dispatch(command).claimed,
     )
-    return swallow(event)
   }
-
-  function finishUnmatched(event: TerminalKeyEvent, fromChord: boolean) {
-    if (!fromChord) return false
-    cancel()
-    return swallow(event)
+  function syncFocus() {
+    const area = options.focus.getSnapshot().current?.area ?? 'global'
+    const context = terminalBindingContext({ pane: area })
+    let node = nodes.get(context)
+    if (!node) {
+      node = dispatcher.createNode({ parent: root, context })
+      nodes.set(context, node)
+    }
+    dispatcher.focus(node)
   }
-
+  function isAvailable(candidate: CompiledBinding) {
+    const binding = bindings[candidate.index]
+    if (!binding) return false
+    const target = options.focus.getSnapshot().current
+    if (
+      target?.area === 'terminal' &&
+      binding.pane !== 'terminal' &&
+      binding.source !== 'user' &&
+      !binding.keys.startsWith('Ctrl+K ') &&
+      binding.keys !== 'F1'
+    )
+      return false
+    const stroke = parseHotkey(binding.keys.split(' ')[0]!, 'linux')
+    const firesWhileTyping =
+      stroke.ctrl ||
+      /^F\d+$/u.test(stroke.key ?? '') ||
+      stroke.key === 'Escape' ||
+      stroke.key === 'Tab'
+    if (target?.capabilities.textEntry && !firesWhileTyping) return false
+    if (binding.command === null) return true
+    return (
+      (captured ?? options.bus.capture('keybinding')).inspect(binding.command).status === 'ready'
+    )
+  }
+  const unsubscribe = options.focus.subscribe(() => {
+    dispatcher.cancel()
+    syncFocus()
+  })
+  syncFocus()
   return {
-    handle,
-    cancel,
+    handle(event: TerminalKeyEvent) {
+      if (disposed || event.defaultPrevented || event.eventType === 'release') return false
+      if (keyCapture) {
+        keyCapture.handle(event)
+        terminalKeyEffects.swallow(event)
+        return true
+      }
+      captured = options.bus.capture('keybinding')
+      const input = keyInputFromTerminalKey(event)
+      if (input.key === 'Escape' && dispatcher.pending()) {
+        dispatcher.cancel()
+        terminalKeyEffects.swallow(event)
+        return true
+      }
+      return dispatcher.handleKey(input, event)
+    },
+    cancel: dispatcher.cancel,
     captureKeys(handle: (event: TerminalKeyEvent) => void) {
-      cancel()
+      dispatcher.cancel()
       const capture = { handle }
       keyCapture = capture
       return () => {
@@ -107,47 +132,26 @@ export function createKeymapSession(options: Options) {
       }
     },
     updateBindings(next: readonly TerminalBinding[]) {
-      cancel()
       bindings = next
-      trie = makeTrie(bindings, options.focus)
+      for (const binding of next) registerCommand(binding)
+      dispatcher.setKeymap(next.map(toEntry))
     },
     dispose() {
       disposed = true
       keyCapture = null
-      cancel()
       unsubscribe()
+      dispatcher.dispose()
     },
   }
 }
 
-function makeTrie(bindings: readonly TerminalBinding[], focus: FocusRegistry) {
-  const area = focus.getSnapshot().current?.area ?? 'global'
-  return buildKeymapTrie(
-    activeBindings(bindings, area)
-      .filter((binding) => {
-        if (area !== 'terminal' || binding.pane === 'terminal') return true
-        return (
-          binding.source === 'user' || binding.keys.startsWith('Ctrl+K ') || binding.keys === 'F1'
-        )
-      })
-      .map((binding) => {
-        const chord = parsedChord(binding.keys, 'linux')
-        const first = parseKeyStroke(binding.keys.split(' ')[0], 'linux')
-        return { chord, payload: { ...binding, firesWhileTyping: firesWhileTyping(first) } }
-      }),
-    'linux',
-  )
-}
-
-function swallow(event: TerminalKeyEvent) {
-  event.preventDefault()
-  event.stopPropagation()
-  return true
-}
-
-function firesWhileTyping(stroke: KeyStroke | null): boolean {
-  if (!stroke) return false
-  return (
-    stroke.ctrl || /^F\d+$/u.test(stroke.key) || stroke.key === 'Escape' || stroke.key === 'Tab'
-  )
+function toEntry(binding: TerminalBinding): KeymapEntry {
+  const shared = {
+    keys: binding.keys,
+    context: terminalBindingContext(binding),
+    source: binding.source,
+  }
+  return binding.unbind
+    ? { ...shared, unbind: binding.unbind }
+    : { ...shared, command: binding.command }
 }

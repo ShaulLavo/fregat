@@ -7,7 +7,7 @@ import { FileSyncService } from '@/features/editor/state/file-sync-service'
 import { EditorSaveService } from '@/features/editor/state/save-service'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import type { QueryClient } from '@tanstack/react-query'
-import { use, useEffect, useRef, useState, type ReactNode } from 'react'
+import { use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ApplicationRuntimeContext } from '@/providers/application-runtime-context'
 import { NavigationContext } from '@/providers/navigation-context'
 import type { ApplicationRuntime } from '@/state/application-runtime'
@@ -34,6 +34,8 @@ import type { SettingsSubmission } from '@workspace/client-core/settings/intent-
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { emptyWorkspaceSlice, type CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
+import { displayPlatformKeyBindings } from '@/keymap/active-bindings'
+import { KeyBindingsContext } from '@/keymap/providers/bindings-context'
 import type { WorkspaceCommandRuntime, WorkspaceCommandSnapshot } from '@/keymap/define-command'
 import {
   CommandContext,
@@ -44,6 +46,7 @@ import { createCommandBus } from '@/keymap/state/command-bus'
 import { createComposerAttach } from '@/features/chat/state/composer-attach'
 import type { PlatformKeyBinding } from '@/keymap/types'
 import { useAppKeymap } from '@/keymap/use-app-keymap'
+import type { WindowKeymap } from '@/keymap/state/window-keymap'
 import {
   captureCommandSnapshot,
   dispatchEditor,
@@ -52,7 +55,6 @@ import {
   resolveCommandTarget,
 } from '@/keymap/state/runtime'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
-import { useFocusSnapshot } from '@/lib/focus/hooks/use-snapshot'
 import {
   focusTargetById,
   registeredFocusTarget,
@@ -86,6 +88,7 @@ export type TestCommandRuntimeOptions = {
 }
 
 export type TestCommandRuntime = {
+  readonly bindKeymap: (keymap: WindowKeymap | null) => void
   readonly bindings: readonly PlatformKeyBinding[]
   readonly bus: PlatformCommandBus
   readonly captureSnapshot: () => WorkspaceCommandSnapshot
@@ -113,7 +116,20 @@ export function createTestCommandRuntime({
       return late.bus.dispatch(...args)
     },
   })
-  const runtime = createRuntime(focus, queryClient, options, composer, application, navigation)
+  let keymap: WindowKeymap | null = null
+  const keymapRuntime = {
+    dispatch: (command: string, invocation: Parameters<WindowKeymap['dispatchCommand']>[1]) =>
+      keymap?.dispatchCommand(command, invocation) ?? false,
+  }
+  const runtime = createRuntime(
+    focus,
+    queryClient,
+    options,
+    composer,
+    keymapRuntime,
+    application,
+    navigation,
+  )
   const captureSnapshot = () => ({
     ...captureCommandSnapshot(runtime),
     ...snapshotPatch(options.snapshot),
@@ -132,6 +148,9 @@ export function createTestCommandRuntime({
   late.bus = bus
 
   return {
+    bindKeymap: (current) => {
+      keymap = current
+    },
     bindings: options.bindings ?? defaultPlatformKeyBindings(),
     bus,
     captureSnapshot,
@@ -151,7 +170,6 @@ export function TestCommandProvider({
   const application = use(ApplicationRuntimeContext) ?? undefined
   const navigation = use(NavigationContext) ?? undefined
   const focus = useFocusService()
-  const focusSnapshot = useFocusSnapshot()
   const [paletteOpen, setPaletteOpenState] = useState(options.paletteOpen ?? false)
   const [paletteOrigin, setPaletteOrigin] = useState(options.paletteOrigin ?? null)
   const [paletteSearch, setPaletteSearch] = useState(options.paletteSearch ?? '')
@@ -261,17 +279,25 @@ export function TestCommandProvider({
     restoreOriginTarget(focus, origin)
   }, [focus, paletteOpen])
 
+  // Hook snapshots share a stable binding table between palette updates.
+  const displayBindings = useMemo(
+    () => displayPlatformKeyBindings(commandRuntime.bindings),
+    [commandRuntime.bindings],
+  )
   const keymap = useAppKeymap({
     bindings: commandRuntime.bindings,
     bus: commandRuntime.bus,
     focus,
-    focusedPane: focusSnapshot.currentOwner?.area ?? 'global',
-    focusedTarget: focusSnapshot.currentOwner?.token ?? null,
   })
+  useLayoutEffect(() => {
+    commandRuntime.bindKeymap(keymap.keymap)
+    return () => commandRuntime.bindKeymap(null)
+  }, [commandRuntime, keymap.keymap])
+  if (!keymap.keymap) return null
   const value: CommandContextValue = {
-    bindings: commandRuntime.bindings,
+    bindings: displayBindings,
     bus: commandRuntime.bus,
-    claimKeybinding: keymap.claimKeybinding,
+    keymap: keymap.keymap,
     closePalette,
     openWorkspaceRoot: commandRuntime.runtime.shell.openWorkspaceRoot,
     paletteOpen,
@@ -284,7 +310,11 @@ export function TestCommandProvider({
     setPaletteSearch,
   }
 
-  return <CommandContext value={value}>{children}</CommandContext>
+  return (
+    <CommandContext value={value}>
+      <KeyBindingsContext value={displayBindings}>{children}</KeyBindingsContext>
+    </CommandContext>
+  )
 }
 
 function createRuntime(
@@ -292,6 +322,7 @@ function createRuntime(
   queryClient: QueryClient,
   options: TestCommandRuntimeOptions,
   composer: WorkspaceCommandRuntime['composer'],
+  keymap: WorkspaceCommandRuntime['keymap'],
   application?: ApplicationRuntime,
   navigation?: Navigation,
 ): WorkspaceCommandRuntime {
@@ -367,6 +398,7 @@ function createRuntime(
   const git = { setPendingMessageFile: () => undefined }
 
   return {
+    keymap,
     composer,
     documents,
     editor,

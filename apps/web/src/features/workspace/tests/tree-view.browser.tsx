@@ -1,6 +1,7 @@
 import '@workspace/ui/globals.css'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
+import { createTreeTestRoot } from '../../../../test/factories/tree-command-root'
 import { flushSync } from 'react-dom'
 
 import { settleLayout } from '../../../../test/env/settle-layout'
@@ -699,7 +700,7 @@ async function renderBrowserTree(
   container.style.height = '180px'
   container.style.width = '360px'
   document.body.append(container)
-  root = createRoot(container)
+  root = createTreeTestRoot(container)
 
   flushSync(() => {
     root?.render(
@@ -724,7 +725,7 @@ async function mountSearchTree(
   container.style.width = '360px'
   if (colorScheme) container.style.colorScheme = colorScheme
   document.body.append(container)
-  root = createRoot(container)
+  root = createTreeTestRoot(container)
   const mountedModel = new TreeViewModel({
     fileTreeSearchMode: 'hide-non-matches',
     flattenEmptyDirectories: false,

@@ -1,4 +1,6 @@
 import { useStore } from 'zustand'
+import { applySettingsOperations, keybindingOverridesSchema } from '@workspace/contracts'
+import * as v from 'valibot'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import { useTerminalDimensions } from '@opentui/react'
 import { useLayoutEffect, useState } from 'react'
@@ -14,6 +16,7 @@ import { SaveFeedback } from '@/settings/components/save-feedback'
 import {
   matchingCommands,
   recordedKeysLabel,
+  recordedSettingOperation,
   recordKey,
   type KeybindingEditorState,
 } from '@/settings/utils/recording'
@@ -40,21 +43,25 @@ export function KeybindingEditor({
   const [state, setState] = useState<KeybindingEditorState>({ kind: 'select' })
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
-  const [pending, setPending] = useState(false)
+  const pending = useStore(owner.store, (snapshot) => snapshot.pendingCount > 0)
   const [failure, setFailure] = useState<string | null>(null)
   const rows = matchingCommands(query)
   const active = state.kind !== 'select' ? state.command : null
   const recorded = state.kind === 'review' ? state.keys : undefined
   const resolution = effectiveTerminalBindings(overrides, commands.kitty)
-  const nextOverrides = { ...overrides }
-  if (active && recorded === undefined) delete nextOverrides[active]
-  if (active && recorded !== undefined)
-    nextOverrides[active] = recorded === null ? null : [recorded]
+  const defaultBindings = effectiveTerminalBindings([], commands.kitty).bindings
+  const operation = recordedSettingOperation(active, recorded, defaultBindings)
+  const changed = operation
+    ? applySettingsOperations({ 'keybindings.overrides': overrides }, [operation]).raw
+    : null
+  const nextOverrides = changed
+    ? v.parse(keybindingOverridesSchema, changed['keybindings.overrides'] ?? [])
+    : overrides
   const preview = effectiveTerminalBindings(nextOverrides, commands.kitty)
   const diagnostics =
     state.kind === 'review'
       ? preview.diagnostics.filter(
-          (entry) => entry.command === active || entry.reason === `Replaced by ${active}.`,
+          (entry) => entry.command === active || entry.reason === `Shadowed by ${active}.`,
         )
       : []
   const recording = state.kind === 'record'
@@ -93,20 +100,11 @@ export function KeybindingEditor({
   )
   const save = async () => {
     if (state.kind !== 'review' || pending || lifetime.signal.aborted) return
-    setPending(true)
     setFailure(null)
-    const operation =
-      state.keys === undefined
-        ? { kind: 'keybinding.remove' as const, command: state.command }
-        : {
-            kind: 'keybinding.set' as const,
-            command: state.command,
-            keys: state.keys === null ? null : [state.keys],
-          }
+    if (!operation) return
     const submission = owner.submit('user', [operation], 'tui.settings.recorder')
     const result = submission.kind === 'submitted' ? await submission.settled : 'discarded'
     if (lifetime.signal.aborted) return
-    setPending(false)
     if (result === 'acknowledged') return setState({ kind: 'actions', command: state.command })
     setFailure('Shortcut could not be saved. Your draft is kept; retry or cancel.')
   }
@@ -169,7 +167,9 @@ export function KeybindingEditor({
       {active && (!short || state.kind === 'actions') && (
         <text fg={theme.mutedForeground}>
           Current: {commandShortcut(resolution.bindings, active)} ·{' '}
-          {active in overrides ? 'User override' : 'Default'}
+          {overrides.some((entry) => ('unbind' in entry ? entry.unbind : entry.command) === active)
+            ? 'User override'
+            : 'Default'}
         </text>
       )}
       {state.kind === 'record' && (

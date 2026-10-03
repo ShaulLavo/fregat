@@ -139,6 +139,7 @@
     "terminal.integrated.cursorBlinking",
     "terminal.integrated.fontSize",
     "terminal.integrated.scrollback",
+    "terminal.shellKeys",
     "tui.theme.colors",
     "window.browser",
     "window.browserStartupIdleSeconds",

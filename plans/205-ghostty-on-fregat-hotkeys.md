@@ -57,6 +57,12 @@ This needs their relevant contract, not completion of every extension or worker 
 
 ## Steps
 
+Execution started 2026-10-03 in the command-foundation wave. The terminal producer owns the
+adapter, packs and minimum host connection needed by this plan, preserving active 286/287
+scaffold contracts. Plan 206 owns final caller integration, review and shipping. Local development
+uses the hotkeys workspace; exact standalone installation is qualified under Plan 207 while npm
+remains deferred.
+
 - [ ] Link `@fregat/hotkeys`; port the current bindings to a pack and the dispatcher, with the
       existing hotkey tests passing.
 - [ ] Add the node API and `terminal.sendKeystroke`; test that unbound keys reach the PTY and a
