@@ -125,7 +125,7 @@ async function install(options: InstallOptions, control: InstallControl) {
   const built = options.from ? readBuildConfig(path.resolve(options.from)) : null
   if (options.from && (!built || built.webBase !== webBase))
     throw createScriptError('The built release must match this installation base.', {
-      fix: `Run bun run release --base=${webBase} --output=<directory>, then install-release --from=<directory>.`,
+      fix: `Run bun run build-release --base=${webBase} --output=<directory>, then install-release --from=<directory>.`,
     })
   if (options.from) {
     cpSync(path.join(path.resolve(options.from), 'web'), release.web, { recursive: true })

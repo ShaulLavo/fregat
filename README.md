@@ -34,7 +34,7 @@ with [mesh](https://github.com/ShaulLavo/mesh), `bun run dev:serve` registers on
 
 ## build a release
 
-`bun run release --output=./fregat-release` builds a self-contained web/server runtime for this OS and architecture. It needs the build prerequisites and writes to your selected directory; its default output is an OS temporary directory.
+`bun run build-release --output=./fregat-release` builds a self-contained web/server runtime for this OS and architecture. It needs the build prerequisites and writes to your selected directory; its default output is an OS temporary directory.
 
 `bun run install-release` builds and installs into an explicitly configured local Mesh/systemd target. `--from=<directory>` installs an existing release. See [development](docs/development.md#optional-local-release-installation) for target configuration, server updates, restart and rollback.
 

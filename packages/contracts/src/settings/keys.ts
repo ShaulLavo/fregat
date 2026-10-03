@@ -1362,7 +1362,7 @@ export const SETTINGS_REGISTRY = {
     widget: 'complex',
     category: 'Developer',
     title: 'Installation target',
-    description: 'Local release installation and pairing through Mesh and systemd.',
+    description: 'Install releases and pair through Mesh and systemd.',
     visibility: 'advanced',
   }),
   'developer.deployRestartWaitMinutes': defineSetting({
@@ -1375,8 +1375,7 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Developer',
     title: 'Restart wait',
-    description:
-      'Minutes install-release --restart waits for busy sessions before giving up. --interrupt ends those turns and restarts immediately.',
+    description: 'Minutes to wait for busy sessions. --interrupt ends them and restarts.',
     visibility: 'advanced',
     keywords: ['developer', 'deploy', 'restart', 'update', 'busy', 'wait'],
   }),
@@ -1507,7 +1506,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Window',
     title: 'Browser',
     description:
-      'The desktop window engine: auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.',
+      'The desktop window engine: auto uses the native WebKit window on macOS. On Linux, auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.',
     requiresRestart: true,
     keywords: ['window', 'browser', 'chromium', 'webview', 'desktop'],
   }),
@@ -1575,7 +1574,7 @@ export const SETTINGS_REGISTRY = {
     optionTitles: { compositor: 'Window manager', window: 'Transparent window' },
     category: 'Window',
     details:
-      'Transparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.',
+      'Transparent macOS windows enable native Frosted and Glass materials. The native WebKit host is the default macOS window engine. On Linux, window-manager mode uses the installed browser app.',
     description:
       'Choose window-manager transparency or a see-through native window using the system webview.',
     // The window is created once, from this value, before the page exists.

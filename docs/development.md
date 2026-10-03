@@ -52,22 +52,22 @@ on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh rou
 
 ## desktop app
 
-The launcher selects an installed Chromium app (Chrome first under automatic selection) or Fregat's native system-webview window. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
+The launcher automatically selects Fregat’s native WebKit window on macOS and prefers an installed Chrome app on Linux. An explicit browser executable selects the installed Chromium path. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
 
 `bun run app:mac` builds a self-contained `Fregat.app` on macOS. Production clients share one machine server per state home. Installation reuses a matching service or registers the OS-activated service; closing or uninstalling the browser app keeps that service, mesh routes and terminals. [Plan 114](../plans/114-installed-app.md) records the approved installation, picker and native-window contracts.
 
 ## portable release build
 
-`bun run release --output=<new-directory>` builds a self-contained release for the current OS and architecture. Omit `--output` for a unique directory under the OS temporary directory. It uses the documented Bun/build prerequisites, compiles workspaces, web and server, installs the pinned runtime dependency closure, includes `bin/bun`, and verifies the artifacts. Its `web/`, `server/`, relative runtime dependency links and bundled Bun move together. Building never reads machine installation settings, contacts Mesh, changes a service or writes application state.
+`bun run build-release --output=<new-directory>` builds a self-contained release for the current OS and architecture. Omit `--output` for a unique directory under the OS temporary directory. It uses the documented Bun/build prerequisites, compiles workspaces, web and server, installs the pinned runtime dependency closure, includes `bin/bun`, and verifies the artifacts. Its `web/`, `server/`, relative runtime dependency links and bundled Bun move together. Building never reads machine installation settings, contacts Mesh, changes a service or writes application state.
 
 `--base=/` is the default application route. Pass a route such as `--base=/fregat/` when building for an installation at that route. The web build records this base; installing it requires the same configured route. `--reason=<text>` records the purpose in `build-config.json`. Use a new output directory; the command preserves existing directories and removes only its own incomplete output on failure. Git, a shell and optional provider tools remain host prerequisites when using those features. The bundled runtime is platform-specific.
 
 ```bash
 bun install --frozen-lockfile
-bun run release --output=./fregat-release --base=/fregat/
+bun run build-release --output=./fregat-release --base=/fregat/
 ```
 
-Package publishing is separate: `bun run release:packages` is the Package releases workflow's Changesets publishing step.
+Package publishing is separate: `bun run release` is the Package releases workflow's Changesets publishing step.
 
 ## optional local release installation
 

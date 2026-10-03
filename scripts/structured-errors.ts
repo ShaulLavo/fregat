@@ -70,6 +70,13 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     why: 'A wrapper stops only ownerless slices under its own root; slices under another root belong to another state directory.',
     fix: 'Report this as a bug in scripts/heavy: the reaper was handed a slice it does not own.',
   },
+  HEAVY_QUIET_BLOCKED: {
+    status: 409,
+    message: ({ label, slice, state }: { label: string; slice: string; state: string }) =>
+      `Quiet lease '${label}' remains held by ${slice} (${state}); this admission reached its wait limit.`,
+    why: 'A successor starts once the predecessor releases its bookkeeping lock and its slice is inactive and empty.',
+    fix: 'Stop the listed slice with `systemctl --user stop <slice>`. Resume or stop its suspended wrapper, then submit the job again.',
+  },
   HEAVY_SLICE_FAILED: {
     status: 502,
     message: ({ slice, detail }: { slice: string; detail: string }) =>

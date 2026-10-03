@@ -82,7 +82,7 @@
         "agent/fixtures/fake-*.mjs",
         "agent/logs.ts",
         "install-release.ts",
-        "release.ts",
+        "build-release.ts",
         "deploy/live-check.mjs",
         "deploy/systemd/promote.ts",
         "desktop-dev.ts",

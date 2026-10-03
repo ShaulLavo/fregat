@@ -7,10 +7,12 @@ const root = path.resolve(import.meta.dirname, '../..')
 
 test('portable release and installation have separate commands', () => {
   const { scripts } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
-  expect(scripts.release).toBe('bun scripts/release.ts')
+  expect(scripts['build-release']).toBe('bun scripts/build-release.ts')
   expect(scripts['install-release']).toBe('bun scripts/install-release.ts')
   expect(scripts).not.toHaveProperty('deploy')
-  expect(scripts['release:packages']).toContain('scripts/release/prepare.mjs')
+  expect(scripts.release).toContain('scripts/release/prepare.mjs')
+  expect(scripts['version-packages']).toBe('changeset version && bun install --lockfile-only')
+  expect(scripts).not.toHaveProperty('release:packages')
 })
 
 test('release help works with an empty HOME and no machine installation', () => {
@@ -19,7 +21,7 @@ test('release help works with an empty HOME and no machine installation', () => 
   mkdirSync(home)
   try {
     const result = Bun.spawnSync(
-      [process.execPath, path.join(root, 'scripts/release.ts'), '--help'],
+      [process.execPath, path.join(root, 'scripts/build-release.ts'), '--help'],
       {
         env: {
           ...process.env,

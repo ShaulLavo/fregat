@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util'
 import { buildPortableRelease } from './deploy/build-release'
 import { scriptFailureText } from './structured-errors'
 
-const usage = `Usage: bun run release [options]
+const usage = `Usage: bun run build-release [options]
 
   Build a self-contained release for this OS and architecture.
   --output=<directory>  New output directory; defaults to a unique OS temporary directory.

@@ -15,7 +15,7 @@ export const releaseInstallationSettings: Scenario = {
     await target.waitFor()
     const targetText = await target.innerText()
     ok(targetText.includes('Installation target'))
-    ok(targetText.includes('Local release installation and pairing through Mesh and systemd.'))
+    ok(targetText.includes('Install releases and pair through Mesh and systemd.'))
     await step('installation-target')
 
     await selectors.settingsSearch(page).fill('developer.deployRestartWaitMinutes')
@@ -23,8 +23,8 @@ export const releaseInstallationSettings: Scenario = {
     await restart.waitFor()
     const restartText = await restart.innerText()
     ok(restartText.includes('Restart wait'))
-    ok(restartText.includes('install-release --restart'))
-    ok(restartText.includes('--interrupt ends those turns and restarts immediately.'))
+    ok(restartText.includes('Minutes to wait for busy sessions.'))
+    ok(restartText.includes('--interrupt ends them and restarts.'))
     await step('installation-restart-wait')
   },
 }
