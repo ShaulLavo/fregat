@@ -882,14 +882,14 @@ export class WorkspaceEditService {
   async undo(): Promise<boolean> {
     void this.flushPendingWorkspaceMutationCleanup()
     const group = this.undoStack.at(-1)
-    if (!group || this.active || this.externalMutationReservation) return false
+    if (!group || !this.historyCommandsAvailable()) return false
     return this.reverseGroup(group, 'undo')
   }
 
   async redo(): Promise<boolean> {
     void this.flushPendingWorkspaceMutationCleanup()
     const group = this.redoStack.at(-1)
-    if (!group || this.active || this.externalMutationReservation) return false
+    if (!group || !this.historyCommandsAvailable()) return false
     return this.reverseGroup(group, 'redo')
   }
 
