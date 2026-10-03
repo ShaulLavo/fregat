@@ -1,4 +1,4 @@
-import { defaultKeyBindings } from './factories/keymap'
+import { defaultKeyBindings, keyboardEvent } from './factories/keymap'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { detectPlatform, parseHotkey, rawHotkeyToParsedHotkey } from '@fregat/hotkeys'
 import { createEditorFindPlugin } from '../../find/src/index.ts'
@@ -400,7 +400,7 @@ function editorInput(): HTMLTextAreaElement {
 }
 
 function dispatchEditorKey(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', {
+  const event = keyboardEvent('keydown', {
     bubbles: true,
     cancelable: true,
     key,
@@ -606,12 +606,15 @@ function dispatchDefaultKey(command: EditorCommandId): KeyboardEvent {
         ? parseHotkey(hotkey, platform)
         : rawHotkeyToParsedHotkey(hotkey, platform)
     if (parsed.key === undefined) throw new Error(`${command} has a physical-code chord`)
-    return dispatchEditorKey(parsed.key, {
+    const init = {
       altKey: parsed.alt,
       ctrlKey: parsed.ctrl,
       metaKey: parsed.meta,
       shiftKey: parsed.shift,
-    })
+    }
+    const event = dispatchEditorKey(parsed.key, init)
+    editorRoot().dispatchEvent(keyboardEvent('keyup', { bubbles: true, key: parsed.key, ...init }))
+    return event
   })
   return events[events.length - 1]!
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Editor } from '@singapore-editor/core/editor'
+import { markdownPack } from '@singapore-editor/core/keymap'
 import {
   setEditorSyntaxSessionFactory,
   setHighlightRegistry,
@@ -150,6 +151,7 @@ describe('markdown preview plugin', () => {
   })
 
   it('indents a list item from its text and outdents it with Shift+Tab', () => {
+    editor.setKeymap({ packs: [markdownPack] })
     editor.setText('- first\n- second', { languageId: 'markdown' })
     editor.setSelection(16)
     editor
@@ -168,6 +170,7 @@ describe('markdown preview plugin', () => {
   })
 
   it('leaves modified Tab shortcuts available to the host', () => {
+    editor.setKeymap({ packs: [markdownPack] })
     editor.setText('- item', { languageId: 'markdown' })
     editor.setSelection(6)
     editor.getInputElement().dispatchEvent(
@@ -228,7 +231,7 @@ describe('markdown preview plugin', () => {
     expect(editor.materializeFullText()).toBe(DOCUMENT)
   })
 
-  it('renders clickable link labels with their resolved destination and unchanged source', async () => {
+  it('opens link labels by click or Enter with their resolved destination and unchanged source', async () => {
     const opened: string[] = []
     editor.setPlugins([createMarkdownPreviewPlugin({ openLink: (href) => opened.push(href) })])
     const source =
@@ -242,7 +245,14 @@ describe('markdown preview plugin', () => {
     ])
     links[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     links[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    expect(opened).toEqual(['https://example.com/a(b)?x=1&y=2', '/guide.md'])
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    links[0]!.dispatchEvent(enter)
+    expect(enter.defaultPrevented).toBe(true)
+    expect(opened).toEqual([
+      'https://example.com/a(b)?x=1&y=2',
+      '/guide.md',
+      'https://example.com/a(b)?x=1&y=2',
+    ])
     expect(editor.materializeFullText()).toBe(source)
     editor.setSelection(source.indexOf('docs'), source.indexOf('docs'))
     expect(rowTexts()).toContain('[**docs**](https://example.com/a(b)?x=1&amp;y=2 "Docs")')

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { detectPlatform } from '@fregat/hotkeys'
 
 import { Editor } from '../src/editor'
-import { defaultKeyBindings, commandCategory } from './factories/keymap'
+import { defaultKeyBindings, commandCategory, keyboardEvent } from './factories/keymap'
 import type { EditorPlugin } from '../src/plugins'
 import { createDocumentSession, type DocumentSession } from '../src/public/document'
 import { resetEditorInstanceCount } from '../src/public/testing'
@@ -238,13 +238,16 @@ function smartSelectModifier(): KeyboardEventInit {
 }
 
 function dispatchSmartSelectKey(key: string): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', {
+  const init = {
     bubbles: true,
     cancelable: true,
     key,
     ...smartSelectModifier(),
-  })
-  ;(document.querySelector('.editor-virtualized') as HTMLElement).dispatchEvent(event)
+  }
+  const event = keyboardEvent('keydown', init)
+  const element = document.querySelector('.editor-virtualized') as HTMLElement
+  element.dispatchEvent(event)
+  element.dispatchEvent(keyboardEvent('keyup', init))
   return event
 }
 

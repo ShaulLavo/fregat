@@ -1116,6 +1116,7 @@ export type EditorPluginHostEvents = {
   onDecorationContributionProviderRemoved?(provider: EditorDecorationContributionProvider): void
   onCommandContributionProviderAdded?(provider: EditorCommandContributionProvider): void
   onCommandContributionProviderRemoved?(provider: EditorCommandContributionProvider): void
+  onContributedCommandsChanged?(): void
   onCapabilityContributionProviderAdded?(provider: EditorCapabilityContributionProvider): void
   onCapabilityContributionProviderRemoved?(provider: EditorCapabilityContributionProvider): void
   onEditContributionProviderAdded?(provider: EditorEditContributionProvider): void
@@ -1617,6 +1618,7 @@ export class EditorPluginHost implements EditorDisposable {
 
     installedPlugin.active = true
     installedPlugin.activationDisposable = activation.disposable
+    if (plugin.commands?.length) this.events.onContributedCommandsChanged?.()
     return true
   }
 
@@ -1744,6 +1746,7 @@ export class EditorPluginHost implements EditorDisposable {
     installedPlugin.activationDisposable = null
     installedPlugin.registrations.active?.dispose()
     installedPlugin.registrations.active = null
+    if (plugin.commands?.length) this.events.onContributedCommandsChanged?.()
     this.events.onPluginDisposed?.(pluginName(plugin))
   }
 
