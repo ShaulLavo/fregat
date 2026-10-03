@@ -72,12 +72,22 @@ test('file changes prune removed keys and deliver one notice', async ({ server, 
   await writeFile(userFile, '{ "editor.fontSize": 18 }\n')
   await server.restart({ settingsWatch: true })
   await writeFile(userFile, '{ "editor.fontSize": 21, "window.frost": false }\n')
+  // The rename is visible before the layer publishes; each GET consumes its pending notice.
   await expect
-    .poll(async () => JSON.parse(await readFile(userFile, 'utf8')), { timeout: 10_000 })
-    .toEqual({ 'editor.fontSize': 21 })
-  const snapshot = await fetchSettings(undefined, client)
-  expect(snapshot.values['editor.fontSize']).toBe(21)
-  expect(snapshot.diagnostics.filter((item) => item.kind === 'removed-key')).toHaveLength(1)
+    .poll(
+      async () => {
+        const snapshot = await fetchSettings(undefined, client)
+        return {
+          fontSize: snapshot.values['editor.fontSize'],
+          removedKeys: snapshot.diagnostics
+            .filter((item) => item.kind === 'removed-key')
+            .map((item) => item.id),
+        }
+      },
+      { timeout: 10_000 },
+    )
+    .toEqual({ fontSize: 21, removedKeys: ['window.frost'] })
+  expect(JSON.parse(await readFile(userFile, 'utf8'))).toEqual({ 'editor.fontSize': 21 })
   expect(
     (await fetchSettings(undefined, client)).diagnostics.some(
       (item) => item.kind === 'removed-key',

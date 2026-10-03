@@ -1,5 +1,6 @@
 import type { ProviderUsagePurpose } from '@workspace/contracts'
 import type { ProviderInstanceId } from '@workspace/contracts'
+import { providerReportedCacheSchema } from '@workspace/contracts'
 import { and, eq, sql } from 'drizzle-orm'
 import * as v from 'valibot'
 import type { PlatformDatabase } from '../db/client'
@@ -32,6 +33,7 @@ const amountsSchema = v.object({
   inputTokens: v.number(),
   outputTokens: v.number(),
   reasoningTokens: v.number(),
+  reportedCache: v.optional(providerReportedCacheSchema),
 })
 
 type UsageTotalsEvent = Extract<ProviderRuntimeEvent, { type: 'usage.totals' }>
@@ -202,17 +204,28 @@ export class ProviderUsageRecorder {
     // Unknown history: seed the baseline and let the next turn count, rather than
     // record a whole resumed conversation as one turn.
     const delta = !baseline && totals.continuesEarlierTurns ? null : usageDelta(totals, baseline)
-    if (!delta && baseline) return []
+    if (
+      !delta &&
+      baseline &&
+      totals.reportedCache?.readTokens === baseline.reportedCache?.readTokens &&
+      totals.reportedCache?.writeTokens === baseline.reportedCache?.writeTokens
+    )
+      return []
+    const amounts =
+      !delta && baseline
+        ? { ...baseline, reportedCache: totals.reportedCache }
+        : usageAmounts(totals)
+    const totalsJson = JSON.stringify(amounts)
     this.database
       .insert(providerUsageBaselines)
       .values({
         model: totals.model,
         scope: totals.scope,
         sessionId: turn.sessionId,
-        totalsJson: JSON.stringify(usageAmounts(totals)),
+        totalsJson,
       })
       .onConflictDoUpdate({
-        set: { totalsJson: JSON.stringify(usageAmounts(totals)) },
+        set: { totalsJson },
         target: [
           providerUsageBaselines.sessionId,
           providerUsageBaselines.scope,
@@ -220,10 +233,43 @@ export class ProviderUsageRecorder {
         ],
       })
       .run()
-    if (!delta) return []
+    if (!delta) {
+      this.updateReportedCache(turn, totals, baseline)
+      return []
+    }
 
     const costUsd = this.addToTurn(turn, totals, baseline, delta)
     return [{ ...delta, costUsd, model: totals.model }]
+  }
+
+  private updateReportedCache(
+    turn: RecordedTurn,
+    totals: ProviderUsageTotals,
+    baseline: ProviderUsageAmounts | null,
+  ) {
+    const key = and(
+      eq(providerUsageTurns.sessionId, turn.sessionId),
+      eq(providerUsageTurns.turnId, turn.turnId),
+      eq(providerUsageTurns.model, totals.model),
+    )
+    const existing = this.database.select().from(providerUsageTurns).where(key).get()
+    if (!existing || !baseline) return
+    const index = existing.contributions.findLastIndex(
+      (entry) => entry.scope === totals.scope && usageDelta(entry.after, baseline) === null,
+    )
+    if (index < 0) return
+    this.database
+      .update(providerUsageTurns)
+      .set({
+        contributions: existing.contributions.map((entry, position) =>
+          position === index
+            ? { ...entry, after: { ...entry.after, reportedCache: totals.reportedCache } }
+            : entry,
+        ),
+        recordedAt: turn.recordedAt,
+      })
+      .where(key)
+      .run()
   }
 
   /** Tokens add once; a late provider cost replaces only its own contribution. */

@@ -165,6 +165,8 @@ export const selectors = {
     page.getByRole('button', { name: 'Agent access and mode', exact: true }),
   composerPlan: (page: Page) => page.getByRole('menuitemradio', { name: /^Plan/ }),
   contextMeter: (page: Page) => page.getByRole('button', { name: /^Context / }),
+  sessionCacheDetails: (page: Page) =>
+    page.getByRole('region', { name: 'Recent prompt cache', exact: true }),
   notificationToast: (page: Page) =>
     page
       .locator('[data-sonner-toast]')
