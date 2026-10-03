@@ -15,6 +15,7 @@ import {
   summaries,
 } from './comparison-report.mjs'
 import { cpuSample, verifyHash, withDeadline } from './comparison-guards.mjs'
+import { createMacHostGate } from './comparison-mac.mjs'
 // Package metadata is pinned by resolver provenance; keep the tooling suites under this entry.
 import './comparison-trace.test.mjs'
 import './comparison-attribution.test.mjs'
@@ -739,6 +740,117 @@ test('portable compaction preserves between-repetition qualifications and bounde
   assert.match(row.medianReason, /unbounded/)
   assert(row.pairs.every(({ ratio, ratioReason }) => ratio === null && ratioReason))
   assert(!JSON.stringify(compact).includes('Infinity'))
+})
+
+test('Mac host qualification survives compaction and report generation without NVIDIA measurements', async () => {
+  const settings = {
+    macIdleLoadAverage: 4,
+    gpuSampleMilliseconds: 1,
+    gpuIdleConsecutiveSamples: 3,
+    gpuIdleWaitMilliseconds: 1000,
+    gpuCommandTimeoutMilliseconds: 100,
+  }
+  let loadAverage = 2.5
+  const gate = createMacHostGate(settings, {
+    sample: async () => ({
+      observedAt: '2026-10-03T00:00:00.000Z',
+      acPower: true,
+      t3Code: false,
+      loadAverage,
+    }),
+  })
+  const idle = await gate.waitForIdle()
+  loadAverage = 9
+  const { gpu: window } = await gate.monitorWindow(async () => 'complete')
+  assert(window.samples.every((sample) => sample.loadAverage > settings.macIdleLoadAverage))
+  const artifact = pairedArtifact()
+  artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
+  artifact.qualifications = [{ ...idle, kind: 'between-repetitions-gpu', repetition: 0 }]
+  for (const run of artifact.runs) {
+    run.gpuIdle = idle
+    run.gpuWindows = [{ label: 'output/rolling-logs', idle, window }]
+  }
+  const compact = JSON.parse(JSON.stringify(await compactEvidence(artifact)))
+  assert.deepEqual(compact.qualifications, artifact.qualifications)
+  for (const run of compact.runs) {
+    assert.deepEqual(run.gpuIdle, idle)
+    for (const [name, evidence] of Object.entries({ idle, window })) {
+      const retained = run.gpuWindows[0][name]
+      assert.deepEqual(retained, { ...evidence, sampleCount: evidence.samples.length })
+      for (const field of [
+        'utilizationPercent',
+        'maxForeignComputeMemoryMiB',
+        'maxOwnedComputeMemoryMiB',
+      ])
+        assert(!Object.hasOwn(retained, field))
+    }
+  }
+  assert(compact.limitations.includes(idle.limitation))
+  assert(!compact.limitations.some((line) => line.includes('NVIDIA total utilization')))
+  for (const evidence of [artifact, compact]) {
+    const report = markdown(evidence)
+    assert.match(report, /AC power/)
+    assert.match(report, /T3 Code presence/)
+    assert.match(report, /host.load/i)
+    assert.match(report, /does not measure Metal GPU utilization/)
+    assert(!report.includes('GPU windows retain utilization samples'))
+    assert(!report.includes('owned/foreign compute-process memory'))
+  }
+  for (const location of ['qualifications', 'gpuIdle', 'gpuWindows']) {
+    const isolated = pairedArtifact()
+    if (location === 'qualifications') isolated.qualifications = artifact.qualifications
+    if (location === 'gpuIdle') isolated.runs[0].gpuIdle = idle
+    if (location === 'gpuWindows') isolated.runs[0].gpuWindows = artifact.runs[0].gpuWindows
+    assert.match(markdown(isolated), /does not measure Metal GPU utilization/)
+  }
+})
+
+test('NVIDIA compaction and report retain utilization and owned/foreign compute-memory evidence', async () => {
+  const artifact = pairedArtifact()
+  artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
+  const evidence = {
+    kind: 'window',
+    foreignActivityMetric: 'resident-compute-memory-mib',
+    qualified: true,
+    status: 'qualified',
+    settings: { gpuWindowUtilizationPercent: 80, gpuComputeMemoryMiB: 256 },
+    samples: [
+      {
+        utilizationPercent: 20,
+        computeMemoryMiB: 128,
+        processes: [
+          { allowed: true, memoryMiB: 64 },
+          { allowed: false, memoryMiB: 128 },
+        ],
+      },
+      {
+        utilizationPercent: 40,
+        computeMemoryMiB: 192,
+        processes: [
+          { allowed: true, memoryMiB: 96 },
+          { allowed: false, memoryMiB: 192 },
+        ],
+      },
+    ],
+  }
+  artifact.runs[0].gpuWindows = [{ label: 'output/rolling-logs', window: evidence }]
+  const compact = JSON.parse(JSON.stringify(await compactEvidence(artifact)))
+  const retained = compact.runs[0].gpuWindows[0].window
+  assert.deepEqual(retained.utilizationPercent, [20, 40])
+  assert.equal(retained.maxForeignComputeMemoryMiB, 192)
+  assert.equal(retained.maxOwnedComputeMemoryMiB, 96)
+  assert.equal(retained.sampleCount, 2)
+  assert.equal(retained.foreignActivityMetric, evidence.foreignActivityMetric)
+  assert.deepEqual(retained.settings, evidence.settings)
+  assert(compact.limitations.some((line) => line.includes('NVIDIA total utilization')))
+  for (const value of [artifact, compact]) {
+    const report = markdown(value)
+    assert.match(
+      report,
+      /GPU windows retain utilization samples, owned\/foreign compute-process memory/,
+    )
+    assert(!report.includes('Metal GPU utilization'))
+  }
 })
 
 test('compaction preserves paired frame-builder identities and ratios', async () => {
