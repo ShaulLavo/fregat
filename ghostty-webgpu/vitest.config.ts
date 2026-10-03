@@ -9,6 +9,7 @@ export default defineConfig({
       'scripts/ghostty-source.test.ts',
       'scripts/wasm-provenance.test.ts',
       'scripts/comparison-source.test.ts',
+      'scripts/browser-file-roots.test.ts',
       'site/src/**/*.test.ts',
       'scripts/config-resolver-native/*.test.ts',
       'demo/**/*.test.ts',
