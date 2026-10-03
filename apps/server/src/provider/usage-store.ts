@@ -192,6 +192,12 @@ export class ProviderUsageStore {
     this.persist()
   }
 
+  /** Mutations validate the credential-bound observation before logical account projection. */
+  readNativeAccount(accountKey: string): ProviderAccountUsage | null {
+    const target = this.targets().find((entry) => entry.accountKey === accountKey)
+    return target ? this.snapshot(target) : null
+  }
+
   async read(): Promise<ProviderUsageResult> {
     const targets = this.targets()
     const native = targets.map((target) => this.snapshot(target))

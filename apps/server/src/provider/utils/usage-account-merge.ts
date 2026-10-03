@@ -34,6 +34,7 @@ function mergeAccount(
   const other = control === left ? right : left
   return {
     ...control,
+    resetCredits: newer.resetCredits ?? left.resetCredits ?? right.resetCredits,
     label: control.label ?? newer.label ?? left.label ?? right.label,
     planType: newer.planType ?? control.planType,
     state: control.state === 'no-data' && other.windows.length > 0 ? other.state : control.state,

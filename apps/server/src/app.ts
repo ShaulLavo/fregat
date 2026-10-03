@@ -473,10 +473,10 @@ export function createApp(options: AppOptions) {
   settings.onChange((event) => {
     usageSettings = event.snapshot.values
     proxyManagementKeyPresent = settings.hasServerSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
+    providerUsage.reconfigure()
     runDetached(
       async () => {
         await reconcileProviderSettings()
-        providerUsage.reconfigure()
         providerTranscriptHistory.reconfigure()
       },
       { area: 'provider', operation: 'usage-reconfigure' },
