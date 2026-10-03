@@ -101,6 +101,10 @@ function validateFunction(value: unknown, kind: string): void {
   throw createGhosttyError('extension.use', `${kind} contribution must be a function`)
 }
 
+interface AttachmentIdentity {
+  current?: Attachment
+}
+
 class Attachment implements ExtensionScope, ExtensionHandle<unknown> {
   api: unknown
   next?: Attachment
@@ -112,7 +116,7 @@ class Attachment implements ExtensionScope, ExtensionHandle<unknown> {
 
   constructor(
     private readonly manager: ExtensionManager,
-    readonly extension: ExtensionValue,
+    readonly identity: AttachmentIdentity,
   ) {}
 
   get terminal(): TerminalApi {
@@ -174,7 +178,8 @@ export interface ExtensionManagerOptions {
 
 export class ExtensionManager {
   readonly terminal: TerminalApi
-  private readonly attachments = new Map<ExtensionValue, Attachment>()
+  // Reattachment reuses a weak identity slot, avoiding key-table rebuilds beside inert values.
+  private readonly identities = new WeakMap<ExtensionValue, AttachmentIdentity>()
   private readonly input = new HookList<TerminalInputHandler>()
   private readonly events = new Map<EventType, HookList<EventHandler>>()
   private readonly osc = new Map<number, OscObserver>()
@@ -202,11 +207,16 @@ export class ExtensionManager {
   use<Api = void>(extension: Extension<Api>): ExtensionHandle<Api> {
     this.ensureActive()
     const value = extension as ExtensionValue
-    if (this.attachments.has(value)) {
+    let identity = this.identities.get(value)
+    if (!identity) {
+      identity = {}
+      this.identities.set(value, identity)
+    }
+    if (identity.current) {
       throw createGhosttyError('extension.use', `Extension ${extension.name} is already attached`)
     }
-    const attachment = new Attachment(this, value)
-    this.attachments.set(value, attachment)
+    const attachment = new Attachment(this, identity)
+    identity.current = attachment
     attachment.previous = this.last
     if (this.last) this.last.next = attachment
     this.last = attachment
@@ -287,7 +297,7 @@ export class ExtensionManager {
   }
 
   detach(attachment: Attachment): void {
-    this.attachments.delete(attachment.extension)
+    attachment.identity.current = undefined
     if (attachment.previous) attachment.previous.next = attachment.next
     if (attachment.next) attachment.next.previous = attachment.previous
     if (this.last === attachment) this.last = attachment.previous
