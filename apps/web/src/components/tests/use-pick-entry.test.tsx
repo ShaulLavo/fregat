@@ -1,9 +1,10 @@
-import { afterEach, onTestFinished } from 'vitest'
+import { afterEach, beforeAll, onTestFinished } from 'vitest'
 import { toast } from 'sonner'
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { entryPickerQueryKeys } from '@/components/utils/query-keys'
+import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { createObservedInProcessClient } from '../../../test/client'
 import { installTestClient } from '../../../test/factories/client-binding'
@@ -11,8 +12,17 @@ import { recordClientLog } from '../../../test/factories/client-log'
 import { serverCapabilities } from '../../../test/factories/server-capabilities'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { expect, test } from '../../../test/fixtures'
-import { renderWithProviders } from '../../../test/render'
+import { holdDeferredDialog, renderWithProviders } from '../../../test/render'
 import { usePickEntry } from '../use-pick-entry'
+
+beforeAll(() => {
+  // New notices must remain observable when Sonner evicts dismissed history.
+  for (let index = 0; index < 101; index += 1) {
+    const id = toast('Earlier notification')
+    toast.dismiss(id)
+  }
+  expect(toast.getHistory()).toHaveLength(100)
+})
 
 afterEach(() => {
   delete window.platformBridge
@@ -53,18 +63,38 @@ test('closed picker defers its runtime and capabilities until it opens', async (
   })
 })
 
-test('Chromium bridge without native picker opens the web folder picker', async ({ client }) => {
-  void client
-  window.platformBridge = {
-    backdrop: 'compositor',
-    platform: 'linux',
-    colorScheme: null,
-    titlebar: 'native',
-  }
-  renderWithProviders(<PickerFixture />)
-  expect(await screen.findByRole('dialog')).toBeTruthy()
-  expect(await screen.findByRole('heading', { name: 'Open folder' })).toBeTruthy()
-})
+test.for(['loading', 'loaded'] as const)(
+  'Chromium bridge without native picker opens the web folder picker with a %s dialog',
+  async (phase, { client }) => {
+    void client
+    const release =
+      phase === 'loading'
+        ? holdDeferredDialog(
+            filePickerDialogQueryOptions.queryKey,
+            () => import('@/components/file-picker-dialog'),
+          )
+        : undefined
+    if (release) onTestFinished(release)
+    if (phase === 'loaded') await resourceQueryClient.query(filePickerDialogQueryOptions)
+    window.platformBridge = {
+      backdrop: 'compositor',
+      platform: 'linux',
+      colorScheme: null,
+      titlebar: 'native',
+    }
+    renderWithProviders(<PickerFixture />)
+    if (release) {
+      const loading = await screen.findByRole('dialog', { name: 'Open folder' })
+      expect(within(loading).getByRole('heading', { name: 'Open folder' })).toBeTruthy()
+      await act(async () => {
+        release()
+        await resourceQueryClient.query(filePickerDialogQueryOptions)
+      })
+    }
+    const loaded = await screen.findByRole('dialog', { name: 'Choose folder' })
+    expect(within(loaded).getByRole('heading', { name: 'Choose folder' })).toBeTruthy()
+  },
+)
 
 test('unverified locality uses the server-filesystem picker even with a native host', async ({
   client,
@@ -93,7 +123,8 @@ test.for([404, 501])(
     server.app.get('/system/capabilities', () =>
       Response.json({ message: 'Unsupported endpoint' }, { status }),
     )
-    const before = toast.getHistory().length
+    const before = new Set(toast.getHistory().map((shown) => shown.id))
+    const notices = () => toast.getHistory().filter((shown) => !before.has(shown.id))
     const logs = recordClientLog('warn')
     const view = renderWithProviders(<PickerFixture />)
     expect(await screen.findByRole('dialog')).toBeTruthy()
@@ -102,7 +133,7 @@ test.for([404, 501])(
         'success',
       ),
     )
-    expect(toast.getHistory()).toHaveLength(before)
+    expect(notices()).toHaveLength(0)
     expect(logs.events('platform.picker_capabilities.summary')).toHaveLength(0)
   },
 )
@@ -110,7 +141,8 @@ test.for([404, 501])(
 test('a valid nativePicker false capability uses a silent fallback', async ({ server, client }) => {
   const identity = v.parse(healthDescriptorSchema, (await client.health.get()).data)
   server.app.get('/system/capabilities', () => serverCapabilities(identity.environmentId)).compile()
-  const before = toast.getHistory().length
+  const before = new Set(toast.getHistory().map((shown) => shown.id))
+  const notices = () => toast.getHistory().filter((shown) => !before.has(shown.id))
   const logs = recordClientLog('warn')
   const view = renderWithProviders(<PickerFixture />)
   expect(await screen.findByRole('dialog')).toBeTruthy()
@@ -119,7 +151,7 @@ test('a valid nativePicker false capability uses a silent fallback', async ({ se
       nativePicker: false,
     }),
   )
-  expect(toast.getHistory()).toHaveLength(before)
+  expect(notices()).toHaveLength(0)
   expect(logs.events('platform.picker_capabilities.summary')).toHaveLength(0)
 })
 
@@ -148,12 +180,13 @@ test.for(['network', 'server', 'schema'] as const)(
       )
     if (kind === 'schema')
       server.app.get('/system/capabilities', () => ({ nativePicker: 'invalid' }))
-    const before = toast.getHistory().length
+    const before = new Set(toast.getHistory().map((shown) => shown.id))
+    const notices = () => toast.getHistory().filter((shown) => !before.has(shown.id))
     const logs = recordClientLog('warn')
     const view = renderWithProviders(<PickerFixture />)
     expect(await screen.findByRole('dialog')).toBeTruthy()
-    await waitFor(() => expect(toast.getHistory()).toHaveLength(before + 1))
-    const shown = toast.getHistory().at(-1)!
+    await waitFor(() => expect(notices()).toHaveLength(1))
+    const shown = notices()[0]!
     expect(shown).toMatchObject({
       type: 'error',
       title: 'Could not check file chooser availability',
@@ -178,7 +211,7 @@ test.for(['network', 'server', 'schema'] as const)(
       expect(state?.fetchStatus).toBe('idle')
       expect(state?.error).not.toBe(failure)
     })
-    expect(toast.getHistory()).toHaveLength(before + 1)
+    expect(notices()).toHaveLength(1)
     expect(logs.events('platform.picker_capabilities.summary')).toHaveLength(1)
     view.unmount()
     renderWithProviders(<PickerFixture />, { queryClient: view.queryClient })
@@ -188,7 +221,7 @@ test.for(['network', 'server', 'schema'] as const)(
         'idle',
       ),
     )
-    expect(toast.getHistory()).toHaveLength(before + 1)
+    expect(notices()).toHaveLength(1)
     expect(logs.events('platform.picker_capabilities.summary')).toHaveLength(1)
   },
 )
@@ -203,7 +236,8 @@ test('a successful capability result resets the failure notice', async ({ server
         : Response.json(serverCapabilities(identity.environmentId)),
     )
     .compile()
-  const before = toast.getHistory().length
+  const before = new Set(toast.getHistory().map((shown) => shown.id))
+  const notices = () => toast.getHistory().filter((shown) => !before.has(shown.id))
   const logs = recordClientLog('warn')
   const view = renderWithProviders(<PickerFixture />)
   expect(await screen.findByRole('dialog')).toBeTruthy()
@@ -212,7 +246,7 @@ test('a successful capability result resets the failure notice', async ({ server
       'idle',
     ),
   )
-  await waitFor(() => expect(toast.getHistory()).toHaveLength(before + 1))
+  await waitFor(() => expect(notices()).toHaveLength(1))
   failed = false
   await act(async () => {
     await view.queryClient.invalidateQueries({ queryKey: entryPickerQueryKeys.capabilities })
@@ -224,6 +258,14 @@ test('a successful capability result resets the failure notice', async ({ server
   await act(async () => {
     await view.queryClient.invalidateQueries({ queryKey: entryPickerQueryKeys.capabilities })
   })
-  await waitFor(() => expect(toast.getHistory()).toHaveLength(before + 2))
+  await waitFor(() => expect(notices()).toHaveLength(2))
+  for (const shown of notices()) {
+    expect(shown).toMatchObject({
+      type: 'error',
+      title: 'Could not check file chooser availability',
+      action: { label: 'Fix with AI' },
+      description: expect.any(String),
+    })
+  }
   expect(logs.events('platform.picker_capabilities.summary')).toHaveLength(2)
 })

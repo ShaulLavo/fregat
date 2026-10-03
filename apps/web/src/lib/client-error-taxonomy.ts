@@ -86,14 +86,17 @@ export function toClientError(input: unknown): ClientError {
 
   if (isConnectivityError(input)) return categorizedClientError('connectivity', input)
 
+  const structured = structuredError(input)
   const code = extractFsErrorCode(input)
-  if (code) return categorizedClientError(categoryByFsErrorCode[code], input)
+  if (code) {
+    const error = categorizedClientError(categoryByFsErrorCode[code], input)
+    return structured ? { ...error, ...structured } : error
+  }
 
   // Structured errors from any non-fs catalog — settings, orchestration — carry
   // their own message, `why` and `fix`. Falling through to `unknown` here is
   // what made every rejected settings save silent: `notifySaveError` returns
   // before its toast on `unknown`, so the user saw nothing at all.
-  const structured = structuredError(input)
   if (structured) {
     return { ...categorizedClientError('io_error', input, structured.message), ...structured }
   }

@@ -117,6 +117,7 @@
     "providers.acpOperationTimeoutMs",
     "providers.instances",
     "providers.proxyUsageProviderInstanceIds",
+    "providers.proxyUsageRequestIntervalHours",
     "providers.proxyUsageUrl",
     "providers.transcriptHistoryMaxBytes",
     "providers.transcriptHistoryMaxFiles",

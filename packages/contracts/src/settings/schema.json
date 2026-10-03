@@ -1284,6 +1284,13 @@
       },
       "type": "array"
     },
+    "providers.proxyUsageRequestIntervalHours": {
+      "default": 1,
+      "description": "Hours between pooled Codex requests. At most one request per account per hour, including failures and restarts. Fresh quota skips requests; three failures pause until newer passive quota arrives.",
+      "maximum": 24,
+      "minimum": 1,
+      "type": "integer"
+    },
     "providers.proxyUsageUrl": {
       "anyOf": [
         {
@@ -1295,7 +1302,7 @@
         }
       ],
       "default": null,
-      "description": "Local CLIProxyAPI management address whose cached Codex quotas Fregat reads. The management key is kept in the secret store."
+      "description": "Local CLIProxyAPI management address for pooled Codex quotas and capped requests. Its management key is kept in the secret store."
     },
     "providers.transcriptHistoryMaxBytes": {
       "default": 268435456,
@@ -1456,7 +1463,7 @@
     },
     "window.browser": {
       "default": "auto",
-      "description": "The desktop window engine: auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.",
+      "description": "The desktop window engine: auto uses the native WebKit window on macOS. On Linux, auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.",
       "pattern": "^(?:auto|webview|\\/[^\\0\\r\\n]+)$",
       "type": "string"
     },
@@ -1498,7 +1505,7 @@
       "default": "compositor",
       "description": "Choose window-manager transparency or a see-through native window using the system webview.",
       "enum": ["compositor", "window"],
-      "markdownDescription": "Choose window-manager transparency or a see-through native window using the system webview.\n\nTransparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.",
+      "markdownDescription": "Choose window-manager transparency or a see-through native window using the system webview.\n\nTransparent macOS windows enable native Frosted and Glass materials. The native WebKit host is the default macOS window engine. On Linux, window-manager mode uses the installed browser app.",
       "type": "string"
     },
     "workbench.colorTheme": {

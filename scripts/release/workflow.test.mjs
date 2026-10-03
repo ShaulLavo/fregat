@@ -6,6 +6,11 @@ const workflow = YAML.parse(
   await readFile(new URL('../../.github/workflows/release.yml', import.meta.url), 'utf8'),
 )
 
+test('version workflow executes the package script without shell operators', () => {
+  const action = workflow.jobs.version.steps.find((step) => step.with?.['version-script'])
+  expect(action.with['version-script']).toBe('bun run version-packages')
+})
+
 function runs(job, enabled, pending) {
   if (!job.if) return true
   const condition = job.if.replace(/^\$\{\{\s*|\s*\}\}$/g, '')
