@@ -452,7 +452,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     expect(existsSync(request)).toBe(true)
   }, 30_000)
 
-  test('a quiet hold ends even while its wrapper is suspended', async () => {
+  test('an expired quiet hold blocks admission until its suspended wrapper releases ownership', async () => {
     const box = quietBox(600)
     const elapsed = path.join(box.root, 'elapsed')
     const preload = path.join(box.root, 'clock.ts')
@@ -487,6 +487,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     ])
     expect(runtime.stdout.toString().trim()).toBe('10min')
     quiet.child.kill('SIGSTOP')
+    let next: ReturnType<typeof start> | undefined
     try {
       await expect
         .poll(() => readFileSync(`/proc/${quiet.child.pid}/status`, 'utf8'), {
@@ -505,11 +506,17 @@ describe.skipIf(!userScopes)('quiet holds', () => {
           quietUntil: bootSeconds() - 1,
         }),
       )
-      const next = await heavy(box, 'after-frozen', ['true'], { jobClass: 'light', machine: true })
-      expect(next.code).toBe(0)
+      next = start(box, 'after-frozen', ['true'], { jobClass: 'light', machine: true })
+      await expect.poll(next.stderr, { timeout: 10_000 }).toContain('quiet hold by')
+      expect(recordOf(box, 'after-frozen')).toBeUndefined()
+      expect(live(box.state, 'jobs').some((entry) => entry.id === owner.id)).toBe(true)
       expect(sliceState(box.sliceRoot, slice)).not.toBe('running')
+      quiet.child.kill('SIGCONT')
+      expect((await next.done).code).toBe(0)
     } finally {
       quiet.child.kill('SIGCONT')
+      next?.child.kill('SIGTERM')
+      await next?.done
     }
     expect((await quiet.done).code).toBe(75)
     expect(recordOf(box, 'frozen')).toMatchObject({ quiet: true, quietHoldExpired: true })

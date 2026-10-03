@@ -54,9 +54,7 @@ function deadlineBox(seconds = 2) {
 }
 
 const pidIn = (file: string) => Number(readFileSync(file, 'utf8').trim())
-const systemdRun = spawnSync('sh', ['-c', 'command -v systemd-run'], {
-  encoding: 'utf8',
-}).stdout.trim()
+const systemdRun = userScopes ? Bun.which('systemd-run') : null
 const watchdogOf = (slice: string) => `${slice.slice(0, -'.slice'.length)}_deadline.service`
 const serviceState = (service: string) =>
   spawnSync('systemctl', ['--user', 'show', service, '-p', 'LoadState', '--value'], {
@@ -64,6 +62,7 @@ const serviceState = (service: string) =>
   }).stdout.trim()
 
 function launcher(box: ReturnType<typeof sandbox>, body: string) {
+  expect(systemdRun).toBeTruthy()
   const bin = path.join(box.root, 'bin')
   mkdirSync(bin)
   writeFileSync(path.join(bin, 'systemd-run'), `#!/bin/bash\n${body}\nexec ${systemdRun} "$@"\n`, {
@@ -330,11 +329,26 @@ describe.skipIf(!userScopes)('whole-slice deadlines (requires user systemd scope
           .toBe(false)
         const drainedAt = bootSeconds()
         expect(drainedAt).toBeLessThan(owner.quietUntil!)
-        await expect
-          .poll(() => existsSync(successorMarker), {
-            timeout: (DEADLINE_START_SECONDS + 22) * 1000,
-          })
-          .toBe(true)
+        expect((await next.done).code).toBe(2)
+        expect(next.stderr()).toContain('Quiet lease')
+        expect(existsSync(successorMarker)).toBe(false)
+        expect(live(box.state, 'jobs').some((entry) => entry.id === owner.id)).toBe(true)
+        owned.child.kill('SIGCONT')
+        await owned.done
+        next = start(
+          box,
+          'released-successor',
+          [
+            'bash',
+            '-c',
+            'touch "$1"; until [ -e "$2" ]; do sleep 0.02; done',
+            '_',
+            successorMarker,
+            release,
+          ],
+          { jobClass: 'light', machine: true },
+        )
+        await expect.poll(() => existsSync(successorMarker), { timeout: 10_000 }).toBe(true)
         const state = {
           mainAlive: alive(pidIn(mainPid)),
           nestedAlive: alive(pidIn(nestedPid)),
