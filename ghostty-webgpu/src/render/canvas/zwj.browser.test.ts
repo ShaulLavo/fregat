@@ -1,6 +1,7 @@
-import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { GhosttyRuntime } from '../../core/runtime.js'
+import { GhosttySelectionGesture } from '../../core/selection.js'
 import type { TerminalFittedFont } from '../../term/types.js'
 import { TestClock } from '../webgl/tests/fixture.js'
 import { CanvasTerminalRenderer } from './renderer.js'
@@ -50,6 +51,7 @@ beforeAll(async () => {
 
 afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup()
+  vi.restoreAllMocks()
 })
 
 afterAll(async () => {
@@ -201,3 +203,187 @@ it.each(specimens)(
     ).toBe(0)
   },
 )
+
+interface ExpectedGlyph {
+  text: string
+  column: number
+  span?: number
+  row?: number
+  font?: string
+  foreground?: string
+  alpha?: number
+}
+
+function glyphOracle(glyphs: readonly ExpectedGlyph[]): HTMLCanvasElement {
+  const canvas = newCanvas()
+  const context = canvas.getContext('2d')!
+  context.textAlign = 'center'
+  context.textBaseline = 'alphabetic'
+  for (const glyph of glyphs) {
+    context.font = `${glyph.font ?? '400'} ${font.settings.size}px ${font.settings.family}`
+    context.fillStyle = glyph.foreground ?? '#ffffff'
+    context.globalAlpha = glyph.alpha ?? 1
+    drawText(context, glyph.text, glyph.column, glyph.row ?? 0, glyph.span ?? 1)
+  }
+  return canvas
+}
+
+function background(canvas: HTMLCanvasElement, column: number, span: number, color: string): void {
+  const context = canvas.getContext('2d')!
+  context.save()
+  context.globalCompositeOperation = 'destination-over'
+  context.globalAlpha = 1
+  context.fillStyle = color
+  context.fillRect(
+    column * font.deviceCellWidth,
+    0,
+    span * font.deviceCellWidth,
+    font.deviceCellHeight,
+  )
+  context.restore()
+}
+
+it('keeps one bold italic faint glyph over a uniform native brush', async () => {
+  const native = await fixture('\x1b[?25l\x1b[1;3;2mA👩‍💻B')
+  const reference = glyphOracle([
+    { text: 'A', column: 0, font: 'italic 700', alpha: 0.5 },
+    { text: '👩‍💻', column: 1, span: 4, font: 'italic 700', alpha: 0.5 },
+    { text: 'B', column: 5, font: 'italic 700', alpha: 0.5 },
+  ])
+  expect(differences(pixels(native.canvas, 0), pixels(reference, 0))).toBe(0)
+})
+
+it.each([
+  { name: 'font', left: '1', right: '3', leftFont: '700', rightFont: 'italic 400' },
+  { name: 'foreground', left: '38;2;255;0;0', right: '38;2;0;255;0' },
+  { name: 'background', left: '48;2;255;0;0', right: '48;2;0;255;0' },
+  { name: 'decoration', left: '4', right: '0' },
+])('keeps components separate across a $name boundary', async (brush) => {
+  const fillText = vi.spyOn(CanvasRenderingContext2D.prototype, 'fillText')
+  const native = await fixture(`\x1b[?25lA\x1b[${brush.left}m👩‍\x1b[0;${brush.right}m💻\x1b[0mB`)
+  expect(fillText.mock.calls.map(([text]) => text)).toEqual(['A', '👩‍', '💻', 'B'])
+  const reference = glyphOracle([
+    { text: 'A', column: 0 },
+    {
+      text: '👩‍',
+      column: 1,
+      span: 2,
+      font: brush.leftFont,
+      foreground: brush.name === 'foreground' ? '#ff0000' : '#ffffff',
+    },
+    {
+      text: '💻',
+      column: 3,
+      span: 2,
+      font: brush.rightFont,
+      foreground: brush.name === 'foreground' ? '#00ff00' : '#ffffff',
+    },
+    { text: 'B', column: 5 },
+  ])
+  if (brush.name === 'background') {
+    background(reference, 1, 2, '#ff0000')
+    background(reference, 3, 2, '#00ff00')
+  }
+  if (brush.name === 'decoration') {
+    const context = reference.getContext('2d')!
+    context.fillStyle = '#ffffff'
+    context.fillRect(24, 46, 48, 1)
+  }
+  expect(differences(pixels(native.canvas, 0), pixels(reference, 0))).toBe(0)
+})
+
+it('retains whole and partial selections, cursor overlays and row damage', async () => {
+  const native = await fixture('\x1b[?25lA👩‍💻B')
+  const selection = new GhosttySelectionGesture(native.terminal)
+  cleanups.push(() => selection.dispose())
+  const joined = glyphOracle([
+    { text: 'A', column: 0 },
+    { text: '👩‍💻', column: 1, span: 4 },
+    { text: 'B', column: 5 },
+  ])
+  const initialRows = native.renderer.metrics.paintedRows
+  expect(selection.selectRange({ x: 1, y: 0 }, { x: 4, y: 0 }).selectionInstalled).toBe(true)
+  native.renderer.notifySelectionChange()
+  native.clock.flushFrame()
+  background(joined, 1, 4, '#334455')
+  expect(selection.getSelection()).toBe('👩‍💻')
+  expect(differences(pixels(native.canvas, 0), pixels(joined, 0))).toBe(0)
+  expect(native.renderer.metrics.paintedRows).toBe(initialRows + rows)
+
+  selection.selectRange({ x: 3, y: 0 }, { x: 4, y: 0 })
+  native.renderer.notifySelectionChange()
+  native.clock.flushFrame()
+  const split = glyphOracle([
+    { text: 'A', column: 0 },
+    { text: '👩‍', column: 1, span: 2 },
+    { text: '💻', column: 3, span: 2 },
+    { text: 'B', column: 5 },
+  ])
+  background(split, 3, 2, '#334455')
+  expect(differences(pixels(native.canvas, 0), pixels(split, 0))).toBe(0)
+
+  selection.clear()
+  native.terminal.write('\x1b[1;4H\x1b[?25h')
+  native.renderer.notifyWrite()
+  native.clock.flushFrame()
+  const cursor = glyphOracle([
+    { text: 'A', column: 0 },
+    { text: '👩‍', column: 1, span: 2 },
+    { text: '💻', column: 3, span: 2 },
+    { text: 'B', column: 5 },
+  ])
+  background(cursor, 3, 1, '#eeeeee')
+  expect(native.terminal.cursor.x).toBe(3)
+  expect(differences(pixels(native.canvas, 0), pixels(cursor, 0))).toBe(0)
+
+  native.terminal.write('\x1b[?25l')
+  native.renderer.notifyWrite()
+  native.clock.flushFrame()
+  const restored = oracle('👩‍💻', 4)
+  expect(differences(pixels(native.canvas, 0), pixels(restored, 0))).toBe(0)
+  const beforeDamage = native.renderer.metrics.paintedRows
+  native.terminal.write('\x1b[2X')
+  native.renderer.notifyWrite()
+  native.clock.flushFrame()
+  const erased = glyphOracle([
+    { text: 'A', column: 0 },
+    { text: '👩‍', column: 1, span: 2 },
+    { text: 'B', column: 5 },
+  ])
+  expect(differences(pixels(native.canvas, 0), pixels(erased, 0))).toBe(0)
+  native.terminal.write('💻')
+  native.renderer.notifyWrite()
+  native.clock.flushFrame()
+  expect(differences(pixels(native.canvas, 0), pixels(restored, 0))).toBe(0)
+  expect(native.renderer.metrics.paintedRows).toBe(beforeDamage + 2)
+  expect(native.renderer.hasPendingFrame).toBe(false)
+  expect(native.renderer.hasPendingTimer).toBe(false)
+})
+
+it('keeps wrapped ZWJ components in their native rows and clips at the right edge', async () => {
+  const native = await fixture('\x1b[?25l\x1b[1;23H👩‍💻B')
+  const reference = glyphOracle([
+    { text: '👩‍', column: 22, span: 2 },
+    { text: '💻', column: 0, row: 1, span: 2 },
+    { text: 'B', column: 2, row: 1 },
+  ])
+  expect(native.terminal.cursor.x).toBe(3)
+  expect(native.terminal.cursor.y).toBe(1)
+  expect(differences(pixels(native.canvas, 0), pixels(reference, 0))).toBe(0)
+  expect(differences(pixels(native.canvas, 1), pixels(reference, 1))).toBe(0)
+})
+
+it('keeps invisible components and unrelated ZWJ text separate', async () => {
+  const fillText = vi.spyOn(CanvasRenderingContext2D.prototype, 'fillText')
+  const native = await fixture('\x1b[?25lA\x1b[8m👩‍\x1b[0m💻B\r\nA‍B')
+  expect(fillText.mock.calls.map(([text]) => text)).toEqual(['A', '💻', 'B', 'A‍', 'B'])
+  const reference = glyphOracle([
+    { text: 'A', column: 0 },
+    { text: '💻', column: 3, span: 2 },
+    { text: 'B', column: 5 },
+    { text: 'A‍', column: 0, row: 1 },
+    { text: 'B', column: 1, row: 1 },
+  ])
+  expect(differences(pixels(native.canvas, 0), pixels(reference, 0))).toBe(0)
+  expect(differences(pixels(native.canvas, 1), pixels(reference, 1))).toBe(0)
+})
