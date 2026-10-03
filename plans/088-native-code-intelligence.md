@@ -2,8 +2,9 @@
 
 Status: approved, implementation not started. Requested 2026-09-11.
 
-Hard prerequisite: [Plan 087, stateless MCP](087-stateless-mcp.md), including real provider
-interoperability. [Root PLAN.md](../PLAN.md) owns scheduling. The
+Hard prerequisite: [Plan 087, stateless MCP](087-stateless-mcp.md), specifically M0 real-provider
+interoperability, M1 native endpoint scope/authentication and relevant M4 conformance/isolation
+receipts. External MCP management transferred to 174 is a separate scope. [Root PLAN.md](../PLAN.md) owns scheduling. The
 [Serena comparison](../docs/serena-implementation-comparison.md) supplies the implementation evidence.
 
 ## Deliver the full capability

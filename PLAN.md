@@ -63,6 +63,43 @@ snapshot; this file remains the scheduler and each plan remains its scope author
 The default is one active structural cutover plus independent closeout/proof work. This order
 schedules Approved work; it does not expand any plan's authorization.
 
+### Upcoming delivery waves
+
+The owner requested cleanup before starting the next wave on 2026-10-03. The
+[readiness review](plans/wave-readiness-2026-10-03.md) records dependency and overlap decisions.
+This pass updates planning; product implementation starts through each plan's existing gates.
+
+| Wave                | Bounded scope and finish line                                                                                                                                                                  | Entry conditions                                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preparation         | Reconcile launch handoffs, delivered contracts, terminal input ownership and shared-file owners. Preserve deferred work and owner-only checks separately.                                      | Current documentation pass; qualify required runtime/package proofs when the implementation wave starts.                                                                                    |
+| Command foundation  | 204 + 205 → 206: migrate Editor, terminal, web and TUI callers and delete the replaced keymap APIs in one verified cutover.                                                                    | Required hotkeys installation/publication under 207; agree the exact host-side input/extension seam with active 286/287 owners. No dependency on completing their whole programs.           |
+| Document foundation | Complete required 198 acceptance, then each permitted 099/200 unit against its exact publication/acquisition/attachment contract. Finish with proved consumer ownership and bounded retention. | 099 publication unit 1 is delivered. Units 2–7 still require accepted 282 evidence and an explicit owner request. Unrelated minimap/LSP units do not block every 200 consumer.              |
+| Feature batches     | Deliver coherent interaction/editor, navigation/save/search, excerpt/review, Git, terminal, chat and Markdown/document slices in their declared dependency order.                              | Use 206 commands and the exact content contracts each slice needs. Pane/layout changes require the relevant 209 decisions and authorized delivered hosts; preserve TUI/parser/device gates. |
+| Broad migrations    | Localize consumers under 208's catalog/error contract, then separately authorized 209 workspace units.                                                                                         | Catalog and design preparation may run earlier. Complete-client translation and the whole workspace redesign are not prerequisites for every feature batch.                                 |
+
+126 engineering closeout and Mesh correctness/access work can proceed beside these waves where
+owners and files do not overlap. An owner-only account/device check stays visible without
+holding unrelated engineering delivery. Existing terminal 286/287 work continues with its owners.
+
+Before launching each wave, name its exact units, owners, shared paths, required receipts,
+acceptance cases and exclusions in the owning plans. Fix the scope at launch; new wanted work
+joins a later batch unless it fixes a blocker. Ship verified units throughout the wave.
+
+### Placement of the large additions
+
+| Program                         | Placement and reason                                                                                                                                                                                                    |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 335 stroke icons                | Give the broad swap a separate structural window after keymap and before broad new UI batches. Registry/mapping preparation can run earlier. It touches keymap icon types and build configuration; packs remain later.  |
+| 320 compile-time data           | G0 compatibility/invalidation proof is independent preparation. Run only qualified defaults/theme/bidi/search units in bounded build windows; coordinate build and lockfile edits. No demonstrated keymap prerequisite. |
+| 172 shared undo                 | Contract/core/session units can follow keymap as a bounded extraction. Coordinate workspace unit 4 with document/transaction owners. Preserve the Editor undo graph and server journal; no async-runtime prerequisite.  |
+| 328–334 async runtime           | Approved and deferred. Qualify one runtime and one consumer when started, then adopt beneath stable domain APIs. It does not block keymap or document contracts; current terminal ownership stays in 286/287.           |
+| 327 virtualization              | Approved and deferred. Start with its fresh baseline and required CSV two-axis geometry when scheduled; tune editor/search/shared lists only with attributed evidence. Optional engine replacement is separate.         |
+| 293/294 Mesh durable scheduling | Independent infrastructure program. Ship 295's manual collector first; recurring coordinated execution waits for durable/quorum/failover guarantees.                                                                    |
+
+Other deferrals retain their owning boundaries: 288 PR previews, 319 agent UI tools, icon packs,
+stopped parser work, DOCX editing and the native Swift editor-first gate. A program's size is a
+reason to split its delivery; dependency evidence determines whether its foundation moves earlier.
+
 ## Approved issue work
 
 The October 3 plans retain the existing structural-cutover limit. Mesh and application bug
@@ -93,7 +130,7 @@ work can proceed independently where their files and contracts do not overlap.
 4. Build the ordinary issue collector [295](plans/295-cross-repository-issue-collection.md)
    for manual use before scheduler integration. Durable storage
    [293](plans/293-mesh-durable-job-state.md) precedes coordinated dispatch
-   [294](plans/294-mesh-job-coordination.md). Schedule the collector after those guarantees pass.
+   [294](plans/294-mesh-job-coordination.md). Schedule recurring collector execution after those guarantees pass; its usable manual command comes first.
 5. Automatic placement [311](plans/311-automatic-machine-placement.md), design-first onboarding
    [315](plans/315-local-remote-onboarding.md), and session attention
    [316](plans/316-session-attention.md) follow their owning product and verification gates.
@@ -103,8 +140,9 @@ work can proceed independently where their files and contracts do not overlap.
 ## Next programs
 
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
-and selected morph sites. Coordinate its broad web/UI edits with the active cutover;
-its icon-pack phase is Approved and scheduled after those phases ship.
+and selected morph sites. Its broad swap takes the structural window after the keymap
+cutover and before broad new UI batches; registry/mapping preparation can proceed earlier.
+Its icon-pack phase is Approved and scheduled after those phases ship.
 
 [320](plans/320-compile-time-data.md) is Approved for a compatibility proof followed by
 settings defaults, bundled themes, Unicode bidi derivation and a settings search index.
