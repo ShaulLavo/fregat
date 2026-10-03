@@ -1010,6 +1010,7 @@ describe('CodexProviderAdapter', () => {
         const adapter = new CodexProviderAdapter()
         const usage = await adapter.readUsage()
         assert(usage.kind === 'reading' && usage.resetCredits)
+        expect(usage.update).toMatchObject({ label: 'fixture', planType: 'pro' })
         expect(
           await adapter.consumeResetCredit({
             idempotencyKey: 'fixture-reset-key',

@@ -510,11 +510,15 @@ export class WebGpuTerminalRenderer {
     try {
       this.drawZigFrame(damage)
     } catch (cause) {
-      this.needsFullRebuild = true
-      if (this.frameFailed) return
-      this.frameFailed = true
-      this.onError?.(cause)
+      this.reportFrameFailure(cause)
     }
+  }
+
+  private reportFrameFailure(cause: unknown): void {
+    this.needsFullRebuild = true
+    if (this.frameFailed) return
+    this.frameFailed = true
+    this.onError?.(cause)
   }
 
   private drawZigFrame(damage: RenderStateDirty): void {
@@ -558,7 +562,13 @@ export class WebGpuTerminalRenderer {
     const updates = builder.changedRanges()
     this.atlasTextures.sync(this.atlas.consumeUploads())
     const operations = this.textPass.uploadFrame(builder, updates)
-    this.textPass.submit(this.context.getCurrentTexture().createView())
+    try {
+      this.textPass.submit(this.context.getCurrentTexture().createView())
+    } catch (cause) {
+      this.reportFrameFailure(cause)
+      // Retry once in this turn; an acquired canvas texture presents empty after an abandoned submit.
+      this.textPass.submit(this.context.getCurrentTexture().createView())
+    }
     let rows: readonly RenderRow[] | undefined
     if (this.frames.requiresFullRows) {
       rows = options.full ? this.renderState.readRows({ packed: true }) : this.rowsToRebuild(damage)
