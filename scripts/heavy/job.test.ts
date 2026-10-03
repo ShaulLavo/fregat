@@ -4,7 +4,7 @@ import { expect, test } from 'vitest'
 
 import { reaperSandbox } from './reaper-sandbox'
 
-import { isHost, localCommand, PI_LAUNCHER, piCommand, SCOPE_SHIM } from './job'
+import { isHost, localCommand, PI_LAUNCHER, piCommand, reapSlice, SCOPE_SHIM } from './job'
 
 const launch = { unit: 'heavy-1.scope', accountingFile: '/run/a', command: ['bun', 'x y'] }
 
@@ -48,7 +48,9 @@ test('a local job runs in its slice, and the shim accounts for the whole slice',
 
 const locks = process.platform === 'linux' ? await import('./lock').catch(() => null) : null
 
-function assertReleased(state: string) {
+function assertReleased(box: ReturnType<typeof reaperSandbox>) {
+  expect(box.managerChildren()).toEqual([])
+  const { state } = box
   expect(readdirSync(path.join(state, 'queue')).filter((name) => name.endsWith('.json'))).toEqual(
     [],
   )
@@ -73,7 +75,7 @@ test('a responsive private manager reaps one orphan exactly once and leaves othe
     await expect.poll(() => job.child.exitCode, { timeout: 4500 }).toBe(75)
     expect(await job.done).toBe(75)
     expect(box.lifecycle().map((call) => call.slice)).toEqual([orphan, orphan, orphan])
-    assertReleased(box.state)
+    assertReleased(box)
   } finally {
     await box.cleanup()
   }
@@ -98,7 +100,7 @@ test.for(['kill', 'stop', 'revert'])(
       expect(box.lifecycle().map((call) => call.operation)).toEqual(
         ['kill', 'stop', 'revert'].slice(0, ['kill', 'stop', 'revert'].indexOf(operation) + 1),
       )
-      assertReleased(box.state)
+      assertReleased(box)
     } finally {
       await box.cleanup()
     }
@@ -120,9 +122,79 @@ test.for(['kill', 'stop'])(
       job.child.kill('SIGTERM')
       await expect.poll(() => job.child.exitCode, { timeout: 1500 }).toBe(143)
       expect(await job.done).toBe(143)
-      assertReleased(box.state)
+      assertReleased(box)
     } finally {
       await box.cleanup()
     }
   },
 )
+
+test('the reaper refuses a slice outside its root before contacting the manager', () => {
+  expect(() =>
+    reapSlice('heavytmine', 'heavy-0123abcd.slice', new AbortController().signal),
+  ).toThrow('outside the slice root heavytmine')
+})
+
+test('one stop budget bounds reconciliation across multiple stalled orphans', async (context) => {
+  if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+  const box = reaperSandbox('kill')
+  box.addSlice('aaaaaaaaaaaa')
+  box.addSlice('bbbbbbbbbbbb')
+  try {
+    const job = box.start(false)
+    await expect.poll(() => box.lifecycle().length, { timeout: 1500 }).toBe(1)
+    const locked = locks!.tryLock(path.join(box.state, 'admission.lock'))
+    if (locked !== null) locks!.unlock(locked)
+    expect(locked).toBeNull()
+    await expect
+      .poll(() => job.stderr(), { timeout: 5500 })
+      .toContain('orphan reconciliation was interrupted')
+    expect(box.lifecycle().map((call) => call.operation)).toEqual(['kill'])
+    expect(box.managerChildren()).toEqual([])
+    const available = locks!.tryLock(path.join(box.state, 'admission.lock'))
+    if (available !== null) locks!.unlock(available)
+    expect(available).not.toBeNull()
+    job.child.kill('SIGTERM')
+    await expect.poll(() => job.child.exitCode, { timeout: 1500 }).toBe(143)
+    expect(await job.done).toBe(143)
+    assertReleased(box)
+  } finally {
+    await box.cleanup()
+  }
+}, 10_000)
+
+test('a locked owner keeps its slice while a neighboring orphan is reaped', async (context) => {
+  if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+  const queue = await import('./queue')
+  const box = reaperSandbox()
+  const owner = box.addSlice('aaaaaaaaaaaa')
+  const orphan = box.addSlice('bbbbbbbbbbbb')
+  const held = queue.promote(
+    box.state,
+    queue.enqueue(box.state, {
+      id: 'aaaaaaaaaaaa',
+      label: 'fixture',
+      jobClass: 'light',
+      estimateBytes: 1048576,
+      sliceRoot: box.sliceRoot,
+      quiet: false,
+      server: false,
+      cwd: box.root,
+      pid: process.pid,
+      since: new Date().toISOString(),
+    }),
+  )
+  writeFileSync(path.join(box.state, 'drain.request'), `pid=${process.pid} holder=fixture`)
+  try {
+    const job = box.start()
+    await expect.poll(() => job.child.exitCode, { timeout: 4500 }).toBe(75)
+    expect(await job.done).toBe(75)
+    expect(box.lifecycle().map((call) => call.slice)).toEqual([orphan, orphan, orphan])
+    expect(box.lifecycle().some((call) => call.slice === owner)).toBe(false)
+    expect(existsSync(held.file)).toBe(true)
+    assertReleased(box)
+  } finally {
+    queue.release(held)
+    await box.cleanup()
+  }
+}, 10_000)
