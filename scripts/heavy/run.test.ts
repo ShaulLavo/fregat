@@ -342,6 +342,36 @@ function runningEntries(box: Box) {
   return existsSync(dir) ? readdirSync(dir).filter((name) => name.endsWith('.json')) : []
 }
 
+test('deadline tests collect when shell and systemd tools are absent', () => {
+  const box = sandbox()
+  const bin = path.join(box.root, 'js-only')
+  mkdirSync(bin)
+  symlinkSync(process.execPath, path.join(bin, 'bun'))
+  const node = spawnSync('node', ['-p', 'process.execPath'], { encoding: 'utf8' }).stdout?.trim()
+  if (node) symlinkSync(node, path.join(bin, 'node'))
+  const root = path.resolve(import.meta.dirname, '../..')
+  const report = path.join(box.root, 'collection.json')
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(root, 'node_modules/vitest/vitest.mjs'),
+      'run',
+      'scripts/heavy/deadline.test.ts',
+      '--environment',
+      'node',
+      '--reporter=json',
+      '--outputFile',
+      report,
+    ],
+    { cwd: root, encoding: 'utf8', env: { ...process.env, PATH: bin } },
+  )
+  const summary = JSON.parse(readFileSync(report, 'utf8'))
+  expect(result.status, JSON.stringify(summary)).toBe(0)
+  expect(summary).toMatchObject({ success: true, numFailedTestSuites: 0, numFailedTests: 0 })
+  expect(summary.numPendingTests).toBeGreaterThan(0)
+  expect(summary.numPendingTests).toBe(summary.numTotalTests)
+})
+
 test('sandbox cleanup stops an external gated process before removing its files', async () => {
   const box = sandbox()
   const ready = path.join(box.root, 'ready')

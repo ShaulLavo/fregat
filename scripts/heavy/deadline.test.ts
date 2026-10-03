@@ -84,6 +84,94 @@ function killSlice(slice: string) {
 }
 
 describe.skipIf(!userScopes)('whole-slice deadlines (requires user systemd scopes)', () => {
+  test('a stalled stop-post blocks an ordinary successor with a bounded error', async () => {
+    const box = deadlineBox()
+    const stranger = deadlineBox()
+    const stopPostPid = path.join(box.root, 'stop-post.pid')
+    const stopPost = path.join(box.root, 'stop-post.sh')
+    writeFileSync(
+      stopPost,
+      `echo $$ > ${JSON.stringify(stopPostPid)}\nkill -STOP $$\nexec systemctl --user kill --signal=SIGKILL "$1"\n`,
+    )
+    const env = launcher(
+      box,
+      `args=("$@"); for i in "\${!args[@]}"; do case "\${args[i]}" in ExecStopPost=*) slice=\${args[i]##* }; args[i]="ExecStopPost=/usr/bin/env bash ${stopPost} $slice";; esac; done; set -- "\${args[@]}"`,
+    )
+    const mainPid = path.join(box.root, 'main.pid')
+    const nestedPid = path.join(box.root, 'nested.pid')
+    const canaryPid = path.join(stranger.root, 'canary.pid')
+    const marker = path.join(box.root, 'successor')
+    const release = path.join(box.root, 'release')
+    const canary = start(
+      stranger,
+      'canary',
+      ['bash', '-c', 'echo $$ > "$1"; exec sleep 60', '_', canaryPid],
+      { jobClass: 'light', machine: true },
+    )
+    const owned = start(
+      box,
+      'stop-post-frozen',
+      [
+        'bash',
+        '-c',
+        'trap "" TERM; bash "$1" --unit="$2" bash -c \'trap "" TERM; echo $$ > "$1"; exec sleep 60\' _ "$3" & until [ -s "$3" ]; do sleep 0.02; done; echo $$ > "$4"; exec sleep 60',
+        '_',
+        NESTED,
+        `${box.sliceRoot}-nested.scope`,
+        nestedPid,
+        mainPid,
+      ],
+      { quiet: true, jobClass: 'light', machine: true, env },
+    )
+    let next: ReturnType<typeof start> | undefined
+    let slice: string | undefined
+    try {
+      await expect
+        .poll(() => existsSync(mainPid) && existsSync(canaryPid), { timeout: 8_000 })
+        .toBe(true)
+      expect(alive(pidIn(mainPid))).toBe(true)
+      expect(alive(pidIn(nestedPid))).toBe(true)
+      expect(alive(pidIn(canaryPid))).toBe(true)
+      const owner = live(box.state, 'jobs').find((entry) => entry.label === 'stop-post-frozen')!
+      slice = ownSlice(box.sliceRoot, owner.id)
+      owned.child.kill('SIGSTOP')
+      await expect.poll(() => existsSync(stopPostPid), { timeout: 8_000 }).toBe(true)
+      await expect.poll(() => bootSeconds(), { timeout: 20_000 }).toBeGreaterThan(owner.quietUntil!)
+      expect(alive(pidIn(stopPostPid))).toBe(false)
+      expect(serviceState(watchdogOf(slice))).toBe('not-found')
+      expect(sliceState(box.sliceRoot, slice)).toBe('running')
+      expect(alive(pidIn(nestedPid))).toBe(true)
+      const started = performance.now()
+      next = start(
+        box,
+        'ordinary-successor',
+        ['bash', '-c', 'touch "$1"; until [ -e "$2" ]; do sleep 0.02; done', '_', marker, release],
+        { jobClass: 'light', machine: true },
+      )
+      await expect
+        .poll(() => existsSync(marker) || next!.stderr().includes('Quiet lease'), {
+          timeout: 8_000,
+        })
+        .toBe(true)
+      expect(existsSync(marker)).toBe(false)
+      const result = await next.done
+      expect(result.code).toBe(2)
+      expect(result.stderr.match(/warn: quiet lease/g)).toHaveLength(1)
+      expect(result.stderr).toContain('Quiet lease')
+      expect(result.stderr).toContain('Fix:')
+      expect(performance.now() - started).toBeLessThan(8_000)
+      expect(alive(pidIn(nestedPid))).toBe(true)
+      expect(alive(pidIn(canaryPid))).toBe(true)
+    } finally {
+      writeFileSync(release, '')
+      if (slice) killSlice(slice)
+      owned.child.kill('SIGCONT')
+      owned.child.kill('SIGTERM')
+      canary.child.kill('SIGTERM')
+      await Promise.all([owned.done, next?.done, canary.done])
+    }
+  }, 30_000)
+
   test('stops TERM-ignoring main and nested siblings while the wrapper is suspended, preserving an unrelated live canary', async () => {
     const box = deadlineBox()
     const stranger = deadlineBox()
