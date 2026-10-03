@@ -125,7 +125,11 @@ export const settingsKeybindings: Scenario = {
     await step('desktop-targeted-delete')
 
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto(new URL('/', page.url()).href, { waitUntil: 'domcontentloaded' })
+    const home = new URL(page.url())
+    home.pathname = `${home.pathname.split('/~')[0]}/`
+    home.search = ''
+    home.hash = ''
+    await page.goto(home.href, { waitUntil: 'domcontentloaded' })
     await page.getByRole('button', { name: 'New session', exact: true }).waitFor()
     await page.keyboard.press('ControlOrMeta+,')
     await selectors.settingsSearch(page).fill('keyboard')
