@@ -259,15 +259,65 @@ nothing on it, and attaching many extensions stays cheap. A small cost per _inte
 is acceptable; any cost per _installed_ extension on the keystroke, write or frame path is a design
 bug, not a tuning task. Gates, with counters exact and timings against a same-machine control:
 
-| Gate | Measure                                                                                                           | Required                                                       |
-| ---- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| X1   | Calls into 1,000 extensions that contribute no `input`, per keystroke, paste and IME commit                       | 0                                                              |
-| X2   | Calls into 1,000 extensions with no `frame` or output subscription, per write and per painted frame               | 0                                                              |
-| X3   | Keystroke-to-PTY and write-to-paint latency with 100 and 1,000 inert extensions against none                      | inside the control envelope                                    |
-| X4   | Marginal cost per extra `input` handler that passes, 10 → 1,000 handlers                                          | small and flat (linear, no per-call allocation)                |
-| X5   | Payload objects built for an event no extension subscribes to (frame rows, OSC payloads, geometry)                | 0                                                              |
-| X6   | `Terminal.create` with 100 extensions against none; `terminal.use` and dispose of one extension with 100 attached | inside the control envelope; independent of the count attached |
-| X7   | Memory retained per inert extension after attach                                                                  | a few hundred bytes, measured                                  |
+| Gate | Measure                                                                                             | Required                                                                                                 |
+| ---- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| X1   | Calls into 1,000 extensions that contribute no `input`, per keystroke, paste and IME commit         | 0                                                                                                        |
+| X2   | Calls into 1,000 extensions with no `frame` or output subscription, per write and per painted frame | 0                                                                                                        |
+| X3   | Keystroke-to-PTY and write-to-paint latency with 100 and 1,000 inert extensions against none        | inside the control envelope                                                                              |
+| X4   | Marginal cost per extra `input` handler that passes, 10 → 1,000 handlers                            | small and flat (linear, no per-call allocation)                                                          |
+| X5   | Payload objects built for an event no extension subscribes to (frame rows, OSC payloads, geometry)  | 0                                                                                                        |
+| X6   | Input/write/frame/use/dispose at 0/100/1,000; `Terminal.create` also at 1 inert attachment          | Exact steady-state independence; fixed activation plus affine attachment counts; registered timing bound |
+| X7   | Memory retained per inert extension after attach                                                    | a few hundred bytes, measured                                                                            |
+
+**X6 registration (2026-10-03).** Complete the exact primary matrix before freezing a new unified
+operation driver: separately reset public use and single-handle disposal, count fresh identities
+and setup calls, and inventory host/session/native-adapter extension-payload factories with
+observable interested controls. One steady-state input, write, frame, attachment or handle disposal
+has identical counts at 0/100/1,000 other inert attachments. Source-categorized creation counts
+follow `core + I[N > 0] * K + B * N`: the N=1 activation control identifies fixed manager
+activation K, while per-attachment factory/setup work B stays constant for N>=1. Lazy activation
+is retained. Cold first public use is reported separately; a warmed zero-inert control may activate
+and dispose one seed before resetting counters, leaving zero installed inert attachments. The
+cold cost remains visible. Fresh handles and independent disposal closures remain required.
+Source-expression counters do not measure realized VM/native allocations or implicit iterators.
+
+Custom OSC native/public positive controls are a **pending separate subgate** until the #573
+native prerequisite and public routing/capability land and qualify. The current public checkpoint
+cannot observe that positive; other operations proceed without claiming OSC coverage. Owned
+tool-only AST instrumentation may cover host/session/native-adapter sources; shared production
+paths stay unchanged.
+
+The earlier strict observed-minimum/maximum lifecycle windows remain **FAILED**, with every
+upper and lower outlier retained. Their criterion and artifacts stay unchanged. Future timing
+acceptance measures the installed-count contrast directly: membership of every arm in a
+control-extrema range is a different quantity and can reject a faster treatment. This criterion
+revision does not establish a cause for any old outlier or convert an old result to a pass.
+
+Approved prospective protocol order: exact counters first, then a frozen unified driver and one
+registered quiet-turn window. Final registration awaits the completed primary evidence and all
+source/driver/launcher/native pins; the owner may tighten the 1.10 bound before that registration.
+
+- For each steady-state non-creation operation separately, compute per-process paired median
+  log ratios for 100/0 and 1,000/0. The one-sided 95% upper bootstrap ratio bound is at most 1.10
+  at both counts. This bounds installed-count overhead; cold first-use activation stays separate.
+- Run 40 independent Node process blocks in one quiet-turn window. Use 20,000 whole paired-vector
+  bootstrap resamples and seed 286006, keeping each process's count arms together. Retain every
+  block and failed operation. No optional stopping, block drops, outlier filtering or GC correction.
+- The unchanged #533 driver covers combined warmed same-value attach/dispose and passing input
+  at 0/1,000 only. Do not repeat it as the new qualification: the new unified driver must cover
+  the required public operation matrix with its own frozen proof identity.
+- Creation includes N=0/1/100/1,000 and reports
+  `(T1000 - T1 - (999 / 99) * (T100 - T1)) / T0`, with a one-sided 95% upper bound at most 0.10.
+  Also report `K_time = T1 - T0` with its confidence interval so activation remains visible.
+  Non-positive base measurements, missing arms and harness failures stay failed or inconclusive.
+- Public original-input/write/frame, separate use/dispose, fresh-identity attachment and public
+  creation must be covered before the non-OSC matrix can qualify. Existing native-byte/visible-row
+  diagnostics establish state correctness. No frame notification substitutes for the Plan 287
+  paint oracle; compositor/hardware latency and the pending OSC subgate remain unqualified.
+
+No new statistical window starts before final registration of the completed counter matrix,
+source pins, driver/launcher, sample count and thresholds. Older accepted tooling, proof sources
+and failed windows remain frozen; the prospective criterion does not reinterpret them.
 
 Harness: a counter test in the package's browser suite and `bun run bench:renderer` workloads with
 0, 100 and 1,000 inert extensions on the hardware adapter. If indexing bookkeeping grows with the

@@ -1,6 +1,6 @@
 {
   "name": "@fregat/hotkeys",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Keyboard shortcuts for editors: key parsing, chord tries and context resolution. A fork of TanStack Hotkeys.",
   "keywords": [
     "chords",
