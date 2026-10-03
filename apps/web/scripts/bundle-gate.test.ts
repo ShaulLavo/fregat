@@ -78,6 +78,31 @@ test('a phone first load that grew past its margin fails on the phone total', ()
   expect(result.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 620_000 }])
 })
 
+test('phone metadata gets 50 gzip bytes while total and owner limits stay fixed', () => {
+  const atLimit: GateReport = {
+    ...baseline,
+    phoneFirstLoad: { scriptGzip: 606_050 },
+    phoneSessionFirstLoad: { scriptGzip: 606_050 },
+  }
+  const result = checkFirstLoad(atLimit, pins)
+  expect(result.passed).toBe(true)
+  expect(result.phone).toEqual({ pinned: 600_000, now: 606_050, limit: 606_050 })
+  expect(result.total.limit).toBe(1_010_000)
+
+  const overPhone = checkFirstLoad(
+    { ...atLimit, phoneSessionFirstLoad: { scriptGzip: 606_051 } },
+    pins,
+  )
+  expect(overPhone.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 606_051 }])
+  const overOwner = checkFirstLoad(
+    { ...atLimit, owners: [{ owner: 'features/chat', firstLoadGzip: 126_001 }] },
+    pins,
+  )
+  expect(overOwner.failures).toEqual([{ owner: 'features/chat', pinned: 120_000, now: 126_001 }])
+  const overTotal = checkFirstLoad({ ...atLimit, firstLoad: { scriptGzip: 1_010_001 } }, pins)
+  expect(overTotal.failures).toEqual([{ owner: '(total)', pinned: 1_000_000, now: 1_010_001 }])
+})
+
 test('re-pinning keeps the history with its reason', () => {
   const next = pinsFrom(baseline, pins, 'Plan 108 landed', '2026-09-26T00:00:00.000Z')
   expect(next.history.map((entry) => entry.reason)).toEqual(['first pin', 'Plan 108 landed'])

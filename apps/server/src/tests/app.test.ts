@@ -1,3 +1,4 @@
+import serverPackage from '../../package.json' with { type: 'json' }
 import { textWriteRequest } from '../../test/file-transport'
 import { readTextResponse } from '../../test/file-transport'
 import { randomUUID } from 'node:crypto'
@@ -50,7 +51,7 @@ describe('fs rpc auth', () => {
       ok: true,
       label: hostname(),
       protocolVersion: ORCHESTRATION_WS_PROTOCOL_VERSION,
-      serverVersion: '0.0.1',
+      serverVersion: serverPackage.version,
       platform: { os: process.platform, arch: process.arch },
     })
     expect(repeated.environmentId).toBe(firstDescriptor.environmentId)
