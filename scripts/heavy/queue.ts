@@ -37,6 +37,8 @@ export type Entry = {
    * claim on the machine lapses even if its wrapper is suspended and cannot release it.
    */
   readonly quietUntil?: number
+  /** Absolute payload deadline in boot seconds; its producer's pinned shim enforces it. */
+  readonly quietDeadline?: number
   readonly cwd: string
   readonly pid: number
   /** When it joined the queue, then when it started. */

@@ -241,17 +241,21 @@ async function run(options: Options) {
       process.on(signal, () => job.stop(signal))
     }
     const holdMs = config.quietHoldSeconds * 1000
+    const deadline = placed.spec.host === 'local' ? placed.spec.runtimeDeadline : undefined
+    const remainingHoldMs =
+      deadline === undefined ? holdMs : Math.max(0, deadline - bootSeconds()) * 1000
     let stoppedAtHold = false
     const hold = options.quiet
       ? setTimeout(() => {
           stoppedAtHold = true
           job.stop('SIGTERM')
-        }, holdMs)
+        }, remainingHoldMs)
       : undefined
     const outcome = await job.done
     clearTimeout(hold)
     // systemd ends the scope at the hold too, so a run this process slept through counts.
-    const holdExpired = options.quiet && (stoppedAtHold || outcome.wallMs >= holdMs)
+    const holdExpired =
+      options.quiet && (stoppedAtHold || (deadline !== undefined && bootSeconds() >= deadline))
     if (holdExpired) {
       console.error(
         `[wave-heavy] quiet hold for '${options.label}' reached its ${config.quietHoldSeconds} s limit (developer.heavyJobQuietHoldSeconds), so the job was stopped. Run it again to queue for another hold.`,
@@ -328,6 +332,7 @@ async function admitLocal(
       id,
       sliceRoot: options.sliceRoot,
       runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
+      runtimeDeadline: admitted.held.entry.quietDeadline,
       entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
@@ -454,7 +459,8 @@ function attemptAdmission(
       .map(({ id, label, pid, cwd, sliceRoot }) => ({ id, label, pid, cwd, sliceRoot }))
     const drained = waiting.entry.quiet
       ? decideQuiet(
-          running.owners.length - serversAtAdmission.length + running.orphanCharges.length,
+          running.owners.filter((job) => !job.server && !expiredQuietWork(job, now)).length +
+            running.orphanCharges.length,
         )
       : null
     if (drained && !drained.admit) return { reason: drained.reason }
@@ -472,7 +478,10 @@ function attemptAdmission(
       return { reason: 'a slot lock was taken exclusively' }
     }
     const lease = waiting.entry.quiet
-      ? { quietUntil: now + config.quietHoldSeconds + stopTimeoutSeconds(config.graceSeconds) }
+      ? {
+          quietDeadline: now + config.quietHoldSeconds,
+          quietUntil: now + config.quietHoldSeconds + stopTimeoutSeconds(config.graceSeconds),
+        }
       : {}
     const held = promote(options.stateDir, waiting, lease)
     // Servers pass the external-lock admission gate, then retain only their entry lock.
@@ -489,6 +498,14 @@ function attemptAdmission(
   } finally {
     unlock(lock)
   }
+}
+
+// Older installed producers can still launch after their lease. Only the pinned deadline
+// guard lets an empty slice prove that its suspended owner has no payload left to launch.
+function expiredQuietWork(job: Entry, now: number) {
+  if (!job.quiet || job.quietDeadline === undefined || job.quietDeadline > now) return false
+  if (!Number.isFinite(job.quietDeadline) || (job.quietUntil ?? Infinity) > now) return false
+  return sliceState(job.sliceRoot, `${job.sliceRoot}-${job.id}.slice`) !== 'running'
 }
 
 /**

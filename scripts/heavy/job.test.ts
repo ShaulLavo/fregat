@@ -55,3 +55,16 @@ test('a finite local job gives the shim its whole-slice runtime budget', () => {
   expect(runtime).toBeGreaterThan(command.indexOf(SCOPE_SHIM))
   expect(command.slice(runtime, runtime + 2)).toEqual(['--runtime', '9'])
 })
+
+test('a quiet job passes its immutable boot-time deadline to the in-scope guard', () => {
+  const command = localCommand({
+    ...launch,
+    graceSeconds: 1,
+    runtimeLimitSeconds: 9,
+    runtimeDeadline: 123.45,
+    slice: 'heavy-1.slice',
+  })
+  const deadline = command.indexOf('--deadline')
+  expect(deadline).toBeGreaterThan(command.indexOf(SCOPE_SHIM))
+  expect(command.slice(deadline, deadline + 2)).toEqual(['--deadline', '12345'])
+})
