@@ -384,7 +384,11 @@ export class WebGlTerminalRenderer {
     if (this.wasZigFrame) this.needsFullRebuild = true
     this.wasZigFrame = false
     const initialRows = this.rowsToRebuild(damage)
-    if (initialRows.length === 0) return
+    if (initialRows.length === 0) {
+      if (damage === RenderStateDirty.False && !this.needsFullRebuild)
+        this.frames.notifyCleanUpdate()
+      return
+    }
     this.needsFullRebuild = true
     this.zigBuilder?.clearGlyphs()
     this.atlas.beginRow(zigGlyphRow)
@@ -405,8 +409,14 @@ export class WebGlTerminalRenderer {
 
   private drawZigFrame(pass: WebGlTextPass, damage: RenderStateDirty): boolean {
     if (!this.renderState.createFrameBuilder) return false
-    if (!this.needsFullRebuild && damage === RenderStateDirty.False && this.overlayRows.size === 0)
+    if (
+      !this.needsFullRebuild &&
+      damage === RenderStateDirty.False &&
+      this.overlayRows.size === 0
+    ) {
+      this.frames.notifyCleanUpdate()
       return true
+    }
     let builder = this.zigBuilder
     if (!builder || builder.columns !== this.grid.columns || builder.rows !== this.grid.rows) {
       this.zigBuilder = undefined

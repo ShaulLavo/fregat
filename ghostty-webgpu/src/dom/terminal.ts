@@ -766,6 +766,7 @@ export class Terminal {
         cursorBlink: appearance.cursor.blink,
         font,
         onError: (cause) => this.reportError(cause, 'renderer.restore'),
+        onCleanUpdate: () => this.handleCleanUpdate(),
         onTextFrame: (snapshot) => this.handleFrame(snapshot),
         needsFrameRows: () => this.accessibility !== undefined || (this.links?.needsFrame ?? false),
         onRowsChanged: (rows) => {
@@ -1121,7 +1122,7 @@ export class Terminal {
   private readFrame(): RendererTextFrameSnapshot | undefined {
     const snapshot = this.lastFrame
     if (!snapshot || snapshot.rows.length > 0) return snapshot
-    if (!this.canReadPaintedState) return undefined
+    if (!this.canReadPaintedState) return this.lastFullFrame
     const rows = Object.freeze(
       this.session.renderState.readTextRows
         ? this.session.renderState.readTextRows()
@@ -1136,6 +1137,11 @@ export class Terminal {
     const snapshot = this.lastFrame
     if (!snapshot) return
     this.updateFrameUi(snapshot)
+  }
+
+  private handleCleanUpdate(): void {
+    if (!this.lastFrame || !this.canReadPaintedState || this.renderer?.hasPendingFrame) return
+    this.lastFrameRevision = this.session.revision
   }
 
   private handleFrame(snapshot: RendererTextFrameSnapshot): void {

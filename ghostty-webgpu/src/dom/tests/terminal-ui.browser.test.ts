@@ -366,6 +366,7 @@ async function createIntegratedHarness(
 async function createObservedRendererHarness(
   options: GhosttyWebGpuTerminalOptions = {},
   backend: 'webgpu' | 'webgl2' = 'webgpu',
+  beforeCleanUpdate?: () => void,
 ): Promise<{
   readonly host: HTMLDivElement
   readonly renderer: WebGpuTerminalRenderer | WebGlTerminalRenderer
@@ -403,6 +404,10 @@ async function createObservedRendererHarness(
       })
       const observedOptions: WebGpuTerminalRendererOptions = {
         ...rendererOptions,
+        onCleanUpdate: () => {
+          beforeCleanUpdate?.()
+          rendererOptions.onCleanUpdate?.()
+        },
         onTextFrame: (snapshot) => {
           snapshots.push(snapshot)
           rendererOptions.onTextFrame?.(snapshot)
@@ -1410,12 +1415,8 @@ describe('terminal frame consumer demand in Chromium', () => {
       const snapshot = harness.terminal.frameSnapshot()!
       expect(snapshot.rows.slice(0, 2).map((row) => row.text.trimEnd())).toEqual(['AAA', 'EEE'])
       expect(snapshot.cursor.viewport).toMatchObject({ x: 3, y: 1 })
-      expect(
-        harness.terminal
-          .visibleLines()
-          .slice(0, 2)
-          .map((text) => text.trimEnd()),
-      ).toEqual(['AAA', 'EEE'])
+      expect(harness.snapshots.at(-1)?.rows).toEqual([])
+      expect(harness.readTextRowsCalls()).toBe(0)
       expect(atlas.rowsWithStaleReferences()).toEqual([])
       const rebuiltRows = renderer.metrics.rebuiltRows
       const styledReads = harness.readRowsCalls()
@@ -1570,6 +1571,120 @@ describe('terminal frame consumer demand in Chromium', () => {
     expect(harness.readTextRowsCalls()).toBe(reads)
     expect(harness.snapshots.at(-1)?.rows).toEqual([])
   })
+
+  it.each(
+    (['webgpu', 'webgl2'] as const).flatMap((backend) =>
+      [
+        { label: 'bell', output: '\u0007' },
+        { label: 'title', output: `${escape}]0;clean title\u0007` },
+      ].flatMap(({ label, output }) =>
+        (['hover', 'keyboard'] as const).map((discovery) => ({
+          backend,
+          discovery,
+          label,
+          output,
+        })),
+      ),
+    ),
+  )(
+    'permits first $discovery discovery after a clean $label update ($backend)',
+    async ({ backend, discovery, output }) => {
+      const harness = await createObservedRendererHarness({}, backend)
+      const scheduler = Reflect.get(harness.renderer, 'scheduler') as RenderScheduler
+      const changedRows: Array<readonly number[]> = []
+      harness.terminal.onFrame((event) => changedRows.push(event.rows))
+      harness.terminal.write('https://clean.test')
+      scheduler.flush()
+      const frames = harness.snapshots.length
+      const rowEvents = changedRows.length
+      const submittedFrames = harness.renderer.metrics.submittedFrames
+      const uploadedBytes = harness.renderer.metrics.uploadedBytes
+      expect(harness.readRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(0)
+
+      harness.terminal.write(output)
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
+      scheduler.flush()
+
+      expect(harness.snapshots.length).toBe(frames)
+      expect(changedRows).toHaveLength(rowEvents)
+      expect(harness.renderer.metrics.submittedFrames).toBe(submittedFrames)
+      expect(harness.renderer.metrics.uploadedBytes).toBe(uploadedBytes)
+      expect(harness.readRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(0)
+      if (discovery === 'keyboard') {
+        await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
+      } else {
+        moveTerminalPointer(harness.terminal, 5, 0)
+        await waitForUi(
+          () => harness.host.querySelector('[role="link"]') !== null,
+          'Clean update blocked first hover discovery',
+        )
+      }
+      expect(harness.host.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+        'https://clean.test',
+      )
+      expect(harness.readRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(1)
+    },
+  )
+
+  it.each(['webgpu', 'webgl2'] as const)(
+    'rejects queued real output during a reentrant clean-update callback (%s)',
+    async (backend) => {
+      let queued: (() => void) | undefined
+      const harness = await createObservedRendererHarness({}, backend, () => queued?.())
+      const scheduler = Reflect.get(harness.renderer, 'scheduler') as RenderScheduler
+      harness.terminal.write('https://old.test')
+      scheduler.flush()
+      const updates = harness.updateCalls()
+      queued = () => {
+        queued = undefined
+        harness.terminal.write(`${escape}[2J${escape}[Hreplacement without links`)
+      }
+
+      harness.terminal.write('\u0007')
+      scheduler.flush()
+
+      expect(harness.terminal.hasPendingFrame).toBe(true)
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
+      expect(harness.updateCalls()).toBe(updates + 1)
+      expect(harness.readTextRowsCalls()).toBe(0)
+      scheduler.flush()
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
+      harness.terminal.write(`${escape}[2J${escape}[Hhttps://fresh.test`)
+      scheduler.flush()
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
+      expect(harness.host.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+        'https://fresh.test',
+      )
+    },
+  )
+
+  it.each(['webgpu', 'webgl2'] as const)(
+    'keeps hidden-document output unsettled until its real paint (%s)',
+    async (backend) => {
+      const harness = await createObservedRendererHarness({}, backend)
+      const scheduler = Reflect.get(harness.renderer, 'scheduler') as RenderScheduler
+      harness.terminal.write('https://old.test')
+      scheduler.flush()
+      const updates = harness.updateCalls()
+      harness.renderer.setDocumentVisible(false)
+      harness.terminal.write(`${escape}[2J${escape}[Hhttps://hidden.test`)
+      scheduler.flush()
+
+      expect(harness.terminal.hasPendingFrame).toBe(false)
+      expect(harness.updateCalls()).toBe(updates)
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
+      expect(harness.readTextRowsCalls()).toBe(0)
+      harness.renderer.setDocumentVisible(true)
+      scheduler.flush()
+      await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
+      expect(harness.host.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+        'https://hidden.test',
+      )
+    },
+  )
 
   it('repaints a revision-advancing fit and permits link discovery after its new frame', async () => {
     const harness = await createObservedRendererHarness()

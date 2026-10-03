@@ -35,6 +35,10 @@ export class FrameObserver {
     this.textRows = []
   }
 
+  notifyCleanUpdate(): void {
+    this.options.onCleanUpdate?.()
+  }
+
   emit(
     state: RenderStateSource,
     cursor: RenderCursorSnapshot,

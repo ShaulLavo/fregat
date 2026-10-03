@@ -207,7 +207,11 @@ export class RowTerminalRenderer {
     if (this.cursorPhaseVisible !== phaseVisible) this.addCursorRow(cursor)
     this.cursorPhaseVisible = phaseVisible
     const rows = this.rowsToPaint(damage)
-    if (rows.length === 0) return
+    if (rows.length === 0) {
+      if (damage === RenderStateDirty.False && !this.needsFullRebuild)
+        this.frames.notifyCleanUpdate()
+      return
+    }
     const style = this.focused ? undefined : this.inactiveCursorStyle
     const cursorState = renderCursorState(this.cursor, this.cursorPhaseVisible, style)
     this.surface.beginFrame?.()

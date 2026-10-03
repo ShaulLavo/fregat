@@ -103,6 +103,8 @@ export interface WebGpuTerminalRendererOptions {
   deviceFactory?: () => Promise<GPUDevice>
   font: TerminalFittedFont
   onError?: (cause: unknown) => void
+  /** Called after a clean render-state update needs no painting or row notification. */
+  onCleanUpdate?: () => void
   onFrame?: (snapshot: RendererFrameSnapshot) => void
   /** Owned row text with lazily decoded cell strings and continuation flags. */
   onTextFrame?: (snapshot: RendererTextFrameSnapshot) => void
@@ -516,7 +518,11 @@ export class WebGpuTerminalRenderer {
     if (this.wasZigFrame) this.needsFullRebuild = true
     this.wasZigFrame = false
     const initialRows = this.rowsToRebuild(damage)
-    if (initialRows.length === 0) return
+    if (initialRows.length === 0) {
+      if (damage === RenderStateDirty.False && !this.needsFullRebuild)
+        this.frames.notifyCleanUpdate()
+      return
+    }
     this.needsFullRebuild = true
     this.zigBuilder?.clearGlyphs()
     this.atlas.beginRow(zigGlyphRow)
@@ -536,8 +542,14 @@ export class WebGpuTerminalRenderer {
 
   private drawZigFrame(damage: RenderStateDirty): boolean {
     if (!this.renderState.createFrameBuilder) return false
-    if (!this.needsFullRebuild && damage === RenderStateDirty.False && this.overlayRows.size === 0)
+    if (
+      !this.needsFullRebuild &&
+      damage === RenderStateDirty.False &&
+      this.overlayRows.size === 0
+    ) {
+      this.frames.notifyCleanUpdate()
       return true
+    }
     let builder = this.zigBuilder
     if (!builder || builder.columns !== this.grid.columns || builder.rows !== this.grid.rows) {
       this.zigBuilder = undefined
