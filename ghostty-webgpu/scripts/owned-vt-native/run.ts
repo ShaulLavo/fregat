@@ -39,6 +39,17 @@ if (!sourceArgument || !editorArgument) {
   )
   process.exit(0)
 }
+if (process.platform === 'win32') {
+  console.log('SKIP owned-VT native proof: the C sensor requires POSIX stdio.')
+  process.exit(0)
+}
+const zig = argument('--zig') ?? 'zig'
+const tools = argument('--binary') ? ['git'] : ['git', zig]
+const missingTools = tools.filter((tool) => !Bun.which(tool, { PATH: process.env['PATH'] ?? '' }))
+if (missingTools.length) {
+  console.log(`SKIP owned-VT native proof: required tools unavailable: ${missingTools.join(', ')}.`)
+  process.exit(0)
+}
 const source = resolve(sourceArgument)
 const editor = resolve(editorArgument)
 await verifyCleanSource(source)
@@ -117,7 +128,7 @@ try {
     )
     const build = Bun.spawn(
       [
-        argument('--zig') ?? 'zig',
+        zig,
         'build',
         '--summary',
         'all',
