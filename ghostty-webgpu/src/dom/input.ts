@@ -283,7 +283,7 @@ const refusedKeyPolicy = Object.freeze({ preventDefault: false, stopPropagation:
 
 type CompositionState =
   | { readonly phase: 'idle' }
-  | { readonly phase: 'cancelled'; readonly value: string }
+  | { readonly phase: 'cancelled' }
   | { readonly phase: 'active'; readonly value: string; readonly committed: boolean }
   | { readonly phase: 'awaiting' | 'ended'; readonly value: string }
 
@@ -352,17 +352,14 @@ class BrowserInputController implements DomInputController {
 
   private readonly handleCompositionEnd = (event: CompositionEvent): void => {
     if (this.disposed) return
-    if (this.composition.phase === 'cancelled') {
-      if (event.data) this.composition = { phase: 'cancelled', value: event.data }
-      return
-    }
+    if (this.composition.phase === 'cancelled') return
     if (this.composition.phase !== 'active') return
     const { committed, value } = this.composition
     this.composition = { phase: 'idle' }
     this.setCompositionValue('')
     if (committed) return
     if (event.data.length === 0) {
-      this.composition = { phase: 'cancelled', value }
+      this.composition = { phase: 'cancelled' }
       this.options.textarea.value = ''
       return
     }
@@ -380,13 +377,14 @@ class BrowserInputController implements DomInputController {
   private readonly handleInput = (event: Event): void => {
     if (this.disposed) return
     const input = event as InputEvent
+    const compositionInput = input.isComposing || input.inputType.includes('Composition')
     if (
-      this.composition.phase === 'cancelled' &&
-      (input.isComposing ||
-        input.inputType.includes('Composition') ||
-        (input.inputType === 'insertText' &&
-          this.inputValue(input.data) === this.composition.value))
+      !compositionInput &&
+      (this.composition.phase === 'ended' || this.composition.phase === 'cancelled')
     ) {
+      this.composition = { phase: 'idle' }
+    }
+    if (this.composition.phase === 'cancelled') {
       this.options.textarea.value = ''
       return
     }
@@ -397,9 +395,7 @@ class BrowserInputController implements DomInputController {
     const value = this.takeInputValue(input.data)
     if (value.length === 0) return
     if (this.composition.phase === 'ended') {
-      const duplicate =
-        value === this.composition.value &&
-        (input.inputType.includes('Composition') || input.inputType === 'insertText')
+      const duplicate = value === this.composition.value
       this.composition = { phase: 'idle' }
       if (duplicate) return
     }
@@ -432,13 +428,6 @@ class BrowserInputController implements DomInputController {
 
   private readonly handleKey = (event: KeyboardEvent): void => {
     if (this.disposed) return
-    if (
-      event.type === 'keydown' &&
-      !isComposingKey(event, false) &&
-      this.composition.phase !== 'active'
-    ) {
-      this.composition = { phase: 'idle' }
-    }
     this.updateModifierTracking(event)
     if (this.options.claimKey?.(event)) {
       if (event.type === 'keydown' && !event.repeat) {
@@ -719,7 +708,7 @@ class BrowserInputController implements DomInputController {
 
   resetTransientState(): void {
     if (this.composition.phase !== 'idle') {
-      this.composition = { phase: 'cancelled', value: this.composition.value }
+      this.composition = { phase: 'cancelled' }
     }
     this.setCompositionValue('')
     this.composingKeyPresses.clear()

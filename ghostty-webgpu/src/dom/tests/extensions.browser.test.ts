@@ -33,7 +33,11 @@ function press(terminal: Terminal, key = 'a', code = 'KeyA'): KeyboardEvent {
   return event
 }
 
-function compose(terminal: Terminal, text: string, order: 'input-first' | 'end-first'): void {
+function compose(
+  terminal: Terminal,
+  text: string,
+  order: 'input-first' | 'end-first' | 'end-only',
+): void {
   const textarea = terminal.textarea!
   textarea.dispatchEvent(new CompositionEvent('compositionstart', { data: '' }))
   textarea.value = text
@@ -408,6 +412,129 @@ describe('public extension activation', () => {
       }
     },
   )
+
+  it.each(['x', '中'])(
+    'preserves a separate keyless text action %s after an end-only composition',
+    async (later) => {
+      const inputs: TerminalInputEvent[] = []
+      const terminal = await openTerminal({
+        extensions: [
+          {
+            name: 'observe',
+            setup: () => ({
+              input: (input) => {
+                inputs.push(input)
+                return 'pass'
+              },
+            }),
+          },
+        ],
+      })
+      const output: string[] = []
+      terminal.onData((data) => output.push(decoder.decode(data)))
+      const textarea = terminal.textarea!
+      textarea.dispatchEvent(new CompositionEvent('compositionstart'))
+      textarea.value = '中'
+      textarea.dispatchEvent(
+        new InputEvent('input', {
+          data: '中',
+          inputType: 'insertCompositionText',
+          isComposing: true,
+        }),
+      )
+      textarea.dispatchEvent(new CompositionEvent('compositionend', { data: '中' }))
+      expect(output).toEqual(['中'])
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      textarea.value = later
+      textarea.dispatchEvent(
+        new InputEvent('input', {
+          data: later,
+          inputType: 'insertText',
+          isComposing: false,
+        }),
+      )
+      expect(output).toEqual(['中', later])
+      expect(inputs).toEqual([
+        { type: 'composition', text: '中' },
+        { type: 'text', data: later },
+      ])
+    },
+  )
+
+  it('lets an extension claim a new identical keyless action after an end-only composition', async () => {
+    const inputs: TerminalInputEvent[] = []
+    const terminal = await openTerminal({
+      extensions: [
+        {
+          name: 'text gate',
+          setup: () => ({
+            input: (input) => {
+              inputs.push(input)
+              return input.type === 'text' ? 'claim' : 'pass'
+            },
+          }),
+        },
+      ],
+    })
+    const output: string[] = []
+    terminal.onData((data) => output.push(decoder.decode(data)))
+    compose(terminal, '中', 'end-only')
+    const textarea = terminal.textarea!
+    textarea.value = '中'
+    textarea.dispatchEvent(new InputEvent('input', { data: '中', inputType: 'insertText' }))
+    expect(inputs).toEqual([
+      { type: 'composition', text: '中' },
+      { type: 'text', data: '中' },
+    ])
+    expect(output).toEqual(['中'])
+  })
+
+  it.each(['x', '中'])(
+    'preserves a separate keyless text action %s after cancelling composition',
+    async (later) => {
+      const terminal = await openTerminal()
+      const output: string[] = []
+      terminal.onData((data) => output.push(decoder.decode(data)))
+      const textarea = terminal.textarea!
+      textarea.dispatchEvent(new CompositionEvent('compositionstart'))
+      textarea.value = '中'
+      textarea.dispatchEvent(
+        new InputEvent('input', {
+          data: '中',
+          inputType: 'insertCompositionText',
+          isComposing: true,
+        }),
+      )
+      textarea.dispatchEvent(new CompositionEvent('compositionend', { data: '' }))
+      textarea.dispatchEvent(
+        new InputEvent('input', {
+          data: '中',
+          inputType: 'insertCompositionText',
+          isComposing: false,
+        }),
+      )
+      expect(output).toEqual([])
+      textarea.value = later
+      textarea.dispatchEvent(new InputEvent('input', { data: later, inputType: 'insertText' }))
+      expect(output).toEqual([later])
+    },
+  )
+
+  it('consumes the genuine composition final tail once and preserves a later identical text action', async () => {
+    const terminal = await openTerminal()
+    const output: string[] = []
+    terminal.onData((data) => output.push(decoder.decode(data)))
+    compose(terminal, '中', 'end-only')
+    const textarea = terminal.textarea!
+    const tail = new InputEvent('input', { data: '中', inputType: 'insertCompositionText' })
+    expect(tail.inputType).toBe('insertCompositionText')
+    textarea.dispatchEvent(tail)
+    expect(output).toEqual(['中'])
+    textarea.dispatchEvent(new InputEvent('beforeinput', { data: '中', inputType: 'insertText' }))
+    textarea.value = '中'
+    textarea.dispatchEvent(new InputEvent('input', { data: '中', inputType: 'insertText' }))
+    expect(output).toEqual(['中', '中'])
+  })
 
   it('preserves a later ordinary key with the same text as the previous composition', async () => {
     const terminal = await openTerminal()
