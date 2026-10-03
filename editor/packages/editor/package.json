@@ -111,7 +111,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@fregat/hotkeys": "0.0.1",
+    "@fregat/hotkeys": "catalog:",
     "@shikijs/engine-oniguruma": "4.4.3",
     "@singapore-editor/textbuffer": "workspace:*",
     "diff": "^9.0.0",

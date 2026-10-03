@@ -3966,6 +3966,10 @@ export function editorKeymapBindings(
   return [
     ...baseEditorKeymap[platform],
     ...(options.packs ?? defaultEditorPacks).flatMap((pack) => pack[platform]),
-    ...(options.bindings ?? []).map((binding) => ({ ...binding, source: 'user' as const })),
+    ...(options.bindings ?? []).map((binding) => ({
+      ...binding,
+      context: binding.context ?? 'Editor && !EditorWidget',
+      source: 'user' as const,
+    })),
   ]
 }
