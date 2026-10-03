@@ -61,6 +61,62 @@ test('macOS publishes actual fullscreen state to the app document', async () => 
   expect(mac).toMatch(/windowDidExitFullScreen:[\s\S]*?\[self publishWindowState\]/)
 })
 
+test('macOS publishes fullscreen targets at animation start and reconciles completion or failure', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('@property(strong) NSNumber *fullscreenTarget;')
+  expect(mac).toMatch(
+    /BOOL fullscreen = self\.fullscreenTarget \? self\.fullscreenTarget\.boolValue\s*:\s*\(self\.window\.styleMask & NSWindowStyleMaskFullScreen\) != 0;/,
+  )
+  for (const [callback, target] of [
+    ['windowWillEnterFullScreen', '@YES'],
+    ['windowWillExitFullScreen', '@NO'],
+    ['windowDidEnterFullScreen', 'nil'],
+    ['windowDidExitFullScreen', 'nil'],
+    ['windowDidFailToEnterFullScreen', 'nil'],
+    ['windowDidFailToExitFullScreen', 'nil'],
+  ]) {
+    const body = mac.match(new RegExp(`- \\(void\\)${callback}:\\([^)]*\\)[^{]*\\{([^}]+)\\}`))?.[1]
+    expect(body, callback).toBeDefined()
+    expect(body).toMatch(
+      new RegExp(
+        `self\\.fullscreenTarget = ${target};\\s*\\[self refreshWindowStateScript\\];\\s*\\[self publishWindowState\\];`,
+      ),
+    )
+  }
+  for (const callback of ['windowDidFailToEnterFullScreen', 'windowDidFailToExitFullScreen']) {
+    expect(mac).toContain(`- (void)${callback}:(NSWindow *)window`)
+  }
+})
+
+test('macOS fills content bounds and outsets the glass rim beyond their clip', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  const mount = mac.match(/- \(void\)mountContentView:\(NSView \*\)view \{([\s\S]*?)\n\}/)?.[1]
+  expect(mount).toBeDefined()
+  expect(mount).toContain('NSView *content = self.window.contentView;')
+  expect(mount).toContain('view.translatesAutoresizingMaskIntoConstraints = NO;')
+  expect(mount).toContain('[content addSubview:view];')
+  expect(mount).toContain('[NSLayoutConstraint activateConstraints:@[')
+  expect(mount).toContain('CGFloat outset = view == self.glassEffect ? 4 : 0;')
+  for (const [edge, constant] of [
+    ['leading', '-outset'],
+    ['trailing', 'outset'],
+    ['top', '-outset'],
+    ['bottom', 'outset'],
+  ]) {
+    expect(mount).toContain(
+      `[view.${edge}Anchor constraintEqualToAnchor:content.${edge}Anchor constant:${constant}]`,
+    )
+  }
+  expect(mac).toContain('window.contentView.layer.masksToBounds = YES;')
+  expect(mac).toContain('[effect setValue:@0 forKey:@"cornerRadius"];')
+  for (const view of ['effect', 'host.glassEffect', 'view']) {
+    expect(mac).toContain(`[host mountContentView:${view}];`)
+  }
+  expect(mac).not.toContain('autoresizingMask')
+  expect(mac).not.toContain('contentLayoutGuide')
+  expect(mac).not.toContain('safeAreaLayoutGuide')
+})
+
 test('macOS clears content and WebKit root layer opacity only in vibrant mode', async () => {
   const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
   expect(mac).toContain('#import <QuartzCore/QuartzCore.h>')
@@ -192,9 +248,7 @@ test('macOS keeps a negligible behind-window material visible to the compositor 
   expect(mac).toContain('self.glassEffect.hidden = !glass;')
   expect(mac).not.toMatch(/(?:self|host)\.effect\s*=\s*nil|removeFromSuperview/)
   expect(mac).not.toMatch(/(?:self\.)?effect\.hidden = .*none/)
-  expect(mac).toMatch(
-    /\[window\.contentView addSubview:effect\];[\s\S]*?\[window\.contentView addSubview:view\];/,
-  )
+  expect(mac).toMatch(/\[host mountContentView:effect\];[\s\S]*?\[host mountContentView:view\];/)
 })
 
 test('macOS leaves translucent opacity to the page and starts with a clear backdrop', async () => {
@@ -221,7 +275,7 @@ test('macOS leaves translucent opacity to the page and starts with a clear backd
   expect(mac).toContain('self.glassEffect.hidden = !glass;')
   expect(mac).toContain('text, host.glassEffect ? @"true" : @"false"')
   expect(mac).toMatch(
-    /\[window\.contentView addSubview:effect\];[\s\S]*?\[window\.contentView addSubview:host\.glassEffect\];[\s\S]*?\[window\.contentView addSubview:view\];/,
+    /\[host mountContentView:effect\];[\s\S]*?\[host mountContentView:host\.glassEffect\];[\s\S]*?\[host mountContentView:view\];/,
   )
   expect(mac).not.toMatch(/\bNSGlassEffectView\s*\*/)
   expect(mac).toContain('platformBridge.capabilities.windowGlass')
