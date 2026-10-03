@@ -3,6 +3,7 @@ import { realpathSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { isRecord } from '@workspace/utils/objects'
+import { settingsWriteContendedError } from './structured-errors'
 
 type Waiter = {
   readonly ready: () => void
@@ -37,17 +38,7 @@ async function acquireSettingsWriteLease(filePath: string): Promise<SettingsWrit
   if (coordinator.held) await waitForCoordinator(coordinator)
   coordinator.held = true
 
-  let released = false
-  return {
-    canonicalPath,
-    waitMs: elapsedMs(startedAt),
-    release: () => {
-      if (released) return
-
-      released = true
-      releaseCoordinator(canonicalPath, coordinator)
-    },
-  }
+  return settingsWriteLease(canonicalPath, coordinator, elapsedMs(startedAt))
 }
 
 export async function withSettingsWriteCoordinator<T>(
@@ -60,6 +51,43 @@ export async function withSettingsWriteCoordinator<T>(
     return await operation(lease)
   } finally {
     lease.release()
+  }
+}
+
+/** Boot cannot wait for an async owner without preventing that owner from releasing. */
+export function withSettingsWriteCoordinatorSync<T>(
+  filePath: string,
+  operation: (lease: SettingsWriteLease) => T,
+): T {
+  const canonicalPath = canonicalSettingsPathSync(filePath)
+  const coordinator = coordinatorFor(canonicalPath)
+  if (coordinator.held) throw settingsWriteContendedError(0, 0)
+
+  coordinator.references += 1
+  coordinator.held = true
+  const lease = settingsWriteLease(canonicalPath, coordinator, 0)
+
+  try {
+    return operation(lease)
+  } finally {
+    lease.release()
+  }
+}
+
+function settingsWriteLease(
+  canonicalPath: string,
+  coordinator: Coordinator,
+  waitMs: number,
+): SettingsWriteLease {
+  let released = false
+  return {
+    canonicalPath,
+    waitMs,
+    release: () => {
+      if (released) return
+      released = true
+      releaseCoordinator(canonicalPath, coordinator)
+    },
   }
 }
 

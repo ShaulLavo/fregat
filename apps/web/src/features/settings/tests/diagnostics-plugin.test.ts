@@ -129,6 +129,20 @@ test('cleanup clears editor markers and unsubscribes from settings updates', () 
   expect(host.highlights).toHaveLength(rendered)
 })
 
+test('removed keys produce no editor diagnostic even when the key range remains', () => {
+  const text = '{ "window.frost": true }'
+  expect(
+    settingsEditorDiagnostics('user', settingsFile(text, 'window.frost'), [
+      {
+        id: 'window.frost',
+        kind: 'removed-key',
+        layer: 'user',
+        detail: 'Window frost was replaced by Window material.',
+      },
+    ]),
+  ).toEqual([])
+})
+
 test('a malformed document renders parse errors instead of last-good value diagnostics', () => {
   const text = '{ "unknown.key" }'
   const file: SettingsLayerFile = {

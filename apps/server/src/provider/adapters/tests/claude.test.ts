@@ -301,6 +301,7 @@ describe('ClaudeProviderAdapter', () => {
       {
         cacheReadTokens: 400,
         cacheWriteTokens: 30,
+        reportedCache: { readTokens: 400, writeTokens: 30 },
         continuesEarlierTurns: false,
         costUsd: 0.42,
         inputTokens: 12,

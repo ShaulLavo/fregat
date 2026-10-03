@@ -20,10 +20,11 @@ const CARRIED_OVER: ReadonlySet<SettingsDiagnostic['kind']> = new Set(['migrated
  * thing missing was somewhere to show them.
  */
 export function DiagnosticsBanner({ diagnostics }: { diagnostics: readonly SettingsDiagnostic[] }) {
-  if (diagnostics.length === 0) return null
+  const persistent = diagnostics.filter((diagnostic) => diagnostic.kind !== 'removed-key')
+  if (persistent.length === 0) return null
 
-  const carried = diagnostics.filter((diagnostic) => CARRIED_OVER.has(diagnostic.kind))
-  const dropped = diagnostics.filter((diagnostic) => !CARRIED_OVER.has(diagnostic.kind))
+  const carried = persistent.filter((diagnostic) => CARRIED_OVER.has(diagnostic.kind))
+  const dropped = persistent.filter((diagnostic) => !CARRIED_OVER.has(diagnostic.kind))
 
   return (
     <div className='mb-(--density-section-padding) flex flex-col gap-(--density-control-gap)'>

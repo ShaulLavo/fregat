@@ -159,7 +159,7 @@ work transferred into execution plans, the original issue links, and remaining i
 | [305](305-spellcheck-language-support.md)             | Explicit spelling languages and dictionary loading                            |
 | [306](306-bun-json-worker.md)                         | JSON syntax data in the Bun worker                                            |
 | [307](307-diff-row-topology.md)                       | Aligned side-by-side diff rows                                                |
-| [308](308-account-usage-feed.md)                      | Adopt passive per-account usage observations                                  |
+| [308](308-account-usage-feed.md)                      | Bounded Fregat usage cache and Mesh feed                                      |
 | [309](309-account-usage-history.md)                   | Deduplicated transcript usage history                                         |
 | [310](310-allowance-visibility.md)                    | Unused allowance and owner-started backlog work                               |
 | [311](311-automatic-machine-placement.md)             | Visible and overridable automatic placement                                   |
@@ -170,6 +170,7 @@ work transferred into execution plans, the original issue links, and remaining i
 | [316](316-session-attention.md)                       | Session rail attention states                                                 |
 | [317](317-tree-sitter-phase-two-prerequisites.md)     | Deferred parser pins and held-out corpus                                      |
 | [318](318-machine-connection-controls.md)             | Persistent connection state and confirmed removal                             |
+| [319](319-agent-ui-mcp.md)                            | Agents reveal and drive the Fregat UI over MCP                                |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |

@@ -34,7 +34,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target browser --format esm --packages external --tsconfig-override tsconfig.build.json && tsc -p tsconfig.build.json",
+    "build": "bun build src/index.ts --outdir dist --target browser --format esm --packages external --external '@fregat/hotkeys*' && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",

@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import {
   chmod,
   mkdir,
@@ -58,6 +59,47 @@ describe('atomic write', () => {
       expect(await readdir(path.dirname(target))).toEqual(['file.json'])
     },
   )
+
+  it('checks a synchronous precondition after staging and before replacing the target', async () => {
+    const directory = await temporaryDirectory()
+    const target = path.join(directory, 'file.json')
+    await writeFile(target, 'previous')
+    let checked = false
+    writeFileAtomicSync(target, 'next', {
+      durability: 'fsync-all',
+      beforeCommit: () => {
+        const staged = readdirSync(directory).find((entry) => entry !== 'file.json')
+        expect(staged).toBeDefined()
+        expect(readFileSync(path.join(directory, staged!), 'utf8')).toBe('next')
+        expect(readFileSync(target, 'utf8')).toBe('previous')
+        checked = true
+      },
+    })
+    expect(checked).toBe(true)
+    expect(await readFile(target, 'utf8')).toBe('next')
+  })
+
+  it('discards synchronous staged bytes when a precondition rejects an external change', async () => {
+    const directory = await temporaryDirectory()
+    const target = path.join(directory, 'file.json')
+    await writeFile(target, 'previous')
+    const failure = { code: 'TEST_PRECONDITION' }
+    let caught: unknown
+    try {
+      writeFileAtomicSync(target, 'next', {
+        durability: 'fsync-all',
+        beforeCommit: () => {
+          writeFileSync(target, 'external')
+          throw failure
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBe(failure)
+    expect(await readFile(target, 'utf8')).toBe('external')
+    expect(await readdir(directory)).toEqual(['file.json'])
+  })
 
   // A umask of 022 or 002 would drop write bits from 0o666 without the chmod.
   it('applies the requested mode exactly', async () => {

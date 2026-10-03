@@ -16,6 +16,7 @@ import {
 } from './comparison-guards.mjs'
 import {
   positiveInteger,
+  gpuCommandTimeout,
   selection,
   hardwareLaunch,
   frameBuilders,
@@ -23,6 +24,8 @@ import {
   selectedPhases,
   measurementCases,
   measurementRepetitions,
+  outputFixture,
+  selectedTracePhases,
 } from './comparison-options.mjs'
 import { presentationLatency } from './comparison-latency.mjs'
 import { comparisonLatencyEndpoint } from './comparison-compact.mjs'
@@ -92,8 +95,10 @@ const variantIds = selectedVariants(
     : ['ghostty-webgpu', 'xterm-webgl'],
 )
 const s = manifest.settings
+const gpuCommandTimeoutMilliseconds = gpuCommandTimeout(s, tracing)
+const gpuSettings = { ...s, gpuCommandTimeoutMilliseconds }
 const ownedComputePids = []
-const gpuGate = createGpuGate(s, { allowedComputePids: ownedComputePids })
+const gpuGate = createGpuGate(gpuSettings, { allowedComputePids: ownedComputePids })
 if (!smoke && platform() === 'darwin') {
   const power = execFileSync('/usr/bin/pmset', ['-g', 'batt'], { encoding: 'utf8' })
   assert(power.includes("'AC Power'"), 'waiting for AC')
@@ -108,18 +113,14 @@ const latencySamples = positiveInteger(
   s.latencySamples,
 )
 const outputFrames = positiveInteger(args, '--output-frames', s.outputFrames)
+const selectedOutputFixture = outputFixture(args, manifest.fixtures)
 const tickSeconds =
   platform() === 'linux'
     ? 1 / Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
     : null
 const cpuOptions = { tickSeconds }
 const traceFrames = positiveInteger(args, '--trace-frames', 180)
-const tracePhases = selection(
-  args,
-  '--trace-phase',
-  ['latency', 'ascii', 'sgr'],
-  ['latency', 'ascii', 'sgr'],
-)
+const tracePhases = selectedTracePhases(args, manifest.fixtures)
 await prepareOutput(output, { tracing })
 const temporary = join(root, 'tmp')
 await mkdir(temporary, { recursive: true })
@@ -194,9 +195,11 @@ const artifact = {
   manifest,
   smoke,
   tracing,
+  gpuCommandTimeoutMilliseconds,
   repetitions: smoke ? 1 : repetitions,
   latencySamples,
   outputFrames,
+  outputFixture: selectedOutputFixture,
   cpuTickSeconds: tickSeconds,
   counts,
   variants: variantIds,
@@ -669,7 +672,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       run.phases = []
       const configurations = [
         { name: 'latency', operation: () => latency(page, session) },
-        ...['ascii', 'sgr'].map((name) => ({
+        ...manifest.fixtures.map(({ name }) => ({
           name,
           operation: () =>
             page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
@@ -735,18 +738,24 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       )
     }
     if (phases.includes('output')) {
-      run.phase = 'output/ascii/warmup'
-      await page.evaluate(() => window.__compare.burst('ascii', 3))
-      run.phase = 'output/ascii'
-      const outputMeasurement = await qualifiedWindow(run, 'output/ascii', () =>
+      run.phase = `output/${selectedOutputFixture}/warmup`
+      await page.evaluate((name) => window.__compare.burst(name, 3), selectedOutputFixture)
+      run.phase = `output/${selectedOutputFixture}`
+      const outputMeasurement = await qualifiedWindow(run, run.phase, () =>
         measureCpu(
           browserSession,
-          () => page.evaluate((frames) => window.__compare.burst('ascii', frames), outputFrames),
+          () =>
+            page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
+              name: selectedOutputFixture,
+              frames: outputFrames,
+            }),
           cpuOptions,
         ),
       )
       run.output = {
         ...outputMeasurement.sample,
+        fixture: selectedOutputFixture,
+        input: manifest.fixtures.find(({ name }) => name === selectedOutputFixture),
         cpu: outputMeasurement.cpu,
         memory: phases.includes('memory') ? await memory(page, session, browserSession) : undefined,
       }
@@ -824,7 +833,7 @@ try {
         : null,
   }
   artifact.environment.gpuIdleSettings = Object.fromEntries(
-    Object.entries(s).filter(([key]) => key.startsWith('gpu')),
+    Object.entries(gpuSettings).filter(([key]) => key.startsWith('gpu')),
   )
   for (let repetition = 0; repetition < artifact.repetitions; repetition++) {
     if (!smoke) {
@@ -892,6 +901,24 @@ try {
   throw error
 } finally {
   await writeFile(artifactPath, JSON.stringify(artifact, null, 2) + '\n')
+  await writeFile(
+    join(output, 'qualification.json'),
+    JSON.stringify(
+      {
+        environment: artifact.environment,
+        qualifications: artifact.qualifications,
+        gpuCommandTimeoutMilliseconds: artifact.gpuCommandTimeoutMilliseconds,
+        runs: artifact.runs.map(({ variant, count, repetition, gpuWindows }) => ({
+          variant,
+          count,
+          repetition,
+          gpuWindows,
+        })),
+      },
+      null,
+      2,
+    ) + '\n',
+  )
   await browser?.close()
   echo.close()
   await new Promise((resolve) => server.close(resolve))

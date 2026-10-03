@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { providerSessionCacheSchema } from './provider-session-cache'
 import { providerInstanceIdSchema } from './chat-ids'
 import { isoDateTimeSchema, trimmedNonEmptyStringSchema } from './chat-model'
 import { providerDriverKindSchema } from './orchestration-runtime'
@@ -204,6 +205,7 @@ export const providerUsageSessionTotalSchema = v.object({
   tokens: tokenCountSchema,
   turns: tokenCountSchema,
   unpricedTokens: tokenCountSchema,
+  cache: providerSessionCacheSchema,
 })
 
 export type ProviderUsageSessionTotal = v.InferOutput<typeof providerUsageSessionTotalSchema>

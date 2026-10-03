@@ -33,6 +33,7 @@ export type TestServer = {
   restart: (
     options?: Pick<AppOptions, 'system' | 'systemRoot' | 'workspaceRoot'> & {
       providerRuntime?: boolean
+      settingsWatch?: boolean
       providerAdapter?: MockProviderAdapter
     },
   ) => Promise<void>
@@ -152,6 +153,7 @@ export async function makeTestServer({
     restart: async (options = {}) => {
       await closeApp(app)
       providerRuntime = options.providerRuntime ?? providerRuntime
+      settingsWatch = options.settingsWatch ?? settingsWatch
       providerAdapter = options.providerAdapter ?? providerAdapter
       system = options.system ?? system
       systemRoot = options.systemRoot ?? systemRoot
