@@ -1,5 +1,5 @@
 import type { BindingResolutionEntry } from '@/keymap/active-bindings'
-import type { UnmappedPresetBinding } from '@/keymap/default-bindings'
+import type { UnmappedPresetBinding } from '@/keymap/presets/inventory'
 
 /** The raw resolution report as plain text, for pasting into an issue. */
 export function shortcutReport(

@@ -712,6 +712,17 @@ export const selectors = {
     page.locator('[data-settings-header]').getByText(/^\d+ settings?$/),
   shortcutsSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
+  shortcutActions: (page: Page) =>
+    page.getByRole('button', { name: 'Shortcut actions', exact: true }),
+  shortcutReportCopy: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Copy shortcut report', exact: true }),
+  shortcutMetadataLoading: (page: Page) =>
+    page.getByRole('status', { name: 'Loading preset report', exact: true }),
+  shortcutMetadataError: (page: Page) =>
+    page.getByText('The preset report could not be loaded.', { exact: true }),
+  shortcutMetadataReload: (page: Page) =>
+    page.getByRole('button', { name: 'Reload app', exact: true }),
+  shortcutUnmapped: (page: Page) => page.getByRole('button', { name: /^Unmapped Zed actions/ }),
   shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
   shortcutRow: (page: Page, command: string, keys?: string, context?: string) =>
     page.locator(

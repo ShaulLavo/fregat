@@ -2,10 +2,9 @@ import { bindingsForInput, compileKeymap, createKeyInput, parseKeyContext } from
 import { expect, test } from '../../../test/fixtures'
 import { binding } from '../../../test/factories/key-binding'
 import { keyBindingResolution, resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
-import { defaultPlatformKeyBindings, presetPlatformKeyBindings } from '@/keymap/default-bindings'
+import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { editorCommandIdFromPlatform } from '@/keymap/editor-keymap'
-import ours from '@/keymap/presets/ours.json'
-import zed from '@/keymap/presets/zed.json'
+import { ours, zed, unmappedPresetBindings } from '@/keymap/presets/inventory'
 
 function selected(
   entries: ReturnType<typeof resolvedPlatformKeyBindings>,
@@ -37,9 +36,9 @@ test('ours preserves the pinned translation apart from the approved four documen
     'workspace.navigateBack',
     'workspace.navigateForward',
   ])
-  const oursPreset = presetPlatformKeyBindings('linux', 'ours')
-  expect(oursPreset.unmapped.length).toBeGreaterThan(0)
-  expect(oursPreset.unmapped[0]).toMatchObject({
+  const unmapped = unmappedPresetBindings('linux', 'ours')
+  expect(unmapped.length).toBeGreaterThan(0)
+  expect(unmapped[0]).toMatchObject({
     platform: 'linux',
     context: expect.any(String),
     command: expect.any(String),
@@ -157,7 +156,10 @@ test('same-depth users win, targeted unbind keeps a different command, and null 
 
 test('unsupported upstream Save keys stay in inventory while valid save bindings remain active', () => {
   for (const preset of ['ours', 'zed'] as const) {
-    const result = presetPlatformKeyBindings('linux', preset)
+    const result = {
+      bindings: defaultPlatformKeyBindings('linux', preset),
+      unmapped: unmappedPresetBindings('linux', preset),
+    }
     expect(result.bindings.some((binding) => binding.keys === 'SAVE')).toBe(false)
     expect(result.unmapped).toContainEqual(
       expect.objectContaining({ keys: 'SAVE', command: 'workspace::Save' }),

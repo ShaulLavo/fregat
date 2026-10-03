@@ -17,30 +17,14 @@ import {
   type EditorKeymapPack,
 } from '@singapore-editor/core/keymap'
 import { detectPlatform, type KeymapEntry } from '@fregat/hotkeys'
-import {
-  chordKeys,
-  isBindableChord,
-  parsedChord,
-  type PlatformName,
-} from '@workspace/client-core/commands/chord'
+import { chordKeys, parsedChord, type PlatformName } from '@workspace/client-core/commands/chord'
 import type { KeybindingPreset } from '@workspace/client-core/commands/metadata'
 
-import ours from '@/keymap/presets/ours.json'
-import zed from '@/keymap/presets/zed.json'
+import { presetRuntimeRows, oursRuntimePatches } from '@/keymap/presets/runtime'
 import vscodeApp from '@/keymap/presets/vscode-app.json'
 import { editorCommandIdFromPlatform, editorPlatformCommandId } from '@/keymap/editor-keymap'
 import { isPlatformCommandId, platformCommand } from '@/keymap/table'
 import type { PlatformKeyBinding } from '@/keymap/types'
-
-export type UnmappedPresetBinding = {
-  readonly platform: string
-  readonly context: string
-  readonly command: string
-  readonly keys: string
-  readonly reason: string
-}
-
-type ZedRow = (typeof zed)[number]
 
 const vscodePacks: readonly EditorKeymapPack[] = [
   vscodeNavigationPack,
@@ -61,14 +45,6 @@ export function defaultPlatformKeyBindings(
   preset: KeybindingPreset = 'ours',
   shellKeys = false,
 ): readonly PlatformKeyBinding[] {
-  return presetPlatformKeyBindings(platform, preset, shellKeys).bindings
-}
-
-export function presetPlatformKeyBindings(
-  platform: PlatformName = detectPlatform(),
-  preset: KeybindingPreset = 'ours',
-  shellKeys = false,
-) {
   const shell = shellKeys
     ? terminalShellKeysPack.map((entry) => presetBinding(entry, platform))
     : []
@@ -104,60 +80,28 @@ export function presetPlatformKeyBindings(
       pack[platform].map((entry) => presetBinding(entry, platform)),
     )
     const terminal = terminalDefaultPack[platform].map((entry) => presetBinding(entry, platform))
-    return {
-      bindings: [...app, ...appWidgets, ...widgets, ...editor, ...terminal, ...readOnly, ...shell],
-      unmapped: [],
-    }
+    return [...app, ...appWidgets, ...widgets, ...editor, ...terminal, ...readOnly, ...shell]
   }
-  const rows: readonly ZedRow[] = preset === 'ours' ? ours : zed
-  const current = rows.filter((row) => row.platform === (platform === 'mac' ? 'mac' : 'linux'))
-  const bindings: PlatformKeyBinding[] = []
-  const unmapped: UnmappedPresetBinding[] = []
-  for (const row of current) {
-    if ('reserved' in row && row.reserved && row.context && row.reason === null) {
-      bindings.push(
-        presetBinding(
-          { keys: row.keys, command: null, context: row.context, source: 'default' },
-          platform,
-          row.upstreamCommand,
-        ),
-      )
-      continue
-    }
-    if (
-      !row.command ||
-      !row.context ||
-      !isPlatformCommandId(row.command) ||
-      !isBindableChord(row.keys)
-    ) {
-      unmapped.push({
-        platform,
-        context: row.context ?? row.upstreamContext,
-        command: row.upstreamCommand,
-        keys: row.keys,
-        reason:
-          row.reason ??
-          (isBindableChord(row.keys)
-            ? 'The command is unavailable in this client.'
-            : 'The key is unavailable in this client.'),
-      })
-      continue
-    }
-    bindings.push(
-      presetBinding(
-        {
-          keys: row.keys,
-          command: editorCommandIdFromPlatform(row.command) ?? row.command,
-          context: row.context,
-          ...('args' in row ? { args: row.args } : {}),
-          source: 'default',
-        },
-        platform,
-        row.upstreamCommand,
-      ),
+  const current = presetRuntimeRows.filter(
+    (row) => row[1] === (platform === 'mac' ? 'mac' : 'linux'),
+  )
+  const bindings = current.map(([index, , keys, command, context, upstreamCommand, args]) => {
+    const patch =
+      preset === 'ours' ? oursRuntimePatches.find((entry) => entry[0] === index) : undefined
+    const action = patch?.[1] ?? command
+    return presetBinding(
+      {
+        keys,
+        command: action === null ? null : (editorCommandIdFromPlatform(action) ?? action),
+        context: patch?.[2] ?? context,
+        ...(args === undefined ? {} : { args }),
+        source: 'default',
+      },
+      platform,
+      upstreamCommand,
     )
-  }
-  return { bindings: [...appWidgets, ...widgets, ...bindings, ...readOnly, ...shell], unmapped }
+  })
+  return [...appWidgets, ...widgets, ...bindings, ...readOnly, ...shell]
 }
 
 export function presetBinding(

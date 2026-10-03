@@ -2,6 +2,7 @@ import type { ProviderInstanceId } from '@workspace/contracts'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 
 export const settingsMutationKeys = {
+  shortcutMetadata: ['settings', 'shortcut-metadata', 'load'] as const,
   keybindings: ['settings', 'mutation', 'keybindings'] as const,
   notificationPermission: () => ['settings', 'notification-permission'] as const,
   importSessions: (providerInstanceId: ProviderInstanceId) =>

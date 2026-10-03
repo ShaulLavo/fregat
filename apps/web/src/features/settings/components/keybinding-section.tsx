@@ -15,10 +15,11 @@ import {
   ShortcutsToolbar,
   type ShortcutSearch,
 } from '@/features/settings/components/shortcuts-toolbar'
-import { UnmappedShortcuts } from '@/features/settings/components/unmapped-shortcuts'
+import { ShortcutMetadata } from '@/features/settings/components/shortcut-metadata'
 import { useBrowserKept } from '@/features/settings/hooks/use-browser-kept'
 import { useListGeometry } from '@/features/settings/hooks/use-list-geometry'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
+import { useShortcutMetadata } from '@/features/settings/hooks/use-shortcut-metadata'
 import { useShortcutRows } from '@/features/settings/hooks/use-shortcut-rows'
 import { SettingsScrollerContext } from '@/features/settings/providers/scroller-context'
 import { noteKeyboardEvent } from '@/features/settings/state/keyboard-seen'
@@ -50,6 +51,7 @@ type Overlay = {
 /** The windowed command list shares the Settings scroller and its sticky toolbar. */
 export function KeybindingSection() {
   const { defaults, overrides, platform, preset, rows } = useShortcutRows()
+  const metadata = useShortcutMetadata()
   const { setKeybinding } = useSettingsActions()
   const kept = useBrowserKept(platform)
   // The page lists rows for the deferred query; narrowing by the live one would split the two.
@@ -79,10 +81,8 @@ export function KeybindingSection() {
   const visible = searched.filter((row) => shortcutFilterMatches(row, filter))
   const overlayRow = overlay ? rows.find((row) => row.id === overlay.rowId) : undefined
   const recordMode = overlay && overlay.kind !== 'menu' ? overlay.kind : null
-  const { report, unmapped } = {
-    ...defaults,
-    report: keyBindingResolution(defaults.bindings, overrides, platform).report,
-  }
+  const report = keyBindingResolution(defaults, overrides, platform).report
+  const unmapped = metadata.data?.unmappedPresetBindings(platform, preset)
 
   function openRecorder(row: ShortcutRowModel, anchor: HTMLElement | null) {
     if (anchor) setOverlay({ kind: row.keys === null ? 'add' : 'change', rowId: row.id, anchor })
@@ -142,13 +142,13 @@ export function KeybindingSection() {
         command: row.command,
         keys: list,
         context,
-        defaultKeys: defaults.bindings
+        defaultKeys: defaults
           .filter((entry) => entry.command === row.command && entry.context === context)
           .map((entry) => entry.keys),
       },
     ]).raw
     const candidate = keyBindingResolution(
-      defaults.bindings,
+      defaults,
       v.parse(keybindingOverridesSchema, next['keybindings.overrides'] ?? []),
       platform,
     )
@@ -171,7 +171,7 @@ export function KeybindingSection() {
         onSearch={setSearch}
         platform={platform}
         ref={toolbarRef}
-        report={shortcutReport(report, unmapped)}
+        report={unmapped ? shortcutReport(report, unmapped) : null}
         search={search}
       />
       <div {...listbox.containerProps} aria-label='Keyboard shortcuts' className='focus-ring-inset'>
@@ -217,7 +217,7 @@ export function KeybindingSection() {
         />
       </div>
       <ShortcutEntries overrides={overrides} report={report} />
-      <UnmappedShortcuts platform={platform} preset={preset} unmapped={unmapped} />
+      <ShortcutMetadata metadata={metadata} platform={platform} preset={preset} />
       {recordMode && overlay && overlayRow ? (
         <ShortcutRecorder
           adding={recordMode === 'add'}
@@ -228,7 +228,7 @@ export function KeybindingSection() {
             setOverlay(null)
             setKeybinding(overlayRow.command, nextList(overlayRow, recordMode, keys, context), {
               context,
-              defaultKeys: defaults.bindings
+              defaultKeys: defaults
                 .filter(
                   (entry) => entry.command === overlayRow.command && entry.context === context,
                 )

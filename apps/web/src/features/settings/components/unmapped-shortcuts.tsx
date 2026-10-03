@@ -7,7 +7,7 @@ import {
 import type { PlatformName } from '@workspace/client-core/commands/chord'
 
 import { ShortcutKeys } from '@/features/settings/components/shortcut-keys'
-import type { UnmappedPresetBinding } from '@/keymap/default-bindings'
+import type { UnmappedPresetBinding } from '@/keymap/presets/inventory'
 
 export function UnmappedShortcuts({
   platform,
