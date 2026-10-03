@@ -24,6 +24,7 @@ import {
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderAdapter, ProviderRuntimeEvent } from './types'
 import { readClaudeUsageCache, readClaudeUsageIdentity } from './usage-claude-cache'
+import { readNativeUsageLabel } from './utils/usage-native-metadata'
 import {
   codexWindowPresentation,
   mergeUsageWindows,
@@ -38,6 +39,7 @@ type AccountTarget = {
   driverKind: ProviderDriverKind
   providerInstanceIds: ProviderInstanceId[]
   claudeCachePath: string | null
+  codexAuthPath: string | null
   credentialFingerprint?: string | null
 }
 type StoredAccount = {
@@ -304,6 +306,7 @@ export class ProviderUsageStore {
         driverKind: account.driverKind,
         providerInstanceIds: [],
         claudeCachePath: account.claudeCachePath ?? null,
+        codexAuthPath: account.codexAuthPath ?? null,
         credentialFingerprint: account.credentialFingerprint,
       }
       target.providerInstanceIds.push(providerInstanceId)
@@ -358,6 +361,15 @@ export class ProviderUsageStore {
         ? await readClaudeUsageIdentity(target.claudeCachePath)
         : undefined
       this.adoptIdentity(target, identity)
+      const metadataPath = target.codexAuthPath ?? target.claudeCachePath
+      const label =
+        metadataPath && (target.driverKind === 'claude' || target.driverKind === 'codex')
+          ? await readNativeUsageLabel(
+              metadataPath,
+              target.driverKind === 'claude' ? 'claude' : 'codex',
+            )
+          : undefined
+      this.applyLabel(target, label)
       const cached = target.claudeCachePath
         ? await readClaudeUsageCache(target.claudeCachePath, this.now())
         : null
@@ -400,6 +412,7 @@ export class ProviderUsageStore {
         return false
       }
       this.applyProbe(target, result, new Date(startedAt).toISOString(), source)
+      this.applyLabel(target, label)
       this.markAttempt(target, false)
       this.persist()
       outcome = result.kind
@@ -433,6 +446,11 @@ export class ProviderUsageStore {
         recordChatPipelineWarning('chat.pipeline.provider_usage.probe_failed', fields)
       else recordChatPipelineInfo('chat.pipeline.provider_usage.probe', fields)
     }
+  }
+
+  private applyLabel(target: AccountTarget, label: string | undefined) {
+    const stored = this.accounts.get(target.accountKey)
+    if (stored && label) stored.snapshot.label = label
   }
 
   private adoptCredentials(target: AccountTarget) {
