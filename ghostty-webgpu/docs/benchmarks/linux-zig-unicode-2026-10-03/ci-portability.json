@@ -59,6 +59,16 @@
     "ciActualGlyphFontAndBitmapMeasured": false,
     "qualification": "Matching-location controlled reproduction, not an exact CI-font run. The CI stack passed full native/JavaScript compositor equality before failing physical screen-row isolation."
   },
+  "correctedSourceAndTestCi": {
+    "head": "623eb68a73105d20a023c9fd4d05b29e0e50f20d",
+    "url": "https://github.com/ShaulLavo/fregat/actions/runs/37103792332",
+    "conclusion": "success",
+    "runtimeUnitPassed": 482,
+    "scriptTestsPassed": 174,
+    "browserPassed": 327,
+    "existingBrowserSkips": 2,
+    "runtimeLog": "/tmp/claude-1000/-work-projects-platform/b0f3ae80-afb6-4ad0-8a1d-c6db81c6feb5/zig-unicode-ci-final-runtime.log"
+  },
   "focusedVerification": {
     "browserPassed": 7,
     "excludedByNameFilter": 112,

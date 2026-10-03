@@ -267,12 +267,14 @@ unchanged. Keep the explicit JavaScript producer and atlas-resource recovery pat
 - [x] Measure the Unicode-prompt fixture at one terminal on WebGL with 2,700 output frames.
 - [x] Retain Zig/fallback counters, CPU process splits, latency and exact baseline-WASM provenance.
 - [x] Obtain independent implementation review, commit by path, push and open
-      [draft PR #462](https://github.com/ShaulLavo/fregat/pull/462); leave merge separate.
+      [PR #462](https://github.com/ShaulLavo/fregat/pull/462); leave merge separate.
 - [x] Correct stale native Unicode expectations and font-dependent screen-row isolation; seven
       focused cases pass, preserving exact native/JavaScript compositor parity and upload bounds.
 - [x] Independently review final source/test repairs and raw measurement evidence: 665 numerical
       checks, 143 archived source hashes and both frozen asset bundles pass.
-- [ ] Confirm corrected full-browser CI and final committed-head review, then mark the PR ready.
+
+Delivery gate: corrected full-browser CI and final committed-head review must pass before the PR
+is marked ready. Merge and deployment remain separate.
 
 All ten approved windows qualify: 80 runs and 674,400 measured native submissions. Synthetic
 Unicode fallback falls from 166,748 frames to zero. At 17 terminals, native WebGL renderer/total
