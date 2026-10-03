@@ -974,18 +974,19 @@ describe('provider usage store', () => {
     })
     expect(accounts.some((account) => account.windows.length)).toBe(false)
     await mapped.close()
+    let proxyReads = 0
     const unconfigured = new ProviderUsageStore(f.registry, {
       proxyInstanceIds: () => [WORK],
       proxyConfigured: () => false,
+      readProxy: async () => {
+        proxyReads += 1
+        return []
+      },
     })
+    unconfigured.accept(limitsEvent(WORK, [window('five_hour', 80)]))
     await unconfigured.refresh()
-    expect((await unconfigured.read()).accounts).toEqual([
-      expect.objectContaining({
-        accountKey: 'local-proxy-source',
-        state: 'no-data',
-        providerInstanceIds: [WORK],
-      }),
-    ])
+    expect((await unconfigured.read()).accounts).toEqual([])
+    expect(proxyReads).toBe(0)
     expect(calls.count).toBe(0)
     await unconfigured.close()
   })

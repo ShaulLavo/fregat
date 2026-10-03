@@ -175,8 +175,7 @@ export class ProviderUsageStore {
   async read(): Promise<ProviderUsageResult> {
     const native = this.targets().map((target) => this.snapshot(target))
     const mappings = this.proxyMappings()
-    const configured =
-      (this.options.proxyConfigured?.() ?? Boolean(this.options.readProxy)) || mappings.length > 0
+    const configured = this.options.proxyConfigured?.() ?? Boolean(this.options.readProxy)
     const proxy =
       configured && this.proxyAccounts.length === 0
         ? [

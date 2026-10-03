@@ -2,6 +2,7 @@ import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
 import { ProviderTranscriptCollection } from '../transcript-collection'
+import { systemErrors } from '../../system/structured-errors'
 import { transcriptHistoryFixture, nativeClaudeResponse } from '../../testing/transcript-usage'
 
 const cleanup: Array<() => Promise<void>> = []
@@ -68,4 +69,30 @@ test('refresh changes configured native roots without mixing the previous source
   expect(collector.read(query).coverage.sources.map((source) => source.id)).toEqual([
     'new-native-home',
   ])
+})
+
+test('defers transcript configuration until initialize and closes safely without identity', async () => {
+  let reads = 0
+  const failure = systemErrors.MACHINE_ID_UNAVAILABLE({
+    internal: { platform: 'darwin', exitCode: 1 },
+  })
+  const options = () => {
+    reads += 1
+    throw failure
+  }
+  const unopened = new ProviderTranscriptCollection(options, () => 60_000)
+  cleanup.push(() => unopened.close())
+  expect(unopened.read(query)).toMatchObject({
+    totals: { tokens: 0 },
+    coverage: { status: 'pending', scannedAt: null, sources: [] },
+  })
+  await expect(unopened.close()).resolves.toBeUndefined()
+  await expect(unopened.initialize()).resolves.toBeUndefined()
+  expect(reads).toBe(0)
+  const failed = new ProviderTranscriptCollection(options, () => 60_000)
+  cleanup.push(() => failed.close())
+  await expect(failed.initialize()).rejects.toBe(failure)
+  expect(reads).toBe(1)
+  expect(failed.read(query).coverage.status).toBe('pending')
+  await expect(failed.close()).resolves.toBeUndefined()
 })
