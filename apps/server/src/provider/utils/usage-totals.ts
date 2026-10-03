@@ -1,4 +1,5 @@
 import type { ModelUsage } from '@anthropic-ai/claude-agent-sdk'
+import type { ProviderReportedCache } from '@workspace/contracts'
 import type { CodexTokenUsageBreakdown } from '../adapters/codex-protocol'
 
 /**
@@ -16,6 +17,8 @@ export type ProviderUsageTotals = {
   outputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
+  /** Provider observations for diagnostics; billing counts retain their existing rules. */
+  reportedCache?: ProviderReportedCache
   reasoningTokens: number
   /** The provider's own estimate; null when it reports none (Codex). */
   costUsd: number | null
@@ -46,18 +49,25 @@ const COUNT_FIELDS = [
 export function claudeUsageTotals(
   scope: string,
   continuesEarlierTurns: boolean,
-  modelUsage: Readonly<Record<string, ModelUsage>>,
+  modelUsage: Readonly<Record<string, Partial<ModelUsage>>>,
 ): ProviderUsageTotals[] {
   return Object.entries(modelUsage).map(([model, usage]) => ({
     cacheReadTokens: count(usage.cacheReadInputTokens),
     continuesEarlierTurns,
     cacheWriteTokens: count(usage.cacheCreationInputTokens),
-    costUsd: Number.isFinite(usage.costUSD) ? Math.max(0, usage.costUSD) : null,
+    costUsd:
+      typeof usage.costUSD === 'number' && Number.isFinite(usage.costUSD)
+        ? Math.max(0, usage.costUSD)
+        : null,
     inputTokens: count(usage.inputTokens),
     model: usage.canonicalModel?.trim() || model,
     outputTokens: count(usage.outputTokens),
     reasoningTokens: count(usage.thinkingTokens),
     scope,
+    reportedCache: {
+      readTokens: reportedCount(usage.cacheReadInputTokens),
+      writeTokens: reportedCount(usage.cacheCreationInputTokens),
+    },
   }))
 }
 
@@ -80,6 +90,10 @@ export function codexUsageTotals(
     outputTokens: count(total.outputTokens),
     reasoningTokens: count(total.reasoningOutputTokens),
     scope,
+    reportedCache: {
+      readTokens: reportedCount(total.cachedInputTokens),
+      writeTokens: reportedCount(total.cacheWriteInputTokens),
+    },
   }
 }
 
@@ -124,7 +138,42 @@ export function usageAmounts(totals: ProviderUsageAmounts): ProviderUsageAmounts
     inputTokens: totals.inputTokens,
     outputTokens: totals.outputTokens,
     reasoningTokens: totals.reasoningTokens,
+    ...(totals.reportedCache ? { reportedCache: totals.reportedCache } : {}),
   }
+}
+
+export function reportedCacheDelta(
+  after: ProviderUsageAmounts,
+  before: ProviderUsageAmounts | null,
+): ProviderReportedCache {
+  return {
+    readTokens: reportedDifference(
+      after.reportedCache?.readTokens,
+      before?.reportedCache?.readTokens,
+      before !== null,
+    ),
+    writeTokens: reportedDifference(
+      after.reportedCache?.writeTokens,
+      before?.reportedCache?.writeTokens,
+      before !== null,
+    ),
+  }
+}
+
+function reportedDifference(
+  after: number | null | undefined,
+  before: number | null | undefined,
+  hasBaseline: boolean,
+) {
+  if (after === null || after === undefined) return null
+  if (!hasBaseline) return after
+  if (before === null || before === undefined || after < before) return null
+  return after - before
+}
+
+function reportedCount(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return null
+  return value
 }
 
 /** A crashed or unstarted query reports all zeros; it is no reading, not a reset. */

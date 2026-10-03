@@ -183,6 +183,33 @@ this measurement pass. The legacy Unicode diagnostic smoke crashes in its old WA
 hardware timing avoids that diagnostic. Atlas residency and ZWJ width observations are tracked
 in #358 and #360; an empty NVIDIA sample invalidated separate DOM attribution attempts (#362).
 
+### Consistent grapheme policy
+
+Status: Approved. Issue #360's exact ZWJ sequences follow the configured Unicode provider and
+grapheme mode. [Matched cell and browser controls](../docs/terminal/zwj-cell-controls-2026-10-03.md)
+show native mode 2027 off equals xterm Unicode 11, and native mode 2027 on equals xterm
+Unicode 15-graphemes. The benchmark's default xterm Unicode 6 assigns each emoji component one
+cell, and its DOM renderer can shape across those cells. Native raw ABI and packed row ownership
+agree. Keep the current packaged default while implementing this configuration prerequisite.
+
+- [ ] Define one `legacy`/`unicode` grapheme-width contract for terminal creation, consistent with
+      Ghostty's `grapheme-width-method`. Wire the package API and Fregat's application-scoped
+      settings entry in the same pass; document standalone defaults and legacy program cursor
+      compatibility. Read native config through its existing resolver when that integration is
+      selected. Set the policy before any terminal output and before JS or Zig frames consume it.
+- [ ] Apply that contract through pinned upstream `GHOSTTY_TERMINAL_OPT_MODE_DEFAULT` for mode
+      2027, which sets both current and RIS reset values. Explicit application mode changes remain
+      authoritative. No renderer infers or overrides cell widths.
+- [ ] Record the benchmark's Unicode provider and mode in qualification. Compare legacy native
+      to xterm Unicode 11 and clustered native to xterm Unicode 15-graphemes. Keep Unicode 6 as a
+      labelled compatibility control, with its narrow component widths and DOM cross-cell shaping.
+- [ ] Prove `ZWJ 👩‍💻 👨‍👩‍👧‍👦|` has cursor columns 18 under legacy and 10 under Unicode
+      clustering; both Unicode-matched xterm controls agree. Check ASCII, CJK and combining text,
+      codepoint/chunk-split writes, wrap/overwrite, selection/history and JS/Zig frames in every
+      shipped renderer. After explicit mode changes and RIS, prove the selected creation policy
+      returns. Capture the same loaded font and DPR, raw ABI and packed rows, cursor reports and
+      actual screenshot geometry separately. Runtime defaults change only in this policy pass.
+
 The earlier three-repetition JS/Zig/xterm measurements are preliminary. This pass measures and
 attributes every renderer; it introduces no renderer performance fixes.
 
