@@ -58,8 +58,27 @@ The launcher selects an installed Chromium app (Chrome first under automatic sel
 
 ## shipping it
 
+`bun run deploy` is an optional Linux integration with Mesh and user systemd. Install, dev and build work with the project prerequisites; deployment additionally needs `mesh`, `systemctl`, `df`, Node and Playwright Chromium. This integration owns `platform-prod.service` on loopback port 3301. Use it on the machine serving your target. Keep that service identity and port unchanged.
+
+Configure `developer.deployTarget` in that machine's production settings (`~/.platform/settings.json`). Add the key to the existing JSON object, preserving other settings. The default is `null`; deploy, restart, rollback and pair stop before side effects until a valid target is configured.
+
+```json
+{
+  "developer.deployTarget": {
+    "productionRoot": "/srv/fregat-production",
+    "meshHost": "my-machine",
+    "meshOrigin": "https://my-machine.example",
+    "meshRoute": "/fregat"
+  }
+}
+```
+
+Choose a dedicated, mounted production directory with at least 2 GiB free and an absolute Unix path without relative segments, whitespace, quotes, backslashes or systemd `$`/`%` substitutions. Create it yourself with your user's ownership. The origin is an HTTP or HTTPS origin with no path, trailing slash or credentials. The route is `/` or slash-separated alphanumeric, underscore and hyphen segments. A trailing slash is accepted. Register the matching proxy once with `mesh serve <meshHost> 3301 --at <meshRoute> --isolate`. Deploy verifies this route and renders the service's root and allowed origin from the configured target.
+
+The built release records the configured page URL. Both immediate and post-restart checks use that release's URL for navigation, release polling, health evidence and observation. A standalone check requires `node scripts/deploy/live-check.mjs --target=<deployed-page-url>`. `bun run pair` prints a link for the same configured target.
+
+When adopting this configuration for an existing installation, record its current production root, Mesh host, origin and route before the next deployment. The command does not migrate files or reconfigure a running service. Library imports without a deployment target resolve local paths under `~/.platform/production`; deploying still requires an explicit target.
+
 `bun run deploy` builds the web app, verifies the candidate, swaps a symlink and runs a headless check against the live url. nothing restarts, so open terminals and agent sessions survive it. server changes need `bun run deploy --server`, which stages the release; the app shows "Update available" and the server restarts when someone clicks Restart. `bun run deploy --server --restart` sends that request itself: it waits for running sessions to finish (`developer.deployRestartWaitMinutes`, 30 by default), then restarts and waits for the live check. `--interrupt` ends busy turns and restarts at once, which a deploy run from inside a Platform chat needs because its own turn counts as busy. a restart ends every live session, so do not reach for `--server` on web-only work
 
-`bun run deploy --rollback` moves back one release. `GET /platform/release` answers whether a change actually landed, reporting the served release, its commit, and the dirty-file count it was built from
-
-the route still says `platform`. renaming it costs a restart, and a restart costs every open session, so it waits for a moment when that is free
+`bun run deploy --rollback` moves back one release. `GET <meshRoute>/release` answers whether a change actually landed, reporting the served release, its commit, and the dirty-file count it was built from.

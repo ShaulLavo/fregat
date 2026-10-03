@@ -783,7 +783,7 @@
     },
     "packages/contracts": {
       "name": "@workspace/contracts",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@workspace/observability": "workspace:*",
         "@workspace/utils": "workspace:*",
@@ -950,7 +950,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.0",
+      "version": "0.0.3",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },

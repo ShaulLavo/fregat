@@ -8,6 +8,7 @@ import {
   meshRoute,
   meshUrl,
   productionRoot,
+  requireDeployTarget,
   releasesRoot,
   serverPort,
   serverUnit,
@@ -49,6 +50,8 @@ import { createScriptError, scriptFailureText } from '../structured-errors'
 
 const usage = `Usage: bun run deploy [options]
 
+  Mesh + user-systemd integration. Requires developer.deployTarget in production settings.
+
   --server            Build the server too and stage the release. The app shows "Update available";
                       the server restarts when someone clicks Restart, or at once with --restart.
   --restart           Restart into the staged release: the Restart button's request, which waits
@@ -78,6 +81,7 @@ try {
 async function main() {
   const command = parseDeployArgs(Bun.argv.slice(2))
   if (command.kind === 'help') return console.log(usage)
+  requireDeployTarget()
   if (command.kind === 'rollback') return rollback(!command.liveCheck)
   if (command.kind === 'restart') return restartStaged(command.request, command.liveCheck)
 
@@ -219,7 +223,13 @@ async function rollback(skipLiveCheck: boolean) {
 }
 
 function liveTarget(directory: string, previous: string | null): LiveCheckTarget {
-  return { name: path.basename(directory), directory, previous, source: checkoutRoot }
+  return {
+    name: path.basename(directory),
+    directory,
+    previous,
+    source: checkoutRoot,
+    meshUrl: readBuildConfig(directory)?.meshUrl ?? meshUrl,
+  }
 }
 
 // The server re-reads the verdict on the signal and shows it to open tabs, failed ones too.
@@ -287,7 +297,9 @@ function liveCheckFailure(target: LiveCheckTarget, restarted: boolean) {
 
 async function preflight() {
   if (!existsSync(productionRoot) || !statSync(productionRoot).isDirectory()) {
-    throw createScriptError(`${productionRoot} is missing. Mount /work before deploying.`)
+    throw createScriptError(
+      `${productionRoot} is missing. Prepare the configured production directory before deploying.`,
+    )
   }
   const available = Number(
     (await output(['df', '--output=avail', '-B1', productionRoot])).split('\n').at(-1),

@@ -10,8 +10,6 @@ import { attachObserver, observedProblems, serializable } from '../agent/observe
 import { readRefusals, refusalFailures } from './live-refusals.mjs'
 import { liveVerdict } from './live-verdict.mjs'
 
-const origin = 'https://omarchy.mesh.shaulavo.dev'
-const base = `${origin}/platform/`
 // A third-party image the chat renders; proves cross-origin isolation still lets favicons load.
 const publicFaviconUrl =
   'https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https%3A%2F%2Fgithub.com&size=32'
@@ -22,12 +20,32 @@ const { values } = parseArgs({
     logs: { type: 'string', default: '' },
     out: { type: 'string', default: fileURLToPath(new URL('.', import.meta.url)) },
     release: { type: 'string' },
-    target: { type: 'string', default: base },
+    target: { type: 'string' },
     'wait-for-server': { type: 'string', default: '0' },
   },
 })
 
-const report = { release: values.release, target: values.target, failures: [], preexisting: [] }
+if (!values.target) {
+  console.error('[live] Pass --target=<deployed-page-url>.')
+  process.exit(1)
+}
+const target = URL.parse(values.target)
+if (
+  !target ||
+  !['http:', 'https:'].includes(target.protocol) ||
+  target.username ||
+  target.password ||
+  target.search ||
+  target.hash
+) {
+  console.error(
+    '[live] The target must be an HTTP or HTTPS page URL without credentials, query or fragment.',
+  )
+  process.exit(1)
+}
+const base = `${target.href.replace(/\/$/, '')}/`
+
+const report = { release: values.release, target: base, failures: [], preexisting: [] }
 const startedAt = new Date().toISOString()
 // The connection gate and a failed boot both render this frame in place of the workbench.
 const errorFrame = '[data-slot="status-frame"][data-tone="error"]'
@@ -46,7 +64,7 @@ const page = await browser.newPage({
 const observed = attachObserver(page, base)
 
 try {
-  await page.goto(values.target, { waitUntil: 'domcontentloaded' })
+  await page.goto(base, { waitUntil: 'domcontentloaded' })
   await page
     .locator(`[aria-label="Window toolbar"], ${errorFrame}`)
     .first()

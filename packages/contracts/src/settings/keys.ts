@@ -1,3 +1,4 @@
+import { deployTargetSchema } from './deploy-target'
 import { LOG_TIME_RANGES } from '../log-dashboard'
 import { modelSelectionSchema } from '../orchestration-runtime'
 import { DEFAULT_CODEX_PROVIDER_SETTINGS } from '../provider'
@@ -1353,6 +1354,18 @@ export const SETTINGS_REGISTRY = {
       'Seconds between checks for an available web update while the app is visible. Refresh applies the update when you choose.',
     visibility: 'advanced',
     keywords: ['developer', 'deploy', 'update', 'refresh'],
+  }),
+  'developer.deployTarget': defineSetting({
+    schema: v.nullable(deployTargetSchema),
+    default: null,
+    scope: 'machine',
+    widget: 'complex',
+    category: 'Developer',
+    title: 'Deployment target',
+    description:
+      'Local Mesh and systemd deployment target: productionRoot, meshHost, meshOrigin and meshRoute. Configure this machine before running deploy or pair. Null disables these commands.',
+    visibility: 'advanced',
+    keywords: ['developer', 'deploy', 'mesh', 'production', 'target'],
   }),
   'developer.deployRestartWaitMinutes': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1440)),

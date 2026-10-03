@@ -266,6 +266,37 @@
       "minimum": 1,
       "type": "integer"
     },
+    "developer.deployTarget": {
+      "anyOf": [
+        {
+          "properties": {
+            "meshHost": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+              "type": "string"
+            },
+            "meshOrigin": {
+              "type": "string"
+            },
+            "meshRoute": {
+              "pattern": "^\\/(?:[a-zA-Z0-9_-]+(?:\\/[a-zA-Z0-9_-]+)*\\/?|)$",
+              "type": "string"
+            },
+            "productionRoot": {
+              "maxLength": 4096,
+              "pattern": "^\\/[^\\s%\"'$\\\\\\0]*$",
+              "type": "string"
+            }
+          },
+          "required": ["meshHost", "meshOrigin", "meshRoute", "productionRoot"],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Local Mesh and systemd deployment target: productionRoot, meshHost, meshOrigin and meshRoute. Configure this machine before running deploy or pair. Null disables these commands."
+    },
     "developer.devServerIdleMinutes": {
       "default": 15,
       "description": "Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs.",

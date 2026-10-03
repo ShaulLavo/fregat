@@ -256,13 +256,11 @@ export function readBuildConfig(directory: string): BuildConfig | null {
   return JSON.parse(readFileSync(file, 'utf8')) as BuildConfig
 }
 
-export async function verifyCandidateFiles(release: Release) {
+export async function verifyCandidateFiles(release: Release, base = webBase) {
   const html = readFileSync(path.join(release.web, 'index.html'), 'utf8')
   const problems = [
-    !html.includes(`src="${webBase}assets/`) &&
-      `index.html does not load assets from ${webBase}assets/`,
-    /(?:src|href)="\/assets\//.test(html) && 'index.html references root /assets/',
-    html.includes('platform-api') && 'index.html still names the platform-api route',
+    !html.includes(`src="${base}assets/`) && `index.html does not load assets from ${base}assets/`,
+    base !== '/' && /(?:src|href)="\/assets\//.test(html) && 'index.html references root /assets/',
     html.includes('%DEV%') && 'index.html kept the %DEV% placeholder',
     html.includes('%BASE_URL%') && 'index.html kept the %BASE_URL% placeholder',
     !readdirSync(path.join(release.web, 'assets')).some((file) => file.endsWith('.wasm')) &&
@@ -280,7 +278,7 @@ export async function verifyCandidateFiles(release: Release) {
 }
 
 /** Boots the candidate server on a free port with throwaway state and reads it back. */
-export async function bootCandidate(release: Release) {
+export async function bootCandidate(release: Release, base = webBase) {
   const scratch = path.join(tmpdir(), `platform-deploy-${release.name}`)
   rmSync(scratch, { force: true, recursive: true })
   mkdirSync(scratch, { recursive: true })
@@ -311,9 +309,9 @@ export async function bootCandidate(release: Release) {
       headers: { 'sec-fetch-dest': 'document' },
     })
     expectEqual('document status', page.status, 200)
-    if (!(await page.text()).includes(`${webBase}assets/`))
+    if (!(await page.text()).includes(`${base}assets/`))
       throw createScriptError('Candidate page has no assets.')
-    const asset = html(release.web).match(/src="\/platform\/(assets\/[^"]+)"/)?.[1]
+    const asset = html(release.web).match(new RegExp(`src="${base}(assets/[^"]+)"`))?.[1]
     if (!asset) throw createScriptError('Candidate page names no entry script.')
     expectEqual('asset status', (await fetch(`${origin}/${asset}`)).status, 200)
     expectEqual('health without origin', (await fetch(`${origin}/health`)).status, 401)
