@@ -24,7 +24,6 @@ import { verifyWorkspaceNativeWorkflow } from './workflow'
 const FIXED_OWNED_PATHS = [
   '.github/workflows/ci.yml',
   '.github/workflows/config-resolver.yml',
-  'package.json',
   'scripts/build-config-resolver.ts',
   'scripts/config-resolver-proof/proof-contract.ts',
   'scripts/config-resolver-proof/proof-recipe.json',
