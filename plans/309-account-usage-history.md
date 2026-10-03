@@ -57,18 +57,21 @@ Reuse the existing price catalog and saved price provenance. A subscription tran
 
 - [x] Reproduce the scope gap with portable native transcripts outside registered projects. Confirm current imported-chat and per-session totals on a known-good fixture. The assertion-specific baseline proof was added retrospectively after implementation existed; its chronology and control results are recorded in Plan 308.
 - [ ] Inventory current readers and detected tool stores. Record supported schemas, billing identities, absent sources, and the refreshed T3 reference commit.
-- [ ] Define normalized records and the source-coverage contract. Test unknown cost/identity and copied billing identities before changing the report.
-- [ ] Extract reusable Claude/Codex parsing and deduplication rules from current import code. Prove existing imported-chat totals remain equal.
-- [ ] Add the persistent streaming scan cache. Verify unchanged, appended, truncated, replaced, incomplete-tail, corrupt-cache, and parser-version cases. Measure cold versus unchanged/warm reads on one reproducible generated corpus.
-- [ ] Scan Claude/Codex stores independently of project discovery, including subagent stores where readable. Reconcile native and Fregat-only records in one ledger.
+- [x] Deliver normalized local records and source coverage for Claude/Codex JSONL, Fregat utilities and uncovered-driver sessions. Verify unknown cost/account identity and native billing-identity deduplication; connected-host identity proofs remain below.
+- [x] Reuse Claude fragment and Codex cumulative/reset/fork rules in the local readers, preserving existing imported-chat/recorder totals in focused checks.
+- [x] Deliver the persistent streaming scan cache with unchanged, appended, truncated, replaced, incomplete-tail, corrupt-cache and parser-version checks. Measure cold and restarted-warm reads on the generated corpus recorded below; retain the documented append-only limitation.
+- [x] Scan local Claude/Codex stores independently of project discovery, including readable subagent stores, and reconcile native records with Fregat-only utility/uncovered-driver supplements.
 - [ ] Add readers for the other detected relevant tool formats from the inventory. Give each a portable fixture and report unsupported versions explicitly. Do not add empty extension points for absent formats.
-- [ ] Switch the local history route to cached normalized aggregation. Preserve range/timezone behavior, unknown prices, per-model totals, and valuable session attribution.
+- [x] Switch the local history route to cached normalized aggregation with range/timezone behavior, unknown prices, per-model totals and valuable recorded session attribution. Preserve recorder supplements before native initialization and after an identity failure.
 - [ ] Add live-connected-host projection composition and global deduplication. Test the same billed event copied to two hosts, independent unknown identities, a stale host, and partial coverage.
 - [ ] Update Settings Usage with host/tool coverage and scan age. Keep the previous range's header and body together until the new range is ready. Keep account limits and transcript totals separately labeled.
 - [ ] Remove recorder/import paths that now duplicate the canonical history source. Preserve Fregat-only utility generations and session attribution only where tests establish their value.
-- [ ] Run narrow server, ledger, parser, and Settings fixture checks. Extend `settings-usage` and `claude-usage-import`; add missing multi-source scenarios and read back `look` evidence.
-- [ ] Compare scan bytes, wall time, and memory before/after on the same corpus through the heavy runner. Confirm that range changes read cache and that UI reads cause zero provider calls and zero host launches.
-- [ ] Commit and push owned paths, run required gates, deploy changed server/web code, and verify the served history report with its coverage labels. Update the root roadmap and this checklist.
+- [x] Run local-wave server/ledger/parser and Settings fixture checks. Read back normal/narrow `settings-usage` and native/idle screenshots with explicit local/unverified coverage; exact receipts are below and in Plan 308.
+- [ ] Extend remaining `claude-usage-import` and connected-host/other-format multi-source scenarios as those increments land; read back their `look` evidence.
+- [x] Measure bounded cold and restarted-warm scan bytes, wall time and memory on the same generated corpus through the heavy runner. Verify cached range/timezone reads and no extra provider calls/native turns in the local UI fixture. This is the narrow measurement below, not a general before/after performance claim.
+- [ ] Prove connected-host composition causes zero host launches and compare its cold/warm resource use once that increment is implemented.
+- [x] Commit/push the local scanner and cached-route paths, pass required gates and merge #413 with exact-head/main-CI disposition recorded below.
+- [ ] Deploy changed server/web code and verify the served production history report and real coverage labels. Update the root roadmap and remaining acceptance checklist; deployment is coordinator-owned under Plan 308.
 
 ## Local-wave verification receipts
 
