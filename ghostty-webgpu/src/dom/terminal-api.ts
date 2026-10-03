@@ -50,7 +50,7 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   readonly textarea: HTMLTextAreaElement | undefined
 
   open(parent: HTMLElement): Promise<void>
-  use<Api = void>(extension: Extension<Api>): ExtensionHandle<Api>
+  use<Api = void>(extension: Extension<Api>): TerminalResult<Mode, ExtensionHandle<Api>>
   on<Type extends GhosttyWebGpuTerminalEventType>(
     type: Type,
     listener: GhosttyWebGpuTerminalListener<Type>,

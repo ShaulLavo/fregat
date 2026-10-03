@@ -2,12 +2,15 @@ import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { DomTerminalRenderer, Terminal } from '../../index.js'
 import type { GhosttyWebGpuTerminalOptions } from '../../index.js'
 import type { Extension, ExtensionInput, ExtensionScope, TerminalInputEvent } from '../../index.js'
+import { Terminal as WorkerTerminal } from '../../worker/index.js'
 
 const terminals: Terminal[] = []
+const workerTerminals: WorkerTerminal[] = []
 const hosts: HTMLElement[] = []
 const decoder = new TextDecoder()
 
-afterEach(() => {
+afterEach(async () => {
+  for (const terminal of workerTerminals.splice(0)) await terminal.dispose()
   for (const terminal of terminals.splice(0)) terminal.dispose()
   for (const host of hosts.splice(0)) host.remove()
 })
@@ -28,7 +31,12 @@ async function openTerminal(options: GhosttyWebGpuTerminalOptions = {}): Promise
 }
 
 function press(terminal: Terminal, key = 'a', code = 'KeyA'): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', { key, code, bubbles: true, cancelable: true })
+  const event = new KeyboardEvent('keydown', {
+    key,
+    code,
+    bubbles: true,
+    cancelable: true,
+  })
   terminal.textarea!.dispatchEvent(event)
   return event
 }
@@ -321,7 +329,10 @@ describe('public extension activation', () => {
     terminal.onData((data) => output.push(decoder.decode(data)))
     const clipboardData = new DataTransfer()
     clipboardData.setData('text/plain', 'paste\ntext')
-    const paste = new ClipboardEvent('paste', { clipboardData, cancelable: true })
+    const paste = new ClipboardEvent('paste', {
+      clipboardData,
+      cancelable: true,
+    })
     terminal.textarea!.dispatchEvent(paste)
     compose(terminal, '中', 'end-first')
     terminal.textarea!.dispatchEvent(
@@ -334,7 +345,12 @@ describe('public extension activation', () => {
     expect(terminal.sendInput('programmatic text')).toHaveLength(0)
     const bytes = new Uint8Array([0xc3, 0xa9])
     expect(terminal.sendInput(bytes)).toHaveLength(0)
-    const input = { action: 'press', code: 'KeyA', text: 'a', composing: false } as const
+    const input = {
+      action: 'press',
+      code: 'KeyA',
+      text: 'a',
+      composing: false,
+    } as const
     expect(terminal.key(input)).toHaveLength(0)
     expect(inputs).toEqual([
       { type: 'paste', data: 'paste\ntext' },
@@ -526,7 +542,10 @@ describe('public extension activation', () => {
     terminal.onData((data) => output.push(decoder.decode(data)))
     compose(terminal, '中', 'end-only')
     const textarea = terminal.textarea!
-    const tail = new InputEvent('input', { data: '中', inputType: 'insertCompositionText' })
+    const tail = new InputEvent('input', {
+      data: '中',
+      inputType: 'insertCompositionText',
+    })
     expect(tail.inputType).toBe('insertCompositionText')
     textarea.dispatchEvent(tail)
     expect(output).toEqual(['中'])
@@ -566,7 +585,10 @@ describe('public extension activation', () => {
     terminal.paste('a\nb')
     expect(output).toEqual(['\x1b[200~a\nb\x1b[201~'])
     expect(calls).toBe(1)
-    terminal.use({ name: 'always claim', setup: () => ({ input: () => 'claim' }) })
+    terminal.use({
+      name: 'always claim',
+      setup: () => ({ input: () => 'claim' }),
+    })
     terminal.write('abc\x1b[6n')
     expect(output.at(-1)).toBe('\x1b[1;4R')
     expect(calls).toBe(1)
@@ -752,4 +774,172 @@ describe('public extension activation', () => {
       expect(reads).toBe(0)
     },
   )
+})
+
+async function createWorkerTerminal(): Promise<WorkerTerminal> {
+  const family = 'ExtensionWorkerIntegration'
+  const url = new URL(
+    '../../../site/public/fonts/jetbrains-mono-latin-400-normal.woff2',
+    import.meta.url,
+  ).href
+  const terminal = await WorkerTerminal.create({
+    backend: 'webgl',
+    fonts: [{ family, source: { url } }],
+    appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+    workerUrl: new URL('../../../dist/worker/entry.js', import.meta.url),
+  })
+  workerTerminals.push(terminal)
+  return terminal
+}
+
+function workerContainer(): HTMLDivElement {
+  const host = document.createElement('div')
+  host.style.width = '320px'
+  host.style.height = '120px'
+  document.body.append(host)
+  hosts.push(host)
+  return host
+}
+
+describe('public worker extension integration', () => {
+  it('returns a Promise for every use outcome while setup and owned cleanup stay on the host', async () => {
+    const terminal = await createWorkerTerminal()
+    const order: string[] = []
+    const extension = {
+      name: 'typed worker handle',
+      setup(scope: ExtensionScope) {
+        order.push('setup')
+        scope.own(() => order.push('cleanup'))
+        return { api: { answer: 42 }, osc: {} }
+      },
+    }
+    const installed = terminal.use(extension)
+    expect(installed instanceof Promise).toBe(true)
+    const handle = await installed
+    expect(handle.api.answer).toBe(42)
+    expect(order).toEqual(['setup'])
+    let duplicate: ReturnType<typeof terminal.use> | undefined
+    expect(() => {
+      duplicate = terminal.use(extension)
+    }).not.toThrow()
+    expect(duplicate instanceof Promise).toBe(true)
+    await expect(duplicate).rejects.toThrow('already')
+    handle.dispose()
+    expect(order).toEqual(['setup', 'cleanup'])
+    const reattached = terminal.use(extension)
+    expect(reattached instanceof Promise).toBe(true)
+    await reattached
+    await terminal.dispose()
+    expect(order).toEqual(['setup', 'cleanup', 'setup', 'cleanup'])
+    let disposed: ReturnType<typeof terminal.use> | undefined
+    expect(() => {
+      disposed = terminal.use(extension)
+    }).not.toThrow()
+    expect(disposed instanceof Promise).toBe(true)
+    await expect(disposed).rejects.toThrow()
+  })
+
+  it('rejects setup and contribution failures asynchronously and rolls back their resources', async () => {
+    const terminal = await createWorkerTerminal()
+    const failures: Extension[] = [
+      {
+        name: 'throws',
+        setup: () => {
+          throw new TypeError('setup failed')
+        },
+      },
+      {
+        name: 'invalid OSC number',
+        setup: () => ({ osc: { '-1': () => {} } }),
+      },
+      { name: 'unavailable OSC', setup: () => ({ osc: { 999: () => {} } }) },
+    ]
+    for (const failure of failures) {
+      const cleanup: string[] = []
+      const extension = {
+        name: failure.name,
+        setup(scope: ExtensionScope) {
+          scope.own(() => cleanup.push('disposed'))
+          return failure.setup(scope)
+        },
+      }
+      let result: ReturnType<typeof terminal.use> | undefined
+      expect(() => {
+        result = terminal.use(extension)
+      }).not.toThrow()
+      expect(result instanceof Promise).toBe(true)
+      await expect(result).rejects.toThrow()
+      expect(cleanup).toEqual(['disposed'])
+    }
+    const absent = terminal.use({ name: 'absent OSC', setup: () => ({}) })
+    expect(absent instanceof Promise).toBe(true)
+    await absent
+  })
+
+  it('claims original worker input synchronously before forwarding and preserves later keyless text', async () => {
+    const terminal = await createWorkerTerminal()
+    await terminal.open(workerContainer())
+    const received: TerminalInputEvent[] = []
+    const output: string[] = []
+    terminal.onData((data) => output.push(new TextDecoder().decode(data)))
+    await terminal.use({
+      name: 'original worker input',
+      setup: () => ({
+        input: (event) => {
+          received.push(event)
+          if (event.type === 'text' && event.data === 'native pass') return 'pass'
+          return 'claim'
+        },
+      }),
+    })
+    await terminal.sendInput('native pass')
+    expect(output).toEqual(['native pass'])
+    const text = terminal.sendInput('claimed text')
+    const paste = terminal.paste('claimed paste')
+    const key = terminal.key({
+      action: 'press',
+      code: 'KeyA',
+      composing: false,
+      text: 'a',
+    })
+    expect([text, paste, key].every((result) => result instanceof Promise)).toBe(true)
+    expect((await Promise.all([text, paste, key])).map((bytes) => bytes.length)).toEqual([0, 0, 0])
+    const event = new KeyboardEvent('keydown', {
+      key: 'b',
+      code: 'KeyB',
+      bubbles: true,
+      cancelable: true,
+    })
+    terminal.textarea!.dispatchEvent(event)
+    expect(received.at(-1)).toEqual({ type: 'key', event })
+    expect(event.defaultPrevented).toBe(true)
+    const textarea = terminal.textarea!
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { data: '' }))
+    textarea.value = '中'
+    textarea.dispatchEvent(
+      new InputEvent('input', {
+        data: '中',
+        inputType: 'insertCompositionText',
+        isComposing: true,
+      }),
+    )
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { data: '中' }))
+    textarea.value = '中'
+    textarea.dispatchEvent(
+      new InputEvent('input', {
+        data: '中',
+        inputType: 'insertText',
+        isComposing: false,
+      }),
+    )
+    expect(received.slice(-2)).toEqual([
+      { type: 'composition', text: '中' },
+      { type: 'text', data: '中' },
+    ])
+    await terminal.write('fence')
+    expect(output).toEqual(['native pass'])
+    expect(
+      received.filter((input) => input.type === 'text' && input.data === 'native pass'),
+    ).toHaveLength(1)
+  })
 })
