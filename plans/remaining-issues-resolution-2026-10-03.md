@@ -2,117 +2,188 @@
 
 Status: Approved
 
-The owner requested tackling all issues left after the plan-conversion pass. The
-opening snapshot contains 17 issues. Eight are closed at the current checkpoint. This pass implements confirmed defects,
-measures performance changes, verifies existing fixes, and retains concrete
-evidence when an external condition prevents resolution. Closing an issue
-requires a shipped fix or evidence that its report is resolved.
+This pass covered the 17 issues left after the plan-conversion pass: **nine closed,
+eight retained**. Confirmed fixes landed; unresolved causes stay visible with the
+specific evidence still needed. No performance request was dropped.
 
-## Keep and close decisions
+## What to keep
 
-Close the confirmed fixes and resolved reports listed below. Keep the four historical Mesh reports because the bounded probes did not reproduce the original failure and the missing syscall, signal sender, readiness condition, or fixture creator remains unidentified. Keep Fregat's original browser hang, GPU sampling cause, and legacy Unicode crash until their triggers are established. Keep the requested cache rebuild warning until reported counters are calibrated; the factual recent-turn history is already delivered.
+- **Mesh #115, #78 and #76:** keep the historical worker failures. The bounded
+  probes passed, but they did not identify the failed syscall, the SIGKILL sender,
+  or the readiness condition that caused the original timeout.
+- **Mesh #77:** keep the historical cleanup report. We fixed a current fixture
+  worker leak, but have not identified the creator of the original leftover state.
+- **Fregat #400:** keep the intermittent browser hang. The test runner now bounds
+  the stalled stages and closes its browser; the original trigger remains unknown.
+- **Fregat #391:** keep the NVIDIA sampling report. The sampler retains better
+  receipts and uses a correct integer deadline and explicit trace budget. Those
+  fixes do not explain the historical empty GPU list.
+- **Fregat #363:** keep the reproducible legacy Unicode WASM crash. The benchmark
+  now contains it in a separate browser, records failure, finishes later
+  diagnostics and exits 1. The upstream crash itself still needs a fix.
+- **Fregat #349:** keep cache rebuild warning calibration. The app now shows the
+  provider's nullable counters and five recent turns. We still need a trustworthy
+  baseline before declaring that a cache was rebuilt.
 
-The extra native-build report has an accounting explanation and new instrumentation ready for merge. Its colder glyph-range cost remains Approved performance work in Plan 283. No performance improvement is dropped for missing measurements.
-
-## Execution checklist
-
-- [x] Refresh all six enabled trackers and retain complete issue comments.
-- [x] Check current main CI and open PRs before assigning overlapping work.
-- [x] Create separate writer worktrees and launch three Sol workers.
-- [ ] Independently review each implementation PR at its recorded head.
-- [ ] Merge verified work on explicit green check rollups.
-- [ ] Verify main CI and deploy each completed batch.
-- [ ] Update source issues with the actual outcome and evidence.
-- [ ] Reconcile the 17 opening issues and any blocking discoveries.
-- [ ] Remove this pass's disposable worktrees and scratch.
+Close the nine resolved reports in the ledger below. Two closures need no product
+change: #390 describes expected tooltip behavior; #360 compares different Unicode
+providers/configurations. A consistent grapheme policy remains Approved in
+Plan 283. #398's extra native builds have an accounting explanation and new
+instrumentation; cold glyph-range costs also remain Approved in Plan 283.
 
 ## Issue ledger
 
-| Issue                                                         | Work                            | State                                                          | Delivery                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------------------------------- | ------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Mesh #117](https://github.com/ShaulLavo/mesh/issues/117)     | Maintained action runtimes      | Merged and closed; main CI and publication passed              | [PR #119](https://github.com/ShaulLavo/mesh/pull/119), squash `3fe1f9d`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| [Mesh #115](https://github.com/ShaulLavo/mesh/issues/115)     | Worker child EPERM              | Not reproduced in bounded probe; open                          | Pinned Go 1.27.0 transition probe passed; original failed syscall unrecorded                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| [Mesh #78](https://github.com/ShaulLavo/mesh/issues/78)       | Benchmark fixture SIGKILL       | Not reproduced in bounded probe; open                          | Pinned Go 1.27.0 profile probe and signal controls passed; historical sender unknown                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| [Mesh #77](https://github.com/ShaulLavo/mesh/issues/77)       | Fixture worker cleanup          | Current leak merged; historical report open                    | [PR #123](https://github.com/ShaulLavo/mesh/pull/123), squash `34ed2bf45`; main CI and publication passed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| [Mesh #76](https://github.com/ShaulLavo/mesh/issues/76)       | Worker readiness timeout        | Not reproduced in bounded probes; open                         | Original Bash recovery and on-demand fixtures passed; zsh unavailable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| [Fregat #400](https://github.com/ShaulLavo/fregat/issues/400) | Terminal browser CI hang        | Cleanup guard merged; historical trigger open                  | [PR #412](https://github.com/ShaulLavo/fregat/pull/412), squash `1c1eeeafe`; stalled stages bounded, browser closed, main CI passed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| [Fregat #398](https://github.com/ShaulLavo/fregat/issues/398) | Extra native builds and uploads | Accounting attribution proved; ready to merge                  | Eight frozen extra frames contain two sibling builds inside one draw, one upload and one submit; 24 writes are one full 12×40 upload. [PR #434](https://github.com/ShaulLavo/fregat/pull/434) records status outcomes and upload batches. Independent review passed. CI exposed one old builder fixture missing `clearGlyphs`; its one-line correction at `57ccdcb10` passed all 154 comparison tests and normal hooks, and passed all 19 exact-head CI checks. Merge follows resolution of the separate main fixture blocker. Historical glyph trigger remains unrecorded                                                                                                                                                       |
-| [Fregat #395](https://github.com/ShaulLavo/fregat/issues/395) | Unknown quota duration          | Merged and closed; main CI passed                              | [PR #407](https://github.com/ShaulLavo/fregat/pull/407), squash `1fcf1a7f8`; gateway payload installed atomically, active requests retain the old process until safe reload                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| [Fregat #391](https://github.com/ShaulLavo/fregat/issues/391) | GPU sampling qualification      | Sampler and integer deadline fixes merged; original cause open | [PR #397](https://github.com/ShaulLavo/fregat/pull/397), squash `99f405fd6`, main CI passed; [PR #421](https://github.com/ShaulLavo/fregat/pull/421), squash `45f22aa0b`; [PR #401](https://github.com/ShaulLavo/fregat/pull/401), squash `4ff2280d3`, passed all 19 checks and merged with the effective trace budget recorded; historical NVIDIA cause remains unknown                                                                                                                                                                                                                                                                                                                                                         |
-| [Fregat #390](https://github.com/ShaulLavo/fregat/issues/390) | Tooltip accessibility semantics | Closed as expected upstream behavior                           | Plain/composed controls and positive ARIA control verified in Chromium; screen-reader announcement order remains untested                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| [Fregat #368](https://github.com/ShaulLavo/fregat/issues/368) | Callback delivery after resize  | Merged and closed; deployed                                    | [PR #431](https://github.com/ShaulLavo/fregat/pull/431), squash `80f759c30`, contains the unchanged approved scheduler plus 0.3.2 canonical metadata. #416 and #428 are superseded. All 23 checks passed after a bounded failed-job rerun; external fd downloads and the separately fixed pruning fixture are documented                                                                                                                                                                                                                                                                                                                                                                                                         |
-| [Fregat #364](https://github.com/ShaulLavo/fregat/issues/364) | Bun build diagnostic            | Merged and closed; main CI passed and deployed                 | [PR #414](https://github.com/ShaulLavo/fregat/pull/414), squash `bd5cf47a3`; configured JSX and external core verified; live client/server `80f759c30` passed release checks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| [Fregat #363](https://github.com/ShaulLavo/fregat/issues/363) | Legacy Unicode diagnostic crash | Reproduced; containment verified, awaiting merge               | [PR #432](https://github.com/ShaulLavo/fregat/pull/432) retains the unchanged probe in its own browser and completes later instrumentation, with overall exit 1. Review corrections own pending launch before acquisition and treat crashes as failure through teardown; fail-first and zero-owned-PID proofs pass at `e134ac9b4`. The automatic main integration at `af185ab90` required no resolution edits. All 63 combined contracts and the clean final three-case smoke passed, preserving ordinary/trace budget metadata and the original call-23 crash with exit 1. All 19 exact-head checks, including aggregate CI, passed. Merge follows resolution of the separate main fixture blocker. Upstream crash remains open |
-| [Fregat #360](https://github.com/ShaulLavo/fregat/issues/360) | ZWJ grapheme width              | Closed as a provider/configuration difference                  | [PR #433](https://github.com/ShaulLavo/fregat/pull/433), squash `f0bbbeb1a`, commits raw controls and screenshot. Legacy native matches xterm Unicode 11; clustered native matches Unicode 15-graphemes. Consistent policy remains Approved in Plan 283                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| [Fregat #358](https://github.com/ShaulLavo/fregat/issues/358) | Atlas residency and eviction    | Merged and closed; deployed                                    | [PR #425](https://github.com/ShaulLavo/fregat/pull/425), squash `0a2ff0126`. All 19 checks passed. Bounded cold insertion needs one eviction/upload instead of two, with pixel parity and no warm scan. PR #399 ownership fix preserved                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| [Fregat #352](https://github.com/ShaulLavo/fregat/issues/352) | Sustained non-ASCII measurement | Merged and closed                                              | [PR #399](https://github.com/ShaulLavo/fregat/pull/399), squash `9dbcc63a9`, adds the selector and artifact identity; exact PR CI passed; included in the verified live batch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| [Fregat #349](https://github.com/ShaulLavo/fregat/issues/349) | Prompt cache rebuild visibility | Factual cache history merged; warning calibration open         | [PR #419](https://github.com/ShaulLavo/fregat/pull/419), squash `41634c0f3`, preserves nullable reported counters and shows five recent turns. All 20 checks passed; the real context-popover scenario and live batch passed. Baseline has 10 Codex turns with unknown writes stored as zero; detector calibration remains an Approved prerequisite                                                                                                                                                                                                                                                                                                                                                                              |
+| Issue                                                         | Outcome                  | What landed or remains                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Mesh #117](https://github.com/ShaulLavo/mesh/issues/117)     | Closed                   | [PR #119](https://github.com/ShaulLavo/mesh/pull/119), `3fe1f9d`: maintained action runtimes; main CI and publication passed.                                                                                                                                                                  |
+| [Mesh #115](https://github.com/ShaulLavo/mesh/issues/115)     | Keep                     | Go 1.27.0 child-transition probe passed; original EPERM syscall unrecorded.                                                                                                                                                                                                                    |
+| [Mesh #78](https://github.com/ShaulLavo/mesh/issues/78)       | Keep                     | Go 1.27.0 profile probe and signal controls passed; historical SIGKILL sender unknown.                                                                                                                                                                                                         |
+| [Mesh #77](https://github.com/ShaulLavo/mesh/issues/77)       | Keep; partial fix        | [PR #123](https://github.com/ShaulLavo/mesh/pull/123), `34ed2bf45`: current fixture cleanup fixed; main CI and publication passed. Historical state creator unknown.                                                                                                                           |
+| [Mesh #76](https://github.com/ShaulLavo/mesh/issues/76)       | Keep                     | Bash recovery and on-demand fixtures passed; original readiness timeout unconfirmed; zsh unavailable.                                                                                                                                                                                          |
+| [Fregat #400](https://github.com/ShaulLavo/fregat/issues/400) | Keep; partial fix        | [PR #412](https://github.com/ShaulLavo/fregat/pull/412), `1c1eeeafe`: bounded runner cleanup; main CI passed. Historical hang trigger unknown.                                                                                                                                                 |
+| [Fregat #398](https://github.com/ShaulLavo/fregat/issues/398) | Closed                   | [PR #434](https://github.com/ShaulLavo/fregat/pull/434), `e5d196741`: distinguish native retry outcomes, upload batches and submissions. Accounting reconciled; exact historical glyph unrecorded.                                                                                             |
+| [Fregat #395](https://github.com/ShaulLavo/fregat/issues/395) | Closed; reload pending   | [PR #407](https://github.com/ShaulLavo/fregat/pull/407), `1fcf1a7f8`: require observed Weekly duration. Main CI passed; gateway payload installed, busy process still uses old code.                                                                                                           |
+| [Fregat #391](https://github.com/ShaulLavo/fregat/issues/391) | Keep; partial fixes      | [PR #397](https://github.com/ShaulLavo/fregat/pull/397), `99f405fd6`; [PR #421](https://github.com/ShaulLavo/fregat/pull/421), `45f22aa0b`; [PR #401](https://github.com/ShaulLavo/fregat/pull/401), `4ff2280d3`. Sampler receipts and deadline/budget fixes landed; historical cause unknown. |
+| [Fregat #390](https://github.com/ShaulLavo/fregat/issues/390) | Closed                   | Expected upstream tooltip semantics, checked against plain/composed controls and a positive ARIA control in Chromium. Screen-reader announcement order untested.                                                                                                                               |
+| [Fregat #368](https://github.com/ShaulLavo/fregat/issues/368) | Closed; deployed         | [PR #431](https://github.com/ShaulLavo/fregat/pull/431), `80f759c30`: complete frame callbacks before nested resize repaint; canonical 0.3.2 metadata; all 23 checks passed. #416/#428 superseded.                                                                                             |
+| [Fregat #364](https://github.com/ShaulLavo/fregat/issues/364) | Closed; deployed         | [PR #414](https://github.com/ShaulLavo/fregat/pull/414), `bd5cf47a3`: build Hotkeys with configured JSX and external core; main CI and live checks passed.                                                                                                                                     |
+| [Fregat #363](https://github.com/ShaulLavo/fregat/issues/363) | Keep; containment landed | [PR #432](https://github.com/ShaulLavo/fregat/pull/432), `f4f007507`: separate owned diagnostic browser and failure-preserving teardown. Original call-23 crash remains reproducible.                                                                                                          |
+| [Fregat #360](https://github.com/ShaulLavo/fregat/issues/360) | Closed                   | [PR #433](https://github.com/ShaulLavo/fregat/pull/433), `f0bbbeb1a`: raw provider controls and screenshot. Legacy native matches xterm Unicode 11; clustered native matches Unicode 15-graphemes.                                                                                             |
+| [Fregat #358](https://github.com/ShaulLavo/fregat/issues/358) | Closed; deployed         | [PR #425](https://github.com/ShaulLavo/fregat/pull/425), `0a2ff0126`: preserve active atlas pages. Cold insertion drops from two evictions/uploads to one; pixels match and warm scans stay absent. No CPU speedup claimed.                                                                    |
+| [Fregat #352](https://github.com/ShaulLavo/fregat/issues/352) | Closed; deployed         | [PR #399](https://github.com/ShaulLavo/fregat/pull/399), `9dbcc63a9`: sustained non-ASCII selector, differential Zig frame ownership and artifact identity; exact PR CI passed.                                                                                                                |
+| [Fregat #349](https://github.com/ShaulLavo/fregat/issues/349) | Keep; history deployed   | [PR #419](https://github.com/ShaulLavo/fregat/pull/419), `41634c0f3`: reported cache counters and recent-turn history. All 20 checks and the real context-popover scenario passed. Warning calibration remains Approved.                                                                       |
 
-## Standing orders
+## Final verification
 
-- The pass ends after reconciling these 17 issues. Newly discovered work is filed
-  separately; a defect blocking verification receives an owner in this pass.
-- Keep three workers at a time within the runtime's four slots, including this
-  coordinator. Refill slots with independent reviews and the next ready unit.
-- Use Sol and inherit the current runtime model. Heavy operations use the shared
-  admission wrapper. Quiet measurements respect other active measurements.
-- Every writer and reviewer owns a separate worktree. Shared checkouts preserve
-  other sessions' changes.
-- One concern per implementation PR. The coordinator owns merges and deployment.
-- Preserve existing approved plans and the work of other active PRs. Never claim
-  a benchmark receipt or instrumentation change proves an unidentified cause.
-- Performance work needs a bounded baseline and before/after evidence. Lack of
-  measurements alone does not justify dropping it.
-- Tests stay portable and focused. No retries, deadline increases, skips, or
-  broad repeated suites to conceal an unresolved defect.
-- No automatic agent launch, provider login changes, private data publication,
-  live gateway restart, or changes to the owner's stored data.
+Every implementation received an independent source/evidence review at its recorded
+head. The coordinator mapped corrections and integration changes to that review.
+GitHub rejected formal approval of #441 because the separate writer and reviewer
+use the same owner account; the independent review is retained as a PR comment.
 
-## Evidence and coordination
+The final three code PRs each passed all 19 exact-head checks, including aggregate
+CI. Main then changed shared benchmark and dependency contracts. Each author
+verified an automatic combined tree in an owned checkout, without changing the
+green PR head or restarting full PR CI:
 
-The complete opening snapshot and per-issue source records are retained in
-`/work/tmp/fregat-evidence/20261003-remaining-issues/`. Each unit retains its
-baseline, final check, and review receipts there. The canonical append-only decision ledger
-is `/work/reports/remaining-issues-20261003/decisions.tsv`. The sibling `events.tsv` records the initial worker launches only.
+- **#441:** 19 navigation tests passed on the supported Pi runner after a fresh
+  frozen install and mapped reuse of the author's own unchanged workspace outputs.
+  Its focused regression first reproduced the two escaped HTTP reads; four nearby
+  files had already passed 34 tests. It changes two test files.
+- **#432:** 64 benchmark contracts passed after main's cadence change. The earlier
+  clean three-case smoke recorded the original Unicode crash, completed later
+  instrumentation and exited 1. The probe and diagnostic module stayed unchanged;
+  pending launches are owned and late browser acquisition is cleaned up.
+- **#434:** six recorder/provenance checks passed. Native renderer/core/atlas,
+  instance and WASM blobs match the green head. Direct controls choose `zigFrame`
+  explicitly and never perform nested scheduler flush. The old `clearGlyphs`
+  fixture correction passed all 154 comparison cases and normal hooks.
 
-Earlier preflight: Fregat `0e440ec26`, with the previous `28b73e2e8` CI green and
-current Ghostty CI green; the current Editor job was still running. Mesh's
-`a68c4d8` CI passed before the `7d400c6` cask-only successor. The Editor job subsequently completed at 22:42:11Z and aggregate CI at 22:42:17Z, before the recorded worker launches at 22:43:06Z. No red main was observed at launch.
+#398's eight frozen extra frames contain two sibling builds inside one draw, one
+upload batch and one submit. Their 24 writes form a full 12×40 upload of 76,800
+bytes. The sequence supports a missing-glyph retry inference; the exact historical
+glyph is unrecorded. Real native/JS browser controls check pixel parity. This is an
+accounting resolution, with no new CPU improvement claim.
 
-At launch, PR #399 claimed to close #352 and contained #398's trace evidence. PR #397
-contained #391's stricter sampler receipts; its failed check reported an unrelated
-quiet-lifecycle test. Stacked PR #401 had passed CI. Their original authors retained
-their branches while this pass assessed overlap and unresolved behavior; the final merged states appear in the ledger above.
+The subsequent main change #443 touched seven server-update/gallery/scenario
+paths, with no relevant shared contract changes. Full main CI at `0555da0d`
+passed in run `37089355186`. The coordinator merged original green #441 first
+(`2553320ce`), then #432 and #434. Post-merge main CI at `e5d196741`
+passed in [run 37090469976](https://github.com/ShaulLavo/fregat/actions/runs/37090469976).
 
-## Blocking discoveries
+## Live delivery
 
-- [Fregat #402](https://github.com/ShaulLavo/fregat/issues/402) records PR #397's
-  quiet fixture failure before the production runner executes. The transient
-  empty slice returned no `active` stdout. Its setup result and lifecycle need
-  attribution; no production quiet-admission defect is established. [PR #409](https://github.com/ShaulLavo/fregat/pull/409) merged as `95cb29f68` and the issue closed. The fixture now explicitly starts its owned empty slice and checks setup; historical cause remains unconfirmed.
+This pass deployed `20261003T012143Z-80f759c3-main-a41e4362`: client and server
+`80f759c30`, zero dirty files, no staged update, live check passed at 01:22:18Z.
+The production shell screenshot was read back and the post-restart warning/error
+window was empty. The real context-popover dev scenario passed with zero browser
+problems before deployment.
 
-- [Fregat #410](https://github.com/ShaulLavo/fregat/issues/410) retains PR #407's folder-move undo event failure. A failed-job rerun passed, enabling #407 to land; a contended baseline reproduced interleaved native watcher echoes. The test isolation repair merged in [PR #415](https://github.com/ShaulLavo/fregat/pull/415), squash `dc3d81592`, and #410 closed. Production event semantics were preserved.
+Other sessions subsequently delivered web-only updates. The latest observed client
+is `0555da0d` (two dirty files reported); the server remains the clean `80f759c30`
+release. Its live check passed at 02:27:12Z, there is no staged update, and the
+refreshed production shell screenshot was read back. Both include this pass's
+runtime fixes. The final test/benchmark-tool changes require no app rebuild.
 
-- [Fregat #422](https://github.com/ShaulLavo/fregat/issues/422) records the terminal patch version's stale native resolver provenance. Main's `83a0cf56f` changed the package and lockfile without updating the canonical package-input and bootstrap hashes. The Ghostty metadata guard failed in job `111082793144`. A peer corrected the 0.3.1 metadata in `5e8bf33e5`; independent structural/hash review passed. The #368 integration updates the final 0.3.2 closure separately. PR #425 and the final scheduler's Ghostty job passed against the corrected native closure. The final scheduler PR passed all 23 checks and closed #422 on merge.
+**Gateway delivery remains incomplete:** #395's payload was installed atomically,
+but the busy process still uses its previous code. A safe reload and live check
+remain necessary. No active requests, credentials or stored data were disturbed.
 
-- [Fregat #424](https://github.com/ShaulLavo/fregat/issues/424) records formatter failure on a commit containing only formatter-excluded generated files. A peer added `--no-error-on-unmatched-pattern` to the two formatter hooks in `fc8a0ca3a`; ordinary formatter failures still propagate. This pass's final scheduler integration runs the corrected normal hooks.
+## Discoveries outside the opening 17
 
-- [Fregat #435](https://github.com/ShaulLavo/fregat/issues/435) retains the two pinned fd release download setup failures, HTTP 500 and 502, before tests. The bounded failed-job rerun passed both jobs. The separately owned settings fixture repair merged in [PR #427](https://github.com/ShaulLavo/fregat/pull/427), squash `8baec21a1`, before the same rerun passed its stale-value assertion.
+Verification blockers were assigned in this pass. Other findings retain separate
+issues so the review remains bounded:
 
-- [Fregat #437](https://github.com/ShaulLavo/fregat/issues/437) records main CI run `37083558556`, web shard 1, failing the disposed navigation-command fixture because MSW observed late `lsp/match` and `fs/read` requests. The failing case uses a different scoped port from those requests, so their origin is under investigation. A controlled timer regression reproduced the exact two requests after harness unmount restored transport but before its editor runtime was disposed. The test helper now disposes its owned application and restores its query-client binding during idempotent unmount. The focused red/green proof passed; four nearby files passed 34 tests on the supported Pi runner. Production navigation and strict MSW stay unchanged. [PR #441](https://github.com/ShaulLavo/fregat/pull/441), head `d322ba5e4`, passed normal commit checks and independent source/evidence review. Exact-head CI is running; subsequent merges are held until the blocker is merged.
+- [#402](https://github.com/ShaulLavo/fregat/issues/402): quiet empty-slice fixture
+  setup failed before the production runner. [PR #409](https://github.com/ShaulLavo/fregat/pull/409),
+  `95cb29f68`, starts/checks its owned slice; closed. Historical cause unconfirmed.
+- [#410](https://github.com/ShaulLavo/fregat/issues/410): folder-move undo test mixed
+  semantic events with native watcher echoes. [PR #415](https://github.com/ShaulLavo/fregat/pull/415),
+  `dc3d81592`, isolated the fixture; closed. Production semantics preserved.
+- [#422](https://github.com/ShaulLavo/fregat/issues/422): stale native package hashes
+  after a patch bump. Corrected canonical metadata and final 0.3.2 closure passed;
+  closed on #431 merge.
+- [#424](https://github.com/ShaulLavo/fregat/issues/424): formatter rejected a commit
+  containing only excluded generated files. Peer fix `fc8a0ca3a` allows unmatched
+  paths while preserving ordinary formatter failures.
+- [#435](https://github.com/ShaulLavo/fregat/issues/435): pinned fd setup downloads
+  returned HTTP 500/502. A bounded failed-job rerun passed. Separate pruning fixture
+  repair #427 had landed before its assertion passed.
+- [#437](https://github.com/ShaulLavo/fregat/issues/437): main's strict MSW check saw
+  `lsp/match` and `fs/read` requests from the preceding navigation fixture. #441
+  now disposes its owned application before restoring transport/query bindings;
+  closed. Production navigation and strict MSW unchanged.
+- [#444](https://github.com/ShaulLavo/fregat/issues/444): older main `59587bb8` failed
+  the Pi lane child-stdin test with EPIPE. Later `2a3d8ca0` full main CI passed;
+  follow-up retains the original failure, with no established product cause.
+- [#446](https://github.com/ShaulLavo/fregat/issues/446): main `9e921d18` timed out
+  installing Editor browser dependencies after Ubuntu APT mirror retries, before
+  tests. Later `0555da0d` full main CI passed; exact blocked subprocess unknown.
 
-A possible long-lived server/browser admission cycle was recorded on existing [Fregat #405](https://github.com/ShaulLavo/fregat/issues/405), with memory admission documented separately. The foreign server later exited and normal admission resumed; this pass stopped no other session's process.
+A possible long-lived server/browser admission cycle was recorded on existing
+[#405](https://github.com/ShaulLavo/fregat/issues/405), alongside memory-admission
+facts. The foreign server later exited and normal admission resumed. No other
+session's process was stopped and no quiet measurement was bypassed.
 
-## Live delivery and audit
+## Evidence, cleanup and audit
 
-This pass deployed release `20261003T012143Z-80f759c3-main-a41e4362`, verifying client and server commit `80f759c30` with zero dirty files and no staged update. Its live check passed at 01:22:18Z. The production shell screenshot was read back and the post-restart warning/error window was empty. The real context-popover dev scenario passed with zero browser problems before deployment. A subsequent web-only release from another session serves client `2a3d8ca08` (one dirty file reported) while the server remains the clean `80f759c30` release. Its live check passed at 01:28:57Z, it has no staged update, and the refreshed production shell screenshot was read back. Both client and server contain this pass's runtime fixes. The shared main CI queue remains visible separately from these local and live checks.
+Complete opening comments, baseline/final checks, reviews and integration receipts
+are retained in `/work/tmp/fregat-evidence/20261003-remaining-issues/`. The canonical
+append-only decision ledger is `/work/reports/remaining-issues-20261003/decisions.tsv`;
+`events.tsv` records only the initial worker launches.
 
-The deployment checkout `/work/worktrees/platform/issues-deploy-20261003` is retained because the running release borrows its dependencies. It must remain until a later deployment replaces those links. Completed disposable writer/reviewer worktrees are removed only when clean; evidence and branch checkpoints are retained.
+The original preflight had green main before launch: Editor finished at 22:42:11Z,
+aggregate CI at 22:42:17Z, workers launched at 22:43:06Z. Earlier apparent CI,
+publication and scheduler-state contradictions were reconciled with primary
+receipts. Subsequent failed setup/test runs remain recorded separately from later
+passing runs.
 
-Claude Haiku 4.5 audited the decision ledger against a bounded excerpt of this active transcript and the report checkpoint. The supplied excerpt omitted bulk tool outputs; this was a trail audit, not a second code review. Four apparent contradictions were resolved against current merge, publication, CI, and issue receipts. One delivery limitation remains: the installed gateway payload still awaits a safe reload and live verification while `/ai` connections remain active. No credentials or stored data were changed.
+Completed disposable worktrees are removed only when clean; evidence and branch
+checkpoints remain. `/work/worktrees/platform/issues-deploy-20261003` stays because
+the retained server release and rollback dependencies point into it. Those links
+must be replaced before its removal.
 
-## Current decisions
+Claude Haiku 4.5 audited the decision ledger against a bounded excerpt of this
+active transcript and the report checkpoint. Bulk tool outputs were omitted;
+this was a trail audit, not a second code review. Four apparent contradictions
+were resolved against current merge, publication, CI and issue receipts. Its
+remaining attention item is the gateway's safe reload/live verification.
 
-Keep the remaining reports. Negative reproduction alone does not justify dropping the four historical Mesh failures, the original GPU sampling trigger, or the terminal CI hang. Their source issues retain the exact missing observation. The legacy Unicode crash remains an upstream dependency problem after benchmark containment. Cache rebuild warnings remain Approved work after provider-counter calibration. No performance request is dropped.
+## Execution checklist
 
-Merged source and live delivery are recorded separately. The gateway payload is installed, but its busy process still serves the previous code. The server batch is live at `80f759c30`; the later client `2a3d8ca08` includes it. Benchmark containment, accounting instrumentation, final source-issue reconciliation, and queued main CI remain execution work in this pass.
+- [x] Collect the opening backlog and complete comments across the review scope.
+- [x] Reproduce confirmed bugs, use separate writers and independently review fixes.
+- [x] Merge explicit green heads and map relevant changes when main moves.
+- [x] Deploy the completed app batch and inspect live evidence.
+- [x] Update source issues; close nine and retain eight with precise missing evidence.
+- [x] File separate follow-ups for newly observed failures.
+- [x] Confirm the final post-merge main CI result.
+- [x] Validate final report formatting and the plan inventory.
+- [x] Remove clean implementation checkouts and audit registered code PRs.
+
+The report is published through [PR #436](https://github.com/ShaulLavo/fregat/pull/436).
+Its own checks and merge state are visible there. The report checkout is removed
+after publication; the deployment dependency checkout remains as described above.
+
+Recurring issue collection remains ordinary API/script work. Starting another
+agent requires the owner's instruction or an explicit opt-in rule. Approved plans
+from the prior pass remain the implementation backlog.
