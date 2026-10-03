@@ -162,6 +162,7 @@ function allowanceFixture(): ProviderUsageResult {
     accounts: [
       {
         accountKey: 'owner-native',
+        label: 'fixture.native',
         driverKind: v.parse(providerDriverKindSchema, 'claude'),
         providerInstanceIds: [],
         planType: 'max',
@@ -195,7 +196,9 @@ function allowanceFixture(): ProviderUsageResult {
           },
         ],
       },
-      ...accountUsageFixture(now).accounts,
+      ...accountUsageFixture(now).accounts.map((account, index) =>
+        index === 0 ? { ...account, label: 'fixture.person' } : account,
+      ),
     ],
   }
 }
@@ -250,6 +253,12 @@ export const settingsUsage: Scenario = {
       await openUsageSettings(page)
       await selectors.usageSummary(page).waitFor({ timeout: 20_000 })
       strictEqual(await selectors.allowanceAccounts(page).count(), 3, 'three independent accounts')
+      await selectors.accountAllowances(page).getByText('fixture.native', { exact: true }).waitFor()
+      await selectors.accountAllowances(page).getByText('fixture.person', { exact: true }).waitFor()
+      await selectors
+        .accountAllowances(page)
+        .getByText('Codex account 2', { exact: true })
+        .waitFor()
       await selectors
         .accountAllowances(page)
         .getByText('No allowance observation', { exact: true })

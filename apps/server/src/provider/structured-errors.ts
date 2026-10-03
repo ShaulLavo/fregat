@@ -2,6 +2,12 @@ import { errorStringField } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
+  USAGE_PROBE_FAILED: {
+    status: 502,
+    message: 'Account usage could not be read.',
+    why: 'The provider control request failed before returning an account reading.',
+    fix: 'Check that the provider is installed and signed in, then refresh usage.',
+  },
   BACKGROUND_CHECK_FAILED: {
     status: 502,
     message: 'The provider background work check failed.',

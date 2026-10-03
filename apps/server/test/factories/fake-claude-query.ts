@@ -216,7 +216,7 @@ export function assistantText(text: string): SDKMessage {
 
 export function fakeClaudeInit(): SDKMessage {
   return {
-    apiKeySource: 'oauth',
+    apiKeySource: 'none',
     claude_code_version: '9.9.9',
     cwd: '/fixture',
     mcp_servers: [],

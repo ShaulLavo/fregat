@@ -720,7 +720,7 @@ test('portable compaction preserves between-repetition qualifications and bounde
   for (const run of artifact.runs) {
     run.info = { adapter: {} }
     run.gpuWindows = []
-    run.output.frameMetrics = [{ terminal: 0, delta: { zigFrames: 1192, jsFallbackFrames: 8 } }]
+    run.output.frameMetrics = [{ terminal: 0, delta: { zigFrames: 1192 } }]
     run.latency.write = run.variant === 'ghostty-webgpu' ? [1] : [0]
   }
   const compact = await compactEvidence(artifact)
@@ -734,7 +734,7 @@ test('portable compaction preserves between-repetition qualifications and bounde
     assert.deepEqual(run.output.input, input)
     assert.equal(run.output.bytes, 4096)
     assert.equal(run.output.nextChunk, 172)
-    assert.deepEqual(run.output.frameMetrics[0].delta, { zigFrames: 1192, jsFallbackFrames: 8 })
+    assert.deepEqual(run.output.frameMetrics[0].delta, { zigFrames: 1192 })
   }
   assert.deepEqual(pairedRatios(compact), compact.pairedRatios)
   const row = compact.pairedRatios.find(({ metric }) => metric === 'write/p50')
@@ -851,12 +851,13 @@ test('native renderer pairs retain generic counterpart values and per-session id
   ])
   artifact.frameBuilders = ['zig']
   const rows = pairedRatios(artifact)
-  assert.equal(rows.length, 21)
+  assert.equal(rows.length, 28)
   for (const [native, counterpart] of Object.entries(counterparts)) {
+    const expected = native === 'ghostty-canvas' ? [counterpart, 'xterm-dom'] : [counterpart]
     const selected = rows.filter((row) => row.nativeVariant === native)
-    assert.equal(selected.length, 7)
+    assert.equal(selected.length, 7 * expected.length)
     for (const row of selected) {
-      assert.equal(row.variant, counterpart)
+      assert(expected.includes(row.variant))
       assert.equal(row.status, 'pass')
       assert.equal(row.frameBuilder, undefined)
       assert.equal(row.pairs[1].counterpart, 100)
@@ -866,12 +867,14 @@ test('native renderer pairs retain generic counterpart values and per-session id
   artifact.runs.find((run) => run.variant === 'ghostty-web').sessionId = 'foreign-session'
   assert(
     pairedRatios(artifact)
-      .filter((row) => row.nativeVariant === 'ghostty-canvas')
+      .filter((row) => row.nativeVariant === 'ghostty-canvas' && row.variant === 'ghostty-web')
       .every((row) => row.status === 'incomplete'),
   )
   const report = markdown(artifact)
   assert(report.includes('xterm removed its canvas renderer'))
   assert(report.includes('ghostty-canvas ↔ ghostty-web'))
+  assert(report.includes('ghostty-canvas ↔ xterm-dom'))
+  assert(report.includes('ratios are correlated'))
   assert(report.includes('| Native | Counterpart |'))
 })
 

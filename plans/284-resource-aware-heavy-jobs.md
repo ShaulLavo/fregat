@@ -9,7 +9,21 @@
 
 Agents run heavy commands (suites, builds, browser tests, benchmarks) as fast as the machine can actually take them. Admission follows live CPU and memory pressure, not a fixed count of three. A job that hogs the machine shows up in a report and gets fixed. Quiet-machine measurements and low-resource stress runs have their own lanes, so neither starves everyone else.
 
-## Today
+## Current implementation and remaining acceptance
+
+The original design below is a historical baseline. The tracked runner, FIFO pressure/memory
+admission, class ceilings, bounded quiet holds, accounting/report tools and Pi adapter now live
+in `scripts/heavy/`. [AGENTS.md](../AGENTS.md#dev-gates-verification) names the installed entry point.
+[312](312-heavy-slice-ownership.md), [313](313-heavy-quiet-lifecycle.md) and
+[314](314-heavy-non-cache-memory.md) own the namespace, quiet-lifecycle and measurement follow-ups.
+Do not rebuild those shipped mechanisms from the old scratch-wrapper description.
+
+The original phase checkboxes below remain acceptance-reconciliation items. Mechanism availability
+alone does not prove the normal-day report, comparative 12-job burst, two-session fairness or
+labeled Pi scenario receipts. Read existing evidence and run only missing bounded checks.
+P4's measured consumer fixes remain ongoing work. Record phase receipts before closing this plan.
+
+## Original baseline, October 1
 
 `/work/tmp/wave-heavy/run.sh` is an untracked bash script from the 2026-09-25 completion wave (after `oomd` killed mesh.service). It holds one of three `flock` slots and runs the command under `systemd-run --user --scope` with `MemoryHigh=6G MemoryMax=7G`. Another session's benchmark tool takes all three locks at once ("exclusive") with no time limit or queue. The script lives in `/work/tmp`, which is scratch, so nothing about it is reviewed or documented where agents look.
 
@@ -22,7 +36,7 @@ Agents run heavy commands (suites, builds, browser tests, benchmarks) as fast as
 5. **Hogs get a report, not more headroom.** The wrapper records each job's peak memory, CPU time and wall time (from its cgroup) to a JSONL log beside Platform's logs. `scripts/heavy/report.ts` lists the top consumers by command. A command that repeatedly exceeds its class gets an owner and a fix (a leaking test, an unbounded worker pool, a missing `VITEST_MAX_WORKERS`), not a bigger cap.
 6. **Pressure tests go to the Raspberry Pi.** The Pi runs 24/7 and is idle. It joins the mesh as a host, reached the way the Mac reaches it today, and gets a `--host pi` lane in the wrapper for runs whose point is low CPU or low memory: large-file typing under load, slow-start paths, worker back-pressure. Measurements that need a quiet fast machine stay local under `--quiet`.
 
-## Phases
+## Original phases and acceptance receipts to reconcile
 
 - [ ] **P1 — track and observe.** Move the wrapper into `scripts/heavy/`, keep today's behaviour, add per-job cgroup accounting and the JSONL log plus `report.ts`. Run one normal day of agent work and publish the top consumers in `/work/reports/heavy-jobs/`.
 - [ ] **P2 — pressure admission.** Replace the three slots with pressure and memory admission by job class, with settings for thresholds. Gate: a burst of 12 concurrent browser and suite jobs completes with no OOM kill and no job killed by its class cap that did not also exceed it alone; compare total wall time against the three-slot wrapper on the same burst.

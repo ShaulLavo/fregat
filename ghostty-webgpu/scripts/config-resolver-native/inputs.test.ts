@@ -73,6 +73,22 @@ test.each(['.', 'ghostty-webgpu'])(
   },
 )
 
+test.each(['.', 'ghostty-webgpu'])(
+  'family TypeScript compiler configuration invalidates native input identity and bootstrap state inside %s',
+  (prefix) => {
+    const family = nativeInputFixture(prefix)
+    const originalInputs = createNativeInputs(family)
+    expect(verifyNativeRepositoryState(family, 'bootstrap')).toBe('bootstrap')
+    const path = join(family, 'tsconfig.json')
+    const config = JSON.parse(readFileSync(path, 'utf8'))
+    config.compilerOptions.verbatimModuleSyntax = !config.compilerOptions.verbatimModuleSyntax
+    writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`)
+
+    expect(canonicalSha256(createNativeInputs(family))).not.toBe(canonicalSha256(originalInputs))
+    expect(() => verifyNativeRepositoryState(family, 'bootstrap')).toThrow(/native inputs/)
+  },
+)
+
 test.each([
   ['main.zig', 'maximum_payload_bytes = 128 * 1024', 'maximum_payload_bytes = 64 * 1024'],
   ['build.zig', 'config.simd = false', 'config.simd = true'],
@@ -97,7 +113,7 @@ function nativeInputFixture(prefix: string): string {
   const checkout = mkdtempSync(join(tmpdir(), 'ghostty-native-inputs-'))
   roots.push(checkout)
   const family = join(checkout, prefix)
-  const files = new Set([...discoverOwnedPaths(source), 'package.json'])
+  const files = new Set([...discoverOwnedPaths(source), 'package.json', 'tsconfig.json'])
   for (const file of files) {
     const destination = join(family, file)
     mkdirSync(dirname(destination), { recursive: true })
