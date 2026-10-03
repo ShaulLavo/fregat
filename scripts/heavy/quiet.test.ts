@@ -427,7 +427,19 @@ describe.skipIf(!userScopes)('quiet holds', () => {
           machine: true,
           quiet,
         })
-        expect(result.code).toBe(quiet ? 75 : 0)
+        expect(
+          result.code,
+          JSON.stringify({
+            label,
+            run,
+            stderr: result.stderr,
+            now: bootSeconds(),
+            owners: live(box.state, 'jobs').map((entry) => ({
+              ...entry,
+              cgroup: sliceState(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`),
+            })),
+          }),
+        ).toBe(quiet ? 75 : 0)
       }
     }
     await Promise.all([loop('quiet', ['sleep', '60'], true), loop('suite', ['true'], false)])

@@ -416,7 +416,12 @@ async function admit(
         return { cancelled: cancellation.signal.reason as NodeJS.Signals }
       if ('retry' in attempt) return attempt
       const elapsedMs = performance.now() - started
-      if (attempt.quiet && elapsedMs >= config.quietHoldSeconds * 1000) {
+      // A healthy predecessor owns its full startup, runtime and cleanup budget.
+      if (
+        attempt.quiet &&
+        elapsedMs >= config.quietHoldSeconds * 1000 &&
+        bootSeconds() >= (attempt.quiet.quietUntil ?? 0)
+      ) {
         const predecessor = attempt.quiet
         const slice = `${predecessor.sliceRoot}-${predecessor.id}.slice`
         const state = sliceState(predecessor.sliceRoot, slice)

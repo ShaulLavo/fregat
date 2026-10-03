@@ -646,11 +646,31 @@ kill -STOP $$
       const exited = new Promise((resolve) => owned.child.on('exit', resolve))
       owned.child.kill('SIGKILL')
       await exited
-      // The dead wrapper's launcher holds fd 6 throughout this delay, including a new admission.
-      const next = start(box, 'while-delayed', ['true'], { jobClass: 'light', machine: true })
-      expect((await next.done).code).toBe(0)
+      // The dead wrapper's launcher holds fd 6, so even an empty cgroup blocks admission.
+      const successorMarker = path.join(box.root, 'successor-ran')
+      const next = start(box, 'while-delayed', ['touch', successorMarker], {
+        jobClass: 'light',
+        machine: true,
+      })
+      expect(
+        (await next.done).code,
+        JSON.stringify({
+          stderr: next.stderr(),
+          now: bootSeconds(),
+          quietUntil: owner!.quietUntil,
+          owners: live(box.state, 'jobs'),
+          cgroup: sliceState(box.sliceRoot, slice),
+        }),
+      ).toBe(2)
+      expect(bootSeconds()).toBeGreaterThanOrEqual(owner!.quietUntil!)
+      expect(next.stderr()).toContain(`Quiet lease 'delayed' remains held by ${slice} (empty)`)
+      expect(next.stderr().match(/warn: quiet lease/g)).toHaveLength(1)
       expect(next.stderr()).not.toContain(`stopping ${slice}`)
       expect(live(box.state, 'jobs').map((entry) => entry.id)).toContain(owner!.id)
+      expect(
+        readdirSync(path.join(box.state, 'queue')).filter((file) => file.endsWith('.json')),
+      ).toEqual([])
+      expect(existsSync(successorMarker)).toBe(false)
       expect(existsSync(marker)).toBe(false)
       expect(serviceState(watchdogOf(slice))).toBe('not-found')
       writeFileSync(go, '')
@@ -659,8 +679,12 @@ kill -STOP $$
       await expect
         .poll(() => sliceState(box.sliceRoot, slice!), { timeout: 6_000 })
         .not.toBe('running')
-      const reaper = start(box, 'after-delayed', ['true'], { jobClass: 'light', machine: true })
+      const reaper = start(box, 'after-delayed', ['touch', successorMarker], {
+        jobClass: 'light',
+        machine: true,
+      })
       expect((await reaper.done).code).toBe(0)
+      expect(existsSync(successorMarker)).toBe(true)
       expect(serviceState(watchdogOf(slice))).toBe('not-found')
     } finally {
       writeFileSync(go, '')
