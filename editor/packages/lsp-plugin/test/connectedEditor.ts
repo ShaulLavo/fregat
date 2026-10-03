@@ -191,6 +191,7 @@ export async function connectedEditor(
   const context = viewContributionContext({
     element,
     registerKeymapContextKey: keymap.registerKeymapContextKey,
+    registerKeymapNode: keymap.registerKeymapNode,
     getSnapshot: () => snapshot,
     getRangeClientRect: () => anchorRect,
     getFeature: (token) => features.get(token) ?? null,
@@ -533,10 +534,12 @@ function viewContributionContext(options: {
   focusEditor(): void
   onDidType(listener: (text: string) => void): () => void
   registerKeymapContextKey: EditorViewContributionContext['registerKeymapContextKey']
+  registerKeymapNode: EditorViewContributionContext['registerKeymapNode']
 }): EditorViewContributionContext {
   return createTestViewContributionContext({
     ...providerRegistry(),
     registerKeymapContextKey: options.registerKeymapContextKey,
+    registerKeymapNode: options.registerKeymapNode,
     onDidType: (listener) => ({ dispose: options.onDidType(listener) }),
     container: options.element,
     scrollElement: options.element,

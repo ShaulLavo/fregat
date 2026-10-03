@@ -808,6 +808,10 @@ export class Editor {
         this.addCommandContributionProvider(provider),
       onCommandContributionProviderRemoved: (provider) =>
         this.removeCommandContributionProvider(provider),
+      onContributedCommandsChanged: () => {
+        if (this.disposed) return
+        this.keymap.updateCommands(this.getCommandDeclarations().map((command) => command.id))
+      },
       onCapabilityContributionProviderAdded: (provider) =>
         this.addCapabilityContributionProvider(provider),
       onCapabilityContributionProviderRemoved: (provider) =>
@@ -1319,7 +1323,7 @@ export class Editor {
     }
   }
 
-  /** A key is true while any of the contributions that registered it says so. */
+  /** The dispatcher and focus node that own this editor's keyboard commands. */
   getHotkeysHost() {
     return this.keymap.host
   }
@@ -2106,20 +2110,15 @@ export class Editor {
   }
 
   addPlugin(plugin: EditorPlugin): EditorDisposable {
-    const registration = this.pluginHost.addPlugin(plugin)
-    this.keymap.updateCommands(this.getCommandDeclarations().map((command) => command.id))
-    return registration
+    return this.pluginHost.addPlugin(plugin)
   }
 
   removePlugin(plugin: EditorPlugin): boolean {
-    const removed = this.pluginHost.removePlugin(plugin)
-    this.keymap.updateCommands(this.getCommandDeclarations().map((command) => command.id))
-    return removed
+    return this.pluginHost.removePlugin(plugin)
   }
 
   setPlugins(plugins: readonly EditorPlugin[]): void {
     this.pluginHost.setPlugins(plugins)
-    this.keymap.updateCommands(this.getCommandDeclarations().map((command) => command.id))
     this.log({
       action: 'editor.plugins.set',
       level: 'info',

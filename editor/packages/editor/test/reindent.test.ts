@@ -11,7 +11,12 @@ import {
 } from '../src/editor/reindent'
 import type { TextEdit } from '../src/tokens'
 import { Editor } from '../src/editor/Editor'
-import { defaultKeyBindings, commandCategory, readonlyCommands } from './factories/keymap'
+import {
+  defaultKeyBindings,
+  commandCategory,
+  readonlyCommands,
+  keyboardEvent,
+} from './factories/keymap'
 import { registerEditorLanguageConfiguration } from '../src/editor/languageConfiguration'
 import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import type { ResolvedSelection } from '../src/selections'
@@ -65,18 +70,17 @@ class MockHighlight extends Set<Range> {}
  */
 function pressOn(editor: Editor, keyName: string, chord: Chord): void {
   const mac = detectPlatform() === 'mac'
-
-  editorElement(editor).dispatchEvent(
-    new KeyboardEvent('keydown', {
-      bubbles: true,
-      cancelable: true,
-      key: keyName,
-      altKey: chord.alt === true,
-      ctrlKey: chord.mod === true && !mac,
-      metaKey: chord.mod === true && mac,
-      shiftKey: chord.shift === true,
-    }),
-  )
+  const init = {
+    bubbles: true,
+    cancelable: true,
+    key: keyName,
+    altKey: chord.alt === true,
+    ctrlKey: chord.mod === true && !mac,
+    metaKey: chord.mod === true && mac,
+    shiftKey: chord.shift === true,
+  }
+  editorElement(editor).dispatchEvent(keyboardEvent('keydown', init))
+  editorElement(editor).dispatchEvent(keyboardEvent('keyup', init))
 }
 
 describe('reindent command wiring', () => {

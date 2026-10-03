@@ -35,7 +35,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@fregat/hotkeys": "0.0.1"
+    "@fregat/hotkeys": "catalog:"
   },
   "devDependencies": {
     "happy-dom": "^20.14.5",

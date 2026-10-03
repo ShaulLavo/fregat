@@ -51,7 +51,8 @@ export class EditorHotkeys {
       readonly dispatch: (command: EditorAnyCommandId, context: EditorCommandContext) => boolean
     },
   ) {
-    const dispatcher = options.hotkeys ?? createBrowserDispatcher({ root: options.target })
+    const dispatcher =
+      options.hotkeys ?? createBrowserDispatcher({ root: options.target.ownerDocument })
     this.ownDispatcher = !options.hotkeys
     const node = dispatcher.createNode({ parent: options.parent, readContext: options.readContext })
     this.host = { dispatcher, node }
