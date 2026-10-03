@@ -62,7 +62,7 @@ test.each(['pwa-unknown', 'pwa-installed'])(
                 method: 'PWA.install',
                 params: {
                   manifestId: 'http://localhost:123/platform/',
-                  installUrlOrBundleUrl: 'http://localhost:123/platform/',
+                  installUrlOrBundleUrl: 'http://localhost:123/platform/install.html',
                 },
               },
               {
@@ -72,6 +72,11 @@ test.each(['pwa-unknown', 'pwa-installed'])(
               },
             ]
           : []),
+        {
+          id: expect.any(Number),
+          method: 'PWA.changeAppUserSettings',
+          params: { manifestId: 'http://localhost:123/platform/', displayMode: 'standalone' },
+        },
       ])
       expect(
         requests.some((request) =>
@@ -137,8 +142,15 @@ test.each(['pwa-invalid-params', 'pwa-install-failed', 'pwa-verify-failed'])(
           onOpen: () => {},
         }),
       ).rejects.toMatchObject({
-        code: 'desktop.launcher.CDP_FAILED',
-        internal: { reason: 'request-error' },
+        code: 'desktop.launcher.CDP_COMMAND_FAILED',
+        internal: {
+          reason: 'request-error',
+          startupPhase: 'installation',
+          browserMajor: 130,
+          browserFamily: 'fixture',
+          waitedMs: expect.any(Number),
+          transport: { readBytes: expect.any(Number), frames: expect.any(Number) },
+        },
       })
       const requests = await readFile(f.pidFile + '.requests', 'utf8')
       if (mode === 'pwa-invalid-params') expect(requests).not.toContain('PWA.install')
@@ -176,7 +188,7 @@ test.each([
       onUnsupported: () => opened.push('unsupported'),
     })
     if (mode === 'pwa-install-failed') {
-      await expect(launch).rejects.toMatchObject({ code: 'desktop.launcher.CDP_FAILED' })
+      await expect(launch).rejects.toMatchObject({ code: 'desktop.launcher.CDP_COMMAND_FAILED' })
       expect(opened).toEqual([])
       return
     }
