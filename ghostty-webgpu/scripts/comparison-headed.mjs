@@ -53,6 +53,22 @@ export function headedLaunchArguments(profile) {
   return [`--user-data-dir=${profile}`, ...headedHardwareArguments, '--remote-debugging-port=0']
 }
 
+export function observedVulkanRenderer(renderer) {
+  assert(typeof renderer === 'string', 'Actual renderer string required')
+  const parsed = renderer.match(
+    /^ANGLE \(([^,()]+), (Vulkan) (\d+\.\d+\.\d+) \((.+\(0x([a-fA-F0-9]+)\).*)\), ([^,()]+)\)$/,
+  )
+  assert(parsed, 'Structured actual ANGLE Vulkan device identity required')
+  return {
+    vendor: parsed[1],
+    angleBackend: parsed[2],
+    vulkanVersion: parsed[3],
+    deviceDescription: parsed[4],
+    deviceId: Number.parseInt(parsed[5], 16),
+    driverLabel: parsed[6],
+  }
+}
+
 export function assertHeadedHardware({
   provenance,
   executable,
@@ -144,23 +160,49 @@ export function assertHeadedHardware({
   )
   const activeDevice = gpu.devices.find((device) => device.deviceString === renderer)
   assert(activeDevice, 'Browser renderer must identify an observed physical GPU')
-  const browserRenderer = renderer.match(/^ANGLE \((.+), ([^,()]+)\)$/)
-  const pageRenderer =
-    typeof gl.renderer === 'string' && gl.renderer.match(/^ANGLE \((.+), ([^,()]+)\)$/)
-  assert(browserRenderer && pageRenderer, 'Structured actual ANGLE renderer labels required')
+  const browserRenderer = observedVulkanRenderer(renderer)
+  const pageRenderer = observedVulkanRenderer(gl.renderer)
+  for (const key of ['vendor', 'angleBackend', 'vulkanVersion', 'deviceDescription', 'deviceId'])
+    assert.equal(
+      pageRenderer[key],
+      browserRenderer[key],
+      'Page Vulkan and physical-device identity must match browser hardware',
+    )
   assert.equal(
-    pageRenderer[1],
-    browserRenderer[1],
-    'Page Vulkan and physical-device identity must match browser hardware',
+    browserRenderer.deviceId,
+    activeDevice.deviceId,
+    'Renderer device ID must match observed physical GPU',
+  )
+  assert(
+    typeof activeDevice.vendorString === 'string' &&
+      activeDevice.vendorString.includes(browserRenderer.vendor),
+    'Renderer vendor must match observed physical GPU',
   )
   // Page debug info may redact the driver version; CDP retains the independent vendor/version fields.
   assert(
-    pageRenderer[2] === browserRenderer[2] ||
-      (pageRenderer[2] === activeDevice.driverVendor &&
-        browserRenderer[2] === `${activeDevice.driverVendor}-${activeDevice.driverVersion}`),
+    pageRenderer.driverLabel === browserRenderer.driverLabel ||
+      (pageRenderer.driverLabel === activeDevice.driverVendor &&
+        browserRenderer.driverLabel ===
+          `${activeDevice.driverVendor}-${activeDevice.driverVersion}`),
     'Page driver label must match the independently observed driver',
   )
   assert.equal(gl.contextLost, false, 'Live page WebGL context required')
+  return {
+    display: window.backend,
+    angleBackend: browserRenderer.angleBackend,
+    vulkanVersion: browserRenderer.vulkanVersion,
+    vendor: browserRenderer.vendor,
+    vendorId: activeDevice.vendorId,
+    deviceId: activeDevice.deviceId,
+    deviceDescription: browserRenderer.deviceDescription,
+    driver: {
+      browserLabel: browserRenderer.driverLabel,
+      pageLabel: pageRenderer.driverLabel,
+      vendor: activeDevice.driverVendor,
+      version: activeDevice.driverVersion,
+    },
+    rawRendererStrings: { browser: renderer, page: gl.renderer },
+  }
 }
 
 async function identity(pid, read = readFile) {
@@ -338,6 +380,21 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     originalExecveArguments: null,
     argumentSpaces: false,
     profile,
+    filesystemCustody: {
+      taskRoot: { path: root, uid: rootStat.uid, canonical: true },
+      profile: {
+        path: profile,
+        uid: profileStat.uid,
+        mode: profileStat.mode & 0o777,
+        canonical: true,
+      },
+      executable: {
+        path: executable,
+        device: executableStat.dev,
+        inode: executableStat.ino,
+        size: executableStat.size,
+      },
+    },
     cleanup: {},
     stderr: '',
   }
@@ -504,7 +561,7 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     )
     const systemInfo = await boundedSession.send('SystemInfo.getInfo')
     evidence.hardware = { gpu: systemInfo.gpu, page: facts, compositor, window }
-    assertHeadedHardware({
+    const actualBackend = assertHeadedHardware({
       provenance,
       executable,
       profile,
@@ -515,13 +572,14 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     })
     owned = await processCustody(boundedSession, child.pid)
     evidence.ownedProcesses = owned
+    evidence.actualBackend = actualBackend
     const ownership = {
       targetId: target.targetId,
       windowId: window.windowId,
       url,
       viewport: { width: facts.width, height: facts.height },
     }
-    return { page, session: pageSession, evidence, ownership, close }
+    return { page, session: pageSession, evidence, ownership, actualBackend, close }
   } catch (error) {
     error.launchEvidence = evidence
     try {

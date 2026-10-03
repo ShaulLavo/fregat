@@ -5,9 +5,10 @@
   "opticalDisplayLatency": false,
   "fixedBackend": "Linux native Wayland, hardware ANGLE Vulkan, DPR 1",
   "api": {
-    "launch": "launchOwnedHeadedBrowser({ executablePath, taskRoot, observeWindow }) -> { page, session, evidence, ownership, close }",
+    "launch": "launchOwnedHeadedBrowser({ executablePath, taskRoot, observeWindow }) -> { page, session, evidence, ownership, actualBackend, close }",
     "smoke": "runHeadedPresentationSmoke({ executablePath, taskRoot, observeWindow }) -> evidence; owns launch and cleanup",
     "presentation": "proveHeadedPresentation({ page, session, ownership: { targetId, windowId, url, viewport: { width, height } }, smokeId, frameTimeoutMilliseconds?, commandTimeoutMilliseconds? })",
+    "actualBackend": "{ display, angleBackend, vulkanVersion, vendor, vendorId, deviceId, deviceDescription, driver, rawRendererStrings }; observed facts, qualify setup only with PASS_SETUP_ONLY and complete cleanup",
     "observeWindow": "({ browserPid, smokeId, windowId }) -> { browserPid, backend: 'wayland', mapped: true, hidden: false, xwayland: false, ...rawOwnedWindowEvidence }"
   },
   "standalone": {

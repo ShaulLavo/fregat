@@ -16,7 +16,8 @@ function observedFacts() {
   const executable = '/fixture/chrome'
   const profile = '/fixture/task/tmp/chrome-123'
   const requestedArguments = headedLaunchArguments(profile)
-  const renderer = 'ANGLE (Physical GPU, Vulkan 1.3, hardware driver)'
+  const renderer =
+    'ANGLE (NVIDIA, Vulkan 1.4.341 (NVIDIA NVIDIA GeForce RTX 3060 Ti (0x00002489)), NVIDIA-610.57.4.0)'
   return {
     executable,
     profile,
@@ -39,8 +40,9 @@ function observedFacts() {
           vendorId: 4318,
           deviceId: 9353,
           deviceString: renderer,
-          driverVendor: 'hardware driver',
-          driverVersion: '1.0',
+          vendorString: 'Google Inc. (NVIDIA)',
+          driverVendor: 'NVIDIA',
+          driverVersion: '610.57.4.0',
         },
       ],
       auxAttributes: {
@@ -267,6 +269,8 @@ test('the observed vendor-only page driver label matches CDP vendor/version, wit
     valid.replace('0x00002489', '0x00001234'),
     valid.replace('RTX 3060 Ti', 'Another GPU'),
     valid.replace('Vulkan 1.4.341', 'OpenGL 4.6'),
+    valid.replace('Vulkan 1.4.341', 'Vulkan 1.3.341'),
+    valid.replace('ANGLE (NVIDIA,', 'ANGLE (AMD,'),
     valid.replace('NVIDIA)', 'AMD)'),
     valid.replace('NVIDIA)', 'NVIDIA-unknown)'),
     'unknown',
