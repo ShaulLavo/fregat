@@ -125,15 +125,16 @@ function sameAppearance(left: RenderCell, right: RenderCell): boolean {
     sameColor(left.foreground, right.foreground) &&
     sameColor(left.background, right.background) &&
     left.selected === right.selected &&
-    left.style?.blink === right.style?.blink &&
-    left.style?.bold === right.style?.bold &&
-    left.style?.faint === right.style?.faint &&
-    left.style?.invisible === right.style?.invisible &&
-    left.style?.inverse === right.style?.inverse &&
-    left.style?.italic === right.style?.italic &&
-    left.style?.overline === right.style?.overline &&
-    left.style?.strikethrough === right.style?.strikethrough &&
-    left.style?.underline === right.style?.underline
+    (left.style === right.style ||
+      (left.style?.blink === right.style?.blink &&
+        left.style?.bold === right.style?.bold &&
+        left.style?.faint === right.style?.faint &&
+        left.style?.invisible === right.style?.invisible &&
+        left.style?.inverse === right.style?.inverse &&
+        left.style?.italic === right.style?.italic &&
+        left.style?.overline === right.style?.overline &&
+        left.style?.strikethrough === right.style?.strikethrough &&
+        left.style?.underline === right.style?.underline))
   )
 }
 
