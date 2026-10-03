@@ -2,15 +2,19 @@
 
 - Status: Approved
 - Date: 2026-10-02
-- Owner: Fregat owns the gateway producer; Mesh owns the generic feed client and terminal panel.
+- Owner: Fregat owns account usage production under Plan 308; Mesh owns the generic feed client and terminal panel.
 - Repositories: `ShaulLavo/fregat`, `ShaulLavo/mesh`.
-- Decision: Zero extra provider requests. Read cached Codex observations from CLIProxyAPI and capture Claude quota headers on ordinary gateway traffic. Coordinator deploys separately.
+- Historical decision: Zero extra provider requests. The gateway producer is retired; Plan 308 owns the replacement.
 
 ## Superseding owner decision (2026-10-03)
 
 [Plan 308](308-account-usage-feed.md) now owns usage production in Fregat: bounded occasional provider requests, passive/native sources, persistent cache, Settings UI and the Mesh-compatible read-only endpoint. The owner explicitly permits occasional requests and keeps Claude pooling forbidden. Mesh retains this plan's approved v1 consumer and TV design. Its shipped parser and panel are reused through a URL cut-over.
 
-The gateway producer below records prior delivery, not the current execution prerequisite. After Fregat deploy and coordinator-confirmed TV cut-over, Plan 308 retires its source. Only the coordinator removes the live `/ai-usage` route, edits installed `runtime.json`, restarts the gateway and deletes its old feed directory. Implementation never touches the Pi or installed gateway.
+The gateway producer is retired from source after the coordinator-confirmed cut-over. The retained gateway, launch and reset-order sources are plain local files under `/work/cli-proxy-api/src`, independently owned outside Fregat. The startup no-Claude-pool guard is unconditional; `readCredits` belongs to reset-order. The local deploy script preserves and restores only the gateway bundle, with bounded readiness checks and no runtime JSON edits. Only the root coordinator installs that bundle, removes the live `/ai-usage` route, or deletes its old feed directory. No installed gateway, runtime JSON, proxy, Mesh or Pi changes occurred during source retirement.
+
+## Historical producer delivery
+
+The sections below preserve the prior producer contract and evidence. They are historical; source and deployment instructions for that producer no longer apply.
 
 ## Outcome and fixed boundary
 
@@ -18,7 +22,7 @@ The TV dashboard shows **AI plans**, grouped by provider, with independently lab
 
 CLIProxyAPI at `127.0.0.1:18317` already has localhost management enabled. Its key lives in `/work/cli-proxy-api/management-key`; never print or log it. Read only `GET /v0/management/auth-files` for cached per-account quota, model quota and cooldown state. No management enablement or proxy restart is required. Never use `/quota/fetch`, `/api-call`, usage-queue drains, provider probes, token refresh or Fregat's active usage route. Never print unredacted config or complete auth records.
 
-The proxy has **no Claude logins and must never get any**. Pooling Claude logins caused a ban. Claude Code uses the existing Bun gateway (`scripts/claude-gpt/`): the Mesh `/ai` route has front port `8318`, and the gateway's configured loopback listener is currently `18318`. Runtime configuration is authoritative for the listener; deployment commands must resolve it rather than assume the source default. The gateway passes Claude requests directly to Anthropic on the owner's own login. Capture `Anthropic-Ratelimit-Unified-*` headers alongside `reset-order.ts`; leave request and response bytes, headers, streams, cancellation and routing unchanged. Only one Claude profile is registered here.
+The proxy has **no Claude logins and must never get any**. Pooling Claude logins caused a ban. Claude Code uses the existing Bun gateway (now locally owned under `/work/cli-proxy-api/src`): the Mesh `/ai` route has front port `8318`, and the gateway's configured loopback listener is currently `18318`. Runtime configuration is authoritative for the listener; deployment commands must resolve it rather than assume the source default. The gateway passes Claude requests directly to Anthropic on the owner's own login. Capture `Anthropic-Ratelimit-Unified-*` headers alongside `reset-order.ts`; leave request and response bytes, headers, streams, cancellation and routing unchanged. Only one Claude profile is registered here.
 
 No provider SDK, OAuth handling or provider request belongs in Mesh. Existing Fregat direct-provider usage features remain outside this change. Feed consumption by Fregat is a later follow-up.
 
@@ -131,7 +135,7 @@ The terminal has no hover. TXT grids are the readable table equivalent. Status c
 - [x] Address independent review: known websocket Spark namespace shares HTTP Bengalfox allowance identity; preserve resets and observation ages without aggregate/model inference.
 - [x] Address independent review: physical feed/key isolation rejects root and credential aliases before publication; retain safe OS-temp ancestor aliases and missing-key restart data.
 
-Producer source and portable verification are complete. `scripts/claude-gpt/usage-feed.ts` normalizes and strictly restores v1; `usage-producer.ts` owns bounded cached sampling and coalesced atomic publication. Direct-Claude capture stays header-only; runtime feed configuration requires explicit empty Claude pool entrypoints and no Claude proxy. Root `test:scripts` runs the three new usage suites. Fail-first evidence captured missing producer modules, absent direct response observation, and absent feed configuration before implementation. The README records configuration, staging bundle/copy, scheduled runner restart (including its owned Codex proxy), and the separate static feed route.
+The former producer normalized and restored v1, sampled cached observations, and coalesced atomic publication. Direct-Claude capture was header-only; feed configuration required empty Claude pool entrypoints and no Claude proxy. Its three usage suites previously ran in the root script test inventory. The producer modules, lifecycle wiring, observer, usage tests and Fregat inventory entries have now been removed. Retained gateway/reset-order/launch fixtures run with the independently owned local source.
 
 Independent HIGH review follow-ups passed fail-first and targeted verification: actual websocket Spark allowance maps to the same HTTP Bengalfox window; physical path isolation rejects unsafe root/ancestor/key aliases before writing or fetching, including a dangling key alias into a future feed. A safe ancestor-alias/missing-key restart regression preserves portable temporary paths and cached data. All three usage suites pass 30 tests after these corrections.
 

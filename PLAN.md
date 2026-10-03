@@ -70,7 +70,7 @@ work can proceed independently where their files and contracts do not overlap.
    [312](plans/312-heavy-slice-ownership.md) are bounded correctness units.
 3. Build Fregat's bounded usage cache and Mesh feed with [308](plans/308-account-usage-feed.md), alongside
    transcript history [309](plans/309-account-usage-history.md) and allowance visibility
-   [310](plans/310-allowance-visibility.md). Plan 308 supersedes Plan 289's gateway producer after coordinator-confirmed TV cut-over.
+   [310](plans/310-allowance-visibility.md). Plan 308 owns the cache feed; Plan 289's gateway producer is retired from source. Retained gateway tooling is independently owned under `/work/cli-proxy-api/src`; live bundle installation remains with the root coordinator.
    Quiet admission [313](plans/313-heavy-quiet-lifecycle.md) and non-cache measurements
    [314](plans/314-heavy-non-cache-memory.md) share the heavy runner but keep separate receipts.
 4. Build the ordinary issue collector [295](plans/295-cross-repository-issue-collection.md)
