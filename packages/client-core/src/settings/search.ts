@@ -1,4 +1,5 @@
-import { descriptorFor, SETTING_ROW_IDS, settingRowIds, type SettingId } from '@workspace/contracts'
+import { presentSetting } from '@workspace/contracts/settings/documentation'
+import { SETTING_ROW_IDS, settingRowIds, type SettingId } from '@workspace/contracts'
 
 import { settingRowTitle } from './humanize'
 
@@ -21,7 +22,7 @@ function scoreRow(id: SettingId, needle: string): number {
 }
 
 function scoreSetting(id: SettingId, needle: string): number {
-  const descriptor = descriptorFor(id)
+  const descriptor = presentSetting(id)
   if (id.toLowerCase().includes(needle)) return 3
   if (settingRowTitle(id).toLowerCase().includes(needle)) return 3
   if (descriptor.category.toLowerCase().includes(needle)) return 2

@@ -1,3 +1,4 @@
+import { presentSetting } from '../packages/contracts/src/settings/documentation'
 import { targetArgument } from './target-argument'
 /**
  * Regenerates `docs/settings-reference.md` from the registry.
@@ -11,7 +12,7 @@ import { targetArgument } from './target-argument'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { SETTING_IDS, descriptorFor, type SettingId } from '../packages/contracts/src/index'
+import { SETTING_IDS, type SettingId } from '../packages/contracts/src/index'
 
 const SCOPE_NOTES: Record<string, string> = {
   application: 'user file only',
@@ -22,7 +23,7 @@ const SCOPE_NOTES: Record<string, string> = {
 
 function table(ids: readonly SettingId[]) {
   const rows = ids.map((id) => {
-    const descriptor = descriptorFor(id)
+    const descriptor = presentSetting(id)
     const flags = [
       descriptor.requiresRestart ? 'restart' : '',
       descriptor.readOnlyReason ? 'read-only' : '',
@@ -46,7 +47,7 @@ function table(ids: readonly SettingId[]) {
 /** A table cell holds one line, so each key's details follow its category's table. */
 function detailsList(ids: readonly SettingId[]): string[] {
   const entries = ids.flatMap((id) => {
-    const details = descriptorFor(id).details
+    const details = presentSetting(id).details
     if (!details) return []
 
     return [`- \`${id}\`: ${details.split('\n\n').join('\n\n  ')}`]
@@ -85,7 +86,7 @@ function pad(cell: string, width: number, delimiter: boolean): string {
 
 const byCategory = new Map<string, SettingId[]>()
 for (const id of SETTING_IDS) {
-  const category = descriptorFor(id).category
+  const category = presentSetting(id).category
   byCategory.set(category, [...(byCategory.get(category) ?? []), id])
 }
 
