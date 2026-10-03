@@ -180,5 +180,4 @@ export type {
   TerminalInputEvent,
   TerminalInputHandler,
 } from './extensions/types.js'
-export type { TerminalApi, TerminalResult } from './dom/terminal-api.js'
 export type { TerminalGeneratedInput, TerminalInputModes } from './dom/types.js'
