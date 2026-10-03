@@ -79,6 +79,12 @@ export type Dispatcher<Source> = {
   readonly handleKey: (input: KeyInput, source: Source, inScope?: boolean) => boolean
   /** Runs a command along the focus path without a key. */
   readonly dispatchCommand: (command: string, args?: unknown) => boolean
+  /** Runs a command on an owned node's path without changing focus. */
+  readonly dispatchCommandFrom: (
+    node: FocusNode<Source>,
+    command: string,
+    args?: unknown,
+  ) => boolean
   readonly pending: () => PendingChordLabel | null
   readonly wantsCapture: () => boolean
   readonly capturesKey: (input: KeyInput) => boolean
@@ -114,6 +120,7 @@ export function createDispatcher<Source = unknown>(
   const platform = options.platform ?? detectPlatform()
   const states = new Map<FocusNode<Source>, NodeState<Source>>()
   let focusedNode: FocusNode<Source> | null = null
+  let disposed = false
   let nextId = 1
   let keymap = compileKeymap(options.keymap ?? [], platform)
   const { isAvailable } = options
@@ -152,9 +159,13 @@ export function createDispatcher<Source = unknown>(
     return focusIdentity
   }
 
-  function focusPath(): NodeState<Source>[] {
+  function focusPath(start: FocusNode<Source> | null = focusedNode): NodeState<Source>[] {
     const path: NodeState<Source>[] = []
-    for (let node = focusedNode; node; node = node.parent) path.push(states.get(node)!)
+    for (let node = start; node; node = node.parent) {
+      const state = states.get(node)
+      if (!state) return []
+      path.push(state)
+    }
     return path.reverse()
   }
   function capture(): Captured<Source> {
@@ -183,6 +194,7 @@ export function createDispatcher<Source = unknown>(
     input: KeyInput | null,
     source: Source | null,
   ): boolean {
+    if (disposed) return false
     for (let index = path.length - 1; index >= 0; index -= 1) {
       const state = path[index]!
       const handlers = state.handlers.get(command)
@@ -260,12 +272,17 @@ export function createDispatcher<Source = unknown>(
     setKeymap,
     handleKey,
     dispatchCommand: (command, args) => runCommand(focusPath(), command, args, null, null),
+    dispatchCommandFrom: (node, command, args) =>
+      runCommand(focusPath(node), command, args, null, null),
     pending: runtime.pending,
     wantsCapture: runtime.wantsCapture,
     capturesKey: runtime.capturesKey,
     releaseAll: runtime.releaseAll,
     cancel: runtime.cancel,
-    dispose: runtime.dispose,
+    dispose: () => {
+      disposed = true
+      runtime.dispose()
+    },
   }
 }
 
