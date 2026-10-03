@@ -257,7 +257,7 @@ Choose the install target once and persist that choice as installation intent.
 | Install mode               | Stable installed start URL                                                                   | Server ownership                                             |
 | -------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | Local packaged desktop     | `http://127.0.0.1:3301/` by default, a single origin serving the packaged web client and API | Per-user launchd/systemd socket-activated installation       |
-| Existing remote production | `https://omarchy.mesh.shaulavo.dev/platform/` today                                          | The remote host's existing production service and mesh route |
+| Existing remote production | Configured remote production URL                                                             | The remote host's existing production service and mesh route |
 | Development                | The existing registered Vite/API mesh routes, with a separate browser profile                | Existing `scripts/dev-serve.ts` registration                 |
 
 The local desktop port becomes a machine-scoped registry entry, with 3301 as the initial default.
@@ -1147,8 +1147,8 @@ owner's real-keychain proof. The current development command is `bun run desktop
 4. The page's titlebar drag: replace the Electrobun class names in `lib/platform/window-drag.ts`
    with a `mousedown` listener on `[data-native-window-drag-region]` that the preload installs when
    `titlebar === 'overlay'`, posting `drag`.
-5. Verify on `shaul-mac`: Chromium path (Helium, the default there, and Chrome), webview path with
-   `window.transparency: 'window'`, Cmd-Q, and that quitting leaves shared servers/terminals alive.
+5. Verify on an authorized macOS host: Chromium and webview paths, `window.transparency: 'window'`,
+   Cmd-Q, and that quitting leaves shared servers and terminals alive.
 
 **Exit**: the Gate 1 and 2 checklists pass on the Mac in both paths.
 
