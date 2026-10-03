@@ -184,6 +184,13 @@ test('clearing the proxy URL through settings stops collection while retaining m
 test.each([
   { key: 'synthetic-management-secret', address: true, configured: true, importKey: false },
   { key: 'synthetic-management-secret', address: true, configured: true, importKey: true },
+  {
+    key: 'synthetic-management-secret',
+    address: true,
+    configured: false,
+    importKey: true,
+    invalidSettings: true,
+  },
   { key: null, address: true, configured: false },
   { key: '', address: true, configured: false },
   { key: 'synthetic-management-secret', address: false, configured: false },
@@ -218,11 +225,13 @@ test.each([
   await writeFile(
     options.userFilePath!,
     JSON.stringify({
+      ...(scenario.invalidSettings ? { 'editor.fontSize': 'invalid' } : {}),
       'providers.instances': [],
       'providers.proxyUsageUrl': scenario.address ? source.url : null,
     }),
   )
   if (scenario.importKey) {
+    const previousSettings = await readFile(options.userFilePath!, 'utf8')
     const checkout = path.resolve(import.meta.dirname, '../../../../..')
     const keyFile = path.join(root, 'import-key')
     await writeFile(keyFile, `${scenario.key}\n`, { mode: 0o600 })
@@ -232,7 +241,7 @@ test.each([
         path.join(checkout, 'scripts/import-proxy-usage-key.ts'),
         keyFile,
         '--url',
-        source.url,
+        scenario.invalidSettings ? 'http://127.0.0.1:18318' : source.url,
       ],
       {
         cwd: checkout,
@@ -246,8 +255,12 @@ test.each([
       new Response(child.stdout).text(),
       new Response(child.stderr).text(),
     ])
-    expect(exit, stderr).toBe(0)
-    expect(stdout + stderr).toBe('')
+    expect(exit, stderr).toBe(scenario.invalidSettings ? 1 : 0)
+    expect(stdout).toBe('')
+    expect(stderr).not.toContain(scenario.key)
+    if (!scenario.invalidSettings) expect(stderr).toBe('')
+    if (scenario.invalidSettings)
+      expect(await readFile(options.userFilePath!, 'utf8')).toBe(previousSettings)
   }
   const registry = new ProviderAdapterRegistry({ services: { cwd: root }, drivers: [] })
   registries.push(registry)
@@ -322,6 +335,32 @@ test.each([
   })
   await rm(options.secretsFilePath!, { recursive: true })
   await rename(savedSecrets, options.secretsFilePath!)
+  const invalidDocuments = ['{', '[]', 'null', '', '{"usage.cliproxy.management":42}']
+  for (const [index, text] of invalidDocuments.entries()) {
+    await writeFile(options.secretsFilePath!, text)
+    const changed = await app.handle(
+      new Request('http://local/settings/write', {
+        method: 'POST',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          mutationId: `retain-invalid-key-presence-${index}`,
+          target: 'user',
+          operations: [
+            { kind: 'set', key: 'providers.usageStaleAfterSeconds', value: 903 + index },
+          ],
+        }),
+      }),
+    )
+    expect(changed.status, await changed.clone().text()).toBe(200)
+    const feed = await app.handle(new Request('http://local/providers/usage/feed'))
+    const accounts = (await feed.json()).accounts
+    expect(accounts).toHaveLength(2)
+    expect(accounts[0]).toMatchObject({
+      checkedAt: observedAt,
+      windows: [{ usedPercent: 6, lastSeenAt: observedAt }],
+    })
+    expect(source.requests).toHaveLength(1)
+  }
   await writeFile(options.secretsFilePath!, '{}')
   const cleared = await app.handle(
     new Request('http://local/settings/write', {

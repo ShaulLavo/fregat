@@ -18,6 +18,7 @@ type ImportCase = {
   url?: string | null
   instances?: readonly string[]
   noProviders?: boolean
+  invalidSettings?: boolean
 }
 
 const cases: ImportCase[] = [
@@ -37,6 +38,13 @@ const cases: ImportCase[] = [
   { name: 'missing explicit URL', success: false, url: null },
   { name: 'optional mapping', success: true, instances: [] },
   { name: 'no configured providers or mapping', success: true, instances: [], noProviders: true },
+  {
+    name: 'failed settings validation preserves absent key and previous endpoint',
+    success: false,
+    instances: [],
+    noProviders: true,
+    invalidSettings: true,
+  },
 ]
 
 test.for(cases)('proxy key CLI: $name', async (scenario) => {
@@ -46,6 +54,7 @@ test.for(cases)('proxy key CLI: $name', async (scenario) => {
   const secretsFile = path.join(root, 'secrets.json')
   const input = scenario.key ?? `${KEY}\n`
   const settings = JSON.stringify({
+    ...(scenario.invalidSettings ? { 'editor.fontSize': 'invalid' } : {}),
     'providers.instances': scenario.noProviders
       ? []
       : [

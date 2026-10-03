@@ -193,6 +193,23 @@ async function flushedEvents(logDir: string): Promise<WideEvent[]> {
 }
 
 describe('cached server secret presence', () => {
+  it.each(['{', '[]', 'null', '', '{"usage.cliproxy.management":42}'])(
+    'retains accepted presence for an invalid secrets document %j and accepts valid removal',
+    async (text) => {
+      const root = await tempRoot()
+      const store = createStore(root)
+      const ref = 'usage.cliproxy.management' as const
+      await store.ensureSecret(ref, () => 'synthetic-management-key')
+      expect(store.hasServerSecret(ref)).toBe(true)
+      await writeFile(path.join(root, 'secrets.json'), text)
+      await touchSettings(store, 'Mod+5')
+      expect(store.hasServerSecret(ref)).toBe(true)
+      await writeFile(path.join(root, 'secrets.json'), '{}')
+      await touchSettings(store, 'Mod+6')
+      expect(store.hasServerSecret(ref)).toBe(false)
+    },
+  )
+
   it.each([true, false])(
     'keeps accepted presence during unreadable refs and accepts removal (present: %s)',
     async (present) => {

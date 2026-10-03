@@ -7,7 +7,9 @@ import {
   readSettingsFileSync,
   stageSettingsFile,
   tryCommitStagedSettingsFile,
+  type SettingsFileContents,
 } from './json-document'
+import { settingsErrors } from './structured-errors'
 import { SECRET_FILE_MODE } from './transaction'
 
 /**
@@ -54,15 +56,26 @@ export class SecretStore {
   }
 
   readSync(): Map<SecretRef, string> {
-    return this.toSecrets(readSettingsFileSync(this.filePath).text)
+    return this.toSecrets(readSettingsFileSync(this.filePath))
   }
 
   async read(): Promise<Map<SecretRef, string>> {
-    return this.toSecrets((await readSettingsFile(this.filePath)).text)
+    return this.toSecrets(await readSettingsFile(this.filePath))
   }
 
-  private toSecrets(text: string): Map<SecretRef, string> {
-    const { values } = parseSettingsDocument(text)
+  private toSecrets(source: SettingsFileContents): Map<SecretRef, string> {
+    const { values, parseErrors } = parseSettingsDocument(source.text)
+    const emptyDocument = source.revision !== null && source.text.trim() === ''
+    const invalidValueCount = Object.values(values).filter(
+      (value) => typeof value !== 'string',
+    ).length
+    // A missing file is empty; a partial existing file must preserve accepted credentials.
+    if (emptyDocument || parseErrors.length > 0 || invalidValueCount > 0)
+      throw settingsErrors.SECRETS_UNREADABLE({
+        file: this.filePath,
+        detail: 'expected a complete JSON object with string values',
+        internal: { emptyDocument, parseErrorCount: parseErrors.length, invalidValueCount },
+      })
     const secrets = new Map<SecretRef, string>()
 
     for (const [ref, value] of Object.entries(values)) {
@@ -79,7 +92,7 @@ export class SecretStore {
     readonly text: string
   }> {
     const source = await readSettingsFile(this.filePath)
-    const current = this.toSecrets(source.text)
+    const current = this.toSecrets(source)
     const next = new Map(current)
     for (const [ref, value] of edits) {
       if (value === null || value === '') {

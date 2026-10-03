@@ -105,12 +105,18 @@ async function main() {
       throw createScriptError('The key file must contain one plain management key.', {
         internal: { validPlainKey: false },
       })
-    const stored = await store.ensureSecret(PROXY_USAGE_MANAGEMENT_KEY_REF, () => key)
-    if (stored !== key)
+    const existing = await store.readSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
+    if (existing && existing !== key)
       throw createScriptError('A different management key is already stored.', {
         internal: { existingKeyMatches: false },
       })
+    // Commit the validated endpoint before a new key can activate this source on restart.
     await store.write(request)
+    const stored = await store.ensureSecret(PROXY_USAGE_MANAGEMENT_KEY_REF, () => key)
+    if (stored !== key)
+      throw createScriptError('The stored management key changed during import.', {
+        internal: { existingKeyMatches: false },
+      })
   } finally {
     bytes?.fill(0)
     store.close()
