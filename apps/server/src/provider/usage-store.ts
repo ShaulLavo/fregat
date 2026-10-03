@@ -27,6 +27,7 @@ import { readClaudeUsageCache, readClaudeUsageIdentity } from './usage-claude-ca
 import { readNativeUsageMetadata, type NativeUsageMetadata } from './utils/usage-native-metadata'
 import { proxyUsageIdentity, usageIdentityContext } from './utils/usage-codex-identity'
 import { mergeProvenUsageAccounts } from './utils/usage-account-merge'
+import { CodexUsageRequestBudget, type ProxyUsageRefresh } from './usage-proxy-budget'
 import {
   codexWindowPresentation,
   mergeUsageWindows,
@@ -91,7 +92,11 @@ type UsageStoreOptions = {
   now?: () => number
   cacheFile?: string
   policy?: () => UsageRefreshPolicy
-  readProxy?: (identityContext: string) => Promise<ProviderAccountUsage[]>
+  readProxy?: (
+    identityContext: string,
+    refresh: ProxyUsageRefresh,
+  ) => Promise<ProviderAccountUsage[]>
+  proxyRequestIntervalHours?: () => number
   proxyInstanceIds?: () => ProviderInstanceId[]
   proxyConfigured?: () => boolean
   proxySourceKey?: () => string | null
@@ -126,6 +131,7 @@ export class ProviderUsageStore {
   private readonly policy: () => UsageRefreshPolicy
   private readonly registry: UsageAccounts
   private readonly options: UsageStoreOptions
+  private readonly proxyBudget: CodexUsageRequestBudget
 
   constructor(registry: UsageAccounts, options: UsageStoreOptions = {}) {
     this.registry = registry
@@ -134,6 +140,12 @@ export class ProviderUsageStore {
     this.policy = options.policy ?? (() => DEFAULT_POLICY)
     this.identityContext = usageIdentityContext(options.cacheFile)
     this.identityContextHash = createHash('sha256').update(this.identityContext).digest('hex')
+    this.proxyBudget = new CodexUsageRequestBudget(
+      options.cacheFile ? `${options.cacheFile}.codex-requests` : undefined,
+      this.now,
+      options.proxyRequestIntervalHours ?? (() => 1),
+      this.identityContextHash,
+    )
     this.proxySourceKey = this.sourceKey()
     this.hydrate()
   }
@@ -657,8 +669,20 @@ export class ProviderUsageStore {
     const generation = this.proxyGeneration
     this.proxyAttemptedAt = this.now()
     this.persist()
+    const refresh: ProxyUsageRefresh = {
+      staleAfterMs: this.policy().staleAfterMs,
+      isCurrent: () =>
+        !this.closed &&
+        this.options.proxyConfigured?.() !== false &&
+        sourceKey === this.sourceKey() &&
+        generation === this.proxyGeneration,
+      latest: (account) => this.latestProxyObservation(account),
+      link: (key, proof) => this.proxyBudget.link(key, proof),
+      reserve: (key, passiveAt) => this.proxyBudget.reserve(key, passiveAt),
+      settle: (reservation, success) => this.proxyBudget.settle(reservation, success),
+    }
     this.proxyProbe = this.options
-      .readProxy(this.identityContext)
+      .readProxy(this.identityContext, refresh)
       .then((accounts) => {
         if (sourceKey !== this.sourceKey() || generation !== this.proxyGeneration) return
         const valid = accounts.filter((account) => validCachedAccount(account, this.now()))
@@ -695,6 +719,32 @@ export class ProviderUsageStore {
         if (generation === this.proxyGeneration) this.proxyAttemptedAt = this.now()
       })
     return this.proxyProbe
+  }
+
+  private latestProxyObservation(account: ProviderAccountUsage) {
+    const proof = proxyUsageIdentity(account)
+    const cached =
+      this.proxyIdentityGeneration === this.proxyGeneration
+        ? this.proxyAccounts.filter((entry) =>
+            proof
+              ? this.proxyIdentityProofs.get(entry.accountKey) === proof
+              : entry.accountKey === account.accountKey,
+          )
+        : []
+    const native = this.targets().flatMap((target) => {
+      const snapshot = this.snapshot(target)
+      return proof && this.accounts.get(target.accountKey)?.identityProof === proof
+        ? [snapshot]
+        : []
+    })
+    return {
+      ...account,
+      windows: [
+        ...account.windows,
+        ...cached.flatMap((entry) => entry.windows),
+        ...native.flatMap((entry) => entry.windows),
+      ],
+    }
   }
 
   private hydrate() {

@@ -35,6 +35,12 @@ terminal.focus()
 
 call `terminal.dispose()` when you're done with it
 
+`TerminalApi<'sync'>` describes this main-thread entry. `TerminalApi<'async'>` describes the
+worker return convention: authoritative operations return promises with the same arguments.
+The default `TerminalApi` accepts both conventions for await-style common callers. Host DOM,
+subscriptions, focus and displayed text stay synchronous; `open()` and `focusNextLink()` already
+return promises in the main entry. The packaged worker entry follows separately.
+
 ## first frames and damage
 
 `renderFrameToHtml(snapshot, { font, columns, rows, theme })` produces the DOM backend's
@@ -48,6 +54,18 @@ all backends. It returns a subscription with `dispose()`, like `onResize`; no da
 allocated when there are no listeners.
 
 Resizing inside a frame callback repaints after that frame's callbacks finish, in the same turn.
+
+`terminal.submittedFrame` is the owned, text-only state of the last submitted frame. Its frame,
+native revision, snapshot version and layout identity accompany the grid, fitted font, padding,
+theme, cursor, selection coordinates, scrollbar and visible row text. The value appears after the
+first submission and holds together while new output or layout is pending. `rows` contains the
+whole visible text viewport; `rowPatches` contains changed row text, with every row included when
+the layout changes. Both can be structured-cloned.
+
+Each text-frame submission owns its row text. Styled cells remain an on-demand read through
+`frameSnapshot()` and `captureViewport()`. A capture is available only while the native revision,
+render snapshot and layout still match the submission. Canvas resizing and context replacement
+can invalidate the displayed pixels independently of the retained submitted state.
 
 ## GPU frame ownership
 
@@ -63,6 +81,16 @@ context replacement still invalidate prior pixels.
 
 Canvas 2D, DOM, accessibility, selection/copy and frame callbacks retain their shared row readers.
 Styled snapshots and text-only rows describe those consumers; GPU rendering reads native records.
+
+## comparisons
+
+From this package, use `bun run bench:compare -- --headed --bundle /path/to/bundle`
+for headed hardware Chromium measurements. A built bundle accepts
+`node comparison-runner.mjs --headed --output results`.
+
+`--headed` selects the browser window independently of `--smoke`, which selects
+correctness checks. Defaults remain headless on Linux and headed on macOS for
+hardware measurements; smoke runs default to headless on both.
 
 ## live geometry and text width
 
@@ -124,13 +152,15 @@ DOM claims and default prevention are synchronous. Native protocol replies remai
 `data` and bypass input claims. Contributions under `events` receive the public host event payloads;
 only interested handlers are indexed and frame payloads are constructed when observed.
 
-Custom OSC observation requires a native reservation and framing capability. This checkpoint rejects
-nonempty OSC contributions and rolls back their setup. Named-command and contributed-link registries
-remain internal; explicit `registerLinkProvider` continues to work. Native width and geometry methods
-keep their synchronous-main and Promise-worker return conventions. Setup closures stay on the host.
+Public custom OSC observation requires numeric reservation metadata and a host subscription adapter.
+This checkpoint rejects nonempty OSC contributions and rolls back their setup. Native Session OSC
+observation is available separately. Named-command and contributed-link registries remain internal;
+explicit `registerLinkProvider` continues to work. Native width and geometry methods keep their
+synchronous-main and Promise-worker return conventions. Setup closures stay on the host.
 
 ## more
 
 - [pty wiring and the native api](docs/integration.md)
+- [font geometry and Canvas comparison](docs/font-geometry.md)
 - [live demo](https://shaullavo.github.io/ghostty-webgpu/), built from [site/](site/) with `bun run site:dev`
 - [optional native ghostty config](docs/config-resolver.md)

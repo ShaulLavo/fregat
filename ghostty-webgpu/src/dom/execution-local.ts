@@ -169,6 +169,12 @@ export class LocalTerminalExecution {
   lineCount() {
     return this.session.lineCount()
   }
+  readLines(start: number, end: number, options?: ReadLinesOptions) {
+    return this.session.readLines(start, end, options)
+  }
+  registerLinkProvider(provider: LinkProvider<Event>) {
+    return this.session.registerLinkProvider(provider)
+  }
   geometry() {
     return this.session.geometry()
   }
@@ -180,12 +186,6 @@ export class LocalTerminalExecution {
   }
   writeAndReadGeometry(data: TerminalInputData) {
     return this.session.writeAndReadGeometry(data)
-  }
-  readLines(start: number, end: number, options?: ReadLinesOptions) {
-    return this.session.readLines(start, end, options)
-  }
-  registerLinkProvider(provider: LinkProvider<Event>) {
-    return this.session.registerLinkProvider(provider)
   }
   write(data: TerminalInputData) {
     return this.session.write(data)

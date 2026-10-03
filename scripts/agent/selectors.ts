@@ -678,6 +678,7 @@ export const selectors = {
   fontPickerGroup: (page: Page, name: 'Recent' | 'Suggested') =>
     page.locator('[data-slot="combobox-group-label"]', { hasText: name }),
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
+  navigationError: (page: Page) => page.getByRole('alert').filter({ hasText: 'Fix with AI' }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
   mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
@@ -1143,6 +1144,8 @@ export const selectors = {
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
+  terminalDomRows: (page: Page) =>
+    selectors.terminalSurface(page).first().locator('.ghostty-webgpu-frame [data-row]'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
   paletteLoading: (page: Page) => page.getByRole('status', { name: 'Loading commands' }),
   pickerLoading: (page: Page) => page.getByRole('status', { name: 'Loading file picker' }),
