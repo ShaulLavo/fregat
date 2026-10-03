@@ -55,8 +55,8 @@ it('retains optional Codex cache writes diagnostically without changing accounti
     reasoningOutputTokens: 12,
     totalTokens: 130,
   }
-  const missing = codexUsageTotals('thread', 'gpt-test', false, reading)
-  const known = codexUsageTotals('thread', 'gpt-test', false, {
+  const missing = codexUsageTotals('conversation-codex', 'gpt-test', false, reading)
+  const known = codexUsageTotals('conversation-codex', 'gpt-test', false, {
     ...reading,
     cacheWriteInputTokens: 25,
   })

@@ -84,11 +84,11 @@ describe('provider usage recorder', () => {
       totalTokens: 130,
     }
     fixture.recorder.accept(
-      totalsEvent('late', [codexUsageTotals('thread', 'gpt-test', false, reading)]),
+      totalsEvent('late', [codexUsageTotals('conversation-codex', 'gpt-test', false, reading)]),
       'turn',
     )
     const before = fixture.history().totals
-    const known = codexUsageTotals('thread', 'gpt-test', false, {
+    const known = codexUsageTotals('conversation-codex', 'gpt-test', false, {
       ...reading,
       cacheWriteInputTokens: 25,
     })
@@ -123,7 +123,7 @@ describe('provider usage recorder', () => {
       outputTokens: number,
       cacheWriteInputTokens?: number,
     ) =>
-      codexUsageTotals('thread', 'gpt-test', false, {
+      codexUsageTotals('conversation-codex', 'gpt-test', false, {
         inputTokens,
         cachedInputTokens,
         outputTokens,
