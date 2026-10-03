@@ -1,6 +1,9 @@
+import { createEditorWidgetKeymap } from '@singapore-editor/core/extensions'
+import type { EditorViewContributionContext } from '@singapore-editor/core/extensions'
 import { createAnchoredSurface } from '@singapore-editor/plugin-ui/anchored-surface'
 
 export type RenameWidgetOptions = {
+  readonly registerKeymapNode?: EditorViewContributionContext['registerKeymapNode']
   readonly document: Document
   /** Element whose computed style carries the editor theme variables. */
   readonly themeSource: HTMLElement
@@ -91,20 +94,18 @@ export function createRenameWidgetController(options: RenameWidgetOptions): Rena
     resolve(value)
   }
 
-  input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      // An unchanged or empty name is a cancel: renaming a symbol to itself is a no-op edit, and to
-      // nothing is not a rename at all.
-      const next = input.value.trim()
-      close(next.length === 0 ? null : next)
-      return
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      close(null)
-    }
+  const standalone = options.registerKeymapNode ? null : createEditorWidgetKeymap(element)
+  const register = options.registerKeymapNode ?? standalone!.registerKeymapNode
+  const hotkeys = register({
+    element,
+    context: 'EditorWidget RenameWidget',
+    commands: {
+      'lsp.rename.accept': () => {
+        const next = input.value.trim()
+        close(next.length ? next : null)
+      },
+      'lsp.rename.cancel': () => close(null),
+    },
   })
   input.addEventListener('blur', () => close(null))
 
@@ -116,6 +117,8 @@ export function createRenameWidgetController(options: RenameWidgetOptions): Rena
       surface.place(anchor)
     },
     dispose() {
+      hotkeys.dispose()
+      standalone?.dispose()
       close(null)
       surface.dispose()
       element.remove()

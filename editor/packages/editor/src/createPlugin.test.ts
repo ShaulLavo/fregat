@@ -115,16 +115,16 @@ describe('createPlugin view scope', () => {
   test('handles a command for its own editor and releases it with the plugin', () => {
     let jumps = 0
     const editor = createEditor((scope) => {
-      scope.handle('goToDefinition', () => {
+      scope.handle('editor.action.goToDefinition', () => {
         jumps += 1
         return true
       })
     })
 
-    expect(editor.dispatchCommand('goToDefinition')).toBe(true)
+    expect(editor.dispatchCommand('editor.action.goToDefinition')).toBe(true)
     editor.setPlugins([])
 
-    expect(editor.dispatchCommand('goToDefinition')).toBe(false)
+    expect(editor.dispatchCommand('editor.action.goToDefinition')).toBe(false)
     expect(jumps).toBe(1)
   })
 
@@ -148,7 +148,7 @@ describe('createPlugin view scope', () => {
   test('a command-only plugin is never updated by edits, selections or scrolls', () => {
     const counts = { updates: 0 }
     const editor = createEditor((scope) => {
-      scope.handle('goToDefinition', () => true)
+      scope.handle('editor.action.goToDefinition', () => true)
     })
     const contributions = Reflect.get(editor, 'viewContributions') as {
       readonly contributions: readonly { update: (...args: unknown[]) => void }[]

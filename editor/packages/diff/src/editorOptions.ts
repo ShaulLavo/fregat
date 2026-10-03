@@ -1,27 +1,19 @@
 import type { EditorOptions } from '@singapore-editor/core/editor'
-import {
-  editorKeymapLayersForCommandPacks,
-  type EditorCommandPack,
-  type EditorKeymapOptions,
-} from '@singapore-editor/core/keymap'
+import { readonlyDiffPack, type EditorKeymapOptions } from '@singapore-editor/core/keymap'
 import type { EditorCursorLineHighlightOptions } from '@singapore-editor/core/rendering'
 
-// Every nested field is present, so a host extends `keymap.layers` or one highlight part in place.
+// Every nested field is present, so a host extends `keymap.packs` or one highlight part in place.
 export type DiffEditorOptions = Required<
-  Pick<EditorOptions, 'detectIndentation' | 'documentMode' | 'editability' | 'folding'>
+  Pick<
+    EditorOptions,
+    'detectIndentation' | 'documentMode' | 'editability' | 'folding' | 'keymapContext'
+  >
 > & {
   readonly cursorLineHighlight: Required<EditorCursorLineHighlightOptions>
   readonly keymap: DiffKeymap
 }
 
-type DiffKeymap = Readonly<Required<Pick<EditorKeymapOptions, 'defaultBindings' | 'layers'>>>
-
-// Read-only already refuses every editing key, and `folding: false` leaves fold keys nothing to do.
-const DIFF_COMMAND_PACKS = [
-  'navigation',
-  'selection',
-  'find',
-] as const satisfies readonly EditorCommandPack[]
+type DiffKeymap = Readonly<Required<Pick<EditorKeymapOptions, 'packs' | 'bindings'>>>
 
 // One object for every call: a React host compares `keymap` by identity and re-applies a new one.
 let diffKeymap: DiffKeymap | undefined
@@ -39,9 +31,10 @@ export function createDiffEditorOptions(): DiffEditorOptions {
     editability: 'readonly',
     // A fold would hide a deletion and its addition, and misalign a split.
     folding: false,
+    keymapContext: { mode: 'diff' },
     keymap: (diffKeymap ??= Object.freeze({
-      defaultBindings: false,
-      layers: editorKeymapLayersForCommandPacks(DIFF_COMMAND_PACKS),
+      packs: [readonlyDiffPack],
+      bindings: [],
     })),
   }
 }

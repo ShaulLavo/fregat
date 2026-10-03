@@ -9,7 +9,6 @@ import { createError } from './logging/errors'
 import type {
   EditorCommandHandler,
   EditorCursorStyle,
-  EditorKeyParticipant,
   EditorInternalPluginContext,
   EditorInternalViewContributionContext,
   EditorPlugin,
@@ -154,8 +153,6 @@ export type EditorViewScope = {
     edits: readonly TextEdit[],
     selection?: EditorSelectionRange | readonly EditorSelectionRange[],
   ): void
-  /** Experimental: sees printable keys before either keymap; see `EditorKeyParticipant`. */
-  keyParticipant(participant: EditorKeyParticipant): void
   /** Experimental: while `accepts` answers false, text input (typing, IME, paste, drop) is refused. */
   textGate(accepts: () => boolean): void
   /** How this view draws its caret, until the scope goes. */
@@ -403,7 +400,6 @@ function createScopeContribution(
     getSelections: () => context.getSelections(),
     applyEdits: (edits, selection) =>
       context.applyEdits(edits, 'editor.plugin.applyEdits', selection),
-    keyParticipant: (participant) => void owned.add(context.registerKeyParticipant(participant)),
     textGate: (accepts) => void owned.add(context.registerTextGate(accepts)),
     cursorStyle: (style) => {
       context.setCursorStyle(style)

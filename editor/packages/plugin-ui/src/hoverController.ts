@@ -87,6 +87,7 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
   const codeTokenizer = snippetTokens ? createTooltipCodeTokenizer(snippetTokens) : null
 
   const tooltip: TooltipController = createTooltipController({
+    registerKeymapNode: (options) => context.registerKeymapNode(options),
     document: ownerDocument,
     themeSource: element,
     reentryElement: element,
@@ -281,14 +282,14 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
     hide()
   }
 
-  const handleKeyDown = (event: KeyboardEvent): void => {
-    if (isModifierKey(event.key)) return
-    hide()
-  }
+  const keymap = context.registerKeymapNode({
+    element,
+    context: () => ({ identifiers: operation?.shown ? ['HoverVisible'] : [] }),
+    commands: { 'tooltip.hide': hide },
+  })
 
   element.addEventListener('pointermove', handlePointerMove)
   element.addEventListener('pointerleave', handlePointerLeave)
-  element.addEventListener('keydown', handleKeyDown)
   ownerDocument.addEventListener('pointerdown', handleDocumentPointerDown, { capture: true })
 
   return {
@@ -310,7 +311,7 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
       disposed = true
       element.removeEventListener('pointermove', handlePointerMove)
       element.removeEventListener('pointerleave', handlePointerLeave)
-      element.removeEventListener('keydown', handleKeyDown)
+      keymap.dispose()
       ownerDocument.removeEventListener('pointerdown', handleDocumentPointerDown, { capture: true })
       hide()
       tooltip.dispose()
@@ -356,8 +357,4 @@ function clearTimers(operation: HoverOperation): void {
 function shouldHideOnUpdate(kind: EditorViewContributionUpdateKind): boolean {
   if (anchoredSurfaceFollowsUpdate(kind)) return true
   return kind === 'content' || kind === 'document' || kind === 'clear'
-}
-
-function isModifierKey(key: string): boolean {
-  return key === 'Shift' || key === 'Control' || key === 'Alt' || key === 'Meta'
 }

@@ -11,6 +11,8 @@ import { isEditorFoldCommand, type EditorFoldCommandId } from './foldOperations'
 import { isEditorInlineSuggestCommand, type EditorInlineSuggestCommandId } from './ghostText'
 
 export type EditorCommandRouterHandlers = {
+  newline(context: EditorCommandContext): boolean
+  clipboard(command: 'copy' | 'cut' | 'paste', context: EditorCommandContext): boolean
   history(command: 'undo' | 'redo', context: EditorCommandContext): boolean
   cursorHistory(command: 'undo' | 'redo', context: EditorCommandContext): boolean
   jumpHistory(command: 'back' | 'forward', context: EditorCommandContext): boolean
@@ -54,6 +56,9 @@ export class EditorCommandRouter {
     if (command === 'closeFind') return this.handlers.clearSecondarySelections(context)
     if (registeredResult !== null) return registeredResult
 
+    if (command === 'insertNewlineAndIndent') return this.handlers.newline(context)
+    if (command === 'copy' || command === 'cut' || command === 'paste')
+      return this.handlers.clipboard(command, context)
     if (command === 'undo') return this.handlers.history('undo', context)
     if (command === 'redo') return this.handlers.history('redo', context)
     if (command === 'jumpBack') return this.handlers.jumpHistory('back', context)

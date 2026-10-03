@@ -66,7 +66,7 @@ describe('createDiffEditorOptions', () => {
   })
 
   it('folds nothing when a host dispatches the fold commands', () => {
-    const { editor, host } = mountDiff(indentedDiff('  '), { enabled: false })
+    const { editor, host } = mountDiff(indentedDiff('  '), { packs: [] })
     editor.setSelection(0)
     const text = visibleText(host)
 
@@ -78,7 +78,7 @@ describe('createDiffEditorOptions', () => {
   })
 
   it('refuses edits from a host keymap that binds them', () => {
-    const { editor, host } = mountDiff(indentedDiff('  '), { defaultBindings: true })
+    const { editor, host } = mountDiff(indentedDiff('  '), {})
     editor.setSelection(20)
     const { length } = editor.getState()
 
