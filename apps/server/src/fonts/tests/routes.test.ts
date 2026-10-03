@@ -172,7 +172,12 @@ describe('fontRoutes', () => {
 
     expect(responses.map((response) => response.status)).toEqual([404, 404, 404, 404, 404])
     expect(await responses[0]?.json()).toEqual({
-      error: { code: 'NOT_FOUND', message: 'font not found' },
+      error: {
+        code: 'NOT_FOUND',
+        message: 'font not found',
+        why: expect.stringMatching(/\S/),
+        fix: expect.stringMatching(/\S/),
+      },
     })
   })
 })
