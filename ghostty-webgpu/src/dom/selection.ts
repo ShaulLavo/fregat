@@ -174,6 +174,7 @@ function isPending<T>(value: SelectionResult<T>): value is PromiseLike<T> {
 class NativeSelectionController implements TerminalSelectionController {
   private activeValue = false
   private intent = 0
+  private pendingRelease: number | undefined
   private tickPending = false
   private readonly getIdentity?: TerminalSelectionControllerOptions['getIdentity']
   private readonly getProjection?: TerminalSelectionControllerOptions['getProjection']
@@ -217,6 +218,7 @@ class NativeSelectionController implements TerminalSelectionController {
     this.ensureActive()
     if (this.activeValue) this.cancel()
     this.activeValue = true
+    this.pendingRelease = undefined
     this.lastDrag = undefined
     return this.update('selection.press', () =>
       this.session.selectionPress(
@@ -258,9 +260,13 @@ class NativeSelectionController implements TerminalSelectionController {
     try {
       const result = this.session.selectionRelease(projection?.viewport, this.getIdentity?.())
       if (!isPending(result)) return result
-      const pending = Promise.resolve(result)
+      this.pendingRelease = intent
+      const pending = Promise.resolve(result).then((release) => {
+        if (this.pendingRelease === intent) this.pendingRelease = undefined
+        return release
+      })
       void pending.catch((cause: unknown) => {
-        if (!this.disposed && this.intent === intent) this.resetGesture()
+        if (this.intent === intent) this.cancel()
         this.reportError(cause, 'selection.release')
       })
       return pending
@@ -275,8 +281,9 @@ class NativeSelectionController implements TerminalSelectionController {
     this.stopAutoscroll()
     this.lastDrag = undefined
     ++this.intent
-    if (!this.activeValue) return
+    if (!this.activeValue && this.pendingRelease === undefined) return
     this.activeValue = false
+    this.pendingRelease = undefined
     this.resetGesture()
   }
 

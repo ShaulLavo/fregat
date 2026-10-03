@@ -86,39 +86,124 @@ describe('native selection delayed acknowledgements', () => {
     },
   )
 
-  it('keeps a newer native gesture when an older release rejects', async () => {
+  it.each(['cancel', 'dispose'] as const)(
+    'resets the native gesture when %s interrupts a pending release',
+    async (interrupt) => {
+      const session = await TerminalSession.create({
+        appearance: { grid: { columns: 8, rows: 3 } },
+      })
+      cleanups.push(() => session.dispose())
+      session.write('hello')
+      const native = new NativeSelectionHistory(session, () => ({ generation: 1, layout: 1 }))
+      const identity = { generation: 1, layout: 1, revision: session.revision }
+      const gate = deferred<void>()
+      let resets = 0
+      const controller = createTerminalSelectionController({
+        clock: clock(),
+        getIdentity: () => identity,
+        session: {
+          resetSelectionGesture: () => {
+            resets++
+            native.resetSelectionGesture()
+          },
+          selectionAutoscrollTick: (input, expected) =>
+            native.selectionAutoscrollTick(input, expected),
+          selectionDrag: (input, expected) => native.selectionDrag(input, expected),
+          selectionPress: (input, expected) => native.selectionPress(input, expected),
+          selectionRelease: (input, expected) =>
+            gate.promise.then(() => native.selectionRelease(input, expected)),
+        },
+      })
+      cleanups.push(() => controller.dispose())
+      await controller.press(projection)
+      session.write('changed')
+      const pending = controller.release(projection)
+      const rejection = expect(pending).rejects.toThrow('identity changed')
+      expect(controller.active).toBe(false)
+      controller[interrupt]()
+      const resetsAtInterruption = resets
+      controller[interrupt]()
+      gate.resolve()
+      await rejection
+      const afterCancelDrag = native.selectionDrag({ ...outside, rectangle: false })
+      expect(resetsAtInterruption).toBe(1)
+      expect(resets).toBe(1)
+      expect(afterCancelDrag.selectionInstalled).toBe(false)
+      expect(controller.active).toBe(false)
+    },
+  )
+
+  it.each(['release', 'cancel'] as const)(
+    'keeps a newer native gesture after %s when an older release rejects',
+    async (previous) => {
+      const session = await TerminalSession.create({
+        appearance: { grid: { columns: 8, rows: 3 } },
+      })
+      cleanups.push(() => session.dispose())
+      session.write('hello')
+      const native = new NativeSelectionHistory(session, () => ({ generation: 1, layout: 1 }))
+      const gate = deferred<void>()
+      let resets = 0
+      const controller = createTerminalSelectionController({
+        clock: clock(),
+        getIdentity: () => ({ generation: 1, layout: 1, revision: session.revision }),
+        session: {
+          resetSelectionGesture: () => {
+            resets++
+            native.resetSelectionGesture()
+          },
+          selectionAutoscrollTick: (input, expected) =>
+            native.selectionAutoscrollTick(input, expected),
+          selectionDrag: (input, expected) => native.selectionDrag(input, expected),
+          selectionPress: (input, expected) => native.selectionPress(input, expected),
+          selectionRelease: (input, expected) =>
+            gate.promise.then(() => native.selectionRelease(input, expected)),
+        },
+      })
+      cleanups.push(() => controller.dispose())
+      await controller.press(projection)
+      const pending = controller.release(projection)
+      const rejection = expect(pending).rejects.toThrow('identity changed')
+      if (previous === 'cancel') controller.cancel()
+      session.write('changed')
+      await controller.press(projection)
+      gate.resolve()
+      await rejection
+      expect(controller.active).toBe(true)
+      expect(resets).toBe(previous === 'cancel' ? 1 : 0)
+      const update = await controller.drag(outside, { captured: true, rectangle: false })
+      expect(update?.selectionInstalled).toBe(true)
+    },
+  )
+
+  it('leaves a settled asynchronous release alone during cancellation', async () => {
     const session = await TerminalSession.create({ appearance: { grid: { columns: 8, rows: 3 } } })
     cleanups.push(() => session.dispose())
     session.write('hello')
-    const native = new NativeSelectionHistory(session, () => ({ generation: 1, layout: 1 }))
     const gate = deferred<void>()
     let resets = 0
     const controller = createTerminalSelectionController({
       clock: clock(),
-      getIdentity: () => ({ generation: 1, layout: 1, revision: session.revision }),
       session: {
         resetSelectionGesture: () => {
           resets++
-          native.resetSelectionGesture()
+          session.resetSelectionGesture()
         },
-        selectionAutoscrollTick: (input, expected) =>
-          native.selectionAutoscrollTick(input, expected),
-        selectionDrag: (input, expected) => native.selectionDrag(input, expected),
-        selectionPress: (input, expected) => native.selectionPress(input, expected),
-        selectionRelease: (input, expected) =>
-          gate.promise.then(() => native.selectionRelease(input, expected)),
+        selectionAutoscrollTick: (input) => session.selectionAutoscrollTick(input),
+        selectionDrag: (input) => session.selectionDrag(input),
+        selectionPress: (input) => session.selectionPress(input),
+        selectionRelease: (input) => gate.promise.then(() => session.selectionRelease(input)),
       },
     })
     cleanups.push(() => controller.dispose())
     await controller.press(projection)
     const pending = controller.release(projection)
-    const rejection = expect(pending).rejects.toThrow('identity changed')
-    session.write('changed')
-    await controller.press(projection)
     gate.resolve()
-    await rejection
-    expect(controller.active).toBe(true)
+    await pending
+    controller.cancel()
+    controller.dispose()
     expect(resets).toBe(0)
+    expect(controller.active).toBe(false)
   })
 
   it('waits for drag acknowledgement and ignores it after synchronous release', async () => {
