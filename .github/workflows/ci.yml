@@ -323,6 +323,11 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun --bun vitest run scripts/agent/browser-launch.test.ts --environment node
 
+      - name: Browser resource teardown
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        run: bun --bun vitest run scripts/browser-gc.test.ts scripts/heavy/browser-gc.test.ts --environment node
+
       - name: Cold dev startup
         if: ${{ !cancelled() }}
         run: bun --bun vitest run scripts/agent/vite-cold-start.test.ts --environment node

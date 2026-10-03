@@ -1,65 +1,79 @@
-# Plan 308: Show every account from the passive usage feed
+# Plan 308: Fregat owns bounded account-usage collection and the Mesh cache feed
 
-- Status: APPROVED
+- Status: Approved
 - Date: 2026-10-03
-- Implementation owner: `ShaulLavo/fregat`, server provider usage and web chat/settings.
-- Sources: [Fregat #341](https://github.com/ShaulLavo/fregat/issues/341) and the account-limits part of [#345](https://github.com/ShaulLavo/fregat/issues/345).
-- Related closed work: [#359](https://github.com/ShaulLavo/fregat/issues/359#issuecomment-5961645602). Claude pooling stays disabled. Its single-login usage comes from passive gateway observations.
-- Prerequisite: [Plan 289](289-proxy-usage-feed.md) owns the producer and isolated static route. Older issue references to Plan 287 refer to that renumbered plan.
+- Owner: `ShaulLavo/fregat`, server provider usage and web Settings Usage.
+- Sources: [#341](https://github.com/ShaulLavo/fregat/issues/341), account limits from [#345](https://github.com/ShaulLavo/fregat/issues/345), and the owner decision below. Those issues were closed by plan conversion; implementation remains tracked here.
+- Related: [141](141-usage-and-rate-limits.md), [289](289-proxy-usage-feed.md), [309](309-account-usage-history.md).
 
-## Outcome
+## Owner decision and outcome
 
-The composer and Settings Usage show each configured proxy account with its own plan, windows, and observation age. A rotating provider shows its account group even when the serving account is unknown. Opening either view reads sanitized cached observations. It creates no provider request, inference demand, host wake, or extension of the inference route's idle window.
+On 2026-10-03 the owner decided: “Fregat itself will align with T3 Code and pull usage here and there, then [mesh] reads from Fregat's cache.” Occasional bounded usage requests are acceptable. Tight polling is not. This decision supersedes the gateway-producer and zero-extra-request prerequisites in Plans 289/308. The gateway producer retires after the Fregat cache cut-over.
 
-## Read the current implementation first
+Fregat collects account allowances, persists observations across restarts, shows independent accounts in Settings › Usage, and serves a read-only cache endpoint for the already-shipped Mesh TV panel. One Claude login belongs to the owner. CLIProxyAPI rotates two Codex/ChatGPT logins. Never pool or proxy Claude logins. Never add account allowances together or invent a selected rotating account.
 
-Source inspection used Fregat `46e47cb71`. Recheck these facts before implementation.
+History is complementary: [Plan 309](309-account-usage-history.md) scans local transcripts across tools, including work outside Fregat projects, with explicit local coverage and API-equivalent cost estimates. Local token totals are not complete cross-device account spend. Provider-reported allowances are account-wide.
 
-- `scripts/claude-gpt/usage-feed.ts`, `usage-producer.ts`, and `run.ts` implement Plan 289's v1 normalization, atomic publication, and gateway lifecycle. The plan records producer source completion, but deployment and live static-route acceptance remain unchecked. Source completion does not establish a running feed.
-- `apps/server/src/provider/usage-store.ts` groups enabled instances by credential-derived keys. `read()` can probe stale native accounts. `snapshot()` discards accounts without windows and removes expired windows. That model cannot retain configured-but-unseen proxy accounts.
-- `provider-adapter-registry.ts` hashes driver kind and credential paths. Equal paths prove shared local credential storage. They do not prove equality with a proxy feed ID.
-- `packages/contracts/src/provider-usage.ts` requires a numeric percentage and one account-wide `checkedAt`. The v1 feed supports unknown percentages, per-window observation times, no-data accounts, and unknown routing selection.
-- `use-provider-usage.ts` and `utils/usage-meter.ts` select the first account matching a provider instance. `usage-limits-meter.tsx` displays one account. Settings `usage-section.tsx` currently displays recorded history without a pool-limits section.
-- `provider/reset-credits.ts` calls `refreshAccount()` after explicit redemption. The store's normal probe path and explicit refresh must have one serialization owner when this integration changes usage reads.
+## Read and record the boundary
 
-Read [Plan 141](141-usage-and-rate-limits.md) for existing direct-account behavior. [Plan 309](309-account-usage-history.md) owns transcript history. This plan does not turn token totals into provider allowance percentages.
+- Fregat baseline: `0e440ec26`, following plan conversion and issue-closure receipts at `28b73e2e8`.
+- T3 reference fetched and fast-forwarded from `6c8fed35dded9ff71c5b46807125457acbb76be6` to `a7b3ce8c0896d123a7c3f02c586ff8193841cc09` on 2026-10-03. Read current `UsageService.ts`, `usageTranscriptReader.ts`, `usageTranscripts.ts`, `cliproxyApi.ts`, Claude/Codex provider layers, passive Claude adapter events, reset credits, and provider status cache. The refreshed tree also includes orchestration-v2 and desktop/mobile changes; adopt usage evidence, not unrelated architecture.
+- Research: `/work/reports/mesh-usage-native/research.md`. Claude `cachedUsageUtilization` has `fetchedAtMs` and an account identity. Codex logs have no reliable quota-account attribution after resume.
+- Mesh canonical v1 schema: `internal/usagefeed/schema.go` at Mesh `origin/main` (`7d400c6` inspected). Shape includes `accounts`, `windows`, optional native `credits`, `source`, `checkedAt`, `lastSeenAt`, routing, and cooldown. Account source is constrained to `passive-header` or `proxy-state`; window source is a validated display string. Preserve that wire contract; keep detailed collector provenance in Fregat's account/window model.
+- Existing Fregat `usage-store.ts` probes on read, is memory-only, hides unseen accounts and expired windows, and has separate explicit-refresh scheduling. `usage-history.ts` reads only recorded/imported turns. These are the observable gaps.
+- Approved TV appearance and freshness rules: `/work/reports/pi-tv-dashboard/usage/README.md` and Plan 289's committed images. Mesh already implements the consumer and dashboard; no layout redesign is required.
 
-## Keep identity and observations explicit
+## One bounded collection owner
 
-Extend Fregat's validated usage contracts with account source, stable opaque ID, safe display label, plan, configured state, and routing membership. A provider-instance association can resolve to a direct account or a rotating account group. Return a selected account ID only after positive attribution. Preserve null when selection is unknown.
+Register sources, intervals, local source paths where configurable, management URL, timeout/size policy, and cache policy in the settings registry with machine/application scope. Management credentials belong in the existing secret store. Defaults must be occasional and validated with minimum intervals; failures consume the interval too. A single lifecycle owner serializes account fetches, reset-credit refreshes, and passive/cache ingestion. Concurrent callers coalesce; shutdown cancels pending work. No timer or query creates inference turns.
 
-Each window carries its source, observed time, nullable percentage, nullable reset, and nullable duration. Preserve v1 window namespaces and status-only observations. `primary` describes an upstream position. Its duration comes from data. A successful file fetch updates transport health but never changes observation age.
+Sources:
 
-Retain configured no-data accounts. Display their identity and plan with `No data yet`. Keep stale valid windows visible with their own ages. After a reset passes, say `Reset passed · awaiting traffic`. Do not fill an unobserved new window with zero. A fresh session window cannot freshen an old weekly reading. Reuse Plan 289's 15-minute stale classification and its last-valid-snapshot behavior.
+1. Claude SDK usage getter, using the existing adapter/SDK, at the bounded cadence. Passive `rate_limit_event` on existing turns adds no requests. Matching `~/.claude.json` cached utilization is free and uses `fetchedAtMs`, never filesystem mtime or read time. Reject cache/account mismatch. Optional reset-credit reads/redemption follow T3 and the existing explicit confirmation flow.
+2. Codex `account/rateLimits/read` through its app-server adapter. Durations classify windows; `primary` is a position, never a five-hour guarantee. Keep provider-native credits separate from reset-grant counts and monetary cost.
+3. CLIProxyAPI local management, enabled only through a registered setting and a stored secret. This delivery reads bounded cached auth-file quota state only. An account without usable cached quota remains explicitly no-data. Never call Claude through the proxy or install Claude credentials in it. Keep two configured Codex identities even before observations. Cooldown or a generic 429 does not manufacture quota exhaustion. Management availability and request buckets do not prove which account served a response.
 
-Use a server-side feed reader. The browser reads Fregat's existing authenticated API. Register the exact sanitized feed URL through the application settings registry. Validate HTTPS or an explicitly supported loopback resource at configuration time. Refuse redirects, credentials in URLs, arbitrary fetch targets, oversized responses, and unsupported schemas. Use the v1 64 KiB bound, bounded timeout, and at most one feed request per 60 seconds. Coalesce readers and cancel work at service shutdown. Keep application Origin and device authorization guards unchanged. The browser receives no management URL, management key, auth record, or raw upstream error.
+A small proxy fallback follow-up awaits explicit owner authorization; it does not block this delivery. Its bounded design is T3's positively attributed management `api-call` usage fetch for ChatGPT accounts lacking cached quota, at most once per hour per account under a registered policy with that default and validated minimum. It skips cooldown/unavailable accounts until available again, persists attempts across restarts and logs sanitized provenance. Workers remain fixture-only; the coordinator owns live source configuration. No fallback is implemented or enabled in the current phase. 4. Local transcript scanning in Plan 309. No quota account is inferred from today's auth file or a session creator ID.
 
-Deduplicate native and feed accounts only when a validated non-secret account identity mapping proves equality. Labels, plan names, credential paths on different hosts, and recent request buckets are insufficient. Without proof, retain source-labeled rows and report that their identity relationship is unknown. Never sum percentages across accounts. Never recreate the closed Claude pool.
+Persist only validated sanitized account observations and scheduling timestamps in Fregat's state home. Atomic replacement, bounded file/response sizes, schema versioning, and restart tests protect the cache. Preserve per-window observation times through failures, sparse updates, restart, and republishing. Merge each account/window by newest valid observation and its reset epoch; older local-cache records and delayed probe responses cannot overwrite newer passive observations. Use source fetch/observation times when available and conservative request-start times otherwise, never response-completion time to disguise old data. Missing values stay unknown. Reset passing retains explicitly historical data until a new observation arrives; it does not refill allowances.
 
-Mark provider instances backed by the passive feed so their UI reads bypass native quota probes. Existing direct-native behavior can retain its current cadence. Put every retained active quota caller, including explicit refresh and the existing post-reset exception, behind one account-keyed scheduler. Preserve the explicit reset-credit command and confirmation. Feed accounts gain no redemption capability. Count provider calls before and after under equal native workloads to prove this integration adds none.
+Deduplicate native and proxy accounts only when a validated non-secret provider identity mapping proves equality. Credential paths, labels, plans and recent request buckets do not prove it. Otherwise retain distinct source-labeled accounts and explicit unknown identity relationships. An explicit provider-instance quota-source mapping selects the proxy group without claiming identity equality or which account served a native turn; exclude its unattributed native quota events. Test proven equality, ambiguous identities and configured source selection independently.
 
-## Execute in bounded steps
+Both Settings/composer readers and the Mesh feed endpoint read cache only. Opening or repeatedly polling either surface cannot fetch provider usage, access management, wake the inference route, or extend its idle window. Collection runs through the service lifecycle at its bounded cadence. Account identity is opaque and stable; no tokens, full emails, raw IDs, auth filenames, prompts, raw errors, or management configuration enter the feed.
 
-Complete each step's narrow check before the next step. Keep decoder, store policy, and rendering changes in separate reviewable commits.
+## UI and feed
 
-- [ ] Verify Plan 289's source version and deployment receipt. If the static route is pending, implement against injected v1 fixtures and record live acceptance as a dependency.
-- [ ] Capture current meter and Settings behavior with `chat-usage-meter` and `settings-usage`. Record provider-call, feed-read, and inference-route demand counters without making inference requests.
-- [ ] Extend the account/window contracts and pure feed decoder. Add fixture checks for two rotating Codex accounts, the single Claude account, nullable percentages, durations, and routing selection.
-- [ ] Add the lifecycle-owned server reader and last-valid snapshot store. Test exact-target validation, redirect rejection, size/schema failures, coalescing, cancellation, and preserved observation times.
-- [ ] Add source-aware instance associations and identity matching. Exercise proven native/feed equality and ambiguous identity as distinct cases.
-- [ ] Route proxy-backed instances through cached reads. Serialize all retained native probe and explicit-refresh entry points. Verify unchanged native request counts and zero provider calls from feed-backed reads.
-- [ ] Render account groups in the composer popover and account limits in Settings Usage. Retain no-data/stale/reset-passed rows, safe full-value titles, and unknown selection. Use TanStack queries and existing UI primitives.
-- [ ] Run portable server fixtures with a fake static feed and injected outside-world fetcher. Assert that repeated reads never contact management, provider, or inference activation endpoints.
-- [ ] Add browser scenarios for mixed-age windows, rotating unknown selection, configured-unseen accounts, and failed refresh retaining the prior snapshot. Read back `look` screenshots at normal and narrow composer widths.
-- [ ] With Plan 289 deployed, verify repeated live reads while the inference route sleeps. Check that it stays asleep and its idle deadline remains unchanged. An unreachable feed preserves stale data. Keep this machine-specific proof in delivery evidence.
-- [ ] Commit and push owned paths, run required gates through the heavy runner, deploy server/web changes through the repository release flow, and verify the served commit and live account groups.
+Settings › Usage shows provider-grouped, independent account/plan/window rows, actual ages, native credits where known, configured-unseen accounts, and clear stale/reset-passed states. Window ages remain independent. Unknown routing remains unknown. Allowances and local transcript accounting are separate sections. Use TanStack queries, registry settings, shared UI primitives, theme tokens, structured errors, full-value titles and the existing loading/held-view patterns. Background collection must reach idle mounted views through collector-driven query invalidation or bounded cache-only polling; a turn or navigation must not be required to see a first observation.
 
-## Acceptance and verification
+Add a production API route beneath `/platform` returning the Mesh v1 shape, capped at 64 KiB and valid UTC timestamps. Its handler reads the persisted service snapshot only. Normal browser API authorization remains intact; the feed is reachable by the existing tailnet-private production route without giving the TV credentials or relaxing unrelated Origin/device guards. Test this precise security boundary and the Mesh strict decoder against a produced fixture. No new Mesh parser is planned; if the actual strict contract makes truthful source export impossible, isolate and independently review only that necessary schema change.
 
-Portable tests use a temporary feed location, injected clock, and simulated HTTP responses. Reuse `provider/tests/usage-store.test.ts`, the meter helper tests, and app fixtures where their ownership still fits. Add contract tests at the wire boundary. Tests assert observable request destinations and counts rather than mock our own store.
+## Phases, tests and PRs
 
-The owner can see all configured accounts with separate allowances. No-data is distinct from zero use. Window ages survive republishing and failures. Unknown serving identity remains unknown. Native/feed identity merges require proof. Reading the usage views creates no additional provider calls or inference activation.
+Each PR receives one independent Sol HIGH reviewer, green CI, and a squash merge. Run fail-first tests before implementation and the narrowest plausible failing checks through the heavy wrapper. Every merge receipt belongs below. Merge a green PR after unrelated main movement without redundant CI; shared contracts/lockfiles/build config require re-verification when changed.
 
-Use `typescript-best-practices`, `tanstack-query-best-practices`, `technical-writing`, and `unslop` during implementation. Use `how` before changing unfamiliar provider lifecycle code and `verify-fregat` for UI evidence. Foundational Thinking puts the account/window shape first. Boundary Discipline places validation at configuration and JSON ingress. Sequence Work into Verifiable Units keeps request-count proof separate from UI delivery.
+- [ ] Phase 0 — publish these Approved updates to Plans 308/309/289, the inventory and root roadmap; `bun run plans:check`, docs format, independent HIGH review, green CI, squash merge.
+- [ ] Phase 1 — server source/cache/contracts/settings and cache-only feed. Fail-first quota normalization, duration, mixed ages, account mismatch, nullable credits, no-data, bounded/coalesced/failure/reset refresh, cache restart, late/out-of-order collector and reset-epoch merge tests, proven/ambiguous identity fixtures, and pure-read request-count tests. Verify with Mesh's strict decoder without contacting a provider.
+- [ ] Phase 2 — local transcript history under Plan 309. Portable native files outside projects reproduce the scope gap; prove deduplication, pricing provenance, partial writes, append/truncate/replace, corrupt/restarted scan cache, timezone/range behavior and cached reads. Keep local coverage explicit. Connected-host composition remains separately scheduled by Plan 309.
+- [ ] Phase 3 — Settings/account UI and composer adoption. Fail-first render/query fixtures; normal/narrow `settings-usage` and account/no-data/stale/mixed-age scenarios, including an idle composer receiving its first background observation. Read back `look` evidence and prove cache-only reads. Do not claim cross-device transcript coverage.
+- [ ] Phase 4 — deploy Fregat. Verify on the mesh-owned dev server, then `bun run deploy --server --restart`; confirm production `/platform/release`, account cache persistence, cache-only feed and unchanged actual observation ages under repeated reads. No Pi or live gateway changes by this lane.
+- [ ] Phase 5 — after the coordinator confirms TV cut-over, delete gateway `usage-feed.ts`, `usage-producer.ts`, their usage tests, `usageFeed` runtime parsing/lifecycle, passive producer wiring and README section. Before deletion, extract `readCredits` from the retired feed module into the retained reset-order owner and update both its call sites. Make the runner's direct-Claude/no-pool startup guard unconditional, independent of `usageFeed`; a runtime with Claude proxy/pool entrypoints must fail even after producer removal. Preserve reset-order and gateway stream/abort behavior. Fail-first no-pool runtime regression, reset-order tests and retained runner rebuild; narrow gateway tests, independent HIGH review, green CI and squash merge. Source retirement is distinct from installing the gateway bundle.
 
-Track execution in this checklist and the root roadmap. An issue closure transfers tracking here. It does not mark the feed adoption shipped.
+## Execution receipts
+
+- Plan PR / merge: pending.
+- Server PR / merge: pending.
+- Transcript PR / merge: pending.
+- UI PR / merge / look evidence: pending.
+- Dev / production deploy evidence and final feed URL: pending.
+- Retirement PR / merge: pending, gated on coordinator cut-over.
+
+## Exact live handoff boundary
+
+The implementation lane never touches the Pi, installed gateway, `runtime.json`, `/ai-usage` route, or `/work/cli-proxy-api/usage-feed`. The coordinator alone performs these steps after the deploy receipt:
+
+1. Point the Pi's `dashboard.usageFeedURL` at the reported production Fregat cache-only endpoint. Preserve all other `hosts.json` fields. Verify the strict v1 response, three independent accounts, real ages, stale/reset/no-data behavior, and the approved panel appearance.
+2. Confirm repeated TV/feed reads make no provider/management requests and keep `/ai` asleep with the same idle deadline. Check that a Fregat restart retains valid observations.
+3. Authorize source retirement after TV acceptance. Following its reviewed merge, remove only the `usageFeed` block from installed `/work/cli-proxy-api/runtime.json`, preserving its other fields; install the rebuilt gateway bundle and restart the gateway using the existing Mesh-owned lifecycle. This also respawns its owned Codex proxy. Never configure Claude pooling.
+4. Remove the `/ai-usage` Mesh route and then delete `/work/cli-proxy-api/usage-feed` only after confirming no consumer still points at it. These are owner-kept live resources; this lane does not delete them.
+
+Report the actual commands resolved from installed route/service metadata in the final handoff, without printing secrets or whole runtime/auth files. Keep runtime modifications and route/directory removal out of portable tests.

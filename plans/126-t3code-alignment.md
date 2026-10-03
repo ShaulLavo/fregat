@@ -12,8 +12,11 @@ Harness A and composer/context D/F were delivered earlier. Current bounded work 
 rail acceptance, native monitor liveness, terminal restart/idle-shell acceptance, project override
 coverage and the ACP transport. Do not rebuild those capabilities from stale absence claims.
 
-The fetched reference object is now `5cc99e1c23980d7995a13c47f969b47cb68ed1be`, 22 commits after
-`c2fa9fc911daeac97df4760f95fc57dca42b84c8`. The acceptance pin remains
+The reference working tree was fetched and fast-forwarded on 2026-10-03 from
+`6c8fed35dded9ff71c5b46807125457acbb76be6` to `a7b3ce8c0896d123a7c3f02c586ff8193841cc09` for
+[Plan 308's usage collection](308-account-usage-feed.md). The usage-service delta changes imports and a test-layer export;
+the broader refresh adds orchestration-v2 and desktop/mobile work, outside this usage wave. The earlier
+`5cc99e1c23980d7995a13c47f969b47cb68ed1be` receipt remains historical. The acceptance pin remains
 `7445aa733ada33e45289e5aa5055f79142556513`. Read pinned and delta objects with `git show`;
 the reference working tree and newer subjects do not change the oracle or establish new defects.
 

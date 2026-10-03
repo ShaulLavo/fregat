@@ -699,8 +699,9 @@ default `none`. The Mac feedback established that fading AppKit's fixed tint and
 another opacity control, especially when the page adds its pane fill. The material now owns the
 whole native surface when selected.
 
-- `none` leaves the native material hidden. The desktop shows through the page's panes at
-  `workbench.surface.opacity`.
+- `none` keeps the active behind-window `NSVisualEffectView` in the hierarchy at alpha `0.0001`.
+  A positive alpha requests live desktop compositing while its blur and tint contribution is
+  negligible. The desktop shows through the page's panes at `workbench.surface.opacity`.
 - `frosted` shows the full-strength public `NSVisualEffectView` material. Page panes paint no fill.
 - `glass` shows the public macOS 26 `NSGlassEffectView`. Runtime class lookup behind a macOS 26
   availability guard allows builds with older SDKs. Older systems use the frosted material;
@@ -721,7 +722,9 @@ only; property names avoid Objective-C `new`, `init` and `copy` ownership famili
 Mac acceptance uses Dark mode on macOS 26.4. Switch None, Frosted, Glass and back to None in a
 transparent native window. Check that each material owns the entire pane surface, pane opacity
 is marked not applicable for Frosted and Glass, and None restores the saved opacity. Repeat
-with a light desktop behind the window, then reload. On macOS before 26, Glass must explain the
+with a light desktop behind the window, then reload. With a live video wallpaper, None must
+keep playback continuous while the desktop stays sharp and untinted, including with the window
+inactive and after switching back from Frosted or Glass. On macOS before 26, Glass must explain the
 requirement and render the frosted fallback. The Fregat.app CI job proves native compilation;
 Linux verification proves the bridge and page behavior with an isolated host fixture.
 

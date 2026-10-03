@@ -15,13 +15,14 @@ import {
 import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
 import { createRpcError } from '@/lib/structured-errors'
+import { notifyPrunedSettings } from '@/features/settings/utils/notify-pruned-settings'
 
 export async function fetchSettings(
   signal: AbortSignal | undefined,
   client: Client,
   options: SettingsReadOptions = {},
 ): Promise<SettingsSnapshot> {
-  return observeClientOperation(
+  const snapshot = await observeClientOperation(
     {
       ...clientLogContext(client),
       action: 'settings.read',
@@ -35,6 +36,8 @@ export async function fetchSettings(
       }),
     summarizeSettings,
   )
+  notifyPrunedSettings(snapshot)
+  return snapshot
 }
 
 export async function saveSettings(

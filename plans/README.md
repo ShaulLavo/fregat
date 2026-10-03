@@ -159,7 +159,7 @@ work transferred into execution plans, the original issue links, and remaining i
 | [305](305-spellcheck-language-support.md)             | Explicit spelling languages and dictionary loading                            |
 | [306](306-bun-json-worker.md)                         | JSON syntax data in the Bun worker                                            |
 | [307](307-diff-row-topology.md)                       | Aligned side-by-side diff rows                                                |
-| [308](308-account-usage-feed.md)                      | Adopt passive per-account usage observations                                  |
+| [308](308-account-usage-feed.md)                      | Bounded Fregat usage cache and Mesh feed                                      |
 | [309](309-account-usage-history.md)                   | Deduplicated transcript usage history                                         |
 | [310](310-allowance-visibility.md)                    | Unused allowance and owner-started backlog work                               |
 | [311](311-automatic-machine-placement.md)             | Visible and overridable automatic placement                                   |

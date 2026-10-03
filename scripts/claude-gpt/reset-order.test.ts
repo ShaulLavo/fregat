@@ -23,6 +23,21 @@ function credential(
   return { name: `${index}.json`, provider, index, priority: 0, disabled: false, observation }
 }
 
+test.each([undefined, '0', '300'])(
+  'an unidentified primary counter gives no Weekly reading with secondary minutes %s',
+  (secondaryMinutes) => {
+    const signals: Record<string, string> = {
+      'X-Codex-Primary-Reset-At': String(now + 50),
+      'X-Codex-Primary-Used-Percent': '100',
+    }
+    if (secondaryMinutes !== undefined)
+      signals['X-Codex-Secondary-Window-Minutes'] = secondaryMinutes
+    const observation = readObservation('codex', signals)
+    expect(observation).toBeNull()
+    expect(mergeStoredObservations([credential('unknown', observation)], {})).toEqual({})
+  },
+)
+
 test('accounts with quota left rank by soonest weekly reset', () => {
   const credentials = [
     credential('late', { resetAt: now + 500, usedPercent: 10 }),
@@ -118,6 +133,7 @@ test('weekly observations carry upstream timestamps and observed credits', () =>
 test('weekly observations omit unobserved credit balances and timestamps', () => {
   expect(
     readObservation('codex', {
+      'X-Codex-Primary-Window-Minutes': '10080',
       'X-Codex-Primary-Reset-At': '12',
       'X-Codex-Primary-Used-Percent': '94',
       'X-Codex-Credits-Has-Credits': 'true',
@@ -195,6 +211,7 @@ test.each([
   expect(mergeStoredObservations([incoming], {})).toEqual({})
   expect(
     readObservation('codex', {
+      'X-Codex-Primary-Window-Minutes': '10080',
       'X-Codex-Primary-Reset-At': String(observation.resetAt),
       'X-Codex-Primary-Used-Percent': String(observation.usedPercent),
     }),
@@ -215,6 +232,7 @@ test.each([
   expect(mergeStoredObservations(credentials, {})).toEqual({ a: observation })
   expect(
     readObservation('codex', {
+      'X-Codex-Primary-Window-Minutes': '10080',
       'X-Codex-Primary-Reset-At': String(observation.resetAt),
       'X-Codex-Primary-Used-Percent': String(observation.usedPercent),
     }),
@@ -321,6 +339,7 @@ test('malformed current weekly headers preserve the valid policy map', async () 
               : {
                   observed_at: '2026-10-03T09:00:00Z',
                   signals: {
+                    'X-Codex-Primary-Window-Minutes': '10080',
                     'X-Codex-Primary-Reset-At': index === 'prior' ? String(resetAt) : '0',
                     'X-Codex-Primary-Used-Percent': index === 'prior' ? '101' : '20',
                   },
@@ -446,6 +465,7 @@ test('confirmed credit absence replaces positive credits and survives fresh week
   const cleared = mergeStoredObservations([{ ...credential('a', null), credits: null }], stored)
   const restored = JSON.parse(JSON.stringify(cleared)) as Record<string, StoredObservation>
   const observation = readObservation('codex', {
+    'X-Codex-Primary-Window-Minutes': '10080',
     'X-Codex-Primary-Reset-At': String(now + 50),
     'X-Codex-Primary-Used-Percent': '20',
     'X-Codex-Credits-Has-Credits': 'false',
@@ -539,15 +559,22 @@ test('equal resets order by auth index so the plan stays stable', () => {
 
 test('signals without a numeric reset or usage give no observation', () => {
   expect(readObservation('codex', undefined)).toBeNull()
-  expect(readObservation('codex', { 'X-Codex-Primary-Reset-At': '12' })).toBeNull()
   expect(
     readObservation('codex', {
+      'X-Codex-Primary-Window-Minutes': '10080',
+      'X-Codex-Primary-Reset-At': '12',
+    }),
+  ).toBeNull()
+  expect(
+    readObservation('codex', {
+      'X-Codex-Primary-Window-Minutes': '10080',
       'X-Codex-Primary-Reset-At': '12',
       'X-Codex-Primary-Used-Percent': 'x',
     }),
   ).toBeNull()
   expect(
     readObservation('codex', {
+      'X-Codex-Primary-Window-Minutes': '10080',
       'X-Codex-Primary-Reset-At': '12',
       'X-Codex-Primary-Used-Percent': '94',
     }),
@@ -691,6 +718,7 @@ test('the loop patches only changed priorities and records observations', async 
                 ? {
                     observed_at: '2026-10-03T09:00:00Z',
                     signals: {
+                      'X-Codex-Primary-Window-Minutes': '10080',
                       'X-Codex-Primary-Reset-At': resetAt,
                       'X-Codex-Primary-Used-Percent': '10',
                       'X-Codex-Credits-Has-Credits': '1',
@@ -750,6 +778,7 @@ test('the loop patches only changed priorities and records observations', async 
             quota: {
               observed_at: '2026-10-03T09:00:00Z',
               signals: {
+                'X-Codex-Primary-Window-Minutes': '10080',
                 'X-Codex-Primary-Reset-At': resetAt,
                 'X-Codex-Primary-Used-Percent': '100',
                 'X-Codex-Credits-Has-Credits': 'True',
@@ -974,6 +1003,7 @@ test('ownership survives a proxy-applied disable with an unreadable acknowledgem
           disabled: index === 'spent' && disabled,
           quota: {
             signals: {
+              'X-Codex-Primary-Window-Minutes': '10080',
               'X-Codex-Primary-Reset-At': resetAt,
               'X-Codex-Primary-Used-Percent': index === 'spent' ? '100' : usablePercent,
             },
