@@ -13,15 +13,17 @@ import {
 
 const smokeId = '12345678-1234-1234-1234-123456789abc'
 const url = `http://127.0.0.1:12345/?smoke=${smokeId}`
-const ownership = { targetId: 'owned-page', windowId: 7, url }
+const ownership = { targetId: 'owned-page', windowId: 7, url, viewport: smokeViewport }
 
-function image(challenge) {
+function image(challenge, scale = 1) {
   const png = new PNG({ width: smokeViewport.width, height: smokeViewport.height })
   png.data.fill(255)
   const { grid, colors } = challenge
   for (let index = 0; index < colors.length; index++) {
-    const x = grid.left + (index % grid.columns) * grid.cell + grid.cell / 2
-    const y = grid.top + Math.floor(index / grid.columns) * grid.cell + grid.cell / 2
+    const x = Math.floor((grid.left + (index % grid.columns) * grid.cell + grid.cell / 2) * scale)
+    const y = Math.floor(
+      (grid.top + Math.floor(index / grid.columns) * grid.cell + grid.cell / 2) * scale,
+    )
     const offset = (y * png.width + x) * 4
     png.data.set([...colors[index], 255], offset)
   }
@@ -34,6 +36,8 @@ function externalBoundaries({
   submitted = {},
   ackError = false,
   stopError = false,
+  viewport = smokeViewport,
+  windowState = 'normal',
 } = {}) {
   const commands = []
   const session = new EventEmitter()
@@ -42,7 +46,7 @@ function externalBoundaries({
     if (method === 'Target.getTargetInfo')
       return { targetInfo: { type: 'page', targetId: ownership.targetId, url, ...target } }
     if (method === 'Browser.getWindowForTarget')
-      return { windowId: ownership.windowId, bounds: { windowState: 'normal' } }
+      return { windowId: ownership.windowId, bounds: { windowState } }
     if (method === 'Page.screencastFrameAck' && ackError) throw new Error('External ACK failure')
     if (method === 'Page.stopScreencast' && stopError) throw new Error('External stop failure')
     return {}
@@ -51,9 +55,17 @@ function externalBoundaries({
     url: () => url,
     evaluate: async (_evaluate, challenge) => {
       const event = {
-        data: image(challenge),
+        data: image(challenge, smokeViewport.width / viewport.width),
         sessionId: 1,
-        metadata: { timestamp: challenge.sequence, deviceWidth: 320, deviceHeight: 440 },
+        metadata: {
+          timestamp: challenge.sequence,
+          deviceWidth: viewport.width,
+          deviceHeight: viewport.height,
+          offsetTop: 0,
+          pageScaleFactor: 1,
+          scrollOffsetX: 0,
+          scrollOffsetY: 0,
+        },
       }
       if (typeof frame === 'function') frame(session, event, challenge)
       if (frame === true) session.emit('Page.screencastFrame', event)
@@ -63,6 +75,8 @@ function externalBoundaries({
         visibility: 'visible',
         dpr: 1,
         url,
+        width: viewport.width,
+        height: viewport.height,
         ...submitted,
       }
     },
@@ -71,7 +85,7 @@ function externalBoundaries({
     proveHeadedPresentation({
       page,
       session,
-      ownership,
+      ownership: { ...ownership, viewport },
       smokeId,
       frameTimeoutMilliseconds: 30,
       commandTimeoutMilliseconds: 30,
@@ -109,6 +123,36 @@ test('three nonce-bearing submitted contents match advancing compositor frames, 
   cleaned(boundaries)
 })
 
+test('uniform screencast downscaling uses actual page and compositor geometry', async () => {
+  const boundaries = externalBoundaries({
+    viewport: { width: 512, height: 704 },
+    windowState: 'maximized',
+  })
+  const result = await boundaries.run()
+  assert.equal(result.presented.length, 3)
+  assert.equal(result.presented[0].scale, 0.625)
+  cleaned(boundaries)
+})
+
+test('emulated geometry contradicting compositor geometry is rejected', async () => {
+  const boundaries = externalBoundaries({
+    frame: (session, event) =>
+      session.emit('Page.screencastFrame', {
+        ...event,
+        metadata: { ...event.metadata, deviceWidth: 922, deviceHeight: 943 },
+      }),
+  })
+  await assert.rejects(boundaries.run(), /viewport widths must agree/)
+  cleaned(boundaries)
+})
+
+test('minimized windows fail before screencast starts', async () => {
+  const boundaries = externalBoundaries({ windowState: 'minimized' })
+  await assert.rejects(boundaries.run(), /Mapped non-minimized window/)
+  assert.equal(boundaries.session.listenerCount('Page.screencastFrame'), 0)
+  assert(!boundaries.commands.some((c) => c.method === 'Page.startScreencast'))
+})
+
 test('RAF and readPixels success without compositor frames cannot pass', async () => {
   const boundaries = externalBoundaries({
     frame: false,
@@ -121,7 +165,10 @@ test('RAF and readPixels success without compositor frames cannot pass', async (
 test('matching content with cached or nonadvancing compositor timestamps fails fast', async () => {
   const boundaries = externalBoundaries({
     frame: (session, event) =>
-      session.emit('Page.screencastFrame', { ...event, metadata: { timestamp: 1 } }),
+      session.emit('Page.screencastFrame', {
+        ...event,
+        metadata: { ...event.metadata, timestamp: 1 },
+      }),
   })
   await assert.rejects(boundaries.run(), { code: 'PRESENTATION_SMOKE_NONADVANCING' })
   assert.equal(boundaries.commands.filter((c) => c.method === 'Page.screencastFrameAck').length, 2)
@@ -193,7 +240,11 @@ test('page-side wrong submission and hidden pages fail even with matching PNGs',
 
 test('missing compositor timestamp never receives invented clocks', async () => {
   const boundaries = externalBoundaries({
-    frame: (session, event) => session.emit('Page.screencastFrame', { ...event, metadata: {} }),
+    frame: (session, event) =>
+      session.emit('Page.screencastFrame', {
+        ...event,
+        metadata: { ...event.metadata, timestamp: undefined },
+      }),
   })
   await assert.rejects(boundaries.run(), { code: 'PRESENTATION_SMOKE_NONADVANCING' })
   cleaned(boundaries)
@@ -243,6 +294,8 @@ test('actual fixture submits WebGL clears at the pixels the compositor verifier 
     },
     location: { href: url },
     devicePixelRatio: 1,
+    innerWidth: smokeViewport.width,
+    innerHeight: smokeViewport.height,
   })
   const challenge = smokeChallenge(smokeId, 1)
   const submitted = window.presentationSmoke.submit(challenge)

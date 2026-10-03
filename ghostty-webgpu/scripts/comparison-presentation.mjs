@@ -69,28 +69,50 @@ window.presentationSmoke = {
     });
     context.flush();
     sequence = challenge.sequence;
-    return { smokeId, sequence, visibility: document.visibilityState, dpr: devicePixelRatio, url: location.href };
+    return { smokeId, sequence, visibility: document.visibilityState, dpr: devicePixelRatio, url: location.href, width: innerWidth, height: innerHeight };
   }
 };
 </script>`
 }
 
-function decodedWitness(frame, challenge) {
+function decodedWitness(frame, challenge, viewport) {
   assert(
     typeof frame.data === 'string' && frame.data.length < 4_000_000,
     'Bounded PNG frame required',
   )
   const bytes = Buffer.from(frame.data, 'base64')
-  if (
-    bytes.length < 24 ||
-    bytes.readUInt32BE(16) !== smokeViewport.width ||
-    bytes.readUInt32BE(20) !== smokeViewport.height
+  assert(bytes.length >= 24, 'PNG header required')
+  const width = bytes.readUInt32BE(16)
+  const height = bytes.readUInt32BE(20)
+  assert(
+    width > 0 && width <= smokeViewport.width && height > 0 && height <= smokeViewport.height,
+    'Bounded compositor image dimensions required',
   )
-    return null
+  assert.equal(
+    frame.metadata?.deviceWidth,
+    viewport.width,
+    'Compositor and page viewport widths must agree',
+  )
+  assert.equal(
+    frame.metadata?.deviceHeight,
+    viewport.height,
+    'Compositor and page viewport heights must agree',
+  )
+  for (const [key, value] of Object.entries({
+    offsetTop: 0,
+    pageScaleFactor: 1,
+    scrollOffsetX: 0,
+    scrollOffsetY: 0,
+  }))
+    assert.equal(frame.metadata[key], value, 'Unscaled, unscrolled compositor content required')
+  const scale = width / viewport.width
+  assert(Math.abs(height - viewport.height * scale) <= 1, 'Uniform compositor image scale required')
   const image = PNG.sync.read(bytes)
   const observedColors = challenge.colors.map((_, index) => {
-    const x = grid.left + (index % grid.columns) * grid.cell + grid.cell / 2
-    const y = grid.top + Math.floor(index / grid.columns) * grid.cell + grid.cell / 2
+    const x = Math.floor((grid.left + (index % grid.columns) * grid.cell + grid.cell / 2) * scale)
+    const y = Math.floor(
+      (grid.top + Math.floor(index / grid.columns) * grid.cell + grid.cell / 2) * scale,
+    )
     const offset = (y * image.width + x) * 4
     assert.equal(image.data[offset + 3], 255, 'Compositor content must be opaque')
     return Array.from(image.data.subarray(offset, offset + 3))
@@ -104,6 +126,8 @@ function decodedWitness(frame, challenge) {
     pngBytes: bytes.length,
     width: image.width,
     height: image.height,
+    viewport,
+    scale,
     observedColors,
   }
 }
@@ -133,7 +157,14 @@ export async function proveHeadedPresentation({
   )
   const window = await send('Browser.getWindowForTarget', { targetId: target.targetId })
   assert.equal(window.windowId, ownership.windowId, 'Wrong owned window')
-  assert.equal(window.bounds.windowState, 'normal', 'Visible normal window required')
+  assert(
+    ['normal', 'maximized', 'fullscreen'].includes(window.bounds.windowState),
+    'Mapped non-minimized window required',
+  )
+  assert(
+    ownership.viewport.width >= 320 && ownership.viewport.height >= 320,
+    'Smoke grid must fit the actual page viewport',
+  )
 
   const evidence = {
     endpoint: 'CDP Page.screencastFrame compositor-surface PNG content',
@@ -179,7 +210,7 @@ export async function proveHeadedPresentation({
       pngBase64: frame.data,
     })
     if (!pending || failure) return
-    const content = decodedWitness(frame, pending.challenge)
+    const content = decodedWitness(frame, pending.challenge, ownership.viewport)
     if (!content) {
       evidence.unmatched++
       return
@@ -229,6 +260,12 @@ export async function proveHeadedPresentation({
         assert.equal(submitted.visibility, 'visible', 'Page must be visible')
         assert.equal(submitted.dpr, 1, 'Smoke uses device scale factor one')
         assert.equal(submitted.url, ownership.url, 'Submission URL must remain owned')
+        assert.equal(submitted.width, ownership.viewport.width, 'Submitted viewport width changed')
+        assert.equal(
+          submitted.height,
+          ownership.viewport.height,
+          'Submitted viewport height changed',
+        )
         evidence.submitted.push({ ...submitted, challenge })
         return await witness
       }, frameTimeoutMilliseconds)
