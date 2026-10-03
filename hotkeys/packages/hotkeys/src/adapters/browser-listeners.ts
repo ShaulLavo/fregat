@@ -1,5 +1,5 @@
 import { keyInputFromKeyboardEvent } from './browser'
-import { isInputElement } from '../_event-target'
+import { hasEditContext, isInputElement } from '../_event-target'
 import type { KeyInput } from '../key-input'
 import type { ChordOutcome, KeymapPlatform } from '../chords/types'
 import type { KeyEffects } from '../chords/runtime'
@@ -19,6 +19,7 @@ export type KeyListeners = {
   readonly syncCapture: () => void
   readonly dispose: () => void
 }
+export type KeyResetReason = 'blur' | 'hidden' | 'releaseAll' | 'dispose'
 
 export const browserKeyEffects: KeyEffects<KeyboardEvent> = {
   preventDefault: (event) => event.preventDefault(),
@@ -35,6 +36,17 @@ export function replayTextInput(input: KeyInput, event: KeyboardEvent): void {
   if (input.modifiers.ctrl || input.modifiers.meta || [...text].length !== 1) return
   const field = event.target
   if (!(field instanceof HTMLElement) || !isInputElement(field)) return
+  if (hasEditContext(field)) {
+    field.dispatchEvent(
+      new InputEvent('beforeinput', {
+        bubbles: true,
+        cancelable: true,
+        data: text,
+        inputType: 'insertText',
+      }),
+    )
+    return
+  }
   const document = field.ownerDocument
   // execCommand keeps the field's undo history; happy-dom and old engines lack it.
   if (typeof document.execCommand === 'function' && document.execCommand('insertText', false, text))
@@ -56,10 +68,13 @@ export function attachKeyListeners(
   platform: KeymapPlatform,
   target: () => KeyListenerTarget,
   beforeKey?: (event: KeyboardEvent) => void,
+  onReset?: (reason: KeyResetReason) => void,
+  capture = false,
 ): KeyListeners {
   const document = 'defaultView' in root ? root : root.ownerDocument
   const window = document.defaultView
   const processed = new WeakMap<KeyboardEvent, boolean>()
+  const processing = new WeakSet<KeyboardEvent>()
   let disposed = false
 
   function syncCapture() {
@@ -70,11 +85,18 @@ export function attachKeyListeners(
     if (disposed) return false
     const prior = processed.get(event)
     if (prior !== undefined) return prior
-    beforeKey?.(event)
-    const input = keyInputFromKeyboardEvent(event, platform)
-    const owned = target().handleKey(input, event, input.type === 'keyup' || inRoot(event))
-    processed.set(event, owned)
-    return owned
+    // A recursive host offer stays claimed while the outer dispatch decides ownership.
+    if (processing.has(event)) return true
+    processing.add(event)
+    try {
+      beforeKey?.(event)
+      const input = keyInputFromKeyboardEvent(event, platform)
+      const owned = target().handleKey(input, event, input.type === 'keyup' || inRoot(event))
+      processed.set(event, owned)
+      return owned
+    } finally {
+      processing.delete(event)
+    }
   }
   function inRoot(event: Event) {
     if (root === document && event.target === null) return true
@@ -93,11 +115,13 @@ export function attachKeyListeners(
   }
   function onBlur() {
     target().releaseAll()
+    onReset?.('blur')
     target().cancel('blur')
   }
   function onVisibilityChange() {
     if (document.visibilityState !== 'hidden') return
     target().releaseAll()
+    onReset?.('hidden')
     target().cancel('hidden')
   }
   function onPointerDown() {
@@ -114,14 +138,14 @@ export function attachKeyListeners(
     if (disposed) return
     disposed = true
     syncCapture()
-    root.removeEventListener('keydown', onKeyDown)
+    root.removeEventListener('keydown', onKeyDown, capture)
     root.removeEventListener('focusout', onFocusOut)
     document.removeEventListener('keyup', onKeyUp, true)
     document.removeEventListener('visibilitychange', onVisibilityChange)
     document.removeEventListener('pointerdown', onPointerDown, true)
     window?.removeEventListener('blur', onBlur)
   }
-  root.addEventListener('keydown', onKeyDown)
+  root.addEventListener('keydown', onKeyDown, capture)
   root.addEventListener('focusout', onFocusOut)
   document.addEventListener('keyup', onKeyUp, true)
   document.addEventListener('visibilitychange', onVisibilityChange)

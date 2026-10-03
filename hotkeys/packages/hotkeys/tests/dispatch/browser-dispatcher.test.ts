@@ -56,3 +56,53 @@ test('the focus path follows DOM containment of attached elements', () => {
   const typed = keydown(input, 'x')
   expect(typed.defaultPrevented).toBe(false)
 })
+
+test.each(['parent-first', 'child-first'] as const)(
+  'the deepest node survives same-element attachment order %s',
+  (order) => {
+    const input = document.createElement('textarea')
+    document.body.append(input)
+    const calls: string[] = []
+    dispatcher = createBrowserDispatcher({
+      platform: 'linux',
+      keymap: [{ keys: 'Control+B', command: 'toggle' }],
+    })
+    const parent = dispatcher.createNode({ commands: { toggle: () => void calls.push('parent') } })
+    const child = dispatcher.createNode({
+      parent,
+      commands: { toggle: () => void calls.push('child') },
+    })
+    const attachments = order === 'parent-first' ? [parent, child] : [child, parent]
+    const removals = new Map(
+      attachments.map((node) => [node, dispatcher!.attachElement(node, input)]),
+    )
+    keydown(input, 'b', { ctrlKey: true })
+    removals.get(child)!()
+    keydown(input, 'b', { ctrlKey: true })
+    removals.get(parent)!()
+    expect(calls).toEqual(['child', 'parent'])
+  },
+)
+
+test('later equal-depth ties restore earlier registrations when detached', () => {
+  const input = document.createElement('textarea')
+  document.body.append(input)
+  const calls: string[] = []
+  dispatcher = createBrowserDispatcher({
+    platform: 'linux',
+    keymap: [{ keys: 'Control+B', command: 'toggle' }],
+  })
+  const first = dispatcher.createNode({ commands: { toggle: () => void calls.push('first') } })
+  const second = dispatcher.createNode({ commands: { toggle: () => void calls.push('second') } })
+  const detachFirst = dispatcher.attachElement(first, input)
+  const detachSecond = dispatcher.attachElement(second, input)
+  keydown(input, 'b', { ctrlKey: true })
+  detachSecond()
+  detachSecond()
+  keydown(input, 'b', { ctrlKey: true })
+  detachFirst()
+  dispatcher.attachElement(second, input)
+  detachFirst()
+  keydown(input, 'b', { ctrlKey: true })
+  expect(calls).toEqual(['second', 'first', 'second'])
+})
