@@ -57,8 +57,9 @@ only changed byte ranges. GPU sources provide `createFrameBuilder`.
 
 Atlas recovery is bounded to three registration sweeps. If a frame still cannot be built, the
 renderer reports a `frame_builder` error, retains the last submitted frame, and keeps damage and
-refresh requests pending. The next write, resize, font change or explicit refresh or cursor activity requests a full
-native rebuild. Recovery adds no failure-specific retry loop.
+refresh requests pending. The next write, resize, font change, explicit refresh or cursor activity
+requests a full native rebuild. Recovery adds no failure-specific retry loop. Canvas resizing and
+context replacement still invalidate prior pixels.
 
 Canvas 2D, DOM, accessibility, selection/copy and frame callbacks retain their shared row readers.
 Styled snapshots and text-only rows describe those consumers; GPU rendering reads native records.

@@ -23,6 +23,11 @@
       WebGPU require native frames; bounded atlas exhaustion reports `frame_builder`, retains the
       submitted frame and unacknowledged damage, and requires a full rebuild on the next request.
       Shared styled/text row readers remain for Canvas 2D, DOM, accessibility and frame callbacks.
+- [x] Native-only deletion control: one rolling-logs WebGL before/after matrix at 17 terminals,
+      four balanced pairs per quiet window against `b991384e0`. Renderer/total paired xterm ratios
+      remain below one (0.6674/0.8165 after); all 16 cases qualify. Cross-session native total CPU
+      is 40.444 → 40.719% core, a descriptive observation. No CPU benefit or proven no-regression
+      claim. Compact records and source verification: `ghostty-webgpu/docs/benchmarks/linux-native-only-2026-10-03/`.
 - [ ] Input: render on the frame that parses the echo (native starts drawing ~15 ms after parse at
       1 terminal; xterm ~0.5 ms).
 - [ ] Full omarchy run of every measure; regenerate `docs/benchmarks.md`; unblock Plan 285's measurements section.
@@ -222,9 +227,10 @@ spike to the full terminal feature set. Measurements use GPU-idle, `--quiet` hea
 
 ### WebGL consumes the Zig frame
 
-Status: Approved. Reuse the existing 64-byte cell and 96-byte glyph records directly in WebGL,
-with changed-range uploads and the existing whole-frame JavaScript fallback. Keep shader and
-record layouts unchanged; additional trailing-blank heuristics wait for measurement.
+Status: Completed milestone (#399). This revision reused the existing 64-byte cell and 96-byte
+glyph records directly in WebGL with changed-range uploads and a whole-frame JavaScript fallback.
+The GPU full move removes that fallback; shader and native record layouts remain unchanged.
+The checks and measurements below describe the historical milestone.
 
 - [x] Make WebGL's supported-subset native producer the default, preserving omitted host options.
 - [x] Upload nonempty changed ranges from fresh WASM views with byte-correct destination offsets.
@@ -251,8 +257,9 @@ record layouts unchanged; additional trailing-blank heuristics wait for measurem
 
 ### Unicode, grapheme, selection and color frames
 
-Status: Approved. Extend the Zig producer to the real shell content that selected whole-frame
-JavaScript fallback: Unicode prompts, wide cells, grapheme clusters, selection and color glyphs.
+Status: Completed milestone (#462). This revision extended the Zig producer to shell content that
+previously selected whole-frame JavaScript fallback: Unicode prompts, wide cells, grapheme clusters,
+selection and color glyphs. The checks and measurements below describe that historical revision.
 Fonts and missing-glyph rasterization remain browser-owned; cell and glyph record layouts stay
 unchanged. That measured revision retained the explicit JavaScript producer. The GPU full move
 removes that producer and preserves bounded native atlas-resource recovery.
