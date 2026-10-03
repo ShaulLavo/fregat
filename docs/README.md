@@ -35,6 +35,8 @@ the revision it inspected; it is not a second implementation queue or proof of t
 
 ## Research and evidence
 
+- [Async runtime research and architecture](async-runtime/README.md): workers, three libraries, alternatives and measurement grounding
+
 - [UI research index](ui-research/README.md), [document library survey](documents/library-survey.md)
 - [Document consumer baseline](document-contributions/baseline-and-inventory.md)
 - [Markdown measurements](markdown-parser/measurements.md), [large-file measurements](large-file-ceiling/README.md)
