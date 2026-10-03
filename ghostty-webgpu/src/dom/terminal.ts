@@ -742,6 +742,7 @@ export class Terminal implements TerminalApi<'sync'> {
       effectivePixelRatio(elements.canvas, this.fitEnvironment),
     )
     this.fittedFont = font
+    this.execution.commitLayout(font, elements.padding)
     const compositionView = elements.compositionView
     if (compositionView) applyPreeditAppearance(compositionView, font, appearance.rendererTheme)
     this.renderer?.setCursorBlinkEnabled(appearance.cursor.blink)
@@ -978,12 +979,15 @@ export class Terminal implements TerminalApi<'sync'> {
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     const paddingChanged = this.elementsValue?.setPadding(result.padding) === true
     const scrollbarWidthChanged = this.scrollbar?.setWidth(result.scrollbarWidth) === true
+    this.execution.commitLayout(result.font, result.padding)
     this.renderer?.setFont(result.font)
     this.fittedFont = result.font
     this.layoutCommitted = true
     if (paddingChanged || scrollbarWidthChanged) this.invalidateLinks()
     this.execution.resize(result.grid)
-    this.execution.commitLayout(result.font, result.padding)
+    // Padding can change without native cells changing; submit its new layout with owned rows.
+    if (paddingChanged || scrollbarWidthChanged)
+      this.renderer?.refreshRows?.(0, result.grid.rows - 1)
     if (this.stateValue !== 'open') return
     this.replayLastFrame()
     this.updateScrollbar()
@@ -992,6 +996,7 @@ export class Terminal implements TerminalApi<'sync'> {
   private commitFixedFont(font: TerminalFittedFont): void {
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     const grid = this.execution.grid
+    this.execution.commitLayout(font, this.elementsValue!.padding)
     this.renderer?.setFont(font)
     this.fittedFont = font
     this.layoutCommitted = true
@@ -1002,7 +1007,6 @@ export class Terminal implements TerminalApi<'sync'> {
       pixelRatio: font.pixelRatio,
       rows: grid.rows,
     })
-    this.execution.commitLayout(font, this.elementsValue!.padding)
     if (this.stateValue !== 'open') return
     this.replayLastFrame()
     this.updateScrollbar()

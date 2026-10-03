@@ -25,7 +25,8 @@ import {
   type TerminalAccessibilityController,
 } from '../accessibility.js'
 import { createDomClipboardPolicyAdapter } from '../clipboard.js'
-import { fitTerminalFont } from '../fit.js'
+import { fitTerminalFont, type TerminalFitController } from '../fit.js'
+import type { TerminalSubmittedFrame } from '../submitted-frame.js'
 import { createDomLinkController, type DomLinkController } from '../links.js'
 import type { CommittedPointerLayout } from '../pointer.js'
 import { createTerminalScrollbar, type TerminalScrollbarClock } from '../scrollbar.js'
@@ -369,6 +370,10 @@ async function createObservedRendererHarness(
   backend: 'webgpu' | 'webgl2' = 'webgpu',
   beforeCleanUpdate?: () => void,
   afterCleanUpdate?: () => void,
+  afterTextFrame?: (
+    terminal: Terminal,
+    renderer: WebGpuTerminalRenderer | WebGlTerminalRenderer,
+  ) => void,
 ): Promise<{
   readonly host: HTMLDivElement
   readonly renderer: WebGpuTerminalRenderer | WebGlTerminalRenderer
@@ -417,6 +422,7 @@ async function createObservedRendererHarness(
         onTextFrame: (snapshot) => {
           snapshots.push(snapshot)
           rendererOptions.onTextFrame?.(snapshot)
+          if (renderer) afterTextFrame?.(terminal, renderer)
         },
       }
       renderer =
@@ -1282,6 +1288,99 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.terminal.visibleLines()).toEqual(after.rows.map((row) => row.text))
       expect(before.rows.map((row) => row.text)).toEqual(beforeText)
       expect(harness.terminal.captureViewport()).toBeDefined()
+    },
+  )
+
+  it.each([
+    ['webgpu', 'resize'],
+    ['webgl2', 'resize'],
+    ['webgpu', 'font'],
+    ['webgl2', 'font'],
+    ['webgpu', 'padding'],
+    ['webgl2', 'padding'],
+  ] as const)(
+    'keeps every submitted layout coherent during %s %s changes',
+    async (backend, change) => {
+      const observations: Array<{
+        readonly summary: TerminalSubmittedFrame
+        readonly font: TerminalFittedFont
+        readonly grid: RendererGridSize
+        readonly caretLeft: number
+        readonly caretTop: number
+        readonly paddingLeft: number
+      }> = []
+      const harness = await createObservedRendererHarness(
+        {},
+        backend,
+        undefined,
+        undefined,
+        (terminal, renderer) => {
+          observations.push({
+            summary: terminal.submittedFrame!,
+            font: Reflect.get(renderer, 'font') as TerminalFittedFont,
+            grid: Reflect.get(renderer, 'grid') as RendererGridSize,
+            caretLeft: Number.parseFloat(terminal.textarea!.style.left),
+            caretTop: Number.parseFloat(terminal.textarea!.style.top),
+            paddingLeft: Number.parseFloat(terminal.canvas!.style.paddingLeft),
+          })
+        },
+      )
+      if (change === 'resize') {
+        harness.host.style.width = '480px'
+        harness.host.style.height = '220px'
+      }
+      if (change === 'padding') {
+        harness.host.style.width = `${harness.host.clientWidth + 4}px`
+      }
+      await animationFrames(3)
+      await settleTerminal(harness.terminal)
+      harness.terminal.write('resize font probe')
+      await settleTerminal(harness.terminal)
+      const before = harness.terminal.submittedFrame!
+      observations.length = 0
+      if (change === 'padding') {
+        const fit = Reflect.get(harness.terminal, 'fit') as TerminalFitController
+        fit.setPadding({ left: 1 })
+      }
+      if (change === 'font') {
+        harness.terminal.setFont({ boldWeight: before.font.settings.boldWeight + 100 })
+      }
+      if (change === 'resize') {
+        harness.terminal.setFont({ size: before.font.settings.size + 5 })
+      }
+      await settleTerminal(harness.terminal)
+      expect(observations.length).toBeGreaterThan(0)
+      const after = harness.terminal.submittedFrame!
+      expect(after.layout).toBeGreaterThan(before.layout)
+      if (change !== 'resize') {
+        expect(after.grid.columns).toBe(before.grid.columns)
+        expect(after.grid.rows).toBe(before.grid.rows)
+      }
+      if (change === 'resize') {
+        expect(after.grid.columns).not.toBe(before.grid.columns)
+        expect(after.grid.rows).not.toBe(before.grid.rows)
+      }
+      if (change === 'padding') expect(after.padding.left).toBe(1)
+      for (const { summary, font, grid, caretLeft, caretTop, paddingLeft } of observations) {
+        expect(summary.font, `frame ${summary.frame}`).toEqual(font)
+        expect(summary.grid).toMatchObject({
+          cellHeight: font.cssCellHeight,
+          cellWidth: font.cssCellWidth,
+          columns: grid.columns,
+          pixelRatio: font.pixelRatio,
+          rows: grid.rows,
+        })
+        expect(summary.scrollbar.length).toBe(grid.rows)
+        expect(summary.rows).toHaveLength(grid.rows)
+        expect(summary.rows[0]?.text.trimEnd()).toBe('resize font probe')
+        expect(summary.padding.left).toBe(paddingLeft)
+        expect(caretLeft).toBe(paddingLeft + (summary.cursor.viewport?.x ?? 0) * font.cssCellWidth)
+        expect(caretTop).toBe(
+          summary.padding.top + (summary.cursor.viewport?.y ?? 0) * font.cssCellHeight,
+        )
+      }
+      expect(harness.readRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
     },
   )
 

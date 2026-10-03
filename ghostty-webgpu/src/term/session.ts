@@ -1541,10 +1541,16 @@ export class TerminalSession<TEvent = unknown> {
 
     this.appearanceValue = next
     if (gridChanged || scrollbackChanged) this.invalidateLinks()
+    const nextScroll =
+      gridChanged || scrollbackChanged ? readScrollSnapshot(this.terminal) : this.scrollValue
+    const scrollChanged = !scrollSnapshotsEqual(this.scrollValue, nextScroll)
+    // Resize listeners can paint synchronously; commit viewport and revision before notifying.
+    if (scrollChanged) this.scrollValue = nextScroll
+    this.revisionValue += 1
     if (gridChanged) this.emitters.resize.emit({ grid: next.grid })
-    if (gridChanged || scrollbackChanged) this.emitScrollChange()
+    if (scrollChanged) this.emitters.scroll.emit(nextScroll)
     this.emitters.appearance.emit({ appearance: next })
-    return this.requestRender()
+    return this.emitRenderRequest()
   }
 
   private applyCursor(cursor: TerminalCursorSettings): void {
@@ -1629,6 +1635,10 @@ export class TerminalSession<TEvent = unknown> {
 
   private requestRender(): TerminalMutationResult {
     this.revisionValue += 1
+    return this.emitRenderRequest()
+  }
+
+  private emitRenderRequest(): TerminalMutationResult {
     const result = this.mutationResult()
     this.emitters.renderRequest.emit({ ...result, state: this.nativeRenderState })
     return result
