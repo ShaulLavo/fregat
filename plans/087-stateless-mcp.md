@@ -294,6 +294,10 @@ This lets an agent check that its change works, or debug one, in the real app.
   server over its existing socket. The server's MCP endpoint lists them beside the native tools and
   forwards each call to the attached client, which runs it through the same command registry and
   input path the keymap uses. Agents run on the server, so this is the one route that reaches them.
+- Outside agents (Claude Code or Codex in a terminal, any MCP client) reach the same tools through
+  the same endpoint. M1 issues tokens only to Fregat's own provider sessions, so add an
+  owner-issued external-client grant: named, scoped to a workspace, revocable from settings,
+  reaching remote machines over the existing SSH access.
 - Also register the same tool definitions with Chrome's in-page tool API (`navigator.modelContext`)
   where it exists, so a browser-resident agent can call them too. One definition, two transports.
 - Opening and placing things is blocked on the new layout system (splits anywhere, easy to place
