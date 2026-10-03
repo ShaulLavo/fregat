@@ -39,7 +39,6 @@ static NSView *glass_effect(NSRect frame) {
     [effect setValue:@0 forKey:@"style"];
     [effect setValue:@0 forKey:@"cornerRadius"];
     effect.hidden = YES;
-    effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     return effect;
   }
   return nil;
@@ -58,6 +57,7 @@ static void emit(NSDictionary *event) {
 @property(strong) WKWebView *view;
 @property(strong) NSVisualEffectView *effect;
 @property(strong) NSView *glassEffect;
+@property(strong) NSNumber *fullscreenTarget;
 @property(strong) NSURL *appURL;
 @property(strong) WKUserScript *startupScript;
 @property(strong) NSOpenPanel *picker;
@@ -73,8 +73,21 @@ static void emit(NSDictionary *event) {
 @end
 
 @implementation PlatformHost
+- (void)mountContentView:(NSView *)view {
+  NSView *content = self.window.contentView;
+  view.translatesAutoresizingMaskIntoConstraints = NO;
+  [content addSubview:view];
+  [NSLayoutConstraint activateConstraints:@[
+    [view.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
+    [view.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
+    [view.topAnchor constraintEqualToAnchor:content.topAnchor],
+    [view.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
+  ]];
+}
 - (NSString *)windowStateSource {
-  BOOL fullscreen = (self.window.styleMask & NSWindowStyleMaskFullScreen) != 0;
+  // AppKit's style mask settles after the fullscreen animation; Will callbacks carry its target.
+  BOOL fullscreen = self.fullscreenTarget ? self.fullscreenTarget.boolValue
+      : (self.window.styleMask & NSWindowStyleMaskFullScreen) != 0;
   NSData *data = [NSJSONSerialization dataWithJSONObject:self.appURL.absoluteString
       options:NSJSONWritingFragmentsAllowed error:nil];
   NSString *appURL = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
@@ -108,11 +121,33 @@ static void emit(NSDictionary *event) {
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
   [self publishWindowState];
 }
+- (void)windowWillEnterFullScreen:(NSNotification *)notification {
+  self.fullscreenTarget = @YES;
+  [self refreshWindowStateScript];
+  [self publishWindowState];
+}
+- (void)windowWillExitFullScreen:(NSNotification *)notification {
+  self.fullscreenTarget = @NO;
+  [self refreshWindowStateScript];
+  [self publishWindowState];
+}
 - (void)windowDidEnterFullScreen:(NSNotification *)notification {
+  self.fullscreenTarget = nil;
   [self refreshWindowStateScript];
   [self publishWindowState];
 }
 - (void)windowDidExitFullScreen:(NSNotification *)notification {
+  self.fullscreenTarget = nil;
+  [self refreshWindowStateScript];
+  [self publishWindowState];
+}
+- (void)windowDidFailToEnterFullScreen:(NSWindow *)window {
+  self.fullscreenTarget = nil;
+  [self refreshWindowStateScript];
+  [self publishWindowState];
+}
+- (void)windowDidFailToExitFullScreen:(NSWindow *)window {
+  self.fullscreenTarget = nil;
   [self refreshWindowStateScript];
   [self publishWindowState];
 }
@@ -339,10 +374,9 @@ int main(int argc, char **argv) {
       effect.alphaValue = liveDesktopAlpha;
       effect.hidden = NO;
       host.effect = effect;
-      effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-      [window.contentView addSubview:effect];
+      [host mountContentView:effect];
       host.glassEffect = glass_effect(window.contentView.bounds);
-      if (host.glassEffect) [window.contentView addSubview:host.glassEffect];
+      if (host.glassEffect) [host mountContentView:host.glassEffect];
     }
     WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
     configuration.websiteDataStore = dataStore;
@@ -353,7 +387,6 @@ int main(int argc, char **argv) {
     WKWebView *view = [[WKWebView alloc] initWithFrame:window.contentView.bounds configuration:configuration];
     host.view = view;
     view.navigationDelegate = host;
-    view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     if (@available(macOS 13.3, *)) view.inspectable = YES;
     if (vibrant) {
       // Clearing WebKit's background can leave its root layer's initial opaque hint.
@@ -362,7 +395,7 @@ int main(int argc, char **argv) {
       view.layer.opaque = NO;
       view.layer.backgroundColor = NSColor.clearColor.CGColor;
     }
-    [window.contentView addSubview:view];
+    [host mountContentView:view];
     __weak PlatformHost *weakHost = host;
     host.mouseMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown handler:^NSEvent *(NSEvent *event) {
       if (event.window == weakHost.window) weakHost.mouseDown = event;
