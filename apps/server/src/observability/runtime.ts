@@ -28,6 +28,17 @@ function shouldPersistServerEvent(context: DrainContext) {
   if (isRoutineHealthEvent(context)) return false
   if (isRoutineClientLogIngestEvent(context)) return false
   if (isRoutineLogDashboardEvent(context)) return false
+  const event = context.event
+  if (
+    event.method === 'GET' &&
+    event.path === '/providers/usage/feed' &&
+    typeof event.status === 'number' &&
+    event.status >= 200 &&
+    event.status < 400 &&
+    event.level === 'info' &&
+    !event.error
+  )
+    return false
 
   return true
 }

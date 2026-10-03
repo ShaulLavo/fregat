@@ -48,6 +48,44 @@ afterEach(async () => {
 })
 
 describe('provider usage store', () => {
+  it.each(['claude', 'codex'] as const)(
+    'uses local %s metadata labels without quota metadata or exporting email domains',
+    async (kind) => {
+      const f = await nativeClaudeFixture(kind)
+      const credentialPath = path.join(path.dirname(f.cachePath), 'credentials.json')
+      if (kind === 'claude')
+        await writeFile(
+          f.cachePath,
+          JSON.stringify({
+            oauthAccount: {
+              accountUuid: 'fixture-account',
+              emailAddress: 'fixture.person@example.test',
+            },
+          }),
+        )
+      else
+        await writeFile(
+          credentialPath,
+          JSON.stringify({
+            tokens: {
+              id_token: `e30.${Buffer.from(JSON.stringify({ email: 'fixture.person@example.test' })).toString('base64url')}.fixture`,
+            },
+          }),
+        )
+      stubUsage(f.registry, WORK, async () => ({ kind: 'unsupported' }))
+      await f.store.refresh()
+      expect((await f.store.read()).accounts[0]).toMatchObject({
+        label: 'fixture.person',
+        windows: [],
+      })
+      expect((await f.store.feed()).accounts[0]!.label).toBe('fixture.person')
+      expect(JSON.stringify(await f.store.read())).not.toMatch(
+        /@|example.test|fixture-account|id_token/,
+      )
+      await f.store.close()
+    },
+  )
+
   it.each([
     {
       name: 'exact 60-minute-old cache at defaults',

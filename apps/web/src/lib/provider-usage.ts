@@ -77,5 +77,5 @@ export function usageRoutingLabel(account: ProviderAccountUsage) {
 }
 
 export function usageAccountLabel(account: ProviderAccountUsage, index: number) {
-  return `${usageProviderLabel(account.driverKind)} account ${index + 1}`
+  return account.label ?? `${usageProviderLabel(account.driverKind)} account ${index + 1}`
 }
