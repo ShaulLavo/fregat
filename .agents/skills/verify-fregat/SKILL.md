@@ -9,15 +9,15 @@ The app is a Vite web client (`apps/web`) over a Bun server (`apps/server`). One
 
 ## Launch
 
-Use the existing Vite dev server on `http://localhost:5173/`. Against it, every run starts its own throwaway API server from the current source, with a temp state home and log directory under the OS temporary directory as `fregat-agent-*`, and removes it when the run ends; the summary names its port and directory, and its full log is copied into the evidence. So a run never touches the owner's sessions or settings, and never sees a stale server. `--shared-dev` drives the running dev API on `http://localhost:3001/` instead (state in `/work/platform-dev/home`). This project, including the mesh deployment called production, is under development. Restart the existing service when needed to complete an authorized fix. Persisted sessions survive restarts; active processes and connections may be interrupted.
+Use the existing Vite dev server on `http://localhost:5173/`. Against it, every run starts its own throwaway API server from the current source, with a temp state home and log directory under the OS temporary directory as `fregat-agent-*`, and removes it when the run ends; the summary names its port and directory, and its full log is copied into the evidence. So a run never touches the owner's sessions or settings, and never sees a stale server. `--shared-dev` drives the configured running dev API and its existing state instead; use it only when the task authorizes access to that state. Machine-specific targets (dev API URL, state home, the owner's instance) live in the host's local instructions.
 
 The throwaway server never starts the machine's Codex or Claude CLI: those drivers run only a fixture binary under the canonical OS temporary directory, so status probes, discovery and turns on real accounts are refused, and a chat scenario installs a mock (`installMockProvider`, `createMockProviderSession`) or a native fixture: `isolatedNativeScenario` for one session, `withFixtureProvider` (Codex `native-conversation.mjs` or Claude `native-claude.mjs`) for scenarios that manage their own sessions. A scenario that needs a real account declares `realProviders: true`, and `agent:browser` refuses it, and any writing scenario under `--shared-dev` or a foreign `--url`, unless the owner passes `--real-providers`. Never pass that flag yourself.
 
-When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify `/release` and exercise the changed protocol in the browser before calling the deployment done.
+When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify the target's release endpoint and exercise the changed protocol in the browser before calling the deployment done.
 
-Never hand-start a Vite or API dev server on `:5173`/`:3001`; if a task needs one outside `agent:browser`'s own throwaway server, give it an explicit free `--port` — a bare host default can resolve to `::1` and shadow the shared route instead of colliding with it.
+A private Vite or API server uses an explicit free `--port` on a known loopback address, and stops when verification finishes.
 
-The runner supports macOS and Linux. Fixture-only runs start with desktop wallpaper disabled; appearance scenarios can enable it or supply `--product-wallpaper`. It uses the host's temporary directory and Playwright's installed browsers; Linux also recognizes the existing `/work/cache/ms-playwright` cache. `FREGAT_EVIDENCE_ROOT` overrides the evidence directory. If the shared mesh route points to another machine, run a local Vite instance on an explicit free port and give the runner the same `WEB_PORT`:
+The runner supports macOS and Linux. Fixture-only runs start with desktop wallpaper disabled; appearance scenarios can enable it or supply `--product-wallpaper`. It uses the host's temporary directory and Playwright's installed browsers; It uses Playwright's installed browser cache or the cache configured for the host. `FREGAT_EVIDENCE_ROOT` overrides the evidence directory. If the shared mesh route points to another machine, run a local Vite instance on an explicit free port and give the runner the same `WEB_PORT`:
 
 ```bash
 # Terminal 1, from this checkout. Pick a free port.
@@ -29,7 +29,7 @@ WEB_PORT=5214 bun run agent:browser scenario approval-turn-ended
 
 `--engine firefox` or `--engine webkit` runs `look`, `scenario`, `renders` or `caches` in another engine; `trace` needs Chromium. Desktop uses an installed Chromium app or the native system-webview host; WebKit coverage also matters for iPhone mesh clients. Playwright's WebKit on Arch needs `scripts/playwright-webkit-arch.sh` after a new WebKit download.
 
-`look`, `trace`, `renders` and `caches` also accept `--url` for a different target, including the mesh build at `https://omarchy.mesh.shaulavo.dev/platform/` and any address URL the user pastes. An address URL puts you in the user's exact state (workspace, tabs, selection); one copied from the dev page needs `--shared-dev`, because a throwaway server has never seen that workspace. The mesh is the owner's real state, so `scenario`, `trace` and `renders` refuse a production URL unless the scenario declares `readOnly: true`.
+`look`, `trace`, `renders` and `caches` also accept `--url` for a different target, including a deployed instance and any address URL the user pastes. An address URL puts you in the user's exact state (workspace, tabs, selection); one copied from the dev page needs `--shared-dev`, because a throwaway server has never seen that workspace. A deployed instance is someone's real state, so `scenario`, `trace` and `renders` refuse a production URL unless the scenario declares `readOnly: true`.
 
 ## Doctor
 
@@ -75,7 +75,7 @@ Read both screenshots. `layout.json` records viewport, document width, image and
 
 Run `scenario demo-workspace` and `scenario demo-agent-git` against `/fregat/demo/index.html`, and `scenario demo-reset` against `/fregat/`. These use the actual app UI. `inspection.json` retains mock requests, unhandled operations and client log batches. The mock's logs are the relevant logs here; demo scenarios do not read the unrelated development server log window. `observed.json` includes service-worker responses, native socket connections and console source locations. Inspect failures as well as successful steps.
 
-For a `--url` run against the mesh, set `OBSERVABILITY_DIR=/work/platform-production/logs` on the browser or logs command so the captured log window comes from the process being driven.
+For a `--url` run, set `OBSERVABILITY_DIR` to the target process's log directory on the browser or logs command so the captured log window comes from the process being driven.
 
 The CLI launches Chrome without Playwright's default `--hide-scrollbars`, so scrollbars take the space they take for a user. Every run records its actual browser and GPU in `browser-renderer.json`. Use `--headed` for product assets and inspect that record; the headless shell can use software rendering.
 
