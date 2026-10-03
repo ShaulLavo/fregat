@@ -677,6 +677,7 @@ export class ProviderUsageStore {
         sourceKey === this.sourceKey() &&
         generation === this.proxyGeneration,
       latest: (account) => this.latestProxyObservation(account),
+      link: (key, proof) => this.proxyBudget.link(key, proof),
       reserve: (key, passiveAt) => this.proxyBudget.reserve(key, passiveAt),
       settle: (reservation, success) => this.proxyBudget.settle(reservation, success),
     }

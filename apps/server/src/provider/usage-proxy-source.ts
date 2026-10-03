@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import {
+  providerAccountUsageSchema,
   providerDriverKindSchema,
   type ProviderAccountUsage,
   type ProviderUsageWindow,
@@ -50,7 +51,11 @@ export async function readProxyUsage(
   const files = object(value)?.files
   const managementObservedAt = timestamp(object(value)?.observed_at, now)
   if (!Array.isArray(files)) throw failure('auth-files-schema')
-  const accounts = new Map<string, ProviderAccountUsage>()
+  const entries = new Map<
+    string,
+    { file: JsonObject; account: ProviderAccountUsage; proof: string | null }
+  >()
+  const groupWindows = new Map<string, ProviderUsageWindow[]>()
   for (const value of files) {
     const file = object(value)
     // Claude logins must never be pooled; even cached Claude rows stay outside this source.
@@ -60,18 +65,34 @@ export async function readProxyUsage(
     const accountKey = `proxy:${createHash('sha256')
       .update(JSON.stringify([origin, 'codex', identity]))
       .digest('hex')}`
-    if (accounts.has(accountKey)) throw failure('duplicate-account')
+    if (entries.has(accountKey)) throw failure('duplicate-account')
     const account = accountSnapshot(file, accountKey, now, managementObservedAt)
     const proof = codexAccountIdentity(
       object(file.id_token)?.chatgpt_account_id,
       options.identityContext,
     )
     rememberProxyUsageIdentity(account, proof)
-    const refreshed = await refreshAccount(options, origin, file, account, proof, fetcher)
-    rememberProxyUsageIdentity(refreshed, proof)
-    accounts.set(accountKey, refreshed)
+    entries.set(accountKey, { file, account, proof })
+    const group = proof ?? accountKey
+    const windows = groupWindows.get(group) ?? []
+    windows.push(...account.windows)
+    groupWindows.set(group, windows)
   }
-  return [...accounts.values()]
+  const accounts: ProviderAccountUsage[] = []
+  for (const { file, account, proof } of entries.values()) {
+    const refreshed = await refreshAccount(
+      options,
+      origin,
+      file,
+      account,
+      proof,
+      groupWindows.get(proof ?? account.accountKey)!,
+      fetcher,
+    )
+    rememberProxyUsageIdentity(refreshed, proof)
+    accounts.push(refreshed)
+  }
+  return accounts
 }
 
 const probeWindowSchema = v.object({
@@ -99,22 +120,27 @@ async function refreshAccount(
   file: JsonObject,
   account: ProviderAccountUsage,
   proof: string | null,
+  currentWindows: readonly ProviderUsageWindow[],
   fetcher: UsageFetch,
 ): Promise<ProviderAccountUsage> {
   const refresh = options.refresh
   const selector = text(file.auth_index)
-  if (!refresh || !selector || !refresh.isCurrent()) return account
+  if (!refresh || !refresh.isCurrent()) return account
+  const key = account.accountKey.slice('proxy:'.length)
+  if (proof && !refresh.link(key, proof)) return account
+  if (!selector) return account
   const now = options.now ?? Date.now
   const latest = refresh.latest(account) ?? account
-  if (latest.windows.some((window) => freshWindow(window, now(), refresh.staleAfterMs)))
+  const observations = [...currentWindows, ...latest.windows]
+  if (observations.some((window) => freshWindow(window, now(), refresh.staleAfterMs)))
     return account
-  const passiveTimes = latest.windows.flatMap((window) =>
+  const passiveTimes = observations.flatMap((window) =>
     window.source !== 'cliproxy-usage-probe' && window.observedAt
       ? [Date.parse(window.observedAt)]
       : [],
   )
   const passiveAt = passiveTimes.length ? Math.max(...passiveTimes) : null
-  const reservation = refresh.reserve(proof ?? account.accountKey.slice('proxy:'.length), passiveAt)
+  const reservation = refresh.reserve(key, passiveAt)
   if (!reservation || !refresh.isCurrent()) return account
   const startedAt = now()
   let outcome = 'transport-failed'
@@ -175,15 +201,16 @@ async function refreshAccount(
       outcome = 'no-windows'
       throw failure('provider-usage-windows')
     }
-    outcome = 'reading'
-    success = true
-    return {
+    const projected = v.parse(providerAccountUsageSchema, {
       ...account,
       checkedAt: observedAt,
       lastSeenAt: observedAt,
       planType: planLabel(usage.plan_type) ?? account.planType,
       windows: mergeUsageWindows(account.windows, windows),
-    }
+    })
+    outcome = 'reading'
+    success = true
+    return projected
   } catch {
     return account
   } finally {

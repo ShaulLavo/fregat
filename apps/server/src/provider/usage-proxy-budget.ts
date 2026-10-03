@@ -7,11 +7,13 @@ import { recordChatPipelineWarning } from '../orchestration/orchestration-loggin
 
 const HOUR_MS = 3_600_000
 export const CODEX_USAGE_MAX_FAILURES = 3
+const keySchema = v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/))
 const budgetSchema = v.object({
   version: v.literal(1),
-  identityContextHash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)),
+  identityContextHash: keySchema,
+  aliases: v.optional(v.record(keySchema, keySchema), () => ({})),
   accounts: v.record(
-    v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)),
+    keySchema,
     v.object({
       attemptedAt: v.pipe(v.number(), v.finite(), v.minValue(0)),
       nextAttemptAt: v.pipe(v.number(), v.finite(), v.minValue(0)),
@@ -31,6 +33,7 @@ export type ProxyUsageRefresh = {
   staleAfterMs: number
   isCurrent(): boolean
   latest(account: ProviderAccountUsage): ProviderAccountUsage | undefined
+  link(key: string, proof: string): boolean
   reserve(key: string, passiveAt: number | null): ProxyUsageReservation | null
   settle(reservation: ProxyUsageReservation, success: boolean): void
 }
@@ -55,31 +58,57 @@ export class CodexUsageRequestBudget {
     this.identityContextHash = identityContextHash
   }
 
+  link(key: string, proof: string): boolean {
+    return (
+      this.update((budget) => {
+        const previousKey = budget.aliases[key] ?? key
+        const previous = budget.accounts[previousKey]
+        const known = budget.accounts[proof]
+        if (previous && previousKey !== proof) {
+          budget.accounts[proof] = known
+            ? {
+                attemptedAt: Math.max(previous.attemptedAt, known.attemptedAt),
+                nextAttemptAt: Math.max(previous.nextAttemptAt, known.nextAttemptAt),
+                failures: Math.min(CODEX_USAGE_MAX_FAILURES, previous.failures + known.failures),
+                passiveAt: Math.max(previous.passiveAt ?? 0, known.passiveAt ?? 0) || null,
+              }
+            : previous
+        }
+        if (previousKey === key && key !== proof) delete budget.accounts[key]
+        budget.aliases[key] = proof
+        return true
+      }) === true
+    )
+  }
+
   reserve(key: string, passiveAt: number | null): ProxyUsageReservation | null {
     return this.update((budget) => {
+      const canonicalKey = budget.aliases[key] ?? key
       const now = this.now()
-      const known = budget.accounts[key]
+      const known = budget.accounts[canonicalKey]
       let failures = known?.failures ?? 0
       if (passiveAt !== null && passiveAt > (known?.passiveAt ?? 0)) failures = 0
       if (known && (now < known.nextAttemptAt || now - known.attemptedAt < HOUR_MS)) return null
       if (failures >= CODEX_USAGE_MAX_FAILURES) return null
       const configured = this.intervalHours()
       const hours = Number.isFinite(configured) ? Math.max(1, configured) : 1
-      budget.accounts[key] = {
+      budget.accounts[canonicalKey] = {
         attemptedAt: now,
         nextAttemptAt: now + hours * HOUR_MS * 2 ** failures,
         failures: failures + 1,
         passiveAt: passiveAt ?? known?.passiveAt ?? null,
       }
-      return { key, attemptedAt: now, failures: failures + 1 }
+      return { key: canonicalKey, attemptedAt: now, failures: failures + 1 }
     })
   }
 
   settle(reservation: ProxyUsageReservation, success: boolean) {
     if (!success) return
     this.update((budget) => {
-      const known = budget.accounts[reservation.key]
-      if (known?.attemptedAt !== reservation.attemptedAt) return null
+      const key = budget.aliases[reservation.key] ?? reservation.key
+      const known = budget.accounts[key]
+      if (known?.attemptedAt !== reservation.attemptedAt || known.failures !== reservation.failures)
+        return null
       known.failures = 0
       return true
     })
@@ -130,6 +159,6 @@ export class CodexUsageRequestBudget {
   }
 
   private empty(): Budget {
-    return { version: 1, identityContextHash: this.identityContextHash, accounts: {} }
+    return { version: 1, identityContextHash: this.identityContextHash, aliases: {}, accounts: {} }
   }
 }
