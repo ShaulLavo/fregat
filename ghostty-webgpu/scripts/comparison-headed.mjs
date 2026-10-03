@@ -142,12 +142,29 @@ export function assertHeadedHardware({
       !/swiftshader|llvmpipe|softpipe|lavapipe|software/i.test(renderer),
     'Observed hardware renderer required',
   )
-  assert.equal(gl.renderer, renderer, 'Page WebGL renderer must match browser hardware renderer')
+  const activeDevice = gpu.devices.find((device) => device.deviceString === renderer)
+  assert(activeDevice, 'Browser renderer must identify an observed physical GPU')
+  const browserRenderer = renderer.match(/^ANGLE \((.+), ([^,()]+)\)$/)
+  const pageRenderer =
+    typeof gl.renderer === 'string' && gl.renderer.match(/^ANGLE \((.+), ([^,()]+)\)$/)
+  assert(browserRenderer && pageRenderer, 'Structured actual ANGLE renderer labels required')
+  assert.equal(
+    pageRenderer[1],
+    browserRenderer[1],
+    'Page Vulkan and physical-device identity must match browser hardware',
+  )
+  // Page debug info may redact the driver version; CDP retains the independent vendor/version fields.
+  assert(
+    pageRenderer[2] === browserRenderer[2] ||
+      (pageRenderer[2] === activeDevice.driverVendor &&
+        browserRenderer[2] === `${activeDevice.driverVendor}-${activeDevice.driverVersion}`),
+    'Page driver label must match the independently observed driver',
+  )
   assert.equal(gl.contextLost, false, 'Live page WebGL context required')
 }
 
-async function identity(pid) {
-  const raw = await readFile(`/proc/${pid}/stat`, 'utf8')
+async function identity(pid, read = readFile) {
+  const raw = await read(`/proc/${pid}/stat`, 'utf8')
   const fields = raw
     .slice(raw.lastIndexOf(')') + 1)
     .trim()
@@ -161,12 +178,12 @@ async function identity(pid) {
   }
 }
 
-async function stillAlive(owned) {
+export async function ownedProcessAlive(owned, read = readFile) {
   try {
-    const current = await identity(owned.pid)
+    const current = await identity(owned.pid, read)
     return current.startTimeTicks === owned.startTimeTicks && current.state !== 'Z'
   } catch (error) {
-    if (error.code === 'ENOENT') return false
+    if (error.code === 'ENOENT' || error.code === 'ESRCH') return false
     throw error
   }
 }
@@ -174,7 +191,7 @@ async function stillAlive(owned) {
 async function ownedGroupProcesses(browserIdentity) {
   const result = []
   assert(
-    await stillAlive(browserIdentity),
+    await ownedProcessAlive(browserIdentity),
     'Browser lifetime must remain owned during group discovery',
   )
   for (const name of await readdir('/proc')) {
@@ -186,7 +203,10 @@ async function ownedGroupProcesses(browserIdentity) {
       if (error.code !== 'ENOENT' && error.code !== 'ESRCH') throw error
     }
   }
-  assert(await stillAlive(browserIdentity), 'Browser lifetime changed during group discovery')
+  assert(
+    await ownedProcessAlive(browserIdentity),
+    'Browser lifetime changed during group discovery',
+  )
   return result
 }
 
@@ -330,7 +350,7 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     if (closed) return evidence.cleanup
     closed = true
     const rootIdentity = owned.find((entry) => entry.pid === child?.pid)
-    if (rootIdentity && (await stillAlive(rootIdentity))) {
+    if (rootIdentity && (await ownedProcessAlive(rootIdentity))) {
       const group = await ownedGroupProcesses(rootIdentity)
       owned = [
         ...owned,
@@ -353,7 +373,7 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     }
     for (const signal of ['SIGTERM', 'SIGKILL']) {
       for (const entry of owned) {
-        if (!(await stillAlive(entry))) continue
+        if (!(await ownedProcessAlive(entry))) continue
         try {
           process.kill(entry.pid, signal)
         } catch (error) {
@@ -361,12 +381,12 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
         }
       }
       for (let attempt = 0; attempt < 20; attempt++) {
-        if (!(await Promise.all(owned.map(stillAlive))).some(Boolean)) break
+        if (!(await Promise.all(owned.map(ownedProcessAlive))).some(Boolean)) break
         await pause(50)
       }
     }
     evidence.cleanup.processes = await Promise.all(
-      owned.map(async (entry) => ({ ...entry, alive: await stillAlive(entry) })),
+      owned.map(async (entry) => ({ ...entry, alive: await ownedProcessAlive(entry) })),
     )
     assert(
       evidence.cleanup.processes.every((entry) => !entry.alive),

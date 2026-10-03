@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { promisify } from 'node:util'
-import { assertHeadedHardware, headedLaunchArguments } from './comparison-headed.mjs'
+import {
+  assertHeadedHardware,
+  headedLaunchArguments,
+  ownedProcessAlive,
+} from './comparison-headed.mjs'
 import { observeOwnedBrowserProvenance } from './comparison-provenance.mjs'
 
 function observedFacts() {
@@ -30,7 +34,15 @@ function observedFacts() {
     },
     window: { browserPid: 123, backend: 'wayland', mapped: true, hidden: false, xwayland: false },
     gpu: {
-      devices: [{ vendorId: 4318, deviceId: 9353 }],
+      devices: [
+        {
+          vendorId: 4318,
+          deviceId: 9353,
+          deviceString: renderer,
+          driverVendor: 'hardware driver',
+          driverVersion: '1.0',
+        },
+      ],
       auxAttributes: {
         displayType: 'ANGLE_VULKAN',
         glImplementationParts: '(gl=egl-angle,angle=vulkan)',
@@ -235,4 +247,61 @@ test('approved real provenance rejects profile-last startup URL and accepts the 
   assert.equal(actual.environment.launchMode, 'headed')
   assert.equal(actual.originalExecveArguments, null)
   assert.deepEqual(actual.observedFlagTokens, flags)
+})
+
+test('the observed vendor-only page driver label matches CDP vendor/version, with exact Vulkan device identity', () => {
+  const facts = observedFacts()
+  const renderer =
+    'ANGLE (NVIDIA, Vulkan 1.4.341 (NVIDIA NVIDIA GeForce RTX 3060 Ti (0x00002489)), NVIDIA-610.57.4.0)'
+  facts.gpu.auxAttributes.glRenderer = renderer
+  Object.assign(facts.gpu.devices[0], {
+    deviceString: renderer,
+    driverVendor: 'NVIDIA',
+    driverVersion: '610.57.4.0',
+  })
+  facts.gl.renderer =
+    'ANGLE (NVIDIA, Vulkan 1.4.341 (NVIDIA NVIDIA GeForce RTX 3060 Ti (0x00002489)), NVIDIA)'
+  assertHeadedHardware(facts)
+  const valid = facts.gl.renderer
+  for (const invalid of [
+    valid.replace('0x00002489', '0x00001234'),
+    valid.replace('RTX 3060 Ti', 'Another GPU'),
+    valid.replace('Vulkan 1.4.341', 'OpenGL 4.6'),
+    valid.replace('NVIDIA)', 'AMD)'),
+    valid.replace('NVIDIA)', 'NVIDIA-unknown)'),
+    'unknown',
+  ]) {
+    facts.gl.renderer = invalid
+    assert.throws(() => assertHeadedHardware(facts))
+  }
+  facts.gl.renderer = valid
+  facts.gpu.devices[0].driverVersion = 'unexpected'
+  assert.throws(() => assertHeadedHardware(facts), /Page driver label/)
+})
+
+test('Linux process disappearance via ESRCH or ENOENT is gone; other OS errors remain unknown', async () => {
+  const owned = { pid: 101, startTimeTicks: '123456' }
+  for (const code of ['ENOENT', 'ESRCH']) {
+    const gone = Object.assign(new Error('External proc disappearance'), { code })
+    assert.equal(
+      await ownedProcessAlive(owned, async () => {
+        throw gone
+      }),
+      false,
+    )
+  }
+  const denied = Object.assign(new Error('External proc read denied'), { code: 'EACCES' })
+  await assert.rejects(
+    ownedProcessAlive(owned, async () => {
+      throw denied
+    }),
+    denied,
+  )
+  const read =
+    (start, state = 'S') =>
+    async () =>
+      `101 (chrome) ${state} 100 ${Array(17).fill('0').join(' ')} ${start} 0\n`
+  assert.equal(await ownedProcessAlive(owned, read('123456')), true)
+  assert.equal(await ownedProcessAlive(owned, read('123457')), false)
+  assert.equal(await ownedProcessAlive(owned, read('123456', 'Z')), false)
 })
