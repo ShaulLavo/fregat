@@ -15,6 +15,10 @@ browser version, page errors, and renderer crash event. `originalUnicodeTrace` r
 the last observed API call and write/frame boundary. A caught WASM trap or renderer
 crash makes the smoke exit nonzero after the remaining cases complete.
 
+The case owns each pending browser launch before acquisition starts. A deadline closes
+the browser as soon as acquisition finishes and prevents later diagnostic work. Cleanup
+finishes before ownership is released, and a crash observed during teardown forces failure.
+
 This change contains the dependency failure. It does not repair the upstream WASM fault
 reported in [Fregat #363](https://github.com/ShaulLavo/fregat/issues/363), and it changes no
 measurement workload or frozen benchmark receipt.

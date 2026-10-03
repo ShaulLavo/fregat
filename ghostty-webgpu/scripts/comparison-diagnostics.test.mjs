@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
 import { chromium } from 'playwright'
+import { withDeadline } from './comparison-guards.mjs'
 import {
   diagnosticFailed,
   isolatedDiagnostic,
@@ -79,5 +80,76 @@ test(
       await correctnessBrowser?.close()
       await new Promise((resolve) => server.close(resolve))
     }
+  },
+)
+
+test(
+  'a deadline owns a pending browser launch and prevents late diagnostic work',
+  {
+    skip: existsSync(chromium.executablePath()) ? false : 'Playwright Chromium is not installed',
+    timeout: 30_000,
+  },
+  async () => {
+    const contexts = new Set()
+    let pending
+    let registeredAtDeadline
+    let operationCalled = false
+    let enterOperation
+    const operationEntered = new Promise((resolve) => {
+      enterOperation = resolve
+    })
+    try {
+      const outcome = await withDeadline(
+        () => {
+          pending = isolatedDiagnostic(
+            { launchOptions: { headless: true }, contexts },
+            async (page) => {
+              operationCalled = true
+              enterOperation()
+              return page.evaluate(() => new Promise(() => {}))
+            },
+          )
+          return pending
+        },
+        1,
+        async () => {
+          registeredAtDeadline = contexts.size
+          await Promise.all([...contexts].map((context) => context.close().catch(() => {})))
+        },
+        { drain: true, drainMilliseconds: 1000 },
+      ).then(
+        () => 'complete',
+        (error) => error.message,
+      )
+      assert.match(outcome, /deadline exceeded/)
+      assert.equal(registeredAtDeadline, 1)
+      assert.equal(contexts.size, 0)
+      assert.equal(operationCalled, false)
+      assert.equal((await pending).status, 'failed')
+    } finally {
+      await Promise.race([operationEntered, pending])
+      await Promise.all([...contexts].map((context) => context.close().catch(() => {})))
+      await pending
+    }
+  },
+)
+
+test(
+  'a fulfilled payload cannot qualify a diagnostic whose renderer crashed',
+  {
+    skip: existsSync(chromium.executablePath()) ? false : 'Playwright Chromium is not installed',
+    timeout: 30_000,
+  },
+  async () => {
+    const result = await isolatedDiagnostic({ launchOptions: { headless: true } }, async (page) => {
+      const session = await page.context().newCDPSession(page)
+      const crashed = page.waitForEvent('crash')
+      void session.send('Page.crash').catch(() => {})
+      await crashed
+      return { documentedTerminalApi: { accepted: true, calls: 35 } }
+    })
+    assert.equal(result.crashed, true)
+    assert.equal(result.status, 'failed')
+    assert.equal(diagnosticFailed({ originalUnicodeProbe: result }), true)
   },
 )

@@ -1,8 +1,9 @@
 import { chromium } from 'playwright'
+import { ComparisonDeadlineError } from './comparison-guards.mjs'
 
 export function diagnosticFailed(run) {
   return [run.legacyWriteControl, run.originalUnicodeProbe].some(
-    (probe) => probe?.status === 'failed',
+    (probe) => probe?.status === 'failed' || probe?.crashed === true,
   )
 }
 
@@ -28,16 +29,28 @@ export async function isolatedDiagnostic(
     trace: [],
     pageErrors: [],
   }
-  let browser
-  let context
+  let stopping = false
+  let cleanup
+  const launching = Promise.resolve().then(() => chromium.launch(launchOptions))
+  const ownership = {
+    close() {
+      stopping = true
+      cleanup ??= launching.then((browser) => browser.close())
+      return cleanup
+    },
+  }
+  // Pending acquisition must be owned before the deadline can snapshot cleanup.
+  contexts.add(ownership)
   try {
     result.phase = 'launch'
     // A separate Chromium process keeps renderer death outside the correctness browser.
-    browser = await chromium.launch(launchOptions)
+    const browser = await launching
+    if (stopping) throw new ComparisonDeadlineError()
     result.browser = browser.version()
-    context = await browser.newContext(contextOptions)
-    contexts.add(context)
+    const context = await browser.newContext(contextOptions)
+    if (stopping) throw new ComparisonDeadlineError()
     const page = await context.newPage()
+    if (stopping) throw new ComparisonDeadlineError()
     page.on('crash', () => {
       result.crashed = true
     })
@@ -49,9 +62,12 @@ export async function isolatedDiagnostic(
         result.trace.push(JSON.parse(message.text().slice(prefix.length)))
     })
     const probe = await operation(page, result)
+    if (stopping) throw new ComparisonDeadlineError()
     Object.assign(result, probe)
     result.status =
-      result.pageErrors.length || Object.values(probe).some((api) => api?.accepted === false)
+      result.crashed ||
+      result.pageErrors.length ||
+      Object.values(probe).some((api) => api?.accepted === false)
         ? 'failed'
         : 'complete'
     return result
@@ -60,7 +76,13 @@ export async function isolatedDiagnostic(
     result.error = String(error.stack ?? error)
     return result
   } finally {
-    await browser?.close()
-    if (context) contexts.delete(context)
+    try {
+      await ownership.close()
+    } catch (error) {
+      result.status = 'failed'
+      result.cleanupError = String(error.stack ?? error)
+    }
+    contexts.delete(ownership)
+    if (result.crashed) result.status = 'failed'
   }
 }
