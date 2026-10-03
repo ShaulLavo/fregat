@@ -3,7 +3,7 @@ pre-commit:
   jobs:
     - name: format staged files
       glob: '*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
-      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --write {staged_files}
+      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --no-error-on-unmatched-pattern --write {staged_files}
       stage_fixed: true
 
     - name: lint fix staged files
@@ -17,7 +17,7 @@ pre-commit:
 
     - name: format check staged files
       glob: '*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
-      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --check {staged_files}
+      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --no-error-on-unmatched-pattern --check {staged_files}
 
     # A new setting that skips its released-id record or leaves the generated
     # schema/reference stale only shows up in CI otherwise; catch it at commit time.
