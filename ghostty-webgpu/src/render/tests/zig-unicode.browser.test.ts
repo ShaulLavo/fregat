@@ -90,7 +90,7 @@ async function sourceFixture(content: string) {
   return { runtime, state, terminal }
 }
 
-async function parityFixture(
+async function nativeFixture(
   backend: 'webgpu' | 'webgl2',
   content: string,
   options: Partial<WebGpuTerminalRendererOptions> = {},
@@ -99,10 +99,10 @@ async function parityFixture(
   document.body.append(fixture)
   disposables.push(() => fixture.remove())
   const Renderer = backend === 'webgpu' ? WebGpuTerminalRenderer : WebGlTerminalRenderer
-  const create = async (zigFrame: boolean) => {
+  const create = async () => {
     const source = await sourceFixture(content)
     const label = document.createElement('p')
-    label.textContent = `${backend} / ${zigFrame ? 'Zig' : 'JavaScript'}`
+    label.textContent = `${backend} / Zig`
     const canvas = document.createElement('canvas')
     const background = options.theme?.background ?? defaultRendererTheme.background
     canvas.style.backgroundColor = `rgb(${background.r}, ${background.g}, ${background.b})`
@@ -119,7 +119,6 @@ async function parityFixture(
       schedulerClock: clock,
       deviceFactory: createDevice,
       ...options,
-      zigFrame,
     })
     disposables.push(() => {
       renderer.dispose()
@@ -131,43 +130,34 @@ async function parityFixture(
     })
     return { ...source, canvas, clock, renderer }
   }
-  const native = await create(true)
-  const js = await create(false)
+  const native = await create()
   const readRows = vi.spyOn(native.state, 'readRows')
   const builds = vi.spyOn(ZigFrameBuilder.prototype, 'build')
-  return { fixture, native, js, readRows, builds }
+  return { fixture, native, readRows, builds }
 }
 
-type Pair = Awaited<ReturnType<typeof parityFixture>>
+type Fixture = Awaited<ReturnType<typeof nativeFixture>>
 
-function flushPair(pair: Pair): void {
-  for (const side of [pair.native, pair.js]) {
-    for (let attempt = 0; attempt < 8 && side.clock.frames.size > 0; attempt += 1)
-      side.clock.flushFrame()
-    expect(side.clock.frames.size).toBe(0)
-    expect(side.clock.timers.size).toBe(0)
-  }
+function flushFrame(pair: Fixture): void {
+  for (let attempt = 0; attempt < 8 && pair.native.clock.frames.size > 0; attempt += 1)
+    pair.native.clock.flushFrame()
+  expect(pair.native.clock.frames.size).toBe(0)
+  expect(pair.native.clock.timers.size).toBe(0)
 }
 
-function writePair(pair: Pair, content: string): void {
-  for (const side of [pair.native, pair.js]) {
-    side.terminal.write(content)
-    side.renderer.notifyWrite()
-  }
-  flushPair(pair)
+function writeFrame(pair: Fixture, content: string): void {
+  pair.native.terminal.write(content)
+  pair.native.renderer.notifyWrite()
+
+  flushFrame(pair)
 }
 
-async function expectParity(pair: Pair, submitted: number): Promise<Uint8Array> {
+async function expectPainted(pair: Fixture, submitted: number): Promise<Uint8Array> {
   expect(pair.native.renderer.metrics.submittedFrames).toBe(submitted)
   expect(pair.native.renderer.metrics.zigFrames).toBe(submitted)
-  expect(pair.native.renderer.metrics.jsFallbackFrames).toBe(0)
-  expect(pair.js.renderer.metrics.zigFrames).toBe(0)
   expect(pair.readRows).not.toHaveBeenCalled()
   const native = await displayedPixels(pair.native.canvas)
-  const js = await displayedPixels(pair.js.canvas)
-  expect(native.byteLength).toBe(js.byteLength)
-  const firstDifference = native.findIndex((value, index) => value !== js[index])
-  expect(firstDifference, 'Scheduled compositor pixels match without capture redraw').toBe(-1)
+  expect(native.some((value, index) => index % 4 !== 3 && value > 0)).toBe(true)
   expect(pair.native.renderer.hasPendingFrame).toBe(false)
   return native
 }
@@ -182,13 +172,13 @@ function cleanRowRecords(builder: ZigFrameBuilder) {
 }
 
 for (const backend of ['webgpu', 'webgl2'] as const) {
-  describe(`${backend} Zig Unicode compositor parity`, () => {
+  describe(`${backend} Zig Unicode compositor`, () => {
     it.each([...zigUnicodeFixtures, ...zigGlyphCollisionFixtures])(
       'submits $name entirely through Zig',
       async ({ content }) => {
-        const pair = await parityFixture(backend, content)
-        flushPair(pair)
-        await expectParity(pair, 1)
+        const pair = await nativeFixture(backend, content)
+        flushFrame(pair)
+        await expectPainted(pair, 1)
         expect(pair.builds.mock.results.at(-1)?.value).toBe(0)
         const glyphs = pair.native.state
           .readRows()[0]!
@@ -198,62 +188,62 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     )
 
     it.each(zigFrameCursorStyles)('matches a %s cursor on a wide head and tail', async (style) => {
-      const pair = await parityFixture(backend, '\x1b[?25h界é👩‍💻\x1b[1;1H')
-      for (const side of [pair.native, pair.js]) side.renderer.setInactiveCursorStyle(style)
-      flushPair(pair)
-      const head = await expectParity(pair, 1)
-      writePair(pair, '\x1b[1;2H')
+      const pair = await nativeFixture(backend, '\x1b[?25h界é👩‍💻\x1b[1;1H')
+      pair.native.renderer.setInactiveCursorStyle(style)
+      flushFrame(pair)
+      const head = await expectPainted(pair, 1)
+      writeFrame(pair, '\x1b[1;2H')
       expect(pair.native.state.readCursor().viewport).toMatchObject({ x: 1, wideTail: true })
       const tailSubmissions = backend === 'webgpu' ? 2 : 1
-      const tail = await expectParity(pair, tailSubmissions)
+      const tail = await expectPainted(pair, tailSubmissions)
       expect(tail).toEqual(head)
-      writePair(pair, '\x1b[2;1H')
-      const away = await expectParity(pair, tailSubmissions + 1)
+      writeFrame(pair, '\x1b[2;1H')
+      const away = await expectPainted(pair, tailSubmissions + 1)
       expect(away).not.toEqual(tail)
     })
 
     it('matches selecting and clearing wide, combining and ZWJ glyphs without terminal writes', async () => {
-      const pair = await parityFixture(backend, '界é👩‍💻\r\nsecond')
-      flushPair(pair)
-      const before = await expectParity(pair, 1)
-      for (const side of [pair.native, pair.js]) {
-        expect(side.terminal.selectAll()).toBe(true)
-        side.renderer.refreshRows(0, 2)
-      }
-      flushPair(pair)
-      const selected = await expectParity(pair, 2)
+      const pair = await nativeFixture(backend, '界é👩‍💻\r\nsecond')
+      flushFrame(pair)
+      const before = await expectPainted(pair, 1)
+
+      expect(pair.native.terminal.selectAll()).toBe(true)
+      pair.native.renderer.refreshRows(0, 2)
+
+      flushFrame(pair)
+      const selected = await expectPainted(pair, 2)
       expect(selected).not.toEqual(before)
       expect(pair.native.terminal.getSelection()).toContain('界é👩‍💻')
-      for (const side of [pair.native, pair.js]) {
-        side.terminal.clearSelection()
-        side.renderer.refreshRows(0, 2)
-      }
-      flushPair(pair)
-      expect(await expectParity(pair, 3)).toEqual(before)
+
+      pair.native.terminal.clearSelection()
+      pair.native.renderer.refreshRows(0, 2)
+
+      flushFrame(pair)
+      expect(await expectPainted(pair, 3)).toEqual(before)
     })
 
     it.each([0, -1])(
       'keeps clean rows intact through wide missing-glyph retry and continuation erasure at baseline offset %i',
       async (baselineOffset) => {
         const font = fittedFont()
-        const pair = await parityFixture(backend, 'first\r\nsecond\r\nlast', {
+        const pair = await nativeFixture(backend, 'first\r\nsecond\r\nlast', {
           font: { ...font, deviceBaseline: font.deviceBaseline + baselineOffset },
         })
-        flushPair(pair)
-        const before = await expectParity(pair, 1)
+        flushFrame(pair)
+        const before = await expectPainted(pair, 1)
         const builder = pair.builds.mock.contexts.at(-1) as ZigFrameBuilder
         const cleanRecords = cleanRowRecords(builder)
         pair.builds.mockClear()
         const uploaded = pair.native.renderer.metrics.uploadedBytes
-        writePair(pair, '\x1b[2;1H\x1b[31;44m界é👩‍💻\x1b[0m')
+        writeFrame(pair, '\x1b[2;1H\x1b[31;44m界é👩‍💻\x1b[0m')
         expect(pair.builds.mock.results.map((result) => result.value)).toEqual([2, 0])
         expect(pair.native.renderer.metrics.uploadedBytes - uploaded).toBe(2 * 40 * (64 + 96))
-        const changed = await expectParity(pair, 2)
+        const changed = await expectPainted(pair, 2)
         expect(changed).not.toEqual(before)
         // Glyph ink can cross screen-row edges; clean logical rows retain their exact records.
         expect(cleanRowRecords(builder)).toEqual(cleanRecords)
-        writePair(pair, '\x1b[2;2H\x1b[33mX\x1b[0m')
-        const erased = await expectParity(pair, 3)
+        writeFrame(pair, '\x1b[2;2H\x1b[33mX\x1b[0m')
+        const erased = await expectPainted(pair, 3)
         expect(erased).not.toEqual(changed)
         expect(cleanRowRecords(builder)).toEqual(cleanRecords)
       },
@@ -272,40 +262,39 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
           weight: 'normal',
         })?.kind,
       ).toBe('color')
-      const pair = await parityFixture(backend, '\x1b[36mXWBG\x1b[35mX\x1b[0m', { font })
-      flushPair(pair)
-      const before = await expectParity(pair, 1)
-      for (const side of [pair.native, pair.js]) {
-        side.terminal.selectAll()
-        side.renderer.refreshRows(0, 2)
-      }
-      flushPair(pair)
-      expect(await expectParity(pair, 2)).not.toEqual(before)
-      for (const side of [pair.native, pair.js]) {
-        side.terminal.clearSelection()
-        side.renderer.setInactiveCursorStyle('block')
-      }
-      writePair(pair, '\x1b[?25h\x1b[1;1H')
-      expect(await expectParity(pair, 3)).not.toEqual(before)
+      const pair = await nativeFixture(backend, '\x1b[36mXWBG\x1b[35mX\x1b[0m', { font })
+      flushFrame(pair)
+      const before = await expectPainted(pair, 1)
+
+      pair.native.terminal.selectAll()
+      pair.native.renderer.refreshRows(0, 2)
+
+      flushFrame(pair)
+      expect(await expectPainted(pair, 2)).not.toEqual(before)
+
+      pair.native.terminal.clearSelection()
+      pair.native.renderer.setInactiveCursorStyle('block')
+
+      writeFrame(pair, '\x1b[?25h\x1b[1;1H')
+      expect(await expectPainted(pair, 3)).not.toEqual(before)
     })
 
-    it('keeps one grayscale descriptor through 1024 truecolor brushes with zero fallback', async () => {
-      const pair = await parityFixture(backend, 'A')
-      flushPair(pair)
+    it('keeps one grayscale descriptor through 1024 truecolor brushes with native records', async () => {
+      const pair = await nativeFixture(backend, 'A')
+      flushFrame(pair)
       for (let index = 0; index < 1024; index += 1) {
-        writePair(pair, `\x1b[1;1H\x1b[38;2;${index & 255};${index >>> 8};91mA`)
+        writeFrame(pair, `\x1b[1;1H\x1b[38;2;${index & 255};${index >>> 8};91mA`)
         const builder = pair.builds.mock.contexts.at(-1) as ZigFrameBuilder
         expect(builder.glyphCount).toBe(1)
         expect(builder.glyphIndexRebuilds).toBe(0)
-        expect(pair.native.renderer.metrics.jsFallbackFrames).toBe(0)
       }
-      await expectParity(pair, 1025)
+      await expectPainted(pair, 1025)
     })
 
-    it('records a visible Unicode differential specimen', async () => {
-      const pair = await parityFixture(backend, 'ASCII café ┌─┬─┐ \r\n界漢字 é ä́\r\n👩‍💻 👨‍👩‍👧‍👦 ❤️ 🏳️‍🌈')
-      flushPair(pair)
-      await expectParity(pair, 1)
+    it('records a visible Unicode specimen', async () => {
+      const pair = await nativeFixture(backend, 'ASCII café ┌─┬─┐ \r\n界漢字 é ä́\r\n👩‍💻 👨‍👩‍👧‍👦 ❤️ 🏳️‍🌈')
+      flushFrame(pair)
+      await expectPainted(pair, 1)
       await page.screenshot({
         element: pair.fixture,
         path: `../../../.artifacts/zig-unicode-${backend}.png`,

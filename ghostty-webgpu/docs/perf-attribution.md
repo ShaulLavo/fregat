@@ -2,6 +2,23 @@
 
 Status: Phase 1 measured and review repairs completed on 2026-10-01. A corrected 17-terminal ASCII CPU rerun supplements the original attribution matrix. Phase 2 implements packed damaged-row snapshots and measures main versus treatment on the Apple M1 at 1 and 17 terminals, ASCII and SGR. The initial matrix has mixed CPU results. A single direct-packed DOM frame follow-up improves CPU in all fresh 17-terminal ASCII/SGR pairs; substantial baseline drift between matrices remains unexplained. The PR stays draft for review. Phase 1's input/echo conclusions remain separate.
 
+## Current GPU architecture, 2026-10-03
+
+WebGL and WebGPU build every GPU frame in Zig. The bridge owns persistent 64-byte cell and
+96-byte glyph records, dirty-range detection and glyph lookup. JavaScript owns browser font
+rasterization, atlas textures and submission. The JavaScript row-to-instance producer and producer
+selection flags have been deleted. The benchmark runs the native GPU pipeline automatically.
+
+After three bounded atlas-recovery sweeps, an unsuccessful build reports `frame_builder`. It makes
+no GPU upload or submission, leaves damage unacknowledged and retains the last submitted frame.
+The next write, resize, font change or explicit refresh or cursor activity attempts a full rebuild. Recovery adds no
+failure-specific retry loop. Canvas 2D, DOM, text-only extraction, accessibility, selection/copy and
+public frame snapshots keep the shared row readers they consume.
+
+The sections below are historical measurements. Their producer choices and comparisons describe
+the measured revisions; they do not define current runtime options. Archived benchmark evidence
+remains unchanged.
+
 ## Shared browser clock and bounded GPU sharing, Linux 2026-10-03
 
 **Decision: no established CPU benefit; leave the scheduler unmerged.** The shared-clock candidate
