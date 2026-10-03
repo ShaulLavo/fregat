@@ -3,12 +3,59 @@ import { GhosttyRuntime } from '../../core/runtime.js'
 import type { CellStyle } from '../../core/types.js'
 import { CanvasColorCache } from '../canvas/colors.js'
 import { canonicalRendererTheme, mergeRendererTheme } from '../config.js'
+import type { CursorState } from '../instances/types.js'
 import { renderRowRuns } from './html.js'
 import { probeFont } from './tests/probe.js'
 
 const theme = canonicalRendererTheme(mergeRendererTheme({}))
 
 describe('adjacent DOM appearance projection', () => {
+  it.each([
+    { visible: false, y: 0 },
+    { visible: true, y: 0 },
+    { visible: true, y: 1 },
+  ])('checks cursor eligibility once per row when visible=$visible and y=$y', async (value) => {
+    const runtime = await GhosttyRuntime.create()
+    try {
+      const terminal = runtime.createTerminal({ columns: 40, rows: 2 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write(`\x1b[?25l${'A'.repeat(40)}`)
+      state.update()
+      let visibilityReads = 0
+      let rowReads = 0
+      let columnReads = 0
+      const cursor: CursorState = {
+        style: 'outline',
+        get visible() {
+          visibilityReads++
+          return value.visible
+        },
+        get y() {
+          rowReads++
+          return value.y
+        },
+        get x() {
+          columnReads++
+          return 20
+        },
+      }
+      const runs = renderRowRuns(state.readRows()[0]!, cursor, probeFont, theme)
+      expect(runs.map((run) => run.text).join('')).toBe('A'.repeat(40))
+      const painted = runs.filter((run) => run.cursor)
+      const eligible = value.visible && value.y === 0
+      expect(painted).toHaveLength(eligible ? 1 : 0)
+      if (eligible) {
+        expect(painted[0]!.text).toBe('A')
+        expect(painted[0]!.style).toContain('box-shadow:inset')
+      }
+      expect(visibilityReads).toBe(1)
+      expect(rowReads).toBe(value.visible ? 1 : 0)
+      expect(columnReads).toBe(eligible ? 1 : 0)
+    } finally {
+      runtime.dispose()
+    }
+  })
+
   it('serializes one style per adjacent appearance and starts fresh for every row', async () => {
     const runtime = await GhosttyRuntime.create()
     const foreground = vi.spyOn(CanvasColorCache.prototype, 'foreground')
