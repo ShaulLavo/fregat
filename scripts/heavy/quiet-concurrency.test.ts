@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
@@ -36,6 +36,116 @@ function concurrentBox(holdSeconds = 600) {
 afterEach(removeSandboxes)
 
 describe.skipIf(!userScopes)('quiet concurrent work', () => {
+  test.each(['completed', 'cancelled'])(
+    'a %s measurement settles independently of a delayed light manager launch',
+    async (mode) => {
+      const box = concurrentBox()
+      const control = start(box, 'control', ['echo', 'control'], {
+        jobClass: 'light',
+        machine: true,
+      })
+      expect((await control.done).code).toBe(0)
+      expect(control.stdout()).toContain('control')
+      expect(recordOf(box, 'control')).toBeDefined()
+      const releaseQuiet = path.join(box.root, 'release-quiet')
+      const releaseSpanning = path.join(box.root, 'release-spanning')
+      const releaseProperty = path.join(box.root, 'release-property')
+      const propertyEntered = path.join(box.root, 'property-entered')
+      const quiet = start(
+        box,
+        'measurement',
+        ['bash', '-c', `echo measuring; ${until(releaseQuiet)}`],
+        { quiet: true, jobClass: 'bench', machine: true },
+      )
+      const children = [quiet]
+      try {
+        await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('measuring')
+        const short = start(box, 'short-light', ['echo', 'short'], {
+          jobClass: 'light',
+          machine: true,
+        })
+        children.push(short)
+        expect((await short.done).code).toBe(0)
+        const spanning = start(
+          box,
+          'spanning-light',
+          ['bash', '-c', `echo spanning; ${until(releaseSpanning)}`],
+          { jobClass: 'light', machine: true },
+        )
+        children.push(spanning)
+        await expect.poll(spanning.stdout, { timeout: 8_000 }).toContain('spanning')
+        const bin = path.join(box.root, 'bin')
+        mkdirSync(bin)
+        const systemctl = path.join(bin, 'systemctl')
+        writeFileSync(
+          systemctl,
+          `#!/bin/bash\nif [[ "$*" == *"set-property"* ]]; then\n touch '${propertyEntered}'\n ${until(releaseProperty)}\nfi\nexport PATH="$HEAVY_FIXTURE_MANAGER_PATH"\nexec systemctl "$@"\n`,
+        )
+        const managerPath = process.env.PATH ?? ''
+        chmodSync(systemctl, 0o755)
+        const delayed = start(box, 'manager-delayed-light', ['echo', 'delayed'], {
+          jobClass: 'light',
+          machine: true,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${managerPath}`,
+            HEAVY_FIXTURE_MANAGER_PATH: managerPath,
+          },
+        })
+        children.push(delayed)
+        await expect.poll(() => existsSync(propertyEntered), { timeout: 8_000 }).toBe(true)
+        expect(delayed.stdout()).toBe('')
+        expect(
+          live(box.state, 'jobs')
+            .map((job) => job.label)
+            .sort(),
+        ).toEqual(['manager-delayed-light', 'measurement', 'spanning-light'])
+        let settled = false
+        void quiet.done.then(() => (settled = true))
+        if (mode === 'cancelled') quiet.child.kill('SIGTERM')
+        if (mode === 'completed') writeFileSync(releaseQuiet, '')
+        await expect.poll(() => settled, { timeout: 5_000 }).toBe(true)
+        expect((await quiet.done).code).toBe(mode === 'completed' ? 0 : 143)
+        const measurement = recordOf(box, 'measurement')!
+        expect(measurement.jobsDuringRun.map((job) => job.label).sort()).toEqual([
+          'short-light',
+          'spanning-light',
+        ])
+        expect(new Set(measurement.jobsDuringRun.map((job) => job.id)).size).toBe(2)
+        expect(measurement.jobsDuringRun.find((job) => job.label === 'short-light')).toMatchObject({
+          endedAt: expect.any(String),
+          allowedCpus: [],
+        })
+        expect(
+          measurement.jobsDuringRun.find((job) => job.label === 'spanning-light'),
+        ).toMatchObject({
+          endedAt: null,
+          allowedCpus: [],
+        })
+        expect(existsSync(path.join(box.state, 'quiet.holder'))).toBe(false)
+        expect(existsSync(path.join(box.state, 'runs', `${measurement.requestId}.json`))).toBe(
+          false,
+        )
+        expect(
+          live(box.state, 'jobs')
+            .map((job) => job.label)
+            .sort(),
+        ).toEqual(['manager-delayed-light', 'spanning-light'])
+        expect(existsSync(releaseProperty)).toBe(false)
+        expect(recordOf(box, 'manager-delayed-light')).toBeUndefined()
+        writeFileSync(releaseProperty, '')
+        expect((await delayed.done).code).toBe(0)
+      } finally {
+        writeFileSync(releaseProperty, '')
+        writeFileSync(releaseQuiet, '')
+        writeFileSync(releaseSpanning, '')
+        quiet.child.kill('SIGTERM')
+        await Promise.all(children.map((child) => child.done))
+      }
+    },
+    30_000,
+  )
+
   test('late light jobs pass held classes and every overlap reaches the measurement log once', async () => {
     const box = concurrentBox()
     const releaseQuiet = path.join(box.root, 'release-quiet')
