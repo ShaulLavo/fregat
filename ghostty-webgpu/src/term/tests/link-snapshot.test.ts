@@ -309,6 +309,145 @@ describe('host link resolution', () => {
   })
 })
 
+describe.each(['hover', 'discovery'] as const)('provider-chain freshness for %s', (path) => {
+  it.each(['current', 'generation', 'layout', 'revision'] as const)(
+    'continues to the second provider only while %s',
+    async (change) => {
+      const native = nativeHarness('plain text')
+      const firstResult = deferred<readonly ProvidedLink<Event>[]>()
+      let firstCalls = 0
+      let secondCalls = 0
+      let batches = 0
+      let cellRequests = 0
+      const host = createProjectedLinkSession({
+        getProjection: native.getProjection,
+        resolveLinkSnapshot: (request) => {
+          cellRequests += 1
+          return native.snapshot(request)
+        },
+        resolveLinkDiscovery: (request) => {
+          batches += 1
+          return native.discovery(request)
+        },
+      })
+      cleanups.push(() => host.dispose())
+      host.registerLinkProvider({
+        provideLinks: () => {
+          firstCalls += 1
+          return firstResult.promise
+        },
+      })
+      host.registerLinkProvider({
+        provideLinks: () => {
+          secondCalls += 1
+          return [{ range: { start: 0, end: 0 }, activate: () => {} }]
+        },
+      })
+      const pending =
+        path === 'hover'
+          ? host.resolveLink({ column: 0, row: 0, line: [] })
+          : host.findNextLink([{ column: 0, row: 0 }]).then((found) => found?.resolution)
+      await expect.poll(() => firstCalls).toBe(1)
+      if (change !== 'current') {
+        const projection = native.getProjection()!
+        native.setProjection({ ...projection, [change]: projection[change] + 1 })
+      }
+      firstResult.resolve([])
+      const resolution = await pending
+      expect(secondCalls).toBe(change === 'current' ? 1 : 0)
+      expect(resolution !== undefined && host.isLinkCurrent(resolution)).toBe(change === 'current')
+      if (change === 'current') expect(resolution?.hit?.source).toBe('provider')
+      expect(batches).toBe(path === 'discovery' ? 1 : 0)
+      expect(cellRequests).toBe(path === 'hover' ? 1 : 0)
+    },
+  )
+
+  it.each(['invalid-result', 'rejection'] as const)(
+    'skips stale provider %s before interpreting or reporting it',
+    async (kind) => {
+      const native = nativeHarness('plain text')
+      const gate = deferred<void>()
+      const started = deferred<void>()
+      const errors: unknown[] = []
+      let secondCalls = 0
+      const host = createProjectedLinkSession({
+        getProjection: native.getProjection,
+        resolveLinkSnapshot: native.snapshot,
+        resolveLinkDiscovery: native.discovery,
+        onError: (error) => {
+          errors.push(error)
+        },
+      })
+      cleanups.push(() => host.dispose())
+      host.registerLinkProvider({
+        provideLinks: async () => {
+          started.resolve()
+          await gate.promise
+          if (kind === 'rejection') return Promise.reject('provider failed')
+          return [{ range: { start: 0, end: 100 }, activate: () => {} }]
+        },
+      })
+      host.registerLinkProvider({
+        provideLinks: () => {
+          secondCalls += 1
+          return []
+        },
+      })
+      const pending =
+        path === 'hover'
+          ? host.resolveLink({ column: 0, row: 0, line: [] })
+          : host.findNextLink([{ column: 0, row: 0 }])
+      await started.promise
+      native.setProjection({ ...native.getProjection()!, revision: 2 })
+      gate.resolve()
+      await pending
+      expect(errors).toEqual([])
+      expect(secondCalls).toBe(0)
+    },
+  )
+
+  it('leaves a newer request current when an obsolete provider completes', async () => {
+    const native = nativeHarness('plain text')
+    const gate = deferred<readonly ProvidedLink<Event>[]>()
+    const started = deferred<void>()
+    let firstCalls = 0
+    let secondCalls = 0
+    const host = createProjectedLinkSession({
+      getProjection: native.getProjection,
+      resolveLinkSnapshot: native.snapshot,
+      resolveLinkDiscovery: native.discovery,
+    })
+    cleanups.push(() => host.dispose())
+    host.registerLinkProvider({
+      provideLinks: () => {
+        firstCalls += 1
+        if (firstCalls > 1) return []
+        started.resolve()
+        return gate.promise
+      },
+    })
+    host.registerLinkProvider({
+      provideLinks: () => {
+        secondCalls += 1
+        return [{ range: { start: 0, end: 0 }, activate: () => {} }]
+      },
+    })
+    const resolve = () =>
+      path === 'hover'
+        ? host.resolveLink({ column: 0, row: 0, line: [] })
+        : host.findNextLink([{ column: 0, row: 0 }]).then((found) => found?.resolution)
+    const obsolete = resolve()
+    await started.promise
+    native.setProjection({ ...native.getProjection()!, layout: 2 })
+    const current = (await resolve())!
+    expect(host.isLinkCurrent(current)).toBe(true)
+    gate.resolve([])
+    await obsolete
+    expect(host.isLinkCurrent(current)).toBe(true)
+    expect(secondCalls).toBe(1)
+  })
+})
+
 describe('bounded keyboard discovery', () => {
   const cells = Array.from({ length: 80 }, (_, index) => ({
     column: index % 40,

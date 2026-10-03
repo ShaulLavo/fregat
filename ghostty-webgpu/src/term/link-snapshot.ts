@@ -222,13 +222,16 @@ class HostLinkSession<TEvent> implements ProjectedLinkSession<TEvent> {
       return { generation: this.resolver.generation }
     if (snapshot.column !== request.column || snapshot.row !== request.row)
       return { generation: this.resolver.generation }
-    const resolution = await this.resolver.resolve({
-      column: snapshot.column,
-      row: snapshot.row,
-      line: snapshot.line,
-      osc8Uri: snapshot.osc8Uri,
-      osc8Range: snapshot.osc8Range,
-    })
+    const resolution = await this.resolver.resolve(
+      {
+        column: snapshot.column,
+        row: snapshot.row,
+        line: snapshot.line,
+        osc8Uri: snapshot.osc8Uri,
+        osc8Range: snapshot.osc8Range,
+      },
+      () => this.isCurrentRequest(epoch, projection),
+    )
     if (this.isCurrentRequest(epoch, projection)) this.projections.set(resolution, projection)
     return resolution
   }
@@ -255,12 +258,15 @@ class HostLinkSession<TEvent> implements ProjectedLinkSession<TEvent> {
       const osc8 = row.osc8Links.find(
         ({ range }) => cell.column >= range.start && cell.column <= range.end,
       )
-      const resolution = await this.resolver.resolve({
-        ...cell,
-        line: row.line,
-        osc8Range: osc8?.range,
-        osc8Uri: osc8?.uri,
-      })
+      const resolution = await this.resolver.resolve(
+        {
+          ...cell,
+          line: row.line,
+          osc8Range: osc8?.range,
+          osc8Uri: osc8?.uri,
+        },
+        () => this.isCurrentRequest(epoch, projection),
+      )
       if (!this.isCurrentRequest(epoch, projection)) return undefined
       if (!resolution.hit) continue
       this.projections.set(resolution, projection)
