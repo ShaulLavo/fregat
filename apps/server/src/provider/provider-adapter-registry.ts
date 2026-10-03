@@ -248,6 +248,35 @@ export class ProviderAdapterRegistry {
     }
   }
 
+  transcriptUsageSources() {
+    const sources = new Map<
+      string,
+      { id: string; driverKind: 'claude' | 'codex'; roots: string[] }
+    >()
+    for (const { config, env } of this.instances.values()) {
+      if (
+        config.enabled === false ||
+        (config.driverKind !== 'claude' && config.driverKind !== 'codex')
+      )
+        continue
+      const driverKind = config.driverKind === 'claude' ? 'claude' : 'codex'
+      const home =
+        driverKind === 'claude'
+          ? (env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), '.claude'))
+          : (env.CODEX_HOME ?? path.join(homedir(), '.codex'))
+      const roots =
+        driverKind === 'claude'
+          ? [path.resolve(home, 'projects')]
+          : [path.resolve(home, 'sessions'), path.resolve(home, 'archived_sessions')]
+      const id = createHash('sha256')
+        .update(`${driverKind}\0${roots.join('\0')}`)
+        .digest('hex')
+        .slice(0, 16)
+      sources.set(id, { id, driverKind, roots })
+    }
+    return [...sources.values()]
+  }
+
   importSources() {
     return [...this.instances.values()]
       .filter(
