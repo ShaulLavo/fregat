@@ -38,7 +38,7 @@ this section supersedes their CDP-injected bridge as the installed-browser targe
 ### Approved outcomes
 
 - Automatic macOS selection uses Fregat’s native WKWebView host, with integrated traffic lights
-  and its own app identity. Linux automatic selection tries Chrome, supported OS-default Chromium,
+  and its own app identity. A native startup failure stays an app error. Linux automatic selection tries Chrome, supported OS-default Chromium,
   the remaining Chromium scan, native webview, then a default-browser tab. Explicit browser
   settings stay first. Automatic window transparency selects the native webview on either OS.
 - Fregat installs automatically with its own name, icon, and OS application identity. The owner

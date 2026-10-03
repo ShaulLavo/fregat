@@ -55,7 +55,7 @@ test.each(['compositor', 'window'])(
       },
       fs,
     )
-    expect(result).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
+    expect(result).toEqual([{ kind: 'webview' }])
     expect(lookups).toBe(0)
   },
 )
@@ -81,10 +81,7 @@ test('explicit browser selection supports default bundle, per-user Applications,
     },
   ])
   expect(result.slice(-2)).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
-  expect(resolveBrowserCandidates('auto', 'window', env, fs)).toEqual([
-    { kind: 'webview' },
-    { kind: 'tab' },
-  ])
+  expect(resolveBrowserCandidates('auto', 'window', env, fs)).toEqual([{ kind: 'webview' }])
   expect(resolveBrowserCandidates('/custom/browser', 'compositor', env, fs)[0]).toMatchObject({
     source: 'setting',
     executable: '/custom/browser',
