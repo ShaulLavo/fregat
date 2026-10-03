@@ -1992,7 +1992,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Providers',
     title: 'Pooled Codex usage request interval',
     description:
-      'Minimum hours between credentialed usage requests for each pooled Codex account. At most one request per account per hour, including failures and restarts. Fresh passive readings skip requests; three failures pause collection until a newer passive reading arrives.',
+      'Hours between pooled Codex requests. At most one request per account per hour, including failures and restarts. Fresh quota skips requests; three failures pause until newer passive quota arrives.',
     keywords: ['usage', 'codex', 'proxy', 'quota', 'cap'],
   }),
   'providers.proxyUsageUrl': defineSetting({
@@ -2020,7 +2020,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Providers',
     title: 'Proxy usage management address',
     description:
-      'Local CLIProxyAPI management address for pooled Codex quotas. Missing or stale readings receive a capped usage request. The management key is kept in the secret store.',
+      'Local CLIProxyAPI management address for pooled Codex quotas and capped requests. Its management key is kept in the secret store.',
     keywords: ['usage', 'codex', 'proxy', 'quota'],
   }),
   'providers.proxyUsageProviderInstanceIds': defineSetting({
