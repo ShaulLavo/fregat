@@ -61,7 +61,7 @@ export function decide(
 }
 
 /**
- * Whether a `--quiet` job at the head of the queue may start: only once nothing heavy runs.
+ * Whether finite work has drained for a `--quiet` job; declared servers are counted separately.
  * Jobs queued behind it wait meanwhile, so the running ones drain.
  */
 export function decideQuiet(running: number): Decision {

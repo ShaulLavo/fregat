@@ -14,9 +14,12 @@ import { createInternalError } from '../../observability/structured-errors'
 import type { MockProviderAdapter } from '../adapters/mock'
 import type { ProviderInstanceConfig } from '../driver'
 import type { ProviderRuntimeStartInput } from '../types'
+import { claudeDriver } from '../drivers/claude'
+import { codexDriver } from '../drivers/codex'
 import { MOCK_DRIVER_KIND, mockDriver } from '../drivers/mock'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import { ProviderStatusCache } from '../status-cache'
+import { resolveProviderInstanceEnvironment } from '../utils/instance-environment'
 
 const WORK = v.parse(providerInstanceIdSchema, 'mock-work')
 const PERSONAL = v.parse(providerInstanceIdSchema, 'mock-personal')
@@ -221,6 +224,106 @@ describe('provider driver registry', () => {
       models: good.models,
       status: 'error',
     })
+  })
+})
+
+describe.each([
+  {
+    driver: claudeDriver,
+    configKey: 'configDir',
+    envKey: 'CLAUDE_CONFIG_DIR',
+    directory: '.claude',
+    file: '.credentials.json',
+  },
+  {
+    driver: codexDriver,
+    configKey: 'home',
+    envKey: 'CODEX_HOME',
+    directory: '.codex',
+    file: 'auth.json',
+  },
+])('$driver.driverKind credential paths', ({ driver, configKey, envKey, directory, file }) => {
+  it('observes the credential home derived from driver config', async () => {
+    const root = await fixtureRoot()
+    const home = path.join(root, 'configured')
+    const config = driver.parseConfig({ [configKey]: home })
+    const env = resolveProviderInstanceEnvironment({
+      base: { HOME: root },
+      derived: driver.environment(config, WORK),
+    })
+
+    expect(driver.credentialPaths({ config, env })).toEqual([path.join(home, file)])
+  })
+
+  it('observes explicit environment overrides of driver config', async () => {
+    const root = await fixtureRoot()
+    const home = path.join(root, 'effective')
+    const config = driver.parseConfig({ [configKey]: path.join(root, 'configured') })
+    const env = resolveProviderInstanceEnvironment({
+      base: { HOME: root },
+      derived: driver.environment(config, WORK),
+      overrides: [{ name: envKey, value: home }],
+    })
+
+    expect(driver.credentialPaths({ config, env })).toEqual([path.join(home, file)])
+  })
+
+  it('uses the effective HOME for the native default credential directory', async () => {
+    const root = await fixtureRoot()
+    const config = driver.defaultConfig()
+    const env = resolveProviderInstanceEnvironment({
+      base: { HOME: root },
+      derived: driver.environment(config, WORK),
+    })
+
+    expect(driver.credentialPaths({ config, env })).toEqual([path.join(root, directory, file)])
+  })
+
+  it('isolates effective account homes and fingerprints across registries', async () => {
+    const root = await fixtureRoot()
+    const configured = path.join(root, 'configured')
+    const work = path.join(root, 'work')
+    const personal = path.join(root, 'personal')
+    await Promise.all([configured, work, personal].map((home) => mkdir(home)))
+    await Promise.all(
+      [configured, work, personal].map((home) => writeFile(path.join(home, file), 'fixture')),
+    )
+    const first = new ProviderAdapterRegistry({ services: { cwd: root }, drivers: [driver] })
+    const second = new ProviderAdapterRegistry({ services: { cwd: root }, drivers: [driver] })
+    registries.push(first, second)
+    await first.reconcile([
+      {
+        providerInstanceId: WORK,
+        driverKind: driver.driverKind,
+        config: { [configKey]: configured },
+        environment: [{ name: envKey, value: work }],
+      },
+    ])
+    await second.reconcile([
+      {
+        providerInstanceId: WORK,
+        driverKind: driver.driverKind,
+        config: { [configKey]: configured },
+        environment: [{ name: envKey, value: personal }],
+      },
+    ])
+    expect(first.updateTarget(WORK).env[envKey]).toBe(work)
+    expect(second.updateTarget(WORK).env[envKey]).toBe(personal)
+    const workAccount = first.usageAccount(WORK)
+    const personalAccount = second.usageAccount(WORK)
+    expect(workAccount).not.toBeNull()
+    expect(personalAccount).not.toBeNull()
+    expect(workAccount?.accountKey).not.toBe(personalAccount?.accountKey)
+
+    await writeFile(path.join(configured, file), 'changed configured fixture')
+    expect(first.usageAccount(WORK)).toEqual(workAccount)
+    expect(second.usageAccount(WORK)).toEqual(personalAccount)
+    await writeFile(path.join(work, file), 'changed effective fixture')
+    expect(first.usageAccount(WORK)?.accountKey).toBe(workAccount?.accountKey)
+    expect(first.usageAccount(WORK)?.credentialFingerprint).not.toBe(
+      workAccount?.credentialFingerprint,
+    )
+    expect(second.usageAccount(WORK)).toEqual(personalAccount)
   })
 })
 

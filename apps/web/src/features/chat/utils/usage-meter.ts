@@ -36,8 +36,8 @@ export function accountUsageFor(
 export function usageWindowTone(window: ProviderUsageWindow): UsageTone {
   if (window.status === 'rejected') return 'destructive'
   if (window.status === 'warning') return 'warning'
-  if (window.usedPercent >= 100) return 'destructive'
-  if (window.usedPercent >= WARNING_PERCENT) return 'warning'
+  if (window.usedPercent !== null && window.usedPercent >= 100) return 'destructive'
+  if (window.usedPercent !== null && window.usedPercent >= WARNING_PERCENT) return 'warning'
 
   return 'muted'
 }
@@ -48,7 +48,8 @@ export function liveUsageWindows(windows: readonly ProviderUsageWindow[], nowMs:
 }
 
 /** `Checked 4m ago`; past fifteen minutes it says the numbers may have moved. */
-export function usageCheckedLabel(checkedAt: string, nowMs: number) {
+export function usageCheckedLabel(checkedAt: string | null, nowMs: number) {
+  if (!checkedAt) return 'Observation time unavailable'
   const ago = formatChatRelativeTime(checkedAt, nowMs)
   const checked = ago === 'now' ? 'Checked just now' : `Checked ${ago}`
   if (nowMs - Date.parse(checkedAt) <= STALE_AFTER_MS) return checked
@@ -59,7 +60,7 @@ export function usageCheckedLabel(checkedAt: string, nowMs: number) {
 /** Near a limit a turn can spend the rest in minutes, so a running session reads more often. */
 export function usageRefetchIntervalMs(windows: readonly ProviderUsageWindow[]) {
   const tightest = tightestUsageWindow(windows)
-  if (tightest && tightest.usedPercent >= 90) return 15_000
+  if (tightest && tightest.usedPercent !== null && tightest.usedPercent >= 90) return 15_000
 
   return 60_000
 }
@@ -82,6 +83,9 @@ function compareTightness(left: ProviderUsageWindow, right: ProviderUsageWindow)
   const toneDelta = TONE_RANK[usageWindowTone(left)] - TONE_RANK[usageWindowTone(right)]
   if (toneDelta !== 0) return toneDelta
 
+  if (left.usedPercent === right.usedPercent) return 0
+  if (left.usedPercent === null) return -1
+  if (right.usedPercent === null) return 1
   return left.usedPercent - right.usedPercent
 }
 
@@ -108,7 +112,10 @@ export const USAGE_TONE_FILL: Record<UsageTone, string> = {
 }
 
 export function usageWindowLabel(window: ProviderUsageWindow, nowMs: number) {
-  const used = `${window.label} ${Math.round(window.usedPercent)}% used`
+  const used =
+    window.usedPercent === null
+      ? `${window.label} usage percentage unknown`
+      : `${window.label} ${Math.round(window.usedPercent)}% used`
   const resetIn = formatResetIn(window.resetsAt, nowMs)
 
   return resetIn ? `${used}, resets in ${resetIn}` : used
@@ -138,9 +145,9 @@ export type UsagePace = {
  * and for a window already spent.
  */
 export function usagePace(window: ProviderUsageWindow, nowMs: number): UsagePace | null {
-  if (!window.resetsAt || !window.windowMinutes) return null
+  if (window.usedPercent === null || !window.resetsAt || !window.windowMinutes) return null
   // A spent window has no pace left to keep; its reset time is the whole story.
-  if (window.usedPercent >= 100) return null
+  if (window.usedPercent !== null && window.usedPercent >= 100) return null
 
   const windowMs = window.windowMinutes * 60_000
   const remainingMs = Date.parse(window.resetsAt) - nowMs

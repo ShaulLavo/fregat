@@ -109,6 +109,7 @@ export type StartOptions = {
   readonly jobClass?: string
   readonly quiet?: boolean
   readonly maxWallSec?: number
+  readonly server?: boolean
   readonly detached?: boolean
   readonly env?: NodeJS.ProcessEnv
   readonly preload?: string
@@ -137,6 +138,7 @@ export function start(
   if (options.jobClass) args.push('--class', options.jobClass)
   if (options.quiet) args.push('--quiet')
   if (options.maxWallSec !== undefined) args.push('--max-wall', String(options.maxWallSec))
+  if (options.server) args.push('--server')
   const child = spawn('bun', [...args, label, '--', ...command], {
     cwd: options.cwd ?? box.root,
     detached: options.detached ?? false,

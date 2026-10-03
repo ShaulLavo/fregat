@@ -28,6 +28,8 @@ export type TestServer = {
   providerAdapter: MockProviderAdapter
   /** Isolated temp workspace root backing this app's filesystem. */
   root: string
+  /** Effective server state home, isolated from the workspace by default. */
+  readonly stateHome: string
   workspaceEditJournalRoot: string
   origin: string
   restart: (
@@ -80,6 +82,7 @@ export async function makeTestServer({
   workspaceRoot,
 }: TestServerOptions = {}): Promise<TestServer> {
   const root = await mkdtemp(path.join(tmpdir(), 'web-itest-'))
+  const stateHome = await mkdtemp(path.join(tmpdir(), 'web-istate-'))
   const workspaceEditJournalRoot = path.join(root, '.platform-test', 'workspace-edit-journals')
   const database = createMetadataDatabase({
     databasePath: persistentDatabase
@@ -94,7 +97,7 @@ export async function makeTestServer({
       auth: { allowedOrigins: [TEST_ORIGIN] },
       homeDirectory: root,
       systemRoot: systemRoot ?? root,
-      system,
+      system: { ...system, stateHome: system?.stateHome ?? stateHome },
       // Keep the real parser/cache/route path, but pin its cache inside this
       // fixture. MSW supplies the external downloads page.
       fonts: new FontCatalogService({
@@ -160,13 +163,16 @@ export async function makeTestServer({
       workspaceRoot = options.workspaceRoot ?? workspaceRoot
       app = buildApp()
     },
-    cleanup: () => cleanupTestServer(app, root, database),
+    cleanup: () => cleanupTestServer(app, root, stateHome, database),
     database,
     origin: TEST_ORIGIN,
     get providerAdapter() {
       return providerAdapter
     },
     root,
+    get stateHome() {
+      return system?.stateHome ?? stateHome
+    },
     workspaceEditJournalRoot,
   }
 }
@@ -174,12 +180,16 @@ export async function makeTestServer({
 async function cleanupTestServer(
   app: ReturnType<typeof createApp>,
   root: string,
+  stateHome: string,
   database: MetadataDatabaseHandle,
 ) {
   try {
     await closeApp(app)
   } finally {
     database.close()
-    await rm(root, { force: true, recursive: true })
+    await Promise.all([
+      rm(root, { force: true, recursive: true }),
+      rm(stateHome, { force: true, recursive: true }),
+    ])
   }
 }

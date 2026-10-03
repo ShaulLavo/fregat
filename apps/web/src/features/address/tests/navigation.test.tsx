@@ -28,6 +28,8 @@ import { scopeAddressEnvironment } from '../../../../test/factories/address-envi
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { waitFor } from '@testing-library/react'
+import { vi } from 'vitest'
+import { server as httpServer } from '../../../../test/msw/server'
 import type { NavigationResult } from '@/state/navigation-coordinator'
 import { createTestNavigation } from '../../../../test/factories/navigation'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
@@ -361,6 +363,42 @@ test.for(['supersede', 'dispose'] as const)(
     }
   },
 )
+
+test('unmount cancels adjacent editor reads before the scoped client is restored', async ({
+  client,
+  server,
+}) => {
+  const workspace = await navigationWorkspace(client, server)
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const origin = 'https://address-harness.example.test'
+  const restore = scopeAddressEnvironment(origin, descriptor.environmentId, client)
+  const requests: string[] = []
+  const observe = ({ request }: { request: Request }) => {
+    if (new URL(request.url).origin === origin) requests.push(request.url)
+  }
+  httpServer.events.on('request:start', observe)
+  seedWorkspaceCache({ ...workspace, tabPaths: ['repo/a.ts'] })
+  const rendered = await renderAddressHarness({ initialEntries: [`${workspace.base}/f/a.ts`] })
+  await waitForNavigation(rendered.navigation)
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    expect(
+      await rendered.navigation.openFile({
+        owner: rendered.harness.workspace,
+        path: filesystemPath('repo/b.ts'),
+      }),
+    ).toEqual({ status: 'applied' })
+    rendered.unmount()
+    restore()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(requests).toEqual([])
+  } finally {
+    rendered.unmount()
+    restore()
+    vi.useRealTimers()
+    httpServer.events.removeListener('request:start', observe)
+  }
+})
 
 test('attaching after Router resolved another destination applies the current location', async ({
   client,

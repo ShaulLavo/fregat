@@ -132,6 +132,14 @@ export class ComparisonTracing {
         rows.reduce((sum, row) => sum + (row.packed?.length ?? row.cells.length), 0),
       )
     })
+    // Frozen comparison runtimes may predate the text-only reader.
+    if (typeof Reflect.get(state, 'readTextRows') === 'function') {
+      this.wrap(state, 'readTextRows', terminal, 'snapshot', (result) => {
+        const rows = result as readonly unknown[]
+        this.count(terminal, 'textRowsCopied', rows.length)
+        this.count(terminal, 'textCellsCopied', rows.length * core.size.columns)
+      })
+    }
     this.wrap(state, 'acknowledge', terminal, 'damage')
     this.wrap(
       state,
@@ -139,7 +147,15 @@ export class ComparisonTracing {
       terminal,
       'js',
       (builder) => {
-        this.wrap(builder, 'build', terminal, 'instances', () => this.count(terminal, 'zigBuilds'))
+        this.wrap(builder, 'build', terminal, 'instances', (result) => {
+          this.count(terminal, 'zigBuilds')
+          if (result === 0) this.count(terminal, 'zigReadyBuilds')
+          if (result === 1) this.count(terminal, 'zigUnsupportedBuilds')
+          if (result === 2) this.count(terminal, 'zigMissingGlyphBuilds')
+        })
+        this.wrap(builder, 'clearGlyphs', terminal, 'instances', () =>
+          this.count(terminal, 'zigGlyphIndexClears'),
+        )
       },
       true,
     )
@@ -256,6 +272,7 @@ export class ComparisonTracing {
       this.wrap(pass, 'syncAtlas', terminal, 'upload')
       const nativeUpload = typeof Reflect.get(pass as object, 'uploadFrame') === 'function'
       const recordUploads = (result: unknown, args: unknown[]) => {
+        if (typeof result === 'number' && result > 0) this.count(terminal, 'instanceUploadBatches')
         this.count(terminal, 'buffersWritten', result as number)
         const updates = args[1] as readonly RowInstanceUpdate[]
         const ranges = nativeUpload ? updates : coalesceInstanceUpdates(updates)
@@ -398,7 +415,7 @@ export class ComparisonTracing {
     this.mark('begin', { timeOrigin: performance.timeOrigin })
   }
 
-  end(): unknown {
+  end() {
     this.mark('end')
     this.active = false
     // Emit timing entries after measurement so trace serialization is outside CPU sampling.

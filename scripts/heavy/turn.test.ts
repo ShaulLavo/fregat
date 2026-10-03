@@ -22,6 +22,7 @@ test.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
       label: id,
       pid: process.pid,
       quiet: index === 0,
+      server: false,
       since: new Date().toISOString(),
       sliceRoot: box.sliceRoot,
     }))
