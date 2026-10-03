@@ -1,21 +1,19 @@
 # Plan 114: Installed app
 
 > **Executor instructions**: Read this plan completely, then read `AGENTS.md` and root `PLAN.md`.
-> The gates are ordered so Electrobun keeps working until Gate 4; do not delete anything earlier.
+> Gates 1–4 are complete. The owner accepted the Mac desktop paths and approved Gate 4 removal on 2026-10-03. Earlier shell/protocol research below is retained as dated evidence, not the current launch contract.
 > Probes from the research rounds live in `/work/tmp/research2/114/` (disposable; described below).
 
 ## Status
 
-- **State**: RESEARCH DONE 2026-09-26 — reworked around the owner's order (installed Chromium in
-  `--app` mode first, system webview second). Chromium path prototyped end to end on Linux; native
-  webview hosts prototyped in C (Linux) and Objective-C (macOS). No Rust.
-  Reconciled 2026-09-28: Gate 1 follows the remaining Plan 132 development-plumbing work and
-  preserves mesh ownership. Host/browser measurements below remain historical research.
-  2026-10-02: Wave 2 engineering proofs delivered; Mac desktop real-keychain/visual acceptance
-  and Gate 4 are PARKED. Plan 114 remains partial and Electrobun remains the default.
-  2026-10-02: installed Chrome app delivered (#332–#335); `Fregat.app` on macOS approved (A1–A3).
-- **Priority**: P2 — the shell works today (plan 073), but every week on Electrobun is a week of
-  someone else's toolchain
+- **State**: DONE — Gates 1–4, 2026-10-03. Approved owner acceptance of the Mac desktop
+  paths closes the previous real-keychain/visual acceptance gate and authorizes removal of the
+  old shell. `desktop:dev` now selects the launcher directly; installed Chromium and the native
+  system-webview host are the delivered window paths. Mesh-owned servers and terminals remain
+  shared. The installed-app and `Fregat.app` contracts below remain authoritative; earlier
+  measurements and partial-status reports are historical evidence.
+- **Priority**: P2 closeout delivered. Signing, public distribution and own-engine work remain
+  explicitly deferred below.
 - **Effort**: M — about 500 lines of TypeScript in the launcher and ~150 lines of C or Objective-C
   per webview host, then a long tail that is mostly deletion
 - **Risk**: LOW–MEDIUM — the common path is the engine `agent:browser` already drives; the risk
@@ -25,16 +23,16 @@
 
 ## Installed Fregat application
 
-**Status: Approved owner design, 2026-10-02. Implementation starts after this plan PR merges.**
-Chrome-first selection has merged separately. Gate 4 remains parked. The browser-installed
+**Status: Delivered; approved owner acceptance and Gate 4 closeout, 2026-10-03.**
+Chrome-first selection, installed-app delivery and the native fallback replace the old shell. The browser-installed
 app must provide the same functionality when opened by the desktop launcher, the Dock, Cmd-Tab/taskbar,
 the OS application launcher, or its browser-created shortcut. A direct OS launch has no
 launcher process, CDP connection, injected script, or `window.platformBridge`.
 
 The owner rejected a launcher-only bridge with reduced functionality on Dock launch. The
 installed-browser path therefore moves desktop behavior into the web client, browser manifest,
-and the selected machine's server. Native webview/Electrobun code remains while its existing
-gates require it. The sections below this design document the current shell and earlier proofs;
+and the selected machine's server. The native webview keeps its own host transport; the old shell
+and toolchain are removed. The sections below this design document the replacement and earlier proofs;
 this section supersedes their CDP-injected bridge as the installed-browser target architecture.
 
 ### Approved outcomes
@@ -631,7 +629,7 @@ host choice; U2 owns runtime web capability/picker choice; U3 owns server capabi
 authorization. Interface changes are published by U3 with all three units agreeing on consumer
 updates before integration. The coordinator runs combined real-server acceptance after the
 parallel unit checks. After implementation merges, the coordinator performs the Mac check below;
-Gate 4 stays parked until its separate owner acceptance is complete.
+The owner completed the separate acceptance and approved Gate 4 on 2026-10-03.
 
 ### Protocol evidence and limits
 
@@ -803,7 +801,14 @@ points outside the bundle; it does not open a window.
   the server stopped, transparency on and off, and the native-window path through the Browser setting
   `webview` (Chrome stays installed).
 
-## Why
+## Historical rationale and prototype design
+
+The following rationale, prototype shape and browser/host measurements record the September
+research baseline. Electrobun/Hutch names, deleted file paths and injected-CDP behavior here
+explain the replacement decision; they are not current dependencies or launch instructions. The
+installed-app and `Fregat.app` sections above supersede this prototype architecture.
+
+### Why
 
 Plan 073 kept Electrobun for one property: the shell's `process.execPath` is Bun, so
 `apps/server` runs on the shell's own runtime. Platform ships one runtime. That property is
@@ -964,8 +969,10 @@ chat/provider batches do not wait on the desktop launcher.
 
 ## Gates
 
-Electrobun keeps working until Gate 4. The new launcher runs beside it as
-`bun run desktop:dev -- --shell=installed` until then.
+**Closeout: Gates 1–4 done, 2026-10-03, following approved owner acceptance.**
+`bun run desktop:dev` runs the launcher directly. Gates 1–3 below retain their original
+engineering requirements and dated proof reports, including the former opt-in command and
+default-shell descriptions. Those historical reports do not reopen the accepted Mac gate.
 
 ### Gate 1 — Chromium launcher on Linux (M)
 
@@ -1045,7 +1052,11 @@ through the same portal dialog.
 Owner: `apps/desktop/native/macos/platform-webview.m` (new, absorbs `vibrancy.m`),
 `apps/desktop/src/launcher/*`.
 
-**Status: PARTIAL — 2026-10-02.** The launcher now discovers LaunchServices' supported default,
+**Status: DONE — approved owner acceptance 2026-10-03.** The owner accepted the desktop
+paths and approved removal. The following 2026-10-02 partial report records the earlier
+engineering proof and its limits.
+
+**Historical partial report — 2026-10-02.** The launcher now discovers LaunchServices' supported default,
 reads bundle executables, uses Chromium first, and falls back to the owned Objective-C host or
 `open`. The WKWebView owns its window, document-start bridge, picker sheets, startup message,
 drag handling and vibrancy view directly. Electrobun remains the default and keeps its library;
@@ -1101,32 +1112,11 @@ at `/work/tmp/fregat-evidence/114-g3-macos-20261002/`. Owned windows and fixture
 were closed; scratch-linked process and PID absence are checked before removing the one remote
 scratch. No rendering-rate or visual acceptance claim is made, and no deployment is part of this unit.
 
-**Owner-only acceptance, Approved and parked.** The Wave 2 engineering track is closed with these
-acceptance gates parked; Plan 114 as a whole remains partial. Run the real-keychain Chromium path
-from **Terminal in the logged-in `shaul-mac` desktop**, using an existing canonical Fregat checkout
-with dependencies/compiler already available. The canonical Mac checkout path is unknown to this
-executor; the command asks for it and has no dependency on the removed verification scratch:
-
-```sh
-printf 'Canonical Fregat checkout on this Mac: '
-IFS= read -r FREGAT_CHECKOUT
-cd "$FREGAT_CHECKOUT" && PLATFORM_HOME="$HOME/Library/Application Support/Fregat/InstalledAppAcceptance" ~/.bun/bin/bun desktop:dev -- --shell=installed
-```
-
-Prerequisites: the checkout's shared API/Vite URLs are configured and reachable; its `.env` leaves
-`PLATFORM_HOME` unset or points to that Mac-writable acceptance home (`.env` overrides shell
-values). Browser is `auto` or the installed Chrome/Helium executable, and Transparency is
-**Window manager** (`compositor`). This uses the real macOS keychain with unchanged production
-flags. Expected: Fregat content in an opaque Chromium app window with its **native browser
-titlebar**, the desktop bridge and working picker. Launch again to verify singleton handoff;
-close the last page, test Cmd-Q, drag the native titlebar and make an interactive picker selection.
-Quitting must leave the configured shared services and terminals alive. A failure before content
-loads remains a real-keychain acceptance failure; the SSH mock-keychain pass does not waive it.
-
-The separate fallback check uses **Transparent window** (`window`) and expects WKWebView's
-overlay traffic-light layout, vibrancy pixels, its drag region and interactive picker. Chromium's
-opaque/native-titlebar acceptance makes no vibrancy promise. Both paths still need the owner's
-visual/Cmd-Q/drag/picker observation before Gate 3 acceptance.
+**Owner acceptance completed — 2026-10-03.** The approved desktop acceptance closes the
+real-keychain and visual/Cmd-Q/drag/picker gate for the installed Chromium path and native
+WKWebView window. The owner authorized Gate 4 deletion. The SSH mock-keychain experiment
+above remains engineering evidence with its original limits; it is not relabeled as the
+owner's real-keychain proof. The current development command is `bun run desktop:dev`.
 
 1. Detection, macOS half: LaunchServices default, bundle table, `Info.plist` executable.
 2. Chromium lifecycle: on `Target.targetDestroyed` of the last page, `Browser.close` (measured on
@@ -1149,26 +1139,25 @@ visual/Cmd-Q/drag/picker observation before Gate 3 acceptance.
 
 ### Gate 4 — Delete Electrobun (S–M)
 
-**Status: PARKED — root decision 2026-10-02.** The owner must observe Fregat Chromium launcher from
-the Mac desktop with the real keychain, plus both paths' visual/Cmd-Q/drag/picker checks above.
-Electrobun remains the default and fallback until that acceptance; the scratch mock-keychain proof
-and closing the Wave 2 engineering track do not authorize deletion or a default-shell switch.
-Removal still needs explicit root approval.
+**Status: DONE — 2026-10-03, approved owner acceptance.** The owner accepted the Mac
+desktop paths and explicitly approved removal. The installed launcher and native window are
+now the desktop entry points. This closes the 2026-10-02 parked decision; scratch engineering
+proofs retain their historical limitations.
 
-1. Remove `src/bun/index.ts`, `src/preload` (its Electroview transport), `src/shared/rpc.ts`,
-   `electrobun.config.ts`, the package, the tsconfig paths, vitest scoping, the `.hutch` ignores
-   in git, oxlint and oxfmt, and the CI cache and prepare steps from `15df2033`. Add the host
-   builds to CI (`pkg-config` + `cc` on the Linux runner, `clang` on macOS).
-2. Delete `color-scheme.ts` and `gtk-portal.ts`: both exist only because of the X11 forcing.
-3. Remove repository references to Hutch. Machine cache/symlink cleanup is a separate owner
-   action after checking other consumers; this plan does not authorize deleting outside-checkout
-   payloads. No shell-delivery gate depends on reclaiming that cache.
-4. `desktop:dev` runs the launcher without the flag. Update `AGENTS.md`: the desktop shell
-   section, the dev-server note, and the mesh section's claim that the shell is a convenience.
-5. Update the `window.transparency` description: it no longer mentions CEF's copy per paint, and
-   says the see-through window uses the system webview.
+- [x] Remove the old main/preload/RPC shell, its SDK/configuration, TypeScript and test aliases,
+      ignored devkit projection and CI preparation/cache. Keep native host builds in CI.
+- [x] Remove old-shell-only color-scheme, portal and window-discovery helpers. The retained
+      native window owns its platform integration directly.
+- [x] Remove Hutch repository wiring. Machine caches/symlinks are outside this removal's scope;
+      cleanup requires a separate owner action after checking other consumers. No outside-checkout
+      payload deletion is authorized by this plan.
+- [x] Make `desktop:dev` run the launcher directly and update desktop/development/mesh guidance.
+- [x] Describe transparent-window mode as the system-webview path and remove CEF paint-copy claims
+      from active setting copy.
 
-**Exit**: `rg -i electrobun` across the repo returns only this plan and the git history.
+**Exit**: repository source/configuration has no Electrobun/Hutch runtime or build dependency.
+Documentation may retain explicitly historical, versioned research and deletion rationale; a
+blanket text search is an audit inventory, not a reason to rewrite measured history.
 
 ## Later, deliberately
 

@@ -6,6 +6,8 @@ Scope: everything `createApp` mounts (`apps/server/src/app.ts:173-232`), the wir
 
 ---
 
+> Historical source inventory. Deleted `apps/desktop/src/bun/index.ts` references below describe the implementation at the time of reading. The current desktop entry point is `apps/desktop/src/launcher/index.ts`; development and production server ownership are documented in [development.md](../development.md) and [Plan 114](../../plans/114-installed-app.md).
+
 ## 0. One-page summary
 
 | Concern                            | Fact                                                                                                                                                                                                                                                                                                                                                                                                            | Source                                                                                                                                |
@@ -389,7 +391,7 @@ Server: `apps/server/src/lsp/routes.ts`, `lsp/proxy-session.ts`. Contract: `pack
 - **CORS** (`app.ts:178-190`): irrelevant outside a browser, but the GET/POST-only method set is a server fact that shaped the API (no DELETE/PUT).
 - **Eden WS**: `new WebSocket(url)` with no headers and unencoded query strings (§8).
 - **`localStorage`**: `lib/workspace-cache-storage.ts:5-7, 40, 87, 98` persists workbench UI state under `platform.workspace-state.v19.*` — chat drafts, rail order, selection, diff scope etc. (see `plans/environments-and-remote-plan.md:117`). A TUI needs its own per-user cache (e.g. a JSON file under `~/.platform`). Not server state.
-- **`window`/`document`/`navigator`**: `lifecycle-flush.ts`, `clipboard.ts`, `default-nerd-font.ts`, `platform/bridge.ts` (Electrobun bridge), `platform/backdrop.ts` — all presentational.
+- **`window`/`document`/`navigator`**: `lifecycle-flush.ts`, `clipboard.ts`, `default-nerd-font.ts`, `platform/bridge.ts` (native-window bridge), `platform/backdrop.ts` — all presentational.
 - **Fonts/wallpaper routes**: browser-only material.
 - **Attachments**: the web builds `<img src>` from `chatAttachmentUrlPath`; a TUI would fetch bytes and either render via a terminal image protocol or show a placeholder.
 - **Provider sign-in** opens a browser on the server host and is polled; fine from a TUI on the same machine, awkward remotely.

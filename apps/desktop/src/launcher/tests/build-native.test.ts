@@ -166,7 +166,7 @@ test.skipIf(!webkit || !compiler)(
   `builds the Linux host (${webkit && compiler ? 'native dependencies present' : `skip reason: ${skipReason()}`})`,
   () => {
     const desktopDir = path.resolve(import.meta.dirname, '../../..')
-    const output = buildNative(desktopDir, 'installed')
+    const output = buildNative(desktopDir)
     expect(output).toBe(path.join(desktopDir, 'native/build/platform-webview'))
     expect(existsSync(output!)).toBe(true)
     for (const options of [
@@ -192,43 +192,40 @@ test.skipIf(!webkit || !compiler)(
   },
 )
 
-test.skipIf(!supported)(
-  'default Electrobun native build needs no optional WebKit/compiler dependencies',
-  () => {
-    const script = path.resolve(import.meta.dirname, '../../../scripts/build-native.ts')
-    const env = { ...process.env, PATH: '/nonexistent-native-build-tools' }
-    const result = Bun.spawnSync([process.execPath, script], { env })
-    expect(result.exitCode).toBe(0)
-    expect(result.stderr.toString()).toBe('')
-    const installed = Bun.spawnSync([process.execPath, script, '--shell=installed'], { env })
-    expect(installed.exitCode).not.toBe(0)
-    expect(installed.stderr.toString()).toContain('desktop.native.BUILD_FAILED')
-  },
-)
+test.skipIf(!supported)('default native build reports missing compiler dependencies', () => {
+  const script = path.resolve(import.meta.dirname, '../../../scripts/build-native.ts')
+  const env = { ...process.env, PATH: '/nonexistent-native-build-tools' }
+  const result = Bun.spawnSync([process.execPath, script], { env })
+  expect(result.exitCode).not.toBe(0)
+  expect(result.stderr.toString()).toContain('desktop.native.BUILD_FAILED')
+})
 
-test('default Electrobun and explicit installed-app entrypoints select their own native build', async () => {
+test('desktop entrypoints build the native host and launch the installed app', async () => {
   const desktop = path.resolve(import.meta.dirname, '../../..')
   const manifest = await Bun.file(path.join(desktop, 'package.json')).json()
   expect(manifest.scripts.dev).toBe(
-    'bun run build:native && bun ../../scripts/run-with-env.ts electrobun dev',
+    'bun run build:native && bun ../../scripts/run-with-env.ts bun src/launcher/index.ts --dev',
   )
-  expect(manifest.scripts.build).toBe('bun run build:native && electrobun build')
+  expect(manifest.scripts.build).toBe('bun run build:native')
   expect(manifest.scripts['build:native']).toBe('bun scripts/build-native.ts')
   const dev = await Bun.file(path.resolve(desktop, '../../scripts/desktop-dev.ts')).text()
-  expect(dev).toMatch(/'build:native',\s*'--shell=installed'/)
+  expect(dev).toContain("'apps/desktop', 'build:native'")
+  expect(dev).toContain("'apps/desktop/src/launcher/index.ts', '--dev'")
 })
 
-// NOT-PORTABLE: macOS case assumes Xcode clang and SDK without a prerequisite check.
-test.skipIf(process.platform !== 'darwin')(
-  'builds the macOS native host executable beside the retained Electrobun library',
+const macCompiler = process.platform === 'darwin' && Bun.which('clang') !== null
+const macSdk =
+  macCompiler &&
+  Bun.which('xcrun') !== null &&
+  Bun.spawnSync(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).exitCode === 0
+
+test.skipIf(!macSdk)(
+  `builds the macOS native host (${macSdk ? 'Xcode SDK present' : 'skip reason: macOS clang and SDK required'})`,
   () => {
     const desktopDir = path.resolve(import.meta.dirname, '../../..')
-    const host = buildNative(desktopDir, 'installed')
+    const host = buildNative(desktopDir)
     expect(host).toBe(path.join(desktopDir, 'native/build/platform-webview'))
     expect(existsSync(host!)).toBe(true)
-    const library = buildNative(desktopDir, 'electrobun')
-    expect(library).toBe(path.join(desktopDir, 'native/build/libVibrancy.dylib'))
-    expect(existsSync(library!)).toBe(true)
   },
 )
 

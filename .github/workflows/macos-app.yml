@@ -31,9 +31,13 @@ jobs:
         with:
           node-version: 24
       - run: bun install --frozen-lockfile
-      - name: Test bundle resolution and layout checker
+      - name: Check native compiler
+        run: xcrun --find clang
+      - name: Build macOS webview host
+        run: bun run --cwd apps/desktop build:native
+      - name: Test native build, bundle resolution and layout checker
         working-directory: apps/desktop
-        run: bun --bun vitest run src/launcher/tests/bundle.test.ts src/launcher/tests/check-app.test.ts
+        run: bun --bun vitest run src/launcher/tests/build-native.test.ts src/launcher/tests/bundle.test.ts src/launcher/tests/check-app.test.ts
       - name: Build app
         run: bun run app:mac
       - name: Check relocated bundle and runtime

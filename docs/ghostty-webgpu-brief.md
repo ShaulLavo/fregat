@@ -219,12 +219,11 @@ Registered and wired in the same pass.
 
 - ~~The callback bridge (Plan 054 S1) is the load-bearing unknown~~ **Resolved — see Phase 0
   results.** All three ABI shapes work via Zig trampolines in the exported funcref table.
-- **WebGPU availability:** verified working in Playwright headless CI (SwiftShader software
-  adapter — fine for correctness tests, not perf) and in the shipping Electrobun CEF desktop on
-  a **hardware Metal 3 adapter** (opaque window). `WINDOW_TRANSPARENT: true` OSR mode remains
-  **untested** — GPU canvas + OSR readback is exactly where WebGPU gets shaky (memory
-  `wallpaper-video-idle-gpu`); must be measured before any transparent-desktop work. WKWebView
-  needs Safari 26+. The dual-renderer rollout keeps canvas until we choose.
+- **WebGPU availability:** the Phase 0 proofs below cover software headless Chromium and the
+  then-shipping opaque CEF desktop. They do not establish current-host performance. Desktop
+  delivery now uses an installed Chromium app or a system-webview native window (Plan 114);
+  compare hardware renderer behavior on the actual selected host. WKWebView needs Safari 26+.
+  CEF OSR readback is historical and is absent from the delivered native-window path.
 - **Upstream API churn:** libghostty-vt is young; bump pins only when ghostling's moves.
 - **Ligatures across cells** are known-hard; deferred to Phase 6 with the atlas keyed to survive.
 - **Accessibility:** the `dom/` mirror ships with Phase 3 input work, not as polish.
@@ -255,7 +254,7 @@ constants total — also progress reports, desktop notifications, PWD, terminfo 
 **S2 — WebGPU environments: PASS with one recorded risk.** Playwright headless Chromium 148:
 device + frame submit OK with `--enable-unsafe-webgpu` (`--enable-features=Vulkan` on Linux);
 adapter is **SwiftShader** (software) headless on macOS — CI is for correctness, perf needs
-headed/hardware. Shipping desktop (Electrobun CEF, Chrome 147, via CDP :9222): device + frame
+headed/hardware. Desktop at the time of this 2026-08-22 proof (Electrobun CEF, Chrome 147, via CDP :9222): device + frame
 submit OK on **hardware `metal-3`**, opaque window. Transparent/OSR mode: untested, recorded
 risk above.
 

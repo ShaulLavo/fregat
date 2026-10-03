@@ -33,7 +33,8 @@ snapshot; this file remains the scheduler and each plan remains its scope author
    replacement input-latency proof and an explicit owner request. The
    [wave record](docs/next-wave.md#foundations-wave-2026-09-30) records delivery, the served
    release and remaining follow-ups. Closure authorizes no additional work.
-2. **Continue the owner's closeout queue: 114 → 126.** 156 P0–P2 delivered 2026-10-02
+2. **Continue the owner's closeout queue with 126.** 114 Gates 1–4 closed on 2026-10-03
+   after approved owner Mac acceptance and old-shell removal. 156 P0–P2 delivered 2026-10-02
    (#269/#280/#286); its Approved P3+ follow-ups retain their gates. This is a default work
    order, not a chain of prerequisites; [the closeout table](#wave-2-closeout-and-dependency-order)
    names the dependencies that matter.
@@ -90,7 +91,7 @@ scopes into one package rewrite, lift a gate or approve gated units. Sizes are i
 
 | Program              | Plans                                                                                                                                                                                | When                                                                                          | Gates and boundaries                                                                                                                                                                                                                                         |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Desktop shell        | [114](plans/114-installed-app.md) Gates 1–4                                                                                                                                          | Next in the closeout queue                                                                    | Preserve mesh-owned servers and terminals. Gate 3 needs a Mac and owns 132's vibrancy check; Mac verification precedes Gate 4's Electrobun removal.                                                                                                          |
+| Desktop app          | [114](plans/114-installed-app.md) Gates 1–4 delivered 2026-10-03                                                                                                                     | Closeout done after approved owner acceptance                                                 | Installed Chromium app and native system-webview host replace the old shell. Preserve mesh-owned servers and terminals; 132's transferred Mac vibrancy gate is accepted.                                                                                     |
 | T3 alignment residue | [126](plans/126-t3code-alignment.md) remaining A–F/J rows, G/H/I follow-ups                                                                                                          | Server, chat and provider proofs any time; desktop rows after 114                             | LIFE-06 schema/state-loss gate, live-account checks and the frozen `7445aa73` oracle stay. Close only rows with fresh evidence.                                                                                                                              |
 | Rich documents       | [156](plans/156-documents-in-the-editor.md) P0–P2 delivered 2026-10-02 (#269/#280/#286); P3+ Approved follow-up                                                                      | Wave 2 scope delivered; schedule follow-ups by format readiness                               | Uses existing file identity and 179's isolation policy. P3–P6 follow; P7 DOCX editing stays parked on Markdown and fidelity decisions.                                                                                                                       |
 | Keymap cutover       | [204](plans/204-editor-on-fregat-hotkeys.md) + [205](plans/205-ghostty-on-fregat-hotkeys.md) → [206](plans/206-platform-one-keymap.md); E026 metadata                                | Next structural cutover; 204/205 producer prep can start now                                  | One verified release migrates every web and TUI caller and deletes the old APIs; Platform builds the shadow report. Before a mirror carries a hotkeys consumer, prove standalone install and publish hotkeys (207's gate). Zed/Vim 220–280 bind after 206.   |
@@ -99,7 +100,7 @@ scopes into one package rewrite, lift a gate or approve gated units. Sizes are i
 | Localization         | [208](plans/208-all-text-in-json.md)                                                                                                                                                 | Broad migration, by unit                                                                      | Catalog and typed generation, then structured-error transport, bounded caller migrations, locale/plural/RTL acceptance. 207 no longer blocks the catalog contract; command/settings metadata coordinates with 206.                                           |
 | Unified workspace    | [209](plans/209-unified-workspace.md)                                                                                                                                                | Design review any time                                                                        | Resolve D1–D6 before affected units. Production implementation needs a separate owner decision. Uses 206 commands, 200 content ownership and 208 catalogs.                                                                                                   |
 
-Work that can start without waiting for another program: 114, 126's server and provider proofs,
+Work that can start without waiting for another program: 126's server and provider proofs,
 204/205 producer prep, 202's local controls, 198's acceptance proofs, 200's baseline
 research and 209's design review. Bounded product lanes continue beside them: Markdown authoring
 in 111/108 before 171's composer swap (parser work in 176/189), measured typing in 201, tree
@@ -126,12 +127,14 @@ Before 204/205 mirror a consumer of hotkeys, prove standalone installation and s
 
 [132](plans/132-process-and-dev-ownership.md) delivered development ownership closeout on
 2026-09-30: standard Vite updates, unified typechecks, cold-cache proof and explicit terminal
-capture ownership. Its Mac vibrancy checks are owned by 114 Gate 3. Main `3ca862a4b` later
+capture ownership. Its Mac vibrancy checks transferred to 114 Gate 3 and were accepted by the
+owner on 2026-10-03. Main `3ca862a4b` later
 removed the remaining app-save hot-update interception.
 
 The owner's closeout queue was **179 → 099 → 114 → 126 → 156**. 179 and 099 unit 1 are delivered;
 099 unit 0 closed out as partial in PR #224, with its unfinished calibration superseded by 282.
-**114 → 126** remains the default work order, not a chain of prerequisites. 156 P0–P2
+**114 closed on 2026-10-03** after approved owner acceptance and Gate 4 removal;
+**126** remains in the default closeout queue. 156 P0–P2
 delivered 2026-10-02 (#269/#280/#286); the whole plan remains open for Approved P3+ work.
 Independent work can move earlier. See the
 [remaining phase checklist](docs/next-wave.md#wave-2-closeout-reconciled-2026-09-28).
@@ -140,7 +143,7 @@ Independent work can move earlier. See the
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [179: content isolation](plans/179-isolating-foreign-content.md)   | Delivered in PR #204. Its isolation policy applies to 156.                                                                                                                                                          |
 | [099: document contributions](plans/099-document-contributions.md) | Unit 1 publication, with 198's retained-analysis subscriber, is delivered in PR #203. Unit 0 is partial (5/10); 282 replaces the unfinished calibration. Units 2–7 retain their explicit gate.                      |
-| [114: installed app](plans/114-installed-app.md)                   | Preserve mesh-owned servers and terminals. Native host checks precede Electrobun removal.                                                                                                                           |
+| [114: installed app](plans/114-installed-app.md)                   | Delivered 2026-10-03 after approved owner Mac acceptance and Gate 4 removal. The launcher/native-window paths preserve mesh-owned servers and terminals.                                                            |
 | [126: T3 alignment](plans/126-t3code-alignment.md)                 | Bounded proofs shipped in PR #210; the row ledger stays open. Desktop host cases consume 114; independent chat/provider/server proofs can run earlier.                                                              |
 | [156: rich documents](plans/156-documents-in-the-editor.md)        | P0–P2 delivered 2026-10-02 (#269/#280/#286), using existing file/buffer identity and 179 isolation. P3 projection diffs/binary restore and later Office viewing/editing remain Approved follow-up with their gates. |
 
