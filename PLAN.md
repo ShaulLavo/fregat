@@ -85,6 +85,13 @@ work can proceed independently where their files and contracts do not overlap.
 
 ## Next programs
 
+[320](plans/320-compile-time-data.md) is Approved for a compatibility proof followed by
+settings defaults, bundled themes, Unicode bidi derivation and a settings search index.
+Compare existing compile-time tools before migrating consumers; file icons remain a
+conditional feasibility unit. This bounded build/data work can be researched independently,
+with implementation scheduled after its tool, dependency-invalidation and package-consumer
+proofs pass. Coordinate shared build-config edits with active package cutovers.
+
 Each program groups Approved plans that share owners and gates. Grouping does not merge their
 scopes into one package rewrite, lift a gate or approve gated units. Sizes are in the
 [inventory](plans/inventory-2026-09-29.md); each plan keeps its own checklist.
@@ -99,6 +106,7 @@ scopes into one package rewrite, lift a gate or approve gated units. Sizes are i
 | TUI                  | [202](plans/202-tui-ui.md) on upstream OpenTUI                                                                                                                                       | Local controls any time                                                                       | Production Markdown cutover waits for the tree-sitter-md M1–M4 producer and Editor semantic S0–S4 consumer gates. Controls use 206's dispatcher. No toolkit package, maintained fork or native release pipeline.                                             |
 | Localization         | [208](plans/208-all-text-in-json.md)                                                                                                                                                 | Broad migration, by unit                                                                      | Catalog and typed generation, then structured-error transport, bounded caller migrations, locale/plural/RTL acceptance. 207 no longer blocks the catalog contract; command/settings metadata coordinates with 206.                                           |
 | Unified workspace    | [209](plans/209-unified-workspace.md)                                                                                                                                                | Design review any time                                                                        | Resolve D1–D6 before affected units. Production implementation needs a separate owner decision. Uses 206 commands, 200 content ownership and 208 catalogs.                                                                                                   |
+| Async runtime        | [328](plans/328-async-runtime-master.md) master + [329](plans/329-async-lifecycle-and-transport.md)–[334](plans/334-async-runtime-verification.md)                                   | Research/planning delivered; implementation deferred at owner request                         | Start qualification before package adoption when execution begins. Preserve 099/282 and terminal 287/286/283 gates, exact standalone publication under 207, current domain authority and independent actors.                                                 |
 
 Work that can start without waiting for another program: 126's server and provider proofs,
 204/205 producer prep, 202's local controls, 198's acceptance proofs, 200's baseline
@@ -236,6 +244,21 @@ for their bindings; each plan lists its own dependencies. Vim is plans 274–280
 record Zed actions that do not apply.
 
 ## Other work and boundaries
+
+### Deferred virtualization work
+
+[327](plans/327-virtualization-and-two-axis-tables.md) is Approved and scheduled later,
+outside the current execution queue. It requires two-axis data-table virtualization,
+starting with CSV, and measures editor rewrapping, recycled search-editor work and shared-list
+costs before tuning. Keep existing renderer ownership and coordinate with 156, 182 and E052.
+CSV column windowing is required; a virtualizer replacement depends on a measured comparison.
+
+[172](plans/172-shared-undo-stack.md) is Approved for the shared operation-history extraction.
+Its local order is entry/execution contracts, shared core, session actions, then workspace
+bookkeeping. Use the integrated action API by default and its lower-level composition where
+explicit transaction control simplifies integration. Preserve separate domain histories, the
+editor graph, and server journal ownership. This work retains the current structural-cutover
+limit; coordinate lifecycle and workspace files with their active owners.
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their
 statuses here. In particular:

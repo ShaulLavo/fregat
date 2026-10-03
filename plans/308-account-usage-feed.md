@@ -56,7 +56,7 @@ Each PR receives one independent Sol HIGH reviewer, green CI, and a squash merge
 - [ ] Phase 2 — local transcript history under Plan 309. Portable native files outside projects reproduce the scope gap; prove deduplication, pricing provenance, partial writes, append/truncate/replace, corrupt/restarted scan cache, timezone/range behavior and cached reads. Keep local coverage explicit. Connected-host composition remains separately scheduled by Plan 309.
 - [ ] Phase 3 — Settings/account UI and composer adoption. Fail-first render/query fixtures; normal/narrow `settings-usage` and account/no-data/stale/mixed-age scenarios, including an idle composer receiving its first background observation. Read back `look` evidence and prove cache-only reads. Do not claim cross-device transcript coverage.
 - [ ] Phase 4 — deploy Fregat. Verify on the mesh-owned dev server, then `bun run deploy --server --restart`; confirm production `/platform/release`, account cache persistence, cache-only feed and unchanged actual observation ages under repeated reads. No Pi or live gateway changes by this lane.
-- [x] Phase 5 source retirement. Removed producer modules, usage tests, runtime feed parsing/lifecycle and passive observer. Preserved `readCredits` inside reset-order and made the no-Claude-pool startup guard unconditional, with empty entrypoints by default. Moved all retained gateway, launch, login, reset-order and fixture source into plain local files under `/work/cli-proxy-api/src`; removed the entire former Fregat source folder and root test/unused inventories. Offline guard, credits, gateway, launch, reset-order, build and deployment-rollback fixtures verify the local delivery. Independent review, merge and root bundle installation remain separate coordinator steps. The unexecuted local deploy script never edits runtime JSON.
+- [x] Phase 5 source retirement. Removed producer modules, usage tests, runtime feed parsing/lifecycle and passive observer. Preserved `readCredits` inside reset-order and made the no-Claude-pool startup guard unconditional, with empty entrypoints by default. Moved all retained gateway, launch, login, reset-order and fixture source into plain local files under `/work/cli-proxy-api/src`; removed the entire former Fregat source folder and root test/unused inventories. Offline guard, credits, gateway, launch, reset-order, build and deployment-rollback fixtures verify the local delivery. Independent review requested constructor and deployment hardening. The author fixes remove the Claude pooling path, validate both exports before binding, and protect rollback from repeated signals and proxy-supplied readiness. Coordinator verification, merge and root bundle installation remain pending. The unexecuted local deploy script never edits runtime JSON.
 
 ## Execution receipts
 
@@ -65,7 +65,7 @@ Each PR receives one independent Sol HIGH reviewer, green CI, and a squash merge
 - Transcript PR / merge: pending.
 - UI PR / merge / look evidence: pending.
 - Dev / production deploy evidence and final feed URL: pending.
-- Retirement PR / merge: pending, gated on coordinator cut-over.
+- Source-retirement PR / merge: [#496](https://github.com/ShaulLavo/fregat/pull/496), author fixes for the independent review delivered; coordinator verification and merge pending. Installed retirement remains gated on root-coordinator TV acceptance and consumer cut-over.
 
 ## Exact live handoff boundary
 
@@ -73,7 +73,7 @@ The implementation lane never touches the Pi, installed gateway, `runtime.json`,
 
 1. Point the Pi's `dashboard.usageFeedURL` at the reported production Fregat cache-only endpoint. Preserve all other `hosts.json` fields. Verify the strict v1 response, three independent accounts, real ages, stale/reset/no-data behavior, and the approved panel appearance.
 2. Confirm repeated TV/feed reads make no provider/management requests and keep `/ai` asleep with the same idle deadline. Check that a Fregat restart retains valid observations.
-3. Authorize source retirement after TV acceptance. Following its reviewed merge, install the rebuilt local gateway bundle through `/work/cli-proxy-api/src/deploy.sh` and restart the gateway using the existing Mesh-owned lifecycle. The retired feed option is ignored by the runtime parser; the deployment script leaves installed runtime JSON untouched. This also respawns its owned Codex proxy. Never configure Claude pooling.
+3. After TV acceptance and the reviewed source-retirement merge, authorize installation of the rebuilt local gateway bundle through `/work/cli-proxy-api/src/deploy.sh` and restart the gateway using the existing Mesh-owned lifecycle. The retired feed option is ignored by the runtime parser; the deployment script leaves installed runtime JSON untouched. This also respawns its owned Codex proxy. Never configure Claude pooling.
 4. Remove the `/ai-usage` Mesh route and then delete `/work/cli-proxy-api/usage-feed` only after confirming no consumer still points at it. These are owner-kept live resources; this lane does not delete them.
 
 Report the actual commands resolved from installed route/service metadata in the final handoff, without printing secrets or whole runtime/auth files. Keep runtime modifications and route/directory removal out of portable tests.

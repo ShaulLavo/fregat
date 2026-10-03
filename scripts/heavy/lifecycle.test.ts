@@ -295,9 +295,9 @@ describe.skipIf(!userScopes)('slice roots', () => {
   }, 40_000)
 
   test('the reaper refuses a slice outside the root it was given', () => {
-    expect(() => reapSlice('heavytmine', 'heavy-0123abcd.slice')).toThrow(
-      'outside the slice root heavytmine',
-    )
+    expect(() =>
+      reapSlice('heavytmine', 'heavy-0123abcd.slice', new AbortController().signal),
+    ).toThrow('outside the slice root heavytmine')
   })
 })
 
