@@ -385,14 +385,16 @@ test('a Pi job waits only for the Pi lane, never for this machine', async () => 
   expect(existsSync(path.join(box.state, 'queue'))).toBe(false)
 })
 
-test('refuses --max-wall without --host pi, and a ceiling that is not whole seconds', () => {
-  const label = 'ceiling-check'
-  const wrapper = (flags: readonly string[]) =>
-    spawnSync(process.execPath, [RUN, ...flags, label, '--', 'true'], { encoding: 'utf8' })
-  const local = wrapper(['--max-wall', '60'])
-  expect(local.status).toBe(2)
-  expect(local.stderr).toContain('--max-wall applies to --host pi')
-  const fraction = wrapper(['--host', 'pi', '--max-wall', '1.5'])
-  expect(fraction.status).toBe(2)
-  expect(fraction.stderr).toContain('positive whole number of seconds')
+test('refuses max-wall ceilings that are not positive whole seconds on either host', () => {
+  for (const host of ['local', 'pi']) {
+    for (const limit of ['0', '-1', '1.5', 'NaN']) {
+      const result = spawnSync(
+        process.execPath,
+        [RUN, '--host', host, '--max-wall', limit, 'ceiling-check', '--', 'true'],
+        { encoding: 'utf8' },
+      )
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain('positive whole number of seconds')
+    }
+  }
 })

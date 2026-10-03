@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
@@ -91,6 +91,187 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     )
     expect(recordOf(box, 'quiet')).toMatchObject({ quiet: true, quietHoldExpired: false })
   }, 40_000)
+
+  test('waiting light jobs get a turn between consecutive quiet holds', async () => {
+    const box = quietBox(600)
+    const releaseQuiet = path.join(box.root, 'release-first')
+    const releaseLight = path.join(box.root, 'release-light')
+    const first = start(
+      box,
+      'first-quiet',
+      ['bash', '-c', `echo started; ${until(releaseQuiet)}`],
+      {
+        jobClass: 'light',
+        machine: true,
+        quiet: true,
+      },
+    )
+    await expect.poll(first.stdout, { timeout: 10_000 }).toContain('started')
+    const second = start(box, 'second-quiet', ['true'], {
+      jobClass: 'light',
+      machine: true,
+      quiet: true,
+    })
+    await expect
+      .poll(() => live(box.state, 'queue').map((entry) => entry.label))
+      .toEqual(['second-quiet'])
+    const lightJob = start(box, 'between', ['bash', '-c', `echo started; ${until(releaseLight)}`], {
+      jobClass: 'light',
+      machine: true,
+    })
+    await expect
+      .poll(() => live(box.state, 'queue').map((entry) => entry.label))
+      .toEqual(['second-quiet', 'between'])
+    expect(lightJob.stdout()).toBe('')
+    writeFileSync(releaseQuiet, '')
+    expect((await first.done).code).toBe(0)
+    await expect.poll(lightJob.stdout, { timeout: 10_000 }).toContain('started')
+    expect(recordOf(box, 'second-quiet')).toBeUndefined()
+    const late = start(box, 'late-arrival', ['true'], { jobClass: 'light', machine: true })
+    await expect
+      .poll(() => live(box.state, 'queue').map((entry) => entry.label))
+      .toEqual(['second-quiet', 'late-arrival'])
+    expect(recordOf(box, 'late-arrival')).toBeUndefined()
+    writeFileSync(releaseLight, '')
+    expect((await lightJob.done).code).toBe(0)
+    expect((await second.done).code).toBe(0)
+    expect((await late.done).code).toBe(0)
+    expect(startedAt(recordOf(box, 'late-arrival'))).toBeGreaterThanOrEqual(
+      endedAt(recordOf(box, 'second-quiet')),
+    )
+    expect(startedAt(recordOf(box, 'between'))).toBeGreaterThanOrEqual(
+      endedAt(recordOf(box, 'first-quiet')),
+    )
+    expect(startedAt(recordOf(box, 'second-quiet'))).toBeGreaterThanOrEqual(
+      endedAt(recordOf(box, 'between')),
+    )
+  }, 40_000)
+
+  test('queue wait longer than max-wall still leaves the full running-time allowance', async () => {
+    const box = quietBox(600)
+    const request = path.join(box.state, 'drain.request')
+    writeFileSync(request, `pid=${process.pid} holder=deadline-test`)
+    const job = start(box, 'wait-then-run', ['bash', '-c', 'echo started; sleep 0.2'], {
+      jobClass: 'light',
+      machine: true,
+      maxWallSec: 1,
+    })
+    await expect.poll(job.stderr, { timeout: 10_000 }).toContain('draining for')
+    await expect
+      .poll(
+        () => {
+          const entry = live(box.state, 'queue')[0]
+          return entry ? Date.now() - Date.parse(entry.since) : 0
+        },
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(1_200)
+    expect(job.stdout()).toBe('')
+    rmSync(request)
+    const result = await job.done
+    expect(result.code, result.stderr).toBe(0)
+    expect(job.stdout()).toContain('started')
+    expect(recordOf(box, 'wait-then-run')!.queuedMs).toBeGreaterThan(1_000)
+    expect(recordOf(box, 'wait-then-run')!.wallMs).toBeLessThan(1_000)
+  }, 30_000)
+
+  test('max-wall stops running work and preserves the shorter quiet-hold maximum', async () => {
+    const box = quietBox(2)
+    const limited = await heavy(box, 'running-limit', sleeper(60), {
+      jobClass: 'light',
+      machine: true,
+      maxWallSec: 1,
+    })
+    expect(limited.code).toBe(124)
+    expect(limited.stderr).toContain('queue wait is unlimited and excluded')
+    expect(recordOf(box, 'running-limit')).toMatchObject({ exitCode: 124, quietHoldExpired: false })
+    expect(unitActive(recordOf(box, 'running-limit')!.slice!)).toBe(false)
+    const quiet = await heavy(box, 'shorter-hold', sleeper(60), {
+      jobClass: 'light',
+      machine: true,
+      quiet: true,
+      maxWallSec: 60,
+    })
+    expect(quiet.code).toBe(75)
+    expect(recordOf(box, 'shorter-hold')).toMatchObject({ quietHoldExpired: true })
+  }, 30_000)
+
+  test('a shorter hard deadline keeps its reason through quiet teardown', async () => {
+    const box = quietBox(2)
+    const result = await heavy(
+      box,
+      'shorter-wall',
+      ['bash', '-c', 'trap "" TERM; echo started; while :; do sleep 1; done'],
+      {
+        jobClass: 'light',
+        machine: true,
+        quiet: true,
+        maxWallSec: 1,
+      },
+    )
+    expect(result.code, result.stderr).toBe(124)
+    expect(result.stderr).not.toContain('quiet hold for')
+    expect(recordOf(box, 'shorter-wall')).toMatchObject({ exitCode: 124, quietHoldExpired: false })
+  }, 30_000)
+
+  test('a long max-wall allowance uses the scope watchdog without overflowing a JS timer', async () => {
+    const box = quietBox(600)
+    const result = await heavy(box, 'long-allowance', ['bash', '-c', 'sleep 0.2; echo finished'], {
+      jobClass: 'light',
+      machine: true,
+      maxWallSec: 2_592_000,
+    })
+    expect(result.code, result.stderr).toBe(0)
+    expect(result.stderr).not.toContain('TimeoutOverflowWarning')
+    expect(recordOf(box, 'long-allowance')).toMatchObject({ exitCode: 0 })
+  }, 30_000)
+
+  test('a failed fairness snapshot preserves the job result and releases its admission', async () => {
+    const box = quietBox(600)
+    const releaseJob = path.join(box.root, 'release-job')
+    const quiet = start(
+      box,
+      'snapshot-fails',
+      ['bash', '-c', `echo started; ${until(releaseJob)}`],
+      {
+        jobClass: 'light',
+        machine: true,
+        quiet: true,
+      },
+    )
+    await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('started')
+    mkdirSync(path.join(box.state, 'quiet.turn.partial'))
+    writeFileSync(releaseJob, '')
+    const result = await quiet.done
+    expect(result.code, result.stderr).toBe(0)
+    expect(result.stderr).toContain('could not save fair turn')
+    expect(live(box.state, 'jobs')).toEqual([])
+    for (const slot of ['slot1.lock', 'slot2.lock', 'slot3.lock']) {
+      const fd = tryLock(path.join(box.state, slot))
+      expect(fd).not.toBeNull()
+      if (fd !== null) unlock(fd)
+    }
+    expect(
+      (await heavy(box, 'after-failed-snapshot', ['true'], { jobClass: 'light', machine: true }))
+        .code,
+    ).toBe(0)
+  }, 30_000)
+
+  test.each(['', '{', '{"quietId":"aaaaaaaaaaaa","waitingIds":5}', '{"quietId":null}'])(
+    'invalid advisory turn metadata leaves FIFO admission available (%s)',
+    async (metadata) => {
+      const box = quietBox(600)
+      writeFileSync(path.join(box.state, 'quiet.turn'), metadata)
+      const result = await heavy(box, 'bad-metadata', ['true'], {
+        jobClass: 'light',
+        machine: true,
+      })
+      expect(result.code, result.stderr).toBe(0)
+      expect(result.stderr).toContain('ignored invalid fair-turn metadata')
+      expect(existsSync(path.join(box.state, 'quiet.turn'))).toBe(false)
+    },
+    30_000,
+  )
 
   test('a hold that runs out stops the quiet job, tells it to queue again, and frees the machine', async () => {
     const box = quietBox(2)

@@ -59,9 +59,10 @@ import {
   type Held,
 } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord } from './record'
+import { beginQuietTurn, finishQuietTurn, turnQueue } from './turn'
 
 const USAGE =
-  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--quiet] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
+  'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--quiet] [--host local|pi] [--max-wall <running seconds>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
 const SLOT_FILES = ['slot1.lock', 'slot2.lock', 'slot3.lock'] as const
 const POLL_MS = 1_000
 const WAIT_NOTICE_MS = 60_000
@@ -144,11 +145,6 @@ function parseOptions(argv: readonly string[]): Options {
     throw createScriptError(`Unknown host ${host}. Hosts: ${HOSTS.join(', ')}.`)
   }
   const maxWall = flags.get('--max-wall')
-  if (maxWall !== undefined && host !== 'pi') {
-    throw createScriptError(
-      `--max-wall applies to --host pi, which enforces it on the Pi. ${USAGE}`,
-    )
-  }
   const maxWallSec = maxWall === undefined ? undefined : Number(maxWall)
   if (maxWallSec !== undefined && (!Number.isSafeInteger(maxWallSec) || maxWallSec <= 0)) {
     throw createScriptError(`--max-wall must be a positive whole number of seconds. ${USAGE}`)
@@ -225,18 +221,29 @@ async function run(options: Options) {
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
       process.on(signal, () => job.stop(signal))
     }
-    const holdMs = config.quietHoldSeconds * 1000
-    let stoppedAtHold = false
-    const hold = options.quiet
-      ? setTimeout(() => {
-          stoppedAtHold = true
-          job.stop('SIGTERM')
-        }, holdMs)
-      : undefined
+    const limitSeconds = options.host === 'local' ? runtimeLimit(options, config) : null
+    const limitMs = limitSeconds === null ? Infinity : limitSeconds * 1000
+    const quietLimit = options.quiet && limitSeconds === config.quietHoldSeconds
+    let stoppedAtLimit = false
+    // Long limits are enforced by systemd; JS timers overflow beyond signed 32-bit delays.
+    const deadline =
+      limitMs <= 2 ** 31 - 1
+        ? setTimeout(() => {
+            stoppedAtLimit = true
+            job.stop('SIGTERM')
+          }, limitMs)
+        : undefined
     const outcome = await job.done
-    clearTimeout(hold)
+    clearTimeout(deadline)
+    const expired = stoppedAtLimit || outcome.wallMs >= limitMs
+    const wallExpired = expired && !quietLimit
+    if (wallExpired) {
+      console.error(
+        `[wave-heavy] running time for '${options.label}' reached its ${options.maxWallSec} s --max-wall limit; queue wait is unlimited and excluded.`,
+      )
+    }
     // systemd ends the scope at the hold too, so a run this process slept through counts.
-    const holdExpired = options.quiet && (stoppedAtHold || outcome.wallMs >= holdMs)
+    const holdExpired = expired && quietLimit
     if (holdExpired) {
       console.error(
         `[wave-heavy] quiet hold for '${options.label}' reached its ${config.quietHoldSeconds} s limit (developer.heavyJobQuietHoldSeconds), so the job was stopped. Run it again to queue for another hold.`,
@@ -249,10 +256,11 @@ async function run(options: Options) {
       cwd,
       holdExpired,
       id,
-      outcome,
+      outcome: wallExpired && !holdExpired ? { ...outcome, exitCode: 124 } : outcome,
       queuedMs,
     })
-    return holdExpired ? RETRY_EXIT : outcome.exitCode
+    if (holdExpired) return RETRY_EXIT
+    return wallExpired ? 124 : outcome.exitCode
   } finally {
     placed.release()
   }
@@ -295,9 +303,17 @@ async function admitLocal(
     budget,
     reason: admitted.reason,
     release: () => {
-      if (options.quiet) clearQuietHolder(options.stateDir, (holder) => holder === id)
-      release(admitted.held)
-      for (const fd of admitted.slots) unlock(fd)
+      const lock = waitLock(path.join(options.stateDir, 'admission.lock'))
+      try {
+        if (options.quiet) {
+          completeQuietTurn(options.stateDir, id)
+          clearQuietHolder(options.stateDir, (holder) => holder === id)
+        }
+        release(admitted.held)
+      } finally {
+        for (const fd of admitted.slots) unlock(fd)
+        unlock(lock)
+      }
     },
     spec: {
       ceilingBytes: budget.ceilingMiB * MiB,
@@ -307,11 +323,27 @@ async function admitLocal(
       host: 'local',
       id,
       sliceRoot: options.sliceRoot,
-      runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
+      runtimeLimitSeconds: runtimeLimit(options, config),
       entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
   }
+}
+
+function completeQuietTurn(stateDir: string, id: string) {
+  try {
+    finishQuietTurn(stateDir, id)
+  } catch (error) {
+    console.error(`[wave-heavy] could not finish fair turn: ${scriptFailureText(error)}`)
+  }
+}
+
+function runtimeLimit(options: Options, config: Config) {
+  const limit = Math.min(
+    options.maxWallSec ?? Infinity,
+    options.quiet ? config.quietHoldSeconds : Infinity,
+  )
+  return Number.isFinite(limit) ? limit : null
 }
 
 // The Pi runs one job at a time under its own ceiling, so this machine's memory is not asked.
@@ -348,8 +380,7 @@ function clearHolder(holder: string) {
 
 type Admitted = { readonly held: Held; readonly slots: readonly number[]; readonly reason: string }
 
-// Waits first-in first-out: only the head of the queue is considered, so a small job never
-// overtakes a large one that is waiting for memory.
+// FIFO within each turn: a small job never overtakes a large one waiting for memory.
 async function admit(options: Options, config: Config, entry: Entry): Promise<Admitted> {
   mkdirSync(options.stateDir, { recursive: true })
   for (const slot of SLOT_FILES) writeFileSync(path.join(options.stateDir, slot), '', { flag: 'a' })
@@ -376,15 +407,14 @@ function attemptAdmission(
   try {
     // Every waiting wrapper reclaims what dead wrappers left, before any rule can stop it.
     const running = reconcile(options, config.graceSeconds)
-    const ahead = live(options.stateDir, 'queue').findIndex(
-      (entry) => entry.id === waiting.entry.id,
-    )
+    const now = bootSeconds()
+    const queue = turnQueue(options.stateDir, live(options.stateDir, 'queue'), running.owners, now)
+    const ahead = queue.findIndex((entry) => entry.id === waiting.entry.id)
     if (ahead > 0) return { reason: `${ahead} job(s) ahead in the queue` }
     const drain = drainRequest(options.stateDir, config.quietHoldSeconds * 1000)
     if (drain) return { reason: `draining for ${drain}` }
     const hold = legacyHold(options.stateDir, SLOT_FILES)
     if (hold) return { reason: hold }
-    const now = bootSeconds()
     const quiet = running.owners.find((job) => job.quiet && (job.quietUntil ?? Infinity) > now)
     if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}` }
     const decision = waiting.entry.quiet
@@ -403,8 +433,12 @@ function attemptAdmission(
       return { reason: 'a slot lock was taken exclusively' }
     }
     const lease = waiting.entry.quiet
-      ? { quietUntil: now + config.quietHoldSeconds + stopTimeoutSeconds(config.graceSeconds) }
+      ? {
+          quietUntil:
+            now + runtimeLimit(options, config)! + stopTimeoutSeconds(config.graceSeconds),
+        }
       : {}
+    if (waiting.entry.quiet) beginQuietTurn(options.stateDir, waiting.entry.id)
     return {
       held: promote(options.stateDir, waiting, lease),
       reason: decision.reason,

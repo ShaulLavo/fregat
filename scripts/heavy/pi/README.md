@@ -98,8 +98,9 @@ holds it until its
 launcher exits, which is after the Pi confirms the job stopped. The launcher syncs the caller's
 checkout, runs the command from the same directory inside the lane slice under the lease above,
 copies the run directory to `/work/tmp/fregat-evidence/`, and hands the slice's totals to the
-wrapper's record. `--max-wall <seconds>` sets the ceiling (pi only). A signal to the wrapper
-cancels the job. The web build is not synced this way; ship it once with `sync.ts --web`.
+wrapper's record. `--max-wall <seconds>` limits running time on either host. Queue wait is
+unlimited and excluded; local jobs have no default running limit, and Pi jobs default to 3600 s.
+A signal to the wrapper cancels the job. The web build is not synced this way; ship it once with `sync.ts --web`.
 
 ## Reading the numbers
 
