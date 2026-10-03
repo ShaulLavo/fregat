@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { sha256 } from './comparison-build.ts'
@@ -75,7 +75,10 @@ async function fixture(context, run) {
 async function assertBundle(output, expectedVersion, expectedBytes) {
   const manifest = JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'))
   assert.equal(manifest.versions['ghostty-webgpu'], expectedVersion)
-  assert.match(await readFile(join(output, 'browser.js'), 'utf8'), new RegExp(expectedVersion))
+  const bundle = await readFile(join(output, 'browser.js'))
+  assert.ok(bundle.toString().includes(expectedVersion))
+  assert.equal(manifest.runtime.version, expectedVersion)
+  assert.equal(manifest.bundleSha256, sha256(bundle))
   for (const [name, bytes] of Object.entries(expectedBytes)) {
     assert.deepEqual(await readFile(join(output, name)), bytes)
     assert.equal(manifest.assets[name], sha256(bytes))
@@ -86,7 +89,7 @@ async function assertBundle(output, expectedVersion, expectedBytes) {
 }
 
 test('runtime-ref CLI bundles source, WASM and package version from one commit', async (context) => {
-  await fixture(context, async ({ repository, git, baseline, build }) => {
+  await fixture(context, async ({ repository, baseline, build }) => {
     const output = join(repository, '.artifacts/baseline')
     const result = build(output, ['--runtime-ref', baseline])
     assert.equal(result.status, 0, result.stderr)
@@ -99,10 +102,14 @@ test('runtime-ref CLI bundles source, WASM and package version from one commit',
     assert.equal(manifest.runtime.commit, baseline)
     assert.equal(manifest.runtime.mode, 'git-ref')
     assert.equal(manifest.runtime.dirty, '')
-    assert.equal(
-      manifest.runtime.files['package.json'],
-      sha256(git(['show', `${baseline}:ghostty-webgpu/package.json`])),
-    )
+    const inventory = Object.keys(manifest.runtime.files)
+      .sort()
+      .map((path) => {
+        const bytes = blob(path)
+        assert.equal(manifest.runtime.files[path], sha256(bytes))
+        return Buffer.concat([Buffer.from(`${path}\0`), bytes, Buffer.from('\0')])
+      })
+    assert.equal(manifest.runtime.sourceSha256, sha256(Buffer.concat(inventory)))
     assert.doesNotMatch(await readFile(join(output, 'browser.js'), 'utf8'), /0\.1\.2/)
   })
 })
@@ -129,11 +136,16 @@ test('missing ref, missing snapshot input and failed builds leave no staging dir
       0,
     )
     for (const path of ['bridge.wasm', 'ghostty-vt.wasm', 'package.json', 'src/runtime.ts']) {
+      const bytes = await readFile(join(root, path))
       git(['rm', `ghostty-webgpu/${path}`])
       git(['commit', '--quiet', '-m', `remove ${path}`])
+      await mkdir(dirname(join(root, path)), { recursive: true })
+      await writeFile(join(root, path), bytes)
       const output = join(repository, '.artifacts/missing-path')
       assert.notEqual(build(output, ['--runtime-ref', 'HEAD']).status, 0, path)
       await assert.rejects(readFile(join(output, 'manifest.json')), { code: 'ENOENT' })
+      git(['add', `ghostty-webgpu/${path}`])
+      git(['commit', '--quiet', '-m', `restore fixture ${path}`])
     }
     await writeFile(join(root, 'bench/comparison-entry.ts'), 'invalid syntax {')
     const output = join(repository, '.artifacts/build-failure')
