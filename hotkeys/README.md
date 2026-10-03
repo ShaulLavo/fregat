@@ -11,7 +11,7 @@ it also formats shortcuts for display and records new ones from the keyboard. th
 
 ## try it
 
-not on npm yet. clone it and `bun link`
+clone the repo and `bun link`, or use the workspaces in Fregat
 
 register a shortcut. `Mod` is Command on mac and Control everywhere else
 

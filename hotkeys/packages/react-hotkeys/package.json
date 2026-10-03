@@ -1,6 +1,6 @@
 {
   "name": "@fregat/react-hotkeys",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "React hooks for @fregat/hotkeys. A fork of TanStack React Hotkeys.",
   "keywords": [
     "hotkeys",
