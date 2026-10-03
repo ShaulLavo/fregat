@@ -4,6 +4,7 @@ import { Terminal as MainTerminal } from '../../dist/index.js'
 import { Terminal as WorkerTerminal, TerminalWorkerError } from '../../dist/worker/index.js'
 import type { TerminalApi } from '../../dist/dom/terminal-api.js'
 import { WebGlTerminalRenderer } from '../../dist/render/webgl/renderer.js'
+import { createDomInputController } from '../../dist/dom/input.js'
 import type { TerminalOutputReady, TerminalOutputMessage } from './protocol.js'
 
 const family = 'PackagedWorkerTest'
@@ -366,3 +367,243 @@ it('forwards release after a pending press when host input becomes disabled', as
   await terminal.readLines(0, 1)
   expect(output).toEqual(['\x1b[97u', '\x1b[97;1:3u'])
 })
+
+describe.each(['main', 'webgl', 'webgpu'] as const)('%s review correction parity', (mode) => {
+  it('delivers the initial fitted resize to pre-open subscribers after opening', async () => {
+    const terminal = await create(mode)
+    const initial = terminal.appearance.grid
+    const events: { cols: number; rows: number; lifecycle: string }[] = []
+    terminal.onResize((grid) => events.push({ ...grid, lifecycle: terminal.lifecycle }))
+    await terminal.open(container())
+    await eventually(
+      () => !!terminal.submittedFrame && terminal.appearance.grid.columns !== initial.columns,
+    )
+    const grid = terminal.appearance.grid
+    expect(events[0]).toEqual({ cols: grid.columns, rows: grid.rows, lifecycle: 'open' })
+    expect(events).toHaveLength(1)
+  })
+
+  it('retains the pre-open inactive cursor choice in the real submitted renderer', async () => {
+    const terminal = await create(mode)
+    await terminal.setCursorInactiveStyle('none')
+    await terminal.open(container())
+    await terminal.setTheme({
+      ...terminal.appearance.theme,
+      background: { r: 0, g: 0, b: 0 },
+      foreground: { r: 255, g: 255, b: 255 },
+      cursor: { r: 255, g: 0, b: 0 },
+    })
+    await eventually(() => terminal.submittedFrame?.theme.cursor.r === 255)
+    expect(terminal.submittedFrame?.cursor.visible).toBe(true)
+    expect(terminal.submittedFrame?.paintedCursor?.visible).toBe(false)
+    expect(await terminal.setCursorInactiveStyle('block')).toBe(true)
+    await eventually(() => terminal.submittedFrame?.paintedCursor?.visible === true)
+    await page.screenshot({
+      element: terminal.element!,
+      path: `../../../.artifacts/review-cursor-${mode}.png`,
+      scale: 'css',
+    })
+  })
+
+  it('reports only changes to retained inactive cursor settings before and after open', async () => {
+    const terminal = await create(mode)
+    expect(await terminal.setCursorInactiveStyle(undefined)).toBe(false)
+    expect(await terminal.setCursorInactiveStyle('none')).toBe(true)
+    expect(await terminal.setCursorInactiveStyle('none')).toBe(false)
+    await terminal.open(container())
+    expect(await terminal.setCursorInactiveStyle('none')).toBe(false)
+    expect(await terminal.setCursorInactiveStyle('block')).toBe(true)
+    expect(await terminal.setCursorInactiveStyle('block')).toBe(false)
+    expect(await terminal.setCursorInactiveStyle(undefined)).toBe(true)
+  })
+
+  it.each(['display', 'width', 'height'] as const)(
+    'retains native grid and content while %s is unmeasurable',
+    async (dimension) => {
+      const terminal = await create(mode)
+      const root = container()
+      await terminal.open(root)
+      await terminal.write('preserved native content')
+      await eventually(() => terminal.visibleLines()[0]?.trimEnd() === 'preserved native content')
+      const grid = terminal.appearance.grid
+      const resized: { cols: number; rows: number }[] = []
+      terminal.onResize((value) => resized.push(value))
+      const hidden = new Promise<void>((resolve) => {
+        const observer = new ResizeObserver(() => {
+          if (terminal.element!.clientWidth > 0 && terminal.element!.clientHeight > 0) return
+          observer.disconnect()
+          resolve()
+        })
+        observer.observe(terminal.element!)
+      })
+      if (dimension === 'display') root.style.display = 'none'
+      if (dimension === 'width') root.style.width = '0px'
+      if (dimension === 'height') root.style.height = '0px'
+      await hidden
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      )
+      await terminal.readLines(0, 1)
+      expect(terminal.appearance.grid).toEqual(grid)
+      expect(resized).toEqual([])
+      await terminal.setFont({ size: 20 })
+      expect(terminal.appearance.grid).toEqual(grid)
+      expect(resized).toEqual([])
+      expect((await terminal.readLines(0, 1))[0]?.text).toContain('preserved native content')
+      root.style.display = ''
+      root.style.width = '320px'
+      root.style.height = '120px'
+      await eventually(
+        () =>
+          terminal.appearance.grid.columns < grid.columns &&
+          terminal.appearance.grid.rows < grid.rows,
+      )
+      await eventually(() => terminal.visibleLines()[0]?.trimEnd() === 'preserved native content')
+      expect(resized).toEqual([
+        { cols: terminal.appearance.grid.columns, rows: terminal.appearance.grid.rows },
+      ])
+    },
+  )
+
+  it('opens an initially hidden host without resizing native state and fits on reveal', async () => {
+    const terminal = await create(mode)
+    const root = container()
+    root.style.display = 'none'
+    const grid = terminal.appearance.grid
+    const resized: { cols: number; rows: number }[] = []
+    terminal.onResize((value) => resized.push(value))
+    await terminal.open(root)
+    await terminal.readLines(0, 1)
+    expect(terminal.appearance.grid.columns).toBe(grid.columns)
+    expect(terminal.appearance.grid.rows).toBe(grid.rows)
+    expect(resized).toEqual([])
+    root.style.display = ''
+    await eventually(() => terminal.appearance.grid.columns < grid.columns)
+    await eventually(() => !!terminal.submittedFrame)
+    expect(resized).toEqual([
+      { cols: terminal.appearance.grid.columns, rows: terminal.appearance.grid.rows },
+    ])
+  })
+})
+
+it.each(['pending', 'current', 'older'] as const)(
+  'review correction preserves release ownership with %s key ACKs',
+  async (ack) => {
+    let disabled = false
+    const terminal = await WorkerTerminal.create({
+      backend: 'webgl',
+      fonts: [{ family, source: { url: fontUrl } }],
+      inputHooks: { inputDisabled: () => disabled },
+    })
+    active.push(terminal)
+    await terminal.open(container())
+    await terminal.write('\x1b[>11u')
+    const output: string[] = []
+    terminal.onData((data) => output.push(new TextDecoder().decode(data)))
+    const send = (type: 'keydown' | 'keyup') =>
+      terminal.textarea!.dispatchEvent(
+        new KeyboardEvent(type, { key: 'a', code: 'KeyA', bubbles: true, cancelable: true }),
+      )
+    if (ack !== 'older') {
+      send('keydown')
+      if (ack === 'current') await terminal.readLines(0, 1)
+      disabled = true
+      send('keyup')
+      await terminal.readLines(0, 1)
+      expect(output).toEqual(['\x1b[97u', '\x1b[97;1:3u'])
+      return
+    }
+    const channel = new MessageChannel()
+    try {
+      const ready = new Promise<TerminalOutputReady>((resolve) => {
+        channel.port1.onmessage = ({ data }) => {
+          if (data.type === 'ready') resolve(data)
+        }
+        channel.port1.start()
+      })
+      await terminal.attachOutputPort(channel.port2)
+      const identity = await ready
+      const firstFence = terminal.fenceOutput(1)
+      send('keydown')
+      send('keyup')
+      const olderAck = terminal.readLines(0, 1)
+      const secondFence = terminal.fenceOutput(2)
+      send('keydown')
+      channel.port1.postMessage({
+        ...identity,
+        type: 'output',
+        sequence: 1,
+        data: new Uint8Array(),
+      })
+      await firstFence
+      await olderAck
+      disabled = true
+      send('keyup')
+      channel.port1.postMessage({
+        ...identity,
+        type: 'output',
+        sequence: 2,
+        data: new Uint8Array(),
+      })
+      await secondFence
+      await terminal.readLines(0, 1)
+      expect(output).toEqual(['\x1b[97u', '\x1b[97;1:3u', '\x1b[97u', '\x1b[97;1:3u'])
+    } finally {
+      channel.port1.close()
+    }
+  },
+)
+
+it.each(['older-empty', 'current-empty', 'released', 'reset', 'dispose'] as const)(
+  'review correction ignores obsolete asynchronous press ACK ownership: %s',
+  async (lifecycle) => {
+    let disabled = false
+    const actions: string[] = []
+    const errors: unknown[] = []
+    const pending: ((bytes: Uint8Array) => void)[] = []
+    const textarea = document.createElement('textarea')
+    container().append(textarea)
+    const controller = createDomInputController({
+      textarea,
+      platform: 'linux',
+      shortcuts: false,
+      signal: new AbortController().signal,
+      hooks: { inputDisabled: () => disabled },
+      onError: (cause) => errors.push(cause),
+      encoding: {
+        key: (input) => {
+          actions.push(input.action)
+          return new Promise((resolve) => pending.push(resolve))
+        },
+        paste: async () => new Uint8Array(),
+        sendInput: async () => new Uint8Array(),
+      },
+    })
+    const send = (type: 'keydown' | 'keyup') =>
+      textarea.dispatchEvent(
+        new KeyboardEvent(type, { key: 'a', code: 'KeyA', bubbles: true, cancelable: true }),
+      )
+    try {
+      send('keydown')
+      if (lifecycle === 'older-empty') {
+        send('keyup')
+        send('keydown')
+      }
+      if (lifecycle === 'released') send('keyup')
+      if (lifecycle === 'reset') controller.resetTransientState()
+      if (lifecycle === 'dispose') controller.dispose()
+      const empty = lifecycle === 'older-empty' || lifecycle === 'current-empty'
+      pending[0]!(empty ? new Uint8Array() : new Uint8Array([97]))
+      await Promise.resolve()
+      disabled = true
+      send('keyup')
+      let expected = ['press']
+      if (lifecycle === 'older-empty') expected = ['press', 'release', 'press', 'release']
+      if (lifecycle === 'released') expected = ['press', 'release']
+      expect(actions).toEqual(expected)
+      expect(errors).toEqual([])
+    } finally {
+      controller.dispose()
+    }
+  },
+)

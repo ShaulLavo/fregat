@@ -394,6 +394,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     let renderer: GhosttyWebGpuRenderer | undefined
     try {
       const elements = this.installElements(parent)
+      if (this.execution.kind === 'async') this.subscribeToSession()
       const initialAppearance = this.execution.appearance
       renderer = await this.createRenderer(elements, initialAppearance)
       if (!this.isOpening(generation)) {
@@ -409,7 +410,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       renderer = undefined
       this.reconcileRendererAppearance(elements, initialAppearance)
       this.setDocumentVisible(elements.root.ownerDocument.visibilityState !== 'hidden')
-      this.subscribeToSession()
+      if (this.execution.kind === 'sync') this.subscribeToSession()
       this.installAccessibility(elements)
       this.installScrollbar(elements)
       this.installInput(elements, parent)

@@ -1,6 +1,7 @@
 import { LocalTerminalExecution } from '../dom/execution-local.js'
 import { calculateTerminalFittedFont } from '../dom/fit.js'
 import type { GhosttyWebGpuRenderer } from '../dom/types.js'
+import type { InactiveCursorStyle } from '../render/cursor.js'
 import type { RenderSchedulerClock } from '../render/scheduler.js'
 import { WebGpuTerminalRenderer, WebGpuUnavailableError } from '../render/renderer.js'
 import { WebGlTerminalRenderer, WebGlUnavailableError } from '../render/webgl/renderer.js'
@@ -40,6 +41,7 @@ const workerClock: RenderSchedulerClock = {
 export class TerminalWorkerRuntime {
   private execution?: LocalTerminalExecution
   private renderer?: GhosttyWebGpuRenderer
+  private inactiveCursorStyle?: InactiveCursorStyle
   private readonly faces: FontFace[] = []
   private readonly subscriptions: TerminalSessionSubscription[] = []
   private readonly abort = new AbortController()
@@ -142,19 +144,22 @@ export class TerminalWorkerRuntime {
   private applyLayout(layout: WorkerLayout): void {
     if (this.layout && layout.identity < this.layout.identity) return
     const execution = this.native()
-    const font = this.fit(layout)
+    const initial = this.layout === undefined
+    this.layout = layout
     const padding = layout.padding
+    const width = layout.width - padding.left - padding.right - layout.scrollbarWidth
+    const height = layout.height - padding.top - padding.bottom
+    if (layout.autoFit && (width <= 0 || height <= 0)) {
+      // A hidden initial host still needs submission metadata, without a native resize.
+      if (initial) execution.commitLayout(this.fit(layout), padding)
+      return
+    }
+    const font = this.fit(layout)
     const columns = layout.autoFit
-      ? Math.max(
-          1,
-          Math.floor(
-            (layout.width - padding.left - padding.right - layout.scrollbarWidth) /
-              font.cssCellWidth,
-          ),
-        )
+      ? Math.max(1, Math.floor(width / font.cssCellWidth))
       : execution.grid.columns
     const rows = layout.autoFit
-      ? Math.max(1, Math.floor((layout.height - padding.top - padding.bottom) / font.cssCellHeight))
+      ? Math.max(1, Math.floor(height / font.cssCellHeight))
       : execution.grid.rows
     // No await splits the font, native grid and renderer commit.
     execution.commitLayout(font, padding)
@@ -168,7 +173,6 @@ export class TerminalWorkerRuntime {
     })
     this.renderer?.resize({ columns, rows })
     this.renderer?.refreshRows?.(0, rows - 1)
-    this.layout = layout
   }
 
   private async open(canvas: OffscreenCanvas, layout: WorkerLayout): Promise<void> {
@@ -238,6 +242,7 @@ export class TerminalWorkerRuntime {
       this.abort.signal,
     )
     this.renderer = renderer
+    this.renderer.setInactiveCursorStyle?.(this.inactiveCursorStyle)
     this.renderer.schedule()
   }
 
@@ -392,9 +397,13 @@ export class TerminalWorkerRuntime {
         return this.renderer?.setFocused(...request.args)
       case 'visible':
         return this.renderer?.setDocumentVisible(...request.args)
-      case 'inactiveCursor':
-        this.renderer?.setInactiveCursorStyle?.(...request.args)
+      case 'inactiveCursor': {
+        const [style] = request.args
+        if (this.inactiveCursorStyle === style) return false
+        this.inactiveCursorStyle = style
+        this.renderer?.setInactiveCursorStyle?.(style)
         return true
+      }
       case 'refresh':
         return this.renderer?.refreshRows?.(...request.args)
       case 'clearTextureAtlas':

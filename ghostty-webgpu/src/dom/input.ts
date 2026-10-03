@@ -307,7 +307,7 @@ class BrowserInputController implements DomInputController {
   private readonly hotkeys: CompiledTerminalHotkeyBindings
   private readonly pasteShortcut: CompiledDomHotkey
   private readonly platform: DomHotkeyPlatform
-  private readonly forwardedKeyPresses = new Set<string>()
+  private readonly forwardedKeyPresses = new Map<string, KeyboardEvent>()
   private readonly pressedModifierCodes = new Set<string>()
   private readonly suppressedShortcuts = new Map<string, SuppressedShortcutPolicy>()
 
@@ -641,15 +641,18 @@ class BrowserInputController implements DomInputController {
       const encoding = this.options.encoding
       if (encoding) {
         if (!this.screenReaderUsesBrowserDefault(event)) event.preventDefault()
-        // Release ownership starts when the host forwards a press, before native acknowledgement.
-        if (event.type === 'keydown' && !event.repeat) this.forwardedKeyPresses.add(event.code)
+        // Ownership follows forwarding; an older acknowledgement cannot clear a newer press.
+        if (event.type === 'keydown' && !event.repeat)
+          this.forwardedKeyPresses.set(event.code, event)
+        if (event.type === 'keyup') this.forwardedKeyPresses.delete(event.code)
         const generation = this.encodingGeneration
         void encoding
           .key(input)
           .then((bytes) => {
             if (this.disposed || generation !== this.encodingGeneration) return
             this.notifyKey(event, bytes)
-            this.updateForwardedKeyPresses(event, bytes)
+            if (bytes.length === 0 && this.forwardedKeyPresses.get(event.code) === event)
+              this.forwardedKeyPresses.delete(event.code)
           })
           .catch((cause: unknown) => this.options.onError(cause, 'key'))
         return
@@ -683,7 +686,7 @@ class BrowserInputController implements DomInputController {
       this.forwardedKeyPresses.delete(event.code)
       return
     }
-    this.forwardedKeyPresses.add(event.code)
+    this.forwardedKeyPresses.set(event.code, event)
   }
 
   private notifyKey(event: KeyboardEvent, bytes: TerminalInputResult): void {
