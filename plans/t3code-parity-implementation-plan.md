@@ -1,5 +1,8 @@
 > [!IMPORTANT]
-> **STATUS: 🟡 NEEDS UPDATE (reviewed 2026-06-06).** Living plan — backend `orchestration/`/`persistence/` and `features/chat/` now partly exist; refresh phase status.
+> **Status: historical architecture grouping, reviewed 2026-06-06.**
+> [Plan 126](126-t3code-alignment.md) and its current ledger own alignment execution.
+> Preserve the original phases as a scope reference; reconcile any unmatched remainder into
+> its current owning plan before scheduling it through [PLAN.md](../PLAN.md).
 
 # Platform Agent Architecture Plan
 
