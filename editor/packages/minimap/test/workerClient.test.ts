@@ -106,6 +106,66 @@ describe('MinimapWorkerClient', () => {
     }
   })
 
+  it.each(['native', 'post'])(
+    'reports the %s error and failed teardown during client disposal',
+    async (mode) => {
+      const runtime = installMinimapRuntime()
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const host = createHost()
+      const view = snapshot()
+      const client = new MinimapWorkerClient({
+        host,
+        options: resolveMinimapOptions(),
+        snapshot: view,
+        decorations: [],
+        onLayoutWidth: vi.fn(),
+        reservedLane: () => 0,
+      })
+      const worker = runtime.workers[0]!
+      const failure = new DOMException('Worker termination failed')
+      const original = new DOMException('Worker post failed', 'DataCloneError')
+      worker.terminate.mockImplementation(() => {
+        throw failure
+      })
+      worker.postMessage.mockImplementation(() => {
+        throw original
+      })
+
+      try {
+        expect(() => {
+          if (mode === 'native') worker.fail('native failure')
+          else client.updateViewport({ ...view.viewport, scrollTop: 20 })
+        }).not.toThrow()
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(warn.mock.calls[0]![1].message).toBe(
+          mode === 'native' ? 'Minimap worker crashed: native failure' : original.message,
+        )
+        const postedRequests = worker.postMessage.mock.calls.length
+        client.dispose()
+        await Promise.resolve()
+        runtime.flushAnimationFrames()
+        client.dispose()
+        expect(warn).toHaveBeenCalledTimes(2)
+        expect(warn).toHaveBeenLastCalledWith(failure.toString(), failure)
+        expect(worker.terminate).toHaveBeenCalledTimes(1)
+        expect(worker.postMessage).toHaveBeenCalledTimes(postedRequests)
+        expect(worker.onmessage).toBeNull()
+        expect(worker.onerror).toBeNull()
+        expect(client.inspectWorker()).toMatchObject({
+          lifecycle: 'crashed',
+          lastError: failure.message,
+        })
+      } finally {
+        client.dispose()
+        await Promise.resolve()
+        host.root.remove()
+        host.colorScope.remove()
+        warn.mockRestore()
+        runtime.restore()
+      }
+    },
+  )
+
   it('records worker error responses on the owner error channel', () => {
     const runtime = installMinimapRuntime()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
