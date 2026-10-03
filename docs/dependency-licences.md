@@ -1,7 +1,9 @@
 # Dependency licences and weight
 
 Research round 2, 2026-09-26. Scope: Platform (`ShaulLavo/fregat`), the linked Editor
-(`ShaulLavo/singapore`) and `ghostty-webgpu`, as they ship today.
+(`ShaulLavo/singapore`) and `ghostty-webgpu`, as they shipped on that date.
+
+The desktop Electrobun/CEF rows below are historical audit evidence. Gate 4 removed that dependency on 2026-10-03. The current launcher uses the installed browser or system webview; `Fregat.app` bundles the Bun runtime and its release dependencies. Its distributable payload needs its own current licence/notices audit; the old CEF row is not that audit.
 
 ## Headline
 

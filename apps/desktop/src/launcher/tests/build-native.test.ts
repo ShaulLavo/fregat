@@ -61,6 +61,62 @@ test('macOS publishes actual fullscreen state to the app document', async () => 
   expect(mac).toMatch(/windowDidExitFullScreen:[\s\S]*?\[self publishWindowState\]/)
 })
 
+test('macOS publishes fullscreen targets at animation start and reconciles completion or failure', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('@property(strong) NSNumber *fullscreenTarget;')
+  expect(mac).toMatch(
+    /BOOL fullscreen = self\.fullscreenTarget \? self\.fullscreenTarget\.boolValue\s*:\s*\(self\.window\.styleMask & NSWindowStyleMaskFullScreen\) != 0;/,
+  )
+  for (const [callback, target] of [
+    ['windowWillEnterFullScreen', '@YES'],
+    ['windowWillExitFullScreen', '@NO'],
+    ['windowDidEnterFullScreen', 'nil'],
+    ['windowDidExitFullScreen', 'nil'],
+    ['windowDidFailToEnterFullScreen', 'nil'],
+    ['windowDidFailToExitFullScreen', 'nil'],
+  ]) {
+    const body = mac.match(new RegExp(`- \\(void\\)${callback}:\\([^)]*\\)[^{]*\\{([^}]+)\\}`))?.[1]
+    expect(body, callback).toBeDefined()
+    expect(body).toMatch(
+      new RegExp(
+        `self\\.fullscreenTarget = ${target};\\s*\\[self refreshWindowStateScript\\];\\s*\\[self publishWindowState\\];`,
+      ),
+    )
+  }
+  for (const callback of ['windowDidFailToEnterFullScreen', 'windowDidFailToExitFullScreen']) {
+    expect(mac).toContain(`- (void)${callback}:(NSWindow *)window`)
+  }
+})
+
+test('macOS fills content bounds and outsets the glass rim beyond their clip', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  const mount = mac.match(/- \(void\)mountContentView:\(NSView \*\)view \{([\s\S]*?)\n\}/)?.[1]
+  expect(mount).toBeDefined()
+  expect(mount).toContain('NSView *content = self.window.contentView;')
+  expect(mount).toContain('view.translatesAutoresizingMaskIntoConstraints = NO;')
+  expect(mount).toContain('[content addSubview:view];')
+  expect(mount).toContain('[NSLayoutConstraint activateConstraints:@[')
+  expect(mount).toContain('CGFloat outset = view == self.glassEffect ? 4 : 0;')
+  for (const [edge, constant] of [
+    ['leading', '-outset'],
+    ['trailing', 'outset'],
+    ['top', '-outset'],
+    ['bottom', 'outset'],
+  ]) {
+    expect(mount).toContain(
+      `[view.${edge}Anchor constraintEqualToAnchor:content.${edge}Anchor constant:${constant}]`,
+    )
+  }
+  expect(mac).toContain('window.contentView.layer.masksToBounds = YES;')
+  expect(mac).toContain('[effect setValue:@0 forKey:@"cornerRadius"];')
+  for (const view of ['effect', 'host.glassEffect', 'view']) {
+    expect(mac).toContain(`[host mountContentView:${view}];`)
+  }
+  expect(mac).not.toContain('autoresizingMask')
+  expect(mac).not.toContain('contentLayoutGuide')
+  expect(mac).not.toContain('safeAreaLayoutGuide')
+})
+
 test('macOS clears content and WebKit root layer opacity only in vibrant mode', async () => {
   const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
   expect(mac).toContain('#import <QuartzCore/QuartzCore.h>')
@@ -110,7 +166,7 @@ test.skipIf(!webkit || !compiler)(
   `builds the Linux host (${webkit && compiler ? 'native dependencies present' : `skip reason: ${skipReason()}`})`,
   () => {
     const desktopDir = path.resolve(import.meta.dirname, '../../..')
-    const output = buildNative(desktopDir, 'installed')
+    const output = buildNative(desktopDir)
     expect(output).toBe(path.join(desktopDir, 'native/build/platform-webview'))
     expect(existsSync(output!)).toBe(true)
     for (const options of [
@@ -136,43 +192,40 @@ test.skipIf(!webkit || !compiler)(
   },
 )
 
-test.skipIf(!supported)(
-  'default Electrobun native build needs no optional WebKit/compiler dependencies',
-  () => {
-    const script = path.resolve(import.meta.dirname, '../../../scripts/build-native.ts')
-    const env = { ...process.env, PATH: '/nonexistent-native-build-tools' }
-    const result = Bun.spawnSync([process.execPath, script], { env })
-    expect(result.exitCode).toBe(0)
-    expect(result.stderr.toString()).toBe('')
-    const installed = Bun.spawnSync([process.execPath, script, '--shell=installed'], { env })
-    expect(installed.exitCode).not.toBe(0)
-    expect(installed.stderr.toString()).toContain('desktop.native.BUILD_FAILED')
-  },
-)
+test.skipIf(!supported)('default native build reports missing compiler dependencies', () => {
+  const script = path.resolve(import.meta.dirname, '../../../scripts/build-native.ts')
+  const env = { ...process.env, PATH: '/nonexistent-native-build-tools' }
+  const result = Bun.spawnSync([process.execPath, script], { env })
+  expect(result.exitCode).not.toBe(0)
+  expect(result.stderr.toString()).toContain('desktop.native.BUILD_FAILED')
+})
 
-test('default Electrobun and explicit installed-app entrypoints select their own native build', async () => {
+test('desktop entrypoints build the native host and launch the installed app', async () => {
   const desktop = path.resolve(import.meta.dirname, '../../..')
   const manifest = await Bun.file(path.join(desktop, 'package.json')).json()
   expect(manifest.scripts.dev).toBe(
-    'bun run build:native && bun ../../scripts/run-with-env.ts electrobun dev',
+    'bun run build:native && bun ../../scripts/run-with-env.ts bun src/launcher/index.ts --dev',
   )
-  expect(manifest.scripts.build).toBe('bun run build:native && electrobun build')
+  expect(manifest.scripts.build).toBe('bun run build:native')
   expect(manifest.scripts['build:native']).toBe('bun scripts/build-native.ts')
   const dev = await Bun.file(path.resolve(desktop, '../../scripts/desktop-dev.ts')).text()
-  expect(dev).toMatch(/'build:native',\s*'--shell=installed'/)
+  expect(dev).toContain("'apps/desktop', 'build:native'")
+  expect(dev).toContain("'apps/desktop/src/launcher/index.ts', '--dev'")
 })
 
-// NOT-PORTABLE: macOS case assumes Xcode clang and SDK without a prerequisite check.
-test.skipIf(process.platform !== 'darwin')(
-  'builds the macOS native host executable beside the retained Electrobun library',
+const macCompiler = process.platform === 'darwin' && Bun.which('clang') !== null
+const macSdk =
+  macCompiler &&
+  Bun.which('xcrun') !== null &&
+  Bun.spawnSync(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).exitCode === 0
+
+test.skipIf(!macSdk)(
+  `builds the macOS native host (${macSdk ? 'Xcode SDK present' : 'skip reason: macOS clang and SDK required'})`,
   () => {
     const desktopDir = path.resolve(import.meta.dirname, '../../..')
-    const host = buildNative(desktopDir, 'installed')
+    const host = buildNative(desktopDir)
     expect(host).toBe(path.join(desktopDir, 'native/build/platform-webview'))
     expect(existsSync(host!)).toBe(true)
-    const library = buildNative(desktopDir, 'electrobun')
-    expect(library).toBe(path.join(desktopDir, 'native/build/libVibrancy.dylib'))
-    expect(existsSync(library!)).toBe(true)
   },
 )
 
@@ -192,9 +245,7 @@ test('macOS keeps a negligible behind-window material visible to the compositor 
   expect(mac).toContain('self.glassEffect.hidden = !glass;')
   expect(mac).not.toMatch(/(?:self|host)\.effect\s*=\s*nil|removeFromSuperview/)
   expect(mac).not.toMatch(/(?:self\.)?effect\.hidden = .*none/)
-  expect(mac).toMatch(
-    /\[window\.contentView addSubview:effect\];[\s\S]*?\[window\.contentView addSubview:view\];/,
-  )
+  expect(mac).toMatch(/\[host mountContentView:effect\];[\s\S]*?\[host mountContentView:view\];/)
 })
 
 test('macOS leaves translucent opacity to the page and starts with a clear backdrop', async () => {
@@ -221,7 +272,7 @@ test('macOS leaves translucent opacity to the page and starts with a clear backd
   expect(mac).toContain('self.glassEffect.hidden = !glass;')
   expect(mac).toContain('text, host.glassEffect ? @"true" : @"false"')
   expect(mac).toMatch(
-    /\[window\.contentView addSubview:effect\];[\s\S]*?\[window\.contentView addSubview:host\.glassEffect\];[\s\S]*?\[window\.contentView addSubview:view\];/,
+    /\[host mountContentView:effect\];[\s\S]*?\[host mountContentView:host\.glassEffect\];[\s\S]*?\[host mountContentView:view\];/,
   )
   expect(mac).not.toMatch(/\bNSGlassEffectView\s*\*/)
   expect(mac).toContain('platformBridge.capabilities.windowGlass')

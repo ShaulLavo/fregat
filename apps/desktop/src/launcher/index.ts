@@ -4,14 +4,13 @@ import path from 'node:path'
 import { launcherFailureFacts, reportStartFailure } from './failure'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
 import { portFromEnv, requestOriginHeaders, runtimeUrl } from '../../../../scripts/runtime-network'
-import { desktopErrors } from '../bun/structured-errors'
 import {
   initializeDesktopObservability,
   flushDesktopObservability,
   recordDesktopInfo,
   recordDesktopError,
   recordDesktopWarning,
-} from '../bun/observability'
+} from './observability'
 import { resolveBrowserCandidates } from './browser'
 import { launchInstalledWindow } from './installed-window'
 import {
@@ -235,7 +234,7 @@ async function waitForHttp(url: string, webUrl: string) {
     }
     await Bun.sleep(250)
   }
-  throw desktopErrors.DEV_SERVER_UNREACHABLE({ url, internal: { waitedMs: 90_000 } })
+  throw launcherErrors.DEV_SERVER_UNREACHABLE({ url, internal: { waitedMs: 90_000 } })
 }
 
 function requestSignal() {

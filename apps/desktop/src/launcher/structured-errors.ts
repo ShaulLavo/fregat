@@ -1,6 +1,12 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const launcherErrors = defineErrorCatalog('desktop.launcher', {
+  DEV_SERVER_UNREACHABLE: {
+    status: 503,
+    message: ({ url }: { url: string }) => `The dev server at ${url} did not answer.`,
+    why: 'The desktop opens the shared dev server, which mesh starts on the first connection.',
+    fix: 'Run `bun run dev:serve` once to register it. `mesh serve ls` shows why a registered route failed.',
+  },
   BROWSER_SETTING_INVALID: {
     status: 400,
     message: 'The window browser setting is invalid.',

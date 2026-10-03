@@ -27,7 +27,7 @@ WEB_PORT=5214 bun run agent:browser look --doctor
 WEB_PORT=5214 bun run agent:browser scenario approval-turn-ended
 ```
 
-`--engine firefox` or `--engine webkit` runs `look`, `scenario`, `renders` or `caches` in another engine; `trace` needs Chromium. The desktop app is CEF, so other engines matter for the mesh (every iPhone browser is WebKit). Playwright's WebKit does not start on this Arch host (missing libicu74, libxml2, libflite).
+`--engine firefox` or `--engine webkit` runs `look`, `scenario`, `renders` or `caches` in another engine; `trace` needs Chromium. Desktop uses an installed Chromium app or the native system-webview host; WebKit coverage also matters for iPhone mesh clients. Playwright's WebKit on Arch needs `scripts/playwright-webkit-arch.sh` after a new WebKit download.
 
 `look`, `trace`, `renders` and `caches` also accept `--url` for a different target, including the mesh build at `https://omarchy.mesh.shaulavo.dev/platform/` and any address URL the user pastes. An address URL puts you in the user's exact state (workspace, tabs, selection); one copied from the dev page needs `--shared-dev`, because a throwaway server has never seen that workspace. The mesh is the owner's real state, so `scenario`, `trace` and `renders` refuse a production URL unless the scenario declares `readOnly: true`.
 

@@ -9,6 +9,13 @@ export function positiveInteger(args, flag, fallback) {
   return number
 }
 
+export function gpuCommandTimeout(settings, tracing) {
+  const key = tracing ? 'gpuTraceCommandTimeoutMilliseconds' : 'gpuCommandTimeoutMilliseconds'
+  const timeout = settings[key]
+  assert(Number.isSafeInteger(timeout) && timeout > 0, `Positive ${key} required`)
+  return timeout
+}
+
 export function analysisArguments(args) {
   const positional = args.filter((arg) => !arg.startsWith('--'))
   assert(
@@ -34,12 +41,6 @@ export function selection(args, flag, fallback, allowed) {
     `${flag} contains an unsupported value`,
   )
   return selected
-}
-
-export function selectedOutputFixture(args, available) {
-  const selected = selection(args, '--output-fixture', ['ascii'], available)
-  assert.equal(selected.length, 1, '--output-fixture needs exactly one fixture')
-  return selected[0]
 }
 
 export function hardwareLaunch(host, smoke, smokeHeaded = false) {

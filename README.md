@@ -28,6 +28,8 @@ open the url it prints, pick a folder
 
 with [mesh](https://github.com/ShaulLavo/mesh), `bun run dev:serve` registers one shared dev server instead: the first connection to `localhost:5173` starts it, and it stops once nothing has been connected for the idle window. `bun run dev:unserve` removes it
 
+`bun run desktop:dev` opens the shared dev routes through the desktop launcher. It uses an installed Chromium app or Fregat's system-webview window; closing the app leaves shared servers and terminals running. `bun run app:mac` builds the self-contained `Fregat.app` on macOS. See [Plan 114](plans/114-installed-app.md) for installation and window ownership.
+
 `bun run dev:web` skips the desktop app. `bun run dev:tui` is the terminal client, see the [tui guide](apps/tui/README.md)
 
 ## what's in it
@@ -35,7 +37,7 @@ with [mesh](https://github.com/ShaulLavo/mesh), `bun run dev:serve` registers on
 - [singapore](https://github.com/ShaulLavo/singapore), the editor. written from scratch
 - [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu), the terminal. libghostty-vt in wasm, not xterm.js
 - an elysia server that owns files, git, watching, language servers and the agent processes
-- clients for web, electrobun desktop, native mac, and a tui
+- clients for web, the installed-browser/native-window desktop app, native mac, and a tui
 
 ## more
 

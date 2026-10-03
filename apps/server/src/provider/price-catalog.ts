@@ -45,6 +45,11 @@ export class ProviderPriceCatalog {
 
   lookup(driverKind: string, model: string) {
     void this.refresh()
+    return this.lookupLocal(driverKind, model)
+  }
+
+  /** Transcript scans use saved rates without starting a network refresh. */
+  lookupLocal(driverKind: string, model: string) {
     return modelPrice(
       this.client.getQueryData<PriceSnapshot>(QUERY_KEY) ?? this.initial,
       driverKind,

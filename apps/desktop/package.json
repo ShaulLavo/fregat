@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run build:native && bun ../../scripts/run-with-env.ts electrobun dev",
-    "build": "bun run build:native && electrobun build",
+    "dev": "bun run build:native && bun ../../scripts/run-with-env.ts bun src/launcher/index.ts --dev",
+    "build": "bun run build:native",
     "build:native": "bun scripts/build-native.ts",
     "test": "bun --bun vitest run",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "typecheck": "bun scripts/ensure-devkit.ts && tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@workspace/contracts": "workspace:*",
@@ -22,7 +22,6 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
-    "electrobun": "2.0.1",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "typescript": "catalog:"

@@ -1566,7 +1566,8 @@ export const SETTINGS_REGISTRY = {
     category: 'Window',
     details:
       'Transparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.',
-    description: 'Choose window-manager transparency or a see-through native window.',
+    description:
+      'Choose window-manager transparency or a see-through native window using the system webview.',
     // The window is created once, from this value, before the page exists.
     requiresRestart: true,
     keywords: ['window', 'transparency', 'vibrancy', 'compositor', 'desktop', 'wallpaper', 'blur'],

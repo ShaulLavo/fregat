@@ -6,7 +6,7 @@ how the repo is put together. the [readme](../README.md) covers what fregat is a
 
 - `apps/web`, the editor shell, workspace tree, git views, file picker, client state
 - `apps/server`, elysia rpc for filesystem, git, file watching, auth, provider adapters, and the typescript lsp websockets
-- `apps/desktop`, the electrobun shell, a bun main process and a preload bridge
+- `apps/desktop`, the Bun launcher, installed Chromium app integration, and native C/Objective-C system-webview hosts
 - `apps/mac`, the native swift client
 - `apps/tui`, the terminal client
 - `packages/contracts`, shared dtos, runtime schemas, the settings registry
@@ -48,7 +48,13 @@ The family folders are mirrored to their standalone repositories. Make library c
 
 on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh route named `:5173`. mesh holds 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds vite and the api on `127.0.0.1`. the first connection starts it and holds requests until both ports answer; an open tab counts as use, and once nothing has been connected for `developer.devServerIdleMinutes` (15 by default) mesh stops it. rerun `dev:serve` after changing that setting
 
-`mesh serve stop :5173` restarts it on the next connection, which is the way to pick up a changed export map or a relinked checkout. `bun run dev` beside the route stops with an error naming it, never a second copy on another port. `bun run dev:unserve` removes the route. the desktop app in dev opens the shared server like any browser
+`mesh serve stop :5173` restarts it on the next connection, which is the way to pick up a changed export map or a relinked checkout. `bun run dev` beside the route stops with an error naming it, never a second copy on another port. `bun run dev:unserve` removes the route. `bun run desktop:dev` opens these shared routes through the launcher; it waits for readiness and leaves API, Vite and shared terminals running when its window closes
+
+## desktop app
+
+The launcher selects an installed Chromium app (Chrome first under automatic selection) or Fregat's native system-webview window. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
+
+`bun run app:mac` builds a self-contained `Fregat.app` on macOS. Production clients share one machine server per state home. Installation reuses a matching service or registers the OS-activated service; closing or uninstalling the browser app keeps that service, mesh routes and terminals. [Plan 114](../plans/114-installed-app.md) records the approved installation, picker and native-window contracts.
 
 ## shipping it
 

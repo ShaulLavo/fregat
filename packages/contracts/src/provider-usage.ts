@@ -3,6 +3,7 @@ import { providerSessionCacheSchema } from './provider-session-cache'
 import { providerInstanceIdSchema } from './chat-ids'
 import { isoDateTimeSchema, trimmedNonEmptyStringSchema } from './chat-model'
 import { providerDriverKindSchema } from './orchestration-runtime'
+import { providerUsageHistoryCoverageSchema } from './provider-usage-history'
 
 const providerUsageWindowKindSchema = v.picklist(['session', 'weekly', 'monthly', 'other'])
 
@@ -151,6 +152,7 @@ export const providerUsageHistorySchema = v.object({
   models: v.array(providerUsageModelRowSchema),
   daily: v.array(providerUsageDayRowSchema),
   purposes: v.array(providerUsagePurposeRowSchema),
+  coverage: v.optional(providerUsageHistoryCoverageSchema),
 })
 
 /** What one session has used so far. `costUsd` sums priced turns; unpriced tokens are named apart. */

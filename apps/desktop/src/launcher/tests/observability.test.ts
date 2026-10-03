@@ -10,7 +10,7 @@ import {
   flushDesktopObservability,
   initializeDesktopObservability,
   recordDesktopInfo,
-} from '../../bun/observability'
+} from '../observability'
 import { ensureInstalledService, installationIntent } from '../installation-client'
 import { test, readLogEvents } from './fixtures/observability'
 
