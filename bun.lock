@@ -41,7 +41,7 @@
     },
     "apps/server": {
       "name": "server",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.283",
         "@elysiajs/cors": "^1.4.2",
@@ -129,7 +129,7 @@
     },
     "apps/web": {
       "name": "web",
-      "version": "0.0.1",
+      "version": "0.0.3",
       "dependencies": {
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/modifiers": "^9.0.0",
@@ -641,7 +641,6 @@
         "@types/node": "^26.6.3",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
-        "tree-sitter-cli": "0.27.0",
         "typescript": "7.0.2",
         "vitest": "5.0.2",
         "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#059451d3c167443643630d471c2c2d61c13b10ff",
@@ -696,6 +695,19 @@
         "typescript": "7.0.2",
         "vitest": "5.0.2",
         "ws": "8.22.0",
+      },
+    },
+    "ghostty-webgpu-line-editor": {
+      "name": "ghostty-webgpu-line-editor",
+      "version": "0.0.1",
+      "dependencies": {
+        "evlog": "2.29.0",
+      },
+      "devDependencies": {
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "7.0.2",
+        "vitest": "5.0.2",
       },
     },
     "ghostty-webgpu/demo": {
@@ -950,7 +962,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },
@@ -2611,6 +2623,8 @@
 
     "ghostty-webgpu-demo": ["ghostty-webgpu-demo@workspace:ghostty-webgpu/demo"],
 
+    "ghostty-webgpu-line-editor": ["ghostty-webgpu-line-editor@workspace:ghostty-webgpu-line-editor"],
+
     "ghostty-webgpu-site": ["ghostty-webgpu-site@workspace:ghostty-webgpu/site"],
 
     "github-from-package": ["github-from-package@0.0.0", "", {}, "sha512-SyHy3T1v2NUXn29OsWdxmK6RwHD+vkj3v8en8AOBZ1wBQ/hCAQ5bAQTD02kW4W9tUp/3Qh6J8r9EvntiyCmOOw=="],
@@ -3414,8 +3428,6 @@
     "tree-sitter-c": ["tree-sitter-c@0.24.1", "", { "dependencies": { "node-addon-api": "^8.3.1", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.22.4" }, "optionalPeers": ["tree-sitter"] }, "sha512-lkYwWN3SRecpvaeqmFKkuPNR3ZbtnvHU+4XAEEkJdrp3JfSp2pBrhXOtvfsENUneye76g889Y0ddF2DM0gEDpA=="],
 
     "tree-sitter-c-sharp": ["tree-sitter-c-sharp@0.23.5", "", { "dependencies": { "node-addon-api": "^8.2.2", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.25.0" }, "optionalPeers": ["tree-sitter"] }, "sha512-xJGOeXPMmld0nES5+080N/06yY6LQi+KWGWV4LfZaZe6srJPtUtfhIbRSN7EZN6IaauzW28v6W4QHFwmeUW6HQ=="],
-
-    "tree-sitter-cli": ["tree-sitter-cli@0.27.0", "", { "bin": { "tree-sitter": "cli.js" } }, "sha512-E42kR0og1mFlZBxPj7K4fBXCTjxPTGe19U9RXGWNq0FQKzXOxIp8bhCYFMKhddiVZUsJwW35MYGU9Q1oVYtpbA=="],
 
     "tree-sitter-cpp": ["tree-sitter-cpp@0.23.4", "", { "dependencies": { "node-addon-api": "^8.2.1", "node-gyp-build": "^4.8.2", "tree-sitter-c": "^0.23.1" }, "peerDependencies": { "tree-sitter": "^0.21.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-qR5qUDyhZ5jJ6V8/umiBxokRbe89bCGmcq/dk94wI4kN86qfdV8k0GHIUEKaqWgcu42wKal5E97LKpLeVW8sKw=="],
 
