@@ -651,3 +651,74 @@ for (const platform of ['linux', 'darwin']) {
     )
   })
 }
+
+for (const platform of ['linux', 'darwin']) {
+  test(`${platform} complete actual version metadata still qualifies headed acceptance`, async () => {
+    const version = { product, userAgent: 'Mozilla/5.0 Chrome/154.0.8037.93 Safari/537.36' }
+    const result = await boundary({ platform, version }).observe({
+      acceptance: true,
+      requestedHeadless: false,
+    })
+    assert.equal(result.acceptanceModeGuard, 'passed-headed')
+    assert.equal(result.environment.headless, false)
+    assert.equal(result.environment.launchMode, 'headed')
+    assert.deepEqual(result.browserVersion, version)
+  })
+
+  for (const [name, version] of [
+    ['missing', { product }],
+    ['empty', { product, userAgent: '' }],
+    ['null', { product, userAgent: null }],
+    ['numeric', { product, userAgent: 42 }],
+    ['whitespace-only', { product, userAgent: ' \r\n\t' }],
+  ]) {
+    test(`${platform} ${name} actual user agent rejects before process observation`, async () => {
+      const external = boundary({ platform, version })
+      await assert.rejects(
+        external.observe({ acceptance: true, requestedHeadless: false }),
+        /Actual browser user agent must be non-empty text/,
+      )
+      assert.deepEqual(external.calls, ['Browser.getVersion'])
+    })
+  }
+}
+
+for (const flag of [
+  '--headless=new\nunexpected',
+  '--headless=unexpected\rvalue',
+  '--headless=new\n',
+  '--headless=old\r\n',
+]) {
+  test(`request guard rejects multiline headless value ${JSON.stringify(flag)} before launch`, () => {
+    assert.throws(
+      () =>
+        assertBrowserAcceptanceRequest({
+          acceptance: true,
+          requestedHeadless: false,
+          requestedArguments: [flag],
+        }),
+      (error) => error.code === 'BROWSER_ACCEPTANCE_REQUIRES_HEADED',
+    )
+  })
+
+  test(`Linux multiline observed headless value ${JSON.stringify(flag)} remains unknown`, async () => {
+    const argv = ['browser', '--user-data-dir=' + taskRoot + '/tmp/p', ...requested, flag]
+    const raw = Buffer.from(argv.join('\0') + '\0')
+    const diagnostic = await boundary({ argv, raw }).observe({ requestedHeadless: false })
+    assert.equal(diagnostic.environment.headless, null)
+    assert.equal(diagnostic.environment.launchMode, 'unknown')
+    assert.deepEqual(diagnostic.observedArguments, argv)
+    assert(diagnostic.observedFlagTokens.includes(flag))
+    assert.equal(diagnostic.rawCommandLineBase64, raw.toString('base64'))
+    await assert.rejects(
+      boundary({ argv, raw }).observe({ acceptance: true, requestedHeadless: false }),
+      (error) => {
+        assert.equal(error.code, 'BROWSER_ACCEPTANCE_REQUIRES_HEADED')
+        assert.equal(error.evidence.environment.headless, null)
+        assert.equal(error.evidence.environment.launchMode, 'unknown')
+        assert.equal(error.evidence.rawCommandLineBase64, diagnostic.rawCommandLineBase64)
+        return true
+      },
+    )
+  })
+}
