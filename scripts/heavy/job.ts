@@ -188,7 +188,7 @@ export function startJob(job: JobSpec) {
       ],
     })
   } catch (error) {
-    if (slice) removeSlice(slice)
+    if (slice) removeJobSlice(slice)
     throw error
   }
 
@@ -213,7 +213,7 @@ export function startJob(job: JobSpec) {
     })
     .finally(() => {
       clearTimeout(escalation)
-      if (slice) removeSlice(slice)
+      if (slice) removeJobSlice(slice)
     })
   return { done, stop }
 }
@@ -246,22 +246,63 @@ function launchCommand(job: JobSpec, unit: string, accountingFile: string) {
  * Kills whatever still runs in a slice whose wrapper is gone, then removes it. Only a slice
  * under `root` qualifies: a wrapper never stops a slice another state directory owns.
  */
-export function reapSlice(root: string, slice: string) {
+export function reapSlice(root: string, slice: string, signal: AbortSignal) {
   if (!slice.startsWith(`${root}-`) || !slice.endsWith('.slice')) {
     throw scriptErrors.HEAVY_SLICE_OUTSIDE_ROOT({ root, slice })
   }
-  systemctl(['kill', '--signal=SIGKILL', slice])
-  removeSlice(slice)
+  return reaperSystemctl(['kill', '--signal=SIGKILL', slice], signal).then(() =>
+    removeSlice(slice, signal),
+  )
 }
 
-/** Stops the slice, its independent deadline service and its drop-ins. */
-export function removeSlice(slice: string) {
+/** Stops the slice, its deadline service and drop-ins; false when refused or interrupted. */
+export async function removeSlice(slice: string, signal: AbortSignal) {
+  const watchdog = `${slice.slice(0, -'.slice'.length)}_deadline.service`
+  const absent = await reaperSystemctl(
+    ['show', watchdog, '-p', 'LoadState', '--value'],
+    signal,
+    'not-found',
+  )
+  const watchdogStopped = absent || (await reaperSystemctl(['stop', watchdog], signal))
+  const stopped = await reaperSystemctl(['stop', slice], signal)
+  return (await reaperSystemctl(['revert', slice], signal)) && stopped && watchdogStopped
+}
+
+function removeJobSlice(slice: string) {
   const watchdog = `${slice.slice(0, -'.slice'.length)}_deadline.service`
   const loaded = systemctl(['show', watchdog, '-p', 'LoadState', '--value'])
   const watchdogStopped =
     loaded.stdout.toString().trim() === 'not-found' || systemctl(['stop', watchdog]).exitCode === 0
   const stopped = systemctl(['stop', slice]).exitCode === 0
   return systemctl(['revert', slice]).exitCode === 0 && stopped && watchdogStopped
+}
+
+// Admission retains its mutex until the interrupted manager client has exited.
+async function reaperSystemctl(
+  args: readonly string[],
+  signal: AbortSignal,
+  expectedOutput?: string,
+) {
+  if (signal.aborted) return false
+  const child = Bun.spawn(['systemctl', '--user', ...args], {
+    stdin: 'ignore',
+    stderr: 'ignore',
+    stdout: expectedOutput === undefined ? 'ignore' : 'pipe',
+  })
+  const output =
+    expectedOutput === undefined ? Promise.resolve('') : new Response(child.stdout).text()
+  const cancel = () => child.kill('SIGKILL')
+  signal.addEventListener('abort', cancel, { once: true })
+  try {
+    const [exitCode, text] = await Promise.all([child.exited, output])
+    return (
+      exitCode === 0 &&
+      !signal.aborted &&
+      (expectedOutput === undefined || text.trim() === expectedOutput)
+    )
+  } finally {
+    signal.removeEventListener('abort', cancel)
+  }
 }
 
 // No MemoryHigh: above it the kernel throttles a runaway into a crawl instead of killing it

@@ -1,4 +1,12 @@
-import { copyFileSync, cpSync, lstatSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  cpSync,
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createScriptError, scriptFailureText } from './structured-errors'
@@ -95,7 +103,26 @@ function validateFiles(files: readonly string[]) {
   }
 }
 
+// An HTML page plus the files it names (its script, styles, images) is one site, not a gallery.
+function pageWithAssets(files: readonly string[]) {
+  const pages = files.filter((file) => htmlExtensions.includes(path.extname(file).toLowerCase()))
+  if (files.length < 2 || pages.length !== 1) return
+  const page = pages[0]!
+  const assets = files.filter((file) => file !== page)
+  const html = readFileSync(page, 'utf8')
+  const names = assets.map((file) => path.basename(file))
+  if (new Set(names).size !== names.length) return
+  if (!names.every((name) => html.includes(name))) return
+  return { page, assets }
+}
+
 function writePage(files: readonly string[], directory: string) {
+  const site = pageWithAssets(files)
+  if (site) {
+    copyAsset(site.page, path.join(directory, 'index.html'))
+    for (const asset of site.assets) copyAsset(asset, path.join(directory, path.basename(asset)))
+    return
+  }
   const first = files[0]!
   if (
     files.length === 1 &&
