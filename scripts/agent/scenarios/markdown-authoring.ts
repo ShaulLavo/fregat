@@ -96,6 +96,8 @@ export const markdownAuthoring: Scenario = {
       await selectors.markdownRenderedPane(page).getByText('third', { exact: true }).waitFor()
       await step('third-before-save')
       await saveAndCheck(page, file, '- first\n- second\n- third')
+      await page.keyboard.press('Home')
+      await page.keyboard.press('Shift+End')
       await page.keyboard.press('Tab')
       await page.keyboard.press('Shift+Tab')
       await saveAndCheck(page, file, '- first\n- second\n- third')

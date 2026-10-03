@@ -58,8 +58,7 @@ export const commandFoundation: Scenario = {
       await focusEditor(page)
       await page.keyboard.press('Control+k')
       await selectors.pendingChord(page).waitFor()
-      await selectors.sidebarTab(page, 'Files').click()
-      await selectors.folderTree(page).focus()
+      await selectors.folderTree(page).getByRole('treeitem').first().focus()
       await selectors.pendingChord(page).waitFor({ state: 'detached' })
       await step('chord-canceled-on-focus')
 

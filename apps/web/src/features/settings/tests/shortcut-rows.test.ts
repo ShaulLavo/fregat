@@ -1,3 +1,4 @@
+import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { describe, expect, it } from 'vitest'
 import type { PlatformKeyBinding } from '@/keymap/types'
 import {
@@ -97,4 +98,23 @@ describe('contextual shortcut rows', () => {
     expect(shortcutListWith(terminal, { add: 'F10' })).toEqual(['F9', 'F10'])
     expect(terminal.defaultKeys).toEqual([])
   })
+})
+
+it('marks a real preset save binding removed so its menu can restore it', () => {
+  const defaults = defaultPlatformKeyBindings('linux', 'ours')
+  const save = shortcutRows(defaults, [], 'linux').find(
+    (row) => row.command === 'workspace.saveFile' && row.keys,
+  )
+  if (!save?.keys) expect.fail('Missing preset save binding')
+  const rows = shortcutRows(
+    defaults,
+    [{ keys: save.keys, unbind: save.command, context: save.context }],
+    'linux',
+  )
+  expect(
+    rows.find(
+      (row) =>
+        row.command === save.command && row.keys === save.keys && row.context === save.context,
+    )?.source,
+  ).toBe('removed')
 })
