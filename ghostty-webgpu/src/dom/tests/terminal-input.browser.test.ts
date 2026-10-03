@@ -468,6 +468,7 @@ describe('Terminal DOM host', () => {
     expect(refusedWheel.defaultPrevented).toBe(false)
     expect(wheelCalls).toBe(1)
 
+    recording.options!.onTextFrame?.(cursorFrame(0, 0))
     wheelAllowed = true
     elements.canvas.dispatchEvent(refusedWheel)
     expect(refusedWheel.defaultPrevented).toBe(true)
@@ -949,11 +950,18 @@ describe('Terminal DOM host', () => {
       background: { b: 6, g: 5, r: 4 },
       foreground: { b: 9, g: 8, r: 7 },
     })
+    expect(getComputedStyle(preedit).backgroundColor).toBe(
+      `rgb(${theme.background.r}, ${theme.background.g}, ${theme.background.b})`,
+    )
+    recording.options!.onTextFrame?.(cursorFrame(3, 2))
     expect(getComputedStyle(preedit).backgroundColor).toBe('rgb(4, 5, 6)')
     expect(getComputedStyle(preedit).color).toBe('rgb(7, 8, 9)')
 
+    const previousFontFamily = preedit.style.fontFamily
     terminal.setFont({ family: 'serif', letterSpacing: 1, lineHeight: 1.2, size: 19 })
     await animationFrames(3)
+    expect(preedit.style.fontFamily).toBe(previousFontFamily)
+    recording.options!.onTextFrame?.(cursorFrame(3, 2))
     expect(preedit.style.fontFamily).toBe('serif')
     expect(preedit.style.fontSize).toBe('19px')
     expect(preedit.style.letterSpacing).toBe('1px')

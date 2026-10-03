@@ -11,6 +11,7 @@ import { displayedPixels } from '../../render/webgl/tests/fixture.js'
 import type { RenderScheduler } from '../../render/scheduler.js'
 import type { WebGpuTextPass } from '../../render/text-pass.js'
 import type {
+  RenderStateSource,
   RendererFrameSnapshot,
   RendererGridSize,
   RendererTextFrameSnapshot,
@@ -372,6 +373,7 @@ async function createObservedRendererHarness(
   readonly host: HTMLDivElement
   readonly renderer: WebGpuTerminalRenderer | WebGlTerminalRenderer
   readonly snapshots: readonly RendererTextFrameSnapshot[]
+  readonly renderState: RenderStateSource
   readonly terminal: Terminal
   readRowsCalls(): number
   readTextRowsCalls(): number
@@ -379,6 +381,7 @@ async function createObservedRendererHarness(
 }> {
   const host = appendRoot(420, 140)
   const snapshots: RendererTextFrameSnapshot[] = []
+  let renderState: RenderStateSource | undefined
   let renderer: WebGpuTerminalRenderer | WebGlTerminalRenderer | undefined
   let readRowsCalls = () => 0
   let readTextRowsCalls = () => 0
@@ -392,6 +395,7 @@ async function createObservedRendererHarness(
       grid: { columns: 30, rows: 4, ...options.appearance?.grid },
     },
     rendererFactory: async (rendererOptions) => {
+      renderState = rendererOptions.renderState
       const readRows = vi.spyOn(rendererOptions.renderState, 'readRows')
       const readTextRows = vi.spyOn(rendererOptions.renderState, 'readTextRows')
       const update = vi.spyOn(rendererOptions.renderState, 'update')
@@ -430,8 +434,17 @@ async function createObservedRendererHarness(
   host.style.height = `${Math.ceil(font.cssCellHeight * grid.rows)}px`
   await terminal.open(host)
   await settleTerminal(terminal)
-  if (!renderer) throw new Error('Observed renderer was not created')
-  return { host, renderer, snapshots, terminal, readRowsCalls, readTextRowsCalls, updateCalls }
+  if (!renderer || !renderState) throw new Error('Observed renderer was not created')
+  return {
+    host,
+    renderer,
+    snapshots,
+    renderState,
+    terminal,
+    readRowsCalls,
+    readTextRowsCalls,
+    updateCalls,
+  }
 }
 
 function measuredFrame(lines: readonly string[]): {
@@ -1242,7 +1255,59 @@ describe('terminal frame consumer demand in Chromium', () => {
   )
 
   it.each(['webgpu', 'webgl2'] as const)(
-    'keeps idle Zig frames row-free while positioning the cursor and publishing changed row IDs (%s)',
+    'holds complete displayed geometry, cursor, selection and text until the next submission (%s)',
+    async (backend) => {
+      const harness = await createObservedRendererHarness({}, backend)
+      harness.terminal.write('old row\r\nsecond row')
+      await settleTerminal(harness.terminal)
+      const before = harness.terminal.submittedFrame!
+      const beforeText = before.rows.map((row) => row.text)
+      const caret = harness.terminal.textarea!.style.left
+      harness.terminal.selectRange({ x: 0, y: 0 }, { x: 2, y: 0 })
+      harness.terminal.setFont({ size: before.font.settings.size + 2 })
+      harness.terminal.write(`${escape}[1;1Hnew${escape}[K`)
+      expect(harness.terminal.submittedFrame).toBe(before)
+      expect(harness.terminal.visibleLines()).toEqual(beforeText)
+      expect(harness.terminal.textarea!.style.left).toBe(caret)
+      expect(harness.terminal.captureViewport()).toBeUndefined()
+      await settleTerminal(harness.terminal)
+      const after = harness.terminal.submittedFrame!
+      expect(after.frame).toBeGreaterThan(before.frame)
+      expect(after.layout).toBeGreaterThan(before.layout)
+      expect(after.nativeRevision).toBeGreaterThan(before.nativeRevision)
+      expect(after.font.settings.size).toBe(before.font.settings.size + 2)
+      expect(after.grid.cellWidth).toBe(after.font.cssCellWidth)
+      expect(after.cursor.viewport).toMatchObject({ x: 3, y: 0 })
+      expect(after.rows[0]?.text.trimEnd()).toBe('new')
+      expect(harness.terminal.visibleLines()).toEqual(after.rows.map((row) => row.text))
+      expect(before.rows.map((row) => row.text)).toEqual(beforeText)
+      expect(harness.terminal.captureViewport()).toBeDefined()
+    },
+  )
+
+  it.each(['webgpu', 'webgl2'] as const)(
+    'patches owned submitted row text without styled-cell reads (%s)',
+    async (backend) => {
+      const harness = await createObservedRendererHarness({}, backend)
+      harness.terminal.write('first\r\nsecond')
+      await settleTerminal(harness.terminal)
+      const before = harness.terminal.submittedFrame!
+      harness.terminal.write(`${escape}[1;1HX`)
+      await settleTerminal(harness.terminal)
+      const after = harness.terminal.submittedFrame!
+      expect(after.rowPatches.map((row) => row.y)).toEqual([0])
+      expect(after.rows[1]).toBe(before.rows[1])
+      expect(before.rows[0]?.text.trimEnd()).toBe('first')
+      expect(after.rows[0]?.text.trimEnd()).toBe('Xirst')
+      expect(Object.isFrozen(after.rowPatches[0])).toBe(true)
+      expect(structuredClone(after).rows).toEqual(after.rows)
+      expect(harness.readRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
+    },
+  )
+
+  it.each(['webgpu', 'webgl2'] as const)(
+    'owns submitted text rows without styled reads while positioning the cursor and publishing changed row IDs (%s)',
     async (backend) => {
       const harness = await createObservedRendererHarness({}, backend)
       const changedRows: Array<readonly number[]> = []
@@ -1253,9 +1318,9 @@ describe('terminal frame consumer demand in Chromium', () => {
 
       expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
       expect(harness.readRowsCalls()).toBe(0)
-      expect(harness.readTextRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
       expect(harness.snapshots.length).toBeGreaterThan(0)
-      expect(harness.snapshots.every((snapshot) => snapshot.rows.length === 0)).toBe(true)
+      expect(harness.snapshots.every((snapshot) => snapshot.rows.length > 0)).toBe(true)
       expect(changedRows.at(-1)).toEqual([0, 1])
       expect(Object.isFrozen(changedRows.at(-1))).toBe(true)
       expect(harness.snapshots.at(-1)?.cursor.viewport).toMatchObject({ x: 6, y: 1 })
@@ -1282,9 +1347,11 @@ describe('terminal frame consumer demand in Chromium', () => {
         await settleTerminal(harness.terminal)
         expect(harness.renderer.metrics.submittedFrames).toBe(submittedFrames)
         expect(harness.snapshots.length).toBeGreaterThan(textFrames)
-        expect(harness.snapshots.at(-1)?.rows).toEqual([])
+        expect(harness.snapshots.at(-1)?.rows).toHaveLength(
+          harness.terminal.submittedFrame!.grid.rows,
+        )
         expect(harness.readRowsCalls()).toBe(0)
-        expect(harness.readTextRowsCalls()).toBe(0)
+        expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
         expect(await displayedPixels(harness.terminal.canvas!)).toEqual(pixels)
         expect(harness.renderer.metrics.submittedFrames).toBe(submittedFrames)
       }
@@ -1305,8 +1372,10 @@ describe('terminal frame consumer demand in Chromium', () => {
       await settleTerminal(harness.terminal)
       expect(harness.renderer.metrics.zigFrames).toBe(zigFrames + 1)
       expect(harness.readRowsCalls()).toBe(0)
-      expect(harness.readTextRowsCalls()).toBe(0)
-      expect(harness.snapshots.at(-1)?.rows).toEqual([])
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
+      expect(harness.snapshots.at(-1)?.rows).toHaveLength(
+        harness.terminal.submittedFrame!.grid.rows,
+      )
       const renderingReads = harness.readRowsCalls()
       const updates = harness.updateCalls()
 
@@ -1317,7 +1386,7 @@ describe('terminal frame consumer demand in Chromium', () => {
 
       expect(harness.updateCalls()).toBe(updates)
       expect(harness.readRowsCalls()).toBe(renderingReads + 1)
-      expect(harness.readTextRowsCalls()).toBe(1)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
       expect(visible[0]?.trimEnd()).toBe('A界B')
       expect(retained.rows.map((row) => row.renderCells)).toEqual(expectedCells)
       expect(retained.rows[0]?.continuations.slice(0, 4)).toEqual([false, false, true, false])
@@ -1333,7 +1402,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.readRowsCalls()).toBe(renderingReads + 1)
       expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('replacement')
       expect(harness.readRowsCalls()).toBe(renderingReads + 1)
-      expect(harness.readTextRowsCalls()).toBe(2)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
       harness.terminal.write(`${escape}[2J${escape}[Hlater`)
       await settleTerminal(harness.terminal)
       expect(harness.terminal.frameSnapshot()?.rows[0]?.text.trimEnd()).toBe('later')
@@ -1413,8 +1482,10 @@ describe('terminal frame consumer demand in Chromium', () => {
       const snapshot = harness.terminal.frameSnapshot()!
       expect(snapshot.rows.slice(0, 2).map((row) => row.text.trimEnd())).toEqual(['AAA', 'EEE'])
       expect(snapshot.cursor.viewport).toMatchObject({ x: 3, y: 1 })
-      expect(harness.snapshots.at(-1)?.rows).toEqual([])
-      expect(harness.readTextRowsCalls()).toBe(0)
+      expect(harness.snapshots.at(-1)?.rows).toHaveLength(
+        harness.terminal.submittedFrame!.grid.rows,
+      )
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
       expect(atlas.rowsWithStaleReferences()).toEqual([])
       const rebuiltRows = renderer.metrics.rebuiltRows
       const styledReads = harness.readRowsCalls()
@@ -1457,19 +1528,18 @@ describe('terminal frame consumer demand in Chromium', () => {
 
   it('retains acquired styled rows and cursor when native state advances without a successful paint', async () => {
     const harness = await createObservedRendererHarness()
-    const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
     harness.terminal.write(`${escape}[1;38;2;12;34;56mold${escape}[0m`)
     await settleTerminal(harness.terminal)
     const retained = harness.terminal.frameSnapshot()!
     const visible = harness.terminal.visibleLines()
     const rowReads = harness.readRowsCalls()
     const textReads = harness.readTextRowsCalls()
-    const version = session.renderState.snapshotVersion!
+    const version = harness.renderState.snapshotVersion!
 
     harness.terminal.write(`${escape}[2J${escape}[Hnew output\r\nnext`)
-    session.renderState.update()
+    harness.renderState.update()
 
-    expect(session.renderState.snapshotVersion).toBeGreaterThan(version)
+    expect(harness.renderState.snapshotVersion).toBeGreaterThan(version)
     expect(harness.terminal.frameSnapshot()).toBe(retained)
     expect(harness.terminal.visibleLines()).toEqual(visible)
     expect(retained.rows[0]?.text.trimEnd()).toBe('old')
@@ -1489,27 +1559,26 @@ describe('terminal frame consumer demand in Chromium', () => {
 
   it('declines lazy hydration when unpainted native state has replaced the last captured state', async () => {
     const harness = await createObservedRendererHarness()
-    const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
     harness.terminal.write('old')
     await settleTerminal(harness.terminal)
     expect(harness.readRowsCalls()).toBe(0)
-    expect(harness.readTextRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
 
     harness.terminal.write(`${escape}[2J${escape}[Hnew output`)
-    session.renderState.update()
+    harness.renderState.update()
 
     expect(harness.terminal.frameSnapshot()).toBeUndefined()
-    expect(harness.terminal.visibleLines()).toEqual([])
+    expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('old')
     expect(harness.terminal.captureViewport()).toBeUndefined()
     expect(harness.readRowsCalls()).toBe(0)
-    expect(harness.readTextRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
     await settleTerminal(harness.terminal)
 
     expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('new output')
     expect(harness.terminal.frameSnapshot()?.cursor.viewport).toMatchObject({ x: 10, y: 0 })
   })
 
-  it('hydrates accessibility immediately from the last painted idle frame and releases demand when disabled', async () => {
+  it('hydrates accessibility from owned submitted rows and keeps later summary patches when disabled', async () => {
     const harness = await createObservedRendererHarness()
     harness.terminal.write('accessible now')
     await settleTerminal(harness.terminal)
@@ -1519,7 +1588,7 @@ describe('terminal frame consumer demand in Chromium', () => {
     expect(harness.terminal.setAccessibilityEnabled(true)).toBe(true)
     expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('accessible now')
     expect(harness.readRowsCalls()).toBe(0)
-    expect(harness.readTextRowsCalls()).toBe(1)
+    expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
     expect(harness.updateCalls()).toBe(updates)
 
     harness.terminal.write('!')
@@ -1527,16 +1596,15 @@ describe('terminal frame consumer demand in Chromium', () => {
     expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('accessible now!')
     expect(harness.snapshots.at(-1)?.rows).toHaveLength(4)
     expect(harness.terminal.setAccessibilityEnabled(false)).toBe(true)
-    const reads = harness.readTextRowsCalls()
     harness.terminal.write('?')
     await settleTerminal(harness.terminal)
 
     expect(harness.readRowsCalls()).toBe(0)
-    expect(harness.readTextRowsCalls()).toBe(reads)
-    expect(harness.snapshots.at(-1)?.rows).toEqual([])
+    expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
+    expect(harness.snapshots.at(-1)?.rows).toHaveLength(harness.terminal.submittedFrame!.grid.rows)
   })
 
-  it('resolves the latest output on first hover after uninterested frames and stops reading on pointer leave', async () => {
+  it('resolves latest submitted output on first hover and retains summary rows after pointer leave', async () => {
     const harness = await createObservedRendererHarness()
     harness.terminal.write('https://old.test')
     await settleTerminal(harness.terminal)
@@ -1552,7 +1620,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       'First hover did not hydrate the current idle viewport',
     )
     expect(harness.readRowsCalls()).toBe(0)
-    expect(harness.readTextRowsCalls()).toBe(1)
+    expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
     harness.terminal.write(`${escape}[2J${escape}[Hhttps://hover.test`)
     await settleTerminal(harness.terminal)
     await waitForUi(
@@ -1563,14 +1631,13 @@ describe('terminal frame consumer demand in Chromium', () => {
     )
     expect(harness.snapshots.at(-1)?.rows).toHaveLength(4)
     harness.terminal.canvas!.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }))
-    const reads = harness.readTextRowsCalls()
     harness.terminal.write(`${escape}[2J${escape}[Hhttps://idle-again.test`)
     await settleTerminal(harness.terminal)
 
     expect(harness.host.querySelector('[role="link"]')).toBeNull()
     expect(harness.readRowsCalls()).toBe(0)
-    expect(harness.readTextRowsCalls()).toBe(reads)
-    expect(harness.snapshots.at(-1)?.rows).toEqual([])
+    expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
+    expect(harness.snapshots.at(-1)?.rows).toHaveLength(harness.terminal.submittedFrame!.grid.rows)
   })
 
   it.each(
@@ -1601,7 +1668,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       const submittedFrames = harness.renderer.metrics.submittedFrames
       const uploadedBytes = harness.renderer.metrics.uploadedBytes
       expect(harness.readRowsCalls()).toBe(0)
-      expect(harness.readTextRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
 
       harness.terminal.write(output)
       await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
@@ -1612,7 +1679,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.renderer.metrics.submittedFrames).toBe(submittedFrames)
       expect(harness.renderer.metrics.uploadedBytes).toBe(uploadedBytes)
       expect(harness.readRowsCalls()).toBe(0)
-      expect(harness.readTextRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
       if (discovery === 'keyboard') {
         await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
       } else {
@@ -1626,7 +1693,7 @@ describe('terminal frame consumer demand in Chromium', () => {
         'https://clean.test',
       )
       expect(harness.readRowsCalls()).toBe(0)
-      expect(harness.readTextRowsCalls()).toBe(1)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
     },
   )
 
@@ -1650,7 +1717,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.terminal.hasPendingFrame).toBe(true)
       await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
       expect(harness.updateCalls()).toBe(updates + 1)
-      expect(harness.readTextRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
       scheduler.flush()
       await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
       harness.terminal.write(`${escape}[2J${escape}[Hhttps://fresh.test`)
@@ -1674,14 +1741,13 @@ describe('terminal frame consumer demand in Chromium', () => {
         () => inspect?.(),
       )
       const scheduler = Reflect.get(harness.renderer, 'scheduler') as RenderScheduler
-      const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
       const links = Reflect.get(harness.terminal, 'links') as DomLinkController
       const linkOptions = Reflect.get(links, 'options') as {
         getFrame(): RendererTextFrameSnapshot | undefined
       }
       harness.terminal.write('https://old.test')
       scheduler.flush()
-      const version = session.renderState.snapshotVersion
+      const version = harness.renderState.snapshotVersion
       const updates = harness.updateCalls()
       let acquired: RendererTextFrameSnapshot | undefined
       let pending: boolean | undefined
@@ -1694,7 +1760,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       inspect = () => {
         inspect = undefined
         pending = harness.terminal.hasPendingFrame
-        observedVersion = session.renderState.snapshotVersion
+        observedVersion = harness.renderState.snapshotVersion
         acquired = linkOptions.getFrame()
       }
 
@@ -1709,7 +1775,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(acquired).toBeUndefined()
       expect(harness.updateCalls()).toBe(updates + 2)
       expect(harness.terminal.hasPendingFrame).toBe(false)
-      expect(harness.readTextRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
       await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
       harness.terminal.write(`${escape}[2J${escape}[Hhttps://fresh.test`)
       scheduler.flush()
@@ -1726,11 +1792,10 @@ describe('terminal frame consumer demand in Chromium', () => {
       let queued: (() => void) | undefined
       const harness = await createObservedRendererHarness({}, backend, () => queued?.())
       const scheduler = Reflect.get(harness.renderer, 'scheduler') as RenderScheduler
-      const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
       harness.terminal.write('https://old.test')
       scheduler.flush()
       const updates = harness.updateCalls()
-      const version = session.renderState.snapshotVersion
+      const version = harness.renderState.snapshotVersion
       queued = () => {
         queued = undefined
         harness.terminal.write(`${escape}[2J${escape}[Hhttps://replacement.test`)
@@ -1741,14 +1806,14 @@ describe('terminal frame consumer demand in Chromium', () => {
       scheduler.flush()
 
       expect(harness.updateCalls()).toBe(updates + 1)
-      expect(session.renderState.snapshotVersion).toBe(version)
+      expect(harness.renderState.snapshotVersion).toBe(version)
       expect(harness.terminal.hasPendingFrame).toBe(false)
       const discovery = await harness.terminal.focusNextLink()
       expect({
         discovery,
         label: harness.host.querySelector('[role="link"]')?.getAttribute('aria-label'),
         textReads: harness.readTextRowsCalls(),
-      }).toEqual({ discovery: false, label: undefined, textReads: 0 })
+      }).toEqual({ discovery: false, label: undefined, textReads: harness.snapshots.length })
       harness.renderer.setDocumentVisible(true)
       scheduler.flush()
       await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
@@ -1773,7 +1838,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.terminal.hasPendingFrame).toBe(false)
       expect(harness.updateCalls()).toBe(updates)
       await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
-      expect(harness.readTextRowsCalls()).toBe(0)
+      expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
       harness.renderer.setDocumentVisible(true)
       scheduler.flush()
       await expect(harness.terminal.focusNextLink()).resolves.toBe(true)
@@ -1785,10 +1850,9 @@ describe('terminal frame consumer demand in Chromium', () => {
 
   it('repaints a revision-advancing fit and permits link discovery after its new frame', async () => {
     const harness = await createObservedRendererHarness()
-    const session = Reflect.get(harness.terminal, 'session') as TerminalSession<Event>
     harness.terminal.write('https://resize.test')
     await settleTerminal(harness.terminal)
-    const revision = session.revision
+    const columnsBeforeFit = harness.terminal.appearance.grid.columns
     const paintedFrames = harness.snapshots.length
     const columns = harness.terminal.appearance.grid.columns
     const font = fitTerminalFont(
@@ -1798,7 +1862,10 @@ describe('terminal frame consumer demand in Chromium', () => {
     )
 
     harness.host.style.width = `${Math.ceil(font.cssCellWidth * (columns + 5) + 12)}px`
-    await waitForUi(() => session.revision > revision, 'Fit did not advance the session revision')
+    await waitForUi(
+      () => harness.terminal.appearance.grid.columns !== columnsBeforeFit,
+      'Fit did not change the grid',
+    )
     await settleTerminal(harness.terminal)
 
     expect(harness.terminal.appearance.grid.columns).toBe(columns + 5)
@@ -1814,14 +1881,14 @@ describe('terminal frame consumer demand in Chromium', () => {
     harness.terminal.write('https://old.test')
     await settleTerminal(harness.terminal)
     const updates = harness.updateCalls()
-    expect(harness.readTextRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
 
     harness.terminal.write(`${escape}[2J${escape}[Hreplacement without links`)
     await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
 
     expect(harness.host.querySelector('[role="link"]')).toBeNull()
     expect(harness.readRowsCalls()).toBe(0)
-    expect(harness.readTextRowsCalls()).toBe(0)
+    expect(harness.readTextRowsCalls()).toBe(harness.snapshots.length)
     expect(harness.updateCalls()).toBe(updates)
     await settleTerminal(harness.terminal)
     await expect(harness.terminal.focusNextLink()).resolves.toBe(false)
@@ -1871,17 +1938,17 @@ describe('terminal frame consumer demand in Chromium', () => {
     expect(harness.terminal.diagnostics.hasPendingLinkResolution).toBe(false)
   })
 
-  it('measures cursor-only caret reads, text-only accessibility, and link cells without styled cell access', async () => {
+  it('owns submitted text for caret and accessibility while decoding link cells on demand', async () => {
     const idle = await createIntegratedHarness({ accessibility: false })
     const idleFrame = measuredFrame(['https://measured.test'])
     idle.renderer.emit(idleFrame.snapshot)
     expect(idleFrame.reads.cursor).toBeGreaterThan(0)
+    expect(idleFrame.reads.text).toBeGreaterThan(0)
+    expect(idleFrame.reads.y).toBeGreaterThan(0)
     expect(idleFrame.reads).toMatchObject({
       cells: 0,
       continuations: 0,
       renderCells: 0,
-      text: 0,
-      y: 0,
     })
 
     const accessible = await createIntegratedHarness()
