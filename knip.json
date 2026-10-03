@@ -120,7 +120,7 @@
         "parity/snooze.ts",
         "parity/wake.ts"
       ],
-      "ignoreBinaries": ["flock", "ssh-keygen", "systemd-run"]
+      "ignoreBinaries": ["flock", "ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
       "ignoreDependencies": ["typescript-api"]
