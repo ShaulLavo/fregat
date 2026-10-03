@@ -15,7 +15,7 @@ import { isTestProcess, platformHomePath } from './home'
 import { bundleRoutes } from './themes/bundle-routes'
 import { WallpaperLibrary } from './themes/wallpapers/library'
 import { wallpaperLibraryRoutes } from './themes/wallpapers/routes'
-import { createInternalError } from './observability/structured-errors'
+import { createInternalError, createStructuredError } from './observability/structured-errors'
 import { cors } from '@elysiajs/cors'
 import {
   terminalClearInputSchema,
@@ -103,10 +103,14 @@ import { ServerUpdate, type UpdateOptions } from './update/service'
 import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { ProviderUsageHistoryReader } from './provider/usage-history'
+import { ProviderTranscriptCollection } from './provider/transcript-collection'
 import { ProviderPriceCatalog } from './provider/price-catalog'
 import { ProviderMaintenance, type ProviderMaintenanceProbe } from './provider/provider-maintenance'
 import { ProviderUsageRecorder } from './provider/usage-recorder'
 import { ProviderUsageStore } from './provider/usage-store'
+import { providerUsageFeedRoutes } from './provider/usage-feed-routes'
+import { readProxyUsage } from './provider/usage-proxy-source'
+import { PROXY_USAGE_MANAGEMENT_KEY_REF } from './settings/secrets'
 import { ProviderResetCredits } from './provider/reset-credits'
 import { MachineService, type MachineServiceOptions } from './machines/service'
 import { machineRoutes } from './machines/routes'
@@ -210,6 +214,36 @@ const DEFAULT_SYSTEM_ADDRESS = 'http://127.0.0.1:3001'
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
 const appMachines = new WeakMap<object, MachineService>()
+const appUsage = new WeakMap<object, ProviderUsageStore>()
+const appHistories = new WeakMap<object, ProviderTranscriptCollection>()
+
+export function appUsageHistory(app: object) {
+  const history = appHistories.get(app)
+  if (!history)
+    throw createStructuredError({
+      code: 'USAGE_HISTORY_MISSING',
+      status: 500,
+      message: 'App has no local usage history service.',
+      why: 'Application services have not been initialized.',
+      fix: 'Restart the server.',
+      internal: { historyPresent: false },
+    })
+  return history
+}
+
+export function appUsageCollector(app: object) {
+  const collector = appUsage.get(app)
+  if (!collector)
+    throw createStructuredError({
+      code: 'USAGE_COLLECTOR_MISSING',
+      status: 500,
+      message: 'App has no usage collector',
+      why: 'Application services have not been initialized.',
+      fix: 'Restart the server.',
+      internal: { collectorPresent: false },
+    })
+  return collector
+}
 
 export function machinesForApp(app: object) {
   const machines = appMachines.get(app)
@@ -392,9 +426,6 @@ export function createApp(options: AppOptions) {
   // Secrets are resolved here rather than in the snapshot: the values a provider
   // spawns with never appear in anything a route can return.
   const reconcileProviderSettings = providerSettingsReconciler(settings, providerAdapterRegistry)
-  settings.onChange(() => {
-    runDetached(reconcileProviderSettings, { area: 'provider', operation: 'reconcile' })
-  })
   const mcpGrants = new McpGrantRegistry()
   const providerService = new ProviderService({
     adapterRegistry: providerAdapterRegistry,
@@ -402,7 +433,53 @@ export function createApp(options: AppOptions) {
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const mcpSignIns = new McpSignInAttempts()
-  const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
+  const usageCacheHome = path.join(
+    options.system?.stateHome ??
+      path.dirname(options.settings?.userFilePath ?? platformHomePath('settings.json')),
+    'usage',
+  )
+  const providerUsage = new ProviderUsageStore(providerAdapterRegistry, {
+    cacheFile: path.join(usageCacheHome, 'accounts.json'),
+    policy: () => {
+      const values = settings.snapshot().values
+      return {
+        minIntervalMs: values['providers.usageRefreshSeconds'] * 1000,
+        failureCooldownMs: values['providers.usageFailureCooldownSeconds'] * 1000,
+        staleAfterMs: values['providers.usageStaleAfterSeconds'] * 1000,
+      }
+    },
+    proxySourceKey: () => settings.snapshot().values['providers.proxyUsageUrl'],
+    proxyInstanceIds: () => settings.snapshot().values['providers.proxyUsageProviderInstanceIds'],
+    proxyConfigured: () =>
+      Boolean(
+        settings.snapshot().values['providers.proxyUsageUrl'] ||
+        settings.snapshot().values['providers.proxyUsageProviderInstanceIds'].length,
+      ),
+    readProxy: async () => {
+      const url = settings.snapshot().values['providers.proxyUsageUrl']
+      const secret = await settings.readSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
+      if (!url || !secret)
+        throw createStructuredError({
+          code: 'PROXY_USAGE_CONFIG_MISSING',
+          status: 503,
+          message: 'Proxy usage collection needs its management address and key.',
+          why: 'The local management source is incomplete.',
+          fix: 'Configure the proxy management address and import its management key.',
+          internal: { addressConfigured: Boolean(url), secretConfigured: Boolean(secret) },
+        })
+      return readProxyUsage({ url, secret })
+    },
+  })
+  settings.onChange(() => {
+    runDetached(
+      async () => {
+        await reconcileProviderSettings()
+        providerUsage.reconfigure()
+        providerTranscriptHistory.reconfigure()
+      },
+      { area: 'provider', operation: 'usage-reconfigure' },
+    )
+  })
   const providerResetCredits = new ProviderResetCredits(
     database,
     providerAdapterRegistry,
@@ -415,6 +492,29 @@ export function createApp(options: AppOptions) {
     providerPrices,
   )
   const providerUsageHistory = new ProviderUsageHistoryReader(database)
+  const providerTranscriptHistory = new ProviderTranscriptCollection(
+    () => {
+      const values = settings.snapshot().values
+      return {
+        cacheDirectory: usageCacheHome,
+        hostId: (options.system?.machineId ?? readMachineId)(),
+        sources: providerAdapterRegistry.transcriptUsageSources(),
+        priceCatalog: providerPrices,
+        utilityHistory: providerUsageHistory,
+        limits: {
+          maxBytes: values['providers.transcriptHistoryMaxBytes'],
+          maxFiles: values['providers.transcriptHistoryMaxFiles'],
+          maxLineBytes: 1024 * 1024,
+          readChunkBytes: 64 * 1024,
+        },
+      }
+    },
+    () => settings.snapshot().values['providers.transcriptHistoryRefreshSeconds'] * 1000,
+  )
+  const stopUsageRegistry = providerAdapterRegistry.subscribeChanges(() => {
+    providerUsage.reconfigure()
+    providerTranscriptHistory.reconfigure()
+  })
   const providerMaintenance = new ProviderMaintenance(
     providerAdapterRegistry,
     options.provider?.maintenanceProbe,
@@ -571,6 +671,9 @@ export function createApp(options: AppOptions) {
     providerPrices,
     providerMaintenance,
     providerResetCredits,
+    providerUsage,
+    providerTranscriptHistory,
+    stopUsageRegistry,
     sessionPush,
     mcpSignIns,
     stopDeviceSweep,
@@ -614,6 +717,7 @@ export function createApp(options: AppOptions) {
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
     .use(webRoutes(options.web ?? {}, update, terminal))
+    .use(providerUsageFeedRoutes(providerUsage))
     // Before the browser guard, which refuses the Origin-less requests agents send.
     .use(
       options.mcp
@@ -692,7 +796,10 @@ export function createApp(options: AppOptions) {
       providerRoutes(
         providerAdapterRegistry,
         providerUsage,
-        providerUsageHistory,
+        {
+          read: (query) => providerTranscriptHistory.read(query),
+          readSession: (sessionId) => providerUsageHistory.readSession(sessionId),
+        },
         providerMaintenance,
         providerResetCredits,
       ),
@@ -727,6 +834,8 @@ export function createApp(options: AppOptions) {
     .use(fsRoutes(fs))
     .use(nativePickerRoutes(system))
     .onStart(() => {
+      providerUsage.start()
+      providerTranscriptHistory.start()
       void providerPrices.refresh()
     })
     .onStop(cleanup)
@@ -741,6 +850,8 @@ export function createApp(options: AppOptions) {
   appUpdates.set(configured, update)
   appMachines.set(configured, machines)
   appSystems.set(configured, system)
+  appUsage.set(configured, providerUsage)
+  appHistories.set(configured, providerTranscriptHistory)
   return configured
 }
 
@@ -786,6 +897,9 @@ function appCleanup(
   providerPrices: ProviderPriceCatalog,
   providerMaintenance: ProviderMaintenance,
   providerResetCredits: ProviderResetCredits,
+  providerUsage: ProviderUsageStore,
+  providerTranscriptHistory: ProviderTranscriptCollection,
+  stopUsageRegistry: () => void,
   sessionPush: SessionNoticePush,
   mcpSignIns: McpSignInAttempts,
   stopDeviceSweep: () => void,
@@ -797,6 +911,7 @@ function appCleanup(
 
     closed = true
     stopDeviceSweep()
+    stopUsageRegistry()
     // A signal stop admits no provider start while the runtime shuts down.
     orchestration.holdProviderStarts()
     orchestrationSockets.closeAll()
@@ -810,6 +925,8 @@ function appCleanup(
     await terminal.dispose()
     // Releases the settings file watchers; without this a test run leaks a
     // native handle per app it builds.
+    await providerUsage.close()
+    await providerTranscriptHistory.close()
     settings.close()
     await orchestration.close()
     await providerService.shutdown()

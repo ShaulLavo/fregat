@@ -19,7 +19,7 @@ export type CodexDriverConfig = v.InferOutput<typeof codexConfigSchema>
 
 export const codexDriver: ProviderDriver<CodexDriverConfig> = {
   capabilities: { ...CODEX_ADAPTER_CAPABILITIES, multiInstance: true },
-  credentialPaths: ({ config }) => [path.join(codexHome(config), 'auth.json')],
+  credentialPaths: ({ env }) => [path.join(codexHome(env), 'auth.json')],
   create: async (input) => {
     const adapter = new CodexProviderAdapter({
       env: codexSpawnEnvironment(input.env, input.binaryPath),
@@ -53,6 +53,6 @@ function codexSpawnEnvironment(env: NodeJS.ProcessEnv, binaryPath: string | unde
   return { ...env, PLATFORM_CODEX_BINARY: binaryPath }
 }
 
-function codexHome(config: CodexDriverConfig) {
-  return config.home ?? path.join(homedir(), '.codex')
+function codexHome(env: NodeJS.ProcessEnv) {
+  return env.CODEX_HOME ?? path.join(env.HOME ?? homedir(), '.codex')
 }

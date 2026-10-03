@@ -1,4 +1,7 @@
+import { statSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import path from 'node:path'
+import { homedir } from 'node:os'
 import type { SessionId } from '@workspace/contracts'
 import type { AgentTerminalProcess } from '../terminal/agent-launch'
 
@@ -237,7 +240,42 @@ export class ProviderAdapterRegistry {
       accountKey,
       driverKind: instance.config.driverKind,
       enabled: instance.config.enabled !== false,
+      credentialFingerprint: credentialFingerprint(instance.credentialPaths),
+      claudeCachePath:
+        instance.config.driverKind === 'claude' && instance.credentialPaths.length > 0
+          ? claudeUsageCachePath(instance.env)
+          : null,
     }
+  }
+
+  transcriptUsageSources() {
+    const sources = new Map<
+      string,
+      { id: string; driverKind: 'claude' | 'codex'; roots: string[] }
+    >()
+    for (const { config, credentialPaths, env } of this.instances.values()) {
+      if (
+        credentialPaths.length === 0 ||
+        config.enabled === false ||
+        (config.driverKind !== 'claude' && config.driverKind !== 'codex')
+      )
+        continue
+      const driverKind = config.driverKind === 'claude' ? 'claude' : 'codex'
+      const home =
+        driverKind === 'claude'
+          ? (env.CLAUDE_CONFIG_DIR ?? path.join(env.HOME ?? homedir(), '.claude'))
+          : (env.CODEX_HOME ?? path.join(env.HOME ?? homedir(), '.codex'))
+      const roots =
+        driverKind === 'claude'
+          ? [path.resolve(home, 'projects')]
+          : [path.resolve(home, 'sessions'), path.resolve(home, 'archived_sessions')]
+      const id = createHash('sha256')
+        .update(`${driverKind}\0${roots.join('\0')}`)
+        .digest('hex')
+        .slice(0, 16)
+      sources.set(id, { id, driverKind, roots })
+    }
+    return [...sources.values()]
   }
 
   importSources() {
@@ -757,4 +795,26 @@ function compareProviderSnapshots(left: ProviderSnapshot, right: ProviderSnapsho
     left.driverKind.localeCompare(right.driverKind) ||
     left.providerInstanceId.localeCompare(right.providerInstanceId)
   )
+}
+
+function claudeUsageCachePath(env: NodeJS.ProcessEnv) {
+  const home = env.HOME ?? homedir()
+  const configDir = env.CLAUDE_CONFIG_DIR
+  if (!configDir || path.resolve(configDir) === path.join(home, '.claude'))
+    return path.join(home, '.claude.json')
+  return path.join(configDir, '.claude.json')
+}
+
+function credentialFingerprint(paths: readonly string[]) {
+  if (!paths.length) return null
+  const hash = createHash('sha256')
+  for (const filePath of paths.toSorted()) {
+    try {
+      const stat = statSync(filePath, { bigint: true })
+      hash.update(`${stat.ino}\0${stat.size}\0${stat.mtimeNs}\0${stat.ctimeNs}\0`)
+    } catch {
+      hash.update('missing\0')
+    }
+  }
+  return hash.digest('hex')
 }

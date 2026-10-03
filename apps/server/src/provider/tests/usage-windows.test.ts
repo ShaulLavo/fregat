@@ -43,10 +43,10 @@ describe('claude rate-limit events', () => {
     })
   })
 
-  it('treats an uncovered rejection without a utilization as a spent window', () => {
+  it('keeps an uncovered rejection without inventing a percentage', () => {
     expect(
       claudeUsageUpdate({ rateLimitType: 'five_hour', status: 'rejected' }, null).windows,
-    ).toEqual([expect.objectContaining({ status: 'rejected', usedPercent: 100 })])
+    ).toEqual([expect.objectContaining({ status: 'rejected', usedPercent: null })])
   })
 
   it('keeps the percentage open and only warns when overage pays for the rejection', () => {
@@ -135,6 +135,7 @@ describe('codex rate-limit snapshots', () => {
         secondary: { usedPercent: 40, windowDurationMins: 10_080 },
       }),
     ).toEqual({
+      credits: null,
       planType: 'pro',
       windows: [
         {
@@ -168,10 +169,10 @@ describe('codex rate-limit snapshots', () => {
     ).toMatchObject({ status: 'warning' })
   })
 
-  it('falls back to a monthly primary window on free plans and hides an unknown plan', () => {
+  it('retains an unknown duration without guessing from account plan', () => {
     expect(
       codexUsageUpdate({ planType: 'free', primary: { usedPercent: 12 } }).windows[0],
-    ).toMatchObject({ kind: 'monthly', label: 'Monthly' })
+    ).toMatchObject({ kind: 'other', label: 'Other', windowMinutes: null })
     expect(codexUsageUpdate({ planType: 'unknown', primary: { usedPercent: 1 } }).planType).toBe(
       null,
     )
@@ -210,11 +211,13 @@ describe('mergeUsageWindows', () => {
     ).toEqual([{ ...session, usedPercent: 30 }, weekly])
   })
 
-  it('takes a status-only reading onto the known percentage and drops one never seen', () => {
+  it('keeps known percentages and preserves new status-only windows', () => {
     expect(
       mergeUsageWindows([session], [{ ...session, status: 'warning', usedPercent: null }]),
     ).toEqual([{ ...session, status: 'warning' }])
-    expect(mergeUsageWindows([], [{ ...weekly, usedPercent: null }])).toEqual([])
+    expect(mergeUsageWindows([], [{ ...weekly, usedPercent: null }])).toEqual([
+      { ...weekly, usedPercent: null },
+    ])
   })
 
   it('returns the previous array itself when nothing changed', () => {

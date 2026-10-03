@@ -19,7 +19,7 @@ export function useResetCredit(account: ProviderAccountUsage) {
     retry: false,
     mutationFn: async (confirmedAccount: ProviderAccountUsage) => {
       const credit = confirmedAccount.resetCredits
-      if (!credit?.creditId)
+      if (!credit?.creditId || !confirmedAccount.checkedAt)
         throw createRpcError({ message: 'Refresh usage before confirming a reset.' })
       const instance = confirmedAccount.providerInstanceIds[0]
       if (!instance) throw createRpcError({ message: 'The provider account is unavailable.' })
