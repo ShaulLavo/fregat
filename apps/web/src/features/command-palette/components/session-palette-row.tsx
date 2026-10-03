@@ -11,7 +11,7 @@ import {
   sessionRowTitle,
 } from '@/features/command-palette/utils/query'
 import { formatChatRelativeTime } from '@/features/chat/utils/formatters'
-import { useCoarseNow } from '@/features/chat/hooks/use-coarse-now'
+import { useCoarseNow } from '@/hooks/use-coarse-now'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 
 export function SessionPaletteRow({ session }: { readonly session: SessionRailItem }) {

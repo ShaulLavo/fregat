@@ -1,7 +1,11 @@
+import { accountUsageFixture } from '../../../apps/web/test/factories/account-usage'
+import { providerDriverKindSchema } from '../../../packages/contracts/src/index'
+import * as v from 'valibot'
 import type {
   ProviderUsageDayRow,
   ProviderUsageHistory,
   ProviderUsageModelRow,
+  ProviderUsageResult,
 } from '../../../packages/contracts/src/index'
 import { strictEqual } from 'node:assert/strict'
 import { selectors, settleAnimations } from '../selectors'
@@ -59,6 +63,58 @@ function historyFixture(): ProviderUsageHistory {
 
   return {
     daily,
+    coverage: {
+      scope: 'local-transcripts',
+      accountAttribution: 'unverified',
+      costMeaning: 'api-equivalent-estimate',
+      status: 'partial',
+      scannedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+      bytesRead: 2048,
+      sources: [
+        {
+          id: 'local-claude',
+          hostId: 'fixture-host',
+          sourceKind: 'native-transcript',
+          driverKind: 'claude',
+          status: 'ready',
+          scannedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+          latestEventAt: new Date().toISOString(),
+          files: 4,
+          records: 24,
+          malformedLines: 0,
+          oversizedLines: 0,
+          unidentifiedRecords: 0,
+        },
+        {
+          id: 'local-codex',
+          hostId: 'fixture-host',
+          sourceKind: 'native-transcript',
+          driverKind: 'codex',
+          status: 'unreadable',
+          scannedAt: null,
+          latestEventAt: null,
+          files: 0,
+          records: 0,
+          malformedLines: 0,
+          oversizedLines: 0,
+          unidentifiedRecords: 0,
+        },
+        {
+          id: 'local-utility',
+          hostId: 'fixture-host',
+          sourceKind: 'fregat-utility',
+          driverKind: 'fregat',
+          status: 'ready',
+          scannedAt: new Date().toISOString(),
+          latestEventAt: new Date().toISOString(),
+          files: 0,
+          records: 12,
+          malformedLines: 0,
+          oversizedLines: 0,
+          unidentifiedRecords: 3,
+        },
+      ],
+    },
     days: 30,
     models: [
       model({
@@ -99,10 +155,56 @@ function historyFixture(): ProviderUsageHistory {
   }
 }
 
+function allowanceFixture(): ProviderUsageResult {
+  const now = Date.now()
+  const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString()
+  return {
+    accounts: [
+      {
+        accountKey: 'owner-native',
+        driverKind: v.parse(providerDriverKindSchema, 'claude'),
+        providerInstanceIds: [],
+        planType: 'max',
+        checkedAt: at(-2),
+        source: 'claude-local-cache',
+        routing: { mode: 'unknown', active: null, lastServedAt: null },
+        windows: [
+          {
+            id: 'five_hour',
+            kind: 'session',
+            label: 'Five-hour',
+            usedPercent: 42,
+            resetsAt: at(120),
+            windowMinutes: 300,
+            status: 'allowed',
+            observedAt: at(-2),
+            source: 'claude-local-cache',
+            freshness: 'fresh',
+          },
+          {
+            id: 'seven_day',
+            kind: 'weekly',
+            label: 'Weekly',
+            usedPercent: 83,
+            resetsAt: at(3000),
+            windowMinutes: 10080,
+            status: 'warning',
+            observedAt: at(-120),
+            source: 'claude-local-cache',
+            freshness: 'stale',
+          },
+        ],
+      },
+      ...accountUsageFixture(now).accounts,
+    ],
+  }
+}
+
 async function openUsageSettings(page: Parameters<Scenario['run']>[0]) {
-  await selectors.windowToolbar(page).waitFor({ timeout: 45_000 })
-  await page.keyboard.press('Control+,')
-  await selectors.settingsSearch(page).fill('usage')
+  const search = selectors.settingsSearch(page)
+  await search.or(selectors.settingsOpen(page)).first().waitFor({ timeout: 45_000 })
+  if (!(await search.isVisible())) await selectors.settingsOpen(page).click()
+  await search.fill('usage')
 }
 
 export const settingsUsage: Scenario = {
@@ -110,7 +212,7 @@ export const settingsUsage: Scenario = {
   readOnly: true,
   description:
     'Settings › Usage: the real history read answers, then a fixed month drives the headline, day chart, model and purpose rows with automatic estimates and unknown costs.',
-  async run(page, { step }) {
+  async run(page, { step, evidence }) {
     const realRead = page.waitForResponse(historyRoute, { timeout: 45_000 })
     await page.reload()
     await openUsageSettings(page)
@@ -119,17 +221,60 @@ export const settingsUsage: Scenario = {
     await selectors.usageSection(page).waitFor({ timeout: 20_000 })
     await step('real-read')
 
-    let unpricedOnly = false
-    await page.route(historyRoute, (route) =>
-      route.fulfill({
-        contentType: 'application/json',
-        json: unpricedOnly ? unpricedHistoryFixture() : historyFixture(),
-      }),
+    const accountRoute = /\/providers\/usage(\?|$)/
+    const reads: { method: string; path: string }[] = []
+    const track = (request: import('playwright').Request) => {
+      if (/\/providers\/usage(?:\/history)?(?:\?|$)/.test(request.url()))
+        reads.push({ method: request.method(), path: new URL(request.url()).pathname })
+    }
+    page.on('request', track)
+    await page.route(accountRoute, (route) =>
+      route.fulfill({ contentType: 'application/json', json: allowanceFixture() }),
     )
+    let unpricedOnly = false
+    let holdRange = false
+    let releaseRange!: () => void
+    const rangeReady = new Promise<void>((resolve) => {
+      releaseRange = resolve
+    })
+    await page.route(historyRoute, async (route) => {
+      const sevenDays = new URL(route.request().url()).searchParams.get('days') === '7'
+      if (sevenDays && holdRange) await rangeReady
+      let json = historyFixture()
+      if (sevenDays) json = sevenDayHistoryFixture()
+      if (unpricedOnly) json = unpricedHistoryFixture()
+      await route.fulfill({ contentType: 'application/json', json })
+    })
     try {
       await page.reload()
       await openUsageSettings(page)
       await selectors.usageSummary(page).waitFor({ timeout: 20_000 })
+      strictEqual(await selectors.allowanceAccounts(page).count(), 3, 'three independent accounts')
+      await selectors
+        .accountAllowances(page)
+        .getByText('No allowance observation', { exact: true })
+        .waitFor()
+      await selectors
+        .accountAllowances(page)
+        .getByText(/Observed 2h(?: 1m)? ago/)
+        .first()
+        .waitFor()
+      await selectors
+        .transcriptCoverage(page)
+        .getByText('Codex transcripts · unreadable', { exact: true })
+        .waitFor()
+      await selectors
+        .accountAllowances(page)
+        .getByRole('heading', { name: 'Account allowances', exact: true })
+        .evaluate((heading) => heading.scrollIntoView({ block: 'start' }))
+      await step('accounts-mixed-age-no-data')
+      await selectors
+        .accountAllowances(page)
+        .getByText('No allowance observation', { exact: true })
+        .scrollIntoViewIfNeeded()
+      await step('configured-no-data')
+      await selectors.transcriptCoverage(page).scrollIntoViewIfNeeded()
+      await step('local-source-coverage')
       strictEqual(await selectors.usageChartBars(page).count(), 30, 'one bar slot per day')
       strictEqual(await selectors.usageModelRows(page).count(), 5, 'top five, the rest folded')
       await selectors
@@ -149,7 +294,10 @@ export const settingsUsage: Scenario = {
         'unknown model stays unpriced',
       )
       strictEqual(
-        await selectors.usageSummary(page).getByText('Estimated cost', { exact: true }).count(),
+        await selectors
+          .usageSummary(page)
+          .getByText('API-equivalent cost estimate', { exact: true })
+          .count(),
         1,
       )
       await page.mouse.move(0, 0)
@@ -165,6 +313,41 @@ export const settingsUsage: Scenario = {
       await selectors.usageModelRows(page).last().scrollIntoViewIfNeeded()
       await step('automatic-pricing')
 
+      holdRange = true
+      const rangeRead = page.waitForRequest(
+        (request) =>
+          historyRoute.test(request.url()) &&
+          new URL(request.url()).searchParams.get('days') === '7',
+      )
+      await selectors.usageSection(page).getByRole('tab', { name: '7 days', exact: true }).click()
+      await rangeRead
+      strictEqual(
+        await selectors
+          .usageSection(page)
+          .getByRole('tab', { name: '30 days', exact: true })
+          .getAttribute('aria-selected'),
+        'true',
+        'held range header stays with the displayed response',
+      )
+      await selectors.usageSummary(page).getByText('$12.00', { exact: true }).waitFor()
+      await selectors.transcriptCoverage(page).getByText('4 files · 24 records').waitFor()
+      strictEqual(await selectors.usageChartBars(page).count(), 30, 'held body keeps month slots')
+      await selectors.transcriptCoverage(page).scrollIntoViewIfNeeded()
+      await step('held-range-pending')
+      releaseRange()
+      await selectors.usageSummary(page).getByText('$7.00', { exact: true }).waitFor()
+      strictEqual(
+        await selectors
+          .usageSection(page)
+          .getByRole('tab', { name: '7 days', exact: true })
+          .getAttribute('aria-selected'),
+        'true',
+        'settled range header swaps with its body',
+      )
+      await selectors.transcriptCoverage(page).getByText('4 files · 7 records').waitFor()
+      strictEqual(await selectors.usageChartBars(page).count(), 7, 'settled body shows week slots')
+      await step('held-range-settled')
+      holdRange = false
       unpricedOnly = true
       await page.reload()
       await openUsageSettings(page)
@@ -177,11 +360,37 @@ export const settingsUsage: Scenario = {
       await step('unknown-prices')
     } finally {
       await page.unroute(historyRoute)
+      await page.unroute(accountRoute)
+      page.off('request', track)
+      strictEqual(
+        reads.every((read) => read.method === 'GET'),
+        true,
+        'Settings requests only cached GET projections',
+      )
+      await evidence.json('usage-read-counters.json', {
+        reads,
+        fixtureTransport: 'playwright route fulfilment for allowance and history display states',
+        providerRequestsFromBrowser: 0,
+        sourceRequestCountsVerifiedBy: 'real-server cache-only component test',
+      })
     }
   },
 }
 
-function unpricedHistoryFixture() {
+function sevenDayHistoryFixture(): ProviderUsageHistory {
+  const history = historyFixture()
+  const source = history.coverage!.sources[0]!
+  return {
+    ...history,
+    days: 7,
+    since: rangeStart(7).toISOString(),
+    daily: history.daily.slice(-2),
+    totals: { ...history.totals, costUsd: 7 },
+    coverage: { ...history.coverage!, sources: [{ ...source, records: 7 }] },
+  }
+}
+
+function unpricedHistoryFixture(): ProviderUsageHistory {
   const history = historyFixture()
   return {
     ...history,

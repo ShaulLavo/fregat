@@ -28,12 +28,42 @@ test('health reports the real workspace root', async ({ client, server }) => {
 
 test('persists usage outside a clean Git workspace across restart', async ({ client, server }) => {
   runGit(server.root, ['init', '-b', 'main'], { cwdMode: 'option' })
-  // Closing the app flushes collector state without depending on its scheduled tick.
+  const usage = await client.providers.usage.get()
+  expect(usage.status).toBe(200)
+  expect(usage.data?.accounts).toHaveLength(1)
+  // Pending reset state is projected by the route from attempts stored in the database.
+  const { resetPending, ...configuredAccount } = usage.data!.accounts[0]!
+  expect(resetPending).toBe(false)
+  expect(configuredAccount).toMatchObject({
+    driverKind: 'codex',
+    providerInstanceIds: [server.providerAdapter.adapterKey],
+    source: 'unknown',
+    state: 'no-data',
+    windows: [],
+    checkedAt: null,
+    resetCredits: null,
+  })
+  // Closing the app flushes the fixture collector's configured account before restart.
   await server.restart()
   const cache = JSON.parse(
     await readFile(path.join(server.stateHome, 'usage', 'accounts.json'), 'utf8'),
   )
-  expect(cache).toMatchObject({ version: 1, accounts: [] })
+  expect(cache).toEqual({
+    version: 1,
+    accounts: [
+      {
+        snapshot: configuredAccount,
+        attemptedAt: expect.any(Number),
+        credentialFingerprint: null,
+        failed: false,
+        unsupported: false,
+      },
+    ],
+    proxyAccounts: [],
+    proxyAttemptedAt: null,
+    proxyFailed: false,
+    proxySourceKey: null,
+  })
   const clean = await client.git.status.get({ query: { path: '', fresh: true } })
   expect(clean.status).toBe(200)
   expect(clean.data?.files).toEqual([])

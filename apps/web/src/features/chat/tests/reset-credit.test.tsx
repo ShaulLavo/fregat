@@ -1,7 +1,9 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import * as v from 'valibot'
-import { providerAccountUsageSchema, type ProviderUsageWindow } from '@workspace/contracts'
-import { appUsageCollector, MockProviderAdapter } from 'server/testing'
+import { providerAccountUsageSchema, providerInstanceIdSchema } from '@workspace/contracts'
+import { appUsageCollector } from 'server/testing'
+import { ResetCreditFixtureAdapter } from '../../../../test/factories/usage'
+import { UsageLimitsMeter } from '@/features/chat/components/usage-limits-meter'
 import { ResetCreditAction } from '@/features/chat/components/reset-credit-action'
 import { providerUsageKeys } from '@/features/chat/utils/query-keys'
 import { expect, test } from '../../../../test/fixtures'
@@ -17,39 +19,11 @@ const account = v.parse(providerAccountUsageSchema, {
   resetCredits: { available: 1, accountKey: 'fixture-account', creditId: 'fixture-credit' },
 })
 
-class ResetCreditFixture extends MockProviderAdapter {
-  readonly keys: string[] = []
-  async consumeResetCredit(input: { idempotencyKey: string }) {
-    this.keys.push(input.idempotencyKey)
-    return 'reset' as const
-  }
-  async readUsage() {
-    const window: ProviderUsageWindow = {
-      id: 'primary',
-      kind: 'session',
-      label: 'Session',
-      usedPercent: this.keys.length ? 0 : 100,
-      resetsAt: new Date(Date.now() + 60_000).toISOString(),
-      windowMinutes: 5,
-      status: 'allowed',
-    }
-    return {
-      kind: 'reading' as const,
-      update: { planType: 'pro', windows: [window] },
-      resetCredits: {
-        available: this.keys.length ? 0 : 1,
-        accountKey: 'fixture-account',
-        creditId: 'fixture-credit',
-      },
-    }
-  }
-}
-
 test('requires confirmation, calls the real route once and settles usage cache', async ({
   server,
   client,
 }) => {
-  const adapter = new ResetCreditFixture()
+  const adapter = new ResetCreditFixtureAdapter()
   await server.restart({ providerAdapter: adapter })
   const response = await client.providers.usage.get()
   expect(response.error).toBeNull()
@@ -58,14 +32,17 @@ test('requires confirmation, calls the real route once and settles usage cache',
   )
   expect(cached).toBeDefined()
   if (!cached) return
-  // GET reads cached usage; seed the replacement adapter's grant through the real collector.
+  // The restart retains the previous adapter's cache cooldown; seed the replacement's grant explicitly.
   await appUsageCollector(server.app).refreshAccount(cached.accountKey)
   const actual = (await client.providers.usage.get()).data?.accounts.find((item) =>
     item.providerInstanceIds.includes(adapter.adapterKey),
   )
   expect(actual).toBeDefined()
   if (!actual) return
-  expect(actual.resetCredits).toMatchObject({ available: 1, creditId: 'fixture-credit' })
+  expect(actual.resetCredits).toMatchObject({
+    available: 1,
+    creditId: `fixture-credit-${adapter.adapterKey}`,
+  })
   const view = renderWithProviders(<ResetCreditAction account={actual} />)
   try {
     fireEvent.click(await screen.findByRole('button', { name: 'Use reset credit…' }))
@@ -102,6 +79,56 @@ test('a pending reset remains retryable after the last available credit disappea
     expect(
       screen.getByText('Sends your last reset request again to see whether it went through.'),
     ).toBeVisible()
+  } finally {
+    view.unmount()
+    view.queryClient.clear()
+  }
+})
+
+test('a grouped meter consumes the selected second account grant without touching its peer', async ({
+  server,
+  client,
+}) => {
+  const first = new ResetCreditFixtureAdapter({
+    providerInstanceId: v.parse(providerInstanceIdSchema, 'reset-peer'),
+  })
+  const second = new ResetCreditFixtureAdapter({
+    providerInstanceId: v.parse(providerInstanceIdSchema, 'reset-target'),
+  })
+  await server.restart({ providerAdapter: first, additionalProviderAdapters: [second] })
+  const response = await client.providers.usage.get()
+  expect(response.error).toBeNull()
+  const firstAccount = response.data!.accounts.find((item) =>
+    item.providerInstanceIds.includes(first.adapterKey),
+  )!
+  const secondAccount = response.data!.accounts.find((item) =>
+    item.providerInstanceIds.includes(second.adapterKey),
+  )!
+  expect(firstAccount.resetCredits?.available).toBe(1)
+  expect(secondAccount.resetCredits?.available).toBe(1)
+  const view = renderWithProviders(<UsageLimitsMeter accounts={[firstAccount, secondAccount]} />)
+  try {
+    fireEvent.click(await screen.findByRole('button', { name: 'Account allowances · 2 accounts' }))
+    const details = document.querySelector(
+      `[data-account-usage="${secondAccount.accountKey}"]`,
+    )!.parentElement!
+    fireEvent.click(within(details).getByRole('button', { name: 'Use reset credit…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use 1 credit' }))
+    await waitFor(() => expect(second.keys).toHaveLength(1))
+    expect(first.keys).toEqual([])
+    await waitFor(() => {
+      const cache = view.queryClient.getQueryData<{
+        accounts: Array<{ accountKey: string; resetCredits?: { available: number } }>
+      }>(providerUsageKeys.all)
+      expect(
+        cache?.accounts.find((item) => item.accountKey === secondAccount.accountKey)?.resetCredits
+          ?.available,
+      ).toBe(0)
+      expect(
+        cache?.accounts.find((item) => item.accountKey === firstAccount.accountKey)?.resetCredits
+          ?.available,
+      ).toBe(1)
+    })
   } finally {
     view.unmount()
     view.queryClient.clear()

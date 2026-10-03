@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ScopedSessionRef } from '@workspace/contracts'
 import { scopedSessionKey } from '@workspace/contracts'
 import { unseenSessionWake } from '@workspace/client-core/chat/rail/unread'
-import { useCoarseNow } from '@/features/chat/hooks/use-coarse-now'
+import { useCoarseNow } from '@/hooks/use-coarse-now'
 import {
   useChatProjectionStore,
   selectChatProjectionSlice,

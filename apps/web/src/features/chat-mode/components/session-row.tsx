@@ -12,7 +12,7 @@ import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
 import { SessionPullRequestBadge } from '@/features/chat-mode/components/session-pull-request-badge'
 
 import { formatChatRelativeTime } from '@/features/chat/utils/formatters'
-import { useCoarseNow } from '@/features/chat/hooks/use-coarse-now'
+import { useCoarseNow } from '@/hooks/use-coarse-now'
 import { SessionRename } from '@/components/session-rename'
 import { SessionRowSnippet } from '@/features/chat-mode/components/session-row-snippet'
 import { activateSessionRow } from '@/features/chat-mode/state/session-commands'

@@ -759,6 +759,7 @@ async function control(request) {
       if (!stopTask(request.task_id)) throw new Error(`No task ${request.task_id}`)
       return {}
     case 'get_usage':
+      record({ event: 'usage-read' })
       // A fixture account has no plan windows to report.
       return {
         session: {

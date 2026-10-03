@@ -170,12 +170,6 @@
   {
     "from": "chat-mode",
     "to": "chat",
-    "module": "features/chat/hooks/use-coarse-now.ts",
-    "reason": "couple: Chat mode and chat share one session lifecycle through useCoarseNow; merge their ownership in a later pass."
-  },
-  {
-    "from": "chat-mode",
-    "to": "chat",
     "module": "features/chat/hooks/use-session-diff-scope.ts",
     "reason": "couple: Chat mode and chat share one session lifecycle through useSessionDiffScope; merge their ownership in a later pass."
   },
@@ -418,12 +412,6 @@
     "to": "chat",
     "module": "features/chat/hooks/use-active-projection.ts",
     "reason": "owner: The palette assembles commands and search results across features; this module supplies useActiveChatProjection."
-  },
-  {
-    "from": "command-palette",
-    "to": "chat",
-    "module": "features/chat/hooks/use-coarse-now.ts",
-    "reason": "owner: The palette assembles commands and search results across features; this module supplies useCoarseNow."
   },
   {
     "from": "command-palette",

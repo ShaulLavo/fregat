@@ -179,9 +179,9 @@ async function expectWelcomeContained(page: Page) {
 async function exerciseUsage(page: Page, step: (label: string) => Promise<void>) {
   await selectors.usageMeter(page).click()
   await selectors.usagePopover(page).waitFor()
-  // The fixture's Codex account has two live windows; its expired one must not show.
+  // The expired reading remains visible with its historical reset state.
   const rows = await selectors.usageWindowRows(page).count()
-  ok(rows === 2, `The usage popover lists ${rows} windows`)
+  ok(rows === 3, `The usage popover lists ${rows} windows`)
   await page.waitForTimeout(250)
   await step('usage-open')
   await selectors.usageMeterViewUsage(page).click()

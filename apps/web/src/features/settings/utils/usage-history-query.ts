@@ -7,7 +7,7 @@ import { createRpcError } from '@/lib/structured-errors'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 import type { UsageDays } from '@/features/settings/utils/usage'
 
-// New rows land per turn; a minute-old page is current enough to read.
+// Local transcript collection runs independently; mounted views follow its cached report.
 const USAGE_HISTORY_STALE_TIME_MS = 60_000
 
 export function usageHistoryQueryOptions(days: UsageDays, utcOffsetMinutes: number) {
@@ -16,6 +16,7 @@ export function usageHistoryQueryOptions(days: UsageDays, utcOffsetMinutes: numb
       fetchUsageHistory(clientForQueryClient(client), days, utcOffsetMinutes),
     queryKey: settingsQueryKeys.usageHistory(days, utcOffsetMinutes),
     staleTime: USAGE_HISTORY_STALE_TIME_MS,
+    refetchInterval: USAGE_HISTORY_STALE_TIME_MS,
   })
 }
 

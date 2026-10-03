@@ -39,6 +39,7 @@ test.each(['range', 'refetch'] as const)(
   'keeps a model visible after a %s removes the only visible model',
   async (change) => {
     const client = new QueryClient()
+    client.setQueryData(['providers', 'usage'], { accounts: [] })
     client.setQueryData(key(30), history(['A', 'B', 'C']))
     client.setQueryData(key(7), history(['A', 'B'], 7))
     const view = render(

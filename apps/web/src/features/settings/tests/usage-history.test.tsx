@@ -3,7 +3,10 @@ import { vi } from 'vitest'
 import { formatContextTokens } from '@workspace/client-core/chat/context-usage'
 import { usageTokenCount } from '@workspace/contracts'
 import { createFederationHarness } from '../../../../test/factories/federation'
-import { recordUtilityUsageFixture } from '../../../../test/factories/usage'
+import {
+  recordUtilityUsageFixture,
+  UsageObservationFixtureAdapter,
+} from '../../../../test/factories/usage'
 import { renderWithProviders } from '../../../../test/render'
 import { expect, test } from '../../../../test/fixtures'
 import { UsageSection } from '@/features/settings/components/usage-section'
@@ -108,6 +111,38 @@ test('cache savings stay unavailable when recorded prices differ inside the sele
       view.unmount()
     }
   } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('mounted local history observes new recorded activity through idle cache reads without provider calls', async ({
+  server,
+  client,
+}) => {
+  expect(client).toBeDefined()
+  const adapter = new UsageObservationFixtureAdapter()
+  await server.restart({ providerAdapter: adapter })
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  const view = renderWithProviders(<UsageSection />)
+  try {
+    await screen.findByText('No usage in the last 30 days')
+    const reads = adapter.usageReads
+    await recordUtilityUsageFixture(server, 2)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+    })
+    await waitFor(() =>
+      expect(view.container.querySelector('[data-usage-summary]')).toHaveTextContent('$3.25'),
+    )
+    for (let index = 0; index < 5; index += 1) {
+      const response = await client.providers.usage.history.get({
+        query: { days: 30, utcOffsetMinutes: -new Date().getTimezoneOffset() },
+      })
+      expect(response.data?.totals.turns).toBe(1)
+    }
+    expect(adapter.usageReads).toBe(reads)
+  } finally {
+    view.unmount()
     vi.useRealTimers()
   }
 })

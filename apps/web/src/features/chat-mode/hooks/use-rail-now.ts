@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { SessionRailEnvironment } from '@workspace/client-core/chat/rail/model'
-import { useCoarseNow } from '@/features/chat/hooks/use-coarse-now'
+import { useCoarseNow } from '@/hooks/use-coarse-now'
 
 export function useRailNow(environments: readonly SessionRailEnvironment[]) {
   const coarse = useCoarseNow()
