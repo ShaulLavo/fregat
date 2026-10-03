@@ -24,7 +24,7 @@
     },
     "apps/desktop": {
       "name": "desktop",
-      "version": "0.0.3",
+      "version": "0.0.2",
       "dependencies": {
         "@workspace/contracts": "workspace:*",
         "@workspace/observability": "workspace:*",
