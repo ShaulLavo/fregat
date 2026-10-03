@@ -840,80 +840,100 @@ describe('provider usage store', () => {
     expect((await f.store.read()).accounts[0]?.windows).toEqual([])
   })
 
-  it('keeps a newer passive observation when an older local cache and delayed SDK reply arrive', async () => {
-    const f = await nativeClaudeFixture()
-    const response = Promise.withResolvers<ProviderUsageProbe>()
-    const started = Promise.withResolvers<void>()
-    stubUsage(f.registry, WORK, () => {
-      started.resolve()
-      return response.promise
-    })
-    const refresh = f.store.refresh()
-    await started.promise
-    f.clock.ms += 1000
-    f.store.accept({
-      ...limitsEvent(WORK, [window('five_hour', 20)]),
-      createdAt: new Date(f.clock.ms).toISOString(),
-      payload: { planType: 'event-plan', windows: [window('five_hour', 20)] },
-    })
-    response.resolve({
-      kind: 'reading',
-      update: { planType: 'older-plan', windows: [window('five_hour', 90)] },
-    })
-    await refresh
-    expect((await f.store.read()).accounts[0]).toMatchObject({
-      planType: 'event-plan',
-      checkedAt: new Date(f.clock.ms).toISOString(),
-      windows: [{ usedPercent: 20, source: 'rate-limit-event' }],
-    })
-  })
+  it.each(['reading', 'unsupported'] as const)(
+    'keeps a newer passive observation when an older local cache and delayed SDK %s arrive',
+    async (kind) => {
+      const f = await nativeClaudeFixture()
+      const response = Promise.withResolvers<ProviderUsageProbe>()
+      const started = Promise.withResolvers<void>()
+      stubUsage(f.registry, WORK, () => {
+        started.resolve()
+        return response.promise
+      })
+      const refresh = f.store.refresh()
+      await started.promise
+      f.clock.ms += 1000
+      f.store.accept({
+        ...limitsEvent(WORK, [window('five_hour', 20)]),
+        createdAt: new Date(f.clock.ms).toISOString(),
+        payload: { planType: 'event-plan', windows: [window('five_hour', 20)] },
+      })
+      response.resolve(
+        kind === 'reading'
+          ? {
+              kind: 'reading',
+              update: { planType: 'older-plan', windows: [window('five_hour', 90)] },
+            }
+          : { kind: 'unsupported' },
+      )
+      await refresh
+      expect((await f.store.read()).accounts[0]).toMatchObject({
+        planType: 'event-plan',
+        checkedAt: new Date(f.clock.ms).toISOString(),
+        windows: [{ usedPercent: 20, source: 'rate-limit-event' }],
+      })
+    },
+  )
 
-  it('clears prior UUID observations at the same home and discards its delayed old request', async () => {
-    const f = await nativeClaudeFixture()
-    const response = Promise.withResolvers<ProviderUsageProbe>()
-    const started = Promise.withResolvers<void>()
-    const calls = stubUsage(f.registry, WORK, () => {
-      started.resolve()
-      return response.promise
-    })
-    const refresh = f.store.refresh()
-    await started.promise
-    await f.writeCache('fixture-new-account', 'fixture-old-account', START_MS, 70)
-    response.resolve(reading([window('five_hour', 90)]))
-    await refresh
-    expect((await f.store.read()).accounts[0]).toMatchObject({
-      checkedAt: null,
-      state: 'no-data',
-      windows: [],
-    })
-    f.clock.ms += 300_000
-    await f.writeCache('fixture-new-account', 'fixture-new-account', f.clock.ms, 5)
-    await f.store.refresh()
-    expect(calls.count).toBe(1)
-    expect((await f.store.read()).accounts[0]?.windows).toEqual([
-      expect.objectContaining({ usedPercent: 5, source: 'claude-local-cache' }),
-    ])
-  })
+  it.each(['reading', 'unsupported'] as const)(
+    'clears prior UUID observations at the same home and discards its delayed old %s',
+    async (kind) => {
+      const f = await nativeClaudeFixture()
+      const response = Promise.withResolvers<ProviderUsageProbe>()
+      const started = Promise.withResolvers<void>()
+      const calls = stubUsage(f.registry, WORK, () => {
+        started.resolve()
+        return response.promise
+      })
+      const refresh = f.store.refresh()
+      await started.promise
+      await f.writeCache('fixture-new-account', 'fixture-old-account', START_MS, 70)
+      response.resolve(
+        kind === 'reading' ? reading([window('five_hour', 90)]) : { kind: 'unsupported' },
+      )
+      await refresh
+      expect((await f.store.read()).accounts[0]).toMatchObject({
+        checkedAt: null,
+        state: 'no-data',
+        windows: [],
+      })
+      f.clock.ms += 300_000
+      await f.writeCache('fixture-new-account', 'fixture-new-account', f.clock.ms, 5)
+      await f.store.refresh()
+      expect(calls.count).toBe(1)
+      expect((await f.store.read()).accounts[0]?.windows).toEqual([
+        expect.objectContaining({ usedPercent: 5, source: 'claude-local-cache' }),
+      ])
+    },
+  )
 
-  it('invalidates a credential-file generation without reading its contents', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'usage-credentials-'))
-    roots.push(root)
-    const f = await usageFixture()
-    await f.registry.reconcile([
-      { ...instance(WORK, 'work.json'), config: { credentialsPath: path.join(root, 'auth.json') } },
-    ])
-    await writeFile(path.join(root, 'auth.json'), 'first-private-auth-record')
-    const response = Promise.withResolvers<ProviderUsageProbe>()
-    const calls = stubUsage(f.registry, WORK, () => response.promise)
-    f.store.accept(limitsEvent(WORK, [window('five_hour', 40)]))
-    const refresh = f.store.refresh()
-    expect(calls.count).toBe(1)
-    await writeFile(path.join(root, 'auth.json'), 'second-distinct-private-auth-record')
-    expect((await f.store.read()).accounts[0]?.windows).toEqual([])
-    response.resolve(reading([window('five_hour', 80)]))
-    await refresh
-    expect((await f.store.read()).accounts[0]?.windows).toEqual([])
-  })
+  it.each(['reading', 'unsupported'] as const)(
+    'invalidates a credential-file generation before delayed %s without reading its contents',
+    async (kind) => {
+      const root = await mkdtemp(path.join(tmpdir(), 'usage-credentials-'))
+      roots.push(root)
+      const f = await usageFixture()
+      await f.registry.reconcile([
+        {
+          ...instance(WORK, 'work.json'),
+          config: { credentialsPath: path.join(root, 'auth.json') },
+        },
+      ])
+      await writeFile(path.join(root, 'auth.json'), 'first-private-auth-record')
+      const response = Promise.withResolvers<ProviderUsageProbe>()
+      const calls = stubUsage(f.registry, WORK, () => response.promise)
+      f.store.accept(limitsEvent(WORK, [window('five_hour', 40)]))
+      const refresh = f.store.refresh()
+      expect(calls.count).toBe(1)
+      await writeFile(path.join(root, 'auth.json'), 'second-distinct-private-auth-record')
+      expect((await f.store.read()).accounts[0]?.windows).toEqual([])
+      response.resolve(
+        kind === 'reading' ? reading([window('five_hour', 80)]) : { kind: 'unsupported' },
+      )
+      await refresh
+      expect((await f.store.read()).accounts[0]?.windows).toEqual([])
+    },
+  )
 
   it('starts background collection and rearms a changed target without a cache read', async () => {
     vi.useFakeTimers()
