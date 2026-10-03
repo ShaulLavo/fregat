@@ -6,6 +6,7 @@
  * - HTMLTextAreaElement
  * - HTMLSelectElement
  * - Elements with contentEditable enabled
+ * - Elements with an attached EditContext
  *
  * Button-type inputs (button, submit, reset) are excluded so hotkeys like
  * Mod+S and Escape fire when the user has tabbed to a form button.
@@ -29,11 +30,16 @@ export function isInputElement(element: EventTarget | null): boolean {
 
   // Check for contenteditable elements (includes "true", "", "plaintext-only",
   // and inherited contenteditable from ancestor elements)
-  if (element instanceof HTMLElement && element.isContentEditable) {
+  if (element instanceof HTMLElement && (element.isContentEditable || hasEditContext(element))) {
     return true
   }
 
   return false
+}
+
+export function hasEditContext(element: HTMLElement): boolean {
+  if (!('editContext' in element)) return false
+  return typeof element.editContext === 'object' && element.editContext !== null
 }
 
 /**

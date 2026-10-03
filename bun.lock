@@ -41,7 +41,7 @@
     },
     "apps/server": {
       "name": "server",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.283",
         "@elysiajs/cors": "^1.4.2",
@@ -676,7 +676,7 @@
     },
     "ghostty-webgpu": {
       "name": "ghostty-webgpu",
-      "version": "0.3.9",
+      "version": "0.3.10",
       "dependencies": {
         "@tanstack/hotkeys": "0.10.0",
         "@webgpu/types": "0.1.74",
@@ -722,7 +722,7 @@
     },
     "hotkeys/packages/hotkeys": {
       "name": "@fregat/hotkeys",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@tanstack/store": "^0.11.1",
       },
@@ -734,7 +734,7 @@
     },
     "hotkeys/packages/react-hotkeys": {
       "name": "@fregat/react-hotkeys",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@fregat/hotkeys": "workspace:*",
         "@tanstack/react-store": "^0.11.1",
@@ -783,7 +783,7 @@
     },
     "packages/contracts": {
       "name": "@workspace/contracts",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@workspace/observability": "workspace:*",
         "@workspace/utils": "workspace:*",
