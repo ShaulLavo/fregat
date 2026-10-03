@@ -4,7 +4,12 @@ import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { resolveMinimapOptions } from '../src/options'
 import { MinimapWorkerRenderer } from '../src/renderer'
-import { canUseMinimapWorker, MinimapWorkerClient, type MinimapHost } from '../src/workerClient'
+import {
+  canUseMinimapWorker,
+  MinimapWorkerClient,
+  MinimapWorkerOwner,
+  type MinimapHost,
+} from '../src/workerClient'
 
 describe.skipIf(!canUseMinimapWorker())('MinimapWorkerClient', () => {
   it('renders through OffscreenCanvas and updates host layout', async () => {
@@ -26,6 +31,7 @@ describe.skipIf(!canUseMinimapWorker())('MinimapWorkerClient', () => {
     expect(host.slider.style.display).toMatch(/block|none/)
 
     client.dispose()
+    expect(client.inspectWorker().lifecycle).toBe('disposed')
     host.root.remove()
     host.colorScope.remove()
   })
@@ -102,6 +108,51 @@ describe.skipIf(!canUseMinimapWorker())('MinimapWorkerClient', () => {
       expect(marker?.[3]).toBeGreaterThan(0)
     } finally {
       renderer.dispose()
+    }
+  })
+})
+
+describe.skipIf(typeof Worker === 'undefined')('MinimapWorkerOwner disposal', () => {
+  it.each(['idle', 'busy'])('settles disposal of a silent %s browser worker', async (mode) => {
+    const url = URL.createObjectURL(
+      new Blob(
+        [
+          `
+      onmessage = () => {
+        postMessage({ type: 'rendered', sequence: 1, sliderNeeded: false,
+          sliderTop: 0, sliderHeight: 0, shadowVisible: false });
+        ${mode === 'busy' ? 'while (true) {}' : ''}
+      };
+    `,
+        ],
+        { type: 'text/javascript' },
+      ),
+    )
+    const worker = new Worker(url)
+    let running = false
+    const owner = new MinimapWorkerOwner({
+      workerFactory: () => worker,
+      onMessage: () => {
+        running = true
+      },
+    })
+
+    try {
+      owner.post({ type: 'render', sequence: 1 })
+      await waitFor(() => running)
+      let settled = false
+      const disposal = owner.dispose().then(() => {
+        settled = true
+      })
+      await Promise.resolve()
+      expect(settled).toBe(true)
+      await disposal
+      expect(owner.inspect().lifecycle).toBe('disposed')
+      expect(worker.onmessage).toBeNull()
+      expect(worker.onerror).toBeNull()
+    } finally {
+      worker.terminate()
+      URL.revokeObjectURL(url)
     }
   })
 })

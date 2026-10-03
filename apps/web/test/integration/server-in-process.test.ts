@@ -1,6 +1,7 @@
 import { openFileReadSession } from '@workspace/client-core/files/read-session'
 import { readFilePreview } from '@workspace/client-core/files/read'
-import { access, readFile, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { access, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { WorkspaceSearchProviderSource, WorkspaceSearchQuery } from '@workspace/contracts'
 import { fetchQuickOpenFiles } from '@/lib/file-server'
@@ -43,8 +44,21 @@ test('persists usage outside a clean Git workspace across restart', async ({ cli
     checkedAt: null,
     resetCredits: null,
   })
+  const identityFile = path.join(server.stateHome, 'usage', 'accounts.json.identity')
+  const identityContext = await readFile(identityFile, 'utf8')
+  expect(identityContext).toMatch(/^[a-f0-9]{64}$/)
+  const identityFileStat = await stat(identityFile)
+  expect(identityFileStat.isFile()).toBe(true)
+  // Windows reports synthesized mode bits; POSIX hosts enforce the private file mode.
+  if (process.platform !== 'win32') expect(identityFileStat.mode & 0o777).toBe(0o600)
+  const identityContextHash = createHash('sha256').update(identityContext).digest('hex')
+  expect(JSON.stringify(usage.data)).not.toContain(identityContext)
+  expect(JSON.stringify(usage.data)).not.toMatch(
+    /identityProof|identityContextHash|proxyIdentityProofs|proxyProofsCurrent/,
+  )
   // Closing the app flushes the fixture collector's configured account before restart.
   await server.restart()
+  expect(await readFile(identityFile, 'utf8')).toBe(identityContext)
   const cache = JSON.parse(
     await readFile(path.join(server.stateHome, 'usage', 'accounts.json'), 'utf8'),
   )
@@ -55,6 +69,7 @@ test('persists usage outside a clean Git workspace across restart', async ({ cli
         snapshot: configuredAccount,
         attemptedAt: expect.any(Number),
         credentialFingerprint: null,
+        identityProof: null,
         failed: false,
         unsupported: false,
       },
@@ -63,7 +78,15 @@ test('persists usage outside a clean Git workspace across restart', async ({ cli
     proxyAttemptedAt: null,
     proxyFailed: false,
     proxySourceKey: null,
+    identityContextHash,
+    proxyIdentityProofs: {},
+    proxyProofsCurrent: false,
   })
+  expect(JSON.stringify(cache)).not.toContain(identityContext)
+  const restartedUsage = await client.providers.usage.get()
+  expect(restartedUsage.status).toBe(200)
+  expect(restartedUsage.data).toEqual(usage.data)
+  expect(JSON.stringify(restartedUsage.data)).not.toContain(identityContextHash)
   const clean = await client.git.status.get({ query: { path: '', fresh: true } })
   expect(clean.status).toBe(200)
   expect(clean.data?.files).toEqual([])
