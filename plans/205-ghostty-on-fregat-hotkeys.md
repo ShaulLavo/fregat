@@ -38,6 +38,23 @@ nothing; the host's terminal layer decides which keys go to the shell, following
 - **Host path:** `claimKeybinding` moves to the library; Platform's capture listener on the
   terminal host (`apps/web/src/features/terminal`) is replaced in 206 by node registration.
 
+## Integration with terminal extensions and worker mode
+
+[286](286-ghostty-extensions.md) moves matching/default bindings into a hotkeys extension;
+core retains a claim/pass input hook. [287](287-ghostty-worker-mode.md) keeps setup, focus-node
+registration and input claims synchronous on the host in both entries, before native encoding
+is queued. Native protocol replies bypass these hooks.
+
+Retarget the matcher/default packs below to that extension. A standalone terminal attaches its
+own dispatcher through the extension; a hosted terminal registers a focus node in the window
+owner through a host adapter and binds no second matcher. `terminal.sendKeystroke` hands the
+key to native encoding only after synchronous claim/pass arbitration. Registration disposal
+removes bindings and the focus node without replacing the native execution owner.
+
+At launch, reconcile the exact landed 286/287 host hook and extension APIs with their active
+owners. Coordinate shared host files and include both main/worker entries in input acceptance.
+This needs their relevant contract, not completion of every extension or worker phase.
+
 ## Steps
 
 - [ ] Link `@fregat/hotkeys`; port the current bindings to a pack and the dispatcher, with the

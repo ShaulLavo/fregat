@@ -1,6 +1,6 @@
 # Disposal of busy syntax workers
 
-Status: Approved. This is an ownership repair. Plan 099's frozen calibration and acceptance gates remain unchanged.
+Status: Delivered ownership repair; dated proof record. [Plan 099](../../plans/099-document-contributions.md) owns current runtime scope and remaining acceptance gates.
 
 A syntax worker executing synchronous code cannot answer a queued disposal message. Shiki and
 Tree-sitter owners previously awaited that answer before calling `terminate()`, so both the
