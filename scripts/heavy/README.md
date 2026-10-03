@@ -15,6 +15,8 @@ The launcher supplies `VITEST_MAX_WORKERS=4` when the caller has not set it. The
 
 Vitest owns configuration resolution. Keeping the ceiling there covers nested test commands and inline projects without teaching the heavy launcher to load suite configs or changing every serial suite. The runner's memory admission and slice ceiling remain unchanged.
 
+The root owns the canonical `patches/vitest@5.0.2.patch`. Editor, Ghostty and hotkeys declare that dependency patch in their family manifests and carry identical patch files inside their exported subtrees. `bun run workspace:check` checks declarations and bytes; `bun run workspace:sync` refreshes them from the root. Exact standalone installs receive the same policy as monorepo installs.
+
 ## Private dev servers
 
 Use the shared mesh dev route for normal app work. A private long-lived server needed by a browser check declares its lifecycle with `--server` and uses an explicit free port:
