@@ -481,8 +481,12 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   writeAndReadGeometry(data: TerminalInputData): TerminalResult<Mode, TerminalGeometry> {
-    this.ensureActive()
+    this.ensureOpen()
+    this.invalidateLinks()
     const geometry = this.execution.writeAndReadGeometry(data)
+    if (this.stateValue !== 'open') return this.result(geometry)
+    this.accessibility?.notifyOutput()
+    this.updateScrollbar()
     this.renderer?.notifyWrite()
     return this.result(geometry)
   }

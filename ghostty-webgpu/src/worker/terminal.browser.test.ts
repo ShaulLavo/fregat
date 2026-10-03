@@ -665,6 +665,82 @@ describe.each(['main', 'webgl', 'webgpu'] as const)('%s actual-owner integration
   })
 })
 
+describe.each(['main', 'webgl', 'webgpu'] as const)('%s review atomic host', (mode) => {
+  it.each(['created', 'opening'] as const)('rejects atomic output while %s', async (lifecycle) => {
+    const terminal = await create(mode)
+    const initial = await terminal.geometry()
+    const opening = lifecycle === 'opening' ? terminal.open(container()) : undefined
+    expect(terminal.lifecycle).toBe(lifecycle)
+    expect(() => terminal.write('ordinary')).toThrow(`lifecycle is ${lifecycle}`)
+    let failure: unknown
+    try {
+      await terminal.writeAndReadGeometry('x')
+    } catch (cause) {
+      failure = cause
+    }
+    await opening
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toContain(`lifecycle is ${lifecycle}`)
+    const after = await terminal.geometry()
+    expect(after.cursor).toMatchObject({ x: 0, y: 0 })
+    if (lifecycle === 'created') expect(after).toEqual(initial)
+  })
+
+  it('announces atomic output through the enabled accessibility live region', async () => {
+    const terminal = await create(mode)
+    const root = container()
+    await terminal.open(root)
+    const mirror = root.querySelector('[role="list"][aria-label="Terminal screen"]')!
+    const live = root.querySelector('[aria-live="polite"]')!
+    expect(mirror).toBeInstanceOf(HTMLElement)
+    expect(live).toBeInstanceOf(HTMLElement)
+    await eventually(() => mirror.children.length > 0)
+    await terminal.write('ordinary ')
+    await eventually(() => live.textContent === 'ordinary')
+    expect(live.children).toHaveLength(1)
+    const operation = terminal.writeAndReadGeometry('atomic prompt')
+    expect(operation instanceof Promise).toBe(mode !== 'main')
+    expect((await operation).cursor).toMatchObject({ x: 22, y: 0 })
+    await eventually(() => mirror.textContent?.includes('ordinary atomic prompt') === true)
+    expect(live.children).toHaveLength(2)
+    expect(live.children[1]?.textContent).toBe(' atomic prompt')
+    await page.screenshot({
+      element: terminal.element!,
+      path: `../../../.artifacts/review-atomic-host-${mode}.png`,
+      scale: 'css',
+    })
+  })
+
+  it('honors disposal reentry before atomic completion and tears down host output', async () => {
+    const terminal = await create(mode)
+    const root = container()
+    await terminal.open(root)
+    const errors: unknown[] = []
+    const events: string[] = []
+    let disposal: ReturnType<TerminalApi['dispose']> | undefined
+    terminal.on('error', (error) => errors.push(error))
+    terminal.on('title', (title) => {
+      events.push(title)
+      disposal = terminal.dispose()
+    })
+    const operation = terminal.writeAndReadGeometry('中> \x1b]0;disposed-prompt\x07')
+    expect(operation instanceof Promise).toBe(mode !== 'main')
+    if (mode === 'main') {
+      expect((await operation).cursor).toMatchObject({ x: 4, y: 0 })
+    } else {
+      await expect(operation).rejects.toMatchObject({ code: 'disposed' })
+    }
+    await disposal
+    expect(events).toEqual(['disposed-prompt'])
+    expect(errors).toEqual([])
+    expect(terminal.lifecycle).toBe('disposed')
+    expect(terminal.element).toBeUndefined()
+    expect(root.children).toHaveLength(0)
+    expect(() => terminal.geometry()).toThrow('disposed')
+    expect(() => terminal.writeAndReadGeometry('late')).toThrow('disposed')
+  })
+})
+
 it('rejects an unsupported Canvas worker backend with a structured capability failure', async () => {
   // JavaScript callers can supply a backend outside the declaration union.
   await expect(
