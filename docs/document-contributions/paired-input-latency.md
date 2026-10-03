@@ -4,13 +4,11 @@ Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-
 
 ## Run the comparison
 
-From the Platform root, run:
+From the Fregat root, run the comparison with paths to your frozen baseline and candidate package sets. Follow the execution host's resource policy for the benchmark.
 
 ```sh
-export PATH=$HOME/.local/share/mise/shims:$PATH
-bash /work/tmp/wave-heavy/run.sh p282-candidate -- env PATH="$PATH" \
-  bun run bench:input:paired --baseline /work/tmp/plan-282/baseline \
-  --candidate /work/tmp/plan-282/candidate
+bun run bench:input:paired --baseline /path/to/frozen-baseline \
+  --candidate /path/to/frozen-candidate
 ```
 
 Quiet default is `platform,native`; loaded default is `native,disabled`. Package hashes do not

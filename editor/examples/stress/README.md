@@ -315,13 +315,13 @@ pending its separately owned undo source-correctness fix. See the
 [acceptance record](../../../docs/document-contributions/paired-input-latency.md#minimap-proof-retention-correction).
 Plan 099 units 2–7 retain their implementation authorization gate.
 
-Compare complete frozen package sets with one command from the Platform or Editor root:
+Compare complete frozen package sets from the Fregat or Editor root. Replace the example paths
+with your frozen baseline and candidate directories. Follow the execution host's resource policy
+for the benchmark.
 
 ```sh
-export PATH=$HOME/.local/share/mise/shims:$PATH
-bash /work/tmp/wave-heavy/run.sh p282-candidate -- env PATH="$PATH" \
-  bun run bench:input:paired --baseline /work/tmp/plan-282/baseline \
-  --candidate /work/tmp/plan-282/candidate
+bun run bench:input:paired --baseline /path/to/frozen-baseline \
+  --candidate /path/to/frozen-candidate
 ```
 
 The quiet default runs Platform's shipping composition and native input. The loaded default
@@ -331,14 +331,13 @@ which runs all ten configurations. `--configurations shiki` extends a default ex
 worker-backed Tree-sitter compositions require loaded full or focused verification.
 A focused `--only native,disabled` run is diagnostic.
 
-Before freezing either package set, verify `/work` is mounted and has free space. Build the public
-packages through the heavy-job wrapper. From the Editor root, freeze each product revision:
+Before freezing either package set, verify that the destination has enough space. Build the public
+packages using the execution host's resource policy. From the Editor root, freeze each product
+revision. Replace `/path/to/frozen-baseline` with your baseline directory:
 
 ```sh
-findmnt --target /work
-df -h /work
-bash /work/tmp/wave-heavy/run.sh p282-build -- env PATH="$PATH" bun run build
-node examples/stress/package-set.mjs "$PWD/packages" /work/tmp/plan-282/baseline \
+bun run build
+node examples/stress/package-set.mjs "$PWD/packages" /path/to/frozen-baseline \
   "$(git rev-parse HEAD)" \
   "$(git diff HEAD --binary -- packages | sha256sum | cut -d ' ' -f 1)" \
   "$(sha256sum ../bun.lock | cut -d ' ' -f 1)"
