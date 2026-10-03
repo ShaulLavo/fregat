@@ -20,6 +20,14 @@ work transferred into execution plans, the original issue links, and remaining i
 [October 3 remaining issues](remaining-issues-resolution-2026-10-03.md) records the
 17-issue execution pass, verified fixes, retained investigations, and delivery checks.
 
+[Wave register](waves.md) preserves batch membership, historical delivery and later additions.
+[October 3 roadmap reconciliation](roadmap-reconciliation-2026-10-03.md) records this organization
+pass and its verification limits. [August log-audit follow-ups](log-audit-follow-ups.md) retain
+14 historical reports for current reproduction.
+
+[Wave readiness review](wave-readiness-2026-10-03.md) records the large-program ordering and
+corrected launch dependencies. Upcoming wave order remains in root `PLAN.md`.
+
 ## Current plan files
 
 | Plan                                                  | Topic                                                                           |
@@ -77,6 +85,8 @@ work transferred into execution plans, the original issue links, and remaining i
 | [205](205-ghostty-on-fregat-hotkeys.md)               | ghostty-webgpu on @fregat/hotkeys                                               |
 | [206](206-platform-one-keymap.md)                     | Platform owns one keymap                                                        |
 | [207](207-one-repo-with-mirrors.md)                   | One repo, with mirrors for the flagship packages                                |
+| [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                             |
+| [209](209-unified-workspace.md)                       | One workspace for chat and code; design review with implementation gates        |
 | [220](220-focused-widget-commands.md)                 | Finish keyboard commands for menus, pickers and notifications                   |
 | [221](221-keybinding-editor-tools.md)                 | Complete the keybinding editor on Plan 206                                      |
 | [222](222-editor-input-commands.md)                   | Expose editor text input, clipboard and snippet commands                        |
@@ -138,6 +148,9 @@ work transferred into execution plans, the original issue links, and remaining i
 | [278](278-vim-visual-multicursor.md)                  | Vim visual and multi-cursor modes                                               |
 | [279](279-vim-registers-marks-repeat.md)              | Vim registers, marks, macros and repeat                                         |
 | [280](280-vim-insert-entry-control.md)                | Vim insert entry and control keys                                               |
+| [281](281-ghostty-benchmarks-and-positioning.md)      | Ghostty benchmarking and positioning; retained performance/report work          |
+| [282](282-fast-paired-input-latency-check.md)         | Replacement paired typing instrument and incomplete acceptance proof            |
+| [283](283-ghostty-output-and-input-latency.md)        | Terminal output CPU, input tail, renderer matrix and grapheme policy            |
 | [284](284-resource-aware-heavy-jobs.md)               | Resource-aware heavy jobs and a weak-machine (Raspberry Pi) lane                |
 | [285](285-ghostty-site-first-frame-and-real-shell.md) | The ghostty-webgpu site paints before the wasm and runs a real shell            |
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                             |
@@ -184,9 +197,6 @@ work transferred into execution plans, the original issue links, and remaining i
 | [333](333-async-terminal-and-server-adapters.md)      | Terminal streams, Bun watch and same-thread server adapters                     |
 | [334](334-async-runtime-verification.md)              | Bounded async qualification, measurements and product acceptance                |
 | [335](335-stroke-icons.md)                            | Stroke icons only, Hugeicons by default, morphing icons, icon packs later       |
-| [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                             |
-
-| [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
 
 ## Package and client plans
 
@@ -216,30 +226,33 @@ in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json
 | [editor-authoring.md](editor-authoring.md)                                                     | Editor backlog plan contract                                                           |
 | [editor-backlog.md](editor-backlog.md)                                                         | Editor backlog                                                                         |
 | [bubli-markdown-consumer.md](bubli-markdown-consumer.md)                                       | Shared Markdown semantics for Editor and Fregat TUI                                    |
-| [editor-wishlist.md](editor-wishlist.md)                                                       | TODO                                                                                   |
+| [editor-wishlist.md](editor-wishlist.md)                                                       | Original Editor wishlist and source-topic inventory                                    |
 | [editor-performance-trace-plan.md](editor-performance-trace-plan.md)                           | Performance Trace Report And Plan                                                      |
 | [editor-architecture-recovery-plan.md](editor-architecture-recovery-plan.md)                   | Architecture Recovery Plan                                                             |
-| [command-palette-vscode-parity-backlog.md](command-palette-vscode-parity-backlog.md)           | > [!IMPORTANT]                                                                         |
+| [command-palette-vscode-parity-backlog.md](command-palette-vscode-parity-backlog.md)           | Command palette parity inventory                                                       |
 | [delta-db-implementation-plan.md](delta-db-implementation-plan.md)                             | Delta DB — Implementation Plan                                                         |
 | [deployment-design.md](deployment-design.md)                                                   | Desktop and one-command web deployment                                                 |
 | [diagnostic-ai-fix-plan.md](diagnostic-ai-fix-plan.md)                                         | Fix diagnostics with AI                                                                |
-| [editor-1000-parity-plan.md](editor-1000-parity-plan.md)                                       | > [!IMPORTANT]                                                                         |
-| [editor-parity-implementation-plan.md](editor-parity-implementation-plan.md)                   | > [!IMPORTANT]                                                                         |
+| [editor-1000-parity-plan.md](editor-1000-parity-plan.md)                                       | Beyond-parity product groups H1–H3                                                     |
+| [editor-parity-implementation-plan.md](editor-parity-implementation-plan.md)                   | Editor parity product groups E0–E9                                                     |
 | [environments-and-remote-plan.md](environments-and-remote-plan.md)                             | Environments strategy                                                                  |
 | [git-panel-implementation-plan.md](git-panel-implementation-plan.md)                           | Git panel and commit graph                                                             |
-| [logseq-parity-implementation-plan.md](logseq-parity-implementation-plan.md)                   | > [!IMPORTANT]                                                                         |
+| [logseq-parity-implementation-plan.md](logseq-parity-implementation-plan.md)                   | Logseq parity product groups                                                           |
 | [native-plan-of-plans.md](native-plan-of-plans.md)                                             | Native Mac Client — Plan of Plans                                                      |
 | [native-plan-prompts.md](native-plan-prompts.md)                                               | Native Plan Prompts                                                                    |
 | [native-syntax-coverage-plan.md](native-syntax-coverage-plan.md)                               | Expand native syntax coverage and improve queries                                      |
 | [pane-zoom-plan.md](pane-zoom-plan.md)                                                         | Independent pane zoom implementation plan                                              |
 | [structured-semantic-search-evaluation-plan.md](structured-semantic-search-evaluation-plan.md) | Structured And Semantic Search Evaluation Plan                                         |
 | [t3code-chat-parity-gap-analysis.md](t3code-chat-parity-gap-analysis.md)                       | T3Code Chat Parity — Verified Gap Analysis and Roadmap                                 |
-| [t3code-parity-implementation-plan.md](t3code-parity-implementation-plan.md)                   | > [!IMPORTANT]                                                                         |
+| [t3code-parity-implementation-plan.md](t3code-parity-implementation-plan.md)                   | Historical T3 architecture phases; current owner 126                                   |
 | [tui-plan.md](tui-plan.md)                                                                     | TUI — Strategy                                                                         |
 | [workspace-content-engine-evaluation-plan.md](workspace-content-engine-evaluation-plan.md)     | Workspace Content Engine Evaluation Plan                                               |
-| [workspace-search-next-steps.md](workspace-search-next-steps.md)                               | > [!IMPORTANT]                                                                         |
+| [workspace-search-next-steps.md](workspace-search-next-steps.md)                               | Workspace search delivery and remaining UI verification                                |
 
 ## Supporting work
+
+- [Monorepo migration delivery](207-migration-completion.md) supports Plan 207. npm publication
+  remains separately deferred; this record is not a second Plan 207.
 
 - [Tree implementation sub-plans](178-tree-in-the-app.md) and [T3 alignment records](126-t3code-alignment.md)
   stay with their owning plans. The [September 20 execution record](126-t3code-alignment/execution-2026-09-20.md)
@@ -252,7 +265,7 @@ in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json
 
 ## Maintenance
 
-Add a link when creating a plan. Keep unfinished plans, including ones waiting on owner checks.
+Add a link when creating a plan and run `bun run plans:check`; it checks top-level index coverage. Keep unfinished plans, including ones waiting on owner checks.
 Retire a completed plan after preserving current contracts and updating incoming links to the
 implementation reference or an immutable historical revision. Git history keeps the full record.
 Do not copy completed plans into an archive directory or add a completed-plan ledger here.

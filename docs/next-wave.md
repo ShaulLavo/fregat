@@ -1,5 +1,9 @@
 # Wave 2 closeout
 
+Historical delivery record. [PLAN.md](../PLAN.md) owns today's schedule, and the
+[wave register](../plans/waves.md) retains batch membership and follow-on programs.
+The sequences and lane references below describe their dated runs.
+
 ## Wave 2 closeout (reconciled 2026-10-02)
 
 Status: Closed, 2026-10-02. Plan 114 desktop acceptance and Gate 4 removal closed on 2026-10-03 with owner approval. Other owner-only checks and parked follow-ups remain below.
@@ -9,7 +13,7 @@ This record supersedes the original lane ordering for those plans. It is a sched
 reconciliation, not proof that every other wave item is complete. Do not infer new production
 permission from a documentation update; preserve explicit gates and owner-only checks.
 
-Default sequence: **179 → 099 → 114 → 126 → 156**. Independent work can move earlier;
+Recorded closeout sequence: **179 → 099 → 114 → 126 → 156**. Independent work could move earlier;
 only the dependencies in this table require serialization.
 
 | Plan | Remaining wave 2 delivery                                                                                                                                                                                                                                                                                                                           | Actual dependencies and follow-ups                                                                                                                                                                                                                                                                                                            |

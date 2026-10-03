@@ -32,6 +32,7 @@ import {
   removeSlice,
   startJob,
   stopTimeoutSeconds,
+  DEADLINE_START_SECONDS,
   type Host,
   type JobOutcome,
   type JobSpec,
@@ -490,7 +491,13 @@ async function attemptAdmission(
       return { reason: 'a slot lock was taken exclusively' }
     }
     const lease = waiting.entry.quiet
-      ? { quietUntil: now + config.quietHoldSeconds + stopTimeoutSeconds(config.graceSeconds) }
+      ? {
+          quietUntil:
+            now +
+            DEADLINE_START_SECONDS +
+            config.quietHoldSeconds +
+            stopTimeoutSeconds(config.graceSeconds),
+        }
       : {}
     const held = promote(options.stateDir, waiting, lease)
     // Servers pass the external-lock admission gate, then retain only their entry lock.

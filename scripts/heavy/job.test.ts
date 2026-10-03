@@ -4,7 +4,15 @@ import { expect, test } from 'vitest'
 
 import { reaperSandbox } from './reaper-sandbox'
 
-import { isHost, localCommand, PI_LAUNCHER, piCommand, reapSlice, SCOPE_SHIM } from './job'
+import {
+  DEADLINE_START_SECONDS,
+  isHost,
+  localCommand,
+  PI_LAUNCHER,
+  piCommand,
+  reapSlice,
+  SCOPE_SHIM,
+} from './job'
 
 const launch = { unit: 'heavy-1.scope', accountingFile: '/run/a', command: ['bun', 'x y'] }
 
@@ -56,7 +64,12 @@ test('a finite local job gives the shim its whole-slice runtime budget', () => {
   expect(command).toContain('RuntimeMaxSec=9s')
   const runtime = command.indexOf('--runtime')
   expect(runtime).toBeGreaterThan(command.indexOf(SCOPE_SHIM))
-  expect(command.slice(runtime, runtime + 2)).toEqual(['--runtime', '9'])
+  expect(command.slice(runtime, runtime + 4)).toEqual([
+    '--runtime',
+    '9',
+    '--startup',
+    String(DEADLINE_START_SECONDS),
+  ])
 })
 
 const locks = process.platform === 'linux' ? await import('./lock').catch(() => null) : null
