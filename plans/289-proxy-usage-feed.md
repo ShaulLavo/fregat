@@ -139,6 +139,10 @@ Deployment remains deferred: no installed gateway/proxy/Mesh/Pi changes, restart
 
 ### 2. Mesh consumer and panel
 
+Historical delivery checklist. The superseding decision above records a shipped parser and panel.
+Verify/link their receipts before marking these original rows; reuse that implementation for
+308's URL cut-over. Remaining live route, retention and TV checks stay open until proved.
+
 - [ ] Optional feed URL in existing config, bounded/cancellable generic HTTP client, strict v1 validation, at most 60-second cadence, last-good retention. Never parse JSON in View or per frame.
 - [ ] Fail-first stale/no-data/exhausted/reset-passed/unknown routing/mixed-age tests; oversized/bad-schema/HTTP failure/cancellation tests. No real provider calls.
 - [ ] 160×45 provider-grouped approved layout across all six themes; overflow counts, ASCII fallback, 80×24 and resize. Keep zero-allocation View and flat render cost, measure before/after.

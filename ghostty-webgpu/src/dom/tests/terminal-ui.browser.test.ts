@@ -423,7 +423,6 @@ async function createObservedRendererHarness(
       return renderer
     },
     runtime: { kind: 'borrowed', runtime },
-    zigFrame: options.zigFrame ?? true,
   })
   cleanups.push(() => terminal.dispose())
   const font = fitTerminalFont(document, terminal.appearance.font, window.devicePixelRatio)
@@ -971,10 +970,17 @@ describe('terminal scrollbar in Chromium', () => {
     const thumb = element.firstElementChild as HTMLDivElement
     for (const size of [14, 20, 12]) {
       terminal.setFont({ size })
-      host.style.height = `${size * 8 + 1}px`
+      await animationFrames()
+      await settleTerminal(terminal)
+      const { cellHeight } = terminal.appearance.grid
+      // Keep both parent heights inside the fitted row interval across platform font metrics.
+      const height = Math.ceil(cellHeight * 8.5)
+      expect(height + 1).toBeLessThan(cellHeight * 9)
+      host.style.height = `${height}px`
       await animationFrames()
       await settleTerminal(terminal)
       const { rows } = terminal.appearance.grid
+      expect(rows).toBe(8)
       const maximum = Number(element.getAttribute('aria-valuemax'))
       expect(maximum).toBeGreaterThan(0)
       expect(element.getAttribute('aria-valuenow')).toBe(String(maximum))
@@ -987,7 +993,7 @@ describe('terminal scrollbar in Chromium', () => {
       expect(geometry.height).toBeCloseTo(expectedHeight, 1)
       expect(geometry.bottom).toBeCloseTo(track.bottom, 1)
       const previousRows = rows
-      host.style.height = `${size * 8 + 2}px`
+      host.style.height = `${height + 1}px`
       await animationFrames()
       await settleTerminal(terminal)
       expect(terminal.appearance.grid.rows).toBe(previousRows)
@@ -1378,7 +1384,6 @@ describe('terminal frame consumer demand in Chromium', () => {
       await settleTerminal(harness.terminal)
 
       expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
-      expect(harness.renderer.metrics.jsFallbackFrames).toBe(0)
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readTextRowsCalls()).toBeGreaterThan(0)
       expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('ABC')
@@ -1420,7 +1425,6 @@ describe('terminal frame consumer demand in Chromium', () => {
       harness.terminal.write(`${escape}[?25l${escape}[8mA${escape}[H`)
       scheduler.flush()
       expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
-      expect(harness.renderer.metrics.jsFallbackFrames).toBe(0)
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('A')
       expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('A')
@@ -1446,7 +1450,6 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(retainedText.rows[0]?.text.trimEnd()).toBe('A')
       expect(changedRows.at(-1)).toEqual([0])
       expect(Object.isFrozen(changedRows.at(-1))).toBe(true)
-      expect(harness.renderer.metrics.jsFallbackFrames).toBe(0)
       expect(harness.renderer.metrics.uploadedBytes).toBe(uploadedBytes)
       expect(harness.renderer.metrics.instanceUploadOperations).toBe(instanceUploadOperations)
       if (backend === 'webgl2') {
@@ -1468,7 +1471,6 @@ describe('terminal frame consumer demand in Chromium', () => {
       await settleTerminal(harness.terminal)
 
       expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
-      expect(harness.renderer.metrics.jsFallbackFrames).toBe(0)
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readTextRowsCalls()).toBe(0)
       expect(harness.snapshots.length).toBeGreaterThan(0)
@@ -1521,7 +1523,6 @@ describe('terminal frame consumer demand in Chromium', () => {
       harness.terminal.write(styled)
       await settleTerminal(harness.terminal)
       expect(harness.renderer.metrics.zigFrames).toBe(zigFrames + 1)
-      expect(harness.renderer.metrics.jsFallbackFrames).toBe(0)
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readTextRowsCalls()).toBe(0)
       expect(harness.snapshots.at(-1)?.rows).toEqual([])
@@ -1562,15 +1563,12 @@ describe('terminal frame consumer demand in Chromium', () => {
     },
   )
 
-  it.each([
-    { backend: 'webgpu', zigFrame: false },
-    { backend: 'webgpu', zigFrame: true },
-    { backend: 'webgl2', zigFrame: false },
-    { backend: 'webgl2', zigFrame: true },
-  ] as const)(
-    'commits atlas-eviction recovery in one paint before lazy snapshots read the captured state ($backend, zigFrame: $zigFrame)',
-    async ({ backend, zigFrame }) => {
-      const harness = await createObservedRendererHarness({ zigFrame }, backend)
+  it.each([{ backend: 'webgpu' }, { backend: 'webgl2' }] as const)(
+    'commits atlas-eviction recovery in one paint before lazy snapshots read the captured state ($backend)',
+    async ({ backend }) => {
+      const harness = await createObservedRendererHarness({}, backend)
+      const onError = vi.fn()
+      harness.terminal.on('error', onError)
       const renderer = harness.renderer
       const rasterizer = Reflect.get(renderer, 'rasterizer') as CanvasGlyphRasterizer
       const bitmaps = Array.from('ABCDE界', (text) => {
@@ -1620,7 +1618,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       harness.terminal.write('AAA\r\nBCD')
       scheduler.flush()
       expect(atlas.evictionCount).toBe(0)
-      if (zigFrame) expect(renderer.metrics.zigFrames).toBeGreaterThan(0)
+      expect(renderer.metrics.zigFrames).toBeGreaterThan(0)
       const paintedFrames = harness.snapshots.length
       const submittedFrames = renderer.metrics.submittedFrames
 
@@ -1641,8 +1639,11 @@ describe('terminal frame consumer demand in Chromium', () => {
       const styledReads = harness.readRowsCalls()
       const zigFrames = renderer.metrics.zigFrames
       harness.terminal.write(`${escape}[1;1H界ABCDE`)
-      expect(() => scheduler.flush()).toThrow('The glyph atlas cannot retain the visible viewport')
-      expect(harness.readRowsCalls()).toBeGreaterThan(styledReads)
+      expect(() => scheduler.flush()).not.toThrow()
+      expect(onError).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ cause: expect.objectContaining({ operation: 'frame_builder' }) }),
+      )
+      expect(harness.readRowsCalls()).toBe(styledReads)
       expect(renderer.metrics.submittedFrames).toBe(submittedFrames + 1)
       expect(harness.terminal.frameSnapshot()).toBe(snapshot)
       expect(
@@ -1656,7 +1657,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       scheduler.flush()
 
       expect(renderer.metrics.submittedFrames).toBe(submittedFrames + 2)
-      expect(renderer.metrics.zigFrames).toBe(zigFrame ? zigFrames + 1 : zigFrames)
+      expect(renderer.metrics.zigFrames).toBe(zigFrames + 1)
       expect(renderer.metrics.rebuiltRows - rebuiltRows).toBe(harness.terminal.appearance.grid.rows)
       expect(
         harness.terminal

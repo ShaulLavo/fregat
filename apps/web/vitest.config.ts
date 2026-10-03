@@ -2,7 +2,7 @@ import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import { gitFixtureEnv } from 'server/testing/git-identity'
 import { defineConfig } from 'vitest/config'
-import DurationSequencer from './test/shard-sequencer'
+import DurationSequencer from './test/shard-sequencer.ts'
 
 // Shared resolution so every project reads the same `@/` paths as the app.
 const alias = {

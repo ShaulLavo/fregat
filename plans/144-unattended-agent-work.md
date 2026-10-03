@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS — Phases 2–3 done 2026-09-26 (wave 2 lane A); Phase 1 on lane B; Phase 4
+- Status: IN PROGRESS — Phases 1–3 landed 2026-09-26; Phase 1 browser/visual proof remains; Phase 4
   waits on Plan 087 M1+. Research done 2026-09-25. Q1–Q3 decided 2026-09-25. PRs #32 (Plan 148) and #35 (Plan 145)
   were still open, so the research read their lane branches as current truth. One gap: the
   Platform-side rendering of a self-started turn is established by code reading, because the dev

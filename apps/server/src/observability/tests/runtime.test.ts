@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Elysia } from 'elysia'
 import { applyObservability, httpStatusLevel } from '../elysia'
-import { captureRequestLogger, recordRequestError } from '../logging'
+import { captureRequestLogger, recordRequestError, recordRequestWarning } from '../logging'
 import { createInternalError } from '../structured-errors'
 import { readFsLogs } from 'evlog/fs'
 import type { WideEvent } from 'evlog'
@@ -120,6 +120,78 @@ describe('observability runtime', () => {
       source: 'be',
       status: 200,
     })
+  })
+
+  it('drops routine cache-only feed GETs while retaining failures and degraded answers', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const app = testApp(root)
+    for (let read = 0; read < 3; read += 1) {
+      const response = await app.handle(new Request('http://local/providers/usage/feed'))
+      expect(response.status).toBe(200)
+      await response.text()
+    }
+    expect((await flushedEvents(logDir)).map((event) => event.path)).not.toContain(
+      '/providers/usage/feed',
+    )
+
+    const failing = new Elysia()
+    applyObservability(failing)
+    failing.get('/providers/usage/feed', ({ set }) => {
+      set.status = 503
+      return { unavailable: true }
+    })
+    const failure = await failing.handle(new Request('http://local/providers/usage/feed'))
+    expect(failure.status).toBe(503)
+    await failure.text()
+    expect(eventForPath(await flushedEvents(logDir), '/providers/usage/feed')).toMatchObject({
+      method: 'GET',
+      status: 503,
+      level: 'error',
+    })
+
+    const degraded = new Elysia()
+    applyObservability(degraded)
+    degraded.get('/providers/usage/feed', () => {
+      recordRequestWarning('synthetic degraded cache')
+      return { degraded: true }
+    })
+    const warning = await degraded.handle(new Request('http://local/providers/usage/feed'))
+    expect(warning.status).toBe(200)
+    await warning.text()
+    expect(await flushedEvents(logDir)).toContainEqual(
+      expect.objectContaining({ path: '/providers/usage/feed', status: 200, level: 'warn' }),
+    )
+
+    const errored = new Elysia()
+    applyObservability(errored)
+    errored.get('/providers/usage/feed', () => {
+      recordRequestError(createInternalError('Synthetic cache failure'))
+      return { recovered: true }
+    })
+    const recovered = await errored.handle(new Request('http://local/providers/usage/feed'))
+    expect(recovered.status).toBe(200)
+    await recovered.text()
+    expect(await flushedEvents(logDir)).toContainEqual(
+      expect.objectContaining({
+        path: '/providers/usage/feed',
+        status: 200,
+        error: expect.any(Object),
+      }),
+    )
+
+    const mutation = new Elysia()
+    applyObservability(mutation)
+    mutation.post('/providers/usage/feed', () => ({ changed: true }))
+    const posted = await mutation.handle(
+      new Request('http://local/providers/usage/feed', { method: 'POST' }),
+    )
+    expect(posted.status).toBe(200)
+    await posted.text()
+    expect(await flushedEvents(logDir)).toContainEqual(
+      expect.objectContaining({ path: '/providers/usage/feed', method: 'POST', status: 200 }),
+    )
   })
 
   it('fans persisted request events out to PostHog when configured', async () => {
@@ -429,17 +501,23 @@ describe('observability runtime', () => {
 
   it('records complete settings context when transaction recovery blocks a later write', async () => {
     const root = await fixtureRoot()
+    const stateHome = await fixtureRoot()
     const logDir = await fixtureRoot()
     initializeObservability(testObservabilityEnv(logDir))
-    const app = testApp(root, {
-      transactionHooks: {
-        afterBoundary(boundary) {
-          if (boundary !== 'settings-directory-synced') return
+    const app = testApp(
+      root,
+      {
+        transactionHooks: {
+          afterBoundary(boundary) {
+            if (boundary !== 'settings-directory-synced') return
 
-          throw settingsErrors.TRANSACTION_RECOVERY_INVALID({ detail: 'injected interruption' })
+            throw settingsErrors.TRANSACTION_RECOVERY_INVALID({ detail: 'injected interruption' })
+          },
         },
       },
-    })
+      undefined,
+      stateHome,
+    )
     const headers = trustedOriginHeaders({ 'content-type': 'application/json' })
     const interrupted = await app.handle(
       new Request('http://local/settings/raw', {
@@ -493,9 +571,7 @@ describe('observability runtime', () => {
       target: 'user',
     })
     await expect(closeApp(app)).resolves.toBeUndefined()
-    const cache = JSON.parse(
-      await readFile(path.join(root, '.platform-test', 'usage', 'accounts.json'), 'utf8'),
-    )
+    const cache = JSON.parse(await readFile(path.join(stateHome, 'usage', 'accounts.json'), 'utf8'))
     expect(cache).toMatchObject({ version: 1, accounts: [] })
   })
 
@@ -798,12 +874,18 @@ describe('observability runtime', () => {
   })
 })
 
-function testApp(root: string, settings: TestSettingsOverrides = {}, web?: WebOptions) {
+function testApp(
+  root: string,
+  settings: TestSettingsOverrides = {},
+  web?: WebOptions,
+  stateHome?: string,
+) {
   return createTestApp({
     auth: {
       allowedOrigins: [TRUSTED_ORIGIN],
     },
     settings: testSettingsOptions(root, settings),
+    system: { stateHome },
     watch: false,
     web,
     workspaceRoot: root,

@@ -6,11 +6,6 @@ export type GatewayOptions = {
   proxyUrl: string
   apiKey: string
   fetcher?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>
-  observeClaudeHeaders?: (headers: Headers) => void
-  // A separate loopback-only proxy that owns the Claude logins; without it Claude pools through proxyUrl.
-  claudeProxy?: { proxyUrl: string; apiKey: string }
-  // User-Agent entrypoints that may use the pool; defaults to the ones the proxy confirms as native.
-  claudePoolEntrypoints?: readonly string[]
 }
 
 const loopbackHost = /^(?:127\.0\.0\.1\.?|localhost\.?|\[::1\])(?::[0-9]+)?$/i
@@ -40,75 +35,6 @@ const proxyHeaders = [
   'x-claude-code-parent-agent-id',
 ]
 
-// CLIProxyAPI v8.0.4 reads exactly these caller headers to confirm native Claude Code and keep
-// cloaking off (copyClaudeCallerFingerprintHeaders, DetectClaudeCodeRequest).
-const claudePoolHeaders = new Set([
-  'content-type',
-  'accept',
-  'accept-encoding',
-  'user-agent',
-  'x-app',
-  'x-client-request-id',
-  'x-client-app',
-  'x-anthropic-additional-protection',
-])
-const claudePoolPrefixes = ['anthropic-', 'x-stainless-', 'x-claude-code-', 'x-claude-remote-']
-
-// The proxy passes a request through untouched only when it confirms native Claude Code
-// (v8.0.4 helps/claude_client_detection.go). Other entrypoints, Agent SDK `sdk-ts` included, get the
-// proxy's CLI header fingerprint, so they join the pool only when configured.
-export const nativeEntrypoints = ['cli', 'sdk-cli', 'claude-vscode']
-const nativeUserAgent =
-  /^claude-cli\/(\d+)\.(\d+)\.(\d+)\s+\(external,\s*([^,)]+)(?:,\s*agent-sdk\/\d+\.\d+\.\d+)?\)$/i
-// The proxy's default device profile, claude-cli/2.1.280, accepts patch releases of 2.1 only.
-const baselineVersion = { major: 2, minor: 1, patch: 280 }
-const deviceId = /^[a-f0-9]{64}$/
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const userIdSchema = v.object({
-  device_id: v.pipe(v.string(), v.regex(deviceId)),
-  session_id: v.pipe(v.string(), v.regex(uuid)),
-  account_uuid: v.optional(v.union([v.literal(''), v.pipe(v.string(), v.regex(uuid))])),
-})
-
-function hasNativeUserId(input: object) {
-  if (!('metadata' in input) || typeof input.metadata !== 'object' || input.metadata === null)
-    return false
-  if (!('user_id' in input.metadata) || typeof input.metadata.user_id !== 'string') return false
-  try {
-    return v.safeParse(userIdSchema, JSON.parse(input.metadata.user_id)).success
-  } catch {
-    return false
-  }
-}
-
-function isPoolUserAgent(userAgent: string, entrypoints: readonly string[]) {
-  const match = nativeUserAgent.exec(userAgent.trim())
-  if (!match) return false
-  const [, major, minor, patch, entrypoint] = match
-  return (
-    entrypoints.includes(entrypoint!.trim().toLowerCase()) &&
-    Number(major) === baselineVersion.major &&
-    Number(minor) === baselineVersion.minor &&
-    Number(patch) >= baselineVersion.patch
-  )
-}
-
-// Haiku helper requests omit the claude-code beta, so they always keep the direct path.
-function isPoolEligible(
-  headers: Headers,
-  input: object,
-  countTokens: boolean,
-  entrypoints: readonly string[] = nativeEntrypoints,
-) {
-  const betas = (headers.get('anthropic-beta') ?? '').split(',').map((beta) => beta.trim())
-  return (
-    headers.get('x-app') === 'cli' &&
-    isPoolUserAgent(headers.get('user-agent') ?? '', entrypoints) &&
-    betas.includes('claude-code-20250219') &&
-    (countTokens || hasNativeUserId(input))
-  )
-}
-
 function connectionNominated(headers: Headers) {
   return new Set(
     (headers.get('connection') ?? '')
@@ -121,22 +47,6 @@ function connectionNominated(headers: Headers) {
 function stripHopHeaders(headers: Headers) {
   for (const name of connectionNominated(headers)) headers.delete(name)
   for (const name of hopHeaders) headers.delete(name)
-}
-
-function claudePoolRequestHeaders(incoming: Headers, apiKey: string) {
-  const nominated = connectionNominated(incoming)
-  const headers = new Headers()
-  for (const [name, value] of incoming) {
-    if (nominated.has(name)) continue
-    if (
-      !claudePoolHeaders.has(name) &&
-      !claudePoolPrefixes.some((prefix) => name.startsWith(prefix))
-    )
-      continue
-    headers.set(name, value)
-  }
-  headers.set('authorization', `Bearer ${apiKey}`)
-  return headers
 }
 
 const registrySchema = v.object({ data: v.array(v.object({ id: v.string() })) })
@@ -260,24 +170,6 @@ function reportReadiness(
   )
 }
 
-function reportClaudePool(
-  level: 'warn' | 'info',
-  state: 'fallback' | 'recovered',
-  fields: Record<string, unknown>,
-) {
-  process.stderr.write(
-    `${JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level,
-      source: 'be',
-      area: 'claude-gpt',
-      operation: 'claude-pool',
-      state,
-      ...fields,
-    })}\n`,
-  )
-}
-
 function proxyUnavailable() {
   return failure(
     503,
@@ -298,7 +190,16 @@ function failure(status: number, type: string, message: string) {
   return Response.json({ type: 'error', error: { type, message } }, { status })
 }
 
+const directOnlySchema = v.object({
+  claudeProxy: v.optional(v.never('Claude traffic requires direct forwarding.')),
+  claudePoolEntrypoints: v.optional(
+    v.array(v.never('Claude traffic requires empty pool entrypoints.')),
+  ),
+})
+
 export function createGateway(options: GatewayOptions) {
+  // Validate direct callers before startGateway binds a listener.
+  v.parse(directOnlySchema, options)
   let models: readonly string[] | null = null
   let startupUntil = performance.now() + startupWindowMs
   let failedWaits = 0
@@ -335,64 +236,8 @@ export function createGateway(options: GatewayOptions) {
     return models !== null && hasModel(models, model) ? 'retry' : missingModel()
   }
 
-  let claudeFallbacks = 0
-
-  function fellBack(reason: 'unreachable' | 'model-unlisted', model: string) {
-    claudeFallbacks++
-    if (claudeFallbacks > 1) return
-    reportClaudePool('warn', 'fallback', {
-      reason,
-      model,
-      why:
-        reason === 'unreachable'
-          ? 'The proxy did not accept the Claude request.'
-          : 'The proxy registry does not list this Claude model.',
-      fix: 'Claude requests use the Claude Code login directly until the proxy serves them. Check the proxy process and its Claude logins.',
-    })
-  }
-
-  function pooled() {
-    if (claudeFallbacks > 0) reportClaudePool('info', 'recovered', { count: claudeFallbacks })
-    claudeFallbacks = 0
-  }
-
-  // A pool response, or the reason the request must go to Anthropic with Claude Code's own login.
-  const claudePool = options.claudeProxy ?? options
-  const poolEntrypoints = options.claudePoolEntrypoints ?? nativeEntrypoints
-
-  async function sendToPool(path: string, request: Request, body: string) {
-    let response: Response
-    try {
-      response = await (options.fetcher ?? fetch)(new URL(path, claudePool.proxyUrl), {
-        method: 'POST',
-        headers: claudePoolRequestHeaders(request.headers, claudePool.apiKey),
-        body,
-        signal: request.signal,
-        redirect: 'manual',
-      })
-    } catch (error) {
-      if (request.signal.aborted) throw error
-      return 'unreachable' as const
-    }
-    if (response.status !== 400) return response
-    const text = await inspectProxyError(response, request.signal)
-    if (text === null)
-      return failure(
-        502,
-        'api_error',
-        'The proxy error response exceeded the inspection limit. Check the proxy and retry.',
-      )
-    if (isUnknownProvider(text)) return 'model-unlisted' as const
-    return new Response(text, { status: response.status, headers: response.headers })
-  }
-
   async function directClaude(path: string, init: RequestInit) {
     const response = await (options.fetcher ?? fetch)(new URL(path, options.anthropicUrl), init)
-    try {
-      options.observeClaudeHeaders?.(new Headers(response.headers))
-    } catch {
-      // Passive instrumentation cannot alter provider responses or consume their streams.
-    }
     return relay(response)
   }
 
@@ -451,20 +296,7 @@ export function createGateway(options: GatewayOptions) {
       signal: request.signal,
       redirect: 'manual',
     } as const
-    const countTokens = url.pathname === '/v1/messages/count_tokens'
-    const eligible = isPoolEligible(request.headers, input, countTokens, poolEntrypoints)
-    if (isClaude && !eligible) {
-      return directClaude(path, init)
-    }
-    if (isClaude) {
-      const attempt = await sendToPool(path, request, body)
-      if (attempt instanceof Response) {
-        pooled()
-        return relay(attempt)
-      }
-      fellBack(attempt, input.model)
-      return directClaude(path, init)
-    }
+    if (isClaude) return directClaude(path, init)
 
     if (models === null) {
       if (!(await isReady(startupWindowMs, request.signal, input.model))) return proxyUnavailable()

@@ -71,6 +71,7 @@ import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
 import { backgroundLiveness, backgroundMonitorLiveness } from './background-liveness'
+import { monitorDraftOwnership } from './monitor-draft-ownership'
 import { spinnerPalette } from './spinner-palette'
 import { sessionBulkFailures } from './session-bulk-failures'
 import { sessionLifecycle } from './session-lifecycle'
@@ -548,6 +549,7 @@ export const scenarios: readonly Scenario[] = [
   asyncQuestions,
   backgroundLiveness,
   backgroundMonitorLiveness,
+  monitorDraftOwnership,
   spinnerPalette,
   checkpointRewind,
   workbenchListFocus,
