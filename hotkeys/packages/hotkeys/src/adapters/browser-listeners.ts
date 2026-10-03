@@ -19,6 +19,7 @@ export type KeyListeners = {
   readonly syncCapture: () => void
   readonly dispose: () => void
 }
+export type KeyResetReason = 'blur' | 'hidden' | 'releaseAll' | 'dispose'
 
 export const browserKeyEffects: KeyEffects<KeyboardEvent> = {
   preventDefault: (event) => event.preventDefault(),
@@ -56,10 +57,12 @@ export function attachKeyListeners(
   platform: KeymapPlatform,
   target: () => KeyListenerTarget,
   beforeKey?: (event: KeyboardEvent) => void,
+  onReset?: (reason: KeyResetReason) => void,
 ): KeyListeners {
   const document = 'defaultView' in root ? root : root.ownerDocument
   const window = document.defaultView
   const processed = new WeakMap<KeyboardEvent, boolean>()
+  const processing = new WeakSet<KeyboardEvent>()
   let disposed = false
 
   function syncCapture() {
@@ -70,11 +73,18 @@ export function attachKeyListeners(
     if (disposed) return false
     const prior = processed.get(event)
     if (prior !== undefined) return prior
-    beforeKey?.(event)
-    const input = keyInputFromKeyboardEvent(event, platform)
-    const owned = target().handleKey(input, event, input.type === 'keyup' || inRoot(event))
-    processed.set(event, owned)
-    return owned
+    // A recursive host offer stays claimed while the outer dispatch decides ownership.
+    if (processing.has(event)) return true
+    processing.add(event)
+    try {
+      beforeKey?.(event)
+      const input = keyInputFromKeyboardEvent(event, platform)
+      const owned = target().handleKey(input, event, input.type === 'keyup' || inRoot(event))
+      processed.set(event, owned)
+      return owned
+    } finally {
+      processing.delete(event)
+    }
   }
   function inRoot(event: Event) {
     if (root === document && event.target === null) return true
@@ -93,11 +103,13 @@ export function attachKeyListeners(
   }
   function onBlur() {
     target().releaseAll()
+    onReset?.('blur')
     target().cancel('blur')
   }
   function onVisibilityChange() {
     if (document.visibilityState !== 'hidden') return
     target().releaseAll()
+    onReset?.('hidden')
     target().cancel('hidden')
   }
   function onPointerDown() {
