@@ -15,11 +15,15 @@ import {
 import { CanvasRowPainter, type Canvas2dContext } from './painter.js'
 import { canvasScrollPlan, type CanvasScrollPlan } from './scroll.js'
 
-export type CanvasRendererMetrics = RowRendererMetrics
+export interface CanvasRendererMetrics extends RowRendererMetrics, CanvasReuseMetrics {}
 
+/** Completed physical work accumulates for the renderer lifetime, including across invalidations. */
 export interface CanvasReuseMetrics {
+  /** Device rows transported by completed self-copies, including rows subsequently repainted. */
   copiedRows: number
+  /** Row painter calls that returned successfully. */
   repaintedRows: number
+  /** Overlap-copy operations that returned successfully. */
   selfCopies: number
 }
 
@@ -61,7 +65,7 @@ class CanvasSurface implements RowRendererSurface {
   private remaining = 0
   private rowHeight = 0
   private rowCount = 0
-  readonly reuseMetrics: CanvasReuseMetrics = { copiedRows: 0, repaintedRows: 0, selfCopies: 0 }
+  reuseMetrics: CanvasReuseMetrics = { copiedRows: 0, repaintedRows: 0, selfCopies: 0 }
 
   constructor(
     private readonly canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -207,6 +211,7 @@ class CanvasSurface implements RowRendererSurface {
 
 export class CanvasTerminalRenderer extends RowTerminalRenderer {
   readonly backend = 'canvas2d' as const
+  declare readonly metrics: CanvasRendererMetrics
   readonly reuseMetrics: Readonly<CanvasReuseMetrics>
   private readonly canvasSurface: CanvasSurface
 
@@ -214,6 +219,7 @@ export class CanvasTerminalRenderer extends RowTerminalRenderer {
     const surface = new CanvasSurface(options.canvas, options)
     super({ ...options, renderState: surface.source(options.renderState) }, surface)
     this.canvasSurface = surface
+    surface.reuseMetrics = Object.assign(this.metrics, surface.reuseMetrics)
     this.reuseMetrics = surface.reuseMetrics
   }
 

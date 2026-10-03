@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
+import { frameMetricDeltas } from '../../../bench/comparison-metrics.js'
 import { RenderStateDirty } from '../../core/abi.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import { GhosttySelectionGesture } from '../../core/selection.js'
@@ -214,13 +215,27 @@ describe('Canvas scroll reuse on native snapshots', () => {
       const f = await fixture(lines(unicode))
       f.parity('initial independent full repaint')
       const damage = vi.spyOn(f.state, 'update')
+      const before = { ...f.renderer.metrics }
       f.write(`\r\n6 ${unicode ? '界 é 😀' : 'alpha beta'} 6`)
       expect(damage.mock.results.at(-1)?.value).toBe(RenderStateDirty.Full)
       expect(f.copy).toHaveBeenCalledExactlyOnceWith(f.canvas, 0, 20, 320, 100, 0, 0, 320, 100)
       expect(f.clear).toHaveBeenCalledTimes(1)
       expect(f.text.mock.calls.length).toBeLessThan(25)
+      const delta = frameMetricDeltas([before], [{ ...f.renderer.metrics }])[0]!.delta
+      expect(f.renderer.metrics).toBe(f.renderer.reuseMetrics)
+      expect(delta).toMatchObject({
+        copiedRows: 5,
+        repaintedRows: 1,
+        selfCopies: 1,
+        paintedRows: 6,
+        submittedFrames: 1,
+      })
       const candidateGlyphs = f.text.mock.calls.length
-      expect(f.renderer.reuseMetrics).toEqual({ copiedRows: 5, repaintedRows: 7, selfCopies: 1 })
+      expect(f.renderer.reuseMetrics).toMatchObject({
+        copiedRows: 5,
+        repaintedRows: 7,
+        selfCopies: 1,
+      })
       f.parity('one-row scroll full-frame pixels')
       const fullGlyphs = f.controlText.mock.calls.length
       expect(candidateGlyphs * 6).toBe(fullGlyphs)
@@ -324,8 +339,12 @@ describe('Canvas scroll reuse on native snapshots', () => {
     f.setTheme({ foreground: { r: 12, g: 200, b: 130 }, background: { r: 2, g: 3, b: 5 } })
     expect(f.copy).not.toHaveBeenCalled()
     f.parity('theme change')
+    const beforeReset = { ...f.renderer.metrics }
     f.renderer.clearTextureAtlas()
+    expect(f.renderer.metrics).toEqual(beforeReset)
     f.clock.flush()
+    expect(f.renderer.metrics.repaintedRows - beforeReset.repaintedRows).toBe(6)
+    expect(f.renderer.metrics.copiedRows).toBe(beforeReset.copiedRows)
     expect(f.copy).not.toHaveBeenCalled()
     expect(f.clear).toHaveBeenCalledTimes(6)
     f.parity('explicit reset')
@@ -349,6 +368,7 @@ it.each(['copy', 'paint'])(
     f.parity('initial before failure')
     const context = f.canvas.getContext('2d')!
     const acknowledged = vi.spyOn(f.state, 'acknowledge')
+    const before = { ...f.renderer.metrics }
     if (failure === 'copy') {
       f.copy.mockImplementationOnce((...args) => {
         Reflect.apply(CanvasRenderingContext2D.prototype.drawImage, context, args)
@@ -364,6 +384,10 @@ it.each(['copy', 'paint'])(
     }
     expect(() => f.write('\r\nnext line')).toThrow('Injected Canvas')
     expect(acknowledged).not.toHaveBeenCalled()
+    expect(f.renderer.metrics.repaintedRows).toBe(before.repaintedRows)
+    expect(f.renderer.metrics.selfCopies - before.selfCopies).toBe(failure === 'copy' ? 0 : 1)
+    expect(f.renderer.metrics.copiedRows - before.copiedRows).toBe(failure === 'copy' ? 0 : 5)
+    expect(f.renderer.metrics.submittedFrames).toBe(before.submittedFrames)
     f.clear.mockClear()
     f.copy.mockClear()
     f.renderer.notifyWrite()
@@ -422,7 +446,7 @@ it('reuses native rows on an OffscreenCanvas without a DOM surface', async () =>
   terminal.write('\r\nOffscreen next')
   renderer.notifyWrite()
   clock.flush()
-  expect(renderer.reuseMetrics).toEqual({ copiedRows: 5, repaintedRows: 7, selfCopies: 1 })
+  expect(renderer.reuseMetrics).toMatchObject({ copiedRows: 5, repaintedRows: 7, selfCopies: 1 })
   control.width = canvas.width
   control.height = canvas.height
   const context = control.getContext('2d', { alpha: true, willReadFrequently: false })!
