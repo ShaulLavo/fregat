@@ -109,6 +109,92 @@ async function runLane(
   return { status, lane, run, ms, unit, stderr: await new Response(child.stderr).text() }
 }
 
+const processProbe = spawnSync('ps', ['-o', 'stat=', '-p', String(process.pid)])
+
+test.skipIf(processProbe.status !== 0).for([true, false])(
+  'classifies a real broken pipe before Bun observes exit, kernel-exited=%s (requires ps)',
+  async (dead) => {
+    vi.useFakeTimers()
+    const spawn = Bun.spawn.bind(Bun)
+    let child: ReturnType<typeof Bun.spawn<'pipe', 'ignore', 'pipe'>> | undefined
+    const root = mkdtempSync(path.join(tmpdir(), 'lane-pipe-'))
+    roots.push(root)
+    const ready = path.join(root, 'ready')
+    const events: string[] = []
+    vi.spyOn(Bun, 'spawn').mockImplementationOnce(() => {
+      child = spawn(
+        ['bash', '-c', dead ? 'exit 0' : 'exec 0<&-; touch "$1"; sleep 30', 'fixture', ready],
+        {
+          stdin: 'pipe',
+          stdout: 'ignore',
+          stderr: 'pipe',
+          onExit: () => {
+            events.push('exit')
+          },
+        },
+      )
+      const input = child.stdin
+      const write = input.write.bind(input)
+      const flush = input.flush.bind(input)
+      const end = input.end.bind(input)
+      vi.spyOn(input, 'write').mockImplementation((data) => {
+        events.push('write:start')
+        return write(data)
+      })
+      vi.spyOn(input, 'flush').mockImplementation(() => {
+        events.push('flush:start')
+        return flush()
+      })
+      vi.spyOn(input, 'end').mockImplementation(() => {
+        events.push('end:start')
+        return end()
+      })
+      return child
+    })
+    const running = runLane('exit-observation', 'true')
+    const settled = running.then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    try {
+      expect(child).toBeDefined()
+      const observed = spawnSync(
+        'bash',
+        [
+          '-c',
+          dead
+            ? 'for ((i=0; i<100; i++)); do state=$(ps -o stat= -p "$1"); [[ -z "$state" || "$state" == *Z* ]] && exit 0; sleep 0.01; done; exit 1'
+            : 'for ((i=0; i<100; i++)); do [[ -f "$2" ]] && exit 0; sleep 0.01; done; exit 1',
+          'probe',
+          String(child!.pid),
+          ready,
+        ],
+        { timeout: 2_000 },
+      )
+      expect(observed.status).toBe(0)
+      expect(child!.exitCode).toBeNull()
+      const state = spawnSync('ps', ['-o', 'stat=', '-p', String(child!.pid)])
+        .stdout.toString()
+        .trim()
+      events.push(`kernel:${state || 'gone'}`)
+      vi.advanceTimersByTime(50)
+      expect(events).toContain('write:start')
+      if (!dead) child!.kill('SIGKILL')
+      const failure = await settled
+      expect(failure, JSON.stringify({ dead, events, exitCode: child!.exitCode })).toEqual(
+        dead ? undefined : expect.objectContaining({ code: 'EPIPE' }),
+      )
+      expect(await child!.exited).toBe(dead ? 0 : 137)
+      expect(events).toContain('end:start')
+    } finally {
+      child?.kill('SIGKILL')
+      await settled
+      vi.restoreAllMocks()
+      vi.useRealTimers()
+    }
+  },
+)
+
 test('awaits heartbeat flush before ending stdin and awaits end before returning', async () => {
   vi.useFakeTimers()
   const exited = Promise.withResolvers<number>()
