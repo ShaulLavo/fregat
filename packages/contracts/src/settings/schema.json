@@ -1286,7 +1286,7 @@
     },
     "providers.proxyUsageRequestIntervalHours": {
       "default": 1,
-      "description": "Hours between requests. At most one request per account per hour, including failures and restarts. Fresh quota skips requests. Three failures pause until newer passive quota.",
+      "description": "Hours between pooled Codex requests. At most one request per account per hour, including failures and restarts. Fresh quota skips requests; three failures pause until newer passive quota arrives.",
       "maximum": 24,
       "minimum": 1,
       "type": "integer"
@@ -1302,7 +1302,7 @@
         }
       ],
       "default": null,
-      "description": "Local CLIProxyAPI pooled quota address; key in the secret store."
+      "description": "Local CLIProxyAPI management address for pooled Codex quotas and capped requests. Its management key is kept in the secret store."
     },
     "providers.transcriptHistoryMaxBytes": {
       "default": 268435456,
