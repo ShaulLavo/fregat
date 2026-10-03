@@ -196,6 +196,7 @@ function accountSnapshot(
   return {
     accountKey,
     driverKind: CODEX_DRIVER_KIND,
+    label: shortProxyLabel(file.email),
     providerInstanceIds: [],
     planType: planLabel(
       signals(quota?.signals)['x-codex-plan-type'] ?? object(file.id_token)?.chatgpt_plan_type,
@@ -210,6 +211,11 @@ function accountSnapshot(
     ...(cooldown ? { cooldown } : {}),
     routing: { mode: 'rotating', active, lastServedAt: null },
   }
+}
+
+function shortProxyLabel(value: unknown): string | undefined {
+  const email = text(value)
+  return email?.match(/^([A-Za-z0-9][A-Za-z0-9._+-]{0,63})@[^@\s\p{Cc}\p{Cf}]+$/u)?.[1]
 }
 
 function planLabel(value: unknown): string | null {

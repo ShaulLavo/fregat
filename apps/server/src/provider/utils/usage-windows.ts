@@ -244,14 +244,13 @@ function codexWindow(
   const duration = window.windowDurationMins
   const windowMinutes =
     typeof duration === 'number' && Number.isFinite(duration) && duration > 0 ? duration : null
-  const kind = windowMinutes === null ? 'other' : kindForMinutes(windowMinutes)
+  const presentation = codexWindowPresentation(windowMinutes)
   const usedPercent = clampPercent(window.usedPercent)
 
   return {
     id,
-    kind,
+    ...presentation,
     windowMinutes,
-    label: KIND_LABELS[kind],
     resetsAt: isoFromEpochSeconds(window.resetsAt),
     status: spentWindowStatus(usedPercent, creditsCover),
     usedPercent,
@@ -265,7 +264,12 @@ function spentWindowStatus(usedPercent: number | null, covered: boolean) {
   return covered ? 'warning' : 'rejected'
 }
 
-function kindForMinutes(minutes: number): ProviderUsageWindowKind {
+export function codexWindowPresentation(minutes: number | null) {
+  const kind = kindForMinutes(minutes)
+  return { kind, label: KIND_LABELS[kind] }
+}
+
+function kindForMinutes(minutes: number | null): ProviderUsageWindowKind {
   if (minutes === MONTH_MINUTES) return 'monthly'
   if (minutes === WEEK_MINUTES) return 'weekly'
 

@@ -228,6 +228,9 @@ describe('settings and secrets transaction boundaries', () => {
       },
     })
 
+    const managementRef = 'usage.cliproxy.management' as const
+    await store.ensureSecret(managementRef, () => 'synthetic-management-key')
+    expect(store.hasServerSecret(managementRef)).toBe(true)
     await expect(
       store.writeRaw({
         baseRevision: store.rawLayer('user').revision,
@@ -243,9 +246,12 @@ describe('settings and secrets transaction boundaries', () => {
         target: 'user',
       }),
     ).rejects.toMatchObject({ code: 'settings.TRANSACTION_RECOVERY_REQUIRED' })
+    expect(store.hasServerSecret(managementRef)).toBe(true)
     store.close()
+    expect(store.hasServerSecret(managementRef)).toBe(true)
 
     const recovered = createStore(root)
+    expect(recovered.hasServerSecret(managementRef)).toBe(true)
     expect(recovered.snapshot().values['editor.fontSize']).toBe(30)
     expect(recovered.snapshot().values['editor.lineHeight']).not.toBe(44)
     expect(providerSecret(recovered)).toBe(NEW_SECRET)

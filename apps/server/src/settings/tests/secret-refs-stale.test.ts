@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { REDACTED_SETTINGS_VALUE } from '@workspace/contracts'
@@ -191,3 +191,44 @@ async function flushedEvents(logDir: string): Promise<WideEvent[]> {
 
   return events
 }
+
+describe('cached server secret presence', () => {
+  it.each(['{', '[]', 'null', '', '{"usage.cliproxy.management":42}'])(
+    'retains accepted presence for an invalid secrets document %j and accepts valid removal',
+    async (text) => {
+      const root = await tempRoot()
+      const store = createStore(root)
+      const ref = 'usage.cliproxy.management' as const
+      await store.ensureSecret(ref, () => 'synthetic-management-key')
+      expect(store.hasServerSecret(ref)).toBe(true)
+      await writeFile(path.join(root, 'secrets.json'), text)
+      await touchSettings(store, 'Mod+5')
+      expect(store.hasServerSecret(ref)).toBe(true)
+      await writeFile(path.join(root, 'secrets.json'), '{}')
+      await touchSettings(store, 'Mod+6')
+      expect(store.hasServerSecret(ref)).toBe(false)
+    },
+  )
+
+  it.each([true, false])(
+    'keeps accepted presence during unreadable refs and accepts removal (present: %s)',
+    async (present) => {
+      const root = await tempRoot()
+      await writeFile(path.join(root, 'secrets.json'), '{}')
+      const store = createStore(root)
+      const ref = 'usage.cliproxy.management' as const
+      expect(store.hasServerSecret(ref)).toBe(false)
+      await store.ensureSecret(ref, () => (present ? 'synthetic-management-key' : ''))
+      expect(store.hasServerSecret(ref)).toBe(present)
+      await breakSecretStore(root)
+      await touchSettings(store, 'Mod+3')
+      expect(store.hasServerSecret(ref)).toBe(present)
+      await repairSecretStore(root)
+      await rm(path.join(root, 'secrets.json'))
+      await touchSettings(store, 'Mod+4')
+      expect(store.hasServerSecret(ref)).toBe(false)
+      store.close()
+      expect(store.hasServerSecret(ref)).toBe(false)
+    },
+  )
+})

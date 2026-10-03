@@ -13,7 +13,7 @@ import { SettingsStore } from '../apps/server/src/settings/store'
 import { createScriptError } from './structured-errors'
 
 const usage =
-  'Usage: bun run usage:import-proxy-key <key-file> --url <localhost-http-url> --instance <codex-instance-id> [--instance <codex-instance-id>…]'
+  'Usage: bun run usage:import-proxy-key <key-file> --url <localhost-http-url> [--instance <codex-instance-id>…]'
 const stopped =
   'Stop the Fregat server before running this command. PLATFORM_HOME selects its state home.'
 
@@ -53,7 +53,7 @@ async function main() {
   })
   if (values.help) {
     process.stderr.write(
-      `${usage}\n${stopped}\nUse --list-instances to print configured enabled Codex instance IDs.\nThe key file contains one plain management key. An existing different key is preserved.\n`,
+      `${usage}\n${stopped}\nUse --list-instances to print configured enabled Codex instance IDs. Instance mappings are optional.\nThe key file contains one plain management key. An existing different key is preserved.\n`,
     )
     return
   }
@@ -65,19 +65,16 @@ async function main() {
     listInstances()
     return
   }
-  if (positionals.length !== 1 || !values.url || !values.instance?.length)
-    throw createScriptError(
-      'A key file, localhost URL, and selected Codex instances are required.',
-      {
-        internal: {
-          positionalCount: positionals.length,
-          hasUrl: Boolean(values.url),
-          instanceCount: values.instance?.length ?? 0,
-        },
+  if (positionals.length !== 1 || !values.url)
+    throw createScriptError('A key file and localhost URL are required.', {
+      internal: {
+        positionalCount: positionals.length,
+        hasUrl: Boolean(values.url),
+        instanceCount: values.instance?.length ?? 0,
       },
-    )
+    })
 
-  const instances = values.instance.map((id) => v.parse(providerInstanceIdSchema, id))
+  const instances = (values.instance ?? []).map((id) => v.parse(providerInstanceIdSchema, id))
   if (new Set(instances).size !== instances.length)
     throw createScriptError('Select each Codex instance once.', {
       internal: { instanceCount: instances.length },
@@ -108,12 +105,18 @@ async function main() {
       throw createScriptError('The key file must contain one plain management key.', {
         internal: { validPlainKey: false },
       })
-    const stored = await store.ensureSecret(PROXY_USAGE_MANAGEMENT_KEY_REF, () => key)
-    if (stored !== key)
+    const existing = await store.readSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
+    if (existing && existing !== key)
       throw createScriptError('A different management key is already stored.', {
         internal: { existingKeyMatches: false },
       })
+    // Commit the validated endpoint before a new key can activate this source on restart.
     await store.write(request)
+    const stored = await store.ensureSecret(PROXY_USAGE_MANAGEMENT_KEY_REF, () => key)
+    if (stored !== key)
+      throw createScriptError('The stored management key changed during import.', {
+        internal: { existingKeyMatches: false },
+      })
   } finally {
     bytes?.fill(0)
     store.close()

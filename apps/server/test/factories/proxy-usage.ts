@@ -1,4 +1,7 @@
-export function startProxyUsageHttpFixture(observedAt: string) {
+export function startProxyUsageHttpFixture(
+  observedAt: string,
+  accounts?: readonly Record<string, unknown>[],
+) {
   const requests: Array<{ method: string; path: string }> = []
   const server = Bun.serve({
     hostname: '127.0.0.1',
@@ -9,7 +12,7 @@ export function startProxyUsageHttpFixture(observedAt: string) {
       if (request.method !== 'GET' || path !== '/v0/management/auth-files')
         return Response.json({ unexpected: true }, { status: 404 })
       return Response.json({
-        files: [
+        files: accounts ?? [
           {
             id: 'synthetic-pooled-account',
             provider: 'codex',

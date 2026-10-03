@@ -440,6 +440,7 @@ export function createApp(options: AppOptions) {
   )
   // Collectors keep accepted configuration available through settings recovery and shutdown.
   let usageSettings = settings.snapshot().values
+  let proxyManagementKeyPresent = settings.hasServerSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry, {
     cacheFile: path.join(usageCacheHome, 'accounts.json'),
     policy: () => {
@@ -453,10 +454,7 @@ export function createApp(options: AppOptions) {
     proxySourceKey: () => usageSettings['providers.proxyUsageUrl'],
     proxyInstanceIds: () => usageSettings['providers.proxyUsageProviderInstanceIds'],
     proxyConfigured: () =>
-      Boolean(
-        usageSettings['providers.proxyUsageUrl'] &&
-        usageSettings['providers.proxyUsageProviderInstanceIds'].length,
-      ),
+      Boolean(usageSettings['providers.proxyUsageUrl']) && proxyManagementKeyPresent,
     readProxy: async () => {
       const url = usageSettings['providers.proxyUsageUrl']
       const secret = await settings.readSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
@@ -474,6 +472,7 @@ export function createApp(options: AppOptions) {
   })
   settings.onChange((event) => {
     usageSettings = event.snapshot.values
+    proxyManagementKeyPresent = settings.hasServerSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
     runDetached(
       async () => {
         await reconcileProviderSettings()

@@ -9,6 +9,7 @@ import { appUsageCollector, type App } from '../../app'
 import { testSettingsOptions } from '../../settings/testing'
 import { MockProviderAdapter } from '../adapters/mock'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
+import { codexUsageUpdate } from '../utils/usage-windows'
 
 const REMOTE_CLIENT = '192.0.2.123'
 const ORIGIN = 'http://localhost:5173'
@@ -167,4 +168,47 @@ test('POST does not expose the public GET usage feed', async () => {
     expect(response.status).toBe(404)
     expect(await response.json()).toMatchObject({ error: { code: 'ROUTE_NOT_FOUND' } })
   }
+})
+
+test.each([
+  { minutes: 10080, id: 'weekly', kind: 'weekly', label: 'Weekly' },
+  { minutes: 300, id: 'session', kind: 'session', label: 'Session' },
+  { minutes: null, id: 'other:primary', kind: 'other', label: 'Other' },
+])('native raw duration survives the service and public feed: %j', async (scenario) => {
+  let probes = 0
+  const update = codexUsageUpdate({
+    primary: {
+      usedPercent: 6,
+      windowDurationMins: scenario.minutes,
+      resetsAt: Math.floor(Date.now() / 1000) + 3600,
+    },
+  })
+  Object.assign(providerAdapter, {
+    readUsage: async () => {
+      probes += 1
+      return { kind: 'reading' as const, update }
+    },
+  })
+  const collector = appUsageCollector(app)
+  await collector.refresh()
+  const account = (await collector.read()).accounts[0]!
+  expect(account.windows[0]).toMatchObject({
+    id: 'primary',
+    kind: scenario.kind,
+    label: scenario.label,
+    usedPercent: 6,
+  })
+  for (let read = 0; read < 2; read += 1) {
+    const response = await app.handle(new Request('http://local/providers/usage/feed'))
+    const feed = v.parse(providerUsageFeedSchema, await response.json())
+    expect(feed.accounts[0]?.windows[0]).toMatchObject({
+      id: scenario.id,
+      label: scenario.label,
+      usedPercent: 6,
+      windowMinutes: scenario.minutes,
+      lastSeenAt: account.windows[0]?.observedAt,
+      resetsAt: account.windows[0]?.resetsAt,
+    })
+  }
+  expect(probes).toBe(1)
 })

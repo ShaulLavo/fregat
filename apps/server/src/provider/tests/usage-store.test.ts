@@ -25,7 +25,11 @@ import {
   initializeObservability,
   resetObservabilityForTests,
 } from '../../observability/runtime'
-import type { ProviderUsageProbe, ProviderUsageReading } from '../utils/usage-windows'
+import {
+  codexUsageUpdate,
+  type ProviderUsageProbe,
+  type ProviderUsageReading,
+} from '../utils/usage-windows'
 
 const WORK = v.parse(providerInstanceIdSchema, 'mock-work')
 const WORK_AGAIN = v.parse(providerInstanceIdSchema, 'mock-work-again')
@@ -44,6 +48,94 @@ afterEach(async () => {
 })
 
 describe('provider usage store', () => {
+  it.each([
+    {
+      primary: 10080,
+      secondary: 300,
+      ids: ['session', 'weekly'],
+      kinds: ['session', 'weekly'],
+      labels: ['Session', 'Weekly'],
+    },
+    {
+      primary: 300,
+      secondary: 10080,
+      ids: ['session', 'weekly'],
+      kinds: ['session', 'weekly'],
+      labels: ['Session', 'Weekly'],
+    },
+    {
+      primary: null,
+      secondary: null,
+      ids: ['other:primary', 'other:secondary'],
+      kinds: ['other', 'other'],
+      labels: ['Other', 'Other'],
+    },
+    {
+      primary: 10080,
+      secondary: 10080,
+      ids: ['weekly:primary', 'weekly:secondary'],
+      kinds: ['weekly', 'weekly'],
+      labels: ['Weekly', 'Weekly'],
+    },
+  ])(
+    'projects native duration IDs while retaining raw merge IDs and hydrated ages: %j',
+    async (scenario) => {
+      const f = await nativeClaudeFixture('codex')
+      const root = await mkdtemp(path.join(tmpdir(), 'usage-duration-cache-'))
+      roots.push(root)
+      const cacheFile = path.join(root, 'accounts.json')
+      const update = codexUsageUpdate({
+        limitId: 'codex',
+        planType: 'pro',
+        primary: {
+          usedPercent: 6,
+          windowDurationMins: scenario.primary,
+          resetsAt: START_MS / 1000 + 3600,
+        },
+        secondary: {
+          usedPercent: 20,
+          windowDurationMins: scenario.secondary,
+          resetsAt: START_MS / 1000 + 7200,
+        },
+        credits: null,
+      })
+      let probes = 0
+      stubUsage(f.registry, WORK, async () => {
+        probes += 1
+        return { kind: 'reading', update }
+      })
+      const store = new ProviderUsageStore(f.registry, { now: () => f.clock.ms, cacheFile })
+      await store.refresh()
+      const raw = (await store.read()).accounts[0]!
+      expect(raw.windows.map((window) => window.kind)).toEqual(scenario.kinds)
+      expect(raw.windows.map((window) => window.label)).toEqual(scenario.labels)
+      expect(new Set(raw.windows.map((window) => window.id))).toEqual(
+        new Set(['primary', 'secondary']),
+      )
+      await store.close()
+      f.clock.ms += 60_000
+      const retained = new ProviderUsageStore(f.registry, { now: () => f.clock.ms, cacheFile })
+      try {
+        const windows = (await retained.feed()).accounts[0]!.windows
+        expect(windows.map((window) => window.id)).toEqual(scenario.ids)
+        expect(windows.map((window) => window.label)).toEqual(scenario.labels)
+        expect(windows.map((window) => window.lastSeenAt)).toEqual([
+          new Date(START_MS).toISOString(),
+          new Date(START_MS).toISOString(),
+        ])
+        expect(windows.find((window) => window.usedPercent === 6)?.resetsAt).toBe(
+          new Date(START_MS + 3600_000).toISOString(),
+        )
+        expect(windows.find((window) => window.usedPercent === 20)?.resetsAt).toBe(
+          new Date(START_MS + 7200_000).toISOString(),
+        )
+        expect(probes).toBe(1)
+      } finally {
+        await retained.close()
+      }
+    },
+  )
+
   it('updates proxy restrictions independently of retained quota ages and clears recovered cooldowns', async () => {
     const f = await usageFixture()
     const base = (await f.store.read()).accounts[0]!
