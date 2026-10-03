@@ -23,6 +23,13 @@ and concurrency rules describe their original runs.
 | Keymap and Zed/Vim programs         | Approved next structural cutover and dependent work                       | 204 + 205 → 206, then bindings for 220–271 and 274–280. 272/273 preserve excluded inventory. Existing feature-owner gates remain.                                                             | [Root ordering](../PLAN.md#next-programs), [Zed workstream](../PLAN.md#zed-parity-workstream)                                                                                  |
 | October additions                   | Retained with individual timing                                           | 281–287 terminal/performance follow-ups; 308 replaces 289's producer; 320 compile-time proof; 335 current icon phases with later packs. 288, 319, 327 and 328–334 remain explicitly deferred. | [Current and deferred programs](../PLAN.md)                                                                                                                                    |
 
+## Upcoming waves
+
+The [root delivery-wave table](../PLAN.md#upcoming-delivery-waves) schedules preparation,
+command foundation, document foundation, coherent feature batches and broad migrations.
+The [readiness review](wave-readiness-2026-10-03.md) explains placement of the large additions.
+Use those current dependencies when drawing work from the historical batches below.
+
 ## Original wave 3 membership
 
 The former batch remains useful as a work grouping. Each row links its current owner;

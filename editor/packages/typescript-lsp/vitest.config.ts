@@ -1,4 +1,4 @@
-import { workspaceRoot } from '../../scripts/workspace-root'
+import { workspaceRoot } from '../../scripts/workspace-root.ts'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({

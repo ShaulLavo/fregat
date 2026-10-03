@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config'
-import { gitFixtureEnv } from './src/testing/git-identity'
+import { gitFixtureEnv } from './src/testing/git-identity.ts'
 
 // Bun-native server: must run under the Bun runtime (`bun --bun vitest`) so
 // bun:sqlite and Bun.spawn resolve. Tests drive the real app via `app.handle`

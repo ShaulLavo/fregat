@@ -25,6 +25,9 @@ work transferred into execution plans, the original issue links, and remaining i
 pass and its verification limits. [August log-audit follow-ups](log-audit-follow-ups.md) retain
 14 historical reports for current reproduction.
 
+[Wave readiness review](wave-readiness-2026-10-03.md) records the large-program ordering and
+corrected launch dependencies. Upcoming wave order remains in root `PLAN.md`.
+
 ## Current plan files
 
 | Plan                                                  | Topic                                                                           |
