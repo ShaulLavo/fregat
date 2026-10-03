@@ -1984,6 +1984,17 @@ export const SETTINGS_REGISTRY = {
     description: 'Maximum transcript files visited in one local history scan.',
     keywords: ['usage', 'quota', 'cache'],
   }),
+  'providers.proxyUsageRequestIntervalHours': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(24)),
+    default: 1,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'Pooled Codex usage request interval',
+    description:
+      'Minimum hours between credentialed usage requests for each pooled Codex account. At most one request per account per hour, including failures and restarts. Fresh passive readings skip requests; three failures pause collection until a newer passive reading arrives.',
+    keywords: ['usage', 'codex', 'proxy', 'quota', 'cap'],
+  }),
   'providers.proxyUsageUrl': defineSetting({
     schema: v.nullable(
       v.pipe(
@@ -2009,7 +2020,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Providers',
     title: 'Proxy usage management address',
     description:
-      'Local CLIProxyAPI management address whose cached Codex quotas Fregat reads. The management key is kept in the secret store.',
+      'Local CLIProxyAPI management address for pooled Codex quotas. Missing or stale readings receive a capped usage request. The management key is kept in the secret store.',
     keywords: ['usage', 'codex', 'proxy', 'quota'],
   }),
   'providers.proxyUsageProviderInstanceIds': defineSetting({
