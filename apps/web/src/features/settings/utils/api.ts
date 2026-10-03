@@ -98,7 +98,7 @@ function summarizeSettings(snapshot: SettingsSnapshot) {
   return {
     diagnosticCount: snapshot.diagnostics.length,
     hiddenModelCount: snapshot.values['models.hidden'].length,
-    keybindingOverrideCount: Object.keys(snapshot.values['keybindings.overrides']).length,
+    keybindingOverrideCount: snapshot.values['keybindings.overrides'].length,
     providerInstanceCount: snapshot.values['providers.instances'].length,
     settingsEpoch: snapshot.serverVersion.epoch,
     settingsSequence: snapshot.serverVersion.sequence,

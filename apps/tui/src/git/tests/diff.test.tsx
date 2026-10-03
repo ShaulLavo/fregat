@@ -22,7 +22,7 @@ for (const width of [70, 119, 120, 160]) {
       <CommandProvider
         scope={{ screen: 'workbench', environmentId: 'test', projectId: '' }}
         handlers={{}}
-        overrides={{}}
+        overrides={[]}
         onError={(error) => expect.unreachable(String(error))}
       >
         <DiffView owner={owner} file={file} theme={resolveTheme('dark', 'dark', true)} enabled />

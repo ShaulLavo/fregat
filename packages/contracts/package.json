@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fregat/hotkeys": "catalog:",
     "@workspace/observability": "workspace:*",
     "@workspace/utils": "workspace:*",
     "culori": "^4.0.2",

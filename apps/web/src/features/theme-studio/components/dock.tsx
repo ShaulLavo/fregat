@@ -1,5 +1,8 @@
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
+import { eventTargetsTextEntry } from '@/keymap/utils/keyboard-event'
+import { openingPopupTrigger } from '@workspace/ui/patterns/popup-trigger'
 import type { ColorMode } from '@workspace/contracts'
-import { useEffect, useEffectEvent, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useEffectEvent } from 'react'
 import { log } from '@/lib/client-logging'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
@@ -134,41 +137,44 @@ export function Dock() {
     store.chooseTheme(next)
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    // Portalled dialogs and menus bubble here through React; their Escape is theirs.
-    if (event.target instanceof Node && !event.currentTarget.contains(event.target)) return
-    if (
-      event.defaultPrevented ||
-      event.nativeEvent.isComposing ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.metaKey
-    )
-      return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      leave()
-      return
-    }
-    if (event.key !== '\\') return
-    const target = event.target
-    if (
-      target instanceof HTMLElement &&
-      (target.isContentEditable || target.closest('input, textarea, select'))
-    )
-      return
-    event.preventDefault()
-    store.setMode(mode === 'dark' ? 'light' : 'dark')
-  }
+  const studioRef = useKeymapNode({
+    area: 'settings',
+    context: 'ThemeStudio',
+    commands: {
+      'themeStudio.close': ({ source }) => {
+        if (!store.open) return false
+        if (source && (eventTargetsTextEntry(source) || openingPopupTrigger(source.target)))
+          return false
+        leave()
+        return true
+      },
+      'themeStudio.toggleMode': () => {
+        if (!store.open) return false
+        store.setMode(mode === 'dark' ? 'light' : 'dark')
+        return true
+      },
+      'themeStudio.apply': ({ source }) => {
+        if (!store.open || store.collapsed || store.tab !== 'themes') return false
+        if (!draft || !editsPending || saving) return false
+        if (!(source?.target instanceof Element) || !source.target.closest('[data-studio-themes]'))
+          return false
+        void apply()
+        return true
+      },
+    },
+  })
+
+  // React ref attachment needs a stable callback to keep both registrations mounted.
+  const dockRef = useCallback(
+    (element: HTMLElement | null) => {
+      studioRef(element)
+      ref(element)
+    },
+    [studioRef, ref],
+  )
 
   return (
-    <section
-      aria-label='Theme studio'
-      className='flex flex-col'
-      data-theme-studio=''
-      ref={ref}
-      onKeyDown={handleKeyDown}
-    >
+    <section aria-label='Theme studio' className='flex flex-col' data-theme-studio='' ref={dockRef}>
       <DockHeader
         collapsed={store.collapsed}
         confirmingDiscard={store.confirmingDiscard}
@@ -190,7 +196,6 @@ export function Dock() {
             customizations={customizations}
             draft={draft}
             mode={mode}
-            onApply={() => void apply()}
             onChoose={chooseTheme}
           />
         ) : null}

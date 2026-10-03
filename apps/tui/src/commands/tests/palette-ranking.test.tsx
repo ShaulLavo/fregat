@@ -41,18 +41,22 @@ test('empty command search keeps recent groups and configured shortcut labels', 
     },
   })
   try {
-    const bindings = effectiveTerminalBindings({ 'workspace.revealChat': ['F7'] }).bindings
+    const bindings = effectiveTerminalBindings([
+      { command: 'workspace.revealChat', keys: 'F7' },
+    ]).bindings
     const rows = paletteOptions(harness.bus.capture('palette'), bindings, '>', ['agent.clearScope'])
     expect(rows[0]).toMatchObject({
       description: 'Recently Used',
       value: { id: 'agent.clearScope' },
     })
-    expect(rows.find((row) => row.value.id === 'workspace.revealChat')?.name).toBe('Show chat  F7')
+    expect(rows.find((row) => row.value.id === 'workspace.revealChat')?.name).toBe(
+      'Show chat  Ctrl+K R / F7',
+    )
     const searched = paletteOptions(harness.bus.capture('palette'), bindings, '> SHOW CHAT ', [
       'agent.clearScope',
     ])
     expect(searched[0]).toMatchObject({
-      name: 'Show chat  F7',
+      name: 'Show chat  Ctrl+K R / F7',
       value: { id: 'workspace.revealChat' },
     })
   } finally {

@@ -70,7 +70,7 @@ test('hides unrelated editor actions but keeps read-only editing actions visibly
   const focus = new FocusService()
   const { bus } = createTestCommandRuntime({ focus, queryClient: createTestQueryClient() })
   const invocation = { source: { kind: 'palette' } } as const
-  const editorCommand = 'editor.editor.action.formatDocument'
+  const editorCommand = 'editor.action.formatDocument'
   expect(
     isCommandVisibleInPalette(editorCommand, bus.capture(invocation).inspect(editorCommand), null),
   ).toBe(false)

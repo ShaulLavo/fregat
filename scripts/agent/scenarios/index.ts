@@ -1,3 +1,4 @@
+import { commandFoundation } from './command-foundation'
 import { nativeWindow } from './native-window'
 import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
@@ -639,6 +640,7 @@ export const scenarios: readonly Scenario[] = [
   terminalRendererWebgl,
   bottomPanelPersistence,
   sidebarToggle,
+  commandFoundation,
   itemNavigation,
   shortcutHints,
   editorAddToChat,

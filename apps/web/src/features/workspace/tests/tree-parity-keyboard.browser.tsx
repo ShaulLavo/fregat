@@ -1,3 +1,4 @@
+import { detectPlatform } from '@fregat/hotkeys'
 /** @jsxImportSource react */
 // Plan 178 parity: keyboard, pointer selection and accessibility of today's tree, driven by real
 // input. The keyboard-and-selection sub-plan replaces this machinery; these pin what it must keep.
@@ -27,6 +28,33 @@ async function focusRow(path: string) {
 }
 
 describe('keyboard', () => {
+  it('Mod+A marks visible rows and Mod+Space toggles the focused mark', async () => {
+    const { model } = await mountParityTree()
+    await focusRow('README.md')
+    const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
+    await userEvent.keyboard(`{${modifier}>}a{/${modifier}}`)
+    await vi.waitFor(() => expect(model.getSelectedPaths()).toContain('docs/'))
+    expect(model.getSelectedPaths()).toContain('README.md')
+    await userEvent.keyboard(`{${modifier}>} {/${modifier}}`)
+    await vi.waitFor(() => expect(model.getSelectedPaths()).not.toContain('README.md'))
+    expect(model.getSelectedPaths()).toContain('docs/')
+  })
+
+  it('F2 renames the focused row and Mod+A stays text selection while renaming', async () => {
+    const { model, events } = await mountParityTree()
+    await focusRow('README.md')
+    await userEvent.keyboard('{F2}')
+    await vi.waitFor(() =>
+      expect(treeScope().querySelector('input[aria-label^="Rename "]')).toBeTruthy(),
+    )
+    const selected = [...model.getSelectedPaths()]
+    const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
+    await userEvent.keyboard(`{${modifier}>}a{/${modifier}}`)
+    expect(model.getSelectedPaths()).toEqual(selected)
+    await userEvent.keyboard('NOTES.md{Enter}')
+    await vi.waitFor(() => expect(events.renames).toHaveLength(1))
+  })
+
   it.each(['{Enter}', ' '])('clears the filter with %s without selecting a result', async (key) => {
     const { model, events } = await mountParityTree()
     await clickRow('README.md')

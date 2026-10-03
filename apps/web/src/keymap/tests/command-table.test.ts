@@ -1,10 +1,9 @@
-import { editorCommandMutates } from '@singapore-editor/core/keymap'
+import { editorCommandMutates } from '@singapore-editor/core/editor'
 import { editorCommandIdFromPlatform } from '@/keymap/editor-keymap'
 import { describe } from 'vitest'
 import { expect, test as it } from '../../../test/fixtures'
 
 import { platformCommandSpecs } from '@/keymap/command-registry'
-import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import type { CommandUndoCategory, CommandWhen } from '@workspace/client-core/commands/metadata'
 import {
   hiddenPaletteCommandIds,
@@ -19,17 +18,13 @@ import {
   type PlatformCommandId,
 } from '@/keymap/types'
 
-/** Every hotkey the app claims from the browser without dispatching anything. */
-const RESERVED_HOTKEYS = ['Control+Tab', 'Control+Q', 'Mod+Alt+Tab', 'Mod+Shift+T', 'Mod+W']
-const MAC_ONLY_RESERVED_HOTKEY = 'Mod+Alt+Tab'
-
 const NUMBERED_COMMAND_PATTERN = /^workspace\.(selectItem|sidebarPanel)\d$/
 
 const TEXT_MENU_EDITOR_COMMANDS = [
-  'editor.editor.action.goToImplementation',
-  'editor.editor.action.goToTypeDefinition',
-  'editor.editor.action.peekDefinition',
-  'editor.editor.action.revealDefinitionAside',
+  'editor.action.goToImplementation',
+  'editor.action.goToTypeDefinition',
+  'editor.action.peekDefinition',
+  'editor.action.revealDefinitionAside',
 ] as const
 
 const ASYNC_COMMAND_IDS = [
@@ -114,70 +109,6 @@ const ASYNC_COMMAND_IDS = [
   'wallpaper.next',
 ] as const satisfies readonly PlatformCommandId[]
 
-const TEXT_EDIT_COMMAND_IDS = [
-  'editor.markdown.bold',
-  'editor.markdown.italic',
-  'editor.markdown.strikethrough',
-  'editor.markdown.code',
-  'editor.markdown.link',
-  'editor.markdown.heading',
-  'editor.markdown.bulletList',
-  'editor.markdown.orderedList',
-  'editor.markdown.taskList',
-  'editor.markdown.toggleTask',
-  'editor.markdown.quote',
-  'editor.markdown.codeBlock',
-
-  'workspace.historyBack',
-  'workspace.historyForward',
-  'editor.undo',
-  'editor.redo',
-  'editor.replaceOne',
-  'editor.replaceAll',
-  'editor.merge-conflict.accept.current',
-  'editor.merge-conflict.accept.incoming',
-  'editor.merge-conflict.accept.both',
-  'editor.merge-conflict.accept.selection',
-  'editor.merge-conflict.accept.all-current',
-  'editor.merge-conflict.accept.all-incoming',
-  'editor.merge-conflict.accept.all-both',
-  'editor.deleteWordLeft',
-  'editor.deleteWordRight',
-  'editor.editor.action.deleteLines',
-  'editor.editor.action.copyLinesUpAction',
-  'editor.editor.action.copyLinesDownAction',
-  'editor.editor.action.moveLinesUpAction',
-  'editor.editor.action.moveLinesDownAction',
-  'editor.editor.action.insertLineBefore',
-  'editor.editor.action.insertLineAfter',
-  'editor.editor.action.commentLine',
-  'editor.editor.action.blockComment',
-  'editor.editor.action.indentLines',
-  'editor.editor.action.outdentLines',
-  'editor.editor.action.trimTrailingWhitespace',
-  'editor.editor.action.sortLinesAscending',
-  'editor.editor.action.sortLinesDescending',
-  'editor.editor.action.joinLines',
-  'editor.editor.action.duplicateSelection',
-  'editor.editor.action.transformToUppercase',
-  'editor.editor.action.transformToLowercase',
-  'editor.editor.action.transformToTitlecase',
-  'editor.editor.action.rename',
-  'editor.editor.action.formatDocument',
-  'editor.deleteBackward',
-  'editor.deleteForward',
-  'editor.indentSelection',
-  'editor.outdentSelection',
-  'editor.deleteWordPartLeft',
-  'editor.deleteWordPartRight',
-  'editor.editor.action.autoFix',
-  'editor.editor.action.inlineSuggest.commit',
-  'editor.editor.action.inlineSuggest.acceptNextWord',
-  'editor.acceptSelectedSuggestion',
-  'editor.editor.action.reindentlines',
-  'editor.editor.action.reindentselectedlines',
-] as const satisfies readonly PlatformCommandId[]
-
 const FILE_OPERATION_COMMAND_IDS = [
   'fileTree.newFile',
   'fileTree.newFolder',
@@ -189,6 +120,14 @@ const FILE_OPERATION_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const WORKSPACE_OPERATION_COMMAND_IDS = [
+  'chat.stashPrompt',
+  'chat.sendMessage',
+  'git.commit',
+  'fileTree.rename',
+  'terminal.close',
+  'terminal.clear',
+  'terminal.copy',
+  'terminal.paste',
   'workspace.undoSessionAction',
   'workspace.redoSessionAction',
   'workspace.toggleCheckpointChange',
@@ -237,14 +176,12 @@ const TAB_OPEN_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const CHAT_MODE_COMMAND_IDS = [
+  'chat.stashPrompt',
+  'chat.sendMessage',
   'workspace.exportTranscript',
   'workspace.newSession',
   'workspace.toggleSessionRail',
 ] satisfies readonly PlatformCommandId[]
-
-function reservedBindings(platform: 'linux' | 'mac' | 'windows') {
-  return defaultPlatformKeyBindings(platform).filter((binding) => binding.command === null)
-}
 
 function commandIdsWhere(predicate: (command: CommandEntry) => boolean) {
   return platformCommands
@@ -292,9 +229,11 @@ describe('command table', () => {
   })
 
   it('keeps non-default undo ownership on the intended commands', () => {
-    expect(commandIdsWithUndoCategory('text-edit')).toEqual(
-      expectedCommandIds(TEXT_EDIT_COMMAND_IDS),
-    )
+    expect(
+      commandIdsWhere(
+        (command) => command.target !== 'editor' && command.undoCategory === 'text-edit',
+      ),
+    ).toEqual(['workspace.historyBack', 'workspace.historyForward'])
     expect(commandIdsWithUndoCategory('file-operation')).toEqual(
       expectedCommandIds(FILE_OPERATION_COMMAND_IDS),
     )
@@ -342,21 +281,6 @@ describe('command table', () => {
         when: ['editorTarget'],
       })
     }
-  })
-
-  it('keeps the browser-hostile chords reserved', () => {
-    const mac = reservedBindings('mac')
-    expect(mac).toHaveLength(5)
-    expect(mac.map((binding) => binding.chord[0])).toEqual(RESERVED_HOTKEYS)
-
-    for (const binding of mac) {
-      expect(binding.preventDefault).toBe(true)
-      expect(binding.stopPropagation).toBe(true)
-    }
-
-    const withoutMacOnly = RESERVED_HOTKEYS.filter((chord) => chord !== MAC_ONLY_RESERVED_HOTKEY)
-    expect(reservedBindings('linux').map((binding) => binding.chord[0])).toEqual(withoutMacOnly)
-    expect(reservedBindings('windows').map((binding) => binding.chord[0])).toEqual(withoutMacOnly)
   })
 
   it('offers session commands while hiding numbered item and panel commands', () => {

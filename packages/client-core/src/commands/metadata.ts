@@ -1,8 +1,5 @@
-import { editorCommandMutates, type KeyChord } from '@singapore-editor/core/keymap'
+import { editorCommandMutates } from '@singapore-editor/core/editor'
 import type { EditorCommandId } from '@singapore-editor/core/editor'
-import type { FocusArea } from './focus'
-
-type CommandPlatformName = 'linux' | 'mac' | 'windows' | 'tui'
 
 export type CommandTargetKind = 'editor' | 'workspace' | 'diagnostic' | 'checkpoint-change'
 
@@ -25,30 +22,13 @@ export type CommandWhen =
 
 export type CommandExecution = 'async' | 'sync'
 
-/** The `keybindings.preset` values. `default` is Platform mode. */
-export type KeybindingPreset = 'default' | 'vscode'
+export type KeybindingPreset = 'ours' | 'zed' | 'vscode'
 
 export type CommandUndoCategory =
   | 'file-operation'
   | 'text-edit'
   | 'view-only'
   | 'workspace-operation'
-
-/** One default key for a command. */
-export type CommandKeyDefault = {
-  readonly terminalProtocol?: 'kitty'
-  readonly chord: KeyChord
-  readonly pane?: FocusArea | 'any'
-  readonly platforms?: readonly CommandPlatformName[]
-  /** Keyboard modes this default belongs to; every mode when absent. */
-  readonly presets?: readonly KeybindingPreset[]
-  readonly preventDefault?: boolean
-  readonly stopPropagation?: boolean
-  /** A modifier chord that leaves a focused text box its own meaning, such as Mod+Z. */
-  readonly yieldsToTextEntry?: boolean
-  /** VS Code command represented by this specific default binding, used for keymap import/export. */
-  readonly vscodeCommandId?: string
-}
 
 export type CommandMetadata<
   Id extends string = string,
@@ -61,7 +41,6 @@ export type CommandMetadata<
   /** Never set today; read by the palette's keyword builder. Kept as a hook. */
   readonly aliases?: readonly string[]
   readonly vscodeCommandIds?: readonly string[]
-  readonly keys?: readonly CommandKeyDefault[]
   readonly execution: Execution
   readonly target: CommandTargetKind
   readonly undoCategory: CommandUndoCategory
@@ -78,9 +57,13 @@ export function defineMetadata<const Id extends string, const Execution extends 
   return command
 }
 
+export type EditorPlatformCommandId<Id extends string> = Id extends `editor.${string}`
+  ? Id
+  : `editor.${Id}`
+
 export function defineEditorMetadata<const Id extends EditorCommandId>(
   command: Omit<
-    CommandMetadata<`editor.${Id}`, 'sync'>,
+    CommandMetadata<EditorPlatformCommandId<Id>, 'sync'>,
     'id' | 'category' | 'target' | 'execution' | 'when'
   > & { readonly id: Id },
 ) {
@@ -89,11 +72,12 @@ export function defineEditorMetadata<const Id extends EditorCommandId>(
   if (command.id.startsWith('markdown.')) when.push('editorMarkdown')
   return {
     ...command,
-    keys: command.keys?.map((key) => ({ pane: 'editor' as const, ...key })),
-    id: `editor.${command.id}` as const,
+    id: (command.id.startsWith('editor.')
+      ? command.id
+      : `editor.${command.id}`) as EditorPlatformCommandId<Id>,
     category: 'Editor',
     target: 'editor',
     execution: 'sync',
     when,
-  } satisfies CommandMetadata<`editor.${Id}`, 'sync'>
+  } satisfies CommandMetadata<EditorPlatformCommandId<Id>, 'sync'>
 }

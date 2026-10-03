@@ -1,3 +1,4 @@
+import { detectPlatform } from '@fregat/hotkeys'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -57,6 +58,30 @@ const CHEAP_FALLBACK_MODELS: ProviderModel[] = [
     slug: 'gpt-5.5-mini',
   },
 ]
+
+test('Mod+Enter commits once through the focused message field', async () => {
+  const adapter = lunaAdapter()
+  await withProviderServer(adapter, async (server) => {
+    const repo = await initRepo(server.root, 'repo')
+    await writeFile(path.join(repo, 'feature.ts'), 'export const feature = true\n')
+    runGit(repo, ['add', 'feature.ts'], { cwdMode: 'option' })
+    renderControls('repo', true)
+    const input = screen.getByRole('textbox', { name: 'Commit message' })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeEnabled())
+    await userEvent.type(input, 'feat: add shortcut proof')
+    const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
+    await userEvent.keyboard(`{${modifier}>}{Enter}{/${modifier}}`)
+    await waitFor(() =>
+      expect(runGit(repo, ['log', '-1', '--format=%s'], { cwdMode: 'option' }).stdout.trim()).toBe(
+        'feat: add shortcut proof',
+      ),
+    )
+    expect(runGit(repo, ['rev-list', '--count', 'HEAD'], { cwdMode: 'option' }).stdout.trim()).toBe(
+      '2',
+    )
+    expect(adapter.startedTurns).toHaveLength(0)
+  })
+})
 
 test('generates from an untracked working diff, fills the input, and never commits', async () => {
   const adapter = lunaAdapter()

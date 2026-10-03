@@ -25,7 +25,7 @@ test('dialog prompt submits the native current input and Escape dismisses once',
     <CommandProvider
       scope={{ screen: 'settings', environmentId: 'test', projectId: null }}
       handlers={{}}
-      overrides={{}}
+      overrides={[]}
       onError={(error) => expect.unreachable(String(error))}
     >
       <Dialog

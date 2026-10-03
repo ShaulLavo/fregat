@@ -1,3 +1,5 @@
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
+import { useState } from 'react'
 import { closestCenter, DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -26,6 +28,9 @@ export function TerminalList({
     useTerminalTabActions(rootPath)
   const sensors = useTabStripSensors()
 
+  const [renamingTabId, setRenamingTabId] = useState<string | null>(null)
+  const editingTabId = tabs.some((tab) => tab.id === renamingTabId) ? renamingTabId : null
+  const [dragging, setDragging] = useState(false)
   const list = useListbox({
     role: 'tablist',
     items: tabs.map((tab) => ({ id: tab.id })),
@@ -33,15 +38,31 @@ export function TerminalList({
     onActiveChange: selectTab,
     onCommit: activateTab,
     onActiveKeyDown(event) {
-      if (
-        ['F2', 'Delete', ' ', 'ContextMenu'].includes(event.key) ||
-        (event.shiftKey && event.key === 'F10')
-      )
+      if ([' ', 'ContextMenu'].includes(event.key) || (event.shiftKey && event.key === 'F10'))
         forwardActiveRowKey(event)
     },
   })
 
+  useKeymapNode({
+    area: 'terminal',
+    context: 'TerminalList',
+    element: () => list.containerProps.ref.current,
+    commands: {
+      'terminal.rename': () => {
+        if (editingTabId || dragging || !list.activeId) return false
+        setRenamingTabId(list.activeId)
+        return true
+      },
+      'terminal.close': () => {
+        if (editingTabId || dragging || !list.activeId) return false
+        closeTab(list.activeId)
+        return true
+      },
+    },
+  })
+
   function finishDrag(event: DragEndEvent, cancelled: boolean) {
+    setDragging(false)
     const intent = cancelled ? null : tabReorderIntent(tabs, event.active.id, event.over?.id)
     log.info({
       area: 'terminal',
@@ -65,6 +86,7 @@ export function TerminalList({
       modifiers={TERMINAL_LIST_DND_MODIFIERS}
       sensors={sensors}
       accessibility={{ restoreFocus: false }}
+      onDragStart={() => setDragging(true)}
       onDragEnd={(event) => finishDrag(event, false)}
       onDragCancel={(event) => finishDrag(event, true)}
     >
@@ -78,6 +100,9 @@ export function TerminalList({
           {tabs.map((tab) => (
             <TerminalListRow
               active={tab.id === activeTabId}
+              editing={tab.id === editingTabId}
+              onStartEditing={() => setRenamingTabId(tab.id)}
+              onStopEditing={() => setRenamingTabId(null)}
               rowProps={list.rowProps(tab.id)}
               key={tab.id}
               tab={tab}

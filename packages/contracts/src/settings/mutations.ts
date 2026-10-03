@@ -19,6 +19,11 @@ import { providerDriverKindSchema, type ProviderDriverKind } from '../orchestrat
 import {
   keybindingCommandIdSchema,
   keybindingListSchema,
+  keybindingChordSchema,
+  keybindingContextSchema,
+  keybindingOverrideSchema,
+  keybindingOverridesSchema,
+  type KeybindingOverride,
   modelRefListSchema,
   modelRefSchema,
   providerEnvironmentVariableSchema,
@@ -83,13 +88,27 @@ export type ResetSettingsOperation = {
 export type SetKeybindingOperation = {
   readonly kind: 'keybinding.set'
   readonly command: string
-  /** The command's complete list; `null` unbinds it. */
+  /** Replaces the command's bindings in this exact context. */
   readonly keys: readonly string[] | null
+  readonly context?: string
+  readonly defaultKeys?: readonly string[]
 }
 
 export type RemoveKeybindingOperation = {
   readonly kind: 'keybinding.remove'
   readonly command: string
+  readonly context?: string
+}
+
+export type AppendKeybindingOperation = {
+  readonly kind: 'keybinding.append'
+  readonly entry: KeybindingOverride
+}
+
+export type DeleteKeybindingOperation = {
+  readonly kind: 'keybinding.delete'
+  readonly index: number
+  readonly expected: readonly KeybindingOverride[]
 }
 
 type SetMachineOperation = {
@@ -177,6 +196,8 @@ export type SettingsOperation =
   | ResetSettingsOperation
   | SetKeybindingOperation
   | RemoveKeybindingOperation
+  | AppendKeybindingOperation
+  | DeleteKeybindingOperation
   | SetMachineOperation
   | RemoveMachineOperation
   | SetModelHiddenOperation
@@ -301,10 +322,22 @@ export const settingsOperationSchemasByKind = {
     kind: v.literal('keybinding.set'),
     command: keybindingCommandIdSchema,
     keys: keybindingListSchema,
+    context: v.optional(keybindingContextSchema),
+    defaultKeys: v.optional(v.array(keybindingChordSchema)),
   }),
   'keybinding.remove': v.strictObject({
     kind: v.literal('keybinding.remove'),
     command: keybindingCommandIdSchema,
+    context: v.optional(keybindingContextSchema),
+  }),
+  'keybinding.append': v.strictObject({
+    kind: v.literal('keybinding.append'),
+    entry: keybindingOverrideSchema,
+  }),
+  'keybinding.delete': v.strictObject({
+    kind: v.literal('keybinding.delete'),
+    index: v.pipe(v.number(), v.integer(), v.minValue(0)),
+    expected: keybindingOverridesSchema,
   }),
   'model.setHidden': v.strictObject({
     kind: v.literal('model.setHidden'),
@@ -439,8 +472,15 @@ export function settingsOperationResourceKeys(
     return [memberResourceKey('environments.machines', operation.name)]
   }
   if (operation.kind === 'keybinding.set' || operation.kind === 'keybinding.remove') {
-    return [memberResourceKey('keybindings.overrides', operation.command)]
+    return [
+      memberResourceKey(
+        'keybindings.overrides',
+        JSON.stringify([operation.command, operation.context ?? '']),
+      ),
+    ]
   }
+  if (operation.kind === 'keybinding.append' || operation.kind === 'keybinding.delete')
+    return [settingResourceKey('keybindings.overrides')]
   if (operation.kind === 'model.setHidden') {
     return [memberResourceKey('models.hidden', modelResourceId(operation.ref))]
   }
@@ -485,7 +525,21 @@ function applySettingsOperation(
   if (operation.kind === 'machine.set') return setMachine(raw, operation)
   if (operation.kind === 'machine.remove') return removeMachine(raw, operation.name)
   if (operation.kind === 'keybinding.set') return setKeybinding(raw, operation)
-  if (operation.kind === 'keybinding.remove') return removeKeybinding(raw, operation.command)
+  if (operation.kind === 'keybinding.remove') return removeKeybinding(raw, operation)
+  if (operation.kind === 'keybinding.append')
+    return replaceSetting(raw, 'keybindings.overrides', [
+      ...storedKeybindings(raw),
+      operation.entry,
+    ])
+  if (operation.kind === 'keybinding.delete') {
+    const current = storedKeybindings(raw)
+    if (!jsonEqual(current, operation.expected)) return raw
+    return replaceSetting(
+      raw,
+      'keybindings.overrides',
+      current.filter((_, index) => index !== operation.index),
+    )
+  }
   if (operation.kind === 'model.setHidden') {
     return setModelMembership(raw, 'models.hidden', operation.ref, operation.hidden)
   }
@@ -533,18 +587,18 @@ function setKeybinding(
   raw: Readonly<Record<string, unknown>>,
   operation: SetKeybindingOperation,
 ): Readonly<Record<string, unknown>> {
-  const current = recordSetting(raw, 'keybindings.overrides')
-  if (
-    Object.hasOwn(current, operation.command) &&
-    jsonEqual(current[operation.command], operation.keys)
-  ) {
-    return raw
-  }
-
-  return replaceSetting(raw, 'keybindings.overrides', {
-    ...current,
-    [operation.command]: operation.keys,
-  })
+  const keys = [...new Set(operation.keys ?? [])]
+  const context = operation.context ? { context: operation.context } : {}
+  const remaining = storedKeybindings(raw).filter((entry) => !matchesKeybinding(entry, operation))
+  const unbinds = [...new Set(operation.defaultKeys ?? [])]
+    .filter((key) => !keys.includes(key))
+    .map((key): KeybindingOverride => ({ keys: key, unbind: operation.command, ...context }))
+  const bindings = keys.map((key): KeybindingOverride => ({
+    keys: key,
+    command: operation.command,
+    ...context,
+  }))
+  return replaceSetting(raw, 'keybindings.overrides', [...remaining, ...unbinds, ...bindings])
 }
 
 function setMachine(
@@ -571,15 +625,23 @@ function removeMachine(
 
 function removeKeybinding(
   raw: Readonly<Record<string, unknown>>,
-  command: string,
+  operation: RemoveKeybindingOperation,
 ): Readonly<Record<string, unknown>> {
-  const current = recordSetting(raw, 'keybindings.overrides')
-  if (!Object.hasOwn(current, command)) return raw
+  const remaining = storedKeybindings(raw).filter((entry) => !matchesKeybinding(entry, operation))
+  return replaceSetting(raw, 'keybindings.overrides', remaining)
+}
 
-  const next = { ...current }
-  delete next[command]
+function matchesKeybinding(
+  entry: KeybindingOverride,
+  operation: Pick<RemoveKeybindingOperation, 'command' | 'context'>,
+): boolean {
+  const command = 'unbind' in entry ? entry.unbind : entry.command
+  return command === operation.command && entry.context === operation.context
+}
 
-  return replaceSetting(raw, 'keybindings.overrides', next)
+function storedKeybindings(raw: Readonly<Record<string, unknown>>): readonly KeybindingOverride[] {
+  const parsed = v.safeParse(keybindingOverridesSchema, raw['keybindings.overrides'])
+  return parsed.success ? parsed.output : []
 }
 
 /** Adds a model to the end of a model list, or removes it; a no-op when already so. */
@@ -658,7 +720,7 @@ function setProjectOverride(
 
 function recordSetting(
   raw: Readonly<Record<string, unknown>>,
-  key: 'environments.machines' | 'keybindings.overrides' | ProjectOverrideSettingId,
+  key: 'environments.machines' | ProjectOverrideSettingId,
 ): Readonly<Record<string, unknown>> {
   const value = raw[key]
 
@@ -711,7 +773,12 @@ function touchedSettingIds(operation: SettingsOperation): readonly SettingId[] {
   if (operation.kind === 'machine.set' || operation.kind === 'machine.remove') {
     return ['environments.machines']
   }
-  if (operation.kind === 'keybinding.set' || operation.kind === 'keybinding.remove') {
+  if (
+    operation.kind === 'keybinding.set' ||
+    operation.kind === 'keybinding.remove' ||
+    operation.kind === 'keybinding.append' ||
+    operation.kind === 'keybinding.delete'
+  ) {
     return ['keybindings.overrides']
   }
   if (operation.kind === 'model.setHidden') return ['models.hidden']

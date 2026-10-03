@@ -18,7 +18,8 @@ import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
 import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
 import { useEditorGutterInset } from '@/hooks/use-editor-gutter-inset'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
-import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
+import { useCommand } from '@/keymap/hooks/use-command'
+import { fileExtension } from '@/lib/path-formatters'
 import { log } from '@/lib/client-logging'
 import { notePressPaint } from '@/lib/intent-prefetch/state/press-paint'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
@@ -94,6 +95,7 @@ export function DiffPane({
     highlight ? syntaxTheme : null,
   )
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
+  const { keymap } = useCommand()
   const unicodeHighlights = useUnicodeHighlights()
   // A plugin instance owns its registered view context for the lifetime of this pane.
   // Manual, because the layout effect below depends on it and the compiler's cache is a cache,
@@ -113,6 +115,7 @@ export function DiffPane({
   const gutterInset = useEditorGutterInset()
   const controller = useEditor({
     ...createDiffEditorOptions(),
+    keymapContext: { mode: 'diff', extension: file ? fileExtension(file.path) : '' },
     suspiciousCharacters: unicodeHighlights.options,
     // No `document`: the React wrapper pushes text through `openDocument`, which takes no scroll
     // position from us and therefore lands back at the top — so every expansion toggle, and every
@@ -120,7 +123,8 @@ export function DiffPane({
     // one that carries the scroll position across, and it is what the package's own contract names.
     ...typography,
     gutterLeadingInset: side === 'new' ? 0 : gutterInset,
-    keymap: HOSTED_EDITOR_KEYMAP,
+    hotkeys: keymap.hotkeys,
+    hotkeysParent: keymap.parentFor('editor'),
     // Only the diff plugin: the critical core set would bring line and fold gutters, find, merge
     // conflicts, shiki and LSP, none of which a diff had — and a fold gutter would break the
     // row-index identity the comment layer reads line numbers off.

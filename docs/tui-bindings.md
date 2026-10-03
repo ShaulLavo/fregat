@@ -1,5 +1,8 @@
 # TUI command bindings
 
+This record describes the pre-206 source audit. Plan 206 removes catalog chords and replaces
+the matcher with the hotkeys core and terminal adapter, preserving the TUI's own defaults.
+
 The shared command catalog now contains 198 rows. Web and TUI compose host handlers around
 that metadata. Terminal defaults are authored with `platforms: ['tui']`; user overrides use
 `keybindings.overrides`. Commands without a mounted handler do not enter the active palette.
@@ -79,7 +82,7 @@ The live table has **179 production rows: 56 workspace and 123 editor**. `enviro
 
 Bun smoke execution imported the public shared trie with `typeof document === 'undefined'`, matched Ctrl+P to quick access, armed Ctrl+K with one descendant, and completed plain s to settings. That proves the actual shared pure entry is usable. No application tests were run for this read-only audit.
 
-The [shared keymap delivery record](keymap/delivery.md) describes the matcher now in use.
+This source audit describes the pre-206 matcher. The current [keymap architecture](keymap/architecture.md) uses the DOM-free hotkeys core and terminal adapter; preserve TUI-specific defaults and focus policy when updating this audit.
 The completed executable plans have been deleted.
 
 ## Named actions missing from the current table

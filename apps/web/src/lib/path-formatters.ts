@@ -59,6 +59,12 @@ export function pathLeaf(path: string) {
   return path.slice(path.lastIndexOf('/') + 1)
 }
 
+export function fileExtension(path: string) {
+  const leaf = pathLeaf(path)
+  const dot = leaf.lastIndexOf('.')
+  return dot > 0 ? leaf.slice(dot + 1).toLowerCase() : ''
+}
+
 export function lastPathSegment(path: string) {
   const parts = path.split('/').filter(Boolean)
   return parts.at(-1) ?? path

@@ -18,13 +18,11 @@ export function ThemesTab({
   customizations,
   draft,
   mode,
-  onApply,
   onChoose,
 }: {
   customizations: ThemeCustomizations
   draft: StudioDraft | null
   mode: ColorMode
-  onApply: () => void
   onChoose: (draft: StudioDraft) => void
 }) {
   const { catalog } = useBundles()
@@ -44,7 +42,7 @@ export function ThemesTab({
       const theme = find(id)
       if (theme) choose(theme)
     },
-    onCommit: onApply,
+    onCommit() {},
     onSelect() {},
     typeahead: true,
     scrollToIndex: (index) =>
@@ -57,6 +55,17 @@ export function ThemesTab({
     <div className='flex h-full min-w-0 items-center gap-2 pr-(--bar-padding-x)'>
       <div
         {...list.containerProps}
+        onKeyDown={(event) => {
+          if (
+            event.key === 'Enter' &&
+            !event.altKey &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.shiftKey
+          )
+            return
+          list.containerProps.onKeyDown(event)
+        }}
         aria-label='Themes'
         className='focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-2 overflow-x-auto overscroll-contain px-(--bar-padding-x) outline-none'
         data-studio-themes=''

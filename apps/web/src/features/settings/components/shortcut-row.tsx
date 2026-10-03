@@ -38,8 +38,9 @@ export function ShortcutRow({
   row: ShortcutRowModel
   rowProps: HTMLAttributes<HTMLDivElement> & { 'aria-selected': boolean }
 }) {
-  const takenBy = row.shadowedBy ? shortcutTitle(row.shadowedBy) : null
-  const where = shortcutConflictLabel(row) ?? shortcutPlacesLabel(row.places)
+  const where = [shortcutPlacesLabel(row.places), shortcutConflictLabel(row)]
+    .filter(Boolean)
+    .join(' · ')
   const hasLoss = row.losses.length > 0
   const source = shortcutSourceLabel(row.source)
   const modified = row.source === 'custom' || row.source === 'removed'
@@ -54,6 +55,8 @@ export function ShortcutRow({
         '@max-3xl/settings:h-12 @max-3xl/settings:flex-col @max-3xl/settings:items-stretch @max-3xl/settings:justify-center @max-3xl/settings:gap-0.5',
       )}
       data-shortcut-command={row.command}
+      data-shortcut-context={row.context ?? ''}
+      data-shortcut-source={row.source ?? 'unassigned'}
       data-shortcut-keys={row.keys ?? undefined}
       data-shortcut-row={row.id}
       onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
@@ -78,9 +81,7 @@ export function ShortcutRow({
           ) : null}
         </span>
         <span className='flex min-w-0 shrink-0 items-center gap-1 @3xl/settings:overflow-hidden'>
-          {row.keys ? (
-            <ShortcutKeys keys={row.keys} platform={platform} struck={takenBy !== null} />
-          ) : null}
+          {row.keys ? <ShortcutKeys keys={row.keys} platform={platform} /> : null}
           {keptNote ? (
             <WarningIcon
               aria-label={keptNote}
@@ -142,7 +143,7 @@ function rowTitle(row: ShortcutRowModel, keptNote: string | null, platform: Plat
   if (row.commandKeys.length > 1) parts.push(`${row.commandKeys.length} shortcuts`)
   if (row.places.length > 0) parts.push(row.places.join('; '))
   for (const loss of row.losses)
-    parts.push(`Taken by ${shortcutTitle(loss.winner)} in ${loss.place}`)
+    parts.push(`Shadowed by ${shortcutTitle(loss.winner)} in ${loss.place}`)
   if (keptNote) parts.push(keptNote)
 
   return parts.join(' · ')

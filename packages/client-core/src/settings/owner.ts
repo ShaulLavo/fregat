@@ -28,6 +28,7 @@ import {
 } from './mutation-policy'
 import { projectSettings } from './projection'
 import { settingsKeys } from './query-keys'
+import { settingsMutationKeys } from './mutation-keys'
 import { readSettings } from './read'
 import { createSettingsSnapshotAdmission } from './snapshot-admission'
 import { superviseSettingsStream, type SettingsStreamStop } from './stream'
@@ -58,7 +59,6 @@ export class SettingsOwner {
   private confirmed: SettingsSnapshot
   /** What the owner publishes; components select from it with `useStore`. */
   readonly store
-  private queue: Promise<void> = Promise.resolve()
   private streamStop: SettingsStreamStop | null = null
   private started = false
   private disposed = false
@@ -217,23 +217,40 @@ export class SettingsOwner {
   }
 
   private enqueue(entry: ActiveSettingsIntent) {
-    this.queue = this.queue.then(() => this.transport(entry))
+    void this.transport(entry)
   }
 
   private async transport(entry: ActiveSettingsIntent) {
     if (this.controller.signal.aborted) return
     const startedAt = performance.now()
     try {
-      await this.apply(entry)
+      await this.queryClient
+        .getMutationCache()
+        .build(this.queryClient, {
+          mutationKey: settingsMutationKeys.write(entry.patch.request.operations),
+          scope: { id: 'settings-document' },
+          mutationFn: () => this.apply(entry),
+          retry: shouldRetrySettingsTransport,
+          retryDelay: settingsRetryDelay,
+        })
+        .execute(undefined)
       this.recordWrite(entry, startedAt, 'acknowledged')
     } catch (error) {
-      if (!this.controller.signal.aborted) failSettingsIntent(entry.intentId, error)
-      this.recordWrite(
-        entry,
-        startedAt,
-        this.controller.signal.aborted ? 'cancelled' : 'failed',
-        error,
-      )
+      try {
+        if (
+          !this.controller.signal.aborted &&
+          errorStringField(error, 'code') === 'settings.KEYBINDINGS_STALE'
+        )
+          await this.refresh()
+      } finally {
+        if (!this.controller.signal.aborted) failSettingsIntent(entry.intentId, error)
+        this.recordWrite(
+          entry,
+          startedAt,
+          this.controller.signal.aborted ? 'cancelled' : 'failed',
+          error,
+        )
+      }
     } finally {
       settleSettingsIntentTransport(entry.intentId)
     }
@@ -241,32 +258,17 @@ export class SettingsOwner {
 
   private async apply(entry: ActiveSettingsIntent) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const result = await this.writeWithRetry(entry)
+      const result = await writeSettings({
+        client: this.options.client,
+        request: entry.patch.request,
+        signal: this.controller.signal,
+      })
       this.controller.signal.throwIfAborted()
       const initial = await this.admission.admitSettingsMutationResult(this.queryClient, result)
       const admission = initial.confirmation ? await initial.confirmation : initial
       if (!settingsResultRequiresActiveEpochRetry(result, admission)) return
     }
     throw settingsInvariantError('Settings mutation could not establish an active epoch')
-  }
-
-  private async writeWithRetry(entry: ActiveSettingsIntent) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      this.controller.signal.throwIfAborted()
-      try {
-        return await writeSettings({
-          client: this.options.client,
-          request: entry.patch.request,
-          signal: this.controller.signal,
-        })
-      } catch (error) {
-        if (!shouldRetrySettingsTransport(attempt, error)) throw error
-        await new Promise<void>((resolve) =>
-          globalThis.setTimeout(resolve, settingsRetryDelay(attempt)),
-        )
-      }
-    }
-    throw settingsInvariantError('Settings mutation retries ended without a response')
   }
 
   private recordWrite(
