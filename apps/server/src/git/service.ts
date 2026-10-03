@@ -1874,6 +1874,12 @@ function isReadOnlyGit(args: readonly string[]) {
   if (action === 'apply' && args.includes('--check')) return true
   const actionIndex = args.indexOf(action)
   if (action === 'config') return args.includes('--get-regexp') || args.includes('--get')
+  if (action === 'symbolic-ref')
+    return (
+      args.length === actionIndex + 3 &&
+      args[actionIndex + 1] === '--quiet' &&
+      !args[actionIndex + 2]?.startsWith('-')
+    )
   // Listing remotes reads config; `remote add` and friends write it.
   if (action === 'remote') return [undefined, '-v', 'get-url'].includes(args[actionIndex + 1])
   return action === 'worktree' && args[actionIndex + 1] === 'list'

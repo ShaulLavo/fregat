@@ -463,7 +463,7 @@ export class GitWorktreeService {
   }
 
   private async headBranch(runner: GitRepositoryRunner) {
-    const result = await runner.run(['rev-parse', '--symbolic-full-name', 'HEAD'], {
+    const result = await runner.run(['symbolic-ref', '--quiet', 'HEAD'], {
       allowFailure: true,
     })
     const ref = result.stdout.trim()

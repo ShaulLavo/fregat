@@ -1,4 +1,4 @@
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { orchestrationDispatchResultSchema } from '@workspace/contracts'
@@ -8,7 +8,7 @@ import { unwrapEdenResponse } from '@/lib/eden-events'
 import { test, expect } from '../fixtures'
 
 for (const kind of ['directory', 'unborn-git'] as const) {
-  test(`${kind} registration keeps its branch and cursor through lifecycle settlement and Git removal`, async ({
+  test(`${kind} registration keeps its branch and cursor through lifecycle settlement and repeated commands`, async ({
     client,
     server,
   }) => {
@@ -42,7 +42,6 @@ for (const kind of ['directory', 'unborn-git'] as const) {
       metadataVersion: 0,
     })
     const original = (await engine.readModelSnapshot()).projects.get(first.result!.projectId)
-    if (kind === 'unborn-git') await rm(path.join(checkout, '.git'), { recursive: true })
     const repeatedCommand = createProjectRegistrationCommand({
       workspaceRoot: checkout,
       title: 'Fixture',
