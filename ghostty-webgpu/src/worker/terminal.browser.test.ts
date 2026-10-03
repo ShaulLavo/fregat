@@ -295,6 +295,24 @@ it.each(['generation', 'control'] as const)(
   },
 )
 
+it.each(['webgl', 'webgpu'] as const)(
+  '%s cancels opening authority explicitly',
+  async (backend) => {
+    const terminal = await create(backend)
+    const root = container()
+    const opening = terminal.open(root)
+    expect(terminal.lifecycle).toBe('opening')
+    const cancelled = expect(opening).rejects.toMatchObject({ name: 'AbortError' })
+    const disposal = terminal.dispose()
+    await cancelled
+    await disposal
+    expect(terminal.lifecycle).toBe('disposed')
+    expect(terminal.element).toBeUndefined()
+    expect(root.children).toHaveLength(0)
+    expect(() => terminal.geometry()).toThrow('disposed')
+  },
+)
+
 it('invalidates the host after a producer sequence error', async () => {
   const terminal = await create('webgl')
   await terminal.open(container())

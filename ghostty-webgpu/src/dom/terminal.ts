@@ -879,7 +879,12 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.trackSubscription(
       this.execution.on('error', (error) => {
         this.emitHostEvent('error', error)
-        if (this.execution.kind === 'async' && this.execution.failed) {
+        // The opening catch owns cleanup so its rejection retains the actor failure.
+        if (
+          this.stateValue === 'open' &&
+          this.execution.kind === 'async' &&
+          this.execution.failed
+        ) {
           void this.execution.dispose().catch(() => {})
           void Promise.resolve(this.dispose()).catch(() => {})
         }
