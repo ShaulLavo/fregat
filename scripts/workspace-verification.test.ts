@@ -1,5 +1,14 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from 'vitest'
 import { readWorkflow } from './workflow-fixtures'
+
+test('CI shares each ref group and cancels only older PR runs', () => {
+  const source = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
+  expect(Bun.YAML.parse(source)).toHaveProperty('concurrency', {
+    group: 'ci-${{ github.workflow }}-${{ github.ref }}',
+    'cancel-in-progress': "${{ startsWith(github.ref, 'refs/pull/') }}",
+  })
+})
 
 test('the main CI verdict includes all reusable library checks', () => {
   const workflow = readWorkflow('ci.yml')
