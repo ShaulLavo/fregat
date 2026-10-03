@@ -47,7 +47,7 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     message: ({ source, changes }: { source: string; changes: number }) =>
       `${source} has ${changes} uncommitted change${changes === 1 ? '' : 's'}, so the heavy-job wrapper was not installed.`,
     why: 'Every session runs the installed wrapper, so it is built only from a committed tree whose commit names it.',
-    fix: 'Install from a clean worktree at the merged commit: `git worktree add <dir> origin/main`, `bun install --frozen-lockfile`, then `bun scripts/heavy/install.ts` there.',
+    fix: 'Install from a clean worktree at the merged commit: `git worktree add <dir> origin/main`, `bun install --frozen-lockfile`, then `bun scripts/heavy/install.ts --root=<directory>` there.',
   },
   HEAVY_INSTALL_COMMIT: {
     status: 409,
