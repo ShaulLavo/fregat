@@ -1,3 +1,4 @@
+import { presentSetting } from '../settings/documentation'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import {
@@ -353,7 +354,7 @@ it('keeps executable keymap presets application-scoped and restricted to impleme
 
 describe('window material', () => {
   it('is adjacent to transparency and defaults to a rendering-only window enum', () => {
-    const setting = descriptorFor('window.material')
+    const setting = presentSetting('window.material')
     expect(DEFAULT_SETTING_VALUES['window.material']).toBe('none')
     expect(setting).toMatchObject({
       scope: 'window',

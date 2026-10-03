@@ -1,4 +1,5 @@
-import { descriptorFor, type SettingId, type SettingsDiagnostic } from '@workspace/contracts'
+import type { SettingId, SettingsDiagnostic } from '@workspace/contracts'
+import { presentSetting } from '@workspace/contracts/settings/documentation'
 
 const RETIRED: Readonly<
   Record<string, { readonly title: string; readonly replacedBy?: SettingId }>
@@ -11,7 +12,7 @@ export function removedSettingsDiagnostics(keys: readonly string[]): SettingsDia
     const retired = Object.hasOwn(RETIRED, id) ? RETIRED[id] : undefined
     const title = retired?.title ?? id
     const detail = retired?.replacedBy
-      ? `${title} was replaced by ${descriptorFor(retired.replacedBy).title}.`
+      ? `${title} was replaced by ${presentSetting(retired.replacedBy).title}.`
       : `Removed setting from an older version: ${title}.`
 
     return { kind: 'removed-key', id, layer: 'user', detail }
