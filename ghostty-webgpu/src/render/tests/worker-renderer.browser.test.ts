@@ -3,19 +3,11 @@ import { createGhosttyError } from '../../core/error.js'
 import type {
   ProducerObservation,
   WorkerBackend,
-  WorkerCleanup,
-  WorkerObservation,
   WorkerRenderMessage,
   WorkerRenderRequest,
 } from './fixtures/worker-protocol.js'
 
-interface WorkerRun {
-  readonly observation?: WorkerObservation
-  readonly cleanup?: WorkerCleanup
-  readonly error?: string
-  readonly producer?: ProducerObservation
-  readonly messageTypes: readonly string[]
-}
+import { WorkerRunCollector, type WorkerRun } from './fixtures/worker-run.js'
 
 async function runWorker(backend: WorkerBackend, failAfterFrame: boolean): Promise<WorkerRun> {
   const canvas = document.createElement('canvas')
@@ -30,20 +22,10 @@ async function runWorker(backend: WorkerBackend, failAfterFrame: boolean): Promi
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
     return await new Promise<WorkerRun>((resolve, reject) => {
-      let observation: WorkerObservation | undefined
-      let cleanup: WorkerCleanup | undefined
-      let producerObservation: ProducerObservation | undefined
-      let terminalResult: { error?: string } | undefined
-      const messageTypes: string[] = []
+      const collector = new WorkerRunCollector(failAfterFrame ? 'error' : 'complete')
       const settle = () => {
-        if (!terminalResult || !producerObservation) return
-        resolve({
-          observation,
-          cleanup,
-          producer: producerObservation,
-          messageTypes,
-          ...terminalResult,
-        })
+        const result = collector.result()
+        if (result) resolve(result)
       }
       timeout = setTimeout(
         () => reject(createGhosttyError('worker test', 'Dedicated worker test timed out')),
@@ -51,11 +33,7 @@ async function runWorker(backend: WorkerBackend, failAfterFrame: boolean): Promi
       )
       worker.onerror = (event) => {
         event.preventDefault()
-        terminalResult = { error: event.message }
-        if (!cleanup) {
-          reject(createGhosttyError('worker test', event.message))
-          return
-        }
+        collector.recordError(event.message)
         settle()
       }
       producer.onerror = (event) => {
@@ -63,28 +41,21 @@ async function runWorker(backend: WorkerBackend, failAfterFrame: boolean): Promi
         reject(createGhosttyError('producer test', event.message))
       }
       producer.onmessage = ({ data }: MessageEvent<ProducerObservation>) => {
-        producerObservation = data
+        collector.recordProducer(data)
         settle()
       }
       worker.onmessage = ({ data }: MessageEvent<WorkerRenderMessage>) => {
-        messageTypes.push(data.type)
-        if (data.type === 'output-ready') {
-          producer.postMessage(channel.port1, [channel.port1])
-          return
-        }
-        if (data.type === 'result') {
-          observation = data.observation
-          return
-        }
-        if (data.type === 'disposed') {
-          cleanup = data.cleanup
-          return
-        }
-        if (data.type !== 'complete') {
+        if (
+          data.type !== 'output-ready' &&
+          data.type !== 'result' &&
+          data.type !== 'disposed' &&
+          data.type !== 'complete'
+        ) {
           reject(createGhosttyError('worker test', 'Unexpected worker message'))
           return
         }
-        terminalResult = {}
+        collector.recordMessage(data)
+        if (data.type === 'output-ready') producer.postMessage(channel.port1, [channel.port1])
         settle()
       }
       const offscreen = canvas.transferControlToOffscreen()
@@ -113,8 +84,8 @@ async function runWorker(backend: WorkerBackend, failAfterFrame: boolean): Promi
 }
 
 function expectCleanup(result: WorkerRun): void {
-  expect(result.cleanup?.framesBeforeDispose).toBeGreaterThan(0)
-  expect(result.cleanup?.timersBeforeDispose).toBeGreaterThan(0)
+  expect(result.cleanup.framesBeforeDispose).toBeGreaterThan(0)
+  expect(result.cleanup.timersBeforeDispose).toBeGreaterThan(0)
   expect(result.cleanup).toMatchObject({
     frames: 0,
     timers: 0,
@@ -141,15 +112,15 @@ it.each(['webgpu', 'webgl'] as const)(
       paste: Array.from(new TextEncoder().encode('\x1b[200~paste\x1b[201~')),
     })
     expect(
-      result.observation?.text
+      result.observation.text
         .split('\n')
         .slice(0, 2)
         .map((line) => line.trimEnd()),
     ).toEqual(['worker native', 'direct-port-output'])
-    expect(result.observation?.metrics.zigFrames).toBeGreaterThanOrEqual(1)
-    expect(result.observation?.metrics.submittedFrames).toBeGreaterThanOrEqual(1)
-    expect(result.observation?.metrics.atlasUploadedBytes).toBeGreaterThan(0)
-    expect(result.observation?.animationFrames).toBeGreaterThan(0)
+    expect(result.observation.metrics.zigFrames).toBeGreaterThanOrEqual(1)
+    expect(result.observation.metrics.submittedFrames).toBeGreaterThanOrEqual(1)
+    expect(result.observation.metrics.atlasUploadedBytes).toBeGreaterThan(0)
+    expect(result.observation.animationFrames).toBeGreaterThan(0)
     expect(result.messageTypes).toEqual(['output-ready', 'result', 'disposed', 'complete'])
     expectCleanup(result)
   },
@@ -162,8 +133,8 @@ it.each(['webgpu', 'webgl'] as const)(
     const result = await runWorker(backend, true)
     expect(result.error).toContain('Injected worker failure after native frame')
     expect(result.messageTypes).toEqual(['output-ready', 'result', 'disposed'])
-    expect(result.cleanup?.metrics?.zigFrames).toBeGreaterThanOrEqual(1)
-    expect(result.cleanup?.metrics?.submittedFrames).toBeGreaterThanOrEqual(1)
+    expect(result.cleanup.metrics?.zigFrames).toBeGreaterThanOrEqual(1)
+    expect(result.cleanup.metrics?.submittedFrames).toBeGreaterThanOrEqual(1)
     expectCleanup(result)
   },
   20_000,
