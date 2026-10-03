@@ -24,6 +24,7 @@ export function installReceipt(url: string, manifest?: string) {
   return {
     manifestId,
     startUrl: start.href,
+    displayMode: 'standalone',
     manifestHash: createHash('sha256').update(manifest).digest('hex'),
   }
 }

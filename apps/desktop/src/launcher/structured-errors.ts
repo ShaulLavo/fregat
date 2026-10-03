@@ -19,6 +19,12 @@ export const launcherErrors = defineErrorCatalog('desktop.launcher', {
     why: 'The browser must answer the desktop control protocol over its private pipe.',
     fix: 'Update the browser or choose another executable in Window settings.',
   },
+  CDP_COMMAND_FAILED: {
+    status: 502,
+    message: 'The browser rejected an app setup command.',
+    why: 'The browser answered the control connection and reported a setup error.',
+    fix: 'Check the launcher logs for the failed command and its installation details.',
+  },
   PWA_UNSUPPORTED: {
     status: 400,
     message: 'The browser cannot install the Fregat app.',

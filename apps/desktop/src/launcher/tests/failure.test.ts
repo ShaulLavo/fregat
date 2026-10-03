@@ -31,7 +31,7 @@ test.each([-32602, 'private protocol code'])(
       const event = { outcome: 'failed', ...launcherFailureFacts(failure) }
       expect(event).toMatchObject({
         outcome: 'failed',
-        code: 'desktop.launcher.CDP_FAILED',
+        code: 'desktop.launcher.CDP_COMMAND_FAILED',
         internal: {
           reason: 'request-error',
           method: 'Browser.grantPermissions',

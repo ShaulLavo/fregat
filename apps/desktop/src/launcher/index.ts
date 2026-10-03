@@ -126,7 +126,12 @@ async function start() {
   recordDesktopInfo('desktop.browser.detect', {
     candidates: candidates.map((candidate) =>
       candidate.kind === 'chromium'
-        ? { kind: candidate.kind, source: candidate.source, confinement: candidate.confinement }
+        ? {
+            kind: candidate.kind,
+            family: candidate.family,
+            source: candidate.source,
+            confinement: candidate.confinement,
+          }
         : { kind: candidate.kind },
     ),
   })
