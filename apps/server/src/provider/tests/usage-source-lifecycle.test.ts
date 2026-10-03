@@ -205,14 +205,14 @@ test.each([
       id: 'private-auth-work.json',
       provider: 'codex',
       email: 'pool.work@example.test',
-      id_token: { chatgpt_plan_type: 'plus' },
+      id_token: { plan_type: 'plus' },
       quota: { observed_at: observedAt, signals: { 'x-codex-primary-used-percent': '6' } },
     },
     {
       id: 'private-auth-personal.json',
       provider: 'codex',
       email: 'pool.personal@example.test',
-      id_token: { chatgpt_plan_type: 'pro' },
+      id_token: { plan_type: 'pro' },
     },
     { id: 'private-auth-claude.json', provider: 'claude' },
   ])
@@ -286,7 +286,7 @@ test.each([
     expect(feed.accounts).toMatchObject([
       {
         id: expect.stringMatching(/^proxy:[a-f0-9]{64}$/),
-        label: 'Proxy · pool.work',
+        label: 'pool.work',
         plan: 'Plus',
         checkedAt: observedAt,
         windows: [{ usedPercent: 6, lastSeenAt: observedAt }],
@@ -294,7 +294,7 @@ test.each([
       },
       {
         id: expect.stringMatching(/^proxy:[a-f0-9]{64}$/),
-        label: 'Proxy · pool.personal',
+        label: 'pool.personal',
         plan: 'Pro',
         state: 'no-data',
         routing: { lastServedAt: null },

@@ -1,5 +1,6 @@
 import { hasCodexBackgroundTerminals } from './utils/codex-background-terminals'
 import { createHash } from 'node:crypto'
+import { usageAccountLabel } from '../utils/usage-account-label'
 import { providerResetCreditOutcomeSchema } from '@workspace/contracts'
 import path from 'node:path'
 import { defaultAttachmentsDir } from '../../attachments/store'
@@ -3024,7 +3025,7 @@ async function readCodexUsage(client: CodexAppServerRpcClient): Promise<Provider
 
   return {
     kind: 'reading',
-    update: codexUsageUpdate(snapshot),
+    update: { ...codexUsageUpdate(snapshot), label: usageAccountLabel(account.email) },
     identityFingerprint: response.accountId
       ? createHash('sha256').update(`codex-usage-account\0${response.accountId}`).digest('hex')
       : undefined,

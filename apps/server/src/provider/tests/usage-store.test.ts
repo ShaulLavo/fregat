@@ -48,6 +48,410 @@ afterEach(async () => {
 })
 
 describe('provider usage store', () => {
+  it.each(['claude', 'codex'] as const)(
+    'uses local %s metadata labels without quota metadata or exporting email domains',
+    async (kind) => {
+      const f = await nativeClaudeFixture(kind)
+      const credentialPath = path.join(path.dirname(f.cachePath), 'credentials.json')
+      if (kind === 'claude')
+        await writeFile(
+          f.cachePath,
+          JSON.stringify({
+            oauthAccount: {
+              accountUuid: 'fixture-account',
+              emailAddress: 'fixture.person@example.test',
+            },
+          }),
+        )
+      else
+        await writeFile(
+          credentialPath,
+          JSON.stringify({
+            tokens: {
+              id_token: `e30.${Buffer.from(JSON.stringify({ email: 'fixture.person@example.test' })).toString('base64url')}.fixture`,
+            },
+          }),
+        )
+      stubUsage(f.registry, WORK, async () => ({ kind: 'unsupported' }))
+      await f.store.refresh()
+      expect((await f.store.read()).accounts[0]).toMatchObject({
+        label: 'fixture.person',
+        windows: [],
+      })
+      expect((await f.store.feed()).accounts[0]!.label).toBe('fixture.person')
+      expect(JSON.stringify(await f.store.read())).not.toMatch(
+        /@|example.test|fixture-account|id_token/,
+      )
+      await f.store.close()
+    },
+  )
+
+  it.each([
+    {
+      name: 'exact 60-minute-old cache at defaults',
+      age: 3600_000,
+      interval: 300_000,
+      sdkCalls: 1,
+    },
+    { name: 'fresh cache at defaults', age: 60_000, interval: 300_000, sdkCalls: 0 },
+    {
+      name: '16-minute-old cache with longer registered refresh interval',
+      age: 960_000,
+      interval: 3600_000,
+      sdkCalls: 1,
+    },
+    {
+      name: 'exact stale boundary with longer registered refresh interval',
+      age: 900_000,
+      interval: 3600_000,
+      sdkCalls: 1,
+    },
+  ])('bounds SDK refresh without redating $name', async ({ age, interval, sdkCalls }) => {
+    const f = await nativeClaudeFixture()
+    await f.writeCache('fixture-old-account', 'fixture-old-account', START_MS - age, 23)
+    const calls = stubUsage(f.registry, WORK, async () => ({ kind: 'unsupported' }))
+    const store = new ProviderUsageStore(f.registry, {
+      now: () => f.clock.ms,
+      policy: () => ({
+        minIntervalMs: interval,
+        failureCooldownMs: 600_000,
+        staleAfterMs: 900_000,
+      }),
+    })
+    await store.refresh()
+    expect(calls.count).toBe(sdkCalls)
+    expect((await store.read()).accounts[0]!.windows[0]).toMatchObject({
+      usedPercent: 23,
+      observedAt: new Date(START_MS - age).toISOString(),
+      freshness: age >= 900_000 ? 'stale' : 'fresh',
+    })
+    await store.refresh()
+    await store.feed()
+    expect(calls.count).toBe(sdkCalls)
+    await store.close()
+    await f.store.close()
+  })
+
+  it.each(['claude', 'codex'] as const)(
+    'records one sanitized outcome for each actual %s probe and keeps polling quiet',
+    async (kind) => {
+      const root = await mkdtemp(path.join(tmpdir(), 'usage-outcomes-'))
+      roots.push(root)
+      const logDir = path.join(root, 'logs')
+      initializeObservability({
+        OBSERVABILITY_CONSOLE: 'false',
+        OBSERVABILITY_DIR: logDir,
+        OBSERVABILITY_ENABLED: 'true',
+        OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+        NODE_ENV: 'production',
+      })
+      const f = await nativeClaudeFixture(kind)
+      await f.writeCache('fixture-old-account', 'fixture-old-account', START_MS - 60_000, 23)
+      const calls = stubUsage(f.registry, WORK, async () => ({ kind: 'unsupported' }))
+      await f.store.refresh()
+      await f.store.refresh()
+      await f.store.read()
+      expect(calls.count).toBe(kind === 'claude' ? 0 : 1)
+      const adapter = f.registry.adapter(WORK)!
+      delete adapter.readUsage
+      f.clock.ms += 600_000
+      await f.store.refresh()
+      stubUsage(f.registry, WORK, async () => {
+        await writeFile(
+          path.join(path.dirname(f.cachePath), 'credentials.json'),
+          'synthetic-generation-change',
+        )
+        return { kind: 'unsupported' }
+      })
+      f.clock.ms += 600_000
+      await f.store.refresh()
+      stubUsage(f.registry, WORK, async () => {
+        throw createInternalError('synthetic-private-error token@example.test /private/home')
+      })
+      f.clock.ms += 600_000
+      await f.store.refresh()
+      // Failure cooldown, suspension and in-flight coalescing never create polling logs.
+      await f.store.refresh()
+      const key = f.registry.usageAccount(WORK)!.accountKey
+      const resume = f.store.suspendCollection(key)
+      f.clock.ms += 600_000
+      await f.store.refresh()
+      resume()
+      await f.store.refresh()
+      await f.store.refresh()
+      let settle!: () => void
+      const coalesced = stubUsage(
+        f.registry,
+        WORK,
+        () =>
+          new Promise((resolve) => {
+            settle = () => resolve({ kind: 'unsupported' })
+          }),
+      )
+      f.clock.ms += 600_000
+      const first = f.store.refresh()
+      const second = f.store.refresh()
+      await vi.waitFor(() => expect(coalesced.count).toBe(1))
+      settle()
+      await Promise.all([first, second])
+      expect(coalesced.count).toBe(1)
+      await flushObservability()
+      const events = []
+      for await (const event of readFsLogs({ dir: logDir })) events.push(event)
+      const outcomes = events.filter((event) =>
+        String(event.action).startsWith('chat.pipeline.provider_usage.probe'),
+      )
+      expect(outcomes).toHaveLength(6)
+      expect(outcomes.map((event) => event.outcome).sort()).toEqual(
+        [
+          kind === 'claude' ? 'cache-hit' : 'unsupported',
+          'no-readUsage',
+          'generation-discard',
+          'failed',
+          'failed',
+          'unsupported',
+        ].sort(),
+      )
+      expect(
+        outcomes.filter((event) => event.action === 'chat.pipeline.provider_usage.probe_failed'),
+      ).toHaveLength(1)
+      expect(outcomes.find((event) => event.outcome === 'no-readUsage')).toMatchObject({
+        collectionSkips: { cooldown: 1 },
+        sdkCalls: 0,
+      })
+      expect(
+        outcomes.find(
+          (event) =>
+            (event.collectionSkips as Record<string, number> | undefined)?.['already-in-flight'],
+        ),
+      ).toMatchObject({
+        outcome: 'unsupported',
+        sdkCalls: 1,
+        collectionSkips: { cooldown: 1, 'already-in-flight': 1 },
+      })
+      expect(outcomes.find((event) => event.outcome === 'failed')).toMatchObject({
+        code: expect.any(String),
+        why: expect.any(String),
+      })
+      expect(JSON.stringify(outcomes)).not.toMatch(
+        /synthetic-private-error|@example.test|private\/home|credentials.json/,
+      )
+      expect(
+        outcomes.every((event) => !('minIntervalMs' in event) && !('staleAfterMs' in event)),
+      ).toBe(true)
+      await f.store.close()
+    },
+  )
+
+  it('keeps the reported aged Claude windows unknown beside fresh empty probe metadata', async () => {
+    const f = await nativeClaudeFixture()
+    const observedAt = '2026-10-03T05:58:33.508Z'
+    const checkedAt = '2026-10-03T07:14:18.887Z'
+    f.clock.ms = Date.parse(checkedAt)
+    await writeFile(
+      f.cachePath,
+      JSON.stringify({
+        oauthAccount: {
+          accountUuid: 'fixture-old-account',
+          emailAddress: 'fixture.person@example.test',
+          organizationType: 'claude_max',
+        },
+        cachedUsageUtilization: {
+          accountUuid: 'fixture-old-account',
+          fetchedAtMs: Date.parse(observedAt),
+          utilization: {
+            five_hour: { utilization: 5, resets_at: '2026-10-03T09:00:00.399Z' },
+            seven_day: { utilization: 84, resets_at: '2026-10-07T17:00:00.399Z' },
+          },
+        },
+      }),
+    )
+    stubUsage(f.registry, WORK, async () => ({
+      kind: 'reading',
+      update: { planType: 'claude_max', windows: [] },
+    }))
+    await f.store.refresh()
+    f.clock.ms = Date.parse('2026-10-03T07:21:45.183Z')
+    const raw = (await f.store.read()).accounts[0]!
+    expect(raw).toMatchObject({
+      checkedAt,
+      state: 'unknown',
+      windows: [
+        { usedPercent: 5, observedAt, freshness: 'stale', resetsAt: '2026-10-03T09:00:00.399Z' },
+        { usedPercent: 84, observedAt, freshness: 'stale', resetsAt: '2026-10-07T17:00:00.399Z' },
+      ],
+    })
+    const feed = (await f.store.feed()).accounts[0]!
+    expect(feed).toMatchObject({
+      state: 'unknown',
+      checkedAt,
+      source: 'passive-header',
+      windows: [
+        { lastSeenAt: observedAt, status: 'unknown', source: 'passive-header' },
+        { lastSeenAt: observedAt, status: 'unknown', source: 'passive-header' },
+      ],
+    })
+    await f.store.close()
+  })
+
+  it.each([
+    { primary: 10080, secondary: 300, ids: ['weekly', 'session'] },
+    { primary: 10080, secondary: 10080, ids: ['weekly:primary', 'weekly:secondary'] },
+    { primary: null, secondary: null, ids: ['other:primary', 'other:secondary'] },
+  ])(
+    'projects actual proxy and model durations without rekeying or redating: %j',
+    async (scenario) => {
+      const f = await usageFixture()
+      const observedAt = new Date(START_MS - 60_000).toISOString()
+      let requests = 0
+      const signals = {
+        'x-codex-primary-used-percent': '65',
+        'x-codex-secondary-used-percent': '20',
+        'x-codex-primary-reset-after-seconds': '3600',
+        ...(scenario.primary === null
+          ? {}
+          : { 'x-codex-primary-window-minutes': String(scenario.primary) }),
+        ...(scenario.secondary === null
+          ? {}
+          : { 'x-codex-secondary-window-minutes': String(scenario.secondary) }),
+      }
+      const store = new ProviderUsageStore(f.registry, {
+        now: () => f.clock.ms,
+        readProxy: () =>
+          readProxyUsage({
+            url: 'http://localhost:18317/v1',
+            secret: 'synthetic-key',
+            now: () => f.clock.ms,
+            fetch: async () => {
+              requests += 1
+              return Response.json({
+                files: [
+                  {
+                    id: 'private-auth.json',
+                    provider: 'codex',
+                    email: 'fixture.person@example.test',
+                    quota: { observed_at: observedAt, signals },
+                    model_quotas: { 'gpt-6.1-sol': { observed_at: observedAt, signals } },
+                  },
+                ],
+              })
+            },
+          }),
+      })
+      await store.refresh()
+      const raw = (await store.read()).accounts.at(-1)!
+      expect(raw.windows.map(({ id }) => id)).toEqual([
+        'primary',
+        'secondary',
+        'model:gpt-6.1-sol:primary',
+        'model:gpt-6.1-sol:secondary',
+      ])
+      const before = JSON.stringify(raw.windows)
+      for (let read = 0; read < 2; read += 1) {
+        const account = (await store.feed()).accounts.at(-1)!
+        expect(account.windows.map(({ id }) => id)).toEqual([
+          ...scenario.ids,
+          ...scenario.ids.map((id) => `model:gpt-6.1-sol:${id}`),
+        ])
+        expect(account.label).toBe('fixture.person')
+        expect(account.source).toBe('proxy-state')
+        expect(account.windows.map(({ source }) => source)).toEqual(Array(4).fill('proxy-state'))
+        expect(account.windows.map(({ lastSeenAt }) => lastSeenAt)).toEqual(
+          Array(4).fill(observedAt),
+        )
+        expect(account.windows[0]).toMatchObject({
+          usedPercent: 65,
+          resetsAt: new Date(START_MS - 60_000 + 3600_000).toISOString(),
+        })
+        expect(new Set(account.windows.map(({ id }) => id)).size).toBe(4)
+        expect(JSON.stringify(account)).not.toContain('@example.test')
+        expect(requests).toBe(1)
+      }
+      expect(JSON.stringify((await store.read()).accounts.at(-1)!.windows)).toBe(before)
+      await store.close()
+    },
+  )
+
+  it('keeps native and proxy identities separate when genuine short labels coincide', async () => {
+    const f = await nativeClaudeFixture('codex')
+    stubUsage(f.registry, WORK, async () => ({
+      kind: 'reading',
+      update: {
+        ...codexUsageUpdate({ primary: { usedPercent: 6, windowDurationMins: 10080 } }),
+        label: 'fixture.person',
+      },
+    }))
+    const store = new ProviderUsageStore(f.registry, {
+      now: () => f.clock.ms,
+      readProxy: () =>
+        readProxyUsage({
+          url: 'http://localhost:18317/v1',
+          secret: 'synthetic-key',
+          now: () => f.clock.ms,
+          fetch: async () =>
+            Response.json({
+              files: ['first', 'second'].map((id) => ({
+                id,
+                provider: 'codex',
+                email: 'fixture.person@example.test',
+                disabled: true,
+                id_token: { plan_type: 'pro' },
+              })),
+            }),
+        }),
+    })
+    await store.refresh()
+    const feed = await store.feed()
+    expect(feed.accounts.map(({ label }) => label)).toEqual(Array(3).fill('fixture.person'))
+    expect(new Set(feed.accounts.map(({ id }) => id)).size).toBe(3)
+    expect(feed.accounts.map(({ source }) => source)).toEqual([
+      'passive-header',
+      'proxy-state',
+      'proxy-state',
+    ])
+    expect(feed.accounts[1]).toMatchObject({
+      state: 'disabled',
+      plan: 'Pro',
+      windows: [],
+      checkedAt: null,
+    })
+    await store.close()
+  })
+
+  it('projects matched Claude account metadata with fresh retained SDK-independent quota', async () => {
+    const f = await nativeClaudeFixture()
+    await f.writeCache('fixture-old-account', 'fixture-old-account', START_MS - 300_000, 19, {
+      emailAddress: 'fixture.person@example.test',
+      organizationType: 'claude_max',
+    })
+    const calls = stubUsage(f.registry, WORK, async () => ({ kind: 'unsupported' }))
+    await f.store.refresh()
+    const raw = (await f.store.read()).accounts[0]!
+    expect(raw).toMatchObject({
+      state: 'ready',
+      windows: [{ freshness: 'fresh', usedPercent: 19 }],
+    })
+    expect(calls.count).toBe(1)
+    const feed = (await f.store.feed()).accounts[0]!
+    expect(feed).toMatchObject({
+      label: 'fixture.person',
+      plan: 'max',
+      state: 'ready',
+      source: 'passive-header',
+      checkedAt: new Date(START_MS - 300_000).toISOString(),
+    })
+    expect(feed.windows[0]).toMatchObject({
+      usedPercent: 19,
+      source: 'passive-header',
+      lastSeenAt: new Date(START_MS - 300_000).toISOString(),
+    })
+    expect(JSON.stringify(feed)).not.toContain('@example.test')
+    expect(feed.id).not.toContain('fixture.person')
+    f.clock.ms += 900_000
+    expect((await f.store.feed()).accounts[0]!.state).toBe('unknown')
+    await f.store.close()
+  })
+
   it.each([
     {
       primary: 10080,
@@ -485,6 +889,49 @@ describe('provider usage store', () => {
     await store.close()
   })
 
+  it.each(['reading', 'unsupported'] as const)(
+    'observes settled native Claude %s control probes independently from old quota',
+    async (kind) => {
+      const root = await mkdtemp(path.join(tmpdir(), 'usage-probe-observability-'))
+      roots.push(root)
+      const logDir = path.join(root, 'logs')
+      initializeObservability({
+        OBSERVABILITY_CONSOLE: 'false',
+        OBSERVABILITY_DIR: logDir,
+        OBSERVABILITY_ENABLED: 'true',
+        OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+        NODE_ENV: 'production',
+      })
+      const f = await nativeClaudeFixture()
+      const calls = stubUsage(f.registry, WORK, async () =>
+        kind === 'reading'
+          ? { kind: 'reading', update: { planType: 'max', windows: [] } }
+          : { kind: 'unsupported' },
+      )
+      await f.store.refresh()
+      expect(calls.count).toBe(1)
+      await flushObservability()
+      const events = []
+      for await (const event of readFsLogs({ dir: logDir })) events.push(event)
+      expect(
+        events.filter((event) => event.action === 'chat.pipeline.provider_usage.probe'),
+      ).toEqual([
+        expect.objectContaining({
+          driverKind: 'claude',
+          outcome: kind,
+          source: 'claude-sdk-control',
+        }),
+      ])
+      const window = (await f.store.read()).accounts[0]!.windows[0]!
+      expect(window).toMatchObject({
+        usedPercent: 23,
+        observedAt: new Date(START_MS - 600_000).toISOString(),
+        source: 'claude-local-cache',
+      })
+      await f.store.close()
+    },
+  )
+
   it('backs off cache writes, warns once per failed series and reports recovery counts', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'usage-write-series-'))
     roots.push(root)
@@ -767,7 +1214,7 @@ describe('provider usage store', () => {
     expect((await restarted.feed()).accounts[0]).toMatchObject({
       checkedAt: observedAt,
       lastSeenAt: observedAt,
-      windows: [{ usedPercent: 19, lastSeenAt: observedAt, source: 'claude-local-cache' }],
+      windows: [{ usedPercent: 19, lastSeenAt: observedAt, source: 'passive-header' }],
     })
     await restarted.refresh()
     expect(calls.count).toBe(1)
@@ -792,7 +1239,7 @@ describe('provider usage store', () => {
     const final = new ProviderUsageStore(f.registry, options)
     expect((await final.feed()).accounts[0]).toMatchObject({
       source: 'passive-header',
-      windows: [{ usedPercent: 25, source: 'rate-limit-event' }],
+      windows: [{ usedPercent: 25, source: 'passive-header' }],
     })
     await final.close()
   })
@@ -904,7 +1351,7 @@ describe('provider usage store', () => {
       usedPercent: null,
       status: 'exhausted',
       lastSeenAt: new Date(START_MS).toISOString(),
-      source: 'rate-limit-event',
+      source: 'passive-header',
     })
     const restarted = new ProviderUsageStore(f.registry, {
       cacheFile: path.join(root, 'accounts.json'),
@@ -977,9 +1424,15 @@ describe('provider usage store', () => {
         started.resolve()
         return response.promise
       })
+      await f.writeCache('fixture-old-account', 'fixture-old-account', START_MS - 600_000, 23, {
+        emailAddress: 'prior.person@example.test',
+      })
       const refresh = f.store.refresh()
       await started.promise
-      await f.writeCache('fixture-new-account', 'fixture-old-account', START_MS, 70)
+      expect((await f.store.feed()).accounts[0]!.label).toBe('prior.person')
+      await f.writeCache('fixture-new-account', 'fixture-old-account', START_MS, 70, {
+        emailAddress: 'unrelated.person@example.test',
+      })
       response.resolve(
         kind === 'reading' ? reading([window('five_hour', 90)]) : { kind: 'unsupported' },
       )
@@ -989,10 +1442,16 @@ describe('provider usage store', () => {
         state: 'no-data',
         windows: [],
       })
+      expect((await f.store.feed()).accounts[0]!.label).not.toMatch(
+        /prior\.person|unrelated\.person/,
+      )
       f.clock.ms += 300_000
-      await f.writeCache('fixture-new-account', 'fixture-new-account', f.clock.ms, 5)
+      await f.writeCache('fixture-new-account', 'fixture-new-account', f.clock.ms, 5, {
+        emailAddress: 'new.person@example.test',
+      })
       await f.store.refresh()
       expect(calls.count).toBe(1)
+      expect((await f.store.feed()).accounts[0]!.label).toBe('new.person')
       expect((await f.store.read()).accounts[0]?.windows).toEqual([
         expect.objectContaining({ usedPercent: 5, source: 'claude-local-cache' }),
       ])
@@ -1188,11 +1647,17 @@ async function nativeClaudeFixture(kind: 'claude' | 'codex' = 'claude') {
     },
   ])
   const clock = { ms: START_MS }
-  const writeCache = (current: string, cached: string, fetchedAtMs: number, utilization: number) =>
+  const writeCache = (
+    current: string,
+    cached: string,
+    fetchedAtMs: number,
+    utilization: number,
+    metadata: { emailAddress?: string; organizationType?: string } = {},
+  ) =>
     writeFile(
       path.join(root, '.claude.json'),
       JSON.stringify({
-        oauthAccount: { accountUuid: current },
+        oauthAccount: { accountUuid: current, ...metadata },
         cachedUsageUtilization: {
           accountUuid: cached,
           fetchedAtMs,
@@ -1204,6 +1669,7 @@ async function nativeClaudeFixture(kind: 'claude' | 'codex' = 'claude') {
   return {
     registry,
     clock,
+    cachePath: path.join(root, '.claude.json'),
     writeCache,
     store: new ProviderUsageStore(registry, { now: () => clock.ms }),
   }
