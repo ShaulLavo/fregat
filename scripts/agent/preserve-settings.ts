@@ -1,5 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
+import * as v from 'valibot'
+import { keybindingOverridesSchema } from '../../packages/contracts/src/settings'
 import type { SettingsOperation } from '../../packages/contracts/src/settings/mutations'
 
 /** The settings API behind the page: the mesh serves it under /platform, dev on the API port. */
@@ -12,7 +14,16 @@ function settingsApi(page: Page) {
 }
 
 type SettingOperation =
-  | Extract<SettingsOperation, { readonly kind: 'keybinding.set' }>
+  | Extract<
+      SettingsOperation,
+      {
+        readonly kind:
+          | 'keybinding.set'
+          | 'keybinding.remove'
+          | 'keybinding.append'
+          | 'keybinding.delete'
+      }
+    >
   | { readonly kind: 'set'; readonly key: string; readonly value: unknown }
   | { readonly kind: 'reset'; readonly keys: readonly string[] }
   | { readonly kind: 'machine.set'; readonly name: string; readonly machine: unknown }
@@ -79,16 +90,31 @@ export async function preserveAppearance(page: Page, onlyKeys?: readonly string[
     'workbench.surface.blur',
     'workbench.surface.saturation',
   ]
-  const operations = (onlyKeys ?? keys).map((key): SettingOperation => {
+  const operations = (onlyKeys ?? keys).flatMap((key): readonly SettingOperation[] => {
     const entry = Object.entries(raw).find(([name]) => name === key)
-    return entry ? { kind: 'set', key, value: entry[1] } : { kind: 'reset', keys: [key] }
+    if (key === 'keybindings.overrides' && entry)
+      return [
+        { kind: 'reset', keys: [key] },
+        ...v
+          .parse(keybindingOverridesSchema, entry[1])
+          .map((binding) => ({ kind: 'keybinding.append' as const, entry: binding })),
+      ]
+    return [entry ? { kind: 'set', key, value: entry[1] } : { kind: 'reset', keys: [key] }]
   })
-  return () => writeUserOperations(page, operations)
+  return async () => {
+    for (const operation of operations) await writeUserOperations(page, [operation])
+  }
 }
 
 function operationKeys(operation: SettingOperation): readonly string[] {
   if (operation.kind === 'set') return [operation.key]
   if (operation.kind === 'reset') return operation.keys
-  if (operation.kind === 'keybinding.set') return ['keybindings.overrides']
+  if (
+    operation.kind === 'keybinding.set' ||
+    operation.kind === 'keybinding.remove' ||
+    operation.kind === 'keybinding.append' ||
+    operation.kind === 'keybinding.delete'
+  )
+    return ['keybindings.overrides']
   return [`environments.machines.${operation.name}`]
 }

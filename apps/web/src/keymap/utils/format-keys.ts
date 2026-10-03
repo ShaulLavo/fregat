@@ -1,4 +1,4 @@
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 
 import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
 import {

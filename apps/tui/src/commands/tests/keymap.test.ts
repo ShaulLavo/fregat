@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import { effectiveTerminalBindings } from '@/commands/utils/bindings'
+import { commandShortcut, effectiveTerminalBindings } from '@/commands/utils/bindings'
 import { createCommandHarness } from '../../../test/commands'
 import { expect, test } from '../../../test/fixtures'
 
@@ -119,7 +119,7 @@ test('unavailable prefixes leave input alone and disabled short bindings retain 
   }
 })
 
-test('focus changes and timeout cancel chords without swallowing later text', () => {
+test('an unbound prefix waits for another key and focus changes cancel it', () => {
   vi.useFakeTimers()
   const harness = createCommandHarness({
     handlers: { 'workspace.showSettings': { run: () => undefined } },
@@ -127,8 +127,8 @@ test('focus changes and timeout cancel chords without swallowing later text', ()
   try {
     harness.key('\x0b')
     vi.advanceTimersByTime(5_001)
-    expect(harness.state.pending).toBeNull()
-    expect(harness.key('s')).toBe(false)
+    expect(harness.state.pending).not.toBeNull()
+    expect(harness.key('s')).toBe(true)
     harness.key('\x0b')
     harness.focus.setScope({ ...harness.scope, environmentId: 'environment-b' })
     expect(harness.state.pending).toBeNull()
@@ -153,42 +153,66 @@ test('Kitty release events do not invoke commands and legacy Alt is not desktop 
   }
 })
 
-test('overrides resolve Mod as Control, retain scope, unbind, and reject ambiguous keys', () => {
-  const resolution = effectiveTerminalBindings({
-    'workspace.showSettings': ['Mod+K e'],
-    'workspace.showQuickAccess': null,
-    'settings.edit': ['F7'],
-    'workspace.copyAddress': ['Ctrl+S'],
-    'workspace.openAddress': ['Ctrl+C'],
-    missing: ['F8'],
+test('a bound prefix executes after its continuation timeout and disposes without a late callback', () => {
+  vi.useFakeTimers()
+  const harness = createCommandHarness({
+    handlers: {
+      'workspace.showSettings': { run: () => {} },
+      'workspace.showCommandPalette': { run: () => {} },
+    },
+    bindings: [
+      { command: 'workspace.showCommandPalette', keys: 'Ctrl+K', source: 'default' },
+      { command: 'workspace.showSettings', keys: 'Ctrl+K s', source: 'default' },
+    ],
   })
-  expect(resolution.bindings).toContainEqual({
-    command: 'workspace.showSettings',
-    keys: 'Ctrl+K E',
-    source: 'user',
-    pane: 'any',
-  })
-  expect(resolution.bindings).toContainEqual({
-    command: 'settings.edit',
-    keys: 'F7',
-    source: 'user',
-    pane: 'settings',
-  })
-  expect(
-    resolution.bindings.some((binding) => binding.command === 'workspace.showQuickAccess'),
-  ).toBe(false)
+  try {
+    expect(harness.key('\x0b')).toBe(true)
+    expect(harness.executed).toEqual([])
+    vi.advanceTimersByTime(5_001)
+    expect(harness.state.pending).toBeNull()
+    expect(harness.executed).toEqual(['workspace.showCommandPalette'])
+    harness.key('\x0b')
+    harness.dispose()
+    vi.advanceTimersByTime(5_001)
+    expect(harness.executed).toEqual(['workspace.showCommandPalette'])
+  } finally {
+    harness.dispose()
+    vi.useRealTimers()
+  }
+})
+
+test('contextual terminal overrides retain defaults and reject ambiguous keys', () => {
+  const resolution = effectiveTerminalBindings([
+    { command: 'workspace.showSettings', keys: 'Mod+K E', context: 'Workspace' },
+    { unbind: 'workspace.showQuickAccess', keys: 'Ctrl+K P', context: 'Workspace' },
+    { command: 'settings.edit', keys: 'F7', context: 'Settings' },
+    { command: 'workspace.copyAddress', keys: 'Ctrl+S' },
+    { command: 'workspace.openAddress', keys: 'Ctrl+C' },
+    { command: 'missing', keys: 'F8' },
+  ])
+  expect(resolution.bindings).toContainEqual(
+    expect.objectContaining({
+      command: 'workspace.showSettings',
+      keys: 'Ctrl+K E',
+      source: 'user',
+      context: 'Workspace',
+    }),
+  )
+  expect(resolution.bindings).toContainEqual(
+    expect.objectContaining({ command: 'settings.edit', keys: 'F7', context: 'Settings' }),
+  )
+  expect(resolution.bindings).toContainEqual(
+    expect.objectContaining({
+      command: 'workspace.showQuickAccess',
+      unbind: 'workspace.showQuickAccess',
+    }),
+  )
   expect(resolution.diagnostics.map((entry) => entry.command)).toEqual([
     'workspace.copyAddress',
     'workspace.openAddress',
     'missing',
     'workspace.focusFileTree',
   ])
-})
-
-test('an override replaces a matching chord but keeps an alternative shortcut', () => {
-  const { bindings } = effectiveTerminalBindings({ 'workspace.showSettings': ['Control+K p'] })
-  const palette = bindings.filter((binding) => binding.command === 'workspace.showCommandPalette')
-  expect(palette.map((binding) => binding.keys)).toEqual(['F1'])
 })
 
 test('Kitty shifted punctuation invokes the same help command as a legacy printable question mark', () => {
@@ -199,6 +223,24 @@ test('Kitty shifted punctuation invokes the same help command as a legacy printa
     expect(harness.key('?', false)).toBe(true)
     expect(harness.key('\x1b[63;2u', true)).toBe(true)
     expect(harness.executed).toEqual(['workspace.showShortcutHelp', 'workspace.showShortcutHelp'])
+  } finally {
+    harness.dispose()
+  }
+})
+
+test('a contextual null reservation releases a default key and removes its hint', () => {
+  const bindings = effectiveTerminalBindings([
+    { keys: 'F2', command: null, context: 'Settings' },
+  ]).bindings
+  const harness = createCommandHarness({
+    bindings,
+    area: 'settings',
+    handlers: { 'settings.edit': { run: () => {} } },
+  })
+  try {
+    expect(harness.key('\x1bOQ')).toBe(false)
+    expect(harness.executed).toEqual([])
+    expect(commandShortcut(bindings, 'settings.edit')).toBe('unassigned')
   } finally {
     harness.dispose()
   }

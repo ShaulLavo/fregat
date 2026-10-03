@@ -1,3 +1,4 @@
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import type { KeyboardEvent as ReactKeyboardEvent, KeyboardEventHandler } from 'react'
 
 import type { TreeFocusCoordinator } from '@/features/workspace/hooks/use-tree-focus-sync'
@@ -15,7 +16,6 @@ import {
   BLOCKED_CONTEXT_MENU_NAV_KEYS,
   canKeyUseStickyKeyboardState,
   isSearchOpenSeedKey,
-  isSpaceSelectionKey,
 } from '@/features/workspace/utils/tree-keys'
 import { isContextMenuKey as isContextMenuOpenKey } from '@workspace/utils/keyboard'
 
@@ -165,6 +165,45 @@ export function useTreeKeyboard(
     stickyRowPathSet,
   } = options
 
+  useKeymapNode({
+    area: 'file-tree',
+    context: 'TreeSelection',
+    element: dom.getRoot,
+    commands: {
+      'fileTree.selectAll': () => {
+        if (isContextMenuOpen || isSearchOpen || renameView.isActive()) return false
+        if (!controller.getFocusedItem()) return false
+        controller.selectAllVisiblePaths()
+        focus.clearStickyKeyboardFocus()
+        invalidateControllerView()
+        return true
+      },
+      'fileTree.toggleMark': () => {
+        if (isContextMenuOpen || isSearchOpen || renameView.isActive()) return false
+        if (!controller.getFocusedItem()) return false
+        const root = dom.getRoot()
+        const active = root ? getActiveTreeElement(root) : null
+        const stickyPath = active?.dataset.fileTreeStickyPath
+        if (stickyPath && stickyPath !== controller.getFocusedPath()) {
+          focus.preserveStickyAtScrollTop(stickyPath, dom.getScroll()?.scrollTop ?? null)
+          controller.focusPath(stickyPath)
+        }
+        controller.toggleFocusedSelection()
+        focus.clearStickyKeyboardFocus()
+        invalidateControllerView()
+        return true
+      },
+      'fileTree.rename': () => {
+        if (!renamingEnabled || isContextMenuOpen || isSearchOpen || renameView.isActive())
+          return false
+        const path = controller.getFocusedPath()
+        if (!path) return false
+        startRenameFromPath(path)
+        return true
+      },
+    },
+  })
+
   const submitFocusedSearchResult = (): void => {
     const currentFocusedPath = controller.getFocusedPath()
     if (currentFocusedPath != null) controller.selectOnlyPath(currentFocusedPath)
@@ -258,14 +297,6 @@ export function useTreeKeyboard(
       })
       return true
     }
-    if ((event.ctrlKey || event.metaKey) && isSpaceSelectionKey(event)) {
-      controller.toggleFocusedSelection()
-      return true
-    }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
-      controller.selectAllVisiblePaths()
-      return true
-    }
     if (event.key === 'ArrowDown') controller.focusNextItem()
     if (event.key === 'ArrowUp') controller.focusPreviousItem()
     if (event.key === 'Home') controller.focusFirstItem()
@@ -290,12 +321,6 @@ export function useTreeKeyboard(
       return
     }
     if (renameView.isActive()) return
-    if (renamingEnabled && event.key === 'F2') {
-      startRenameFromPath(focusedPath ?? undefined)
-      event.preventDefault()
-      event.stopPropagation()
-      return
-    }
     if (isSearchOpen) {
       if (handleSearchKey(event)) {
         finishHandledEvent(event, invalidateControllerView)

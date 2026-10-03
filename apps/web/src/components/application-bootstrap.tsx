@@ -4,7 +4,6 @@ import { useEffect, type ReactNode } from 'react'
 import { useStore } from 'zustand'
 import type { createBootstrap } from '@/state/bootstrap'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { ActiveEnvironmentApplication } from '@/components/active-environment-application'
 import { StatusFrame } from '@workspace/ui/patterns/status-frame'
 import { DeferredPairDevice } from '@/components/deferred-pair-device'
@@ -56,11 +55,9 @@ export function ApplicationBootstrap({
         <ApplicationRuntimeProvider application={application}>
           <EnvironmentTransportsProvider connections={application.connections}>
             <FocusProvider>
-              <HotkeysProvider>
-                <CommandBusProvider binding={application.commandBinding}>
-                  <ActiveEnvironmentApplication>{children}</ActiveEnvironmentApplication>
-                </CommandBusProvider>
-              </HotkeysProvider>
+              <CommandBusProvider binding={application.commandBinding}>
+                <ActiveEnvironmentApplication>{children}</ActiveEnvironmentApplication>
+              </CommandBusProvider>
             </FocusProvider>
           </EnvironmentTransportsProvider>
         </ApplicationRuntimeProvider>

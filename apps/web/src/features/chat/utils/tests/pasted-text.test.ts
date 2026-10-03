@@ -1,5 +1,4 @@
 import {
-  isPasteAsTextShortcut,
   nextPastedTextFileName,
   pastedTextFolds,
   PASTED_TEXT_ATTACHMENT_THRESHOLD_BYTES,
@@ -15,14 +14,6 @@ test('text folds at the byte threshold unless pasted inline', () => {
   expect(pastedTextFolds('€'.repeat(PASTED_TEXT_ATTACHMENT_THRESHOLD_BYTES / 3 + 1), false)).toBe(
     true,
   )
-})
-
-test('Ctrl/Cmd+Shift+V pastes inline, other chords do not', () => {
-  const chord = { altKey: false, ctrlKey: true, key: 'V', metaKey: false, shiftKey: true }
-  expect(isPasteAsTextShortcut(chord)).toBe(true)
-  expect(isPasteAsTextShortcut({ ...chord, ctrlKey: false, metaKey: true })).toBe(true)
-  expect(isPasteAsTextShortcut({ ...chord, shiftKey: false })).toBe(false)
-  expect(isPasteAsTextShortcut({ ...chord, altKey: true })).toBe(false)
 })
 
 test('folded pastes get readable names that do not collide', () => {

@@ -973,6 +973,16 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['input', 'ime', 'editcontext', 'composition', 'autocorrect', 'textarea'],
   }),
+  'terminal.shellKeys': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Terminal',
+    title: 'Shell keys',
+    description: 'Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell.',
+    keywords: ['terminal', 'shell', 'readline', 'shortcut', 'keybinding'],
+  }),
   'terminal.integrated.fontSize': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(6), v.maxValue(72)),
     default: 12,
@@ -2092,32 +2102,29 @@ export const SETTINGS_REGISTRY = {
     keywords: ['model', 'favorite', 'star', 'pin', 'picker'],
   }),
   'keybindings.preset': defineSetting({
-    schema: v.picklist(['default', 'vscode'] as const),
-    default: 'default',
+    schema: v.picklist(['ours', 'zed', 'vscode'] as const),
+    default: 'ours',
     scope: 'application',
     widget: 'enum',
-    optionTitles: { default: 'Platform', vscode: 'VS Code' },
+    optionTitles: { ours: 'Ours', zed: 'Zed', vscode: 'VS Code' },
     category: 'Keyboard shortcuts',
     title: 'Keyboard mode',
     description:
-      'The set of shortcuts your own changes build on. VS Code uses VS Code’s shortcuts. Platform starts from those and adds its own keys for tabs, chats and sidebar panels.',
-    keywords: ['keybinding', 'shortcut', 'preset', 'vscode', 'keymap'],
+      'The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts.',
+    keywords: ['keybinding', 'shortcut', 'preset', 'zed', 'vscode', 'keymap'],
   }),
   'keybindings.overrides': defineSetting({
     schema: keybindingOverridesSchema,
-    default: {},
+    default: [],
     // A binding can invoke any app command, which puts this on the execution
     // side of the scope rule despite looking like pure preference.
     scope: 'application',
     widget: 'keybindings',
     category: 'Keyboard shortcuts',
     title: 'Shortcuts',
-    description: 'Every command and its keys.',
+    description: 'Shortcuts and the focus contexts where they apply.',
     details:
-      'In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.',
-    // The one key that merges rather than replaces: a later layer should be able
-    // to bind a command without dropping every other binding the user set.
-    merge: 'record',
+      'An ordered list of {keys, command, context?} or {keys, unbind, context?}. A null command reserves the keys; unbind removes the named key and command pair. Context is a focus predicate such as Editor or Workspace > Terminal. User bindings win at equal depth; deeper bindings take precedence.',
     keywords: ['keybinding', 'shortcut', 'hotkey', 'chord', 'keymap'],
   }),
 } satisfies Readonly<Record<string, SettingDescriptor>>

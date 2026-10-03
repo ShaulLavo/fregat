@@ -1,4 +1,4 @@
-import { Terminal } from '../../dist/dom/terminal.js'
+import { Terminal, hotkeys } from '../../dist/index.js'
 import type {
   GhosttyWebGpuRendererFactory,
   GhosttyWebGpuTerminalDiagnostics,
@@ -614,6 +614,7 @@ async function start(): Promise<void> {
   demoToken = token
   updateSecurityStatus()
   const current = await Terminal.create({
+    extensions: [hotkeys()],
     accessibility: { label: 'Interactive PTY terminal' },
     appearance: {
       cursor: { blink: false },

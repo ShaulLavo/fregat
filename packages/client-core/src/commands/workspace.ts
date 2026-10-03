@@ -1,26 +1,5 @@
-import { FOCUS_AREAS, UNDO_OWNING_PANES } from './focus'
-import type { KeyChord } from '@singapore-editor/core/keymap'
-import { defineMetadata, type CommandKeyDefault } from './metadata'
+import { defineMetadata } from './metadata'
 import { selectItemCommandId, sidebarPanelCommandId, type ItemPosition } from './item-position'
-
-/** Every pane without its own undo; text entry keeps its own through `yieldsToTextEntry`. */
-function sessionHistoryKeys(
-  chord: KeyChord[number],
-  railChord: KeyChord[number],
-): CommandKeyDefault[] {
-  const panes = FOCUS_AREAS.filter((pane) => !UNDO_OWNING_PANES.has(pane))
-  return [
-    ...panes.map((pane): CommandKeyDefault => ({
-      chord: [chord],
-      pane,
-      // The TUI's chat pane runs in a terminal, where Control+Z suspends; its rail takes U.
-      ...(pane === 'chat' ? { platforms: ['linux', 'mac', 'windows'] as const } : {}),
-      preventDefault: true,
-      yieldsToTextEntry: true,
-    })),
-    { chord: [railChord], pane: 'chat', platforms: ['tui'] },
-  ]
-}
 
 export const workspaceCommandMetadata = {
   'workspace.fixDiagnostic': defineMetadata({
@@ -31,7 +10,6 @@ export const workspaceCommandMetadata = {
     target: 'diagnostic',
     undoCategory: 'view-only',
     when: [],
-    keys: [{ chord: ['Mod+.'], pane: 'problems' }],
   }),
   'workspace.toggleCheckpointChange': defineMetadata({
     id: 'workspace.toggleCheckpointChange',
@@ -41,7 +19,6 @@ export const workspaceCommandMetadata = {
     target: 'checkpoint-change',
     undoCategory: 'workspace-operation',
     when: [],
-    keys: [{ chord: ['Mod+Backspace'], pane: 'git' }],
   }),
   'workspace.undoWorkspaceEdit': defineMetadata({
     category: 'Workspace',
@@ -68,7 +45,7 @@ export const workspaceCommandMetadata = {
     description: 'Undo the last archive, snooze, pin or unpin of a session.',
     id: 'workspace.undoSessionAction',
     execution: 'async',
-    keys: sessionHistoryKeys('Mod+Z', 'U'),
+
     target: 'workspace',
     undoCategory: 'workspace-operation',
     when: ['sessionActionUndoable'],
@@ -79,7 +56,7 @@ export const workspaceCommandMetadata = {
     description: 'Redo the last session change you undid.',
     id: 'workspace.redoSessionAction',
     execution: 'async',
-    keys: sessionHistoryKeys('Mod+Shift+Z', 'Shift+U'),
+
     target: 'workspace',
     undoCategory: 'workspace-operation',
     when: ['sessionActionRedoable'],
@@ -90,7 +67,7 @@ export const workspaceCommandMetadata = {
     description: 'Undo the latest move, rename, create, duplicate or delete in the file tree.',
     id: 'fileTree.undo',
     execution: 'async',
-    keys: [{ chord: ['Mod+Z'], pane: 'file-tree', preventDefault: true, yieldsToTextEntry: true }],
+
     target: 'workspace',
     undoCategory: 'file-operation',
     when: ['workspaceOpen', 'fileOperationUndoable'],
@@ -101,9 +78,7 @@ export const workspaceCommandMetadata = {
     description: 'Redo the file tree operation undone last.',
     id: 'fileTree.redo',
     execution: 'async',
-    keys: [
-      { chord: ['Mod+Shift+Z'], pane: 'file-tree', preventDefault: true, yieldsToTextEntry: true },
-    ],
+
     target: 'workspace',
     undoCategory: 'file-operation',
     when: ['workspaceOpen', 'fileOperationRedoable'],
@@ -114,15 +89,7 @@ export const workspaceCommandMetadata = {
     description: 'Search workspace files and quick actions.',
     id: 'workspace.showQuickAccess',
     keepsPaletteOpen: true,
-    keys: [
-      {
-        chord: ['Mod+P'],
-        preventDefault: true,
-        stopPropagation: true,
-        vscodeCommandId: 'workbench.action.quickOpen',
-      },
-      { chord: ['Control+P'], platforms: ['tui'] },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -136,23 +103,7 @@ export const workspaceCommandMetadata = {
     hiddenInPalette: true,
     id: 'workspace.showCommandPalette',
     keepsPaletteOpen: true,
-    keys: [
-      {
-        chord: ['Mod+Shift+P'],
-        preventDefault: true,
-        stopPropagation: true,
-        vscodeCommandId: 'workbench.action.showCommands',
-      },
-      {
-        chord: ['F1'],
-        preventDefault: true,
-        stopPropagation: true,
-        vscodeCommandId: 'workbench.action.showCommands',
-      },
-      { chord: ['F1'], platforms: ['tui'] },
-      { chord: ['Control+K', 'P'], platforms: ['tui'] },
-      { chord: ['Control+Shift+P'], platforms: ['tui'], terminalProtocol: 'kitty' },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -287,16 +238,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Open providers, models, and keybindings.',
     id: 'workspace.showSettings',
-    keys: [
-      {
-        chord: ['Mod+,'],
-        preventDefault: true,
-        stopPropagation: true,
-        vscodeCommandId: 'workbench.action.openSettings',
-      },
-      { chord: ['Mod+K', 'Mod+S'], vscodeCommandId: 'workbench.action.openGlobalKeybindings' },
-      { chord: ['Control+K', 'S'], platforms: ['tui'] },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -316,7 +258,6 @@ export const workspaceCommandMetadata = {
     vscodeCommandIds: ['workbench.action.quickOpen'],
   }),
   'workspace.openSearchEditor': defineMetadata({
-    keys: [{ chord: ['Control+K', 'F'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Open workspace search results in an editor tab.',
     id: 'workspace.openSearchEditor',
@@ -339,7 +280,6 @@ export const workspaceCommandMetadata = {
     vscodeCommandIds: ['workbench.action.quickOpenPreviousEditor'],
   }),
   'workspace.quickOpenView': defineMetadata({
-    keys: [{ chord: ['Control+K', 'V'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Search and focus workspace views.',
     id: 'workspace.quickOpenView',
@@ -356,13 +296,7 @@ export const workspaceCommandMetadata = {
     description: 'Search symbols in the active editor.',
     id: 'workspace.gotoSymbol',
     keepsPaletteOpen: true,
-    keys: [
-      {
-        chord: ['Mod+Shift+O'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.gotoSymbol',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -386,9 +320,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Save the active editor.',
     id: 'workspace.saveFile',
-    keys: [
-      { chord: ['Mod+S'], preventDefault: true, vscodeCommandId: 'workbench.action.files.save' },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'file-operation',
@@ -433,7 +365,7 @@ export const workspaceCommandMetadata = {
     description: 'Step to the previous editor state in time, across undo branches.',
     id: 'workspace.historyBack',
     execution: 'async',
-    keys: [{ chord: ['Mod+Alt+Z'], pane: 'editor', preventDefault: true }],
+
     target: 'workspace',
     undoCategory: 'text-edit',
     when: ['fileBackedTab'],
@@ -444,7 +376,7 @@ export const workspaceCommandMetadata = {
     description: 'Step to the next editor state in time, across undo branches.',
     id: 'workspace.historyForward',
     execution: 'async',
-    keys: [{ chord: ['Mod+Alt+Shift+Z'], pane: 'editor', preventDefault: true }],
+
     target: 'workspace',
     undoCategory: 'text-edit',
     when: ['fileBackedTab'],
@@ -488,7 +420,7 @@ export const workspaceCommandMetadata = {
     description:
       "Put the editor's selected lines in this workspace's chat composer, or the file when nothing is selected.",
     id: 'workspace.addSelectionToChat',
-    keys: [{ chord: ['Mod+L'], pane: 'editor', preventDefault: true }],
+
     execution: 'sync',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -542,13 +474,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Show or hide the workbench sidebar, or the session list in chat.',
     id: 'workspace.toggleSidebarVisibility',
-    keys: [
-      {
-        chord: ['Mod+B'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.toggleSidebarVisibility',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -560,13 +486,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Show or hide the active workspace panel.',
     id: 'workspace.togglePanel',
-    keys: [
-      {
-        chord: ['Mod+J'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.togglePanel',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -610,14 +530,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Focus the first editor group.',
     id: 'workspace.focusFirstEditorGroup',
-    keys: [
-      {
-        chord: ['Mod+1'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.focusFirstEditorGroup',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -629,14 +542,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Focus the second editor group.',
     id: 'workspace.focusSecondEditorGroup',
-    keys: [
-      {
-        chord: ['Mod+2'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.focusSecondEditorGroup',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -648,14 +554,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Focus the third editor group.',
     id: 'workspace.focusThirdEditorGroup',
-    keys: [
-      {
-        chord: ['Mod+3'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.focusThirdEditorGroup',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -664,7 +563,6 @@ export const workspaceCommandMetadata = {
     vscodeCommandIds: ['workbench.action.focusThirdEditorGroup'],
   }),
   'workspace.focusEditor': defineMetadata({
-    keys: [{ chord: ['Control+K', 'I'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Move keyboard focus to the editor.',
     id: 'workspace.focusEditor',
@@ -678,10 +576,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Move keyboard focus to the file tree.',
     id: 'workspace.focusFileTree',
-    keys: [
-      { chord: ['Mod+Shift+E'], preventDefault: true },
-      { chord: ['Control+K', 'E'], platforms: ['tui'] },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -692,7 +587,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Filter the loaded files in the file tree.',
     id: 'workspace.findInFileTree',
-    keys: [{ chord: ['Mod+F'], pane: 'file-tree', preventDefault: true }],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -710,7 +605,6 @@ export const workspaceCommandMetadata = {
     title: 'Reveal active file in tree',
   }),
   'workspace.focusGit': defineMetadata({
-    keys: [{ chord: ['Control+K', 'G'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Move keyboard focus to the Git panel.',
     id: 'workspace.focusGit',
@@ -735,7 +629,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Go back to the previous document.',
     id: 'workspace.navigateBack',
-    keys: [{ chord: ['Mod+['] }, { chord: ['Control+K', 'B'], platforms: ['tui'] }],
+
     execution: 'sync',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -746,7 +640,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Go forward again.',
     id: 'workspace.navigateForward',
-    keys: [{ chord: ['Mod+]'] }, { chord: ['Control+K', 'N'], platforms: ['tui'] }],
+
     execution: 'sync',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -757,7 +651,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Bring the chat composer on screen.',
     id: 'workspace.revealChat',
-    keys: [{ chord: ['Control+K', 'R'], platforms: ['tui'] }],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -765,7 +659,6 @@ export const workspaceCommandMetadata = {
     title: 'Show chat',
   }),
   'workspace.revealTerminal': defineMetadata({
-    keys: [{ chord: ['Control+K', 'T'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Bring the workbench terminal on screen.',
     id: 'workspace.revealTerminal',
@@ -779,13 +672,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Open another terminal tab in the workbench panel.',
     id: 'workspace.newTerminal',
-    keys: [
-      {
-        chord: ['Mod+`'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.terminal.new',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -808,7 +695,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Switch to the next terminal tab.',
     id: 'workspace.focusNextTerminal',
-    keys: [{ chord: ['Mod+PageDown'], pane: 'terminal', preventDefault: true }],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -820,7 +707,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Switch to the previous terminal tab.',
     id: 'workspace.focusPreviousTerminal',
-    keys: [{ chord: ['Mod+PageUp'], pane: 'terminal', preventDefault: true }],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -875,7 +762,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Switch the active diff viewer between split and unified modes.',
     id: 'workspace.toggleDiffViewMode',
-    keys: [{ chord: ['Mod+Shift+D'] }],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'workspace-operation',
@@ -886,7 +773,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Switch between the Workbench and Chat layouts.',
     id: 'workspace.toggleUiMode',
-    keys: [{ chord: ['Mod+Shift+M'], preventDefault: true }],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -973,7 +860,7 @@ export const workspaceCommandMetadata = {
     description: 'Switch the whole look at once: colors, code colors, wallpaper and surfaces.',
     id: 'workspace.selectThemeBundle',
     execution: 'async',
-    keys: [{ chord: ['Mod+K', 'Mod+T'], vscodeCommandId: 'workbench.action.selectTheme' }],
+
     target: 'workspace',
     undoCategory: 'view-only',
     when: [],
@@ -1027,10 +914,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Start a new chat session in the active project.',
     id: 'workspace.newSession',
-    keys: [
-      { chord: ['Mod+Alt+N'], preventDefault: true },
-      { chord: ['Control+N'], platforms: ['tui'] },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'workspace-operation',
@@ -1041,23 +925,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Select the next editor tab, or the next chat in chat mode.',
     id: 'workspace.nextItem',
-    keys: [
-      { chord: ['Mod+Alt+]'], preventDefault: true },
-      {
-        chord: ['Mod+Alt+ArrowRight'],
-        platforms: ['mac'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.nextEditor',
-      },
-      {
-        chord: ['Control+PageDown'],
-        platforms: ['linux', 'windows'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.nextEditor',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -1069,23 +937,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Select the previous editor tab, or the previous chat in chat mode.',
     id: 'workspace.previousItem',
-    keys: [
-      { chord: ['Mod+Alt+['], preventDefault: true },
-      {
-        chord: ['Mod+Alt+ArrowLeft'],
-        platforms: ['mac'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.previousEditor',
-      },
-      {
-        chord: ['Control+PageUp'],
-        platforms: ['linux', 'windows'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId: 'workbench.action.previousEditor',
-      },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -1097,7 +949,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Show or hide the list of sessions.',
     id: 'workspace.toggleSessionRail',
-    keys: [{ chord: ['Mod+Alt+B'], preventDefault: true }],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -1116,24 +968,7 @@ export function selectItemMetadata(position: ItemPosition) {
     description: `Select editor tab ${position}, or chat ${position} in chat mode.`,
     hiddenInPalette: true,
     id: selectItemCommandId(position),
-    keys: [
-      { chord: [`Mod+${position}`], presets: ['default'], preventDefault: true },
-      {
-        chord: [`Control+${position}`],
-        platforms: ['mac'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId,
-      },
-      {
-        chord: [`Alt+${position}`],
-        platforms: ['linux', 'windows'],
-        presets: ['vscode'],
-        preventDefault: true,
-        vscodeCommandId,
-      },
-      { chord: [`Mod+Alt+${position}`], presets: ['vscode'], preventDefault: true },
-    ],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -1149,7 +984,7 @@ export function sidebarPanelMetadata(position: ItemPosition) {
     description: `Show sidebar panel ${position}, or hide the sidebar when that panel is showing.`,
     hiddenInPalette: true,
     id: sidebarPanelCommandId(position),
-    keys: [{ chord: [`Mod+Alt+${position}`], presets: ['default'], preventDefault: true }],
+
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',

@@ -22,7 +22,7 @@ export function TerminalPreview({
           projectId: rootPath,
         }}
         handlers={{}}
-        overrides={{}}
+        overrides={[]}
         onError={(error) => {
           throw error
         }}

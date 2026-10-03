@@ -101,6 +101,35 @@ requirements with this ownership before implementing its remaining catalog work.
 
 ## Steps
 
+### Execution 2026-10-03
+
+Status: Approved, in progress. The owner requested the next wave through completion and
+renewed npm deferral. Finish means one integrated 204/205/206 release with all callers migrated,
+the replaced APIs removed, independent review, green CI and inspected deployment. Document
+runtime work, native clients, icon work and the TUI redesign stay in their separately scheduled
+programs.
+
+The Editor and terminal producers prepare isolated source branches. A single integration owner
+combines them with the window/TUI dispatcher, preset translation, settings and raw shortcut
+lanes. The coordinator owns plan reconciliation, reviewed package artifacts, merges and shipping.
+The terminal lane consumes the active 286/287 host contracts needed here; their whole programs
+remain independent. Exact standalone family installation remains a gate under Plan 207.
+
+- [x] Pin the source inventory and old host binding tables.
+- [x] Capture the 20,000-line typing baseline and read its screenshot.
+- [x] Reproduce Markdown Mod+B formatting while the sidebar remains visible; read the screenshot.
+- [x] Prove root workspace versus isolated-family catalog resolution with no npm publication.
+- [ ] Integrate final Editor, terminal, settings and raw-handler source, and remove obsolete APIs.
+- [ ] Qualify actual isolated family installation from the final reviewed dependency artifact.
+- [ ] Run the required scenario, input ownership and typing comparison checks; inspect evidence.
+- [ ] Complete independent review, fix findings, pass CI, merge and inspect the deployed release.
+
+Execution receipts: `/work/reports/command-foundation-2026-10-03/`. The baseline Markdown
+scenario completed at `/work/tmp/fregat-evidence/20261003T163951Z-scenario-markdown-authoring/`;
+its unrelated temporary-file read warnings are tracked in Fregat issue 568.
+
+### Delivery checklist
+
 - [ ] Translate Zed's default keymaps into `zed` and `ours`; list unmapped actions.
 - [ ] Wire the dispatcher and contexts from the focus service; port the command bus to handle
       node commands; keep `bun run gates` green.
@@ -131,3 +160,7 @@ requirements with this ownership before implementing its remaining catalog work.
 ## Out of scope
 
 The TUI's keymap design (its own redesign plan), Markdown formatting UI, a Vim pack.
+
+The initial `ours` deviation keeps the approved document-navigation keys: Mod+[ and Mod+] dispatch `workspace.navigateBack` and `workspace.navigateForward` at Workspace depth. The four source rows record this choice; `zed` retains the pinned Editor indent/outdent bindings.
+
+Chord cancellation retains Plan 203: an unbound nonprintable prefix waits for its next key; a bound prefix expires and executes after the continuation timeout. Focus, blur and pointer changes cancel the pending owner.

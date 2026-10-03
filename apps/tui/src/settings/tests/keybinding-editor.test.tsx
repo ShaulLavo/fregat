@@ -70,7 +70,12 @@ test('records a real two-stroke shortcut without firing commands, saves semantic
           ? state.owner.readSettingsMirror()['keybindings.overrides']
           : null
       })
-      .toEqual({ 'settings.edit': ['Mod+K E'], 'workspace.openAddress': ['F8'] })
+      .toEqual(
+        expect.arrayContaining([
+          { keys: 'Mod+K E', command: 'settings.edit', context: 'Settings' },
+          { keys: 'F8', command: 'workspace.openAddress' },
+        ]),
+      )
     await act(async () => {
       frame.mockInput.pressKey('ESCAPE')
     })
@@ -97,10 +102,23 @@ test('records a real two-stroke shortcut without firing commands, saves semantic
       .poll(() => {
         const state = session.getSnapshot()
         return state.kind === 'ready'
-          ? state.owner.readSettingsMirror()['keybindings.overrides']['settings.edit']
+          ? state.owner
+              .readSettingsMirror()
+              ['keybindings.overrides'].filter(
+                (entry) => 'unbind' in entry && entry.unbind === 'settings.edit',
+              )
           : undefined
       })
-      .toBeNull()
+      .toEqual(expect.arrayContaining([expect.objectContaining({ unbind: 'settings.edit' })]))
+    await act(async () => {
+      await expect
+        .poll(() => {
+          const state = session.getSnapshot()
+          return state.kind === 'ready' ? state.owner.getSnapshot().pendingCount : 1
+        })
+        .toBe(0)
+      await frame.renderOnce()
+    })
     await act(async () => {
       frame.mockInput.pressArrow('down')
       frame.mockInput.pressArrow('down')
@@ -116,7 +134,7 @@ test('records a real two-stroke shortcut without firing commands, saves semantic
           ? state.owner.readSettingsMirror()['keybindings.overrides']
           : null
       })
-      .toEqual({ 'workspace.openAddress': ['F8'] })
+      .toEqual([{ keys: 'F8', command: 'workspace.openAddress' }])
   } finally {
     await frame.cleanup()
     session.dispose()
@@ -171,12 +189,12 @@ test('recorder reports unsupported keys and shortcut conflicts before saving', a
       frame.mockInput.pressKey('RETURN')
     })
     await frame.renderOnce()
-    expect(frame.captureCharFrame()).toContain('Replaced by workspace.openAddress')
+    expect(frame.captureCharFrame()).toContain('Shadowed by workspace.openAddress')
     expect(frame.captureCharFrame()).toContain('Save shortcut')
     const state = session.getSnapshot()
     expect(
       state.kind === 'ready' && state.owner.readSettingsMirror()['keybindings.overrides'],
-    ).toEqual({})
+    ).toEqual([])
   } finally {
     await frame.cleanup()
     session.dispose()

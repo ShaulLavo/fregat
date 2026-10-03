@@ -4,12 +4,20 @@ import { expect, test } from '../../../test/fixtures'
 import { pickerParentPath as filePickerParentPath } from '@/features/file-picker/utils/model'
 import {
   basename,
+  fileExtension,
   lastPathSegment,
   parentPath,
   parentFilesystemPath,
   pathLeaf,
 } from '@/lib/path-formatters'
 import { filesystemPath } from '@/lib/documents/utils/identity'
+
+test('extensions use the lowercased basename suffix', () => {
+  expect(fileExtension('/repo.with.dots/README')).toBe('')
+  expect(fileExtension('/repo/README.MD')).toBe('md')
+  expect(fileExtension('/repo/.gitignore')).toBe('')
+  expect(fileExtension('/repo/file.test.TS')).toBe('ts')
+})
 
 describe('parentPath', () => {
   test('is empty for a file at the repository root', () => {

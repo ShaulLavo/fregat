@@ -112,7 +112,7 @@
     "site:dev": "bun run --cwd site dev"
   },
   "dependencies": {
-    "@tanstack/hotkeys": "0.10.0",
+    "@fregat/hotkeys": "catalog:",
     "@webgpu/types": "0.1.74"
   },
   "devDependencies": {

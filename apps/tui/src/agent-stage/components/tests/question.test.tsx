@@ -13,7 +13,7 @@ test.for(['message', 'native'] as const)(
       <CommandProvider
         scope={{ screen: 'chat', environmentId: 'test', projectId: null }}
         handlers={{}}
-        overrides={{}}
+        overrides={[]}
         onError={(error) => expect.unreachable(String(error))}
       >
         <Question
