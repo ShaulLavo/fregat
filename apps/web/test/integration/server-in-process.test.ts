@@ -1,6 +1,6 @@
 import { openFileReadSession } from '@workspace/client-core/files/read-session'
 import { readFilePreview } from '@workspace/client-core/files/read'
-import { writeFile } from 'node:fs/promises'
+import { access, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { WorkspaceSearchProviderSource, WorkspaceSearchQuery } from '@workspace/contracts'
 import { fetchQuickOpenFiles } from '@/lib/file-server'
@@ -14,6 +14,8 @@ import type { Client } from '@workspace/client-core/transport/client'
 import { onTestFinished } from 'vitest'
 import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 import { expect, test } from '../fixtures'
+import { runGit } from '../factories/git'
+import { makeTestServer } from '../server'
 
 // Proves the phase-2 foundation: a real server, driven in-process through the
 // typed eden client, against a real filesystem. No MSW, no mock.module.
@@ -22,6 +24,69 @@ test('health reports the real workspace root', async ({ client, server }) => {
 
   expect(status).toBe(200)
   expect(data).toMatchObject({ ok: true, workspaceRoot: server.root })
+})
+
+test('persists usage outside a clean Git workspace across restart', async ({ client, server }) => {
+  runGit(server.root, ['init', '-b', 'main'], { cwdMode: 'option' })
+  const usage = await client.providers.usage.get()
+  expect(usage.status).toBe(200)
+  expect(usage.data?.accounts).toHaveLength(1)
+  // Pending reset state is projected by the route from attempts stored in the database.
+  const { resetPending, ...configuredAccount } = usage.data!.accounts[0]!
+  expect(resetPending).toBe(false)
+  expect(configuredAccount).toMatchObject({
+    driverKind: 'codex',
+    providerInstanceIds: [server.providerAdapter.adapterKey],
+    source: 'unknown',
+    state: 'no-data',
+    windows: [],
+    checkedAt: null,
+    resetCredits: null,
+  })
+  // Closing the app flushes the fixture collector's configured account before restart.
+  await server.restart()
+  const cache = JSON.parse(
+    await readFile(path.join(server.stateHome, 'usage', 'accounts.json'), 'utf8'),
+  )
+  expect(cache).toEqual({
+    version: 1,
+    accounts: [
+      {
+        snapshot: configuredAccount,
+        attemptedAt: expect.any(Number),
+        credentialFingerprint: null,
+        failed: false,
+        unsupported: false,
+      },
+    ],
+    proxyAccounts: [],
+    proxyAttemptedAt: null,
+    proxyFailed: false,
+    proxySourceKey: null,
+  })
+  const clean = await client.git.status.get({ query: { path: '', fresh: true } })
+  expect(clean.status).toBe(200)
+  expect(clean.data?.files).toEqual([])
+
+  await writeFile(path.join(server.root, 'workspace-owned.txt'), 'untracked\n')
+  const changed = await client.git.status.get({ query: { path: '', fresh: true } })
+  expect(changed.status).toBe(200)
+  expect(changed.data?.files).toMatchObject([
+    { path: 'workspace-owned.txt', index: 'untracked', worktree: 'untracked' },
+  ])
+})
+
+test('cleans its workspace and owned state home', async () => {
+  const server = await makeTestServer()
+  try {
+    await server.restart()
+    await access(server.root)
+    await access(path.join(server.stateHome, 'usage', 'accounts.json'))
+  } finally {
+    await server.cleanup()
+  }
+  await expect(access(server.root)).rejects.toMatchObject({ code: 'ENOENT' })
+  await expect(access(server.stateHome)).rejects.toMatchObject({ code: 'ENOENT' })
 })
 
 test('reads a file written to the real workspace', async ({ client, server }) => {

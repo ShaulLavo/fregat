@@ -385,7 +385,8 @@ it('uploads native changed-range byte offsets into the matching GPU buffer regio
   })!
   const glyph = grid.atlas.getOrInsert('native-A', bitmap, 0).glyph
   expect(glyph).toBeDefined()
-  builder.registerGlyph(65, glyph)
+  expect(builder.missingGlyphs.map((key) => builder.glyphInput(key).text)).toEqual(['A'])
+  for (const key of builder.missingGlyphs) builder.registerGlyph(key, glyph)
   expect(builder.build(options)).toBe(0)
   grid.pass.syncAtlas(grid.atlas.consumeUploads())
   expect(grid.pass.uploadFrame(builder, builder.changedRanges())).toBeGreaterThan(0)
@@ -396,6 +397,12 @@ it('uploads native changed-range byte offsets into the matching GPU buffer regio
   expect(builder.build({ ...options, full: false })).toBe(0)
   const changes = builder.changedRanges()
   expect(changes).toEqual([
+    {
+      row: 0,
+      invalidatedRows: [],
+      cell: { byteOffset: 0, byteLength: 0 },
+      glyph: { byteOffset: 0, byteLength: 0 },
+    },
     {
       row: 1,
       invalidatedRows: [],

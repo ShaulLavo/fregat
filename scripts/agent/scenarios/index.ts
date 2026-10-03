@@ -194,6 +194,7 @@ import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
 import { opencodeModelCatalog } from './opencode-model-catalog'
 import { chatUsageMeter } from './chat-usage-meter'
+import { chatUsageIdle } from './chat-usage-idle'
 import { chatComposerNarrow } from './chat-composer-narrow'
 import { settingsUsage } from './settings-usage'
 import { pushSubscribe } from './push-subscribe'
@@ -560,6 +561,7 @@ export const scenarios: readonly Scenario[] = [
   chatModelPicker,
   opencodeModelCatalog,
   chatUsageMeter,
+  chatUsageIdle,
   chatComposerNarrow,
   restNoFlicker,
   settingsUsage,

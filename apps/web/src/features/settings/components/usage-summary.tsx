@@ -11,7 +11,7 @@ export function UsageSummary({ history }: { readonly history: ProviderUsageHisto
 
   return (
     <div className='flex flex-col gap-1' data-usage-summary>
-      <p className='text-muted-foreground text-xs'>Estimated cost</p>
+      <p className='text-muted-foreground text-xs'>API-equivalent cost estimate</p>
       <div className='flex flex-wrap items-baseline gap-x-3 gap-y-1'>
         <span className='text-sm font-semibold tabular-nums'>{formatModelCost(totals)}</span>
         <span className='text-muted-foreground text-xs tabular-nums'>
@@ -20,7 +20,7 @@ export function UsageSummary({ history }: { readonly history: ProviderUsageHisto
         </span>
       </div>
       <p className='text-muted-foreground text-2xs'>
-        Claude's own estimate, or standard API rates for models Platform prices.
+        Provider-reported estimates or recorded standard API rates for covered local transcripts.
       </p>
       <p className='text-xs'>
         <UsageCacheSavings costUsd={savings.costUsd} />

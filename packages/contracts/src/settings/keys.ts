@@ -1,6 +1,7 @@
 import { LOG_TIME_RANGES } from '../log-dashboard'
 import { modelSelectionSchema } from '../orchestration-runtime'
 import { DEFAULT_CODEX_PROVIDER_SETTINGS } from '../provider'
+import { providerInstanceIdSchema } from '../chat-ids'
 import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
@@ -1468,9 +1469,9 @@ export const SETTINGS_REGISTRY = {
     category: 'Developer',
     title: 'Heavy job quiet hold',
     details:
-      'A `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.',
+      'A `--quiet` job waits for finite jobs to finish while later jobs queue behind it. Declared servers keep running and count toward resource admission. Admission and execution each get this many seconds. Expiry releases the request or stops the running job and returns exit 75; invoke it again for a fresh queue ticket. A `drain.request` is honoured for this many seconds from its first observation.',
     description:
-      'Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.',
+      'Maximum seconds for quiet admission, a running quiet hold, and an external drain request, measured independently.',
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'quiet', 'exclusive', 'hold', 'drain', 'benchmark'],
   }),
@@ -1921,6 +1922,106 @@ export const SETTINGS_REGISTRY = {
     description:
       'Milliseconds an ACP agent has to initialize, change configuration or drain a cancelled turn. Active answers wait until they finish or you stop them.',
     keywords: ['provider', 'acp', 'timeout'],
+  }),
+  'providers.usageRefreshSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(60), v.maxValue(86400)),
+    default: 300,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'Usage refresh interval',
+    description:
+      'Minimum seconds between native account usage requests. Usage reads return persisted observations.',
+    keywords: ['usage', 'quota', 'cache'],
+  }),
+  'providers.usageFailureCooldownSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(60), v.maxValue(86400)),
+    default: 600,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'Usage failure cooldown',
+    description: 'Seconds before retrying a failed account usage request.',
+    keywords: ['usage', 'quota', 'cache'],
+  }),
+  'providers.usageStaleAfterSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(60), v.maxValue(86400)),
+    default: 900,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'Usage observation age',
+    description: 'Seconds an observed quota remains current before its window is marked stale.',
+    keywords: ['usage', 'quota', 'cache'],
+  }),
+  'providers.transcriptHistoryRefreshSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(60), v.maxValue(86400)),
+    default: 60,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'Transcript history refresh',
+    description: 'Seconds between bounded local transcript scans.',
+    keywords: ['usage', 'quota', 'cache'],
+  }),
+  'providers.transcriptHistoryMaxBytes': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(65536), v.maxValue(2147483647)),
+    default: 268435456,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'Transcript scan byte budget',
+    description: 'Maximum transcript bytes read in one local history scan.',
+    keywords: ['usage', 'quota', 'cache'],
+  }),
+  'providers.transcriptHistoryMaxFiles': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000000)),
+    default: 10000,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'Transcript scan file budget',
+    description: 'Maximum transcript files visited in one local history scan.',
+    keywords: ['usage', 'quota', 'cache'],
+  }),
+  'providers.proxyUsageUrl': defineSetting({
+    schema: v.nullable(
+      v.pipe(
+        v.string(),
+        v.url(),
+        v.check((value) => {
+          const url = URL.parse(value)
+          return Boolean(
+            url &&
+            url.protocol === 'http:' &&
+            ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) &&
+            !url.username &&
+            !url.password &&
+            !url.search &&
+            !url.hash,
+          )
+        }, 'Use a localhost HTTP management address.'),
+      ),
+    ),
+    default: null,
+    scope: 'machine',
+    widget: 'string',
+    category: 'Providers',
+    title: 'Proxy usage management address',
+    description:
+      'Local CLIProxyAPI management address whose cached Codex quotas Fregat reads. The management key is kept in the secret store.',
+    keywords: ['usage', 'codex', 'proxy', 'quota'],
+  }),
+  'providers.proxyUsageProviderInstanceIds': defineSetting({
+    schema: v.array(providerInstanceIdSchema),
+    default: [],
+    scope: 'application',
+    widget: 'complex',
+    category: 'Providers',
+    title: 'Proxy quota source instances',
+    description:
+      'Optional enabled Codex instances whose allowance comes from the proxy account group. Selecting an instance pauses its native quota collection. Proxy accounts also appear independently.',
+    keywords: ['usage', 'codex', 'proxy', 'quota'],
   }),
   'providers.instances': defineSetting({
     schema: providerInstanceConfigsSchema,

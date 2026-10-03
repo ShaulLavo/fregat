@@ -36,6 +36,7 @@ import {
   spotCheck,
   type ComparisonCase,
   type FixtureName,
+  type RollingFixtureName,
 } from './comparison-fixtures.js'
 
 interface Driver {
@@ -51,6 +52,7 @@ interface Driver {
     | undefined
 }
 
+const accessibility = new URLSearchParams(location.search).get('accessibility') === 'on'
 const tracing = new ComparisonTracing()
 const mount = document.querySelector('main')!
 let drivers: Driver[] = []
@@ -101,7 +103,10 @@ function configureNativeHistory(terminal: GhosttyTerminal): void {
 }
 
 async function createNative(host: HTMLElement): Promise<Driver> {
-  native ??= await GhosttyRuntime.create({ wasm: '/native.wasm', bridge: '/bridge.wasm' })
+  native ??= await GhosttyRuntime.create({
+    wasm: '/native.wasm',
+    bridge: '/bridge.wasm',
+  })
   const session = await TerminalSession.create<Event>({
     runtime: { kind: 'borrowed', runtime: native },
     appearance: {
@@ -137,7 +142,7 @@ async function createNative(host: HTMLElement): Promise<Driver> {
     | undefined
   const terminal = createGhosttyWebGpuTerminalFromSession(session, {
     autoFit: false,
-    accessibility: false,
+    accessibility: accessibility ? {} : false,
     rendererFactory: async (options) => {
       if (current.variant !== 'ghostty-webgpu') {
         const factories = {
@@ -147,7 +152,10 @@ async function createNative(host: HTMLElement): Promise<Driver> {
         }
         const factory = factories[current.variant as keyof typeof factories]
         if (!factory) throw new Error('Explicit native renderer required')
-        const renderer = await factory.create(options)
+        const renderer = await factory.create({
+          ...options,
+          zigFrame: new URLSearchParams(location.search).has('zig'),
+        })
         tracing.nativeRenderer(drivers.length, renderer)
         mountedRenderer = renderer
         return renderer
@@ -240,6 +248,7 @@ function createXterm(host: HTMLElement): Driver {
     lineHeight: settings.lineHeight,
     scrollback: settings.scrollback,
     cursorBlink: false,
+    screenReaderMode: accessibility,
     theme: { foreground: '#ffffff', background: '#000000' },
   })
   terminal.open(host)
@@ -348,7 +357,7 @@ async function parseFixture(
   const bytes = encoder.encode(text)
   const chunks = inputChunks(bytes, current.path, size)
   const expected = expectedScreen(
-    name === 'rolling-logs' ? 'logs' : name,
+    name === 'rolling-logs' || name === 'rolling-unicode-logs' ? 'logs' : name,
     unit,
     text.length / unit.length,
     settings.columns,
@@ -364,10 +373,17 @@ async function parseFixture(
     try {
       screen = driver.screen()
     } catch (cause) {
-      throw new Error(`${name} parser snapshot failed: ${String(cause)}`, { cause })
+      throw new Error(`${name} parser snapshot failed: ${String(cause)}`, {
+        cause,
+      })
     }
     const validation = qualifyScreen(screen, expected)
-    return { bytes: bytes.length, milliseconds, chunkCount: chunks.length, validation }
+    return {
+      bytes: bytes.length,
+      milliseconds,
+      chunkCount: chunks.length,
+      validation,
+    }
   } finally {
     driver.dispose()
   }
@@ -375,7 +391,11 @@ async function parseFixture(
 
 async function parser(): Promise<ParserDriver> {
   if (current.variant.startsWith('xterm-')) {
-    const terminal = new Xterm({ cols: settings.columns, rows: settings.rows, scrollback: 0 })
+    const terminal = new Xterm({
+      cols: settings.columns,
+      rows: settings.rows,
+      scrollback: 0,
+    })
     // Pinned 6.0.0 boundary includes decoding, VT parsing and buffer writes; excludes WriteBuffer timers.
     const handler = Reflect.get(Reflect.get(terminal, '_core'), '_inputHandler') as {
       parse(data: InputChunk): unknown
@@ -455,8 +475,14 @@ async function parser(): Promise<ParserDriver> {
       dispose: () => terminal.free(),
     }
   }
-  const runtime = await GhosttyRuntime.create({ wasm: '/native.wasm', bridge: '/bridge.wasm' })
-  const terminal = runtime.createTerminal({ columns: settings.columns, rows: settings.rows })
+  const runtime = await GhosttyRuntime.create({
+    wasm: '/native.wasm',
+    bridge: '/bridge.wasm',
+  })
+  const terminal = runtime.createTerminal({
+    columns: settings.columns,
+    rows: settings.rows,
+  })
   terminal.setScrollbackLimit(settings.scrollback)
   configureNativeHistory(terminal)
   const render = runtime.createRenderState(terminal)
@@ -516,6 +542,19 @@ async function legacyEmptyWrite(): Promise<unknown> {
   }
 }
 
+async function legacyWriteControl(): Promise<unknown> {
+  const text = corpus('ASCII control\r\n', settings.chunkBytes)
+  const data = input(text)
+  await drivers[0]!.write('\x1b[3J\x1b[2J\x1b[H')
+  for (let call = 0; call < 35; call++) {
+    await drivers[0]!.write(data)
+    await settle()
+  }
+  return {
+    documentedTerminalApi: { accepted: true, calls: 35, bytesPerCall: encoder.encode(text).length },
+  }
+}
+
 async function legacyOriginalUnicode(): Promise<unknown> {
   if (current.variant !== 'ghostty-web') return undefined
   const unit = '日本語 中文 é café 👩‍💻 👨‍👩‍👧‍👦 🧪\r\n'
@@ -543,7 +582,11 @@ async function legacyOriginalUnicode(): Promise<unknown> {
           JSON.stringify({ api, call: calls + 1, phase: 'after-frame' }),
         )
       }
-      return { accepted: true, calls, bytesPerCall: encoder.encode(text).length }
+      return {
+        accepted: true,
+        calls,
+        bytesPerCall: encoder.encode(text).length,
+      }
     } catch (cause) {
       return {
         accepted: false,
@@ -564,8 +607,8 @@ async function legacyOriginalUnicode(): Promise<unknown> {
   }
 }
 
-async function rollingBurst(steps: number): Promise<unknown> {
-  const fixture = rollingFixture(logs)
+async function rollingBurst(name: RollingFixtureName, steps: number): Promise<unknown> {
+  const fixture = rollingFixture(logs, settings.corpusBytes, settings.chunkBytes, name)
   const chunks = rollingInputs(fixture, current.path)
   let offset = 0
   await writeAll('\x1b[3J\x1b[2J\x1b[H')
@@ -589,7 +632,7 @@ async function rollingBurst(steps: number): Promise<unknown> {
     bytes: rollingByteCount(fixture, steps) * drivers.length,
     milliseconds,
     frameMetrics: frameMetricDeltas(before, after),
-    fixture: 'rolling-logs',
+    fixture: name,
     chunkCount: chunks.length,
     reset: 'corpus-start',
     completedCycles: Math.floor(steps / chunks.length),
@@ -598,7 +641,7 @@ async function rollingBurst(steps: number): Promise<unknown> {
 }
 
 async function burst(name: FixtureName, steps: number): Promise<unknown> {
-  if (name === 'rolling-logs') return rollingBurst(steps)
+  if (name === 'rolling-logs' || name === 'rolling-unicode-logs') return rollingBurst(name, steps)
   const text = corpus(fixtureText(name, logs), settings.chunkBytes)
   await writeAll('\x1b[3J\x1b[2J\x1b[H')
   await settle()
@@ -687,6 +730,7 @@ window.__compare = {
   initialize,
   legacyEmptyWrite,
   legacyOriginalUnicode,
+  legacyWriteControl,
   prepare,
   correctness,
   parse,
@@ -729,6 +773,7 @@ declare global {
       initialize: typeof initialize
       legacyEmptyWrite: typeof legacyEmptyWrite
       legacyOriginalUnicode: typeof legacyOriginalUnicode
+      legacyWriteControl: typeof legacyWriteControl
       prepare: typeof prepare
       correctness: typeof correctness
       parse: typeof parse

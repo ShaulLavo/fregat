@@ -31,7 +31,11 @@ export type SettingControl =
   | { readonly widget: 'wallpaper'; readonly value: WallpaperSelection }
   | { readonly widget: 'boolean'; readonly value: boolean }
   | { readonly widget: 'number'; readonly value: number }
-  | { readonly widget: 'string' | 'multiline'; readonly value: string }
+  | {
+      readonly widget: 'string' | 'multiline'
+      readonly value: string | null
+      readonly nullable: boolean
+    }
   | { readonly widget: 'font'; readonly value: string }
   | { readonly widget: 'code-theme'; readonly value: string }
   | { readonly widget: 'palette'; readonly value: string }
@@ -59,7 +63,11 @@ export function settingControl(id: SettingId, value: SettingValue<SettingId>): S
     return typeof value === 'string' ? { widget, value } : { widget: 'unsupported' }
   }
   if (widget === 'string' || widget === 'multiline') {
-    return typeof value === 'string' ? { widget, value } : { widget: 'unsupported' }
+    const nullable = v.safeParse(schema, null).success
+    if (typeof value === 'string' || (value === null && nullable)) {
+      return { widget, value, nullable }
+    }
+    return { widget: 'unsupported' }
   }
   if (widget === 'enum') {
     if (typeof value !== 'string') return { widget: 'unsupported' }

@@ -17,6 +17,9 @@ small-fix batch, reproduction needs and decisions for the owner.
 [October 3 plan conversion](issue-plan-conversion-2026-10-03.md) records approved backlog
 work transferred into execution plans, the original issue links, and remaining investigations.
 
+[October 3 remaining issues](remaining-issues-resolution-2026-10-03.md) records the
+17-issue execution pass, verified fixes, retained investigations, and delivery checks.
+
 ## Current plan files
 
 | Plan                                                  | Topic                                                                         |

@@ -4,6 +4,7 @@ import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { useState } from 'react'
 
 import { Section } from '@/features/dev/components/section'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { UpdatePopover } from '@/features/server-update/components/update-popover'
 
 const BUSY: readonly BusySession[] = [
@@ -22,7 +23,7 @@ const BUSY: readonly BusySession[] = [
 ]
 
 export function UpdatesTab() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
 
   return (
     <div className='mx-auto flex max-w-3xl flex-col gap-8 p-(--density-section-padding)'>
@@ -50,9 +51,12 @@ export function UpdatesTab() {
       >
         <PaneBar>
           <span className='flex-1 text-xs font-medium'>Fregat</span>
-          <Button aria-busy size='xs' variant='secondary'>
-            Updating…
-          </Button>
+          <span className='flex items-center gap-(--density-gap-tight)'>
+            <Spinner size='sm' label='Reconnecting…' />
+            <Button aria-busy disabled size='xs' variant='secondary'>
+              Reconnecting…
+            </Button>
+          </span>
         </PaneBar>
       </Section>
       <Section

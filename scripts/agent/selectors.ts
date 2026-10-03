@@ -941,7 +941,7 @@ export const selectors = {
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
   clientUpdateReload: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
-  serverUpdating: (page: Page) => page.getByRole('button', { name: 'Updating…', exact: true }),
+  serverUpdating: (page: Page) => page.locator('[data-server-update] button[aria-busy="true"]'),
   serverUpdateRetry: (page: Page) =>
     page.getByRole('button', { name: 'Retry update', exact: true }),
   serverUpdateTooltip: (page: Page) =>
@@ -1063,11 +1063,12 @@ export const selectors = {
       .getByRole('menuitem', { name: new RegExp(`^${label}`) }),
   usageMeter: (page: Page) => page.locator('[data-composer-actions] [data-usage-meter]'),
   usagePopover: (page: Page) => page.locator('[data-usage-popover]'),
-  usageWindowRows: (page: Page) => page.locator('[data-usage-popover] [data-usage-window]'),
-  usageChecked: (page: Page) => page.locator('[data-usage-popover] [data-usage-checked]'),
-  usagePaceMarkers: (page: Page) => page.locator('[data-usage-popover] [data-usage-pace-marker]'),
+  usageWindowRows: (page: Page) => page.locator('[data-usage-popover] [data-account-window]'),
   usageMeterViewUsage: (page: Page) =>
     page.locator('[data-usage-popover]').getByRole('button', { name: 'View usage', exact: true }),
+  accountAllowances: (page: Page) => page.locator('[data-account-allowances]'),
+  allowanceAccounts: (page: Page) => page.locator('[data-account-allowances] [data-account-usage]'),
+  transcriptCoverage: (page: Page) => page.locator('[data-transcript-coverage]'),
   usageSection: (page: Page) => page.locator('[data-usage-section]'),
   usageSummary: (page: Page) => page.locator('[data-usage-section] [data-usage-summary]'),
   usageModelRows: (page: Page) => page.locator('[data-usage-section] [data-usage-model]'),

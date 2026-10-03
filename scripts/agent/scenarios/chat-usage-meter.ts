@@ -11,8 +11,7 @@ const HOUR_MS = 3_600_000
 /**
  * Serves fixed plan windows so the warning and spent states are reachable without
  * spending a real allowance. The new session picks the scenario's mock instance, which
- * reads the Codex account. That reading is twenty minutes old, so its popover says it
- * may be out of date.
+ * reads the Codex account. Historical reset and stale readings remain visible.
  */
 export function usageFixture(nowMs: number, providerInstanceId: string) {
   const resetsIn = (hours: number) => new Date(nowMs + hours * HOUR_MS).toISOString()
@@ -57,7 +56,18 @@ function window(
 ) {
   const windowMinutes = { monthly: 43_200, session: 300, weekly: 10_080 }[kind] ?? null
 
-  return { id, kind, label, resetsAt, status, usedPercent, windowMinutes }
+  return {
+    id,
+    kind,
+    label,
+    resetsAt,
+    status,
+    usedPercent,
+    windowMinutes,
+    observedAt: new Date(Date.now() - 20 * 60_000).toISOString(),
+    source: 'fixture',
+    freshness: 'stale',
+  }
 }
 
 /**
@@ -111,8 +121,7 @@ export const chatUsageMeter: Scenario = {
 
       const meter = selectors.usageMeter(page)
       await meter.waitFor({ timeout: 20_000 })
-      const tone = await meter.getAttribute('data-tone')
-      strictEqual(tone === 'warning' || tone === 'destructive', true, `meter tone ${tone}`)
+      strictEqual(await meter.getAttribute('aria-label'), 'Account allowances · Unknown')
       await page.mouse.move(0, 0)
       await step('meter')
 
@@ -126,12 +135,13 @@ export const chatUsageMeter: Scenario = {
       const popover = selectors.usagePopover(page)
       await popover.waitFor({ timeout: 10_000 })
       await settleAnimations(popover)
-      // Each account also carries a window whose reset has passed; it must not show.
-      strictEqual(await selectors.usageWindowRows(page).count(), 2, 'one row per live window')
-      // The weekly window is part-used with time left, so it carries a pace marker.
-      strictEqual(await selectors.usagePaceMarkers(page).count(), 1, 'pace on the unspent window')
-      const checked = (await selectors.usageChecked(page).textContent()) ?? ''
-      strictEqual(checked.startsWith('Checked '), true, `checked label ${checked}`)
+      strictEqual(
+        await selectors.usageWindowRows(page).count(),
+        3,
+        'historical reset windows remain visible',
+      )
+      await popover.getByText('Reset passed · awaiting observation', { exact: true }).waitFor()
+      strictEqual(await popover.getByText('Stale observation', { exact: true }).count(), 2)
       await step('popover')
 
       // The popover's way out: Settings › Usage, where the history lives.

@@ -12,13 +12,13 @@
     "packages/client-core": 54773,
     "apps/web/src/features/chat-mode": 49789,
     "apps/web/src/features/search": 43977,
-    "packages/contracts": 41441,
+    "packages/contracts": 43985,
     "apps/web/src/features/workbench": 41332,
     "apps/web/src/features/git": 39461,
     "packages/tree": 35779,
     "packages/ui": 33910,
     "apps/web/src/keymap": 23689,
-    "apps/web/src/components": 22965,
+    "apps/web/src/components": 25617,
     "apps/web/src/state": 18765,
     "apps/web/src/features/settings": 13409,
     "apps/web/src/features/address": 10009,
@@ -114,6 +114,18 @@
       "scriptGzip": 1735134,
       "phoneScriptGzip": 1421202,
       "reason": "Reattribute chat owner gzip to 183480 after splitting phone list and conversation chunks. Chat source is unchanged; chunk compression shares moved. Desktop and phone total pins are unchanged."
+    },
+    {
+      "at": "2026-10-03T02:24:03.000Z",
+      "scriptGzip": 1738082,
+      "phoneScriptGzip": 1434698,
+      "reason": "Account usage and local history add nullable observations, per-window provenance, routing, credits, coverage and collection settings to browser-consumed contracts. Measured contracts owner gzip 41441 -> 43985 (+2544). Isolating the server-only feed schema produced identical bundles, so that experiment was removed. Re-pin this owner only; desktop and phone total pins, other owner pins and gate margins remain unchanged."
+    },
+    {
+      "at": "2026-10-03T04:46:27.436Z",
+      "scriptGzip": 1738735,
+      "phoneScriptGzip": 1435154,
+      "reason": "Shared account and allowance-window details serve the composer and Usage settings with mapped accounts, independent observations, routing, provider credits and reset grants. Measured components owner gzip 22965 -> 25617 (+2652). Re-pin this owner only; desktop and phone total pins, every other owner pin and gate margins remain unchanged."
     }
   ]
 }

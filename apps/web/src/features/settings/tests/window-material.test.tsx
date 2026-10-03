@@ -70,6 +70,7 @@ test('older macOS keeps Frosted selectable and marks Glass unavailable', async (
 
 test('switching native material updates opacity applicability and restores its saved fill', async ({
   client,
+  task,
 }) => {
   expect(client).toBeDefined()
   window.platformBridge = {
@@ -85,8 +86,17 @@ test('switching native material updates opacity applicability and restores its s
   selectSettingsCategory('Appearance')
   renderWithProviders(<SettingsPage />)
 
-  const material = await screen.findByRole('combobox', { name: 'Window material' })
-  const opacity = await screen.findByRole('slider', { name: 'Pane opacity' })
+  // Whole categories mount in transitions; the form owns their readiness signal.
+  await waitFor(
+    () =>
+      expect(screen.getByRole('region', { name: 'Settings form' })).toHaveAttribute(
+        'aria-busy',
+        'false',
+      ),
+    { timeout: task.timeout },
+  )
+  const material = screen.getByRole('combobox', { name: 'Window material' })
+  const opacity = screen.getByRole('slider', { name: 'Pane opacity' })
   expect(opacity).not.toBeDisabled()
   await userEvent.click(material)
   await userEvent.click(await screen.findByRole('option', { name: 'Frosted' }))

@@ -163,11 +163,15 @@ export async function renderAddressHarness({
     application,
     { navigation },
   )
-  onTestFinished(() => {
+  let unmounted = false
+  const unmount = () => {
+    if (unmounted) return
+    unmounted = true
     rendered.unmount()
     application.dispose()
     registerEnvironmentQueryClient(owner.queryClient, owner.origin, previousClient)
-  })
+  }
+  onTestFinished(unmount)
 
   // `waitFor` retries until the assertion stops failing, so this IS the wait.
   await waitFor(() => {
@@ -176,6 +180,7 @@ export async function renderAddressHarness({
 
   return {
     ...rendered,
+    unmount,
     application,
     get harness() {
       if (!harness) return expect.unreachable('address harness never mounted')

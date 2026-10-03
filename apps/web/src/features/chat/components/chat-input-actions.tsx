@@ -126,8 +126,12 @@ export function ChatInputActions({
               usage={contextUsage}
             />
           ) : null}
-          {accountUsage && !tiny ? (
-            <UsageLimitsMeter account={accountUsage} compact={compact} />
+          {modelSelection?.providerInstanceId && !tiny ? (
+            <UsageLimitsMeter
+              accounts={accountUsage.accounts}
+              receivedAtMs={accountUsage.receivedAtMs}
+              compact={compact}
+            />
           ) : null}
           {statusLabel && !compact ? (
             <span

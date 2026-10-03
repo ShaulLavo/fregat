@@ -3,12 +3,13 @@ import { cn } from '@workspace/ui/lib/utils'
 
 import { useDeferredCommitField } from '@/features/settings/hooks/use-deferred-commit-field'
 
-/** Trims and rejects blank unless `verbatim`, where whitespace and emptiness are the value. */
+/** Nullable fields clear to null; verbatim fields preserve whitespace and emptiness. */
 export function StringWidget({
   'aria-label': ariaLabel,
   className,
   disabled,
   id,
+  nullable = false,
   onCommit,
   value,
   verbatim = false,
@@ -17,8 +18,9 @@ export function StringWidget({
   className?: string
   disabled?: boolean
   id: string
-  onCommit: (next: string) => void
-  value: string
+  nullable?: boolean
+  onCommit: (next: string | null) => void
+  value: string | null
   verbatim?: boolean
 }) {
   const field = useDeferredCommitField({
@@ -26,9 +28,10 @@ export function StringWidget({
     parse: (draft) => {
       if (verbatim) return draft
       const next = draft.trim()
-      return next === '' ? undefined : next
+      if (next !== '') return next
+      return nullable ? null : undefined
     },
-    toDraft: (current) => current,
+    toDraft: (current) => current ?? '',
     value,
   })
 

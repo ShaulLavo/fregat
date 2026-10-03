@@ -307,7 +307,9 @@ export function validateArtifact(artifact) {
   assert(
     phases.length &&
       new Set(phases).size === phases.length &&
-      phases.every((name) => ['latency', 'ascii', 'sgr', 'rolling-logs'].includes(name)),
+      phases.every((name) =>
+        ['latency', 'ascii', 'sgr', 'rolling-logs', 'rolling-unicode-logs'].includes(name),
+      ),
     'Incomplete phase matrix',
   )
   assert(Array.isArray(artifact.qualifications), 'Incomplete display evidence')
@@ -342,7 +344,7 @@ export function validateArtifact(artifact) {
   for (const run of artifact.runs) {
     assert(
       variants.includes(run.variant) &&
-        (run.variant === 'ghostty-webgpu'
+        (['ghostty-webgpu', 'ghostty-webgl'].includes(run.variant)
           ? builders.includes(run.frameBuilder)
           : run.frameBuilder === undefined) &&
         counts.includes(run.count) &&

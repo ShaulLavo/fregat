@@ -9,6 +9,7 @@ import { initializePlatformDatabase } from '../../db/initialize'
 import { providerResetCreditAttempts } from '../../db/schema'
 import { MockProviderAdapter } from '../adapters/mock'
 import { ProviderResetCredits } from '../reset-credits'
+import { ProviderUsageStore } from '../usage-store'
 import { sessionIdentityErrors } from '../structured-errors'
 import type { ProviderAdapter } from '../types'
 
@@ -59,13 +60,21 @@ async function fixture(consume: (key: string) => Promise<ProviderResetCreditOutc
   })
   const registry = {
     adapter: () => adapter,
+    listInstances: () => [INSTANCE, OTHER],
     usageAccount: (instance: typeof INSTANCE) => ({
       accountKey: state.splitHomes && instance === OTHER ? 'different-home' : state.accountKey,
       driverKind: adapter.driverKind,
       enabled: state.enabled,
+      claudeCachePath: null,
+      credentialFingerprint: null,
     }),
   }
-  const usage = { read: async () => ({ accounts: [] }), refreshAccount: vi.fn(async () => true) }
+  const store = new ProviderUsageStore(registry, { now: () => state.now })
+  const usage = {
+    suspendCollection: (key: string) => store.suspendCollection(key),
+    read: () => store.read(),
+    refreshAccount: vi.fn((key: string) => store.refreshAccount(key)),
+  }
   let service = new ProviderResetCredits(handle.db, registry, usage, () => state.now)
   cleanups.push(() => {
     service.close()
@@ -152,7 +161,12 @@ test('a declined attempt is cleared so the next confirmation can redeem', async 
 test('a refresh failure preserves the settled outcome and retry cannot spend again', async () => {
   const consume = vi.fn(async (_key: string) => 'reset' as const)
   const f = await fixture(consume)
-  f.usage.refreshAccount.mockRejectedValueOnce(new Error('probe failed'))
+  const original = f.usage.refreshAccount.getMockImplementation()!
+  f.usage.refreshAccount.mockImplementationOnce(async (key) => {
+    const result = await original(key)
+    f.usage.refreshAccount.mockRejectedValueOnce(new Error('probe failed'))
+    return result
+  })
   expect(await f.service.redeem(INSTANCE, input)).toMatchObject({
     outcome: 'reset',
     refresh: 'unconfirmed',

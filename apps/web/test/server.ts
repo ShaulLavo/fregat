@@ -5,6 +5,7 @@ import path from 'node:path'
 import {
   closeApp,
   createApp,
+  appUsageCollector,
   createMetadataDatabase,
   FontCatalogService,
   initializePlatformDatabase,
@@ -28,6 +29,8 @@ export type TestServer = {
   providerAdapter: MockProviderAdapter
   /** Isolated temp workspace root backing this app's filesystem. */
   root: string
+  /** Effective server state home, isolated from the workspace by default. */
+  readonly stateHome: string
   workspaceEditJournalRoot: string
   origin: string
   restart: (
@@ -35,6 +38,7 @@ export type TestServer = {
       providerRuntime?: boolean
       settingsWatch?: boolean
       providerAdapter?: MockProviderAdapter
+      additionalProviderAdapters?: readonly MockProviderAdapter[]
     },
   ) => Promise<void>
   cleanup: () => Promise<void>
@@ -80,6 +84,7 @@ export async function makeTestServer({
   workspaceRoot,
 }: TestServerOptions = {}): Promise<TestServer> {
   const root = await mkdtemp(path.join(tmpdir(), 'web-itest-'))
+  const stateHome = await mkdtemp(path.join(tmpdir(), 'web-istate-'))
   const workspaceEditJournalRoot = path.join(root, '.platform-test', 'workspace-edit-journals')
   const database = createMetadataDatabase({
     databasePath: persistentDatabase
@@ -89,12 +94,13 @@ export async function makeTestServer({
   initializePlatformDatabase(database.db)
   if (environmentId)
     database.db.$client.run('UPDATE environment_identity SET id = ?', [environmentId])
+  let additionalProviderAdapters: readonly MockProviderAdapter[] = []
   const buildApp = () =>
     createApp({
       auth: { allowedOrigins: [TEST_ORIGIN] },
       homeDirectory: root,
       systemRoot: systemRoot ?? root,
-      system,
+      system: { ...system, stateHome: system?.stateHome ?? stateHome },
       // Keep the real parser/cache/route path, but pin its cache inside this
       // fixture. MSW supplies the external downloads page.
       fonts: new FontCatalogService({
@@ -114,7 +120,7 @@ export async function makeTestServer({
         // real CLIs, so any route that touches a provider would spawn a binary,
         // read the developer's own machine, and answer differently per checkout.
         providerAdapterRegistry: new ProviderAdapterRegistry({
-          adapters: [providerAdapter],
+          adapters: [providerAdapter, ...additionalProviderAdapters],
           services: { cwd: process.cwd() },
         }),
       },
@@ -146,6 +152,9 @@ export async function makeTestServer({
     })
 
   let app = buildApp()
+  // app.handle has no listen lifecycle; start the real collector against injected adapters.
+  appUsageCollector(app).start()
+  await appUsageCollector(app).refresh()
   return {
     get app() {
       return app
@@ -155,18 +164,24 @@ export async function makeTestServer({
       providerRuntime = options.providerRuntime ?? providerRuntime
       settingsWatch = options.settingsWatch ?? settingsWatch
       providerAdapter = options.providerAdapter ?? providerAdapter
+      additionalProviderAdapters = options.additionalProviderAdapters ?? []
       system = options.system ?? system
       systemRoot = options.systemRoot ?? systemRoot
       workspaceRoot = options.workspaceRoot ?? workspaceRoot
       app = buildApp()
+      appUsageCollector(app).start()
+      await appUsageCollector(app).refresh()
     },
-    cleanup: () => cleanupTestServer(app, root, database),
+    cleanup: () => cleanupTestServer(app, root, stateHome, database),
     database,
     origin: TEST_ORIGIN,
     get providerAdapter() {
       return providerAdapter
     },
     root,
+    get stateHome() {
+      return system?.stateHome ?? stateHome
+    },
     workspaceEditJournalRoot,
   }
 }
@@ -174,12 +189,16 @@ export async function makeTestServer({
 async function cleanupTestServer(
   app: ReturnType<typeof createApp>,
   root: string,
+  stateHome: string,
   database: MetadataDatabaseHandle,
 ) {
   try {
     await closeApp(app)
   } finally {
     database.close()
-    await rm(root, { force: true, recursive: true })
+    await Promise.all([
+      rm(root, { force: true, recursive: true }),
+      rm(stateHome, { force: true, recursive: true }),
+    ])
   }
 }
