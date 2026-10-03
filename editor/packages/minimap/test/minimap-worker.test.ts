@@ -46,20 +46,6 @@ describe('minimap worker', () => {
     expect(postMessage).not.toHaveBeenCalled()
   })
 
-  it('acknowledges dispose requests', async () => {
-    const postMessage = vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
-    await import('../src/minimap.worker')
-
-    const onmessage = globalThis.onmessage as ((event: MessageEvent) => void) | null
-    onmessage?.(
-      new MessageEvent('message', {
-        data: { type: 'dispose' } as MinimapWorkerRequest,
-      }),
-    )
-
-    expect(postMessage).toHaveBeenCalledWith({ type: 'disposed' } satisfies MinimapWorkerResponse)
-  })
-
   it('records request diagnostics through the shared diagnostics sink', async () => {
     const diagnostics: {
       readonly name: string

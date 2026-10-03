@@ -501,17 +501,23 @@ describe('observability runtime', () => {
 
   it('records complete settings context when transaction recovery blocks a later write', async () => {
     const root = await fixtureRoot()
+    const stateHome = await fixtureRoot()
     const logDir = await fixtureRoot()
     initializeObservability(testObservabilityEnv(logDir))
-    const app = testApp(root, {
-      transactionHooks: {
-        afterBoundary(boundary) {
-          if (boundary !== 'settings-directory-synced') return
+    const app = testApp(
+      root,
+      {
+        transactionHooks: {
+          afterBoundary(boundary) {
+            if (boundary !== 'settings-directory-synced') return
 
-          throw settingsErrors.TRANSACTION_RECOVERY_INVALID({ detail: 'injected interruption' })
+            throw settingsErrors.TRANSACTION_RECOVERY_INVALID({ detail: 'injected interruption' })
+          },
         },
       },
-    })
+      undefined,
+      stateHome,
+    )
     const headers = trustedOriginHeaders({ 'content-type': 'application/json' })
     const interrupted = await app.handle(
       new Request('http://local/settings/raw', {
@@ -565,9 +571,7 @@ describe('observability runtime', () => {
       target: 'user',
     })
     await expect(closeApp(app)).resolves.toBeUndefined()
-    const cache = JSON.parse(
-      await readFile(path.join(root, '.platform-test', 'usage', 'accounts.json'), 'utf8'),
-    )
+    const cache = JSON.parse(await readFile(path.join(stateHome, 'usage', 'accounts.json'), 'utf8'))
     expect(cache).toMatchObject({ version: 1, accounts: [] })
   })
 
@@ -870,12 +874,18 @@ describe('observability runtime', () => {
   })
 })
 
-function testApp(root: string, settings: TestSettingsOverrides = {}, web?: WebOptions) {
+function testApp(
+  root: string,
+  settings: TestSettingsOverrides = {},
+  web?: WebOptions,
+  stateHome?: string,
+) {
   return createTestApp({
     auth: {
       allowedOrigins: [TRUSTED_ORIGIN],
     },
     settings: testSettingsOptions(root, settings),
+    system: { stateHome },
     watch: false,
     web,
     workspaceRoot: root,
