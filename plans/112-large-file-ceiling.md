@@ -66,10 +66,9 @@ want for text already exists in the same file, for images.
 
 This is not only a transport swap, and the plan should not pretend otherwise:
 
-- **Decoding moves to the client.** [`text-encoding.ts`](../apps/server/src/fs/text-encoding.ts)
-  would have to move into a shared package so web, TUI and desktop decode identically. That is
-  arguably where it belongs — `lossy` and `seemsBinary` describe a string, and the string would now
-  be made client-side — but it is a real relocation with its own parity tests.
+- **Decoding moves to the client.** [`text-encoding.ts`](../packages/contracts/src/text-encoding.ts)
+  already lives in the shared contracts package. Web, TUI and desktop can use that same owner
+  for client-side decoding; preserve its `lossy` and `seemsBinary` behavior with parity tests.
 - **`version` changes meaning.** `textFileVersion` hashes the decoded string. If the server never
   decodes, the natural version is a hash of the bytes: cheaper and more honest, but it is a
   different value, and [`write.ts`](../apps/server/src/fs/write.ts) compares against it for

@@ -63,10 +63,6 @@ function handleRequest(request: MinimapWorkerRequest): void {
     case 'render':
       postRender(request.sequence)
       return
-    case 'dispose':
-      renderer.dispose()
-      post({ type: 'disposed' })
-      return
   }
 }
 

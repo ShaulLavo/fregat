@@ -132,4 +132,4 @@ npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
 
 <!-- opensrc:end -->
 
-- Firefox/WebKit Playwright runs on the Arch dev machine need `/work/projects/platform/scripts/playwright-webkit-arch.sh` after any `playwright install` that downloads a new WebKit.
+- On Arch Linux, run `scripts/playwright-webkit-arch.sh` from the Fregat checkout root after any `playwright install` that downloads a new WebKit, before Firefox or WebKit verification.

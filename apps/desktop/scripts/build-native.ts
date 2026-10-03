@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { defineErrorCatalog } from 'evlog'
+import { developmentNativeHost } from '../src/shared/native-path'
 
 const buildErrors = defineErrorCatalog('desktop.native', {
   BUILD_FAILED: {
@@ -22,8 +23,7 @@ export function buildNative(
     'native',
     linux ? 'linux/platform-webview.c' : 'macos/platform-webview.m',
   )
-  const outputDir = path.join(desktopDir, 'native', 'build')
-  const output = path.join(outputDir, 'platform-webview')
+  const output = developmentNativeHost(desktopDir)
   if (!existsSync(source))
     throw buildErrors.BUILD_FAILED({ internal: { stage: 'source', platform: process.platform } })
   const compiler = linux ? 'cc' : 'clang'
@@ -53,13 +53,41 @@ export function buildNative(
         '-framework',
         'Cocoa',
       ]
-  mkdirSync(outputDir, { recursive: true })
+  mkdirSync(path.dirname(output), { recursive: true })
   const result = Bun.spawnSync([compiler, ...args, '-O2', '-o', output, source, ...flags])
   if (result.exitCode !== 0) {
     process.stderr.write(result.stderr)
     throw buildErrors.BUILD_FAILED({ internal: { stage: 'compile', exitCode: result.exitCode } })
   }
+  if (!linux) writeDevelopmentBundle(desktopDir, output)
   return output
+}
+
+function writeDevelopmentBundle(desktopDir: string, binary: string) {
+  const contents = path.dirname(path.dirname(binary))
+  const resources = path.join(contents, 'Resources')
+  mkdirSync(resources, { recursive: true })
+  copyFileSync(
+    path.join(desktopDir, '../web/public/icons/fregat.icns'),
+    path.join(resources, 'Fregat.icns'),
+  )
+  writeFileSync(
+    path.join(contents, 'Info.plist'),
+    `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>dev.shaulavo.fregat.dev</string>
+<key>CFBundleExecutable</key><string>platform-webview</string>
+<key>CFBundleName</key><string>Fregat Dev</string>
+<key>CFBundleDisplayName</key><string>Fregat Dev</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleIconFile</key><string>Fregat.icns</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>NSHighResolutionCapable</key><true/>
+<key>LSMinimumSystemVersion</key><string>11.0</string>
+</dict></plist>
+`,
+  )
 }
 
 if (import.meta.main) {

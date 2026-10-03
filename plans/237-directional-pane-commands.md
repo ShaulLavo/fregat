@@ -3,7 +3,9 @@
 ## Status and authorization
 
 - Status: APPROVED 2026-09-29, requested by the owner: "implement everything Zed has".
-- Triage: ZT-18, size L. Depends on Plan 206, Plan 209, Plan 234.
+- Triage: ZT-18, size L. Depends on Plan 206 and Plan 234, plus the relevant Plan 209
+  pane/focus/content-capability design contracts. Mixed-content units also need their authorized,
+  delivered hosts; unrelated 209 shell work is not a blanket prerequisite.
 - Inputs: `/work/reports/keymap-wave/zed-feature-triage.md`, its `.json`, and
   `/work/reports/keymap-wave/206-zed-translation.json`. Zed evidence is pinned to `933d8d93`.
 - Plan 234 is an added dependency for untitled creation in NewFileSplitHorizontal.
@@ -60,9 +62,19 @@ contexts, payloads, section order and key equivalents from the translation inven
 rows when their owner exists. The focused node may decline; use the shared dispatcher without
 local shortcut listeners or inline command chords.
 
+## Scoped workspace dependency
+
+Review focus destinations, clone/move capability, retained host placement and maximize/restore
+with 209 before affected units. File-only operations extend the current group owner after
+that contract review. Chat/terminal acceptance requires the relevant mixed-content owners to
+be authorized and delivered; resolving a design question grants no 209 production permission.
+Keep unavailable targets disabled and full mixed-content acceptance open. Preserve 209's D1–D6
+review and separate implementation decision without waiting for unrelated column/locale work.
+
 ## Steps
 
-- [ ] Complete Plan 209 design review and add failing nested-group direction/swap/edge-move fixtures.
+- [ ] Resolve the relevant 209 pane/focus/content-capability contracts and record required host
+      receipts; add failing nested-group direction/swap/edge-move fixtures against the current owner.
 - [ ] Extend pure group operations and geometry selection; preserve IDs, tab state, sizes and focus.
 - [ ] Wire split and zoom with retained terminal/chat hosts and Plan 234 untitled creation.
 - [ ] Register all twenty-four actions and exact direction/focus payloads; add `zed-directional-panes`.
@@ -76,7 +88,7 @@ directions, cycles/focuses indexed and geometric targets, swaps, moves to an edg
 Terminal fixture process identity and chat state survive layout changes; NewFileSplitHorizontal
 creates an unsaved buffer. Focus reaches an adjacent available dock/sidebar through its owner.
 
-Run heavy checks through `bash /work/tmp/wave-heavy/run.sh "<label>" -- env PATH="$PATH" <cmd>`.
+Run heavy checks through the current heavy wrapper in [AGENTS.md](../AGENTS.md#dev-gates-verification).
 Use fixture providers and fixture language servers. Add scenario selectors in
 `scripts/agent/selectors.ts`, run `bun run agent:browser scenario <name>` for the named scenario above, then
 `bun run agent:browser look`; read screenshots back and record the evidence directory. Run `bun run gates`

@@ -302,13 +302,20 @@ export function validateArtifact(artifact) {
     phases.length &&
       new Set(phases).size === phases.length &&
       phases.every((name) =>
-        ['latency', 'ascii', 'sgr', 'rolling-logs', 'rolling-unicode-logs'].includes(name),
+        [
+          'latency',
+          'ascii',
+          'sgr',
+          'rolling-logs',
+          'rolling-unicode-logs',
+          'rolling-slow',
+        ].includes(name),
       ),
     'Incomplete phase matrix',
   )
   assert(Array.isArray(artifact.qualifications), 'Incomplete display evidence')
   const variants = artifact.variants ?? ['ghostty-webgpu', 'xterm-webgl']
-  const known = [...Object.keys(counterparts), ...new Set(Object.values(counterparts))]
+  const known = [...Object.keys(counterparts), ...new Set(Object.values(counterparts).flat())]
   assert(
     variants.length &&
       new Set(variants).size === variants.length &&

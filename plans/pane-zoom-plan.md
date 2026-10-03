@@ -1,10 +1,10 @@
 # Independent pane zoom implementation plan
 
-Status: proposed, implementation not started. Grounded in checkout `3c9b88c3` and the Fable reference checkout.
+Status: Approved, implementation not started. Grounded in checkout `3c9b88c3` and the Fable reference checkout.
 
 Bring Fable's direct zoom gesture to the web workspace: point at a pane and pinch the trackpad, or hold Ctrl and scroll. That pane changes scale immediately and remembers the result.
 
-The user requested independent pane zoom and trackpad support. The scope, limits, persistence model, and reset controls below are proposed implementation defaults.
+The user requested independent pane zoom and trackpad support. The scope, limits, persistence model, and reset controls below are the implementation defaults.
 
 ## Preserve the interaction from Fable
 

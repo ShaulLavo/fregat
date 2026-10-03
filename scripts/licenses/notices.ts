@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import * as v from 'valibot'
-import { createScriptError } from '../structured-errors'
+import { createScriptError } from '../structured-errors.ts'
 
 const packageSchema = v.object({
   name: v.string(),

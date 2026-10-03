@@ -4,7 +4,7 @@ react hooks for [`@fregat/hotkeys`](../hotkeys). a hook registers a shortcut whi
 
 ## try it
 
-not on npm yet. clone the repo and `bun link`, or depend on it as `workspace:*` inside fregat. needs react 18 or newer
+clone the repo and `bun link`, or depend on it as `workspace:*` inside Fregat. needs React 18 or newer
 
 ```tsx
 import { formatForDisplay, useHotkey, useHotkeySequence } from '@fregat/react-hotkeys'

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { constants } from 'node:os'
 
@@ -11,7 +11,7 @@ import {
 } from '../../packages/contracts/src/settings/keys'
 import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
-import { createScriptError, scriptFailureText } from '../structured-errors'
+import { createScriptError, scriptErrors, scriptFailureText } from '../structured-errors'
 import {
   bootSeconds,
   chargeOf,
@@ -32,6 +32,7 @@ import {
   removeSlice,
   startJob,
   stopTimeoutSeconds,
+  DEADLINE_START_SECONDS,
   type Host,
   type JobOutcome,
   type JobSpec,
@@ -370,6 +371,7 @@ function clearHolder(holder: string) {
 
 type Cancelled = { readonly cancelled: NodeJS.Signals }
 type Deferred = { readonly retry: true; readonly reason: string }
+type Blocked = { readonly reason: string; readonly quiet?: Entry }
 type Admitted = {
   readonly held: Held
   readonly slots: readonly number[]
@@ -413,7 +415,25 @@ async function admit(
       if (cancellation.signal.aborted)
         return { cancelled: cancellation.signal.reason as NodeJS.Signals }
       if ('retry' in attempt) return attempt
-      if (performance.now() - started >= nextNotice) {
+      const elapsedMs = performance.now() - started
+      // A healthy predecessor owns its full startup, runtime and cleanup budget.
+      if (
+        attempt.quiet &&
+        elapsedMs >= config.quietHoldSeconds * 1000 &&
+        bootSeconds() >= (attempt.quiet.quietUntil ?? 0)
+      ) {
+        const predecessor = attempt.quiet
+        const slice = `${predecessor.sliceRoot}-${predecessor.id}.slice`
+        const state = sliceState(predecessor.sliceRoot, slice)
+        console.error(`[wave-heavy] warn: quiet lease '${predecessor.label}' still holds admission`)
+        throw scriptErrors.HEAVY_QUIET_BLOCKED({
+          label: predecessor.label,
+          slice,
+          state,
+          internal: { elapsedMs, predecessorId: predecessor.id, sliceState: state },
+        })
+      }
+      if (elapsedMs >= nextNotice) {
         console.error(`[wave-heavy] '${options.label}' is waiting: ${attempt.reason}`)
         nextNotice += WAIT_NOTICE_MS
       }
@@ -439,7 +459,7 @@ async function attemptAdmission(
   config: Config,
   waiting: Held,
   cancellation: AbortSignal,
-): Promise<Admitted | Deferred | { reason: string }> {
+): Promise<Admitted | Deferred | Blocked> {
   const lock = tryLock(path.join(options.stateDir, 'admission.lock'))
   if (lock === null) return { reason: 'another wrapper is admitting a job' }
   let timeout: ReturnType<typeof setTimeout> | undefined
@@ -455,6 +475,8 @@ async function attemptAdmission(
     const running = await reconcile(options, config.graceSeconds, signal)
     const expired = expiredAdmission(waiting.entry, config.quietHoldSeconds)
     if (expired) return expired
+    const quiet = running.quietHolders[0]
+    if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}`, quiet }
     if (signal.aborted) return { reason: 'orphan reconciliation was interrupted' }
     const ahead = live(options.stateDir, 'queue').findIndex(
       (entry) => entry.id === waiting.entry.id,
@@ -465,8 +487,6 @@ async function attemptAdmission(
     const hold = legacyHold(options.stateDir, SLOT_FILES)
     if (hold) return { reason: hold }
     const now = bootSeconds()
-    const quiet = running.owners.find((job) => job.quiet && (job.quietUntil ?? Infinity) > now)
-    if (quiet) return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}` }
     const serversAtAdmission = running.owners
       .filter((job) => job.server)
       .map(({ id, label, pid, cwd, sliceRoot }) => ({ id, label, pid, cwd, sliceRoot }))
@@ -490,7 +510,13 @@ async function attemptAdmission(
       return { reason: 'a slot lock was taken exclusively' }
     }
     const lease = waiting.entry.quiet
-      ? { quietUntil: now + config.quietHoldSeconds + stopTimeoutSeconds(config.graceSeconds) }
+      ? {
+          quietUntil:
+            now +
+            DEADLINE_START_SECONDS +
+            config.quietHoldSeconds +
+            stopTimeoutSeconds(config.graceSeconds),
+        }
       : {}
     const held = promote(options.stateDir, waiting, lease)
     // Servers pass the external-lock admission gate, then retain only their entry lock.
@@ -530,8 +556,15 @@ async function reconcile(options: Options, graceSeconds: number, signal: AbortSi
     if (signal.aborted) break
     await settleDeadEntry(job, signal)
   }
-  clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
-  return { orphanCharges, owners }
+  // A dead quiet entry remains until its slice is empty and the manager has stopped it.
+  const quietHolders = [
+    ...owners.filter((job) => job.quiet),
+    ...dead.flatMap((job) =>
+      job.attributable && job.entry.quiet && existsSync(job.file) ? [job.entry] : [],
+    ),
+  ]
+  clearQuietHolder(options.stateDir, (holder) => !quietHolders.some((job) => job.id === holder))
+  return { orphanCharges, owners, quietHolders }
 }
 
 // A slice that outlives its stop stays charged and is retried quietly on each later pass. A
@@ -575,9 +608,8 @@ function forgetStoppedFailures(stateDir: string) {
   }
 }
 
-// A dead entry is the only record of a slice on another root, so it stays until that slice is
-// gone, or empty and stopped; a stop that failed is retried, and charged, on the next pass. An
-// entry this wrapper did not write names nothing and is dropped.
+// A dead entry is the only record of a slice on another root. Keep it until its cgroup is
+// drained and manager cleanup succeeds; an unattributable entry names nothing and is dropped.
 async function settleDeadEntry(job: DeadJob, signal: AbortSignal) {
   if (!job.attributable) {
     console.error(`[wave-heavy] dropped ${job.file}: not a job entry a wrapper wrote`)
@@ -586,7 +618,7 @@ async function settleDeadEntry(job: DeadJob, signal: AbortSignal) {
   const slice = `${job.entry.sliceRoot}-${job.entry.id}.slice`
   const state = sliceState(job.entry.sliceRoot, slice)
   if (state === 'running') return
-  if (state === 'empty' && !(await removeSlice(slice, signal))) return
+  if (!(await removeSlice(slice, signal))) return
   rmSync(job.file, { force: true })
 }
 

@@ -33,8 +33,12 @@ export async function ensureInstalledApp(cdp: Pick<CdpClient, 'request'>, url: s
   } catch (error) {
     const internal = (error as { internal?: Record<string, unknown> }).internal
     if (internal?.protocolReason !== 'unknown-app') throw error
-    await request('PWA.install', { manifestId, installUrlOrBundleUrl: manifestId })
+    await request('PWA.install', {
+      manifestId,
+      installUrlOrBundleUrl: new URL('install.html', manifestId).href,
+    })
     await state()
   }
+  await request('PWA.changeAppUserSettings', { manifestId, displayMode: 'standalone' })
   return { manifestId, appId }
 }

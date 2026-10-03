@@ -1,4 +1,5 @@
 import { test } from 'node:test'
+import { fixtureNames } from '../bench/comparison-fixtures.ts'
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -82,7 +83,7 @@ test('phase selection retains explicit narrow phases and rejects malformed value
 
 test('output fixture defaults to ASCII and accepts exactly one committed manifest fixture', async () => {
   const { outputFixture } = await import('./comparison-options.mjs')
-  const fixtures = [{ name: 'ascii' }, { name: 'logs' }, { name: 'rolling-logs' }]
+  const fixtures = fixtureNames.map((name) => ({ name }))
   assert.equal(outputFixture([], fixtures), 'ascii')
   for (const name of fixtures.map(({ name }) => name))
     assert.equal(outputFixture(['--output-fixture', name], fixtures), name)
@@ -93,11 +94,14 @@ test('output fixture defaults to ASCII and accepts exactly one committed manifes
 
 test('trace phases preserve defaults and accept committed output fixtures', async () => {
   const { selectedTracePhases } = await import('./comparison-options.mjs')
-  const fixtures = ['ascii', 'sgr', 'logs', 'rolling-logs'].map((name) => ({ name }))
+  const fixtures = fixtureNames.map((name) => ({ name }))
   assert.deepEqual(selectedTracePhases([], fixtures), ['latency', 'ascii', 'sgr'])
   assert.deepEqual(selectedTracePhases(['--trace-phase', 'rolling-logs,latency'], fixtures), [
     'rolling-logs',
     'latency',
+  ])
+  assert.deepEqual(selectedTracePhases(['--trace-phase', 'rolling-slow'], fixtures), [
+    'rolling-slow',
   ])
   for (const value of [undefined, '', 'unknown', 'rolling-logs,rolling-logs'])
     assert.throws(() => selectedTracePhases(['--trace-phase', value], fixtures))
@@ -110,7 +114,9 @@ test('even repetitions remain at least four and selected native/counterpart orde
     assert.throws(() => measurementRepetitions(['--repetitions', value], 4))
   assert.equal(measurementRepetitions([], 4), 4)
   for (const repetitions of [4, 6, 8]) {
-    const variants = Object.keys(counterparts).concat([...new Set(Object.values(counterparts))])
+    const variants = Object.keys(counterparts).concat([
+      ...new Set(Object.values(counterparts).flat()),
+    ])
     const before = Object.fromEntries(Object.keys(counterparts).map((native) => [native, 0]))
     for (let repetition = 0; repetition < repetitions; repetition++) {
       const cases = measurementCases(variants, ['bytes', 'string'], [1, 17], repetition)
@@ -125,7 +131,7 @@ test('even repetitions remain at least four and selected native/counterpart orde
               .sort(),
             ['ghostty-webgl', 'ghostty-webgpu'],
           )
-          for (const [native, counterpart] of Object.entries(counterparts)) {
+          for (const [native, [counterpart]] of Object.entries(counterparts)) {
             if (
               selected.findIndex((entry) => entry.variant === native) <
               selected.findIndex((entry) => entry.variant === counterpart)
@@ -245,6 +251,7 @@ for (const tracing of [false, true]) {
       tracing,
       gpuCommandTimeout,
       createGpuGate,
+      platform: () => 'linux',
       randomUUID,
       smoke: false,
       repetitions: settings.repetitions,
@@ -254,6 +261,7 @@ for (const tracing of [false, true]) {
       accessibility: 'off',
       measurementCases,
       tickSeconds: null,
+      cpuTickSource: null,
       counts: [1],
       variantIds: [],
       phases: [],
@@ -302,3 +310,29 @@ for (const tracing of [false, true]) {
     }
   })
 }
+
+test('explicit browser executable preserves paths with spaces and rejects missing values', async () => {
+  const { browserExecutable } = await import('./comparison-options.mjs')
+  assert.equal(browserExecutable([]), undefined)
+  const path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  assert.equal(browserExecutable(['--browser-executable', path]), path)
+  assert.throws(() => browserExecutable(['--browser-executable']))
+  assert.throws(() => browserExecutable(['--browser-executable', '--smoke']))
+})
+
+test('Mac installed-browser arguments preserve Canvas primary and explicit secondary selection', async () => {
+  const { browserExecutable, hardwareLaunch, selectedVariants } =
+    await import('./comparison-options.mjs')
+  const { variants } = await import('../bench/comparison-fixtures.ts')
+  const path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  const available = variants.map(({ id }) => id)
+  for (const [selection, expected] of [
+    ['ghostty-canvas', ['ghostty-canvas', 'ghostty-web']],
+    ['ghostty-canvas,xterm-dom', ['ghostty-canvas', 'xterm-dom', 'ghostty-web']],
+  ]) {
+    const args = ['--browser-executable', path, '--variants', selection]
+    assert.equal(browserExecutable(args), path)
+    assert.deepEqual(hardwareLaunch('darwin', false), { headless: false, arguments: [] })
+    assert.deepEqual(selectedVariants(args, available, []), expected)
+  }
+})

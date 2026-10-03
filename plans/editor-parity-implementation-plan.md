@@ -1,9 +1,17 @@
 > [!IMPORTANT]
-> **STATUS: 🟢 CURRENT (reconciled 2026-08-24).** Living product roadmap, not an executable plan.
+> **STATUS: 🟢 CURRENT (reconciled 2026-08-24).** Retained product groups, with current approvals linked below.
 > E0 is complete and E1 is partially landed. Root [`PLAN.md`](../PLAN.md) is the only execution
 > scheduler; linked files under `plans/` are the executable handoffs. Companion analysis:
 > [editor-parity-gap-matrix.md](../docs/editor-parity-gap-matrix.md). The beyond-parity vision layer lives in
 > [editor-1000-parity-plan.md](editor-1000-parity-plan.md) (this plan is its dimension D1).
+
+Current decision reconciliation, 2026-10-03: preserve E0–E9 as product groups. Newer approved
+plans own changed decisions: [208 localization](208-all-text-in-json.md),
+[262 notebooks](262-notebook-cells.md), [266 profiles](266-settings-navigation-profiles.md),
+[268 lifecycle](268-extension-packages-lifecycle.md) and [269 extension manager](269-extension-manager.md).
+Their scopes and gates supersede conflicting earlier deferrals below. Settings sync,
+collaboration and other exclusions retain their own decisions. [PLAN.md](../PLAN.md) schedules
+execution across all packages.
 
 # Editor Mode Parity Plan — VS Code / NeuralInverse / Athas
 

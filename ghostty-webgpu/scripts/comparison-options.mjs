@@ -43,8 +43,8 @@ export function selection(args, flag, fallback, allowed) {
   return selected
 }
 
-export function hardwareLaunch(host, smoke, smokeHeaded = false) {
-  const headless = host === 'linux' ? !smokeHeaded : smoke && !smokeHeaded
+export function hardwareLaunch(host, smoke, headed = false) {
+  const headless = host === 'linux' ? !headed : smoke && !headed
   const arguments_ =
     host === 'linux' && !smoke
       ? ['--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist']
@@ -52,11 +52,20 @@ export function hardwareLaunch(host, smoke, smokeHeaded = false) {
   return { headless, arguments: arguments_ }
 }
 
+export function browserExecutable(args) {
+  const index = args.indexOf('--browser-executable')
+  if (index < 0) return undefined
+  const path = args[index + 1]
+  assert(path && !path.startsWith('--'), '--browser-executable needs a path')
+  return path
+}
+
+// The primary is selected automatically; secondary comparisons require explicit selection.
 export const counterparts = {
-  'ghostty-webgpu': 'xterm-webgl',
-  'ghostty-webgl': 'xterm-webgl',
-  'ghostty-canvas': 'ghostty-web',
-  'ghostty-dom': 'xterm-dom',
+  'ghostty-webgpu': ['xterm-webgl'],
+  'ghostty-webgl': ['xterm-webgl'],
+  'ghostty-canvas': ['ghostty-web', 'xterm-dom'],
+  'ghostty-dom': ['xterm-dom'],
 }
 
 export const measurementPhases = ['parser', 'memory', 'idle', 'latency', 'burst', 'output']
@@ -64,7 +73,7 @@ export const measurementPhases = ['parser', 'memory', 'idle', 'latency', 'burst'
 export function selectedVariants(args, available, fallback) {
   const selected = [...selection(args, '--variants', fallback, available)]
   for (const native of selected) {
-    const counterpart = counterparts[native]
+    const counterpart = counterparts[native]?.[0]
     if (counterpart && !selected.includes(counterpart)) selected.push(counterpart)
   }
   return selected
