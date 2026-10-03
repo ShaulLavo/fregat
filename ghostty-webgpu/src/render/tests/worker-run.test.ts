@@ -121,3 +121,23 @@ it.each(['error', 'complete'] as const)('requires the expected %s terminal signa
   if (signal === 'complete') collector.recordError(error)
   expect(collector.result()).toBeUndefined()
 })
+
+it.each([
+  ['complete', ['error', 'complete']],
+  ['complete', ['complete', 'error']],
+  ['error', ['error', 'complete']],
+  ['error', ['complete', 'error']],
+] as const)('latches conflicting signals for expected %s in order %j', (signal, events) => {
+  const collector = new WorkerRunCollector(signal)
+  collector.recordProducer(producer)
+  collector.recordMessage({ type: 'result', observation })
+  collector.recordMessage({ type: 'disposed', cleanup })
+  for (const event of events) {
+    if (event === 'error') collector.recordError('unexpected worker failure')
+    if (event === 'complete') collector.recordMessage({ type: 'complete' })
+  }
+  expect(collector.result()).toBeUndefined()
+  if (signal === 'error') collector.recordError(error)
+  if (signal === 'complete') collector.recordMessage({ type: 'complete' })
+  expect(collector.result()).toBeUndefined()
+})

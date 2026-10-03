@@ -21,7 +21,7 @@ export class WorkerRunCollector {
   private observation?: WorkerObservation
   private cleanup?: WorkerCleanup
   private producer?: ProducerObservation
-  private signal?: TerminalSignal
+  private signal?: TerminalSignal | { readonly type: 'invalid' }
   private readonly messageTypes: string[] = []
 
   constructor(private readonly expectedSignal: TerminalSignal['type']) {}
@@ -30,7 +30,7 @@ export class WorkerRunCollector {
     this.messageTypes.push(message.type)
     if (message.type === 'result') this.observation = message.observation
     if (message.type === 'disposed') this.cleanup = message.cleanup
-    if (message.type === 'complete') this.signal = message
+    if (message.type === 'complete') this.recordSignal(message)
   }
 
   recordProducer(observation: ProducerObservation): void {
@@ -38,7 +38,12 @@ export class WorkerRunCollector {
   }
 
   recordError(error: string): void {
-    this.signal = { type: 'error', error }
+    this.recordSignal({ type: 'error', error })
+  }
+
+  private recordSignal(signal: TerminalSignal): void {
+    if (this.signal?.type === 'invalid') return
+    this.signal = signal.type === this.expectedSignal ? signal : { type: 'invalid' }
   }
 
   result(): WorkerRun | undefined {
