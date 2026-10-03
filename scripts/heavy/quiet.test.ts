@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
@@ -273,6 +273,163 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     30_000,
   )
 
+  test('unreadable advisory turn metadata preserves admission and quiet completion', async () => {
+    const box = quietBox(600)
+    mkdirSync(path.join(box.state, 'quiet.turn'))
+    const result = await heavy(box, 'unreadable-turn', ['true'], {
+      jobClass: 'light',
+      machine: true,
+      quiet: true,
+    })
+    expect(result.code, result.stderr).toBe(0)
+    expect(result.stderr).toContain('could not read fair turn')
+    expect(result.stderr).toContain('could not remove fair turn')
+    expect(live(box.state, 'jobs')).toEqual([])
+    for (const slot of ['slot1.lock', 'slot2.lock', 'slot3.lock']) {
+      const fd = tryLock(path.join(box.state, slot))
+      expect(fd).not.toBeNull()
+      if (fd !== null) unlock(fd)
+    }
+    expect(
+      (await heavy(box, 'after-unreadable-turn', ['true'], { jobClass: 'light', machine: true }))
+        .code,
+    ).toBe(0)
+  }, 30_000)
+
+  test.each([0, 7])(
+    'completion observed after the deadline preserves the command exit code (%s)',
+    async (exitCode) => {
+      const box = quietBox(600)
+      const finished = path.join(box.root, 'finished')
+      const releaseCommand = path.join(box.root, 'release-command')
+      const job = start(
+        box,
+        'delayed-observation',
+        [
+          'bash',
+          '-c',
+          `echo started; ${until(releaseCommand)}; touch ${JSON.stringify(finished)}; exit ${exitCode}`,
+        ],
+        { jobClass: 'light', machine: true, maxWallSec: 1 },
+      )
+      await expect.poll(job.stdout, { timeout: 10_000 }).toContain('started')
+      job.child.kill('SIGSTOP')
+      try {
+        await expect
+          .poll(() => readFileSync(`/proc/${job.child.pid}/status`, 'utf8'), { timeout: 10_000 })
+          .toMatch(/^State:\s+T/m)
+        writeFileSync(releaseCommand, '')
+        await expect.poll(() => existsSync(finished), { timeout: 10_000 }).toBe(true)
+        const owner = live(box.state, 'jobs').find(
+          (entry) => entry.label === 'delayed-observation',
+        )!
+        const scope = `${box.sliceRoot}-${owner.id}.scope`
+        await expect.poll(() => unitActive(scope), { timeout: 10_000 }).toBe(false)
+        await expect
+          .poll(() => Date.now() - Date.parse(owner.since), { timeout: 10_000 })
+          .toBeGreaterThan(2200)
+      } finally {
+        job.child.kill('SIGCONT')
+      }
+      const result = await job.done
+      expect(result.code, result.stderr).toBe(exitCode)
+      expect(result.stderr).not.toContain('--max-wall limit')
+      expect(recordOf(box, 'delayed-observation')).toMatchObject({ exitCode })
+    },
+    30_000,
+  )
+
+  test('a quiet launch delayed beyond its admitted budget cannot overlap ordinary work', async () => {
+    const box = quietBox(600)
+    const paused = path.join(box.root, 'paused')
+    const launched = path.join(box.root, 'launched')
+    const releaseOrdinary = path.join(box.root, 'release-ordinary')
+    const preload = path.join(box.root, 'pause-launch.ts')
+    writeFileSync(
+      preload,
+      `
+      import { writeFileSync } from 'node:fs'
+      const spawn = Bun.spawnSync.bind(Bun)
+      Bun.spawnSync = (...args) => {
+        if (Array.isArray(args[0]) && args[0].includes('set-property')) {
+          writeFileSync(${JSON.stringify(paused)}, '')
+          process.kill(process.pid, 'SIGSTOP')
+        }
+        return spawn(...args)
+      }
+    `,
+    )
+    const quiet = start(box, 'late-launch', ['touch', launched], {
+      jobClass: 'light',
+      machine: true,
+      quiet: true,
+      maxWallSec: 1,
+      preload,
+    })
+    await expect.poll(() => existsSync(paused), { timeout: 10_000 }).toBe(true)
+    try {
+      const ordinary = start(
+        box,
+        'ordinary-after-lease',
+        ['bash', '-c', `echo started; ${until(releaseOrdinary)}`],
+        {
+          jobClass: 'light',
+          machine: true,
+        },
+      )
+      await expect.poll(ordinary.stdout, { timeout: 15_000 }).toContain('started')
+      quiet.child.kill('SIGCONT')
+      const result = await quiet.done
+      expect(result.code, result.stderr).toBe(124)
+      expect(existsSync(launched)).toBe(false)
+      expect(recordOf(box, 'late-launch')).toMatchObject({ exitCode: 124, quietHoldExpired: false })
+      expect(recordOf(box, 'ordinary-after-lease')).toBeUndefined()
+      writeFileSync(releaseOrdinary, '')
+      expect((await ordinary.done).code).toBe(0)
+    } finally {
+      quiet.child.kill('SIGCONT')
+      writeFileSync(releaseOrdinary, '')
+    }
+  }, 30_000)
+
+  test('explicit cancellation reaches a live shim after its accounting file opens', async () => {
+    const box = quietBox(600)
+    const bin = path.join(box.root, 'bin')
+    const marker = path.join(box.root, 'accounting-open')
+    const releaseAccounting = path.join(box.root, 'release-accounting')
+    mkdirSync(bin)
+    const cat = path.join(bin, 'cat')
+    writeFileSync(
+      cat,
+      `#!/usr/bin/env bash
+      case "$1" in
+        */memory.peak)
+          touch ${JSON.stringify(marker)}
+          ${until(releaseAccounting)}
+          ;;
+      esac
+      command -p cat "$@"
+    `,
+    )
+    chmodSync(cat, 0o755)
+    const job = start(box, 'cancel-accounting', ['true'], {
+      jobClass: 'light',
+      machine: true,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    })
+    try {
+      await expect.poll(() => existsSync(marker), { timeout: 10_000 }).toBe(true)
+      job.child.kill('SIGTERM')
+      await expect.poll(() => recordOf(box, 'cancel-accounting'), { timeout: 10_000 }).toBeDefined()
+      const result = await job.done
+      expect(result.code).toBe(0)
+      expect(existsSync(releaseAccounting)).toBe(false)
+      expect(live(box.state, 'jobs')).toEqual([])
+    } finally {
+      writeFileSync(releaseAccounting, '')
+    }
+  }, 30_000)
+
   test('a hold that runs out stops the quiet job, tells it to queue again, and frees the machine', async () => {
     const box = quietBox(2)
     const quiet = start(box, 'long', sleeper(60), { jobClass: 'light', machine: true, quiet: true })
@@ -329,25 +486,11 @@ describe.skipIf(!userScopes)('quiet holds', () => {
   }, 30_000)
 
   test('a quiet hold ends even while its wrapper is suspended', async () => {
-    const box = quietBox(600)
-    const elapsed = path.join(box.root, 'elapsed')
-    const preload = path.join(box.root, 'clock.ts')
-    writeFileSync(elapsed, '0')
-    writeFileSync(
-      preload,
-      `
-      import { readFileSync } from 'node:fs'
-      const now = performance.now.bind(performance)
-      Object.defineProperty(performance, 'now', {
-        value: () => now() + Number(readFileSync(${JSON.stringify(elapsed)}, 'utf8')),
-      })
-    `,
-    )
+    const box = quietBox(2)
     const quiet = start(box, 'frozen', sleeper(60), {
       jobClass: 'light',
       machine: true,
       quiet: true,
-      preload,
     })
     await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('started')
     const owner = live(box.state, 'jobs').find((entry) => entry.label === 'frozen')!
@@ -361,7 +504,12 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       'RuntimeMaxUSec',
       '--value',
     ])
-    expect(runtime.stdout.toString().trim()).toBe('10min')
+    const duration = /^(\d+(?:\.\d+)?)(ms|us|s)$/.exec(runtime.stdout.toString().trim())
+    expect(duration).not.toBeNull()
+    const divisor = { s: 1, ms: 1_000, us: 1_000_000 }
+    const scopeLimit = Number(duration![1]) / divisor[duration![2] as keyof typeof divisor]
+    expect(scopeLimit).toBeGreaterThan(0)
+    expect(scopeLimit).toBeLessThanOrEqual(2)
     quiet.child.kill('SIGSTOP')
     try {
       await expect
@@ -369,18 +517,9 @@ describe.skipIf(!userScopes)('quiet holds', () => {
           timeout: 10_000,
         })
         .toMatch(/^State:\s+T/m)
-      // Inject the watchdog's stop and advance both clocks while the wrapper cannot run.
-      writeFileSync(elapsed, '601000')
-      const expired = spawnSync('systemctl', ['--user', 'stop', scope])
-      expect(expired.status).toBe(0)
       await expect.poll(() => unitActive(scope), { timeout: 10_000 }).toBe(false)
-      writeFileSync(
-        path.join(box.state, 'jobs', `${owner.id}.json`),
-        JSON.stringify({
-          ...owner,
-          quietUntil: bootSeconds() - 1,
-        }),
-      )
+      const result = spawnSync('systemctl', ['--user', 'show', scope, '-p', 'Result', '--value'])
+      expect(result.stdout.toString().trim()).toBe('timeout')
       const next = await heavy(box, 'after-frozen', ['true'], { jobClass: 'light', machine: true })
       expect(next.code).toBe(0)
       expect(sliceState(box.sliceRoot, slice)).not.toBe('running')

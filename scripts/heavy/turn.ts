@@ -32,11 +32,11 @@ export function turnQueue(
   if (holder && (holder.quietUntil ?? Infinity) > now) return queue
   // A dead or suspended wrapper may never finish its turn; the next admission snapshots it.
   const waitingIds = turn.waitingIds ?? nonQuietIds(queue)
-  if (turn.waitingIds === undefined) writeTurn(stateDir, { ...turn, waitingIds })
+  if (turn.waitingIds === undefined && !writeTurn(stateDir, { ...turn, waitingIds })) return queue
   const ids = new Set(waitingIds)
   const cohort = queue.filter((entry) => !entry.quiet && ids.has(entry.id))
   if (cohort.length === 0) {
-    rmSync(turnFile(stateDir), { force: true })
+    removeTurn(stateDir)
     return queue
   }
   return [...cohort, ...queue.filter((entry) => !ids.has(entry.id))]
@@ -51,12 +51,18 @@ function turnFile(stateDir: string) {
 }
 
 function readTurn(stateDir: string): Turn | null {
-  const text = unlessMissing(() => readFileSync(turnFile(stateDir), 'utf8'))
-  if (text === null) return null
-  const turn = parseTurn(text)
-  if (turn) return turn
-  rmSync(turnFile(stateDir), { force: true })
-  console.error('[wave-heavy] ignored invalid fair-turn metadata; FIFO admission continues')
+  try {
+    const text = unlessMissing(() => readFileSync(turnFile(stateDir), 'utf8'))
+    if (text === null) return null
+    const turn = parseTurn(text)
+    if (turn) return turn
+    removeTurn(stateDir)
+    console.error('[wave-heavy] ignored invalid fair-turn metadata; FIFO admission continues')
+  } catch (error) {
+    console.error(
+      `[wave-heavy] could not read fair turn; FIFO admission continues: ${scriptFailureText(error)}`,
+    )
+  }
   return null
 }
 
@@ -77,16 +83,28 @@ function isId(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{12}$/.test(value)
 }
 
+function removeTurn(stateDir: string) {
+  try {
+    rmSync(turnFile(stateDir), { force: true })
+  } catch (error) {
+    console.error(
+      `[wave-heavy] could not remove fair turn; FIFO admission continues: ${scriptFailureText(error)}`,
+    )
+  }
+}
+
 function writeTurn(stateDir: string, turn: Turn) {
   const file = turnFile(stateDir)
   const partial = `${file}.partial`
   try {
     writeFileSync(partial, JSON.stringify(turn))
     renameSync(partial, file)
+    return true
   } catch (error) {
-    rmSync(file, { force: true })
+    removeTurn(stateDir)
     console.error(
       `[wave-heavy] could not save fair turn; FIFO admission continues: ${scriptFailureText(error)}`,
     )
+    return false
   }
 }

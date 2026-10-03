@@ -111,6 +111,7 @@ export type JobOutcome = JobAccounting & {
   readonly unit: string
   readonly exitCode: number
   readonly wallMs: number
+  readonly runtimeLimitExpired: boolean
 }
 
 type JobBase = {
@@ -137,8 +138,8 @@ export type JobSpec =
        * launcher may still start the job.
        */
       readonly entryLock: number
-      /** Wall-clock limit systemd enforces on the job's scope; null for none. */
-      readonly runtimeLimitSeconds: number | null
+      /** Monotonic deadline set at admission; null for unlimited running time. */
+      readonly runtimeDeadlineSeconds: number | null
     })
   | (JobBase & { readonly host: 'pi'; readonly maxWallSec?: number })
 
@@ -156,8 +157,27 @@ export function startJob(job: JobSpec) {
   const started = performance.now()
   let child: ReturnType<typeof Bun.spawn>
   try {
+    const command = launchCommand(job, unit, accountingFile)
+    if (command === null) {
+      if (slice) removeSlice(slice)
+      return {
+        done: Promise.resolve<JobOutcome>({
+          unit,
+          slice,
+          exitCode: 124,
+          wallMs: Math.round(performance.now() - started),
+          runtimeLimitExpired: true,
+          memoryPeakBytes: null,
+          cpuUsageUsec: null,
+          oomKills: null,
+          leftoverProcesses: null,
+        }),
+        stop: () => false,
+        stopAtDeadline: () => false,
+      }
+    }
     child = Bun.spawn({
-      cmd: launchCommand(job, unit, accountingFile),
+      cmd: command,
       cwd: job.cwd,
       env: {
         ...process.env,
@@ -184,8 +204,10 @@ export function startJob(job: JobSpec) {
   }
   let escalation: ReturnType<typeof setTimeout> | undefined
   const stop = (signal: NodeJS.Signals) => {
+    if (child.exitCode !== null || child.signalCode !== null) return false
     signalJob(signal)
     escalation ??= setTimeout(() => signalJob('SIGKILL'), job.graceSeconds * 1000)
+    return true
   }
 
   const done = child.exited
@@ -193,13 +215,71 @@ export function startJob(job: JobSpec) {
       const signalCode = child.signalCode
       const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
       const wallMs = Math.round(performance.now() - started)
-      return { exitCode, slice, unit, wallMs, ...readAccounting(accountingFile) }
+      const runtimeLimitExpired =
+        job.host === 'local' &&
+        job.runtimeDeadlineSeconds !== null &&
+        scopeExpired(unit, job.runtimeDeadlineSeconds)
+      return {
+        exitCode,
+        slice,
+        unit,
+        wallMs,
+        runtimeLimitExpired,
+        ...readAccounting(accountingFile),
+      }
     })
     .finally(() => {
       clearTimeout(escalation)
       if (slice) removeSlice(slice)
     })
-  return { done, stop }
+  const stopAtDeadline = () => {
+    // Accounting can finish while a suspended wrapper has yet to observe child.exited.
+    if (existsSync(accountingFile)) {
+      const state = Bun.spawnSync(
+        ['systemctl', '--user', 'show', unit, '-p', 'ActiveState', '--value'],
+        {
+          stdout: 'pipe',
+          stderr: 'ignore',
+        },
+      )
+        .stdout.toString()
+        .trim()
+      if (state !== 'active' && state !== 'activating' && state !== 'deactivating') return false
+    }
+    return stop('SIGTERM')
+  }
+  return { done, stop, stopAtDeadline }
+}
+
+function scopeExpired(unit: string, deadline: number) {
+  const result = Bun.spawnSync(
+    [
+      'systemctl',
+      '--user',
+      'show',
+      unit,
+      '-p',
+      'Result',
+      '-p',
+      'ActiveState',
+      '-p',
+      'InactiveEnterTimestampMonotonic',
+    ],
+    { stdout: 'pipe', stderr: 'ignore' },
+  )
+  const values = new Map(
+    result.stdout
+      .toString()
+      .trim()
+      .split('\n')
+      .map((line) => line.split('=') as [string, string | undefined]),
+  )
+  if (values.get('Result') === 'timeout') return true
+  // systemd-run can reset Result after a timeout; the failed state and native end time remain.
+  return (
+    values.get('ActiveState') === 'failed' &&
+    Number(values.get('InactiveEnterTimestampMonotonic')) / 1_000_000 >= deadline
+  )
 }
 
 /** How long systemd waits for a stopped scope: the shim's TERM grace, then its KILL settle. */
@@ -217,10 +297,15 @@ function launchCommand(job: JobSpec, unit: string, accountingFile: string) {
   const launch = { accountingFile, command: job.command, unit }
   if (job.host === 'pi') return piCommand({ ...launch, maxWallSec: job.maxWallSec })
   limitSlice(jobSlice(job), job.ceilingBytes)
+  const remaining =
+    job.runtimeDeadlineSeconds === null
+      ? null
+      : job.runtimeDeadlineSeconds - Number(process.hrtime.bigint()) / 1_000_000_000
+  if (remaining !== null && remaining <= 0) return null
   return localCommand({
     ...launch,
     graceSeconds: job.graceSeconds,
-    runtimeLimitSeconds: job.runtimeLimitSeconds,
+    runtimeLimitSeconds: remaining,
     slice: jobSlice(job),
   })
 }

@@ -222,20 +222,26 @@ async function run(options: Options) {
       process.on(signal, () => job.stop(signal))
     }
     const limitSeconds = options.host === 'local' ? runtimeLimit(options, config) : null
-    const limitMs = limitSeconds === null ? Infinity : limitSeconds * 1000
+    const limitMs =
+      placed.spec.host === 'local' && placed.spec.runtimeDeadlineSeconds !== null
+        ? Math.max(
+            0,
+            (placed.spec.runtimeDeadlineSeconds - Number(process.hrtime.bigint()) / 1_000_000_000) *
+              1000,
+          )
+        : Infinity
     const quietLimit = options.quiet && limitSeconds === config.quietHoldSeconds
     let stoppedAtLimit = false
     // Long limits are enforced by systemd; JS timers overflow beyond signed 32-bit delays.
     const deadline =
       limitMs <= 2 ** 31 - 1
         ? setTimeout(() => {
-            stoppedAtLimit = true
-            job.stop('SIGTERM')
+            stoppedAtLimit = job.stopAtDeadline()
           }, limitMs)
         : undefined
     const outcome = await job.done
     clearTimeout(deadline)
-    const expired = stoppedAtLimit || outcome.wallMs >= limitMs
+    const expired = stoppedAtLimit || outcome.runtimeLimitExpired
     const wallExpired = expired && !quietLimit
     if (wallExpired) {
       console.error(
@@ -323,7 +329,10 @@ async function admitLocal(
       host: 'local',
       id,
       sliceRoot: options.sliceRoot,
-      runtimeLimitSeconds: runtimeLimit(options, config),
+      runtimeDeadlineSeconds:
+        runtimeLimit(options, config) === null
+          ? null
+          : admitted.startedAt + runtimeLimit(options, config)!,
       entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
@@ -378,7 +387,12 @@ function clearHolder(holder: string) {
   }
 }
 
-type Admitted = { readonly held: Held; readonly slots: readonly number[]; readonly reason: string }
+type Admitted = {
+  readonly held: Held
+  readonly slots: readonly number[]
+  readonly reason: string
+  readonly startedAt: number
+}
 
 // FIFO within each turn: a small job never overtakes a large one waiting for memory.
 async function admit(options: Options, config: Config, entry: Entry): Promise<Admitted> {
@@ -407,6 +421,7 @@ function attemptAdmission(
   try {
     // Every waiting wrapper reclaims what dead wrappers left, before any rule can stop it.
     const running = reconcile(options, config.graceSeconds)
+    const startedAt = Number(process.hrtime.bigint()) / 1_000_000_000
     const now = bootSeconds()
     const queue = turnQueue(options.stateDir, live(options.stateDir, 'queue'), running.owners, now)
     const ahead = queue.findIndex((entry) => entry.id === waiting.entry.id)
@@ -441,6 +456,7 @@ function attemptAdmission(
     if (waiting.entry.quiet) beginQuietTurn(options.stateDir, waiting.entry.id)
     return {
       held: promote(options.stateDir, waiting, lease),
+      startedAt,
       reason: decision.reason,
       slots: taken,
     }
