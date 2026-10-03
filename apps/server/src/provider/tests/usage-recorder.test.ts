@@ -18,7 +18,7 @@ import type { ProviderPriceCatalog } from '../price-catalog'
 import { ProviderUsageHistoryReader } from '../usage-history'
 import { ProviderUsageRecorder } from '../usage-recorder'
 import { claudeTranscriptUsage, codexRolloutUsage } from '../utils/imported-usage'
-import type { ProviderUsageTotals } from '../utils/usage-totals'
+import { codexUsageTotals, type ProviderUsageTotals } from '../utils/usage-totals'
 
 const INSTANCE = v.parse(providerInstanceIdSchema, 'claude')
 const SESSION = v.parse(sessionIdSchema, 'ee84050b-1b17-5fe8-9f71-0983f1fceccc')
@@ -29,6 +29,138 @@ afterEach(() => {
 })
 
 describe('provider usage recorder', () => {
+  it('keeps cost baselines and numeric contributions intact during a sparse cache-only correction', () => {
+    const fixture = recorderFixture()
+    fixture.recorder.accept(
+      totalsEvent('first', [
+        totals({
+          inputTokens: 100,
+          costUsd: 0.4,
+          reportedCache: { readTokens: 40, writeTokens: null },
+        }),
+      ]),
+      'turn',
+    )
+    fixture.restart().accept(
+      totalsEvent('first', [
+        totals({
+          inputTokens: 100,
+          costUsd: null,
+          reportedCache: { readTokens: 40, writeTokens: 25 },
+        }),
+      ]),
+      'turn',
+    )
+    expect(fixture.rows()[0]).toMatchObject({
+      costUsd: 0.4,
+      inputTokens: 100,
+      contributions: [
+        expect.objectContaining({
+          after: expect.objectContaining({ costUsd: 0.4, inputTokens: 100 }),
+        }),
+      ],
+    })
+    fixture.restart().accept(
+      totalsEvent('second', [
+        totals({
+          inputTokens: 120,
+          costUsd: 0.5,
+          reportedCache: { readTokens: 60, writeTokens: 30 },
+        }),
+      ]),
+      'turn',
+    )
+    expect(fixture.rows()[1]?.costUsd).toBeCloseTo(0.1)
+    expect(fixture.history().totals.costUsd).toBeCloseTo(0.5)
+  })
+
+  it('retains a late optional cache observation without adding tokens, cost, or a turn', () => {
+    const fixture = recorderFixture(() => null, 'codex')
+    const reading = {
+      cachedInputTokens: 60,
+      inputTokens: 100,
+      outputTokens: 30,
+      reasoningOutputTokens: 0,
+      totalTokens: 130,
+    }
+    fixture.recorder.accept(
+      totalsEvent('late', [codexUsageTotals('thread', 'gpt-test', false, reading)]),
+      'turn',
+    )
+    const before = fixture.history().totals
+    const known = codexUsageTotals('thread', 'gpt-test', false, {
+      ...reading,
+      cacheWriteInputTokens: 25,
+    })
+    fixture.restart().accept(totalsEvent('late', [known]), 'turn')
+    fixture.restart().accept(totalsEvent('late', [known]), 'turn')
+    expect(fixture.history().totals).toEqual(before)
+    expect(fixture.readSession().cache?.turns[0]).toMatchObject({ readTokens: 60, writeTokens: 25 })
+    expect(fixture.rows()).toHaveLength(1)
+  })
+
+  it('leaves a turn cache share unknown when an auxiliary scope omitted its counters', () => {
+    const fixture = recorderFixture()
+    fixture.recorder.accept(
+      totalsEvent('mixed', [
+        totals({ inputTokens: 10, reportedCache: { readTokens: 40, writeTokens: 60 } }),
+        totals({ inputTokens: 5, model: 'auxiliary', scope: 'child' }),
+      ]),
+      'turn',
+    )
+    expect(fixture.readSession().cache?.turns[0]).toMatchObject({
+      readTokens: null,
+      writeTokens: null,
+      writeShare: null,
+    })
+  })
+
+  it('preserves cache counter presence through restart and keeps billing totals unchanged', () => {
+    const fixture = recorderFixture(() => null, 'codex')
+    const reading = (
+      inputTokens: number,
+      cachedInputTokens: number,
+      outputTokens: number,
+      cacheWriteInputTokens?: number,
+    ) =>
+      codexUsageTotals('thread', 'gpt-test', false, {
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+        reasoningOutputTokens: 0,
+        totalTokens: inputTokens + outputTokens,
+        ...(cacheWriteInputTokens === undefined ? {} : { cacheWriteInputTokens }),
+      })
+    fixture.recorder.accept(totalsEvent('first', [reading(100, 20, 10)]), 'turn')
+    fixture.restart().accept(totalsEvent('second', [reading(150, 60, 20, 30)]), 'turn')
+    fixture.restart().accept(totalsEvent('third', [reading(200, 90, 30, 50)]), 'turn')
+    fixture.restart().accept(totalsEvent('third', [reading(200, 90, 30, 50)]), 'turn')
+
+    expect(fixture.rows()[0]?.contributions[0]?.after.reportedCache).toEqual({
+      readTokens: 20,
+      writeTokens: null,
+    })
+    const total = fixture.readSession()
+    expect(total).toMatchObject({ tokens: 230, turns: 3, costUsd: null })
+    expect(total.cache?.turns.find((turn) => turn.turnId === 'first')).toMatchObject({
+      readTokens: 20,
+      writeTokens: null,
+      writeShare: null,
+    })
+    expect(total.cache?.turns.find((turn) => turn.turnId === 'second')).toMatchObject({
+      readTokens: 40,
+      writeTokens: null,
+      writeShare: null,
+    })
+    expect(total.cache?.turns.find((turn) => turn.turnId === 'third')).toMatchObject({
+      readTokens: 30,
+      writeTokens: 20,
+      writeShare: 0.4,
+    })
+    expect(fixture.rows()).toHaveLength(3)
+    expect(fixture.rows().every((row) => row.cacheWriteTokens === 0)).toBe(true)
+  })
+
   it('counts the first resumed turn after receiving its pre-turn native baseline', () => {
     const { recorder, rows } = recorderFixture()
     const before = totalsEvent('resumed', [
@@ -560,6 +692,7 @@ function recorderFixture(
       new ProviderUsageHistoryReader(database, {
         now: () => Date.parse('2026-09-25T12:00:00.000Z'),
       }).read({ days: 7, utcOffsetMinutes: 0 }),
+    readSession: () => new ProviderUsageHistoryReader(database).readSession(SESSION),
     rows: () => database.select().from(schema.providerUsageTurns).all(),
   }
 }

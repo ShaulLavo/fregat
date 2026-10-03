@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { codexUsageTotals, usageDelta, type ProviderUsageAmounts } from '../utils/usage-totals'
+import {
+  claudeUsageTotals,
+  codexUsageTotals,
+  usageDelta,
+  type ProviderUsageAmounts,
+} from '../utils/usage-totals'
 
 const ZERO: ProviderUsageAmounts = {
   cacheReadTokens: 0,
@@ -40,4 +45,37 @@ it('splits Codex cached input out of its input count', () => {
       totalTokens: 130,
     }),
   ).toMatchObject({ cacheReadTokens: 60, costUsd: null, inputTokens: 40, reasoningTokens: 12 })
+})
+
+it('retains optional Codex cache writes diagnostically without changing accounting', () => {
+  const reading = {
+    cachedInputTokens: 60,
+    inputTokens: 100,
+    outputTokens: 30,
+    reasoningOutputTokens: 12,
+    totalTokens: 130,
+  }
+  const missing = codexUsageTotals('thread', 'gpt-test', false, reading)
+  const known = codexUsageTotals('thread', 'gpt-test', false, {
+    ...reading,
+    cacheWriteInputTokens: 25,
+  })
+  expect(missing.reportedCache).toEqual({ readTokens: 60, writeTokens: null })
+  expect(known.reportedCache).toEqual({ readTokens: 60, writeTokens: 25 })
+  expect(known).toMatchObject({ inputTokens: 40, cacheReadTokens: 60, cacheWriteTokens: 0 })
+})
+
+it('keeps complete Claude cache zeros and leaves missing auxiliary counters unknown', () => {
+  const readings = claudeUsageTotals('conversation', false, {
+    main: {
+      inputTokens: 100,
+      outputTokens: 10,
+      costUSD: 0.01,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 20,
+    },
+    auxiliary: { inputTokens: 5, outputTokens: 1, costUSD: 0.001 },
+  })
+  expect(readings[0]?.reportedCache).toEqual({ readTokens: 0, writeTokens: 20 })
+  expect(readings[1]?.reportedCache).toEqual({ readTokens: null, writeTokens: null })
 })

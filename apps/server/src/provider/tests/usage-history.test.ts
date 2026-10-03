@@ -4,6 +4,12 @@ import type { ProviderUsagePurpose } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
+import { OrchestrationProjectionPipeline } from '../../orchestration/projection-pipeline'
+import {
+  DOMAIN_IDS,
+  domainBootstrap,
+  domainEvent,
+} from '../../orchestration/tests/factories/session-domain'
 import { ProviderUsageHistoryReader } from '../usage-history'
 
 // 2026-09-25 10:00 in UTC+3, the viewer's zone below.
@@ -16,6 +22,81 @@ afterEach(() => {
 })
 
 describe('provider usage history', () => {
+  it('joins retained turn timestamps without substituting the usage observation time', () => {
+    const fixture = historyFixture()
+    const pipeline = new OrchestrationProjectionPipeline(fixture.database)
+    pipeline.applyEvents(domainBootstrap())
+    pipeline.applyEvents([
+      domainEvent(
+        'session.turn-provider-started',
+        {
+          origin: 'provider',
+          sessionId: DOMAIN_IDS.session,
+          turnId: DOMAIN_IDS.turn,
+          runtimeEpoch: 'fixture-epoch',
+          createdAt: '2026-09-25T05:00:00.000Z',
+        },
+        4,
+      ),
+      domainEvent(
+        'session.message-sent',
+        {
+          sessionId: DOMAIN_IDS.session,
+          turnId: DOMAIN_IDS.turn,
+          messageId: 'answer',
+          role: 'assistant',
+          text: 'Done',
+          attachments: [],
+          streaming: false,
+          createdAt: '2026-09-25T05:01:00.000Z',
+          updatedAt: '2026-09-25T05:02:00.000Z',
+        },
+        5,
+      ),
+    ])
+    fixture.insert({
+      sessionId: DOMAIN_IDS.session,
+      turnId: DOMAIN_IDS.turn,
+      recordedAt: '2026-09-25T06:00:00.000Z',
+    })
+    const turn = fixture.readSession(DOMAIN_IDS.session).cache?.turns[0]
+    expect(turn).toMatchObject({
+      requestedAt: '2026-09-25T05:00:00.000Z',
+      startedAt: '2026-09-25T05:00:00.000Z',
+      completedAt: '2026-09-25T05:02:00.000Z',
+      recordedAt: '2026-09-25T06:00:00.000Z',
+    })
+  })
+
+  it('keeps legacy cache presence unknown, excludes utility turns, and bounds recent chat turns', () => {
+    const fixture = historyFixture()
+    for (let index = 0; index < 7; index += 1)
+      fixture.insert({
+        turnId: `turn-${index}`,
+        recordedAt: `2026-09-25T06:0${index}:00.000Z`,
+        cacheReadTokens: 100,
+      })
+    fixture.insert({ turnId: 'title', purpose: 'title', recordedAt: '2026-09-25T06:09:00.000Z' })
+    const cache = fixture.readSession('session-1').cache
+    expect(cache?.turns.map((turn) => turn.turnId)).toEqual([
+      'turn-6',
+      'turn-5',
+      'turn-4',
+      'turn-3',
+      'turn-2',
+    ])
+    expect(cache?.turns[0]).toMatchObject({
+      readTokens: null,
+      writeTokens: null,
+      writeShare: null,
+      requestedAt: null,
+      startedAt: null,
+      completedAt: null,
+    })
+    expect(cache?.readTokens).toBeNull()
+    expect(cache?.writeTokens).toBeNull()
+  })
+
   it('groups by the viewer’s calendar day and starts the range at their midnight', () => {
     const fixture = historyFixture()
     // 23:30 UTC on the 23rd is 02:30 on the 24th in UTC+3.
@@ -138,6 +219,7 @@ describe('provider usage history', () => {
     expect(total).toMatchObject({ tokens: 450, turns: 2, unpricedTokens: 150 })
     expect(total.costUsd).toBeCloseTo(0.4)
     expect(fixture.readSession('empty')).toEqual({
+      cache: { turns: [], readTokens: null, writeTokens: null, writeShare: null },
       costUsd: null,
       tokens: 0,
       turns: 0,
@@ -186,6 +268,7 @@ function historyFixture() {
   const reader = new ProviderUsageHistoryReader(database, { now: () => NOW })
 
   return {
+    database,
     insert: (row: TurnRow) =>
       database
         .insert(schema.providerUsageTurns)
