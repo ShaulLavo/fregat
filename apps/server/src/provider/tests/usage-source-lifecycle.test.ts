@@ -179,6 +179,28 @@ test('clearing the proxy URL through settings stops collection while retaining m
   expect(
     after.coverage.sources.filter((entry) => entry.sourceKind === 'native-transcript'),
   ).toEqual(before.coverage.sources.filter((entry) => entry.sourceKind === 'native-transcript'))
+  const restored = await app.handle(
+    new Request('http://local/settings/write', {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        mutationId: 'restore-proxy-source',
+        target: 'user',
+        operations: [{ kind: 'set', key: 'providers.proxyUsageUrl', value: source.url }],
+      }),
+    }),
+  )
+  expect(restored.status).toBe(200)
+  await vi.waitFor(async () => {
+    const returned = (await collector.read()).accounts.find(
+      (account) => account.source === 'cli-proxy-management',
+    )
+    expect(returned).toMatchObject({
+      checkedAt: observedAt,
+      windows: [{ usedPercent: 25, observedAt }],
+    })
+  })
+  expect(nativeProbes).toBe(0)
 })
 
 test.each([
