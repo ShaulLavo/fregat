@@ -15,12 +15,14 @@ export type ProviderUsageReading = Omit<ProviderUsageWindow, 'usedPercent'> & {
 export type ProviderUsageUpdate = {
   planType: string | null
   windows: ProviderUsageReading[]
+  credits?: { balance: number; unlimited: boolean } | null
 }
 
-/** A full read replaces the account's windows; `unsupported` means no plan limits apply. */
+/** A probe contributes observed windows; `unsupported` means no plan limits apply. */
 export type ProviderUsageProbe =
   | {
       kind: 'reading'
+      identityFingerprint?: string
       update: ProviderUsageUpdate
       resetCredits?: { available: number; accountKey: string; creditId: string | null } | null
     }
@@ -82,7 +84,7 @@ export function claudeUsageUpdate(
         ...window,
         resetsAt: isoFromEpochSeconds(info.resetsAt),
         status: blocking ? 'rejected' : claudeCoveredStatus(info),
-        usedPercent: blocking && usedPercent === null ? 100 : usedPercent,
+        usedPercent,
       },
     ],
   }
@@ -131,7 +133,12 @@ function claudeScopedWindow(displayName: string) {
  * `get_usage` reports every window at once, 0–100 with ISO resets. The first scoped
  * model that drew a row is the one the stream's overage-included event refers to.
  */
-export function claudeUsageProbe(response: SDKControlGetUsageResponse): {
+export function claudeUsageProbe(
+  response: Pick<
+    SDKControlGetUsageResponse,
+    'rate_limits_available' | 'rate_limits' | 'subscription_type'
+  >,
+): {
   probe: ProviderUsageProbe
   scopedModel: string | null
 } {
@@ -209,30 +216,35 @@ function probeWindow(
 export function codexUsageUpdate(snapshot: CodexRateLimitSnapshot): ProviderUsageUpdate {
   if (snapshot.limitId && snapshot.limitId !== 'codex') return { planType: null, windows: [] }
 
-  const monthlyPlan = snapshot.planType === 'free' || snapshot.planType === 'go'
   const creditsCover = Boolean(snapshot.credits?.hasCredits || snapshot.credits?.unlimited)
   const positions = [
-    ['primary', snapshot.primary, monthlyPlan ? MONTH_MINUTES : SESSION_MINUTES],
-    ['secondary', snapshot.secondary, WEEK_MINUTES],
+    ['primary', snapshot.primary],
+    ['secondary', snapshot.secondary],
   ] as const
   const windows: ProviderUsageReading[] = []
-  for (const [id, window, fallbackMinutes] of positions) {
+  for (const [id, window] of positions) {
     if (!window || !Number.isFinite(window.usedPercent)) continue
 
-    windows.push(codexWindow(id, window, fallbackMinutes, creditsCover))
+    windows.push(codexWindow(id, window, creditsCover))
   }
 
-  return { planType: planLabel(snapshot.planType), windows }
+  const balance = Number(snapshot.credits?.balance)
+  const credits =
+    snapshot.credits?.balance != null && Number.isFinite(balance) && balance >= 0
+      ? { balance, unlimited: Boolean(snapshot.credits?.unlimited) }
+      : null
+  return { planType: planLabel(snapshot.planType), windows, credits }
 }
 
 function codexWindow(
   id: string,
   window: CodexRateLimitWindow,
-  fallbackMinutes: number,
   creditsCover: boolean,
 ): ProviderUsageReading {
-  const windowMinutes = window.windowDurationMins ?? fallbackMinutes
-  const kind = kindForMinutes(windowMinutes)
+  const duration = window.windowDurationMins
+  const windowMinutes =
+    typeof duration === 'number' && Number.isFinite(duration) && duration > 0 ? duration : null
+  const kind = windowMinutes === null ? 'other' : kindForMinutes(windowMinutes)
   const usedPercent = clampPercent(window.usedPercent)
 
   return {
@@ -247,23 +259,24 @@ function codexWindow(
 }
 
 // A full read carries no early warning; a spent window is the one state it implies.
-function spentWindowStatus(usedPercent: number, covered: boolean) {
-  if (usedPercent < 100) return null
+function spentWindowStatus(usedPercent: number | null, covered: boolean) {
+  if (usedPercent === null || usedPercent < 100) return null
 
   return covered ? 'warning' : 'rejected'
 }
 
 function kindForMinutes(minutes: number): ProviderUsageWindowKind {
-  if (minutes >= MONTH_MINUTES) return 'monthly'
-  if (minutes >= WEEK_MINUTES) return 'weekly'
+  if (minutes === MONTH_MINUTES) return 'monthly'
+  if (minutes === WEEK_MINUTES) return 'weekly'
 
-  return 'session'
+  if (minutes === SESSION_MINUTES) return 'session'
+  return 'other'
 }
 
 /**
  * Windows upsert by id; one the update omits keeps its last values, and a reading
- * without a percentage or a reset keeps the known one. A reading with no percentage
- * for a window never seen is dropped. Returns `previous` itself when nothing changed.
+ * without a percentage keeps the known one within that reset epoch. Status-only
+ * windows remain visible. Returns `previous` itself when nothing changed.
  */
 export function mergeUsageWindows<Windows extends readonly ProviderUsageWindow[]>(
   previous: Windows,
@@ -288,8 +301,9 @@ function mergedWindow(
   existing: ProviderUsageWindow | undefined,
   reading: ProviderUsageReading,
 ): ProviderUsageWindow | null {
-  const usedPercent = reading.usedPercent ?? existing?.usedPercent
-  if (usedPercent === undefined) return null
+  const sameEpoch =
+    !reading.resetsAt || !existing?.resetsAt || reading.resetsAt === existing.resetsAt
+  const usedPercent = reading.usedPercent ?? (sameEpoch ? existing?.usedPercent : null) ?? null
 
   return {
     ...reading,
@@ -297,17 +311,6 @@ function mergedWindow(
     usedPercent,
     windowMinutes: reading.windowMinutes ?? existing?.windowMinutes ?? null,
   }
-}
-
-/** A full read: the windows it names, nothing carried over. */
-export function probedUsageWindows(update: readonly ProviderUsageReading[]) {
-  const windows: ProviderUsageWindow[] = []
-  for (const reading of update) {
-    const window = mergedWindow(undefined, reading)
-    if (window) windows.push(window)
-  }
-
-  return sortUsageWindows(windows)
 }
 
 const KIND_ORDER: Record<ProviderUsageWindowKind, number> = {
@@ -331,7 +334,9 @@ function sameWindow(left: ProviderUsageWindow, right: ProviderUsageWindow) {
     left.usedPercent === right.usedPercent &&
     left.resetsAt === right.resetsAt &&
     left.windowMinutes === right.windowMinutes &&
-    left.status === right.status
+    left.status === right.status &&
+    left.observedAt === right.observedAt &&
+    left.source === right.source
   )
 }
 
@@ -376,7 +381,8 @@ export function stoppingUsageWindow(windows: readonly ProviderUsageWindow[], atM
 
 function isStoppingWindow(window: ProviderUsageWindow, atMs: number) {
   if (window.status === 'warning') return false
-  if (window.usedPercent < 100 && window.status !== 'rejected') return false
+  if ((window.usedPercent === null || window.usedPercent < 100) && window.status !== 'rejected')
+    return false
 
   return resetMs(window) > atMs
 }
@@ -394,13 +400,14 @@ function planLabel(planType: string | null | undefined) {
 }
 
 function clampPercent(value: number) {
-  if (!Number.isFinite(value)) return 0
+  if (!Number.isFinite(value)) return null
 
   return Math.min(100, Math.max(0, value))
 }
 
 function isoFromEpochSeconds(value: number | null | undefined) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 253402300799)
+    return null
 
   return new Date(value * 1000).toISOString()
 }

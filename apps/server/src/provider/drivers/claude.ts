@@ -18,7 +18,7 @@ export type ClaudeDriverConfig = v.InferOutput<typeof claudeConfigSchema>
 
 export const claudeDriver: ProviderDriver<ClaudeDriverConfig> = {
   capabilities: { ...CLAUDE_ADAPTER_CAPABILITIES, multiInstance: true },
-  credentialPaths: ({ config }) => [path.join(claudeConfigDir(config), '.credentials.json')],
+  credentialPaths: ({ env }) => [path.join(claudeConfigDir(env), '.credentials.json')],
   create: async (input) => {
     const adapter = new ClaudeProviderAdapter({
       ...(input.services.agentDiagnostics
@@ -46,6 +46,6 @@ function claudeEnvironment(config: ClaudeDriverConfig): ProviderEnvironmentVaria
   return [{ name: 'CLAUDE_CONFIG_DIR', value: config.configDir }]
 }
 
-function claudeConfigDir(config: ClaudeDriverConfig) {
-  return config.configDir ?? path.join(homedir(), '.claude')
+function claudeConfigDir(env: NodeJS.ProcessEnv) {
+  return env.CLAUDE_CONFIG_DIR ?? path.join(env.HOME ?? homedir(), '.claude')
 }

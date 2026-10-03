@@ -21,13 +21,13 @@ export class ProviderResetCredits {
 
   private readonly database: PlatformDatabase
   private readonly registry: Registry
-  private readonly usage: Pick<ProviderUsageStore, 'read' | 'refreshAccount'>
+  private readonly usage: Pick<ProviderUsageStore, 'read' | 'refreshAccount' | 'suspendCollection'>
   private readonly now: () => number
 
   constructor(
     database: PlatformDatabase,
     registry: Registry,
-    usage: Pick<ProviderUsageStore, 'read' | 'refreshAccount'>,
+    usage: Pick<ProviderUsageStore, 'read' | 'refreshAccount' | 'suspendCollection'>,
     now: () => number = Date.now,
   ) {
     this.database = database
@@ -42,7 +42,14 @@ export class ProviderResetCredits {
     const observer = new MutationObserver(this.client, {
       mutationKey: ['provider', 'reset-credit', input.accountKey],
       scope: { id: `reset-credit:${input.accountKey}` },
-      mutationFn: () => this.run(instanceId, input),
+      mutationFn: async () => {
+        const resume = this.usage.suspendCollection(this.target(instanceId).credentialAccountKey)
+        try {
+          return await this.run(instanceId, input)
+        } finally {
+          resume()
+        }
+      },
       retry: false,
     })
     return observer.mutate()
@@ -81,7 +88,6 @@ export class ProviderResetCredits {
       throw resetError('UNAVAILABLE', 'Reset credits are unavailable for this provider.', 409)
     return {
       consume: adapter.consumeResetCredit.bind(adapter),
-      read: adapter.readUsage.bind(adapter),
       credentialAccountKey: account.accountKey,
     }
   }
@@ -141,8 +147,12 @@ export class ProviderResetCredits {
     input: ProviderResetCreditBody,
   ): Promise<ProviderResetCreditResult> {
     const target = this.target(instanceId)
-    const reading = await target.read().catch(() => null)
-    if (reading?.kind !== 'reading' || reading.resetCredits?.accountKey !== input.accountKey)
+    const confirmed = await this.usage.refreshAccount(target.credentialAccountKey)
+    const usage = await this.usage.read()
+    const reading = usage.accounts.find(
+      (account) => account.accountKey === target.credentialAccountKey,
+    )
+    if (!confirmed || reading?.resetCredits?.accountKey !== input.accountKey)
       throw resetError(
         'ACCOUNT_CHANGED',
         'The signed-in account changed. Refresh usage before confirming a reset.',
