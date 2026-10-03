@@ -16,17 +16,24 @@ export class BrowserProvenanceError extends Error {
 }
 
 function headlessFlag(argument) {
-  return /^--headless(?:=.*)?$/.test(argument) || argument === '--ozone-platform=headless'
+  return (
+    argument === '--headless' ||
+    argument.startsWith('--headless=') ||
+    argument === '--ozone-platform=headless'
+  )
 }
 
 function observedEnvironment(browserVersion, tokens, requestedHeadless, executable) {
   const unknown = tokens.some(
     (arg) =>
-      headlessFlag(arg) && !/^(?:--headless(?:=new|=old)?|--ozone-platform=headless)$/.test(arg),
+      headlessFlag(arg) &&
+      !['--headless', '--headless=new', '--headless=old', '--ozone-platform=headless'].includes(
+        arg,
+      ),
   )
   const headless =
     browserVersion.product.startsWith('HeadlessChrome/') ||
-    /\bHeadlessChrome\//.test(browserVersion.userAgent ?? '') ||
+    /\bHeadlessChrome\//.test(browserVersion.userAgent) ||
     tokens.some(headlessFlag) ||
     /(?:^|\/)(?:chrome-headless-shell|headless_shell)(?: \(deleted\))?$/.test(executable ?? '')
   let launchMode = headless ? 'headless' : 'headed'
@@ -247,6 +254,10 @@ export async function observeOwnedBrowserProvenance({
 
   const browserVersion = await session.send('Browser.getVersion')
   assert.equal(browserVersion.product, expectedProduct, 'Actual browser product/build must match')
+  assert(
+    typeof browserVersion.userAgent === 'string' && browserVersion.userAgent.trim().length > 0,
+    'Actual browser user agent must be non-empty text',
+  )
   const { processInfo } = await session.send('SystemInfo.getProcessInfo')
   assert(Array.isArray(processInfo), 'CDP process snapshot required')
   const browsers = processInfo.filter(

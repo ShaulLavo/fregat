@@ -364,7 +364,10 @@ test('launch mode follows actual product and exact OS tokens', async () => {
     const headlessProduct = 'HeadlessChrome/154.0.8037.93'
     assert.equal(
       (
-        await boundary({ platform, version: { product: headlessProduct } }).observe({
+        await boundary({
+          platform,
+          version: { product: headlessProduct, userAgent: 'Mozilla/5.0 ' + headlessProduct },
+        }).observe({
           expectedProduct: headlessProduct,
         })
       ).environment.launchMode,
