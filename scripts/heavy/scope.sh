@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside a systemd scope, so the cgroup still exists when the command exits and its totals
 # can be read. Bash, not Bun: this process is counted in the memory peak.
-# Usage: scope.sh [--slice] [--grace <seconds>] <accounting file> <command…>
+# Usage: scope.sh [--slice] [--grace <seconds>] [--runtime <seconds>] <accounting file> <command…>
 # --slice: the job is the scope's parent slice (this scope and the scopes nested-scope.sh opened
 # beside it). Without it the job is this scope alone, as for a bench case inside a job.
 # --grace: seconds the job's leftover processes get between TERM and KILL (default 10).
@@ -13,17 +13,38 @@
 exec 6<&-
 whole_slice=
 grace=10
-while [ "${1:-}" = --slice ] || [ "${1:-}" = --grace ]; do
-  if [ "$1" = --slice ]; then
-    whole_slice=1
-    shift
-    continue
-  fi
-  grace=$2
+runtime=
+while [ "${1:-}" = --slice ] || [ "${1:-}" = --grace ] || [ "${1:-}" = --runtime ]; do
+  case "$1" in
+    --slice) whole_slice=1; shift; continue ;;
+    --grace) grace=$2 ;;
+    --runtime) runtime=$2 ;;
+  esac
   shift 2
 done
 out=$1
 shift
+trap 'exit 125' INT TERM HUP
+if [ -n "$runtime" ]; then
+  read -r started _ </proc/uptime || exit 125
+  deadline=$((10#${started/./} + runtime * 100))
+  slice=${HEAVY_JOB_SLICE:?}
+  [[ "$slice" =~ ^[a-z0-9]+-[a-z0-9]+\.slice$ ]] || exit 125
+  watchdog=${slice%.slice}_deadline.service
+  script=$(dirname -- "$0")/deadline.sh
+  # Readiness gates execution. Arming inside the scope keeps a delayed launcher from recreating
+  # a slice after its watchdog has expired; fd 6 protected that launcher until entry above.
+  systemd-run --user --quiet --collect --expand-environment=no --unit="$watchdog" --slice=app.slice \
+    -p Type=notify -p NotifyAccess=all -p "TimeoutStartSec=$((grace + 3))s" \
+    -p "RuntimeMaxSec=$((runtime + grace))s" -p KillSignal=SIGKILL -p TimeoutStopSec=1s \
+    -p "ExecStopPost=/usr/bin/env systemctl --user kill --signal=SIGKILL $slice" \
+    bash -p "$script" "$slice" "$runtime" "$grace" 3<&- 4<&- 5<&- || exit 125
+  systemctl --user is-active --quiet "$watchdog" || exit 125
+  # The service stays active during grace. A late readiness return must also have runtime left,
+  # even if TERM was missed; /proc/uptime is monotonic and reports centiseconds.
+  read -r now _ </proc/uptime || exit 125
+  [ "$((10#${now/./}))" -lt "$deadline" ] || exit 125
+fi
 trap : INT TERM HUP
 "$@" 3<&- 4<&- 5<&-
 rc=$?

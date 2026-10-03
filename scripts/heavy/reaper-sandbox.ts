@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 /** A filesystem and manager stand-in. No command reaches the user systemd manager. */
-export function reaperSandbox(operation: string = '') {
+export function reaperSandbox(operation: string = '', watchdogLoaded = false) {
   const root = mkdtempSync(path.join(tmpdir(), 'heavy-reaper-'))
   const sliceRoot = `heavyt${randomBytes(4).toString('hex')}`
   const state = path.join(root, 'state')
@@ -52,12 +52,13 @@ import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 const args = Bun.argv.slice(2)
 const operation = args[1]
-const slice = args.at(-1)
+const slice = operation === 'show' ? args[2] : args.at(-1)
 appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ operation, slice, pid: process.pid }) + '\\n')
 if (operation === ${JSON.stringify(operation)}) {
   while (!existsSync(${JSON.stringify(gate)})) await Bun.sleep(20)
 }
-if (operation === 'stop') writeFileSync(path.join(${JSON.stringify(cgroups)}, ${JSON.stringify(`${sliceRoot}.slice`)}, slice, 'cgroup.events'), 'populated 0\\n')
+if (operation === 'show') console.log(${JSON.stringify(watchdogLoaded ? 'loaded' : 'not-found')})
+if (operation === 'stop' && slice.endsWith('.slice')) writeFileSync(path.join(${JSON.stringify(cgroups)}, ${JSON.stringify(`${sliceRoot}.slice`)}, slice, 'cgroup.events'), 'populated 0\\n')
 `,
     { mode: 0o755 },
   )
@@ -108,7 +109,7 @@ if (operation === 'stop') writeFileSync(path.join(${JSON.stringify(cgroups)}, ${
     return job
   }
 
-  const lifecycle = (): { operation: string; slice: string; pid: number }[] =>
+  const managerCalls = (): { operation: string; slice: string; pid: number }[] =>
     existsSync(calls)
       ? readFileSync(calls, 'utf8')
           .trim()
@@ -116,8 +117,10 @@ if (operation === 'stop') writeFileSync(path.join(${JSON.stringify(cgroups)}, ${
           .map((line) => JSON.parse(line))
       : []
 
+  const lifecycle = () => managerCalls().filter(({ slice }) => slice.endsWith('.slice'))
+
   function managerChildren() {
-    return lifecycle().filter(({ pid }) => {
+    return managerCalls().filter(({ pid }) => {
       try {
         return readFileSync(`/proc/${pid}/cmdline`, 'utf8')
           .split('\0')
@@ -143,6 +146,7 @@ if (operation === 'stop') writeFileSync(path.join(${JSON.stringify(cgroups)}, ${
     cleanup,
     gate,
     lifecycle,
+    managerCalls,
     managerChildren,
     root,
     sliceRoot,

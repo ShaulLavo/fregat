@@ -46,6 +46,19 @@ test('a local job runs in its slice, and the shim accounts for the whole slice',
   ])
 })
 
+test('a finite local job gives the shim its whole-slice runtime budget', () => {
+  const command = localCommand({
+    ...launch,
+    graceSeconds: 1,
+    runtimeLimitSeconds: 9,
+    slice: 'heavy-1.slice',
+  })
+  expect(command).toContain('RuntimeMaxSec=9s')
+  const runtime = command.indexOf('--runtime')
+  expect(runtime).toBeGreaterThan(command.indexOf(SCOPE_SHIM))
+  expect(command.slice(runtime, runtime + 2)).toEqual(['--runtime', '9'])
+})
+
 const locks = process.platform === 'linux' ? await import('./lock').catch(() => null) : null
 
 function assertReleased(box: ReturnType<typeof reaperSandbox>) {
@@ -198,3 +211,64 @@ test('a locked owner keeps its slice while a neighboring orphan is reaped', asyn
     await box.cleanup()
   }
 }, 10_000)
+
+test.for(['show', 'stop'])(
+  'quiet admission bounds a stalled deadline service %s',
+  { timeout: 10_000 },
+  async (operation, context) => {
+    if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+    const box = reaperSandbox(operation, operation === 'stop')
+    const orphan = box.addSlice('aaaaaaaaaaaa')
+    const watchdog = `${orphan.slice(0, -'.slice'.length)}_deadline.service`
+    writeFileSync(path.join(box.state, 'drain.request'), `pid=${process.pid} holder=fixture`)
+    try {
+      const job = box.start()
+      await expect
+        .poll(
+          () =>
+            box
+              .managerCalls()
+              .some((call) => call.operation === operation && call.slice === watchdog),
+          { timeout: 1500 },
+        )
+        .toBe(true)
+      await expect.poll(() => job.child.exitCode, { timeout: 4500 }).toBe(75)
+      expect(await job.done).toBe(75)
+      expect(job.stderr()).toContain('wait reached its 2 s limit')
+      expect(box.lifecycle().map((call) => call.operation)).toEqual(['kill'])
+      assertReleased(box)
+    } finally {
+      await box.cleanup()
+    }
+  },
+)
+
+test.for(['show', 'stop'])(
+  'cancellation drains a stalled deadline service %s before releasing admission',
+  { timeout: 10_000 },
+  async (operation, context) => {
+    if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+    const box = reaperSandbox(operation, operation === 'stop')
+    const orphan = box.addSlice('aaaaaaaaaaaa')
+    const watchdog = `${orphan.slice(0, -'.slice'.length)}_deadline.service`
+    try {
+      const job = box.start(false)
+      await expect
+        .poll(
+          () =>
+            box
+              .managerCalls()
+              .some((call) => call.operation === operation && call.slice === watchdog),
+          { timeout: 1500 },
+        )
+        .toBe(true)
+      job.child.kill('SIGTERM')
+      await expect.poll(() => job.child.exitCode, { timeout: 1500 }).toBe(143)
+      expect(await job.done).toBe(143)
+      expect(box.lifecycle().map((call) => call.operation)).toEqual(['kill'])
+      assertReleased(box)
+    } finally {
+      await box.cleanup()
+    }
+  },
+)
