@@ -67,7 +67,9 @@ test('Mod+Enter commits once through the focused message field', async () => {
     runGit(repo, ['add', 'feature.ts'], { cwdMode: 'option' })
     renderControls('repo', true)
     const input = screen.getByRole('textbox', { name: 'Commit message' })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeEnabled())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^Commit(?:\s|$)/ })).toBeEnabled(),
+    )
     await userEvent.type(input, 'feat: add shortcut proof')
     const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
     await userEvent.keyboard(`{${modifier}>}{Enter}{/${modifier}}`)

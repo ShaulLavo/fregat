@@ -1,3 +1,6 @@
+import { detectPlatform } from '@fregat/hotkeys'
+import type { KeybindingPreset } from '@workspace/client-core/commands/metadata'
+import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { Toaster } from '@workspace/ui/components/sonner'
 import { toast } from 'sonner'
 import { SessionDialogs } from '@/components/session-dialogs'
@@ -210,6 +213,7 @@ export function renderInRailHarness(
   harness: RailHarness,
   children: ReactNode,
   focusService?: FocusService,
+  preset: KeybindingPreset = 'ours',
 ) {
   return renderWithProviders(
     <EditorStateProvider runtime={harness.application.getSnapshot().editor}>
@@ -217,6 +221,7 @@ export function renderInRailHarness(
     </EditorStateProvider>,
     {
       application: harness.application,
+      command: { bindings: defaultPlatformKeyBindings(detectPlatform(), preset) },
       focusService,
       queryClient: harness.application.getSnapshot().queryClient,
     },
@@ -228,11 +233,14 @@ export function renderRailHarness(
   header = false,
   onRender: ProfilerOnRenderCallback = () => {},
   focusService?: FocusService,
+  preset: KeybindingPreset = 'ours',
+  children?: ReactNode,
 ) {
   const row = firstRow(harness)
   return renderInRailHarness(
     harness,
     <ChatRailOrderProvider>
+      {children}
       {header ? (
         <StageHeader
           contextUsage={null}
@@ -250,6 +258,7 @@ export function renderRailHarness(
       <ProjectRenameDialog />
     </ChatRailOrderProvider>,
     focusService,
+    preset,
   )
 }
 

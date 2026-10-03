@@ -1,5 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { detectPlatform } from '@fregat/hotkeys'
 import type { FocusArea, FocusTargetId } from '@workspace/client-core/commands/focus'
 import {
@@ -27,6 +28,9 @@ import { useSessionActions } from '@/features/chat-mode/hooks/use-session-action
 import { reorderRailSession } from '@/features/chat-mode/state/rail-order-commands'
 import { railMarkerId } from '@workspace/client-core/chat/rail/drop'
 import { scopedSessionKey } from '@workspace/contracts'
+import { fileOperationHistoryQuery } from '@/features/workspace/state/file-operations'
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
+import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { FocusService } from '@/lib/focus/state/service'
 import { getNavigation } from '@/state/navigation-binding'
 import { createRailHarness, renderRailHarness } from '../../../../../test/factories/rail-harness'
@@ -67,12 +71,34 @@ function focusNeutral() {
   return button
 }
 
+test('Ours leaves Mod+Z unclaimed with real session history and keeps menu Undo available', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server)
+  const first = h.sessionIds[0]!
+  renderRailHarness(h)
+  const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
+  await menu('Mark as settled')
+  await waitFor(async () => expect((await current()).settledOverride).toBe('settled'))
+  const history = useSessionUndoStore.getState().undo.at(-1)
+  expect(history).not.toBeUndefined()
+  const neutral = focusNeutral()
+  expect(pressUndo(neutral).defaultPrevented).toBe(false)
+  expect(pressUndo(neutral, true).defaultPrevented).toBe(false)
+  expect(useSessionUndoStore.getState().undo.at(-1)).toBe(history)
+  expect((await current()).settledOverride).toBe('settled')
+  neutral.remove()
+  await userEvent.click(await undoButton('1 settled'))
+  await waitFor(async () => expect((await current()).settledOverride).toBeNull())
+})
+
 test('unpin Undo restores the pin key the row had', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
   const first = h.sessionIds[0]!
   await h.dispatch(createSessionLifecycleCommand(first, { type: 'pin', orderKey: 'm' }))
   await h.refresh()
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
   await menu('Unpin')
   await waitFor(async () => expect((await current()).pinnedAt).toBeNull())
@@ -83,7 +109,7 @@ test('unpin Undo restores the pin key the row had', async ({ client, server }) =
   expect(useSessionUndoStore.getState().undo.at(-1)).toBeUndefined()
 })
 
-test('settle Undo by Mod+Z restores the pin key, active slot and snooze that settling cleared', async ({
+test('VSCode settle Undo by Mod+Z restores the pin key, active slot and snooze that settling cleared', async ({
   client,
   server,
 }) => {
@@ -94,7 +120,7 @@ test('settle Undo by Mod+Z restores the pin key, active slot and snooze that set
   await h.dispatch(createSessionLifecycleCommand(first, { type: 'pin', orderKey: 'm' }))
   await h.dispatch(createSessionLifecycleCommand(first, { type: 'snooze', snoozedUntil }))
   await h.refresh()
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
   await menu('Mark as settled')
   await waitFor(async () =>
@@ -121,39 +147,69 @@ test('settle Undo by Mod+Z restores the pin key, active slot and snooze that set
   neutral.remove()
 })
 
-test('Mod+Z leaves text fields, editors, terminals and the file tree their own undo', async ({
+test('VSCode Mod+Z leaves text fields, editors, terminals and the file tree their own undo', async ({
   client,
   server,
 }) => {
   const h = await createRailHarness(client, server)
   const first = h.sessionIds[0]!
+  const queryClient = h.application.getSnapshot().queryClient
+  const root = h.application.getSnapshot().editor.workspaceStore.getState().rootFolder!
+  const fileHistory = await queryClient.query(fileOperationHistoryQuery(queryClient, root.path))
+  expect(fileHistory.undo).toHaveLength(0)
   const focus = new FocusService()
-  renderRailHarness(h, false, undefined, focus)
+  let editorUndos = 0
+  renderRailHarness(
+    h,
+    false,
+    undefined,
+    focus,
+    'vscode',
+    <>
+      <UndoSurface
+        area='editor'
+        id={{ kind: 'editor', key: '/project/a.ts', surface: 'document' }}
+        onUndo={() => {
+          editorUndos++
+          return false
+        }}
+      />
+      <UndoSurface
+        area='terminal'
+        id={{ kind: 'terminal', rootPath: '/project', sessionId: 'shell' }}
+        onUndo={() => false}
+      />
+      <UndoSurface
+        area='file-tree'
+        id={{ kind: 'file-tree', rootPath: '/project' }}
+        onUndo={() => false}
+      />
+    </>,
+  )
   const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
   await menu('Mark as settled')
   await waitFor(async () => expect((await current()).settledOverride).toBe('settled'))
 
-  const surfaces: readonly (readonly [FocusArea, FocusTargetId])[] = [
-    ['editor', { kind: 'editor', key: '/project/a.ts', surface: 'document' }],
-    ['terminal', { kind: 'terminal', rootPath: '/project', sessionId: 'shell' }],
-    ['file-tree', { kind: 'file-tree', rootPath: '/project' }],
-  ]
-  for (const [area, id] of surfaces) {
-    const element = document.createElement('div')
-    element.tabIndex = -1
-    document.body.append(element)
-    const registration = focus.register({ area, element, id, onIntent: () => false })
+  for (const area of ['editor', 'terminal', 'file-tree'] as const) {
+    const element = screen.getByTestId(`undo-${area}`)
     act(() => element.focus())
     pressUndo(element)
     expect(useSessionUndoStore.getState().undo.at(-1), area).not.toBeUndefined()
-    registration.unregister()
-    element.remove()
+    expect((await current()).settledOverride, area).toBe('settled')
   }
+  expect(editorUndos).toBe(1)
   const input = document.createElement('input')
   document.body.append(input)
   act(() => input.focus())
   expect(pressUndo(input).defaultPrevented).toBe(false)
   input.remove()
+  const editable = document.createElement('div')
+  editable.contentEditable = 'true'
+  editable.tabIndex = -1
+  document.body.append(editable)
+  act(() => editable.focus())
+  expect(pressUndo(editable).defaultPrevented).toBe(false)
+  editable.remove()
   expect((await current()).settledOverride).toBe('settled')
 
   const neutral = focusNeutral()
@@ -162,14 +218,14 @@ test('Mod+Z leaves text fields, editors, terminals and the file tree their own u
   neutral.remove()
 })
 
-test('Mod+Z undoes from panes without their own undo: the git pane and the chat transcript', async ({
+test('VSCode Mod+Z undoes from panes without their own undo: the git pane and the chat transcript', async ({
   client,
   server,
 }) => {
   const h = await createRailHarness(client, server)
   const first = h.sessionIds[0]!
   const focus = new FocusService()
-  renderRailHarness(h, false, undefined, focus)
+  renderRailHarness(h, false, undefined, focus, 'vscode')
   const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
   const surfaces: readonly (readonly [FocusArea, FocusTargetId])[] = [
     ['git', { kind: 'git', rootPath: '/project' }],
@@ -196,7 +252,7 @@ test('archiving the viewed session opens a draft, and Undo unarchives it and ope
 }) => {
   const h = await createRailHarness(client, server)
   const first = h.sessionIds[0]!
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   await act(async () => {
     await getNavigation().openChat({
       environmentId: h.environmentId,
@@ -222,7 +278,7 @@ test('two archives stack two notices; each Undo restores its own row and offers 
 }) => {
   const h = await createRailHarness(client, server)
   const [first, second] = h.sessionIds as [SessionId, SessionId]
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const archivedAt = async (id: SessionId) =>
     (await h.refresh()).sessions.find((session) => session.id === id)?.archivedAt
   await menu('Archive', 'First')
@@ -238,7 +294,7 @@ test('two archives stack two notices; each Undo restores its own row and offers 
   await waitFor(async () => expect(await archivedAt(first)).not.toBeNull())
 })
 
-test('bulk archive Undo restores only the rows that were archived', async ({ server }) => {
+test('VSCode bulk archive Undo restores only the rows that were archived', async ({ server }) => {
   let failedId: SessionId | undefined
   const unarchived: string[] = []
   const client = createObservedInProcessClient(server, async (request) => {
@@ -260,6 +316,7 @@ test('bulk archive Undo restores only the rows that were archived', async ({ ser
   useSessionMultiSelectStore.setState({ refs, anchor: refs[0] })
   const hook = renderHookWithProviders(() => useSessionActions(), {
     application: h.application,
+    command: { bindings: defaultPlatformKeyBindings(detectPlatform(), 'vscode') },
     queryClient: h.application.getSnapshot().queryClient,
   })
   await act(async () => {
@@ -285,7 +342,7 @@ test('consecutive settles are separate, and a manual change discards only its ro
   server,
 }) => {
   const h = await createRailHarness(client, server)
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const session = async (id: string) =>
     (await h.refresh()).sessions.find((candidate) => candidate.id === id)!
   const [first, second] = h.sessionIds as [SessionId, SessionId]
@@ -322,7 +379,7 @@ test('dragging a pinned row to Settled offers the same Undo, which restores its 
   const first = h.sessionIds[0]!
   await h.dispatch(createSessionLifecycleCommand(first, { type: 'pin', orderKey: 'm' }))
   await h.refresh()
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
   const outcome = await reorderRailSession({
     activeId: scopedSessionKey({ environmentId: h.environmentId, sessionId: first }),
@@ -351,7 +408,7 @@ test('dragging a pin into Active offers an unpin Undo that restores its pin key'
   const [first, second] = h.sessionIds as [SessionId, SessionId]
   await h.dispatch(createSessionLifecycleCommand(first, { type: 'pin', orderKey: 'm' }))
   await h.refresh()
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
   const outcome = await reorderRailSession({
     activeId: scopedSessionKey({ environmentId: h.environmentId, sessionId: first }),
@@ -388,11 +445,12 @@ test('a bulk Undo restores every row it can and names the ones the server refuse
   failedId = first
   await h.dispatch(createSessionLifecycleCommand(first, { type: 'pin', orderKey: 'm' }))
   await h.refresh()
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const session = async (id: string) =>
     (await h.refresh()).sessions.find((candidate) => candidate.id === id)!
   const hook = renderHookWithProviders(() => useSessionActions(), {
     application: h.application,
+    command: { bindings: defaultPlatformKeyBindings(detectPlatform(), 'vscode') },
     queryClient: h.application.getSnapshot().queryClient,
   })
   await act(() =>
@@ -417,7 +475,7 @@ test('archiving the session open in the side chat reopens it there on Undo', asy
 }) => {
   const h = await createRailHarness(client, server)
   const [first, second] = h.sessionIds as [SessionId, SessionId]
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   renderWithProviders(
     <SideChatReconciler environmentId={h.environmentId} projectId={h.projectId} />,
     {
@@ -470,16 +528,17 @@ function SideChatReconciler({
   return null
 }
 
-test('two changes on one row undo and redo with Mod+Z and Mod+Shift+Z', async ({
+test('VSCode two changes on one row undo and redo with Mod+Z and Mod+Shift+Z', async ({
   client,
   server,
 }) => {
   const h = await createRailHarness(client, server)
   const first = h.sessionIds[0]!
   const ref = { environmentId: h.environmentId, sessionId: first }
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const hook = renderHookWithProviders(() => useSessionActions(), {
     application: h.application,
+    command: { bindings: defaultPlatformKeyBindings(detectPlatform(), 'vscode') },
     queryClient: h.application.getSnapshot().queryClient,
   })
   const wake = async () =>
@@ -508,9 +567,10 @@ test('another client changing the row blocks stale Undo and clears its redo hist
 }) => {
   const h = await createRailHarness(client, server)
   const first = h.sessionIds[0]!
-  renderRailHarness(h)
+  renderRailHarness(h, false, undefined, undefined, 'vscode')
   const hook = renderHookWithProviders(() => useSessionActions(), {
     application: h.application,
+    command: { bindings: defaultPlatformKeyBindings(detectPlatform(), 'vscode') },
     queryClient: h.application.getSnapshot().queryClient,
   })
   await act(() =>
@@ -533,3 +593,33 @@ test('another client changing the row blocks stale Undo and clears its redo hist
   )
   expect(await redoLatestSessionAction()).toBe(false)
 })
+
+function UndoSurface({
+  area,
+  id,
+  onUndo,
+}: {
+  readonly area: Extract<FocusArea, 'editor' | 'terminal' | 'file-tree'>
+  readonly id: FocusTargetId
+  readonly onUndo: () => boolean
+}) {
+  const contexts = { editor: 'Editor writable', terminal: 'Terminal', 'file-tree': 'TreeSelection' }
+  const keymapRef = useKeymapNode({
+    area,
+    context: contexts[area],
+    commands: area === 'editor' ? { undo: onUndo } : {},
+  })
+  const focus = useFocusTarget<HTMLElement>({
+    area,
+    id,
+    onIntent: () => false,
+    capabilities:
+      area === 'editor' ? { editor: { writable: true, dispatch: () => true } } : undefined,
+  })
+  const ref = (element: HTMLElement | null) => {
+    focus.ref(element)
+    keymapRef(element)
+  }
+  if (area === 'terminal') return <textarea data-testid={`undo-${area}`} ref={ref} />
+  return <div data-testid={`undo-${area}`} tabIndex={-1} ref={ref} />
+}

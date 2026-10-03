@@ -14,7 +14,7 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import { documentTab, tabContentKey } from '@/lib/documents/utils/tabs'
 import { platformCommandSpecs } from '@/keymap/command-registry'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
-import { resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
+import { displayPlatformKeyBindings, resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
 import { formatChord } from '@/keymap/utils/format-keys'
 
 test('command palette items expose platform command metadata and shortcuts', () => {
@@ -47,12 +47,25 @@ test('command groups rank strong command matches above earlier weak fuzzy groups
 })
 
 test('includes both strokes in a chord shortcut hint', () => {
+  const defaults = defaultPlatformKeyBindings('linux')
   const bindings = resolvedPlatformKeyBindings(
-    defaultPlatformKeyBindings('linux'),
-    [{ command: 'workspace.showSettings', keys: 'Mod+K Mod+S', context: 'Workspace' }],
+    defaults,
+    [
+      ...defaults
+        .filter((binding) => binding.command === 'workspace.showSettings')
+        .map((binding) => ({
+          keys: binding.keys,
+          unbind: 'workspace.showSettings',
+          context: binding.context,
+        })),
+      { command: 'workspace.showSettings', keys: 'Mod+K Mod+S', context: 'Workspace' },
+    ],
     'linux',
   )
-  const items = commandPaletteItems(platformCommandSpecs, bindings)
+  const items = commandPaletteItems(
+    platformCommandSpecs,
+    displayPlatformKeyBindings(bindings, 'linux'),
+  )
 
   expect(items.find((item) => item.id === 'workspace.showSettings')?.shortcut).toBe(
     formatChord('Mod+K Mod+S'),

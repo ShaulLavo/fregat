@@ -6,7 +6,13 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { act, screen, waitFor } from '@testing-library/react'
 import { MAX_CHAT_ATTACHMENTS } from '@workspace/contracts'
-import { PASTE_COMMAND, type LexicalEditor } from 'lexical'
+import {
+  COMMAND_PRIORITY_CRITICAL,
+  PASTE_COMMAND,
+  $getSelection,
+  $getRoot,
+  type LexicalEditor,
+} from 'lexical'
 import { ChatInputDraftPlugin } from '../chat-input-draft-plugin'
 import { ChatInputPasteFoldPlugin } from '../chat-input-paste-fold-plugin'
 import { prepareChatInputFile } from '../../utils/input-attachments'
@@ -98,15 +104,37 @@ test('Mod+Shift+V keeps a large paste inline and preserves native paste', async 
     </LexicalComposer>,
   )
   await waitFor(() => expect(editor).not.toBeNull())
-  act(() => screen.getByRole('textbox', { name: 'Inline paste composer' }).focus())
+  act(() => {
+    editor!.update(() => $getRoot().selectEnd(), { discrete: true })
+    screen.getByRole('textbox', { name: 'Inline paste composer' }).focus()
+  })
+  const pasteEvents: string[] = []
+  const unregister = editor!.registerCommand(
+    PASTE_COMMAND,
+    (event) => {
+      pasteEvents.push(event.constructor.name)
+      expect($getSelection()).not.toBeNull()
+      return false
+    },
+    COMMAND_PRIORITY_CRITICAL,
+  )
+  const keyboardEvents: KeyboardEvent[] = []
+  const element = screen.getByRole('textbox', { name: 'Inline paste composer' })
+  element.addEventListener('keydown', (event) => keyboardEvents.push(event))
   const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
   await userEvent.keyboard(`{${modifier}>}{Shift>}v{/Shift}{/${modifier}}`)
+  const inlineKey = keyboardEvents.find((event) => event.key.toLowerCase() === 'v')
+  expect(inlineKey).toBeDefined()
+  expect(inlineKey?.defaultPrevented).toBe(false)
   const clipboardData = new DataTransfer()
   clipboardData.setData('text/plain', text)
   const event = new ClipboardEvent('paste', { clipboardData, cancelable: true })
   act(() => {
     editor!.dispatchCommand(PASTE_COMMAND, event)
   })
+  expect(attached).toBe(0)
+  expect(pasteEvents).toEqual(['ClipboardEvent'])
+  unregister()
   await waitFor(() =>
     expect(screen.getByRole('textbox', { name: 'Inline paste composer' }).textContent).toBe(text),
   )

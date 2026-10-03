@@ -167,3 +167,27 @@ test('unsupported upstream Save keys stay in inventory while valid save bindings
     )
   }
 })
+
+test('VSCode global session Undo and Redo keep native owners even with empty local history', () => {
+  const compiled = compileKeymap(
+    defaultPlatformKeyBindings('linux', 'vscode').map(({ entry }) => entry),
+    'linux',
+  )
+  for (const shift of [false, true]) {
+    const input = createKeyInput({ key: 'Z', modifiers: { ctrl: true, shift } })
+    const command = shift ? 'workspace.redoSessionAction' : 'workspace.undoSessionAction'
+    for (const contexts of [['Workspace'], ['Workspace', 'Chat'], ['Workspace', 'Sidebar', 'Git']])
+      expect(
+        bindingsForInput(compiled, [input], contexts.map(parseKeyContext)).bindings.map(
+          ({ command }) => command,
+        ),
+      ).toContain(command)
+    for (const owner of ['Editor', 'Terminal', 'FileTree'])
+      expect(
+        bindingsForInput(compiled, [input], ['Workspace', owner].map(parseKeyContext)).bindings.map(
+          ({ command }) => command,
+        ),
+        owner,
+      ).not.toContain(command)
+  }
+})

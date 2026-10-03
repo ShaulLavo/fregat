@@ -154,7 +154,7 @@ describe('keyboard', () => {
     expect(model.getSelectedPaths()).toEqual(['src/a.ts'])
   })
 
-  it('Enter and Space act as a click: select only this row and toggle a folder', async () => {
+  it('VSCode Enter and Space act as a click: select only this row and toggle a folder', async () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['src/'])
     await clickRow('src/a.ts')
@@ -167,6 +167,21 @@ describe('keyboard', () => {
     await userEvent.keyboard(' ')
     await vi.waitFor(() => expect(row('docs/').getAttribute('aria-expanded')).toBe('false'))
     expect(model.getSelectedPaths()).toEqual(['docs/'])
+  })
+
+  it('Ours Enter renames the focused row', async () => {
+    const { events } = await mountParityTree({ preset: 'ours' })
+    await focusRow('README.md')
+    await userEvent.keyboard('{Enter}')
+    await vi.waitFor(() =>
+      expect(treeScope().querySelector('input[aria-label="Rename README.md"]')).toBeTruthy(),
+    )
+    await userEvent.keyboard('NOTES.md{Enter}')
+    await vi.waitFor(() => expect(events.renames).toHaveLength(1))
+    expect(events.renames[0]).toMatchObject({
+      sourcePath: 'README.md',
+      destinationPath: 'NOTES.md',
+    })
   })
 
   it('the ContextMenu key opens the menu on the focused row', async () => {

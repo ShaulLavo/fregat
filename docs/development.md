@@ -34,6 +34,14 @@ commit hooks are opt-in. `bun run hooks:install` gets you oxfmt and oxlint over 
 
 Editor packages live in `editor/packages/`, and the terminal library lives in `ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
 
+Desktop launcher bundle tests load these workspace exports too. Build the libraries before running the launcher checks from a fresh checkout:
+
+```bash
+bun run build:workspaces
+cd apps/desktop
+bun --bun vitest run src/launcher/tests/build-native.test.ts src/launcher/tests/bundle.test.ts src/launcher/tests/check-app.test.ts
+```
+
 `dev` and `dev:web` serve both libraries from their TypeScript source through Vite aliases. Turbo coordinates tasks; Vite owns browser updates through its normal module graph and watcher. Fregat UI and the Editor React adapter use Fast Refresh. The adapter replaces its retained controller when its implementation changes. Editor core changes reload the page. Terminal panel and saved-viewport components are excluded from Fast Refresh because their cached modules retain WASM owners; their changes use Vite's native page reload. Generated `dist` files and unloaded package sources leave the page running. The custom source reload plugin is deleted.
 
 `bun run --cwd apps/web typecheck` checks the browser and Node configurations plus the source map Vite uses. `typecheck:dev`, the development watcher and production builds use the same checker. Source-package unused checks remain with their producer packages.

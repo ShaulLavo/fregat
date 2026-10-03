@@ -83,7 +83,7 @@ export function presetPlatformKeyBindings(
       if (row.platforms && !row.platforms.includes(platform)) return []
       if (row.presets && !row.presets.includes('vscode')) return []
       if (!isPlatformCommandId(row.command)) return []
-      const context = areaContext(row.pane)
+      const context = areaContext(row.pane, row.command)
       return [
         presetBinding(
           {
@@ -203,7 +203,12 @@ function editorPresetContext(context: string): string {
   return `(${context}) && !EditorWidget`
 }
 
-function areaContext(area: string | undefined): string {
+function areaContext(area: string | undefined, command: string): string {
+  if (
+    area === 'global' &&
+    (command === 'workspace.undoSessionAction' || command === 'workspace.redoSessionAction')
+  )
+    return 'Workspace && !Editor && !Terminal && !FileTree'
   const contexts: Readonly<Record<string, string>> = {
     editor: 'Editor',
     terminal: 'Terminal',
