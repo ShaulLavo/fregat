@@ -18,6 +18,7 @@ import {
   isPasteSafe,
 } from '../core/input.js'
 import type { MouseEncoderState, NormalizedKeyEvent, NormalizedMouseEvent } from '../core/input.js'
+import { measurePrintingText, printingText } from '../core/measurement.js'
 import { GhosttyRenderState } from '../core/render-state.js'
 import { GhosttyRuntime } from '../core/runtime.js'
 import {
@@ -34,6 +35,8 @@ import type {
   ReadLinesOptions,
   RgbColor,
   TerminalEffects,
+  TerminalGeometry,
+  TerminalTextMeasurement,
   TerminalLine,
   TerminalScrollbar,
   TerminalSelectionFormatOptions,
@@ -1147,6 +1150,53 @@ export class TerminalSession<TEvent = unknown> {
   readLines(start: number, end: number, options: ReadLinesOptions = {}): readonly TerminalLine[] {
     this.ensureActive()
     return this.terminal.readLines(start, end, options)
+  }
+
+  geometry(): TerminalGeometry {
+    this.ensureActive()
+    const size = this.terminal.size
+    return Object.freeze({
+      ...size,
+      cellWidth: this.appearanceValue.grid.cellWidth,
+      cellHeight: this.appearanceValue.grid.cellHeight,
+      revision: this.revisionValue,
+      cursor: Object.freeze(this.terminal.cursor),
+      scrollbar: Object.freeze(this.terminal.scrollbar),
+      graphemeClustering: this.terminal.isModeEnabled(TerminalMode.GraphemeClustering),
+      autowrap: this.terminal.isModeEnabled(TerminalMode.Autowrap),
+    })
+  }
+
+  measure(text: string): number {
+    return this.measureTexts([text]).texts[0]!.cells
+  }
+
+  /** Plain printing text only; VT controls go through writeAndReadGeometry. */
+  measureTexts(texts: readonly string[]): TerminalTextMeasurement {
+    this.ensureActive()
+    const prepared = texts.map(printingText)
+    return this.runOperation(() => {
+      const geometry = this.geometry()
+      const measured = prepared.map((text) =>
+        measurePrintingText(this.runtimeValue, text, geometry.graphemeClustering),
+      )
+      return Object.freeze({ geometry, texts: Object.freeze(measured) })
+    })
+  }
+
+  writeAndReadGeometry(data: TerminalInputData): TerminalGeometry {
+    return this.runOperation(() => {
+      this.runVtWrite(() => this.terminal.write(data))
+      this.mouseEncoder.syncFromTerminal()
+      this.invalidateLinks()
+      this.revisionValue += 1
+      // Effects can reenter the owner; capture this write before publishing any of them.
+      const geometry = this.geometry()
+      this.flushEffects()
+      this.emitScrollChange()
+      this.emitRenderRequest()
+      return geometry
+    })
   }
 
   get viewportActive(): boolean {

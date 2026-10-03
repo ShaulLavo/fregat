@@ -169,6 +169,18 @@ export class LocalTerminalExecution {
   lineCount() {
     return this.session.lineCount()
   }
+  geometry() {
+    return this.session.geometry()
+  }
+  measure(text: string) {
+    return this.session.measure(text)
+  }
+  measureTexts(texts: readonly string[]) {
+    return this.session.measureTexts(texts)
+  }
+  writeAndReadGeometry(data: TerminalInputData) {
+    return this.session.writeAndReadGeometry(data)
+  }
   readLines(start: number, end: number, options?: ReadLinesOptions) {
     return this.session.readLines(start, end, options)
   }

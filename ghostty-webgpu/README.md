@@ -64,6 +64,24 @@ context replacement still invalidate prior pixels.
 Canvas 2D, DOM, accessibility, selection/copy and frame callbacks retain their shared row readers.
 Styled snapshots and text-only rows describe those consumers; GPU rendering reads native records.
 
+## live geometry and text width
+
+`terminal.geometry()` samples the current native columns, rows, cursor, pending wrap,
+scrollbar, autowrap and grapheme-clustering mode. Cell dimensions are CSS pixels. Its revision
+identifies the execution owner's state. `visibleLines()` continues to describe submitted text.
+
+`terminal.measure(text)` returns the sum of native printing-unit cell widths.
+`terminal.measureTexts(texts)` measures a readonly batch against one live geometry sample and
+returns UTF16 source ranges and cell widths for each printing unit. Mode 2027 selects native
+grapheme clusters; with it disabled, units are codepoints. These methods accept plain printable
+text, including combining marks and variation selectors. Empty text measures zero. VT controls,
+newlines and tabs are rejected; this API measures widths and does not predict wrapping.
+
+`terminal.writeAndReadGeometry(data)` writes through the native VT parser and captures the
+resulting cursor and geometry before publishing output observers. A colored prompt can establish
+its edit origin with this single operation. Observers may subsequently write more output; the
+returned sample retains the prompt write's revision and cursor.
+
 ## more
 
 - [pty wiring and the native api](docs/integration.md)

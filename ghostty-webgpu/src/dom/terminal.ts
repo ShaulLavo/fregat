@@ -1,6 +1,8 @@
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
 import type {
   ReadLinesOptions,
+  TerminalGeometry,
+  TerminalTextMeasurement,
   TerminalLine,
   TerminalScrollbar,
   TerminalSelectionFormatOptions,
@@ -488,6 +490,32 @@ export class Terminal implements TerminalApi<'sync'> {
       },
       token: registration.token,
     })
+  }
+
+  geometry(): TerminalGeometry {
+    this.ensureActive()
+    return this.execution.geometry()
+  }
+
+  measure(text: string): number {
+    this.ensureActive()
+    return this.execution.measure(text)
+  }
+
+  measureTexts(texts: readonly string[]): TerminalTextMeasurement {
+    this.ensureActive()
+    return this.execution.measureTexts(texts)
+  }
+
+  writeAndReadGeometry(data: TerminalInputData): TerminalGeometry {
+    this.ensureOpen()
+    this.invalidateLinks()
+    const geometry = this.execution.writeAndReadGeometry(data)
+    if (this.stateValue !== 'open') return geometry
+    this.accessibility?.notifyOutput()
+    this.updateScrollbar()
+    this.renderer?.notifyWrite()
+    return geometry
   }
 
   write(data: TerminalInputData): TerminalMutationResult {
