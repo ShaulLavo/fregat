@@ -170,6 +170,7 @@ work transferred into execution plans, the original issue links, and remaining i
 | [316](316-session-attention.md)                       | Session rail attention states                                                 |
 | [317](317-tree-sitter-phase-two-prerequisites.md)     | Deferred parser pins and held-out corpus                                      |
 | [318](318-machine-connection-controls.md)             | Persistent connection state and confirmed removal                             |
+| [319](319-agent-ui-mcp.md)                            | Agents reveal and drive the Fregat UI over MCP                                |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |

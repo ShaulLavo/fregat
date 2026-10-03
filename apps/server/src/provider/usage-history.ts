@@ -14,6 +14,7 @@ import { usageTokenCount } from '@workspace/contracts'
 import { eq, gte, sql } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
 import { providerUsageTurns as turns } from '../db/schema'
+import { readSessionCache } from './session-cache'
 
 const DAY_MS = 24 * 60 * 60_000
 const COST_SOURCE_RANK: Record<ProviderUsageCostSource, number> = {
@@ -120,6 +121,7 @@ export class ProviderUsageHistoryReader {
       tokens: row ? usageTokenCount(row) : 0,
       turns: row?.turns ?? 0,
       unpricedTokens: row?.unpricedTokens ?? 0,
+      cache: readSessionCache(this.database, sessionId),
     }
   }
 
