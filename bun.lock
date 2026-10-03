@@ -432,7 +432,7 @@
     },
     "editor/packages/minimap": {
       "name": "@singapore-editor/minimap",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "dependencies": {
         "@singapore-editor/core": "workspace:*",
       },
