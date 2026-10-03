@@ -301,11 +301,12 @@ function disconnected(native: Native, session: Session): Owner {
   }
 }
 
-async function viewportGuard(
+export async function viewportGuard(
   binary: string,
   session: Session,
   missing: boolean,
   receipt: Receipt,
+  corrupt?: (session: Session, native: Native) => Promise<void>,
 ): Promise<void> {
   const native = new Native(binary, 'long-buffer/actual', receipt)
   void session.read({ prompt: '> ', secondaryPrompt: '> ' }).catch(() => {})
@@ -319,6 +320,7 @@ async function viewportGuard(
       owner.edit({ kind: 'insert', text: 'abcdefghijklmnopqrstuvwxyz' }),
       /long-buffer viewport/,
     )
+    await corrupt?.(session, native)
     assert.equal(await native.point(0), null)
     const model = session.model.snapshot
     const snapshot = await native.snapshot()
@@ -328,6 +330,9 @@ async function viewportGuard(
       native: snapshot,
       policy: 'stop when owned origin leaves active screen',
     })
+    assert.equal(model.text, 'abcdefghijklmnopqrstuvwxyz', 'overflow must preserve retained text')
+    assert.equal(model.cursor, 26, 'overflow must preserve retained cursor')
+    assert.deepEqual(snapshot.cursor, [3, 1, true], 'overflow native cursor and pending wrap')
     await assert.rejects(owner.edit({ kind: 'insert', text: '#' }), /long-buffer viewport/)
     assert.deepEqual(
       session.model.snapshot,

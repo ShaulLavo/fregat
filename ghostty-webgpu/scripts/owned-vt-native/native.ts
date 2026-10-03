@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { ArtifactBuildError } from '../ghostty-source.js'
 
 export interface Cell {
   cp: number[]
@@ -15,9 +16,37 @@ export interface Snapshot {
 }
 export type Point = [number, number]
 export type Receipt = (value: Record<string, unknown>) => void
+interface Deadlines {
+  readonly acknowledgement: number
+  readonly shutdown: number
+  readonly forcedShutdown: number
+  readonly drain: number
+}
+const deadlines: Deadlines = {
+  acknowledgement: 5000,
+  shutdown: 1000,
+  forcedShutdown: 1000,
+  drain: 1000,
+}
 
-async function* lines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
-  const reader = stream.getReader()
+async function deadline<T>(task: Promise<T>, milliseconds: number, phase: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      task,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new ArtifactBuildError(`Native ${phase} deadline expired`)),
+          milliseconds,
+        )
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function* lines(reader: ReadableStreamDefaultReader<Uint8Array>): AsyncGenerator<string> {
   const decoder = new TextDecoder()
   let buffer = ''
   try {
@@ -38,29 +67,60 @@ async function* lines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string
   assert.equal(buffer, '', 'native protocol ended with an incomplete record')
 }
 
+async function collect(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<string> {
+  const decoder = new TextDecoder()
+  let result = ''
+  try {
+    while (true) {
+      const chunk = await reader.read()
+      if (chunk.done) return result + decoder.decode()
+      result += decoder.decode(chunk.value, { stream: true })
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 export class Native {
   private readonly process
   private readonly replies
+  private readonly stdout
+  private readonly stderrReader
   private readonly stderr: Promise<string>
-  private readonly receipt: Receipt
-  private readonly label: string
+  private retired = false
+  private failure: Error | undefined
+  private finishing: Promise<void> | undefined
 
-  constructor(binary: string, label: string, receipt: Receipt) {
+  constructor(
+    binary: string,
+    private readonly label: string,
+    private readonly receipt: Receipt,
+    private readonly limits: Deadlines = deadlines,
+  ) {
+    for (const name of Object.keys(deadlines) as (keyof Deadlines)[]) {
+      const value = limits[name]
+      assert.ok(
+        Number.isInteger(value) && value > 0 && value <= deadlines[name],
+        'test deadlines can only shorten the finite transport policy',
+      )
+    }
     this.process = Bun.spawn([binary], { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
-    this.stderr = new Response(this.process.stderr).text()
-    this.replies = lines(this.process.stdout)
-    this.receipt = receipt
-    this.label = label
+    this.stdout = this.process.stdout.getReader()
+    this.stderrReader = this.process.stderr.getReader()
+    this.stderr = collect(this.stderrReader)
+    this.replies = lines(this.stdout)
   }
 
   async request(command: string): Promise<unknown> {
-    this.process.stdin.write(`${command}\n`)
-    await this.process.stdin.flush()
-    const reply = await this.replies.next()
-    assert.equal(reply.done, false, 'native process ended before acknowledging the operation')
-    const value: unknown = JSON.parse(reply.value!)
-    this.receipt({ kind: 'native', terminal: this.label, command, value })
-    return value
+    if (this.failure) throw this.failure
+    if (this.retired) throw new ArtifactBuildError('Native transport is closed')
+    try {
+      return await deadline(this.exchange(command), this.limits.acknowledgement, 'acknowledgement')
+    } catch (error) {
+      this.fail(error)
+      await this.dispose()
+      throw this.failure
+    }
   }
 
   async create(cols: number, rows: number): Promise<void> {
@@ -89,11 +149,60 @@ export class Native {
   }
 
   async close(): Promise<void> {
-    this.process.stdin.end()
-    const code = await this.process.exited
-    const stderr = await this.stderr
-    this.receipt({ kind: 'native-exit', terminal: this.label, code, stderr })
-    if (stderr) console.error(stderr)
-    assert.equal(code, 0, 'native process must exit cleanly')
+    await this.dispose()
+    if (this.failure) throw this.failure
+  }
+
+  private async exchange(command: string): Promise<unknown> {
+    this.process.stdin.write(`${command}\n`)
+    await this.process.stdin.flush()
+    const reply = await this.replies.next()
+    assert.equal(reply.done, false, 'native process ended before acknowledging the operation')
+    const value: unknown = JSON.parse(reply.value!)
+    this.receipt({ kind: 'native', terminal: this.label, command, value })
+    return value
+  }
+
+  private fail(error: unknown): void {
+    if (this.failure) return
+    this.failure =
+      error instanceof Error ? error : new ArtifactBuildError('Native transport failed')
+    this.receipt({ kind: 'transport-failure', terminal: this.label, error: String(this.failure) })
+  }
+
+  private dispose(): Promise<void> {
+    this.retired = true
+    // Concurrent request failure and close share one bounded resource cleanup.
+    this.finishing ??= this.finish().catch((error) => this.fail(error))
+    return this.finishing
+  }
+
+  private async finish(): Promise<void> {
+    try {
+      try {
+        void Promise.resolve(this.process.stdin.end()).catch((error) => this.fail(error))
+      } catch (error) {
+        this.fail(error)
+      }
+      let code: number
+      try {
+        code = await deadline(this.process.exited, this.limits.shutdown, 'shutdown')
+      } catch (error) {
+        this.fail(error)
+        this.process.kill('SIGKILL')
+        code = await deadline(this.process.exited, this.limits.forcedShutdown, 'forced shutdown')
+      }
+      const stderr = await deadline(this.stderr, this.limits.drain, 'stderr drain')
+      this.receipt({ kind: 'native-exit', terminal: this.label, code, stderr })
+      if (stderr) console.error(stderr)
+      if (!this.failure) assert.equal(code, 0, 'native process must exit cleanly')
+    } finally {
+      await deadline(
+        Promise.allSettled([this.stdout.cancel(), this.stderrReader.cancel()]),
+        this.limits.drain,
+        'stream cleanup',
+      )
+      await deadline(this.replies.return(undefined), this.limits.drain, 'protocol cleanup')
+    }
   }
 }
