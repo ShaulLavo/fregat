@@ -243,17 +243,21 @@ async function run(options: Options) {
       process.on(signal, () => job.stop(signal))
     }
     const holdMs = config.quietHoldSeconds * 1000
+    const deadline = placed.spec.host === 'local' ? placed.spec.runtimeDeadline : undefined
+    const remainingHoldMs =
+      deadline === undefined ? holdMs : Math.max(0, deadline - bootSeconds()) * 1000
     let stoppedAtHold = false
     const hold = options.quiet
       ? setTimeout(() => {
           stoppedAtHold = true
           job.stop('SIGTERM')
-        }, holdMs)
+        }, remainingHoldMs)
       : undefined
     const outcome = await job.done
     clearTimeout(hold)
     // systemd ends the scope at the hold too, so a run this process slept through counts.
-    const holdExpired = options.quiet && (stoppedAtHold || outcome.wallMs >= holdMs)
+    const holdExpired =
+      options.quiet && (stoppedAtHold || (deadline !== undefined && bootSeconds() >= deadline))
     if (holdExpired) {
       console.error(
         `[wave-heavy] quiet hold for '${options.label}' reached its ${config.quietHoldSeconds} s limit (developer.heavyJobQuietHoldSeconds), so the job was stopped. Run it again to queue for another hold.`,
@@ -330,6 +334,7 @@ async function admitLocal(
       id,
       sliceRoot: options.sliceRoot,
       runtimeLimitSeconds: options.quiet ? config.quietHoldSeconds : null,
+      runtimeDeadline: admitted.held.entry.quietDeadline,
       entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
@@ -511,6 +516,7 @@ async function attemptAdmission(
     }
     const lease = waiting.entry.quiet
       ? {
+          quietDeadline: now + config.quietHoldSeconds,
           quietUntil:
             now +
             DEADLINE_START_SECONDS +
