@@ -4,9 +4,12 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useNavigation } from '@/hooks/use-navigation'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 import { WorkspaceSwitchPending } from '@/components/workspace-switch-pending'
+import { Button } from '@workspace/ui/components/button'
+import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 
 export function NavigationStatus() {
   const navigation = useNavigation()
+  const openPicker = useEditorWorkspaceState((state) => state.openPicker)
   const status = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot)
   if (status.status === 'applied') return null
   if (status.status === 'unavailable')
@@ -14,7 +17,12 @@ export function NavigationStatus() {
       <Alert variant='destructive'>
         <AlertDescription>
           <p>{status.reason}</p>
-          <FixWithAgentButton error={{ message: status.reason, title: 'Navigation' }} />
+          <div className='flex items-center gap-(--density-gap-tight)'>
+            <Button onClick={openPicker} size='xs' variant='secondary'>
+              Choose folder
+            </Button>
+            <FixWithAgentButton error={{ message: status.reason, title: 'Navigation' }} />
+          </div>
         </AlertDescription>
       </Alert>
     )

@@ -23,7 +23,7 @@ import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { confirmedEnvironmentId, confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { errorMessage } from '@/lib/error-message'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import type { ApplicationRuntime } from '@/state/application-runtime'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { intentForAddress } from '@/features/address/utils/intent'
@@ -62,7 +62,7 @@ export async function applyAddressView(options: ApplyOptions): Promise<AddressAp
       options.isCurrent() && !options.signal?.aborted
         ? {
             status: 'unavailable',
-            reason: errorMessage(error, 'The address could not be restored.'),
+            reason: clientErrorDescription(toClientError(error)),
           }
         : superseded()
   }

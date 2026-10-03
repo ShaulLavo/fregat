@@ -55,6 +55,7 @@ export function resolveBrowserCandidates(
   env: BrowserEnvironment,
   fs: BrowserFileSystem,
 ): readonly WindowCandidate[] {
+  if (setting === 'auto' && env.platform === 'darwin') return [{ kind: 'webview' }]
   if (setting === 'webview' || (setting === 'auto' && transparency === 'window')) {
     return [{ kind: 'webview' }, { kind: 'tab' }]
   }
