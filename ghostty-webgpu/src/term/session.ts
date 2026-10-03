@@ -1191,9 +1191,10 @@ export class TerminalSession<TEvent = unknown> {
       this.invalidateLinks()
       this.revisionValue += 1
       // Effects can reenter the owner; capture this write before publishing any of them.
+      const scroll = this.commitScrollChange()
       const geometry = this.geometry()
       this.flushEffects()
-      this.emitScrollChange()
+      if (scroll) this.emitters.scroll.emit(scroll)
       this.emitRenderRequest()
       return geometry
     })
@@ -1505,9 +1506,12 @@ export class TerminalSession<TEvent = unknown> {
     this.runVtWrite(() => this.terminal.write(data))
     this.mouseEncoder.syncFromTerminal()
     this.invalidateLinks()
+    // Observers can read geometry or reenter; publish the committed native revision first.
+    this.revisionValue += 1
+    const scroll = this.commitScrollChange()
     this.flushEffects()
-    this.emitScrollChange()
-    return this.requestRender()
+    if (scroll) this.emitters.scroll.emit(scroll)
+    return this.emitRenderRequest()
   }
 
   private runVtWrite(write: () => void): void {
@@ -1536,10 +1540,12 @@ export class TerminalSession<TEvent = unknown> {
     this.runVtWrite(() => this.terminal.clear())
     this.selection.reset()
     this.invalidateLinks()
+    this.revisionValue += 1
+    const scroll = this.commitScrollChange(forceScroll)
     this.flushEffects()
     if (hadSelection) this.emitSelection()
-    this.emitScrollChange(forceScroll)
-    return this.requestRender()
+    if (scroll) this.emitters.scroll.emit(scroll)
+    return this.emitRenderRequest()
   }
 
   private resetNow(): TerminalMutationResult {
@@ -1550,18 +1556,23 @@ export class TerminalSession<TEvent = unknown> {
     this.mouseEncoder.reset()
     this.mouseEncoder.syncFromTerminal()
     this.invalidateLinks()
+    this.revisionValue += 1
+    const scroll = this.commitScrollChange()
     this.flushEffects()
     if (hadSelection) this.emitSelection()
-    this.emitScrollChange()
-    return this.requestRender()
+    if (scroll) this.emitters.scroll.emit(scroll)
+    return this.emitRenderRequest()
   }
 
   private selectionAutoscrollTickNow(input: TerminalSelectionDragInput): SelectionGestureUpdate {
     const update = this.selection.autoscrollTick(input)
     this.invalidateLinks()
-    const scrollChanged = this.emitScrollChange()
+    const scroll = this.commitScrollChange()
+    if (!update.selectionChanged && !scroll) return update
+    this.revisionValue += 1
+    if (scroll) this.emitters.scroll.emit(scroll)
     if (update.selectionChanged) this.emitSelection()
-    if (update.selectionChanged || scrollChanged) this.requestRender()
+    this.emitRenderRequest()
     return update
   }
 
@@ -1611,8 +1622,11 @@ export class TerminalSession<TEvent = unknown> {
   private scroll(action: () => void): TerminalMutationResult {
     action()
     this.invalidateLinks()
-    if (!this.emitScrollChange()) return this.mutationResult()
-    return this.requestRender()
+    const scroll = this.commitScrollChange()
+    if (!scroll) return this.mutationResult()
+    this.revisionValue += 1
+    this.emitters.scroll.emit(scroll)
+    return this.emitRenderRequest()
   }
 
   private publishInput(bytes: Uint8Array, clearSelection: boolean): TerminalInputResult {
@@ -1643,12 +1657,11 @@ export class TerminalSession<TEvent = unknown> {
     })
   }
 
-  private emitScrollChange(force = false): boolean {
+  private commitScrollChange(force = false): TerminalScrollEvent | undefined {
     const next = readScrollSnapshot(this.terminal)
-    if (!force && scrollSnapshotsEqual(this.scrollValue, next)) return false
+    if (!force && scrollSnapshotsEqual(this.scrollValue, next)) return undefined
     this.scrollValue = next
-    this.emitters.scroll.emit(next)
-    return true
+    return next
   }
 
   private flushEffects(): void {

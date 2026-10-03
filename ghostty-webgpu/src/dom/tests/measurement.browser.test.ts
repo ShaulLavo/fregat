@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { DomTerminalRenderer, Terminal } from '../../index.js'
+import type { TerminalGeometry } from '../../index.js'
 
 const terminals: Terminal[] = []
 const hosts: HTMLElement[] = []
@@ -40,6 +41,22 @@ describe('public native width and geometry hooks', () => {
     expect(terminal.measure('👩‍💻')).toBe(4)
     expect(terminal.geometry().graphemeClustering).toBe(false)
   })
+
+  it.each(['title', 'data'] as const)(
+    'publishes ordinary write geometry before public %s observers',
+    async (event) => {
+      const terminal = await openTerminal()
+      const before = terminal.geometry()
+      let observed: TerminalGeometry | undefined
+      terminal.on(event, () => {
+        observed = terminal.geometry()
+      })
+      terminal.write(event === 'title' ? 'abc\x1b]0;revision\x07' : 'abc\x1b[6n')
+      expect(observed?.cursor.x).toBe(3)
+      expect(observed?.revision).toBeGreaterThan(before.revision)
+      expect(observed).toEqual(terminal.geometry())
+    },
+  )
 
   it('captures the native colored prompt origin before host title observers run', async () => {
     const terminal = await openTerminal()
