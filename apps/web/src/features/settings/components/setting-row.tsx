@@ -40,6 +40,10 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import type { SettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { useSettingsScope, writableSettingsScope } from '@/features/settings/state/scope-store'
 import { settingDependencyNote, settingRowTitle } from '@workspace/client-core/settings/humanize'
+import {
+  settingAvailabilityReason,
+  settingEnvironment,
+} from '@/features/settings/utils/availability'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function SettingRow({
@@ -60,7 +64,10 @@ export function SettingRow({
   // A read-only key is shown, not hidden: the answer to "why is this off" belongs
   // on the page rather than in a commit message. It outranks the scope reason —
   // no scope makes a read-only key writable.
-  const disabledReason = descriptor.readOnlyReason ?? inspection.disabledReason
+  const disabledReason =
+    descriptor.readOnlyReason ??
+    settingAvailabilityReason(id, settingEnvironment(snapshot.values['window.material'])) ??
+    inspection.disabledReason
   const dependencyNote = settingDependencyNote(id, snapshot.values)
   const value = snapshot.values[id]
   // The same mode the value was resolved for and a part write targets.

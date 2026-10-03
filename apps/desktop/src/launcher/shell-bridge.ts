@@ -53,13 +53,14 @@ export function shellBridge(
     platform: platform === 'darwin' ? 'darwin' : 'linux',
     colorScheme: null,
     titlebar: engine === 'wkwebview' ? 'overlay' : 'native',
-    capabilities: { displayCapture: false },
+    capabilities: { displayCapture: false, windowGlass: false },
   }
   return `(() => {
     if (location.origin !== ${JSON.stringify(new URL(url).origin)} || window !== window.top || globalThis.__platformShellReply) return;
     const bridge = ${JSON.stringify(bridge)};
     const send = body => { webkit.messageHandlers.platformShell.postMessage(body); };
     const token = ${JSON.stringify(token)};
+    ${engine === 'wkwebview' && vibrancy ? "bridge.setWindowAppearance = appearance => { send({ ...appearance, method: 'setWindowAppearance', origin: location.origin, token }); };" : ''}
     const documentId = crypto.randomUUID();
     const pending = new Map();
     let next = 0;

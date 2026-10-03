@@ -1,7 +1,37 @@
 diff --git a/dist/chunks/index.C-uw7tH9.js b/dist/chunks/index.C-uw7tH9.js
 --- a/dist/chunks/index.C-uw7tH9.js
 +++ b/dist/chunks/index.C-uw7tH9.js
-@@ -10377,8 +10377,8 @@
+@@ -10307,7 +10307,7 @@
+ 				});
+ 			}).then(async () => {
+ 				debug$1?.("[%s] test %s finished running", sessionId, file);
+-				await maybeCollectChromiumGarbage(this.project, sessionId);
++				await collectChromiumGarbageAfterFile(this.project, sessionId, file.filepath);
+ 				this.runNextTest(method, sessionId);
+ 			}).catch((error) => {
+ 				// if user cancels the test run manually, ignore the error and exit gracefully
+@@ -10351,6 +10351,20 @@
+ const chromiumGCDiskThreshold = process.env.VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB ? Number(process.env.VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB) * 1024 ** 3 : 4 * 1024 ** 3;
+ const forceChromiumGC = !!process.env.VITEST_CHROMIUM_GC_FORCE;
+ const debugGC = createDebugger("vitest:browser:gc");
++async function collectChromiumGarbageAfterFile(project, sessionId, file) {
++	let timer;
++	try {
++		await Promise.race([
++			maybeCollectChromiumGarbage(project, sessionId),
++			new Promise((_, reject) => {
++				// Isolated-file collection shares the shutdown resource teardown budget.
++				timer = setTimeout(() => reject(new Error(`The post-file Chromium garbage collection exceeded teardownTimeout for ${file} (${project.config.teardownTimeout}ms).`)), project.config.teardownTimeout).unref();
++			})
++		]);
++	} finally {
++		clearTimeout(timer);
++	}
++}
+ async function maybeCollectChromiumGarbage(project, sessionId) {
+ 	// trigger only on linux/chromium/playwright
+ 	const provider = project.browser.provider;
+@@ -10377,8 +10391,8 @@
  		diagnostics.availableBytesBefore = available.toString();
  		diagnostics.thresholdBytes = chromiumGCDiskThreshold.toString();
  		diagnostics.tempDirectory = tempDirectory;
@@ -12,7 +42,7 @@ diff --git a/dist/chunks/index.C-uw7tH9.js b/dist/chunks/index.C-uw7tH9.js
  		operationStart = performance.now();
  		// `detach` is available only internally and not on CDPSession type
  		const cdp = await provider.getCDPSession(sessionId);
-@@ -10402,7 +10402,7 @@
+@@ -10402,7 +10416,7 @@
  		}
  		const availableGiB = available / 1024 ** 3;
  		const thresholdGiB = chromiumGCDiskThreshold / 1024 ** 3;
@@ -21,7 +51,7 @@ diff --git a/dist/chunks/index.C-uw7tH9.js b/dist/chunks/index.C-uw7tH9.js
  	} catch (error) {
  		// don't surface if fs or cdp fails
  		debugGC?.("[%s] failed to collect Chromium garbage: %s", sessionId, error);
-@@ -21435,6 +21435,8 @@
+@@ -21435,6 +21449,8 @@
  				for (const error of errors) this.logger.error("error during close", error);
  				this._checkUnhandledErrors(errors);
  			});

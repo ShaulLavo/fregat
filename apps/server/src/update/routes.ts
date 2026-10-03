@@ -11,6 +11,7 @@ export function serverUpdateRoutes(update: Pick<ServerUpdate, 'requestRestart'>)
       update.requestRestart(
         body.interrupt,
         request.headers.get('x-client-instance')?.slice(0, 64) ?? null,
+        body.target,
       ),
     { body: serverRestartInputSchema },
   )

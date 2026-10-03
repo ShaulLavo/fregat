@@ -1,10 +1,12 @@
 import type { SettingsValues } from '@workspace/contracts'
 
 import { fontStack } from '@/lib/fonts/utils/stack'
+import { getPlatformBridge } from '@/lib/platform/bridge'
 
 /** The keys that change how the app looks the instant they resolve. */
 export type AppearanceValues = Pick<
   SettingsValues,
+  | 'window.material'
   | 'editor.fontFamily'
   | 'workbench.colorTheme'
   | 'workbench.density'
@@ -50,9 +52,28 @@ export function applyAppearance(values: AppearanceValues, root: Root, prefersDar
   root.setAttribute('data-density', values['workbench.density'])
   root.setAttribute('data-feel', values['workbench.feel'])
 
-  root.style.setProperty('--surface-opacity', `${values['workbench.surface.opacity']}%`)
-  root.style.setProperty('--content-opacity', `${values['workbench.surface.contentOpacity']}%`)
-  root.style.setProperty('--surface-blur', `${values['workbench.surface.blur']}px`)
+  const bridge = getPlatformBridge()
+  const nativeMaterial =
+    bridge?.platform === 'darwin' &&
+    bridge.backdrop === 'transparent' &&
+    typeof bridge.setWindowAppearance === 'function'
+  const materialOwnsFill = nativeMaterial && values['window.material'] !== 'none'
+  const opacity = materialOwnsFill ? 0 : values['workbench.surface.opacity']
+  root.style.setProperty('--surface-opacity', `${opacity}%`)
+  root.style.setProperty('--control-opacity', `${values['workbench.surface.opacity']}%`)
+  bridge?.setWindowAppearance?.({
+    opacity: values['workbench.surface.opacity'],
+    material: values['window.material'],
+  })
+  root.style.setProperty(
+    '--content-opacity',
+    `${materialOwnsFill ? 0 : values['workbench.surface.contentOpacity']}%`,
+  )
+  // Native windows own desktop filtering, even when their material is off.
+  root.style.setProperty(
+    '--surface-blur',
+    nativeMaterial ? '0px' : `${values['workbench.surface.blur']}px`,
+  )
   root.style.setProperty('--surface-saturation', `${values['workbench.surface.saturation']}%`)
   applyFileTreeIndentGuideVisibility(values['workbench.tree.indentGuides'], root)
 

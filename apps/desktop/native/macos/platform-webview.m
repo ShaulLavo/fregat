@@ -1,11 +1,16 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#import <QuartzCore/QuartzCore.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
+
+// Keep the behind-window effect visible at negligible alpha so live wallpaper keeps updating.
+static const CGFloat liveDesktopAlpha = 0.0001;
 
 static WKWebsiteDataStore *persistent_store(NSString *directory) {
   if (@available(macOS 14.0, *)) {
@@ -25,6 +30,21 @@ static WKWebsiteDataStore *persistent_store(NSString *directory) {
   return WKWebsiteDataStore.defaultDataStore;
 }
 
+static NSView *glass_effect(NSRect frame) {
+  if (@available(macOS 26.0, *)) {
+    Class glassClass = NSClassFromString(@"NSGlassEffectView");
+    if (!glassClass) return nil;
+    NSView *effect = [[glassClass alloc] initWithFrame:frame];
+    // The public regular style is zero; runtime KVC keeps older SDK builds working.
+    [effect setValue:@0 forKey:@"style"];
+    [effect setValue:@0 forKey:@"cornerRadius"];
+    effect.hidden = YES;
+    effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    return effect;
+  }
+  return nil;
+}
+
 static void emit(NSDictionary *event) {
   NSData *data = [NSJSONSerialization dataWithJSONObject:event options:0 error:nil];
   if (!data) return;
@@ -36,6 +56,8 @@ static void emit(NSDictionary *event) {
 @interface PlatformHost : NSObject <NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate>
 @property(strong) NSWindow *window;
 @property(strong) WKWebView *view;
+@property(strong) NSVisualEffectView *effect;
+@property(strong) NSView *glassEffect;
 @property(strong) NSURL *appURL;
 @property(strong) WKUserScript *startupScript;
 @property(strong) NSOpenPanel *picker;
@@ -168,6 +190,22 @@ static void emit(NSDictionary *event) {
 }
 - (void)command:(NSDictionary *)command {
   if (self.closed) return;
+  if (command[@"windowAppearance"]) {
+    id appearance = command[@"windowAppearance"];
+    if (![appearance isKindOfClass:NSDictionary.class]) return;
+    id opacity = appearance[@"opacity"];
+    id material = appearance[@"material"];
+    if (![opacity isKindOfClass:NSNumber.class] || CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()) return;
+    if (![material isKindOfClass:NSString.class] || ![@[@"none", @"frosted", @"glass"] containsObject:material]) return;
+    double opacityValue = [opacity doubleValue];
+    if (!isfinite(opacityValue) || opacityValue < 0 || opacityValue > 100) return;
+    BOOL glass = [material isEqual:@"glass"] && self.glassEffect != nil;
+    // Pane opacity is page-owned; selected native materials render at full strength.
+    self.effect.alphaValue = [material isEqual:@"none"] ? liveDesktopAlpha : 1;
+    self.effect.hidden = glass;
+    self.glassEffect.hidden = !glass;
+    return;
+  }
   if ([command[@"eval"] isKindOfClass:NSString.class]) {
     [self.view evaluateJavaScript:command[@"eval"] completionHandler:nil];
     return;
@@ -291,16 +329,26 @@ int main(int argc, char **argv) {
     if (vibrant) {
       window.opaque = NO;
       window.backgroundColor = NSColor.clearColor;
+      window.contentView.wantsLayer = YES;
+      window.contentView.layer.opaque = NO;
+      window.contentView.layer.backgroundColor = NSColor.clearColor.CGColor;
       NSVisualEffectView *effect = [[NSVisualEffectView alloc] initWithFrame:window.contentView.bounds];
       effect.material = NSVisualEffectMaterialUnderWindowBackground;
       effect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
       effect.state = NSVisualEffectStateActive;
+      effect.alphaValue = liveDesktopAlpha;
+      effect.hidden = NO;
+      host.effect = effect;
       effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
       [window.contentView addSubview:effect];
+      host.glassEffect = glass_effect(window.contentView.bounds);
+      if (host.glassEffect) [window.contentView addSubview:host.glassEffect];
     }
     WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
     configuration.websiteDataStore = dataStore;
-    host.startupScript = [[WKUserScript alloc] initWithSource:text injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
+    NSString *startupSource = [NSString stringWithFormat:@"%@\n;if (globalThis.platformBridge) globalThis.platformBridge.capabilities.windowGlass = %@;",
+        text, host.glassEffect ? @"true" : @"false"];
+    host.startupScript = [[WKUserScript alloc] initWithSource:startupSource injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
     [configuration.userContentController addScriptMessageHandler:host name:@"platformShell"];
     WKWebView *view = [[WKWebView alloc] initWithFrame:window.contentView.bounds configuration:configuration];
     host.view = view;
@@ -308,8 +356,11 @@ int main(int argc, char **argv) {
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     if (@available(macOS 13.3, *)) view.inspectable = YES;
     if (vibrant) {
+      // Clearing WebKit's background can leave its root layer's initial opaque hint.
       [view setValue:@NO forKey:@"drawsBackground"];
       if (@available(macOS 12.0, *)) view.underPageBackgroundColor = NSColor.clearColor;
+      view.layer.opaque = NO;
+      view.layer.backgroundColor = NSColor.clearColor.CGColor;
     }
     [window.contentView addSubview:view];
     __weak PlatformHost *weakHost = host;

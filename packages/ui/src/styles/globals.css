@@ -311,8 +311,16 @@
   --card: color-mix(in oklch, var(--card-solid) var(--surface-opacity), transparent);
   --content-well: color-mix(in oklch, var(--background-solid) var(--content-opacity), transparent);
   --popover: var(--popover-solid);
-  --muted: color-mix(in oklch, var(--muted-solid) var(--surface-opacity), transparent);
-  --accent: color-mix(in oklch, var(--accent-solid) var(--surface-opacity), transparent);
+  --muted: color-mix(
+    in oklch,
+    var(--muted-solid) var(--control-opacity, var(--surface-opacity)),
+    transparent
+  );
+  --accent: color-mix(
+    in oklch,
+    var(--accent-solid) var(--control-opacity, var(--surface-opacity)),
+    transparent
+  );
   /* One vocabulary for list-row interaction. These are OVERLAY TINTS, not
      surfaces: they are painted on top of a pane that has already resolved
      --surface-opacity, so they carry their own fixed alpha and are defined

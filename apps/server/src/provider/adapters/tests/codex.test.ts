@@ -2824,6 +2824,7 @@ describe('CodexProviderAdapter', () => {
                 {
                   cacheReadTokens: 800,
                   cacheWriteTokens: 0,
+                  reportedCache: { readTokens: 800, writeTokens: null },
                   continuesEarlierTurns: false,
                   costUsd: null,
                   inputTokens: 1600,

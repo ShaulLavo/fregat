@@ -4,19 +4,30 @@ import path from 'node:path'
 
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { onTestFinished } from 'vitest'
+import { beforeEach, onTestFinished } from 'vitest'
 import { orchestrationServerConfig } from '@workspace/client-core/test/orchestration-server-config'
 import { MockProviderAdapter, orchestrationForApp, updateForApp } from 'server/testing'
 
-import { createInProcessClient, createObservedInProcessClient } from '../../../../test/client'
+import { createObservedInProcessClient } from '../../../../test/client'
 import { TEST_ENVIRONMENT_ID } from '../../../../test/factories/chat'
 import { installTestClient } from '../../../../test/factories/client-binding'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
 import { makeTestServer } from '../../../../test/server'
-import { ServerUpdateStatus } from '@/features/server-update/components/status'
+import { ServerUpdateStatus } from '@/components/server-update-status'
+import { updateIntentStore } from '@/features/server-update/state/intent'
 import { primaryServerOrigin } from '@/lib/client'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { serverUpdateQueryKeys } from '@/features/server-update/utils/query-keys'
+import { serverUpdateMutationKeys } from '@/features/server-update/utils/mutation-keys'
 import { resetServerConnectionStore, useEnvironmentsStore } from '@/lib/environments/state/store'
+
+beforeEach(() => {
+  updateIntentStore.getState().setIntent({ kind: 'idle' })
+  primaryQueryClient().removeQueries({ queryKey: serverUpdateQueryKeys.release() })
+})
 
 type RestartRecord = { interrupted: { sessionId: string }[] }
 
@@ -51,9 +62,18 @@ async function busyServer() {
     }),
     update: { root: production, restart: (record) => exits.push(record) },
   })
-  const restoreClient = installTestClient(createInProcessClient(server))
+  const requests: unknown[] = []
+  const restartTransport = Promise.withResolvers<void>()
+  let holdRestart = false
+  const client = createObservedInProcessClient(server, async (request) => {
+    if (new URL(request.url).pathname !== '/server/restart') return
+    requests.push(await request.clone().json())
+    if (holdRestart) await restartTransport.promise
+  })
+  const restoreClient = installTestClient(client)
   onTestFinished(async () => {
     held.resolve()
+    restartTransport.resolve()
     restoreClient()
     await server.cleanup()
     await rm(production, { force: true, recursive: true })
@@ -99,63 +119,175 @@ async function busyServer() {
   useEnvironmentsStore
     .getState()
     .recordServerUpdate(primaryServerOrigin(), updateForApp(server.app).state())
-  return { exits, startTurn }
+  return {
+    async deadlineSettings() {
+      await saveSettings(
+        {
+          mutationId: 'busy-update-deadline',
+          operations: [{ key: 'server.activationTimeoutSeconds', kind: 'set', value: 1 }],
+          target: 'user',
+        },
+        client,
+      )
+      const queryClient = createTestQueryClient()
+      queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, client))
+      onTestFinished(() => queryClient.clear())
+      return queryClient
+    },
+    exits,
+    requests,
+    startTurn,
+    holdRestart() {
+      holdRestart = true
+    },
+    releaseRestart() {
+      restartTransport.resolve()
+    },
+    async finishTurns() {
+      held.resolve()
+      await engine.providerRuntimeIdle()
+    },
+  }
 }
 
-test('Restart names the running session, Cancel keeps it, and confirming restarts the server', async () => {
+test('Update app lists busy sessions, closing keeps them, and Update now interrupts the accepted list', async () => {
   const { exits, startTurn } = await busyServer()
   const user = userEvent.setup()
   renderWithProviders(<ServerUpdateStatus />)
 
-  expect(await screen.findByText('Update available')).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Restart' }))
-  const dialog = await screen.findByRole('alertdialog', { name: 'Restart server' })
+  expect(await screen.findByRole('button', { name: 'Update app' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Update app' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Update now?' })
   expect(within(dialog).getByText('Fix the parser')).toBeInTheDocument()
   expect(within(dialog).getByText('Running')).toBeInTheDocument()
-  expect(
-    within(dialog).getByText(
-      'Restarting interrupts 1 session. Queued messages start on the new server.',
-    ),
-  ).toBeInTheDocument()
+  expect(within(dialog).getByText('Updating now interrupts 1 session.')).toBeInTheDocument()
   expect(exits).toEqual([])
 
-  await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
-  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(exits).toEqual([])
 
-  await user.click(screen.getByRole('button', { name: 'Restart' }))
-  const again = await screen.findByRole('alertdialog', { name: 'Restart server' })
+  await user.click(screen.getByRole('button', { name: 'Update app' }))
+  const again = await screen.findByRole('dialog', { name: 'Update now?' })
   await startTurn(LATE_SESSION_ID, 'Write the docs')
-  await user.click(within(again).getByRole('button', { name: 'Restart' }))
+  await user.click(within(again).getByRole('button', { name: 'Update now' }))
 
   // A session that became busy after the first answer comes back in the same dialog.
   expect(await within(again).findByText('Write the docs')).toBeInTheDocument()
   expect(within(again).getByText('Fix the parser')).toBeInTheDocument()
   expect(exits).toEqual([])
 
-  await user.click(within(again).getByRole('button', { name: 'Restart' }))
-  expect(await screen.findByText('Restarting…')).toBeInTheDocument()
+  await user.click(within(again).getByRole('button', { name: 'Update now' }))
+  expect(await screen.findByText('Updating…')).toBeInTheDocument()
   expect(exits).toHaveLength(1)
   expect(exits[0]?.interrupted.map((session) => session.sessionId).toSorted()).toEqual(
     [SESSION_ID, LATE_SESSION_ID].toSorted(),
   )
-  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(screen.queryByRole('dialog')).toBeNull()
 })
 
-test('A dropped Restart request shows Restarting… only while the socket is off the instance it asked', async () => {
+test('Update when done waits for authoritative busy state to clear without interrupting', async () => {
+  const { deadlineSettings, exits, requests, finishTurns } = await busyServer()
+  const queryClient = await deadlineSettings()
+  const user = userEvent.setup()
+  renderWithProviders(<ServerUpdateStatus />, { queryClient })
+
+  await user.click(await screen.findByRole('button', { name: 'Update app' }))
+  const popover = await screen.findByRole('dialog', { name: 'Update now?' })
+  expect(within(popover).getByText('Fix the parser')).toBeInTheDocument()
+  await user.click(within(popover).getByRole('button', { name: 'Update when done' }))
+  expect(exits).toEqual([])
+
+  const requestCount = requests.length
+  // Re-reading the same busy snapshot cannot turn waiting into forced interruption.
+  await act(async () => {
+    await primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+  })
+  expect(exits).toEqual([])
+
+  expect(requests).toHaveLength(requestCount)
+  const waitingSince = Date.now()
+  await waitFor(() => expect(Date.now() - waitingSince).toBeGreaterThanOrEqual(2400), {
+    timeout: 4000,
+  })
+  expect(updateIntentStore.getState().intent.kind).toBe('waiting')
+  expect(screen.queryByRole('button', { name: 'Retry update' })).toBeNull()
+  expect(exits).toEqual([])
+  expect(requests).toHaveLength(requestCount)
+
+  await finishTurns()
+  await act(async () => {
+    await primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+  })
+  await waitFor(() => expect(exits).toHaveLength(1))
+  expect(exits[0]?.interrupted).toEqual([])
+  expect(requests).toHaveLength(requestCount + 1)
+  expect(requests.at(-1)).toMatchObject({ interrupt: [] })
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+test('a hung automatic restart is bounded and its late acknowledgement cannot overwrite a retry', async () => {
+  const fixture = await busyServer()
+  const queryClient = await fixture.deadlineSettings()
+  const user = userEvent.setup()
+  renderWithProviders(<ServerUpdateStatus />, { queryClient })
+  await user.click(await screen.findByRole('button', { name: 'Update app' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Update now?' })
+  await user.click(within(dialog).getByRole('button', { name: 'Update when done' }))
+  const beforeAutomaticRestart = fixture.requests.length
+  fixture.holdRestart()
+  await fixture.finishTurns()
+  await act(async () => {
+    await primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+  })
+  await waitFor(() => expect(fixture.requests).toHaveLength(beforeAutomaticRestart + 1))
+  expect(fixture.requests.at(-1)).toMatchObject({ interrupt: [] })
+  expect(fixture.exits).toEqual([])
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(), {
+    timeout: 4000,
+  })
+  const expired = updateIntentStore.getState().intent
+  expect(expired.kind).toBe('failed')
+  if (expired.kind !== 'failed') return
+  await user.click(screen.getByRole('button', { name: 'Retry update' }))
+  await waitFor(() => expect(updateIntentStore.getState().intent.kind).toBe('restarting'))
+  const retried = updateIntentStore.getState().intent
+  expect(retried).toMatchObject({ target: expired.target })
+  if (retried.kind !== 'restarting') return
+  expect(fixture.requests).toHaveLength(beforeAutomaticRestart + 1)
+  fixture.releaseRestart()
+  await waitFor(() => expect(fixture.exits).toHaveLength(1))
+  await waitFor(() =>
+    expect(
+      primaryQueryClient().isMutating({ mutationKey: serverUpdateMutationKeys.restart() }),
+    ).toBe(0),
+  )
+  await waitFor(() => expect(screen.getByText('Updating…')).toHaveAttribute('aria-busy', 'true'))
+  expect(updateIntentStore.getState().intent).toMatchObject({
+    kind: 'restarting',
+    target: expired.target,
+    startedAt: retried.startedAt,
+  })
+  expect(
+    fixture.requests.every(
+      (request) => (request as { interrupt: unknown[] }).interrupt.length === 0,
+    ),
+  ).toBe(true)
+})
+
+test('a dropped restart reaches bounded exact-target retry when the same server instance reconnects', async () => {
   const production = await stagedProduction()
   const server = await makeTestServer({
     environmentId: TEST_ENVIRONMENT_ID,
     update: { root: production, restart: () => {} },
   })
-  let attempts = 0
-  const restoreClient = installTestClient(
-    createObservedInProcessClient(server, (request) => {
-      if (new URL(request.url).pathname !== '/server/restart') return
-      attempts += 1
-      throw new TypeError('Failed to fetch')
-    }),
-  )
+  const requests: unknown[] = []
+  const client = createObservedInProcessClient(server, async (request) => {
+    if (new URL(request.url).pathname !== '/server/restart') return
+    requests.push(await request.clone().json())
+    throw new TypeError('Failed to fetch')
+  })
+  const restoreClient = installTestClient(client)
   onTestFinished(async () => {
     restoreClient()
     resetServerConnectionStore()
@@ -170,19 +302,44 @@ test('A dropped Restart request shows Restarting… only while the socket is off
   })
   store.recordHandshake(origin, connected)
   store.recordServerUpdate(origin, updateForApp(server.app).state())
+  await saveSettings(
+    {
+      mutationId: 'dropped-update-deadline',
+      operations: [{ key: 'server.activationTimeoutSeconds', kind: 'set', value: 1 }],
+      target: 'user',
+    },
+    client,
+  )
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, client))
+  onTestFinished(() => queryClient.clear())
   const user = userEvent.setup()
-  renderWithProviders(<ServerUpdateStatus />)
+  renderWithProviders(<ServerUpdateStatus />, { queryClient })
 
-  await user.click(await screen.findByRole('button', { name: 'Restart' }))
-  await waitFor(() => expect(attempts).toBe(1))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Restart' })).toBeEnabled())
-  expect(screen.queryByText('Restarting…')).toBeNull()
+  await user.click(await screen.findByRole('button', { name: 'Update app' }))
+  await waitFor(() => expect(requests).toHaveLength(1))
+  expect(await screen.findByText('Updating…')).toBeInTheDocument()
+  const original = updateIntentStore.getState().intent
+  expect(original.kind).toBe('restarting')
+  if (original.kind !== 'restarting') return
+  expect(original.confirmed).toBe(false)
 
   act(() => useEnvironmentsStore.getState().markDisconnected(origin))
-  expect(await screen.findByText('Restarting…')).toBeInTheDocument()
+  expect(await screen.findByText('Updating…')).toBeInTheDocument()
 
   // Reconnecting to the same process proves nothing restarted.
   act(() => useEnvironmentsStore.getState().recordHandshake(origin, connected))
-  expect(await screen.findByText('Update available')).toBeInTheDocument()
-  expect(screen.queryByText('Restarting…')).toBeNull()
+  expect(await screen.findByText('Updating…')).toBeInTheDocument()
+  expect(requests).toHaveLength(1)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(), {
+    timeout: 4000,
+  })
+  expect(updateIntentStore.getState().intent).toMatchObject({
+    kind: 'failed',
+    target: original.target,
+  })
+  await user.click(screen.getByRole('button', { name: 'Retry update' }))
+  await waitFor(() => expect(requests).toHaveLength(2))
+  expect(requests[1]).toEqual(requests[0])
+  expect(requests[1]).toMatchObject({ interrupt: [] })
 })

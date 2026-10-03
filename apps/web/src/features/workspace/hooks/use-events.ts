@@ -3,6 +3,7 @@ import { supportsTextFile } from '@/features/editor/state/workspace-document-ser
 import { materializeFileSnapshot, type FileSnapshot } from '@/lib/file-snapshot'
 import { parentPath } from '@/lib/path-formatters'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
+import { subscribeWorkspaceReconnect } from '@/features/workspace/state/reconnect-subscription'
 import { startPageSubscription } from '@/lib/state/page-subscription'
 import { entryFromResponse } from '@/lib/file-system-types'
 import type { PickedFsEntry } from '@/lib/file-system-types'
@@ -257,6 +258,11 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
           })
         },
       })
+      // An accepted handshake revives exhausted watches, including windows opened during an outage.
+      const unsubscribeReconnect = subscribeWorkspaceReconnect(
+        originForQueryClient(queryClient),
+        () => streams.resume(),
+      )
       const unsubscribeFiles = workspaceStore.subscribe(
         (state) => state.openTabContents,
         (contents) => streams.setFiles(filePathsForTabs(contents)),
@@ -276,6 +282,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
       })
 
       return () => {
+        unsubscribeReconnect()
         unsubscribeFocus()
         setWatchCoverage(coverageKey, undefined)
         unsubscribeOnline()
@@ -565,6 +572,10 @@ async function applyTreeRefreshOperation(
 
   // Whatever was listed before the watch attached can miss what changed while it attached.
   const model = queryClient.getQueryData<TreeModel>(fileSystemKeys.tree(rootPath))
+  if (!model) {
+    await queryClient.invalidateQueries({ queryKey: fileSystemKeys.tree(rootPath), exact: true })
+    return
+  }
   const directories = [...(model?.loadedDirectoryPaths ?? [])].map((treePath) =>
     treePath ? `${operation.path}/${treePath}` : operation.path,
   )

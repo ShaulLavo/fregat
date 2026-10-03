@@ -61,6 +61,28 @@ test('macOS publishes actual fullscreen state to the app document', async () => 
   expect(mac).toMatch(/windowDidExitFullScreen:[\s\S]*?\[self publishWindowState\]/)
 })
 
+test('macOS clears content and WebKit root layer opacity only in vibrant mode', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('#import <QuartzCore/QuartzCore.h>')
+  const vibrantBlocks = [...mac.matchAll(/if \(vibrant\) \{([\s\S]*?)\n    \}/g)]
+  expect(vibrantBlocks).toHaveLength(2)
+  expect(vibrantBlocks[0]?.[1]).toMatch(
+    /window\.opaque = NO;[\s\S]*?window\.contentView\.wantsLayer = YES;\s*window\.contentView\.layer\.opaque = NO;\s*window\.contentView\.layer\.backgroundColor = NSColor\.clearColor\.CGColor;/,
+  )
+  expect(vibrantBlocks[1]?.[1]).toMatch(
+    /\[view setValue:@NO forKey:@"drawsBackground"\];\s*if \(@available\(macOS 12\.0, \*\)\) view\.underPageBackgroundColor = NSColor\.clearColor;\s*view\.layer\.opaque = NO;\s*view\.layer\.backgroundColor = NSColor\.clearColor\.CGColor;/,
+  )
+  for (const statement of [
+    'window.contentView.wantsLayer = YES;',
+    'window.contentView.layer.opaque = NO;',
+    'window.contentView.layer.backgroundColor = NSColor.clearColor.CGColor;',
+    'view.layer.opaque = NO;',
+    'view.layer.backgroundColor = NSColor.clearColor.CGColor;',
+  ]) {
+    expect(mac.split(statement)).toHaveLength(2)
+  }
+})
+
 test('macOS host getters and methods avoid implicit ARC ownership families', async () => {
   const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
   const properties = mac.matchAll(/@property\([^)]*\)[^;]*?\b([A-Za-z_]\w*)\s*;/g)
@@ -153,3 +175,58 @@ test.skipIf(process.platform !== 'darwin')(
     expect(existsSync(library!)).toBe(true)
   },
 )
+
+test('macOS keeps a negligible behind-window material visible to the compositor for None', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  const alpha = mac.match(/static const CGFloat liveDesktopAlpha = ([\d.]+);/)
+  expect(alpha).not.toBeNull()
+  expect(Number(alpha?.[1])).toBeGreaterThan(0)
+  expect(Number(alpha?.[1])).toBeLessThanOrEqual(0.0001)
+  expect(mac).toMatch(
+    /effect\.blendingMode = NSVisualEffectBlendingModeBehindWindow;\s*effect\.state = NSVisualEffectStateActive;\s*effect\.alphaValue = liveDesktopAlpha;\s*effect\.hidden = NO;\s*host\.effect = effect;/,
+  )
+  expect(mac).toContain(
+    'self.effect.alphaValue = [material isEqual:@"none"] ? liveDesktopAlpha : 1;',
+  )
+  expect(mac).toContain('self.effect.hidden = glass;')
+  expect(mac).toContain('self.glassEffect.hidden = !glass;')
+  expect(mac).not.toMatch(/(?:self|host)\.effect\s*=\s*nil|removeFromSuperview/)
+  expect(mac).not.toMatch(/(?:self\.)?effect\.hidden = .*none/)
+  expect(mac).toMatch(
+    /\[window\.contentView addSubview:effect\];[\s\S]*?\[window\.contentView addSubview:view\];/,
+  )
+})
+
+test('macOS leaves translucent opacity to the page and starts with a clear backdrop', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  expect(mac).toContain('@property(strong) NSVisualEffectView *effect;')
+  expect(mac).toMatch(
+    /effect.alphaValue = liveDesktopAlpha;\s*effect.hidden = NO;\s*host.effect = effect;/,
+  )
+  expect(mac).toContain('command[@"windowAppearance"]')
+  expect(mac).toContain('CFGetTypeID((__bridge CFTypeRef)opacity) == CFBooleanGetTypeID()')
+  expect(mac).toContain('!isfinite(opacityValue) || opacityValue < 0 || opacityValue > 100')
+  expect(mac).toContain('appearance[@"material"]')
+  expect(mac).not.toContain('appearance[@"frost"]')
+  expect(mac).toContain(
+    'self.effect.alphaValue = [material isEqual:@"none"] ? liveDesktopAlpha : 1;',
+  )
+  expect(mac).toContain('@available(macOS 26.0, *)')
+  expect(mac).toContain('NSClassFromString(@"NSGlassEffectView")')
+  expect(mac).toContain('[effect setValue:@0 forKey:@"style"]')
+  expect(mac).toContain('[effect setValue:@0 forKey:@"cornerRadius"]')
+  expect(mac).toContain('![@[@"none", @"frosted", @"glass"] containsObject:material]')
+  expect(mac).toContain('BOOL glass = [material isEqual:@"glass"] && self.glassEffect != nil;')
+  expect(mac).toContain('self.effect.hidden = glass;')
+  expect(mac).toContain('self.glassEffect.hidden = !glass;')
+  expect(mac).toContain('text, host.glassEffect ? @"true" : @"false"')
+  expect(mac).toMatch(
+    /\[window\.contentView addSubview:effect\];[\s\S]*?\[window\.contentView addSubview:host\.glassEffect\];[\s\S]*?\[window\.contentView addSubview:view\];/,
+  )
+  expect(mac).not.toMatch(/\bNSGlassEffectView\s*\*/)
+  expect(mac).toContain('platformBridge.capabilities.windowGlass')
+  expect(mac).not.toContain('__platformWindowGlass')
+  expect(mac).not.toMatch(/self\.(?:effect|glassEffect)\.hidden = .*opacity/)
+  expect(mac).not.toMatch(/@property[^;]*\b(?:new|init|copy)\w*\s*;/)
+  expect(mac).toContain('dispatch_async(dispatch_get_main_queue(), ^{ [host command:command]; });')
+})

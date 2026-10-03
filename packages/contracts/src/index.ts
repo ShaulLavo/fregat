@@ -370,6 +370,13 @@ export {
   type ProviderUsageWindowStatus,
 } from './provider-usage'
 export {
+  SESSION_CACHE_TURN_LIMIT,
+  providerReportedCacheSchema,
+  providerSessionCacheSchema,
+  type ProviderReportedCache,
+  type ProviderSessionCache,
+} from './provider-session-cache'
+export {
   clientOrchestrationCommandSchema,
   orchestrationCommandSchema,
   projectMetaUpdateCommandSchema,
@@ -1114,6 +1121,7 @@ export {
   busySessionSchema,
   busySessionStateSchema,
   liveCheckVerdictSchema,
+  sameUpdateTarget,
   serverRestartInputSchema,
   serverRestartResultSchema,
   serverUpdateErrorSchema,

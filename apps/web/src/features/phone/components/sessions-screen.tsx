@@ -2,7 +2,6 @@ import { GearSixIcon } from '@phosphor-icons/react'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 import { SessionRail } from '@/features/chat-mode/components/session-rail'
-import { ServerUpdateStatus } from '@/features/server-update/components/status'
 import { Header } from '@/features/phone/components/header'
 import { HeaderButton } from '@/features/phone/components/header-button'
 import { preloadSession } from '@/features/phone/utils/preload-session'
@@ -18,7 +17,6 @@ export function SessionsScreen() {
       <Header
         actions={
           <>
-            <ServerUpdateStatus />
             <HeaderButton
               command='workspace.showSettings'
               icon={GearSixIcon}

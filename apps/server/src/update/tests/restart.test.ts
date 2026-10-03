@@ -124,6 +124,33 @@ describe('POST /server/restart', () => {
     await expect.poll(() => next.startedTurns.map((turn) => turn.turnId)).toEqual(['queued-turn'])
   })
 
+  it('GET /release reports the same busy gate as restart and clears when the held turn ends', async () => {
+    const turns = held()
+    const fixture = await restartFixture(turns.adapter)
+    await fixture.createSession(await fixture.register(), BUSY, 'Busy session')
+    await fixture.send(BUSY, 'held-turn')
+    await turns.started()
+
+    const refused = await fixture.restart([])
+    expect(refused.result?.restarting).toBe(false)
+    const response = await fixture.app.handle(new Request('http://local/release'))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    const descriptor = await response.json()
+    expect(descriptor.busy).toEqual(
+      refused.result && !refused.result.restarting ? refused.result.busy : null,
+    )
+    expect(descriptor.pending).toEqual(updateForApp(fixture.app).state().pending)
+
+    turns.finish()
+    await fixture.engine.providerRuntimeIdle()
+    const idle = await fixture.app.handle(new Request('http://local/release'))
+    expect(await idle.json()).toMatchObject({ busy: [], phase: 'serving' })
+    expect(fixture.exits).toEqual([])
+    expect((await fixture.restart([])).result).toEqual({ restarting: true })
+    expect(fixture.exits[0]?.interrupted).toEqual([])
+  })
+
   it('counts an unanswered approval as busy', async () => {
     const fixture = await restartFixture(new MockProviderAdapter())
     await fixture.createSession(await fixture.register(), IDLE, 'Asking session')
@@ -158,6 +185,80 @@ describe('POST /server/restart', () => {
     })
     expect(fixture.exits).toEqual([])
     expect((await fixture.restart([BUSY, IDLE])).result).toEqual({ restarting: true })
+  })
+
+  it('keeps idempotency bound to the accepted restart target when a later deploy restages', async () => {
+    const fixture = await restartFixture(new MockProviderAdapter())
+    const accepted = updateForApp(fixture.app).state().pending!
+    expect((await fixture.restart([])).result).toEqual({ restarting: true })
+    await stageRelease(fixture.production, 'newer-release')
+
+    const newer = await fixture.restart([])
+    expect(newer.status).toBe(409)
+    expect(newer.body).toMatchObject({ error: { code: 'update.STAGED_RELEASE_CHANGED' } })
+    expect(updateForApp(fixture.app).state().pending?.release).toBe('newer-release')
+
+    const duplicate = await fixture.app.handle(
+      new Request('http://local/server/restart', {
+        method: 'POST',
+        headers: { origin: 'http://localhost:5173', 'content-type': 'application/json' },
+        body: JSON.stringify({ target: accepted, interrupt: [] }),
+      }),
+    )
+    expect(duplicate.status).toBe(200)
+    expect(await duplicate.json()).toEqual({ restarting: true })
+    expect(fixture.exits).toHaveLength(1)
+    expect(fixture.exits[0]?.to).toBe(accepted.release)
+    expect(
+      JSON.parse(readFileSync(path.join(fixture.production, 'restart-approved.json'), 'utf8')),
+    ).toEqual(accepted)
+  })
+
+  it('refuses the old exact target when a deploy restages before the request arrives', async () => {
+    const fixture = await restartFixture(new MockProviderAdapter())
+    const target = updateForApp(fixture.app).state().pending
+    await stageRelease(fixture.production, 'newer-release')
+
+    const response = await fixture.app.handle(
+      new Request('http://local/server/restart', {
+        method: 'POST',
+        headers: { origin: 'http://localhost:5173', 'content-type': 'application/json' },
+        body: JSON.stringify({ target, interrupt: [] }),
+      }),
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      error: { code: 'update.STAGED_RELEASE_CHANGED' },
+    })
+    expect(fixture.exits).toEqual([])
+    expect(existsSync(path.join(fixture.production, 'restart-approved.json'))).toBe(false)
+    expect(updateForApp(fixture.app).state().pending?.release).toBe('newer-release')
+    expect((await fixture.restart([])).result).toMatchObject({ restarting: true })
+    expect(fixture.exits[0]?.to).toBe('newer-release')
+  })
+
+  it('refuses a target with the right release name and the wrong staged timestamp', async () => {
+    const fixture = await restartFixture(new MockProviderAdapter())
+    const target = updateForApp(fixture.app).state().pending!
+    const response = await fixture.app.handle(
+      new Request('http://local/server/restart', {
+        method: 'POST',
+        headers: { origin: 'http://localhost:5173', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          target: { ...target, stagedAt: '2000-01-01T00:00:00.000Z' },
+          interrupt: [],
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      error: { code: 'update.STAGED_RELEASE_CHANGED' },
+    })
+    expect(fixture.exits).toEqual([])
+    expect(updateForApp(fixture.app).state().phase).toBe('serving')
+    expect(existsSync(path.join(fixture.production, 'restart-approved.json'))).toBe(false)
   })
 
   it('holds a claim that was mid-flight when the restart was accepted', async () => {
@@ -221,6 +322,7 @@ describe('ServerUpdate.requestRestart', () => {
         throw new TypeError('A refused restart must not exit')
       },
       gate: {
+        busySessions: () => [],
         async beginRestart(_interrupt, commit = () => {}) {
           await stageRelease(root, 'second-release')
           commit()
@@ -230,7 +332,7 @@ describe('ServerUpdate.requestRestart', () => {
       },
     })
 
-    await expect(update.requestRestart([], null)).rejects.toMatchObject({
+    await expect(update.requestRestart([], null, update.state().pending!)).rejects.toMatchObject({
       code: 'update.STAGED_RELEASE_CHANGED',
     })
     expect(held).toBe(false)

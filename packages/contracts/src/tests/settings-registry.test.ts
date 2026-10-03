@@ -10,6 +10,7 @@ import {
   settingsValuesSchema,
   type SettingsValues,
 } from '../settings/keys'
+import { resolveSettings } from '../settings/resolve'
 import { defineSetting, registryProblems } from '../settings/registry'
 import {
   keybindingChordSchema,
@@ -348,4 +349,36 @@ it('keeps executable keymap presets application-scoped and restricted to impleme
   expect(v.safeParse(descriptor.schema, 'default').success).toBe(true)
   expect(v.safeParse(descriptor.schema, 'vscode').success).toBe(true)
   expect(v.safeParse(descriptor.schema, 'vim').success).toBe(false)
+})
+
+describe('window material', () => {
+  it('is adjacent to transparency and defaults to a rendering-only window enum', () => {
+    const setting = descriptorFor('window.material')
+    expect(DEFAULT_SETTING_VALUES['window.material']).toBe('none')
+    expect(setting).toMatchObject({
+      scope: 'window',
+      category: 'Appearance',
+      title: 'Window material',
+      widget: 'enum',
+    })
+    expect(setting.requiresRestart).not.toBe(true)
+    expect(SETTING_IDS.indexOf('window.material')).toBe(
+      SETTING_IDS.indexOf('window.transparency') + 1,
+    )
+    expect(isSettingId('window.frost')).toBe(false)
+  })
+  it.each(['none', 'frosted', 'glass'])('accepts %s', (value) => {
+    expect(v.safeParse(descriptorFor('window.material').schema, value).success).toBe(true)
+  })
+  it.each([0, 50, 100, true, false, '50', 'invalid', null])('rejects %s', (value) => {
+    expect(v.safeParse(descriptorFor('window.material').schema, value).success).toBe(false)
+  })
+})
+
+it('allows workspace rendering-only material without changing machine transparency', () => {
+  const resolved = resolveSettings([
+    { id: 'workspace', raw: { 'window.material': 'frosted', 'window.transparency': 'window' } },
+  ])
+  expect(resolved.values['window.material']).toBe('frosted')
+  expect(resolved.values['window.transparency']).toBe('compositor')
 })

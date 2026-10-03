@@ -41,6 +41,8 @@ export const rootSwitchRows = {
   Files: '[role="treeitem"]',
 } as const
 
+export const transientAlertSelector =
+  '[role="alert"], [data-sonner-toast], [role="status"].text-warning'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
@@ -97,7 +99,6 @@ export const selectors = {
   chatFileFallback: (page: Page) =>
     page.getByText('Download this file to view its contents.', { exact: true }),
   fileFacts: (page: Page) => page.getByRole('region', { name: 'File facts' }),
-  revealFileFacts: (page: Page) => page.getByRole('button', { name: 'Reveal in files' }),
   missingFileMessage: (page: Page) =>
     page.getByText('This file no longer exists.', { exact: true }),
   pdfEngineFailure: (page: Page) =>
@@ -164,6 +165,8 @@ export const selectors = {
     page.getByRole('button', { name: 'Agent access and mode', exact: true }),
   composerPlan: (page: Page) => page.getByRole('menuitemradio', { name: /^Plan/ }),
   contextMeter: (page: Page) => page.getByRole('button', { name: /^Context / }),
+  sessionCacheDetails: (page: Page) =>
+    page.getByRole('region', { name: 'Recent prompt cache', exact: true }),
   notificationToast: (page: Page) =>
     page
       .locator('[data-sonner-toast]')
@@ -738,6 +741,12 @@ export const selectors = {
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsEnum: (page: Page, title: string) =>
     page.getByRole('combobox', { name: title, exact: true }),
+  settingsEnumOption: (page: Page, title: string) =>
+    page.getByRole('option', { name: title, exact: true }),
+  settingsScopeIndicator: (page: Page) =>
+    page
+      .getByRole('tablist', { name: 'Settings scope', exact: true })
+      .locator('[data-slot="tabs-indicator"]'),
   settingsRawConflictBanner: (page: Page) =>
     page.getByText('settings.json changed somewhere else', { exact: true }),
   gitSizeLimitNotice: (page: Page) =>
@@ -930,23 +939,24 @@ export const selectors = {
   rewindFiles: (page: Page) =>
     page.getByRole('button', { name: 'Rewind chat and files', exact: true }),
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
-  clientUpdateRefresh: (page: Page) =>
-    page.getByRole('button', { name: 'Reload app', exact: true }),
+  clientUpdateReload: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
-  serverUpdateRestarting: (page: Page) => page.locator('[data-server-update="restarting"]'),
-  serverUpdateRestart: (page: Page) =>
-    page.locator('[data-server-update]').getByRole('button', { name: 'Restart', exact: true }),
-  // Scoped to the dialog: the rail lists the same session titles.
-  restartDialog: (page: Page) => page.getByRole('alertdialog', { name: 'Restart server' }),
-  restartDialogSession: (page: Page, title: string) =>
+  serverUpdating: (page: Page) => page.getByRole('button', { name: 'Updating…', exact: true }),
+  serverUpdateRetry: (page: Page) =>
+    page.getByRole('button', { name: 'Retry update', exact: true }),
+  serverUpdateTooltip: (page: Page) =>
+    page.locator('[data-slot="tooltip-content"]').filter({ hasText: 'Retry update' }),
+  serverUpdateApply: (page: Page) =>
+    page.locator('[data-server-update]').getByRole('button', { name: 'Update app', exact: true }),
+  updatePopover: (page: Page) => page.getByRole('dialog', { name: 'Update now?' }),
+  updateSession: (page: Page, title: string) =>
     page
-      .getByRole('alertdialog', { name: 'Restart server' })
+      .getByRole('dialog', { name: 'Update now?' })
       .getByRole('listitem')
       .filter({ hasText: title }),
-  restartDialogCancel: (page: Page) =>
-    page
-      .getByRole('alertdialog', { name: 'Restart server' })
-      .getByRole('button', { name: 'Cancel', exact: true }),
+  updateWhenDone: (page: Page) =>
+    page.getByRole('button', { name: 'Update when done', exact: true }),
+  updateNow: (page: Page) => page.getByRole('button', { name: 'Update now', exact: true }),
   chatComposerFileInput: (page: Page) =>
     page
       .getByRole('button', { name: 'Attach', exact: true })

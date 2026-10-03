@@ -143,8 +143,8 @@ export const terminalHistory: Scenario = {
       const firstCount = first.length
       const secondCount = other.length
       await stageRelease(server)
-      await selectors.serverUpdateRestart(page).waitFor()
-      await selectors.serverUpdateRestart(page).click()
+      await selectors.serverUpdateApply(page).waitFor()
+      await selectors.serverUpdateApply(page).click()
       await selectors.serverUpdate(page).waitFor({ state: 'detached', timeout: 20_000 })
       await until(
         page,

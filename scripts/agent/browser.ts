@@ -237,8 +237,8 @@ function runVerb(
 
 const SERVER_VERBS = new Set(['look', 'scenario', 'trace', 'renders', 'caches'])
 
-// Only the dev page gets a throwaway server: production serves its own API, and a static or
-// site capture has none.
+// The dev app and gallery load resources from a throwaway API. Production and
+// standalone site captures serve their own resources.
 function needsIsolatedServer(
   verb: string | undefined,
   scenario: Scenario | undefined,
@@ -246,8 +246,8 @@ function needsIsolatedServer(
   sharedDev: boolean,
 ) {
   if (sharedDev || !verb || !SERVER_VERBS.has(verb)) return false
-  // Site and demo scenarios answer from a static preview or the demo's mock backend.
-  if (options.site || options.staticDir || scenario?.surface) return false
+  if (options.staticDir || scenario?.surface) return false
+  if (options.site && !/^\/dev(\/|$)/.test(new URL(options.url).pathname)) return false
   return isDevPage(options.url)
 }
 
@@ -804,7 +804,8 @@ function apiBase(url: string) {
   if (parsed.port === '5173' || parsed.port === (process.env.WEB_PORT ?? '5173')) {
     return `http://localhost:${process.env.PORT ?? '3001'}/`
   }
-  return `${parsed.origin}${parsed.pathname.replace(/\/[^/]*$/, '/')}`
+  const pathname = parsed.pathname.replace(/\/~.*$/, '/')
+  return `${parsed.origin}${pathname.replace(/\/[^/]*$/, '/')}`
 }
 
 async function appendLogs(evidence: Evidence, server: IsolatedServer | undefined) {

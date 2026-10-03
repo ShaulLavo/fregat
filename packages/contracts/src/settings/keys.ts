@@ -1555,14 +1555,7 @@ export const SETTINGS_REGISTRY = {
     keywords: ['window', 'native', 'shutdown', 'grace'],
   }),
   'window.transparency': defineSetting({
-    // Who supplies the see-through, not how much of it there is.
-    //
-    // `compositor` leaves the shell window opaque and lets the window manager
-    // blend it over the desktop — what Linux compositors already do to every
-    // window, at no cost to us. `window` makes the window itself transparent,
-    // which is what a macOS NSVisualEffectView needs and what puts the desktop
-    // directly behind each translucent pane; it also forces CEF into off-screen
-    // rendering, measured at a 5.5MB CPU copy per paint.
+    // Window creation belongs to the native host, before the page exists.
     schema: v.picklist(['compositor', 'window'] as const),
     default: 'compositor',
     // Machine scope: window chrome is a property of this machine's desktop shell,
@@ -1572,12 +1565,21 @@ export const SETTINGS_REGISTRY = {
     optionTitles: { compositor: 'Window manager', window: 'Transparent window' },
     category: 'Window',
     details:
-      'A per-pixel transparent window switches the embedded Chromium renderer to off-screen rendering. On macOS a 1440×960 window then copies 5.5 MB through the CPU on every paint, where the opaque window produced no paint events at all. On Linux the window manager already blends an opaque window over the desktop.',
-    description:
-      'What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame.',
+      'Transparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.',
+    description: 'Choose window-manager transparency or a see-through native window.',
     // The window is created once, from this value, before the page exists.
     requiresRestart: true,
     keywords: ['window', 'transparency', 'vibrancy', 'compositor', 'desktop', 'wallpaper', 'blur'],
+  }),
+  'window.material': defineSetting({
+    schema: v.picklist(['none', 'frosted', 'glass']),
+    default: 'none',
+    scope: 'window',
+    widget: 'enum',
+    optionTitles: { none: 'None', frosted: 'Frosted', glass: 'Glass' },
+    category: 'Appearance',
+    title: 'Window material',
+    description: 'None shows the desktop; Frosted blurs it; Glass adds Liquid Glass.',
   }),
   'prefetch.enabled': defineSetting({
     schema: v.boolean(),

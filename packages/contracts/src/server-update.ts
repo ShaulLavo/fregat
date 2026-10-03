@@ -2,7 +2,7 @@ import * as v from 'valibot'
 import { sessionIdSchema } from './chat-ids'
 import { isoDateTimeSchema, trimmedNonEmptyStringSchema } from './chat-model'
 
-/** A release `deploy --server` staged; it goes live when someone clicks Restart (Plan 148). */
+/** A staged server release and the identity of this staging operation. */
 export const stagedReleaseSchema = v.object({
   release: trimmedNonEmptyStringSchema,
   stagedAt: isoDateTimeSchema,
@@ -49,8 +49,9 @@ export const busySessionSchema = v.object({
   state: busySessionStateSchema,
 })
 
-/** The sessions the person agreed to interrupt; the first click sends none. */
+/** Consent applies to this exact staging operation and the listed sessions. */
 export const serverRestartInputSchema = v.object({
+  target: stagedReleaseSchema,
   interrupt: v.pipe(v.array(sessionIdSchema), v.maxLength(1000)),
 })
 
@@ -68,3 +69,11 @@ export type BusySessionState = v.InferOutput<typeof busySessionStateSchema>
 export type BusySession = v.InferOutput<typeof busySessionSchema>
 export type ServerRestartInput = v.InferOutput<typeof serverRestartInputSchema>
 export type ServerRestartResult = v.InferOutput<typeof serverRestartResultSchema>
+
+/** Identity includes the staging operation; a page-only release has no staging timestamp. */
+export function sameUpdateTarget(
+  left: { readonly release: string; readonly stagedAt: string | null } | null | undefined,
+  right: { readonly release: string; readonly stagedAt: string | null } | null | undefined,
+): boolean {
+  return left?.release === right?.release && left?.stagedAt === right?.stagedAt
+}

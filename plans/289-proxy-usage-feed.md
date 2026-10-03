@@ -6,6 +6,12 @@
 - Repositories: `ShaulLavo/fregat`, `ShaulLavo/mesh`.
 - Decision: Zero extra provider requests. Read cached Codex observations from CLIProxyAPI and capture Claude quota headers on ordinary gateway traffic. Coordinator deploys separately.
 
+## Superseding owner decision (2026-10-03)
+
+[Plan 308](308-account-usage-feed.md) now owns usage production in Fregat: bounded occasional provider requests, passive/native sources, persistent cache, Settings UI and the Mesh-compatible read-only endpoint. The owner explicitly permits occasional requests and keeps Claude pooling forbidden. Mesh retains this plan's approved v1 consumer and TV design. Its shipped parser and panel are reused through a URL cut-over.
+
+The gateway producer below records prior delivery, not the current execution prerequisite. After Fregat deploy and coordinator-confirmed TV cut-over, Plan 308 retires its source. Only the coordinator removes the live `/ai-usage` route, edits installed `runtime.json`, restarts the gateway and deletes its old feed directory. Implementation never touches the Pi or installed gateway.
+
 ## Outcome and fixed boundary
 
 The TV dashboard shows **AI plans**, grouped by provider, with independently labeled 5h and Weekly windows per account. Claude `shaul9191` is Max. Codex `shaul9191` and `shaul.lavochkin` are both Pro. Future providers add groups without provider-specific layout branches. Keep unknown and no-data visible; never sum account allowances.
@@ -24,7 +30,7 @@ Publish `v1.json` by same-directory atomic replacement in an isolated sanitized 
 
 A **separate tailnet-only isolated Mesh static route** serves that directory, e.g. `https://omarchy.mesh.shaulavo.dev/ai-usage/v1.json`. It serves the last snapshot while `/ai` sleeps, never wakes `/ai`, extends its idle timer, invokes readiness or wakes a machine. Keep management localhost-only; the Pi gets no secret. Feed reads cannot redirect into activation/provider/management routes. Unreachable hosts leave cached stale data on the TV.
 
-Implementation does not modify the installed gateway, proxy, Mesh or Pi. Loading producer code will require a coordinator-scheduled **gateway** restart, which interrupts live agents. No proxy restart is needed. Report exact static-route and deployment commands after source verification; do not execute them during this task.
+Implementation does not modify the installed gateway, proxy, Mesh or Pi. Loading producer code will require a coordinator-scheduled **gateway** restart, which interrupts live agents. No separate proxy management/configuration restart is needed; reloading the gateway runner also respawns its owned Codex proxy. Report exact static-route and deployment commands after source verification; do not execute them during this task.
 
 ## Generic JSON v1 contract
 
@@ -112,16 +118,24 @@ The terminal has no hover. TXT grids are the readable table equivalent. Status c
 ### 0. Plans and capability
 
 - [x] Renumber original draft 287 to 289; update `plans/README.md`, canonical links and both approved visuals. Run `bun run plans:check`.
-- [ ] Update Mesh plan 10 with current source facts and approved layout. Independently review both plan PRs; green CI; squash-merge before implementation.
-- [ ] Read only sanitized management schema/projected fields; establish exact quota/cooldown mapping and attribution limits without provider requests. Never expose secrets in evidence.
+- [x] Update Mesh plan 10 with current source facts and approved layout. Both plan PRs received independent HIGH reviews and green CI: Fregat #336 (`ec65e5c9d`) and Mesh #73 (`b64fb55`). Squash-merged before implementation.
+- [x] Read only sanitized management schema/projected fields; establish exact quota/cooldown mapping and attribution limits without provider requests. Confirmed against local CLIProxyAPI v8.0.4 source; no secrets exposed in evidence.
 
 ### 1. Fregat producer
 
-- [ ] Fail-first pure normalization and injected-fetcher tests: two Codex Pro identities; Claude Max; scaling, timestamps, durations, relative resets, malformed/status-only signals, understood model windows, cooldown and honest unknown attribution.
-- [ ] Capture passive Claude headers beside the existing reset-order observer. Prove byte-identical responses, streaming/abort/error behavior and no body reads by the observer.
-- [ ] Lifecycle-bound serialized sampler and atomic sanitized publication. Preserve valid prior values through failures/restart; initial registered identities use no-data. Bound fetch time/size and file size. No auth-directory fallback exposing credentials.
-- [ ] Counters prove zero extra provider calls and no readiness/demand requests. Temp paths derive from OS temp/config, never owner paths in portable tests.
-- [ ] Record gateway runtime configuration and coordinator deployment/restart requirements. No installed service changes.
+- [x] Fail-first pure normalization and injected-fetcher tests: two Codex Pro identities; Claude Max; scaling, timestamps, durations, relative resets, malformed/status-only signals, understood model windows, cooldown and honest unknown attribution.
+- [x] Capture passive Claude headers beside the existing reset-order observer. Prove byte-identical responses, streaming/abort/error behavior and no body reads by the observer.
+- [x] Lifecycle-bound serialized sampler and atomic sanitized publication. Preserve valid prior values through failures/restart; initial registered identities use no-data. Bound fetch time/size and file size. No auth-directory fallback exposing credentials.
+- [x] Counters prove zero extra provider calls and no readiness/demand requests. Temp paths derive from OS temp/config, never owner paths in portable tests.
+- [x] Record gateway runtime configuration and coordinator deployment/restart requirements. No installed service changes.
+- [x] Address independent review: known websocket Spark namespace shares HTTP Bengalfox allowance identity; preserve resets and observation ages without aggregate/model inference.
+- [x] Address independent review: physical feed/key isolation rejects root and credential aliases before publication; retain safe OS-temp ancestor aliases and missing-key restart data.
+
+Producer source and portable verification are complete. `scripts/claude-gpt/usage-feed.ts` normalizes and strictly restores v1; `usage-producer.ts` owns bounded cached sampling and coalesced atomic publication. Direct-Claude capture stays header-only; runtime feed configuration requires explicit empty Claude pool entrypoints and no Claude proxy. Root `test:scripts` runs the three new usage suites. Fail-first evidence captured missing producer modules, absent direct response observation, and absent feed configuration before implementation. The README records configuration, staging bundle/copy, scheduled runner restart (including its owned Codex proxy), and the separate static feed route.
+
+Independent HIGH review follow-ups passed fail-first and targeted verification: actual websocket Spark allowance maps to the same HTTP Bengalfox window; physical path isolation rejects unsafe root/ancestor/key aliases before writing or fetching, including a dangling key alias into a future feed. A safe ancestor-alias/missing-key restart regression preserves portable temporary paths and cached data. All three usage suites pass 30 tests after these corrections.
+
+Deployment remains deferred: no installed gateway/proxy/Mesh/Pi changes, restarts, provider requests or management requests were performed. Live route isolation, sleeping inference-route behavior, stale-host retention and final Pi appearance remain coordinator acceptance checks below.
 
 ### 2. Mesh consumer and panel
 
@@ -140,4 +154,4 @@ The terminal has no hover. TXT grids are the readable table equivalent. Status c
 
 Fregat can later consume this same feed, with source-aware identities and no active probes for proxy-backed accounts. Direct-provider quota behavior stays unchanged here. Multiple pools need honest per-account presentation, never a single arbitrary winner. Unknown selection is acceptable.
 
-Passive observations age indefinitely without traffic. Normal gateway responses may lack model-specific Claude windows. Upstream schema drift becomes unknown, never fabricated 0% or 100%. Gateway restart interrupts all live Sol work; only the coordinator schedules it. Proxy management is already on and needs no restart.
+Passive observations age indefinitely without traffic. Normal gateway responses may lack model-specific Claude windows. Upstream schema drift becomes unknown, never fabricated 0% or 100%. Gateway restart interrupts all live Sol work; only the coordinator schedules it. Proxy management is already on and needs no enablement change or separate restart. Reloading the gateway runner also stops and respawns its owned Codex proxy.

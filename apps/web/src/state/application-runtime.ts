@@ -1,3 +1,9 @@
+import { restartGateSignature } from '@/features/chat/utils/restart-gate-signature'
+import { createReloadSafetyStore } from '@/lib/reload-safety'
+import { documentSourcePath } from '@/lib/documents/utils/capabilities'
+import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
+import { updateIntentStore } from '@/features/server-update/state/intent'
+import { serverUpdateQueryKeys } from '@/features/server-update/utils/query-keys'
 import { prepareSearchReload } from '@/features/search/state/result-scroll-state'
 import { prepareTerminalReload } from '@/features/terminal/state/reload'
 import { prepareLogsViewReload } from '@/features/logs/state/view-reload'
@@ -34,7 +40,7 @@ import { subscribeWorkspaceCachePersistence } from '@/features/workspace/state/c
 import { activateWorkspaceRoot } from '@/features/workspace/state/active-project'
 import { createCommandRuntimeBinding } from '@/keymap/state/runtime-binding'
 import { canonicalServerOrigin } from '@workspace/client-core/transport/client'
-import { activeServerOrigin } from '@/lib/client'
+import { activeServerOrigin, primaryServerOrigin } from '@/lib/client'
 import {
   resumeEnvironmentActivity,
   suspendEnvironmentActivity,
@@ -52,6 +58,7 @@ type RetainedEnvironment = {
   readonly stopSearchReload: () => void
   readonly stopCachePersistence: () => void
   readonly stopSpellcheckWords: () => void
+  readonly stopReloadSafety: () => void
   readonly unsubscribeRoot: () => void
 }
 
@@ -79,10 +86,29 @@ export function createApplicationRuntime({
   }
 }) {
   const commandBinding = createCommandRuntimeBinding()
+  const reloadSafety = createReloadSafetyStore()
   const environments = new Map<EnvironmentId, RetainedEnvironment>()
   let current: RetainedEnvironment
   let started = false
   let disposed = false
+
+  function syncReloadSafety() {
+    const dirtyFiles: string[] = []
+    for (const { editor } of environments.values()) {
+      const state = editor.documentStore.getState()
+      for (const document of Object.values(state.liveDocumentsByKey)) {
+        if (!state.dirtyDocumentKeys.has(document.key) && !document.buffer.isDirty()) continue
+        dirtyFiles.push(documentSourcePath(document.target) ?? String(document.key))
+      }
+    }
+    const previous = reloadSafety.getState().dirtyFiles
+    if (
+      previous.length === dirtyFiles.length &&
+      previous.every((file, index) => file === dirtyFiles[index])
+    )
+      return
+    reloadSafety.setState({ dirtyFiles })
+  }
 
   // Only the active machine's editor runs, and not while ConnectionGate withholds its workbench.
   function syncActiveEditor() {
@@ -111,6 +137,10 @@ export function createApplicationRuntime({
       queryClient,
       editor,
       stopSearchReload,
+      stopReloadSafety: editor.documentStore.subscribe(
+        (state) => state.dirtyDocumentKeys,
+        syncReloadSafety,
+      ),
       // Before any recovery, so a recovered root recreates its erased cache entry.
       stopCachePersistence: subscribeWorkspaceCachePersistence({
         storage,
@@ -146,9 +176,22 @@ export function createApplicationRuntime({
   restoreSessionSelection(confirmedEnvironmentId(current.origin))
   resumeEnvironmentActivity(current.origin)
   environments.set(confirmedEnvironmentId(current.origin), current)
+  syncReloadSafety()
   activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
 
   const connections = createEnvironmentConnections()
+  let updateGateSignature = ''
+  const stopUpdateGate = useChatProjectionStore.subscribe((state, previous) => {
+    if (updateIntentStore.getState().intent.kind !== 'waiting') return
+    const primary = useEnvironmentsStore.getState().entries[primaryServerOrigin()]?.environmentId
+    if (!primary) return
+    const slice = state.slices[primary]
+    if (slice?.sessionById === previous.slices[primary]?.sessionById) return
+    const signature = restartGateSignature(slice)
+    if (signature === updateGateSignature) return
+    updateGateSignature = signature
+    void primaryQueryClient().invalidateQueries({ queryKey: serverUpdateQueryKeys.release() })
+  })
   const stopAdmissionWatch = useEnvironmentsStore.subscribe(syncActiveEditor)
   const stopLatency = watchSettingValue(
     primaryQueryClient(),
@@ -167,6 +210,7 @@ export function createApplicationRuntime({
 
   const application = {
     connections,
+    reloadSafety,
     commandBinding,
     getSnapshot: () => current,
     getEnvironment: (environmentId: EnvironmentId) => environments.get(environmentId),
@@ -190,6 +234,7 @@ export function createApplicationRuntime({
         environments.get(environmentId) ??
         createEnvironment(origin, readWorkspaceCache(environmentScopedStorage(environmentId)))
       environments.set(environmentId, next)
+      syncReloadSafety()
       if (current === next) return
       commandBinding.clear()
       suspendEnvironmentActivity(current.origin)
@@ -238,6 +283,7 @@ export function createApplicationRuntime({
     dispose() {
       disposed = true
       stopAdmissionWatch()
+      stopUpdateGate()
       commandBinding.clear()
       stopLatency()
       stopMachines()
@@ -245,6 +291,7 @@ export function createApplicationRuntime({
       for (const environment of environments.values()) {
         suspendEnvironmentActivity(environment.origin)
         environment.unsubscribeRoot()
+        environment.stopReloadSafety()
         environment.stopSearchReload()
         environment.stopCachePersistence()
         environment.stopSpellcheckWords()

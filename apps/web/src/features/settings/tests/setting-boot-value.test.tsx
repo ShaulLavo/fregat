@@ -1,7 +1,11 @@
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useSettingValue } from '@/hooks/use-setting-value'
-import { readSettingBootValue, writeBootMirror } from '@/lib/settings-boot-mirror'
+import {
+  readSettingBootValue,
+  readSettingsMirror,
+  writeBootMirror,
+} from '@/lib/settings-boot-mirror'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { afterEach } from 'vitest'
 
@@ -55,4 +59,15 @@ test('single-key boot reads validate mirrored values and ignore unmirrored value
   expect(readSettingBootValue('environments.machines')).toBe(
     DEFAULT_SETTING_VALUES['environments.machines'],
   )
+})
+
+test('material is available to first paint from confirmed boot values and validates storage', () => {
+  writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'window.material': 'glass' })
+  expect(readSettingsMirror()['window.material']).toBe('glass')
+  expect(readSettingBootValue('window.material')).toBe('glass')
+  localStorage.setItem(
+    'platform.settings-boot-mirror.v1',
+    JSON.stringify({ 'window.material': true }),
+  )
+  expect(readSettingsMirror()['window.material']).toBe('none')
 })

@@ -21,9 +21,10 @@ import {
   frameBuilders,
   selectedVariants,
   selectedPhases,
-  selectedOutputFixture,
   measurementCases,
   measurementRepetitions,
+  outputFixture,
+  selectedTracePhases,
 } from './comparison-options.mjs'
 import { presentationLatency } from './comparison-latency.mjs'
 import { comparisonLatencyEndpoint } from './comparison-compact.mjs'
@@ -78,10 +79,6 @@ const fixtures = selection(
   manifest.fixtures.map(({ name }) => name),
   manifest.fixtures.map(({ name }) => name),
 )
-const outputFixture = selectedOutputFixture(
-  args,
-  manifest.fixtures.map(({ name }) => name),
-)
 const writePaths = selection(args, '--paths', ['bytes', 'string'], ['bytes', 'string'])
 if (smoke) counts = [Number(value('--smoke-count', 1))]
 if (tracing && args.includes('--trace-count')) counts = [Number(value('--trace-count', 1))]
@@ -113,18 +110,14 @@ const latencySamples = positiveInteger(
   s.latencySamples,
 )
 const outputFrames = positiveInteger(args, '--output-frames', s.outputFrames)
+const selectedOutputFixture = outputFixture(args, manifest.fixtures)
 const tickSeconds =
   platform() === 'linux'
     ? 1 / Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
     : null
 const cpuOptions = { tickSeconds }
 const traceFrames = positiveInteger(args, '--trace-frames', 180)
-const tracePhases = selection(
-  args,
-  '--trace-phase',
-  ['latency', 'ascii', 'sgr'],
-  ['latency', 'ascii', 'sgr'],
-)
+const tracePhases = selectedTracePhases(args, manifest.fixtures)
 await prepareOutput(output, { tracing })
 const temporary = join(root, 'tmp')
 await mkdir(temporary, { recursive: true })
@@ -202,7 +195,7 @@ const artifact = {
   repetitions: smoke ? 1 : repetitions,
   latencySamples,
   outputFrames,
-  outputFixture,
+  outputFixture: selectedOutputFixture,
   cpuTickSeconds: tickSeconds,
   counts,
   variants: variantIds,
@@ -516,9 +509,9 @@ async function qualifiedWindow(run, label, operation) {
     await refreshGpuOwnership()
     const idle = await gpuGate.waitForIdle()
     run.gpuWindows.push({ label, idle })
-    const measured =
-      ['idle', 'latency', 'delayed-write'].includes(label) || label.startsWith('output/')
-    const sampleMilliseconds = measured ? s.gpuMeasuredSampleMilliseconds : s.gpuSampleMilliseconds
+    const sampleMilliseconds = ['idle', 'output/ascii', 'latency', 'delayed-write'].includes(label)
+      ? s.gpuMeasuredSampleMilliseconds
+      : s.gpuSampleMilliseconds
     const { value, gpu } = await gpuGate.monitorWindow(operation, { sampleMilliseconds })
     run.gpuWindows.at(-1).window = gpu
     const skipped = idle.skipReason ?? gpu.skipReason ?? run.gpuIdle?.skipped
@@ -675,7 +668,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       run.phases = []
       const configurations = [
         { name: 'latency', operation: () => latency(page, session) },
-        ...['ascii', 'sgr'].map((name) => ({
+        ...manifest.fixtures.map(({ name }) => ({
           name,
           operation: () =>
             page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
@@ -741,15 +734,15 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       )
     }
     if (phases.includes('output')) {
-      run.phase = `output/${outputFixture}/warmup`
-      await page.evaluate((name) => window.__compare.burst(name, 3), outputFixture)
-      run.phase = `output/${outputFixture}`
+      run.phase = `output/${selectedOutputFixture}/warmup`
+      await page.evaluate((name) => window.__compare.burst(name, 3), selectedOutputFixture)
+      run.phase = `output/${selectedOutputFixture}`
       const outputMeasurement = await qualifiedWindow(run, run.phase, () =>
         measureCpu(
           browserSession,
           () =>
             page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
-              name: outputFixture,
+              name: selectedOutputFixture,
               frames: outputFrames,
             }),
           cpuOptions,
@@ -757,6 +750,8 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       )
       run.output = {
         ...outputMeasurement.sample,
+        fixture: selectedOutputFixture,
+        input: manifest.fixtures.find(({ name }) => name === selectedOutputFixture),
         cpu: outputMeasurement.cpu,
         memory: phases.includes('memory') ? await memory(page, session, browserSession) : undefined,
       }

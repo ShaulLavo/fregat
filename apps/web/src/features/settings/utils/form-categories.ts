@@ -2,13 +2,11 @@ import type { PlatformName } from '@workspace/client-core/commands/chord'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
 import { descriptorFor, settingParentId, type SettingId } from '@workspace/contracts'
 
-import { isSettingAvailable } from '@/features/settings/utils/availability'
+import { isSettingAvailable, settingEnvironment } from '@/features/settings/utils/availability'
 import { MCP_CATEGORY, matchesMcpSearch } from '@/features/settings/utils/mcp'
 import { matchesPushSearch } from '@/features/settings/utils/push-device'
 import { matchingShortcutRows, type ShortcutRow } from '@/features/settings/utils/shortcut-rows'
 import { matchesUsageSearch } from '@/features/settings/utils/usage'
-import { documentBackdrop } from '@/lib/platform/backdrop'
-import { runtimeCapabilities } from '@/lib/platform/capabilities'
 
 export type FormCategories = readonly (readonly [string, SettingId[]])[]
 
@@ -25,10 +23,7 @@ export function formCategories(
 ) {
   // `matchingSettingIds` already searches rows rather than keys, so a key edited
   // from another row is folded into its owner here rather than dropped.
-  const environment = {
-    backdrop: documentBackdrop(),
-    nativeTransparency: runtimeCapabilities().nativeTransparency,
-  }
+  const environment = settingEnvironment()
   // Settings search finds shortcuts too: a command that matches brings its list along.
   const shortcutsMatch =
     query.trim() !== '' &&

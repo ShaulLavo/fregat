@@ -6,6 +6,7 @@ import {
   SelectValue,
 } from '@workspace/ui/components/select'
 import type { SettingId } from '@workspace/contracts'
+import { materialOptionReason, settingEnvironment } from '@/features/settings/utils/availability'
 import { settingOptionTitle } from '@workspace/client-core/settings/humanize'
 
 export function EnumWidget({
@@ -21,6 +22,7 @@ export function EnumWidget({
   options: readonly string[]
   value: string
 }) {
+  const environment = settingEnvironment()
   return (
     <Select
       disabled={disabled}
@@ -36,11 +38,20 @@ export function EnumWidget({
         <SelectValue>{settingOptionTitle(id, value)}</SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option} value={option}>
-            {settingOptionTitle(id, option)}
-          </SelectItem>
-        ))}
+        {options.map((option) => {
+          const reason = id === 'window.material' ? materialOptionReason(option, environment) : null
+          return (
+            <SelectItem
+              disabled={reason !== null}
+              key={option}
+              value={option}
+              title={reason ?? undefined}
+            >
+              {settingOptionTitle(id, option)}
+              {reason ? <span className='text-muted-foreground text-xs'>{reason}</span> : null}
+            </SelectItem>
+          )
+        })}
       </SelectContent>
     </Select>
   )

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -12,21 +11,43 @@ import {
   settings,
   variants,
 } from '../bench/comparison-fixtures'
+import {
+  checkoutFiles,
+  comparisonBuildArguments,
+  framedInputHash,
+  runtimeSource,
+  sha256 as hash,
+  sourceInventory,
+} from '../bench/comparison-build'
+import { comparisonSourceHash } from './comparison-source'
 
 const root = resolve(import.meta.dirname, '..')
-const output = resolve(process.argv[2] ?? join(root, '.artifacts/comparison-bundle'))
+const { output, ref } = comparisonBuildArguments(
+  process.argv.slice(2),
+  join(root, '.artifacts/comparison-bundle'),
+)
 const require = createRequire(join(root, 'package.json'))
-const hash = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 await mkdir(output, { recursive: true })
-const build = await Bun.build({
-  entrypoints: [join(root, 'bench/comparison-entry.ts')],
-  target: 'browser',
-  format: 'esm',
-  outdir: output,
-  naming: 'browser.js',
-  external: ['@xterm/xterm', '@xterm/addon-webgl', 'ghostty-web'],
-})
-assert(build.success, JSON.stringify(build.logs))
+const benchmarkPatterns = ['bench', 'scripts/comparison*', 'scripts/build-comparison.ts']
+const benchmark = await sourceInventory(root, checkoutFiles(root, benchmarkPatterns))
+const runtime = await runtimeSource(root, ref)
+const checkoutSourceSha256 = await comparisonSourceHash(root, ref)
+try {
+  const build = await Bun.build({
+    entrypoints: [join(root, 'bench/comparison-entry.ts')],
+    target: 'browser',
+    format: 'esm',
+    // Archive staging paths must not become bundle source comments.
+    minify: { whitespace: true, syntax: false, identifiers: false },
+    outdir: output,
+    naming: 'browser.js',
+    external: ['@xterm/xterm', '@xterm/addon-webgl', 'ghostty-web'],
+    plugins: runtime.plugins,
+  })
+  assert(build.success, JSON.stringify(build.logs))
+} finally {
+  await runtime.dispose()
+}
 const assets = {
   'native.wasm': join(root, 'ghostty-vt.wasm'),
   'bridge.wasm': join(root, 'bridge.wasm'),
@@ -72,18 +93,25 @@ for (const name of [
 }
 const logs = await readFile(assets['logs.txt'], 'utf8')
 const fixtures = fixtureNames.map((name) => {
-  if (name === 'rolling-logs') {
-    const fixture = rollingFixture(logs)
-    return {
-      name,
-      bytes: fixture.bytes.length,
-      sha256: hash(fixture.bytes),
-      chunkBytes: settings.chunkBytes,
-      chunks: fixture.chunks.map((chunk) => ({ bytes: chunk.length, sha256: hash(chunk) })),
-    }
-  }
   const text = corpus(fixtureText(name, logs), settings.corpusBytes)
-  return { name, bytes: Buffer.byteLength(text), sha256: hash(text) }
+  const chunks =
+    name === 'rolling-logs'
+      ? rollingFixture(logs).chunks
+      : [new TextEncoder().encode(corpus(fixtureText(name, logs), settings.chunkBytes))]
+  return {
+    name,
+    bytes: Buffer.byteLength(text),
+    sha256: hash(text),
+    stream: {
+      strategy: name === 'rolling-logs' ? 'rolling-utf8-chunks-v1' : 'repeat-unit-v1',
+      reset: 'corpus-start',
+      sha256: framedInputHash(chunks),
+      hashFormat: 'sha256(decimal-byte-length + NUL + chunk-bytes, per frame in one cycle)',
+      framesPerCycle: chunks.length,
+      bytesPerCycle: chunks.reduce((total, chunk) => total + chunk.length, 0),
+      chunkByteLengths: chunks.map((chunk) => chunk.length),
+    },
+  }
 })
 const versions = Object.fromEntries(
   [
@@ -112,35 +140,43 @@ const versions = Object.fromEntries(
 )
 versions['ghostty-webgpu'] = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-const sourceFiles = execFileSync(
-  'git',
-  [
-    'ls-files',
-    '--cached',
-    '--others',
-    '--exclude-standard',
-    'src',
-    'bench',
-    'scripts/comparison*',
-    'scripts/build-comparison.ts',
-  ],
-  { cwd: root, encoding: 'utf8' },
+assert.equal(
+  (await sourceInventory(root, checkoutFiles(root, benchmarkPatterns))).sha256,
+  benchmark.sha256,
+  'Benchmark sources changed during the build; rebuild from stable sources',
 )
-  .trim()
-  .split('\n')
-const sourceHash = createHash('sha256')
-for (const path of sourceFiles) {
-  sourceHash.update(path)
-  sourceHash.update(await readFile(join(root, path)))
-}
+if (!ref)
+  assert.equal(
+    (await sourceInventory(root, checkoutFiles(root, ['src']))).sha256,
+    runtime.inventory.sha256,
+    'Runtime sources changed during the build; rebuild from stable sources',
+  )
 const manifest = {
   schema: 1,
+  builder: { bun: Bun.version, revision: Bun.revision },
+  sourceInventoryHashFormat: 'sha256(sorted relative path + NUL + file bytes + NUL, per file)',
   commit,
   dirty: execFileSync('git', ['status', '--porcelain', '--', '.'], {
     cwd: root,
     encoding: 'utf8',
   }).trim(),
-  sourceSha256: sourceHash.digest('hex'),
+  checkoutSourceSha256,
+  sourceSha256: hash(`runtime\0${runtime.inventory.sha256}\0benchmark\0${benchmark.sha256}`),
+  sourceHashFormat:
+    'sha256(runtime + NUL + runtime.sha256 + NUL + benchmark + NUL + benchmark.sha256)',
+  runtime: {
+    mode: runtime.mode,
+    ref,
+    commit: runtime.commit,
+    dirty: runtime.dirty,
+    sourceSha256: runtime.inventory.sha256,
+    files: runtime.inventory.files,
+  },
+  benchmark: {
+    commit,
+    sourceSha256: benchmark.sha256,
+    files: benchmark.files,
+  },
   bundleSha256: hash(await readFile(join(output, 'browser.js'))),
   versions,
   settings,

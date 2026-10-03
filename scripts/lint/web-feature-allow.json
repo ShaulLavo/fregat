@@ -762,12 +762,6 @@
     "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
   },
   {
-    "from": "phone",
-    "to": "server-update",
-    "module": "features/server-update/components/status.tsx",
-    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
-  },
-  {
     "from": "search",
     "to": "editor",
     "module": "features/editor/state/document-state.tsx",
@@ -1438,5 +1432,11 @@
     "to": "git",
     "module": "features/git/hooks/use-panel-root.ts",
     "reason": "owner: The composed Git header and body share the root held until status and visible history are ready."
+  },
+  {
+    "from": "dev",
+    "to": "server-update",
+    "module": "features/server-update/components/update-popover.tsx",
+    "reason": "owner: the /dev gallery renders the update confirmation with fixture sessions and unsaved files for desktop and phone verification."
   }
 ]

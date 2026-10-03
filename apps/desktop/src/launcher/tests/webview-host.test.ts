@@ -340,3 +340,67 @@ test.each(['darwin', 'linux'] as const)(
     }
   },
 )
+
+test.each([
+  { platform: 'darwin', vibrancy: true, accepts: true },
+  { platform: 'darwin', vibrancy: false, accepts: false },
+  { platform: 'linux', vibrancy: true, accepts: false },
+] as const)(
+  'window appearance reaches only the transparent $platform host ($vibrancy)',
+  async ({ platform, vibrancy, accepts }) => {
+    const stateHome = mkdtempSync(path.join(tmpdir(), 'native-window-opacity-'))
+    const fake = fakeHost()
+    let token = ''
+    const launched = await launchWebview({
+      binary: '/host',
+      url: 'http://localhost:3301/',
+      stateHome,
+      platform,
+      vibrancy,
+      budget: { dialogMs: 200, stopGraceMs: 20 },
+      startup: { limitMs: 1000, idleMs: 500 },
+      spawn: (args) => {
+        const source = readFileSync(args[2]!, 'utf8')
+        token = JSON.parse(source.match(/const token = (.*);/)![1]!)
+        fake.stdout.write('{"event":"ready"}\n')
+        return fake.process
+      },
+      onOpen: () => {},
+    })
+    const message = (body: Record<string, unknown>) =>
+      fake.stdout.write(
+        `${JSON.stringify({ event: 'message', body: { method: 'setWindowAppearance', origin: 'http://localhost:3301', token, ...body } })}\n`,
+      )
+    try {
+      for (const opacity of [20, 80, 0, 100]) message({ opacity, material: 'frosted' })
+      message({ opacity: 20, material: 'frosted', token: 'foreign' })
+      message({ opacity: 20, material: 'frosted', origin: 'http://foreign.test' })
+      for (const opacity of [-1, 101, '20', true, false, null, NaN, Infinity, -Infinity])
+        message({ opacity, material: 'frosted' })
+      for (const material of ['none', 'glass']) message({ opacity: 80, material })
+      for (const material of [-1, 101, '50', 'Frosted', '', true, false, null, {}, []])
+        message({ opacity: 80, material })
+      message({ opacity: 80 })
+      message({ opacity: 80, frost: 50 })
+      message({ material: 'frosted' })
+      await tick()
+      expect(fake.commands.map((line) => JSON.parse(line))).toEqual(
+        accepts
+          ? [
+              { windowAppearance: { opacity: 20, material: 'frosted' } },
+              { windowAppearance: { opacity: 80, material: 'frosted' } },
+              { windowAppearance: { opacity: 0, material: 'frosted' } },
+              { windowAppearance: { opacity: 100, material: 'frosted' } },
+              { windowAppearance: { opacity: 80, material: 'none' } },
+              { windowAppearance: { opacity: 80, material: 'glass' } },
+            ]
+          : [],
+      )
+    } finally {
+      const closing = launched.close()
+      fake.finish()
+      await closing
+      rmSync(stateHome, { recursive: true, force: true })
+    }
+  },
+)

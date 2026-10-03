@@ -36,6 +36,22 @@ test('compact evidence preserves terminal frame distributions and hashes raw int
   ])
 })
 
+test('compact evidence preserves GPU qualifications without display periods', () => {
+  const gpu = {
+    kind: 'idle',
+    status: 'qualified',
+    qualified: true,
+    samples: [{ utilizationPercent: 0, computeMemoryMiB: 0 }],
+    settings: { gpuIdleConsecutiveSamples: 3 },
+  }
+  const result = compactAnalysis({
+    qualifications: [gpu, { median: 16.67, periods: [16.67] }],
+    rows: [],
+  })
+  assert.deepEqual(result.qualifications[0], gpu)
+  assert.match(result.qualifications[1].periodsSha256, /^[a-f0-9]{64}$/)
+})
+
 test('main task denominator clips the window and unions nested tasks', () => {
   assert.equal(
     unionMilliseconds([
@@ -326,8 +342,8 @@ test('presentation joins the containing animation frame identity, not a nearby g
   assert.deepEqual(result.boundariesBeforeFrame, [19])
 })
 
-function completeArtifact() {
-  const phases = ['ascii']
+function completeArtifact(phaseName = 'ascii') {
+  const phases = [phaseName]
   const runs = [0, 1, 2].flatMap((repetition) =>
     ['ghostty-webgpu', 'xterm-webgl'].map((variant) => ({
       variant,
@@ -336,7 +352,7 @@ function completeArtifact() {
       repetition,
       status: 'complete',
       phases: [false, true].map((traced) => ({
-        label: `${variant}-17-${repetition}-ascii-${traced ? 'trace' : 'control'}`,
+        label: `${variant}-17-${repetition}-${phaseName}-${traced ? 'trace' : 'control'}`,
         traced,
         milliseconds: 100,
         cpu: { percentOfOneCore: 100 },
@@ -372,6 +388,20 @@ function completeArtifact() {
     ),
   }
 }
+
+test('qualified analysis accepts complete rolling logs and rejects a missing control phase', () => {
+  const artifact = completeArtifact('rolling-logs')
+  assert.doesNotThrow(() => validateArtifact(artifact))
+  artifact.runs[0].phases.shift()
+  assert.throws(() => validateArtifact(artifact), /Incomplete phase pairs/)
+})
+
+test('qualified analysis rejects unknown and duplicate rolling phase selections', () => {
+  assert.throws(() => validateArtifact(completeArtifact('unknown')), /Incomplete phase matrix/)
+  const duplicate = completeArtifact('rolling-logs')
+  duplicate.tracePhases.push('rolling-logs')
+  assert.throws(() => validateArtifact(duplicate), /Incomplete phase matrix/)
+})
 
 test('qualified analysis rejects post-phase page errors and unfinished deadline evidence', () => {
   const valid = completeArtifact()

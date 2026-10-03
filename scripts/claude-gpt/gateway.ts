@@ -5,6 +5,8 @@ export type GatewayOptions = {
   anthropicUrl: string
   proxyUrl: string
   apiKey: string
+  fetcher?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+  observeClaudeHeaders?: (headers: Headers) => void
   // A separate loopback-only proxy that owns the Claude logins; without it Claude pools through proxyUrl.
   claudeProxy?: { proxyUrl: string; apiKey: string }
   // User-Agent entrypoints that may use the pool; defaults to the ones the proxy confirms as native.
@@ -141,7 +143,7 @@ const registrySchema = v.object({ data: v.array(v.object({ id: v.string() })) })
 const proxyErrorSchema = v.object({ error: v.object({ message: v.string() }) })
 const startupWindowMs = 15_000
 
-type ProxyOptions = Pick<GatewayOptions, 'proxyUrl' | 'apiKey'>
+type ProxyOptions = Pick<GatewayOptions, 'proxyUrl' | 'apiKey' | 'fetcher'>
 
 function hasGptModels(models: readonly string[] | null): models is readonly string[] {
   return models !== null && models.some((model) => model.startsWith('gpt-'))
@@ -150,7 +152,7 @@ function hasGptModels(models: readonly string[] | null): models is readonly stri
 async function readProxyModels(options: ProxyOptions, timeoutMs: number, signal?: AbortSignal) {
   const timeout = AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs)))
   try {
-    const response = await fetch(new URL('/v1/models', options.proxyUrl), {
+    const response = await (options.fetcher ?? fetch)(new URL('/v1/models', options.proxyUrl), {
       headers: { authorization: `Bearer ${options.apiKey}` },
       redirect: 'manual',
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
@@ -361,7 +363,7 @@ export function createGateway(options: GatewayOptions) {
   async function sendToPool(path: string, request: Request, body: string) {
     let response: Response
     try {
-      response = await fetch(new URL(path, claudePool.proxyUrl), {
+      response = await (options.fetcher ?? fetch)(new URL(path, claudePool.proxyUrl), {
         method: 'POST',
         headers: claudePoolRequestHeaders(request.headers, claudePool.apiKey),
         body,
@@ -382,6 +384,16 @@ export function createGateway(options: GatewayOptions) {
       )
     if (isUnknownProvider(text)) return 'model-unlisted' as const
     return new Response(text, { status: response.status, headers: response.headers })
+  }
+
+  async function directClaude(path: string, init: RequestInit) {
+    const response = await (options.fetcher ?? fetch)(new URL(path, options.anthropicUrl), init)
+    try {
+      options.observeClaudeHeaders?.(new Headers(response.headers))
+    } catch {
+      // Passive instrumentation cannot alter provider responses or consume their streams.
+    }
+    return relay(response)
   }
 
   return async (request: Request) => {
@@ -442,7 +454,7 @@ export function createGateway(options: GatewayOptions) {
     const countTokens = url.pathname === '/v1/messages/count_tokens'
     const eligible = isPoolEligible(request.headers, input, countTokens, poolEntrypoints)
     if (isClaude && !eligible) {
-      return relay(await fetch(new URL(path, options.anthropicUrl), init))
+      return directClaude(path, init)
     }
     if (isClaude) {
       const attempt = await sendToPool(path, request, body)
@@ -451,7 +463,7 @@ export function createGateway(options: GatewayOptions) {
         return relay(attempt)
       }
       fellBack(attempt, input.model)
-      return relay(await fetch(new URL(path, options.anthropicUrl), init))
+      return directClaude(path, init)
     }
 
     if (models === null) {
@@ -463,7 +475,7 @@ export function createGateway(options: GatewayOptions) {
     }
     headers.set('authorization', `Bearer ${options.apiKey}`)
     const upstream = new URL(path, options.proxyUrl)
-    let response = await fetch(upstream, init)
+    let response = await (options.fetcher ?? fetch)(upstream, init)
     if (response.status === 400) {
       const text = await inspectProxyError(response, request.signal)
       if (text === null)
@@ -476,7 +488,7 @@ export function createGateway(options: GatewayOptions) {
       if (isUnknownProvider(text)) {
         const recovered = await recoverModel(input.model, request.signal)
         if (recovered instanceof Response) return recovered
-        if (recovered === 'retry') response = await fetch(upstream, init)
+        if (recovered === 'retry') response = await (options.fetcher ?? fetch)(upstream, init)
       }
     }
     return relay(response)

@@ -6,6 +6,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readdirSync,
   renameSync,
   rmSync,
 } from 'node:fs'
@@ -173,6 +174,44 @@ export function settingsTransactionJournalPath(secretsPath: string): string {
     path.dirname(secretsPath),
     `.${path.basename(secretsPath)}.settings-transaction.json`,
   )
+}
+
+/** Cleanup must leave destinations intact while a journal or orphaned recovery artifact exists. */
+export function hasSettingsRecoveryArtifacts(
+  settingsPaths: readonly string[],
+  secretsPath?: string,
+): boolean {
+  const destinations = secretsPath ? [...settingsPaths, secretsPath] : settingsPaths
+  const directories = new Map<string, string[]>()
+  for (const destination of destinations) {
+    const directory = path.dirname(destination)
+    const prefixes = directories.get(directory) ?? []
+    prefixes.push(`.${path.basename(destination)}.`)
+    directories.set(directory, prefixes)
+  }
+
+  for (const [directory, prefixes] of directories) {
+    if (recoveryArtifactNames(directory).some((name) => isRecoveryArtifact(name, prefixes))) {
+      return true
+    }
+  }
+  return false
+}
+
+function recoveryArtifactNames(directory: string): readonly string[] {
+  try {
+    return readdirSync(directory)
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') return []
+    throw error
+  }
+}
+
+function isRecoveryArtifact(name: string, prefixes: readonly string[]): boolean {
+  if (name.endsWith('.settings-transaction.json')) return true
+  if (name.includes('.settings-transaction.json.') && name.endsWith('.tmp')) return true
+  if (!name.endsWith('.stage') && !name.endsWith('.backup')) return false
+  return prefixes.some((prefix) => name.startsWith(prefix))
 }
 
 async function stageTransaction(

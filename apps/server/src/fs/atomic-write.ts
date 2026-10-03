@@ -93,7 +93,7 @@ export async function commitAtomicWrite(
 export function writeFileAtomicSync(
   target: string,
   data: string | Uint8Array,
-  options: Omit<StageOptions, 'driver'>,
+  options: Omit<StageOptions, 'driver'> & { readonly beforeCommit?: () => void },
 ) {
   const temporary = atomicTemporaryPath(target)
   let created = false
@@ -102,6 +102,7 @@ export function writeFileAtomicSync(
     created = true
     if (options.mode !== undefined) chmodSync(temporary, options.mode)
     if (options.durability !== 'rename') fsyncPathSync(temporary)
+    options.beforeCommit?.()
     renameSync(temporary, target)
   } catch (error) {
     if (created || nodeErrorCode(error) !== 'EEXIST') rmSync(temporary, { force: true })
