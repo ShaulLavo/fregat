@@ -230,6 +230,68 @@ export async function ownedProcessAlive(owned, read = readFile) {
   }
 }
 
+export async function ownedProcessStates(owned, read = readFile) {
+  return await Promise.all(
+    owned.map(async (entry) => ({ ...entry, alive: await ownedProcessAlive(entry, read) })),
+  )
+}
+
+export async function settleOwnedWindowGeometry({
+  page,
+  session,
+  observeWindow,
+  browserPid,
+  smokeId,
+  targetId,
+  windowId,
+}) {
+  const snapshots = []
+  let previous
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const facts = await boundedSmokeOperation(
+      () =>
+        page.evaluate(() => ({
+          width: innerWidth,
+          height: innerHeight,
+          outerWidth,
+          outerHeight,
+          dpr: devicePixelRatio,
+          visibility: document.visibilityState,
+        })),
+      1000,
+    )
+    const window = await boundedSmokeOperation(
+      () => session.send('Browser.getWindowForTarget', { targetId }),
+      1000,
+    )
+    const compositor = await boundedSmokeOperation(
+      () => observeWindow({ browserPid, smokeId, windowId }),
+      2500,
+    )
+    assert.equal(window.windowId, windowId, 'Owned window changed during readiness')
+    assert.equal(compositor.browserPid, browserPid, 'Compositor window owner changed')
+    assert.equal(compositor.backend, 'wayland', 'Actual Wayland window required during readiness')
+    assert.equal(compositor.mapped, true, 'Owned compositor window must be mapped')
+    assert.equal(compositor.hidden, false, 'Owned compositor window must be visible')
+    assert.equal(compositor.xwayland, false, 'Native Wayland window required')
+    const matches =
+      facts.dpr === 1 &&
+      facts.visibility === 'visible' &&
+      facts.width >= 320 &&
+      facts.height >= 320 &&
+      facts.outerWidth === window.bounds.width &&
+      facts.outerHeight === window.bounds.height &&
+      facts.outerWidth === compositor.size?.width &&
+      facts.outerHeight === compositor.size?.height
+    snapshots.push({ page: facts, window, compositorSize: compositor.size })
+    const current = matches ? JSON.stringify(snapshots.at(-1)) : null
+    if (current && current === previous) return { page: facts, window, compositor, snapshots }
+    previous = current
+    await pause(50)
+  }
+  assert.fail('Actual page, CDP window and compositor geometry did not settle')
+}
+
 async function ownedGroupProcesses(browserIdentity) {
   const result = []
   assert(
@@ -303,6 +365,7 @@ export async function observeHyprlandWindow({ browserPid, smokeId }) {
     mapped: client.mapped,
     hidden: client.hidden,
     xwayland: client.xwayland,
+    size: { width: client.size[0], height: client.size[1] },
     client,
   }
 }
@@ -438,13 +501,11 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
         }
       }
       for (let attempt = 0; attempt < 20; attempt++) {
-        if (!(await Promise.all(owned.map(ownedProcessAlive))).some(Boolean)) break
+        if (!(await ownedProcessStates(owned)).some((entry) => entry.alive)) break
         await pause(50)
       }
     }
-    evidence.cleanup.processes = await Promise.all(
-      owned.map(async (entry) => ({ ...entry, alive: await ownedProcessAlive(entry) })),
-    )
+    evidence.cleanup.processes = await ownedProcessStates(owned)
     assert(
       evidence.cleanup.processes.every((entry) => !entry.alive),
       'Owned Chrome processes survived cleanup',
@@ -573,11 +634,21 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     owned = await processCustody(boundedSession, child.pid)
     evidence.ownedProcesses = owned
     evidence.actualBackend = actualBackend
+    const geometry = await settleOwnedWindowGeometry({
+      page,
+      session: pageSession,
+      observeWindow,
+      browserPid: child.pid,
+      smokeId: evidence.smokeId,
+      targetId: target.targetId,
+      windowId: window.windowId,
+    })
+    evidence.geometry = geometry
     const ownership = {
       targetId: target.targetId,
       windowId: window.windowId,
       url,
-      viewport: { width: facts.width, height: facts.height },
+      viewport: { width: geometry.page.width, height: geometry.page.height },
     }
     return { page, session: pageSession, evidence, ownership, actualBackend, close }
   } catch (error) {

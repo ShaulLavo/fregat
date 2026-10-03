@@ -9,7 +9,7 @@
     "smoke": "runHeadedPresentationSmoke({ executablePath, taskRoot, observeWindow }) -> evidence; owns launch and cleanup",
     "presentation": "proveHeadedPresentation({ page, session, ownership: { targetId, windowId, url, viewport: { width, height } }, smokeId, frameTimeoutMilliseconds?, commandTimeoutMilliseconds? })",
     "actualBackend": "{ display, angleBackend, vulkanVersion, vendor, vendorId, deviceId, deviceDescription, driver, rawRendererStrings }; observed facts, qualify setup only with PASS_SETUP_ONLY and complete cleanup",
-    "observeWindow": "({ browserPid, smokeId, windowId }) -> { browserPid, backend: 'wayland', mapped: true, hidden: false, xwayland: false, ...rawOwnedWindowEvidence }"
+    "observeWindow": "({ browserPid, smokeId, windowId }) -> { browserPid, backend: 'wayland', mapped: true, hidden: false, xwayland: false, size: { width, height }, ...rawOwnedWindowEvidence }"
   },
   "standalone": {
     "from": "repository root",

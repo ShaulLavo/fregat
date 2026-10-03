@@ -9,6 +9,8 @@ import {
   assertHeadedHardware,
   headedLaunchArguments,
   ownedProcessAlive,
+  ownedProcessStates,
+  settleOwnedWindowGeometry,
 } from './comparison-headed.mjs'
 import { observeOwnedBrowserProvenance } from './comparison-provenance.mjs'
 
@@ -308,4 +310,120 @@ test('Linux process disappearance via ESRCH or ENOENT is gone; other OS errors r
   assert.equal(await ownedProcessAlive(owned, read('123456')), true)
   assert.equal(await ownedProcessAlive(owned, read('123457')), false)
   assert.equal(await ownedProcessAlive(owned, read('123456', 'Z')), false)
+})
+
+test('multi-process cleanup state batches preserve the OS reader, independent of Array.map indexes', async () => {
+  const owned = [
+    { pid: 101, startTimeTicks: '123456' },
+    { pid: 102, startTimeTicks: '123457' },
+  ]
+  const read = async (path) => {
+    const pid = Number(path.split('/')[2])
+    return `${pid} (chrome) S 100 ${Array(17).fill('0').join(' ')} ${pid === 101 ? '123456' : 'changed-lifetime'} 0\n`
+  }
+  const states = await ownedProcessStates(owned, read)
+  assert.deepEqual(
+    states.map(({ pid, alive }) => ({ pid, alive })),
+    [
+      { pid: 101, alive: true },
+      { pid: 102, alive: false },
+    ],
+  )
+  const vanished = await ownedProcessStates(owned, async () => {
+    throw Object.assign(new Error('External process gone'), { code: 'ESRCH' })
+  })
+  assert(vanished.every((entry) => !entry.alive))
+})
+
+test('setup waits for actual native resize agreement twice before capturing ownership viewport', async () => {
+  let count = 0
+  const page = {
+    evaluate: async () =>
+      ++count === 1
+        ? {
+            width: 500,
+            height: 431,
+            outerWidth: 532,
+            outerHeight: 560,
+            dpr: 1,
+            visibility: 'visible',
+          }
+        : {
+            width: 922,
+            height: 943,
+            outerWidth: 922,
+            outerHeight: 1030,
+            dpr: 1,
+            visibility: 'visible',
+          },
+  }
+  const session = {
+    send: async () => ({
+      windowId: 7,
+      bounds: {
+        width: count === 1 ? 532 : 922,
+        height: count === 1 ? 560 : 1030,
+        windowState: 'normal',
+      },
+    }),
+  }
+  const observeWindow = async () => ({
+    browserPid: 101,
+    backend: 'wayland',
+    mapped: true,
+    hidden: false,
+    xwayland: false,
+    size: { width: 922, height: 1030 },
+  })
+  const ready = await settleOwnedWindowGeometry({
+    page,
+    session,
+    observeWindow,
+    browserPid: 101,
+    windowId: 7,
+    targetId: 'owned-page',
+    smokeId: 'owned-smoke',
+  })
+  assert.equal(ready.snapshots.length, 3)
+  assert.deepEqual(
+    { width: ready.page.width, height: ready.page.height },
+    { width: 922, height: 943 },
+  )
+  assert.equal(ready.snapshots[0].page.width, 500)
+})
+
+test('setup refuses contradictory page/CDP/compositor sizes without guessing a transform', async () => {
+  const page = {
+    evaluate: async () => ({
+      width: 500,
+      height: 431,
+      outerWidth: 532,
+      outerHeight: 560,
+      dpr: 1,
+      visibility: 'visible',
+    }),
+  }
+  const session = {
+    send: async () => ({ windowId: 7, bounds: { width: 532, height: 560, windowState: 'normal' } }),
+  }
+  const observeWindow = async () => ({
+    browserPid: 101,
+    backend: 'wayland',
+    mapped: true,
+    hidden: false,
+    xwayland: false,
+    size: { width: 922, height: 1030 },
+  })
+  await assert.rejects(
+    settleOwnedWindowGeometry({
+      page,
+      session,
+      observeWindow,
+      browserPid: 101,
+      windowId: 7,
+      targetId: 'owned-page',
+      smokeId: 'owned-smoke',
+    }),
+    /geometry did not settle/,
+  )
 })
