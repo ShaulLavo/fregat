@@ -32,7 +32,7 @@ const modalRows = [
   ...Array.from({ length: 95 }, (_, index) => String.fromCharCode(index + 32)),
   'Escape',
 ].flatMap((key) =>
-  [false, true].map((shift) => ({
+  [false, true].map((shift): EditorKeymapPack['linux'][number] => ({
     keys: [{ key, shift }],
     command: 'example.modal.stroke',
     context: 'Editor && !EditorWidget && modalNormal',
