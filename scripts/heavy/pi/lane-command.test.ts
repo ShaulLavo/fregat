@@ -25,6 +25,16 @@ type Lane = {
 // `ready`: heartbeats until the job writes $LANE_RUN/ready, then closed.
 type Stdin = 'heartbeat' | 'closed' | 'silent' | 'ready'
 
+// Bun can report a broken pipe before its exit notification; ps also identifies an unreaped child.
+function childHasExited(child: Pick<Bun.Subprocess, 'exitCode' | 'signalCode' | 'pid'>) {
+  if (child.exitCode !== null || child.signalCode) return true
+  if (!Number.isSafeInteger(child.pid) || child.pid <= 0) return false
+  const state = spawnSync('ps', ['-o', 'stat=', '-p', String(child.pid)], { timeout: 1_000 })
+  if (state.error || state.signal || state.stderr.length > 0) return false
+  if (state.status === 1 && state.stdout.length === 0) return true
+  return state.status === 0 && state.stdout.toString().trim().startsWith('Z')
+}
+
 // The same shell the Pi runs, run here; the lane root's platform/ is this checkout. stdin plays
 // the lane's controlling connection: heartbeat lines, closed at once, or open and quiet.
 async function runLane(
@@ -67,11 +77,11 @@ async function runLane(
       await operation()
     } catch (error) {
       if (
-        child.exitCode !== null &&
         typeof error === 'object' &&
         error !== null &&
         'code' in error &&
-        error.code === 'EPIPE'
+        error.code === 'EPIPE' &&
+        childHasExited(child)
       )
         return
       failures.push(error)
@@ -109,10 +119,10 @@ async function runLane(
   return { status, lane, run, ms, unit, stderr: await new Response(child.stderr).text() }
 }
 
-const processProbe = spawnSync('ps', ['-o', 'stat=', '-p', String(process.pid)])
+const laneTools = process.platform !== 'win32' && Boolean(Bun.which('bash') && Bun.which('ps'))
 
-test.skipIf(processProbe.status !== 0).for([true, false])(
-  'classifies a real broken pipe before Bun observes exit, kernel-exited=%s (requires ps)',
+test.skipIf(!laneTools).for([true, false])(
+  'classifies a real broken pipe before Bun observes exit, kernel-exited=%s (requires POSIX bash and ps)',
   async (dead) => {
     vi.useFakeTimers()
     const spawn = Bun.spawn.bind(Bun)
@@ -123,7 +133,7 @@ test.skipIf(processProbe.status !== 0).for([true, false])(
     const events: string[] = []
     vi.spyOn(Bun, 'spawn').mockImplementationOnce(() => {
       child = spawn(
-        ['bash', '-c', dead ? 'exit 0' : 'exec 0<&-; touch "$1"; sleep 30', 'fixture', ready],
+        ['bash', '-c', dead ? 'exit 0' : 'exec 0<&-; touch "$1"; exec sleep 30', 'fixture', ready],
         {
           stdin: 'pipe',
           stdout: 'ignore',
@@ -345,7 +355,8 @@ function unloaded(unit: string) {
 const caseScope = (mib: number) =>
   `systemd-run --user --scope --quiet --slice="$HEAVY_JOB_SLICE" bun -e 'Buffer.alloc(${mib} * 2 ** 20, 1)'`
 
-describe.skipIf(!userScopes)('a lane job', () => {
+// The local lane integration requires systemd user scopes, bash and ps.
+describe.skipIf(!userScopes || !laneTools)('a lane job', () => {
   test('counts the memory of case scopes that join its slice, then unloads it', async () => {
     const { status, lane, unit } = await runLane('counts', caseScope(300))
     expect(status).toBe(0)
@@ -412,7 +423,9 @@ describe.skipIf(!userScopes)('a lane job', () => {
   }, 40_000)
 
   test('stops the job at its wall-clock ceiling while the connection is healthy', async () => {
-    const { status, ms, unit } = await runLane('ceiling', 'sleep 30', { limits: { maxWallSec: 2 } })
+    const { status, ms, unit } = await runLane('ceiling', 'sleep 30', {
+      limits: { maxWallSec: 2 },
+    })
     expect(ms).toBeLessThan(10_000)
     expect(status).not.toBe(0)
     expect(unloaded(unit)).toBe(true)
