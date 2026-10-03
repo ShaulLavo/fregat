@@ -47,7 +47,6 @@ import {
   tryLock,
   unlessMissing,
   unlock,
-  waitLock,
 } from './lock'
 import {
   deadJobs,
@@ -60,7 +59,6 @@ import {
   type Held,
 } from './queue'
 import { appendRecord, redactCommand, type HeavyJobRecord, type ServerAtAdmission } from './record'
-import { beginQuietTurn, finishQuietTurn, turnQueue } from './turn'
 
 const USAGE =
   'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--quiet | --server] [--host local|pi] [--max-wall <running seconds>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
@@ -330,16 +328,13 @@ async function admitLocal(
     reason: admitted.reason,
     serversAtAdmission: admitted.serversAtAdmission,
     release: () => {
-      const lock = waitLock(path.join(options.stateDir, 'admission.lock'))
       try {
         if (options.quiet) {
-          completeQuietTurn(options.stateDir, id)
           clearQuietHolder(options.stateDir, (holder) => holder === id)
         }
         release(admitted.held)
       } finally {
         for (const fd of admitted.slots) unlock(fd)
-        unlock(lock)
       }
     },
     spec: {
@@ -357,14 +352,6 @@ async function admitLocal(
       entryLock: admitted.held.fd,
       slotLocks: admitted.slots,
     },
-  }
-}
-
-function completeQuietTurn(stateDir: string, id: string) {
-  try {
-    finishQuietTurn(stateDir, id)
-  } catch (error) {
-    console.error(`[wave-heavy] could not finish fair turn: ${scriptFailureText(error)}`)
   }
 }
 
@@ -418,7 +405,7 @@ type Admitted = {
   readonly serversAtAdmission: readonly ServerAtAdmission[]
 }
 
-// FIFO within each turn: a small job never overtakes a large one waiting for memory.
+// FIFO: a small job never overtakes a large one waiting for memory.
 async function admit(options: Options, config: Config, entry: Entry): Promise<Admitted | Deferred> {
   mkdirSync(options.stateDir, { recursive: true })
   for (const slot of SLOT_FILES) writeFileSync(path.join(options.stateDir, slot), '', { flag: 'a' })
@@ -480,7 +467,7 @@ function attemptAdmission(
     const expired = expiredAdmission(waiting.entry, config.quietHoldSeconds)
     if (expired) return expired
     const now = bootSeconds()
-    const queue = turnQueue(options.stateDir, live(options.stateDir, 'queue'), running.owners, now)
+    const queue = live(options.stateDir, 'queue')
     const ahead = queue.findIndex((entry) => entry.id === waiting.entry.id)
     if (ahead > 0) return { reason: `${ahead} job(s) ahead in the queue` }
     const drain = drainRequest(options.stateDir, config.quietHoldSeconds * 1000)
@@ -518,7 +505,6 @@ function attemptAdmission(
       for (const fd of taken) unlock(fd)
       return expiredAtBoundary
     }
-    if (waiting.entry.quiet) beginQuietTurn(options.stateDir, waiting.entry.id)
     const lease = waiting.entry.quiet
       ? {
           quietUntil:

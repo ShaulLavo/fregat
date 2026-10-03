@@ -7,7 +7,7 @@ bun /work/platform-production/heavy/current/run.js --class suite checks -- bun r
 bun /work/platform-production/heavy/current/run.js --class bench --quiet measurement -- bun run bench
 ```
 
-Classes (`suite`, `browser`, `build`, `bench`, `light`) choose a memory estimate and a per-job slice ceiling from `developer.heavyJobClasses`. Admission is FIFO within each turn and accounts for available memory, running jobs' unrealized estimates, the memory reserve, memory pressure and CPU load. Every job retains its own slice, accounting, stop grace and orphan cleanup. `nested-scope.sh` puts child scopes under the job's ceiling.
+Classes (`suite`, `browser`, `build`, `bench`, `light`) choose a memory estimate and a per-job slice ceiling from `developer.heavyJobClasses`. Admission is FIFO and accounts for available memory, running jobs' unrealized estimates, the memory reserve, memory pressure and CPU load. Every job retains its own slice, accounting, stop grace and orphan cleanup. `nested-scope.sh` puts child scopes under the job's ceiling.
 
 ## Private dev servers
 
@@ -25,7 +25,7 @@ bun /work/platform-production/heavy/current/run.js --class browser fixture-check
 
 Stop the server wrapper after the check, including on failure or cancellation. SIGINT or SIGTERM stops its whole slice with the configured grace.
 
-A declared server enters the same admission queue and keeps its class estimate, memory ceiling and accounting. Once admitted, it stays outside the quiet drain and holds no shared slot locks. This breaks the cycle where a quiet measurement waits for a server whose browser check is queued behind that measurement. New server requests follow the queue's turn ordering and wait during active quiet holds. The flag applies to local jobs and cannot combine with `--quiet` or `--host pi`.
+A declared server enters the same admission queue and keeps its class estimate, memory ceiling and accounting. Once admitted, it stays outside the quiet drain and holds no shared slot locks. This breaks the cycle where a quiet measurement waits for a server whose browser check is queued behind that measurement. New server requests follow FIFO and wait during active quiet holds. The flag applies to local jobs and cannot combine with `--quiet` or `--host pi`.
 
 A single finite browser job can also own server startup, readiness, browser work and teardown within its slice. Its child commands run directly in that job; the owning job must be able to finish without queuing another heavy job.
 
@@ -39,7 +39,7 @@ The running budget starts at admission with an absolute monotonic deadline enfor
 
 `--max-wall <seconds>` bounds running time on either host and excludes queue wait. Ordinary queue wait is unlimited. Quiet requests retain the separate admission window above. Local jobs have no default running limit; Pi jobs default to 3600 seconds. For a quiet job, the shorter of `--max-wall` and the configured quiet hold sets the running budget. An expired shorter `--max-wall` returns exit 124 and retains that reason through teardown; an expired quiet hold returns exit 75.
 
-After each quiet hold, admission snapshots the waiting non-quiet requests and gives that finite cohort a turn ahead of the next quiet request. FIFO and resource checks apply within the turn. Later arrivals keep their queue positions and cannot extend the cohort.
+Requests keep FIFO order after a quiet hold. Fair turns between consecutive quiet requests remain tracked in [issue #405](https://github.com/ShaulLavo/fregat/issues/405). Job completion releases its entry and slot locks independently of the admission mutex.
 
 The admission boundary determines which servers may coexist with a quiet measurement: a server admitted earlier stays eligible to launch and appears in `serversAtAdmission`; new server requests wait for admission during the hold.
 

@@ -100,60 +100,55 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     expect(recordOf(box, 'quiet')).toMatchObject({ quiet: true, quietHoldExpired: false })
   }, 40_000)
 
-  test('waiting light jobs get a turn between consecutive quiet holds', async () => {
-    const box = quietBox(600)
-    const releaseQuiet = path.join(box.root, 'release-first')
-    const releaseLight = path.join(box.root, 'release-light')
-    const first = start(
-      box,
-      'first-quiet',
-      ['bash', '-c', `echo started; ${until(releaseQuiet)}`],
-      {
+  test.each([false, true])(
+    'completed jobs release resources while admission is locked (%s)',
+    async (quiet) => {
+      const box = quietBox(600)
+      const bin = path.join(box.root, 'bin')
+      const finish = path.join(box.root, 'finish')
+      mkdirSync(bin)
+      writeFileSync(path.join(bin, 'systemctl'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+      writeFileSync(
+        path.join(bin, 'systemd-run'),
+        `#!/bin/sh\necho started\n${until(finish)}\nexit 0\n`,
+        { mode: 0o755 },
+      )
+      const job = start(box, 'mutex-held-completion', ['true'], {
         jobClass: 'light',
         machine: true,
-        quiet: true,
-      },
-    )
-    await expect.poll(first.stdout, { timeout: 10_000 }).toContain('started')
-    const second = start(box, 'second-quiet', ['true'], {
-      jobClass: 'light',
-      machine: true,
-      quiet: true,
-    })
-    await expect
-      .poll(() => live(box.state, 'queue').map((entry) => entry.label))
-      .toEqual(['second-quiet'])
-    const lightJob = start(box, 'between', ['bash', '-c', `echo started; ${until(releaseLight)}`], {
-      jobClass: 'light',
-      machine: true,
-    })
-    await expect
-      .poll(() => live(box.state, 'queue').map((entry) => entry.label))
-      .toEqual(['second-quiet', 'between'])
-    expect(lightJob.stdout()).toBe('')
-    writeFileSync(releaseQuiet, '')
-    expect((await first.done).code).toBe(0)
-    await expect.poll(lightJob.stdout, { timeout: 10_000 }).toContain('started')
-    expect(recordOf(box, 'second-quiet')).toBeUndefined()
-    const late = start(box, 'late-arrival', ['true'], { jobClass: 'light', machine: true })
-    await expect
-      .poll(() => live(box.state, 'queue').map((entry) => entry.label))
-      .toEqual(['second-quiet', 'late-arrival'])
-    expect(recordOf(box, 'late-arrival')).toBeUndefined()
-    writeFileSync(releaseLight, '')
-    expect((await lightJob.done).code).toBe(0)
-    expect((await second.done).code).toBe(0)
-    expect((await late.done).code).toBe(0)
-    expect(startedAt(recordOf(box, 'late-arrival'))).toBeGreaterThanOrEqual(
-      endedAt(recordOf(box, 'second-quiet')),
-    )
-    expect(startedAt(recordOf(box, 'between'))).toBeGreaterThanOrEqual(
-      endedAt(recordOf(box, 'first-quiet')),
-    )
-    expect(startedAt(recordOf(box, 'second-quiet'))).toBeGreaterThanOrEqual(
-      endedAt(recordOf(box, 'between')),
-    )
-  }, 40_000)
+        maxWallSec: 1,
+        quiet,
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, XDG_RUNTIME_DIR: box.root },
+      })
+      let mutex: number | null = null
+      try {
+        await expect.poll(job.stdout, { timeout: 10_000 }).toContain('started')
+        await expect
+          .poll(() => {
+            mutex ??= tryLock(path.join(box.state, 'admission.lock'))
+            return mutex !== null
+          })
+          .toBe(true)
+        writeFileSync(finish, '')
+        await expect
+          .poll(() => recordOf(box, 'mutex-held-completion'))
+          .toMatchObject({ exitCode: 0 })
+        await expect.poll(() => job.child.exitCode, { timeout: 1_500 }).toBe(0)
+        expect((await job.done).code).toBe(0)
+        expect(live(box.state, 'jobs')).toEqual([])
+        for (const n of [1, 2, 3]) {
+          const fd = tryLock(path.join(box.state, `slot${n}.lock`))
+          expect(fd).not.toBeNull()
+          if (fd !== null) unlock(fd)
+        }
+      } finally {
+        if (mutex !== null) unlock(mutex)
+        writeFileSync(finish, '')
+        await job.done
+      }
+    },
+    20_000,
+  )
 
   test('queue wait longer than max-wall still leaves the full running-time allowance', async () => {
     const box = quietBox(600)
@@ -226,7 +221,6 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       expect(records(box)).toEqual([])
       expect(live(box.state, 'jobs')).toEqual([])
       expect(live(box.state, 'queue')).toEqual([])
-      expect(existsSync(path.join(box.state, 'quiet.turn'))).toBe(false)
       for (const n of [1, 2, 3]) {
         const fd = tryLock(path.join(box.state, `slot${n}.lock`))
         expect(fd).not.toBeNull()
@@ -285,76 +279,6 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     expect(result.code, result.stderr).toBe(0)
     expect(result.stderr).not.toContain('TimeoutOverflowWarning')
     expect(recordOf(box, 'long-allowance')).toMatchObject({ exitCode: 0 })
-  }, 30_000)
-
-  test('a failed fairness snapshot preserves the job result and releases its admission', async () => {
-    const box = quietBox(600)
-    const releaseJob = path.join(box.root, 'release-job')
-    const quiet = start(
-      box,
-      'snapshot-fails',
-      ['bash', '-c', `echo started; ${until(releaseJob)}`],
-      {
-        jobClass: 'light',
-        machine: true,
-        quiet: true,
-      },
-    )
-    await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('started')
-    mkdirSync(path.join(box.state, 'quiet.turn.partial'))
-    writeFileSync(releaseJob, '')
-    const result = await quiet.done
-    expect(result.code, result.stderr).toBe(0)
-    expect(result.stderr).toContain('could not save fair turn')
-    expect(live(box.state, 'jobs')).toEqual([])
-    for (const slot of ['slot1.lock', 'slot2.lock', 'slot3.lock']) {
-      const fd = tryLock(path.join(box.state, slot))
-      expect(fd).not.toBeNull()
-      if (fd !== null) unlock(fd)
-    }
-    expect(
-      (await heavy(box, 'after-failed-snapshot', ['true'], { jobClass: 'light', machine: true }))
-        .code,
-    ).toBe(0)
-  }, 30_000)
-
-  test.each(['', '{', '{"quietId":"aaaaaaaaaaaa","waitingIds":5}', '{"quietId":null}'])(
-    'invalid advisory turn metadata leaves FIFO admission available (%s)',
-    async (metadata) => {
-      const box = quietBox(600)
-      writeFileSync(path.join(box.state, 'quiet.turn'), metadata)
-      const result = await heavy(box, 'bad-metadata', ['true'], {
-        jobClass: 'light',
-        machine: true,
-      })
-      expect(result.code, result.stderr).toBe(0)
-      expect(result.stderr).toContain('ignored invalid fair-turn metadata')
-      expect(existsSync(path.join(box.state, 'quiet.turn'))).toBe(false)
-    },
-    30_000,
-  )
-
-  test('unreadable advisory turn metadata preserves admission and quiet completion', async () => {
-    const box = quietBox(600)
-    mkdirSync(path.join(box.state, 'quiet.turn'))
-    const result = await heavy(box, 'unreadable-turn', ['true'], {
-      jobClass: 'light',
-      machine: true,
-      quiet: true,
-    })
-    expect(result.code, result.stderr).toBe(0)
-    expect(result.stderr).toContain('could not read fair turn')
-    expect(result.stderr).toContain('could not remove fair turn')
-    expect(live(box.state, 'jobs')).toEqual([])
-    for (const slot of ['slot1.lock', 'slot2.lock', 'slot3.lock']) {
-      const fd = tryLock(path.join(box.state, slot))
-      expect(fd).not.toBeNull()
-      if (fd !== null) unlock(fd)
-    }
-    expect(
-      (await heavy(box, 'after-unreadable-turn', ['true'], { jobClass: 'light', machine: true }))
-        .code,
-    ).toBe(0)
   }, 30_000)
 
   test.each([0, 7])(
