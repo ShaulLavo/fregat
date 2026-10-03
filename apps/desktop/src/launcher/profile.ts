@@ -46,7 +46,7 @@ export function chromiumArguments(
     ...prefix,
     ...(app
       ? [`--app-id=${app.appId}`, `--app-launch-url-for-shortcuts-menu-item=${app.url}`]
-      : ['about:blank']),
+      : ['about:blank', '--headless=new']),
     `--user-data-dir=${profile}`,
     '--profile-directory=Platform',
     ...(app ? [] : ['--remote-debugging-pipe']),

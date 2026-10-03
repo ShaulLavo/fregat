@@ -20,7 +20,7 @@ const USAGE =
 // run.sh and AGENTS.md name `<root>/current/run.js`, so the root is fixed rather than a setting.
 const INSTALL_ROOT = path.join(productionRoot, 'heavy')
 const ENTRIES = ['run.ts', 'report.ts', 'status.ts', 'pi/launch.ts']
-const SHELL_SCRIPTS = ['scope.sh', 'nested-scope.sh']
+const SHELL_SCRIPTS = ['scope.sh', 'nested-scope.sh', 'deadline.sh']
 
 try {
   install()

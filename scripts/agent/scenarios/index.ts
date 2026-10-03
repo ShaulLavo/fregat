@@ -71,6 +71,7 @@ import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
 import { backgroundLiveness, backgroundMonitorLiveness } from './background-liveness'
+import { monitorDraftOwnership } from './monitor-draft-ownership'
 import { spinnerPalette } from './spinner-palette'
 import { sessionBulkFailures } from './session-bulk-failures'
 import { sessionLifecycle } from './session-lifecycle'
@@ -202,6 +203,7 @@ import { pushSessionNotice } from './push-session-notice'
 import { chatClaudeCatalog } from './chat-claude-catalog'
 import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
+import { workspaceLinkError } from './workspace-link-error'
 import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalOfflineHost } from './terminal-offline-host'
@@ -548,6 +550,7 @@ export const scenarios: readonly Scenario[] = [
   asyncQuestions,
   backgroundLiveness,
   backgroundMonitorLiveness,
+  monitorDraftOwnership,
   spinnerPalette,
   checkpointRewind,
   workbenchListFocus,
@@ -570,6 +573,7 @@ export const scenarios: readonly Scenario[] = [
   chatClaudeCatalog,
   chatDraftContextStrip,
   machineConnectError,
+  workspaceLinkError,
   machineProtocolMismatch,
   wallpaperIconHints,
   gitChanges,
