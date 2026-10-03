@@ -71,7 +71,6 @@
         "check-editor-backlog.mjs",
         "agent/browser.ts",
         "agent/desktop-display.ts",
-        "claude-gpt/run.ts",
         "large-file/bench.ts",
         "heavy/pi/launch.ts",
         "heavy/pi/run.ts",
@@ -120,7 +119,7 @@
         "parity/snooze.ts",
         "parity/wake.ts"
       ],
-      "ignoreBinaries": ["flock", "ssh-keygen", "systemd-run", "taskset"]
+      "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
       "ignoreDependencies": ["typescript-api"]

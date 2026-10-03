@@ -1144,6 +1144,8 @@ export const selectors = {
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
+  terminalDomRows: (page: Page) =>
+    selectors.terminalSurface(page).first().locator('.ghostty-webgpu-frame [data-row]'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
   paletteLoading: (page: Page) => page.getByRole('status', { name: 'Loading commands' }),
   pickerLoading: (page: Page) => page.getByRole('status', { name: 'Loading file picker' }),

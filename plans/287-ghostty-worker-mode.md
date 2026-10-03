@@ -9,8 +9,8 @@
   (`apps/web/src/features/terminal/`), which switches to it.
 - Order: starts after Plan 283's Zig frame full move, so the worker carries the new pipeline and
   nothing is ported twice. Coordinates its public API with Plan 286's extension model.
-- Versions: patch bumps only, including the new entry point, under the owner's 2026-10-03
-  package-version decision.
+- Versions: patch Changesets through launch, including breaking changes. The release workflow
+  assigns package and lockfile versions; source PRs retain the current main versions.
 
 ## Outcome
 
@@ -47,25 +47,29 @@ Fregat uses the worker entry. Both entries pass the same test suite.
 
 ### Shared API agreement with Plan 286 — approved 2026-10-03
 
-Messages and one native-state owner require one async public `Terminal` API in both entries.
-There are no synchronous compatibility wrappers. The execution owner keeps `TerminalSession`
-local and synchronous; the public host sends typed requests to a local or worker adapter.
+Both entries share method names and arguments. The main entry keeps its synchronous authoritative
+operations; the worker entry returns promises for those operations. The common interface is generic
+over the return convention. Common suites and extensions use await-style calls, which work with
+both conventions. The execution owner keeps `TerminalSession` local and synchronous within its
+actor. There are no compatibility wrappers or a promise facade over the main entry.
 
 - `Terminal.create(options)` returns `Promise<Terminal>` in both entries. Options accept readonly
   nested extension values and presets. A native runtime object stays with its execution actor and
   is excluded from the common high-level creation options.
-- Authoritative operations return promises in both entries: writes, input encoding, reset, scroll,
-  selection mutations, appearance/geometry changes, history and buffer reads, selection text and
-  coordinates, cell measurement, live geometry, serialization and captures. An atomic selection
-  request returns text and coordinates from the same revision.
+- Authoritative operations stay synchronous in the main entry and return promises in the worker
+  entry: writes, input encoding, reset, scroll, selection mutations, appearance/geometry changes,
+  history and buffer reads, selection text and coordinates, cell measurement, live geometry,
+  serialization and captures. An atomic selection request returns text and coordinates from the
+  same revision.
 - A named last-submitted-frame summary supplies synchronous displayed rows, IME placement,
   hit-testing and cursor rectangles. It identifies terminal generation, frame, processed operation
   sequences, native revision and committed layout. Grid, cell metrics, cursor, selection coordinates
   and viewport belong to that same submitted frame. Row-text patches are owned copies; selection
   text is requested on demand. The summary is displayed state, separate from authoritative reads.
 - DOM elements, subscriptions, focus/blur and host registrations remain synchronous. Confirmed
-  appearance snapshots change after acknowledgement. Disposal immediately invalidates the host;
-  its promise resolves after execution-owner cleanup. Settlement runs while page rAF is suspended.
+  appearance snapshots change after native execution or worker acknowledgement. Disposal immediately
+  invalidates the host; main-entry cleanup is synchronous and worker disposal resolves after
+  execution-owner cleanup. Worker settlement runs while page rAF is suspended.
 - `Extension.setup(scope)` and `terminal.use(extension)` execute on the host/main side in both
   entries. `use` synchronously returns the typed `{ api, dispose }` attachment. Input claim/pass
   hooks run synchronously before native input encoding is queued; native protocol replies bypass
@@ -86,14 +90,20 @@ local and synchronous; the public host sends typed requests to a local or worker
   Host measurements supply DOM dimensions, padding, insets and DPR. Font/layout generations reject
   stale commits and hold the previous complete geometry until its replacement is ready.
 
-Plan 287 owns the async API, shared host/execution adapters and Platform/site call-site conversion.
-Each API-changing PR updates its consumer call sites in the same PR. Plan 286 owns extension
-lifecycle, contribution indexes and new hooks; both tracks agree before changing shared host files.
-Its internal scaffold can land independently. Public API delivery waits for their agreed hooks
-and verified standalone installation. Phases 1–2 continue while those hooks are built.
-Public API changes ship as patch bumps with their Platform/site callers. Npm publication and
-dependencies that require a published package retain [207](207-one-repo-with-mirrors.md)'s gates;
-deferred npm setup does not block monorepo API delivery.
+Plan 287 owns the shared return-convention contract, host/execution adapters and Phase 4
+Platform/site worker migration. Existing main-entry consumers keep their synchronous calls until
+that migration. Plan 286 owns extension lifecycle, contribution indexes and new hooks; both tracks
+agree on hook typing before changing shared host files. Its internal scaffold can land independently.
+Public API shipment waits for their agreed hooks; Phases 1–2 continue while that dependency is built.
+Npm publication and dependencies requiring a published package retain
+[207](207-one-repo-with-mirrors.md)'s gates; deferred npm setup does not block monorepo API delivery.
+
+The first owner-boundary PR extracts concrete local native execution, narrow controller intents and
+an explicit submitted-frame summary with the current main public API unchanged. The shared generic
+contract and packaged worker follow separately. The local owner keeps borrowed runtimes and renderer
+factories actor-bound; host DOM/input/link callbacks are never serialized. Common worker creation
+uses finite clone-safe backend selection and explicit font sources. An importable execution
+descriptor is added only if a real use case requires it.
 
 ## Phases
 
@@ -108,10 +118,12 @@ deferred npm setup does not block monorepo API delivery.
 
 - [x] Real dedicated-worker feasibility: native session, Zig frames, WebGPU/WebGL, worker fonts,
       glyph ink, rAF and direct-port output. Chromium SwiftShader proves correctness only.
-- [x] Common async API and host-side extension/input ownership agreed with Plan 286.
+- [x] Main-sync/worker-async return convention and host-side extension/input ownership selected.
 - [ ] Phase 1a: permanent native-worker renderer CI gate, with both GPU backends and clean teardown.
-- [ ] Phase 1b: async common public API and consumer conversion; shared host and local execution
-      boundary, with ordered settlement and native clipboard baseline tests.
+- [ ] Phase 1b prerequisite: concrete local native execution owner, narrow controller intents and
+      atomic submitted-frame summary; unchanged main public API, native ordering and clipboard tests.
+- [ ] Phase 1b: shared public interface generic over the return convention; await-style common
+      suites and extension typing, with ordered worker settlement. Keep main-entry consumers intact.
 - [ ] Phase 1c: packaged worker entry, real worker-owned execution/fonts/rendering, fitted layout,
       input/focus, structured capability errors and direct-port sequencing. Start the common
       dual-entry matrix with covered operations; preserve remaining main-entry coverage.
