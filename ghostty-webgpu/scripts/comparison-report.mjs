@@ -444,6 +444,38 @@ function pairedMarkdown(artifact) {
   return lines
 }
 
+export function qualificationNotes(artifact) {
+  const evidence = [
+    ...(artifact.qualifications ?? []),
+    ...artifact.runs.flatMap((run) => [
+      run.gpuIdle,
+      ...(run.gpuWindows ?? []).flatMap(({ idle, window, failure }) => [idle, window, failure]),
+    ]),
+  ].filter(Boolean)
+  const notes = []
+  if (evidence.some((value) => value.foreignActivityMetric === 'resident-compute-memory-mib'))
+    notes.push(
+      'GPU windows retain utilization samples, owned/foreign compute-process memory, thresholds, and qualification. Their recorded idle and in-window limits allow the benchmark’s own measured load while bounding shared GPU saturation and foreign compute residency.',
+      'NVIDIA total utilization includes benchmark load; foreign compute residency is a conservative activity proxy, and sampling can miss short bursts.',
+    )
+  const mac = evidence.filter(
+    (value) => value.foreignActivityMetric === 'host-load-average-and-t3-process-presence',
+  )
+  if (mac.length)
+    notes.push(
+      'Mac host qualification retains AC power, T3 Code presence, host-load samples, thresholds, and qualification. Consecutive idle samples must meet the host-load ceiling; measured windows check AC power and T3 Code presence.',
+      ...new Set(
+        mac.map(
+          (value) =>
+            value.limitation ??
+            'Host load is an idle proxy. This gate does not measure Metal GPU utilization.',
+        ),
+      ),
+    )
+  if (!notes.length) notes.push('GPU activity qualification metric is unrecorded.')
+  return notes
+}
+
 export function markdown(artifact, review = {}, artifactDirectory = '.') {
   const link = (path) => (artifactDirectory === '.' ? path : `${artifactDirectory}/${path}`)
   assert(
@@ -471,8 +503,9 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     'Use `bun run bench:compare -- --build-only --bundle /path/to/bundle` for a portable Node bundle.',
     'On the target machine, enter that bundle and run `npm install --ignore-scripts`,',
     '`npx playwright install chromium`, then `node comparison-runner.mjs --smoke`.',
-    'Run `node comparison-runner.mjs --output results` on AC power for measurements.',
-    'Linux hardware runs use Vulkan Chromium headless-shell; macOS hardware runs open headed Chromium windows. Select one count and path per quiet window; the configured matrix has a bounded budget of ten minutes per case.',
+    'Run `node comparison-runner.mjs --headed --output results` on AC power for headed hardware measurements.',
+    '`--headed` selects the browser window independently of `--smoke`, which selects correctness checks.',
+    'Hardware runs default to Vulkan Chromium headless-shell on Linux and headed Chromium on macOS; smoke runs default to headless on both. Select one count and path per quiet window; the configured matrix has a bounded budget of ten minutes per case.',
     'Regenerate the checked-in report with `node scripts/comparison-report.mjs docs/benchmarks/mac-m1/comparison.json docs/benchmarks.md docs/benchmarks/mac-m1/review.json`.',
     '',
     '## Environment',
@@ -486,6 +519,11 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
       : []),
     `- Output fixture: ${artifact.outputFixture ?? 'ascii'}. Frames: ${artifact.outputFrames ?? artifact.manifest.settings.outputFrames}.`,
     `- Browser: ${artifact.environment.browser}. OS: ${artifact.environment.os}.`,
+    ...(artifact.cpuTickSource
+      ? [
+          `- CPU comparison accounting bound: ${artifact.cpuTickSeconds}s from \`${artifact.cpuTickSource.command}\`. ${artifact.cpuTickSource.scope}`,
+        ]
+      : []),
     `- Latency endpoint: ${artifact.environment.latencyEndpoint}. Samples per operation/repetition: ${artifact.latencySamples}.`,
     `- GPU: ${artifact.environment.renderer}. Hardware adapter: ${artifact.hardware}. Headless: ${artifact.environment.headless ?? false}.`,
     `- Font: JetBrains Mono ${artifact.manifest.versions['@fontsource/jetbrains-mono']}, bundled regular/bold Latin faces. Emoji and CJK use the same OS fallback fonts.`,
@@ -522,7 +560,7 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     'PNG glyph captures qualify correctness. In headless-shell, presentation acknowledgement is on-demand and follows submission independently of physical vsync. Renderer rAF pacing still determines when a terminal can draw.',
     'GPU variants require a submitted glyph draw. Canvas and DOM variants require a real terminal row paint within the selected animation frame; deferred no-op frames are excluded.',
     'Physical-vsync and optical display latency are unmeasured. The optional --validate-presentation phase inserts one renderer rAF before write, and retains the delayed samples beside the ordinary samples.',
-    'GPU windows retain utilization samples, owned/foreign compute-process memory, thresholds, and qualification. Their recorded idle and in-window limits allow the benchmark’s own measured load while bounding shared GPU saturation and foreign compute residency.',
+    ...qualificationNotes(artifact),
     'Screencasting is stopped for burst, CPU, and memory measurements.',
     '',
     'Repeating fixtures write the same complete unit of at least 4 KiB per terminal per animation frame.',

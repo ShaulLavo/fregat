@@ -122,7 +122,16 @@ test('revalidates resolved directories and never retargets a stored ID through a
   )
   const endpoint = `/fs/workspace-address/${registered.id}`
   await rm(path.join(workspace.root, 'project'), { recursive: true })
-  expect((await request(app, endpoint)).status).toBe(404)
+  const missing = await request(app, endpoint)
+  expect(missing.status).toBe(404)
+  expect(await missing.json()).toEqual({
+    error: {
+      code: 'NOT_FOUND',
+      message: 'The saved workspace folder could not be found.',
+      why: 'The folder saved in this workspace link is missing from this machine.',
+      fix: 'Choose folder to open its current location, or select another workspace.',
+    },
+  })
   await symlink('../outside', path.join(workspace.root, 'project'))
   expect((await request(app, endpoint)).status).toBe(403)
   await rm(path.join(workspace.root, 'project'))

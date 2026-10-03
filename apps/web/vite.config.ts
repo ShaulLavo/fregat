@@ -5,16 +5,20 @@ import { createRequire } from 'node:module'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { portFromEnv } from '../../scripts/runtime-network'
-import { createScriptError } from '../../scripts/structured-errors'
-import { readDevSources, sourceAliases } from '../../scripts/dev-sources'
-import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
-import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
-import { devPagePlugin } from './scripts/dev-page-plugin'
-import { bootAppearancePlugin } from './scripts/boot-appearance-plugin'
-import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin'
-import { SHELL_ENTRIES, PHONE_BOOT_SCREENS, shellChunksPlugin } from './scripts/shell-chunks-plugin'
-import { shellChunkGroups } from './scripts/shell-chunk-groups'
+import { portFromEnv } from '../../scripts/runtime-network.ts'
+import { createScriptError } from '../../scripts/structured-errors.ts'
+import { readDevSources, sourceAliases } from '../../scripts/dev-sources.ts'
+import { bundleStatsPlugin } from './scripts/bundle-stats-plugin.ts'
+import { demoPreviewPlugin } from './scripts/demo-preview-plugin.ts'
+import { devPagePlugin } from './scripts/dev-page-plugin.ts'
+import { bootAppearancePlugin } from './scripts/boot-appearance-plugin.ts'
+import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin.ts'
+import {
+  SHELL_ENTRIES,
+  PHONE_BOOT_SCREENS,
+  shellChunksPlugin,
+} from './scripts/shell-chunks-plugin.ts'
+import { shellChunkGroups } from './scripts/shell-chunk-groups.ts'
 
 const workspaceRoot = path.resolve(import.meta.dirname, '../..')
 const markdownRequire = createRequire(path.join(workspaceRoot, 'packages/markdown/package.json'))

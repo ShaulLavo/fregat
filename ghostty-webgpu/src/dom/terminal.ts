@@ -1,3 +1,5 @@
+import { copiedFrameRow } from '../render/frame-row.js'
+import { encodeTerminalViewport } from './viewport.js'
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
 import type {
   ReadLinesOptions,
@@ -12,10 +14,7 @@ import { createCompatibleTerminalRenderer } from '../render/selector.js'
 import type { InactiveCursorStyle } from '../render/cursor.js'
 import { EventEmitter } from '../term/events.js'
 import type { LinkProvider, LinkProviderRegistration } from '../term/links.js'
-import type { TerminalSession } from '../term/session.js'
-import { LocalTerminalExecution } from './execution-local.js'
-import type { TerminalSubmittedFrame } from './submitted-frame.js'
-import type { TerminalApi } from './terminal-api.js'
+import { TerminalSession } from '../term/session.js'
 import type {
   TerminalAppearance,
   TerminalAppearanceOptions,
@@ -206,6 +205,24 @@ function effectivePixelRatio(
   throw new RangeError('pixelRatio must be a finite positive number')
 }
 
+function copiedFrame(snapshot: RendererFrameSnapshot): RendererFrameSnapshot {
+  const viewport = snapshot.cursor.viewport
+  const cursor = Object.freeze({
+    ...snapshot.cursor,
+    viewport: viewport ? Object.freeze({ ...viewport }) : undefined,
+  })
+  const rows = snapshot.rows.map((row) =>
+    copiedFrameRow({ cells: row.renderCells, dirty: false, y: row.y }),
+  )
+  return Object.freeze({
+    cursor,
+    rows: Object.freeze(rows),
+    paintedCursor: snapshot.paintedCursor
+      ? Object.freeze({ ...snapshot.paintedCursor })
+      : undefined,
+  })
+}
+
 function physicalPadding(value: number, pixelRatio: number): number {
   const result = Math.round(value * pixelRatio)
   if (Number.isSafeInteger(result) && result >= 0) return result
@@ -234,7 +251,7 @@ function fittedFontSettingsEqual(
 
 const createFromSessionInternal = Symbol('createFromSessionInternal')
 
-export class Terminal implements TerminalApi<'sync'> {
+export class Terminal {
   private accessibility?: TerminalAccessibilityController
   private readonly accessibilityOptions?: false | GhosttyWebGpuTerminalAccessibilityOptions
   private readonly autoFit: boolean
@@ -252,6 +269,9 @@ export class Terminal implements TerminalApi<'sync'> {
   private inactiveCursorStyle?: InactiveCursorStyle
   private readonly keyboard
   private lastFrame?: RendererTextFrameSnapshot
+  private lastFrameVersion?: number
+  private lastFullFrame?: RendererFrameSnapshot
+  private lastFrameRevision?: number
   private readonly linkActivationModifier
   private links?: DomLinkController
   private layoutCommitted = false
@@ -268,7 +288,7 @@ export class Terminal implements TerminalApi<'sync'> {
   private stateValue: GhosttyWebGpuTerminalLifecycle = 'created'
 
   private constructor(
-    private readonly execution: LocalTerminalExecution,
+    private readonly session: TerminalSession<Event>,
     options: GhosttyWebGpuTerminalFromSessionOptions,
   ) {
     this.accessibilityOptions = options.accessibility
@@ -283,13 +303,13 @@ export class Terminal implements TerminalApi<'sync'> {
     this.rendererFactory = options.rendererFactory ?? defaultRendererFactory
     this.scrollbarOptions = options.scrollbar
     this.scrollbarWidthValue = scrollbarWidth(options.scrollbar?.width)
-    this.cleanup.add(() => this.execution.dispose())
+    this.cleanup.add(() => this.session.dispose())
     const elements = options.elements
     if (elements) {
       this.elementsValue = elements
       this.cleanup.add(() => elements.dispose())
     }
-    this.execution.setClipboardWritePolicy(
+    this.session.setClipboardWritePolicy(
       createDomClipboardPolicyAdapter({
         onError: (cause, operation) => this.reportError(cause, operation),
         policy: options.clipboardWrite,
@@ -298,15 +318,15 @@ export class Terminal implements TerminalApi<'sync'> {
   }
 
   static async create(options: GhosttyWebGpuTerminalOptions = {}): Promise<Terminal> {
-    const execution = await LocalTerminalExecution.create({
+    const session = await TerminalSession.create<Event>({
       appearance: options.appearance,
       links: options.links,
       runtime: options.runtime,
     })
     try {
-      return new Terminal(execution, options)
+      return new Terminal(session, options)
     } catch (cause) {
-      execution.dispose()
+      session.dispose()
       throw cause
     }
   }
@@ -316,7 +336,7 @@ export class Terminal implements TerminalApi<'sync'> {
     options: GhosttyWebGpuTerminalFromSessionOptions = {},
   ): Terminal {
     try {
-      return new Terminal(new LocalTerminalExecution(session), options)
+      return new Terminal(session, options)
     } catch (cause) {
       options.elements?.dispose()
       session.dispose()
@@ -326,7 +346,7 @@ export class Terminal implements TerminalApi<'sync'> {
 
   get appearance(): TerminalAppearance {
     this.ensureActive()
-    return this.execution.appearance
+    return this.session.appearance
   }
 
   get canvas(): HTMLCanvasElement | undefined {
@@ -379,7 +399,7 @@ export class Terminal implements TerminalApi<'sync'> {
     let renderer: GhosttyWebGpuRenderer | undefined
     try {
       const elements = this.installElements(parent)
-      const initialAppearance = this.execution.appearance
+      const initialAppearance = this.session.appearance
       renderer = await this.createRenderer(elements, initialAppearance)
       if (!this.isOpening(generation)) {
         const staleRenderer = renderer
@@ -440,34 +460,65 @@ export class Terminal implements TerminalApi<'sync'> {
     return this.on('frame', listener)
   }
 
-  get submittedFrame(): TerminalSubmittedFrame | undefined {
-    this.ensureActive()
-    return this.execution.submittedFrame
-  }
-
   frameSnapshot(): RendererFrameSnapshot | undefined {
     this.ensureActive()
-    return this.execution.frameSnapshot()
+    if (!this.lastFrame) return undefined
+    if (!this.canReadPaintedState) return this.lastFullFrame
+    const rows = Object.freeze(
+      this.session.renderState.readRows({ packed: true }).map(copiedFrameRow),
+    )
+    this.lastFullFrame = copiedFrame(Object.freeze({ ...this.lastFrame, rows }))
+    return this.lastFullFrame
   }
 
   captureViewport(): string | undefined {
     this.ensureActive()
-    const parent = this.elementsValue?.root.parentElement
-    if (!parent) return undefined
-    return this.execution.captureViewport(parent.clientWidth, parent.clientHeight)
+    const elements = this.elementsValue
+    const font = this.fittedFont
+    const cursor = this.lastFrame?.cursor
+    const parent = elements?.root.parentElement
+    if (
+      !parent ||
+      !elements ||
+      !font ||
+      !cursor ||
+      this.lastFrameRevision !== this.session.revision ||
+      !this.canReadPaintedState
+    )
+      return undefined
+    const painted = this.lastFrame?.paintedCursor
+    const savedCursor = painted
+      ? {
+          ...cursor,
+          visible: painted.visible,
+          style: painted.style,
+          viewport: { x: painted.x, y: painted.y, wideTail: false },
+        }
+      : cursor
+    return encodeTerminalViewport({
+      width: parent.clientWidth,
+      height: parent.clientHeight,
+      columns: this.session.grid.columns,
+      rows: this.session.renderState.readRows(),
+      cursor: savedCursor,
+      scrollbar: this.session.scrollbar,
+      font,
+      theme: this.session.appearance.rendererTheme,
+      padding: elements.padding,
+    })
   }
 
   /** Count retained scrollback and visible rows on the active screen. */
   lineCount(): number {
     this.ensureActive()
-    return this.execution.lineCount()
+    return this.session.lineCount()
   }
 
   /** Read clamped, oldest-first active-screen rows [start, end), capped at TERMINAL_READ_LINES_MAX_ROWS.
    * trimRight defaults to true. Upstream has no inactive-screen selector. */
   readLines(start: number, end: number, options: ReadLinesOptions = {}): readonly TerminalLine[] {
     this.ensureActive()
-    return this.execution.readLines(start, end, options)
+    return this.session.readLines(start, end, options)
   }
 
   visibleLines(): readonly string[] {
@@ -478,7 +529,7 @@ export class Terminal implements TerminalApi<'sync'> {
 
   registerLinkProvider(provider: LinkProvider<Event>): LinkProviderRegistration {
     this.ensureActive()
-    const registration = this.execution.registerLinkProvider(provider)
+    const registration = this.session.registerLinkProvider(provider)
     this.refreshLinks()
     let disposed = false
     return Object.freeze({
@@ -494,23 +545,23 @@ export class Terminal implements TerminalApi<'sync'> {
 
   geometry(): TerminalGeometry {
     this.ensureActive()
-    return this.execution.geometry()
+    return this.session.geometry()
   }
 
   measure(text: string): number {
     this.ensureActive()
-    return this.execution.measure(text)
+    return this.session.measure(text)
   }
 
   measureTexts(texts: readonly string[]): TerminalTextMeasurement {
     this.ensureActive()
-    return this.execution.measureTexts(texts)
+    return this.session.measureTexts(texts)
   }
 
   writeAndReadGeometry(data: TerminalInputData): TerminalGeometry {
     this.ensureOpen()
     this.invalidateLinks()
-    const geometry = this.execution.writeAndReadGeometry(data)
+    const geometry = this.session.writeAndReadGeometry(data)
     if (this.stateValue !== 'open') return geometry
     this.accessibility?.notifyOutput()
     this.updateScrollbar()
@@ -521,7 +572,7 @@ export class Terminal implements TerminalApi<'sync'> {
   write(data: TerminalInputData): TerminalMutationResult {
     this.ensureOpen()
     this.invalidateLinks()
-    const result = this.execution.write(data)
+    const result = this.session.write(data)
     if (this.stateValue !== 'open') return result
     this.accessibility?.notifyOutput()
     this.updateScrollbar()
@@ -532,7 +583,7 @@ export class Terminal implements TerminalApi<'sync'> {
   writeln(data: TerminalInputData): TerminalMutationResult {
     this.ensureOpen()
     this.invalidateLinks()
-    const result = this.execution.writeln(data)
+    const result = this.session.writeln(data)
     if (this.stateValue !== 'open') return result
     this.accessibility?.notifyOutput()
     this.updateScrollbar()
@@ -542,17 +593,17 @@ export class Terminal implements TerminalApi<'sync'> {
 
   sendInput(data: TerminalInputData): TerminalInputResult {
     this.ensureOpen()
-    return this.execution.sendInput(data)
+    return this.session.sendInput(data)
   }
 
   paste(data: TerminalInputData): TerminalInputResult {
     this.ensureOpen()
-    return this.execution.paste(data)
+    return this.session.paste(data)
   }
 
   key(input: TerminalKeyInput): TerminalInputResult {
     this.ensureOpen()
-    return this.execution.key(input)
+    return this.session.key(input)
   }
 
   focus(): void {
@@ -569,7 +620,7 @@ export class Terminal implements TerminalApi<'sync'> {
     this.ensureOpen()
     this.input?.resetTransientState()
     this.pointer?.cancel()
-    return this.execution.reset()
+    return this.session.reset()
   }
 
   refresh(startRow: number, endRow: number): void {
@@ -584,56 +635,56 @@ export class Terminal implements TerminalApi<'sync'> {
 
   scrollToTop(): TerminalMutationResult {
     this.ensureOpen()
-    return this.execution.scrollToTop()
+    return this.session.scrollToTop()
   }
 
   scrollToBottom(): TerminalMutationResult {
     this.ensureOpen()
-    return this.execution.scrollToBottom()
+    return this.session.scrollToBottom()
   }
 
   scrollBy(delta: number): TerminalMutationResult {
     this.ensureOpen()
-    return this.execution.scrollBy(delta)
+    return this.session.scrollBy(delta)
   }
 
   scrollToRow(row: number): TerminalMutationResult {
     this.ensureOpen()
-    return this.execution.scrollToRow(row)
+    return this.session.scrollToRow(row)
   }
 
   getSelection(options: TerminalSelectionFormatOptions = {}): string | undefined {
     this.ensureOpen()
-    return this.execution.getSelection(options)
+    return this.session.getSelection(options)
   }
 
   selectionCoordinates(): Readonly<SelectionCoordinates> | undefined {
     this.ensureOpen()
-    return this.execution.selectionCoordinates()
+    return this.session.selectionCoordinates()
   }
 
   clearSelection(): boolean {
     this.ensureOpen()
     this.pointer?.cancel()
-    return this.execution.clearSelection()
+    return this.session.clearSelection()
   }
 
   selectAll(): boolean {
     this.ensureOpen()
     this.pointer?.cancel()
-    return this.execution.selectAll().selectionChanged
+    return this.session.selectAll().selectionChanged
   }
 
   selectRange(start: SelectionPoint, end: SelectionPoint): boolean {
     this.ensureOpen()
     this.pointer?.cancel()
-    return this.execution.selectRange(start, end).selectionChanged
+    return this.session.selectRange(start, end).selectionChanged
   }
 
   selectLines(startRow: number, endRow: number): boolean {
     this.ensureOpen()
     this.pointer?.cancel()
-    return this.execution.selectLines(startRow, endRow).selectionChanged
+    return this.session.selectLines(startRow, endRow).selectionChanged
   }
 
   focusNextLink(): Promise<boolean> {
@@ -657,8 +708,7 @@ export class Terminal implements TerminalApi<'sync'> {
     if (!elements) return false
     this.accessibility = this.createAccessibility(elements)
     const snapshot = this.readFrame()
-    if (snapshot && this.execution.submittedFrame)
-      this.accessibility.update(snapshot, this.execution.submittedFrame.scrollbar)
+    if (snapshot) this.accessibility.update(snapshot, this.session.scrollbar)
     return true
   }
 
@@ -680,7 +730,7 @@ export class Terminal implements TerminalApi<'sync'> {
 
   setAppearance(options: TerminalAppearanceOptions): TerminalMutationResult {
     this.ensureOpen()
-    return this.execution.setAppearance(options)
+    return this.session.setAppearance(options)
   }
 
   dispose(): void {
@@ -695,6 +745,8 @@ export class Terminal implements TerminalApi<'sync'> {
     this.input = undefined
     this.inputLifecycle = undefined
     this.lastFrame = undefined
+    this.lastFullFrame = undefined
+    this.lastFrameVersion = undefined
     this.layoutCommitted = false
     this.links = undefined
     this.pointer = undefined
@@ -730,11 +782,9 @@ export class Terminal implements TerminalApi<'sync'> {
       effectivePixelRatio(elements.canvas, this.fitEnvironment),
     )
     this.fittedFont = font
-    this.execution.commitLayout(font, elements.padding)
     const compositionView = elements.compositionView
     if (compositionView) applyPreeditAppearance(compositionView, font, appearance.rendererTheme)
-    return this.execution.createRenderer(
-      this.rendererFactory,
+    return this.rendererFactory(
       {
         canvas: elements.canvas,
         columns: grid.columns,
@@ -743,11 +793,12 @@ export class Terminal implements TerminalApi<'sync'> {
         onError: (cause) => this.reportError(cause, 'renderer.restore'),
         onCleanUpdate: () => this.handleCleanUpdate(),
         onTextFrame: (snapshot) => this.handleFrame(snapshot),
-        needsFrameRows: () => true,
+        needsFrameRows: () => this.accessibility !== undefined || (this.links?.needsFrame ?? false),
         onRowsChanged: (rows) => {
           if (!this.emitters.frame.hasListeners) return
           this.emitters.frame.emit(Object.freeze({ rows: rows }))
         },
+        renderState: this.session.renderState,
         replaceCanvas: elements.replaceCanvas
           ? () => this.replaceRendererCanvas(elements)
           : undefined,
@@ -762,7 +813,7 @@ export class Terminal implements TerminalApi<'sync'> {
     elements: TerminalElements,
     initialAppearance: TerminalAppearance,
   ): void {
-    const appearance = this.execution.appearance
+    const appearance = this.session.appearance
     if (appearance === initialAppearance) return
     const font = fitTerminalFont(
       elements.canvas.ownerDocument,
@@ -770,7 +821,6 @@ export class Terminal implements TerminalApi<'sync'> {
       effectivePixelRatio(elements.canvas, this.fitEnvironment),
     )
     this.fittedFont = font
-    this.execution.commitLayout(font, elements.padding)
     const compositionView = elements.compositionView
     if (compositionView) applyPreeditAppearance(compositionView, font, appearance.rendererTheme)
     this.renderer?.setCursorBlinkEnabled(appearance.cursor.blink)
@@ -790,23 +840,21 @@ export class Terminal implements TerminalApi<'sync'> {
 
   private subscribeToSession(): void {
     this.trackSubscription(
-      this.execution.on('appearance', ({ appearance }) => this.handleAppearance(appearance)),
+      this.session.on('appearance', ({ appearance }) => this.handleAppearance(appearance)),
     )
-    this.trackSubscription(this.execution.on('bell', () => this.emitHostEvent('bell', undefined)))
+    this.trackSubscription(this.session.on('bell', () => this.emitHostEvent('bell', undefined)))
     this.trackSubscription(
-      this.execution.on('data', ({ bytes }) => this.emitHostEvent('data', Uint8Array.from(bytes))),
+      this.session.on('data', ({ bytes }) => this.emitHostEvent('data', Uint8Array.from(bytes))),
     )
+    this.trackSubscription(this.session.on('error', (error) => this.emitHostEvent('error', error)))
+    this.trackSubscription(this.session.on('renderRequest', () => this.handleRenderRequest()))
+    this.trackSubscription(this.session.on('resize', ({ grid }) => this.handleResize(grid)))
+    this.trackSubscription(this.session.on('scroll', (scroll) => this.handleScroll(scroll)))
     this.trackSubscription(
-      this.execution.on('error', (error) => this.emitHostEvent('error', error)),
-    )
-    this.trackSubscription(this.execution.on('renderRequest', () => this.handleRenderRequest()))
-    this.trackSubscription(this.execution.on('resize', ({ grid }) => this.handleResize(grid)))
-    this.trackSubscription(this.execution.on('scroll', (scroll) => this.handleScroll(scroll)))
-    this.trackSubscription(
-      this.execution.on('selection', (selection) => this.handleSelection(selection)),
+      this.session.on('selection', (selection) => this.handleSelection(selection)),
     )
     this.trackSubscription(
-      this.execution.on('title', ({ title }) => this.emitHostEvent('title', title)),
+      this.session.on('title', ({ title }) => this.emitHostEvent('title', title)),
     )
   }
 
@@ -847,14 +895,14 @@ export class Terminal implements TerminalApi<'sync'> {
   private installScrollbar(elements: TerminalElements): void {
     const options = this.scrollbarOptions
     const scrollbar = createTerminalScrollbar({
-      actions: this.execution.scroll,
+      actions: this.session,
       clock: options?.clock,
       fadeDelayMs: options?.fadeDelayMs,
       minThumbSize: options?.minThumbSize,
       onError: (cause, operation) => this.reportError(cause, `scrollbar.${operation}`),
       root: elements.root,
       signal: elements.signal,
-      snapshot: this.execution.scrollbar,
+      snapshot: this.session.scrollbar,
       width: this.scrollbarWidthValue,
     })
     this.scrollbar = scrollbar
@@ -885,7 +933,7 @@ export class Terminal implements TerminalApi<'sync'> {
         hooks: this.inputHooks,
         onError: (cause, operation) => this.reportError(cause, `input.${operation}`),
         onPreedit: (value) => this.updatePreedit(value),
-        session: this.execution.input,
+        session: this.session,
         shortcuts: this.keyboard?.shortcuts,
         signal: elements.signal,
         textarea: elements.textarea,
@@ -898,7 +946,7 @@ export class Terminal implements TerminalApi<'sync'> {
       onError: (cause, operation) => this.reportError(cause, `input.${operation}`),
       onFocused: (focused) => this.handleFocused(focused),
       onResetTransientState: () => input?.resetTransientState(),
-      session: this.execution.focus,
+      session: this.session,
       signal: elements.signal,
       textarea: elements.textarea,
     })
@@ -916,7 +964,7 @@ export class Terminal implements TerminalApi<'sync'> {
     const fit = createTerminalFitController({
       container: elements.root,
       environment: this.fitEnvironment,
-      font: this.execution.appearance.font,
+      font: this.session.appearance.font,
       getScrollbarWidth: () => this.scrollbarWidthValue,
       onFit: (result) => this.applyFit(result),
       padding: this.padding,
@@ -930,7 +978,7 @@ export class Terminal implements TerminalApi<'sync'> {
   private installPointer(elements: TerminalElements): void {
     const selection = createTerminalSelectionController({
       onError: (cause, operation) => this.reportError(cause, operation),
-      session: this.execution.selectionGesture,
+      session: this.session,
       view: owningWindow(elements.canvas),
     })
     let pointer: TerminalPointerController
@@ -940,7 +988,12 @@ export class Terminal implements TerminalApi<'sync'> {
         getLayout: () => this.committedPointerLayout(),
         onError: (cause, operation) => this.reportError(cause, operation),
         selection,
-        session: this.execution.pointer,
+        session: {
+          mouse: (input) => this.session.mouse(input),
+          mouseTracking: () => this.session.mouseTracking,
+          resetMouseTracking: () => this.session.resetMouseTracking(),
+          scrollBy: (delta) => this.session.scrollBy(delta),
+        },
         signal: elements.signal,
       })
     } catch (cause) {
@@ -954,15 +1007,13 @@ export class Terminal implements TerminalApi<'sync'> {
   private installLinks(elements: TerminalElements): void {
     const links = createDomLinkController({
       getFrame: () =>
-        this.execution.submittedFrame?.nativeRevision === this.execution.revision
-          ? this.readFrame()
-          : undefined,
+        this.lastFrameRevision === this.session.revision ? this.readFrame() : undefined,
       activationModifier: this.linkActivationModifier,
       canvas: elements.canvas,
       getLayout: () => this.committedPointerLayout(),
       onError: (cause, operation) => this.reportError(cause, `link.${operation}`),
       root: elements.root,
-      session: this.execution.links,
+      session: this.session,
       signal: elements.signal,
     })
     this.links = links
@@ -1007,15 +1058,12 @@ export class Terminal implements TerminalApi<'sync'> {
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     const paddingChanged = this.elementsValue?.setPadding(result.padding) === true
     const scrollbarWidthChanged = this.scrollbar?.setWidth(result.scrollbarWidth) === true
-    this.execution.commitLayout(result.font, result.padding)
     this.renderer?.setFont(result.font)
     this.fittedFont = result.font
+    this.updatePreeditAppearance(result.font, this.session.appearance.rendererTheme)
     this.layoutCommitted = true
     if (paddingChanged || scrollbarWidthChanged) this.invalidateLinks()
-    this.execution.resize(result.grid)
-    // Padding can change without native cells changing; submit its new layout with owned rows.
-    if (paddingChanged || scrollbarWidthChanged)
-      this.renderer?.refreshRows?.(0, result.grid.rows - 1)
+    this.session.resize(result.grid)
     if (this.stateValue !== 'open') return
     this.replayLastFrame()
     this.updateScrollbar()
@@ -1023,12 +1071,12 @@ export class Terminal implements TerminalApi<'sync'> {
 
   private commitFixedFont(font: TerminalFittedFont): void {
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
-    const grid = this.execution.grid
-    this.execution.commitLayout(font, this.elementsValue!.padding)
+    const grid = this.session.grid
     this.renderer?.setFont(font)
     this.fittedFont = font
+    this.updatePreeditAppearance(font, this.session.appearance.rendererTheme)
     this.layoutCommitted = true
-    this.execution.resize({
+    this.session.resize({
       cellHeight: font.cssCellHeight,
       cellWidth: font.cssCellWidth,
       columns: grid.columns,
@@ -1059,6 +1107,7 @@ export class Terminal implements TerminalApi<'sync'> {
     }
     renderer?.setCursorBlinkEnabled(appearance.cursor.blink)
     renderer?.setTheme(appearance.rendererTheme)
+    this.updatePreeditAppearance(this.fittedFont, appearance.rendererTheme)
     this.emitHostEvent('appearance', appearance)
   }
 
@@ -1091,8 +1140,22 @@ export class Terminal implements TerminalApi<'sync'> {
     this.renderer?.schedule()
   }
 
+  private get canReadPaintedState(): boolean {
+    return this.lastFrameVersion === this.session.renderState.snapshotVersion
+  }
+
   private readFrame(): RendererTextFrameSnapshot | undefined {
-    return this.execution.textFrame()
+    const snapshot = this.lastFrame
+    if (!snapshot || snapshot.rows.length > 0) return snapshot
+    if (!this.canReadPaintedState) return this.lastFullFrame
+    const rows = Object.freeze(
+      this.session.renderState.readTextRows
+        ? this.session.renderState.readTextRows()
+        : this.session.renderState.readRows({ packed: true }).map(copiedFrameRow),
+    )
+    const frame = Object.freeze({ ...snapshot, rows })
+    this.lastFrame = frame
+    return frame
   }
 
   private replayLastFrame(): void {
@@ -1102,19 +1165,27 @@ export class Terminal implements TerminalApi<'sync'> {
   }
 
   private handleCleanUpdate(): void {
-    this.execution.confirmCleanUpdate()
+    if (
+      !this.lastFrame ||
+      !this.canReadPaintedState ||
+      this.renderer?.canPaint !== true ||
+      this.renderer.hasPendingFrame
+    )
+      return
+    this.lastFrameRevision = this.session.revision
   }
 
   private handleFrame(snapshot: RendererTextFrameSnapshot): void {
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
-    this.updateFrameUi(this.execution.submit(snapshot))
+    this.lastFrameRevision = this.session.revision
+    this.lastFrameVersion = this.session.renderState.snapshotVersion
+    this.lastFullFrame = undefined
+    this.updateFrameUi(snapshot)
   }
 
   private updateFrameUi(snapshot: RendererTextFrameSnapshot): void {
     this.lastFrame = snapshot
-    const summary = this.execution.submittedFrame
-    const scrollbar = summary?.scrollbar ?? this.execution.scrollbar
-    if (summary) this.updatePreeditAppearance(summary.font, summary.theme)
+    const scrollbar = this.session.scrollbar
     this.runUiOperation('frame.caret', () => this.positionTextarea(snapshot))
     this.runUiOperation('frame.links', () => {
       if (snapshot.rows.length > 0 && this.links?.needsFrame) this.updateLinkFrame(snapshot)
@@ -1148,12 +1219,11 @@ export class Terminal implements TerminalApi<'sync'> {
   private committedPointerLayout(): CommittedPointerLayout | undefined {
     const elements = this.elementsValue
     if (!elements || !this.layoutCommitted) return undefined
-    const summary = this.execution.submittedFrame
-    if (!summary) return undefined
-    const grid = summary.grid
-    const font = summary.font
+    const grid = this.session.grid
+    const font = this.fittedFont
+    if (!font) return undefined
     const ratio = font.pixelRatio
-    const padding = summary.padding
+    const padding = elements.padding
     const physical = Object.freeze({
       deviceCellHeight: font.deviceCellHeight,
       deviceCellWidth: font.deviceCellWidth,
@@ -1181,9 +1251,7 @@ export class Terminal implements TerminalApi<'sync'> {
   private updateScrollbar(snapshot?: Readonly<TerminalScrollbar>): void {
     const scrollbar = this.scrollbar
     if (!scrollbar || this.stateValue === 'disposed') return
-    scrollbar.update(
-      this.execution.submittedFrame?.scrollbar ?? snapshot ?? this.execution.scrollbar,
-    )
+    scrollbar.update(snapshot ?? this.session.scrollbar)
   }
 
   private runUiOperation(operation: string, action: () => unknown): void {
@@ -1265,12 +1333,10 @@ export class Terminal implements TerminalApi<'sync'> {
     const column = leadingCursorColumn(snapshot)
     const viewport = snapshot.cursor.viewport
     if (column === undefined || !viewport) return
-    const summary = this.execution.submittedFrame
-    if (!summary) return
-    const grid = summary.grid
+    const grid = this.session.grid
     elements.positionTextarea({
-      x: summary.padding.left + column * grid.cellWidth,
-      y: summary.padding.top + viewport.y * grid.cellHeight,
+      x: elements.padding.left + column * grid.cellWidth,
+      y: elements.padding.top + viewport.y * grid.cellHeight,
     })
   }
 
