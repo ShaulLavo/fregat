@@ -6,6 +6,7 @@ import type { RenderRow } from '../../core/types.js'
 import type { CursorState } from '../instances/types.js'
 import type { RendererFrameSnapshot } from '../renderer.js'
 import { Terminal } from '../../dom/terminal.js'
+import { fitTerminalFont } from '../../dom/fit.js'
 import { CanvasTerminalRenderer } from '../canvas/renderer.js'
 import { snapshotRenderState } from '../frame.js'
 import { WebGpuUnavailableError } from '../renderer.js'
@@ -231,6 +232,58 @@ describe('DOM terminal renderer', () => {
       probe.clock.flush()
       expectSerializedFrame()
     }
+  })
+
+  it('preserves tall accents, italic and emoji ink across row boundaries with wide outline cursors', async () => {
+    const font = fitTerminalFont(document, probeFont.settings, 1)
+    const probe = await rendererProbe('dom', '\x1b[?25l\x1b[2J', font)
+    probe.terminal.setDefaultCursorStyle('outline')
+    probe.terminal.write('\x1b[2;1H\x1b[3mÂ̈̍fj\x1b[0m😀界\x1b[?25h\x1b[2;6H')
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+    const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+    const live = await page.screenshot({ element: frame, save: false, scale: 'css' })
+    await page.screenshot({
+      element: frame,
+      path: '../../../.artifacts/dom-row-ink-live.png',
+      scale: 'css',
+    })
+    for (const row of frame.querySelectorAll<HTMLElement>('[data-row]')) row.style.contain = 'none'
+    const reference = await page.screenshot({ element: frame, save: false, scale: 'css' })
+    await page.screenshot({
+      element: frame,
+      path: '../../../.artifacts/dom-row-ink-reference.png',
+      scale: 'css',
+    })
+    expect(
+      live === reference,
+      'Containment must preserve ink that crosses a fitted row boundary',
+    ).toBe(true)
+  })
+
+  it('contains changed row layout and paint while preserving grid and caret geometry', async () => {
+    const probe = await rendererProbe('dom')
+    const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+    const rows = Array.from(frame.children)
+    const initial = rows.map((row) => row.getBoundingClientRect())
+    for (const row of rows) expect(getComputedStyle(row).contain).toBe('layout paint')
+    for (const input of ['\x1b[2;1Hchanged', '\x1b[1;2H', '\x1b[3;2H']) {
+      probe.terminal.write(input)
+      probe.renderer.notifyWrite()
+      probe.clock.flush()
+      expect(Array.from(frame.children).every((row, index) => row === rows[index])).toBe(true)
+      for (const [index, row] of rows.entries()) {
+        const geometry = row.getBoundingClientRect()
+        expect(geometry.toJSON()).toEqual(initial[index]!.toJSON())
+      }
+      const cursor = frame.querySelector('[data-cursor]')!
+      expect(cursor.getBoundingClientRect().height).toBe(probeFont.cssCellHeight)
+    }
+    await page.screenshot({
+      element: frame,
+      path: '../../../.artifacts/dom-row-containment.png',
+      scale: 'css',
+    })
   })
 
   it('reports actual mutations while identical repaints still settle damage and callbacks', async () => {
