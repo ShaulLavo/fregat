@@ -513,6 +513,7 @@ export function createApp(options: AppOptions) {
       }
     },
     () => usageSettings['providers.transcriptHistoryRefreshSeconds'] * 1000,
+    providerUsageHistory,
   )
   const stopUsageRegistry = providerAdapterRegistry.subscribeChanges(() => {
     providerUsage.reconfigure()
