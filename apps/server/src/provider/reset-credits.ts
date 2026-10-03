@@ -21,13 +21,19 @@ export class ProviderResetCredits {
 
   private readonly database: PlatformDatabase
   private readonly registry: Registry
-  private readonly usage: Pick<ProviderUsageStore, 'read' | 'refreshAccount' | 'suspendCollection'>
+  private readonly usage: Pick<
+    ProviderUsageStore,
+    'read' | 'readNativeAccount' | 'refreshAccount' | 'suspendCollection'
+  >
   private readonly now: () => number
 
   constructor(
     database: PlatformDatabase,
     registry: Registry,
-    usage: Pick<ProviderUsageStore, 'read' | 'refreshAccount' | 'suspendCollection'>,
+    usage: Pick<
+      ProviderUsageStore,
+      'read' | 'readNativeAccount' | 'refreshAccount' | 'suspendCollection'
+    >,
     now: () => number = Date.now,
   ) {
     this.database = database
@@ -148,10 +154,7 @@ export class ProviderResetCredits {
   ): Promise<ProviderResetCreditResult> {
     const target = this.target(instanceId)
     const confirmed = await this.usage.refreshAccount(target.credentialAccountKey)
-    const usage = await this.usage.read()
-    const reading = usage.accounts.find(
-      (account) => account.accountKey === target.credentialAccountKey,
-    )
+    const reading = this.usage.readNativeAccount(target.credentialAccountKey)
     if (!confirmed || reading?.resetCredits?.accountKey !== input.accountKey)
       throw resetError(
         'ACCOUNT_CHANGED',

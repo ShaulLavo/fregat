@@ -34,6 +34,8 @@ export function createTestApp(options: AppOptions = {}): App {
   const app = createApp({
     ...options,
     metadataDatabase: options.metadataDatabase ?? database,
+    // Persistent service state stays outside the workspace being inspected by Git and files.
+    system: { ...options.system, stateHome: options.system?.stateHome ?? createTestJournalRoot() },
     orchestration: { database: database.db, pullRequestLookup: null, ...options.orchestration },
     workspaceEditJournalRoot,
     // Never the real state home: a pairing test writes the device file.
