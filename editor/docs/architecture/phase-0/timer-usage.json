@@ -31,7 +31,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:requestAnimationFrame:dffa87e548",
       "justification": "Benchmark observation of the first animation frame after an applied key; it records a timestamp only, tracks the frame handle, and cancels pending frames on disposal.",
-      "line": 169,
+      "line": 258,
       "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
@@ -39,7 +39,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:setTimeout:e5c148c176",
       "justification": "The bounded churn benchmark yields to the browser every ten iterations so cancellation and rendering can run. The timer only resolves the awaited promise; the next iteration checks cancellation before editing.",
-      "line": 238,
+      "line": 327,
       "snippet": "if (index % 10 === 0) await new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -95,7 +95,7 @@
       "file": "examples/stress/src/inputLatency.ts",
       "id": "examples/stress/src/inputLatency.ts:queueMicrotask:2bd1143d41",
       "justification": "Benchmark observation of input dispatch completion after synchronous edit callbacks return. The enabled guard drops observations after disposal; measuring this boundary through the editor scheduler would change the interval being measured.",
-      "line": 100,
+      "line": 103,
       "snippet": "queueMicrotask(() => finishDispatch(sample))"
     },
     {
@@ -103,7 +103,7 @@
       "file": "examples/stress/src/inputLatency.ts",
       "id": "examples/stress/src/inputLatency.ts:requestAnimationFrame:4be2a86626",
       "justification": "Benchmark observation of the next animation frame after input dispatch. It records a timestamp only, tracks each frame handle, and cancels pending frames when the probe is disposed.",
-      "line": 88,
+      "line": 90,
       "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
@@ -111,7 +111,7 @@
       "file": "examples/stress/src/inputReadiness.ts",
       "id": "examples/stress/src/inputReadiness.ts:setTimeout:1fa46d1e38",
       "justification": "Harness readiness and cleanup only: the shared deadline bounds worker awaits outside captured input; the timer is cleared when the stage settles.",
-      "line": 29,
+      "line": 32,
       "snippet": "timer = setTimeout(() => reject(timeoutError(stage, observe)), remaining)"
     },
     {
@@ -119,7 +119,7 @@
       "file": "examples/stress/src/inputReadiness.ts",
       "id": "examples/stress/src/inputReadiness.ts:setTimeout:3e3c273e6a",
       "justification": "Harness readiness only: polling yields for states without a completion event, outside captured input and within the caller's absolute deadline.",
-      "line": 37,
+      "line": 40,
       "snippet": "return new Promise((resolve) => setTimeout(resolve, ms))"
     },
     {
@@ -196,14 +196,6 @@
     },
     {
       "api": "setTimeout",
-      "file": "packages/editor/src/keymap/runtime.ts",
-      "id": "packages/editor/src/keymap/runtime.ts:setTimeout:23bc05437c",
-      "justification": "The standalone keymap runtime owns the pending chord deadline. Each continuation replaces the timer; completion, cancellation, disabled state, blur, hidden document, binding changes, and disposal clear it.",
-      "line": 78,
-      "snippet": "timer = setTimeout(() => cancel('timeout'), TIMEOUT_MS)"
-    },
-    {
-      "api": "setTimeout",
       "file": "packages/editor/src/semanticTokenLayer.ts",
       "id": "packages/editor/src/semanticTokenLayer.ts:setTimeout:7075ce6e49",
       "justification": "Coalesces the demand signal against the viewport rather than against rendering. `'viewport'` is fired once per scroll event and is not throttled at source, so a flung scroll is one update per frame; `cancel()` on every input is what turns that into one question per pause. The delay itself is the host's number — this editor names none.",
@@ -215,7 +207,7 @@
       "file": "packages/editor/src/shiki/shiki.worker.ts",
       "id": "packages/editor/src/shiki/shiki.worker.ts:setTimeout:7613cb083b",
       "justification": "Runs once per highlighter after a one-second delay so background grammar preload stays behind latency-sensitive tokenization and its first paint. `backgroundLoaded` prevents duplicate schedules, and worker-task tracking keeps idle fences and teardown behind the preload.",
-      "line": 244,
+      "line": 250,
       "snippet": "setTimeout(() => {"
     },
     {
@@ -335,7 +327,7 @@
       "file": "packages/markdown/src/authoringPlugin.ts",
       "id": "packages/markdown/src/authoringPlugin.ts:queueMicrotask:2fd8ec60a7",
       "justification": "Applies after the contribution pass so the edit never runs inside a view update; the pending request, disposal and document are rechecked when it runs.",
-      "line": 116,
+      "line": 104,
       "snippet": "queueMicrotask(() => {"
     },
     {
@@ -359,7 +351,7 @@
       "file": "packages/paged/src/document.ts",
       "id": "packages/paged/src/document.ts:setTimeout:b2279f38a6",
       "justification": "Yields once per MiB so indexing a large source never holds the thread; it only resolves the awaited promise, and the next page read carries the lifetime signal.",
-      "line": 251,
+      "line": 253,
       "snippet": "await new Promise<void>((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -375,7 +367,7 @@
       "file": "packages/plugin-ui/src/hoverController.ts",
       "id": "packages/plugin-ui/src/hoverController.ts:setTimeout:017e4b5257",
       "justification": "Enforces the hover dwell before paint; the pointer leaving the target clears it.",
-      "line": 234,
+      "line": 235,
       "snippet": "current.revealTimer = setTimeout(() => {"
     },
     {
@@ -383,7 +375,7 @@
       "file": "packages/plugin-ui/src/hoverController.ts",
       "id": "packages/plugin-ui/src/hoverController.ts:setTimeout:ceab8e0fd3",
       "justification": "Delays the loading row until the participants are observably slow; every target change cancels it.",
-      "line": 220,
+      "line": 221,
       "snippet": "current.loadingTimer = setTimeout(() => revealLoading(current), HOVER_LOADING_DELAY_MS)"
     },
     {
@@ -391,7 +383,7 @@
       "file": "packages/plugin-ui/src/hoverController.ts",
       "id": "packages/plugin-ui/src/hoverController.ts:setTimeout:f83b59645d",
       "justification": "Starts server work midway through the pointer dwell so transient targets are skipped while network time overlaps the rest of the dwell.",
-      "line": 229,
+      "line": 230,
       "snippet": "current.dispatchTimer = setTimeout(() => {"
     },
     {
@@ -399,7 +391,7 @@
       "file": "packages/plugin-ui/src/tooltip.ts",
       "id": "packages/plugin-ui/src/tooltip.ts:setTimeout:89686cb98f",
       "justification": "A pointer grace period before the hover goes away, cancelled by re-entry; it schedules no editor work.",
-      "line": 187,
+      "line": 190,
       "snippet": "hideTimer = setTimeout(() => {"
     },
     {
@@ -407,7 +399,7 @@
       "file": "packages/plugin-ui/src/tooltip.ts",
       "id": "packages/plugin-ui/src/tooltip.ts:setTimeout:8ff275af18",
       "justification": "Resets the copy button's label after the user has had time to read it; DOM only.",
-      "line": 617,
+      "line": 629,
       "snippet": "setTimeout(() => {"
     },
     {

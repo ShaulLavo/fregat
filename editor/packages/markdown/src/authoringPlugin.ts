@@ -18,33 +18,22 @@ export function createMarkdownAuthoringPlugin(): EditorPlugin {
       scope.own(scope.view.requestSyntaxCaptures())
       const isMarkdown = () => scope.view.getSnapshot().languageId === 'markdown'
       scope.own(scope.view.registerKeymapContextKey('markdown', isMarkdown))
-      scope.keyParticipant((event, context) => {
-        if (
-          event.key !== 'Tab' ||
-          event.ctrlKey ||
-          event.metaKey ||
-          event.altKey ||
-          !isMarkdown() ||
-          !context.writable ||
-          context.tabFocusMode ||
-          context.inlineSuggestionVisible ||
-          context.suggestWidgetVisible
-        )
-          return 'delegate'
-        const selection = scope.getSelections()[0]
-        if (!selection) return 'delegate'
-        const source = scope.editor.getTextSnapshot()
-        const line = source.lineRange(source.lineAt(selection.headOffset))
-        if (!/^\s*(?:[-+*]|\d+[.)])\s/.test(source.readRange(line.start, line.end)))
-          return 'delegate'
-        const records = scope.editor.getSyntaxRecords()?.data
-        if (insideCodeBlock(records, selection.headOffset)) return 'delegate'
-        scope.editor.dispatchCommand(
-          event.shiftKey ? 'editor.action.outdentLines' : 'editor.action.indentLines',
-          { event },
-        )
-        return 'consume'
-      })
+      for (const [command, target] of [
+        ['markdown.indentListItem', 'editor.action.indentLines'],
+        ['markdown.outdentListItem', 'editor.action.outdentLines'],
+      ] as const) {
+        scope.handle(command, (context) => {
+          if (!isMarkdown()) return false
+          const selection = scope.getSelections()[0]
+          if (!selection) return false
+          const source = scope.editor.getTextSnapshot()
+          const line = source.lineRange(source.lineAt(selection.headOffset))
+          if (!/^\s*(?:[-+*]|\d+[.)])\s/.test(source.readRange(line.start, line.end))) return false
+          if (insideCodeBlock(scope.editor.getSyntaxRecords()?.data, selection.headOffset))
+            return false
+          return scope.editor.dispatchCommand(target, context)
+        })
+      }
       installAuthoringCommands(scope, isMarkdown)
     },
   })

@@ -36,7 +36,7 @@ plugins go in `plugins` when you construct the editor. a plugin is an object wit
 - `/extensions`: the plugin api
 - `/rendering`: themes and `registerEditorColor`
 - `/syntax`: syntax provider contracts and token helpers
-- `/keymap`: `createKeymapRuntime`, for hosts that share keys with the editor
+- `/keymap`: named pack data and command metadata, for hosts that share keys with the editor
 - `/shiki`: a shiki highlighter plugin and vscode theme conversion
 - `/style.css`: the base stylesheet
 

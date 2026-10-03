@@ -1,3 +1,8 @@
+import { createEditorWidgetKeymap } from '@singapore-editor/core/extensions'
+import type {
+  EditorViewContributionContext,
+  EditorDisposable,
+} from '@singapore-editor/core/extensions'
 import type { EditorFindWidgetState } from './findController'
 import { createFindIcon, FIND_ICONS, type FindIcon } from './findIcons'
 import { FIND_MATCHES_LIMIT } from './search'
@@ -9,6 +14,7 @@ const EDITOR_THEME_VARIABLES = [
 ] as const
 
 export type EditorFindWidgetOptions = {
+  readonly registerKeymapNode?: EditorViewContributionContext['registerKeymapNode']
   readonly onSearchInput: (value: string) => void
   readonly onReplaceInput: (value: string) => void
   readonly onToggleReplace: () => void
@@ -25,6 +31,7 @@ export type EditorFindWidgetOptions = {
 }
 
 export class EditorFindWidget {
+  private readonly hotkeys: EditorDisposable[] = []
   private readonly root: HTMLDivElement
   private readonly findInput: HTMLInputElement
   private readonly replaceInput: HTMLInputElement
@@ -111,6 +118,7 @@ export class EditorFindWidget {
   }
 
   public dispose(): void {
+    for (const registration of this.hotkeys) registration.dispose()
     this.root.remove()
   }
 
@@ -174,7 +182,27 @@ export class EditorFindWidget {
   }
 
   private installHandlers(): void {
-    this.root.addEventListener('keydown', (event) => this.handleKeyDown(event))
+    const standalone = this.options.registerKeymapNode ? null : createEditorWidgetKeymap(this.root)
+    if (standalone) this.hotkeys.push(standalone)
+    const register = this.options.registerKeymapNode ?? standalone?.registerKeymapNode
+    if (register) {
+      const commands = {
+        closeFind: () => this.options.onClose(),
+        findNext: () => this.options.onNext(),
+        findPrevious: () => this.options.onPrevious(),
+        replaceOne: () => this.options.onReplaceOne(),
+      }
+      this.hotkeys.push(
+        register({ element: this.root, context: 'EditorWidget FindWidget', commands }),
+      )
+      this.hotkeys.push(
+        register({
+          element: this.replaceInput,
+          context: 'EditorWidget FindWidget ReplaceInput',
+          commands,
+        }),
+      )
+    }
     this.findInput.addEventListener('input', () => this.options.onSearchInput(this.findInput.value))
     this.replaceInput.addEventListener('input', () =>
       this.options.onReplaceInput(this.replaceInput.value),
@@ -185,25 +213,6 @@ export class EditorFindWidget {
     this.replaceToggleButton.addEventListener('click', this.options.onToggleReplace)
     this.scopeButton.addEventListener('click', this.options.onToggleScope)
     this.preserveButton.addEventListener('click', this.options.onTogglePreserveCase)
-  }
-
-  private handleKeyDown(event: KeyboardEvent): void {
-    event.stopPropagation()
-    const shouldClose = [isFindToggleKey(event), event.key === 'Escape'].some(Boolean)
-    if (shouldClose) {
-      event.preventDefault()
-      this.options.onClose()
-      return
-    }
-
-    if (event.key !== 'Enter') return
-    event.preventDefault()
-    if (event.target === this.replaceInput && !event.shiftKey) {
-      this.options.onReplaceOne()
-      return
-    }
-    if (event.shiftKey) this.options.onPrevious()
-    else this.options.onNext()
   }
 }
 
@@ -248,12 +257,6 @@ function setToggleExpanded(button: HTMLButtonElement, expanded: boolean, label: 
 function setNativeTooltip(element: HTMLElement, value: string): void {
   element.title = value
   element.setAttribute('aria-label', value)
-}
-
-function isFindToggleKey(event: KeyboardEvent): boolean {
-  if (event.key.toLowerCase() !== 'f') return false
-  if (event.altKey || event.shiftKey) return false
-  return event.metaKey || event.ctrlKey
 }
 
 function toggleTooltip(label: string, active: boolean): string {

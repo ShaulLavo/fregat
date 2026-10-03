@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { EditorCommandId } from '../src/editor/commands'
 import type { EditorOptions, HighlightRegistry } from '../src/editor/types'
 import {
   childContainingNode,
@@ -12,17 +11,6 @@ import {
   NO_DISPLAY_PROJECTION_DISPOSAL,
   type EditorDisplayProjection,
 } from '../src/editor/displayProjectionRegistry'
-import {
-  defaultEditorCommandPacks,
-  defaultEditorKeyBindings,
-  defaultEditorKeymapLayers,
-  editorCommandPackForCommand,
-  editorKeyBindings,
-  editorKeymapLayersForBindings,
-  editorKeymapLayersForCommandPacks,
-  filterEditorKeymapLayersByCommandPacks,
-  readonlySafeEditorCommandPacks,
-} from '../src/editor/keymap'
 import {
   foldMarkerFromRange,
   foldRangeKey,
@@ -305,176 +293,6 @@ describe('navigation helpers', () => {
   })
 })
 
-describe('default editor keybindings', () => {
-  it('resolves later layers over earlier layers for the same normalized hotkey', () => {
-    const bindings = editorKeyBindings({
-      defaultBindings: false,
-      layers: [
-        {
-          id: 'base',
-          bindings: [{ chord: ['Mod+K'], command: 'find' }],
-        },
-        {
-          id: 'override',
-          bindings: [{ chord: [{ key: 'K', mod: true }], command: 'selectAll' }],
-        },
-      ],
-    })
-
-    expect(bindings.map((binding) => binding.command)).toEqual(['selectAll', 'find'])
-  })
-
-  it('builds readonly-safe command pack layers without edit commands', () => {
-    const commands = editorKeymapLayersForCommandPacks(readonlySafeEditorCommandPacks, 'linux')
-      .flatMap((layer) => layer.bindings)
-      .map((binding) => binding.command)
-
-    expect(commands).toContain('cursorLeft')
-    expect(commands).toContain('selectAll')
-    expect(commands).toContain('find')
-    expect(commands).not.toContain('deleteBackward')
-    expect(commands).not.toContain('findReplace')
-    expect(commands).not.toContain('editor.action.insertCursorAbove')
-    expect(commands).not.toContain('goToDefinition')
-  })
-
-  it('binds VS Code edit actions by default', () => {
-    const commands = defaultEditorKeyBindings('mac').map((binding) => binding.command)
-
-    expect(commands).toContain('deleteWordLeft')
-    expect(commands).toContain('deleteWordRight')
-    expect(commands).toContain('editor.action.commentLine')
-    expect(commands).toContain('editor.action.blockComment')
-    expect(commands).toContain('editor.action.indentLines')
-    expect(commands).toContain('editor.action.outdentLines')
-    expect(commands).toContain('editor.action.deleteLines')
-    expect(commands).toContain('editor.action.copyLinesUpAction')
-    expect(commands).toContain('editor.action.copyLinesDownAction')
-    expect(commands).toContain('editor.action.moveLinesUpAction')
-    expect(commands).toContain('editor.action.moveLinesDownAction')
-    expect(commands).toContain('editor.action.insertLineBefore')
-    expect(commands).toContain('editor.action.insertLineAfter')
-  })
-
-  it('binds VS Code multi-cursor actions without chord-only commands', () => {
-    const commands = defaultEditorKeyBindings('linux').map((binding) => binding.command)
-
-    expect(commands).toContain('editor.action.insertCursorAbove')
-    expect(commands).toContain('editor.action.insertCursorBelow')
-    expect(commands).toContain('editor.action.selectHighlights')
-    expect(commands).toContain('editor.action.changeAll')
-    expect(commands).not.toContain('editor.action.moveSelectionToNextFindMatch')
-  })
-
-  // A binding whose hotkey a later layer takes is dropped from the resolved keymap, so asking for
-  // the exact chord back is asking whether the command is still reachable at all.
-  it.each([
-    ['mac', 'cursorColumnSelectLeft', { alt: true, key: 'ArrowLeft', mod: true, shift: true }],
-    ['mac', 'cursorColumnSelectRight', { alt: true, key: 'ArrowRight', mod: true, shift: true }],
-    ['mac', 'cursorColumnSelectUp', { alt: true, key: 'ArrowUp', mod: true, shift: true }],
-    ['mac', 'cursorColumnSelectDown', { alt: true, key: 'ArrowDown', mod: true, shift: true }],
-    ['mac', 'cursorColumnSelectPageUp', { alt: true, key: 'PageUp', mod: true, shift: true }],
-    ['mac', 'cursorColumnSelectPageDown', { alt: true, key: 'PageDown', mod: true, shift: true }],
-    ['windows', 'cursorColumnSelectUp', { alt: true, key: 'ArrowUp', mod: true, shift: true }],
-    ['windows', 'cursorColumnSelectDown', { alt: true, key: 'ArrowDown', mod: true, shift: true }],
-    ['windows', 'cursorColumnSelectPageUp', { alt: true, key: 'PageUp', mod: true, shift: true }],
-    [
-      'windows',
-      'cursorColumnSelectPageDown',
-      { alt: true, key: 'PageDown', mod: true, shift: true },
-    ],
-    ['linux', 'cursorColumnSelectUp', { key: 'ArrowUp', mod: true }],
-    ['linux', 'cursorColumnSelectDown', { key: 'ArrowDown', mod: true }],
-    ['linux', 'cursorColumnSelectPageUp', { alt: true, key: 'PageUp', mod: true, shift: true }],
-    ['linux', 'cursorColumnSelectPageDown', { alt: true, key: 'PageDown', mod: true, shift: true }],
-  ] as const)('leaves %s a chord for %s', (platform, command, hotkey) => {
-    expect(defaultEditorKeyBindings(platform)).toContainEqual({ command, chord: [hotkey] })
-  })
-
-  // Both helpers answer through the classification, so a command belonging to no pack is dropped
-  // from a host's own layer however many packs the host turned on — and dropped silently, because
-  // a filter that kept nothing looks from outside like one that had nothing to keep.
-  it('keeps a host layer bound to the commands the editor ships no key of its own for', () => {
-    const commands: readonly EditorCommandId[] = [
-      'editor.action.jumpToBracket',
-      'editor.action.toggleWordWrap',
-      'editor.action.trimTrailingWhitespace',
-      'editor.action.sortLinesAscending',
-      'editor.action.sortLinesDescending',
-      'editor.action.joinLines',
-      'editor.action.duplicateSelection',
-      'editor.action.transformToUppercase',
-      'editor.action.transformToLowercase',
-      'editor.action.transformToTitlecase',
-    ]
-    const bindings = commands.map((command, index) => ({
-      chord: [{ alt: true, key: `F${index + 1}` }] as const,
-      command,
-    }))
-
-    for (const command of commands) {
-      expect(editorCommandPackForCommand(command)).not.toBeNull()
-    }
-    expect(
-      filterEditorKeymapLayersByCommandPacks(
-        [{ id: 'host', source: 'app', bindings }],
-        defaultEditorCommandPacks,
-      ).flatMap((layer) => layer.bindings),
-    ).toEqual(bindings)
-    expect(editorKeymapLayersForBindings(bindings).flatMap((layer) => layer.bindings)).toEqual(
-      expect.arrayContaining(bindings),
-    )
-  })
-
-  it('keeps column selection in a keymap a host has narrowed to packs', () => {
-    const commands = filterEditorKeymapLayersByCommandPacks(
-      defaultEditorKeymapLayers('linux'),
-      readonlySafeEditorCommandPacks,
-    )
-      .flatMap((layer) => layer.bindings)
-      .map((binding) => binding.command)
-
-    expect(commands).toEqual(
-      expect.arrayContaining([
-        'cursorColumnSelectLeft',
-        'cursorColumnSelectRight',
-        'cursorColumnSelectUp',
-        'cursorColumnSelectDown',
-        'cursorColumnSelectPageUp',
-        'cursorColumnSelectPageDown',
-      ]),
-    )
-  })
-
-  it('uses VS Code platform-specific edit shortcut shapes', () => {
-    expect(defaultEditorKeyBindings('mac')).toContainEqual(
-      expect.objectContaining({
-        command: 'deleteWordLeft',
-        chord: [expect.objectContaining({ alt: true, key: 'Backspace' })],
-      }),
-    )
-    expect(defaultEditorKeyBindings('linux')).toContainEqual(
-      expect.objectContaining({
-        command: 'editor.action.copyLinesUpAction',
-        chord: [
-          expect.objectContaining({
-            alt: true,
-            key: 'ArrowUp',
-            mod: true,
-            shift: true,
-          }),
-        ],
-      }),
-    )
-    expect(defaultEditorKeyBindings('windows')).toContainEqual(
-      expect.objectContaining({
-        command: 'editor.action.blockComment',
-        chord: [expect.objectContaining({ alt: true, key: 'A', shift: true })],
-      }),
-    )
-  })
-})
-
 describe('text range helpers', () => {
   it('finds line and word ranges at clamped offsets', () => {
     const text = 'one two\nthree'
@@ -596,7 +414,7 @@ describe('token projection', () => {
 
   // The failure is a keystroke whose cost grows with the document below the caret.
   it('visits only the tokens the edit touches, however long the suffix', () => {
-    const tokenCount = 5_000
+    const tokenCount = 5000
     const text = 'a '.repeat(tokenCount)
     const tokens = store(
       Array.from({ length: tokenCount }, (_, index) => ({
