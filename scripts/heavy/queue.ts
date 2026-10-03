@@ -32,10 +32,7 @@ export type Entry = {
   readonly server: boolean
   /** A queued quiet request's deadline, in boot seconds; independent of its running lease. */
   readonly quietAdmissionUntil?: number
-  /**
-   * A running quiet job's lease, in boot seconds: by then systemd has ended its scope, so its
-   * claim on the machine lapses even if its wrapper is suspended and cannot release it.
-   */
+  /** The expected wall deadline in boot seconds; ownership and slice cleanup gate admission. */
   readonly quietUntil?: number
   /** Absolute payload deadline in boot seconds; its producer's pinned shim enforces it. */
   readonly quietDeadline?: number
