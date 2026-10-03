@@ -173,4 +173,85 @@ describe('RenderScheduler', () => {
     expect(scheduler.hasPendingFrame).toBe(false)
     expect(scheduler.hasPendingTimer).toBe(false)
   })
+
+  it('coalesces nested flushes until the active frame callback finishes', () => {
+    const clock = new FakeClock()
+    const events: string[] = []
+    let frames = 0
+    let scheduler: RenderScheduler
+    scheduler = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        const frame = ++frames
+        events.push(`start:${frame}`)
+        if (frame === 1) {
+          scheduler.flush()
+          expect(scheduler.hasPendingFrame).toBe(true)
+          scheduler.flush()
+          expect(scheduler.hasPendingFrame).toBe(true)
+          events.push('requested')
+        }
+        events.push(`end:${frame}`)
+      },
+    })
+
+    scheduler.schedule()
+    clock.takeFrame()()
+    expect(events).toEqual(['start:1', 'requested', 'end:1', 'start:2', 'end:2'])
+    expect(scheduler.hasPendingFrame).toBe(false)
+  })
+
+  it('retains a nested repaint and releases the active frame when its callback throws', () => {
+    const clock = new FakeClock()
+    const failure = new Error('callback failed')
+    let frames = 0
+    let scheduler: RenderScheduler
+    scheduler = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        frames += 1
+        if (frames > 1) return
+        scheduler.flush()
+        throw failure
+      },
+    })
+
+    expect(() => scheduler.flush()).toThrow(failure)
+    expect(frames).toBe(1)
+    expect(scheduler.hasPendingFrame).toBe(true)
+    clock.takeFrame()()
+    expect(frames).toBe(2)
+    expect(scheduler.hasPendingFrame).toBe(false)
+    scheduler.flush()
+    expect(frames).toBe(3)
+  })
+
+  it.each(['dispose', 'hide'] as const)(
+    'stops a nested flush after the active callback requests %s',
+    (action) => {
+      const clock = new FakeClock()
+      let frames = 0
+      let scheduler: RenderScheduler
+      scheduler = new RenderScheduler({
+        clock,
+        onFrame: () => {
+          frames += 1
+          if (frames > 1) return
+          scheduler.flush()
+          if (action === 'dispose') scheduler.dispose()
+          if (action === 'hide') scheduler.setDocumentVisible(false)
+        },
+      })
+
+      scheduler.flush()
+      expect(frames).toBe(1)
+      expect(scheduler.hasPendingFrame).toBe(false)
+      expect(scheduler.canPaint).toBe(false)
+      if (action === 'dispose') return
+      scheduler.setDocumentVisible(true)
+      expect(scheduler.canPaint).toBe(true)
+      clock.takeFrame()()
+      expect(frames).toBe(2)
+    },
+  )
 })

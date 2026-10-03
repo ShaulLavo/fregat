@@ -1,3 +1,4 @@
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 
@@ -16,12 +17,13 @@ export function ServerUpdateStatus(
   if (!update.currentTarget) return null
 
   const kind = update.intent.kind
-  const working = kind === 'restarting' || kind === 'waiting'
+  const working = update.progressLabel !== null
   let label = 'Update app'
-  if (working) label = 'Updating…'
+  if (update.progressLabel) label = update.progressLabel
   else if (kind === 'reload' || update.currentTarget.stagedAt === null) label = 'Reload app'
   else if (kind === 'failed') label = 'Retry update'
   let tooltip = `Updates the app to ${update.currentTarget.release}.`
+  if (update.progressLabel) tooltip = update.progressLabel
   if (update.intent.kind === 'failed') tooltip = updateFailureDescription(update.intent.reason)
   if (update.dirtyFiles.length > 0)
     tooltip += ` Save ${update.dirtyFiles.length} file${update.dirtyFiles.length === 1 ? '' : 's'} to reload the app.`
@@ -34,31 +36,38 @@ export function ServerUpdateStatus(
       data-server-update={working ? 'restarting' : 'staged'}
     >
       <Tooltip>
-        <UpdatePopover
-          open={kind === 'confirm'}
-          onOpenChange={(open) => {
-            if (!open && !update.pending) update.close()
-          }}
-          busy={update.busy}
-          dirtyFiles={update.dirtyFiles}
-          pending={update.pending}
-          onWait={update.wait}
-          onUpdate={update.updateNow}
+        <TooltipTrigger
+          render={
+            <span
+              tabIndex={working ? 0 : -1}
+              className='focus-ring flex items-center gap-(--density-gap-tight)'
+            />
+          }
         >
-          <TooltipTrigger
-            render={
-              <Button
-                size='xs'
-                variant='secondary'
-                type='button'
-                aria-busy={working}
-                onClick={working ? undefined : update.request}
-              >
-                {label}
-              </Button>
-            }
-          />
-        </UpdatePopover>
+          {working && <Spinner size='sm' label={label} />}
+          <UpdatePopover
+            open={kind === 'confirm'}
+            onOpenChange={(open) => {
+              if (!open && !update.pending) update.close()
+            }}
+            busy={update.busy}
+            dirtyFiles={update.dirtyFiles}
+            pending={update.pending}
+            onWait={update.wait}
+            onUpdate={update.updateNow}
+          >
+            <Button
+              size='xs'
+              variant='secondary'
+              type='button'
+              aria-busy={working}
+              disabled={working}
+              onClick={working ? undefined : update.request}
+            >
+              {label}
+            </Button>
+          </UpdatePopover>
+        </TooltipTrigger>
         <TooltipContent>{tooltip}</TooltipContent>
       </Tooltip>
     </div>

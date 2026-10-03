@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { stripVTControlCharacters } from 'node:util'
 import { chromium } from 'playwright'
 import { expect, test } from 'vitest'
 
@@ -88,7 +89,7 @@ async function runBrowser(root: string, slice: string | undefined) {
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
   ])
-  const output = `${stdout}\n${stderr}`
+  const output = stripVTControlCharacters(`${stdout}\n${stderr}`)
   expect(code, output).toBe(0)
   expect(output, output).toMatch(/Test Files\s+2 passed/)
   expect(output, output).toMatch(/Tests\s+2 passed/)

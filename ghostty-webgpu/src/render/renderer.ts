@@ -1,6 +1,8 @@
+import { FrameObserver } from './frame-observer.js'
+import { rebuildFrame } from './rebuild-frame.js'
 import { RenderStateDirty } from '../core/abi.js'
 import type { ZigFrameBuilder } from '../core/zig-frame.js'
-import { glyphKey } from './atlas/key.js'
+import { registerZigGlyphs, zigGlyphRow } from './atlas/zig-glyphs.js'
 import type { GhosttyRenderState } from '../core/render-state.js'
 import {
   type CellStyle,
@@ -15,7 +17,6 @@ import { GlyphAtlas } from './atlas/atlas.js'
 import { CanvasGlyphRasterizer } from './atlas/canvas-rasterizer.js'
 import { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import { renderCursorState, type InactiveCursorStyle } from './cursor.js'
-import { copiedFrameRow } from './frame-row.js'
 import type { GlyphBitmap } from './atlas/types.js'
 import {
   browserRenderClock,
@@ -38,10 +39,12 @@ import { RenderScheduler, type RenderSchedulerClock } from './scheduler.js'
 import { WebGpuTextPass } from './text-pass.js'
 
 export interface RenderStateSource {
+  readonly snapshotVersion?: number
   createFrameBuilder?(columns: number, rows: number): ZigFrameBuilder
   acknowledge(): number
   readCursor(): RenderCursorSnapshot
   readRows(options?: ReadRowsOptions): readonly RenderRow[]
+  readTextRows?(options?: ReadRowsOptions): readonly RendererTextFrameRow[]
   update(): RenderStateDirty
 }
 
@@ -53,18 +56,25 @@ export type RendererFrameCell = Readonly<
   readonly style?: Readonly<CellStyle>
 }
 
-export interface RendererFrameRow {
+export interface RendererFrameRow extends RendererTextFrameRow {
   readonly renderCells: readonly RendererFrameCell[]
+}
+
+export interface RendererTextFrameRow {
   readonly cells: readonly string[]
   readonly continuations: readonly boolean[]
   readonly text: string
   readonly y: number
 }
 
-export interface RendererFrameSnapshot {
+export interface RendererFrameSnapshot extends RendererTextFrameSnapshot {
+  readonly rows: readonly RendererFrameRow[]
+}
+
+export interface RendererTextFrameSnapshot {
   readonly paintedCursor?: Readonly<CursorState>
   readonly cursor: Readonly<RenderCursorSnapshot>
-  readonly rows: readonly RendererFrameRow[]
+  readonly rows: readonly RendererTextFrameRow[]
 }
 
 export interface RendererMetrics {
@@ -85,7 +95,7 @@ export interface RendererMetrics {
 }
 
 export interface WebGpuTerminalRendererOptions {
-  /** Experimental WASM instance construction with JS fallback for unsupported content. */
+  /** WASM instance construction with JS fallback; defaults on for WebGL and off for WebGPU. */
   zigFrame?: boolean
   canvas: HTMLCanvasElement | OffscreenCanvas
   columns: number
@@ -93,7 +103,15 @@ export interface WebGpuTerminalRendererOptions {
   deviceFactory?: () => Promise<GPUDevice>
   font: TerminalFittedFont
   onError?: (cause: unknown) => void
+  /** Called after a clean render-state update needs no painting or row notification. */
+  onCleanUpdate?: () => void
   onFrame?: (snapshot: RendererFrameSnapshot) => void
+  /** Owned row text with lazily decoded cell strings and continuation flags. */
+  onTextFrame?: (snapshot: RendererTextFrameSnapshot) => void
+  /** Return false for cursor-only snapshots; row data resumes with the full viewport. */
+  needsFrameRows?: () => boolean
+  /** Painted row IDs without requesting cell data. */
+  onRowsChanged?: (rows: readonly number[]) => void
   onRowsPainted?: (rows: readonly RenderRow[]) => void
   replaceCanvas?: () => HTMLCanvasElement | OffscreenCanvas
   renderState: GhosttyRenderState | RenderStateSource
@@ -140,7 +158,9 @@ async function defaultDeviceFactory(): Promise<GPUDevice> {
   if (!navigator.gpu) throw new WebGpuUnavailableError('api', 'WebGPU is unavailable')
   let adapter: GPUAdapter | null
   try {
-    adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
+    adapter = await navigator.gpu.requestAdapter({
+      powerPreference: 'high-performance',
+    })
   } catch (cause) {
     throw new WebGpuUnavailableError('adapter', 'WebGPU adapter request failed', { cause })
   }
@@ -177,15 +197,13 @@ function cursorEquals(left: RenderCursorSnapshot, right: RenderCursorSnapshot): 
   )
 }
 
-function copiedCursor(cursor: RenderCursorSnapshot): Readonly<RenderCursorSnapshot> {
-  const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
-  return Object.freeze({ ...cursor, viewport })
-}
-
 function validateRenderer(options: WebGpuTerminalRendererOptions): ValidatedRenderer {
   return {
     font: copyFittedFont(options.font),
-    grid: normalizeRendererGrid({ columns: options.columns, rows: options.rows }),
+    grid: normalizeRendererGrid({
+      columns: options.columns,
+      rows: options.rows,
+    }),
   }
 }
 
@@ -229,8 +247,7 @@ export class WebGpuTerminalRenderer {
   private grid: RendererGridSize
   private instances: InstanceRows
   private needsFullRebuild = true
-  private readonly onFrame?: (snapshot: RendererFrameSnapshot) => void
-  private readonly onRowsPainted?: (rows: readonly RenderRow[]) => void
+  private readonly frames: FrameObserver
   private readonly overlayRows = new Set<number>()
   private rasterizer: CanvasGlyphRasterizer
   private readonly renderState: RenderStateSource
@@ -240,7 +257,6 @@ export class WebGpuTerminalRenderer {
   private textPass: WebGpuTextPass
   private theme: CanonicalRendererTheme
   private themeInput: RendererTheme
-  private visibleRows: (RendererFrameRow | undefined)[]
   readonly metrics: RendererMetrics = {
     zigFrames: 0,
     jsFallbackFrames: 0,
@@ -275,9 +291,8 @@ export class WebGpuTerminalRenderer {
     this.themeInput = mergeRendererTheme(options.theme)
     this.theme = canonicalRendererTheme(this.themeInput)
     this.cursorBlinkPreference = options.cursorBlink ?? false
-    this.onFrame = options.onFrame
-    this.onRowsPainted = options.onRowsPainted
-    this.visibleRows = Array.from({ length: this.grid.rows })
+    this.frames = new FrameObserver(options)
+    this.frames.resize(this.grid.rows)
     this.format = prepared.format
     this.resizeCanvas()
     this.configureContext(device)
@@ -307,6 +322,10 @@ export class WebGpuTerminalRenderer {
       if (!prepared) device.destroy()
       throw cause
     }
+  }
+
+  get canPaint(): boolean {
+    return this.scheduler.canPaint
   }
 
   get hasPendingFrame(): boolean {
@@ -401,7 +420,7 @@ export class WebGpuTerminalRenderer {
     this.resizeCanvas()
     this.instances = this.createInstances()
     this.replaceTextPass()
-    this.visibleRows = Array.from({ length: this.grid.rows })
+    this.frames.resize(this.grid.rows)
     this.repaintNow()
   }
 
@@ -502,15 +521,18 @@ export class WebGpuTerminalRenderer {
     if (this.zigFrame && this.drawZigFrame(damage)) return
     if (this.wasZigFrame) this.needsFullRebuild = true
     this.wasZigFrame = false
-    const rows = this.rowsToRebuild(damage)
-    if (rows.length === 0) return
-    const updates = this.rebuildRows(rows)
-    this.zigBuilder?.clearGlyphs()
-    if (updates.some((update) => update.invalidatedRows.length > 0)) {
-      this.needsFullRebuild = true
-      this.scheduler.schedule()
+    const initialRows = this.rowsToRebuild(damage)
+    if (initialRows.length === 0) {
+      if (damage === RenderStateDirty.False && !this.needsFullRebuild)
+        this.frames.notifyCleanUpdate()
       return
     }
+    this.needsFullRebuild = true
+    this.zigBuilder?.clearGlyphs()
+    this.atlas.beginRow(zigGlyphRow)
+    const { rows, updates } = rebuildFrame(initialRows, this.renderState, this.atlas, (source) =>
+      this.rebuildRows(source),
+    )
     this.atlasTextures.sync(this.atlas.consumeUploads())
     const instanceUploadOperations = this.textPass.upload(this.instances, updates)
     this.textPass.submit(this.context.getCurrentTexture().createView())
@@ -520,13 +542,18 @@ export class WebGpuTerminalRenderer {
     this.needsFullRebuild = false
     this.overlayRows.clear()
     this.emitFrame(rows)
-    this.onRowsPainted?.(rows)
   }
 
   private drawZigFrame(damage: RenderStateDirty): boolean {
     if (!this.renderState.createFrameBuilder) return false
-    if (!this.needsFullRebuild && damage === RenderStateDirty.False && this.overlayRows.size === 0)
+    if (
+      !this.needsFullRebuild &&
+      damage === RenderStateDirty.False &&
+      this.overlayRows.size === 0
+    ) {
+      this.frames.notifyCleanUpdate()
       return true
+    }
     let builder = this.zigBuilder
     if (!builder || builder.columns !== this.grid.columns || builder.rows !== this.grid.rows) {
       this.zigBuilder = undefined
@@ -549,7 +576,10 @@ export class WebGpuTerminalRenderer {
     }
     let status = builder.build(options)
     if (status === 2) {
-      if (!this.registerZigGlyphs(builder)) return false
+      if (!registerZigGlyphs(builder, this.atlas, this.rasterizer, this.theme)) {
+        this.needsFullRebuild = true
+        return false
+      }
       status = builder.build(options)
     }
     if (status !== 0) return false
@@ -558,7 +588,7 @@ export class WebGpuTerminalRenderer {
     const operations = this.textPass.uploadFrame(builder, updates)
     this.textPass.submit(this.context.getCurrentTexture().createView())
     let rows: readonly RenderRow[] | undefined
-    if (this.onFrame || this.onRowsPainted) {
+    if (this.frames.requiresFullRows) {
       rows = options.full ? this.renderState.readRows({ packed: true }) : this.rowsToRebuild(damage)
     }
     if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
@@ -567,36 +597,10 @@ export class WebGpuTerminalRenderer {
     this.wasZigFrame = true
     this.needsFullRebuild = false
     this.overlayRows.clear()
-    if (rows) {
-      this.emitFrame(rows)
-      this.onRowsPainted?.(rows)
-    }
-    return true
-  }
-
-  private registerZigGlyphs(builder: ZigFrameBuilder): boolean {
-    for (const key of builder.missingGlyphs) {
-      const input = {
-        cellSpan: 1,
-        foreground: this.theme.foreground,
-        italic: (key & 256) !== 0,
-        text: String.fromCharCode(key & 127),
-        weight: (key & 128) !== 0 ? ('bold' as const) : ('normal' as const),
-      }
-      const bitmap = this.rasterizer.rasterize(input)
-      if (!bitmap) {
-        builder.registerGlyph(key, undefined)
-        continue
-      }
-      if (bitmap.kind !== 'grayscale') return false
-      const result = this.atlas.getOrInsert(glyphKey(input, bitmap.kind), bitmap, 0)
-      if (result.invalidatedRows.length > 0) {
-        builder.clearGlyphs()
-        this.needsFullRebuild = true
-        return false
-      }
-      builder.registerGlyph(key, result.glyph)
-    }
+    this.emitFrame(
+      rows,
+      updates.map((update) => update.row),
+    )
     return true
   }
 
@@ -624,20 +628,21 @@ export class WebGpuTerminalRenderer {
     this.overlayRows.add(row)
   }
 
-  private emitFrame(updatedRows: readonly RenderRow[]): void {
-    if (!this.onFrame || !this.cursor) return
-    for (const row of updatedRows) this.visibleRows[row.y] = copiedFrameRow(row)
-    const rows = this.visibleRows.filter((row): row is RendererFrameRow => row !== undefined)
-    this.onFrame(
-      Object.freeze({
-        cursor: copiedCursor(this.cursor),
-        paintedCursor: renderCursorState(
-          this.cursor,
-          this.cursorPhaseVisible,
-          this.focused ? undefined : this.inactiveCursorStyle,
-        ),
-        rows: Object.freeze([...rows]),
-      }),
+  private emitFrame(
+    rows: readonly RenderRow[] | undefined,
+    changed = rows?.map((row) => row.y) ?? [],
+  ): void {
+    if (!this.cursor) return
+    this.frames.emit(
+      this.renderState,
+      this.cursor,
+      renderCursorState(
+        this.cursor,
+        this.cursorPhaseVisible,
+        this.focused ? undefined : this.inactiveCursorStyle,
+      ),
+      changed,
+      rows,
     )
   }
 
@@ -701,7 +706,7 @@ export class WebGpuTerminalRenderer {
     this.configureContext(this.device)
     this.instances = this.createInstances()
     this.replaceTextPass()
-    this.visibleRows = Array.from({ length: this.grid.rows })
+    this.frames.resize(this.grid.rows)
   }
 
   private releaseRemovedRows(nextRowCount: number): void {
@@ -749,7 +754,10 @@ export class WebGpuTerminalRenderer {
     if (this.needsFullRebuild) return this.renderState.readRows({ packed: true })
     const rows = new Map<number, RenderRow>()
     if (damage !== RenderStateDirty.False) {
-      for (const row of this.renderState.readRows({ packed: true, dirtyOnly: true }))
+      for (const row of this.renderState.readRows({
+        packed: true,
+        dirtyOnly: true,
+      }))
         rows.set(row.y, row)
     }
     if (this.overlayRows.size === 0) return [...rows.values()]
@@ -758,7 +766,10 @@ export class WebGpuTerminalRenderer {
       if (!rows.has(row)) missingRows.add(row)
     }
     if (missingRows.size === 0) return [...rows.values()]
-    for (const row of this.renderState.readRows({ packed: true, rows: missingRows })) {
+    for (const row of this.renderState.readRows({
+      packed: true,
+      rows: missingRows,
+    })) {
       if (missingRows.has(row.y)) rows.set(row.y, row)
     }
     return [...rows.values()].sort((left, right) => left.y - right.y)

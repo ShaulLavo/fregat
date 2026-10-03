@@ -211,7 +211,7 @@ describe('ClaudeProviderAdapter', () => {
     await waitFor(() => runtimeWarnings(harness).length === 1, 'no limit warning')
 
     expect((await waitForEvent(harness, 'account.rate-limits.updated')).payload.windows).toEqual([
-      expect.objectContaining({ id: 'seven_day_fable', status: 'rejected', usedPercent: 100 }),
+      expect.objectContaining({ id: 'seven_day_fable', status: 'rejected', usedPercent: null }),
     ])
     expect(runtimeWarnings(harness).map((event) => event.payload.message)).toEqual([
       expect.stringMatching(/^Claude usage limit reached\. The weekly · Fable limit resets in 2h/),
@@ -301,6 +301,7 @@ describe('ClaudeProviderAdapter', () => {
       {
         cacheReadTokens: 400,
         cacheWriteTokens: 30,
+        reportedCache: { readTokens: 400, writeTokens: 30 },
         continuesEarlierTurns: false,
         costUsd: 0.42,
         inputTokens: 12,

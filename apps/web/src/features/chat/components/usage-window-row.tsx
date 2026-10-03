@@ -27,15 +27,23 @@ export function UsageWindowRow({
       <div className='flex items-baseline justify-between gap-3'>
         <span className='text-muted-foreground'>{window.label}</span>
         <span className={cn('tabular-nums', tone === 'muted' ? null : USAGE_TONE_TEXT[tone])}>
-          <TickerNumber size='xs' value={Math.round(window.usedPercent)} />%
+          {window.usedPercent === null ? (
+            'Unknown'
+          ) : (
+            <>
+              <TickerNumber size='xs' value={Math.round(window.usedPercent)} />%
+            </>
+          )}
         </span>
       </div>
       <div className='bg-muted relative h-1 rounded-full'>
-        <div
-          data-usage-fill
-          className={cn('h-full rounded-full', USAGE_TONE_FILL[tone])}
-          style={{ width: `${window.usedPercent}%` }}
-        />
+        {window.usedPercent !== null ? (
+          <div
+            data-usage-fill
+            className={cn('h-full rounded-full', USAGE_TONE_FILL[tone])}
+            style={{ width: `${window.usedPercent}%` }}
+          />
+        ) : null}
         {/* Where even spending would stand: fill past it is use ahead of time. */}
         {pace ? (
           <div

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readlinkSync, readdirSync } from 'node:fs'
+import { readlinkSync, readdirSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -32,24 +32,26 @@ class CapturedPty {
 type Fixtures = {
   root: string
   launch: (options: Omit<SpawnOptions, 'onData'>) => CapturedPty
+  terminalCleanup: void
 }
 
 export const test = base.extend<Fixtures>({
+  terminalCleanup: [
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, provide) => withTerminalCleanup(() => provide()),
+    { auto: true },
+  ],
   // Vitest requires destructuring the fixture dependencies even when none are needed.
   // oxlint-disable-next-line no-empty-pattern
   root: async ({}, provide) => {
-    // NOT-PORTABLE: Selects /work/tmp when /work exists without checking writability.
-    const basePath = existsSync('/work') ? '/work/tmp' : tmpdir()
-    mkdirSync(basePath, { recursive: true })
-    const root = await mkdtemp(path.join(basePath, 'pty-test-'))
+    const root = await mkdtemp(path.join(tmpdir(), 'pty-test-'))
     try {
       await provide(root)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
   },
-  // oxlint-disable-next-line no-empty-pattern
-  launch: async ({}, provide) => {
+  launch: async ({ terminalCleanup: _terminalCleanup }, provide) => {
     const processes: CapturedPty[] = []
     try {
       await provide((options) => {
@@ -64,6 +66,16 @@ export const test = base.extend<Fixtures>({
 })
 
 export { expect } from 'vitest'
+
+export async function withTerminalCleanup(run: () => Promise<void>) {
+  const before = terminalDescriptors()
+  try {
+    await run()
+  } finally {
+    // Bun's native worker pool can close reader/writer descriptors after disposal resolves.
+    await expect.poll(terminalDescriptors).toEqual(before)
+  }
+}
 
 export function childCommand(mode: string, ...args: string[]): readonly [string, ...string[]] {
   return [process.execPath, path.join(import.meta.dirname, 'fixtures/child.ts'), mode, ...args]

@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import * as v from 'valibot'
 import { providerAccountUsageSchema, type ProviderUsageWindow } from '@workspace/contracts'
-import { MockProviderAdapter } from 'server/testing'
+import { appUsageCollector, MockProviderAdapter } from 'server/testing'
 import { ResetCreditAction } from '@/features/chat/components/reset-credit-action'
 import { providerUsageKeys } from '@/features/chat/utils/query-keys'
 import { expect, test } from '../../../../test/fixtures'
@@ -53,17 +53,27 @@ test('requires confirmation, calls the real route once and settles usage cache',
   await server.restart({ providerAdapter: adapter })
   const response = await client.providers.usage.get()
   expect(response.error).toBeNull()
-  const actual = response.data?.accounts[0]
+  const cached = response.data?.accounts.find((item) =>
+    item.providerInstanceIds.includes(adapter.adapterKey),
+  )
+  expect(cached).toBeDefined()
+  if (!cached) return
+  // GET reads cached usage; seed the replacement adapter's grant through the real collector.
+  await appUsageCollector(server.app).refreshAccount(cached.accountKey)
+  const actual = (await client.providers.usage.get()).data?.accounts.find((item) =>
+    item.providerInstanceIds.includes(adapter.adapterKey),
+  )
   expect(actual).toBeDefined()
   if (!actual) return
+  expect(actual.resetCredits).toMatchObject({ available: 1, creditId: 'fixture-credit' })
   const view = renderWithProviders(<ResetCreditAction account={actual} />)
   try {
-    fireEvent.click(screen.getByRole('button', { name: 'Use reset credit…' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Use reset credit…' }))
     expect(screen.getByRole('dialog')).toBeVisible()
     expect(adapter.keys).toEqual([])
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(adapter.keys).toEqual([])
-    fireEvent.click(screen.getByRole('button', { name: 'Use reset credit…' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Use reset credit…' }))
     fireEvent.click(screen.getByRole('button', { name: 'Use 1 credit' }))
     await waitFor(() => expect(adapter.keys).toHaveLength(1))
     await waitFor(() =>

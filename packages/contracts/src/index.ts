@@ -370,6 +370,13 @@ export {
   type ProviderUsageWindowStatus,
 } from './provider-usage'
 export {
+  SESSION_CACHE_TURN_LIMIT,
+  providerReportedCacheSchema,
+  providerSessionCacheSchema,
+  type ProviderReportedCache,
+  type ProviderSessionCache,
+} from './provider-session-cache'
+export {
   clientOrchestrationCommandSchema,
   orchestrationCommandSchema,
   projectMetaUpdateCommandSchema,
@@ -1179,3 +1186,11 @@ export {
   type NativePickerRequest,
   type NativePickerResult,
 } from './native-picker'
+
+export { providerUsageFeedSchema, type ProviderUsageFeed } from './provider-usage-feed'
+export {
+  providerUsageHistoryCoverageSchema,
+  providerUsageHistorySourceSchema,
+  type ProviderUsageHistoryCoverage,
+  type ProviderUsageHistorySource,
+} from './provider-usage-history'

@@ -165,7 +165,7 @@ jobs:
       - name: Unused code
         run: bun run unused:check
 
-  # Package tests ride here: they share the devkit, and alone they cost a runner for under a minute.
+  # Package tests share this runner with typechecking and generated checks.
   typecheck:
     name: Typecheck, generated, packages
     needs: changes
@@ -184,19 +184,13 @@ jobs:
           TURBO_TELEMETRY_DISABLED: '1'
         run: bun run dev:web -- --dry-run=json > /dev/null
 
-      # Electrobun 2 ships its SDK as a Hutch devkit projected into
-      # apps/desktop/.hutch, not through node_modules, so the desktop typecheck
-      # and tests resolve nothing until it exists. Keyed on the pinned release;
-      # the store is about 700 MB, so a cold prepare is a real download.
-      - name: Cache Hutch store
-        uses: actions/cache@v4
-        with:
-          path: ~/.hutch
-          key: ${{ runner.os }}-hutch-${{ hashFiles('apps/desktop/package.json') }}
+      - name: Install Linux webview build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev
 
-      - name: Prepare Electrobun devkit
-        working-directory: apps/desktop
-        run: node_modules/.bin/electrobun prepare
+      - name: Build Linux webview host
+        run: bun run --cwd apps/desktop build:native
 
       - name: Typecheck
         run: bun run typecheck
@@ -322,6 +316,11 @@ jobs:
       - name: Agent browser shared memory
         if: ${{ !cancelled() }}
         run: bun --bun vitest run scripts/agent/browser-launch.test.ts --environment node
+
+      - name: Browser resource teardown
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        run: bun --bun vitest run scripts/browser-gc.test.ts scripts/heavy/browser-gc.test.ts --environment node
 
       - name: Cold dev startup
         if: ${{ !cancelled() }}

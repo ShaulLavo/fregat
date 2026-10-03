@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
@@ -92,6 +92,310 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     expect(recordOf(box, 'quiet')).toMatchObject({ quiet: true, quietHoldExpired: false })
   }, 40_000)
 
+  test('a server waiting for a browser check lets the quiet job ahead of that check finish', async () => {
+    const box = quietBox(600)
+    const releaseServer = path.join(box.root, 'release-server')
+    const releaseWork = path.join(box.root, 'release-work')
+    const releaseQuiet = path.join(box.root, 'release-quiet')
+    const server = start(
+      box,
+      'vite-server',
+      ['bash', '-c', `echo started; ${until(releaseServer)}`],
+      {
+        jobClass: 'light',
+        machine: true,
+        server: true,
+      },
+    )
+    const work = start(box, 'finite-work', ['bash', '-c', `echo started; ${until(releaseWork)}`], {
+      jobClass: 'light',
+      machine: true,
+    })
+    let quiet: ReturnType<typeof start> | undefined
+    let browser: ReturnType<typeof start> | undefined
+    try {
+      await expect.poll(server.stdout, { timeout: 10_000 }).toContain('started')
+      await expect.poll(work.stdout, { timeout: 10_000 }).toContain('started')
+      const owner = live(box.state, 'jobs').find((entry) => entry.label === 'vite-server')!
+      quiet = start(box, 'measurement', ['bash', '-c', `echo started; ${until(releaseQuiet)}`], {
+        jobClass: 'bench',
+        machine: true,
+        quiet: true,
+      })
+      await expect
+        .poll(() => live(box.state, 'queue').map((entry) => entry.label), {
+          timeout: 10_000,
+        })
+        .toEqual(['measurement'])
+      browser = start(box, 'browser-check', ['touch', releaseServer], {
+        jobClass: 'browser',
+        machine: true,
+      })
+      await expect
+        .poll(() => live(box.state, 'queue').map((entry) => entry.label), {
+          timeout: 10_000,
+        })
+        .toEqual(['measurement', 'browser-check'])
+      writeFileSync(releaseWork, '')
+      expect((await work.done).code).toBe(0)
+      await expect.poll(quiet.stdout, { timeout: 5_000 }).toContain('started')
+      expect(recordOf(box, 'browser-check')).toBeUndefined()
+      expect(
+        live(box.state, 'jobs')
+          .map((entry) => entry.label)
+          .sort(),
+      ).toEqual(['measurement', 'vite-server'])
+      writeFileSync(releaseQuiet, '')
+      expect((await quiet.done).code).toBe(0)
+      expect(recordOf(box, 'measurement')).toMatchObject({
+        quiet: true,
+        serversAtAdmission: [
+          {
+            id: owner.id,
+            label: owner.label,
+            pid: owner.pid,
+            cwd: owner.cwd,
+            sliceRoot: owner.sliceRoot,
+          },
+        ],
+      })
+      expect((await browser.done).code).toBe(0)
+      expect((await server.done).code).toBe(0)
+    } finally {
+      for (const file of [releaseServer, releaseWork, releaseQuiet]) writeFileSync(file, '')
+      await Promise.all([server.done, work.done, quiet?.done, browser?.done])
+    }
+  }, 40_000)
+
+  test('a declared server keeps its ceiling and accounting while leaving external slot locks free', async () => {
+    const box = quietBox(600)
+    const releaseServer = path.join(box.root, 'release-server')
+    const server = start(box, 'server', ['bash', '-c', `echo started; ${until(releaseServer)}`], {
+      jobClass: 'light',
+      machine: true,
+      server: true,
+    })
+    try {
+      await expect.poll(server.stdout, { timeout: 10_000 }).toContain('started')
+      const owner = live(box.state, 'jobs')[0]!
+      expect(owner).toMatchObject({ server: true, estimateBytes: 64 * 2 ** 20 })
+      const ceiling = spawnSync('systemctl', [
+        '--user',
+        'show',
+        `${box.sliceRoot}-${owner.id}.slice`,
+        '-p',
+        'MemoryMax',
+        '--value',
+      ])
+      expect(ceiling.stdout.toString().trim()).toBe(String(1024 * 2 ** 20))
+      for (const slot of ['slot1.lock', 'slot2.lock', 'slot3.lock']) {
+        const fd = tryLock(path.join(box.state, slot))
+        if (fd !== null) unlock(fd)
+        expect(fd).not.toBeNull()
+      }
+      const status = spawnSync('bun', [
+        path.join(import.meta.dirname, 'status.ts'),
+        '--state-dir',
+        box.state,
+        '--slice-root',
+        box.sliceRoot,
+      ])
+      expect(status.stdout.toString()).toContain('server (light, 64 MiB, server)')
+    } finally {
+      writeFileSync(releaseServer, '')
+      await server.done
+    }
+    expect(recordOf(box, 'server')).toMatchObject({
+      server: true,
+      quiet: false,
+      serversAtAdmission: [],
+      exitCode: 0,
+    })
+  }, 30_000)
+
+  test.each([
+    { name: 'memory', machine: { availableMiB: 512 }, reason: 'memory:' },
+    {
+      name: 'memory pressure',
+      machine: { availableMiB: 65536, memoryPressure: 99 },
+      reason: 'memory pressure',
+    },
+    { name: 'CPU load', machine: { availableMiB: 65536, loadPerCore: 9 }, reason: 'CPU load' },
+  ])(
+    'quiet admission expires under $name so a server-dependent browser check can progress',
+    async ({ machine, reason }) => {
+      const box = quietBox(3)
+      writeSettings(box, {
+        'developer.heavyJobClasses': { ...classes, bench: { ceilingMiB: 2048, estimateMiB: 1024 } },
+        'developer.heavyJobQuietHoldSeconds': 3,
+        'developer.heavyJobMemoryReserveMiB': 0,
+        'developer.heavyJobStopGraceSeconds': 1,
+      })
+      const releaseServer = path.join(box.root, 'release-server')
+      const server = start(box, 'server', ['bash', '-c', `echo started; ${until(releaseServer)}`], {
+        jobClass: 'light',
+        machine: true,
+        server: true,
+      })
+      let browser: ReturnType<typeof start> | undefined
+      try {
+        await expect.poll(server.stdout, { timeout: 10_000 }).toContain('started')
+        writeMachine(box, machine)
+        const quiet = start(box, 'quiet', ['echo', 'measurement'], {
+          jobClass: 'bench',
+          machine: true,
+          quiet: true,
+        })
+        await expect.poll(quiet.stderr, { timeout: 10_000 }).toContain(reason)
+        browser = start(box, 'browser', ['touch', releaseServer], {
+          jobClass: 'browser',
+          machine: true,
+        })
+        const result = await quiet.done
+        expect(result.code).toBe(75)
+        expect(result.stderr).toContain("quiet admission for 'quiet' expired")
+        expect(result.stderr).toContain('wait reached its 3 s limit')
+        expect(result.stderr).toContain('Run it again to queue for another admission window')
+        expect(quiet.stdout()).toBe('')
+        expect(recordOf(box, 'quiet')).toBeUndefined()
+        expect(live(box.state, 'queue').some((entry) => entry.label === 'quiet')).toBe(false)
+        expect(existsSync(path.join(box.state, 'quiet.holder'))).toBe(false)
+        // Pressure can hold ordinary admission too; memory leaves room for the browser already.
+        if (reason !== 'memory:') writeMachine(box, { availableMiB: 65536 })
+        expect((await browser.done).code).toBe(0)
+        expect((await server.done).code).toBe(0)
+      } finally {
+        writeMachine(box, { availableMiB: 65536 })
+        writeFileSync(releaseServer, '')
+        await Promise.all([server.done, browser?.done])
+      }
+    },
+    30_000,
+  )
+
+  test.each(['earlier queue', 'drain request', 'slot locks', 'admission lock'])(
+    'quiet admission has a deadline behind %s',
+    async (obstruction) => {
+      const box = quietBox(3)
+      const slot = path.join(
+        box.state,
+        obstruction === 'admission lock' ? 'admission.lock' : 'slot1.lock',
+      )
+      const fd = obstruction === 'drain request' ? null : tryLock(slot)!
+      const drain = path.join(box.state, 'drain.request')
+      if (obstruction === 'drain request') writeFileSync(drain, `pid=${process.pid} holder=test`)
+      const ahead =
+        obstruction === 'earlier queue'
+          ? start(box, 'ahead', ['true'], { jobClass: 'light', machine: true })
+          : undefined
+      try {
+        if (ahead)
+          await expect.poll(ahead.stderr, { timeout: 10_000 }).toContain('held exclusively')
+        const quiet = start(box, 'deadline', ['echo', 'measurement'], {
+          jobClass: 'light',
+          machine: true,
+          quiet: true,
+        })
+        await expect
+          .poll(() => live(box.state, 'queue').some((entry) => entry.label === 'deadline'), {
+            timeout: 10_000,
+          })
+          .toBe(true)
+        const status = spawnSync('bun', [
+          path.join(import.meta.dirname, 'status.ts'),
+          '--state-dir',
+          box.state,
+          '--slice-root',
+          box.sliceRoot,
+        ])
+        expect(status.stdout.toString()).toMatch(/deadline .*quiet admission: [0-3]s left/)
+        expect((await quiet.done).code).toBe(75)
+        expect(quiet.stdout()).toBe('')
+        expect(
+          readdirSync(path.join(box.state, 'queue')).filter((name) => name.endsWith('.json')),
+        ).toHaveLength(ahead ? 1 : 0)
+        expect(live(box.state, 'queue').map((entry) => entry.label)).toEqual(ahead ? ['ahead'] : [])
+        expect(existsSync(path.join(box.state, 'quiet.holder'))).toBe(false)
+      } finally {
+        if (fd !== null) unlock(fd)
+        rmSync(drain, { force: true })
+        await ahead?.done
+      }
+      expect((await heavy(box, 'after', ['true'], { jobClass: 'light', machine: true })).code).toBe(
+        0,
+      )
+    },
+    30_000,
+  )
+
+  test('cancelling a quiet admission releases its waiting entry immediately', async () => {
+    const box = quietBox(600)
+    const fd = tryLock(path.join(box.state, 'slot1.lock'))!
+    const quiet = start(box, 'cancelled', ['true'], {
+      jobClass: 'light',
+      machine: true,
+      quiet: true,
+    })
+    try {
+      await expect.poll(quiet.stderr, { timeout: 10_000 }).toContain('held exclusively')
+      const queued = live(box.state, 'queue')[0]!
+      quiet.child.kill('SIGTERM')
+      expect((await quiet.done).code).toBe(143)
+      const entries = path.join(box.state, 'queue')
+      expect(existsSync(path.join(entries, `000000000001-${queued.id}.json`))).toBe(false)
+      expect(existsSync(path.join(box.state, 'quiet.holder'))).toBe(false)
+    } finally {
+      quiet.child.kill('SIGTERM')
+      unlock(fd)
+    }
+  }, 30_000)
+
+  test('an admission exception releases its waiting entry', async () => {
+    const box = quietBox(600)
+    rmSync(path.join(box.proc, 'meminfo'))
+    const result = await heavy(box, 'broken-readings', ['true'], {
+      jobClass: 'light',
+      machine: true,
+      quiet: true,
+    })
+    expect(result.code).toBe(2)
+    expect(
+      readdirSync(path.join(box.state, 'queue')).filter((name) => name.endsWith('.json')),
+    ).toEqual([])
+    expect(live(box.state, 'queue')).toEqual([])
+    expect(existsSync(path.join(box.state, 'quiet.holder'))).toBe(false)
+  })
+
+  test('the running quiet hold starts independently after admission finishes', async () => {
+    const box = quietBox(4)
+    const releaseWork = path.join(box.root, 'release-work')
+    const work = start(box, 'work', ['bash', '-c', `echo started; ${until(releaseWork)}`], {
+      jobClass: 'light',
+      machine: true,
+    })
+    let quiet: ReturnType<typeof start> | undefined
+    try {
+      await expect.poll(work.stdout, { timeout: 10_000 }).toContain('started')
+      quiet = start(box, 'independent-hold', sleeper(60), {
+        jobClass: 'light',
+        machine: true,
+        quiet: true,
+      })
+      await expect.poll(quiet.stderr, { timeout: 10_000 }).toContain('waiting for 1 running job')
+      await Bun.sleep(1100)
+      writeFileSync(releaseWork, '')
+      expect((await work.done).code).toBe(0)
+      await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('started')
+      expect((await quiet.done).code).toBe(75)
+      expect(recordOf(box, 'independent-hold')).toMatchObject({ quietHoldExpired: true })
+      expect(recordOf(box, 'independent-hold')!.queuedMs).toBeGreaterThanOrEqual(1000)
+      expect(recordOf(box, 'independent-hold')!.wallMs).toBeGreaterThanOrEqual(3000)
+    } finally {
+      writeFileSync(releaseWork, '')
+      await Promise.all([work.done, quiet?.done])
+    }
+  }, 30_000)
+
   test('a hold that runs out stops the quiet job, tells it to queue again, and frees the machine', async () => {
     const box = quietBox(2)
     const quiet = start(box, 'long', sleeper(60), { jobClass: 'light', machine: true, quiet: true })
@@ -114,7 +418,8 @@ describe.skipIf(!userScopes)('quiet holds', () => {
   }, 30_000)
 
   test('quiet measurements and suites in two loops both make progress', async () => {
-    const box = quietBox(2)
+    // Admission includes the finite loop's systemd handoff; only running holds expire here.
+    const box = quietBox(10)
     const loop = async (label: string, command: readonly string[], quiet: boolean) => {
       for (let run = 0; run < 2; run += 1) {
         const result = await heavy(box, `${label}-${run}`, command, {
@@ -283,31 +588,59 @@ describe.skipIf(!userScopes)('quiet holds', () => {
   }, 30_000)
 })
 
-describe.skipIf(!userScopes)('slices that run nothing', () => {
-  test('an empty slice left behind counts as nothing running and is left alone', async () => {
+describe('slices that run nothing', () => {
+  test('an empty slice left behind counts as nothing running and is left alone', async (context) => {
+    if (!userScopes) context.skip('Requires a working user systemd manager and user scopes')
     const box = quietBox(600)
     const empty = `${box.sliceRoot}-leftover.slice`
-    spawnSync('systemd-run', ['--user', '--scope', '--quiet', `--slice=${empty}`, 'true'])
-    expect(spawnSync('systemctl', ['--user', 'is-active', empty]).stdout.toString().trim()).toBe(
-      'active',
-    )
+    // Explicitly activate a process-free slice and check the cgroup that admission reads.
+    const setup = spawnSync('systemctl', ['--user', 'start', empty], { encoding: 'utf8' })
+    expect(setup.status, setup.error?.message ?? setup.stderr).toBe(0)
+    expect(sliceState(box.sliceRoot, empty)).toBe('empty')
     const quiet = await heavy(box, 'quiet-now', ['true'], {
       jobClass: 'light',
       machine: true,
       quiet: true,
     })
-    expect(quiet.code).toBe(0)
+    expect(quiet.code, quiet.stderr).toBe(0)
     expect(quiet.stderr).toContain('the machine is quiet')
+    expect(sliceState(box.sliceRoot, empty)).toBe('empty')
     const next = await heavy(box, 'alone', ['true'], { jobClass: 'light', machine: true })
+    expect(next.code).toBe(0)
     expect(next.stderr).toContain('no heavy job is running')
     expect(`${quiet.stderr}${next.stderr}`).not.toContain('its wrapper is gone')
+    expect(sliceState(box.sliceRoot, empty)).toBe('empty')
   }, 30_000)
 })
 
-test('--quiet applies to this machine only', () => {
-  const result = spawnSync(process.execPath, [RUN, '--quiet', '--host', 'pi', 'q', '--', 'true'], {
-    encoding: 'utf8',
-  })
-  expect(result.status).toBe(2)
-  expect(result.stderr).toContain('--quiet applies to this machine')
+test.each([
+  { flags: ['--quiet', '--host', 'pi'], message: '--quiet applies to this machine' },
+  { flags: ['--server', '--quiet'], message: '--server declares a local dev server' },
+  { flags: ['--server', '--host', 'pi'], message: '--server declares a local dev server' },
+])('invalid lifecycle flags are rejected (%j)', ({ flags, message }) => {
+  const box = quietBox(600)
+  const result = spawnSync(
+    process.execPath,
+    [
+      RUN,
+      '--state-dir',
+      box.state,
+      '--settings-home',
+      box.home,
+      '--proc',
+      box.proc,
+      '--slice-root',
+      box.sliceRoot,
+      ...flags,
+      'invalid-lifecycle',
+      '--',
+      'true',
+    ],
+    // A validation regression must stay inside the fixture and cannot launch host tools.
+    { encoding: 'utf8', env: { ...process.env, PATH: box.root }, timeout: 10_000 },
+  )
+  expect(result.status, result.stderr).toBe(2)
+  expect(result.stderr).toContain(message)
+  expect(readdirSync(box.state)).not.toContain('queue')
+  expect(records(box)).toEqual([])
 })

@@ -14,8 +14,12 @@ import {
 } from 'server/testing'
 import type { TestServer } from '../server'
 
-/** The real catalog and recorder write the database the owner's history route reads. */
-export async function recordUsageFixture(server: TestServer, inputRate: number) {
+// Utility generations have verified source attribution in account-wide local history.
+export async function recordUtilityUsageFixture(
+  server: TestServer,
+  inputRate: number,
+  recordedAt = new Date().toISOString(),
+) {
   const instance = v.parse(providerInstanceIdSchema, 'usage-fixture')
   const registry = new ProviderAdapterRegistry({
     services: { cwd: process.cwd() },
@@ -44,8 +48,8 @@ export async function recordUsageFixture(server: TestServer, inputRate: number) 
     recorder.accept(
       {
         type: 'usage.totals',
-        eventId: `usage-${turn}`,
-        createdAt: new Date().toISOString(),
+        eventId: `usage-${sessionId}-${turn}`,
+        createdAt: recordedAt,
         runtimeEpoch: 'fixture-epoch',
         providerInstanceId: instance,
         sessionId,
@@ -66,7 +70,7 @@ export async function recordUsageFixture(server: TestServer, inputRate: number) 
           ],
         },
       },
-      'turn',
+      'title',
     )
   record('known')
   return { record }

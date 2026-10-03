@@ -50,11 +50,10 @@ state-loss review and authorization.
 
 ## Transferred native work
 
-Electrobun's window-title vibrancy workaround belongs to
-[Plan 114 Gate 3](114-installed-app.md#gate-3--macos-m), which replaces that host.
-Mac window ownership and vibrancy remain unverified here. The current desktop connects to
-mesh-owned servers; quitting it flushes observability and does not own their shutdown.
-Gate 3 must preserve that ownership before Electrobun removal.
+Plan 114 Gate 3 replaced the old window-title vibrancy workaround with direct native host
+ownership. The owner accepted the Mac desktop paths on 2026-10-03 and approved Gate 4 removal.
+The launcher connects to shared servers; quitting it flushes observability and leaves their
+processes and terminals running.
 
 ## Verification record
 

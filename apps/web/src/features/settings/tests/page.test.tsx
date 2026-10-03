@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { ensureFolderPath } from '@/lib/file-server'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
@@ -8,7 +10,8 @@ import {
   filesystemPath,
   tabId,
 } from '@/lib/documents/utils/identity'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
+import { settingControl, type SettingId } from '@workspace/contracts'
 import userEvent from '@testing-library/user-event'
 import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core/document'
 
@@ -167,21 +170,15 @@ test('searching a key edited from another row finds the row that edits it', () =
   expect(matchingSettingIds('models')).not.toContain('models.order')
 })
 
-test('shows a diagnostic for a key the settings file holds but cannot apply', async ({
+test('shows a diagnostic for an unknown key preserved in workspace settings', async ({
+  server,
   client,
 }) => {
   expect(client).toBeDefined()
-  // Through the raw route, the way the JSON escape hatch writes: a document
-  // holding a key this build does not register. The resolver keeps it in the
-  // file and reports it rather than applying it, and the page has to say so —
-  // otherwise a renamed key just looks like a setting that stopped working.
-  const before = await fetchSettings(undefined, getClient())
-  await getClient().settings.raw.post({
-    baseRevision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
-    target: 'user',
-    text: '{ "editor.fromANewerBuild": true }',
-    writeId: 'page-unknown-setting',
-  })
+  const workspaceFile = path.join(server.root, '.platform', 'settings.json')
+  await mkdir(path.dirname(workspaceFile), { recursive: true })
+  await writeFile(workspaceFile, '{ "editor.fromANewerBuild": true }')
+  await server.restart()
 
   renderWithProviders(<SettingsPage />)
 
@@ -265,17 +262,21 @@ test(
       'providers',
     )
 
-    // The built-in providers live in the registry as constants, not in the
-    // settings document, so the row has to source them from the running snapshots.
-    // Before this the page showed "Edit in settings.json" for the one screen whose
-    // whole job is configuring providers.
-    expect(screen.queryByText('Edit in settings.json')).toBeNull()
-    const switches = await screen.findAllByRole(
+    const providersRow = (await screen.findByText('providers.instances')).closest<HTMLElement>(
+      '[data-setting-row]',
+    )
+    expect(providersRow).not.toBeNull()
+    const providers = within(providersRow!)
+
+    // Built-in providers come from running snapshots; other matching settings
+    // may legitimately use the JSON editor hint.
+    const switches = await providers.findAllByRole(
       'switch',
       { name: /Enable/ },
       { timeout: SLOW_RENDER_TIMEOUT_MS },
     )
     expect(switches.length).toBeGreaterThan(0)
+    expect(providers.queryByText('Edit in settings.json')).toBeNull()
   },
   SLOW_RENDER_TIMEOUT_MS,
 )
@@ -368,20 +369,33 @@ test('a collection edited back to empty leaves no key behind to look modified', 
   expect(screen.queryByLabelText('Modified')).toBeNull()
 })
 
-test('every registered widget resolves a real control, not the JSON escape hatch', async ({
-  client,
-}) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<SettingsPage />)
+test(
+  'every registered widget renders its control or declared JSON fallback',
+  async ({ client }) => {
+    const snapshot = await fetchSettings(undefined, client)
+    const { container } = renderWithProviders(<SettingsPage />)
+    const summary = await screen.findByText(/^\d+ settings$/)
 
-  // A row has to be on screen before the absence of the hint means anything.
-  await planModeSwitch()
+    // Rows mount in separate passes; the first screen cannot prove dispatch
+    // coverage for settings farther down the page.
+    await waitFor(
+      () =>
+        expect(container.querySelectorAll('[data-setting-row]')).toHaveLength(
+          Number.parseInt(summary.textContent ?? '', 10),
+        ),
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
+    )
 
-  // The hint is the dispatch's fallback for `list`, `complex` and a value whose
-  // shape does not match its widget — none of which any registered key
-  // produces. One on the page means a widget kind lost its branch.
-  expect(screen.queryAllByText('Edit in settings.json')).toEqual([])
-})
+    for (const row of container.querySelectorAll<HTMLElement>('[data-setting-row]')) {
+      const id = row.dataset.settingRow as SettingId
+      const control = settingControl(id, snapshot.values[id])
+      expect(within(row).queryAllByText('Edit in settings.json'), id).toHaveLength(
+        control.widget === 'unsupported' ? 1 : 0,
+      )
+    }
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
 
 test('Escape from a row returns focus to the search box', async ({ client }) => {
   expect(client).toBeDefined()

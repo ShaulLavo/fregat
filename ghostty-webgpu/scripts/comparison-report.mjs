@@ -326,6 +326,19 @@ function hasPairConfiguration(artifact) {
   )
 }
 
+function frameBuilderTreatments(artifact, variant) {
+  if (!['ghostty-webgpu', 'ghostty-webgl'].includes(variant)) return [undefined]
+  const observed = [
+    ...new Set(
+      artifact.runs.filter((run) => run.variant === variant).map((run) => run.frameBuilder),
+    ),
+  ]
+  // Historical unlabeled evidence stays separate from explicitly selected treatments.
+  if (observed.includes(undefined)) return observed
+  const builders = artifact.frameBuilders ?? observed
+  return builders.length ? builders : [undefined]
+}
+
 export function pairedRatios(artifact) {
   if (!hasPairConfiguration(artifact)) return []
   const groups = new Map()
@@ -353,15 +366,7 @@ export function pairedRatios(artifact) {
     .flatMap((nativeVariant) => {
       const variant = counterparts[nativeVariant]
       if (!artifact.variants.includes(variant)) return []
-      if (nativeVariant !== 'ghostty-webgpu') return [{ nativeVariant, variant }]
-      const builders = artifact.frameBuilders ?? [
-        ...new Set(
-          artifact.runs
-            .filter((run) => run.variant === nativeVariant)
-            .map((run) => run.frameBuilder),
-        ),
-      ]
-      return (builders.length ? builders : [undefined]).map((frameBuilder) => ({
+      return frameBuilderTreatments(artifact, nativeVariant).map((frameBuilder) => ({
         nativeVariant,
         variant,
         frameBuilder,
@@ -443,6 +448,13 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     'Correctness smoke cannot generate performance claims',
   )
   const rows = summaries(artifact).filter((row) => row.repetitions === artifact.repetitions)
+  const builders = artifact.frameBuilders ?? [
+    ...new Set(
+      artifact.runs
+        .filter((run) => ['ghostty-webgpu', 'ghostty-webgl'].includes(run.variant))
+        .map((run) => run.frameBuilder ?? 'unlabeled'),
+    ),
+  ]
   const lines = [
     '# Terminal comparison benchmarks',
     '',
@@ -462,7 +474,14 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     '',
     '## Environment',
     '',
-    `- Commit measured: \`${artifact.manifest.commit}\`. Source SHA-256: \`${artifact.manifest.sourceSha256}\`.`,
+    `- Benchmark checkout commit: \`${artifact.manifest.commit}\`. Combined source SHA-256: \`${artifact.manifest.sourceSha256}\`.`,
+    ...(artifact.manifest.runtime
+      ? [
+          `- Runtime: ${artifact.manifest.runtime.mode} at \`${artifact.manifest.runtime.commit}\`. Runtime source SHA-256: \`${artifact.manifest.runtime.sourceSha256}\`.`,
+          `- Benchmark source SHA-256: \`${artifact.manifest.benchmark.sourceSha256}\`. Bundle SHA-256: \`${artifact.manifest.bundleSha256}\`.`,
+        ]
+      : []),
+    `- Output fixture: ${artifact.outputFixture ?? 'ascii'}. Frames: ${artifact.outputFrames ?? artifact.manifest.settings.outputFrames}.`,
     `- Browser: ${artifact.environment.browser}. OS: ${artifact.environment.os}.`,
     `- Latency endpoint: ${artifact.environment.latencyEndpoint}. Samples per operation/repetition: ${artifact.latencySamples}.`,
     `- GPU: ${artifact.environment.renderer}. Hardware adapter: ${artifact.hardware}. Headless: ${artifact.environment.headless ?? false}.`,
@@ -470,7 +489,7 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     `- Font size: ${artifact.manifest.settings.fontSize}px. DPR: ${artifact.manifest.settings.dpr}. Grid: ${artifact.manifest.settings.columns} × ${artifact.manifest.settings.rows}.`,
     `- Libraries: ghostty-webgpu ${artifact.manifest.versions['ghostty-webgpu']}; xterm ${artifact.manifest.versions['@xterm/xterm']} with WebGL addon ${artifact.manifest.versions['@xterm/addon-webgl']}; ghostty-web ${artifact.manifest.versions['ghostty-web']}.`,
     `- Selected phases: ${(artifact.phases ?? ['parser', 'memory', 'idle', 'latency', 'burst', 'output']).join(', ')}. Omitted-phase metrics are not measured.`,
-    `- Selected variants: ${(artifact.variants ?? []).join(', ')}. WebGPU frame builders: ${(artifact.frameBuilders ?? ['js']).join(', ')}.`,
+    `- Selected variants: ${(artifact.variants ?? []).join(', ')}. GPU frame builders: ${builders.join(', ')}.`,
     `- Repetitions: ${artifact.repetitions}. Each table cell is the median of the per-run result, including per-run p50/p95.`,
     `- Artifact: [comparison.json](${link('comparison.json')}).`,
     '',
@@ -503,7 +522,9 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     'GPU windows retain utilization samples, owned/foreign compute-process memory, thresholds, and qualification. Their recorded idle and in-window limits allow the benchmark’s own measured load while bounding shared GPU saturation and foreign compute residency.',
     'Screencasting is stopped for burst, CPU, and memory measurements.',
     '',
-    'Burst output writes at least 4 KiB per terminal per animation frame for each corpus.',
+    'Repeating fixtures write the same complete unit of at least 4 KiB per terminal per animation frame.',
+    'rolling-logs advances through the real Git-history corpus in chunks of at most 4 KiB, ending between UTF-8 codepoints. The corpus tail is a shorter frame, then the stream wraps.',
+    'Every burst resets to the corpus start, including the separate warmup. The fixture records corpus and length-framed cycle hashes; output records exact bytes and the final chunk offset.',
     'Every library uses exactly one shared animation-frame pacing wait per iteration. The synchronous ghostty-web public write receives no presentation callback.',
     'Frame intervals come from requestAnimationFrame timestamps. Dropped frames are inferred from the measured idle refresh period,',
     'rounded to the nearest number of display intervals. They are missed animation-frame opportunities, not GPU presentation counters.',
@@ -514,7 +535,7 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     'Failed latency phases retain the last capture image/metadata and a direct screenshot; their partial capture stream is not serialized.',
     '',
     'Memory per terminal and per 10k rows is the post-GC CDP used JS heap plus backing storage delta, divided by terminal count.',
-    'Output memory is sampled after the 60-frame ASCII output phase, outside CPU timing. Initial memory is the idle baseline.',
+    'Output memory is sampled after the selected output fixture and frame count, outside CPU timing. Initial memory is the idle baseline.',
     'This is retained JS/backing storage, not total terminal memory. WASM linear-memory capacity is reported separately.',
     'Renderer/GPU RSS deltas cover all Chromium processes and include browser allocation noise and shared resources.',
     'GPU allocation is not available per terminal. Negative deltas are retained as measurement noise.',
@@ -531,11 +552,8 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
     '',
   ]
   const selectedVariants = artifact.variants ?? artifact.manifest.variants.map(({ id }) => id)
-  const builders = [...new Set(artifact.runs.map((run) => run.frameBuilder).filter(Boolean))]
   const variants = selectedVariants.flatMap((id) =>
-    id === 'ghostty-webgpu' && builders.length
-      ? builders.map((builder) => `${id}-${builder}`)
-      : [id],
+    frameBuilderTreatments(artifact, id).map((builder) => (builder ? `${id}-${builder}` : id)),
   )
   const cases = (artifact.counts ?? artifact.manifest.settings.counts).flatMap((count) =>
     (artifact.paths ?? ['bytes', 'string']).map((path) => ({ count, path })),

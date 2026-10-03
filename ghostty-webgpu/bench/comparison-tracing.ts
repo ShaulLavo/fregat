@@ -4,6 +4,8 @@ import type { GhosttyTerminal } from '../src/core/terminal.js'
 import type { WebGlTerminalRenderer } from '../src/render/webgl/renderer.js'
 import type { RowTerminalRenderer } from '../src/render/row-renderer.js'
 import type { WebGpuTerminalRenderer } from '../src/render/renderer.js'
+import type { RowInstanceUpdate } from '../src/render/instances/types.js'
+import { coalesceInstanceUpdates } from '../src/render/instances/uploads.js'
 
 type Category = 'parse' | 'snapshot' | 'damage' | 'instances' | 'upload' | 'commands' | 'js'
 interface Span {
@@ -130,6 +132,14 @@ export class ComparisonTracing {
         rows.reduce((sum, row) => sum + (row.packed?.length ?? row.cells.length), 0),
       )
     })
+    // Frozen comparison runtimes may predate the text-only reader.
+    if (typeof Reflect.get(state, 'readTextRows') === 'function') {
+      this.wrap(state, 'readTextRows', terminal, 'snapshot', (result) => {
+        const rows = result as readonly unknown[]
+        this.count(terminal, 'textRowsCopied', rows.length)
+        this.count(terminal, 'textCellsCopied', rows.length * core.size.columns)
+      })
+    }
     this.wrap(state, 'acknowledge', terminal, 'damage')
     this.wrap(
       state,
@@ -137,7 +147,15 @@ export class ComparisonTracing {
       terminal,
       'js',
       (builder) => {
-        this.wrap(builder, 'build', terminal, 'instances', () => this.count(terminal, 'zigBuilds'))
+        this.wrap(builder, 'build', terminal, 'instances', (result) => {
+          this.count(terminal, 'zigBuilds')
+          if (result === 0) this.count(terminal, 'zigReadyBuilds')
+          if (result === 1) this.count(terminal, 'zigUnsupportedBuilds')
+          if (result === 2) this.count(terminal, 'zigMissingGlyphBuilds')
+        })
+        this.wrap(builder, 'clearGlyphs', terminal, 'instances', () =>
+          this.count(terminal, 'zigGlyphIndexClears'),
+        )
       },
       true,
     )
@@ -159,29 +177,7 @@ export class ComparisonTracing {
       ),
     })
     this.wrap(renderer, 'notifyWrite', terminal, 'js')
-    let submittedFrames = 0
-    let zigFrames = 0
-    let fallbackFrames = 0
-    this.wrap(
-      renderer,
-      'drawFrame',
-      terminal,
-      'js',
-      () => {
-        const submitted = renderer.metrics.submittedFrames - submittedFrames
-        const zig = renderer.metrics.zigFrames - zigFrames
-        const fallback = renderer.metrics.jsFallbackFrames - fallbackFrames
-        if (submitted > 0) this.count(terminal, 'frames', submitted)
-        if (zig > 0) this.count(terminal, 'zigFrames', zig)
-        if (fallback > 0) this.count(terminal, 'zigFallbackFrames', fallback)
-      },
-      false,
-      () => {
-        submittedFrames = renderer.metrics.submittedFrames
-        zigFrames = renderer.metrics.zigFrames
-        fallbackFrames = renderer.metrics.jsFallbackFrames
-      },
-    )
+    this.traceGpuFrames(terminal, renderer)
     this.wrap(renderer, 'rowsToRebuild', terminal, 'damage')
     this.wrap(renderer, 'rebuildRows', terminal, 'instances')
     this.wrap(renderer, 'drawZigFrame', terminal, 'js')
@@ -224,6 +220,41 @@ export class ComparisonTracing {
     })
   }
 
+  private traceGpuFrames(
+    terminal: number,
+    renderer: {
+      readonly metrics: {
+        readonly submittedFrames: number
+        readonly zigFrames?: number
+        readonly jsFallbackFrames?: number
+      }
+    },
+  ): void {
+    let submittedFrames = 0
+    let zigFrames = 0
+    let fallbackFrames = 0
+    this.wrap(
+      renderer,
+      'drawFrame',
+      terminal,
+      'js',
+      () => {
+        const submitted = renderer.metrics.submittedFrames - submittedFrames
+        const zig = (renderer.metrics.zigFrames ?? 0) - zigFrames
+        const fallback = (renderer.metrics.jsFallbackFrames ?? 0) - fallbackFrames
+        if (submitted > 0) this.count(terminal, 'frames', submitted)
+        if (zig > 0) this.count(terminal, 'zigFrames', zig)
+        if (fallback > 0) this.count(terminal, 'zigFallbackFrames', fallback)
+      },
+      false,
+      () => {
+        submittedFrames = renderer.metrics.submittedFrames
+        zigFrames = renderer.metrics.zigFrames ?? 0
+        fallbackFrames = renderer.metrics.jsFallbackFrames ?? 0
+      },
+    )
+  }
+
   nativeRenderer(terminal: number, renderer: WebGlTerminalRenderer | RowTerminalRenderer): void {
     if (!this.enabled) return
     const backend = field(renderer, 'backend')
@@ -233,16 +264,34 @@ export class ComparisonTracing {
       scheduler: this.identity(field(renderer, 'scheduler')),
     })
     this.wrap(renderer, 'notifyWrite', terminal, 'js')
-    this.wrap(renderer, 'drawFrame', terminal, 'js', () => this.count(terminal, 'frames'))
     if (backend === 'webgl2') {
+      this.traceGpuFrames(terminal, renderer)
       const pass = field(field(renderer, 'state'), 'pass')
       this.wrap(renderer, 'rowsToRebuild', terminal, 'damage')
       this.wrap(renderer, 'rebuildRows', terminal, 'instances')
       this.wrap(pass, 'syncAtlas', terminal, 'upload')
-      this.wrap(pass, 'upload', terminal, 'upload')
+      const nativeUpload = typeof Reflect.get(pass as object, 'uploadFrame') === 'function'
+      const recordUploads = (result: unknown, args: unknown[]) => {
+        if (typeof result === 'number' && result > 0) this.count(terminal, 'instanceUploadBatches')
+        this.count(terminal, 'buffersWritten', result as number)
+        const updates = args[1] as readonly RowInstanceUpdate[]
+        const ranges = nativeUpload ? updates : coalesceInstanceUpdates(updates)
+        this.count(
+          terminal,
+          'bufferBytes',
+          ranges.reduce((sum, range) => sum + range.cell.byteLength + range.glyph.byteLength, 0),
+        )
+      }
+      // Archived JS runtimes expose only upload; its rows are coalesced before GL writes.
+      this.wrap(pass, 'upload', terminal, 'upload', nativeUpload ? undefined : recordUploads)
+      if (nativeUpload) {
+        this.wrap(renderer, 'drawZigFrame', terminal, 'js')
+        this.wrap(pass, 'uploadFrame', terminal, 'upload', recordUploads)
+      }
       this.wrap(pass, 'submit', terminal, 'commands', () => this.count(terminal, 'submissions'))
       return
     }
+    this.wrap(renderer, 'drawFrame', terminal, 'js', () => this.count(terminal, 'frames'))
     this.wrap(renderer, 'rowsToPaint', terminal, 'damage')
     const surface = field(renderer, 'surface')
     if (backend === 'canvas2d') {
@@ -366,7 +415,7 @@ export class ComparisonTracing {
     this.mark('begin', { timeOrigin: performance.timeOrigin })
   }
 
-  end(): unknown {
+  end() {
     this.mark('end')
     this.active = false
     // Emit timing entries after measurement so trace serialization is outside CPU sampling.

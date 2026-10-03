@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util'
 import { readHomeSetting } from '../home-setting'
 import { productionStateHome } from '../state-home'
 import {
+  bootSeconds,
   drainRequest,
   legacyHold,
   legacyQuietHold,
@@ -54,8 +55,14 @@ function printEntries(title: string, entries: readonly Entry[]) {
     const estimate = Math.round(entry.estimateBytes / MiB)
     const used = sliceMemory(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`)
     const usage = used === null ? '' : ` using ${Math.round(used / MiB)} MiB`
+    const server = entry.server ? ', server' : ''
+    const quiet = entry.quiet ? ', quiet' : ''
+    const admission =
+      title === 'waiting' && entry.quietAdmissionUntil !== undefined
+        ? ` quiet admission: ${Math.max(0, Math.ceil(entry.quietAdmissionUntil - bootSeconds()))}s left`
+        : ''
     console.log(
-      `  ${entry.label} (${entry.jobClass}, ${estimate} MiB) ${age}s pid=${entry.pid} cwd=${entry.cwd}${usage}`,
+      `  ${entry.label} (${entry.jobClass}, ${estimate} MiB${server}${quiet}) ${age}s pid=${entry.pid} cwd=${entry.cwd}${usage}${admission}`,
     )
   }
 }

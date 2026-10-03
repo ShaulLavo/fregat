@@ -1406,7 +1406,8 @@ describe('file operations', () => {
   })
 
   it('publishes a folder move as one renamed event each way', async () => {
-    const fixture = await createFixture({ watch: true })
+    // Isolate finalized semantic publication from independently scheduled native watcher echoes.
+    const fixture = await createFixture({ watch: false })
     await seedFiles(fixture, { 'src/a/x.txt': 'x' })
     const stream = await startEvents(fixture.service)
     try {

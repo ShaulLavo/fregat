@@ -168,7 +168,15 @@ export function startJob(job: JobSpec) {
         'inherit',
         'inherit',
         'inherit',
-        ...(job.host === 'local' ? [...job.slotLocks, job.entryLock] : []),
+        // Server jobs hold no slot locks; the entry lock must still arrive on fd 6.
+        ...(job.host === 'local'
+          ? [
+              job.slotLocks[0] ?? 'ignore',
+              job.slotLocks[1] ?? 'ignore',
+              job.slotLocks[2] ?? 'ignore',
+              job.entryLock,
+            ]
+          : []),
       ],
     })
   } catch (error) {

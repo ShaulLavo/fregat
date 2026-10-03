@@ -318,6 +318,7 @@ import { settingsFocus } from './settings-focus'
 import { settingsAppearanceRows } from './settings-appearance-rows'
 import { settingsWallpaperScroll } from './settings-wallpaper-scroll'
 import { settingsAppearanceOpen } from './settings-appearance-open'
+import { settingsPrune } from './settings-prune'
 import { editorSettingsPreviewTyping } from './editor-settings-preview-typing'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
@@ -745,6 +746,7 @@ export const scenarios: readonly Scenario[] = [
   settingsFocus,
   settingsAppearanceRows,
   settingsAppearanceOpen,
+  settingsPrune,
   editorSettingsPreviewTyping,
   settingsWallpaperScroll,
   settingsColdLoad,

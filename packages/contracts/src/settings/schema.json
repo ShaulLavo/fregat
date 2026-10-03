@@ -414,8 +414,8 @@
     },
     "developer.heavyJobQuietHoldSeconds": {
       "default": 600,
-      "description": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.",
-      "markdownDescription": "Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.\n\nA `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.",
+      "description": "Maximum seconds for quiet admission, a running quiet hold, and an external drain request, measured independently.",
+      "markdownDescription": "Maximum seconds for quiet admission, a running quiet hold, and an external drain request, measured independently.\n\nA `--quiet` job waits for finite jobs to finish while later jobs queue behind it. Declared servers keep running and count toward resource admission. Admission and execution each get this many seconds. Expiry releases the request or stops the running job and returns exit 75; invoke it again for a fresh queue ticket. A `drain.request` is honoured for this many seconds from its first observation.",
       "maximum": 7200,
       "minimum": 1,
       "type": "integer"
@@ -1273,6 +1273,72 @@
       },
       "type": "array"
     },
+    "providers.proxyUsageProviderInstanceIds": {
+      "default": [],
+      "description": "Provider instances whose allowance is shown from the configured proxy account group. Their native quota collection pauses while this source is selected.",
+      "items": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "providers.proxyUsageUrl": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Local CLIProxyAPI management address whose cached Codex quotas Fregat reads. The management key is kept in the secret store."
+    },
+    "providers.transcriptHistoryMaxBytes": {
+      "default": 268435456,
+      "description": "Maximum transcript bytes read in one local history scan.",
+      "maximum": 2147483647,
+      "minimum": 65536,
+      "type": "integer"
+    },
+    "providers.transcriptHistoryMaxFiles": {
+      "default": 10000,
+      "description": "Maximum transcript files visited in one local history scan.",
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "providers.transcriptHistoryRefreshSeconds": {
+      "default": 60,
+      "description": "Seconds between bounded local transcript scans.",
+      "maximum": 86400,
+      "minimum": 60,
+      "type": "integer"
+    },
+    "providers.usageFailureCooldownSeconds": {
+      "default": 600,
+      "description": "Seconds before retrying a failed account usage request.",
+      "maximum": 86400,
+      "minimum": 60,
+      "type": "integer"
+    },
+    "providers.usageRefreshSeconds": {
+      "default": 300,
+      "description": "Minimum seconds between native account usage requests. Usage reads return persisted observations.",
+      "maximum": 86400,
+      "minimum": 60,
+      "type": "integer"
+    },
+    "providers.usageStaleAfterSeconds": {
+      "default": 900,
+      "description": "Seconds an observed quota remains current before its window is marked stale.",
+      "maximum": 86400,
+      "minimum": 60,
+      "type": "integer"
+    },
     "search.caseSensitive": {
       "default": false,
       "description": "Match case by default.",
@@ -1430,9 +1496,9 @@
     },
     "window.transparency": {
       "default": "compositor",
-      "description": "Choose window-manager transparency or a see-through native window.",
+      "description": "Choose window-manager transparency or a see-through native window using the system webview.",
       "enum": ["compositor", "window"],
-      "markdownDescription": "Choose window-manager transparency or a see-through native window.\n\nTransparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.",
+      "markdownDescription": "Choose window-manager transparency or a see-through native window using the system webview.\n\nTransparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.",
       "type": "string"
     },
     "workbench.colorTheme": {

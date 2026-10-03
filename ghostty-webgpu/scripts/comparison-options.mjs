@@ -9,6 +9,13 @@ export function positiveInteger(args, flag, fallback) {
   return number
 }
 
+export function gpuCommandTimeout(settings, tracing) {
+  const key = tracing ? 'gpuTraceCommandTimeoutMilliseconds' : 'gpuCommandTimeoutMilliseconds'
+  const timeout = settings[key]
+  assert(Number.isSafeInteger(timeout) && timeout > 0, `Positive ${key} required`)
+  return timeout
+}
+
 export function analysisArguments(args) {
   const positional = args.filter((arg) => !arg.startsWith('--'))
   assert(
@@ -76,6 +83,22 @@ export function selectedVariants(args, available, fallback) {
   return selected
 }
 
+export function outputFixture(args, fixtures) {
+  const names = fixtures.map(({ name }) => name)
+  const selected = selection(args, '--output-fixture', ['ascii'], names)
+  assert(selected.length === 1 && names.includes(selected[0]), '--output-fixture needs one fixture')
+  return selected[0]
+}
+
+export function selectedTracePhases(args, fixtures) {
+  return selection(
+    args,
+    '--trace-phase',
+    ['latency', 'ascii', 'sgr'],
+    ['latency', ...fixtures.map(({ name }) => name)],
+  )
+}
+
 export function selectedPhases(args) {
   return selection(args, '--phases', measurementPhases, measurementPhases)
 }
@@ -87,7 +110,7 @@ export function measurementCases(variants, paths, counts, builders, repetition) 
     return repetition % 2 ? rotated.reverse() : rotated
   }
   const treatments = ordered(variants).flatMap((variant) => {
-    if (variant !== 'ghostty-webgpu') return [{ variant }]
+    if (variant !== 'ghostty-webgpu' && variant !== 'ghostty-webgl') return [{ variant }]
     return ordered(builders).map((frameBuilder) => ({ variant, frameBuilder }))
   })
   return (repetition % 2 ? paths.toReversed() : paths).flatMap((path) =>
@@ -102,4 +125,10 @@ export function measurementRepetitions(args, fallback) {
     'Measurements require an even number of at least four repetitions',
   )
   return repetitions
+}
+
+export function accessibilityMode(args) {
+  const modes = selection(args, '--accessibility', ['off'], ['on', 'off'])
+  assert.equal(modes.length, 1, '--accessibility needs one mode')
+  return modes[0]
 }

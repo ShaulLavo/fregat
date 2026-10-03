@@ -19,9 +19,10 @@ type ProviderSecretRef = `provider.${string}.env.${string}`
 
 /** The Web Push signing key (VAPID, P-256), base64url. The server creates it; no client reads it. */
 export const VAPID_PRIVATE_KEY_REF = 'push.vapid.privateKey'
+export const PROXY_USAGE_MANAGEMENT_KEY_REF = 'usage.cliproxy.management'
 
 /** A secret the server generates for itself and never hands to a client. */
-export type ServerSecretRef = typeof VAPID_PRIVATE_KEY_REF
+export type ServerSecretRef = typeof VAPID_PRIVATE_KEY_REF | typeof PROXY_USAGE_MANAGEMENT_KEY_REF
 
 export type SecretRef = ProviderSecretRef | ServerSecretRef
 

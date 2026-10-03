@@ -10,7 +10,6 @@
   ],
   "ignorePatterns": [
     "apps/desktop/build/**",
-    "apps/desktop/.hutch/**",
     "editor/packages/textbuffer/bench/vscode-textbuffer/**"
   ],
   "rules": {

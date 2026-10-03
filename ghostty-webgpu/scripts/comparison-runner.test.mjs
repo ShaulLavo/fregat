@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
+import { measurementCases } from './comparison-options.mjs'
 
 const source = await readFile(new URL('./comparison-runner.mjs', import.meta.url), 'utf8')
 const start = source.indexOf('async function measureBody(')
@@ -20,6 +21,7 @@ const createMeasureBody = new Function(
   'origin',
   'smoke',
   'args',
+  'accessibility',
   `return ${source.slice(start, end)}`,
 )
 
@@ -31,7 +33,10 @@ async function failureArtifacts(testCase, repetition) {
   error.captureMetadata = { timestamp: 1 }
   const page = {
     on() {},
-    goto: async () => {
+    goto: async (url) => {
+      const query = new URL(url).searchParams
+      assert.equal(query.get('accessibility'), 'on')
+      assert.equal(query.has('zig'), testCase.frameBuilder === 'zig')
       throw error
     },
     evaluate: async () => ({}),
@@ -52,6 +57,7 @@ async function failureArtifacts(testCase, repetition) {
     'http://localhost',
     true,
     [],
+    'on',
   )
   const contexts = new Set()
   const run = {}
@@ -67,17 +73,110 @@ for (const [kind, prefix] of [
 ]) {
   test(`${prefix} artifacts distinguish paired frame builders`, async () => {
     const names = []
-    for (const frameBuilder of ['js', 'zig']) {
+    const treatments = ['ghostty-webgpu', 'ghostty-webgl'].flatMap((variant) =>
+      ['js', 'zig'].map((frameBuilder) => ({ variant, frameBuilder })),
+    )
+    for (const { variant, frameBuilder } of treatments) {
       const artifacts = await failureArtifacts(
-        { variant: 'ghostty-webgpu', frameBuilder, path: 'bytes', count: 8 },
+        { variant, frameBuilder, path: 'bytes', count: 8 },
         2,
       )
-      assert.deepEqual(artifacts[kind], [`${prefix}-ghostty-webgpu-${frameBuilder}-bytes-8-2.png`])
+      assert.deepEqual(artifacts[kind], [`${prefix}-${variant}-${frameBuilder}-bytes-8-2.png`])
       names.push(...artifacts[kind])
     }
-    assert.equal(new Set(names).size, 2)
+    assert.equal(new Set(names).size, 4)
   })
 }
+
+test('selected output fixture reaches warmup, measured writes, and the artifact', async () => {
+  const fixture = { name: 'rolling-logs', sha256: 'corpus', stream: { sha256: 'framed-cycle' } }
+  const artifactStart = source.indexOf('const artifact = {')
+  const artifactEnd = source.indexOf('\nconst artifactPath', artifactStart)
+  const artifact = new Function(
+    'context',
+    `
+    const {randomUUID, manifest, smoke, tracing, repetitions, latencySamples, outputFrames,
+      selectedOutputFixture, tickSeconds, counts, variantIds, phases, builders, writePaths,
+      fixtures, s, tracePhases, traceFrames, accessibility, measurementCases,
+      gpuCommandTimeoutMilliseconds} = context;
+    ${source.slice(artifactStart, artifactEnd)}
+    return artifact;
+  `,
+  )({
+    randomUUID: () => 'session',
+    manifest: { fixtures: [fixture] },
+    smoke: false,
+    tracing: false,
+    gpuCommandTimeoutMilliseconds: 2000,
+    repetitions: 4,
+    outputFrames: 1200,
+    selectedOutputFixture: fixture.name,
+    counts: [17],
+    variantIds: ['ghostty-webgl', 'xterm-webgl'],
+    phases: ['output'],
+    builders: ['js', 'zig'],
+    accessibility: 'on',
+    measurementCases,
+    writePaths: ['bytes'],
+    fixtures: [fixture.name],
+    s: { caseDeadlineMilliseconds: 600000 },
+  })
+  assert.equal(artifact.outputFixture, fixture.name)
+  assert.equal(artifact.outputFrames, 1200)
+  assert.equal(artifact.accessibility, 'on')
+  assert.equal(artifact.measurementBudgetMilliseconds, 3 * 4 * 600000)
+  const blockStart = source.indexOf("    if (phases.includes('output')) {")
+  const blockEnd = source.indexOf('\n    assert.deepEqual(errors, [])', blockStart)
+  const calls = []
+  const window = {
+    __compare: {
+      burst: async (name, frames) => {
+        calls.push({ name, frames })
+        return { bytes: frames * 4096 * 17 }
+      },
+    },
+  }
+  const page = {
+    evaluate: async (callback, argument) =>
+      new Function('window', 'argument', `return (${callback.toString()})(argument)`)(
+        window,
+        argument,
+      ),
+  }
+  const run = {}
+  const execute = new Function(
+    'context',
+    `
+    const {phases, run, page, selectedOutputFixture, qualifiedWindow, measureCpu,
+      browserSession, cpuOptions, outputFrames, manifest} = context;
+    return (async () => { ${source.slice(blockStart, blockEnd)} })();
+  `,
+  )
+  await execute({
+    phases: ['output'],
+    run,
+    page,
+    selectedOutputFixture: fixture.name,
+    outputFrames: 1200,
+    qualifiedWindow: async (_run, label, operation) => {
+      assert.equal(label, 'output/rolling-logs')
+      return operation()
+    },
+    measureCpu: async (_browser, operation) => ({
+      sample: await operation(),
+      cpu: { milliseconds: 123 },
+    }),
+    manifest: { fixtures: [fixture] },
+  })
+  assert.deepEqual(calls, [
+    { name: fixture.name, frames: 3 },
+    { name: fixture.name, frames: 1200 },
+  ])
+  assert.equal(run.output.fixture, fixture.name)
+  assert.deepEqual(run.output.input, fixture)
+  assert.equal(run.output.bytes, 1200 * 4096 * 17)
+  assert.equal(run.output.cpu.milliseconds, 123)
+})
 
 test('failure artifacts retain control variant, write path, count, and repetition', async () => {
   const artifacts = await failureArtifacts({ variant: 'xterm-webgl', path: 'string', count: 17 }, 3)

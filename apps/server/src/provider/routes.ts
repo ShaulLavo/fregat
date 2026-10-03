@@ -55,7 +55,7 @@ const commandCatalogQuerySchema = v.object({
 export function providerRoutes(
   adapterRegistry: ProviderAdapterRegistry,
   usage: ProviderUsageStore,
-  history: ProviderUsageHistoryReader,
+  history: Pick<ProviderUsageHistoryReader, 'read' | 'readSession'>,
   maintenance: ProviderMaintenance,
   resetCredits?: ProviderResetCredits,
 ) {

@@ -103,6 +103,7 @@ export function SettingsPage({
   // transitions, which React time-slices and commits apart, so no one task lays out every row.
   const [rowBudget, setRowBudget] = useState(FIRST_SCREEN_ROWS)
   const complete = rowBudget >= mountCost(shown)
+  const formPending = pending || (!showJson && !project && !complete)
   useEffect(() => {
     if (!ready || complete) return
     startTransition(() => setRowBudget((budget) => budget + ROWS_PER_PASS))
@@ -150,7 +151,7 @@ export function SettingsPage({
           <PageHeader
             actions={
               <div className='flex items-center justify-end gap-1'>
-                {pending ? <Spinner label='Loading settings view' size='xs' /> : null}
+                {formPending ? <Spinner label='Loading settings view' size='xs' /> : null}
                 {tabId ? <ViewToggle /> : null}
                 <SettingsOwnerProvider key={showJson ? 'editor' : 'global'} queryClient={owner}>
                   {project ? null : <PageActions scope={writableSettingsScope(scope)} />}
@@ -255,6 +256,7 @@ export function SettingsPage({
         ) : (
           <div
             aria-label='Settings form'
+            aria-busy={formPending}
             role='region'
             ref={scrollRef}
             className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) [overflow-anchor:none] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_[data-slot=tabs-tab]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'

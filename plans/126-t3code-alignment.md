@@ -453,7 +453,7 @@ Owners EXT-07/08/09/16. These remain visible work, not an exception list.
   Existing SSH and mesh reachability do not imply per-device authorization equivalence.
 - Desktop activation/deep links, capture, update/restart and OS integrations; mobile client and
   install/update/distribution workflows. Enumerate host-specific outcomes before implementation.
-  Existing Electrobun/Mac/TUI code is reused where it supplies the behavior; merely having a
+  Existing installed-app/native-host/Mac/TUI code is reused where it supplies the behavior; merely having a
   client directory does not count as a matching mobile/desktop experience.
 
 First deliverable for each subsystem is an operation/OS/capability matrix and runnable host test

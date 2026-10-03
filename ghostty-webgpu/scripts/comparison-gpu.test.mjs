@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { setImmediate as nextTurn, setTimeout as pause } from 'node:timers/promises'
+import { promisify } from 'node:util'
 import test from 'node:test'
 import {
   createGpuGate,
@@ -71,6 +73,143 @@ test('NVIDIA commands run asynchronously in parallel with bounded execution', as
   assert.equal((await sampling).utilizationPercent, 0)
 })
 
+test('fractional NVIDIA budgets round up to a positive integer command timeout', async () => {
+  for (const [timeoutMilliseconds, expected] of [
+    [1755.1763169999977, 1756],
+    [0.125, 1],
+  ]) {
+    const timeouts = []
+    const result = await sampleNvidiaGpu({
+      timeoutMilliseconds,
+      command: async (_binary, args, options) => {
+        timeouts.push(options.timeout)
+        assert.equal(options.timeout, expected)
+        return { stdout: args[0].startsWith('--query-gpu=') ? 'GPU-A, 0' : '' }
+      },
+    })
+    assert.equal(result.utilizationPercent, 0)
+    assert.deepEqual(timeouts, [expected, expected])
+  }
+})
+
+for (const [timeoutMilliseconds, expected] of [
+  [2000, 2000],
+  [1787.023949999988, 1788],
+  [1817.9464489999991, 1818],
+  [0.125, 1],
+]) {
+  test(`failed-command receipts record the executed ${expected} ms timeout for budget ${timeoutMilliseconds}`, async () => {
+    const timeouts = []
+    await assert.rejects(
+      sampleNvidiaGpu({
+        timeoutMilliseconds,
+        command: async (_binary, args, options) => {
+          timeouts.push(options.timeout)
+          if (args[0].startsWith('--query-gpu='))
+            throw Object.assign(new GpuQualificationError('Controlled sampling timeout', null), {
+              code: 'ETIMEDOUT',
+            })
+          return { stdout: '' }
+        },
+      }),
+      (error) => {
+        assert.equal(error.code, 'ETIMEDOUT')
+        assert.deepEqual(timeouts, [expected, expected])
+        assert.deepEqual(
+          error.samplingCommands.map((command) => command.timeoutMilliseconds),
+          timeouts,
+        )
+        assert(
+          error.samplingCommands.every((command) => Number.isInteger(command.timeoutMilliseconds)),
+        )
+        return true
+      },
+    )
+  })
+}
+
+test('empty successful GPU output fails closed with exact command diagnostics', async () => {
+  const gate = createGpuGate(settings, {
+    platform: 'linux',
+    sample: (timeoutMilliseconds) =>
+      sampleNvidiaGpu({
+        timeoutMilliseconds,
+        command: async (_binary, args) => ({
+          stdout: args[0].startsWith('--query-gpu=') ? '' : 'GPU-A, 42, 12\n',
+          stderr: 'driver diagnostic\n',
+        }),
+      }),
+  })
+  await assert.rejects(gate.waitForIdle(), (error) => {
+    const failure = error.evidence.samplingError
+    assert.equal(failure.code, 'ERR_ASSERTION')
+    assert.match(failure.message, /at least one GPU/)
+    assert.equal(error.evidence.qualified, false)
+    assert.equal(failure.commands.length, 2)
+    assert.deepEqual(failure.commands[0].args, [
+      '--query-gpu=uuid,utilization.gpu',
+      '--format=csv,noheader,nounits',
+    ])
+    assert.equal(failure.commands[0].binary, 'nvidia-smi')
+    assert.equal(failure.commands[0].code, 0)
+    assert.equal(failure.commands[0].stdout, '')
+    assert.equal(failure.commands[0].stderr, 'driver diagnostic\n')
+    assert.equal(failure.commands[1].stdout, 'GPU-A, 42, 12\n')
+    for (const command of failure.commands) {
+      assert(Number.isFinite(command.started))
+      assert(command.completed >= command.started)
+    }
+    return true
+  })
+})
+
+test('command rejection drains both queries and preserves stdout, stderr and termination status', async () => {
+  let completeCompute
+  const compute = new Promise((resolve) => {
+    completeCompute = resolve
+  })
+  let settled = false
+  const sampling = sampleNvidiaGpu({
+    timeoutMilliseconds: 20,
+    command: async (_binary, args) => {
+      if (args[0].startsWith('--query-compute-apps=')) return compute
+      throw Object.assign(new Error('driver failed'), {
+        code: 9,
+        signal: 'SIGTERM',
+        killed: true,
+        stdout: 'partial GPU output',
+        stderr: 'driver error',
+      })
+    },
+  }).finally(() => {
+    settled = true
+  })
+  await nextTurn()
+  assert.equal(settled, false)
+  completeCompute({ stdout: '', stderr: '' })
+  await assert.rejects(sampling, (error) => {
+    assert.equal(error.code, 9)
+    assert.deepEqual(
+      error.samplingCommands.map(({ code, stdout, stderr, signal }) => ({
+        code,
+        stdout,
+        stderr,
+        signal,
+      })),
+      [
+        {
+          code: 9,
+          stdout: 'partial GPU output',
+          stderr: 'driver error',
+          signal: 'SIGTERM',
+        },
+        { code: 0, stdout: '', stderr: '', signal: null },
+      ],
+    )
+    return true
+  })
+})
+
 test('idle gate resets consecutive samples and tolerates resident desktop memory', async () => {
   const samples = [reading(0, 341), reading(30, 341), reading(0, 341), reading(5, 1024)]
   const gate = createGpuGate(settings, {
@@ -119,7 +258,10 @@ test('missing NVIDIA tooling and other platforms record skip reasons', async () 
   const window = await gate.monitorWindow(async () => 42)
   assert.equal(window.value, 42)
   assert.equal(window.gpu.skipReason, idle.skipReason)
-  const other = createGpuGate(settings, { platform: 'darwin', sample: async () => assert.fail() })
+  const other = createGpuGate(settings, {
+    platform: 'darwin',
+    sample: async () => assert.fail(),
+  })
   assert.match((await other.waitForIdle()).skipReason, /Linux/)
 })
 
@@ -187,7 +329,10 @@ test('measurement detects activity during window and drains the sampler', async 
 })
 
 test('window rejects foreign compute before starting and at its final sample', async () => {
-  const gate = createGpuGate(settings, { platform: 'linux', sample: async () => reading(0, 5900) })
+  const gate = createGpuGate(settings, {
+    platform: 'linux',
+    sample: async () => reading(0, 5900),
+  })
   await assert.rejects(
     gate.monitorWindow(async () => assert.fail()),
     GpuQualificationError,
@@ -232,12 +377,17 @@ test('real async command timeout kills a stuck sampling subprocess', async () =>
     const timer = setTimeout(() => child.kill(), options.timeout)
     try {
       await once(child, 'exit')
-      throw Object.assign(new Error('sampling timed out'), { code: 'ETIMEDOUT' })
+      throw Object.assign(new Error('sampling timed out'), {
+        code: 'ETIMEDOUT',
+      })
     } finally {
       clearTimeout(timer)
     }
   }
-  await assert.rejects(sampleNvidiaGpu({ command, timeoutMilliseconds: 20 }), /sampling timed out/)
+  await assert.rejects(sampleNvidiaGpu({ command, timeoutMilliseconds: 20 }), (error) => {
+    assert.equal(error.code, 'ETIMEDOUT')
+    return true
+  })
   await Promise.all(
     children.map(async (child) => {
       if (child.exitCode === null && child.signalCode === null) await once(child, 'exit')
@@ -319,7 +469,9 @@ test('sampler evidence wins when both monitoring and operation fail', async () =
       sample: async () => {
         if (++calls === 1) return reading()
         resolveDuring()
-        throw Object.assign(new Error('sampler failure'), { code: 'ETIMEDOUT' })
+        throw Object.assign(new Error('sampler failure'), {
+          code: 'ETIMEDOUT',
+        })
       },
     },
   )
@@ -469,7 +621,9 @@ test('repeated idle timeouts clamp command timeout to remaining wait budget', as
     sample: async (timeout) => {
       timeouts.push(timeout)
       await time.sleep(timeout)
-      throw Object.assign(new Error('sampling timed out'), { code: 'ETIMEDOUT' })
+      throw Object.assign(new Error('sampling timed out'), {
+        code: 'ETIMEDOUT',
+      })
     },
   })
   await assert.rejects(gate.waitForIdle(), (error) => {
@@ -495,7 +649,9 @@ test('window polling override changes cadence and evidence while retaining bound
       await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }))
     },
   })
-  const result = await gate.monitorWindow(async () => 42, { sampleMilliseconds: 250 })
+  const result = await gate.monitorWindow(async () => 42, {
+    sampleMilliseconds: 250,
+  })
   assert.deepEqual(intervals, [250])
   assert.equal(calls, 2)
   assert.equal(result.gpu.settings.gpuSampleMilliseconds, 250)
@@ -504,3 +660,205 @@ test('window polling override changes cadence and evidence while retaining bound
     /Positive sampleMilliseconds/,
   )
 })
+
+for (const driverQuery of ['--query-gpu=', '--query-compute-apps=']) {
+  test(`mixed timeout and driver failure fail qualification with driver in ${driverQuery}`, async () => {
+    let calls = 0
+    const gate = createGpuGate(settings, {
+      platform: 'linux',
+      ...clock(),
+      command: async (_binary, args) => {
+        if (++calls > 2)
+          return {
+            stdout: args[0].startsWith('--query-gpu=') ? 'GPU-A, 0' : '',
+          }
+        if (args[0].startsWith(driverQuery))
+          throw Object.assign(new Error('driver failure'), {
+            code: 9,
+            killed: false,
+            stdout: 'partial driver output',
+            stderr: 'driver failed',
+          })
+        await nextTurn()
+        throw Object.assign(new Error('timeout'), {
+          code: 'ETIMEDOUT',
+          killed: true,
+          signal: 'SIGTERM',
+        })
+      },
+    })
+    await assert.rejects(gate.waitForIdle(), (error) => {
+      assert.equal(error.evidence.qualified, false)
+      assert.equal(error.evidence.samplingError.code, 9)
+      assert.equal(error.evidence.samplingError.commands.length, 2)
+      assert.deepEqual(
+        error.evidence.samplingError.failures.map(({ code }) => code).sort(),
+        [9, 'ETIMEDOUT'].sort(),
+      )
+      return true
+    })
+    assert.equal(calls, 2, 'a nonretryable peer failure must not be hidden by retry')
+  })
+}
+
+test('a rejected query plus pending adapter query has a finite sampling outcome', async () => {
+  const gate = createGpuGate(settings, {
+    platform: 'linux',
+    command: (_binary, args) => {
+      if (args[0].startsWith('--query-gpu='))
+        return Promise.reject(Object.assign(new Error('driver failed'), { code: 9 }))
+      return new Promise(() => {})
+    },
+  })
+  const result = gate.waitForIdle().then(
+    () => null,
+    (error) => error,
+  )
+  const outcome = await Promise.race([result, pause(500).then(() => 'pending')])
+  assert.notEqual(outcome, 'pending')
+  assert.equal(outcome.evidence.qualified, false)
+  assert.equal(outcome.evidence.samplingError.code, 9)
+  assert.equal(outcome.evidence.samplingError.commands[1].deadlineExpired, true)
+})
+
+test('owned SIGTERM-resistant command is killed and bounded while its peer fails', async () => {
+  const execute = promisify(execFile)
+  let pending
+  const gate = createGpuGate(
+    { ...settings, gpuCommandTimeoutMilliseconds: 200 },
+    {
+      platform: 'linux',
+      sample: () =>
+        sampleNvidiaGpu({
+          timeoutMilliseconds: 200,
+          command: (_binary, args, options) => {
+            if (args[0].startsWith('--query-gpu='))
+              return Promise.reject(Object.assign(new Error('driver failed'), { code: 9 }))
+            pending = execute(
+              process.execPath,
+              ['-e', "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"],
+              { ...options, killSignal: 'SIGTERM' },
+            )
+            return pending
+          },
+        }),
+    },
+  )
+  try {
+    const result = gate.waitForIdle().then(
+      () => null,
+      (error) => error,
+    )
+    const outcome = await Promise.race([result, pause(600).then(() => 'pending')])
+    assert.notEqual(outcome, 'pending', 'a resistant owned peer must reach the hard deadline')
+    assert.equal(outcome.evidence.qualified, false)
+    assert.equal(outcome.evidence.samplingError.commands[1].deadlineExpired, true)
+    await assert.rejects(pending)
+    assert.equal(pending.child.signalCode, 'SIGKILL')
+  } finally {
+    pending?.child?.kill('SIGKILL')
+    await pending?.catch(() => {})
+  }
+})
+
+for (const stdout of ['GPU-A, 0', '']) {
+  test(`exit-zero termination metadata cannot qualify ${stdout ? 'valid partial' : 'empty'} output`, async () => {
+    const gate = createGpuGate(settings, {
+      platform: 'linux',
+      ...clock(),
+      command: (_binary, args) => {
+        const pending = Promise.resolve({
+          stdout: args[0].startsWith('--query-gpu=') ? stdout : '',
+          stderr: 'termination output',
+        })
+        pending.child = { killed: true, exitCode: 0, signalCode: null }
+        return pending
+      },
+    })
+    await assert.rejects(gate.waitForIdle(), (error) => {
+      assert.equal(error.evidence.qualified, false)
+      assert.equal(error.evidence.samplingError.code, 'ETIMEDOUT')
+      const receipt = error.evidence.samplingError.commands[0]
+      assert.equal(receipt.killed, true)
+      assert.equal(receipt.exitCode, 0)
+      assert.equal(receipt.stdout, stdout)
+      return true
+    })
+  })
+}
+
+test('real execFile timeout preserves partial streams and never reads as success', async () => {
+  const execute = promisify(execFile)
+  const children = []
+  const gate = createGpuGate(settings, {
+    platform: 'linux',
+    sample: () =>
+      sampleNvidiaGpu({
+        timeoutMilliseconds: 200,
+        command: (_binary, args, options) => {
+          const stdout = args[0].startsWith('--query-gpu=') ? 'GPU-A, 0' : ''
+          const pending = execute(
+            process.execPath,
+            [
+              '-e',
+              `process.on('SIGTERM', () => process.exit(0)); process.stdout.write(${JSON.stringify(stdout)}); process.stderr.write('partial stderr'); setInterval(() => {}, 1000)`,
+            ],
+            options,
+          )
+          children.push(pending)
+          return pending
+        },
+      }),
+  })
+  try {
+    await assert.rejects(
+      gate.monitorWindow(async () => assert.fail('operation must not start')),
+      (error) => {
+        assert.equal(error.evidence.qualified, false)
+        const receipt = error.evidence.samplingError.commands[0]
+        assert.equal(receipt.code, 'ETIMEDOUT')
+        assert.equal(receipt.killed, true)
+        assert.equal(receipt.stdout, 'GPU-A, 0')
+        assert.equal(receipt.stderr, 'partial stderr')
+        return true
+      },
+    )
+    await Promise.allSettled(children)
+    assert(children.every((pending) => pending.child.signalCode === 'SIGKILL'))
+  } finally {
+    for (const pending of children) pending.child.kill('SIGKILL')
+    await Promise.allSettled(children)
+  }
+})
+
+for (const [malformedGpu, peerCode] of [
+  [true, 'ETIMEDOUT'],
+  [false, 'ETIMEDOUT'],
+  [true, 'ENOENT'],
+  [false, 'ENOENT'],
+]) {
+  test(`malformed successful ${malformedGpu ? 'GPU' : 'compute'} query is not hidden by ${peerCode} peer`, async () => {
+    let calls = 0
+    const gate = createGpuGate(settings, {
+      platform: 'linux',
+      ...clock(),
+      command: async (_binary, args) => {
+        const gpu = args[0].startsWith('--query-gpu=')
+        if (++calls > 2) return { stdout: gpu ? 'GPU-A, 0' : '' }
+        if (gpu === malformedGpu) return { stdout: gpu ? '' : 'GPU-A, invalid-pid, 5' }
+        throw Object.assign(new Error('peer failure'), { code: peerCode })
+      },
+    })
+    await assert.rejects(gate.waitForIdle(), (error) => {
+      assert.equal(error.evidence.qualified, false)
+      assert.equal(
+        error.evidence.samplingError.code,
+        peerCode === 'ETIMEDOUT' ? 'ERR_ASSERTION' : peerCode,
+      )
+      assert.equal(error.evidence.samplingError.commands.length, 2)
+      assert.equal(error.evidence.samplingError.failures.length, 2)
+      return true
+    })
+    assert.equal(calls, 2)
+  })
+}

@@ -34,7 +34,6 @@
       },
       "devDependencies": {
         "@types/bun": "catalog:",
-        "electrobun": "2.0.1",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
         "typescript": "catalog:",
@@ -66,6 +65,7 @@
         "typescript": "7.0.2",
         "typescript-language-server": "6.0.1",
         "valibot": "^1.5.0",
+        "zustand": "^5.0.15",
       },
       "devDependencies": {
         "@anthropic-ai/sdk": "^0.128.0",
@@ -676,7 +676,7 @@
     },
     "ghostty-webgpu": {
       "name": "ghostty-webgpu",
-      "version": "0.3.0",
+      "version": "0.3.2",
       "dependencies": {
         "@tanstack/hotkeys": "0.10.0",
         "@webgpu/types": "0.1.74",
@@ -2452,8 +2452,6 @@
     "ecdsa-sig-formatter": ["ecdsa-sig-formatter@1.0.11", "", { "dependencies": { "safe-buffer": "^5.0.1" } }, "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ=="],
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
-
-    "electrobun": ["electrobun@2.0.1", "", { "bin": { "electrobun": "bin/electrobun.cjs" } }, "sha512-1+OjJ0tMemjVrUEsh/AhmxnqUNpyCfJslCbcWOvkogFJuNVMmTlWMzyZem/Ts/7lg8f7ULWu8uuQBsKeGQsu7A=="],
 
     "elkjs": ["elkjs@0.9.3", "", {}, "sha512-f/ZeWvW/BCXbhGEf1Ujp29EASo/lk1FDnETgNKwJrsVvGZhUWCZyg3xLJjAsxfOmt8KjswHmI5EwCQcPMpOYhQ=="],
 

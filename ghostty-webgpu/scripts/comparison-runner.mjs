@@ -16,13 +16,17 @@ import {
 } from './comparison-guards.mjs'
 import {
   positiveInteger,
+  gpuCommandTimeout,
   selection,
   hardwareLaunch,
   frameBuilders,
+  accessibilityMode,
   selectedVariants,
   selectedPhases,
   measurementCases,
   measurementRepetitions,
+  outputFixture,
+  selectedTracePhases,
 } from './comparison-options.mjs'
 import { presentationLatency } from './comparison-latency.mjs'
 import { comparisonLatencyEndpoint } from './comparison-compact.mjs'
@@ -39,12 +43,14 @@ import {
 } from './comparison-trace.mjs'
 import { WebSocketServer } from 'ws'
 import { markdown, summaries } from './comparison-report.mjs'
+import { diagnosticFailed, legacyDiagnostic } from './comparison-diagnostics.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const manifest = JSON.parse(await readFile(join(root, 'manifest.json'), 'utf8'))
 const args = process.argv.slice(2)
 const smoke = args.includes('--smoke')
 const tracing = args.includes('--trace')
+const accessibility = accessibilityMode(args)
 const builders = frameBuilders(args)
 const phases = selectedPhases(args)
 assert(!(tracing && args.includes('--phases')), '--trace uses --trace-phase')
@@ -92,8 +98,10 @@ const variantIds = selectedVariants(
     : ['ghostty-webgpu', 'xterm-webgl'],
 )
 const s = manifest.settings
+const gpuCommandTimeoutMilliseconds = gpuCommandTimeout(s, tracing)
+const gpuSettings = { ...s, gpuCommandTimeoutMilliseconds }
 const ownedComputePids = []
-const gpuGate = createGpuGate(s, { allowedComputePids: ownedComputePids })
+const gpuGate = createGpuGate(gpuSettings, { allowedComputePids: ownedComputePids })
 if (!smoke && platform() === 'darwin') {
   const power = execFileSync('/usr/bin/pmset', ['-g', 'batt'], { encoding: 'utf8' })
   assert(power.includes("'AC Power'"), 'waiting for AC')
@@ -108,18 +116,14 @@ const latencySamples = positiveInteger(
   s.latencySamples,
 )
 const outputFrames = positiveInteger(args, '--output-frames', s.outputFrames)
+const selectedOutputFixture = outputFixture(args, manifest.fixtures)
 const tickSeconds =
   platform() === 'linux'
     ? 1 / Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
     : null
 const cpuOptions = { tickSeconds }
 const traceFrames = positiveInteger(args, '--trace-frames', 180)
-const tracePhases = selection(
-  args,
-  '--trace-phase',
-  ['latency', 'ascii', 'sgr'],
-  ['latency', 'ascii', 'sgr'],
-)
+const tracePhases = selectedTracePhases(args, manifest.fixtures)
 await prepareOutput(output, { tracing })
 const temporary = join(root, 'tmp')
 await mkdir(temporary, { recursive: true })
@@ -194,21 +198,24 @@ const artifact = {
   manifest,
   smoke,
   tracing,
+  gpuCommandTimeoutMilliseconds,
   repetitions: smoke ? 1 : repetitions,
   latencySamples,
   outputFrames,
+  outputFixture: selectedOutputFixture,
   cpuTickSeconds: tickSeconds,
   counts,
   variants: variantIds,
   phases,
   frameBuilders: builders,
+  accessibility,
   paths: tracing ? ['bytes'] : writePaths,
   fixtures,
   hardware: false,
   measurementBudgetMilliseconds:
     counts.length *
     (tracing ? 1 : writePaths.length) *
-    (variantIds.length + (variantIds.includes('ghostty-webgpu') ? builders.length - 1 : 0)) *
+    measurementCases(variantIds, ['bytes'], [1], builders, 0).length *
     (smoke ? 1 : repetitions) *
     s.caseDeadlineMilliseconds,
   startedAt: new Date().toISOString(),
@@ -403,7 +410,7 @@ async function parserOnly(testCase, run, contexts) {
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message))
     await page.goto(
-      `${origin}/?${new URLSearchParams({ ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
+      `${origin}/?${new URLSearchParams({ accessibility, ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.evaluate((testCase) => window.__compare.initialize(testCase), testCase)
@@ -449,7 +456,9 @@ async function measure(testCase, repetition, browserSession) {
       { drain: true },
     )
     result.status =
-      result.error || result.phases?.some((phase) => phase.error) ? 'failed' : 'complete'
+      result.error || diagnosticFailed(result) || result.phases?.some((phase) => phase.error)
+        ? 'failed'
+        : 'complete'
     return result
   } catch (error) {
     if (String(error).includes('Mac display unavailable')) throw error
@@ -510,9 +519,9 @@ async function qualifiedWindow(run, label, operation) {
     await refreshGpuOwnership()
     const idle = await gpuGate.waitForIdle()
     run.gpuWindows.push({ label, idle })
-    const sampleMilliseconds = ['idle', 'output/ascii', 'latency', 'delayed-write'].includes(label)
-      ? s.gpuMeasuredSampleMilliseconds
-      : s.gpuSampleMilliseconds
+    const measured =
+      ['idle', 'latency', 'delayed-write'].includes(label) || label.startsWith('output/')
+    const sampleMilliseconds = measured ? s.gpuMeasuredSampleMilliseconds : s.gpuSampleMilliseconds
     const { value, gpu } = await gpuGate.monitorWindow(operation, { sampleMilliseconds })
     run.gpuWindows.at(-1).window = gpu
     const skipped = idle.skipReason ?? gpu.skipReason ?? run.gpuIdle?.skipped
@@ -569,16 +578,12 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  run.originalUnicodeTrace = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
-    const prefix = 'legacy-original-unicode '
-    if (message.text().startsWith(prefix))
-      run.originalUnicodeTrace.push(JSON.parse(message.text().slice(prefix.length)))
   })
   try {
     await page.goto(
-      `${origin}/?${new URLSearchParams({ ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
+      `${origin}/?${new URLSearchParams({ accessibility, ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.bringToFront()
@@ -643,11 +648,33 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       run.phase = 'diagnostic/legacy-empty-write'
       run.emptyWriteProbe = await page.evaluate(() => window.__compare.legacyEmptyWrite())
       assert.deepEqual(errors, [])
-      run.phase = 'diagnostic/legacy-original-unicode'
-      run.originalUnicodeProbe = await page
-        .evaluate(() => window.__compare.legacyOriginalUnicode())
-        .catch((error) => ({ error: String(error.stack ?? error) }))
+      if (testCase.variant === 'ghostty-web') {
+        const diagnosticOptions = {
+          launchOptions: {
+            channel: platform() === 'linux' && headless ? undefined : 'chromium',
+            headless,
+            args: browserArgs,
+            env: launchEnv,
+          },
+          contextOptions: { viewport: s.viewport, deviceScaleFactor: s.dpr },
+          origin,
+          testCase,
+          contexts,
+        }
+        run.phase = 'diagnostic/legacy-write-control'
+        run.legacyWriteControl = await legacyDiagnostic({
+          ...diagnosticOptions,
+          method: 'legacyWriteControl',
+        })
+        run.phase = 'diagnostic/legacy-original-unicode'
+        run.originalUnicodeProbe = await legacyDiagnostic({
+          ...diagnosticOptions,
+          method: 'legacyOriginalUnicode',
+        })
+        run.originalUnicodeTrace = run.originalUnicodeProbe.trace
+      }
       if (args.includes('--smoke-instrumentation')) {
+        run.phase = 'smoke/instrumentation'
         await page.evaluate(() => window.__compare.traceBegin())
         await page.evaluate(() => window.__compare.burst('ascii', 2))
         run.instrumentationCheck = await page.evaluate(() => window.__compare.traceEnd())
@@ -669,7 +696,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       run.phases = []
       const configurations = [
         { name: 'latency', operation: () => latency(page, session) },
-        ...['ascii', 'sgr'].map((name) => ({
+        ...manifest.fixtures.map(({ name }) => ({
           name,
           operation: () =>
             page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
@@ -735,18 +762,24 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       )
     }
     if (phases.includes('output')) {
-      run.phase = 'output/ascii/warmup'
-      await page.evaluate(() => window.__compare.burst('ascii', 3))
-      run.phase = 'output/ascii'
-      const outputMeasurement = await qualifiedWindow(run, 'output/ascii', () =>
+      run.phase = `output/${selectedOutputFixture}/warmup`
+      await page.evaluate((name) => window.__compare.burst(name, 3), selectedOutputFixture)
+      run.phase = `output/${selectedOutputFixture}`
+      const outputMeasurement = await qualifiedWindow(run, run.phase, () =>
         measureCpu(
           browserSession,
-          () => page.evaluate((frames) => window.__compare.burst('ascii', frames), outputFrames),
+          () =>
+            page.evaluate(({ name, frames }) => window.__compare.burst(name, frames), {
+              name: selectedOutputFixture,
+              frames: outputFrames,
+            }),
           cpuOptions,
         ),
       )
       run.output = {
         ...outputMeasurement.sample,
+        fixture: selectedOutputFixture,
+        input: manifest.fixtures.find(({ name }) => name === selectedOutputFixture),
         cpu: outputMeasurement.cpu,
         memory: phases.includes('memory') ? await memory(page, session, browserSession) : undefined,
       }
@@ -824,7 +857,7 @@ try {
         : null,
   }
   artifact.environment.gpuIdleSettings = Object.fromEntries(
-    Object.entries(s).filter(([key]) => key.startsWith('gpu')),
+    Object.entries(gpuSettings).filter(([key]) => key.startsWith('gpu')),
   )
   for (let repetition = 0; repetition < artifact.repetitions; repetition++) {
     if (!smoke) {
@@ -870,7 +903,7 @@ try {
       )
       artifact.runs.push(await measure(testCase, repetition, browserSession))
       await writeFile(artifactPath, JSON.stringify(artifact, null, 2) + '\n')
-      if (artifact.runs.at(-1).error)
+      if (artifact.runs.at(-1).status === 'failed')
         console.error(
           `Failed case retained: ${testCase.variant}/${testCase.path}/${testCase.count}`,
         )
@@ -892,6 +925,24 @@ try {
   throw error
 } finally {
   await writeFile(artifactPath, JSON.stringify(artifact, null, 2) + '\n')
+  await writeFile(
+    join(output, 'qualification.json'),
+    JSON.stringify(
+      {
+        environment: artifact.environment,
+        qualifications: artifact.qualifications,
+        gpuCommandTimeoutMilliseconds: artifact.gpuCommandTimeoutMilliseconds,
+        runs: artifact.runs.map(({ variant, count, repetition, gpuWindows }) => ({
+          variant,
+          count,
+          repetition,
+          gpuWindows,
+        })),
+      },
+      null,
+      2,
+    ) + '\n',
+  )
   await browser?.close()
   echo.close()
   await new Promise((resolve) => server.close(resolve))
@@ -899,7 +950,11 @@ try {
 console.log(`Artifact: ${artifactPath}`)
 if (
   artifact.runs.some(
-    (run) => run.error || run.parserErrors?.length || run.phases?.some((phase) => phase.error),
+    (run) =>
+      run.error ||
+      diagnosticFailed(run) ||
+      run.parserErrors?.length ||
+      run.phases?.some((phase) => phase.error),
   )
 )
   process.exitCode = 1

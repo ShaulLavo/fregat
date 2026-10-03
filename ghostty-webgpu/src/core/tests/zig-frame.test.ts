@@ -5,6 +5,7 @@ import type { ZigFrameBuilder, ZigFrameOptions } from '../zig-frame.js'
 import type { AtlasGlyph } from '../../render/atlas/types.js'
 import { InstanceRows } from '../../render/instances/rows.js'
 import { defaultRendererTheme } from '../../render/instances/types.js'
+import { zigFrameContents, zigFrameCursorStyles } from './zig-frame-fixtures.js'
 
 let runtime: GhosttyRuntime | undefined
 let builder: ZigFrameBuilder | undefined
@@ -53,13 +54,7 @@ function readyFrame(frameOptions = options): void {
 }
 
 describe('WASM frame differential parity', () => {
-  it.each([
-    'plain ASCII abc 123',
-    '\x1b[31;44mANSI\x1b[0m default',
-    '\x1b[38;5;202;48;5;17mindexed',
-    '\x1b[38;2;19;91;173;48;2;31;42;53mtruecolor',
-    '\x1b[1;3;2;4;7;9;53mstyled\x1b[0m\x1b[8mhidden',
-  ])('matches JS instance bytes for %j', async (content) => {
+  it.each(zigFrameContents)('matches JS instance bytes for %j', async (content) => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 32, rows: 3 })
     const state = runtime.createRenderState(terminal)
@@ -83,30 +78,27 @@ describe('WASM frame differential parity', () => {
     expect(builder.changedRanges()).toEqual(updates)
   })
 
-  it.each(['block', 'bar', 'underline', 'outline'] as const)(
-    'matches the JS %s cursor',
-    async (style) => {
-      runtime = await GhosttyRuntime.create()
-      const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
-      const state = runtime.createRenderState(terminal)
-      terminal.write('ABC')
-      state.update()
-      builder = state.createFrameBuilder(8, 2)
-      const cursor = { style, visible: true, x: 1, y: 0 }
-      readyFrame({ ...options, cursor })
-      const js = new InstanceRows({ columns: 8, rows: 2, cellWidth: 8, cellHeight: 16 })
-      for (const row of state.readRows())
-        js.rebuildRow(
-          row,
-          { beginRow() {}, resolve: () => ({ glyph, invalidatedRows: [] }) },
-          { rasterize: () => bitmap },
-          options.theme,
-          cursor,
-        )
-      expect(builder.cellData).toEqual(js.cellData)
-      expect(builder.glyphData).toEqual(js.glyphData)
-    },
-  )
+  it.each(zigFrameCursorStyles)('matches the JS %s cursor', async (style) => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('ABC')
+    state.update()
+    builder = state.createFrameBuilder(8, 2)
+    const cursor = { style, visible: true, x: 1, y: 0 }
+    readyFrame({ ...options, cursor })
+    const js = new InstanceRows({ columns: 8, rows: 2, cellWidth: 8, cellHeight: 16 })
+    for (const row of state.readRows())
+      js.rebuildRow(
+        row,
+        { beginRow() {}, resolve: () => ({ glyph, invalidatedRows: [] }) },
+        { rasterize: () => bitmap },
+        options.theme,
+        cursor,
+      )
+    expect(builder.cellData).toEqual(js.cellData)
+    expect(builder.glyphData).toEqual(js.glyphData)
+  })
 
   it('retains clean rows, reports changed ranges, and refreshes memory views after growth', async () => {
     runtime = await GhosttyRuntime.create()
@@ -161,8 +153,49 @@ describe('WASM frame differential parity', () => {
     expect(builder.build({ ...options, full: false })).toBe(0)
     expect(builder.changedRanges()).toEqual([])
     readyFrame({ ...options, full: false, overlayRows: new Set([2]) })
-    expect(builder.changedRanges()).toEqual([])
+    expect(builder.changedRanges()).toEqual([
+      {
+        row: 2,
+        invalidatedRows: [],
+        cell: { byteOffset: 2 * 12 * 64, byteLength: 0 },
+        glyph: { byteOffset: 2 * 12 * 96, byteLength: 0 },
+      },
+    ])
   })
+
+  it.each([0, 1])(
+    'reports concealed text changes in logical row %s without GPU uploads',
+    async (row) => {
+      runtime = await GhosttyRuntime.create()
+      const terminal = runtime.createTerminal({ columns: 8, rows: 2 })
+      const state = runtime.createRenderState(terminal)
+      const position = `\x1b[${row + 1};1H`
+      terminal.write(`\x1b[?25l${position}\x1b[8mA${position}`)
+      state.update()
+      builder = state.createFrameBuilder(8, 2)
+      readyFrame()
+      expect(state.readTextRows({ rows: new Set([row]) })[0]!.cells[0]).toBe('A')
+      const previousCells = builder.cellData.slice()
+      const previousGlyphs = builder.glyphData.slice()
+      state.acknowledge()
+
+      terminal.write(`B${position}`)
+      state.update()
+      expect(state.readRows({ dirtyOnly: true }).map((value) => value.y)).toEqual([row])
+      expect(state.readTextRows({ rows: new Set([row]) })[0]!.cells[0]).toBe('B')
+      readyFrame({ ...options, full: false })
+      expect(builder.cellData).toEqual(previousCells)
+      expect(builder.glyphData).toEqual(previousGlyphs)
+      expect(builder.changedRanges()).toEqual([
+        {
+          row,
+          invalidatedRows: [],
+          cell: { byteOffset: row * 8 * 64, byteLength: 0 },
+          glyph: { byteOffset: row * 8 * 96, byteLength: 0 },
+        },
+      ])
+    },
+  )
 
   it('preserves changed cell bytes through a new-glyph retry', async () => {
     runtime = await GhosttyRuntime.create()

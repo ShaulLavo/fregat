@@ -1,0 +1,1263 @@
+{
+  "source": "a8c481489",
+  "ghosttyRevision": "c8554f28e0efe2f5595f32020371c34b25ec628f",
+  "versions": {
+    "@xterm/xterm": "6.0.0",
+    "@xterm/addon-unicode11": "0.9.0",
+    "@xterm/addon-unicode-graphemes": "0.4.0",
+    "@fontsource/jetbrains-mono": "5.3.0"
+  },
+  "browser": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) T3Code(Alpha)/0.0.44 Chrome/152.0.7977.130 Electron/44.4.2 Safari/537.36",
+    "dpr": 2,
+    "font": "Bench Mono",
+    "size": 12,
+    "lineHeight": 1.2
+  },
+  "text": "ZWJ 👩‍💻 👨‍👩‍👧‍👦|",
+  "nativeChecks": [
+    {
+      "backend": "dom",
+      "mode2027": "off",
+      "cursorX": 18,
+      "cellWidth": 7,
+      "packedMatchesDirectAbi": true
+    },
+    {
+      "backend": "dom",
+      "mode2027": "on",
+      "cursorX": 10,
+      "cellWidth": 7,
+      "packedMatchesDirectAbi": true
+    },
+    {
+      "backend": "canvas",
+      "mode2027": "off",
+      "cursorX": 18,
+      "cellWidth": 7,
+      "packedMatchesDirectAbi": true
+    },
+    {
+      "backend": "canvas",
+      "mode2027": "on",
+      "cursorX": 10,
+      "cellWidth": 7,
+      "packedMatchesDirectAbi": true
+    },
+    {
+      "backend": "webgl",
+      "mode2027": "off",
+      "cursorX": 18,
+      "cellWidth": 7,
+      "packedMatchesDirectAbi": true
+    },
+    {
+      "backend": "webgl",
+      "mode2027": "on",
+      "cursorX": 10,
+      "cellWidth": 7,
+      "packedMatchesDirectAbi": true
+    }
+  ],
+  "native": [
+    {
+      "mode2027": "off",
+      "cursor": {
+        "pendingWrap": false,
+        "visible": true,
+        "x": 18,
+        "y": 2
+      },
+      "rawRow": [
+        {
+          "codepoints": [90],
+          "continuation": false,
+          "text": "Z",
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "continuation": false,
+          "text": "W",
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "continuation": false,
+          "text": "J",
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "continuation": false,
+          "text": " ",
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205],
+          "continuation": false,
+          "text": "👩‍",
+          "x": 4
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 5
+        },
+        {
+          "codepoints": [128187],
+          "continuation": false,
+          "text": "💻",
+          "x": 6
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 7
+        },
+        {
+          "codepoints": [32],
+          "continuation": false,
+          "text": " ",
+          "x": 8
+        },
+        {
+          "codepoints": [128104, 8205],
+          "continuation": false,
+          "text": "👨‍",
+          "x": 9
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 10
+        },
+        {
+          "codepoints": [128105, 8205],
+          "continuation": false,
+          "text": "👩‍",
+          "x": 11
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 12
+        },
+        {
+          "codepoints": [128103, 8205],
+          "continuation": false,
+          "text": "👧‍",
+          "x": 13
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 14
+        },
+        {
+          "codepoints": [128102],
+          "continuation": false,
+          "text": "👦",
+          "x": 15
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 16
+        },
+        {
+          "codepoints": [124],
+          "continuation": false,
+          "text": "|",
+          "x": 17
+        }
+      ],
+      "packedRow": [
+        {
+          "codepoints": [90],
+          "continuation": false,
+          "text": "Z",
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "continuation": false,
+          "text": "W",
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "continuation": false,
+          "text": "J",
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "continuation": false,
+          "text": " ",
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205],
+          "continuation": false,
+          "text": "👩‍",
+          "x": 4
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 5
+        },
+        {
+          "codepoints": [128187],
+          "continuation": false,
+          "text": "💻",
+          "x": 6
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 7
+        },
+        {
+          "codepoints": [32],
+          "continuation": false,
+          "text": " ",
+          "x": 8
+        },
+        {
+          "codepoints": [128104, 8205],
+          "continuation": false,
+          "text": "👨‍",
+          "x": 9
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 10
+        },
+        {
+          "codepoints": [128105, 8205],
+          "continuation": false,
+          "text": "👩‍",
+          "x": 11
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 12
+        },
+        {
+          "codepoints": [128103, 8205],
+          "continuation": false,
+          "text": "👧‍",
+          "x": 13
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 14
+        },
+        {
+          "codepoints": [128102],
+          "continuation": false,
+          "text": "👦",
+          "x": 15
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 16
+        },
+        {
+          "codepoints": [124],
+          "continuation": false,
+          "text": "|",
+          "x": 17
+        }
+      ],
+      "spans": [
+        {
+          "span": 1,
+          "text": "Z",
+          "x": 0
+        },
+        {
+          "span": 1,
+          "text": "W",
+          "x": 1
+        },
+        {
+          "span": 1,
+          "text": "J",
+          "x": 2
+        },
+        {
+          "span": 1,
+          "text": " ",
+          "x": 3
+        },
+        {
+          "span": 2,
+          "text": "👩‍",
+          "x": 4
+        },
+        {
+          "span": 2,
+          "text": "💻",
+          "x": 6
+        },
+        {
+          "span": 1,
+          "text": " ",
+          "x": 8
+        },
+        {
+          "span": 2,
+          "text": "👨‍",
+          "x": 9
+        },
+        {
+          "span": 2,
+          "text": "👩‍",
+          "x": 11
+        },
+        {
+          "span": 2,
+          "text": "👧‍",
+          "x": 13
+        },
+        {
+          "span": 2,
+          "text": "👦",
+          "x": 15
+        },
+        {
+          "span": 1,
+          "text": "|",
+          "x": 17
+        }
+      ],
+      "selection": "ASCII|\nwide 日本語 é|\nZWJ 👩‍💻 👨‍👩‍👧‍👦|",
+      "history": [
+        {
+          "text": "ASCII|",
+          "wrapped": false
+        },
+        {
+          "text": "wide 日本語 é|",
+          "wrapped": false
+        },
+        {
+          "text": "ZWJ 👩‍💻 👨‍👩‍👧‍👦|",
+          "wrapped": false
+        }
+      ]
+    },
+    {
+      "mode2027": "on",
+      "cursor": {
+        "pendingWrap": false,
+        "visible": true,
+        "x": 10,
+        "y": 2
+      },
+      "rawRow": [
+        {
+          "codepoints": [90],
+          "continuation": false,
+          "text": "Z",
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "continuation": false,
+          "text": "W",
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "continuation": false,
+          "text": "J",
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "continuation": false,
+          "text": " ",
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205, 128187],
+          "continuation": false,
+          "text": "👩‍💻",
+          "x": 4
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 5
+        },
+        {
+          "codepoints": [32],
+          "continuation": false,
+          "text": " ",
+          "x": 6
+        },
+        {
+          "codepoints": [128104, 8205, 128105, 8205, 128103, 8205, 128102],
+          "continuation": false,
+          "text": "👨‍👩‍👧‍👦",
+          "x": 7
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 8
+        },
+        {
+          "codepoints": [124],
+          "continuation": false,
+          "text": "|",
+          "x": 9
+        }
+      ],
+      "packedRow": [
+        {
+          "codepoints": [90],
+          "continuation": false,
+          "text": "Z",
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "continuation": false,
+          "text": "W",
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "continuation": false,
+          "text": "J",
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "continuation": false,
+          "text": " ",
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205, 128187],
+          "continuation": false,
+          "text": "👩‍💻",
+          "x": 4
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 5
+        },
+        {
+          "codepoints": [32],
+          "continuation": false,
+          "text": " ",
+          "x": 6
+        },
+        {
+          "codepoints": [128104, 8205, 128105, 8205, 128103, 8205, 128102],
+          "continuation": false,
+          "text": "👨‍👩‍👧‍👦",
+          "x": 7
+        },
+        {
+          "codepoints": [],
+          "continuation": true,
+          "text": "",
+          "x": 8
+        },
+        {
+          "codepoints": [124],
+          "continuation": false,
+          "text": "|",
+          "x": 9
+        }
+      ],
+      "spans": [
+        {
+          "span": 1,
+          "text": "Z",
+          "x": 0
+        },
+        {
+          "span": 1,
+          "text": "W",
+          "x": 1
+        },
+        {
+          "span": 1,
+          "text": "J",
+          "x": 2
+        },
+        {
+          "span": 1,
+          "text": " ",
+          "x": 3
+        },
+        {
+          "span": 2,
+          "text": "👩‍💻",
+          "x": 4
+        },
+        {
+          "span": 1,
+          "text": " ",
+          "x": 6
+        },
+        {
+          "span": 2,
+          "text": "👨‍👩‍👧‍👦",
+          "x": 7
+        },
+        {
+          "span": 1,
+          "text": "|",
+          "x": 9
+        }
+      ],
+      "selection": "ASCII|\nwide 日本語 é|\nZWJ 👩‍💻 👨‍👩‍👧‍👦|",
+      "history": [
+        {
+          "text": "ASCII|",
+          "wrapped": false
+        },
+        {
+          "text": "wide 日本語 é|",
+          "wrapped": false
+        },
+        {
+          "text": "ZWJ 👩‍💻 👨‍👩‍👧‍👦|",
+          "wrapped": false
+        }
+      ]
+    }
+  ],
+  "xterm": [
+    {
+      "backend": "dom",
+      "unicode": "6",
+      "cursor": {
+        "x": 12,
+        "y": 2
+      },
+      "cellWidth": 7.2,
+      "row": [
+        {
+          "codepoints": [90],
+          "text": "Z",
+          "width": 1,
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "text": "W",
+          "width": 1,
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "text": "J",
+          "width": 1,
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205],
+          "text": "👩‍",
+          "width": 1,
+          "x": 4
+        },
+        {
+          "codepoints": [128187],
+          "text": "💻",
+          "width": 1,
+          "x": 5
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 6
+        },
+        {
+          "codepoints": [128104, 8205],
+          "text": "👨‍",
+          "width": 1,
+          "x": 7
+        },
+        {
+          "codepoints": [128105, 8205],
+          "text": "👩‍",
+          "width": 1,
+          "x": 8
+        },
+        {
+          "codepoints": [128103, 8205],
+          "text": "👧‍",
+          "width": 1,
+          "x": 9
+        },
+        {
+          "codepoints": [128102],
+          "text": "👦",
+          "width": 1,
+          "x": 10
+        },
+        {
+          "codepoints": [124],
+          "text": "|",
+          "width": 1,
+          "x": 11
+        }
+      ],
+      "dom": {
+        "rect": {
+          "width": 288,
+          "x": 30
+        },
+        "spans": [
+          {
+            "style": null,
+            "text": "ZWJ ",
+            "width": 28.8515625,
+            "x": 30
+          },
+          {
+            "style": "letter-spacing: -4.8px;",
+            "text": "👩‍💻",
+            "width": 7.203125,
+            "x": 58.8515625
+          },
+          {
+            "style": null,
+            "text": " ",
+            "width": 7.21875,
+            "x": 66.0546875
+          },
+          {
+            "style": "letter-spacing: -4.8px;",
+            "text": "👨‍👩‍👧‍👦",
+            "width": 7.203125,
+            "x": 73.2734375
+          },
+          {
+            "style": null,
+            "text": "|",
+            "width": 7.21875,
+            "x": 80.4765625
+          },
+          {
+            "style": null,
+            "text": " ",
+            "width": 7.21875,
+            "x": 87.6953125
+          }
+        ],
+        "text": "ZWJ 👩‍💻 👨‍👩‍👧‍👦| "
+      },
+      "dsr": ["\u001b[3;13R"]
+    },
+    {
+      "backend": "webgl",
+      "unicode": "6",
+      "cursor": {
+        "x": 12,
+        "y": 2
+      },
+      "cellWidth": 7,
+      "row": [
+        {
+          "codepoints": [90],
+          "text": "Z",
+          "width": 1,
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "text": "W",
+          "width": 1,
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "text": "J",
+          "width": 1,
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205],
+          "text": "👩‍",
+          "width": 1,
+          "x": 4
+        },
+        {
+          "codepoints": [128187],
+          "text": "💻",
+          "width": 1,
+          "x": 5
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 6
+        },
+        {
+          "codepoints": [128104, 8205],
+          "text": "👨‍",
+          "width": 1,
+          "x": 7
+        },
+        {
+          "codepoints": [128105, 8205],
+          "text": "👩‍",
+          "width": 1,
+          "x": 8
+        },
+        {
+          "codepoints": [128103, 8205],
+          "text": "👧‍",
+          "width": 1,
+          "x": 9
+        },
+        {
+          "codepoints": [128102],
+          "text": "👦",
+          "width": 1,
+          "x": 10
+        },
+        {
+          "codepoints": [124],
+          "text": "|",
+          "width": 1,
+          "x": 11
+        }
+      ],
+      "dsr": ["\u001b[3;13R"]
+    },
+    {
+      "backend": "dom",
+      "unicode": "11",
+      "cursor": {
+        "x": 18,
+        "y": 2
+      },
+      "cellWidth": 7.2,
+      "row": [
+        {
+          "codepoints": [90],
+          "text": "Z",
+          "width": 1,
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "text": "W",
+          "width": 1,
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "text": "J",
+          "width": 1,
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205],
+          "text": "👩‍",
+          "width": 2,
+          "x": 4
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 5
+        },
+        {
+          "codepoints": [128187],
+          "text": "💻",
+          "width": 2,
+          "x": 6
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 7
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 8
+        },
+        {
+          "codepoints": [128104, 8205],
+          "text": "👨‍",
+          "width": 2,
+          "x": 9
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 10
+        },
+        {
+          "codepoints": [128105, 8205],
+          "text": "👩‍",
+          "width": 2,
+          "x": 11
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 12
+        },
+        {
+          "codepoints": [128103, 8205],
+          "text": "👧‍",
+          "width": 2,
+          "x": 13
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 14
+        },
+        {
+          "codepoints": [128102],
+          "text": "👦",
+          "width": 2,
+          "x": 15
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 16
+        },
+        {
+          "codepoints": [124],
+          "text": "|",
+          "width": 1,
+          "x": 17
+        }
+      ],
+      "dom": {
+        "rect": {
+          "width": 288,
+          "x": 30
+        },
+        "spans": [
+          {
+            "style": null,
+            "text": "ZWJ ",
+            "width": 28.8515625,
+            "x": 30
+          },
+          {
+            "style": "letter-spacing: 2.4px;",
+            "text": "👩‍💻",
+            "width": 14.40625,
+            "x": 58.8515625
+          },
+          {
+            "style": null,
+            "text": " ",
+            "width": 7.21875,
+            "x": 73.2578125
+          },
+          {
+            "style": "letter-spacing: 2.4px;",
+            "text": "👨‍👩‍👧‍👦",
+            "width": 14.40625,
+            "x": 80.4765625
+          },
+          {
+            "style": null,
+            "text": "|",
+            "width": 7.21875,
+            "x": 94.8828125
+          },
+          {
+            "style": null,
+            "text": " ",
+            "width": 7.21875,
+            "x": 102.1015625
+          }
+        ],
+        "text": "ZWJ 👩‍💻 👨‍👩‍👧‍👦| "
+      },
+      "dsr": ["\u001b[3;19R"]
+    },
+    {
+      "backend": "webgl",
+      "unicode": "11",
+      "cursor": {
+        "x": 18,
+        "y": 2
+      },
+      "cellWidth": 7,
+      "row": [
+        {
+          "codepoints": [90],
+          "text": "Z",
+          "width": 1,
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "text": "W",
+          "width": 1,
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "text": "J",
+          "width": 1,
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205],
+          "text": "👩‍",
+          "width": 2,
+          "x": 4
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 5
+        },
+        {
+          "codepoints": [128187],
+          "text": "💻",
+          "width": 2,
+          "x": 6
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 7
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 8
+        },
+        {
+          "codepoints": [128104, 8205],
+          "text": "👨‍",
+          "width": 2,
+          "x": 9
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 10
+        },
+        {
+          "codepoints": [128105, 8205],
+          "text": "👩‍",
+          "width": 2,
+          "x": 11
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 12
+        },
+        {
+          "codepoints": [128103, 8205],
+          "text": "👧‍",
+          "width": 2,
+          "x": 13
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 14
+        },
+        {
+          "codepoints": [128102],
+          "text": "👦",
+          "width": 2,
+          "x": 15
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 16
+        },
+        {
+          "codepoints": [124],
+          "text": "|",
+          "width": 1,
+          "x": 17
+        }
+      ],
+      "dsr": ["\u001b[3;19R"]
+    },
+    {
+      "backend": "dom",
+      "unicode": "15-graphemes",
+      "cursor": {
+        "x": 10,
+        "y": 2
+      },
+      "cellWidth": 7.2,
+      "row": [
+        {
+          "codepoints": [90],
+          "text": "Z",
+          "width": 1,
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "text": "W",
+          "width": 1,
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "text": "J",
+          "width": 1,
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205, 128187],
+          "text": "👩‍💻",
+          "width": 2,
+          "x": 4
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 5
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 6
+        },
+        {
+          "codepoints": [128104, 8205, 128105, 8205, 128103, 8205, 128102],
+          "text": "👨‍👩‍👧‍👦",
+          "width": 2,
+          "x": 7
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 8
+        },
+        {
+          "codepoints": [124],
+          "text": "|",
+          "width": 1,
+          "x": 9
+        }
+      ],
+      "dom": {
+        "rect": {
+          "width": 288,
+          "x": 30
+        },
+        "spans": [
+          {
+            "style": null,
+            "text": "ZWJ ",
+            "width": 28.8515625,
+            "x": 30
+          },
+          {
+            "style": "letter-spacing: 2.4px;",
+            "text": "👩‍💻",
+            "width": 14.40625,
+            "x": 58.8515625
+          },
+          {
+            "style": null,
+            "text": " ",
+            "width": 7.21875,
+            "x": 73.2578125
+          },
+          {
+            "style": "letter-spacing: 2.4px;",
+            "text": "👨‍👩‍👧‍👦",
+            "width": 14.40625,
+            "x": 80.4765625
+          },
+          {
+            "style": null,
+            "text": "|",
+            "width": 7.21875,
+            "x": 94.8828125
+          },
+          {
+            "style": null,
+            "text": " ",
+            "width": 7.21875,
+            "x": 102.1015625
+          }
+        ],
+        "text": "ZWJ 👩‍💻 👨‍👩‍👧‍👦| "
+      },
+      "dsr": ["\u001b[3;11R"]
+    },
+    {
+      "backend": "webgl",
+      "unicode": "15-graphemes",
+      "cursor": {
+        "x": 10,
+        "y": 2
+      },
+      "cellWidth": 7,
+      "row": [
+        {
+          "codepoints": [90],
+          "text": "Z",
+          "width": 1,
+          "x": 0
+        },
+        {
+          "codepoints": [87],
+          "text": "W",
+          "width": 1,
+          "x": 1
+        },
+        {
+          "codepoints": [74],
+          "text": "J",
+          "width": 1,
+          "x": 2
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 3
+        },
+        {
+          "codepoints": [128105, 8205, 128187],
+          "text": "👩‍💻",
+          "width": 2,
+          "x": 4
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 5
+        },
+        {
+          "codepoints": [32],
+          "text": " ",
+          "width": 1,
+          "x": 6
+        },
+        {
+          "codepoints": [128104, 8205, 128105, 8205, 128103, 8205, 128102],
+          "text": "👨‍👩‍👧‍👦",
+          "width": 2,
+          "x": 7
+        },
+        {
+          "codepoints": [],
+          "text": "",
+          "width": 0,
+          "x": 8
+        },
+        {
+          "codepoints": [124],
+          "text": "|",
+          "width": 1,
+          "x": 9
+        }
+      ],
+      "dsr": ["\u001b[3;11R"]
+    }
+  ],
+  "browserWidths": [
+    {
+      "text": "ASCII|",
+      "width": 43.199981689453125
+    },
+    {
+      "text": "wide 日本語 é|",
+      "width": 94.35597229003906
+    },
+    {
+      "text": "ZWJ 👩‍💻 👨‍👩‍👧‍👦|",
+      "width": 73.19998168945312
+    }
+  ]
+}
