@@ -8,7 +8,7 @@ import type { JobDuringRun } from './record'
 type Run = JobDuringRun & { readonly quiet: boolean }
 type Journal = Record<string, JobDuringRun>
 
-/** Launch and settlement share a short mutex, independent of asynchronous orphan admission. */
+/** Publishes the spawn interval; the caller keeps manager preparation and cleanup outside. */
 export function beginRun<T>(stateDir: string, entry: Entry, launch: () => T): T {
   return underLock(stateDir, () => {
     const owners = new Set(live(stateDir, 'jobs').map((job) => job.id))

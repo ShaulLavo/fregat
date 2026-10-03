@@ -246,9 +246,9 @@ async function run(options: Options) {
   try {
     // Read before launch: the job, or another session, may commit while it runs.
     const checkout = repositoryOf(cwd)
-    const job = placed.entry
-      ? beginRun(options.stateDir, placed.entry, () => startJob(placed.spec))
-      : startJob(placed.spec)
+    const job = startJob(placed.spec, (launch) =>
+      placed.entry ? beginRun(options.stateDir, placed.entry, launch) : launch(),
+    )
     // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
     // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {

@@ -122,7 +122,7 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
           endedAt: null,
           allowedCpus: [],
         })
-        expect(existsSync(path.join(box.state, 'quiet.holder'))).toBe(false)
+        expect(readFileSync(path.join(box.state, 'quiet.holder'), 'utf8')).toBe('')
         expect(existsSync(path.join(box.state, 'runs', `${measurement.requestId}.json`))).toBe(
           false,
         )
