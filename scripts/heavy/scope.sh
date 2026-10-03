@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside a systemd scope, so the cgroup still exists when the command exits and its totals
 # can be read. Bash, not Bun: this process is counted in the memory peak.
-# Usage: scope.sh [--slice] [--grace <seconds>] [--runtime <seconds>] [--deadline <boot cs>] <accounting file> <command…>
+# Usage: scope.sh [--slice] [--grace <seconds>] [--runtime <seconds>] [--startup <seconds>] [--deadline <boot cs>] <accounting file> <command…>
 # --slice: the job is the scope's parent slice (this scope and the scopes nested-scope.sh opened
 # beside it). Without it the job is this scope alone, as for a bench case inside a job.
 # --grace: seconds the job's leftover processes get between TERM and KILL (default 10).
@@ -15,12 +15,14 @@ whole_slice=
 grace=10
 runtime=
 absolute=
-while [ "${1:-}" = --slice ] || [ "${1:-}" = --grace ] || [ "${1:-}" = --runtime ] || [ "${1:-}" = --deadline ]; do
+startup=
+while [ "${1:-}" = --slice ] || [ "${1:-}" = --grace ] || [ "${1:-}" = --runtime ] || [ "${1:-}" = --startup ] || [ "${1:-}" = --deadline ]; do
   case "$1" in
     --slice) whole_slice=1; shift; continue ;;
     --grace) grace=$2 ;;
     --runtime) runtime=$2 ;;
     --deadline) absolute=$2 ;;
+    --startup) startup=$2 ;;
   esac
   shift 2
 done
@@ -38,7 +40,7 @@ if [ -n "$runtime" ]; then
   [ -z "$absolute" ] || [ "$absolute" -ge "$deadline" ] || deadline=$absolute
   remaining=$((deadline - 10#${started/./}))
   [ "$remaining" -gt 0 ] || exit 75
-  runtime_max=$(((remaining + 99) / 100 + grace))
+  printf -v runtime_max '%d.%02d' "$((remaining / 100 + grace))" "$((remaining % 100))"
   printf -v runtime '%d.%02d' "$((remaining / 100))" "$((remaining % 100))"
   slice=${HEAVY_JOB_SLICE:?}
   [[ "$slice" =~ ^[a-z0-9]+-[a-z0-9]+\.slice$ ]] || exit 125
@@ -47,8 +49,8 @@ if [ -n "$runtime" ]; then
   # Readiness gates execution. Arming inside the scope keeps a delayed launcher from recreating
   # a slice after its watchdog has expired; fd 6 protected that launcher until entry above.
   systemd-run --user --quiet --collect --expand-environment=no --unit="$watchdog" --slice=app.slice \
-    -p Type=notify -p NotifyAccess=all -p "TimeoutStartSec=$((grace + 3))s" \
-    -p "RuntimeMaxSec=${runtime_max}s" -p KillSignal=SIGKILL -p TimeoutStopSec=1s \
+    -p Type=notify -p NotifyAccess=all -p "TimeoutStartSec=${startup:?}s" \
+    -p "RuntimeMaxSec=${runtime_max}s" -p WatchdogSec=3s -p WatchdogSignal=SIGKILL -p KillSignal=SIGKILL -p TimeoutStopSec=1s \
     -p "ExecStopPost=/usr/bin/env systemctl --user kill --signal=SIGKILL $slice" \
     bash -p "$script" "$slice" "$runtime" "$grace" 3<&- 4<&- 5<&- || exit 125
   systemctl --user is-active --quiet "$watchdog" || exit 125

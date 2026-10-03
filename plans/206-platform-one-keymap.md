@@ -11,6 +11,16 @@
 - Greenfield: replace the preset and override settings without migration; delete obsolete tests,
   docs and persisted keybinding state.
 
+## Terminal launch contract
+
+Before the coordinated cutover, reconcile [205](205-ghostty-on-fregat-hotkeys.md)'s hotkeys
+extension and hosted focus-node adapter against active [286](286-ghostty-extensions.md)/
+[287](287-ghostty-worker-mode.md) work. Host claim/pass arbitration stays synchronous before
+native input encoding in both terminal entries. Verify app-bound keys are claimed once,
+unhandled and shell-bound keys reach the terminal once, text composition remains intact, and
+native protocol replies bypass host key hooks. Match registration/disposal to the landed host
+API; do not create a second dispatcher or make the whole terminal program a prerequisite.
+
 ## Why
 
 Platform runs one matcher today but does not decide its editor keys: `default-bindings.ts:42`

@@ -5,6 +5,10 @@ import path from 'node:path'
 import { scriptErrors } from '../structured-errors'
 import { DEFAULT_LIMITS } from './pi/lane-command'
 
+// Startup measured 8–17 ms; 10 seconds leaves scheduler headroom with a bounded READY wait.
+// The complete lease is startup + runtime + grace + 3 seconds for stop and slice cleanup.
+export const DEADLINE_START_SECONDS = 10
+
 export const SCOPE_SHIM = path.join(import.meta.dirname, 'scope.sh')
 // install.ts bundles pi/launch.ts beside run.js as pi/launch.js.
 export const PI_LAUNCHER = path.join(
@@ -77,7 +81,9 @@ export function localCommand({
     '--slice',
     '--grace',
     String(graceSeconds),
-    ...(runtimeLimitSeconds === null ? [] : ['--runtime', String(runtimeLimitSeconds)]),
+    ...(runtimeLimitSeconds === null
+      ? []
+      : ['--runtime', String(runtimeLimitSeconds), '--startup', String(DEADLINE_START_SECONDS)]),
     ...(runtimeDeadline === undefined
       ? []
       : ['--deadline', String(Math.floor(runtimeDeadline * 100))]),

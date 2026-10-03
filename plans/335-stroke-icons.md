@@ -4,6 +4,7 @@
 
 - Status: Approved. Owner decision 2026-10-03, after comparing Phosphor, Lucide, Tabler, Hugeicons, Iconoir, Solar Linear and Mynaui side by side at app size.
 - Four parts: stroke icons only, Hugeicons as the default, morphing icons, icon packs. Phases 1–3 (swap, MorphIcon, morph sites) are the current work. Phase 4 (icon packs) is Approved and scheduled later; it starts after Phase 3 ships, and may split into its own plan once its design is written.
+- Scheduling: [root roadmap](../PLAN.md#placement-of-the-large-additions) puts the broad swap after the keymap cutover and before broad new UI batches. Registry/mapping preparation can proceed earlier; Phases 1–3 remain the current approved scope.
 - Priority: P2. Effort: L (about 330 files touch an icon). Risk: low per file, concentrated in the filled/duotone call sites and the morph timing rules.
 - Planned against Fregat `4799803b7`. Before execution, rerun the counts below; they drift as features land.
 

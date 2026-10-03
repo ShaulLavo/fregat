@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 
 import { live } from './queue'
 import { bootSeconds, sliceState } from './admission'
-import { removeSlice } from './job'
+import { DEADLINE_START_SECONDS, removeSlice } from './job'
 import { tryLock, unlock } from './lock'
 import {
   alive,
@@ -159,6 +159,226 @@ describe.skipIf(!userScopes)('whole-slice deadlines (requires user systemd scope
     expect(unitActive(slice!)).toBe(false)
     expect(slotsFree(box)).toBe(true)
   }, 25_000)
+
+  test.each([false, true])(
+    'pre-notification delay stays within the lease (frozen watchdog=%s)',
+    async (freeze) => {
+      const box = deadlineBox(12)
+      writeSettings(box, {
+        ...JSON.parse(readFileSync(path.join(box.home, 'settings.json'), 'utf8')),
+        'developer.heavyJobStopGraceSeconds': 10,
+      })
+      const stranger = deadlineBox()
+      const canaryPid = path.join(stranger.root, 'canary.pid')
+      const canary = start(
+        stranger,
+        'canary',
+        ['bash', '-c', 'echo $$ > "$1"; exec sleep 60', '_', canaryPid],
+        { jobClass: 'light', machine: true },
+      )
+      const delayed = path.join(box.root, 'slow-deadline.sh')
+      writeFileSync(
+        delayed,
+        `sleep 7\nexec bash -p ${JSON.stringify(path.join(import.meta.dirname, 'deadline.sh'))} "$@"\n`,
+      )
+      const env = launcher(
+        box,
+        `args=("$@"); for i in "\${!args[@]}"; do case "\${args[i]}" in */deadline.sh) args[i]=${JSON.stringify(delayed)};; esac; done; exec ${systemdRun} "\${args[@]}"`,
+      )
+      const mainPid = path.join(box.root, 'main.pid')
+      const nestedPid = path.join(box.root, 'nested.pid')
+      const successorMarker = path.join(box.root, 'successor')
+      const release = path.join(box.root, 'release')
+      const owned = start(
+        box,
+        'slow-ready',
+        [
+          'bash',
+          '-c',
+          'trap "" TERM; bash "$1" --unit="$2" bash -c \'trap "" TERM; echo $$ > "$1"; exec sleep 60\' _ "$3" & until [ -s "$3" ]; do sleep 0.02; done; echo $$ > "$4"; exec sleep 60',
+          '_',
+          NESTED,
+          `${box.sliceRoot}-nested.scope`,
+          nestedPid,
+          mainPid,
+        ],
+        { quiet: true, jobClass: 'light', machine: true, env },
+      )
+      let next: ReturnType<typeof start> | undefined
+      let slice: string | undefined
+      try {
+        await expect
+          .poll(() => existsSync(mainPid) && existsSync(canaryPid), { timeout: 15_000 })
+          .toBe(true)
+        const owner = live(box.state, 'jobs').find((entry) => entry.label === 'slow-ready')!
+        slice = ownSlice(box.sliceRoot, owner.id)
+        expect(bootSeconds()).toBeLessThan(owner.quietUntil! - 10)
+        owned.child.kill('SIGSTOP')
+        if (freeze)
+          expect(
+            spawnSync('systemctl', [
+              '--user',
+              'kill',
+              '--kill-whom=main',
+              '--signal=SIGSTOP',
+              watchdogOf(slice),
+            ]).status,
+          ).toBe(0)
+        next = start(
+          box,
+          'ordinary-successor',
+          [
+            'bash',
+            '-c',
+            'touch "$1"; until [ -e "$2" ]; do sleep 0.02; done',
+            '_',
+            successorMarker,
+            release,
+          ],
+          { jobClass: 'light', machine: true },
+        )
+        await expect
+          .poll(() => alive(pidIn(mainPid)) || alive(pidIn(nestedPid)), { timeout: 23_000 })
+          .toBe(false)
+        const drainedAt = bootSeconds()
+        expect(drainedAt).toBeLessThan(owner.quietUntil!)
+        await expect
+          .poll(() => existsSync(successorMarker), {
+            timeout: (DEADLINE_START_SECONDS + 22) * 1000,
+          })
+          .toBe(true)
+        const state = {
+          mainAlive: alive(pidIn(mainPid)),
+          nestedAlive: alive(pidIn(nestedPid)),
+          slice: sliceState(box.sliceRoot, slice),
+          canaryAlive: alive(pidIn(canaryPid)),
+        }
+        console.log(
+          JSON.stringify({
+            event: 'pre-notification-lease',
+            freeze,
+            drainedAt,
+            watchdog: serviceState(watchdogOf(slice)),
+            now: bootSeconds(),
+            quietUntil: owner.quietUntil,
+            ...state,
+          }),
+        )
+        expect(state.mainAlive).toBe(false)
+        expect(state.nestedAlive).toBe(false)
+        expect(state.slice).not.toBe('running')
+        expect(state.canaryAlive).toBe(true)
+        expect(serviceState(watchdogOf(slice))).toBe('not-found')
+      } finally {
+        writeFileSync(release, '')
+        if (slice) killSlice(slice)
+        owned.child.kill('SIGCONT')
+        owned.child.kill('SIGTERM')
+        canary.child.kill('SIGTERM')
+        await Promise.all([owned.done, next?.done, canary.done])
+      }
+    },
+    50_000,
+  )
+
+  test('a watchdog frozen before READY is bounded by startup and kills only its owned slice', async () => {
+    const box = deadlineBox(20)
+    const stranger = deadlineBox()
+    const canaryPid = path.join(stranger.root, 'canary.pid')
+    const canary = start(
+      stranger,
+      'canary',
+      ['bash', '-c', 'echo $$ > "$1"; exec sleep 60', '_', canaryPid],
+      { jobClass: 'light', machine: true },
+    )
+    const frozen = path.join(box.root, 'frozen.pid')
+    const nestedPid = path.join(box.root, 'nested.pid')
+    const marker = path.join(box.root, 'payload')
+    const helper = path.join(box.root, 'frozen-start.sh')
+    writeFileSync(
+      helper,
+      `HEAVY_JOB_SLICE="$1" bash ${JSON.stringify(NESTED)} --unit="\${1%.slice}-nested.scope" bash -c 'trap "" TERM; echo $$ > "$1"; exec sleep 60' _ ${JSON.stringify(nestedPid)} &
+until [ -s ${JSON.stringify(nestedPid)} ]; do sleep 0.02; done
+sleep 2
+echo $$ > ${JSON.stringify(frozen)}
+kill -STOP $$
+`,
+    )
+    // Disable runtime fallbacks so startup expiry alone must drain the private sibling.
+    const env = launcher(
+      box,
+      `args=("$@"); for i in "\${!args[@]}"; do case "\${args[i]}" in */deadline.sh) args[i]=${JSON.stringify(helper)};; RuntimeMaxSec=*) args[i]=RuntimeMaxSec=infinity;; esac; done; exec ${systemdRun} "\${args[@]}"`,
+    )
+    const owned = start(box, 'frozen-startup', ['touch', marker], {
+      env,
+      quiet: true,
+      jobClass: 'light',
+      machine: true,
+    })
+    let slice: string | undefined
+    try {
+      await expect
+        .poll(() => existsSync(frozen) && existsSync(canaryPid), { timeout: 8_000 })
+        .toBe(true)
+      const owner = live(box.state, 'jobs').find((entry) => entry.label === 'frozen-startup')!
+      slice = ownSlice(box.sliceRoot, owner.id)
+      owned.child.kill('SIGSTOP')
+      await expect
+        .poll(() => sliceState(box.sliceRoot, slice!), {
+          timeout: (DEADLINE_START_SECONDS + 3) * 1000,
+        })
+        .not.toBe('running')
+      expect(alive(pidIn(frozen))).toBe(false)
+      expect(alive(pidIn(nestedPid))).toBe(false)
+      expect(existsSync(marker)).toBe(false)
+      expect(alive(pidIn(canaryPid))).toBe(true)
+      await expect
+        .poll(() => serviceState(watchdogOf(slice!)), { timeout: 2_000 })
+        .toBe('not-found')
+      console.log(
+        JSON.stringify({
+          event: 'frozen-before-ready',
+          now: bootSeconds(),
+          quietUntil: owner.quietUntil,
+          nestedAlive: alive(pidIn(nestedPid)),
+          watchdogAlive: alive(pidIn(frozen)),
+          slice: sliceState(box.sliceRoot, slice),
+          payloadRan: existsSync(marker),
+          canaryAlive: alive(pidIn(canaryPid)),
+        }),
+      )
+    } finally {
+      if (slice) killSlice(slice)
+      owned.child.kill('SIGCONT')
+      owned.child.kill('SIGTERM')
+      canary.child.kill('SIGTERM')
+      await Promise.all([owned.done, canary.done])
+    }
+  }, 25_000)
+
+  test('healthy heartbeats preserve a running job beyond the native watchdog interval', async () => {
+    const box = deadlineBox(20)
+    const marker = path.join(box.root, 'payload.pid')
+    const owned = start(
+      box,
+      'healthy-watchdog',
+      ['bash', '-c', 'echo $$ > "$1"; sleep 6', '_', marker],
+      { quiet: true, jobClass: 'light', machine: true },
+    )
+    let slice: string | undefined
+    try {
+      await expect.poll(() => existsSync(marker), { timeout: 8_000 }).toBe(true)
+      const owner = live(box.state, 'jobs').find((entry) => entry.label === 'healthy-watchdog')!
+      slice = ownSlice(box.sliceRoot, owner.id)
+      expect((await owned.done).code).toBe(0)
+      expect(serviceState(watchdogOf(slice))).toBe('not-found')
+      expect(slotsFree(box)).toBe(true)
+    } finally {
+      if (slice) killSlice(slice)
+      owned.child.kill('SIGTERM')
+      await owned.done
+    }
+  }, 15_000)
 
   test('the native service deadline kills the slice even when the watchdog shell is suspended', async () => {
     const box = deadlineBox()
@@ -331,7 +551,9 @@ describe.skipIf(!userScopes)('whole-slice deadlines (requires user systemd scope
       expect(live(box.state, 'jobs').map((entry) => entry.id)).toContain(owner!.id)
       expect(existsSync(marker)).toBe(false)
       expect(serviceState(watchdogOf(slice))).toBe('not-found')
-      await expect.poll(bootSeconds, { timeout: 6_000 }).toBeGreaterThan(owner!.quietUntil!)
+      await expect
+        .poll(bootSeconds, { timeout: (DEADLINE_START_SECONDS + 8) * 1000 })
+        .toBeGreaterThan(owner!.quietUntil!)
       writeFileSync(go, '')
       await expect
         .poll(() => live(box.state, 'jobs').map((entry) => entry.id), { timeout: 6_000 })
@@ -349,7 +571,7 @@ describe.skipIf(!userScopes)('whole-slice deadlines (requires user systemd scope
       owned.child.kill('SIGTERM')
       await owned.done
     }
-  }, 25_000)
+  }, 35_000)
 
   test.each([
     { name: 'during grace', delay: 2.3, missedTerm: false },

@@ -11,9 +11,7 @@
 - Risk: LOW–MED. Lowering a level can hide a failure; every downgrade names the case that still
   logs at warn.
 - Planned at: Platform `bf806401`, 2026-09-25. Origin: the 2026-09-25 daily-driver blocker review.
-- Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately
-  requested.
-- Server changes deploy with `bun run deploy --server`.
+- Checkout, commit, checks and deployment follow the current [repository instructions](../AGENTS.md).
 
 ## Outcome
 

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
 import { bootSeconds, sliceState } from './admission'
+import { DEADLINE_START_SECONDS, stopTimeoutSeconds } from './job'
 import { tryLock, unlock } from './lock'
 import { live } from './queue'
 
@@ -492,12 +493,18 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       let ordinary: ReturnType<typeof start> | undefined
       quiet.child.kill('SIGSTOP')
       try {
+        expect(owner.quietUntil! - owner.quietDeadline!).toBeCloseTo(
+          DEADLINE_START_SECONDS + stopTimeoutSeconds(1),
+          2,
+        )
         await expect
           .poll(() => readFileSync(`/proc/${quiet.child.pid}/status`, 'utf8'), {
             timeout: 10_000,
           })
           .toMatch(/^State:\s+T/m)
-        await expect.poll(bootSeconds, { timeout: 10_000 }).toBeGreaterThan(owner.quietUntil!)
+        await expect
+          .poll(bootSeconds, { timeout: (DEADLINE_START_SECONDS + 10) * 1000 })
+          .toBeGreaterThan(owner.quietUntil!)
         await expect.poll(() => unitActive(scope), { timeout: 5_000 }).toBe(false)
         writeSettings(box, {
           'developer.heavyJobClasses': classes,
@@ -589,8 +596,14 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         delayed.child.kill('SIGSTOP')
         const owner = live(box.state, 'jobs').find((entry) => entry.label === 'delayed')!
         expect(owner).toBeDefined()
+        expect(owner.quietUntil! - owner.quietDeadline!).toBeCloseTo(
+          DEADLINE_START_SECONDS + stopTimeoutSeconds(1),
+          2,
+        )
         expect(sliceState(box.sliceRoot, `${box.sliceRoot}-${owner.id}.slice`)).not.toBe('running')
-        await expect.poll(bootSeconds, { timeout: 10_000 }).toBeGreaterThan(owner.quietUntil!)
+        await expect
+          .poll(bootSeconds, { timeout: (DEADLINE_START_SECONDS + 10) * 1000 })
+          .toBeGreaterThan(owner.quietUntil!)
         writeSettings(box, {
           'developer.heavyJobClasses': classes,
           'developer.heavyJobQuietHoldSeconds': 60,
