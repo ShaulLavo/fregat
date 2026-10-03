@@ -8,6 +8,8 @@ import type { KeyResetReason } from './browser-listeners'
 export type BrowserDispatcherOptions = Omit<DispatcherOptions<KeyboardEvent>, 'effects'> & {
   /** Where idle keys are heard; defaults to the global document. */
   readonly root?: HTMLElement | Document
+  /** Hears idle keys before descendant input handlers; defaults to bubbling. */
+  readonly capture?: boolean
   /** Runs before each key event is offered, for hosts that update the keymap lazily. */
   readonly beforeKey?: (event: KeyboardEvent) => void
 }
@@ -24,6 +26,8 @@ export type BrowserDispatcher = Dispatcher<KeyboardEvent> & {
    * Later attachments win equal-depth ties. Returns the tie's removal.
    */
   readonly attachElement: (node: FocusNode<KeyboardEvent>, element: Element) => () => void
+  /** Finds the closest attached element's node for a captured command origin. */
+  readonly nodeForElement: (element: Element) => FocusNode<KeyboardEvent> | null
   /** Offers an event before DOM dispatch reaches the root, for hosts that forward keys (terminals). */
   readonly claimKeybinding: (event: KeyboardEvent) => boolean
   /** Observes the existing key pipeline; returns the observer's removal. */
@@ -50,7 +54,14 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
       options.onCaptureChange?.()
     },
   })
-  const listeners = attachKeyListeners(root, platform, () => dispatcher, focusFromEvent, reset)
+  const listeners = attachKeyListeners(
+    root,
+    platform,
+    () => dispatcher,
+    focusFromEvent,
+    reset,
+    options.capture,
+  )
 
   function focusFromEvent(event: KeyboardEvent) {
     options.beforeKey?.(event)
@@ -81,6 +92,19 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
     }
     return selected?.node
   }
+  function nodeForElement(element: Element) {
+    if (disposed) return null
+    for (let current: Element | null = element; current; current = parentElement(current)) {
+      const node = attachedNode(current)
+      if (node) return node
+    }
+    return null
+  }
+  function parentElement(element: Element) {
+    if (element.parentElement) return element.parentElement
+    const root = element.getRootNode()
+    return root instanceof ShadowRoot ? root.host : null
+  }
   function observeKeys(observer: BrowserKeyObserver) {
     if (disposed) return () => {}
     observers.add(observer)
@@ -92,6 +116,7 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
   return {
     ...dispatcher,
     attachElement,
+    nodeForElement,
     claimKeybinding: listeners.claim,
     observeKeys,
     releaseAll: () => {
