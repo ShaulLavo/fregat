@@ -88,7 +88,7 @@ test('macOS publishes fullscreen targets at animation start and reconciles compl
   }
 })
 
-test('macOS pins every effect and web view to the full content bounds', async () => {
+test('macOS fills content bounds and outsets the glass rim beyond their clip', async () => {
   const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
   const mount = mac.match(/- \(void\)mountContentView:\(NSView \*\)view \{([\s\S]*?)\n\}/)?.[1]
   expect(mount).toBeDefined()
@@ -96,9 +96,19 @@ test('macOS pins every effect and web view to the full content bounds', async ()
   expect(mount).toContain('view.translatesAutoresizingMaskIntoConstraints = NO;')
   expect(mount).toContain('[content addSubview:view];')
   expect(mount).toContain('[NSLayoutConstraint activateConstraints:@[')
-  for (const edge of ['leading', 'trailing', 'top', 'bottom']) {
-    expect(mount).toContain(`[view.${edge}Anchor constraintEqualToAnchor:content.${edge}Anchor]`)
+  expect(mount).toContain('CGFloat outset = view == self.glassEffect ? 4 : 0;')
+  for (const [edge, constant] of [
+    ['leading', '-outset'],
+    ['trailing', 'outset'],
+    ['top', '-outset'],
+    ['bottom', 'outset'],
+  ]) {
+    expect(mount).toContain(
+      `[view.${edge}Anchor constraintEqualToAnchor:content.${edge}Anchor constant:${constant}]`,
+    )
   }
+  expect(mac).toContain('window.contentView.layer.masksToBounds = YES;')
+  expect(mac).toContain('[effect setValue:@0 forKey:@"cornerRadius"];')
   for (const view of ['effect', 'host.glassEffect', 'view']) {
     expect(mac).toContain(`[host mountContentView:${view}];`)
   }
