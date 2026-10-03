@@ -13,7 +13,7 @@ import {
 import { editorTabRecordsForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identity'
 import { testDocumentKey, testTabContents } from '../../../../test/factories/document-targets'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
 import { test, expect } from '../../../../test/fixtures'
@@ -28,6 +28,24 @@ import { makeSessionDomainFixture, DOMAIN_SESSION } from '../../../../test/facto
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { useSessionDiffScopeStore } from '@/features/chat/state/session-diff-scope-store'
 import { scopedSessionKey } from '@workspace/contracts'
+
+test('a missing saved workspace shows its recovery guidance', async ({ client, server }) => {
+  await mkdir(path.join(server.root, 'gone'))
+  const workspace = await registerTestWorkspaceAddress(client, 'gone')
+  await rm(path.join(server.root, 'gone'), { recursive: true })
+  const { application } = await createAddressTestRuntime(client)
+  const result = await applyAddressView({
+    application,
+    address: parseAddressIntent(`/~${workspaceToken(workspace)}/workbench`),
+    reason: 'boot',
+    isCurrent: () => true,
+  })
+  expect(result).toEqual({
+    status: 'unavailable',
+    reason:
+      'The saved workspace folder could not be found. Choose folder to open its current location, or select another workspace.',
+  })
+})
 
 test('boot adds tabs while explicit navigation orders addressed tabs and retains dirty and outside-root extras', async ({
   client,
