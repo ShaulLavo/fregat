@@ -13,7 +13,7 @@ Use the existing Vite dev server on `http://localhost:5173/`. Against it, every 
 
 The throwaway server never starts the machine's Codex or Claude CLI: those drivers run only a fixture binary under the canonical OS temporary directory, so status probes, discovery and turns on real accounts are refused, and a chat scenario installs a mock (`installMockProvider`, `createMockProviderSession`) or a native fixture: `isolatedNativeScenario` for one session, `withFixtureProvider` (Codex `native-conversation.mjs` or Claude `native-claude.mjs`) for scenarios that manage their own sessions. A scenario that needs a real account declares `realProviders: true`, and `agent:browser` refuses it, and any writing scenario under `--shared-dev` or a foreign `--url`, unless the owner passes `--real-providers`. Never pass that flag yourself.
 
-When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify the target's release endpoint and exercise the changed protocol in the browser before calling the deployment done.
+For an authorized deployment where web changes depend on a server protocol change, ship a compatible server with the web build, since a web-only deployment reuses the old server. Verify the target's release endpoint and exercise the changed protocol in the browser before calling the deployment done.
 
 A private Vite or API server uses an explicit free `--port` on a known loopback address, and stops when verification finishes.
 
