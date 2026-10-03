@@ -677,7 +677,7 @@
     },
     "ghostty-webgpu": {
       "name": "ghostty-webgpu",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "dependencies": {
         "@tanstack/hotkeys": "0.10.0",
         "@webgpu/types": "0.1.74",
