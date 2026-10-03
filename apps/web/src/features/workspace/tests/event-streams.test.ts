@@ -11,7 +11,9 @@ import { createCuttableEventsClient, createObservedInProcessClient } from '../..
 import type { StreamInterruption } from '@/features/workspace/state/event-streams'
 
 const events: Record<string, unknown>[] = []
-beforeEach(() => {
+let serverReadyInSetup = false
+beforeEach(({ task }) => {
+  serverReadyInSetup = 'server' in task.context
   events.length = 0
   vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
   vi.stubEnv('VITE_CLIENT_LOG_LEVEL', 'info')
@@ -33,6 +35,7 @@ test('keeps the project stream and retained file events alive across tab changes
   server,
   client,
 }) => {
+  expect(serverReadyInSetup).toBe(true)
   await mkdir(path.join(server.root, 'project', 'dist'), { recursive: true })
   const first = 'project/dist/first.txt'
   const second = 'project/dist/second.txt'
