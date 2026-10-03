@@ -59,11 +59,14 @@ const codexRowSchema = v.looseObject({
           v.string(),
           v.looseObject({
             subagent: v.optional(
-              v.looseObject({
-                thread_spawn: v.optional(
-                  v.looseObject({ parent_thread_id: v.optional(v.string()) }),
-                ),
-              }),
+              v.union([
+                v.string(),
+                v.looseObject({
+                  thread_spawn: v.optional(
+                    v.looseObject({ parent_thread_id: v.optional(v.string()) }),
+                  ),
+                }),
+              ]),
             ),
           }),
         ]),
@@ -261,10 +264,11 @@ export function reduceCodexUsage(
   if (!parsed.success) return null
   const row = parsed.output
   if (row.type === 'session_meta') {
+    const subagent =
+      typeof row.payload?.source === 'object' ? row.payload.source.subagent : undefined
     state.forked ??= Boolean(
       row.payload?.forked_from_id ||
-      (typeof row.payload?.source === 'object' &&
-        row.payload.source.subagent?.thread_spawn?.parent_thread_id),
+      (typeof subagent === 'object' && subagent.thread_spawn?.parent_thread_id),
     )
     return null
   }
