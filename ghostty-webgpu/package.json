@@ -1,6 +1,6 @@
 {
   "name": "ghostty-webgpu",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Ghostty for the web with a damage-aware WebGPU renderer and native API",
   "keywords": [
     "browser",
@@ -111,6 +111,7 @@
     "site:dev": "bun run --cwd site dev"
   },
   "dependencies": {
+    "@fregat/hotkeys": "0.0.1",
     "@tanstack/hotkeys": "0.10.0",
     "@webgpu/types": "0.1.74"
   },
