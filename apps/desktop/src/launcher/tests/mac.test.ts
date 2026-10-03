@@ -38,9 +38,31 @@ function macFixture(preferred = 'net.imput.helium') {
   return { env, fs, plists }
 }
 
-test('macOS supports default bundle, per-user Applications, Spotlight and absolute override', () => {
+test.each(['compositor', 'window'])(
+  'macOS auto selects its native host with %s transparency',
+  (transparency) => {
+    const { env, fs } = macFixture()
+    let lookups = 0
+    const result = resolveBrowserCandidates(
+      'auto',
+      transparency,
+      {
+        ...env,
+        runMac: () => {
+          lookups++
+          return ''
+        },
+      },
+      fs,
+    )
+    expect(result).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
+    expect(lookups).toBe(0)
+  },
+)
+
+test('explicit browser selection supports default bundle, per-user Applications, Spotlight and absolute override', () => {
   const { env, fs } = macFixture()
-  const result = resolveBrowserCandidates('auto', 'compositor', env, fs)
+  const result = resolveBrowserCandidates('/missing/browser', 'compositor', env, fs)
   expect(result.slice(0, 3)).toMatchObject([
     {
       family: 'chrome',
@@ -69,13 +91,15 @@ test('macOS supports default bundle, per-user Applications, Spotlight and absolu
   })
 })
 
-test('macOS without Chrome selects the supported default before scan', () => {
+test('explicit macOS browser lookup without Chrome selects the supported default before scan', () => {
   const { env, fs } = macFixture()
   const withoutChrome = {
     ...fs,
     exists: (file: string) => !file.endsWith('/Google Chrome') && fs.exists(file),
   }
-  expect(resolveBrowserCandidates('auto', 'compositor', env, withoutChrome)).toMatchObject([
+  expect(
+    resolveBrowserCandidates('/missing/browser', 'compositor', env, withoutChrome),
+  ).toMatchObject([
     { family: 'helium', source: 'default' },
     { family: 'brave', source: 'scan' },
     { kind: 'webview' },
@@ -83,18 +107,20 @@ test('macOS without Chrome selects the supported default before scan', () => {
   ])
 })
 
-test('macOS without Chrome or supported default scans before webview', () => {
+test('explicit macOS browser lookup without Chrome or supported default scans before webview', () => {
   const { env, fs } = macFixture('org.mozilla.firefox')
   const withoutChrome = {
     ...fs,
     exists: (file: string) => !file.endsWith('/Google Chrome') && fs.exists(file),
   }
-  expect(resolveBrowserCandidates('auto', 'compositor', env, withoutChrome)[0]).toMatchObject({
+  expect(
+    resolveBrowserCandidates('/missing/browser', 'compositor', env, withoutChrome)[0],
+  ).toMatchObject({
     family: 'brave',
     source: 'scan',
   })
   expect(
-    resolveBrowserCandidates('auto', 'compositor', env, { ...fs, exists: () => false }),
+    resolveBrowserCandidates('/missing/browser', 'compositor', env, { ...fs, exists: () => false }),
   ).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
 })
 
@@ -108,11 +134,16 @@ test('unsupported defaults, malformed metadata and escaped bundle executables ar
     CFBundleIdentifier: 'other',
     CFBundleExecutable: 'Brave Browser',
   }
-  expect(resolveBrowserCandidates('auto', 'compositor', env, fs).slice(0, -2)).toMatchObject([
-    { family: 'chrome', source: 'scan' },
-  ])
   expect(
-    resolveBrowserCandidates('auto', 'compositor', { ...env, runMac: () => 'invalid' }, fs),
+    resolveBrowserCandidates('/missing/browser', 'compositor', env, fs).slice(0, -2),
+  ).toMatchObject([{ family: 'chrome', source: 'scan' }])
+  expect(
+    resolveBrowserCandidates(
+      '/missing/browser',
+      'compositor',
+      { ...env, runMac: () => 'invalid' },
+      fs,
+    ),
   ).toEqual([{ kind: 'webview' }, { kind: 'tab' }])
 })
 

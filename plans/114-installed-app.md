@@ -24,7 +24,7 @@
 ## Installed Fregat application
 
 **Status: Delivered; approved owner acceptance and Gate 4 closeout, 2026-10-03.**
-Chrome-first selection, installed-app delivery and the native fallback replace the old shell. The browser-installed
+The native macOS host, Chrome-first Linux selection and installed-app delivery replace the old shell. The browser-installed
 app must provide the same functionality when opened by the desktop launcher, the Dock, Cmd-Tab/taskbar,
 the OS application launcher, or its browser-created shortcut. A direct OS launch has no
 launcher process, CDP connection, injected script, or `window.platformBridge`.
@@ -37,9 +37,10 @@ this section supersedes their CDP-injected bridge as the installed-browser targe
 
 ### Approved outcomes
 
-- With default compositor transparency, automatic browser selection tries Chrome, supported
-  OS-default Chromium, the remaining Chromium scan, native webview, then a default-browser tab.
-  Explicit settings stay first. Automatic window transparency retains the native webview.
+- Automatic macOS selection uses Fregat’s native WKWebView host, with integrated traffic lights
+  and its own app identity. Linux automatic selection tries Chrome, supported OS-default Chromium,
+  the remaining Chromium scan, native webview, then a default-browser tab. Explicit browser
+  settings stay first. Automatic window transparency selects the native webview on either OS.
 - Fregat installs automatically with its own name, icon, and OS application identity. The owner
   performs no installation step. The browser owns its installed registration and OS shortcuts.
 - The launcher selects the browser, ensures installation, and requests launch. Runtime app
@@ -141,7 +142,8 @@ app therefore launches through the browser's installed-app command after the con
 No runtime bridge, debugging connection, chooser binding or permission grant reaches that app.
 
 1. Resolve the effective browser profile and stable absolute manifest identity for the app URL.
-   An explicit browser setting keeps precedence; automatic selection uses Chrome-first ordering.
+   An explicit browser setting keeps precedence; Linux automatic selection uses Chrome-first ordering.
+   macOS automatic selection uses the native host.
    Hold a launcher-owned `flock` file beside that profile through installation, controller exit and
    app handoff. A second launcher waits within the same startup cap, then rechecks the singleton;
    it never forwards its URL to another launcher's installation controller. The kernel releases
@@ -694,16 +696,35 @@ needs: no Bun, Git checkout or terminal step on the user's machine.
 
 ### Window choice
 
-- `window.browser=auto` with `window.transparency=compositor` (the default): the installed Chrome
-  app from the section above, preferring Chrome. Chrome owns the window and its Dock identity;
-  `Fregat.app` hands off and exits.
-- `window.browser=auto` with `window.transparency=window`: Fregat's own window, the
-  `platform-webview` WKWebView host with vibrancy. The owner accepts WebKit's rendering here; no
+- `window.browser=auto`: Fregat’s native WKWebView window. Compositor mode keeps the window
+  opaque; transparent-window mode enables native Frosted and Glass materials. The transparency
+  control remains available in either native Mac mode.
+- `window.browser=auto` with `window.transparency=window`: the native WKWebView host with
+  vibrancy. The owner accepts WebKit's rendering here; no
   WebKit performance study is needed.
 - `window.browser=webview` selects the native host explicitly; an explicit browser executable takes
   precedence over automatic selection.
 - No supported Chromium browser: the native host, with vibrancy set by `window.transparency`.
-- Every path gives a native macOS window. Electron and a bundled engine are later (see below).
+- An explicit browser executable retains the installed Chromium app path. Chrome owns that
+  window’s frame and controls. Electron and a bundled engine are later (see below).
+- Development wraps the native host in `Fregat Dev.app` with Fregat’s icon and a separate bundle
+  identifier. Packaged clients use `Fregat.app` and its production identity.
+
+**Default decision — 2026-10-03.** The owner rejected the installed Chrome window as the normal
+Mac desktop experience and selected the retained native WebKit host. This supersedes the earlier
+Mac Chrome-first decision. Today’s fresh development home was distinct from yesterday’s isolated
+native acceptance home. Engine-selection checks must cover fresh defaults as well as transparent
+mode, and visible verification must inspect the real native app and integrated traffic lights.
+
+Verification for this change used the actual `Fregat Dev.app` on macOS. The opaque host exposed
+`window.transparency`; selecting Transparent window saved it to the isolated settings home.
+After reopening, the host reported transparent backdrop, overlay titlebar and Liquid Glass
+capability, and received Glass then Frosted appearance commands. Both native windows were
+visually inspected. The native runtime reported WebGPU available, EditContext absent and
+screen capture absent. The editor retains its textarea input fallback. Evidence is in
+`/tmp/fregat-native-default.urPRqz/`; the browser health capture is
+`evidence/20261003T183718Z-look-1440x1000/`. Playwright WebKit was unavailable on this Mac;
+system WKWebView supplied the native proof.
 
 ### Window material
 
@@ -1328,4 +1349,5 @@ now uses):
    Linux and Windows. **Recommendation: (a)**: one engine on every desktop keeps the editor's
    EditContext route and `agent:browser trace` on the engine users run, and question 5 already
    gives the native look to anyone who turns on see-through windows.
-   Decided 2026-09-26: owner — (a).
+   Decided 2026-09-26: owner — (a). Superseded 2026-10-03: owner — (b), native WebKit
+   is the normal macOS app. The installed Chrome frame was rejected for that experience.
