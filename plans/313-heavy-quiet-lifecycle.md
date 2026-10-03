@@ -16,9 +16,11 @@ The issue describes two private Vite jobs held open while dependent browser chec
 
 ## Lifecycle choices
 
-Keep heavy jobs finite. For a private browser scenario, one browser job owns server startup, readiness, browser work, and teardown. Its server runs inside that job's slice and shares its ceiling and accounting. Queue the complete scenario once. Never queue a second heavy job that the first job needs to finish. Nested subprocesses use the established `nested-scope.sh` contract where a separate scope is necessary.
+Finite work keeps ordinary FIFO admission. A private long-lived dev server declares `--server` and uses its existing `light` or `build` class. It retains the class estimate, memory ceiling, accounting and orphan cleanup, but stays outside the quiet drain and holds no shared slot locks while running. Quiet measurements still admit against its resource charge and record its identity in `serversAtAdmission`. Server requests use the same FIFO queue; a previously admitted server remains eligible to launch during a later quiet hold. The flag is local and excludes `--quiet` and `--host pi`.
 
-Persistent development servers use the existing mesh route or a separately owned service lifecycle. They do not hold an indefinite heavy-job queue lease. Private server ports remain explicit and free. A browser scenario's cleanup must stop its own server on success, failure, timeout, or cancellation. It cannot stop the shared mesh dev route.
+For a self-contained private browser scenario, one finite browser job can also own server startup, readiness, browser work and teardown inside its slice. Queue that complete scenario once and run its children directly. Never queue a second heavy job a finite job needs to finish. Nested subprocesses use the established `nested-scope.sh` contract where a separate scope is necessary.
+
+Normal development servers use the shared mesh route. Private server ports remain explicit and free. A browser scenario's cleanup must stop its own server on success, failure, timeout or cancellation, whether it runs inside the browser slice or as a declared server. It leaves the shared mesh dev route alone.
 
 Bound a quiet request's total admission wait using the existing `developer.heavyJobQuietHoldSeconds` value. Start that monotonic deadline when the request joins the queue. Check expiry even while earlier jobs, resource pressure, an external drain, or legacy exclusive locks block admission. On expiry, remove only this request, close its locks, emit one actionable completion, and exit 75. Do not automatically retry inside the wrapper. A new invocation receives a new FIFO ticket. The running hold remains independently measured from launch.
 
@@ -26,19 +28,20 @@ Keep FIFO for finite jobs and preserve orphan charging, reaping, quiet leases, s
 
 ## Execution checklist
 
-- [ ] Reproduce the dependency cycle with a bounded stand-in server and dependent check in a private namespace. Capture queue order and the distinction between admission and hold clocks.
-- [ ] Inventory private server callers, starting with browser verification launch code and the documented Vite workflows. Convert the affected workflow into one finite owner job with readiness and teardown.
-- [ ] Add a typed admission outcome for quiet wait expiry. Release waiting entries on expiry, exceptions, and signals. Keep the job's actual exit code and running-hold expiry separate.
-- [ ] Extend status and usage output to distinguish quiet admission deadline from running hold expiry. Regenerate settings reference if the existing setting description changes.
-- [ ] Add process tests for a held-open server, a quiet request, and an ordinary follow-up. Prove the ordinary job starts after quiet admission expires without an operator stopping the server.
-- [ ] Exercise the converted browser workflow, then a finite quiet measurement. Confirm teardown and FIFO progress. Update the heavy instructions with the single-owner server workflow.
+- [x] Reproduce the dependency cycle with a gated stand-in server and dependent check in a private namespace. The red regression holds the browser behind the quiet request after finite work ends.
+- [x] Declare separate long-lived servers with `--server` and document a browser scenario targeting the private Vite port, with explicit teardown. Preserve the self-contained finite-owner alternative.
+- [x] Add a typed admission outcome for quiet wait expiry. Release waiting entries on expiry, exceptions and signals. Keep the job's actual exit code and running-hold expiry separate.
+- [x] Extend status and usage output to distinguish quiet admission deadline from running hold expiry. Regenerate the settings reference for the shared bound's description.
+- [ ] Pass process tests for the server dependency cycle, resource denial, FIFO/external-lock obstructions, cancellation and independent running holds, followed by the full heavy suite and required commit gates.
+- [ ] Get independent review, commit by path, push and open the issue-closing PR.
+- [ ] Owner installs the merged runner, restarts private servers with `--server`, cancels old queued quiet wrappers before invoking their requests again and confirms installed FIFO progress.
 
 ## Verification and acceptance
 
 Extend `scripts/heavy/quiet.test.ts` and `lifecycle.test.ts` with isolated fixture clocks/settings. Verify expiry behind another job, expiry under pressure, queue cleanup on cancellation, and the existing running-hold lease. Existing tests for bounded external drains and suspended quiet wrappers must remain valid. Use temporary roots and existing portable skip rules for unavailable user systemd scopes.
 
-The runtime proof starts a private server and browser check inside one admitted job. The job exits and stops the server. A competing quiet request either starts after that finite job drains or exits 75 within its configured admission bound. An ordinary job queued behind an expired quiet request then completes. Publish the queue timeline and owned unit cleanup. Do not claim a throughput improvement without a comparable before/after run.
+The runtime proof admits a declared private server, queues a quiet measurement before its dependent browser check, then releases separate finite work. The measurement runs beside the accounted server; the browser check waits for the quiet hold to finish, then releases the server. Resource-denial proofs make quiet admission expire with exit 75, release its ticket and let an ordinary check behind it proceed. Verify the private units, entry locks and slot locks are cleaned up. Do not claim a throughput improvement without a comparable before/after run.
 
 ## Delivery
 
-Run narrow tests and required gates through the heavy wrapper. Commit by path, push, and install `scripts/heavy/` from a clean worktree at that commit. Recheck installed status and one isolated deadline case. Browser workflow changes need `verify-fregat` scenario and screenshot evidence. Deploy application changes through the mesh if any are needed. Tick the root roadmap only after installed behavior and cleanup pass.
+Run narrow tests and required gates through the heavy wrapper. Commit by path, push and open the reviewed PR. After merge, the owner installs `scripts/heavy/` from a clean worktree at that commit and restarts private servers with `--server`. Cancel old queued quiet wrappers before invoking their requests again through the updated runner, so the old FIFO tickets are released. Recheck installed status and one isolated deadline case. App UI changes need `verify-fregat` scenario and screenshot evidence and deployment through the mesh. Tick the root roadmap only after installed behavior and cleanup pass.
