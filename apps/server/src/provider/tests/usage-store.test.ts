@@ -620,17 +620,89 @@ describe('provider usage store', () => {
     ])
   })
 
-  it('retains an unsupported configured account, events included', async () => {
-    const fixture = await usageFixture()
-    stubUsage(fixture.registry, PERSONAL, async () => ({ kind: 'unsupported' }))
-    await fixture.store.refresh()
-    fixture.store.accept(limitsEvent(PERSONAL, [window('five_hour', 5)]))
+  it('retains a native no-data account when control is unsupported and accepts Claude passive evidence', async () => {
+    const f = await nativeClaudeFixture()
+    await f.writeCache('fixture-old-account', 'fixture-other-account', START_MS, 19)
+    const calls = stubUsage(f.registry, WORK, async () => ({ kind: 'unsupported' }))
+    await f.store.refresh()
+    const empty = (await f.store.read()).accounts[0]
+    f.store.accept(limitsEvent(WORK, [window('five_hour', 5)]))
+    expect((await f.store.read()).accounts[0]).toMatchObject({
+      state: 'ready',
+      checkedAt: new Date(START_MS).toISOString(),
+      windows: [{ usedPercent: 5, source: 'rate-limit-event' }],
+    })
+    expect(empty).toMatchObject({
+      state: 'no-data',
+      checkedAt: null,
+      lastSeenAt: null,
+      windows: [],
+    })
+    f.clock.ms += 300_000
+    await f.store.refresh()
+    expect(calls.count).toBe(2)
+    expect((await f.store.read()).accounts[0]).toMatchObject({
+      checkedAt: new Date(START_MS).toISOString(),
+      windows: [{ usedPercent: 5, source: 'rate-limit-event' }],
+    })
+  })
 
-    expect(
-      (await fixture.store.read()).accounts.find((account) =>
-        account.providerInstanceIds.includes(PERSONAL),
-      ),
-    ).toMatchObject({ state: 'unknown', windows: [] })
+  it('retains matched local-cache observations across unsupported SDK refresh and restart without redating', async () => {
+    const f = await nativeClaudeFixture()
+    const root = await mkdtemp(path.join(tmpdir(), 'usage-unsupported-'))
+    roots.push(root)
+    const options = { cacheFile: path.join(root, 'accounts.json'), now: () => f.clock.ms }
+    const store = new ProviderUsageStore(f.registry, options)
+    const observedAt = new Date(START_MS).toISOString()
+    await f.writeCache('fixture-old-account', 'fixture-old-account', START_MS, 19)
+    const calls = stubUsage(f.registry, WORK, async () => ({ kind: 'unsupported' }))
+    await store.refresh()
+    expect(calls.count).toBe(0)
+    expect((await store.read()).accounts[0]).toMatchObject({
+      checkedAt: observedAt,
+      windows: [{ usedPercent: 19, observedAt, source: 'claude-local-cache' }],
+    })
+    f.clock.ms += 300_000
+    await store.refresh()
+    expect(calls.count).toBe(1)
+    expect((await store.read()).accounts[0]).toMatchObject({
+      checkedAt: observedAt,
+      lastSeenAt: observedAt,
+      windows: [{ usedPercent: 19, observedAt, source: 'claude-local-cache', freshness: 'fresh' }],
+    })
+    await store.close()
+    const restarted = new ProviderUsageStore(f.registry, options)
+    expect((await restarted.feed()).accounts[0]).toMatchObject({
+      checkedAt: observedAt,
+      lastSeenAt: observedAt,
+      windows: [{ usedPercent: 19, lastSeenAt: observedAt, source: 'claude-local-cache' }],
+    })
+    await restarted.refresh()
+    expect(calls.count).toBe(1)
+    f.clock.ms += 900_000
+    await restarted.refresh()
+    expect(calls.count).toBe(2)
+    expect((await restarted.read()).accounts[0]).toMatchObject({
+      state: 'unknown',
+      checkedAt: observedAt,
+      windows: [{ usedPercent: 19, observedAt, source: 'claude-local-cache', freshness: 'stale' }],
+    })
+    restarted.accept({
+      ...limitsEvent(WORK, [window('five_hour', 25)]),
+      createdAt: new Date(f.clock.ms).toISOString(),
+    })
+    expect((await restarted.read()).accounts[0]).toMatchObject({
+      state: 'ready',
+      checkedAt: new Date(f.clock.ms).toISOString(),
+      windows: [{ usedPercent: 25, source: 'rate-limit-event', freshness: 'fresh' }],
+    })
+    await restarted.close()
+    const final = new ProviderUsageStore(f.registry, options)
+    expect((await final.feed()).accounts[0]).toMatchObject({
+      source: 'passive-header',
+      windows: [{ usedPercent: 25, source: 'rate-limit-event' }],
+    })
+    await final.close()
   })
 
   it('retains a window with honest reset-passed freshness', async () => {

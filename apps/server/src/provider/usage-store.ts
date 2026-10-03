@@ -165,12 +165,7 @@ export class ProviderUsageStore {
     const account = this.registry.usageAccount(event.providerInstanceId)
     if (!account?.enabled) return
     const target = this.targets().find((entry) => entry.accountKey === account.accountKey)
-    if (
-      !target ||
-      target.driverKind === 'codex' ||
-      this.accounts.get(target.accountKey)?.unsupported
-    )
-      return
+    if (!target || target.driverKind === 'codex') return
     const fingerprint = this.accounts.get(target.accountKey)?.credentialFingerprint
     if (fingerprint !== undefined && fingerprint !== target.credentialFingerprint) return
     this.applyUpdate(target, event.payload, event.createdAt, 'rate-limit-event')
@@ -434,21 +429,18 @@ export class ProviderUsageStore {
     observedAt: string,
     source: string,
   ) {
-    const previous = this.accounts.get(target.accountKey)?.snapshot
+    const previous = this.accounts.get(target.accountKey)
     if (result.kind === 'unsupported') {
-      if (previous?.checkedAt && Date.parse(previous.checkedAt) > Date.parse(observedAt)) return
-      this.accounts.set(target.accountKey, {
-        snapshot: { ...this.empty(target), checkedAt: observedAt, state: 'unknown', source },
-        attemptedAt: this.now(),
-        failed: false,
-        unsupported: true,
-        credentialFingerprint: target.credentialFingerprint,
-      })
+      // Control capability says nothing about retained cache or passive quota evidence.
+      if (previous) previous.unsupported = true
       return
     }
     this.applyUpdate(target, result.update, observedAt, source)
     const stored = this.accounts.get(target.accountKey)!
-    if (!previous?.checkedAt || Date.parse(observedAt) >= Date.parse(previous.checkedAt))
+    if (
+      !previous?.snapshot.checkedAt ||
+      Date.parse(observedAt) >= Date.parse(previous.snapshot.checkedAt)
+    )
       stored.snapshot.resetCredits = result.resetCredits ?? null
     stored.unsupported = false
   }
