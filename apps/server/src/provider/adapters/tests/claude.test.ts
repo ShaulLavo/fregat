@@ -200,6 +200,7 @@ describe('ClaudeProviderAdapter', () => {
 
     const pending = harness.adapter.sendTurn(providerTurnInput())
     await waitForEvent(harness, 'turn.started')
+    latestQuery(harness).emit(initMessage())
     const resetsAt = Math.floor(Date.now() / 1000) + 2 * 3600
     const limited = rateLimitEvent({
       rateLimitType: 'seven_day_overage_included',
@@ -1792,6 +1793,7 @@ function claudeHarness(
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
+    env: {},
     ...(agentDiagnostics ? { agentDiagnostics } : {}),
     ...(projectMcpApprovalsFile ? { projectMcpApprovalsFile } : {}),
     historyRunner,

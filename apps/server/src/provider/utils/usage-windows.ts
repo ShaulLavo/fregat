@@ -14,6 +14,7 @@ export type ProviderUsageReading = Omit<ProviderUsageWindow, 'usedPercent'> & {
 
 export type ProviderUsageUpdate = {
   planType: string | null
+  label?: string
   windows: ProviderUsageReading[]
   credits?: { balance: number; unlimited: boolean } | null
 }

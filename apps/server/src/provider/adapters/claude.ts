@@ -1,3 +1,4 @@
+import { nativeClaudeUsageTransport } from './utils/claude-native-usage'
 import { platformReadTools } from '../../mcp/tool-names'
 import { spawn } from 'node:child_process'
 import { ProviderProcessLifetime } from './process-lifetime'
@@ -819,6 +820,8 @@ class ClaudeAgentSession extends SessionContext {
   private status: ProviderAdapterRuntime['status'] = 'starting'
   /** `type:resetsAt` of the limit stops this turn has already announced. */
   private readonly announcedLimitStops = new Set<string>()
+  private readonly nativeUsageTransport: boolean
+  private nativeUsageAuthenticated = false
   private readonly scopedUsageModel: () => string | null
   private readonly resumed: boolean
   /** Project servers this session started with turned off, awaiting the owner's approval. */
@@ -833,6 +836,7 @@ class ClaudeAgentSession extends SessionContext {
     cwd: string
     emit: (event: ProviderRuntimeEvent) => void
     ephemeral: boolean
+    env: NodeJS.ProcessEnv
     interactionMode: InteractionMode
     model: string
     providerInstanceId: ProviderTurnInput['providerInstanceId']
@@ -846,6 +850,7 @@ class ClaudeAgentSession extends SessionContext {
     unapprovedProjectMcp: readonly string[]
   }) {
     super(input)
+    this.nativeUsageTransport = nativeClaudeUsageTransport(input.env)
     this.resumed = input.resumeExisting === true
     this.conversationStarted = this.resumed
     this.unapprovedProjectMcp = input.unapprovedProjectMcp
@@ -1880,6 +1885,7 @@ class ClaudeAgentSession extends SessionContext {
    */
   private handleInitMessage(message: ClaudeSystemMessageOf<'init'>) {
     this.confirmSessionId(message.session_id)
+    this.nativeUsageAuthenticated = message.apiKeySource === 'oauth'
     // Every turn opens with `init`. With nothing running it is the owner's queued prompt (a CLI
     // without lifecycle frames) or a turn the harness started, such as a task notification.
     if (!this.activeTurn && this.pendingTurn) this.startPendingTurn()
@@ -2661,11 +2667,13 @@ class ClaudeAgentSession extends SessionContext {
   private handleRateLimitEvent(message: SDKRateLimitEvent) {
     const info = message.rate_limit_info
     const scopedModel = this.scopedUsageModel()
-    this.emitRuntimeNotification(
-      'account.rate-limits.updated',
-      claudeUsageUpdate(info, scopedModel),
-      message,
-    )
+    // A gateway or external key can emit this frame without observing the native home’s account.
+    if (this.nativeUsageTransport && this.nativeUsageAuthenticated)
+      this.emitRuntimeNotification(
+        'account.rate-limits.updated',
+        claudeUsageUpdate(info, scopedModel),
+        message,
+      )
     if (!claudeBlocksTurn(info) || !this.activeTurn) return
 
     // The SDK parks a rejected turn without a word; say why, once per window and reset.
