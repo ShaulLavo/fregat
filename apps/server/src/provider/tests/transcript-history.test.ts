@@ -2,6 +2,8 @@ import { mkdir, writeFile, appendFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { LocalTranscriptUsageService } from '../transcript-history'
+import { codexRolloutUsage } from '../utils/imported-usage'
+import { usageTokenCount } from '@workspace/contracts'
 import {
   transcriptHistoryFixture,
   nativeClaudeResponse,
@@ -539,7 +541,11 @@ it('groups Claude tool-round billing responses by sanitized native user prompts'
   database.close()
 })
 
-it('honors fork baselines when native Codex metadata reports source cli', async () => {
+it.each([
+  { source: 'cli', forked_from_id: 'parent' },
+  { source: { subagent: { thread_spawn: { parent_thread_id: 'parent' } } } },
+  { source: { subagent: 'review' }, forked_from_id: 'parent' },
+])('honors native fork and subagent cumulative baselines: %j', async (metadata) => {
   const f = await transcriptHistoryFixture(cleanup)
   f.service.close()
   const service = new LocalTranscriptUsageService({
@@ -549,7 +555,7 @@ it('honors fork baselines when native Codex metadata reports source cli', async 
   cleanup.push(async () => service.close())
   await service.initialize()
   const rows = [
-    { type: 'session_meta', payload: { id: 'child', source: 'cli', forked_from_id: 'parent' } },
+    { type: 'session_meta', payload: { id: 'child', ...metadata } },
     { type: 'turn_context', payload: { turn_id: 'child-turn', model: 'gpt-test' } },
     {
       type: 'event_msg',
@@ -569,6 +575,7 @@ it('honors fork baselines when native Codex metadata reports source cli', async 
   )
   await service.refresh()
   expect(service.read(query).totals.tokens).toBe(60)
+  expect(codexRolloutUsage(rows).reduce((total, row) => total + usageTokenCount(row), 0)).toBe(60)
 })
 
 it('rotates shared scan budgets so earlier stores cannot starve later stores', async () => {
@@ -655,29 +662,116 @@ it('documents the append-only assumption for arbitrary interior edits that prese
   expect(f.service.read(query).totals.tokens).toBe(180)
 })
 
-it.each(['-1000', '1e999'])('rejects corrupt saved price rates on restart: %s', async (rate) => {
+it.each(
+  ['input', 'output', 'cacheRead', 'cacheWrite', 'costUsd', 'reportedCostUsd'].flatMap((field) =>
+    ['-1000', '1e999', 'NaN'].map((value) => ({ field, value })),
+  ),
+)('rejects corrupt saved monetary fields on restart: %j', async ({ field, value }) => {
   const f = await transcriptHistoryFixture(cleanup)
   await writeFile(
     join(f.transcripts, 'native.jsonl'),
     JSON.stringify(nativeClaudeResponse('priced')) + '\n',
   )
+  await writeFile(
+    join(f.transcripts, 'retained.jsonl'),
+    JSON.stringify(nativeClaudeResponse('retained')) + '\n',
+  )
   await f.service.refresh()
   f.service.close()
+  await rm(join(f.transcripts, 'retained.jsonl'))
   const { Database } = await import('bun:sqlite')
   const database = new Database(join(f.options.cacheDirectory, 'transcript-history.sqlite'))
-  const row = database.query<{ id: string; value: string }, []>('SELECT id, value FROM files').get()
+  const row = database
+    .query<{ id: string; value: string }, []>(
+      "SELECT id, value FROM files WHERE value LIKE '%native.jsonl%'",
+    )
+    .get()
   expect(row).toBeDefined()
   if (!row) return
-  database
-    .query('UPDATE files SET value = ? WHERE id = ?')
-    .run(row.value.replace('"input":1', '"input":' + rate), row.id)
+  const corrupted = row.value.replace(new RegExp(`"${field}":[^,}]+`), `"${field}":${value}`)
+  expect(corrupted).not.toBe(row.value)
+  database.query('UPDATE files SET value = ? WHERE id = ?').run(corrupted, row.id)
   database.close()
   const restarted = new LocalTranscriptUsageService(f.options)
   cleanup.push(async () => restarted.close())
   await restarted.initialize()
-  expect(restarted.read(query).totals.tokens).toBe(0)
-  expect(restarted.read(query).coverage?.status).toBe('pending')
-  await restarted.refresh()
   expect(restarted.read(query).totals.tokens).toBe(120)
   expect(restarted.read(query).totals.costUsd).toBeCloseTo(0.00014)
+  expect(restarted.read(query).coverage?.status).toBe('pending')
+  await restarted.refresh()
+  expect(restarted.read(query).totals.tokens).toBe(240)
+  expect(restarted.read(query).totals.costUsd).toBeCloseTo(0.00028)
+})
+
+it('persists Codex baselines through model changes, cumulative resets and repeated observations', async () => {
+  const f = await transcriptHistoryFixture(cleanup)
+  f.service.close()
+  const options = {
+    ...f.options,
+    sources: [{ id: 'codex', driverKind: 'codex' as const, roots: [f.transcripts] }],
+  }
+  const service = new LocalTranscriptUsageService(options)
+  cleanup.push(async () => service.close())
+  await service.initialize()
+  const file = join(f.transcripts, 'codex.jsonl')
+  await writeFile(
+    file,
+    [
+      { type: 'session_meta', payload: { source: 'cli' } },
+      { type: 'turn_context', payload: { turn_id: 'turn-1', model: 'gpt-old' } },
+      {
+        type: 'event_msg',
+        timestamp: '2026-10-03T10:00:00Z',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: { input_tokens: 100, output_tokens: 20, reasoning_output_tokens: 8 },
+          },
+        },
+      },
+    ]
+      .map((row) => JSON.stringify(row))
+      .join('\n') + '\n',
+  )
+  await service.refresh()
+  service.close()
+  const restarted = new LocalTranscriptUsageService(options)
+  cleanup.push(async () => restarted.close())
+  await restarted.initialize()
+  const reset = {
+    type: 'event_msg',
+    timestamp: '2026-10-03T11:00:00Z',
+    payload: {
+      type: 'token_count',
+      info: {
+        total_token_usage: { input_tokens: 30, output_tokens: 20, reasoning_output_tokens: 2 },
+      },
+    },
+  }
+  await appendFile(
+    file,
+    [
+      { type: 'turn_context', payload: { turn_id: 'turn-1', model: 'gpt-new' } },
+      {
+        type: 'event_msg',
+        timestamp: '2026-10-03T10:30:00Z',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: { input_tokens: 130, output_tokens: 20, reasoning_output_tokens: 8 },
+          },
+        },
+      },
+      { type: 'turn_context', payload: { turn_id: 'turn-2', model: 'gpt-new' } },
+      reset,
+      reset,
+    ]
+      .map((row) => JSON.stringify(row))
+      .join('\n') + '\n',
+  )
+  await restarted.refresh()
+  const report = restarted.read(query)
+  expect(report.totals).toMatchObject({ tokens: 200, turns: 2 })
+  expect(report.models).toHaveLength(2)
+  expect(report.models.reduce((total, row) => total + row.reasoningTokens, 0)).toBe(10)
 })
