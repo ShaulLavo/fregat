@@ -11,6 +11,7 @@ import {
 import { OrchestrationStreamHub, OrchestrationStreams } from '../streams'
 import { orchestrationWsServerConfig } from '../ws-rpc'
 import { readEnvironmentIdentity } from '../../db/environment-identity'
+import serverPackage from '../../../package.json' with { type: 'json' }
 import {
   assistantDeltaEvent,
   createShellWorkspace,
@@ -261,7 +262,7 @@ describe('connection handshake', () => {
     const identity = readEnvironmentIdentity(workspace.database)
     const config = v.parse(orchestrationWsServerConfigSchema, orchestrationWsServerConfig(identity))
 
-    expect(config.serverVersion).toBe('0.0.1')
+    expect(config.serverVersion).toBe(serverPackage.version)
     expect(config.protocolVersion).toBe(ORCHESTRATION_WS_PROTOCOL_VERSION)
     expect(config.capabilities).toEqual({ resume: true, synchronizedMarker: true })
     expect(config.limits.resumeMaxGap).toBe(ORCHESTRATION_RESUME_MAX_GAP)

@@ -7,6 +7,7 @@ import { healthDescriptorSchema, ORCHESTRATION_WS_PROTOCOL_VERSION } from '@work
 import * as v from 'valibot'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import serverPackage from '../../package.json' with { type: 'json' }
 import { closeTestApps, createTestApp } from '../../test/server'
 import { testSettingsOptions } from '../settings/testing'
 import { textFileVersion } from '../fs/version'
@@ -50,7 +51,7 @@ describe('fs rpc auth', () => {
       ok: true,
       label: hostname(),
       protocolVersion: ORCHESTRATION_WS_PROTOCOL_VERSION,
-      serverVersion: '0.0.1',
+      serverVersion: serverPackage.version,
       platform: { os: process.platform, arch: process.arch },
     })
     expect(repeated.environmentId).toBe(firstDescriptor.environmentId)
