@@ -722,7 +722,7 @@
     },
     "hotkeys/packages/hotkeys": {
       "name": "@fregat/hotkeys",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@tanstack/store": "^0.11.1",
       },
@@ -734,7 +734,7 @@
     },
     "hotkeys/packages/react-hotkeys": {
       "name": "@fregat/react-hotkeys",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@fregat/hotkeys": "workspace:*",
         "@tanstack/react-store": "^0.11.1",
