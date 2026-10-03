@@ -575,6 +575,7 @@ it('publishes immutable copied frame state only after submitted frames', async (
   expect(Object.isFrozen(frames[0]?.rows[0]?.cells)).toBe(true)
   expect(Object.isFrozen(frames[0]?.rows[0]?.continuations)).toBe(true)
   expect(Object.isFrozen(frames[0]?.cursor.viewport)).toBe(true)
+  expect(Object.isFrozen(frames[0]?.paintedCursor)).toBe(true)
 
   renderer.schedule()
   clock.flushFrame()

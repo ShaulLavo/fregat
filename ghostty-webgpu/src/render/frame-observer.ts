@@ -55,7 +55,7 @@ export class FrameObserver {
     const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
     const snapshot = {
       cursor: Object.freeze({ ...cursor, viewport }),
-      paintedCursor,
+      paintedCursor: paintedCursor ? Object.freeze({ ...paintedCursor }) : undefined,
     }
     const fullFrame = onFrame
       ? Object.freeze({

@@ -352,7 +352,8 @@ fn buildRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, cells: *c.
             glyph_end = @intCast(x + 1);
         }
     }
-    if (cell_end == 0 and glyph_end == 0) return c.GHOSTTY_SUCCESS;
+    // Logical row changes can leave GPU bytes identical, such as concealed text.
+    if (!write) return c.GHOSTTY_SUCCESS;
     if (frame.ranges_len == frame.ranges_cap) return c.GHOSTTY_OUT_OF_SPACE;
     frame.ranges[frame.ranges_len] = .{
         .cell_offset = (y * frame.columns + if (cell_end == 0) @as(u32, 0) else cell_first) * 64,
