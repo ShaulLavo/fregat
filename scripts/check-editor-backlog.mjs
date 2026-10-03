@@ -20,6 +20,11 @@ const sections = [
 ]
 const indexPath = resolve(directory, 'editor-backlog.md')
 const index = readFileSync(indexPath, 'utf8')
+const planIndexPath = resolve(directory, 'README.md')
+const planIndex = readFileSync(planIndexPath, 'utf8')
+const planDocuments = readdirSync(directory).filter(
+  (file) => file.endsWith('.md') && file !== 'README.md',
+)
 const rows = index
   .split('\n')
   .filter((line) => line.startsWith('|'))
@@ -182,6 +187,11 @@ function checkPlanningDirectory(path) {
 for (const family of ['apps', 'packages', 'editor', 'ghostty-webgpu', 'hotkeys'])
   checkPlanningDirectory(resolve(root, family))
 
+for (const file of planDocuments)
+  check(planIndex.includes(`](${file})`), `Plan absent from root index: ${file}`)
+for (const path of [resolve(root, 'PLAN.md'), planIndexPath])
+  checkLinks(path, readFileSync(path, 'utf8'))
+
 check(manifest.schemaVersion === 2, 'Unsupported manifest schema')
 check(/^[a-f0-9]{40}$/.test(manifest.baseline), 'Invalid inspected baseline')
 for (const plan of manifest.plans) checkPlan(plan)
@@ -213,6 +223,9 @@ if (problems.length > 0) {
   console.error(problems.join('\n'))
   process.exitCode = 1
 } else {
+  console.log(
+    `Plan index: all ${planDocuments.length} top-level documents indexed; roadmap and index local links valid.`,
+  )
   console.log(
     `Editor backlog: ${plans.size} entries; all ${topics.size} wishlist topics covered; dependencies acyclic; metadata and local links valid.`,
   )

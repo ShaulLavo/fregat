@@ -2,7 +2,7 @@ import { playwright } from '@vitest/browser-playwright'
 import { defineConfig, type Plugin } from 'vitest/config'
 import type { BrowserCommand } from 'vitest/node'
 import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
-import { workspaceRoot } from '../../scripts/workspace-root'
+import { workspaceRoot } from '../../scripts/workspace-root.ts'
 
 // Outages live in the dev server, shared by every test file: a Playwright route resolves before
 // the test frame's loader intercepts with it, so a request sent right after blocking could load.
