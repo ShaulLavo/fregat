@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import * as v from 'valibot'
 import {
+  errorStringField,
   providerAccountUsageSchema,
   providerDriverKindSchema,
   providerUsageFeedSchema,
@@ -14,6 +15,8 @@ import {
   type ProviderUsageResult,
 } from '@workspace/contracts'
 import { writeFileAtomicSync } from '../fs/atomic-write'
+import { isEvlogError } from '../observability/structured-errors'
+import { sessionIdentityErrors } from './structured-errors'
 import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
@@ -77,6 +80,10 @@ const cacheSchema = v.object({
 export class ProviderUsageStore {
   private readonly accounts = new Map<string, StoredAccount>()
   private readonly probes = new Map<string, Promise<boolean>>()
+  private readonly collectionSkips = new Map<
+    string,
+    Partial<Record<'cooldown' | 'already-in-flight', number>>
+  >()
   private readonly suspended = new Map<string, number>()
   private proxyAccounts: ProviderAccountUsage[] = []
   private proxyAttemptedAt: number | null = null
@@ -157,6 +164,7 @@ export class ProviderUsageStore {
     this.timer = null
     await Promise.allSettled([...this.probes.values(), this.proxyProbe])
     this.persist(true)
+    this.collectionSkips.clear()
   }
 
   accept(event: ProviderRuntimeEvent) {
@@ -215,11 +223,11 @@ export class ProviderUsageStore {
         id: safeFeedText(account.accountKey),
         provider: safeFeedText(account.driverKind),
         label: feedAccountLabel(account, index),
-        plan: safeFeedText(account.planType ?? 'Unknown'),
+        plan: feedPlanLabel(account),
         checkedAt: account.checkedAt,
         lastSeenAt: account.lastSeenAt ?? account.checkedAt,
         state: account.state ?? 'unknown',
-        source: account.source === 'rate-limit-event' ? 'passive-header' : 'proxy-state',
+        source: feedAccountSource(account),
         routing: account.routing ?? { mode: 'unknown', active: null, lastServedAt: null },
         windows: account.windows.map((window) => ({
           ...feedWindowPresentation(account, window),
@@ -228,7 +236,7 @@ export class ProviderUsageStore {
           windowMinutes: window.windowMinutes,
           status: feedWindowStatus(window),
           lastSeenAt: window.observedAt ?? null,
-          source: safeFeedText(window.source ?? account.source ?? 'unknown'),
+          source: feedAccountSource(account),
         })),
         cooldown: account.cooldown ?? null,
         ...(account.credits ? { credits: account.credits } : {}),
@@ -308,7 +316,10 @@ export class ProviderUsageStore {
   private collect(target: AccountTarget, force: boolean): Promise<boolean> {
     if (!force && this.suspended.has(target.accountKey)) return Promise.resolve(false)
     const pending = this.probes.get(target.accountKey)
-    if (pending) return pending
+    if (pending) {
+      this.countCollectionSkip(target.accountKey, 'already-in-flight')
+      return pending
+    }
     const previous = this.accounts.get(target.accountKey)
     const wait = previous?.failed ? this.policy().failureCooldownMs : this.policy().minIntervalMs
     if (
@@ -316,11 +327,19 @@ export class ProviderUsageStore {
       previous?.credentialFingerprint === target.credentialFingerprint &&
       previous?.attemptedAt != null &&
       this.now() - previous.attemptedAt < wait
-    )
+    ) {
+      this.countCollectionSkip(target.accountKey, 'cooldown')
       return Promise.resolve(false)
+    }
     const probe = this.probe(target, force).finally(() => this.probes.delete(target.accountKey))
     this.probes.set(target.accountKey, probe)
     return probe
+  }
+
+  private countCollectionSkip(accountKey: string, reason: 'cooldown' | 'already-in-flight') {
+    const counts = this.collectionSkips.get(accountKey) ?? {}
+    counts[reason] = (counts[reason] ?? 0) + 1
+    this.collectionSkips.set(accountKey, counts)
   }
 
   private async probe(target: AccountTarget, force: boolean) {
@@ -329,8 +348,11 @@ export class ProviderUsageStore {
     this.adoptCredentials(target)
     this.markAttempt(target, wasFailed)
     this.persist()
-    const source =
-      target.driverKind === 'codex' ? 'codex-account-rate-limits' : 'claude-sdk-control'
+    let source = target.driverKind === 'codex' ? 'codex-account-rate-limits' : 'claude-sdk-control'
+    let outcome = 'failed'
+    let cacheAgeMs: number | undefined
+    let sdkCalls = 0
+    let failure: { code?: string; why?: string } | undefined
     try {
       const identity = target.claudeCachePath
         ? await readClaudeUsageIdentity(target.claudeCachePath)
@@ -341,16 +363,27 @@ export class ProviderUsageStore {
         : null
       if (cached) {
         this.applyProbe(target, cached.probe, cached.observedAt, 'claude-local-cache')
-        if (!force && this.now() - Date.parse(cached.observedAt) < this.policy().minIntervalMs) {
+        cacheAgeMs = this.now() - Date.parse(cached.observedAt)
+        if (
+          !force &&
+          cacheAgeMs < Math.min(this.policy().minIntervalMs, this.policy().staleAfterMs)
+        ) {
+          outcome = 'cache-hit'
+          source = 'claude-local-cache'
           this.markAttempt(target, false)
           this.persist()
           return true
         }
       }
-      if (!target.adapter?.readUsage) return false
+      if (!target.adapter?.readUsage) {
+        outcome = 'no-readUsage'
+        return false
+      }
+      sdkCalls = 1
       const result = await target.adapter.readUsage()
       const current = this.registry.usageAccount(target.providerInstanceIds[0]!)
       if (current && current.credentialFingerprint !== target.credentialFingerprint) {
+        outcome = 'generation-discard'
         this.adoptCredentials({ ...target, credentialFingerprint: current.credentialFingerprint })
         this.persist()
         return false
@@ -362,29 +395,43 @@ export class ProviderUsageStore {
         : undefined
       this.adoptIdentity(target, currentIdentity)
       if (identity !== undefined && currentIdentity !== undefined && identity !== currentIdentity) {
+        outcome = 'generation-discard'
         this.persist()
         return false
       }
       this.applyProbe(target, result, new Date(startedAt).toISOString(), source)
       this.markAttempt(target, false)
       this.persist()
-      recordChatPipelineInfo('chat.pipeline.provider_usage.probe', {
-        driverKind: target.driverKind,
-        durationMs: this.now() - startedAt,
-        outcome: result.kind,
-        source,
-      })
+      outcome = result.kind
       return result.kind === 'reading'
-    } catch {
+    } catch (error) {
       this.markAttempt(target, true)
       this.persist()
-      if (!wasFailed)
-        recordChatPipelineWarning('chat.pipeline.provider_usage.probe_failed', {
-          driverKind: target.driverKind,
-          durationMs: this.now() - startedAt,
-          source,
-        })
+      const structured = isEvlogError(error)
+        ? error
+        : sessionIdentityErrors.USAGE_PROBE_FAILED({ internal: { driverKind: target.driverKind } })
+      failure = {
+        code: errorStringField(structured, 'code'),
+        why: errorStringField(structured, 'why'),
+      }
       return false
+    } finally {
+      const collectionSkips = this.collectionSkips.get(target.accountKey)
+      this.collectionSkips.delete(target.accountKey)
+      const fields = {
+        ...(collectionSkips ? { collectionSkips } : {}),
+        driverKind: target.driverKind,
+        durationMs: this.now() - startedAt,
+        outcome,
+        source,
+        sdkCalls,
+        ...(cacheAgeMs === undefined ? {} : { cacheAgeMs }),
+        ...failure,
+      }
+      // Polling gates run before this attempt; one settled outcome explains every actual probe.
+      if (failure && !wasFailed)
+        recordChatPipelineWarning('chat.pipeline.provider_usage.probe_failed', fields)
+      else recordChatPipelineInfo('chat.pipeline.provider_usage.probe', fields)
     }
   }
 
@@ -497,6 +544,7 @@ export class ProviderUsageStore {
         lastSeenAt: checkedAt,
         source: newer ? source : previous.source,
         planType: newer ? (update.planType ?? previous.planType) : previous.planType,
+        label: newer ? (update.label ?? previous.label) : previous.label,
         windows: mergeUsageWindows(previous.windows, updates),
         credits:
           newer && update.credits !== undefined ? update.credits : (previous.credits ?? null),
@@ -667,10 +715,19 @@ function windowFreshness(
   return nowMs - Date.parse(observedAt) >= staleAfterMs ? 'stale' : 'fresh'
 }
 
+// Mesh v1 renders these two live-source classes; detailed provenance stays in our API/cache.
+function feedAccountSource(account: ProviderAccountUsage): 'passive-header' | 'proxy-state' {
+  return account.source === 'cli-proxy-management' ? 'proxy-state' : 'passive-header'
+}
+
 function feedAccountLabel(account: ProviderAccountUsage, index: number) {
-  if (account.source === 'cli-proxy-management')
-    return account.label ? `Proxy · ${account.label}` : `Proxy account ${index + 1}`
+  if (account.label) return account.label
   return `${account.driverKind === 'claude' ? 'Claude' : 'Codex'} account ${index + 1}`
+}
+
+function feedPlanLabel(account: ProviderAccountUsage) {
+  const plan = account.planType ?? 'Unknown'
+  return safeFeedText(account.driverKind === 'claude' ? plan.replace(/^claude_/, '') : plan)
 }
 
 function feedWindowPresentation(
@@ -679,20 +736,28 @@ function feedWindowPresentation(
 ) {
   if (
     account.driverKind !== 'codex' ||
-    account.source === 'cli-proxy-management' ||
-    !isCodexPosition(window.id)
+    (account.source !== 'cli-proxy-management' && !isCodexPosition(window.id))
   )
     return { id: safeFeedText(window.id), label: safeFeedText(window.label) }
   const { kind, label } = codexWindowPresentation(window.windowMinutes)
+  const namespace = window.id.slice(0, window.id.lastIndexOf(':') + 1)
+  const position = window.id.slice(namespace.length)
   const sharedKind = account.windows.some(
     (peer) =>
       peer.id !== window.id &&
-      isCodexPosition(peer.id) &&
+      peer.id.slice(0, peer.id.lastIndexOf(':') + 1) === namespace &&
       codexWindowPresentation(peer.windowMinutes).kind === kind,
   )
-  // Positions remain merge keys; the feed names genuine durations, including retained reads.
-  const id = kind === 'other' || sharedKind ? `${kind}:${window.id}` : kind
-  return { id, label }
+  // Positions remain merge keys; duration names are scoped only in the exported feed.
+  const suffix = kind === 'other' || sharedKind ? `${kind}:${position}` : kind
+  const scope = namespace
+    .replace(/^model:/, '')
+    .replaceAll(':', ' ')
+    .trim()
+  return {
+    id: safeFeedText(`${namespace}${suffix}`),
+    label: safeFeedText(scope ? `${scope} ${label}` : label),
+  }
 }
 
 function isCodexPosition(id: string) {

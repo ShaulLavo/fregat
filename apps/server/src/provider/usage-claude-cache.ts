@@ -3,9 +3,14 @@ import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import * as v from 'valibot'
 import { claudeUsageProbe, type ProviderUsageProbe } from './utils/usage-windows'
+import { usageAccountLabel } from './utils/usage-account-label'
 
 const cacheSchema = v.object({
-  oauthAccount: v.object({ accountUuid: v.string(), organizationType: v.optional(v.string()) }),
+  oauthAccount: v.object({
+    accountUuid: v.string(),
+    organizationType: v.optional(v.string()),
+    emailAddress: v.optional(v.unknown()),
+  }),
   cachedUsageUtilization: v.object({
     accountUuid: v.string(),
     fetchedAtMs: v.pipe(v.number(), v.finite(), v.minValue(1)),
@@ -59,6 +64,7 @@ export async function readClaudeUsageCache(
       subscription_type: account.organizationType ?? null,
     })
     if (probe.kind !== 'reading' || probe.update.windows.length === 0) return null
+    probe.update.label = usageAccountLabel(account.emailAddress)
     return { observedAt: new Date(cache.fetchedAtMs).toISOString(), probe }
   } catch {
     // Optional CLI state can disappear during its own atomic save.
