@@ -1,6 +1,6 @@
 {
   "name": "ghostty-webgpu",
-  "version": "0.3.8",
+  "version": "0.3.10",
   "description": "Ghostty for the web with a damage-aware WebGPU renderer and native API",
   "keywords": [
     "browser",
@@ -28,6 +28,7 @@
     "native/config-resolver/linux-arm64",
     "native/config-resolver/linux-x64",
     "ghostty-vt.wasm",
+    "ghostty-vt.provenance.json",
     "bridge.wasm",
     "README.md",
     "LICENSE",

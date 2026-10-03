@@ -1,3 +1,4 @@
+import serverPackage from '../../../package.json' with { type: 'json' }
 import { LiveStreamBudget } from '../live-stream-budget'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
@@ -11,7 +12,6 @@ import {
 import { OrchestrationStreamHub, OrchestrationStreams } from '../streams'
 import { orchestrationWsServerConfig } from '../ws-rpc'
 import { readEnvironmentIdentity } from '../../db/environment-identity'
-import serverPackage from '../../../package.json' with { type: 'json' }
 import {
   assistantDeltaEvent,
   createShellWorkspace,

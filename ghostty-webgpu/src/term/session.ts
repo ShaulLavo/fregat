@@ -18,6 +18,7 @@ import {
   isPasteSafe,
 } from '../core/input.js'
 import type { MouseEncoderState, NormalizedKeyEvent, NormalizedMouseEvent } from '../core/input.js'
+import { measurePrintingText, printingText } from '../core/measurement.js'
 import { GhosttyRenderState } from '../core/render-state.js'
 import { GhosttyRuntime } from '../core/runtime.js'
 import {
@@ -30,10 +31,13 @@ import {
 import { GhosttyTerminal } from '../core/terminal.js'
 import { normalizeCellGeometry } from '../core/types.js'
 import type {
+  CustomOscObservation,
   ClipboardWrite,
   ReadLinesOptions,
   RgbColor,
   TerminalEffects,
+  TerminalGeometry,
+  TerminalTextMeasurement,
   TerminalLine,
   TerminalScrollbar,
   TerminalSelectionFormatOptions,
@@ -52,6 +56,7 @@ import {
   type LinkResolverOptions,
 } from './links.js'
 import type {
+  TerminalCustomOscSubscription,
   TerminalAppearance,
   TerminalAppearanceOptions,
   TerminalClipboardLocation,
@@ -93,6 +98,8 @@ import type {
 
 const encoder = new TextEncoder()
 const paletteLength = 256
+// One native write retains at most 2 MiB of custom OSC payloads before publication.
+const customOscObservationLimit = 1024
 
 type CanonicalTerminalRendererTheme = TerminalRendererTheme & {
   readonly cursorText: TerminalColor
@@ -464,6 +471,7 @@ const defaultCursor: TerminalCursorSettings = Object.freeze({
 })
 
 type PendingEffect =
+  | { readonly observation: CustomOscObservation; readonly type: 'customOSC' }
   | { readonly bytes: Uint8Array; readonly type: 'data' }
   | { readonly cause: unknown; readonly operation: string; readonly type: 'error' }
   | { readonly type: 'bell' }
@@ -848,6 +856,7 @@ function createEmitters(): SessionEmitters {
   return {
     appearance: new EventEmitter(createEventSink(error, 'event.appearance')),
     bell: new EventEmitter(createEventSink(error, 'event.bell')),
+    customOSC: new EventEmitter(createEventSink(error, 'event.customOSC')),
     data: new EventEmitter(createEventSink(error, 'event.data')),
     error,
     renderRequest: new EventEmitter(createEventSink(error, 'event.renderRequest')),
@@ -861,6 +870,7 @@ function createEmitters(): SessionEmitters {
 function disposeEmitters(emitters: SessionEmitters): void {
   emitters.appearance.dispose()
   emitters.bell.dispose()
+  emitters.customOSC.dispose()
   emitters.data.dispose()
   emitters.renderRequest.dispose()
   emitters.resize.dispose()
@@ -998,6 +1008,10 @@ export interface TerminalSessionKeyOptions {
 
 export class TerminalSession<TEvent = unknown> {
   private activeOperations = 0
+  private customOscGeneration = 0
+  private customOscRemaining = customOscObservationLimit
+  private customOscDropped = 0
+  private readonly customOscSubscriptions = new Map<number, number>()
   private appearanceValue: TerminalAppearance
   private disposalRequested = false
   private disposed = false
@@ -1149,6 +1163,54 @@ export class TerminalSession<TEvent = unknown> {
     return this.terminal.readLines(start, end, options)
   }
 
+  geometry(): TerminalGeometry {
+    this.ensureActive()
+    const size = this.terminal.size
+    return Object.freeze({
+      ...size,
+      cellWidth: this.appearanceValue.grid.cellWidth,
+      cellHeight: this.appearanceValue.grid.cellHeight,
+      revision: this.revisionValue,
+      cursor: Object.freeze(this.terminal.cursor),
+      scrollbar: Object.freeze(this.terminal.scrollbar),
+      graphemeClustering: this.terminal.isModeEnabled(TerminalMode.GraphemeClustering),
+      autowrap: this.terminal.isModeEnabled(TerminalMode.Autowrap),
+    })
+  }
+
+  measure(text: string): number {
+    return this.measureTexts([text]).texts[0]!.cells
+  }
+
+  /** Plain printing text only; VT controls go through writeAndReadGeometry. */
+  measureTexts(texts: readonly string[]): TerminalTextMeasurement {
+    this.ensureActive()
+    const prepared = texts.map(printingText)
+    return this.runOperation(() => {
+      const geometry = this.geometry()
+      const measured = prepared.map((text) =>
+        measurePrintingText(this.runtimeValue, text, geometry.graphemeClustering),
+      )
+      return Object.freeze({ geometry, texts: Object.freeze(measured) })
+    })
+  }
+
+  writeAndReadGeometry(data: TerminalInputData): TerminalGeometry {
+    return this.runOperation(() => {
+      this.runVtWrite(() => this.terminal.write(data))
+      this.mouseEncoder.syncFromTerminal()
+      this.invalidateLinks()
+      this.revisionValue += 1
+      // Effects can reenter the owner; capture this write before publishing any of them.
+      const scroll = this.commitScrollChange()
+      const geometry = this.geometry()
+      this.flushEffects()
+      if (scroll) this.emitters.scroll.emit(scroll)
+      this.emitRenderRequest()
+      return geometry
+    })
+  }
+
   get viewportActive(): boolean {
     this.ensureActive()
     return this.scrollValue.viewportActive
@@ -1161,6 +1223,27 @@ export class TerminalSession<TEvent = unknown> {
     this.ensureActive()
     const emitter = this.emitters[type] as EventEmitter<TerminalSessionEventMap[TType]>
     return emitter.subscribe(listener)
+  }
+
+  subscribeCustomOsc(number: number): TerminalCustomOscSubscription {
+    this.ensureActive()
+    const generation = this.customOscGeneration + 1
+    const unsubscribe = this.terminal.subscribeCustomOsc(
+      number,
+      generation,
+      (observation) => this.effectState.pending.push({ observation, type: 'customOSC' }),
+      () => this.reserveCustomOscObservation(),
+    )
+    this.customOscGeneration = generation
+    this.customOscSubscriptions.set(number, generation)
+    return {
+      generation,
+      dispose: () => {
+        if (this.customOscSubscriptions.get(number) !== generation) return
+        this.customOscSubscriptions.delete(number)
+        unsubscribe()
+      },
+    }
   }
 
   write(data: TerminalInputData): TerminalMutationResult {
@@ -1440,6 +1523,7 @@ export class TerminalSession<TEvent = unknown> {
     this.disposeResource('renderState.dispose', () => this.nativeRenderState.dispose())
     this.disposeResource('terminal.dispose', () => this.terminal.dispose())
     if (this.ownsRuntime) this.disposeResource('runtime.dispose', () => this.runtimeValue.dispose())
+    this.customOscSubscriptions.clear()
     this.effectState.pending.length = 0
     this.effectState.clipboardWrite = undefined
     this.osc8RangeCache = undefined
@@ -1455,12 +1539,26 @@ export class TerminalSession<TEvent = unknown> {
     this.runVtWrite(() => this.terminal.write(data))
     this.mouseEncoder.syncFromTerminal()
     this.invalidateLinks()
+    // Observers can read geometry or reenter; publish the committed native revision first.
+    this.revisionValue += 1
+    const scroll = this.commitScrollChange()
     this.flushEffects()
-    this.emitScrollChange()
-    return this.requestRender()
+    if (scroll) this.emitters.scroll.emit(scroll)
+    return this.emitRenderRequest()
+  }
+
+  private reserveCustomOscObservation(): boolean {
+    if (this.customOscRemaining > 0) {
+      this.customOscRemaining -= 1
+      return true
+    }
+    this.customOscDropped += 1
+    return false
   }
 
   private runVtWrite(write: () => void): void {
+    this.customOscRemaining = customOscObservationLimit
+    this.customOscDropped = 0
     this.effectState.vtWriteActive = true
     try {
       write()
@@ -1470,6 +1568,15 @@ export class TerminalSession<TEvent = unknown> {
     } finally {
       this.effectState.vtWriteActive = false
     }
+    if (this.customOscDropped === 0) return
+    this.effectState.pending.push({
+      cause: createGhosttyError('custom_osc.capture', 'Custom OSC observation limit reached', {
+        dropped: this.customOscDropped,
+        limit: customOscObservationLimit,
+      }),
+      operation: 'customOSC.capture',
+      type: 'error',
+    })
   }
 
   private setFocusedNow(focused: boolean): TerminalInputResult {
@@ -1486,10 +1593,12 @@ export class TerminalSession<TEvent = unknown> {
     this.runVtWrite(() => this.terminal.clear())
     this.selection.reset()
     this.invalidateLinks()
+    this.revisionValue += 1
+    const scroll = this.commitScrollChange(forceScroll)
     this.flushEffects()
     if (hadSelection) this.emitSelection()
-    this.emitScrollChange(forceScroll)
-    return this.requestRender()
+    if (scroll) this.emitters.scroll.emit(scroll)
+    return this.emitRenderRequest()
   }
 
   private resetNow(): TerminalMutationResult {
@@ -1500,18 +1609,23 @@ export class TerminalSession<TEvent = unknown> {
     this.mouseEncoder.reset()
     this.mouseEncoder.syncFromTerminal()
     this.invalidateLinks()
+    this.revisionValue += 1
+    const scroll = this.commitScrollChange()
     this.flushEffects()
     if (hadSelection) this.emitSelection()
-    this.emitScrollChange()
-    return this.requestRender()
+    if (scroll) this.emitters.scroll.emit(scroll)
+    return this.emitRenderRequest()
   }
 
   private selectionAutoscrollTickNow(input: TerminalSelectionDragInput): SelectionGestureUpdate {
     const update = this.selection.autoscrollTick(input)
     this.invalidateLinks()
-    const scrollChanged = this.emitScrollChange()
+    const scroll = this.commitScrollChange()
+    if (!update.selectionChanged && !scroll) return update
+    this.revisionValue += 1
+    if (scroll) this.emitters.scroll.emit(scroll)
     if (update.selectionChanged) this.emitSelection()
-    if (update.selectionChanged || scrollChanged) this.requestRender()
+    this.emitRenderRequest()
     return update
   }
 
@@ -1541,10 +1655,16 @@ export class TerminalSession<TEvent = unknown> {
 
     this.appearanceValue = next
     if (gridChanged || scrollbackChanged) this.invalidateLinks()
+    const nextScroll =
+      gridChanged || scrollbackChanged ? readScrollSnapshot(this.terminal) : this.scrollValue
+    const scrollChanged = !scrollSnapshotsEqual(this.scrollValue, nextScroll)
+    // Resize listeners can paint synchronously; commit viewport and revision before notifying.
+    if (scrollChanged) this.scrollValue = nextScroll
+    this.revisionValue += 1
     if (gridChanged) this.emitters.resize.emit({ grid: next.grid })
-    if (gridChanged || scrollbackChanged) this.emitScrollChange()
+    if (scrollChanged) this.emitters.scroll.emit(nextScroll)
     this.emitters.appearance.emit({ appearance: next })
-    return this.requestRender()
+    return this.emitRenderRequest()
   }
 
   private applyCursor(cursor: TerminalCursorSettings): void {
@@ -1555,8 +1675,11 @@ export class TerminalSession<TEvent = unknown> {
   private scroll(action: () => void): TerminalMutationResult {
     action()
     this.invalidateLinks()
-    if (!this.emitScrollChange()) return this.mutationResult()
-    return this.requestRender()
+    const scroll = this.commitScrollChange()
+    if (!scroll) return this.mutationResult()
+    this.revisionValue += 1
+    this.emitters.scroll.emit(scroll)
+    return this.emitRenderRequest()
   }
 
   private publishInput(bytes: Uint8Array, clearSelection: boolean): TerminalInputResult {
@@ -1587,12 +1710,11 @@ export class TerminalSession<TEvent = unknown> {
     })
   }
 
-  private emitScrollChange(force = false): boolean {
+  private commitScrollChange(force = false): TerminalScrollEvent | undefined {
     const next = readScrollSnapshot(this.terminal)
-    if (!force && scrollSnapshotsEqual(this.scrollValue, next)) return false
+    if (!force && scrollSnapshotsEqual(this.scrollValue, next)) return undefined
     this.scrollValue = next
-    this.emitters.scroll.emit(next)
-    return true
+    return next
   }
 
   private flushEffects(): void {
@@ -1612,6 +1734,15 @@ export class TerminalSession<TEvent = unknown> {
   }
 
   private flushEffect(effect: ReadyEffect): void {
+    if (effect.type === 'customOSC') {
+      if (this.disposed || this.disposalRequested) return
+      if (
+        this.customOscSubscriptions.get(effect.observation.number) !== effect.observation.generation
+      )
+        return
+      this.emitters.customOSC.emit(effect.observation)
+      return
+    }
     if (effect.type === 'data') {
       this.emitters.data.emit({ bytes: effect.bytes })
       return
@@ -1629,6 +1760,10 @@ export class TerminalSession<TEvent = unknown> {
 
   private requestRender(): TerminalMutationResult {
     this.revisionValue += 1
+    return this.emitRenderRequest()
+  }
+
+  private emitRenderRequest(): TerminalMutationResult {
     const result = this.mutationResult()
     this.emitters.renderRequest.emit({ ...result, state: this.nativeRenderState })
     return result

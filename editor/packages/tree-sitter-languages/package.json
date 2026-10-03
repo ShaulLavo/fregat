@@ -69,7 +69,6 @@
     "@types/node": "^26.6.3",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
-    "tree-sitter-cli": "0.27.0",
     "typescript": "7.0.2",
     "vitest": "5.0.2",
     "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#059451d3c167443643630d471c2c2d61c13b10ff"

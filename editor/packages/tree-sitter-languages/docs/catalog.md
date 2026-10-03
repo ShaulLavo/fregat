@@ -21,8 +21,15 @@ mapped-query hashes. `NOTICE` retains upstream licenses. npm sources are exact v
 compiler provenance is explicitly unknown when the upstream package does not publish it.
 Astro is built from the revision in `languages.json` with tree-sitter 0.27.0 and wasi-sdk 34.
 `astro-build.lock.json` records that build's inputs and output; `languages:build -- --check`
-rebuilds it and compares the lock. Set `TMPDIR` for build scratch on machines without `/work`.
+rebuilds it and compares the lock. Grammar builds use the OS temporary directory; set `TMPDIR`
+to choose another scratch directory.
 Updating revisions is an explicit manifest edit, followed by regeneration and verification.
+
+Ordinary installs and package builds use the bundled WASM files. The explicit
+`languages:build`, `languages:build:sql` and `languages:build:mdx` commands acquire
+`tree-sitter-cli@0.27.0` through `bun x --package tree-sitter-cli@0.27.0 tree-sitter`.
+Bun caches the CLI for later grammar builds. Each command checks the CLI version before
+fetching source. Install wasi-sdk 34 and set `WASI_SDK_PATH` to its directory for WASM builds.
 
 The 23 parser entries include Markdown's internal inline parser. Every entry has a curated
 capture fixture and a browser-worker edit comparison. These establish partial support, not
@@ -59,7 +66,7 @@ maps to `keyword.storage`. Fixtures cover generic statements and lazy Markdown f
 Dialect parity, PL/SQL, uppercase exponent literals and SQL folds are not established.
 
 MDX is built from srazzak/tree-sitter-mdx at the pinned revision in `languages.json`.
-`WASI_SDK_PATH=/work/cache/tree-sitter/wasi-sdk bun run languages:build:mdx` regenerates the
+`bun run languages:build:mdx` regenerates the
 WASM, adapted query, notice and source lock. Add `-- --check` to compare a reproducible build.
 `patches/mdx-inline.patch` permits JSX and expressions inside paragraphs and headings, and fixes
 an incorrectly indexed scanner table that read past its bounds during paragraph interruption.

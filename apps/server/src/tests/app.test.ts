@@ -1,3 +1,4 @@
+import serverPackage from '../../package.json' with { type: 'json' }
 import { textWriteRequest } from '../../test/file-transport'
 import { readTextResponse } from '../../test/file-transport'
 import { randomUUID } from 'node:crypto'
@@ -7,7 +8,6 @@ import { healthDescriptorSchema, ORCHESTRATION_WS_PROTOCOL_VERSION } from '@work
 import * as v from 'valibot'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import serverPackage from '../../package.json' with { type: 'json' }
 import { closeTestApps, createTestApp } from '../../test/server'
 import { testSettingsOptions } from '../settings/testing'
 import { textFileVersion } from '../fs/version'
