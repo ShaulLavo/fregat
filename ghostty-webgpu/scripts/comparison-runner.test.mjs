@@ -98,7 +98,7 @@ test('selected output fixture reaches warmup, measured writes, and the artifact'
     'context',
     `
     const {randomUUID, manifest, smoke, tracing, repetitions, latencySamples, outputFrames,
-      selectedOutputFixture, tickSeconds, counts, variantIds, phases, builders, writePaths,
+      selectedOutputFixture, tickSeconds, cpuTickSource, counts, variantIds, phases, builders, writePaths,
       fixtures, s, tracePhases, traceFrames, accessibility, measurementCases,
       gpuCommandTimeoutMilliseconds} = context;
     ${source.slice(artifactStart, artifactEnd)}

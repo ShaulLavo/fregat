@@ -15,7 +15,7 @@ import {
   summaries,
 } from './comparison-report.mjs'
 import { cpuSample, verifyHash, withDeadline } from './comparison-guards.mjs'
-import { createMacHostGate } from './comparison-mac.mjs'
+import { createMacHostGate, macCpuAccounting } from './comparison-mac.mjs'
 // Package metadata is pinned by resolver provenance; keep the tooling suites under this entry.
 import './comparison-trace.test.mjs'
 import './comparison-attribution.test.mjs'
@@ -766,12 +766,17 @@ test('Mac host qualification survives compaction and report generation without N
   const artifact = pairedArtifact()
   artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
   artifact.qualifications = [{ ...idle, kind: 'between-repetitions-gpu', repetition: 0 }]
+  const accounting = macCpuAccounting('kern.clockrate: { hz = 100, tick = 10000 }')
+  artifact.cpuTickSeconds = accounting.tickSeconds
+  artifact.cpuTickSource = accounting.source
   for (const run of artifact.runs) {
     run.gpuIdle = idle
     run.gpuWindows = [{ label: 'output/rolling-logs', idle, window }]
   }
   const compact = JSON.parse(JSON.stringify(await compactEvidence(artifact)))
   assert.deepEqual(compact.qualifications, artifact.qualifications)
+  assert.equal(compact.cpuTickSeconds, 0.01)
+  assert.deepEqual(compact.cpuTickSource, accounting.source)
   for (const run of compact.runs) {
     assert.deepEqual(run.gpuIdle, idle)
     for (const [name, evidence] of Object.entries({ idle, window })) {
@@ -793,6 +798,8 @@ test('Mac host qualification survives compaction and report generation without N
     assert.match(report, /T3 Code presence/)
     assert.match(report, /host.load/i)
     assert.match(report, /does not measure Metal GPU utilization/)
+    assert.match(report, /CPU comparison accounting bound: 0\.01s/)
+    assert.match(report, /Finer CDP counter resolution is unmeasured/)
     assert(!report.includes('GPU windows retain utilization samples'))
     assert(!report.includes('owned/foreign compute-process memory'))
   }

@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createMacHostGate, sampleMacHost } from './comparison-mac.mjs'
+import {
+  createMacHostGate,
+  macCpuAccounting,
+  macHostSettings,
+  sampleMacHost,
+} from './comparison-mac.mjs'
 import { GpuQualificationError } from './comparison-gpu.mjs'
 
 const settings = {
@@ -20,6 +25,45 @@ function clock() {
     },
   }
 }
+
+test('Mac startup wait extends only admission time and gives up at five minutes', async () => {
+  const timing = clock()
+  const configured = macHostSettings({ ...settings, gpuSampleMilliseconds: 10_000 })
+  assert.equal(settings.gpuIdleWaitMilliseconds, 100)
+  assert.equal(configured.gpuIdleWaitMilliseconds, 300_000)
+  assert.equal(configured.macIdleLoadAverage, settings.macIdleLoadAverage)
+  assert.equal(configured.gpuIdleConsecutiveSamples, settings.gpuIdleConsecutiveSamples)
+  const gate = createMacHostGate(configured, {
+    ...timing,
+    sample: async () => reading({ loadAverage: timing.now() < 70_000 ? 7 : 3 }),
+  })
+  const result = await gate.waitForIdle()
+  assert.equal(result.waitMilliseconds, 80_000)
+  assert.equal(result.qualified, true)
+  const busy = createMacHostGate(configured, {
+    ...clock(),
+    sample: async () => reading({ loadAverage: 4 }),
+  })
+  await assert.rejects(busy.waitForIdle(), (error) => {
+    assert.equal(error.evidence.waitMilliseconds, 300_000)
+    assert.equal(error.evidence.qualified, false)
+    return /idle wait expired/.test(error.message)
+  })
+})
+
+test('Darwin clockrate supplies a labeled conservative bound without claiming CDP precision', () => {
+  const observed =
+    'kern.clockrate: { hz = 100, tick = 10000, tickadj = 0, profhz = 100, stathz = 100 }'
+  const accounting = macCpuAccounting(observed)
+  assert.equal(accounting.tickSeconds, 0.01)
+  assert.equal(accounting.source.hz, 100)
+  assert.equal(accounting.source.microsecondsPerTick, 10000)
+  assert.equal(accounting.source.observed, observed)
+  assert.match(accounting.source.kind, /conservative/)
+  assert.match(accounting.source.scope, /CDP counter resolution is unmeasured/)
+  assert.throws(() => macCpuAccounting('kern.clockrate: unavailable'))
+  assert.throws(() => macCpuAccounting('{ hz = 100, tick = 0 }'))
+})
 
 test('Mac sampling records power, T3 presence and host load with bounded commands', async () => {
   for (const process of [

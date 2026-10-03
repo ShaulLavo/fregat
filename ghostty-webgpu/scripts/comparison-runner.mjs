@@ -32,7 +32,7 @@ import {
 import { presentationLatency } from './comparison-latency.mjs'
 import { comparisonLatencyEndpoint } from './comparison-compact.mjs'
 import { createGpuGate } from './comparison-gpu.mjs'
-import { createMacHostGate } from './comparison-mac.mjs'
+import { createMacHostGate, macCpuAccounting, macHostSettings } from './comparison-mac.mjs'
 import { ink } from './comparison-pixels.mjs'
 import {
   assertDisplay,
@@ -102,7 +102,8 @@ const variantIds = selectedVariants(
 )
 const s = manifest.settings
 const gpuCommandTimeoutMilliseconds = gpuCommandTimeout(s, tracing)
-const gpuSettings = { ...s, gpuCommandTimeoutMilliseconds }
+let gpuSettings = { ...s, gpuCommandTimeoutMilliseconds }
+if (platform() === 'darwin') gpuSettings = macHostSettings(gpuSettings)
 const ownedComputePids = []
 const gpuGate =
   platform() === 'darwin'
@@ -123,10 +124,21 @@ const latencySamples = positiveInteger(
 )
 const outputFrames = positiveInteger(args, '--output-frames', s.outputFrames)
 const selectedOutputFixture = outputFixture(args, manifest.fixtures)
-const tickSeconds =
-  platform() === 'linux'
-    ? 1 / Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
-    : null
+let tickSeconds = null
+let cpuTickSource = null
+if (platform() === 'linux')
+  tickSeconds = 1 / Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
+if (platform() === 'darwin') {
+  const accounting = macCpuAccounting(
+    execFileSync('/usr/sbin/sysctl', ['kern.clockrate'], {
+      encoding: 'utf8',
+      timeout: gpuCommandTimeoutMilliseconds,
+      killSignal: 'SIGKILL',
+    }),
+  )
+  tickSeconds = accounting.tickSeconds
+  cpuTickSource = accounting.source
+}
 const cpuOptions = { tickSeconds }
 const traceFrames = positiveInteger(args, '--trace-frames', 180)
 const tracePhases = selectedTracePhases(args, manifest.fixtures)
@@ -220,6 +232,7 @@ const artifact = {
   outputFrames,
   outputFixture: selectedOutputFixture,
   cpuTickSeconds: tickSeconds,
+  cpuTickSource,
   counts,
   variants: variantIds,
   phases,

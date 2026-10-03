@@ -8,6 +8,33 @@ import { GpuQualificationError } from './comparison-gpu.mjs'
 
 const execute = promisify(execFile)
 
+export function macHostSettings(settings) {
+  // Chrome startup load remains in the one-minute average after the browser becomes quiet.
+  return { ...settings, gpuIdleWaitMilliseconds: 300_000 }
+}
+
+export function macCpuAccounting(clockrate) {
+  const hz = Number(/\bhz\s*=\s*(\d+)/.exec(clockrate)?.[1])
+  const microsecondsPerTick = Number(/\btick\s*=\s*(\d+)/.exec(clockrate)?.[1])
+  assert(Number.isFinite(hz) && hz > 0, 'Positive Darwin clock frequency required')
+  assert(
+    Number.isFinite(microsecondsPerTick) && microsecondsPerTick > 0,
+    'Positive Darwin clock tick required',
+  )
+  return {
+    tickSeconds: microsecondsPerTick / 1_000_000,
+    source: {
+      kind: 'conservative-macos-clockrate-bound',
+      command: '/usr/sbin/sysctl kern.clockrate',
+      observed: clockrate.trim(),
+      hz,
+      microsecondsPerTick,
+      scope:
+        'OS clockrate supplies a conservative CPU comparison bound. Finer CDP counter resolution is unmeasured.',
+    },
+  }
+}
+
 export async function sampleMacHost({ command = execute, load = loadavg, timeoutMilliseconds }) {
   const options = {
     encoding: 'utf8',

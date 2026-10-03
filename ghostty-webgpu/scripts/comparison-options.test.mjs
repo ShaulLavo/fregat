@@ -276,6 +276,7 @@ for (const tracing of [false, true]) {
       accessibility: 'off',
       measurementCases,
       tickSeconds: null,
+      cpuTickSource: null,
       counts: [1],
       variantIds: [],
       phases: [],

@@ -124,6 +124,7 @@ export async function compactEvidence(artifact, directory) {
     outputFrames: artifact.outputFrames,
     outputFixture: artifact.outputFixture,
     cpuTickSeconds: artifact.cpuTickSeconds,
+    cpuTickSource: artifact.cpuTickSource,
     gpuCommandTimeoutMilliseconds: artifact.gpuCommandTimeoutMilliseconds,
     hardware: artifact.hardware,
     manifest: {

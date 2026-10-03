@@ -515,6 +515,11 @@ export function markdown(artifact, review = {}, artifactDirectory = '.') {
       : []),
     `- Output fixture: ${artifact.outputFixture ?? 'ascii'}. Frames: ${artifact.outputFrames ?? artifact.manifest.settings.outputFrames}.`,
     `- Browser: ${artifact.environment.browser}. OS: ${artifact.environment.os}.`,
+    ...(artifact.cpuTickSource
+      ? [
+          `- CPU comparison accounting bound: ${artifact.cpuTickSeconds}s from \`${artifact.cpuTickSource.command}\`. ${artifact.cpuTickSource.scope}`,
+        ]
+      : []),
     `- Latency endpoint: ${artifact.environment.latencyEndpoint}. Samples per operation/repetition: ${artifact.latencySamples}.`,
     `- GPU: ${artifact.environment.renderer}. Hardware adapter: ${artifact.hardware}. Headless: ${artifact.environment.headless ?? false}.`,
     `- Font: JetBrains Mono ${artifact.manifest.versions['@fontsource/jetbrains-mono']}, bundled regular/bold Latin faces. Emoji and CJK use the same OS fallback fonts.`,
