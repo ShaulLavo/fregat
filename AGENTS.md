@@ -7,7 +7,6 @@
 - Keep long-run checklists in the plan or scratchpad; tick completed items.
 - End with owner needs, changes, then findings. Name unconfirmed facts and where you checked.
 
-
 ## Task-specific skills
 
 Read the applicable skills before writing or reviewing code, or running their workflows:
