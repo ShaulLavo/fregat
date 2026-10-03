@@ -78,6 +78,7 @@ test.skipIf(!userScopes || !checkoutClean)(
     expect(readlinkSync(path.join(root, 'current'))).toBe(head)
     expect(readdirSync(path.join(root, head)).toSorted()).toEqual([
       'commit',
+      'deadline.sh',
       'nested-scope.sh',
       'pi',
       'report.js',
