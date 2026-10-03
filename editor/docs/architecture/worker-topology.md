@@ -8,12 +8,12 @@ owning disposal, and defining what happens after a worker failure.
 
 ## Summary
 
-| Owner                      | Package                            | Cache limit                                                                                                                                                                                                                                                                               | Restart behavior                                                                                                                                                                                                                                           |
-| -------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TreeSitterWorkerClient`   | `@singapore-editor/tree-sitter`    | Per worker document cache keeps at most 6 parsed snapshots and at most 8,000,000 retained source units, while preserving the newest 2 snapshots. Owner-side source chunk accounting is per live document and cleared on document disposal, source-cache errors, crash, or owner disposal. | A crash terminates the worker, rejects pending requests, clears owner caches, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically.                        |
-| `MinimapWorkerOwner`       | `@singapore-editor/minimap`        | No cross-document worker cache. The client owns one current minimap projection, one queued update, latest token source, style signatures, and a CSS color cache cleared on theme/style invalidation or disposal.                                                                          | A crash terminates the worker and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the minimap contribution/client. Disposal detaches listeners, terminates the worker immediately, and settles the disposal promise. |
-| `ShikiWorkerOwner`         | `@singapore-editor/core/shiki`     | Owner caches theme-request promises by sorted theme key. Worker caches one tokenizer per open document and highlighters by sorted language/theme key. These caches are lifecycle-scoped, not size-bounded.                                                                                | A crash terminates the worker, rejects pending requests, clears owner theme cache, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically.                   |
-| `TypeScriptLspWorkerOwner` | `@singapore-editor/typescript-lsp` | No owner-side document cache. The owner tracks posted-message count, listener counts, and last error. The worker owns LSP document/project state for the lifetime of the worker.                                                                                                          | A crash posts `$/serverExited` to the client, terminates the worker, clears listeners, and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the LSP transport/session/connection.                                     |
+| Owner                      | Package                            | Cache limit                                                                                                                                                                                                                                                                               | Restart behavior                                                                                                                                                                                                                                                                                            |
+| -------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TreeSitterWorkerClient`   | `@singapore-editor/tree-sitter`    | Per worker document cache keeps at most 6 parsed snapshots and at most 8,000,000 retained source units, while preserving the newest 2 snapshots. Owner-side source chunk accounting is per live document and cleared on document disposal, source-cache errors, crash, or owner disposal. | A crash terminates the worker, rejects pending requests, clears owner caches, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically. Disposal detaches callbacks and immediately terminates the worker.      |
+| `MinimapWorkerOwner`       | `@singapore-editor/minimap`        | No cross-document worker cache. The client owns one current minimap projection, one queued update, latest token source, style signatures, and a CSS color cache cleared on theme/style invalidation or disposal.                                                                          | A crash terminates the worker and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the minimap contribution/client. Disposal detaches listeners, terminates the worker immediately, and settles the disposal promise.                                                  |
+| `ShikiWorkerOwner`         | `@singapore-editor/core/shiki`     | Owner caches theme-request promises by sorted theme key. Worker caches one tokenizer per open document and highlighters by sorted language/theme key. These caches are lifecycle-scoped, not size-bounded.                                                                                | A crash terminates the worker, rejects pending requests, clears owner theme cache, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically. Disposal detaches callbacks and immediately terminates the worker. |
+| `TypeScriptLspWorkerOwner` | `@singapore-editor/typescript-lsp` | No owner-side document cache. The owner tracks posted-message count, listener counts, and last error. The worker owns LSP document/project state for the lifetime of the worker.                                                                                                          | A crash posts `$/serverExited` to the client, terminates the worker, clears listeners, and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the LSP transport/session/connection.                                                                                      |
 
 There is not yet a separate document worker owner. The main-thread document engine remains the
 document truth until that Phase 11 item is implemented.
@@ -70,8 +70,10 @@ Disposal and restart:
 
 - `disposeDocument(documentId)` invalidates owner source chunk accounting and posts
   `disposeDocument` to the worker.
-- `dispose()` posts `dispose`, terminates the worker, clears language/source accounting, rejects
-  pending requests, and leaves lifecycle `disposed`.
+- `dispose()` detaches callbacks and immediately terminates the worker. A busy worker cannot
+  acknowledge disposal, so the owner sends no disposal request and waits for no acknowledgement.
+- The owner clears language/source accounting, rejects pending requests, and leaves lifecycle
+  `disposed`.
 - On native worker error, the owner terminates the worker, rejects pending requests, clears
   language/source accounting, stores `lastError`, and leaves lifecycle `crashed`.
 - The next request on the same owner creates a new worker generation and runs `init` again.
@@ -140,8 +142,11 @@ Caches:
 Transport:
 
 - Token results use the same `PackedEditorTokens` structure-of-arrays transport as Tree-sitter:
-  three transferable `Uint32Array` buffers plus a value-interned style palette. The owner unpacks
-  the buffers immediately into the editor-facing indexed token array.
+  three transferable `Uint32Array` buffers (`starts`, `ends`, and `styleIds`) plus a value-interned
+  style palette.
+- Each Shiki highlighter session retains the packed arrays in an `EditorTokenStore` created by
+  `EditorTokenStore.fromPacked()`. Full results replace the store; packed edit patches update it
+  through `applyPatch()`. The editor reads tokens through the store's indexed accessors.
 
 Limits:
 
@@ -156,8 +161,9 @@ Disposal and restart:
 
 - `disposeDocument(documentId)` posts a document disposal request without creating a worker if none
   exists.
-- `dispose()` posts `dispose`, terminates the worker, clears owner theme cache, rejects pending
-  requests, and leaves lifecycle `disposed`.
+- `dispose()` detaches callbacks and immediately terminates the worker. A busy worker cannot
+  acknowledge disposal, so the owner sends no disposal request and waits for no acknowledgement.
+- The owner clears its theme cache, rejects pending requests, and leaves lifecycle `disposed`.
 - Session-level late tokenizer results are ignored after the highlighter session is disposed.
 - On native worker error, the owner terminates the worker, rejects pending requests, clears owner
   theme cache, stores `lastError`, and leaves lifecycle `crashed`.
