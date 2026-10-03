@@ -6,7 +6,7 @@ react hooks live in [`@fregat/react-hotkeys`](../react-hotkeys)
 
 ## try it
 
-not on npm yet. clone the repo and `bun link`, or depend on it as `workspace:*` inside fregat
+clone the repo and `bun link`, or depend on it as `workspace:*` inside Fregat
 
 ### one-call shortcuts
 
@@ -45,6 +45,20 @@ keys.attachElement(editor, editorElement)
 ```
 
 `keys.setKeymap(entries)` swaps the table, e.g. after the user edits their bindings
+
+use `readContext` for values that change with editor or plugin state. the dispatcher reads it once per node when it captures context for a key, including chord continuations and timeout replay
+
+```ts
+const editor = keys.createNode({
+  parent: app,
+  readContext: () => ({
+    identifiers: canComment() ? ['Editor', 'canComment'] : ['Editor'],
+    values: { mode: currentMode() },
+  }),
+})
+```
+
+`editor.context()` also reads the current context. `readContext` supplies the full context; nodes with static context can update it through `setContext`
 
 ### display and recording
 
