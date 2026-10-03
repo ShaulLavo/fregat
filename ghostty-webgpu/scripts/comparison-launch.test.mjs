@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import {
   accessibilityMode,
+  browserExecutable,
   hardwareLaunch,
   measurementPhases,
   selectedPhases,
@@ -19,6 +20,7 @@ const configure = new Function(
   'accessibilityMode',
   'selectedPhases',
   'hardwareLaunch',
+  'browserExecutable',
   `${source.slice(start, end)}\nreturn { smoke, tracing, phases, launch, headless }`,
 )
 
@@ -30,6 +32,7 @@ function options(host, args) {
     accessibilityMode,
     selectedPhases,
     hardwareLaunch,
+    browserExecutable,
   )
 }
 
@@ -50,10 +53,13 @@ test('ordinary Linux --headed preserves hardware launch flags and measurement mo
 })
 
 test('headed Chromium launch retains the ordinary hardware GPU requirement', async () => {
-  const launchStart = source.indexOf('  browser = await chromium.launch({')
+  const optionsStart = source.indexOf("let browserChannel = 'chromium'")
+  const optionsEnd = source.indexOf('\nlet browser', optionsStart)
+  const launchStart = source.indexOf('  browser = await chromium.launch(browserLaunchOptions)')
   const launchEnd = source.indexOf('\n  artifact.environment =', launchStart)
   const rendererStart = source.indexOf('function renderer(info) {')
   const rendererEnd = source.indexOf('\n}', rendererStart) + 2
+  assert(optionsStart >= 0 && optionsEnd > optionsStart)
   assert(launchStart >= 0 && launchEnd > launchStart)
   assert(rendererStart >= 0 && rendererEnd > rendererStart)
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
@@ -65,7 +71,8 @@ test('headed Chromium launch retains the ordinary hardware GPU requirement', asy
     'launchEnv',
     'smoke',
     'assert',
-    `let browser, browserSession; const artifact = {};
+    `let browser, browserSession; const artifact = {}; const executablePath = undefined;
+${source.slice(optionsStart, optionsEnd)}
 ${source.slice(rendererStart, rendererEnd)}
 ${source.slice(launchStart, launchEnd)}
 return artifact.hardware`,
@@ -75,7 +82,13 @@ return artifact.hardware`,
   for (const renderer of ['ANGLE hardware GPU', 'SwiftShader', 'llvmpipe', 'unknown']) {
     const chromium = {
       launch: async (actual) => {
-        assert.deepEqual(actual, { channel: 'chromium', headless: false, args, env })
+        assert.deepEqual(actual, {
+          channel: 'chromium',
+          executablePath: undefined,
+          headless: false,
+          args,
+          env,
+        })
         return {
           newBrowserCDPSession: async () => ({
             send: async (method) => {
