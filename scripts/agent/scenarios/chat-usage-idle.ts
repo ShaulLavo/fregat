@@ -127,10 +127,12 @@ export const chatUsageIdle = isolatedNativeScenario({
       .filter({ hasText: 'isolated-unpriced-model' })
       .waitFor({ timeout: 135_000 })
     await selectors.transcriptCoverage(page).getByText('1 files · 1 records').waitFor()
+    await selectors.transcriptCoverage(page).scrollIntoViewIfNeeded()
     await step('first-background-transcript-observation')
-    const historyResponse = await page.request.get(`${base}/providers/usage/history?days=30`, {
-      headers: { Origin: new URL(page.url()).origin },
-    })
+    const historyResponse = await page.request.get(
+      `${base}/providers/usage/history?days=30&utcOffsetMinutes=0`,
+      { headers: { Origin: new URL(page.url()).origin } },
+    )
     strictEqual(historyResponse.status(), 200, 'cache-only native history GET')
     const history = await historyResponse.json()
     strictEqual(history.totals.tokens, 120)

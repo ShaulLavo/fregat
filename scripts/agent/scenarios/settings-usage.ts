@@ -256,7 +256,7 @@ export const settingsUsage: Scenario = {
         .waitFor()
       await selectors
         .accountAllowances(page)
-        .getByText('Observed 2h ago', { exact: false })
+        .getByText(/Observed 2h(?: 1m)? ago/)
         .first()
         .waitFor()
       await selectors
