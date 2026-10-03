@@ -5,7 +5,7 @@ import { Terminal as WorkerTerminal, TerminalWorkerError } from '../../dist/work
 import type { TerminalApi } from '../../dist/dom/terminal-api.js'
 import { WebGlTerminalRenderer } from '../../dist/render/webgl/renderer.js'
 import { createDomInputController } from '../../dist/dom/input.js'
-import type { TerminalOutputReady, TerminalOutputMessage } from './protocol.js'
+import type { TerminalOutputReady, TerminalOutputMessage, TerminalOutputAck } from './protocol.js'
 
 const family = 'PackagedWorkerTest'
 const fontUrl = new URL(
@@ -823,6 +823,102 @@ describe.each(['webgl', 'webgpu'] as const)('%s ordered output accessibility', (
       expect(live.children).toHaveLength(following ? 2 : 1)
       expect(live.children[0]?.textContent).toBe('ordered output')
       if (following) expect(live.children[1]?.textContent).toBe(' tail')
+    },
+  )
+})
+
+describe.each(['webgl', 'webgpu'] as const)('%s producer output accessibility', (backend) => {
+  it.each(['mixed', 'fenced', 'unfenced'] as const)(
+    'announces %s producer output once per submitted advance',
+    async (ordering) => {
+      const terminal = await WorkerTerminal.create({
+        appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+        backend,
+        fonts: [{ family, source: { url: fontUrl } }],
+        workerUrl:
+          ordering === 'unfenced'
+            ? workerUrl
+            : new URL('./tests/output-frame-order.worker.ts', import.meta.url),
+      })
+      active.push(terminal)
+      const root = container()
+      await terminal.open(root)
+      const mirror = root.querySelector('[role="list"][aria-label="Terminal screen"]')!
+      const live = root.querySelector('[aria-live="polite"]')!
+      await eventually(() => mirror.children.length > 0)
+      const frames: { frame: number; text: string; live: string }[] = []
+      terminal.onFrame(() => {
+        frames.push({
+          frame: terminal.submittedFrame!.frame,
+          text: mirror.textContent ?? '',
+          live: live.textContent ?? '',
+        })
+      })
+      const channel = new MessageChannel()
+      let acknowledge: () => void = () => {}
+      const acknowledged = new Promise<void>((resolve) => {
+        acknowledge = resolve
+      })
+      const ready = new Promise<TerminalOutputReady>((resolve) => {
+        channel.port1.onmessage = ({
+          data,
+        }: MessageEvent<TerminalOutputReady | TerminalOutputAck>) => {
+          if (data.type === 'ready') resolve(data)
+          if (data.type === 'output-ack' && data.sequence === 1) acknowledge()
+        }
+        channel.port1.start()
+      })
+      try {
+        await terminal.attachOutputPort(channel.port2)
+        const identity = await ready
+        const bytes = new TextEncoder().encode('producer')
+        const output: TerminalOutputMessage = {
+          ...identity,
+          type: 'output',
+          sequence: 1,
+          data: bytes,
+        }
+        channel.port1.postMessage(output, [bytes.buffer])
+        await acknowledged
+        if (ordering === 'mixed') await terminal.write(' tail')
+        if (ordering === 'fenced') await terminal.fenceOutput(1)
+        const expected = ordering === 'mixed' ? 'producer tail' : 'producer'
+        await eventually(() => mirror.textContent === expected)
+        const native = await terminal.readLines(0, 1)
+        expect(native[0]?.text).toContain(expected)
+        expect(live.textContent, JSON.stringify({ ordering, native, frames })).toBe(expected)
+        expect(live.children).toHaveLength(ordering === 'mixed' ? 2 : 1)
+        expect(live.children[0]?.textContent).toBe('producer')
+        if (ordering === 'mixed') {
+          expect(live.children[1]?.textContent).toBe(' tail')
+          expect(frames).toContainEqual({
+            frame: expect.any(Number),
+            text: 'producer',
+            live: 'producer',
+          })
+        }
+        const before = terminal.submittedFrame!.frame
+        const refresh = terminal.refresh(0, terminal.submittedFrame!.grid.rows - 1)
+        await Promise.all([refresh, terminal.fenceOutput(1)])
+        await eventually(() => terminal.submittedFrame!.frame > before)
+        expect(live.textContent, JSON.stringify(frames)).toBe(expected)
+        expect(live.children).toHaveLength(ordering === 'mixed' ? 2 : 1)
+        const next = new TextEncoder().encode(' next')
+        channel.port1.postMessage({ ...identity, type: 'output', sequence: 2, data: next }, [
+          next.buffer,
+        ])
+        await eventually(() => mirror.textContent === `${expected} next`)
+        expect(live.children).toHaveLength(ordering === 'mixed' ? 3 : 2)
+        expect(live.lastElementChild?.textContent).toBe(' next')
+        if (ordering === 'mixed')
+          await page.screenshot({
+            element: terminal.element!,
+            path: `../../../.artifacts/review-producer-output-${backend}.png`,
+            scale: 'css',
+          })
+      } finally {
+        channel.port1.close()
+      }
     },
   )
 })

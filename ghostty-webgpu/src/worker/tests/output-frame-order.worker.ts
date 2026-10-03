@@ -17,8 +17,10 @@ scope.onmessage = ({ data }) => {
   }
   let refreshControl: number | undefined
   let outputControl: number | undefined
+  let producerPending = false
+  let producerReleaseRequested = false
   const held: WorkerRequest[] = []
-  let frame: WorkerMessage | undefined
+  const frames: WorkerMessage[] = []
 
   function forward(request: WorkerRequest): void {
     const transfer: Transferable[] = []
@@ -43,30 +45,37 @@ scope.onmessage = ({ data }) => {
   }
 
   function release(): void {
-    if (held.length === 0 || !frame) return
-    data.port.postMessage(frame)
+    if (held.length === 0 || frames.length === 0) return
+    if (producerPending && !producerReleaseRequested) return
+    for (const frame of frames.splice(0)) data.port.postMessage(frame)
+    producerPending = false
     refreshControl = undefined
-    frame = undefined
     forwardQueued()
   }
 
   data.port.onmessage = ({ data: request }: MessageEvent<WorkerRequest>) => {
     if (request.command === 'refresh') refreshControl = request.control
     if (request.command === 'dispose') disposalId = request.id
-    // Deliver the real refresh submission after the page has posted its next write.
+    if (producerPending && (request.command === 'write' || request.command === 'fence'))
+      producerReleaseRequested = true
+    // Deliver the real output or refresh submission after the page posts the next control.
     if (
       request.command !== 'refresh' &&
-      (refreshControl !== undefined || outputControl !== undefined)
+      (refreshControl !== undefined || outputControl !== undefined || producerPending)
     ) {
       held.push(request)
       release()
       return
     }
+    if (request.command === 'attachOutput') producerPending = true
     forward(request)
   }
   transport.port1.onmessage = ({ data: message }: MessageEvent<WorkerMessage>) => {
-    if (message.type === 'frame' && message.control === refreshControl) {
-      frame = message
+    if (
+      message.type === 'frame' &&
+      (message.control === refreshControl || (producerPending && message.output > 0))
+    ) {
+      frames.push(message)
       release()
       return
     }

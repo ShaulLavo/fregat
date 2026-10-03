@@ -43,6 +43,7 @@ export class WorkerTerminalExecution {
   private output = 0
   private readonly outputControls = new Set<number>()
   private submittedOutputValue = false
+  private submittedProducerOutput = 0
   private nextId = 0
   private state?: WorkerState
   private summary?: TerminalSubmittedFrame
@@ -215,7 +216,9 @@ export class WorkerTerminalExecution {
         )
         return
       }
-      this.submittedOutputValue = false
+      // Producer submissions advance independently of the host's requested output fence.
+      this.submittedOutputValue = message.output > this.submittedProducerOutput
+      this.submittedProducerOutput = message.output
       for (const control of this.outputControls) {
         if (control > message.control) break
         this.submittedOutputValue = true
