@@ -1,10 +1,14 @@
 import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
 import { heavy, removeSandboxes, sandbox, userScopes, writeMachine } from './sandbox'
 
 const checkout = path.resolve(import.meta.dirname, '../..')
+const browserProvider = createRequire(path.join(checkout, 'apps/web/package.json')).resolve(
+  '@vitest/browser-playwright',
+)
 
 afterEach(removeSandboxes)
 
@@ -16,13 +20,16 @@ function probe() {
   const script = path.join(box.root, 'probe.mjs')
   writeFileSync(
     script,
-    `import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+    `import { mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { createVitest, resolveConfig } from 'vitest/node'
 const root = process.cwd()
 const options = JSON.parse(process.argv[2])
 const result = process.argv[3]
 const mode = process.argv[4]
-const config = { root, config: false, watch: false, ...options }
+const browserImport = options.browser ? 'import { playwright } from ' + ${JSON.stringify(JSON.stringify(browserProvider))} + '\\n' : ''
+const provider = options.browser ? 'config.test.browser.provider = playwright()\\n' : ''
+writeFileSync(root + '/vitest.config.mjs', browserImport + 'const config = ' + JSON.stringify({ test: options }) + '\\n' + provider + 'export default config')
+const config = { root, config: root + '/vitest.config.mjs', watch: false }
 if (mode === 'resolve') {
   const resolved = await resolveConfig(config)
   writeFileSync(result, JSON.stringify({ maxWorkers: resolved.test.maxWorkers }))
@@ -47,7 +54,10 @@ if (mode === 'resolve') {
   }, 5)
   try {
     await vitest.start()
-    writeFileSync(result, JSON.stringify({ maxWorkers: vitest.config.maxWorkers, peak }))
+    writeFileSync(result, JSON.stringify({
+      maxWorkers: vitest.config.maxWorkers, peak,
+      files: vitest.state.getFiles().length, failed: vitest.state.getCountOfFailedTests()
+    }))
   } finally {
     clearInterval(controller)
     await vitest.close()
@@ -70,7 +80,10 @@ test.each([
   { label: 'parallel above ceiling', options: { maxWorkers: 8 }, workers: 4 },
   {
     label: 'browser serial',
-    options: { browser: { enabled: true }, fileParallelism: false },
+    options: {
+      browser: { enabled: true, instances: [{ browser: 'chromium' }] },
+      fileParallelism: false,
+    },
     workers: 1,
   },
 ])('Vitest resolves $label within the injected ceiling', async ({ options, workers }) => {
@@ -136,6 +149,6 @@ test('holds a worker until its batch is ready', async () => {
     expect(existsSync(result), run.stderr).toBe(true)
     const observed = JSON.parse(readFileSync(result, 'utf8'))
     console.info(`${label}: ${JSON.stringify(observed)}`)
-    expect(observed).toEqual({ maxWorkers: workers, peak: workers })
+    expect(observed).toEqual({ maxWorkers: workers, peak: workers, files: 6, failed: 0 })
   })
 })

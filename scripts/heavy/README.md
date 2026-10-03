@@ -9,6 +9,12 @@ bun /work/platform-production/heavy/current/run.js --class bench --quiet measure
 
 Classes (`suite`, `browser`, `build`, `bench`, `light`) choose a memory estimate and a per-job slice ceiling from `developer.heavyJobClasses`. Admission is FIFO and accounts for available memory, running jobs' unrealized estimates, the memory reserve, memory pressure and CPU load. Every job retains its own slice, accounting, stop grace and orphan cleanup. `nested-scope.sh` puts child scopes under the job's ceiling.
 
+## Vitest worker ceiling
+
+The launcher supplies `VITEST_MAX_WORKERS=4` when the caller has not set it. The checkout's pinned Vitest patch intersects that ceiling with each suite's resolved worker count. `fileParallelism: false` keeps one worker, a smaller explicit `maxWorkers` keeps its limit, and otherwise parallel suites use at most the supplied count. Node and browser pools consume the same resolved policy.
+
+Vitest owns configuration resolution. Keeping the ceiling there covers nested test commands and inline projects without teaching the heavy launcher to load suite configs or changing every serial suite. The runner's memory admission and slice ceiling remain unchanged.
+
 ## Private dev servers
 
 Use the shared mesh dev route for normal app work. A private long-lived server needed by a browser check declares its lifecycle with `--server` and uses an explicit free port:
