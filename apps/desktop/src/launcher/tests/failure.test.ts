@@ -81,7 +81,8 @@ test('dev-server failure guides contributors through the ordinary Bun developmen
   expect(failure.status).toBe(503)
   expect(failure.why).toContain('configured development URL')
   expect(failure.fix).toContain('`bun run dev`')
-  expect(failure.fix).toContain('Window settings')
+  expect(failure.fix).toContain('development environment')
+  expect(failure.fix).toContain('WEB_HOST, WEB_PORT, FS_HOST and PORT')
   expect(`${failure.why} ${failure.fix}`).not.toMatch(/mesh|dev:serve/i)
 })
 

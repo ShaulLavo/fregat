@@ -234,7 +234,7 @@ async function waitForHttp(url: string, webUrl: string) {
     }
     await Bun.sleep(250)
   }
-  throw launcherErrors.DEV_SERVER_UNREACHABLE({ url, internal: { waitedMs: 90_000 } })
+  throw launcherErrors.DEV_SERVER_UNREACHABLE({ internal: { waitedMs: 90_000 } })
 }
 
 function requestSignal() {
