@@ -52,13 +52,14 @@ it.each(['amd', 'intel', 'apple', 'arm', 'qualcomm', 'imagination', 'broadcom', 
 )
 
 it.each([
+  undefined,
   { architecture: '', description: '', isFallbackAdapter: false, vendor: '' },
   { ...hardware, vendor: 'unknown' },
   { ...hardware, isFallbackAdapter: true },
   { ...hardware, isFallbackAdapter: undefined },
   { architecture: 'software', description: 'llvmpipe', isFallbackAdapter: true, vendor: 'mesa' },
 ])('reports unresolved adapter identity without granting a software skip', (info) => {
-  const qualification = qualifyDeviceReplacement(info as typeof hardware, 'Linux')
+  const qualification = qualifyDeviceReplacement(info, 'Linux')
   expect(qualification.kind).toBe('unresolved')
   expect(qualification).toHaveProperty(
     'reason',
