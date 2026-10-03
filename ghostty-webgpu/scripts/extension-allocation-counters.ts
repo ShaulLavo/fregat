@@ -37,9 +37,21 @@ for (const name of ['ghostty-vt.wasm', 'bridge.wasm'])
 const child = spawnSync('node', [join(output, 'entry.mjs'), output], { stdio: 'inherit' })
 assert.equal(child.status, 0)
 const result = JSON.parse(await readFile(join(output, 'counters.json'), 'utf8')) as {
-  rows: { inert: number; operations: number; lifecycle: Record<string, number> }[]
+  rows: {
+    inert: number
+    operations: number
+    lifecycle: Record<string, number>
+    positiveAllocation: Record<string, number>
+  }[]
 }
 for (const row of result.rows) {
+  for (const kind of ['ArrayExpression', 'EntriesFactory'])
+    assert(
+      Object.entries(row.positiveAllocation).some(
+        ([site, count]) => site.startsWith(`${kind}@`) && count > 0,
+      ),
+      `Interested setup must make the ${kind} counter observable`,
+    )
   const totals: Record<string, number> = {}
   for (const [site, count] of Object.entries(row.lifecycle)) {
     const kind = site.split('@')[0]!

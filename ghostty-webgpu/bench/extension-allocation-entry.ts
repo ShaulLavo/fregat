@@ -51,12 +51,18 @@ try {
     assert.equal(payloads, 0)
     assert.deepEqual(Object.keys(owned.__extensionOwned), [])
     let calls = 0
+    let frames = 0
     const positive = manager.use({
       name: 'positive',
       setup: () => ({
         input: () => {
           calls += 1
           return 'pass'
+        },
+        events: {
+          frame: () => {
+            frames += 1
+          },
         },
       }),
     })
@@ -66,12 +72,20 @@ try {
       'Allocation instrumentation must observe attachment setup',
     )
     owned.__extensionOwned = Object.create(null) as Record<string, number>
-    for (let index = 0; index < 1_000; index += 1) manager.dispatchInput(input)
+    for (let index = 0; index < 1_000; index += 1) {
+      manager.dispatchInput(input)
+      manager.emit('frame', () => {
+        payloads += 1
+        return { rows: [0] }
+      })
+    }
     assert.equal(calls, 1_000)
+    assert.equal(frames, 1_000)
+    assert.equal(payloads, 1_000)
     assert.deepEqual(Object.keys(owned.__extensionOwned), [])
     positive.dispose()
     manager.dispose()
-    rows.push({ inert, operations: 1_000, lifecycle, positiveAllocation, calls, payloads })
+    rows.push({ inert, operations: 1_000, lifecycle, positiveAllocation, calls, frames, payloads })
   }
   await writeFile(
     join(output, 'counters.json'),
