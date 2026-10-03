@@ -184,7 +184,6 @@ test('three-way Canvas treatments balance before and after both counterparts', (
       ['ghostty-canvas', 'ghostty-web', 'xterm-dom'],
       ['bytes'],
       [17],
-      ['js'],
       repetition,
     ).map(({ variant }) => variant)
     for (const counterpart of Object.keys(balance)) {
