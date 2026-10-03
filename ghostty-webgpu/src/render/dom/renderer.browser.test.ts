@@ -6,7 +6,7 @@ import type { RenderRow } from '../../core/types.js'
 import type { CursorState } from '../instances/types.js'
 import type { RendererFrameSnapshot } from '../renderer.js'
 import { Terminal } from '../../dom/terminal.js'
-import { fitTerminalFont } from '../../dom/fit.js'
+import { calculateTerminalFittedFont } from '../../dom/fit.js'
 import { CanvasTerminalRenderer } from '../canvas/renderer.js'
 import { snapshotRenderState } from '../frame.js'
 import { WebGpuUnavailableError } from '../renderer.js'
@@ -234,14 +234,22 @@ describe('DOM terminal renderer', () => {
     }
   })
 
-  it('preserves tall accents, italic and emoji ink across row boundaries with wide outline cursors', async () => {
-    const font = fitTerminalFont(document, probeFont.settings, 1)
+  it('preserves crossing ink and wide outline cursors with short fitted rows', async () => {
+    const font = calculateTerminalFittedFont(
+      { ...probeFont.settings, size: 32 },
+      { advanceWidth: 19, fontAscent: 10, fontDescent: 2 },
+      1,
+    )
     const probe = await rendererProbe('dom', '\x1b[?25l\x1b[2J', font)
     probe.terminal.setDefaultCursorStyle('outline')
     probe.terminal.write('\x1b[2;1H\x1b[3mÂ̈̍fj\x1b[0m😀界\x1b[?25h\x1b[2;6H')
     probe.renderer.notifyWrite()
     probe.clock.flush()
     const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+    expect(frame.textContent).toContain('Â̈̍fj😀界')
+    const cursor = frame.querySelector('[data-cursor="outline"]')!
+    expect(cursor.textContent).toBe('界')
+    expect(cursor.getBoundingClientRect().width).toBe(font.cssCellWidth * 2)
     const live = await page.screenshot({ element: frame, save: false, scale: 'css' })
     await page.screenshot({
       element: frame,
@@ -255,18 +263,33 @@ describe('DOM terminal renderer', () => {
       path: '../../../.artifacts/dom-row-ink-reference.png',
       scale: 'css',
     })
+    const image = new Image()
+    image.src = `data:image/png;base64,${reference}`
+    await image.decode()
+    const decoded = document.createElement('canvas')
+    decoded.width = image.naturalWidth
+    decoded.height = image.naturalHeight
+    const context = decoded.getContext('2d')!
+    context.drawImage(image, 0, 0)
+    const upperRow = context.getImageData(0, 0, decoded.width, font.cssCellHeight).data
+    const crossingInk = Array.from({ length: upperRow.length / 4 }, (_, index) =>
+      upperRow.slice(index * 4, index * 4 + 3).some((channel) => channel !== 17),
+    ).filter(Boolean).length
+    expect(
+      crossingInk,
+      'Uncontained control must expose ink above the changed row',
+    ).toBeGreaterThan(0)
     expect(
       live === reference,
       'Containment must preserve ink that crosses a fitted row boundary',
     ).toBe(true)
   })
 
-  it('contains changed row layout and paint while preserving grid and caret geometry', async () => {
+  it('preserves grid and caret geometry while patching changed rows', async () => {
     const probe = await rendererProbe('dom')
     const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
     const rows = Array.from(frame.children)
     const initial = rows.map((row) => row.getBoundingClientRect())
-    for (const row of rows) expect(getComputedStyle(row).contain).toBe('layout paint')
     for (const input of ['\x1b[2;1Hchanged', '\x1b[1;2H', '\x1b[3;2H']) {
       probe.terminal.write(input)
       probe.renderer.notifyWrite()
@@ -281,7 +304,7 @@ describe('DOM terminal renderer', () => {
     }
     await page.screenshot({
       element: frame,
-      path: '../../../.artifacts/dom-row-containment.png',
+      path: '../../../.artifacts/dom-grid-caret.png',
       scale: 'css',
     })
   })
