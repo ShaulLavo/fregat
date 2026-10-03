@@ -75,6 +75,7 @@ export function localCommand({
     '--slice',
     '--grace',
     String(graceSeconds),
+    ...(runtimeLimitSeconds === null ? [] : ['--runtime', String(runtimeLimitSeconds)]),
     accountingFile,
     ...command,
   ]
@@ -137,7 +138,7 @@ export type JobSpec =
        * launcher may still start the job.
        */
       readonly entryLock: number
-      /** Wall-clock limit systemd enforces on the job's scope; null for none. */
+      /** Finite runtime enforced by systemd on the scope and the whole slice; null for none. */
       readonly runtimeLimitSeconds: number | null
     })
   | (JobBase & { readonly host: 'pi'; readonly maxWallSec?: number })
@@ -245,10 +246,14 @@ export function reapSlice(root: string, slice: string) {
   removeSlice(slice)
 }
 
-/** Stops the slice and drops its drop-ins; false when systemd refused either. */
+/** Stops the slice, its independent deadline service and its drop-ins. */
 export function removeSlice(slice: string) {
+  const watchdog = `${slice.slice(0, -'.slice'.length)}_deadline.service`
+  const loaded = systemctl(['show', watchdog, '-p', 'LoadState', '--value'])
+  const watchdogStopped =
+    loaded.stdout.toString().trim() === 'not-found' || systemctl(['stop', watchdog]).exitCode === 0
   const stopped = systemctl(['stop', slice]).exitCode === 0
-  return systemctl(['revert', slice]).exitCode === 0 && stopped
+  return systemctl(['revert', slice]).exitCode === 0 && stopped && watchdogStopped
 }
 
 // No MemoryHigh: above it the kernel throttles a runaway into a crawl instead of killing it
@@ -267,7 +272,7 @@ function limitSlice(slice: string, ceilingBytes: number) {
 }
 
 function systemctl(args: readonly string[]) {
-  return Bun.spawnSync(['systemctl', '--user', ...args], { stderr: 'pipe', stdout: 'ignore' })
+  return Bun.spawnSync(['systemctl', '--user', ...args], { stderr: 'pipe', stdout: 'pipe' })
 }
 
 export function readAccounting(file: string): JobAccounting {

@@ -42,3 +42,16 @@ test('a local job runs in its slice, and the shim accounts for the whole slice',
     'x y',
   ])
 })
+
+test('a finite local job gives the shim its whole-slice runtime budget', () => {
+  const command = localCommand({
+    ...launch,
+    graceSeconds: 1,
+    runtimeLimitSeconds: 9,
+    slice: 'heavy-1.slice',
+  })
+  expect(command).toContain('RuntimeMaxSec=9s')
+  const runtime = command.indexOf('--runtime')
+  expect(runtime).toBeGreaterThan(command.indexOf(SCOPE_SHIM))
+  expect(command.slice(runtime, runtime + 2)).toEqual(['--runtime', '9'])
+})
