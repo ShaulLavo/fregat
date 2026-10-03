@@ -72,6 +72,8 @@ export type Dispatcher<Source> = {
   readonly createNode: (options?: FocusNodeOptions<Source>) => FocusNode<Source>
   readonly focus: (node: FocusNode<Source> | null) => void
   readonly focused: () => FocusNode<Source> | null
+  /** Whether the active dispatcher owns the node and its complete ancestor path. */
+  readonly hasNode: (node: FocusNode<Source>) => boolean
   /** Contexts from the outermost node to the focused one. */
   readonly contextStack: () => readonly KeyContext[]
   readonly setKeymap: (entries: readonly KeymapEntry[]) => void
@@ -168,6 +170,13 @@ export function createDispatcher<Source = unknown>(
     }
     return path.reverse()
   }
+  function hasNode(node: FocusNode<Source>): boolean {
+    if (disposed) return false
+    for (let current: FocusNode<Source> | null = node; current; current = current.parent) {
+      if (!states.has(current)) return false
+    }
+    return true
+  }
   function capture(): Captured<Source> {
     const path = focusPath()
     const stack: KeyContext[] = []
@@ -249,7 +258,7 @@ export function createDispatcher<Source = unknown>(
     return node
   }
   function focus(node: FocusNode<Source> | null) {
-    if (node && !states.has(node)) return
+    if (node && !hasNode(node)) return
     focusedNode = node
   }
   function handleKey(input: KeyInput, source: Source, inScope = true): boolean {
@@ -268,6 +277,7 @@ export function createDispatcher<Source = unknown>(
     createNode,
     focus,
     focused: () => focusedNode,
+    hasNode,
     contextStack: () => capture().stack,
     setKeymap,
     handleKey,

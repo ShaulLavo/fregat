@@ -60,16 +60,47 @@ test('removed and foreign nodes and disposed dispatchers decline origin commands
   const foreign = createDispatcher()
   const node = dispatcher.createNode({ commands: { send: () => void calls.push('local') } })
   const outsider = foreign.createNode({ commands: { send: () => void calls.push('foreign') } })
+  expect(dispatcher.hasNode(node)).toBe(true)
+  expect(dispatcher.hasNode(outsider)).toBe(false)
   expect(dispatcher.dispatchCommandFrom(outsider, 'send')).toBe(false)
   node.remove()
+  expect(dispatcher.hasNode(node)).toBe(false)
   expect(dispatcher.dispatchCommandFrom(node, 'send')).toBe(false)
   const live = dispatcher.createNode({ commands: { send: () => void calls.push('disposed') } })
   live.focus()
   dispatcher.dispose()
+  expect(dispatcher.hasNode(live)).toBe(false)
   expect(dispatcher.dispatchCommandFrom(live, 'send')).toBe(false)
   expect(dispatcher.dispatchCommand('send')).toBe(false)
   expect(calls).toEqual([])
   foreign.dispose()
+})
+
+test('ownership checks reject orphaned paths and leave live readers unsampled', () => {
+  const dispatcher = createDispatcher()
+  let reads = 0
+  const parent = dispatcher.createNode({
+    readContext: () => {
+      reads += 1
+      return 'Parent'
+    },
+  })
+  const child = dispatcher.createNode({
+    parent,
+    readContext: () => {
+      reads += 1
+      return 'Child'
+    },
+  })
+  expect(dispatcher.hasNode(child)).toBe(true)
+  child.focus()
+  expect(dispatcher.focused()).toBe(child)
+  parent.remove()
+  expect(dispatcher.hasNode(child)).toBe(false)
+  child.focus()
+  expect(dispatcher.focused()).toBeNull()
+  expect(reads).toBe(0)
+  dispatcher.dispose()
 })
 
 test('origin lookup follows nearest attachments and restores same-element ancestors', () => {
