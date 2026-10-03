@@ -1,6 +1,6 @@
 # Implement stateless MCP support
 
-Status: M0 and M1 (scope (b)) built 2026-09-26 (wave 2 lane A); M0's live provider calls are an owner check. M2/M3 moved to Plan 174; M4 remains. M5 (reveal tools) waits for a layout system that has no plan yet. Requested 2026-09-11. **M0 approved; M1+ not approved.**
+Status: M0 and M1 (scope (b)) built 2026-09-26 (wave 2 lane A); M0's live provider calls are an owner check. M2/M3 moved to Plan 174; M4 remains. M5 (client tools: reveal and drive the UI) is partly blocked on a layout system that has no plan yet. Requested 2026-09-11. **M0 approved; M1+ not approved.**
 
 Decided 2026-09-25: owner — approve milestone M0 only. The owner wants to discuss M1 onward before
 anything else in this plan starts; M0's exit result is the input to that conversation.
@@ -282,22 +282,40 @@ cancel, permission denial, input continuation, and integration failure remain di
 Exit: record the SDK/provider versions, wire traces with secrets removed, focused checks, and live
 provider evidence. Plan 088 remains dependency-blocked until M0–M4 pass.
 
-### M5. Reveal tools (blocked on the layout system)
+### M5. Client tools: reveal and drive the UI
 
-Added 2026-10-01 by the owner. Agents show the user something: a file at a line, a diff, a commit,
-a preview URL, later an embedded browser and other surfaces.
+Added 2026-10-01 by the owner; widened 2026-10-03. Agents show the user something (a file at a
+line, a diff, a commit, a preview URL, later an embedded browser) and drive the live UI the way a
+user does: type into an editor or terminal, press keys, run commands, then read what the UI shows.
+This lets an agent check that its change works, or debug one, in the real app.
 
-- Tools live on this server endpoint, alongside the other native tools. The server routes a reveal
-  intent over the client's existing socket, and the client runs the command the keymap runs for it.
-  No frontend MCP: Chrome's in-page tool registration serves browser-resident agents, and ours run
-  on the server, which already holds the state.
-- Blocked on a new layout system (splits anywhere, easy to place content), which is still being
-  ideated and has no plan yet. Where a revealed item lands, and which window receives it (the
-  chat's own window or the last-focused one), are that system's decisions. Design the tool shapes
-  once it has a plan.
+- Driving needs the client: keystrokes, focus, selection and rendered output exist only in the
+  page. Each client registers its tools (open, type, press, run command, read view state) with the
+  server over its existing socket. The server's MCP endpoint lists them beside the native tools and
+  forwards each call to the attached client, which runs it through the same command registry and
+  input path the keymap uses. Agents run on the server, so this is the one route that reaches them.
+- Two MCP servers on the same Fregat server. `platform` holds everyday work: native tools plus
+  reveal (open a file, diff, commit or terminal), which changes server state and lets the app
+  redraw. `platform-ui` holds the client-run tools (type, press keys, run a command through the
+  UI, focus and selection, read what is rendered) for checking and debugging through the real UI.
+  Its tools would bloat everyday sessions, so chats get it only when a setting
+  (`application` scope, off by default) or the session turns it on. No tool exists in both.
+- Outside agents (Claude Code or Codex in a terminal, any MCP client) reach the same tools through
+  the same endpoint. M1 issues tokens only to Fregat's own provider sessions, so add an
+  owner-issued external-client grant: named, scoped to a workspace, revocable from settings,
+  reaching remote machines over the existing SSH access.
+- Also register the same tool definitions with Chrome's in-page tool API (`navigator.modelContext`)
+  where it exists, so a browser-resident agent can call them too. One definition, two transports.
+- Opening and placing things is blocked on the new layout system (splits anywhere, easy to place
+  content), which is still being ideated and has no plan yet. Where a revealed item lands, and
+  which window receives a call (the chat's own window or the last-focused one), are that system's
+  decisions. Typing into and reading an already-open editor or terminal does not wait for it.
+- Driving the window the owner is using fights them for focus. Calls target a window by id, and an
+  agent can open its own window or tab to work in.
 
-Exit: an agent call reveals each supported surface in the intended window, and a call with no
-attached client returns a domain error the agent can read.
+Exit: an agent opens a file, types into it, and reads the result back; types a command into a
+terminal and reads its output; a call with no attached client returns a domain error the agent
+can read.
 
 ## Verify plausible failures
 
