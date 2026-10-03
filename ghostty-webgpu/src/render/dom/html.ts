@@ -112,7 +112,7 @@ function cellStyle(
     const paint = colors.css(theme.cursor)
     css += `background-color:${colors.css(tail.background)};background-image:linear-gradient(${paint},${paint});background-size:var(--ghostty-cell-width, ${font.cssCellWidth}px) 100%;background-repeat:no-repeat;`
   }
-  return css + cursorDecoration(cursor, colors.foreground(resolved), font, width)
+  return css + cursorDecoration(cursor, foreground, font, width)
 }
 
 function sameColor(left: RgbColor | undefined, right: RgbColor | undefined): boolean {

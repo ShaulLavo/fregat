@@ -22,7 +22,26 @@ describe('adjacent DOM appearance projection', () => {
         expect(runs[0]!.text).toBe('abcdefghijkl')
         expect(runs[0]!.style).toContain('width:calc(12 * var(--ghostty-cell-width, 10px));')
       }
-      expect(foreground).toHaveBeenCalledTimes(4)
+      expect(foreground).toHaveBeenCalledTimes(2)
+    } finally {
+      foreground.mockRestore()
+      runtime.dispose()
+    }
+  })
+
+  it('looks up foreground once per appearance when every cell alternates', async () => {
+    const runtime = await GhosttyRuntime.create()
+    const foreground = vi.spyOn(CanvasColorCache.prototype, 'foreground')
+    try {
+      const terminal = runtime.createTerminal({ columns: 12, rows: 1 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write(`\x1b[?25l${'\x1b[31mA\x1b[32mB'.repeat(6)}`)
+      state.update()
+      const row = state.readRows()[0]!
+      const runs = renderRowRuns(row, undefined, probeFont, theme)
+      expect(runs).toHaveLength(12)
+      expect(runs.map((run) => run.text).join('')).toBe('AB'.repeat(6))
+      expect(foreground).toHaveBeenCalledTimes(12)
     } finally {
       foreground.mockRestore()
       runtime.dispose()
@@ -59,7 +78,7 @@ describe('adjacent DOM appearance projection', () => {
           .map((run) => run.text)
           .join(''),
       ).toBe('ABCD')
-      expect(foreground).toHaveBeenCalledTimes(6)
+      expect(foreground).toHaveBeenCalledTimes(3)
     } finally {
       foreground.mockRestore()
       runtime.dispose()
@@ -83,7 +102,7 @@ describe('adjacent DOM appearance projection', () => {
       const runs = renderRowRuns({ ...row, cells }, undefined, probeFont, theme)
       expect(runs.map((run) => run.text)).toEqual(['A', 'BC', 'D'])
       expect(runs[1]!.style).toContain('background-color:rgb(51, 68, 85);')
-      expect(foreground).toHaveBeenCalledTimes(6)
+      expect(foreground).toHaveBeenCalledTimes(3)
     } finally {
       foreground.mockRestore()
       runtime.dispose()
@@ -115,7 +134,7 @@ describe('adjacent DOM appearance projection', () => {
         const runs = renderRowRuns({ ...row, cells }, undefined, probeFont, theme)
         expect(cells[1]![field]).not.toBe(cells[2]![field])
         expect(runs.map((run) => run.text)).toEqual(['A', 'BC', 'D'])
-        expect(foreground).toHaveBeenCalledTimes(6)
+        expect(foreground).toHaveBeenCalledTimes(3)
       } finally {
         foreground.mockRestore()
         runtime.dispose()
@@ -160,7 +179,7 @@ describe('adjacent DOM appearance projection', () => {
         expect(runs[1]!.style).toContain('text-align:center;')
         expect(runs[1]!.style).toContain('width:calc(2 * var(--ghostty-cell-width, 10px));')
         expect(runs[3]!.cursor).toBe(style)
-        expect(foreground).toHaveBeenCalledTimes(10)
+        expect(foreground).toHaveBeenCalledTimes(5)
       } finally {
         foreground.mockRestore()
         runtime.dispose()
