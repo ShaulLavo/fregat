@@ -98,6 +98,7 @@ class CanvasSurface implements RowRendererSurface {
         if (!this.capturing) return rows
         for (const row of rows) {
           if (row.y < 0 || row.y >= this.rowCount) continue
+          if (options?.rows && !options.rows.has(row.y)) continue
           this.pending.set(row.y, JSON.stringify(row.cells))
         }
         return rows
