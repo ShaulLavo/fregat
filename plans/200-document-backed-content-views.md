@@ -38,14 +38,17 @@ integrate comparison analysis only after 197's diff service ownership is availab
 baseline capture can run earlier. Full completion of 099's unrelated minimap/LSP units is not a
 dependency. If a required contribution API remains gated, defer that dependent unit to its owner
 instead of implementing an alternate runtime. The owner superseded 198's fixed post-wave
-priority on 2026-09-28; schedule these contracts by dependency. 099 publication remains open,
-while some 198 analysis code has landed. This plan grants no authorization to execute gated
+priority on 2026-09-28; schedule these contracts by dependency. 099 unit 1 publication and
+198 foundation contracts are delivered; 198's remaining acceptance must prove the guarantees
+each consumer needs. 099 units 2–7 retain their gates. This plan grants no authorization to execute gated
 work in other plans.
 
 ## Source audit and drift check
 
-Inspected Platform `4a85ec005` and Editor `401d30cd` on 2026-09-28. Recheck both heads, dirty files,
-linked package build and CI `editor-ref` before executing.
+Historical inspection: Platform `4a85ec005` and Editor `401d30cd` on 2026-09-28.
+At execution, record the canonical Fregat HEAD and owned dirty files, build `editor/packages/`
+through root workspaces, and reconcile exact mirror/package contracts under 207. Separate
+Editor checkout pins and CI `editor-ref` were removed by the source cutover.
 
 - `lib/documents/utils/types.ts` already names file, settings JSON, Git reference, Git diff,
   compare-saved, history, conflict and search documents. Adding identity alone will not fix the
@@ -204,7 +207,8 @@ concrete integration contracts without a competing implementation.
 - [ ] Verify bounded retention and cancellation under repeated open/close and environment disposal.
       Measure reads, syntax sessions and retained memory before claiming reuse or performance gains.
 - [ ] Run the narrow tests and browser matrix below, relevant repository gates and paired builds.
-      Land any Editor changes first and update Platform's CI `editor-ref` with its integration.
+      Land Editor source and all Platform consumers together in Fregat; verify exact standalone
+      mirror installation where package contracts change. No CI `editor-ref` update remains.
 - [ ] Commit owned paths, push, deploy via the mesh and verify the served release. Record permanent
       delivery evidence and retire this plan under the repository convention.
 

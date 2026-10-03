@@ -2,7 +2,7 @@
 
 Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
 
-Status: proposed cross-repository integration work package, requested by the owner on 2026-09-28. Documentation only; no editor, dependency, worker or build changes are made in this PR. This is part of Fregat Plan 202, coordinated with existing Plans 176/189/099/197/198, not a second independent Editor roadmap or a replacement for the numbered backlog.
+Status: Approved cross-repository integration work package, requested by the owner on 2026-09-28. Documentation only; no editor, dependency, worker or build changes are made in this PR. This is part of Fregat Plan 202, coordinated with existing Plans 176/189/099/197/198, not a second independent Editor roadmap or a replacement for the numbered backlog.
 
 Owner revision, 2026-09-29: the terminal UI lives in Fregat's `apps/tui/src/ui/` on upstream OpenTUI. The bubli name, standalone toolkit and permanent renderer-fork assumption are superseded. Singapore's S0-S4 work and the parser's semantic, compatibility, streaming and package gates remain in scope. The existing plan filename is retained for link stability, not as a toolkit dependency.
 

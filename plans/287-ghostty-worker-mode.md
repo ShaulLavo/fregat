@@ -9,8 +9,8 @@
   (`apps/web/src/features/terminal/`), which switches to it.
 - Order: starts after Plan 283's Zig frame full move, so the worker carries the new pipeline and
   nothing is ported twice. Coordinates its public API with Plan 286's extension model.
-- Versions: agents bump patch only; the release that adds the entry point waits for the owner's
-  approval of a minor bump.
+- Versions: patch bumps only, including the new entry point, under the owner's 2026-10-03
+  package-version decision.
 
 ## Outcome
 
@@ -89,8 +89,11 @@ local and synchronous; the public host sends typed requests to a local or worker
 Plan 287 owns the async API, shared host/execution adapters and Platform/site call-site conversion.
 Each API-changing PR updates its consumer call sites in the same PR. Plan 286 owns extension
 lifecycle, contribution indexes and new hooks; both tracks agree before changing shared host files.
-Its internal scaffold can land independently. Public API shipment waits for their agreed hooks and
-for the owner's release-version approval; Phases 1–2 here continue while that dependency is built.
+Its internal scaffold can land independently. Public API delivery waits for their agreed hooks
+and verified standalone installation. Phases 1–2 continue while those hooks are built.
+Public API changes ship as patch bumps with their Platform/site callers. Npm publication and
+dependencies that require a published package retain [207](207-one-repo-with-mirrors.md)'s gates;
+deferred npm setup does not block monorepo API delivery.
 
 ## Phases
 

@@ -1,5 +1,10 @@
 # Log Audit — Implementation Prompts
 
+Historical August 2026 audit evidence. Preserve the reports below; their paths and proposed
+fixes describe that checkout. [Current reproduction inventory](../plans/log-audit-follow-ups.md)
+retains all 14 reports under the shared roadmap. Reconcile current owners and evidence before
+executing an old prompt. [PLAN.md](../PLAN.md) owns scheduling.
+
 Source: audit of `/Users/shaul/Desktop/D/platform/logs/*.jsonl`, 14 files,
 174,840 lines, 2026-08-11 → 2026-08-22. 4,441 errors, 5,851 warnings.
 

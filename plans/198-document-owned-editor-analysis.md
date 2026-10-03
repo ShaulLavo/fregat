@@ -228,10 +228,11 @@ names against the landed code; the ownership and observable behavior above are t
 
 ### 0. Reconcile and establish the baseline
 
-- Record Platform and Editor HEADs, dirty diffs, the CI `editor-ref`, and the actual linked build.
-  Planning inspected Platform `ae3bf6d92` and Editor `f97fdad99`.
+- Record canonical Fregat HEAD, owned dirty diffs and built Editor workspace artifacts.
+  The historical planning baseline was Platform `ae3bf6d92` and Editor `f97fdad99`;
+  207 removed separate-checkout CI refs. Verify exact standalone package contracts where affected.
 - Read current landed changes before designing replacement types. Reuse the buffer revision
-  publication from Plan 099 units 0–1 if landed. This work covers syntax lifetime and tab
+  publication delivered by Plan 099 unit 1. This work covers syntax lifetime and tab
   attachment; it does not require the broader minimap/LSP contribution migration.
 - Inventory all callers of `startDocument`, `createEditorPreparedDocument`, prepared `.take()`, and view
   snapshot restore, including standalone Editor, React, diff views and examples. Record each
@@ -297,8 +298,8 @@ without losing edits, history, view state, or provider resources used by another
 
 - Run the acceptance matrix below with real workers and the relevant input-latency checks. Compare
   against the unit 0 baseline. Attribute any regression before changing budgets or thresholds.
-- Run affected Editor and Platform tests, builds and repository gates. Land Editor first, then
-  update Platform's linked contract and CI `editor-ref` in its integration commit.
+- Run affected Editor and Platform tests, workspace builds and repository gates. Land source
+  and consumers together in Fregat; prove standalone mirror installation where contracts change.
 - Verify on the dev route, commit and push the owned paths, deploy through the mesh, check the
   served release, and run the production read-only tab scenario. Read back the screenshots.
 - Record results and accepted limits in a permanent document. Retire this executable plan under

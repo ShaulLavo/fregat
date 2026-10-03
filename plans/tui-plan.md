@@ -1,8 +1,8 @@
 # TUI — Strategy
 
-> **STATUS: 🟢 REVIEWED STRATEGY, PREPARED 2026-09-05.** Product and architecture direction for a
-> terminal front end to `apps/server`. Like every `docs/` strategy, it authorizes nothing; the
-> executable slices in §10 become `plans/0NN-tui-*.md` one at a time and root
+> **Status: retained strategy, prepared 2026-09-05.** Product and architecture reference for a
+> terminal front end to `apps/server`. [Plan 202](202-tui-ui.md) owns current UI execution.
+> The slice order in §10 describes the original program; root
 > [`PLAN.md`](../PLAN.md) owns cross-project order. Research behind every claim is preserved under
 > [`docs/tui-research/`](../docs/tui-research/) (§13); those notes cite file and line for each fact.
 
@@ -16,7 +16,9 @@ timeline, session rail, provider controls, blocking requests, plans, and termina
 Plan 083 completed on 2026-09-08 with checkout choice, first-send worktree creation,
 lifecycle status, and cleanup.
 Its [worktree record](../docs/tui-worktrees.md) covers the implementation and native verification.
-Distribution (084) is next.
+Distribution's former Plan 084 is retired. Use the [TUI guide](../apps/tui/README.md) for
+current running/distribution contracts and [Plan 202](202-tui-ui.md) for remaining UI work.
+Web parity items keep the TUI redesign boundary in [AGENTS.md](../AGENTS.md#tui).
 
 ## 0. What the TUI is
 

@@ -35,7 +35,7 @@ Cerious-scroll's ordinary-list camera stores an item index and an offset, with a
 
 - This plan owns the measurement matrix, required two-axis data-table windowing and bounded shared-list improvements.
 - [156](156-documents-in-the-editor.md) retains CSV format fidelity, document ownership, editing and later Office presentation. Coordinate this plan's table geometry with those contracts. Include future spreadsheet/data-grid presentations when they become executable under 156's gates.
-- [182](182-search-view-rendering.md) retains the selected recycled per-file editor architecture. Execute the search unit against that direction; one-editor/multibuffer alternatives remain unscheduled.
+- [182](182-search-view-rendering.md) retains the selected recycled per-file editor architecture. Execute the search unit against that direction; replacing the selected search renderer with one editor or a multibuffer remains unscheduled. Approved [229](229-multibuffer-excerpt-model.md)/[230](230-aggregated-source-views.md) retain their separate engine and aggregated-view scopes.
 - [E052](e052-proportional-font-extents.md) retains proportional font extents and compact blank-line work; [111](111-editor-decorations.md) retains rich block-widget geometry. This plan's rewrap measurement and scheduling work preserves those owners.
 - [282](282-fast-paired-input-latency-check.md) supplies paired input evidence when a change affects typing. It is not a prerequisite for the initial scroll/table baseline.
 - [Issue #491](https://github.com/ShaulLavo/fregat/issues/491) tracks the disabled tail-follow geometry read. Confirm its browser cost and behavior before fixing or closing it.

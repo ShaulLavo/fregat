@@ -790,6 +790,36 @@ test('Mac host qualification survives compaction and report generation without N
         assert(!Object.hasOwn(retained, field))
     }
   }
+  const canvas = structuredClone(artifact)
+  canvas.variants = ['ghostty-canvas', 'ghostty-web', 'xterm-dom']
+  canvas.runs = artifact.runs.flatMap((run) =>
+    run.variant === 'ghostty-webgpu'
+      ? [{ ...run, variant: 'ghostty-canvas' }]
+      : ['ghostty-web', 'xterm-dom'].map((variant) => ({ ...run, variant })),
+  )
+  const canvasCompact = JSON.parse(JSON.stringify(await compactEvidence(canvas)))
+  assert.deepEqual(pairedRatios(canvasCompact), pairedRatios(canvas))
+  for (const counterpart of ['ghostty-web', 'xterm-dom']) {
+    const rows = pairedRatios(canvasCompact).filter((row) => row.variant === counterpart)
+    assert.equal(rows.length, 7)
+    assert(
+      rows.every((row) => row.pairs.length === canvas.repetitions && row.gpuSkipped.length === 0),
+    )
+    assert(
+      canvasCompact.runs
+        .filter((run) => run.variant === counterpart)
+        .every(
+          (run) =>
+            run.gpuWindows[0].window.foreignActivityMetric ===
+            'host-load-average-and-t3-process-presence',
+        ),
+    )
+  }
+  const canvasReport = markdown(canvasCompact)
+  assert.match(canvasReport, /ghostty-canvas ↔ ghostty-web/)
+  assert.match(canvasReport, /ghostty-canvas ↔ xterm-dom/)
+  assert.match(canvasReport, /ratios are correlated/)
+  assert.match(canvasReport, /does not measure Metal GPU utilization/)
   assert(compact.limitations.includes(idle.limitation))
   assert(!compact.limitations.some((line) => line.includes('NVIDIA total utilization')))
   for (const evidence of [artifact, compact]) {
@@ -986,12 +1016,13 @@ test('native renderer pairs retain generic counterpart values and per-session id
   ])
   artifact.frameBuilders = ['zig']
   const rows = pairedRatios(artifact)
-  assert.equal(rows.length, 21)
+  assert.equal(rows.length, 28)
   for (const [native, counterpart] of Object.entries(counterparts)) {
+    const expected = native === 'ghostty-canvas' ? [counterpart, 'xterm-dom'] : [counterpart]
     const selected = rows.filter((row) => row.nativeVariant === native)
-    assert.equal(selected.length, 7)
+    assert.equal(selected.length, 7 * expected.length)
     for (const row of selected) {
-      assert.equal(row.variant, counterpart)
+      assert(expected.includes(row.variant))
       assert.equal(row.status, 'pass')
       assert.equal(row.frameBuilder, undefined)
       assert.equal(row.pairs[1].counterpart, 100)
@@ -1001,12 +1032,14 @@ test('native renderer pairs retain generic counterpart values and per-session id
   artifact.runs.find((run) => run.variant === 'ghostty-web').sessionId = 'foreign-session'
   assert(
     pairedRatios(artifact)
-      .filter((row) => row.nativeVariant === 'ghostty-canvas')
+      .filter((row) => row.nativeVariant === 'ghostty-canvas' && row.variant === 'ghostty-web')
       .every((row) => row.status === 'incomplete'),
   )
   const report = markdown(artifact)
   assert(report.includes('xterm removed its canvas renderer'))
   assert(report.includes('ghostty-canvas ↔ ghostty-web'))
+  assert(report.includes('ghostty-canvas ↔ xterm-dom'))
+  assert(report.includes('ratios are correlated'))
   assert(report.includes('| Native | Counterpart |'))
 })
 
