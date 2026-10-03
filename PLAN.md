@@ -13,13 +13,30 @@ completed references and the [original wishlist](plans/editor-wishlist.md).
 The [native work breakdown](plans/native-plan-of-plans.md) retains its editor-first gates.
 Package roadmap files link here. Create and update plans in root `plans/`.
 
+## Reading the roadmap
+
+Use this file to choose what runs next. The [plan index](plans/README.md) includes every
+top-level plan and links package inventories and supporting records. Each owning plan keeps
+its implementation checklist and acceptance gates. The [wave register](plans/waves.md) preserves
+the large batches, their original membership and the plans carrying their remaining work.
+An added plan joins this roadmap and the index.
+
+The current queue below schedules closeout and the keymap cutover. Independent bounded work
+can run beside it. Approved work scheduled later stays in the backlog, including native,
+virtualization, async runtime, PR previews and agent UI tools. Historical parity waves retain
+their scopes; newer owner decisions in the linked plans govern changed boundaries.
+
 ## Current execution order
 
 The [October 2 issue triage](plans/issue-triage-2026-10-02.md) delivered its small confirmed
 fixes. The approved [October 3 plan conversion](plans/issue-plan-conversion-2026-10-03.md)
 transfers wanted larger scopes into Plans 290–318. Source issues close after published plan
 links carry their remaining work. Reproduction and benchmark investigations stay in the next
-review pass. Preserve the dependency gates and explicit deferrals below.
+review pass. The [remaining-issue pass](plans/remaining-issues-resolution-2026-10-03.md)
+then closed nine reports and retained eight investigations with their missing evidence.
+Use that newer record for their disposition, including the outstanding safe gateway reload
+receipt; Plan 308's cut-over must account for it. Preserve the dependency gates and explicit
+deferrals below.
 
 The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remaining
 work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
@@ -45,6 +62,43 @@ snapshot; this file remains the scheduler and each plan remains its scope author
 
 The default is one active structural cutover plus independent closeout/proof work. This order
 schedules Approved work; it does not expand any plan's authorization.
+
+### Upcoming delivery waves
+
+The owner requested cleanup before starting the next wave on 2026-10-03. The
+[readiness review](plans/wave-readiness-2026-10-03.md) records dependency and overlap decisions.
+This pass updates planning; product implementation starts through each plan's existing gates.
+
+| Wave                | Bounded scope and finish line                                                                                                                                                                  | Entry conditions                                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preparation         | Reconcile launch handoffs, delivered contracts, terminal input ownership and shared-file owners. Preserve deferred work and owner-only checks separately.                                      | Current documentation pass; qualify required runtime/package proofs when the implementation wave starts.                                                                                    |
+| Command foundation  | 204 + 205 → 206: migrate Editor, terminal, web and TUI callers and delete the replaced keymap APIs in one verified cutover.                                                                    | Required hotkeys installation/publication under 207; agree the exact host-side input/extension seam with active 286/287 owners. No dependency on completing their whole programs.           |
+| Document foundation | Complete required 198 acceptance, then each permitted 099/200 unit against its exact publication/acquisition/attachment contract. Finish with proved consumer ownership and bounded retention. | 099 publication unit 1 is delivered. Units 2–7 still require accepted 282 evidence and an explicit owner request. Unrelated minimap/LSP units do not block every 200 consumer.              |
+| Feature batches     | Deliver coherent interaction/editor, navigation/save/search, excerpt/review, Git, terminal, chat and Markdown/document slices in their declared dependency order.                              | Use 206 commands and the exact content contracts each slice needs. Pane/layout changes require the relevant 209 decisions and authorized delivered hosts; preserve TUI/parser/device gates. |
+| Broad migrations    | Localize consumers under 208's catalog/error contract, then separately authorized 209 workspace units.                                                                                         | Catalog and design preparation may run earlier. Complete-client translation and the whole workspace redesign are not prerequisites for every feature batch.                                 |
+
+126 engineering closeout and Mesh correctness/access work can proceed beside these waves where
+owners and files do not overlap. An owner-only account/device check stays visible without
+holding unrelated engineering delivery. Existing terminal 286/287 work continues with its owners.
+
+Before launching each wave, name its exact units, owners, shared paths, required receipts,
+acceptance cases and exclusions in the owning plans. Fix the scope at launch; new wanted work
+joins a later batch unless it fixes a blocker. Ship verified units throughout the wave.
+
+### Placement of the large additions
+
+| Program                         | Placement and reason                                                                                                                                                                                                    |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 335 stroke icons                | Give the broad swap a separate structural window after keymap and before broad new UI batches. Registry/mapping preparation can run earlier. It touches keymap icon types and build configuration; packs remain later.  |
+| 320 compile-time data           | G0 compatibility/invalidation proof is independent preparation. Run only qualified defaults/theme/bidi/search units in bounded build windows; coordinate build and lockfile edits. No demonstrated keymap prerequisite. |
+| 172 shared undo                 | Contract/core/session units can follow keymap as a bounded extraction. Coordinate workspace unit 4 with document/transaction owners. Preserve the Editor undo graph and server journal; no async-runtime prerequisite.  |
+| 328–334 async runtime           | Approved and deferred. Qualify one runtime and one consumer when started, then adopt beneath stable domain APIs. It does not block keymap or document contracts; current terminal ownership stays in 286/287.           |
+| 327 virtualization              | Approved and deferred. Start with its fresh baseline and required CSV two-axis geometry when scheduled; tune editor/search/shared lists only with attributed evidence. Optional engine replacement is separate.         |
+| 293/294 Mesh durable scheduling | Independent infrastructure program. Ship 295's manual collector first; recurring coordinated execution waits for durable/quorum/failover guarantees.                                                                    |
+
+Other deferrals retain their owning boundaries: 288 PR previews, 319 agent UI tools, icon packs,
+stopped parser work, DOCX editing and the native Swift editor-first gate. A program's size is a
+reason to split its delivery; dependency evidence determines whether its foundation moves earlier.
 
 ## Approved issue work
 
@@ -76,7 +130,7 @@ work can proceed independently where their files and contracts do not overlap.
 4. Build the ordinary issue collector [295](plans/295-cross-repository-issue-collection.md)
    for manual use before scheduler integration. Durable storage
    [293](plans/293-mesh-durable-job-state.md) precedes coordinated dispatch
-   [294](plans/294-mesh-job-coordination.md). Schedule the collector after those guarantees pass.
+   [294](plans/294-mesh-job-coordination.md). Schedule recurring collector execution after those guarantees pass; its usable manual command comes first.
 5. Automatic placement [311](plans/311-automatic-machine-placement.md), design-first onboarding
    [315](plans/315-local-remote-onboarding.md), and session attention
    [316](plans/316-session-attention.md) follow their owning product and verification gates.
@@ -84,6 +138,18 @@ work can proceed independently where their files and contracts do not overlap.
    remain Approved and deferred to Phase 2 preparation. They do not start the stopped parser wave.
 
 ## Next programs
+
+[335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
+and selected morph sites. Its broad swap takes the structural window after the keymap
+cutover and before broad new UI batches; registry/mapping preparation can proceed earlier.
+Its icon-pack phase is Approved and scheduled after those phases ship.
+
+[320](plans/320-compile-time-data.md) is Approved for a compatibility proof followed by
+settings defaults, bundled themes, Unicode bidi derivation and a settings search index.
+Compare existing compile-time tools before migrating consumers; file icons remain a
+conditional feasibility unit. This bounded build/data work can be researched independently,
+with implementation scheduled after its tool, dependency-invalidation and package-consumer
+proofs pass. Coordinate shared build-config edits with active package cutovers.
 
 Each program groups Approved plans that share owners and gates. Grouping does not merge their
 scopes into one package rewrite, lift a gate or approve gated units. Sizes are in the
@@ -99,6 +165,7 @@ scopes into one package rewrite, lift a gate or approve gated units. Sizes are i
 | TUI                  | [202](plans/202-tui-ui.md) on upstream OpenTUI                                                                                                                                       | Local controls any time                                                                       | Production Markdown cutover waits for the tree-sitter-md M1–M4 producer and Editor semantic S0–S4 consumer gates. Controls use 206's dispatcher. No toolkit package, maintained fork or native release pipeline.                                             |
 | Localization         | [208](plans/208-all-text-in-json.md)                                                                                                                                                 | Broad migration, by unit                                                                      | Catalog and typed generation, then structured-error transport, bounded caller migrations, locale/plural/RTL acceptance. 207 no longer blocks the catalog contract; command/settings metadata coordinates with 206.                                           |
 | Unified workspace    | [209](plans/209-unified-workspace.md)                                                                                                                                                | Design review any time                                                                        | Resolve D1–D6 before affected units. Production implementation needs a separate owner decision. Uses 206 commands, 200 content ownership and 208 catalogs.                                                                                                   |
+| Async runtime        | [328](plans/328-async-runtime-master.md) master + [329](plans/329-async-lifecycle-and-transport.md)–[334](plans/334-async-runtime-verification.md)                                   | Research/planning delivered; implementation deferred at owner request                         | Start qualification before package adoption when execution begins. Preserve 099/282 and terminal 287/286/283 gates, exact standalone publication under 207, current domain authority and independent actors.                                                 |
 
 Work that can start without waiting for another program: 126's server and provider proofs,
 204/205 producer prep, 202's local controls, 198's acceptance proofs, 200's baseline
@@ -137,7 +204,7 @@ The owner's closeout queue was **179 → 099 → 114 → 126 → 156**. 179 and 
 **126** remains in the default closeout queue. 156 P0–P2
 delivered 2026-10-02 (#269/#280/#286); the whole plan remains open for Approved P3+ work.
 Independent work can move earlier. See the
-[remaining phase checklist](docs/next-wave.md#wave-2-closeout-reconciled-2026-09-28).
+[remaining phase checklist](docs/next-wave.md#wave-2-closeout-reconciled-2026-10-02).
 
 | Work                                                               | Dependency that matters                                                                                                                                                                                             |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -165,7 +232,9 @@ contracts a consumer needs:
   198 acquisition/attachment guarantees. Comparison integration also needs 197's diff service.
   Its baseline research can run before those contracts land.
 - [182](plans/182-search-view-rendering.md) owns the selected recycled-editor search rendering;
-  one-editor/multibuffer alternatives remain unscheduled.
+  replacing that selected search renderer with one editor or a multibuffer remains unscheduled.
+  Approved [229](plans/229-multibuffer-excerpt-model.md)/[230](plans/230-aggregated-source-views.md)
+  retain their excerpt-engine and aggregated-view scopes and gates.
   [171](plans/171-composer-on-our-editor.md) owns the composer migration. Neither moves into 200.
 - Markdown authoring and rendered blocks follow [108](plans/108-markdown-modes.md),
   [111](plans/111-editor-decorations.md) and [176](plans/176-markdown-parser.md). Reconcile landed
@@ -229,13 +298,51 @@ for implementation; its design work can proceed alongside closeout work.
 
 ## Zed parity workstream
 
-Plans 220–280 implement the Zed actions Fregat lacks, from the 2026-09-29 triage
+Plans 220–271 and 274–280 implement the Zed actions Fregat lacks, from the 2026-09-29 triage
 (`/work/reports/keymap-wave/zed-feature-triage.md`: 432 input actions plus Zed's Vim keymap, 46
 groups). They bind through [206's keymap](plans/206-platform-one-keymap.md), so 206 comes first
 for their bindings; each plan lists its own dependencies. Vim is plans 274–280. Plans 272–273 only
 record Zed actions that do not apply.
 
+## Retained product and package work
+
+These groups make the rest of the backlog visible without creating another priority queue.
+The linked plans retain their status, dependencies and remaining checks.
+
+| Area                                 | Owning plans and retained scope                                                                                                                                                                                                                                                                                                                                                                     | Scheduling boundary                                                                                                                                    |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Editor foundations and performance   | [Editor inventory](plans/editor-backlog.md), [201](plans/201-cheap-overlay-marks.md), [282](plans/282-fast-paired-input-latency-check.md), [native B3R mount repair](plans/native-plan-of-plans.md#b3r--recover-large-document-mount-performance), [syntax coverage](plans/native-syntax-coverage-plan.md)                                                                                          | Reproduce B3R against current code before tuning. 282's replacement proof is still unaccepted; 099 units 2–7 retain their gate.                        |
+| Agent editing and tools              | [139](plans/139-acting-on-agent-diffs.md), [140](plans/140-editor-agent-advantage.md), [169](plans/169-agent-review-mode.md), [diagnostic fixes](plans/diagnostic-ai-fix-plan.md), [087](plans/087-stateless-mcp.md), [088](plans/088-native-code-intelligence.md), [174](plans/174-external-mcp-servers.md)                                                                                        | Reconcile delivered phases before taking residual work; 088 follows 087's required contracts.                                                          |
+| Sessions and harnesses               | [126](plans/126-t3code-alignment.md), [141](plans/141-usage-and-rate-limits.md), [144](plans/144-unattended-agent-work.md), [145](plans/145-harness-controls.md), [186](plans/186-pull-request-sync-rate.md), [187](plans/187-setup-scripts-in-terminals.md)                                                                                                                                        | Preserve live-account, runtime and schema gates. Usage additions remain in 308–310.                                                                    |
+| Workbench and phone                  | [143](plans/143-phone-layout.md), [155](plans/155-site-demo-replica.md), [178](plans/178-tree-in-the-app.md), [181](plans/181-chat-timeline-end-anchoring.md), [191](plans/191-file-picker-polish.md), [192](plans/192-no-swap-flash.md), [pane zoom](plans/pane-zoom-plan.md)                                                                                                                      | Device acceptance stays explicit; 155 follows 143's relevant phone work. Tree sub-plans keep their own dependencies.                                   |
+| Commands, settings and appearance    | [166](plans/166-bare-function-keys.md), [180](plans/180-file-icon-variants.md), [195](plans/195-settings-defaults-browser.md), [196](plans/196-shared-control-polish.md), [335](plans/335-stroke-icons.md) and 220–280                                                                                                                                                                              | Bindings follow 206. File-type icons remain separate from 335's UI icons.                                                                              |
+| Research and longer product programs | [110](plans/110-workspace-indexing.md), [122](plans/122-composable-plugins.md), [Editor parity](plans/editor-parity-implementation-plan.md), [beyond parity](plans/editor-1000-parity-plan.md), [Logseq parity](plans/logseq-parity-implementation-plan.md), [Delta DB](plans/delta-db-implementation-plan.md), [semantic search](plans/structured-semantic-search-evaluation-plan.md)              | Keep the original groups and go/no-go decisions. Later approved numbered plans supersede conflicting earlier deferrals; root scheduling still applies. |
+| Delivery and observability           | [147](plans/147-log-hygiene-and-noise-gate.md), [184](plans/184-dependency-diet.md), [190](plans/190-faster-ci.md), [284](plans/284-resource-aware-heavy-jobs.md), [slice ownership](plans/312-heavy-slice-ownership.md), [quiet lifecycle](plans/313-heavy-quiet-lifecycle.md), [non-cache memory](plans/314-heavy-non-cache-memory.md), [old log-audit follow-ups](plans/log-audit-follow-ups.md) | Separate shipped infrastructure from missing acceptance receipts. Old audit prompts require current reproduction.                                      |
+
+The remaining unnumbered plans, supporting checklists and research handoffs stay discoverable
+through the complete [plan index](plans/README.md). This grouping approves no additional scope.
+
 ## Other work and boundaries
+
+### Deferred virtualization work
+
+[327](plans/327-virtualization-and-two-axis-tables.md) is Approved and scheduled later,
+outside the current execution queue. It requires two-axis data-table virtualization,
+starting with CSV, and measures editor rewrapping, recycled search-editor work and shared-list
+costs before tuning. Keep existing renderer ownership and coordinate with 156, 182 and E052.
+CSV column windowing is required; a virtualizer replacement depends on a measured comparison.
+
+[288](plans/288-pr-preview-environments.md) is Approved for later, after the owner's
+greenfield-exit decision and its Mesh prerequisites. [319](plans/319-agent-ui-mcp.md) stays
+far in the future. It consumes 087's MCP contracts; opening and placing content also waits
+for the still-unplanned layout system. Driving an already-open view has its separate boundary.
+
+[172](plans/172-shared-undo-stack.md) is Approved for the shared operation-history extraction.
+Its local order is entry/execution contracts, shared core, session actions, then workspace
+bookkeeping. Use the integrated action API by default and its lower-level composition where
+explicit transaction control simplifies integration. Preserve separate domain histories, the
+editor graph, and server journal ownership. This work retains the current structural-cutover
+limit; coordinate lifecycle and workspace files with their active owners.
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their
 statuses here. In particular:
@@ -254,5 +361,5 @@ statuses here. In particular:
 
 Keep only current order and cross-plan dependencies here. Update a plan's own status when work
 lands. Retire completed plans after preserving current contracts and updating their backlinks;
-git history keeps the original plan and evidence. Historical wave coordination is linked from
-[the wave record](docs/next-wave.md); it does not override current repository instructions.
+git history keeps the original plan and evidence. The [wave register](plans/waves.md) retains
+batch membership and points to historical delivery records. Run `bun run plans:check` after changing the index or Editor inventory.

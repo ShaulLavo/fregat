@@ -1,5 +1,5 @@
 import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
-import { workspaceRoot } from '../../scripts/workspace-root'
+import { workspaceRoot } from '../../scripts/workspace-root.ts'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
