@@ -1,7 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { stripTypeScriptTypes } from 'node:module'
 import { runInNewContext } from 'node:vm'
 import {
   corpus,
@@ -12,7 +11,9 @@ import {
   settings,
 } from '../bench/comparison-fixtures.ts'
 import { expectedScreen, pacedBurst } from '../bench/comparison-protocol.ts'
+import { frameMetricDeltas } from '../bench/comparison-metrics.ts'
 
+const transpiler = new Bun.Transpiler({ loader: 'ts' })
 const encoder = new TextEncoder()
 const decoder = new TextDecoder('utf-8', { fatal: true })
 const entry = await readFile(new URL('../bench/comparison-entry.ts', import.meta.url), 'utf8')
@@ -21,17 +22,17 @@ function functionSource(signature, nextSignature) {
   const start = entry.indexOf(signature)
   const end = entry.indexOf(nextSignature, start)
   assert(start >= 0 && end > start)
-  return stripTypeScriptTypes(entry.slice(start, end))
+  return transpiler.transformSync(entry.slice(start, end))
 }
 const createBurst = new Function(
   'dependencies',
   `
   const { rollingFixture, rollingInputs, rollingByteCount, corpus, fixtureText,
-    settings, encoder, drivers, current, logs, frame, performance, pacedBurst } = dependencies;
+    settings, encoder, drivers, current, logs, frame, performance, pacedBurst, frameMetricDeltas } = dependencies;
   ${functionSource('async function settle(', '\nfunction input(')}
   ${functionSource('function input(', '\nfunction configureNativeHistory(')}
   ${functionSource('async function writeAll(', '\nasync function correctness(')}
-  ${functionSource('async function burst(', '\nasync function history(')}
+  ${functionSource('async function rollingBurst(', '\nasync function history(')}
   return burst;
 `,
 )
@@ -53,6 +54,7 @@ function burstHarness(path, logs) {
     current: { path },
     logs,
     pacedBurst,
+    frameMetricDeltas,
     drivers: writes.map((received, index) => ({
       write: async (data) => {
         received.push(data)
@@ -125,7 +127,10 @@ for (const path of ['bytes', 'string']) {
     }
     assert.equal(events.filter((event) => event === 'frame').length, frames + 5)
     assert.equal(result.fixture, 'rolling-logs')
-    assert.equal(result.rollingChunks, expected.length)
+    assert.equal(result.chunkCount, expected.length)
+    assert.equal(result.reset, 'corpus-start')
+    assert.equal(result.completedCycles, Math.floor(frames / expected.length))
+    assert.equal(result.nextChunk, frames % expected.length)
     assert.equal(result.bytes, rollingByteCount(fixture, frames) * writes.length)
     assert.deepEqual(result.intervals, Array(frames).fill(1))
   })
@@ -146,8 +151,8 @@ test('actual measured output and warmup select rolling logs independently of fix
     'dependencies',
     `
     return (async () => {
-      const { phases, run, outputFixture, page, qualifiedWindow, measureCpu,
-        browserSession, outputFrames, cpuOptions } = dependencies;
+      const { phases, run, selectedOutputFixture, page, qualifiedWindow, measureCpu,
+        browserSession, outputFrames, cpuOptions, manifest } = dependencies;
       ${runner.slice(start, end)}
     })();
   `,
@@ -158,7 +163,8 @@ test('actual measured output and warmup select rolling logs independently of fix
   await runOutput({
     phases: ['output'],
     run,
-    outputFixture: 'rolling-logs',
+    selectedOutputFixture: 'rolling-logs',
+    manifest: { fixtures: [{ name: 'rolling-logs' }] },
     outputFrames: 5,
     cpuOptions: {},
     browserSession: {},
@@ -177,19 +183,4 @@ test('actual measured output and warmup select rolling logs independently of fix
   assert.equal(run.output.fixture, 'rolling-logs')
   assert.equal(run.output.intervals.length, 5)
   assert.equal(writes[0].length, 10)
-})
-
-test('every measured output fixture keeps the existing measured GPU sampling cadence', () => {
-  const start = runner.indexOf('    const measured =')
-  const end = runner.indexOf('\n    const { value, gpu }', start)
-  assert(start >= 0 && end > start)
-  const cadence = new Function(
-    'label',
-    's',
-    `${runner.slice(start, end)}; return sampleMilliseconds`,
-  )
-  for (const label of ['idle', 'latency', 'delayed-write', 'output/ascii', 'output/rolling-logs'])
-    assert.equal(cadence(label, settings), settings.gpuMeasuredSampleMilliseconds)
-  for (const label of ['mount', 'burst/ascii', 'burst/rolling-logs', 'parse/rolling-logs'])
-    assert.equal(cadence(label, settings), settings.gpuSampleMilliseconds)
 })

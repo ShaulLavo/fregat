@@ -55,19 +55,19 @@
     "endpoint": "AnimationFrame::Presentation with same-sample echo, parse, successful mutation boundary and containing animation-frame identity; no capture or nearest fallback",
     "maximumRawSummaryResidualMicroseconds": 7,
     "nativeParseMaximumMilliseconds": {
-      "17": 0.014,
-      "1": 0.015
+      "1": 0.015,
+      "17": 0.014
     },
     "nativeFrameStartToPaintMaximumMilliseconds": {
-      "17": 0.359,
-      "1": 0.296
+      "1": 0.296,
+      "17": 0.359
     },
     "nativeWholeDrawFrameMaximumMilliseconds": {
-      "17": 0.958,
-      "1": 0.771
+      "1": 0.771,
+      "17": 0.958
     },
     "p95TailDominantSegment": "Among top five input samples per native run, send-to-echo dominates 18 of 20 at count17 and 19 of 20 at count1",
-    "count1HighMedianMode": "Repetitions2/3 native p50 witnesses have 14.010\u201315.635ms parse-to-frame waits, 0.132\u20130.205ms frame-to-paint, and parse <=0.007ms",
+    "count1HighMedianMode": "Repetitions2/3 native p50 witnesses have 14.010–15.635ms parse-to-frame waits, 0.132–0.205ms frame-to-paint, and parse <=0.007ms",
     "limitations": "Disjoint same-sample segments explain the witnesses; overlapping drawFrame intervals and separate segment medians are not additive. Boundary-to-Presentation does not isolate CSS. No network, driver or event-loop causal claim; near-threshold count17 CPU passes are protocol medians, not confidence guarantees."
   },
   "v2FrozenCandidate": {
@@ -131,8 +131,8 @@
     "latencySamples": 96,
     "balancedPairsPerCount": 4,
     "outputFrames": {
-      "17": 1200,
-      "1": 2700
+      "1": 2700,
+      "17": 1200
     },
     "gpuCommandTimeoutMilliseconds": 2000,
     "harnessSourcesSha256": "874d1b00ed041ed427eceec7536765c59860809d57d5b37637bee00acb58151f",
@@ -141,8 +141,8 @@
     "completeUtf8Chunks": 259,
     "qualification": "All original/v1/v2 matrices finished with eight complete runs, four balanced pairs and zero GPU-window failures each; no rerun/exclusion. Independent v2 qualification and exact endpoints approved; performance remains three passes/six failures/one unresolved. The two separate historical v3 ordinary invocations failed sampler qualification and provide no performance verdict.",
     "actualOutputBytesPerTerminal": {
-      "17": 4910340,
-      "1": 11047050
+      "1": 11047050,
+      "17": 4910340
     },
     "actualFixtureVerifiedInEveryOutputRun": true,
     "chunkSizes": "258 complete-UTF8 chunks of 4096 bytes and one 2881-byte tail; deterministic wrapping and offset reset for each burst",
@@ -361,7 +361,11 @@
   "v2RollingTargetFailures": 6,
   "v2RollingTargetUnresolved": 1,
   "hostTimestampDiagnosticPreparation": {
-    "status": "observer3-source-review-pending-capture-held-known-sampler-defect",
+    "status": "observer3-source-and-ordered-lifecycle-approved-capture-held-new-sampler-archive-required",
+    "independentOrderedLifecycleAuditSha256": "4e3d572c4613fece131d81b6d08b57e2282915c3905a9f8c864e68ded38be028",
+    "independentOrderedLifecycleScriptSha256": "867b39c9b9bbbb2c4dd6033e5b34d7cbb63ac07e26d2bbd550ef51e70cc8e2bc",
+    "independentFreezeAuditSha256": "d58a801d9353b228737b885564ad2e0f040c54f7b3981481bb370c3a3d248c2f",
+    "independentFreezeScriptSha256": "cf7e55c0516a6f0b5ae4f3309bcf0884b3234eb8d85e85784bfe2b472ec42d43",
     "diagnosticOnly": true,
     "performanceQualified": false,
     "manifestSha256": "34212f9ae4f638d4338d302ce73a621d8502871156bc2a2619a9a25682413894",
@@ -383,7 +387,7 @@
     "binding": "Only unique newly created connection above entry watermark, immediately after original awaited connectEcho. Existing prior closing connection never owns new phase. Unexpected/foreign/concurrent connection or pre-loop message fails matching.",
     "previousArchives": "All preserved unrun. Observer1 single-pair recipe violates production minimum; observer2 selected prior/absent connection at entry; first observer3 lacked silent concurrent guard.",
     "clockPolicy": "Browser coarsening and inter-bracket drift UNBOUNDED; reject ALL precise cross-clock ordering/overlap. Same-clock host durations/source associations only.",
-    "limitations": "No capture. Known fractional sampler defect blocks invocation even if observer source approved. Any corrected diagnostic host archive requires distinct exact identity/review/admission. Synthetic finite clock initially rounded timestamp below start; proof fixture only changed to binary-exact125ms steps; failed receipts preserved. No transport/PNG/browser performance claim."
+    "limitations": "No capture. Source and ordered lifecycle are approved; archived sampler still has the known fractional timeout defect. Merged sampler fixes require a distinct mixed-scope archive with exact identity/review/admission. Synthetic finite clock initially rounded timestamp below start; proof fixture only changed to binary-exact125ms steps; failed receipts preserved. No transport/PNG/browser performance claim."
   },
   "v2IndependentAudit": {
     "status": "qualification-and-endpoints-approved-performance-targets-unmet",
@@ -395,16 +399,16 @@
     "inputSamples": 1536,
     "maximumRawSummaryResidualMicroseconds": 9,
     "nativeParseMaximumMilliseconds": {
-      "17": 0.021,
-      "1": 0.014
+      "1": 0.014,
+      "17": 0.021
     },
     "nativeFrameStartToPaintMaximumMilliseconds": {
-      "17": 0.32,
-      "1": 0.264
+      "1": 0.264,
+      "17": 0.32
     },
     "nativeWholeDrawFrameMaximumMilliseconds": {
-      "17": 0.981,
-      "1": 0.925
+      "1": 0.925,
+      "17": 0.981
     },
     "selectedInputTails": {
       "sendToEchoDominant": 74,
@@ -463,5 +467,47 @@
     "followupPullRequest": "https://github.com/ShaulLavo/fregat/pull/421",
     "issueComment": "https://github.com/ShaulLavo/fregat/issues/391#issuecomment-5963870547",
     "limitation": "Node rejected final fractional remaining timeout option; empty receipts do not indicate successful NVIDIA empty output. Earlier busy idle samples do not establish cause. Preserve failed bundles/results permanently. New main changes shared row renderer and harness; no old-to-new DOM-only absolute attribution."
+  },
+  "mainCommonPreparation": {
+    "status": "narrow-cadence-and-extraction-source-tests-independently-approved-no-freeze-or-measurement",
+    "integratedWorkerGitSha": "29645c3b40132ec6185614a940b91197464026fa",
+    "firstIntegratedMainGitSha": "45f22aa0b69a5eb111d64763cf537913e13b6843",
+    "freshCommonMain": "pending-normal-integration-of-reviewed-merged-401-and-cadence-fix",
+    "measuredGpuCadenceMilliseconds": 1000,
+    "measuredGpuLabels": ["idle", "latency", "delayed-write", "output/*"],
+    "unmeasuredGpuCadenceMilliseconds": 250,
+    "ordinaryGpuCommandTimeoutMilliseconds": 2000,
+    "topLevelTrace": false,
+    "cadenceRegression": {
+      "receipt": "main-common-cadence-red.txt",
+      "sha256": "4528350915498ce7233dd970d4bdd7d2de2f92a4edc36598fce8131c42bf27b5",
+      "failure": "Actual original qualifiedWindow selected250ms for output/rolling-logs; expected1000ms. One executed test, assertion failure, no guard/load failure."
+    },
+    "properBunHarnessCheck": {
+      "command": "bun run bench:compare:test",
+      "passed": 163,
+      "failed": 0,
+      "receipt": "main-common-cadence-and-harness-green.txt",
+      "sha256": "b3a56507658f5ebd8581a5019af5e32ceb93ded46c134ae8ecdb30ef52f756ee"
+    },
+    "narrowDomProjectionCheck": {
+      "command": "node ../node_modules/vitest/vitest.mjs run src/render/dom/html.test.ts src/render/dom/projection.test.ts",
+      "passed": 32,
+      "failed": 0,
+      "receipt": "main-common-dom-projection-green.txt",
+      "sha256": "beb6809d259ef8ee2c9d9dd3293e680acadb6c8218ef1e07a3b8f7509de69c0f"
+    },
+    "previousFailedChecks": [
+      {
+        "receipt": "dom-main-integrated-node-checks.txt",
+        "reason": "Wrong plain Node runner caused TypeScript .js resolution failures; four stale rolling-source extraction failures were also genuine."
+      },
+      {
+        "receipt": "dom-main-integrated-bun-checks.txt",
+        "reason": "Proper Bun runner exposed unavailable node:module stripTypeScriptTypes export; replaced only test transpilation with Bun.Transpiler."
+      }
+    ],
+    "scope": "Historical measured cadence restored for both fresh bundles; actual new rollingBurst metadata/context executes with retained assertions. Runtime optimization unchanged. Freeze and fresh paired quartet require independent review and explicit admission.",
+    "historicalFailuresRemainFailed": true
   }
 }
