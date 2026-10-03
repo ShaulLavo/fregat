@@ -19,6 +19,7 @@
       "editor/packages/*",
       "editor/examples/*",
       "ghostty-webgpu",
+      "ghostty-webgpu-line-editor",
       "ghostty-webgpu/demo",
       "ghostty-webgpu/site"
     ],
@@ -100,7 +101,7 @@
     "syntax:coverage": "bun apps/web/scripts/syntax-coverage.ts",
     "syntax:coverage:check": "bun apps/web/scripts/syntax-coverage.ts --check",
     "query:check": "node scripts/lint/query-api.mjs",
-    "build:workspaces": "turbo run build --filter='./editor/packages/*' --filter=ghostty-webgpu --filter='@fregat/*'",
+    "build:workspaces": "turbo run build --filter='./editor/packages/*' --filter=ghostty-webgpu --filter=ghostty-webgpu-line-editor --filter='@fregat/*'",
     "changeset": "node node_modules/@changesets/cli/bin.js",
     "version-packages": "changeset version && bun install --lockfile-only",
     "release": "bun x turbo run build --filter=\"@singapore-editor/*\" --filter=\"@fregat/*\" --filter=ghostty-webgpu && bun scripts/release/prepare.mjs && node node_modules/@changesets/cli/bin.js publish",
