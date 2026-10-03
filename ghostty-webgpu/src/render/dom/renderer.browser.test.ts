@@ -285,6 +285,55 @@ describe('DOM terminal renderer', () => {
     ).toBe(true)
   })
 
+  it('preserves fixed-frame ink, cursors, and pointer geometry with layout containment', async () => {
+    const font = calculateTerminalFittedFont(
+      { ...probeFont.settings, size: 32 },
+      { advanceWidth: 19, fontAscent: 10, fontDescent: 2 },
+      1,
+    )
+    const probe = await rendererProbe('dom', '\x1b[?25l\x1b[2J', font)
+    probe.terminal.write('\x1b[2;1H\x1b[3mÂ̈̍fj\x1b[0m😀界\x1b[?25h\x1b[2;6H')
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+    const host = probe.canvas.parentElement!
+    const frame = host.querySelector<HTMLElement>('.ghostty-webgpu-frame')!
+    const rows = Array.from(frame.children)
+    const initial = frame.getBoundingClientRect().toJSON()
+    for (const style of ['block', 'bar', 'underline', 'outline'] as const) {
+      probe.terminal.setDefaultCursorStyle(style)
+      probe.terminal.write('\x1b[2;6H')
+      probe.renderer.notifyWrite()
+      probe.clock.flush()
+      const cursor = frame.querySelector('[data-cursor]')!
+      expect(cursor.getAttribute('data-cursor')).toBe(style)
+      expect(cursor.textContent).toBe('界')
+      expect(cursor.getBoundingClientRect().width).toBe(font.cssCellWidth * 2)
+      expect(frame.textContent).toContain('Â̈̍fj😀界')
+      const savedStyle = frame.getAttribute('style')!
+      const live = await page.screenshot({ element: host, save: false, scale: 'css' })
+      await page.screenshot({
+        element: host,
+        path: `../../../.artifacts/dom-fixed-frame-${style}-live.png`,
+        scale: 'css',
+      })
+      frame.style.contain = 'none'
+      const reference = await page.screenshot({ element: host, save: false, scale: 'css' })
+      await page.screenshot({
+        element: host,
+        path: `../../../.artifacts/dom-fixed-frame-${style}-reference.png`,
+        scale: 'css',
+      })
+      expect(live, `${style} ink across the fixed frame and its surrounding padding`).toBe(
+        reference,
+      )
+      expect(frame.getBoundingClientRect().toJSON()).toEqual(initial)
+      expect(Array.from(frame.children).every((row, index) => row === rows[index])).toBe(true)
+      expect(document.elementFromPoint(initial.left + 1, initial.top + 1)).toBe(probe.canvas)
+      frame.setAttribute('style', savedStyle)
+    }
+    expect(getComputedStyle(frame).contain).toBe('layout paint')
+  })
+
   it('preserves grid and caret geometry while patching changed rows', async () => {
     const probe = await rendererProbe('dom')
     const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
