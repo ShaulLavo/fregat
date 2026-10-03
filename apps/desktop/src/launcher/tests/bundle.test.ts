@@ -3,6 +3,7 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import { appBundle } from '../bundle'
 import { nativeHostBinary } from '../native-window'
+import { developmentNativeHost } from '../../shared/native-path'
 
 test('derives the native host and release from the executable bundle', () => {
   const app = path.join(tmpdir(), 'Applications with spaces', 'Fregat.app')
@@ -45,9 +46,7 @@ test('native host selection prefers the app and falls back to the development ch
     process.execPath = path.join(app, 'Contents/MacOS/fregat')
     expect(nativeHostBinary(root)).toBe(path.join(app, 'Contents/MacOS/platform-webview'))
     process.execPath = path.join(tmpdir(), 'bin/bun')
-    expect(nativeHostBinary(root)).toBe(
-      path.join(root, 'apps/desktop/native/build/platform-webview'),
-    )
+    expect(nativeHostBinary(root)).toBe(developmentNativeHost(path.join(root, 'apps/desktop')))
   } finally {
     process.execPath = original
   }

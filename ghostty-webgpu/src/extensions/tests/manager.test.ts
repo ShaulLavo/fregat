@@ -162,6 +162,37 @@ describe('extension attachment', () => {
     expect(signal?.aborted).toBe(true)
   })
 
+  it('preserves a fresh same-value attachment created while the old scope aborts', () => {
+    let sequence = 0
+    let replacement: ExtensionHandle<number> | undefined
+    const cleanup = vi.fn()
+    const extension: Extension<number> = {
+      name: 'reattach-on-abort',
+      setup: (scope) => {
+        const api = ++sequence
+        scope.own(cleanup)
+        if (api === 1) {
+          scope.signal.addEventListener('abort', () => {
+            replacement = manager.use(extension)
+          })
+        }
+        return { api, input: () => 'claim' }
+      },
+    }
+    const first = manager.use(extension)
+    first.dispose()
+    first.dispose()
+    expect(first.api).toBe(1)
+    expect(replacement?.api).toBe(2)
+    expect(manager.dispatchInput(textInput)).toBe(true)
+    expect(() => manager.use(extension)).toThrow('already attached')
+    expect(cleanup).toHaveBeenCalledOnce()
+    replacement?.dispose()
+    expect(manager.hasInput).toBe(false)
+    expect(cleanup).toHaveBeenCalledTimes(2)
+    expect(manager.use(extension).api).toBe(3)
+  })
+
   it('rolls back throwing setup and permits another attachment of the same value', () => {
     const failure = new TypeError('setup failed')
     const calls: number[] = []
@@ -554,6 +585,41 @@ describe('interested-only hook indexes', () => {
       expect(frame).not.toHaveBeenCalled()
       expect(osc).not.toHaveBeenCalled()
       expect(controller).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each([100, 1000])(
+    'reattaches one identity without rebuilding its index beside %s inert attachments',
+    (count) => {
+      manager.install(Array.from({ length: count }, (_, index) => inert(String(index))))
+      let sequence = 0
+      const target: Extension<number> = {
+        name: 'target',
+        setup: () => ({ api: ++sequence }),
+      }
+      const first = manager.use(target)
+      first.dispose()
+      const mutations = [
+        vi.spyOn(Map.prototype, 'set'),
+        vi.spyOn(Map.prototype, 'delete'),
+        vi.spyOn(WeakMap.prototype, 'set'),
+        vi.spyOn(WeakMap.prototype, 'delete'),
+      ]
+      const apis: number[] = []
+      for (let index = 0; index < 100; index += 1) {
+        const handle = manager.use(target)
+        first.dispose()
+        apis.push(handle.api)
+        handle.dispose()
+      }
+      const identityMutations = mutations.map(
+        (mutation) => mutation.mock.calls.filter(([key]) => key === target).length,
+      )
+      mutations.forEach((mutation) => mutation.mockRestore())
+      expect(identityMutations).toEqual([0, 0, 0, 0])
+      expect(first.api).toBe(1)
+      expect(apis).toEqual(Array.from({ length: 100 }, (_, index) => index + 2))
+      expect(() => manager.use(target)).not.toThrow()
     },
   )
 
