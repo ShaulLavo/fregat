@@ -1,3 +1,4 @@
+export { createEditorWidgetKeymap } from '../editor/hotkeys'
 export type { EditorRowPresentation } from '../rowPresentation'
 export type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
 export {
@@ -73,7 +74,7 @@ export {
   viewportInput,
   visibleRowsInput,
 } from '../createPlugin'
-export type { EditorCursorStyle, EditorKeyDecision, EditorKeyParticipant } from '../plugins'
+export type { EditorCursorStyle } from '../plugins'
 export type {
   EditorChannel,
   EditorChannelPolicy,

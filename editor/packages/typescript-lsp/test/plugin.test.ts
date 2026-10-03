@@ -1369,7 +1369,7 @@ describe('createTypeScriptLspPlugin', () => {
 
     expect([...commands.keys()]).toEqual(
       expect.arrayContaining([
-        'goToDefinition',
+        'editor.action.goToDefinition',
         'editor.action.goToDefinition',
         'editor.action.goToReferences',
         'editor.action.peekDefinition',

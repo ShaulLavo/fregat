@@ -45,5 +45,8 @@ const replacementsForContext = (
   if (context.languageId === null) return []
   if (!languageIds.has(context.languageId)) return []
   if (context.records?.languageId !== context.languageId) return []
-  return markdownInlineReplacements(context.textSnapshot, context.records.data, options)
+  return markdownInlineReplacements(context.textSnapshot, context.records.data, {
+    ...options,
+    registerKeymapNode: context.registerKeymapNode,
+  })
 }

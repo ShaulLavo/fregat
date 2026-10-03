@@ -191,7 +191,6 @@ export type InputSelectionControllerOptions = {
   /** False while a plugin's text gate refuses typed, composed, pasted or dropped text. */
   acceptsText(): boolean
   /** Offers a key to plugin key participants first; true when one took it. */
-  offerKey(event: KeyboardEvent): boolean
   beginPointerJump?(): void
   finishPointerJump?(): void
   cancelPointerJump?(): void
@@ -331,8 +330,7 @@ export class InputSelectionController {
     el.addEventListener('drop', this.handleDrop)
     el.addEventListener('paste', this.handlePaste)
     el.addEventListener('keydown', this.holdKeyForComposition, { capture: true })
-    el.addEventListener('keydown', this.offerKeyToParticipants, { capture: true })
-    el.addEventListener('keydown', this.handleKeyDown)
+    el.ownerDocument.addEventListener('keydown', this.handleKeyDown)
     el.addEventListener('compositionstart', this.handleCompositionStart)
     el.addEventListener('compositionupdate', this.handleCompositionUpdate)
     el.addEventListener('compositionend', this.handleCompositionEnd)
@@ -353,8 +351,7 @@ export class InputSelectionController {
     el.removeEventListener('drop', this.handleDrop)
     el.removeEventListener('paste', this.handlePaste)
     el.removeEventListener('keydown', this.holdKeyForComposition, { capture: true })
-    el.removeEventListener('keydown', this.offerKeyToParticipants, { capture: true })
-    el.removeEventListener('keydown', this.handleKeyDown)
+    el.ownerDocument.removeEventListener('keydown', this.handleKeyDown)
     el.removeEventListener('compositionstart', this.handleCompositionStart)
     el.removeEventListener('compositionupdate', this.handleCompositionUpdate)
     el.removeEventListener('compositionend', this.handleCompositionEnd)
@@ -372,6 +369,29 @@ export class InputSelectionController {
     }
 
     this.uninstallNativeInputHandlers()
+  }
+
+  applyNewlineCommand(context: EditorCommandContext): boolean {
+    if (!this.session || !this.canTypeText() || this.inputState.compositionActive) return false
+    this.applyKeyboardText('\n', context.event ? eventStartMs(context.event) : nowMs())
+    return true
+  }
+
+  applyClipboardCommand(command: 'copy' | 'cut' | 'paste', context: EditorCommandContext): boolean {
+    if (!this.session) return false
+    if (command !== 'copy' && !this.canTypeText()) return false
+    const event = context.event
+    const nativeKey = command === 'copy' ? 'c' : command === 'cut' ? 'x' : 'v'
+    if (
+      event?.key.toLowerCase() === nativeKey &&
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
+      !event.shiftKey
+    )
+      return true
+    this.options.view.focusInput()
+    const document = this.options.el.ownerDocument
+    return typeof document.execCommand === 'function' && document.execCommand(command)
   }
 
   applyHistoryCommand(command: 'undo' | 'redo', context: EditorCommandContext): boolean {
@@ -3071,16 +3091,6 @@ export class InputSelectionController {
     event.stopPropagation()
   }
 
-  // Ahead of both keymaps: the editor's own on this element and a host's on the document. A key
-  // that is part of a composition belongs to the IME, never to a participant.
-  private offerKeyToParticipants = (event: KeyboardEvent): void => {
-    if (event.isComposing || this.inputState.compositionActive) return
-    if (!this.options.offerKey(event)) return
-
-    event.preventDefault()
-    event.stopPropagation()
-  }
-
   /** Text may enter the document: it is writable and no text gate refuses. */
   private canTypeText(): boolean {
     return this.options.canEditDocument() && this.options.acceptsText()
@@ -3095,10 +3105,16 @@ export class InputSelectionController {
    * why waiting on one to decide about the other was a race worth deleting rather than tuning.
    */
   private handleKeyDown = this.traceInput('input.keydownFallback', (event: KeyboardEvent): void => {
+    if (event.defaultPrevented || !event.composedPath().includes(this.options.el)) return
     const session = this.session
     if (!session) return
     if (!this.canTypeText()) return
     if (event.target === this.options.view.inputElement) return
+    if (
+      event.target instanceof Element &&
+      event.target.closest('input, textarea, button, a, [contenteditable]')
+    )
+      return
 
     const typedText = keyboardFallbackText(event)
     if (typedText === null) return

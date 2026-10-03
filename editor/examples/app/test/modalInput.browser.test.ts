@@ -3,7 +3,8 @@ import { commands } from 'vitest/browser'
 import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
 import { Editor } from '@singapore-editor/core/editor'
 import '@singapore-editor/core/style.css'
-import { createModalEditingPlugin } from '../src/modal/modalPlugin'
+import { defaultEditorPacks } from '@singapore-editor/core/keymap'
+import { createModalEditingPlugin, modalPack } from '../src/modal/modalPlugin'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -42,6 +43,7 @@ async function open(route: Route, options: { readonly readonly?: boolean } = {})
     inputRoute: route,
     editability: options.readonly ? 'readonly' : 'editable',
     plugins: [createModalEditingPlugin()],
+    keymap: { packs: [...defaultEditorPacks, modalPack] },
   })
   editors.push(editor)
   await frames()
@@ -145,7 +147,10 @@ it('keeps each view of one document in its own mode', async () => {
       host.style.cssText = 'width:600px;height:120px;display:flex'
       document.body.append(host)
       hosts.push(host)
-      const editor = new Editor(host, { plugins: [createModalEditingPlugin()] })
+      const editor = new Editor(host, {
+        plugins: [createModalEditingPlugin()],
+        keymap: { packs: [...defaultEditorPacks, modalPack] },
+      })
       editors.push(editor)
       editor.attachSession(createEditorBufferSession(buffer), { documentId: 'shared.txt' })
       return { editor, host }

@@ -38,7 +38,9 @@ type ActEnvironment = typeof globalThis & {
 
 type Diagnostic = {
   readonly name: string
-  readonly detail?: { readonly fullTextReads?: number }
+  readonly detail?: {
+    readonly fullTextReads?: number
+  }
 }
 
 type EditorCursor = {
@@ -387,7 +389,9 @@ describe('useEditor', () => {
 
   it('never reads the whole text when store or view snapshots are spread or stringified', () => {
     const diagnostics = collectDiagnostics()
-    const captured: { snapshot: ReactEditorStoreSnapshot | null } = { snapshot: null }
+    const captured: {
+      snapshot: ReactEditorStoreSnapshot | null
+    } = { snapshot: null }
     const host = document.createElement('div')
     const root = createRoot(host)
     document.body.append(host)
@@ -531,7 +535,7 @@ describe('useEditor', () => {
     })
     const editor = editorElement(mounted.host)
     expect(editor).not.toBeNull()
-    mockEditorViewport(editor!, 80, 40, 2_000)
+    mockEditorViewport(editor!, 80, 40, 2000)
 
     act(() => mounted.controller.commands.setSelection(0))
     editor!.scrollTop = 0
@@ -841,7 +845,7 @@ describe('useEditor', () => {
   it('applies keymap changes without recreating the editor', () => {
     const mounted = mountReactEditor({
       document: { text: 'alpha', documentId: 'a.ts', revision: 1 },
-      keymap: { enabled: false },
+      keymap: { packs: [] },
     })
     const instance = mounted.controller.getEditor()
 
@@ -849,8 +853,8 @@ describe('useEditor', () => {
 
     const setKeymapSpy = vi.spyOn(instance as Editor, 'setKeymap')
     const keymap = {
-      defaultBindings: false,
-      layers: [],
+      packs: [],
+      bindings: [],
     }
 
     mounted.render({
@@ -972,7 +976,11 @@ function FineGrainedHarness({
   renders,
 }: {
   readonly onController: (controller: ReactEditorController) => void
-  readonly renders: { text: number; length: number; selections: number }
+  readonly renders: {
+    text: number
+    length: number
+    selections: number
+  }
 }): ReactElement {
   const controller = useEditor({
     document: { text: 'alpha', documentId: 'a.ts', revision: 1 },
@@ -1038,7 +1046,9 @@ function CursorProbe({
 function StoreProbeHarness({
   captured,
 }: {
-  readonly captured: { snapshot: ReactEditorStoreSnapshot | null }
+  readonly captured: {
+    snapshot: ReactEditorStoreSnapshot | null
+  }
 }): ReactElement {
   const controller = useEditor({ document: { text: 'alpha', documentId: 'a.ts', revision: 1 } })
   captured.snapshot = useEditorSelector(controller, (snapshot) => snapshot)
@@ -1092,7 +1102,9 @@ function TextProbe({
   renders,
 }: {
   readonly controller: ReactEditorController
-  readonly renders: { text: number }
+  readonly renders: {
+    text: number
+  }
 }): null {
   renders.text += 1
   const text = controller.useFullText()
@@ -1105,7 +1117,9 @@ function LengthProbe({
   renders,
 }: {
   readonly controller: ReactEditorController
-  readonly renders: { length: number }
+  readonly renders: {
+    length: number
+  }
 }): null {
   renders.length += 1
   const length = useEditorSelector(controller, (snapshot) => snapshot.state?.length ?? 0)
@@ -1118,7 +1132,9 @@ function SelectionProbe({
   renders,
 }: {
   readonly controller: ReactEditorController
-  readonly renders: { selections: number }
+  readonly renders: {
+    selections: number
+  }
 }): null {
   renders.selections += 1
   const selections = useEditorSelector(

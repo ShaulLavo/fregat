@@ -37,6 +37,9 @@ export default defineConfig({
           // tree-sitter-md is plain ESM over web-tree-sitter; served as-is, it is never discovered.
           exclude: ['web-tree-sitter', 'tree-sitter-md'],
           include: [
+            '@fregat/hotkeys',
+            '@tanstack/store',
+            'diff',
             '@shikijs/engine-oniguruma',
             '@shikijs/engine-oniguruma/wasm-inlined',
             'shiki/core',

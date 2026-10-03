@@ -17,7 +17,7 @@ export type EditorCommandPack =
  * What a command is for, as a keymap groups it: the command packs, plus merge conflicts, whose
  * commands have no default key.
  */
-export type EditorCommandCategory = EditorCommandPack | 'merge-conflict'
+export type EditorCommandCategory = EditorCommandPack | 'merge-conflict' | 'widget'
 
 /**
  * One command's facts, known before any editor exists: its id, the name and description a palette,
@@ -40,8 +40,79 @@ function declare<const Id extends string>(
   return declaration
 }
 
-/** Every built-in command, once. The command id union, readonly policy and packs derive from it. */
+/** Every built-in command, once. Command ids, categories and readonly policy derive from it. */
 export const EDITOR_COMMANDS = [
+  declare({
+    id: 'insertNewlineAndIndent',
+    title: 'Insert newline',
+    category: 'text-editing',
+    mutates: true,
+  }),
+  declare({ id: 'copy', title: 'Copy', category: 'selection', mutates: false }),
+  declare({ id: 'cut', title: 'Cut', category: 'text-editing', mutates: true }),
+  declare({ id: 'paste', title: 'Paste', category: 'text-editing', mutates: true }),
+  declare({
+    id: 'markdown.indentListItem',
+    title: 'Indent Markdown list item',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.outdentListItem',
+    title: 'Outdent Markdown list item',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'lsp.rename.accept',
+    title: 'Accept symbol name',
+    category: 'widget',
+    mutates: true,
+  }),
+  declare({
+    id: 'lsp.rename.cancel',
+    title: 'Cancel symbol rename',
+    category: 'widget',
+    mutates: false,
+  }),
+  declare({ id: 'tooltip.hide', title: 'Close tooltip', category: 'widget', mutates: false }),
+  declare({
+    id: 'tooltip.scrollUp',
+    title: 'Scroll tooltip up',
+    category: 'widget',
+    mutates: false,
+  }),
+  declare({
+    id: 'tooltip.scrollDown',
+    title: 'Scroll tooltip down',
+    category: 'widget',
+    mutates: false,
+  }),
+  declare({ id: 'tooltip.pageUp', title: 'Page tooltip up', category: 'widget', mutates: false }),
+  declare({
+    id: 'tooltip.pageDown',
+    title: 'Page tooltip down',
+    category: 'widget',
+    mutates: false,
+  }),
+  declare({
+    id: 'tooltip.scrollStart',
+    title: 'Scroll tooltip to start',
+    category: 'widget',
+    mutates: false,
+  }),
+  declare({
+    id: 'tooltip.scrollEnd',
+    title: 'Scroll tooltip to end',
+    category: 'widget',
+    mutates: false,
+  }),
+  declare({
+    id: 'markdown.openLink',
+    title: 'Open Markdown link',
+    category: 'widget',
+    mutates: false,
+  }),
   declare({
     id: 'markdown.bold',
     title: 'Toggle Markdown bold',
@@ -184,13 +255,6 @@ export const EDITOR_COMMANDS = [
     category: 'find',
     mutates: false,
     vscodeCommandIds: ['editor.action.previousMatchFindAction'],
-  }),
-  declare({
-    id: 'goToDefinition',
-    title: 'Go to definition',
-    category: 'lsp-navigation',
-    mutates: false,
-    vscodeCommandIds: ['editor.action.revealDefinition'],
   }),
   declare({
     id: 'editor.action.goToDefinition',
@@ -1161,4 +1225,8 @@ export function editorCommandDeclaration(
 
 export function isEditorCommandId(command: string): command is EditorCommandId {
   return declarations.has(command)
+}
+
+export function editorCommandMutates(command: EditorCommandId): boolean {
+  return editorCommandDeclaration(command).mutates
 }

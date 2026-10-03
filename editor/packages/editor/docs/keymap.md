@@ -1,63 +1,67 @@
-# keymap
+# keymaps
 
-## chords
+Editor uses `@fregat/hotkeys` for key parsing, predicates, chords, and browser event ownership. Command metadata lives in the Editor catalog; shortcuts live in explicit pack data.
 
-Declare shortcuts as a non-empty `chord` array. Single strokes use the same field.
-Each Editor owns its sequence state and cancels it when focus leaves the editor.
+## Standalone editors
+
+`new Editor(container)` installs the base text controls and the named `defaultEditorPacks`. Markdown shortcuts are opt-in. Pack values contain `linux`, `mac`, and `windows` binding arrays.
 
 ```ts
+import { Editor } from '@singapore-editor/core/editor'
+import { defaultEditorPacks, markdownPack } from '@singapore-editor/core/keymap'
+
 const editor = new Editor(container, {
   keymap: {
-    layers: [
+    packs: [...defaultEditorPacks, markdownPack],
+    bindings: [
       {
-        id: 'comments',
-        bindings: [
-          {
-            chord: ['Mod+K', 'Mod+C'],
-            command: 'editor.action.commentLine',
-            when: ['writable'],
-          },
-        ],
+        keys: ['Mod+K', 'Mod+C'],
+        command: 'editor.action.commentLine',
+        context: 'Editor && !EditorWidget && writable',
       },
     ],
   },
 })
 ```
 
-`keymap.preset` selects `default` or `vscode`. The default pack puts folding under
-`Mod+K`; the VS Code pack uses its folding shortcuts and adds supported language
-navigation, formatting, hover, and comment chords. Packs contain only commands
-this Editor implements. `defaultBindings: false` drops the pack and keeps your layers.
+`packs: []` keeps the minimal base controls. `bindings` appends custom rows at user precedence. A `command: null` row unbinds matching keys. `setKeymap()` updates the standalone dispatcher live and cancels a pending chord when its table changes. Equivalent tables leave the current table in place.
 
-## matching order
+The named packs are `vscodeNavigationPack`, `vscodeSelectionPack`, `vscodeEditingPack`, `vscodeAdvancedEditingPack`, `vscodeMultiCursorPack`, `vscodeFindPack`, `vscodeFoldingPack`, `vscodeLspNavigationPack`, `vscodeLspEditingPack`, `vscodeInlineSuggestPack`, `suggestPack`, `markdownPack`, and `readonlyDiffPack`. `baseEditorKeymap` supplies minimal controls and widget rows.
 
-Later layers precede earlier layers. Rows within a layer keep declaration order,
-including rows with the same chord and different `when` conditions. At each stroke,
-the runtime captures one context and tries eligible terminal candidates in order
-until one dispatch claims the event. A declined candidate runs once, then falls
-through. Explicit `preventDefault: true` or `stopPropagation: true` keeps event
-ownership even when every eligible command declines. An eligible single stroke wins
-over a longer sequence with the same prefix.
+## Hosted editors
 
-An available prefix consumes the event immediately and starts a five-second timer.
-After that prefix, completion and unmatched keys stay consumed even if availability
-changes. Held keys remain owned through release. Repeats do not extend the timer.
-`setKeymap()` replaces bindings and cancels pending state. `enabled: false` disables
-shortcuts while native typing, selection, composition, and clipboard handling stay
-active. Disabling keeps ownership of consumed keys until release.
+The host owns the window dispatcher and installs all bindings. A hosted Editor contributes a node, live context, and handlers without installing any binding listener or table.
 
-## host keymaps
+```ts
+import { createBrowserDispatcher, detectPlatform } from '@fregat/hotkeys'
+import { baseEditorKeymap, vscodeEditingPack } from '@singapore-editor/core/keymap'
 
-Hosts combining Editor and application commands can import `createKeymapRuntime`
-from `@singapore-editor/core/keymap`, supply a DOM root and ordered generic bindings, and
-provide synchronous context, availability, and dispatch callbacks. The returned
-runtime mounts immediately and exposes `claimKeybinding`, `updateBindings`,
-`setEnabled`, `cancel`, and `dispose`. Hosts must call `cancel()` when their exact
-command target changes and `dispose()` when its owner unmounts. Embedded editors
-then use `keymap: { enabled: false }`; their public commands remain available.
+const platform = detectPlatform()
+const hotkeys = createBrowserDispatcher({ root: document })
+const windowNode = hotkeys.createNode({ context: 'Workspace' })
+hotkeys.attachElement(windowNode, document.body)
+hotkeys.setKeymap([
+  ...baseEditorKeymap[platform],
+  ...vscodeEditingPack[platform],
+  { keys: 'Mod+B', command: 'sidebar.toggle', context: 'Workspace' },
+])
+const editor = new Editor(container, {
+  hotkeys,
+  hotkeysParent: windowNode,
+  keymapContext: { mode: 'full', extension: 'ts' },
+})
+```
 
-The keymap entry point imports without a DOM. `editor.getKeymapContext()` exposes the
-facts used by pack conditions. `editor.getInputElement()` identifies the native
-editor input so a host can tell it apart from local widget inputs. Local widgets
-handle their own idle key events before the runtime; a widget that stops an event
-also prevents an application bubble listener from seeing it.
+`editor.getHotkeysHost()` exposes the dispatcher and Editor node. `editor.registerKeymapNode()` attaches a child widget element and its command handlers. Plugins use the same method through `EditorViewContributionContext`; contribution disposal removes its nodes. Editor disposal removes its node and listeners and leaves a host dispatcher running.
+
+## Context and command policy
+
+The Editor node always identifies as `Editor`. It samples `writable`, `hasSelection`, `tabFocusMode`, and `inlineSuggestionVisible` on each dispatch capture. Plugins contribute identifiers through `registerKeymapContextKey`: Find supplies `findVisible`, Markdown supplies `markdown`, and LSP supplies `suggestWidgetVisible`, `parameterHintsVisible`, and `parameterHintsMultipleSignatures`. Metadata values are `mode` (`full`, `single_line`, or `diff`) and `extension`; an explicit extension takes precedence over the document filename.
+
+Find, replace, rename, tooltip, and rendered Markdown links have child nodes with `EditorWidget` and their local identity. Pack predicates address descendants with `Editor > FindWidget`, for example. Field navigation remains native, and host commands still bubble through the focus tree. Tooltip controls publish `TooltipControl` so scrolling shortcuts address only the tooltip body. Command handlers enforce mutation policy on readonly views for keyboard, direct, and contributed command dispatch.
+
+## Chords and text input
+
+The dispatcher captures context once per stroke and resolves each chord prefix through the current focused path. A mismatch replays the current stroke; an ambiguous prefix waits for its continuation or timeout. Focus changes cancel pending state. Pack order and later row precedence are defined by `@fregat/hotkeys`.
+
+Text entry, composition, browser clipboard events, and completion commit characters stay in their native input paths. Enter and clipboard shortcuts invoke Editor commands through the dispatcher; the newline command uses the same indentation, pair, list, and multi-cursor edit pipeline as text input. Clipboard command rows allow trusted browser clipboard events to complete.

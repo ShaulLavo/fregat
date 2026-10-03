@@ -78,17 +78,16 @@ exported), **host** (the host's API, not a plugin hook), **proposed** (lands exp
 
 ### Input
 
-| Hook                       | Scope, phase, rights                                                                | Order, cancel, dispose                                                    | Consumer                         | Status       |
-| -------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------- | ------------ |
-| `registerPressParticipant` | View context. Asked before a press becomes a caret; `true` claims it (E050 row 5).  | Registration order; first claim wins; the editor prevents the default.    | diff, definition links           | supported    |
-| `registerNonCaretRows`     | View context. Caret moves step over the rows.                                       | Claimed during creation only.                                             | diff                             | supported    |
-| `registerKeymapContextKey` | View context. Read when a key is matched (E050 row 6).                              | Unregistered keys read false.                                             | find, completion, signature help | supported    |
-| `onDidType`                | View context. After the typed edit lands.                                           | Not claimed by the editor; the contribution must dispose it.              | auto-close consumers             | supported    |
-| `EDITOR_PASTE_HANDLER`     | Language feature token. First handler that answers takes the paste.                 | Selector score, then priority, then registration order.                   | built-in paste handlers          | supported    |
-| Keymap bindings            | Host only, through `EditorKeymapOptions.layers`. A plugin cannot add a binding.     | Later layers first; `when` conditions; mutating commands need `writable`. | Platform disables it             | host         |
-| Key participant            | View context. Consume or delegate a key before the editor keymap and default input. | See the input section below.                                              | E028                             | experimental |
-| Text commit gate           | View context. Allow or reject text from every source before it commits.             | See the input section below.                                              | E028                             | experimental |
-| Replace the input loop     | —                                                                                   | Rejected below.                                                           | —                                | unsupported  |
+| Hook                       | Scope, phase, rights                                                                           | Order, cancel, dispose                                                          | Consumer                         | Status       |
+| -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------- | ------------ |
+| `registerPressParticipant` | View context. Asked before a press becomes a caret; `true` claims it (E050 row 5).             | Registration order; first claim wins; the editor prevents the default.          | diff, definition links           | supported    |
+| `registerNonCaretRows`     | View context. Caret moves step over the rows.                                                  | Claimed during creation only.                                                   | diff                             | supported    |
+| `registerKeymapContextKey` | View context. Read when a key is matched (E050 row 6).                                         | Unregistered keys read false.                                                   | find, completion, signature help | supported    |
+| `onDidType`                | View context. After the typed edit lands.                                                      | Not claimed by the editor; the contribution must dispose it.                    | auto-close consumers             | supported    |
+| `EDITOR_PASTE_HANDLER`     | Language feature token. First handler that answers takes the paste.                            | Selector score, then priority, then registration order.                         | built-in paste handlers          | supported    |
+| Keymap bindings            | Host only, through `EditorKeymapOptions.packs` and `.bindings`. A plugin cannot add a binding. | Shared dispatcher precedence and context predicates; handlers enforce readonly. | Hosted Editor binds nothing      | host         |
+| Text commit gate           | View context. Allow or reject text from every source before it commits.                        | See the input section below.                                                    | E028                             | experimental |
+| Replace the input loop     | —                                                                                              | Rejected below.                                                                 | —                                | unsupported  |
 
 ### Syntax and language features
 
@@ -163,37 +162,21 @@ exported), **host** (the host's API, not a plugin hook), **proposed** (lands exp
 Keydown for a key typed into the hidden input (textarea or EditContext host, both inside the scroll
 element `el`):
 
-1. Document capture. A keymap runtime with a chord pending or a key held claims first. Both the
-   editor's runtime and a host's runtime rooted at `document` do this.
-2. `el` capture: `holdKeyForComposition` stops propagation while composing, so nothing after sees the
-   key ([inputSelectionController.ts:3003](../../packages/editor/src/editor/inputSelectionController.ts)).
-3. `el` bubble: the editor keymap runtime (installed first, [Editor.ts:721](../../packages/editor/src/editor/Editor.ts)),
-   then the keydown fallback, which ignores keys aimed at the hidden input.
-4. Listeners a contribution added on its own container, in whatever order they were attached.
-5. Document bubble: a host keymap rooted at `document`. Platform's is here and the editor keymap is
-   disabled there (`HOSTED_EDITOR_KEYMAP`).
-6. Default action: `beforeinput` (textarea) or `textupdate` (EditContext), then the editor commits.
+1. Document capture handles held keys and pending chords through the shared dispatcher.
+2. The native input composition guard keeps an active IME key in its input path.
+3. A standalone Editor dispatcher listens at its root. A hosted Editor contributes only focus nodes and commands to the host dispatcher.
+4. Document bubble runs the native text fallback after the dispatcher. Inputs and widget controls keep their native text and navigation.
+5. Default action emits `beforeinput` or `textupdate`, then the editor commits.
 
 Text reaches the document from five sources, the `pendingTextSource` values in
 [inputState.ts](../../packages/editor/src/editor/inputState.ts): `beforeinput`, `composition`,
 `deduced`, `paste` and `drop`. A key filter alone cannot stop the last four.
 
-### Key participant (experimental)
+### Widget commands
 
-`scope.keyParticipant(participant)` on a `createPlugin` scope; `EditorKeyParticipant` is
-`(event, context) => 'consume' | 'delegate'` from `@singapore-editor/core/extensions`.
+`registerKeymapNode` attaches a widget element below the Editor focus node and installs its named commands. The host supplies the binding table. Standalone widgets can use `createEditorWidgetKeymap` to own a base dispatcher. Contributions dispose their node registrations with their lifecycle.
 
-- Asked at an `el` capture listener registered after `holdKeyForComposition`, so ahead of the editor
-  keymap (step 3) and a host keymap (step 5), and never while a composition is active.
-- Only unmodified and Shift-only keys (owner decision, Plan 122 question 2, c). Ctrl, Cmd and Alt
-  chords go to the host's keymap; claiming one waits for E026 default keys in the catalog.
-- Registration order; the first `consume` wins, and the editor calls `preventDefault` and
-  `stopPropagation`, so no `beforeinput` or `textupdate` follows. `delegate` changes nothing.
-- `context` is the editor's keymap context, widget keys included.
-- A throwing participant counts as `delegate` and is logged. Readonly views still ask participants;
-  their edits are refused by `applyEdits`.
-
-This is the keyboard twin of `registerPressParticipant` (E050 row 5).
+The modal example exports `modalPack` and contributes live `modalNormal`/`modalInsert` identifiers. Its grammar executes through `example.modal.stroke`; `keyParticipant` and its capture listener have been removed.
 
 ### Text commit gate (experimental)
 
@@ -209,5 +192,5 @@ VS Code lets an extension overwrite the `type` command and keeps `default:type` 
 ([coreCommands.ts:2153](https://github.com/microsoft/vscode/blob/c1c5b32e3fd5a2f3922ea20d7d65055b8b4c47e2/src/vs/editor/browser/coreCommands.ts#L2153)).
 Here the loop is `InputSelectionController`, 3,758 lines owning two input routes, composition,
 hidden-input reconciliation, auto-closing, snippets and linked editing. A replacement inherits all of
-that or breaks it, and two owners of one `beforeinput` is the failure E027 must rule out. The two
-narrow hooks above express the bounded E028 grammar without it.
+that or breaks it, and two owners of one `beforeinput` is the failure E027 must rule out. The command and
+text gate express the bounded E028 grammar without it.

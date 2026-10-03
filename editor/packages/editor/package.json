@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ShaulLavo/fregat.git",
@@ -111,9 +111,9 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@fregat/hotkeys": "0.0.1",
     "@shikijs/engine-oniguruma": "4.4.3",
     "@singapore-editor/textbuffer": "workspace:*",
-    "@tanstack/hotkeys": "0.10.0",
     "diff": "^9.0.0",
     "evlog": "^2.29.0",
     "shiki": "^4.4.3"
