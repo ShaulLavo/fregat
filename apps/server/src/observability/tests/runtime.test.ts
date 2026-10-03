@@ -10,6 +10,7 @@ import { readFsLogs } from 'evlog/fs'
 import type { WideEvent } from 'evlog'
 
 import { closeTestApps, createTestApp } from '../../../test/server'
+import { closeApp } from '../../app'
 import { createPushSubscriber } from '../../../test/factories/push-subscriber'
 import { createPushSessionFixture } from '../../../test/factories/push-sessions'
 import { createInProcessOrchestrationSocket } from '../../../test/orchestration-socket'
@@ -491,6 +492,11 @@ describe('observability runtime', () => {
       settingIds: ['editor.fontSize'],
       target: 'user',
     })
+    await expect(closeApp(app)).resolves.toBeUndefined()
+    const cache = JSON.parse(
+      await readFile(path.join(root, '.platform-test', 'usage', 'accounts.json'), 'utf8'),
+    )
+    expect(cache).toMatchObject({ version: 1, accounts: [] })
   })
 
   it('persists client logs in the shared file drain with a client source marker', async () => {

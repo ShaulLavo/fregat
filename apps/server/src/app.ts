@@ -438,25 +438,27 @@ export function createApp(options: AppOptions) {
       path.dirname(options.settings?.userFilePath ?? platformHomePath('settings.json')),
     'usage',
   )
+  // Collectors keep accepted configuration available through settings recovery and shutdown.
+  let usageSettings = settings.snapshot().values
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry, {
     cacheFile: path.join(usageCacheHome, 'accounts.json'),
     policy: () => {
-      const values = settings.snapshot().values
+      const values = usageSettings
       return {
         minIntervalMs: values['providers.usageRefreshSeconds'] * 1000,
         failureCooldownMs: values['providers.usageFailureCooldownSeconds'] * 1000,
         staleAfterMs: values['providers.usageStaleAfterSeconds'] * 1000,
       }
     },
-    proxySourceKey: () => settings.snapshot().values['providers.proxyUsageUrl'],
-    proxyInstanceIds: () => settings.snapshot().values['providers.proxyUsageProviderInstanceIds'],
+    proxySourceKey: () => usageSettings['providers.proxyUsageUrl'],
+    proxyInstanceIds: () => usageSettings['providers.proxyUsageProviderInstanceIds'],
     proxyConfigured: () =>
       Boolean(
-        settings.snapshot().values['providers.proxyUsageUrl'] ||
-        settings.snapshot().values['providers.proxyUsageProviderInstanceIds'].length,
+        usageSettings['providers.proxyUsageUrl'] &&
+        usageSettings['providers.proxyUsageProviderInstanceIds'].length,
       ),
     readProxy: async () => {
-      const url = settings.snapshot().values['providers.proxyUsageUrl']
+      const url = usageSettings['providers.proxyUsageUrl']
       const secret = await settings.readSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
       if (!url || !secret)
         throw createStructuredError({
@@ -470,7 +472,8 @@ export function createApp(options: AppOptions) {
       return readProxyUsage({ url, secret })
     },
   })
-  settings.onChange(() => {
+  settings.onChange((event) => {
+    usageSettings = event.snapshot.values
     runDetached(
       async () => {
         await reconcileProviderSettings()
@@ -494,7 +497,7 @@ export function createApp(options: AppOptions) {
   const providerUsageHistory = new ProviderUsageHistoryReader(database)
   const providerTranscriptHistory = new ProviderTranscriptCollection(
     () => {
-      const values = settings.snapshot().values
+      const values = usageSettings
       return {
         cacheDirectory: usageCacheHome,
         hostId: (options.system?.machineId ?? readMachineId)(),
@@ -509,7 +512,7 @@ export function createApp(options: AppOptions) {
         },
       }
     },
-    () => settings.snapshot().values['providers.transcriptHistoryRefreshSeconds'] * 1000,
+    () => usageSettings['providers.transcriptHistoryRefreshSeconds'] * 1000,
   )
   const stopUsageRegistry = providerAdapterRegistry.subscribeChanges(() => {
     providerUsage.reconfigure()

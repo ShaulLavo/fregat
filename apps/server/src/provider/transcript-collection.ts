@@ -1,12 +1,13 @@
 import { QueryClient } from '@tanstack/query-core'
-import type { ProviderUsageHistoryQuery } from '@workspace/contracts'
+import type { ProviderUsageHistoryCoverage, ProviderUsageHistoryQuery } from '@workspace/contracts'
 import { recordProcessInfo, recordProcessWarning } from '../observability/runtime'
 import { LocalTranscriptUsageService, type LocalTranscriptUsageOptions } from './transcript-history'
+import { aggregateTranscriptHistory } from './usage-history'
 
 /** Owns the local scan schedule; route reads only project the retained service. */
 export class ProviderTranscriptCollection {
   private readonly queries = new QueryClient()
-  private service: LocalTranscriptUsageService
+  private service: LocalTranscriptUsageService | null = null
   private configuredKey: string | null = null
   private timer: ReturnType<typeof setTimeout> | null = null
   private generation = 0
@@ -18,17 +19,27 @@ export class ProviderTranscriptCollection {
   constructor(options: () => LocalTranscriptUsageOptions, intervalMs: () => number) {
     this.options = options
     this.intervalMs = intervalMs
-    this.service = new LocalTranscriptUsageService(options())
   }
 
   read(query: ProviderUsageHistoryQuery) {
-    return this.service.read(query)
+    if (this.service) return this.service.read(query)
+    const coverage: ProviderUsageHistoryCoverage = {
+      scope: 'local-transcripts',
+      accountAttribution: 'unverified',
+      costMeaning: 'api-equivalent-estimate',
+      status: 'pending',
+      scannedAt: null,
+      bytesRead: 0,
+      sources: [],
+    }
+    return { ...aggregateTranscriptHistory([], query, Date.now()), coverage }
   }
 
   async initialize() {
+    if (this.closed) return
     const options = this.options()
     const key = JSON.stringify({ sources: options.sources, limits: options.limits })
-    if (this.closed || key === this.configuredKey) return
+    if (key === this.configuredKey) return
     await this.queries.query({
       queryKey: ['provider', 'transcript-collection', 'initialize'],
       queryFn: async () => {
@@ -43,7 +54,7 @@ export class ProviderTranscriptCollection {
           next.close()
           return false
         }
-        this.service.close()
+        this.service?.close()
         this.service = next
         this.configuredKey = key
         return true
@@ -60,7 +71,7 @@ export class ProviderTranscriptCollection {
       queryKey: ['provider', 'transcript-collection', 'refresh'],
       queryFn: async () => {
         await this.initialize()
-        if (this.closed) return false
+        if (this.closed || !this.service) return false
         await this.service.refresh()
         return true
       },
@@ -97,7 +108,7 @@ export class ProviderTranscriptCollection {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
     await this.queries.cancelQueries()
-    this.service.close()
+    this.service?.close()
     this.queries.clear()
   }
 
