@@ -1,9 +1,9 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 
 import { enqueue, promote, release, type Entry } from './queue'
-import { beginRun, finishRun } from './runtime'
+import { beginRun, finishRun, stopRunConcurrency } from './runtime'
 import { removeSandboxes, sandbox } from './sandbox'
 
 const entries: readonly Entry[] = ['before', 'measurement', 'short', 'after', 'next'].map(
@@ -105,6 +105,46 @@ test('short intervals are journaled without a sampling tick and files do not inc
       'sliceRoot',
       'startedAt',
     ])
+  } finally {
+    for (const job of held) {
+      finishRun(box.state, job.entry.id)
+      release(job)
+    }
+  }
+})
+
+test('stopping concurrency retains ownership and journal intervals until whole-slice settlement', () => {
+  const box = sandbox()
+  const held = entries.slice(1, 4).map((entry) => promote(box.state, enqueue(box.state, entry)))
+  const measurement = held[0]!.entry
+  const runtimeFile = path.join(box.state, 'runs', measurement.id + '.json')
+  const journalFile = path.join(box.state, 'measurements', measurement.id + '.json')
+  try {
+    beginRun(box.state, measurement, () => true)
+    beginRun(box.state, held[1]!.entry, () => true)
+    const interval = JSON.parse(readFileSync(runtimeFile, 'utf8'))
+    stopRunConcurrency(box.state, measurement.id)
+    const stopped = readFileSync(runtimeFile, 'utf8')
+    expect(JSON.parse(stopped)).toMatchObject({
+      acceptsLight: false,
+      endedAt: null,
+      quiet: true,
+      startedAt: interval.startedAt,
+    })
+    expect(existsSync(held[0]!.file)).toBe(true)
+    expect(existsSync(journalFile)).toBe(true)
+    stopRunConcurrency(box.state, measurement.id)
+    expect(readFileSync(runtimeFile, 'utf8')).toBe(stopped)
+    finishRun(box.state, held[1]!.entry.id)
+    // A previously admitted job can finish preparation and spawn during retained cleanup.
+    beginRun(box.state, held[2]!.entry, () => true)
+    const journal = finishRun(box.state, measurement.id)
+    expect(journal.map((job) => job.label)).toEqual(['short', 'after'])
+    expect(journal[0]!.endedAt).toEqual(expect.any(String))
+    expect(journal[1]!.endedAt).toBeNull()
+    expect(journal.every((job) => !Object.hasOwn(job, 'acceptsLight'))).toBe(true)
+    expect(existsSync(runtimeFile)).toBe(false)
+    expect(existsSync(journalFile)).toBe(false)
   } finally {
     for (const job of held) {
       finishRun(box.state, job.entry.id)

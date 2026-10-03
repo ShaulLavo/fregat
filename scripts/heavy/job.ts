@@ -166,6 +166,7 @@ export type JobSpec =
 export function startJob(
   job: JobSpec,
   publish = (launch: () => ReturnType<typeof Bun.spawn>) => launch(),
+  onExit = () => {},
 ) {
   const unit = `${job.host === 'local' ? job.sliceRoot : 'heavy'}-${job.id}.scope`
   const accountingFile = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `${unit}.accounting`)
@@ -219,6 +220,7 @@ export function startJob(
 
   const done = child.exited
     .then((): JobOutcome => {
+      onExit()
       const signalCode = child.signalCode
       const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
       const wallMs = Math.round(performance.now() - started)

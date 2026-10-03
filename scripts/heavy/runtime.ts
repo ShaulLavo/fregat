@@ -2,11 +2,11 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync
 import path from 'node:path'
 
 import { bootSeconds, sliceState } from './admission'
-import { unlessMissing, unlock, waitLock } from './lock'
+import { tryLock, unlessMissing, unlock, waitLock } from './lock'
 import { live, type Entry } from './queue'
 import type { JobDuringRun } from './record'
 
-type Run = JobDuringRun & { readonly quiet: boolean }
+type Run = JobDuringRun & { readonly quiet: boolean; readonly acceptsLight: boolean }
 type Journal = Record<string, JobDuringRun>
 
 /** Publishes the spawn interval; the caller keeps manager preparation and cleanup outside. */
@@ -19,6 +19,7 @@ export function beginRun<T>(stateDir: string, entry: Entry, launch: () => T): T 
       return false
     })
     const run: Run = {
+      acceptsLight: entry.quiet,
       allowedCpus: entry.allowedCpus ?? [],
       class: entry.jobClass,
       cwd: entry.cwd,
@@ -77,20 +78,37 @@ export function finishRun(stateDir: string, id: string): readonly JobDuringRun[]
   })
 }
 
-/** Retained admission ownership alone cannot authorize concurrent light work. */
-export function isActiveQuietRun(stateDir: string, entry: Entry) {
-  if (!entry.quiet || entry.quietDeadline === undefined || bootSeconds() >= entry.quietDeadline)
-    return false
-  return underLock(stateDir, () => {
-    const run = readRuns(stateDir).find((job) => job.id === entry.id && job.quiet)
-    if (!run || run.pid !== entry.pid || run.sliceRoot !== entry.sliceRoot) return false
-    const status = unlessMissing(() => readFileSync(`/proc/${entry.pid}/status`, 'utf8'))
-    if (!status || !/^State:\s+[RSDI]\b/m.test(status)) return false
-    return sliceState(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`) === 'running'
+/** Cleanup keeps the interval and journal open while preventing new concurrent admissions. */
+export function stopRunConcurrency(stateDir: string, id: string) {
+  underLock(stateDir, () => {
+    const run = readRuns(stateDir).find((job) => job.id === id)
+    if (!run?.acceptsLight) return
+    writeJson(runFile(stateDir, id), { ...run, acceptsLight: false })
   })
 }
 
-function overlap({ quiet: _quiet, ...job }: Run): JobDuringRun {
+/** Retained admission ownership alone cannot authorize concurrent light work. */
+export function isActiveQuietRun(stateDir: string, entry: Entry) {
+  if (!entry.quiet || entry.quietDeadline === undefined) return false
+  // A suspended publisher keeps admission in its cancellable, deadline-bounded polling loop.
+  const fd = tryLock(path.join(stateDir, 'runtime.lock'))
+  if (fd === null) return false
+  try {
+    if (bootSeconds() >= entry.quietDeadline) return false
+    const run = readRuns(stateDir).find((job) => job.id === entry.id && job.quiet)
+    if (!run?.acceptsLight || run.pid !== entry.pid || run.sliceRoot !== entry.sliceRoot)
+      return false
+    const status = unlessMissing(() => readFileSync(`/proc/${entry.pid}/status`, 'utf8'))
+    if (!status || !/^State:\s+[RSDI]\b/m.test(status)) return false
+    const populated =
+      sliceState(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`) === 'running'
+    return populated && bootSeconds() < entry.quietDeadline
+  } finally {
+    unlock(fd)
+  }
+}
+
+function overlap({ quiet: _quiet, acceptsLight: _acceptsLight, ...job }: Run): JobDuringRun {
   return job
 }
 

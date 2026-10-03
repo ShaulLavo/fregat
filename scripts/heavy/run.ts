@@ -68,7 +68,7 @@ import {
   type JobDuringRun,
   type ServerAtAdmission,
 } from './record'
-import { beginRun, finishRun, isActiveQuietRun } from './runtime'
+import { beginRun, finishRun, isActiveQuietRun, stopRunConcurrency } from './runtime'
 
 const USAGE =
   'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--quiet | --server] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
@@ -246,8 +246,12 @@ async function run(options: Options) {
   try {
     // Read before launch: the job, or another session, may commit while it runs.
     const checkout = repositoryOf(cwd)
-    const job = startJob(placed.spec, (launch) =>
-      placed.entry ? beginRun(options.stateDir, placed.entry, launch) : launch(),
+    const job = startJob(
+      placed.spec,
+      (launch) => (placed.entry ? beginRun(options.stateDir, placed.entry, launch) : launch()),
+      () => {
+        if (placed.entry?.quiet) stopRunConcurrency(options.stateDir, placed.entry.id)
+      },
     )
     // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
     // also reaches it directly, so it sees SIGINT twice; one is enough to stop it.
@@ -568,6 +572,15 @@ async function attemptAdmission(
             stopTimeoutSeconds(config.graceSeconds),
         }
       : {}
+    const expiredBeforePromotion = expiredAdmission(waiting.entry, config.quietHoldSeconds)
+    if (expiredBeforePromotion) {
+      for (const fd of taken) unlock(fd)
+      return expiredBeforePromotion
+    }
+    if (quiet && !isActiveQuietRun(options.stateDir, quiet)) {
+      for (const fd of taken) unlock(fd)
+      return { reason: `quiet hold by '${quiet.label}' since ${quiet.since}`, quiet }
+    }
     const held = promote(options.stateDir, waiting, lease)
     // Servers pass the external-lock admission gate, then retain only their entry lock.
     if (waiting.entry.server) for (const fd of taken) unlock(fd)

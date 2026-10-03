@@ -22,24 +22,59 @@ runs:
     # Workspace search shells out to `fd` and `rg`, and silently degrades to a
     # different provider when either is missing — so without these the search
     # tests do not fail loudly, they assert against the fallback's results.
+    # The action hash keys the pinned versions and checksums together.
+    - name: Restore search tool archives
+      id: search-tools-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/search-tools
+        key: search-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/actions/setup/action.yml') }}
+
     # Pinned release binaries: `apt-get update` alone took ~10 s per job.
     - name: Install search tools
       shell: bash
       env:
+        GH_TOKEN: ${{ github.token }}
         RG_VERSION: 15.2.0
         RG_SHA256: 33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c
         FD_VERSION: 10.4.2
         FD_SHA256: e3257d48e29a6be965187dbd24ce9af564e0fe67b3e73c9bdcd180f4ec11bdde
       run: |
-        cd "$RUNNER_TEMP"
+        mkdir -p "$RUNNER_TEMP/search-tools" "$RUNNER_TEMP/search-tool-bin"
+        cd "$RUNNER_TEMP/search-tools"
         rg="ripgrep-$RG_VERSION-x86_64-unknown-linux-musl"
         fd="fd-v$FD_VERSION-x86_64-unknown-linux-musl"
-        curl -fsSLO --retry 2 --retry-max-time 60 --connect-timeout 10 --max-time 30 "https://github.com/BurntSushi/ripgrep/releases/download/$RG_VERSION/$rg.tar.gz"
-        curl -fsSLO --retry 2 --retry-max-time 60 --connect-timeout 10 --max-time 30 "https://github.com/sharkdp/fd/releases/download/v$FD_VERSION/$fd.tar.gz"
+        download() {
+          local repo="$1" tag="$2" archive="$3" attempt delay
+          if [[ -f "$archive" ]]; then return; fi
+          for attempt in 1 2 3 4 5 6; do
+            echo "Downloading $repo $tag $archive (attempt $attempt/6)"
+            if timeout 30s gh release download "$tag" --repo "$repo" --pattern "$archive" --dir . --clobber; then
+              return
+            fi
+            if [[ "$attempt" == 6 ]]; then
+              echo "::error::Failed to download $repo $tag $archive after 6 attempts"
+              return 1
+            fi
+            delay=$((2 ** attempt))
+            echo "Retrying $repo in ${delay}s"
+            sleep "$delay"
+          done
+        }
+        download BurntSushi/ripgrep "$RG_VERSION" "$rg.tar.gz"
+        download sharkdp/fd "v$FD_VERSION" "$fd.tar.gz"
         printf '%s  %s\n' "$RG_SHA256" "$rg.tar.gz" "$FD_SHA256" "$fd.tar.gz" | sha256sum --check --strict
-        tar -xzf "$rg.tar.gz" "$rg/rg"
-        tar -xzf "$fd.tar.gz" "$fd/fd"
-        sudo install -m 0755 "$rg/rg" "$fd/fd" /usr/local/bin/
+        tar -xzf "$rg.tar.gz" -C "$RUNNER_TEMP/search-tool-bin" "$rg/rg"
+        tar -xzf "$fd.tar.gz" -C "$RUNNER_TEMP/search-tool-bin" "$fd/fd"
+        sudo install -m 0755 "$RUNNER_TEMP/search-tool-bin/$rg/rg" "$RUNNER_TEMP/search-tool-bin/$fd/fd" /usr/local/bin/
+
+    # Save after verification, even when a later dependency or test step fails.
+    - name: Save search tool archives
+      if: steps.search-tools-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/search-tools
+        key: ${{ steps.search-tools-cache.outputs.cache-primary-key }}
 
     # The git service tests build real repositories and commit to them, which
     # needs an identity the runner does not have.

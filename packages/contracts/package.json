@@ -1,6 +1,6 @@
 {
   "name": "@workspace/contracts",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "type": "module",
   "sideEffects": false,
@@ -8,7 +8,9 @@
     ".": "./src/index.ts",
     "./error-fields": "./src/error-fields.ts",
     "./text-encoding": "./src/text-encoding.ts",
-    "./file-response": "./src/file-response.ts"
+    "./file-response": "./src/file-response.ts",
+    "./settings/documentation": "./src/settings/documentation.ts",
+    "./settings/defaults-document": "./src/settings/defaults-document.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

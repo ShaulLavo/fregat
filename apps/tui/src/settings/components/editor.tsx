@@ -7,6 +7,7 @@ import {
   type SettingsSnapshot,
   type SettingsWriteTarget,
 } from '@workspace/contracts'
+import { presentSetting } from '@workspace/contracts/settings/documentation'
 import { useRef, useState } from 'react'
 
 import { Dialog } from '@/components/dialog'
@@ -115,7 +116,7 @@ export function SettingsEditor({
         multiline ? `${commandShortcut(commands.bindings, 'dialog.confirm')} save` : 'Enter save'
       }
     >
-      {!short && <text fg={theme.mutedForeground}>{descriptorFor(id).description}</text>}
+      {!short && <text fg={theme.mutedForeground}>{presentSetting(id).description}</text>}
       {id === 'providers.instances' && (
         <text fg={theme.warning}>
           Only enabled flags can be changed here. Provider configuration and secrets remain managed

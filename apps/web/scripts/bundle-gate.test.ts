@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest'
 
+import { settingsDocumentationInStartup } from './bundle-report'
 import { checkFirstLoad, pinsFrom, type GateReport, type Pins } from './bundle-gate'
 
 const baseline: GateReport = {
+  eagerSettingsDocumentation: [],
   firstLoad: { scriptGzip: 1_000_000 },
   phoneFirstLoad: { scriptGzip: 600_000 },
   phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -20,6 +22,7 @@ test('the pinned build passes', () => {
 
 test('an owner that grew past its margin fails and is named', () => {
   const grown: GateReport = {
+    eagerSettingsDocumentation: [],
     firstLoad: { scriptGzip: 1_020_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -35,6 +38,7 @@ test('an owner that grew past its margin fails and is named', () => {
 
 test('a new owner in first load is named when it passes the floor', () => {
   const added: GateReport = {
+    eagerSettingsDocumentation: [],
     firstLoad: { scriptGzip: 1_030_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -47,6 +51,7 @@ test('a new owner in first load is named when it passes the floor', () => {
 
 test('small drift inside the margins passes, and a tiny owner has a floor', () => {
   const drift: GateReport = {
+    eagerSettingsDocumentation: [],
     firstLoad: { scriptGzip: 1_005_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -61,6 +66,7 @@ test('small drift inside the margins passes, and a tiny owner has a floor', () =
 
 test('total growth spread thin over owners still fails on the total', () => {
   const spread: GateReport = {
+    eagerSettingsDocumentation: [],
     firstLoad: { scriptGzip: 1_020_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -78,22 +84,22 @@ test('a phone first load that grew past its margin fails on the phone total', ()
   expect(result.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 620_000 }])
 })
 
-test('phone metadata gets 300 gzip bytes while total and owner limits stay fixed', () => {
+test('phone uses the same total margin without a metadata allowance', () => {
   const atLimit: GateReport = {
     ...baseline,
-    phoneFirstLoad: { scriptGzip: 606_300 },
-    phoneSessionFirstLoad: { scriptGzip: 606_300 },
+    phoneFirstLoad: { scriptGzip: 606_000 },
+    phoneSessionFirstLoad: { scriptGzip: 606_000 },
   }
   const result = checkFirstLoad(atLimit, pins)
   expect(result.passed).toBe(true)
-  expect(result.phone).toEqual({ pinned: 600_000, now: 606_300, limit: 606_300 })
+  expect(result.phone).toEqual({ pinned: 600_000, now: 606_000, limit: 606_000 })
   expect(result.total.limit).toBe(1_010_000)
 
   const overPhone = checkFirstLoad(
-    { ...atLimit, phoneSessionFirstLoad: { scriptGzip: 606_301 } },
+    { ...atLimit, phoneSessionFirstLoad: { scriptGzip: 606_001 } },
     pins,
   )
-  expect(overPhone.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 606_301 }])
+  expect(overPhone.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 606_001 }])
   const overOwner = checkFirstLoad(
     { ...atLimit, owners: [{ owner: 'features/chat', firstLoadGzip: 126_001 }] },
     pins,
@@ -113,4 +119,27 @@ test('a direct conversation boot is gated even when the sessions list is smaller
   expect(checkFirstLoad(heavier, pins).failures).toEqual([
     { owner: '(phone total)', pinned: 600_000, now: 620_000 },
   ])
+})
+
+test('settings documentation cannot return to first load within the byte budget', () => {
+  const owner = '/checkout/packages/contracts/src/settings/documentation.ts'
+  const result = checkFirstLoad({ ...baseline, eagerSettingsDocumentation: [owner] }, pins)
+  expect(result.passed).toBe(false)
+  expect(result.failures).toEqual([{ owner, pinned: 0, now: 1 }])
+})
+
+test('the ownership oracle inspects emitted startup files and ignores lazy or removed modules', () => {
+  const documentation = '/checkout/packages/contracts/src/settings/documentation.ts'
+  const defaults = '/checkout/packages/contracts/src/settings/defaults-document.ts'
+  const chunks = [
+    { fileName: 'desktop.js', modules: [{ id: defaults, renderedLength: 10 }] },
+    { fileName: 'phone.js', modules: [{ id: documentation, renderedLength: 20 }] },
+    { fileName: 'lazy.js', modules: [{ id: documentation, renderedLength: 20 }] },
+    { fileName: 'initial.js', modules: [{ id: documentation, renderedLength: 0 }] },
+  ]
+  expect(settingsDocumentationInStartup(chunks, [{ fileName: 'desktop.js' }])).toEqual([defaults])
+  expect(settingsDocumentationInStartup(chunks, [{ fileName: 'phone.js' }])).toEqual([
+    documentation,
+  ])
+  expect(settingsDocumentationInStartup(chunks, [{ fileName: 'initial.js' }])).toEqual([])
 })
