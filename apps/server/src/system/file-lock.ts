@@ -24,12 +24,15 @@ export type FileLock = { release: () => void }
 export function tryFileLock(file: string): FileLock | null {
   mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
   const fd = openSync(file, 'a+', 0o600)
-  if (flock(fd, LOCK_EX | LOCK_NB) !== 0) {
-    closeSync(fd)
-    return null
+  let retained = false
+  try {
+    if (flock(fd, LOCK_EX | LOCK_NB) !== 0) return null
+    // Diagnostics only: the lock, not this number, decides ownership.
+    ftruncateSync(fd)
+    writeSync(fd, `${process.pid}\n`, 0)
+    retained = true
+    return { release: () => closeSync(fd) }
+  } finally {
+    if (!retained) closeSync(fd)
   }
-  // Diagnostics only: the lock, not this number, decides ownership.
-  ftruncateSync(fd)
-  writeSync(fd, `${process.pid}\n`, 0)
-  return { release: () => closeSync(fd) }
 }

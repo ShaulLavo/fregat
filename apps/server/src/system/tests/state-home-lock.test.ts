@@ -38,6 +38,31 @@ async function holdInChild(home: string) {
 }
 
 describe('state home lock', () => {
+  it.skipIf(!Bun.which('bash') || process.platform === 'win32')(
+    'releases descriptors and ownership after a diagnostic write fails (requires POSIX bash)',
+    async () => {
+      const home = await stateHome()
+      const fixture = path.join(import.meta.dirname, 'fixtures', 'file-lock-write-failure.ts')
+      const child = Bun.spawn({
+        cmd: [
+          'bash',
+          '-c',
+          'trap "" XFSZ; ulimit -S -f 0; exec "$@"',
+          '--',
+          process.execPath,
+          fixture,
+          path.join(home, 'server.lock'),
+        ],
+        stdout: 'pipe',
+        stderr: 'pipe',
+      })
+      holders.push(child)
+      const stderr = new Response(child.stderr).text()
+      expect(await child.exited, await stderr).toBe(0)
+      acquireStateHomeLock(home).release()
+    },
+  )
+
   it('refuses a second server on the same state home while the first lives', async () => {
     const home = await stateHome()
     const holder = await holdInChild(home)
