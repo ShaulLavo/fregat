@@ -1,6 +1,7 @@
 // Writes docs/commands.md from the command catalog; `--check` fails when the file is out of date.
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { format } from 'oxfmt'
 import { EDITOR_COMMANDS } from '../packages/editor/src/editor/commandCatalog'
 
 const target = resolve(import.meta.dir, '../docs/commands.md')
@@ -22,15 +23,20 @@ const text = [
   ...rows,
   '',
 ].join('\n')
+const formatted = await format(target, text, { printWidth: 100 })
+if (formatted.errors.length > 0) {
+  console.error(formatted.errors)
+  process.exit(1)
+}
 
 const current = await readFile(target, 'utf8').catch(() => '')
 if (check) {
-  if (current !== text) {
+  if (current !== formatted.code) {
     console.error('docs/commands.md is out of date: run bun run commands:reference')
     process.exit(1)
   }
   console.log('command reference: ok')
 } else {
-  await writeFile(target, text)
+  await writeFile(target, formatted.code)
   console.log(`wrote ${target}`)
 }

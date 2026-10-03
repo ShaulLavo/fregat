@@ -8,7 +8,12 @@ import type { Editor } from '../src/editor'
 import { createVisibleEditor } from './factories/visibleEditor'
 import { EDITOR_FOLD_LEVELS, type EditorCommandId } from '../src/editor/commands'
 import { foldNesting, isEditorFoldCommand } from '../src/editor/foldOperations'
-import { defaultKeyBindings, commandCategory, readonlyCommands } from './factories/keymap'
+import {
+  defaultKeyBindings,
+  commandCategory,
+  readonlyCommands,
+  keyboardEvent,
+} from './factories/keymap'
 import type { EditorPlugin } from '../src/plugins'
 import {
   createEmptySyntaxResult,
@@ -196,9 +201,18 @@ type Chord = {
   readonly shift?: boolean
 }
 
-function pressFold(keyName: string, shift = false): void {
+function pressFold(keyName: string): void {
   press('k', { mod: true })
-  press(keyName, { mod: true, shift })
+  press(keyName, { mod: true })
+}
+
+function pressBracket(keyName: '[' | ']', recursively = false): void {
+  if (recursively) {
+    pressFold(keyName)
+    return
+  }
+  const mac = detectPlatform() === 'mac'
+  press(keyName, { mod: true, alt: mac, shift: !mac })
 }
 
 /**
@@ -207,18 +221,17 @@ function pressFold(keyName: string, shift = false): void {
  */
 function press(keyName: string, chord: Chord): void {
   const mac = detectPlatform() === 'mac'
-
-  editorRoot().dispatchEvent(
-    new KeyboardEvent('keydown', {
-      bubbles: true,
-      cancelable: true,
-      key: keyName,
-      altKey: chord.alt === true,
-      ctrlKey: chord.mod === true && !mac,
-      metaKey: chord.mod === true && mac,
-      shiftKey: chord.shift === true,
-    }),
-  )
+  const init = {
+    bubbles: true,
+    cancelable: true,
+    key: keyName,
+    altKey: chord.alt === true,
+    ctrlKey: chord.mod === true && !mac,
+    metaKey: chord.mod === true && mac,
+    shiftKey: chord.shift === true,
+  }
+  editorRoot().dispatchEvent(keyboardEvent('keydown', init))
+  editorRoot().dispatchEvent(keyboardEvent('keyup', init))
 }
 
 /** The chevrons the gutter is offering, which is one for every row that heads a region. */
@@ -318,27 +331,27 @@ describe('fold commands', () => {
   it('folds and unfolds the region at the caret from the keyboard', async () => {
     await openTree(2)
 
-    pressFold('[')
+    pressBracket('[')
     expect(visibleText()).toContain('  if (a) {')
     expect(visibleText()).not.toContain('    inner()')
 
-    pressFold(']')
+    pressBracket(']')
     expect(visibleText()).toContain('    inner()')
   })
 
   it('folds the region under the caret together with everything inside it', async () => {
     await openTree(0)
 
-    pressFold('[', true)
+    pressBracket('[', true)
     expect(visibleText()).toContain('function outer() {')
     expect(visibleText()).not.toContain('  tail()')
 
     // Opening the outer block alone leaves the inner one as the recursion left it.
-    pressFold(']')
+    pressBracket(']')
     expect(visibleText()).toContain('  if (a) {')
     expect(visibleText()).not.toContain('    inner()')
 
-    pressFold(']', true)
+    pressBracket(']', true)
     expect(visibleText()).toContain('    inner()')
   })
 
@@ -400,7 +413,7 @@ describe('fold commands', () => {
     // Left inside the rows it hides, the caret is what would open the region again.
     expect(editor.getState().cursor).toEqual({ row: 9, column: 0 })
 
-    pressFold(',', true)
+    pressFold('.')
     expect(visibleText()).toContain('data one')
   })
 
@@ -549,7 +562,7 @@ describe('fold commands', () => {
 
     it('opens every region standing between the destination and the reader', async () => {
       await openTree(0)
-      pressFold('[', true)
+      pressBracket('[', true)
       expect(visibleText()).not.toContain('  if (a) {')
 
       editor.setSelection(rowStart(TREE_TEXT, 2) + 4)

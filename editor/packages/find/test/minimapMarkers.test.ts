@@ -1,5 +1,6 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createEditorWidgetKeymap } from '@singapore-editor/core/extensions'
 import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import type {
   EditorMinimapDecoration,
@@ -14,6 +15,13 @@ import {
   createTestCapabilityContributionContext,
   createTestViewContributionContext,
 } from '@singapore-editor/core/testing'
+
+const keymaps: ReturnType<typeof createEditorWidgetKeymap>[] = []
+const containers: HTMLElement[] = []
+afterEach(() => {
+  for (const keymap of keymaps.splice(0)) keymap.dispose()
+  for (const container of containers.splice(0)) container.remove()
+})
 
 const MINIMAP_MATCH_SOURCE = 'editor-find-test-find-match'
 const MINIMAP_CURRENT_SOURCE = 'editor-find-test-find-current'
@@ -181,14 +189,19 @@ function viewContext(
   selection: readonly [number, number] = [0, 0],
 ): EditorViewContributionContext {
   const container = document.createElement('div')
+  document.body.append(container)
+  containers.push(container)
   const scrollElement = document.createElement('div')
   container.appendChild(scrollElement)
   const viewSnapshot = snapshot(text, selection)
+  const keymap = createEditorWidgetKeymap(container)
+  keymaps.push(keymap)
 
   return createTestViewContributionContext({
     container,
     scrollElement,
     contentElement: scrollElement,
+    registerKeymapNode: keymap.registerKeymapNode,
     highlightPrefix: 'editor-find-test',
     getSnapshot: () => viewSnapshot,
     getFeature: <T>(token: unknown) => (token === EDITOR_MINIMAP_FEATURE ? (minimap as T) : null),
