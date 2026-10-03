@@ -1469,9 +1469,9 @@ export const SETTINGS_REGISTRY = {
     category: 'Developer',
     title: 'Heavy job quiet hold',
     details:
-      'A `--quiet` job runs alone: it waits for running jobs to finish, and jobs queued after it wait for it. When the hold ends the job is stopped and has to queue again, so other sessions run between measurements. A `drain.request` older than the hold is ignored.',
+      'A `--quiet` job waits for finite jobs to finish while later jobs queue behind it. Declared servers keep running and count toward resource admission. Admission and execution each get this many seconds. Expiry releases the request or stops the running job and returns exit 75; invoke it again for a fresh queue ticket. A `drain.request` is honoured for this many seconds from its first observation.',
     description:
-      'Seconds a `scripts/heavy/run.ts --quiet` job, or a `drain.request`, keeps this machine to itself.',
+      'Maximum seconds for quiet admission, a running quiet hold, and an external drain request, measured independently.',
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'quiet', 'exclusive', 'hold', 'drain', 'benchmark'],
   }),
@@ -1567,7 +1567,8 @@ export const SETTINGS_REGISTRY = {
     category: 'Window',
     details:
       'Transparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.',
-    description: 'Choose window-manager transparency or a see-through native window.',
+    description:
+      'Choose window-manager transparency or a see-through native window using the system webview.',
     // The window is created once, from this value, before the page exists.
     requiresRestart: true,
     keywords: ['window', 'transparency', 'vibrancy', 'compositor', 'desktop', 'wallpaper', 'blur'],

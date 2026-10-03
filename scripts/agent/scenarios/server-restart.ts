@@ -7,7 +7,7 @@ import { stageRelease } from './server-update'
 
 const NAME = 'server-restart'
 // Long enough that a person looks at the screen and wonders whether anything is happening.
-const SLOW_RESTART_MS = 3000
+const SLOW_RESTART_MS = 6000
 const EXPECTED_OFFLINE_NOTICE =
   /^.+ is unreachable\. (Reconnect to use this terminal\.|Showing cached data\.)$/
 const EXPECTED_TERMINAL_CONNECTING_NOTICE =
@@ -58,7 +58,7 @@ function sampleRestartDocument() {
       at: Date.now() - started,
       documentTimeOrigin: performance.timeOrigin,
       item: item?.dataset.serverUpdate ?? null,
-      spinning: item?.querySelector('[data-restart-spinning]') !== null && item !== null,
+      spinning: item?.querySelector('[data-slot="spinner"]') !== null && item !== null,
       alerts,
     })
     sessionStorage.setItem('scenario-restart-samples', JSON.stringify(samples))
@@ -109,7 +109,16 @@ async function verifyRestart(
   )
   await selectors.serverUpdateApply(page).click()
   await page.waitForTimeout(600)
+  await selectors.serverUpdating(page).waitFor()
+  ok(await selectors.serverUpdating(page).isDisabled(), 'The update control is disabled')
   await step('restart-clicked')
+  const viewport = page.viewportSize()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await selectors.phoneShell(page).waitFor()
+  await selectors.serverUpdating(page).waitFor()
+  ok(await selectors.serverUpdating(page).isDisabled(), 'The phone update control is disabled')
+  await step('phone-reconnecting')
+  if (viewport) await page.setViewportSize(viewport)
   await page.waitForTimeout(1500)
   await step('server-down')
   if (reloadDocument) {
@@ -134,7 +143,7 @@ async function verifyRestart(
   }))
   const timelinePath = await evidence.json('restart-samples.json', { clickedAt, samples })
   console.log(`sample timeline: ${timelinePath}`)
-  const shown = samples.filter((sample) => sample.item !== null && sample.at > clickedAt)
+  const shown = samples.filter((sample) => sample.item === 'restarting' && sample.at > clickedAt)
   const alerts = [...new Set(samples.flatMap((sample) => sample.alerts))]
   const documentCount = new Set(samples.map((sample) => sample.documentTimeOrigin)).size
   console.log(`sampled documents: ${documentCount}; samples: ${samples.length}`)
@@ -143,8 +152,8 @@ async function verifyRestart(
   console.log(`alerts: ${alerts.length ? alerts.join(' | ') : 'none'}`)
   ok(shown.length > 0, 'The update is observed while reconnecting')
   ok(
-    shown.every((sample) => !sample.spinning),
-    'Updating keeps the control still',
+    shown.every((sample) => sample.spinning),
+    'Every in-progress update shows the shared Spinner',
   )
   const unexpectedAlerts = [
     ...new Set(
@@ -173,7 +182,7 @@ async function verifyRestart(
 export const serverRestart: Scenario = {
   name: NAME,
   description:
-    'Update a staged release on a server that takes 3 s to come back. The control says Updating… without an icon and no expected disconnect becomes an error.',
+    'Update a staged release on a server that takes 6 s to come back. The control shows a Spinner beside its current step and no expected disconnect becomes an error.',
   run: (page, context) => verifyRestart(page, context, false),
 }
 

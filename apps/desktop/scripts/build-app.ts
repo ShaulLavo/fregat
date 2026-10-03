@@ -56,7 +56,7 @@ export async function buildApp(arch: 'arm64' | 'x64' = process.arch === 'arm64' 
       '--outfile',
       path.join(macos, 'fregat'),
     ])
-    const native = buildNative(desktop, 'installed', arch)
+    const native = buildNative(desktop, arch)
     if (!native) throw createScriptError('The macOS native host was not built.')
     copyFileSync(native, path.join(macos, 'platform-webview'))
     const checkout = await readCheckout(root)

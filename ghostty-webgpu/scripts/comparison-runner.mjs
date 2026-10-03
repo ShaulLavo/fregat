@@ -20,6 +20,7 @@ import {
   selection,
   hardwareLaunch,
   frameBuilders,
+  accessibilityMode,
   selectedVariants,
   selectedPhases,
   measurementCases,
@@ -42,12 +43,14 @@ import {
 } from './comparison-trace.mjs'
 import { WebSocketServer } from 'ws'
 import { markdown, summaries } from './comparison-report.mjs'
+import { diagnosticFailed, legacyDiagnostic } from './comparison-diagnostics.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const manifest = JSON.parse(await readFile(join(root, 'manifest.json'), 'utf8'))
 const args = process.argv.slice(2)
 const smoke = args.includes('--smoke')
 const tracing = args.includes('--trace')
+const accessibility = accessibilityMode(args)
 const builders = frameBuilders(args)
 const phases = selectedPhases(args)
 assert(!(tracing && args.includes('--phases')), '--trace uses --trace-phase')
@@ -205,13 +208,14 @@ const artifact = {
   variants: variantIds,
   phases,
   frameBuilders: builders,
+  accessibility,
   paths: tracing ? ['bytes'] : writePaths,
   fixtures,
   hardware: false,
   measurementBudgetMilliseconds:
     counts.length *
     (tracing ? 1 : writePaths.length) *
-    (variantIds.length + (variantIds.includes('ghostty-webgpu') ? builders.length - 1 : 0)) *
+    measurementCases(variantIds, ['bytes'], [1], builders, 0).length *
     (smoke ? 1 : repetitions) *
     s.caseDeadlineMilliseconds,
   startedAt: new Date().toISOString(),
@@ -406,7 +410,7 @@ async function parserOnly(testCase, run, contexts) {
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message))
     await page.goto(
-      `${origin}/?${new URLSearchParams({ ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
+      `${origin}/?${new URLSearchParams({ accessibility, ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.evaluate((testCase) => window.__compare.initialize(testCase), testCase)
@@ -452,7 +456,9 @@ async function measure(testCase, repetition, browserSession) {
       { drain: true },
     )
     result.status =
-      result.error || result.phases?.some((phase) => phase.error) ? 'failed' : 'complete'
+      result.error || diagnosticFailed(result) || result.phases?.some((phase) => phase.error)
+        ? 'failed'
+        : 'complete'
     return result
   } catch (error) {
     if (String(error).includes('Mac display unavailable')) throw error
@@ -513,9 +519,9 @@ async function qualifiedWindow(run, label, operation) {
     await refreshGpuOwnership()
     const idle = await gpuGate.waitForIdle()
     run.gpuWindows.push({ label, idle })
-    const sampleMilliseconds = ['idle', 'output/ascii', 'latency', 'delayed-write'].includes(label)
-      ? s.gpuMeasuredSampleMilliseconds
-      : s.gpuSampleMilliseconds
+    const measured =
+      ['idle', 'latency', 'delayed-write'].includes(label) || label.startsWith('output/')
+    const sampleMilliseconds = measured ? s.gpuMeasuredSampleMilliseconds : s.gpuSampleMilliseconds
     const { value, gpu } = await gpuGate.monitorWindow(operation, { sampleMilliseconds })
     run.gpuWindows.at(-1).window = gpu
     const skipped = idle.skipReason ?? gpu.skipReason ?? run.gpuIdle?.skipped
@@ -572,16 +578,12 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  run.originalUnicodeTrace = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
-    const prefix = 'legacy-original-unicode '
-    if (message.text().startsWith(prefix))
-      run.originalUnicodeTrace.push(JSON.parse(message.text().slice(prefix.length)))
   })
   try {
     await page.goto(
-      `${origin}/?${new URLSearchParams({ ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
+      `${origin}/?${new URLSearchParams({ accessibility, ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.bringToFront()
@@ -646,11 +648,33 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
       run.phase = 'diagnostic/legacy-empty-write'
       run.emptyWriteProbe = await page.evaluate(() => window.__compare.legacyEmptyWrite())
       assert.deepEqual(errors, [])
-      run.phase = 'diagnostic/legacy-original-unicode'
-      run.originalUnicodeProbe = await page
-        .evaluate(() => window.__compare.legacyOriginalUnicode())
-        .catch((error) => ({ error: String(error.stack ?? error) }))
+      if (testCase.variant === 'ghostty-web') {
+        const diagnosticOptions = {
+          launchOptions: {
+            channel: platform() === 'linux' && headless ? undefined : 'chromium',
+            headless,
+            args: browserArgs,
+            env: launchEnv,
+          },
+          contextOptions: { viewport: s.viewport, deviceScaleFactor: s.dpr },
+          origin,
+          testCase,
+          contexts,
+        }
+        run.phase = 'diagnostic/legacy-write-control'
+        run.legacyWriteControl = await legacyDiagnostic({
+          ...diagnosticOptions,
+          method: 'legacyWriteControl',
+        })
+        run.phase = 'diagnostic/legacy-original-unicode'
+        run.originalUnicodeProbe = await legacyDiagnostic({
+          ...diagnosticOptions,
+          method: 'legacyOriginalUnicode',
+        })
+        run.originalUnicodeTrace = run.originalUnicodeProbe.trace
+      }
       if (args.includes('--smoke-instrumentation')) {
+        run.phase = 'smoke/instrumentation'
         await page.evaluate(() => window.__compare.traceBegin())
         await page.evaluate(() => window.__compare.burst('ascii', 2))
         run.instrumentationCheck = await page.evaluate(() => window.__compare.traceEnd())
@@ -879,7 +903,7 @@ try {
       )
       artifact.runs.push(await measure(testCase, repetition, browserSession))
       await writeFile(artifactPath, JSON.stringify(artifact, null, 2) + '\n')
-      if (artifact.runs.at(-1).error)
+      if (artifact.runs.at(-1).status === 'failed')
         console.error(
           `Failed case retained: ${testCase.variant}/${testCase.path}/${testCase.count}`,
         )
@@ -926,7 +950,11 @@ try {
 console.log(`Artifact: ${artifactPath}`)
 if (
   artifact.runs.some(
-    (run) => run.error || run.parserErrors?.length || run.phases?.some((phase) => phase.error),
+    (run) =>
+      run.error ||
+      diagnosticFailed(run) ||
+      run.parserErrors?.length ||
+      run.phases?.some((phase) => phase.error),
   )
 )
   process.exitCode = 1

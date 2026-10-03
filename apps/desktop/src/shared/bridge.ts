@@ -1,5 +1,3 @@
-import type { ShellBackdrop, ShellColorScheme, ShellPlatform } from './window'
-
 export type PlatformPickOptions = {
   mode: 'folder' | 'file'
   accept?: readonly string[]
@@ -17,11 +15,17 @@ export type PlatformBridge = {
   // wallpaper and a floor of its own. The shell reports what it actually
   // created, never what the setting currently says.
   capabilities?: { displayCapture?: boolean; windowGlass?: boolean }
-  backdrop: ShellBackdrop
-  platform: ShellPlatform
+  backdrop: 'app' | 'compositor' | 'transparent'
+  platform: 'darwin' | 'linux' | 'win32'
   // The desktop's preference when the webview cannot be trusted to know it.
-  colorScheme: ShellColorScheme
+  colorScheme: 'dark' | 'light' | null
   titlebar: 'native' | 'overlay'
   pickEntry?(options: PlatformPickOptions): Promise<string[]>
   setWindowAppearance?(appearance: WindowAppearance): void
+}
+
+declare global {
+  interface Window {
+    platformBridge?: PlatformBridge
+  }
 }

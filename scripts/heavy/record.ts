@@ -1,6 +1,10 @@
 import { appendFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 
+import type { Entry } from './queue'
+
+export type ServerAtAdmission = Pick<Entry, 'id' | 'label' | 'pid' | 'cwd' | 'sliceRoot'>
+
 /** One finished heavy job, as one line of `<logDir>/<UTC date>.jsonl`. */
 export type HeavyJobRecord = {
   readonly timestamp: string
@@ -31,6 +35,9 @@ export type HeavyJobRecord = {
   /** The local job slice; null for a Pi job. */
   readonly slice: string | null
   readonly quiet: boolean
+  readonly server: boolean
+  /** Declared servers already admitted when this job acquired its queue place. */
+  readonly serversAtAdmission: readonly ServerAtAdmission[]
   /** A quiet job stopped because its hold ran out; it has to queue again. */
   readonly quietHoldExpired: boolean
   readonly unit: string

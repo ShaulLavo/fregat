@@ -6,7 +6,7 @@ if rg -n 'devSwitchOrigin|dev-origin-dialog' apps/web/src packages/client-core/s
   exit 1
 fi
 
-if rg -n 'connectMachine|disconnectMachine|onMachineState' apps/desktop/src/shared apps/desktop/src/preload; then
+if rg -n 'connectMachine|disconnectMachine|onMachineState' apps/desktop/src/shared apps/desktop/src/launcher; then
   exit 1
 fi
 
@@ -17,7 +17,7 @@ fi
 )
 (
   cd apps/desktop
-  bun --bun vitest run src/bun/tests/quit.test.ts
+  bun --bun vitest run src/launcher/tests/ownership.test.ts src/launcher/tests/singleton.test.ts
   bun run typecheck
   bun run lint
   bun run format:check

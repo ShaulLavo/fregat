@@ -108,6 +108,7 @@ export type StartOptions = {
   readonly sliceRoot?: string
   readonly jobClass?: string
   readonly quiet?: boolean
+  readonly server?: boolean
   readonly detached?: boolean
   readonly env?: NodeJS.ProcessEnv
   readonly preload?: string
@@ -135,6 +136,7 @@ export function start(
   if (options.machine) args.push('--proc', box.proc)
   if (options.jobClass) args.push('--class', options.jobClass)
   if (options.quiet) args.push('--quiet')
+  if (options.server) args.push('--server')
   const child = spawn('bun', [...args, label, '--', ...command], {
     cwd: options.cwd ?? box.root,
     detached: options.detached ?? false,

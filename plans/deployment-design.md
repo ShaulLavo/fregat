@@ -2,6 +2,10 @@
 
 Status: proposed design, implementation not started. Based on Platform `548cebdf`, inspected on 2026-09-11. This document does not change execution order in `PLAN.md`. The "One server owns the application" section is promoted into plan 105 together with the mesh deploy procedure; the npm and desktop packaging sections remain proposed here.
 
+The desktop-shell design below records the September 11 baseline. Its Electrobun packaging
+instructions are superseded by [Plan 114](114-installed-app.md), whose installed launcher,
+native hosts and self-contained `Fregat.app` were accepted on 2026-10-03.
+
 ## The launch experience
 
 Platform ships as a desktop application and as a local web application. Both run the same server and built React frontend on the user's machine.

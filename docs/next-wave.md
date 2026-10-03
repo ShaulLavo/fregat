@@ -2,7 +2,7 @@
 
 ## Wave 2 closeout (reconciled 2026-10-02)
 
-Status: Closed, 2026-10-02. Remaining items are owner-only checks and the parked follow-ups listed below.
+Status: Closed, 2026-10-02. Plan 114 desktop acceptance and Gate 4 removal closed on 2026-10-03 with owner approval. Other owner-only checks and parked follow-ups remain below.
 
 The owner identified 099, 156, 179, 114, 126 and 132 as the remaining wave 2 closeout queue.
 This record supersedes the original lane ordering for those plans. It is a scheduling
@@ -14,10 +14,10 @@ only the dependencies in this table require serialization.
 
 | Plan | Remaining wave 2 delivery                                                                                                                                                                                                                                                                                                                           | Actual dependencies and follow-ups                                                                                                                                                                                                                                                                                                            |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 132  | Delivered 2026-09-30: typechecks, native Vite updates, memory/cold-start proof and capture ownership                                                                                                                                                                                                                                                | Mac vibrancy ownership is transferred to 114 Gate 3.                                                                                                                                                                                                                                                                                          |
+| 132  | Delivered 2026-09-30: typechecks, native Vite updates, memory/cold-start proof and capture ownership                                                                                                                                                                                                                                                | Mac vibrancy ownership transferred to 114 Gate 3; owner acceptance completed 2026-10-03.                                                                                                                                                                                                                                                      |
 | 179  | Delivered 2026-09-30 in PR #204: P0 instruments, P3 Mermaid, P5 CSS, P6 isolation rule                                                                                                                                                                                                                                                              | P1/P2/P4 landed earlier. 156 consumes the isolation policy. Physical Mac/iPhone rendering is unconfirmed.                                                                                                                                                                                                                                     |
 | 099  | Unit 1 delivered in PR #203. Unit 0 is partial (5/10) in PR #224; 282 replaces the unfinished calibration                                                                                                                                                                                                                                           | Unit 1 includes 198's retained-analysis subscriber. Units 2–7 retain their explicit gate; no repeat SAB deletion.                                                                                                                                                                                                                             |
-| 114  | Gate 1 Chromium #270; Gate 2 native fallback #310; Gate 3 partial macOS #316 and Chromium-on-Mac proof #319; readiness fixes #313/#324                                                                                                                                                                                                              | Engineering proofs delivered. Gate 3 desktop acceptance remains owner-only; Gate 4 Electrobun removal is PARKED pending the owner’s Mac desktop check and explicit approval. Electrobun stays the default and fallback.                                                                                                                       |
+| 114  | Gate 1 Chromium #270; Gate 2 native fallback #310; Gate 3 partial macOS #316 and Chromium-on-Mac proof #319; readiness fixes #313/#324                                                                                                                                                                                                              | Gates 1–4 done 2026-10-03 after approved owner desktop acceptance. The installed launcher and native system-webview host replace the old shell; mesh-owned servers and terminals remain shared.                                                                                                                                               |
 | 126  | Residual batches delivered: harness #265/#276/#274/#288/#296; rail/recovery #275/#284; roster #268; terminal #264; provider transport/catalog #263/#273/#292/#294/#308, Cursor #290 and startup-registry fix #312; machine capacity/preferences #272; forge discussion/review/activity #267/#293/#305; project overrides/usage #266/#283; docs #315 | Bounded delivery closes the wave scope. G/I follow-ons, Grok, Antigravity and owner-parked H-scopes stay open. Account, credit and device acceptance remains owner-only. Response-loss departure reporting, LIFE-06 state-loss, subproject identity/schema and browser annotation retain their gates; ghost-draft causality remains unproved. |
 | 156  | P0 binary guard #269; P1 PDF #280; P2 CSV #286; paged stale-read fix #311; docs #309                                                                                                                                                                                                                                                                | P0–P2 delivered and live. P3+ and Office/DOCX remain Approved follow-ups under the format, review, editing and fidelity gates. Existing document identity, buffers and isolation policy remain the owners.                                                                                                                                    |
 
@@ -39,19 +39,11 @@ Closeout checklist:
 
 ### Owner-only checks
 
-- 114: From Terminal in the logged-in Mac desktop, run the real-Keychain Fregat Chromium launcher
-  [acceptance command](../plans/114-installed-app.md#gate-3--macos-m).
-  Look for Fregat content, the desktop bridge and a working picker in the native-titlebar
-  Chromium window. The SSH mock-Keychain proof leaves this desktop acceptance open.
-- 114: Check Mac visuals on Chromium and the transparent WKWebView fallback. Look for the
-  opaque native Chromium titlebar and, on the fallback, overlay traffic lights and vibrancy.
-  On both paths, test Cmd-Q, window drag and native picker select/cancel; look for correct
-  window behavior, the selected path or clean cancellation, and shared services/terminals
-  remaining alive after quit.
-- 114: Run headed Chromium on the Linux desktop and exercise native chooser select/cancel.
-  Look for painted Fregat content and a selected path or clean cancellation.
-- 114: Launch the desktop launcher again while its first window is open to test genuine singleton handoff.
-  Look for the existing window receiving focus and one surviving desktop owner.
+Plan 114's Mac desktop acceptance and removal gate were completed with owner approval on
+2026-10-03; its earlier SSH-only proof did not itself waive real-keychain/visual acceptance.
+The [plan](../plans/114-installed-app.md#gate-4--delete-electrobun-sm) retains the delivered
+launcher/native-window contracts and dated engineering evidence.
+
 - 126: Smoke Cursor, OpenCode, Claude and Codex with real accounts. Look for successful
   authentication, model discovery and a completed turn with the supported driver capabilities.
 - 126: Redeem a real reset credit and exercise the device checks in the
@@ -63,8 +55,11 @@ Closeout checklist:
 ### Test portability follow-up
 
 Committed tests and verification scripts must run from a fresh clone on any machine and in CI,
-under [AGENTS.md → Testing](../AGENTS.md#testing). The 98 known non-portable spots carry
-`NOT-PORTABLE:` markers; `rg 'NOT-PORTABLE:'` lists the remaining fixes.
+under [AGENTS.md → Testing](../AGENTS.md#testing). `NOT-PORTABLE:` markers identify remaining
+fixes; run `rg 'NOT-PORTABLE:'` against the current tree. The earlier 98-spot count is historical
+and includes removed desktop-shell files. The marker in deleted
+`apps/desktop/src/bun/tests/quit.test.ts` described the removed devkit dependency and is retired;
+track only markers in files that still exist.
 
 ## Foundations wave, 2026-09-30
 

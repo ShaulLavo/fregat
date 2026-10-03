@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline'
 import type { PlatformPickOptions, WindowAppearance } from '../shared/bridge'
-import { recordDesktopInfo } from '../bun/observability'
+import { recordDesktopInfo } from './observability'
 import {
   NativeHelper,
   nativeBudget,

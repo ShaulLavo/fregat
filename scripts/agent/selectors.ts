@@ -941,7 +941,7 @@ export const selectors = {
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
   clientUpdateReload: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
-  serverUpdating: (page: Page) => page.getByRole('button', { name: 'Updating…', exact: true }),
+  serverUpdating: (page: Page) => page.locator('[data-server-update] button[aria-busy="true"]'),
   serverUpdateRetry: (page: Page) =>
     page.getByRole('button', { name: 'Retry update', exact: true }),
   serverUpdateTooltip: (page: Page) =>

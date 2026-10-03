@@ -82,7 +82,7 @@ export function shellBridge(
     addEventListener('pagehide', () => { for (const request of pending.values()) request.reject(new DOMException('The window closed.', 'AbortError')); pending.clear(); }, { once: true });
     if (bridge.titlebar === 'overlay') addEventListener('mousedown', event => {
       if (event.button !== 0 || !(event.target instanceof Element)) return;
-      if (!event.target.closest('[data-native-window-drag-region]') || event.target.closest('.electrobun-webkit-app-region-no-drag, [data-native-window-no-drag], button, input, textarea, select, a, [role=button], [contenteditable]')) return;
+      if (!event.target.closest('[data-native-window-drag-region]') || event.target.closest('.window-no-drag, [data-native-window-no-drag], button, input, textarea, select, a, [role=button], [contenteditable]')) return;
       send({ method: 'drag', origin: location.origin, token });
     });
     globalThis.__platformShell = bridge;
