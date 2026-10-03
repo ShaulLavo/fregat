@@ -149,3 +149,37 @@ test('terminal native input closure agrees with its package dependencies', () =>
   expect(result.status, result.stdout + result.stderr).toBe(0)
   expect(['bootstrap', 'assembled']).toContain(result.stdout.trim())
 })
+
+test.each(['editor', 'ghostty-webgpu', 'hotkeys'])(
+  'keeps the shared Vitest patch inside the %s standalone export',
+  async (family) => {
+    await withWorkspace(async (fixture) => {
+      await prepare(fixture)
+      const key = 'vitest@5.0.2'
+      const patch = 'patches/vitest@5.0.2.patch'
+      const source = 'shared Vitest patch\n'
+      const root = await fixture.read('.')
+      await fixture.put('.', { ...root, patchedDependencies: { [key]: patch } })
+      await mkdir(join(fixture.root, 'patches'))
+      await writeFile(join(fixture.root, patch), source)
+      for (const name of ['editor', 'ghostty-webgpu', 'hotkeys']) {
+        await fixture.put(name, { name, patchedDependencies: { [key]: patch } })
+        await mkdir(join(fixture.root, name, 'patches'))
+        await writeFile(join(fixture.root, name, patch), source)
+      }
+      await fixture.put(family, { name: family })
+      const missing = run(fixture.root)
+      expect(missing.status).not.toBe(0)
+      expect(missing.stderr).toContain(`${family}/package.json: patch ${key}`)
+      expect(run(fixture.root, '--write').status).toBe(0)
+      expect((await fixture.read(family)).patchedDependencies[key]).toBe(patch)
+      await writeFile(join(fixture.root, family, patch), 'stale patch\n')
+      const stale = run(fixture.root)
+      expect(stale.status).not.toBe(0)
+      expect(stale.stderr).toContain(`${family}/${patch} must match the root patch`)
+      expect(run(fixture.root, '--write').status).toBe(0)
+      expect(await readFile(join(fixture.root, family, patch), 'utf8')).toBe(source)
+      expect(run(fixture.root).status).toBe(0)
+    })
+  },
+)
