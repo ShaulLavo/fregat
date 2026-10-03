@@ -1,6 +1,6 @@
 # Bare function keys in text fields
 
-Owner decision, 2026-09-26, supplement to [Plan 166](166-shortcuts-editor.md).
+Owner decision, 2026-09-26. Approved work scheduled through [PLAN.md](../PLAN.md).
 
 Unmodified F1–F12 reach app commands while a text field has focus, including settings search,
 the palette input, and the chat composer. Function keys insert no characters. After Escape

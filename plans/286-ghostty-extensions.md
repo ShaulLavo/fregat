@@ -7,8 +7,8 @@
   line editor is gonna be one of the first ones."
 - Owns: `ghostty-webgpu/` (core and new extension packages), its site, and Platform's terminal
   feature (`apps/web/src/features/terminal/`), the package's only consumer.
-- Versions: agents bump patch only (`~/.agents/AGENTS.md`). Phases 0 and 2 change the public API;
-  the release that ships them is a minor or major bump and waits for the owner's approval.
+- Versions: patch bumps only, including public API changes, under the owner's 2026-10-03
+  package-version decision. Update all consumers in the same delivery unit.
 
 ## Outcome
 
@@ -148,10 +148,13 @@ without the Editor's composition machinery.
 
 ## Native custom OSC pin prerequisite
 
-Status: **Approved. Native implementation checkpoint; metadata integration pending.**
+Status: **Approved. Native prerequisite integrated with the landed lifecycle contracts.**
 
-The checkpoint bumps the fetched main package from 0.3.4 to 0.3.5. It remains nonmergeable
-until #475 → #477 → #494 land and its next patch and resolver provenance are reconciled.
+The prerequisite preserves the actual main package and lockfile versions and carries its own
+`ghostty-webgpu` patch changeset. Integration includes the landed #494 squash
+`fffe237f9fdbf020647e3bb64e19fad8c1bffc16`, preserving its attachment lifetime and typed API
+contracts. Native build inputs and WASM bytes match the approved native checkpoint; resolver
+records use the current input closure. Public X6 remains failed/held, and full Phase 0 is pending.
 
 - [x] Build the official introducing revision
       `7b11f3dca034d8d24369ad3856afe57946d7902a`, parent
@@ -179,9 +182,10 @@ until #475 → #477 → #494 land and its next patch and resolver provenance are
       callbacks and the new pin reports both BEL and ST; the APC positive control works on both.
 - [x] Add portable unit/provenance gates to `test:unit`, which runs in the Libraries CI job and
       the standalone package verification. The test callback and allocator remain internal tests.
-- [ ] Merge after metadata predecessors #475, #477 and #494, reconcile the fresh patch version
-      and regenerate resolver bootstrap inputs. The native resolver has its own unchanged upstream
-      pin; the VT pin is recorded as an owned source input.
+- [x] Reconcile with landed predecessors #475, #477 and #494, preserve actual main release
+      metadata, add a patch changeset and regenerate resolver records for the changed VT pin input.
+      The native resolver keeps its own upstream pin and excludes package version metadata.
+- [ ] Merge the native prerequisite after independent integration review.
 - [ ] Activate host extensions and deliver subscriptions across both execution entries.
 - [ ] Complete X1–X7 and the full Phase 0 done-when. This prerequisite claims native correctness
       only, with no hardware timing, worker synchronous interception or worker query-reply claim.
@@ -198,14 +202,16 @@ interface Extension<Api = void> {
   setup(scope: ExtensionScope): Contributions<Api>
 }
 
-interface Contributions<Api> {
+interface HookContributions {
   readonly input?: (event: TerminalInputEvent) => 'claim' | 'pass'
   readonly events?: Partial<TerminalEventHandlers> // resize, frame, title, bell, prompt, cwd, …
-  readonly osc?: Readonly<Record<number, OscHandler>>
+  readonly osc?: Readonly<Record<number, OscObserver>>
   readonly links?: LinkProvider
   readonly commands?: Readonly<Record<string, TerminalCommand>>
-  readonly api?: Api
 }
+
+type Contributions<Api = void> = HookContributions &
+  ([Api] extends [void] ? { readonly api?: Api } : { readonly api: Api })
 
 // A host lists extensions up front; arrays are presets and flatten in order.
 const terminal = await Terminal.create({ extensions: [browserPreset(), links(fileLinks)] })
@@ -272,16 +278,72 @@ Core hooks this phase adds, each with a test extension that uses it without priv
 - **Input.** User keys, pastes and IME commits pass through `input` contributions before encoding.
   `onData` today mixes user input with protocol replies (`term/session.ts:1562–1617`); split them
   so replies never reach an input handler.
-- **Live geometry.** Synchronous grid size, cursor position and cell metrics from the session,
-  not the last painted frame.
-- **Cell width.** `terminal.measure(text)` returns libghostty-vt's cell width for a string, by
-  grapheme cluster and honoring mode 2027, so no extension re-derives Unicode width.
+- **Live geometry.** Authoritative grid size, cursor position and cell metrics from the terminal
+  owner. The main-thread entry returns values; the worker entry returns Promises. Rendering and
+  input placement use the explicit last-submitted frame summary.
+- **Cell width.** `terminal.measure(text)` returns libghostty-vt's cell width for plain text,
+  honoring live mode 2027. Extensions await its value or Promise. Cluster segmentation and widths
+  come from the native Unicode exports. Measurement batching must let a line editor compute
+  wrapping in one owner request.
 - **Output.** `terminal.write` stays the only output path; extensions coordinate output through
   their own API (the line editor's `printAbove`), never by wrapping `write`.
 
 Done when: test extensions claim input, read geometry, measure `👩‍💻` and CJK text, register an
 OSC handler and a duplicate (rejected), and dispose cleanly on terminal dispose and on their own;
 a throwing `setup` leaves nothing behind; gates X1–X7 pass.
+
+### Shared API agreement with Plan 287
+
+Authoritative method families stay synchronous in the main-thread entry; the worker entry
+returns Promises under the same method names. Extensions await terminal operations so their code
+handles either result. Extension `setup`, `use`, input claims and closures stay synchronous on the
+host/main thread. Presets accept nested readonly arrays. A non-void extension API is required in its
+contributions, so `handle.api` preserves its declared type. Plan 287 owns the shared
+`TerminalApi<Mode>` contract; the internal scope and manager use its default `sync | async`
+convention. This is a type contract for the actual entries, with no execution facade.
+
+Authoritative `measure`, geometry, `lineCount`, `readLines`, `getSelection`,
+`selectionCoordinates`, `frameSnapshot`, `captureViewport` and mutations follow the entry's
+sync/async contract. The explicit last-submitted `FrameSummary` supplies synchronous renderer and
+input-placement geometry. Host elements, subscriptions, focus, blur and local DOM registrations
+stay synchronous, including `visibleLines`, a paint-version-guarded displayed-frame read.
+Inherently asynchronous host methods such as `open` retain their Promise results in both entries.
+Appearance snapshots update on execution acknowledgement. Disposal invalidates the host immediately;
+the worker Promise resolves after owner cleanup. Common create options remove borrowed native
+runtimes, while low-level native APIs stay local.
+
+Custom OSC contributions are **observers returning void** for native-parsed unsupported/custom
+numbers. Duplicate and core-owned numbers are rejected. Subscription changes and output use an
+ordered owner channel; closures stay on the host. Built-in protocols retain native ownership.
+OSC 52 keeps the current denied-by-default, write-only bridge. Immutable execution policy controls
+immediate acceptance; browser completion reports errors separately. Browser clipboard reads or
+grants remain outside this work. Plan 287 verifies native read-query behavior before and after its
+conversion.
+
+At the pinned `c8554f28e0efe2f5595f32020371c34b25ec628f`, the unknown-sequence callback reports
+APC only. Native custom OSC delivery needs an upstream-pin prerequisite after PR #470's final
+recovery change merges. Plan 286 owns that prerequisite; output is never reparsed in TypeScript.
+The shipped native Unicode exports already measure graphemes and codepoints. Live mode 2027
+selects their interpretation: `👩‍💻` is two cells when enabled and four when disabled. The current
+native default is disabled.
+
+### Phase 0 implementation checklist
+
+- [x] Internal lifecycle/index scaffold in `ghostty-webgpu/src/extensions/`: typed contributions,
+      identity-based attachment, nested presets, transactional rollback, lazy scoped resources,
+      interested-only indexes, reentrant dispatch and reverse disposal. Node tests exercise the
+      manager with the real main terminal; type assertions also accept the async shared contract.
+      Core supplies the reserved OSC-number set at integration.
+- [ ] Public export and host activation after Plan 287's sync/async entry contracts land.
+- [ ] Original key/paste/IME hooks before encoding, with protocol replies bypassing arbitration.
+- [ ] Authoritative geometry and mode-aware native measurement with a batched wrapping contract.
+- [ ] Native custom OSC prerequisite, subscription delivery and observer tests in both entries.
+- [ ] X1–X7 full gates. Scaffold tests count 100/1,000 inert attachments and 10/100/1,000 interested
+      handlers, but these are internal structural tests. Browser input/output/frame counters,
+      hardware control envelopes, native payload-allocation counters and retained-memory proof remain
+      pending. No browser, hardware timing or memory gate is claimed by the scaffold.
+- [ ] Phase 0 done-when. The internal scaffold bumps the package patch version and regenerates
+      native resolver provenance; it adds no root export, consumer activation or deployment.
 
 ## Phase 1: the line editor
 
@@ -384,15 +446,14 @@ no-Canvas tests still pass.
 
 0 → 1 → 2 (steps in order, each its own PR) → 3 → 4 → 5. Phase 1 can merge before Phase 2
 starts; Phase 3 items can start once Phase 0 lands.
-Every PR gets an independent review before merge. The release carrying Phases 0–2 waits for the
-owner's minor or major version approval; until then extension packages are workspace-only and the
-site and Platform consume them from the monorepo.
+Every PR gets an independent review before merge. Phases 0–2 ship with patch bumps and
+matching site/Platform consumers. Standalone package publication keeps the applicable
+[Plan 207](207-one-repo-with-mirrors.md) installation and publication gates.
 
 ## Owner questions
 
 - Package names: scoped (`@ghostty-webgpu/line-editor`, needs the npm scope) or flat
   (`ghostty-webgpu-line-editor`).
-- The version for the release that ships the new contract (minor or major).
 
 ## Done when
 

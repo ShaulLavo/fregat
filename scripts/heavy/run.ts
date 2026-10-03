@@ -220,6 +220,7 @@ async function run(options: Options) {
     options.host === 'pi'
       ? await admitPi(options, config, cwd, id)
       : await admitLocal(options, config, cwd, id)
+  if ('cancelled' in placed) return 128 + constants.signals[placed.cancelled]
   if ('retry' in placed) {
     console.error(
       `[wave-heavy] quiet admission for '${options.label}' expired: ${placed.reason}. Run it again to queue for another admission window.`,
@@ -288,7 +289,7 @@ async function admitLocal(
   config: Config,
   cwd: string,
   id: string,
-): Promise<Placed | Deferred> {
+): Promise<Placed | Deferred | Cancelled> {
   const budget = config.classes[options.jobClass]
   const entry: Entry = {
     cwd,
@@ -303,7 +304,7 @@ async function admitLocal(
     sliceRoot: options.sliceRoot,
   }
   const admitted = await admit(options, config, entry)
-  if ('retry' in admitted) return admitted
+  if ('retry' in admitted || 'cancelled' in admitted) return admitted
   if (options.quiet) {
     writeFileSync(
       path.join(options.stateDir, 'quiet.holder'),
@@ -367,6 +368,7 @@ function clearHolder(holder: string) {
   }
 }
 
+type Cancelled = { readonly cancelled: NodeJS.Signals }
 type Deferred = { readonly retry: true; readonly reason: string }
 type Admitted = {
   readonly held: Held
@@ -377,7 +379,11 @@ type Admitted = {
 
 // Waits first-in first-out: only the head of the queue is considered, so a small job never
 // overtakes a large one that is waiting for memory.
-async function admit(options: Options, config: Config, entry: Entry): Promise<Admitted | Deferred> {
+async function admit(
+  options: Options,
+  config: Config,
+  entry: Entry,
+): Promise<Admitted | Deferred | Cancelled> {
   mkdirSync(options.stateDir, { recursive: true })
   for (const slot of SLOT_FILES) writeFileSync(path.join(options.stateDir, slot), '', { flag: 'a' })
   const waiting = enqueue(options.stateDir, {
@@ -387,23 +393,25 @@ async function admit(options: Options, config: Config, entry: Entry): Promise<Ad
   const started = performance.now()
   let nextNotice = 0
   let promoted = false
+  const cancellation = new AbortController()
   const cancellations = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map((signal) => {
-    const handler = () => {
-      release(waiting)
-      process.exit(128 + constants.signals[signal])
-    }
+    const handler = () => cancellation.abort(signal)
     process.on(signal, handler)
     return { signal, handler }
   })
   try {
     for (;;) {
+      if (cancellation.signal.aborted)
+        return { cancelled: cancellation.signal.reason as NodeJS.Signals }
       const expired = expiredAdmission(waiting.entry, config.quietHoldSeconds)
       if (expired) return expired
-      const attempt = attemptAdmission(options, config, waiting)
+      const attempt = await attemptAdmission(options, config, waiting, cancellation.signal)
       if ('held' in attempt) {
         promoted = true
         return attempt
       }
+      if (cancellation.signal.aborted)
+        return { cancelled: cancellation.signal.reason as NodeJS.Signals }
       if ('retry' in attempt) return attempt
       if (performance.now() - started >= nextNotice) {
         console.error(`[wave-heavy] '${options.label}' is waiting: ${attempt.reason}`)
@@ -426,18 +434,28 @@ function expiredAdmission(entry: Entry, seconds: number): Deferred | null {
   }
 }
 
-function attemptAdmission(
+async function attemptAdmission(
   options: Options,
   config: Config,
   waiting: Held,
-): Admitted | Deferred | { reason: string } {
+  cancellation: AbortSignal,
+): Promise<Admitted | Deferred | { reason: string }> {
   const lock = tryLock(path.join(options.stateDir, 'admission.lock'))
   if (lock === null) return { reason: 'another wrapper is admitting a job' }
+  let timeout: ReturnType<typeof setTimeout> | undefined
   try {
-    // Every waiting wrapper reclaims what dead wrappers left, before any rule can stop it.
-    const running = reconcile(options, config.graceSeconds)
+    const controller = new AbortController()
+    const remaining = (waiting.entry.quietAdmissionUntil ?? Infinity) - bootSeconds()
+    timeout = setTimeout(
+      () => controller.abort(),
+      Math.max(0, Math.min(remaining, stopTimeoutSeconds(config.graceSeconds)) * 1000),
+    )
+    const signal = AbortSignal.any([cancellation, controller.signal])
+    // Reconciliation shares one stop budget, shortened to the quiet admission's remainder.
+    const running = await reconcile(options, config.graceSeconds, signal)
     const expired = expiredAdmission(waiting.entry, config.quietHoldSeconds)
     if (expired) return expired
+    if (signal.aborted) return { reason: 'orphan reconciliation was interrupted' }
     const ahead = live(options.stateDir, 'queue').findIndex(
       (entry) => entry.id === waiting.entry.id,
     )
@@ -487,6 +505,7 @@ function attemptAdmission(
       slots: waiting.entry.server ? [] : taken,
     }
   } finally {
+    clearTimeout(timeout)
     unlock(lock)
   }
 }
@@ -495,16 +514,22 @@ function attemptAdmission(
  * Reaps orphans: job slices whose wrapper is gone (`orphanSlices`). Each is charged its
  * ceiling less its use, read before the kill; if the kill fails it may still grow that far.
  */
-function reconcile(options: Options, graceSeconds: number) {
+async function reconcile(options: Options, graceSeconds: number, signal: AbortSignal) {
   const owners = live(options.stateDir, 'jobs')
   const dead = deadJobs(options.stateDir)
   const orphans = orphanSlices(options.sliceRoot, owners, dead)
   const orphanCharges = orphans.map((orphan) =>
     chargeOf(orphan.root, orphan.slice, orphan.ceilingBytes),
   )
-  for (const orphan of orphans) reapOrphan(options.stateDir, orphan, graceSeconds)
+  for (const orphan of orphans) {
+    if (signal.aborted) break
+    await reapOrphan(options.stateDir, orphan, graceSeconds, signal)
+  }
   forgetStoppedFailures(options.stateDir)
-  for (const job of dead) settleDeadEntry(job)
+  for (const job of dead) {
+    if (signal.aborted) break
+    await settleDeadEntry(job, signal)
+  }
   clearQuietHolder(options.stateDir, (holder) => !owners.some((job) => job.id === holder))
   return { orphanCharges, owners }
 }
@@ -512,11 +537,16 @@ function reconcile(options: Options, graceSeconds: number) {
 // A slice that outlives its stop stays charged and is retried quietly on each later pass. A
 // marker under `reaping/` keeps the series across wrappers: one warning when it starts, one
 // error once the stop timeout has passed, each naming the slice and how to stop it by hand.
-function reapOrphan(stateDir: string, orphan: LiveSlice, graceSeconds: number) {
+async function reapOrphan(
+  stateDir: string,
+  orphan: LiveSlice,
+  graceSeconds: number,
+  signal: AbortSignal,
+) {
   const marker = path.join(stateDir, 'reaping', orphan.slice)
   const failing = readText(marker).trim()
   if (!failing) console.error(`[wave-heavy] stopping ${orphan.slice}: its wrapper is gone`)
-  reapSlice(orphan.root, orphan.slice)
+  await reapSlice(orphan.root, orphan.slice, signal)
   if (sliceState(orphan.root, orphan.slice) !== 'running') return rmSync(marker, { force: true })
   const now = bootSeconds()
   if (!failing) {
@@ -548,7 +578,7 @@ function forgetStoppedFailures(stateDir: string) {
 // A dead entry is the only record of a slice on another root, so it stays until that slice is
 // gone, or empty and stopped; a stop that failed is retried, and charged, on the next pass. An
 // entry this wrapper did not write names nothing and is dropped.
-function settleDeadEntry(job: DeadJob) {
+async function settleDeadEntry(job: DeadJob, signal: AbortSignal) {
   if (!job.attributable) {
     console.error(`[wave-heavy] dropped ${job.file}: not a job entry a wrapper wrote`)
     return rmSync(job.file, { force: true })
@@ -556,7 +586,7 @@ function settleDeadEntry(job: DeadJob) {
   const slice = `${job.entry.sliceRoot}-${job.entry.id}.slice`
   const state = sliceState(job.entry.sliceRoot, slice)
   if (state === 'running') return
-  if (state === 'empty' && !removeSlice(slice)) return
+  if (state === 'empty' && !(await removeSlice(slice, signal))) return
   rmSync(job.file, { force: true })
 }
 

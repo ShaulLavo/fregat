@@ -7,6 +7,7 @@ import {
 import { defineErrorCatalog } from 'evlog'
 import * as v from 'valibot'
 import { usageAccountLabel } from './utils/usage-account-label'
+import { codexAccountIdentity, rememberProxyUsageIdentity } from './utils/usage-codex-identity'
 
 const CODEX_DRIVER_KIND = v.parse(providerDriverKindSchema, 'codex')
 
@@ -27,6 +28,7 @@ export interface ReadProxyUsageOptions {
   secret: string
   fetch?: UsageFetch
   now?: () => number
+  identityContext?: string
 }
 
 /** Reads passive management caches. Provider probes and queue drains never belong here. */
@@ -51,7 +53,12 @@ export async function readProxyUsage(
       .update(JSON.stringify([origin, 'codex', identity]))
       .digest('hex')}`
     if (accounts.has(accountKey)) throw failure('duplicate-account')
-    accounts.set(accountKey, accountSnapshot(file, accountKey, now, managementObservedAt))
+    const account = accountSnapshot(file, accountKey, now, managementObservedAt)
+    rememberProxyUsageIdentity(
+      account,
+      codexAccountIdentity(object(file.id_token)?.chatgpt_account_id, options.identityContext),
+    )
+    accounts.set(accountKey, account)
   }
   return [...accounts.values()]
 }
