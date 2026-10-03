@@ -9,23 +9,37 @@ afterEach(async () => {
 })
 
 const transports = [
-  { name: 'direct native OAuth', env: {}, auth: 'oauth', accepted: true },
+  { name: 'direct native OAuth with current none init', env: {}, auth: 'none', accepted: true },
+  ...[
+    'CLAUDE_CODE_USE_BEDROCK',
+    'CLAUDE_CODE_USE_VERTEX',
+    'CLAUDE_CODE_USE_FOUNDRY',
+    'CLAUDE_CODE_USE_ANTHROPIC_AWS',
+    'CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD',
+    'CLAUDE_CODE_USE_MANTLE',
+    'CLAUDE_CODE_USE_GATEWAY',
+  ].map((name, index) => ({
+    name,
+    env: { [name]: ['1', 'true', 'yes', 'on'][index % 4]! },
+    auth: 'none',
+    accepted: false,
+  })),
   {
-    name: 'gateway transport despite OAuth-shaped init',
+    name: 'gateway transport with current none init',
     env: { ANTHROPIC_BASE_URL: 'https://gateway.example.test' },
-    auth: 'oauth',
+    auth: 'none',
     accepted: false,
   },
   {
     name: 'API-key transport',
     env: { ANTHROPIC_API_KEY: 'synthetic-fixture-key' },
-    auth: 'apiKey',
+    auth: 'ANTHROPIC_API_KEY',
     accepted: false,
   },
   {
-    name: 'token transport despite OAuth-shaped init',
+    name: 'token transport with current none init',
     env: { ANTHROPIC_AUTH_TOKEN: 'synthetic-fixture-token' },
-    auth: 'oauth',
+    auth: 'none',
     accepted: false,
   },
   { name: 'unattributed pre-init frame', env: {}, auth: null, accepted: false },
@@ -36,7 +50,7 @@ describe('native Claude usage subscription lifecycle', () => {
     const f = await createClaudeUsageLifecycleFixture()
     fixtures.push(f)
     const before = await f.store.read()
-    f.init('oauth')
+    f.init('none')
     await f.rateLimit()
     const held = await f.store.read()
     const binding = f.directory.getBinding(f.input.sessionId)!
@@ -69,7 +83,7 @@ describe('native Claude usage subscription lifecycle', () => {
     expect(f.registry.usageAccount(f.providerInstanceId)!.credentialFingerprint).not.toBe(
       generation,
     )
-    f.init('oauth')
+    f.init('none')
     await f.rateLimit({ rateLimitType: 'five_hour', status: 'allowed', utilization: 0.41 })
     const after = await f.store.read()
     expect(

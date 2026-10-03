@@ -2437,7 +2437,7 @@ function taskNotification(): SDKMessage {
 
 function initMessage(): SDKMessage {
   return {
-    apiKeySource: 'oauth',
+    apiKeySource: 'none',
     claude_code_version: '9.9.9',
     cwd: WORKSPACE_ROOT,
     mcp_servers: [],

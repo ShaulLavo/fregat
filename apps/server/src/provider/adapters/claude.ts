@@ -821,7 +821,7 @@ class ClaudeAgentSession extends SessionContext {
   /** `type:resetsAt` of the limit stops this turn has already announced. */
   private readonly announcedLimitStops = new Set<string>()
   private readonly nativeUsageTransport: boolean
-  private nativeUsageAuthenticated = false
+  private nativeUsageWithoutApiKey = false
   private readonly scopedUsageModel: () => string | null
   private readonly resumed: boolean
   /** Project servers this session started with turned off, awaiting the owner's approval. */
@@ -1885,7 +1885,8 @@ class ClaudeAgentSession extends SessionContext {
    */
   private handleInitMessage(message: ClaudeSystemMessageOf<'init'>) {
     this.confirmSessionId(message.session_id)
-    this.nativeUsageAuthenticated = message.apiKeySource === 'oauth'
+    // Current OAuth, bearer and cloud sessions all report none; transport evidence narrows it.
+    this.nativeUsageWithoutApiKey = message.apiKeySource === 'none'
     // Every turn opens with `init`. With nothing running it is the owner's queued prompt (a CLI
     // without lifecycle frames) or a turn the harness started, such as a task notification.
     if (!this.activeTurn && this.pendingTurn) this.startPendingTurn()
@@ -2668,7 +2669,7 @@ class ClaudeAgentSession extends SessionContext {
     const info = message.rate_limit_info
     const scopedModel = this.scopedUsageModel()
     // A gateway or external key can emit this frame without observing the native home’s account.
-    if (this.nativeUsageTransport && this.nativeUsageAuthenticated)
+    if (this.nativeUsageTransport && this.nativeUsageWithoutApiKey)
       this.emitRuntimeNotification(
         'account.rate-limits.updated',
         claudeUsageUpdate(info, scopedModel),

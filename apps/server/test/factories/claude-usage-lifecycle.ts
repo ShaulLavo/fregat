@@ -77,6 +77,10 @@ export async function createClaudeUsageLifecycleFixture(env: NodeJS.ProcessEnv =
     'CLAUDE_CODE_USE_BEDROCK',
     'CLAUDE_CODE_USE_VERTEX',
     'CLAUDE_CODE_USE_FOUNDRY',
+    'CLAUDE_CODE_USE_ANTHROPIC_AWS',
+    'CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD',
+    'CLAUDE_CODE_USE_MANTLE',
+    'CLAUDE_CODE_USE_GATEWAY',
   ].map((name) => ({ name, value: env[name] ?? '' }))
   await registry.reconcile([
     { providerInstanceId, driverKind: claudeDriver.driverKind, config: { configDir }, environment },
