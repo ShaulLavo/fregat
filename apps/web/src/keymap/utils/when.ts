@@ -1,20 +1,7 @@
 import { filesystemResource, saveCapability } from '@/lib/documents/utils/capabilities'
 import type { DocumentRef, TabId } from '@/lib/documents/utils/types'
 import type { CommandTargetKind, CommandWhen } from '@workspace/client-core/commands/metadata'
-import {
-  editorKeyConditionMatches,
-  type EditorKeyCondition,
-  type EditorKeymapContext,
-} from '@singapore-editor/core/keymap'
-
-export function editorBindingConditionsMatch(
-  conditions: readonly EditorKeyCondition[] | undefined,
-  context: EditorKeymapContext | null,
-): boolean {
-  if (!conditions?.length) return true
-  if (!context) return false
-  return conditions.every((condition) => editorKeyConditionMatches(condition, context))
-}
+import type { EditorKeymapContext } from '@singapore-editor/core/editor'
 
 export type CommandWhenSnapshot = {
   readonly activeDocumentSavable: boolean

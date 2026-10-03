@@ -1,7 +1,7 @@
-import { GhosttyRuntime, Terminal, type GhosttyWebGpuRenderer } from 'ghostty-webgpu'
+import { GhosttyRuntime, Terminal, hotkeys, type GhosttyWebGpuRenderer } from 'ghostty-webgpu'
+import { detectPlatform } from '@fregat/hotkeys'
 import { flushSync } from 'react-dom'
 
-import { useTerminalKeybindings } from '@/features/terminal/hooks/use-keybindings'
 import { useCommand } from '@/keymap/hooks/use-command'
 import type { PlatformKeyBinding } from '@/keymap/types'
 import { FocusService } from '@/lib/focus/state/service'
@@ -43,27 +43,30 @@ export async function createTerminalKeymap(bindings: readonly PlatformKeyBinding
       return true
     },
   })
-  const hostRef = { current: host }
   const calls: boolean[] = []
-  const view = renderHookWithProviders(
-    () => {
-      useTerminalKeybindings(hostRef)
-      return useCommand()
-    },
-    {
-      command: {
-        bindings,
-        runtime: {
-          settings: {
-            setWallpaperEnabled: (enabled) => {
-              calls.push(enabled)
-              return { kind: 'noop' }
-            },
+  const view = renderHookWithProviders(useCommand, {
+    command: {
+      bindings,
+      runtime: {
+        settings: {
+          setWallpaperEnabled: (enabled) => {
+            calls.push(enabled)
+            return { kind: 'noop' }
           },
         },
       },
-      focusService: focus,
     },
+    focusService: focus,
+  })
+  const errors: unknown[] = []
+  terminal.use(
+    hotkeys({
+      mode: 'hosted',
+      dispatcher: view.result.current.keymap.hotkeys,
+      parent: view.result.current.keymap.parentFor('terminal'),
+      platform: detectPlatform(),
+      onError: (cause) => errors.push(cause),
+    }),
   )
   flushSync(() => terminal.focus())
 
@@ -71,6 +74,7 @@ export async function createTerminalKeymap(bindings: readonly PlatformKeyBinding
     alternateTarget,
     calls,
     focus,
+    errors,
     output,
     pendingChord: () => view.result.current.pendingChord,
     terminal,

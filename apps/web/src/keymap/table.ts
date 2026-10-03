@@ -1,3 +1,4 @@
+import { nodeCommands } from '@/keymap/node-commands'
 import { environmentCommands } from '@/keymap/environment-commands'
 import type { Icon } from '@phosphor-icons/react'
 
@@ -5,15 +6,24 @@ import { editorCommands } from './editor-commands'
 import type { PlatformCommandId } from './types'
 import { workspaceCommands } from './workspace-commands'
 
-export const platformCommands = [...workspaceCommands, ...editorCommands, ...environmentCommands]
+export const platformCommands = [
+  ...workspaceCommands,
+  ...editorCommands,
+  ...environmentCommands,
+  ...nodeCommands,
+]
 
 /** One row from the sole live command table. */
 export type CommandEntry = (typeof platformCommands)[number]
 
-const byId = new Map(platformCommands.map((command) => [command.id, command]))
+const byId = new Map<string, CommandEntry>(platformCommands.map((command) => [command.id, command]))
 
-export function platformCommand(id: PlatformCommandId): CommandEntry | null {
-  return byId.get(id) ?? null
+export function platformCommand(id: string): CommandEntry | null {
+  return isPlatformCommandId(id) ? (byId.get(id) ?? null) : null
+}
+
+export function isPlatformCommandId(id: string): id is PlatformCommandId {
+  return byId.has(id)
 }
 
 function iconsById(): Partial<Record<PlatformCommandId, Icon>> {

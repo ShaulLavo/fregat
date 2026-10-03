@@ -1,4 +1,4 @@
-import { fitTerminalFont, Terminal } from '../../dist/index.js'
+import { fitTerminalFont, Terminal, hotkeys } from '../../dist/index.js'
 import { GhostDemo } from './demos/ghost.js'
 import { MatrixDemo } from './demos/matrix.js'
 import { ShellDemo } from './demos/shell.js'
@@ -213,6 +213,7 @@ async function boot(): Promise<void> {
   const base = document.baseURI
   performance.mark('ghost:create-start')
   const creating = Terminal.create({
+    extensions: [hotkeys()],
     appearance: {
       cursor: { blink: true, style: 'block' },
       font: { family: FONT_FAMILY, lineHeight: FIT_LINE_HEIGHT, size: firstFontSize },

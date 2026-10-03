@@ -71,27 +71,27 @@ export function editorTextMenu(spelling: MenuSection | null = null, markdown = f
         ]
       : []),
     section('navigate', [
-      commandItem('editor.goToDefinition', {
+      commandItem('editor.action.goToDefinition', {
         icon: ArrowSquareOutIcon,
         label: 'Go to Definition',
       }),
-      commandItem('editor.editor.action.goToTypeDefinition', {
+      commandItem('editor.action.goToTypeDefinition', {
         icon: BracketsCurlyIcon,
         label: 'Go to Type Definition',
       }),
-      commandItem('editor.editor.action.goToImplementation', {
+      commandItem('editor.action.goToImplementation', {
         icon: GitForkIcon,
         label: 'Go to Implementations',
       }),
-      commandItem('editor.editor.action.goToReferences', {
+      commandItem('editor.action.goToReferences', {
         icon: ListMagnifyingGlassIcon,
         label: 'Find All References',
       }),
-      commandItem('editor.editor.action.peekDefinition', {
+      commandItem('editor.action.peekDefinition', {
         icon: EyeIcon,
         label: 'Peek Definition',
       }),
-      commandItem('editor.editor.action.revealDefinitionAside', {
+      commandItem('editor.action.revealDefinitionAside', {
         icon: ColumnsPlusRightIcon,
         label: 'Open Definition to the Side',
       }),
@@ -107,23 +107,23 @@ export function editorTextMenu(spelling: MenuSection | null = null, markdown = f
       }),
     ]),
     section('edit', [
-      commandItem('editor.editor.action.changeAll', {
+      commandItem('editor.action.changeAll', {
         icon: CursorTextIcon,
         label: 'Change All Occurrences',
       }),
-      commandItem('editor.editor.action.commentLine', {
+      commandItem('editor.action.commentLine', {
         icon: CodeIcon,
         label: 'Toggle Line Comment',
       }),
-      commandItem('editor.editor.action.blockComment', {
+      commandItem('editor.action.blockComment', {
         icon: CodeBlockIcon,
         label: 'Toggle Block Comment',
       }),
-      commandItem('editor.editor.action.rename', {
+      commandItem('editor.action.rename', {
         icon: PencilSimpleIcon,
         label: 'Rename Symbol',
       }),
-      commandItem('editor.editor.action.formatDocument', {
+      commandItem('editor.action.formatDocument', {
         icon: MagicWandIcon,
         label: 'Format Document',
       }),

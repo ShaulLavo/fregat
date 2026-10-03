@@ -11,7 +11,7 @@ import { CloneRepositoryDialog } from '@/features/git/components/clone-repositor
 import { StartPullRequestSessionDialog } from '@/features/chat-mode/components/start-pull-request-session-dialog'
 import { parentPath } from '@/lib/path-formatters'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contracts'
 
@@ -37,17 +37,17 @@ import { useSettingsStream } from '@/features/settings/hooks/use-settings-stream
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { readLiveSettingsProjection } from '@/features/settings/state/live-projection'
 import { useOpenWorkspaceRoot } from '@/features/workspace/hooks/use-open-root'
-import { resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
+import { displayPlatformKeyBindings, resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { KeyBindingsContext } from '@/keymap/providers/bindings-context'
 import { createComposerAttach } from '@/features/chat/state/composer-attach'
 import { useAppKeymap } from '@/keymap/use-app-keymap'
+import type { WindowKeymap } from '@/keymap/state/window-keymap'
 import type { WorkspaceCommandRuntime, WorkspaceCommandSnapshot } from '@/keymap/define-command'
 import { CommandContext, type CommandContextValue } from '@/keymap/providers/command-context'
 import { useBusBinding } from '@/keymap/hooks/use-bus-binding'
 import { openWorkspaceSettings } from '@/keymap/state/runtime'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
-import { useFocusSnapshot } from '@/lib/focus/hooks/use-snapshot'
 import {
   focusTargetById,
   registeredFocusTarget,
@@ -98,7 +98,6 @@ function runtimeAdapters({
 
 export function CommandProvider({ children }: { readonly children: ReactNode }) {
   const focus = useFocusService()
-  const focusSnapshot = useFocusSnapshot()
   const editorRuntime = useEditorRuntime()
   const documentStore = useEditorDocumentStoreApi()
   const workspace = useEditorWorkspaceStoreApi()
@@ -198,7 +197,12 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   }
 
   const { binding, bus } = useBusBinding()
+  const keymapRef = useRef<WindowKeymap | null>(null)
   const [runtime] = useState<WorkspaceCommandRuntime>(() => ({
+    keymap: {
+      dispatch: (command, invocation) =>
+        keymapRef.current?.dispatchCommand(command, invocation) ?? false,
+    },
     composer: createComposerAttach(bus),
     documents: { queryClient, store: documentStore, save: editorRuntime.saveService },
     editorUi: editorRuntime.uiStore,
@@ -316,16 +320,30 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     workspaceEdits,
   }))
   useLayoutEffect(() => binding.bind(runtime), [binding, runtime])
-  const defaults = defaultPlatformKeyBindings(undefined, preset)
+  const shellKeys = useSettingValue('terminal.shellKeys')
+  // The binding update effect must keep chord state when only its indicator changes.
+  const defaults = useMemo(
+    () => defaultPlatformKeyBindings(undefined, preset, shellKeys),
+    [preset, shellKeys],
+  )
   // Stable identity is required by the document listener and every shortcut-hint consumer.
-  const bindings = resolvedPlatformKeyBindings(defaults, overrides)
-  const { claimKeybinding, pendingChord } = useAppKeymap({
+  const bindings = useMemo(
+    () => resolvedPlatformKeyBindings(defaults, overrides),
+    [defaults, overrides],
+  )
+  // Badge snapshots and menu contexts depend on this table's identity.
+  const displayBindings = useMemo(() => displayPlatformKeyBindings(bindings), [bindings])
+  const { keymap, pendingChord } = useAppKeymap({
     bindings,
     bus,
     focus,
-    focusedPane: focusSnapshot.currentOwner?.area ?? 'global',
-    focusedTarget: focusSnapshot.currentOwner?.token ?? null,
   })
+  useLayoutEffect(() => {
+    keymapRef.current = keymap
+    return () => {
+      keymapRef.current = null
+    }
+  }, [keymap])
 
   const closePalette = (restoreOrigin: boolean) => {
     paletteRestoreRef.current = restoreOrigin ? paletteOrigin : undefined
@@ -384,10 +402,12 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     settingsRestoreRef.current = undefined
     restoreCapturedOrigin(focus, origin, 'settings-dialog')
   }, [focus, settingsOpen])
+  if (!keymap) return null
+
   const value: CommandContextValue = {
-    bindings,
+    bindings: displayBindings,
     bus,
-    claimKeybinding,
+    keymap,
     closePalette,
     openWorkspaceRoot,
     paletteOpen,
@@ -402,7 +422,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
 
   return (
     <CommandContext value={value}>
-      <KeyBindingsContext value={bindings}>{children}</KeyBindingsContext>
+      <KeyBindingsContext value={displayBindings}>{children}</KeyBindingsContext>
       {environmentDialog ? (
         <PickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
       ) : null}

@@ -217,8 +217,8 @@ export function FileViewer({
           setQuery('')
         },
       },
-      'editor.goToDefinition': { run: () => languageAction('definition') },
-      'editor.editor.action.showHover': { run: () => languageAction('hover') },
+      'editor.action.goToDefinition': { run: () => languageAction('definition') },
+      'editor.action.showHover': { run: () => languageAction('hover') },
       'workspace.goToLine': {
         run: () => {
           setDraft(String(position.line + 1))

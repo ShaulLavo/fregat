@@ -37,8 +37,8 @@ for a hook taxonomy must inventory this existing model before adding another reg
 [InputSelectionController](../editor/packages/editor/src/editor/inputSelectionController.ts) owns
 browser keydown, beforeinput, composition, paste, and selection handling.
 [inputState.ts](../editor/packages/editor/src/editor/inputState.ts) tracks browser and session ownership.
-[EditorKeymapController](../editor/packages/editor/src/editor/keymap.ts) already uses the
-[public shared chord runtime](../editor/packages/editor/src/public/keymap.ts).
+[EditorHotkeys](../editor/packages/editor/src/editor/hotkeys.ts) uses the
+[shared focus dispatcher](../hotkeys/packages/hotkeys/src/dispatch/dispatcher.ts).
 
 [DisplayProjectionRegistry](../editor/packages/editor/src/editor/displayProjectionRegistry.ts) is an
 internal composition point. Public [rendering exports](../editor/packages/editor/src/public/rendering.ts)

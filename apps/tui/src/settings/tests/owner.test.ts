@@ -82,6 +82,50 @@ test('rejected workspace execution settings roll back and remain discardable', a
   }
 })
 
+test('a stale binding deletion refreshes confirmed settings before its failure settles', async ({
+  client,
+}) => {
+  const entries = [
+    { keys: 'F6', command: null },
+    { keys: 'F7', command: null },
+    { keys: 'F7', command: null },
+  ] as const
+  for (const [index, entry] of entries.entries())
+    await writeSettings({
+      client,
+      request: {
+        mutationId: `owner-delete-seed-${index}`,
+        target: 'user',
+        operations: [{ kind: 'keybinding.append', entry }],
+      },
+    })
+  const owner = await makeSettingsOwner(client)
+  try {
+    await writeSettings({
+      client,
+      request: {
+        mutationId: 'owner-delete-other-client',
+        target: 'user',
+        operations: [{ kind: 'keybinding.delete', index: 0, expected: entries }],
+      },
+    })
+    expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual(entries)
+    const submission = owner.submit('user', [
+      { kind: 'keybinding.delete', index: 1, expected: entries },
+    ])
+    expect(submission.kind).toBe('submitted')
+    if (submission.kind === 'submitted') expect(await submission.settled).toBe('failed')
+    expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual(entries.slice(1))
+    expect(owner.getSnapshot().projection.values['keybindings.overrides']).toEqual(entries.slice(1))
+    expect(owner.getSnapshot().pendingCount).toBe(0)
+    expect(owner.getSnapshot().failures[0]?.error).toMatchObject({
+      code: 'settings.KEYBINDINGS_STALE',
+    })
+  } finally {
+    owner.dispose()
+  }
+})
+
 test('collection edits use semantic operations and advanced records reject stale revisions', async ({
   client,
 }) => {
@@ -91,15 +135,15 @@ test('collection edits use semantic operations and advanced records reject stale
     expect(
       await saveSettingDraft({
         id: 'keybindings.overrides',
-        draft: '{"workspace.showSettings":["F8"]}',
+        draft: '[{"keys":"F8","command":"workspace.showSettings"}]',
         snapshot,
         owner,
         target: 'user',
       }),
     ).toBe('acknowledged')
-    expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual({
-      'workspace.showSettings': ['F8'],
-    })
+    expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual([
+      { keys: 'F8', command: 'workspace.showSettings' },
+    ])
     const current = owner.getSnapshot().snapshot
     const layer = current.layers.find((entry) => entry.id === 'user')
     await writeSettingsText({
@@ -127,7 +171,7 @@ test('collection edits use semantic operations and advanced records reject stale
   }
 })
 
-test('editing one collection entry preserves another client’s changes to other entries', async ({
+test('an outdated whole-list draft refuses to overwrite another client’s bindings', async ({
   client,
 }) => {
   const owner = await makeSettingsOwner(client)
@@ -148,20 +192,23 @@ test('editing one collection entry preserves another client’s changes to other
         ],
       },
     })
-    await saveSettingDraft({
-      id: 'keybindings.overrides',
-      draft: JSON.stringify({
-        'workspace.showSettings': ['F7'],
-        'workspace.showQuickAccess': ['F9'],
+    await expect(
+      saveSettingDraft({
+        id: 'keybindings.overrides',
+        draft: JSON.stringify([
+          { keys: 'F7', command: 'workspace.showSettings' },
+          { keys: 'F9', command: 'workspace.showQuickAccess' },
+        ]),
+        snapshot: base,
+        owner,
+        target: 'user',
       }),
-      snapshot: base,
-      owner,
-      target: 'user',
-    })
-    expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual({
-      'workspace.showSettings': ['F7'],
-      'workspace.showQuickAccess': ['F10'],
-    })
+    ).rejects.toMatchObject({ code: 'settings.RAW_REVISION_STALE' })
+    await owner.refresh()
+    expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual([
+      { keys: 'F8', command: 'workspace.showSettings' },
+      { keys: 'F10', command: 'workspace.showQuickAccess' },
+    ])
   } finally {
     owner.dispose()
   }
@@ -333,6 +380,42 @@ test('refresh after stopped supervision restarts the stream and receives later w
       },
     })
     await expect.poll(() => owner.readSettingsMirror()['editor.fontSize']).toBe(30)
+  } finally {
+    owner.dispose()
+  }
+})
+
+test('contextual writes settle the owner mirror before acknowledgement and preserve another context', async ({
+  client,
+}) => {
+  const owner = await makeSettingsOwner(client)
+  try {
+    const initial = owner.submit('user', [
+      { kind: 'keybinding.set', command: 'workspace.saveFile', keys: ['F6'], context: 'Workspace' },
+    ])
+    if (initial.kind === 'submitted') await initial.settled
+    const edit = owner.submit('user', [
+      {
+        kind: 'keybinding.set',
+        command: 'workspace.saveFile',
+        keys: ['F7'],
+        context: 'Editor',
+        defaultKeys: ['Mod+S'],
+      },
+    ])
+    if (edit.kind === 'submitted') expect(await edit.settled).toBe('acknowledged')
+    expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual([
+      { keys: 'F6', command: 'workspace.saveFile', context: 'Workspace' },
+      { keys: 'Mod+S', unbind: 'workspace.saveFile', context: 'Editor' },
+      { keys: 'F7', command: 'workspace.saveFile', context: 'Editor' },
+    ])
+    const reset = owner.submit('user', [
+      { kind: 'keybinding.remove', command: 'workspace.saveFile', context: 'Editor' },
+    ])
+    if (reset.kind === 'submitted') await reset.settled
+    expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual([
+      { keys: 'F6', command: 'workspace.saveFile', context: 'Workspace' },
+    ])
   } finally {
     owner.dispose()
   }

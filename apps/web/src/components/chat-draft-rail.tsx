@@ -149,8 +149,8 @@ export function ChatDraftRail({
         {...list.containerProps}
         aria-label='Drafts'
         onKeyDown={(event) => {
-          event.stopPropagation()
           list.containerProps.onKeyDown(event)
+          if (event.defaultPrevented) event.stopPropagation()
         }}
       >
         {visible.map((row) => (

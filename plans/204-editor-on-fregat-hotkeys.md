@@ -52,6 +52,11 @@ dispatcher and binds nothing. `enabled` is gone. The Markdown pack exists but is
 
 ## Steps
 
+Execution started 2026-10-03 in the command-foundation wave. The Editor producer owns the
+family source and pack snapshots; Plan 206 owns final caller integration, review and shipping.
+Local development uses the hotkeys workspace. Exact standalone family installation is qualified
+under Plan 207 while npm remains deferred.
+
 - [ ] Link `@fregat/hotkeys`; add the node registration and standalone dispatcher behind the
       current options, with the existing chord browser tests
       (`packages/editor/test/chords.browser.test.ts`) passing on it.

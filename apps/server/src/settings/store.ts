@@ -824,6 +824,18 @@ export class SettingsStore {
     current: Readonly<Record<string, unknown>>,
     operations: readonly SettingsOperation[],
   ): PreparedReduction {
+    for (const operation of operations) {
+      if (operation.kind !== 'keybinding.delete') continue
+      const currentEntries = current['keybindings.overrides'] ?? []
+      if (jsonEqual(currentEntries, operation.expected)) continue
+      throw settingsErrors.KEYBINDINGS_STALE({
+        internal: {
+          index: operation.index,
+          expectedCount: operation.expected.length,
+          currentCount: Array.isArray(currentEntries) ? currentEntries.length : 0,
+        },
+      })
+    }
     const reduction = applySettingsOperations(current, operations)
     let raw = reduction.raw
     const secretEdits = new Map<SecretRef, string | null>()

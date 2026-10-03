@@ -1,4 +1,4 @@
-import { detectPlatform, isModifierKey, normalizeKeyName } from '@tanstack/hotkeys'
+import { detectPlatform, isModifierKey, normalizeKeyName } from '@fregat/hotkeys'
 
 type RecordingKeyEvent = {
   readonly key: string

@@ -1,5 +1,5 @@
 import '@workspace/ui/globals.css'
-import { detectPlatform } from '@tanstack/react-hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import { flushSync } from 'react-dom'
 import { commands } from 'vitest/browser'
 import { expect, test } from 'vitest'
@@ -8,6 +8,7 @@ import { CHORD_TIMEOUT_MS } from '@workspace/client-core/commands/chord'
 
 import { binding } from '../../../../test/factories/key-binding'
 import { createTerminalKeymap } from '../../../../test/factories/terminal-keymap'
+import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -16,6 +17,23 @@ declare module 'vitest/browser' {
     proofKeyUp: (input: { readonly key: string }) => Promise<void>
   }
 }
+
+test.skipIf(detectPlatform() !== 'linux').each([false, true])(
+  'Linux Ctrl+B sends one shell byte with shellKeys=%s',
+  async (shellKeys) => {
+    const scenario = await createTerminalKeymap(
+      defaultPlatformKeyBindings('linux', 'ours', shellKeys),
+    )
+    try {
+      await commands.proofKeyPress({ key: 'Control+b' })
+      expect(scenario.output).toEqual(['\u0002'])
+      expect(scenario.calls).toEqual([])
+      expect(scenario.errors).toEqual([])
+    } finally {
+      scenario.dispose()
+    }
+  },
+)
 
 test('terminal shortcuts claim before encoding and ordinary shell input still reaches wasm', async () => {
   const platform = detectPlatform()
@@ -46,7 +64,7 @@ test('terminal shortcuts claim before encoding and ordinary shell input still re
   }
 })
 
-test('a swallowed terminal continuation cannot leak a Kitty key release', async () => {
+test('an unmatched terminal continuation reaches native input with one Kitty key release', async () => {
   const platform = detectPlatform()
   const scenario = await createTerminalKeymap([
     binding('Mod+K Mod+S', { command: 'workspace.toggleWallpaper', platform }),
@@ -59,7 +77,8 @@ test('a swallowed terminal continuation cannot leak a Kitty key release', async 
     await commands.proofKeyPress({ key: 'x' })
 
     expect(scenario.calls).toHaveLength(0)
-    expect(scenario.output).toEqual([])
+    expect(scenario.output).toEqual(['x', '\u001b[120;1:3u'])
+    scenario.output.length = 0
 
     await commands.proofKeyPress({ key: 'y' })
     expect(scenario.output.join('')).toContain('121')
@@ -114,7 +133,7 @@ test('claimed key releases remain swallowed after another terminal owner takes f
 })
 
 test(
-  'a held prefix stays out of the shell after the chord timeout',
+  'an unbound prefix waits for the continuation beyond the bound-prefix timeout',
   async () => {
     const platform = detectPlatform()
     const scenario = await createTerminalKeymap([
@@ -126,14 +145,15 @@ test(
       await commands.proofKeyDown({ key: modifier })
       await commands.proofKeyDown({ key: 'k' })
       expect(scenario.pendingChord()).not.toBeNull()
-      await expect.poll(scenario.pendingChord, { timeout: CHORD_TIMEOUT_MS + 1_000 }).toBeNull()
-
-      await commands.proofKeyDown({ key: 'k' })
+      await new Promise((resolve) => setTimeout(resolve, CHORD_TIMEOUT_MS + 100))
+      expect(scenario.pendingChord()).not.toBeNull()
       await commands.proofKeyUp({ key: 'k' })
+      await commands.proofKeyPress({ key: 's' })
       await commands.proofKeyUp({ key: modifier })
 
-      expect(scenario.calls).toHaveLength(0)
+      expect(scenario.calls).toHaveLength(1)
       expect(scenario.output).toEqual([])
+      expect(scenario.errors).toEqual([])
     } finally {
       await commands.proofKeyUp({ key: 'k' })
       await commands.proofKeyUp({ key: modifier })

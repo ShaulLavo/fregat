@@ -1,9 +1,11 @@
+import type { SettingsOperation } from '@workspace/contracts'
+import type { TerminalBinding } from '@/commands/utils/bindings'
 import type { CommandId } from '@workspace/client-core/commands/catalog'
 import { commandMetadata } from '@workspace/client-core/commands/catalog'
 import { MAX_CHORD_STROKES, normalizedChord } from '@workspace/client-core/commands/chord'
 import { recordedStroke, recordingControl } from '@workspace/client-core/settings/recording'
 
-import { terminalBindingReason } from '@/commands/utils/bindings'
+import { terminalBindingReason, terminalBindingContext } from '@/commands/utils/bindings'
 import { terminalKeyboardEvent, type TerminalKeyEvent } from '@/commands/utils/keyboard'
 
 export type KeybindingEditorState =
@@ -67,4 +69,22 @@ export function recordedKeysLabel(keys: string | null | undefined) {
   if (keys === undefined) return 'Restore default'
   if (keys === null) return 'Disabled'
   return keys.replaceAll('Mod+', 'Ctrl+')
+}
+
+export function recordedSettingOperation(
+  command: string | null,
+  recorded: string | null | undefined,
+  defaults: readonly TerminalBinding[],
+): SettingsOperation | null {
+  if (!command) return null
+  const matches = defaults.filter((binding) => binding.command === command)
+  const context = matches[0] ? terminalBindingContext(matches[0]) : undefined
+  if (recorded === undefined) return { kind: 'keybinding.remove', command, context }
+  return {
+    kind: 'keybinding.set',
+    command,
+    context,
+    keys: recorded === null ? null : [recorded],
+    defaultKeys: matches.map((binding) => binding.keys),
+  }
 }

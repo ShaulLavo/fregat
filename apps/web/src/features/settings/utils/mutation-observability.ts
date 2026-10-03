@@ -55,6 +55,10 @@ function appendOperationMetadata(
     appendUnique(affectedIds, operation.command)
     return
   }
+  if (operation.kind === 'keybinding.append' || operation.kind === 'keybinding.delete') {
+    appendUnique(settingIds, 'keybindings.overrides')
+    return
+  }
   if (operation.kind === 'model.setHidden') {
     appendUnique(settingIds, 'models.hidden')
     appendUnique(affectedIds, modelRefKey(operation.ref))

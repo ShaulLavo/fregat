@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import type { FocusArea, FocusTargetId } from '@workspace/client-core/commands/focus'
 import {
   createSessionActiveReorderCommand,

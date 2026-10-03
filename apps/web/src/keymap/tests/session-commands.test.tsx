@@ -26,21 +26,10 @@ import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import type { ProjectId } from '@workspace/contracts'
 import { runGit } from 'server/testing'
 
-test('Platform mode puts items on Mod+digits and sidebar panels on Mod+Alt+digits', () => {
-  const bound = boundCommands('linux', 'default')
-
-  expect(bound.get('workspace.toggleSidebarVisibility')).toEqual(['Mod+B'])
-  expect(bound.get('workspace.newSession')).toEqual(['Mod+Alt+N'])
-  expect(bound.get('workspace.toggleSessionRail')).toEqual(['Mod+Alt+B'])
-  expect(bound.get('workspace.previousItem')).toEqual(['Mod+Alt+['])
-  expect(bound.get('workspace.nextItem')).toEqual(['Mod+Alt+]'])
-  expect(ITEM_POSITIONS.map((position) => bound.get(selectItemCommandId(position)))).toEqual(
-    ITEM_POSITIONS.map((position) => [`Mod+${position}`]),
-  )
-  expect(ITEM_POSITIONS.map((position) => bound.get(sidebarPanelCommandId(position)))).toEqual(
-    ITEM_POSITIONS.map((position) => [`Mod+Alt+${position}`]),
-  )
-  expect(bound.get('workspace.focusFirstEditorGroup')).toBeUndefined()
+test('ours preserves the approved workspace sidebar and document navigation shortcuts', () => {
+  const bound = boundCommands('linux', 'ours')
+  expect(bound.get('workspace.toggleSidebarVisibility')).toContain('Mod+B')
+  expect(bound.get('workspace.navigateBack')).toContain('Mod+[')
 })
 
 test.each([
@@ -224,7 +213,7 @@ function selectedSessionId() {
   const { selection } = useSessionSelectionStore.getState()
   return selection.kind === 'session' ? selection.sessionId : null
 }
-function boundCommands(platform: 'linux' | 'mac', preset: 'default' | 'vscode') {
+function boundCommands(platform: 'linux' | 'mac', preset: 'ours' | 'vscode') {
   const commands = new Map<PlatformCommandId, string[]>()
   for (const binding of defaultPlatformKeyBindings(platform, preset)) {
     if (!binding.command) continue

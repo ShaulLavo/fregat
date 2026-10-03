@@ -1,4 +1,5 @@
-import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
+import { useCommand } from '@/keymap/hooks/use-command'
+import { fileExtension } from '@/lib/path-formatters'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import { EditorHost, useEditor } from '@singapore-editor/react'
@@ -77,6 +78,7 @@ export const SearchResultFileEditor = memo(
     const { openTarget, replaceMatch, selectResultWithoutReveal } = useSearchResultActions()
     // Manual memo: `fileDocument` is a useMemo dependency, and the compiler's cache is a
     // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
+    const { keymap } = useCommand()
     const fileDocument = useMemo(() => searchResultFileDocument(file), [file])
     // Manual keys: the compiler would also key this on `activeResultId`, so moving the selection
     // would rebuild the windowed document under the editor.
@@ -107,10 +109,12 @@ export const SearchResultFileEditor = memo(
       // A parked editor's syntax and match ranges stay live in the page and slow every DOM write.
       document: parked ? null : document,
       editability: 'readonly',
+      keymapContext: { mode: 'diff', extension: fileExtension(file.path) },
       fontFamily,
       fontSize: EXCERPT_EDITOR_FONT_SIZE,
       gutterLeadingInset,
-      keymap: HOSTED_EDITOR_KEYMAP,
+      hotkeys: keymap.hotkeys,
+      hotkeysParent: keymap.parentFor('search'),
       lineHeight: EXCERPT_EDITOR_LINE_HEIGHT,
       plugins,
       rangeDecorations,

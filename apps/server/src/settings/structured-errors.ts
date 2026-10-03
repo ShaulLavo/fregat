@@ -48,6 +48,12 @@ export const settingsErrors = defineErrorCatalog('settings', {
     why: 'Saving replaces the whole file, so saving over the newer version would erase the other change.',
     fix: 'Choose Use the latest version to drop your edits, Keep my changes to save over it, or Compare to see both.',
   },
+  KEYBINDINGS_STALE: {
+    status: 409,
+    message: () => 'Authored bindings changed before this entry was deleted',
+    why: 'Another change moved or replaced entries in the binding list.',
+    fix: 'Review the refreshed bindings and delete the entry again.',
+  },
   WRITE_CONTENDED: {
     status: 503,
     message: () => 'Settings kept changing while this change was being saved',
