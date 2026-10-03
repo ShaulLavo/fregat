@@ -48,7 +48,7 @@ work transferred into execution plans, the original issue links, and remaining i
 | [169](169-agent-review-mode.md)                       | Agent review mode                                                               |
 | [170](170-language-census.md)                         | Language census for grammar and theme prefetch                                  |
 | [171](171-composer-on-our-editor.md)                  | The chat composer runs on our own editor                                        |
-| [172](172-shared-undo-stack.md)                       | One shared undo/redo stack                                                      |
+| [172](172-shared-undo-stack.md)                       | Shared undo: integrated action API and explicit composition                     |
 | [174](174-external-mcp-servers.md)                    | Managed external MCP servers                                                    |
 | [176](176-markdown-parser.md)                         | One markdown parser                                                             |
 | [177](177-prefetch-every-press.md)                    | Prefetch every press                                                            |
@@ -176,6 +176,14 @@ work transferred into execution plans, the original issue links, and remaining i
 | [319](319-agent-ui-mcp.md)                            | Agents reveal and drive the Fregat UI over MCP                                  |
 | [320](320-compile-time-data.md)                       | Compile-time defaults, themes, bidi and search; conditional icon investigation  |
 | [327](327-virtualization-and-two-axis-tables.md)      | Two-axis tables and measured editor, search and shared-list virtualization work |
+| [328](328-async-runtime-master.md)                    | Purpose-built async runtime: master plan; implementation deferred               |
+| [329](329-async-lifecycle-and-transport.md)           | Async lifecycle, cancellation, owned resources and private transport            |
+| [330](330-async-scheduling-and-admission.md)          | Bounded latest work, FIFO, sweeps and owner-scope admission                     |
+| [331](331-async-state-and-revision-contracts.md)      | Async state authority, exact revisions, barriers and recovery                   |
+| [332](332-async-editor-migration.md)                  | Bounded Editor worker and scheduler migration                                   |
+| [333](333-async-terminal-and-server-adapters.md)      | Terminal streams, Bun watch and same-thread server adapters                     |
+| [334](334-async-runtime-verification.md)              | Bounded async qualification, measurements and product acceptance                |
+| [335](335-stroke-icons.md)                            | Stroke icons only, Hugeicons by default, morphing icons, icon packs later       |
 | [208](208-all-text-in-json.md)                        | All app text in JSON with Paraglide                                             |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
