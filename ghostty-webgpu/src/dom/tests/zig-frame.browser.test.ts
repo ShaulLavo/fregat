@@ -2,6 +2,8 @@ import { afterAll, afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { GhosttyResult } from '../../core/abi.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
+import { createGhosttyError } from '../../core/error.js'
+import type { WebGpuTextPass } from '../../render/text-pass.js'
 import { ZigFrameBuilder } from '../../core/zig-frame.js'
 import { CanvasGlyphRasterizer } from '../../render/atlas/canvas-rasterizer.js'
 import { defaultRendererTheme } from '../../render/instances/types.js'
@@ -414,6 +416,112 @@ it.each(['webgl2', 'webgpu'] as const)(
     expect(native.errors).toHaveLength(2)
   },
 )
+
+function submissionSpies(native: Awaited<ReturnType<typeof hostFixture>>) {
+  const device = Reflect.get(native.renderer, 'device') as GPUDevice
+  const pass = Reflect.get(native.renderer, 'textPass') as WebGpuTextPass
+  return {
+    texture: () => vi.spyOn(native.canvas.getContext('webgpu')!, 'getCurrentTexture'),
+    pass: () => vi.spyOn(pass, 'submit'),
+    queue: () => vi.spyOn(device.queue, 'submit'),
+  }
+}
+
+it.each(['texture', 'pass', 'queue'] as const)(
+  'recovers an idle hidden-cursor frame after a one-shot presentation failure (%s)',
+  async (location) => {
+    const clock = new TestClock()
+    const native = await hostFixture('webgpu', { columns: 6, rows: 3 }, clock)
+    native.terminal.write('\x1b[?25lABAB\r\nBBBB\r\nlast')
+    clock.flushFrame()
+    const before = await displayedPixels(native.canvas)
+    const snapshot = native.terminal.frameSnapshot()
+    const submitted = native.renderer.metrics.submittedFrames
+    const acknowledge = vi.spyOn(native.state, 'acknowledge')
+    const reports: unknown[] = []
+    native.terminal.on('error', () =>
+      reports.push({
+        acknowledged: acknowledge.mock.calls.length,
+        submitted: native.renderer.metrics.submittedFrames,
+        snapshot: native.terminal.frameSnapshot(),
+      }),
+    )
+    const injected = createGhosttyError('presentation', 'Injected presentation failure')
+    const fault = submissionSpies(native)
+      [location]()
+      .mockImplementationOnce(() => {
+        throw injected
+      })
+    native.terminal.write('\x1b[1;1HBBBB')
+    expect(() => clock.flushFrame()).not.toThrow()
+    expect(clock.frames.size).toBe(0)
+    expect(clock.timers.size).toBe(0)
+    const after = await displayedPixels(native.canvas)
+    const rowBytes = native.canvas.width * (native.canvas.height / 3) * 4
+    const expected = before.slice()
+    expected.set(before.subarray(rowBytes, rowBytes * 2), 0)
+    expect(
+      after.every((value, index) => value === expected[index]),
+      'the idle canvas presents recovered glyph ink without another request',
+    ).toBe(true)
+    expect(fault).toHaveBeenCalledTimes(2)
+    expect(native.errors).toEqual([expect.objectContaining({ cause: injected })])
+    expect(reports).toEqual([{ acknowledged: 0, submitted, snapshot }])
+    expect(acknowledge).toHaveBeenCalledOnce()
+    expect(native.renderer.metrics.submittedFrames).toBe(submitted + 1)
+    expect(native.terminal.frameSnapshot()?.rows[0]?.text).toBe('BBBB  ')
+  },
+)
+
+it('bounds failed presentation retries and resets the error episode after recovery', async () => {
+  const clock = new TestClock()
+  const native = await hostFixture('webgpu', { columns: 6, rows: 3 }, clock)
+  native.terminal.write('\x1b[?25lABAB\r\nBBBB\r\nlast')
+  clock.flushFrame()
+  const before = await displayedPixels(native.canvas)
+  const snapshot = native.terminal.frameSnapshot()
+  const submitted = native.renderer.metrics.submittedFrames
+  const acknowledge = vi.spyOn(native.state, 'acknowledge')
+  const injected = createGhosttyError('presentation', 'Injected persistent presentation failure')
+  const fault = submissionSpies(native)
+    .queue()
+    .mockImplementation(() => {
+      throw injected
+    })
+  native.terminal.write('\x1b[1;1HBBBB')
+  expect(() => clock.flushFrame()).not.toThrow()
+  expect(fault).toHaveBeenCalledTimes(2)
+  native.renderer.schedule()
+  expect(() => clock.flushFrame()).not.toThrow()
+  expect(fault).toHaveBeenCalledTimes(4)
+  expect(native.errors).toEqual([expect.objectContaining({ cause: injected })])
+  expect(acknowledge).not.toHaveBeenCalled()
+  expect(native.renderer.metrics.submittedFrames).toBe(submitted)
+  expect(native.terminal.frameSnapshot()).toBe(snapshot)
+  expect(clock.frames.size).toBe(0)
+  expect(clock.timers.size).toBe(0)
+  fault.mockRestore()
+  native.renderer.schedule()
+  clock.flushFrame()
+  expect(acknowledge).toHaveBeenCalledOnce()
+  expect(native.renderer.metrics.submittedFrames).toBe(submitted + 1)
+  const recovered = await displayedPixels(native.canvas)
+  const rowBytes = native.canvas.width * (native.canvas.height / 3) * 4
+  const expected = before.slice()
+  expected.set(before.subarray(rowBytes, rowBytes * 2), 0)
+  expect(recovered.every((value, index) => value === expected[index])).toBe(true)
+  submissionSpies(native)
+    .queue()
+    .mockImplementationOnce(() => {
+      throw injected
+    })
+  native.terminal.write('\x1b[1;1HABAB')
+  expect(() => clock.flushFrame()).not.toThrow()
+  expect(native.errors).toHaveLength(2)
+  expect(await displayedPixels(native.canvas)).toEqual(before)
+  expect(clock.frames.size).toBe(0)
+  expect(clock.timers.size).toBe(0)
+})
 
 it('settles rolling ASCII scroll notifications without uploading unchanged native records', async () => {
   const native = await hostFixture()

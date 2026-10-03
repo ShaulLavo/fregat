@@ -241,6 +241,9 @@ export class ProviderAdapterRegistry {
       driverKind: instance.config.driverKind,
       enabled: instance.config.enabled !== false,
       credentialFingerprint: credentialFingerprint(instance.credentialPaths),
+      ...(instance.config.driverKind === 'codex'
+        ? { codexAuthPath: instance.credentialPaths[0] ?? null }
+        : {}),
       claudeCachePath:
         instance.config.driverKind === 'claude' && instance.credentialPaths.length > 0
           ? claudeUsageCachePath(instance.env)
