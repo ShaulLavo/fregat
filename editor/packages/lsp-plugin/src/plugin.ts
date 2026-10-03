@@ -913,6 +913,7 @@ class LanguageServerContribution implements EditorViewContribution {
     if (this.rename) return this.rename
 
     this.rename = createRenameWidgetController({
+      registerKeymapNode: (options) => this.context.registerKeymapNode(options),
       classNamespace: this.options.hoverDefinition.tooltipClassNamespace ?? 'lsp-plugin',
       document: this.context.container.ownerDocument,
       themeSource: this.context.scrollElement,
@@ -1209,10 +1210,6 @@ function resolveHoverDefinitionOptions(
 }
 
 const LANGUAGE_SERVER_COMMANDS: readonly LanguageServerCommandSpec[] = [
-  {
-    id: 'goToDefinition',
-    run: (state) => state.goToDefinitionFromSelection(),
-  },
   {
     id: 'editor.action.goToDefinition',
     run: (state) => state.goToDefinitionFromSelection(),

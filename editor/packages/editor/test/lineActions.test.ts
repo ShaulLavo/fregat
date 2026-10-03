@@ -9,7 +9,7 @@ import {
   type EditorEditActionCommandId,
   type EditorEditActionOptions,
 } from '../src/editor/editActions'
-import { defaultEditorKeyBindings, editorCommandPackForCommand } from '../src/editor/keymap'
+import { defaultKeyBindings, commandCategory } from './factories/keymap'
 import { registerEditorLanguageConfiguration } from '../src/editor/languageConfiguration'
 import { SelectionGoal, type ResolvedSelection, type SelectionAffinity } from '../src/selections'
 import type { EditorSyntaxInjection } from '../src/syntax/session'
@@ -479,12 +479,10 @@ describe('word-part command wiring', () => {
   it.each(wordPartCommands)(
     'gives %s a pack and a default binding on every platform',
     (command) => {
-      expect(editorCommandPackForCommand(command)).not.toBeNull()
+      expect(commandCategory(command)).not.toBeNull()
 
       for (const platform of ['mac', 'windows', 'linux'] as const) {
-        expect(defaultEditorKeyBindings(platform).map((binding) => binding.command)).toContain(
-          command,
-        )
+        expect(defaultKeyBindings(platform).map((binding) => binding.command)).toContain(command)
       }
     },
   )

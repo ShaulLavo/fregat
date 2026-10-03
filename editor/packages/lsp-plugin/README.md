@@ -71,3 +71,5 @@ const plugin = createLanguageServerSetPlugin({
 - `LspConnectionPool` lets editors share one connection per project so switching files skips the handshake
 - subpath exports (`./diagnostics`, `./paths`, `./completion`, `./document-sync`, `./workspace-edit` and more) expose the pieces for hosts that build their own ui
 - [`@singapore-editor/typescript-lsp`](../typescript-lsp/), this plugin wired to typescript in a worker
+
+Hosted editors contribute completion and parameter-hint context and commands to the host dispatcher. Import `suggestPack` from `@singapore-editor/core/keymap` and include its platform table in the host keymap to enable Enter, Tab, Escape, arrows, and signature-hint navigation.

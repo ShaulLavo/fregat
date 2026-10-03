@@ -23,7 +23,9 @@ import type {
   EditorInputRoute,
   EditorWrapBreak,
 } from '../virtualization/virtualizedTextViewTypes'
-import type { EditorKeymapOptions } from './keymap'
+import type { EditorKeymapOptions } from '../keymap/presets'
+import type { BrowserDispatcher, FocusNode } from '@fregat/hotkeys'
+import type { EditorKeymapMetadata } from './hotkeys'
 import type { EditorAutoClosingPair } from './languageConfiguration'
 import type { EditorSuspiciousCharactersOptions } from '../unicodeHighlight'
 import type { TextEdit } from '../tokens'
@@ -114,6 +116,9 @@ export type EditorOptions = {
   readonly onInitialPaint?: (event: EditorInitialPaintEvent) => void
   readonly plugins?: readonly EditorPlugin[]
   readonly keymap?: EditorKeymapOptions
+  readonly hotkeys?: BrowserDispatcher
+  readonly hotkeysParent?: FocusNode<KeyboardEvent>
+  readonly keymapContext?: EditorKeymapMetadata
   readonly cursorLineHighlight?: EditorCursorLineHighlightOptions
   readonly hiddenCharacters?: HiddenCharactersMode
   /** In pixels. Popups the editor opens follow it. Unset, the stylesheet decides (13px). */

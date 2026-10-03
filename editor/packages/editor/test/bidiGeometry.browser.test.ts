@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import '../src/style.css'
 
 import { Editor, type EditorOptions } from '../src/editor'

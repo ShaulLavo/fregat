@@ -65,10 +65,10 @@ const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
     applied: ['show'],
   },
   keymap: {
-    initial: { enabled: false },
-    next: { enabled: true, defaultBindings: false },
+    initial: { packs: [] },
+    next: { packs: [], bindings: [] },
     method: 'setKeymap',
-    applied: [{ enabled: true, defaultBindings: false }],
+    applied: [{ packs: [], bindings: [] }],
   },
   lineHeight: { initial: 20, next: 34, method: 'setLineHeight', applied: [34] },
   rangeDecorations: {

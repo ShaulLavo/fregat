@@ -12,7 +12,7 @@ import {
   sameSuspiciousCharactersOptions,
 } from '../unicodeHighlight'
 import type { Editor } from './Editor'
-import type { EditorKeymapOptions } from './keymap'
+import type { EditorKeymapOptions } from '../keymap/presets'
 import type { EditorSetSelectionOptions } from './selectionReveal'
 import type {
   EditorEditability,

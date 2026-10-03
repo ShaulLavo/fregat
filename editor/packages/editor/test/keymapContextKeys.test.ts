@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { Editor, EditorOptions } from '../src/editor'
 import type { EditorPlugin } from '../src/plugins'
 import { setHighlightRegistry } from '../src/public/testing'
-import { defaultEditorKeyBindings, vscodeEditorKeyBindings } from '../src/keymap/presets'
 import { createVisibleEditor } from './factories/visibleEditor'
 
 const editors: Editor[] = []
@@ -83,25 +82,11 @@ test('a key goes with the contribution that registered it', () => {
   expect(editor.getKeymapContext()).not.toHaveProperty('suggestWidgetVisible')
 })
 
-// A condition is any string, so a misspelled key would compile and never match.
-test('every condition the presets use names a key the editor or a bundled plugin sets', () => {
-  const known = new Set([
-    ...['writable', 'hasSelection', 'tabFocusMode', 'inlineSuggestionVisible'],
-    'findVisible', // @singapore-editor/find
-    'suggestWidgetVisible', // @singapore-editor/lsp-plugin, completion
-    'parameterHintsVisible', // @singapore-editor/lsp-plugin, signature help
-    'parameterHintsMultipleSignatures',
-    'markdown', // @singapore-editor/markdown, authoring
-  ])
-  const platforms = ['mac', 'windows', 'linux'] as const
-  const conditions = platforms.flatMap((platform) =>
-    [...defaultEditorKeyBindings(platform), ...vscodeEditorKeyBindings(platform)].flatMap(
-      (binding) => binding.when ?? [],
-    ),
-  )
-
-  const unknown = conditions.filter((condition) => !known.has(condition.replace(/^!/, '')))
-
-  expect(conditions.length).toBeGreaterThan(0)
-  expect([...new Set(unknown)]).toEqual([])
+test('the editor publishes true keys as identifiers and mode/extension as values', () => {
+  const editor = mountEditor({ keymapContext: { mode: 'single_line', extension: 'md' } })
+  const context = editor.getHotkeysHost().node.context()
+  expect(context.identifiers.has('writable')).toBe(true)
+  expect(context.identifiers.has('hasSelection')).toBe(false)
+  expect(context.values.get('mode')).toBe('single_line')
+  expect(context.values.get('extension')).toBe('md')
 })
