@@ -161,12 +161,17 @@ No runtime bridge, debugging connection, chooser binding or permission grant rea
    receipt, changed manifest or missing directory runs setup. A failed direct app launch invalidates
    its receipt and retries setup while idle within the remaining startup cap; an exhausted cap
    leaves setup for the next idle launch. Singleton presence proves ownership, never an app window.
-   Setup starts a temporary browser with the existing CDP pipe and calls
+   Setup starts a headless temporary browser with the existing CDP pipe and calls
    `PWA.getOsAppState({ manifestId })`. Success identifies an existing installation. An unknown
    app returns `InvalidParams` (`-32602`) with the unknown-app reason. Other parameter failures
    remain operational errors; there is no `installed: false` field.
 3. For an uninstalled identity, call
-   `PWA.install({ manifestId, installUrlOrBundleUrl: installUrl })` and check OS state again.
+   `PWA.install({ manifestId, installUrlOrBundleUrl: installPageUrl })` and check OS state again.
+   `installPageUrl` resolves `install.html` under the app base. This static document links the
+   manifest without starting the app or restoring a saved address during Chrome's metadata fetch.
+   Set `PWA.changeAppUserSettings({ manifestId, displayMode: "standalone" })` before recording a
+   verified receipt, including for an existing installation. Chrome's installation API defaults
+   the user launch mode to browser. Receipts include the configured standalone display mode.
    A failed installation is a failed launch with structured guidance. Repeat idle setup converges
    after a partial install or uninstall. Installation repair runs only while the profile is idle.
 4. Before closing the controller, query `Target.getTargets` and collect its HTTP(S) page URLs;
@@ -197,6 +202,16 @@ focuses the existing sole window, and that its last-window close works. The nest
 gray render leaves app title/icon and launchQueue URL delivery unconfirmed. Evidence is retained
 at `/work/tmp/fregat-evidence/u1-installed-client-20261002/`; private compositor and DBus teardown
 records are linked there. Chrome and macOS remain coordinator acceptance work.
+
+**Mac startup regression proof — 2026-10-03.** Chrome 154 rejected installation from the app
+root after a disposable profile had saved its workbench address. The same profile installed
+successfully from the static metadata page. Headless setup produced no bootstrap window.
+The installed window was inspected through macOS accessibility and a screenshot: Fregat owned
+the menu and window, with no browser tabs or address bar. Protocol tests cover the static install
+URL, standalone mode, preserved installation reasons and receipt invalidation. A deliberate
+real-browser failure produced `install-info-unavailable` in the launcher's JSONL with browser
+major, setup phase, elapsed time and pipe counters. Earlier successful protocol-only installation
+checks did not establish these visible launch properties.
 
 A Dock-started browser cannot acquire a retroactive private pipe. Do not scan browser databases,
 intercept Dock launch, require runtime debugging, or kill that browser to regain installation
