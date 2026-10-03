@@ -245,10 +245,12 @@ export class WebGpuTerminalRenderer {
   private font: TerminalFittedFont
   private format: GPUTextureFormat
   private grid: RendererGridSize
+  private frameFailed = false
   private needsFullRebuild = true
   private readonly frames: FrameObserver
   private readonly overlayRows = new Set<number>()
   private rasterizer: CanvasGlyphRasterizer
+  private readonly onError?: (cause: unknown) => void
   private readonly renderState: RenderStateSource
   private restorePromise?: Promise<void>
   private deviceUnavailable = false
@@ -283,6 +285,7 @@ export class WebGpuTerminalRenderer {
     this.device = device
     this.deviceFactory = options.deviceFactory ?? defaultDeviceFactory
     this.renderState = options.renderState
+    this.onError = options.onError
     this.grid = prepared.grid
     this.font = prepared.font
     this.themeInput = mergeRendererTheme(options.theme)
@@ -504,7 +507,14 @@ export class WebGpuTerminalRenderer {
     const phaseVisible = this.scheduler.cursorVisible
     if (this.cursorPhaseVisible !== phaseVisible) this.addCursorRow(cursor)
     this.cursorPhaseVisible = phaseVisible
-    this.drawZigFrame(damage)
+    try {
+      this.drawZigFrame(damage)
+    } catch (cause) {
+      this.needsFullRebuild = true
+      if (this.frameFailed) return
+      this.frameFailed = true
+      this.onError?.(cause)
+    }
   }
 
   private drawZigFrame(damage: RenderStateDirty): void {
@@ -540,7 +550,6 @@ export class WebGpuTerminalRenderer {
     }
     const status = buildZigFrame(builder, this.atlas, this.rasterizer, options)
     if (status !== 0) {
-      this.needsFullRebuild = true
       throw createGhosttyError(
         'frame_builder',
         `The native frame could not be built after atlas recovery (status ${status})`,
@@ -558,6 +567,7 @@ export class WebGpuTerminalRenderer {
     this.recordFrame(updates, operations)
     this.metrics.zigFrames += 1
     this.needsFullRebuild = false
+    this.frameFailed = false
     this.overlayRows.clear()
     this.emitFrame(
       rows,

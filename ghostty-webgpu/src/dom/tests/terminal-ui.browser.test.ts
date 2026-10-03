@@ -1348,6 +1348,8 @@ describe('terminal frame consumer demand in Chromium', () => {
     'commits atlas-eviction recovery in one paint before lazy snapshots read the captured state ($backend)',
     async ({ backend }) => {
       const harness = await createObservedRendererHarness({}, backend)
+      const onError = vi.fn()
+      harness.terminal.on('error', onError)
       const renderer = harness.renderer
       const rasterizer = Reflect.get(renderer, 'rasterizer') as CanvasGlyphRasterizer
       const bitmaps = Array.from('ABCDE界', (text) => {
@@ -1418,8 +1420,9 @@ describe('terminal frame consumer demand in Chromium', () => {
       const styledReads = harness.readRowsCalls()
       const zigFrames = renderer.metrics.zigFrames
       harness.terminal.write(`${escape}[1;1H界ABCDE`)
-      expect(() => scheduler.flush()).toThrow(
-        'The native frame could not be built after atlas recovery (status 2)',
+      expect(() => scheduler.flush()).not.toThrow()
+      expect(onError).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ cause: expect.objectContaining({ operation: 'frame_builder' }) }),
       )
       expect(harness.readRowsCalls()).toBe(styledReads)
       expect(renderer.metrics.submittedFrames).toBe(submittedFrames + 1)

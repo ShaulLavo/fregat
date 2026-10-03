@@ -368,7 +368,8 @@ describe('WebGL WASM frame lifecycle', () => {
   it('frees partial replacement allocations and recovers from a failed builder resize', async () => {
     const source = await runtimeFixture(8, 2)
     source.terminal.write('\x1b[?25lfirst')
-    const { clock, renderer } = await rendererFixture(source)
+    const onError = vi.fn()
+    const { clock, renderer } = await rendererFixture(source, { onError })
     clock.flushFrame()
     source.terminal.resize({ columns: 9, rows: 2 })
     const memory = source.runtime.memory
@@ -382,7 +383,8 @@ describe('WebGL WASM frame lifecycle', () => {
       return pointer
     })
     const free = vi.spyOn(memory, 'free')
-    expect(() => renderer.resize({ columns: 9, rows: 2 })).toThrow(injected)
+    expect(() => renderer.resize({ columns: 9, rows: 2 })).not.toThrow()
+    expect(onError).toHaveBeenCalledExactlyOnceWith(injected)
     expect(free.mock.calls.slice(-2)).toEqual(
       allocations.map(({ pointer, length }) => [pointer, length]),
     )

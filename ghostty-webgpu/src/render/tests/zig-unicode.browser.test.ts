@@ -2,13 +2,16 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { page } from 'vitest/browser'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import {
+  expectedGlyphs,
   zigFrameCursorStyles,
   zigGlyphCollisionFixtures,
   zigUnicodeFixtures,
 } from '../../core/tests/zig-frame-fixtures.js'
+import type { RenderRow } from '../../core/types.js'
+import type { TerminalFittedFont } from '../../term/types.js'
 import { ZigFrameBuilder } from '../../core/zig-frame.js'
 import { CanvasGlyphRasterizer } from '../atlas/canvas-rasterizer.js'
-import { defaultRendererTheme } from '../instances/types.js'
+import { defaultRendererTheme, type CanonicalRendererTheme } from '../instances/types.js'
 import { WebGpuTerminalRenderer, type WebGpuTerminalRendererOptions } from '../renderer.js'
 import { WebGlTerminalRenderer } from '../webgl/renderer.js'
 import { displayedPixels, fittedFont, TestClock } from '../webgl/tests/fixture.js'
@@ -19,6 +22,10 @@ const devicePool: GPUDevice[] = []
 const resourceChecks: (() => void)[] = []
 let sentinel: GPUDevice
 const viewport = { width: window.innerWidth, height: window.innerHeight }
+const unicodeFont = new FontFace(
+  'Zig Unicode Test',
+  `url(${new URL('../../../site/public/fonts/jetbrains-mono-latin-400-normal.woff2', import.meta.url).href})`,
+)
 const intrinsicFont = new FontFace(
   'Zig Intrinsic Colors',
   `url(${new URL('./fixtures/intrinsic-colors.ttf', import.meta.url).href})`,
@@ -27,6 +34,7 @@ const intrinsicFont = new FontFace(
 beforeAll(async () => {
   await page.viewport(900, 650)
   document.fonts.add(await intrinsicFont.load())
+  document.fonts.add(await unicodeFont.load())
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
   expect(adapter).not.toBeNull()
   // Keep Dawn's instance alive between independently owned renderer devices.
@@ -42,6 +50,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   document.fonts.delete(intrinsicFont)
+  document.fonts.delete(unicodeFont)
   const losses = devicePool.map((device) => device.lost)
   for (const device of devicePool) device.destroy()
   await Promise.all(losses)
@@ -110,12 +119,17 @@ async function nativeFixture(
     const clock = new TestClock()
     const unconfigure =
       backend === 'webgpu' ? vi.spyOn(canvas.getContext('webgpu')!, 'unconfigure') : undefined
+    const fitted = fittedFont()
+    const font = {
+      ...fitted,
+      settings: { ...fitted.settings, family: '"Zig Unicode Test", monospace' },
+    }
     const renderer = await Renderer.create({
       canvas,
       columns: 40,
       rows: 3,
       renderState: source.state,
-      font: fittedFont(),
+      font,
       schedulerClock: clock,
       deviceFactory: createDevice,
       ...options,
@@ -128,7 +142,7 @@ async function nativeFixture(
       if (backend === 'webgl2')
         canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext()
     })
-    return { ...source, canvas, clock, renderer }
+    return { ...source, canvas, clock, renderer, font: options.font ?? font }
   }
   const native = await create()
   const readRows = vi.spyOn(native.state, 'readRows')
@@ -162,6 +176,79 @@ async function expectPainted(pair: Fixture, submitted: number): Promise<Uint8Arr
   return native
 }
 
+function expectGlyphInk(
+  pixels: Uint8Array,
+  canvas: HTMLCanvasElement,
+  rows: readonly RenderRow[],
+  font: TerminalFittedFont,
+): void {
+  const theme: CanonicalRendererTheme = {
+    ...defaultRendererTheme,
+    cursorText: defaultRendererTheme.background,
+  }
+  const reference = document.createElement('canvas')
+  reference.width = canvas.width
+  reference.height = canvas.height
+  const context = reference.getContext('2d')!
+  for (const row of rows) {
+    for (const cell of row.cells) {
+      const background = cell.background ?? theme.background
+      const foreground = cell.foreground ?? theme.foreground
+      const brush = cell.style?.inverse ? foreground : background
+      context.fillStyle = `rgb(${brush.r}, ${brush.g}, ${brush.b})`
+      context.fillRect(
+        cell.x * font.deviceCellWidth,
+        row.y * font.deviceCellHeight,
+        font.deviceCellWidth,
+        font.deviceCellHeight,
+      )
+    }
+  }
+  // Transparent text keeps atlas-style grayscale antialiasing without reading atlas rasters.
+  const ink = document.createElement('canvas')
+  ink.width = canvas.width
+  ink.height = canvas.height
+  const inkContext = ink.getContext('2d')!
+  inkContext.textAlign = 'center'
+  inkContext.textBaseline = 'alphabetic'
+  for (const { x, y, input } of expectedGlyphs(rows, theme)) {
+    inkContext.clearRect(0, 0, ink.width, ink.height)
+    const weight = input.weight === 'bold' ? font.settings.boldWeight : font.settings.weight
+    const italic = input.italic ? 'italic ' : ''
+    inkContext.font = `${italic}${weight} ${font.settings.size * font.pixelRatio}px ${font.settings.family}`
+    inkContext.fillStyle = '#fff'
+    const spacing = font.deviceCellWidth - font.deviceCharWidth
+    const center = font.charLeft + (font.deviceCellWidth * input.cellSpan - spacing) / 2
+    const drawX = x * font.deviceCellWidth + center
+    const drawY = y * font.deviceCellHeight + font.deviceBaseline
+    inkContext.fillText(input.text, drawX, drawY)
+    const image = inkContext.getImageData(0, 0, ink.width, ink.height)
+    const color = image.data.some(
+      (value, index) => index % 4 !== 3 && image.data[index - (index % 4) + 3]! > 0 && value < 253,
+    )
+    const brush = input.foreground
+    if (color) {
+      inkContext.clearRect(0, 0, ink.width, ink.height)
+      inkContext.fillStyle = `rgb(${brush.r}, ${brush.g}, ${brush.b})`
+      inkContext.fillText(input.text, drawX, drawY)
+    } else {
+      for (let index = 0; index < image.data.length; index += 4) {
+        image.data[index] = brush.r
+        image.data[index + 1] = brush.g
+        image.data[index + 2] = brush.b
+      }
+      inkContext.putImageData(image, 0, 0)
+    }
+    context.drawImage(ink, 0, 0)
+  }
+  const expected = context.getImageData(0, 0, canvas.width, canvas.height).data
+  const differences = pixels.reduce(
+    (count, value, index) => count + (Math.abs(value - expected[index]!) > 2 ? 1 : 0),
+    0,
+  )
+  expect(differences, 'GPU glyph ink matches the independent Canvas2D text oracle').toBe(0)
+}
+
 function cleanRowRecords(builder: ZigFrameBuilder) {
   const cells = builder.cellData
   const glyphs = builder.glyphData
@@ -178,12 +265,37 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       async ({ content }) => {
         const pair = await nativeFixture(backend, content)
         flushFrame(pair)
-        await expectPainted(pair, 1)
+        const pixels = await expectPainted(pair, 1)
         expect(pair.builds.mock.results.at(-1)?.value).toBe(0)
-        const glyphs = pair.native.state
-          .readRows()[0]!
-          .cells.filter((cell) => cell.text.trim().length > 0 && !cell.continuation)
-        expect(glyphs.length).toBeGreaterThan(0)
+        expectGlyphInk(pixels, pair.native.canvas, pair.native.state.readRows(), pair.native.font)
+      },
+    )
+
+    it.each(['absent ink', 'aliased grapheme'] as const)(
+      'rejects $0 with the bundled-font ink oracle',
+      async (mutation) => {
+        if (mutation === 'absent ink') {
+          vi.spyOn(CanvasGlyphRasterizer.prototype, 'rasterize').mockReturnValue(undefined)
+        } else {
+          const glyphInput = ZigFrameBuilder.prototype.glyphInput
+          vi.spyOn(ZigFrameBuilder.prototype, 'glyphInput').mockImplementation(function (
+            this: ZigFrameBuilder,
+            key,
+          ) {
+            return { ...glyphInput.call(this, key), text: 'A' }
+          })
+        }
+        const pair = await nativeFixture(backend, 'AÁ')
+        flushFrame(pair)
+        const pixels = await expectPainted(pair, 1)
+        expect(() =>
+          expectGlyphInk(
+            pixels,
+            pair.native.canvas,
+            pair.native.state.readRows(),
+            pair.native.font,
+          ),
+        ).toThrow('GPU glyph ink matches the independent Canvas2D text oracle')
       },
     )
 

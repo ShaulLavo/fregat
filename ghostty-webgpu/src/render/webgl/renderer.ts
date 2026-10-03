@@ -105,6 +105,7 @@ export class WebGlTerminalRenderer {
   private font: TerminalFittedFont
   private grid: RendererGridSize
   private inactiveCursorStyle?: InactiveCursorStyle
+  private frameFailed = false
   private needsFullRebuild = true
   private readonly onError?: (cause: unknown) => void
   private readonly onContextLost?: () => void
@@ -366,7 +367,14 @@ export class WebGlTerminalRenderer {
     const phaseVisible = this.scheduler.cursorVisible
     if (this.cursorPhaseVisible !== phaseVisible) this.addCursorRow(cursor)
     this.cursorPhaseVisible = phaseVisible
-    this.drawZigFrame(pass, damage)
+    try {
+      this.drawZigFrame(pass, damage)
+    } catch (cause) {
+      this.needsFullRebuild = true
+      if (this.frameFailed) return
+      this.frameFailed = true
+      this.onError?.(cause)
+    }
   }
 
   private drawZigFrame(pass: WebGlTextPass, damage: RenderStateDirty): void {
@@ -402,7 +410,6 @@ export class WebGlTerminalRenderer {
     }
     const status = buildZigFrame(builder, this.atlas, this.rasterizer, options)
     if (status !== 0) {
-      this.needsFullRebuild = true
       throw createGhosttyError(
         'frame_builder',
         `The native frame could not be built after atlas recovery (status ${status})`,
@@ -427,6 +434,7 @@ export class WebGlTerminalRenderer {
       this.metrics.zigFrames += 1
     }
     this.needsFullRebuild = false
+    this.frameFailed = false
     this.overlayRows.clear()
     this.emitFrame(
       rows,

@@ -12,6 +12,7 @@ import { buildZigFrame } from '../../render/atlas/zig-glyphs.js'
 import { CellFlag, CellOffset, GlyphFlag, GlyphOffset } from '../../render/instances/layout.js'
 import { defaultRendererTheme } from '../../render/instances/types.js'
 import {
+  expectedGlyphs,
   zigFrameContents,
   zigFrameCursorStyles,
   zigGlyphCollisionFixtures,
@@ -304,13 +305,22 @@ function inputIdentity(input: GlyphRasterizationInput): string {
   ])
 }
 
+function expectGlyphDescriptors(
+  frame: ZigFrameBuilder,
+  inputs: readonly GlyphRasterizationInput[],
+) {
+  const descriptors = frame.missingGlyphs.map((key) => inputIdentity(frame.glyphInput(key)))
+  expect([...new Set(descriptors)]).toEqual([...new Set(inputs.map(inputIdentity))])
+}
+
 function fixtureGlyphs(kind: 'color' | 'grayscale') {
   const glyphs = new Map<string, AtlasGlyph>()
+  const identityOf = (input: GlyphRasterizationInput) =>
+    kind === 'color'
+      ? inputIdentity(input)
+      : JSON.stringify([input.text, input.cellSpan, input.weight, input.italic])
   const resolveInput = (input: GlyphRasterizationInput): AtlasGlyph => {
-    const identity =
-      kind === 'color'
-        ? inputIdentity(input)
-        : JSON.stringify([input.text, input.cellSpan, input.weight, input.italic])
+    const identity = identityOf(input)
     const existing = glyphs.get(identity)
     if (existing) return existing
     const index = glyphs.size + 1
@@ -328,6 +338,7 @@ function fixtureGlyphs(kind: 'color' | 'grayscale') {
   }
   return {
     glyphs,
+    identityOf,
     resolveInput,
   }
 }
@@ -412,15 +423,19 @@ describe('WASM Unicode descriptors and native records', () => {
     builder = state.createFrameBuilder(40, 3)
     const frameOptions = { ...options, theme: { ...options.theme, minimumContrast: 4.5 } }
     const registered = fixtureGlyphs(kind)
+    const expected = expectedGlyphs(state.readRows(), frameOptions.theme)
+    expect(expected.length).toBeGreaterThan(0)
     expect(builder.build(frameOptions)).toBe(2)
-    const inputs: GlyphRasterizationInput[] = []
+    expectGlyphDescriptors(
+      builder,
+      expected.map(({ input }) => input),
+    )
     let status = 2
     for (let attempt = 0; attempt < 3 && status === 2; attempt += 1) {
       const keys = [...builder.missingGlyphs]
       expect(new Set(keys).size).toBe(keys.length)
       for (const key of keys) {
         const input = builder.glyphInput(key)
-        inputs.push(input)
         builder.registerGlyph(key, registered.resolveInput(input))
       }
       status = builder.build(frameOptions)
@@ -428,7 +443,59 @@ describe('WASM Unicode descriptors and native records', () => {
     expect(status).toBe(0)
     expectNativeRecords(builder)
     expect(builder.missingGlyphs).toEqual([])
+    expect(registered.glyphs.size).toBe(
+      new Set(expected.map(({ input }) => registered.identityOf(input))).size,
+    )
+    for (const { x, y, input } of expected) {
+      const atlasGlyph = registered.glyphs.get(registered.identityOf(input))
+      expect(atlasGlyph, inputIdentity(input)).toBeDefined()
+      const offset = (y * 40 + x) * 24
+      const record = builder.glyphData.subarray(offset, offset + 24)
+      expect(record.slice(0, 4)).toEqual(
+        new Float32Array([
+          x * 8 + atlasGlyph!.offsetX,
+          y * 16 + atlasGlyph!.offsetY,
+          atlasGlyph!.width,
+          atlasGlyph!.height,
+        ]),
+      )
+      expect(record.slice(8, 12)).toEqual(
+        new Float32Array([
+          atlasGlyph!.x / atlasGlyph!.atlasWidth,
+          atlasGlyph!.y / atlasGlyph!.atlasHeight,
+          (atlasGlyph!.x + atlasGlyph!.width) / atlasGlyph!.atlasWidth,
+          (atlasGlyph!.y + atlasGlyph!.height) / atlasGlyph!.atlasHeight,
+        ]),
+      )
+      expect(record[GlyphOffset.Meta]).toBe(GlyphFlag.Glyph)
+      expect(record.slice(20, 23)).toEqual(
+        new Float32Array([atlasGlyph!.layer, atlasGlyph!.generation, kind === 'color' ? 1 : 0]),
+      )
+      if (input.cellSpan === 2)
+        expect(builder.glyphData.slice(offset + 24, offset + 48)).toEqual(new Float32Array(24))
+    }
   })
+
+  it.each(['AÁŁ', 'e é è ȩ́'])(
+    'rejects aliased descriptors for %s using the independent styled reader',
+    async (content) => {
+      runtime = await GhosttyRuntime.create()
+      const terminal = runtime.createTerminal({ columns: 12, rows: 1 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write(`\x1b[?25l${content}`)
+      state.update()
+      builder = state.createFrameBuilder(12, 1)
+      expect(builder.build(options)).toBe(2)
+      const expected = expectedGlyphs(state.readRows(), options.theme).map(({ input }) => input)
+      expectGlyphDescriptors(builder, expected)
+      const glyphInput = builder.glyphInput.bind(builder)
+      vi.spyOn(builder, 'glyphInput').mockImplementation((key) => {
+        const input = glyphInput(key)
+        return { ...input, text: String.fromCodePoint(input.text.codePointAt(0)! & 0x7f) }
+      })
+      expect(() => expectGlyphDescriptors(builder!, expected)).toThrow()
+    },
+  )
 
   it.each(zigFrameCursorStyles.flatMap((style) => [0, 1].map((x) => ({ style, x }))))(
     'encodes selection and $style cursor on CJK column $x',

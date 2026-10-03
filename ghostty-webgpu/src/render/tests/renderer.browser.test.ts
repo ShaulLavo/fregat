@@ -1062,6 +1062,7 @@ it('recovers after a Zig builder replacement allocation fails', async () => {
   const state = runtime.createRenderState(terminal)
   const clock = new FakeClock()
   terminal.write('first')
+  const onError = vi.fn()
   const renderer = await createRenderer({
     canvas: new OffscreenCanvas(1, 1),
     columns: 8,
@@ -1069,6 +1070,7 @@ it('recovers after a Zig builder replacement allocation fails', async () => {
     font: fittedFont(),
     renderState: state,
     schedulerClock: clock,
+    onError,
   })
   try {
     clock.flushFrame()
@@ -1081,7 +1083,8 @@ it('recovers after a Zig builder replacement allocation fails', async () => {
       if (calls === 3) throw injected
       return allocate(length)
     })
-    expect(() => renderer.resize({ columns: 9, rows: 2 })).toThrow(injected)
+    expect(() => renderer.resize({ columns: 9, rows: 2 })).not.toThrow()
+    expect(onError).toHaveBeenCalledExactlyOnceWith(injected)
     failing.mockRestore()
     expect(() => renderer.clearTextureAtlas()).not.toThrow()
     terminal.resize({ columns: 8, rows: 2 })
