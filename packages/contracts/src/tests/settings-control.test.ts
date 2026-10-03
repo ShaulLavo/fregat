@@ -24,6 +24,26 @@ describe('settingControl', () => {
     })
   })
 
+  it('carries schema-authorized nullable strings into a text control', () => {
+    expect(settingControl('providers.proxyUsageUrl', null)).toEqual({
+      widget: 'string',
+      value: null,
+      nullable: true,
+    })
+    expect(settingControl('providers.proxyUsageUrl', 'http://127.0.0.1:8317')).toEqual({
+      widget: 'string',
+      value: 'http://127.0.0.1:8317',
+      nullable: true,
+    })
+    expect(settingControl('server.address', 'http://127.0.0.1:3301')).toEqual({
+      widget: 'string',
+      value: 'http://127.0.0.1:3301',
+      nullable: false,
+    })
+    expect(settingControl('server.address', null)).toEqual({ widget: 'unsupported' })
+    expect(settingControl('providers.proxyUsageUrl', 42)).toEqual({ widget: 'unsupported' })
+  })
+
   it('parses a structured value rather than casting it', () => {
     // Value-less, like `models`: the section sources its own rows from the
     // keymap, so the stored record tells the control nothing.

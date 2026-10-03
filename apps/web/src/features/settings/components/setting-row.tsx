@@ -298,6 +298,7 @@ function SettingControl({
       <StringWidget
         disabled={disabled}
         id={id}
+        nullable={control.nullable}
         onCommit={onChange}
         value={control.value}
         verbatim={id === 'editor.unicodeHighlight.allowedCharacters'}
