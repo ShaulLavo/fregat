@@ -217,18 +217,26 @@ test('an exact Ghostty export installs the serial policy without root dependenci
       '--input-type=module',
       '-e',
       `
-import { writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
+import { chromium } from 'playwright'
 import { resolveConfig } from 'vitest/node'
+const browserPayload = existsSync(chromium.executablePath())
 const config = await resolveConfig({ root: process.cwd(), config: process.cwd() + '/vitest.browser.config.ts' })
 writeFileSync(${JSON.stringify(result)}, JSON.stringify({
   maxWorkers: config.test.maxWorkers, fileParallelism: config.test.fileParallelism,
-  browser: config.test.browser.enabled,
+  browser: config.test.browser.enabled, browserPayload,
 }))
 `,
     ],
     {
       cwd: box.root,
-      env: { ...process.env, VITEST_MAX_WORKERS: '4' },
+      env: {
+        ...process.env,
+        VITEST_MAX_WORKERS: '4',
+        PLAYWRIGHT_BROWSERS_PATH: path.join(box.root, 'browser-payloads'),
+        GHOSTTY_BROWSER_ENGINE: 'chromium',
+        GHOSTTY_BROWSER_HARDWARE: '0',
+      },
       stdout: 'pipe',
       stderr: 'pipe',
     },
@@ -243,6 +251,7 @@ writeFileSync(${JSON.stringify(result)}, JSON.stringify({
     maxWorkers: 1,
     fileParallelism: false,
     browser: true,
+    browserPayload: false,
   })
 })
 
