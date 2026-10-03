@@ -26,7 +26,7 @@ already has. A third party can write an extension against the public API alone.
 
 Clones in `references/` (gitignored): `xterm.js` (c58ea36), `local-echo` (8d0b7f5),
 `xterm-readline` (0268a50, the maintained repo is strtok/xterm-readline), `ghostty-web` (1858a59),
-`ghostty` (83edd49; our wasm pins c8554f2).
+`ghostty` (83edd49; the native OSC prerequisite pins official 7b11f3d).
 
 ### xterm.js addons
 
@@ -102,8 +102,8 @@ From the macOS app, apprt and VT layer (`references/ghostty`):
   notifications, OSC 9;4 progress, OSC 52 clipboard (reads too) and the kitty keyboard protocol.
   Our bridge (`src/core/bridge.ts`, `src/core/types.ts:101–109`) exposes title, bell and clipboard
   writes, but not prompt marks, cwd, notifications or progress.
-- Upstream since our pin adds semantic-prompt callbacks and a C search API with cell ranges; the
-  pin has the lower-level Zig search pieces only.
+- Research against the original c8554f2 pin found newer semantic-prompt callbacks and a C search
+  API with cell ranges. Extension integration of these native APIs remains later work.
 - Kitty graphics is disabled for `wasm32-freestanding`, our target (`src/terminal/build_options.zig:155–165`);
   Sixel is not implemented. Images are not available without upstream work.
 - App-level, not for a library: quick terminal, splits and tabs, the command palette UI, secure
@@ -145,6 +145,50 @@ House style to match: the Editor's plugins attach through a small typed context 
 disposables (`editor/packages/editor/src/plugins.ts`, `createPlugin.ts`); capabilities are either
 single-owner or multi-provider (`editor/src/editor/Editor.ts`). The terminal takes that shape
 without the Editor's composition machinery.
+
+## Native custom OSC pin prerequisite
+
+Status: **Approved. Native prerequisite integrated with the landed lifecycle contracts.**
+
+The prerequisite preserves the actual main package and lockfile versions and carries its own
+`ghostty-webgpu` patch changeset. Integration includes the landed #494 squash
+`fffe237f9fdbf020647e3bb64e19fad8c1bffc16`, preserving its attachment lifetime and typed API
+contracts. Native build inputs and WASM bytes match the approved native checkpoint; resolver
+records use the current input closure. Public X6 remains failed/held, and full Phase 0 is pending.
+
+- [x] Build the official introducing revision
+      `7b11f3dca034d8d24369ad3856afe57946d7902a`, parent
+      `ed350cbb4be3523e66016ceecd3be92b61334755`, after the merged Zig-only frame change
+      `81b09d4b0dff5f5f39a54df0320a9bdf770572df`. No upstream patch or fork is used.
+      The smallest proven candidate builds with Zig 0.16.0 without production ABI adaptation.
+- [x] Regenerate the checked-in WASM with `bun run build:wasm`. Its generated
+      `ghostty-webgpu/ghostty-vt.provenance.json` records the official source tree, Git archive and
+      codeload archive digests, compiler executable, build-input hashes and artifact hashes.
+      Rebuilding preserves the bridge byte-for-byte and keeps the frame ABI unchanged.
+- [x] Observe native unknown OSC callbacks through real writes. Portable tests install a
+      test-only native function-table callback, copy borrowed content before returning, and cover
+      split chunks, BEL, split ST, truncation, CAN and SUB cancellation. Native ST notification
+      occurs at ESC; the following backslash completes the escape without a second callback.
+      Callback code never reenters `vt_write` on the same terminal.
+- [x] Count native allocations through a test allocator. Capture defaults to zero. A callback
+      with the default limit captures nothing and allocates nothing; the 2048-byte OSC path also
+      allocates nothing. A larger capture provides the allocating positive control.
+- [x] Preserve recognized OSC title, hyperlink and color behavior, including malformed
+      core-owned numbers. OSC 52 stays denied by default and write-only when accepted; read queries
+      produce no clipboard reply and no browser read callback or grant is added.
+- [x] Preserve paired native mode 2027 widths, enabled/disabled: woman-technologist 2/4,
+      CJK 4/4, combining accent 1/1, heart plus variation selector 2/1. Cell content, damage and
+      cursor tests use the real checked-in native artifacts. The old pin reports zero custom OSC
+      callbacks and the new pin reports both BEL and ST; the APC positive control works on both.
+- [x] Add portable unit/provenance gates to `test:unit`, which runs in the Libraries CI job and
+      the standalone package verification. The test callback and allocator remain internal tests.
+- [x] Reconcile with landed predecessors #475, #477 and #494, preserve actual main release
+      metadata, add a patch changeset and regenerate resolver records for the changed VT pin input.
+      The native resolver keeps its own upstream pin and excludes package version metadata.
+- [ ] Merge the native prerequisite after independent integration review.
+- [ ] Activate host extensions and deliver subscriptions across both execution entries.
+- [ ] Complete X1–X7 and the full Phase 0 done-when. This prerequisite claims native correctness
+      only, with no hardware timing, worker synchronous interception or worker query-reply claim.
 
 ## Phase 0: the extension contract and core hooks
 
