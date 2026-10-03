@@ -87,6 +87,7 @@ const job = {
   label: 'x',
   pid: process.pid,
   quiet: false,
+  server: false,
   sliceRoot: 'heavytqueue',
 }
 
@@ -609,35 +610,49 @@ describe.skipIf(!userScopes)('reaping a dead entry on another root', () => {
     expect(entries()).toEqual([])
   }, 60_000)
 
-  test('no startup file of the shim can carry the entry lock past it', async () => {
-    const box = lifecycleBox(65536)
-    const other = sandbox().sliceRoot
-    const helpers = path.join(box.root, 'helpers')
-    const bashEnv = path.join(box.root, 'bash-env')
-    writeFileSync(bashEnv, `sleep 60 & echo $! >> ${helpers}\n`)
-    const pidFile = path.join(box.root, 'pid')
-    const orphaned = start(box, 'orphaned', ['bash', '-c', `echo $$ > ${pidFile}; exec sleep 60`], {
-      env: { ...process.env, BASH_ENV: bashEnv },
-      jobClass: 'light',
-      machine: true,
-      sliceRoot: other,
-    })
-    await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true)
-    const entry = readdirSync(path.join(box.state, 'jobs')).find((name) => name.endsWith('.json'))!
-    const entryFile = realpathSync(path.join(box.state, 'jobs', entry))
-    // The job's own bash still reads BASH_ENV; no helper started anywhere holds the entry lock.
-    const started = readFileSync(helpers, 'utf8').trim().split('\n').map(Number)
-    expect(started.length).toBeGreaterThan(0)
-    for (const pid of started) {
-      const fds = readdirSync(`/proc/${pid}/fd`).map((fd) => readlinkSafe(`/proc/${pid}/fd/${fd}`))
-      expect(fds).not.toContain(entryFile)
-    }
-    await killWrapper(orphaned)
+  test.each([false, true])(
+    'no startup file of the shim can carry the entry lock past it (server=%s)',
+    async (server) => {
+      const box = lifecycleBox(65536)
+      const other = sandbox().sliceRoot
+      const helpers = path.join(box.root, 'helpers')
+      const bashEnv = path.join(box.root, 'bash-env')
+      writeFileSync(bashEnv, `sleep 60 & echo $! >> ${helpers}\n`)
+      const pidFile = path.join(box.root, 'pid')
+      const orphaned = start(
+        box,
+        'orphaned',
+        ['bash', '-c', `echo $$ > ${pidFile}; exec sleep 60`],
+        {
+          env: { ...process.env, BASH_ENV: bashEnv },
+          server,
+          jobClass: 'light',
+          machine: true,
+          sliceRoot: other,
+        },
+      )
+      await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true)
+      const entry = readdirSync(path.join(box.state, 'jobs')).find((name) =>
+        name.endsWith('.json'),
+      )!
+      const entryFile = realpathSync(path.join(box.state, 'jobs', entry))
+      // The job's own bash still reads BASH_ENV; no helper started anywhere holds the entry lock.
+      const started = readFileSync(helpers, 'utf8').trim().split('\n').map(Number)
+      expect(started.length).toBeGreaterThan(0)
+      for (const pid of started) {
+        const fds = readdirSync(`/proc/${pid}/fd`).map((fd) =>
+          readlinkSafe(`/proc/${pid}/fd/${fd}`),
+        )
+        expect(fds).not.toContain(entryFile)
+      }
+      await killWrapper(orphaned)
 
-    const next = await heavy(box, 'next', ['true'], { jobClass: 'light', machine: true })
-    expect(next.stderr).toContain(`stopping ${other}-`)
-    expect(alive(pidIn(pidFile))).toBe(false)
-  }, 40_000)
+      const next = await heavy(box, 'next', ['true'], { jobClass: 'light', machine: true })
+      expect(next.stderr).toContain(`stopping ${other}-`)
+      expect(alive(pidIn(pidFile))).toBe(false)
+    },
+    40_000,
+  )
 
   test('keeps a dead entry whose empty slice failed to stop', async () => {
     const box = lifecycleBox(65536)

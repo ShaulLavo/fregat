@@ -27,8 +27,11 @@ export type Entry = {
   readonly estimateBytes: number
   /** Where its slice runs: `<sliceRoot>-<id>.slice`. Wrappers sharing a state directory may differ. */
   readonly sliceRoot: string
-  /** A `--quiet` job: it runs alone, for at most one quiet hold. */
+  /** A `--quiet` job: it drains finite jobs, for at most one quiet hold. */
   readonly quiet: boolean
+  readonly server: boolean
+  /** A queued quiet request's deadline, in boot seconds; independent of its running lease. */
+  readonly quietAdmissionUntil?: number
   /**
    * A running quiet job's lease, in boot seconds: by then systemd has ended its scope, so its
    * claim on the machine lapses even if its wrapper is suspended and cannot release it.
