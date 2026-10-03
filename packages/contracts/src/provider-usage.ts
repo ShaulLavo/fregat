@@ -36,6 +36,8 @@ export const providerUsageWindowSchema = v.object({
 export const providerAccountUsageSchema = v.object({
   accountKey: trimmedNonEmptyStringSchema,
   driverKind: providerDriverKindSchema,
+  /** Sanitized proxy presentation hint; account identity stays in the opaque key. */
+  label: v.optional(v.pipe(v.string(), v.regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/))),
   providerInstanceIds: v.array(providerInstanceIdSchema),
   planType: v.nullable(trimmedNonEmptyStringSchema),
   windows: v.array(providerUsageWindowSchema),

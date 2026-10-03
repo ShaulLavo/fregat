@@ -24,7 +24,7 @@ test('reads only management GETs and sanitizes pooled account snapshots', async 
             id: 'private-file.json',
             auth_index: 'raw-index',
             provider: 'codex',
-            email: 'private@example.test',
+            email: 'pool.work@example.test',
             label: 'private',
             access_token: 'sensitive-token',
             path: '/private/credentials/private-file.json',
@@ -56,6 +56,7 @@ test('reads only management GETs and sanitizes pooled account snapshots', async 
   expect(accounts[0]).toMatchObject({
     accountKey: expect.stringMatching(/^proxy:[a-f0-9]{64}$/),
     driverKind: 'codex',
+    label: 'pool.work',
     providerInstanceIds: [],
     planType: 'Pro',
     state: 'ready',
@@ -594,4 +595,42 @@ test('sanitizes management failures and malformed cache responses', async () => 
       expect(JSON.stringify(error)).not.toContain('sensitive')
     }
   }
+})
+
+test.each([
+  { email: 'pool.work@example.test', label: 'pool.work' },
+  { email: 'pool+work@example.test', label: 'pool+work' },
+  { email: 'bad\u0000local@example.test', label: undefined },
+  { email: 'bad‮local@example.test', label: undefined },
+  { email: 'no-at-sign', label: undefined },
+  { email: 'double@@example.test', label: undefined },
+  { email: `${'a'.repeat(65)}@example.test`, label: undefined },
+])('proxy short labels use sanitized email local parts only: %j', async (scenario) => {
+  const accounts = await readProxyUsage({
+    url: URL,
+    secret: SECRET,
+    now: () => NOW,
+    fetch: async () =>
+      Response.json({
+        files: [
+          {
+            provider: 'codex',
+            id: 'private-auth-file.json',
+            label: 'private-file-label',
+            email: scenario.email,
+          },
+          { provider: 'codex', id: 'different-private-file.json', email: scenario.email },
+        ],
+      }),
+  })
+  expect(accounts).toHaveLength(2)
+  expect(accounts.map((account) => ('label' in account ? account.label : undefined))).toEqual([
+    scenario.label,
+    scenario.label,
+  ])
+  expect(accounts[0]?.accountKey).not.toBe(accounts[1]?.accountKey)
+  expect(JSON.stringify(accounts)).not.toMatch(
+    /@|private-auth-file|different-private-file|private-file-label/,
+  )
+  expect(accounts.every((account) => account.routing?.lastServedAt === null)).toBe(true)
 })

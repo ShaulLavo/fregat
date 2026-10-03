@@ -22,6 +22,7 @@ import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderAdapter, ProviderRuntimeEvent } from './types'
 import { readClaudeUsageCache, readClaudeUsageIdentity } from './usage-claude-cache'
 import {
+  codexWindowPresentation,
   mergeUsageWindows,
   type ProviderUsageProbe,
   type ProviderUsageUpdate,
@@ -213,7 +214,7 @@ export class ProviderUsageStore {
       accounts: accounts.map((account, index) => ({
         id: safeFeedText(account.accountKey),
         provider: safeFeedText(account.driverKind),
-        label: `${account.driverKind === 'claude' ? 'Claude' : 'Codex'} account ${index + 1}`,
+        label: feedAccountLabel(account, index),
         plan: safeFeedText(account.planType ?? 'Unknown'),
         checkedAt: account.checkedAt,
         lastSeenAt: account.lastSeenAt ?? account.checkedAt,
@@ -221,8 +222,7 @@ export class ProviderUsageStore {
         source: account.source === 'rate-limit-event' ? 'passive-header' : 'proxy-state',
         routing: account.routing ?? { mode: 'unknown', active: null, lastServedAt: null },
         windows: account.windows.map((window) => ({
-          id: safeFeedText(window.id),
-          label: safeFeedText(window.label),
+          ...feedWindowPresentation(account, window),
           usedPercent: window.usedPercent,
           resetsAt: window.resetsAt,
           windowMinutes: window.windowMinutes,
@@ -665,6 +665,38 @@ function windowFreshness(
   if (!observedAt) return 'unknown'
   if (resetsAt && Date.parse(resetsAt) <= nowMs) return 'reset-passed'
   return nowMs - Date.parse(observedAt) >= staleAfterMs ? 'stale' : 'fresh'
+}
+
+function feedAccountLabel(account: ProviderAccountUsage, index: number) {
+  if (account.source === 'cli-proxy-management')
+    return account.label ? `Proxy · ${account.label}` : `Proxy account ${index + 1}`
+  return `${account.driverKind === 'claude' ? 'Claude' : 'Codex'} account ${index + 1}`
+}
+
+function feedWindowPresentation(
+  account: ProviderAccountUsage,
+  window: ProviderAccountUsage['windows'][number],
+) {
+  if (
+    account.driverKind !== 'codex' ||
+    account.source === 'cli-proxy-management' ||
+    !isCodexPosition(window.id)
+  )
+    return { id: safeFeedText(window.id), label: safeFeedText(window.label) }
+  const { kind, label } = codexWindowPresentation(window.windowMinutes)
+  const sharedKind = account.windows.some(
+    (peer) =>
+      peer.id !== window.id &&
+      isCodexPosition(peer.id) &&
+      codexWindowPresentation(peer.windowMinutes).kind === kind,
+  )
+  // Positions remain merge keys; the feed names genuine durations, including retained reads.
+  const id = kind === 'other' || sharedKind ? `${kind}:${window.id}` : kind
+  return { id, label }
+}
+
+function isCodexPosition(id: string) {
+  return id === 'primary' || id === 'secondary'
 }
 
 function safeFeedText(value: string) {

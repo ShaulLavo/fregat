@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import * as v from 'valibot'
@@ -179,4 +179,163 @@ test('clearing the proxy URL through settings stops collection while retaining m
   expect(
     after.coverage.sources.filter((entry) => entry.sourceKind === 'native-transcript'),
   ).toEqual(before.coverage.sources.filter((entry) => entry.sourceKind === 'native-transcript'))
+})
+
+test.each([
+  { key: 'synthetic-management-secret', address: true, configured: true, importKey: false },
+  { key: 'synthetic-management-secret', address: true, configured: true, importKey: true },
+  { key: null, address: true, configured: false },
+  { key: '', address: true, configured: false },
+  { key: 'synthetic-management-secret', address: false, configured: false },
+])('unmapped proxy activation uses address and stored key: %j', async (scenario) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'usage-unmapped-source-'))
+  roots.push(root)
+  const options = testSettingsOptions(root)
+  await mkdir(path.dirname(options.userFilePath!), { recursive: true })
+  const observedAt = new Date(Date.now() - 60_000).toISOString()
+  const source = startProxyUsageHttpFixture(observedAt, [
+    {
+      id: 'private-auth-work.json',
+      provider: 'codex',
+      email: 'pool.work@example.test',
+      id_token: { chatgpt_plan_type: 'plus' },
+      quota: { observed_at: observedAt, signals: { 'x-codex-primary-used-percent': '6' } },
+    },
+    {
+      id: 'private-auth-personal.json',
+      provider: 'codex',
+      email: 'pool.personal@example.test',
+      id_token: { chatgpt_plan_type: 'pro' },
+    },
+    { id: 'private-auth-claude.json', provider: 'claude' },
+  ])
+  sources.push(source)
+  if (scenario.key !== null && !scenario.importKey)
+    await writeFile(
+      options.secretsFilePath!,
+      JSON.stringify({ [PROXY_USAGE_MANAGEMENT_KEY_REF]: scenario.key }),
+    )
+  await writeFile(
+    options.userFilePath!,
+    JSON.stringify({
+      'providers.instances': [],
+      'providers.proxyUsageUrl': scenario.address ? source.url : null,
+    }),
+  )
+  if (scenario.importKey) {
+    const checkout = path.resolve(import.meta.dirname, '../../../../..')
+    const keyFile = path.join(root, 'import-key')
+    await writeFile(keyFile, `${scenario.key}\n`, { mode: 0o600 })
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        path.join(checkout, 'scripts/import-proxy-usage-key.ts'),
+        keyFile,
+        '--url',
+        source.url,
+      ],
+      {
+        cwd: checkout,
+        env: { ...process.env, PLATFORM_HOME: path.dirname(options.userFilePath!) },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+    )
+    const [exit, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+    expect(exit, stderr).toBe(0)
+    expect(stdout + stderr).toBe('')
+  }
+  const registry = new ProviderAdapterRegistry({ services: { cwd: root }, drivers: [] })
+  registries.push(registry)
+  const app = createTestApp({
+    homeDirectory: root,
+    workspaceRoot: root,
+    systemRoot: root,
+    settings: options,
+    system: { stateHome: path.join(root, 'state') },
+    themes: { root: path.join(root, 'themes') },
+    orchestration: { providerRuntime: false, providerAdapterRegistry: registry },
+    auth: { allowedOrigins: [origin] },
+    watch: false,
+  })
+  const collector = appUsageCollector(app)
+  await collector.refresh()
+  for (let read = 0; read < 2; read += 1) {
+    const response = await app.handle(new Request('http://local/providers/usage/feed'))
+    expect(response.status).toBe(200)
+    const feed = await response.json()
+    expect(feed.accounts).toHaveLength(scenario.configured ? 2 : 0)
+    if (!scenario.configured) continue
+    expect(feed.accounts).toMatchObject([
+      {
+        id: expect.stringMatching(/^proxy:[a-f0-9]{64}$/),
+        label: 'Proxy · pool.work',
+        plan: 'Plus',
+        checkedAt: observedAt,
+        windows: [{ usedPercent: 6, lastSeenAt: observedAt }],
+        routing: { lastServedAt: null },
+      },
+      {
+        id: expect.stringMatching(/^proxy:[a-f0-9]{64}$/),
+        label: 'Proxy · pool.personal',
+        plan: 'Pro',
+        state: 'no-data',
+        routing: { lastServedAt: null },
+      },
+    ])
+    expect(new Set(feed.accounts.map((account: { id: string }) => account.id)).size).toBe(2)
+    expect(JSON.stringify(feed)).not.toMatch(/@|private-auth|synthetic-management-secret/)
+    expect(
+      (await collector.read()).accounts.every(
+        (account) => account.providerInstanceIds.length === 0,
+      ),
+    ).toBe(true)
+  }
+  expect(source.requests).toEqual(
+    scenario.configured ? [{ method: 'GET', path: '/v0/management/auth-files' }] : [],
+  )
+  if (!scenario.configured) return
+  const savedSecrets = path.join(root, 'accepted-secrets.json')
+  await rename(options.secretsFilePath!, savedSecrets)
+  await mkdir(options.secretsFilePath!)
+  const accepted = await app.handle(
+    new Request('http://local/settings/write', {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        mutationId: 'retain-unreadable-key-presence',
+        target: 'user',
+        operations: [{ kind: 'set', key: 'providers.usageStaleAfterSeconds', value: 902 }],
+      }),
+    }),
+  )
+  expect(accepted.status, await accepted.clone().text()).toBe(200)
+  const retainedResponse = await app.handle(new Request('http://local/providers/usage/feed'))
+  expect(retainedResponse.status).toBe(200)
+  expect((await retainedResponse.json()).accounts[0]).toMatchObject({
+    checkedAt: observedAt,
+    windows: [{ usedPercent: 6, lastSeenAt: observedAt }],
+  })
+  await rm(options.secretsFilePath!, { recursive: true })
+  await rename(savedSecrets, options.secretsFilePath!)
+  await writeFile(options.secretsFilePath!, '{}')
+  const cleared = await app.handle(
+    new Request('http://local/settings/write', {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        mutationId: 'accept-cleared-key',
+        target: 'user',
+        operations: [{ kind: 'set', key: 'providers.usageStaleAfterSeconds', value: 901 }],
+      }),
+    }),
+  )
+  expect(cleared.status, await cleared.clone().text()).toBe(200)
+  await collector.refresh()
+  expect((await collector.read()).accounts).toEqual([])
+  expect(source.requests).toHaveLength(1)
 })

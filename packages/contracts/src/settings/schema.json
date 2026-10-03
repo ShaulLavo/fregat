@@ -1275,7 +1275,7 @@
     },
     "providers.proxyUsageProviderInstanceIds": {
       "default": [],
-      "description": "Provider instances whose allowance is shown from the configured proxy account group. Their native quota collection pauses while this source is selected.",
+      "description": "Optional enabled Codex instances whose allowance comes from the proxy account group. Selecting an instance pauses its native quota collection. Proxy accounts also appear independently.",
       "items": {
         "maxLength": 64,
         "minLength": 1,

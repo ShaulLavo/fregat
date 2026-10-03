@@ -17,6 +17,7 @@ type ImportCase = {
   existingKey?: string
   url?: string | null
   instances?: readonly string[]
+  noProviders?: boolean
 }
 
 const cases: ImportCase[] = [
@@ -34,7 +35,8 @@ const cases: ImportCase[] = [
   { name: 'non-local URL', success: false, url: 'http://remote.example:18317' },
   { name: 'credential in URL', success: false, url: `http://${KEY}@127.0.0.1:18317` },
   { name: 'missing explicit URL', success: false, url: null },
-  { name: 'missing explicit mapping', success: false, instances: [] },
+  { name: 'optional mapping', success: true, instances: [] },
+  { name: 'no configured providers or mapping', success: true, instances: [], noProviders: true },
 ]
 
 test.for(cases)('proxy key CLI: $name', async (scenario) => {
@@ -44,13 +46,15 @@ test.for(cases)('proxy key CLI: $name', async (scenario) => {
   const secretsFile = path.join(root, 'secrets.json')
   const input = scenario.key ?? `${KEY}\n`
   const settings = JSON.stringify({
-    'providers.instances': [
-      { providerInstanceId: 'codex-work', driverKind: 'codex' },
-      { providerInstanceId: 'codex-personal', driverKind: 'codex' },
-      { providerInstanceId: 'codex-unselected', driverKind: 'codex' },
-      { providerInstanceId: 'disabled-account', driverKind: 'codex', enabled: false },
-      { providerInstanceId: 'other-driver', driverKind: 'cursor' },
-    ],
+    'providers.instances': scenario.noProviders
+      ? []
+      : [
+          { providerInstanceId: 'codex-work', driverKind: 'codex' },
+          { providerInstanceId: 'codex-personal', driverKind: 'codex' },
+          { providerInstanceId: 'codex-unselected', driverKind: 'codex' },
+          { providerInstanceId: 'disabled-account', driverKind: 'codex', enabled: false },
+          { providerInstanceId: 'other-driver', driverKind: 'cursor' },
+        ],
     'providers.proxyUsageUrl': 'http://127.0.0.1:11111',
     'providers.proxyUsageProviderInstanceIds': ['codex-unselected'],
   })
@@ -98,10 +102,7 @@ test.for(cases)('proxy key CLI: $name', async (scenario) => {
     expect(stderr).toBe('')
     const saved = JSON.parse(await readFile(settingsFile, 'utf8'))
     expect(saved['providers.proxyUsageUrl']).toBe(URL)
-    expect(saved['providers.proxyUsageProviderInstanceIds']).toEqual([
-      'codex-work',
-      'codex-personal',
-    ])
+    expect(saved['providers.proxyUsageProviderInstanceIds'] ?? []).toEqual(instances)
     expect(saved['providers.instances']).toEqual(JSON.parse(settings)['providers.instances'])
     expect(await readFile(settingsFile, 'utf8')).not.toContain(KEY)
     const stored = JSON.parse(await readFile(secretsFile, 'utf8'))

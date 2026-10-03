@@ -2020,7 +2020,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Providers',
     title: 'Proxy quota source instances',
     description:
-      'Provider instances whose allowance is shown from the configured proxy account group. Their native quota collection pauses while this source is selected.',
+      'Optional enabled Codex instances whose allowance comes from the proxy account group. Selecting an instance pauses its native quota collection. Proxy accounts also appear independently.',
     keywords: ['usage', 'codex', 'proxy', 'quota'],
   }),
   'providers.instances': defineSetting({

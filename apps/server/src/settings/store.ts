@@ -173,6 +173,7 @@ export class SettingsStore {
   private cachedSnapshot: SettingsSnapshot | null = null
   private resolved: SettingsValues | null = null
   private secretRefs: ReadonlySet<SecretRef> = new Set()
+  private nonEmptySecretRefs: ReadonlySet<SecretRef> = new Set()
   private secretRefsStale = false
   private recoveryBlocked = false
   private pruningEnabled = false
@@ -268,10 +269,11 @@ export class SettingsStore {
     return applyProviderSecrets(this.snapshot().values[PROVIDER_INSTANCES], secrets)
   }
 
-  /**
-   * Reads a server-owned secret, creating it on first use. Runs under the same
-   * coordinator as settings writes, so two first uses agree on one value.
-   */
+  /** Last accepted nonempty key presence; cache-only reads survive recovery and shutdown. */
+  hasServerSecret(ref: ServerSecretRef): boolean {
+    return this.nonEmptySecretRefs.has(ref)
+  }
+
   async readSecret(ref: ServerSecretRef): Promise<string | null> {
     this.assertOperational()
     return (await this.secretStore.read()).get(ref) ?? null
@@ -1049,9 +1051,17 @@ export class SettingsStore {
     }
   }
 
+  private acceptSecretRefs() {
+    const secrets = this.secretStore.readSync()
+    this.secretRefs = new Set(secrets.keys())
+    this.nonEmptySecretRefs = new Set(
+      [...secrets].filter(([, value]) => value.trim()).map(([ref]) => ref),
+    )
+  }
+
   private loadSecretRefsAtStartup(filePath: string) {
     try {
-      this.secretRefs = new Set(this.secretStore.readSync().keys())
+      this.acceptSecretRefs()
     } catch (error) {
       throw settingsErrors.SECRETS_UNREADABLE({
         file: filePath,
@@ -1064,7 +1074,7 @@ export class SettingsStore {
 
   private reloadSecretRefs() {
     try {
-      this.secretRefs = new Set(this.secretStore.readSync().keys())
+      this.acceptSecretRefs()
       this.secretRefsStale = false
     } catch (error) {
       this.secretRefsStale = true
