@@ -294,6 +294,12 @@ This lets an agent check that its change works, or debug one, in the real app.
   server over its existing socket. The server's MCP endpoint lists them beside the native tools and
   forwards each call to the attached client, which runs it through the same command registry and
   input path the keymap uses. Agents run on the server, so this is the one route that reaches them.
+- Two MCP servers on the same Fregat server. `platform` holds everyday work: native tools plus
+  reveal (open a file, diff, commit or terminal), which changes server state and lets the app
+  redraw. `platform-ui` holds the client-run tools (type, press keys, run a command through the
+  UI, focus and selection, read what is rendered) for checking and debugging through the real UI.
+  Its tools would bloat everyday sessions, so chats get it only when a setting
+  (`application` scope, off by default) or the session turns it on. No tool exists in both.
 - Outside agents (Claude Code or Codex in a terminal, any MCP client) reach the same tools through
   the same endpoint. M1 issues tokens only to Fregat's own provider sessions, so add an
   owner-issued external-client grant: named, scoped to a workspace, revocable from settings,
