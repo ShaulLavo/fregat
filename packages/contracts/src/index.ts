@@ -592,10 +592,6 @@ export {
   type WorkbenchFeel,
 } from './settings/boot-defaults'
 export {
-  DEFAULT_SETTINGS_DOCUMENT_REVISION,
-  defaultSettingsDocument,
-} from './settings/defaults-document'
-export {
   deriveWriteTarget,
   inspectSetting,
   layerAllowsScope,

@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { setTimeout as delay } from 'node:timers/promises'
 import * as v from 'valibot'
 
 import { hostPaths, terminalHostErrors } from './protocol'
@@ -16,11 +18,11 @@ export function processStart(pid: number): string | null {
       const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
       return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19] ?? null
     }
-    const result = Bun.spawnSync(['ps', '-p', String(pid), '-o', 'lstart='], {
+    const result = spawnSync('ps', ['-p', String(pid), '-o', 'lstart='], {
       env: { ...process.env, LC_ALL: 'C' },
-      stderr: 'ignore',
+      stdio: ['ignore', 'pipe', 'ignore'],
     })
-    return result.exitCode === 0 ? result.stdout.toString().trim() || null : null
+    return result.status === 0 ? result.stdout.toString().trim() || null : null
   } catch {
     return null
   }
@@ -53,7 +55,7 @@ export async function stopTerminalHost(stateRoot: string, env: NodeJS.ProcessEnv
   const deadline = Date.now() + 5_000
   while (Date.now() < deadline) {
     if (!hostIdentityMatches(identity)) return
-    await Bun.sleep(25)
+    await delay(25)
   }
   throw terminalHostErrors.HOST_UNREACHABLE({
     internal: { reason: 'shutdown-timeout', hostPid: identity.hostPid },

@@ -1,12 +1,12 @@
+import { presentSetting } from '../settings/documentation'
 import { expect, test } from 'vitest'
 import * as v from 'valibot'
-import { descriptorFor } from '../settings/keys'
 import { SETTINGS_JSON_SCHEMA } from '../settings/schema'
 
 const ID = 'providers.proxyUsageRequestIntervalHours'
 
 test('pooled Codex usage has a machine-only interval with an explicit hourly minimum', () => {
-  const descriptor = descriptorFor(ID)
+  const descriptor = presentSetting(ID)
   expect(descriptor.scope).toBe('machine')
   expect(descriptor.default).toBe(1)
   expect(descriptor.description).toContain('At most one request per account per hour')

@@ -5,11 +5,22 @@ import path from 'node:path'
 
 import { reserveForwardPort } from '../../src/machines/forward'
 import { shellQuote } from '../../src/utils/shell'
+import { openSshDiagnostics } from './openssh-diagnostics'
 
 export const sshPassphrase = 'temporary OpenSSH fixture passphrase'
 
-export async function localOpenSsh(passwordOnly = false, remotePath?: string) {
+export async function localOpenSsh(
+  passwordOnly = false,
+  remotePath?: string,
+  captureDiagnostics = false,
+) {
   const directory = await mkdtemp(path.join(tmpdir(), 'platform-openssh-'))
+  const diagnostics = captureDiagnostics ? openSshDiagnostics(directory) : undefined
+  const trace = diagnostics
+    ? ` -v -E ${shellQuote(diagnostics.tracePath)} -o IdentityAgent=none`
+    : ''
+  // Detached masters inherit stderr; a fixture file keeps the caller's pipe from staying open.
+  const stderr = diagnostics ? ` 2>>${shellQuote(diagnostics.tracePath)}` : ''
   const port = await reserveForwardPort()
   const privateBin = path.join(directory, 'bin')
   const clientKey = path.join(directory, 'client-key')
@@ -29,7 +40,7 @@ export async function localOpenSsh(passwordOnly = false, remotePath?: string) {
   )
   await writeFile(
     path.join(privateBin, 'ssh'),
-    `#!/bin/sh\nexec ${shellQuote(ssh)} -F ${shellQuote(config)} "$@"\n`,
+    `#!/bin/sh\nexec ${shellQuote(ssh)}${trace} -F ${shellQuote(config)} "$@"${stderr}\n`,
     { mode: 0o700 },
   )
   await writeFile(
@@ -58,6 +69,7 @@ export async function localOpenSsh(passwordOnly = false, remotePath?: string) {
     port,
     close,
     readLog: () => readFile(daemonLog, 'utf8'),
+    diagnostics,
     environment: { ...process.env, PATH: `${privateBin}:${process.env.PATH}` },
   }
 }
