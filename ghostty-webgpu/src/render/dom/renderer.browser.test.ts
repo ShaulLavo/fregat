@@ -1,4 +1,4 @@
-import { cdp, page } from 'vitest/browser'
+import { page } from 'vitest/browser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import { Terminal } from '../../dom/terminal.js'
@@ -50,31 +50,12 @@ function mountedCanvas(): HTMLCanvasElement {
   return canvas
 }
 
-async function wideGlyphPlatformFonts() {
-  const session = cdp()
-  await session.send('DOM.getDocument')
-  await session.send('CSS.enable')
-  const { result } = await session.send('Runtime.evaluate', {
-    expression:
-      "document.querySelector('iframe[data-vitest=\"true\"]').contentDocument.querySelector('.ghostty-webgpu-frame span[data-cursor]')",
-    returnByValue: false,
-  })
-  if (!result.objectId) return { unavailable: result.description ?? result.type }
-  const objectId = result.objectId
-  try {
-    const { nodeId } = await session.send('DOM.requestNode', { objectId })
-    return await session.send('CSS.getPlatformFontsForNode', { nodeId })
-  } finally {
-    await session.send('Runtime.releaseObject', { objectId })
-  }
-}
-
-async function rendererProbe(backend: 'dom' | 'canvas2d') {
+async function rendererProbe(backend: 'dom' | 'canvas2d', input = probeInput, font = probeFont) {
   const runtime = await GhosttyRuntime.create()
   cleanups.push(() => runtime.dispose())
   const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
   const state = runtime.createRenderState(terminal)
-  terminal.write(probeInput)
+  terminal.write(input)
   const canvas = mountedCanvas()
   const clock = new ProbeClock()
   const frames: (readonly number[])[] = []
@@ -82,7 +63,7 @@ async function rendererProbe(backend: 'dom' | 'canvas2d') {
     canvas,
     columns: 12,
     rows: 3,
-    font: probeFont,
+    font,
     renderState: state,
     schedulerClock: clock,
     onRowsPainted: (rows: readonly { y: number }[]) => frames.push(rows.map((row) => row.y)),
@@ -94,6 +75,49 @@ async function rendererProbe(backend: 'dom' | 'canvas2d') {
   cleanups.push(() => renderer.dispose())
   clock.flush()
   return { runtime, terminal, state, canvas, renderer, clock, frames }
+}
+
+async function expectWideGlyphCursorPaint(font = probeFont) {
+  // Hidden ink isolates cursor/background paint from font-specific DOM and Canvas baselines.
+  const input = probeInput.replace('界', '\x1b[8m界\x1b[28m')
+  const dom = await rendererProbe('dom', input, font)
+  const canvas = await rendererProbe('canvas2d', input, font)
+  const frame = dom.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+  for (const style of ['block', 'bar', 'underline', 'outline'] as const) {
+    for (const probe of [dom, canvas]) {
+      probe.terminal.setDefaultCursorStyle(style)
+      probe.terminal.write('\x1b[1;3H')
+      probe.renderer.notifyWrite()
+      probe.clock.flush()
+    }
+    const cursor = frame.querySelector('[data-cursor]')!
+    expect(cursor.textContent).toBe('界')
+    expect(cursor.getBoundingClientRect().width).toBe(font.cssCellWidth * 2)
+    const screenshot = await page.screenshot({ element: frame, save: false, scale: 'css' })
+    const image = new Image()
+    image.src = `data:image/png;base64,${screenshot}`
+    await image.decode()
+    const decoded = document.createElement('canvas')
+    decoded.width = image.naturalWidth
+    decoded.height = image.naturalHeight
+    const pixels = decoded.getContext('2d')!
+    pixels.drawImage(image, 0, 0)
+    const reference = canvas.canvas.getContext('2d')!
+    for (const [x, y] of [
+      [20, 0],
+      [21, 1],
+      [21, 19],
+      [31, 1],
+      [31, 19],
+    ]) {
+      const expected = reference.getImageData(x!, y!, 1, 1).data
+      const background = expected[3] === 0 ? [17, 17, 17] : [...expected].slice(0, 3)
+      expect(
+        [...pixels.getImageData(x!, y!, 1, 1).data].slice(0, 3),
+        `${style} cursor pixel (${x}, ${y})`,
+      ).toEqual(background)
+    }
+  }
 }
 
 describe('DOM terminal renderer', () => {
@@ -126,105 +150,30 @@ describe('DOM terminal renderer', () => {
   })
 
   it('keeps wide-glyph cursor paint confined to the leading cell like Canvas2D', async () => {
-    const dom = await rendererProbe('dom')
-    const canvas = await rendererProbe('canvas2d')
-    const frame = dom.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
-    for (const style of ['block', 'bar', 'underline', 'outline'] as const) {
-      for (const probe of [dom, canvas]) {
-        probe.terminal.setDefaultCursorStyle(style)
-        probe.terminal.write('\x1b[1;3H')
-        probe.renderer.notifyWrite()
-        probe.clock.flush()
-      }
-      const screenshot = await page.screenshot({ element: frame, save: false, scale: 'css' })
-      const image = new Image()
-      image.src = `data:image/png;base64,${screenshot}`
-      await image.decode()
-      const decoded = document.createElement('canvas')
-      decoded.width = image.naturalWidth
-      decoded.height = image.naturalHeight
-      const pixels = decoded.getContext('2d')!
-      pixels.drawImage(image, 0, 0)
-      const reference = canvas.canvas.getContext('2d')!
-      for (const [x, y] of [
-        [20, 0],
-        [21, 1],
-        [21, 19],
-        [31, 1],
-        [31, 19],
-      ]) {
-        const expected = reference.getImageData(x!, y!, 1, 1).data
-        const background = expected[3] === 0 ? [17, 17, 17] : [...expected].slice(0, 3)
-        const receivedRgba = [...pixels.getImageData(x!, y!, 1, 1).data]
-        const received = receivedRgba.slice(0, 3)
-        if (received.some((channel, index) => channel !== background[index])) {
-          const spans = [...frame.querySelectorAll('span')].filter((span) =>
-            span.textContent?.includes('界'),
-          )
-          const faces: { family: string; status: string; weight: string; style: string }[] = []
-          document.fonts.forEach((face) => {
-            faces.push({
-              family: face.family,
-              status: face.status,
-              weight: face.weight,
-              style: face.style,
-            })
-          })
-          console.info(
-            'GHOSTTY_CURSOR_PIXEL_DIAGNOSTIC',
-            JSON.stringify({
-              style,
-              x,
-              y,
-              expected: [...expected],
-              background,
-              received,
-              receivedRgba,
-              fonts: { status: document.fonts.status, faces },
-              platformFonts: await wideGlyphPlatformFonts().catch((error) => ({
-                unavailable: String(error),
-              })),
-              spans: spans.map((span) => {
-                const computed = getComputedStyle(span)
-                return {
-                  text: span.textContent,
-                  font: computed.font,
-                  family: computed.fontFamily,
-                  lineHeight: computed.lineHeight,
-                  letterSpacing: computed.letterSpacing,
-                  bounds: span.getBoundingClientRect().toJSON(),
-                }
-              }),
-              canvasFont: reference.font,
-              canvasBaseline: reference.textBaseline,
-              canvasAlign: reference.textAlign,
-              canvasMetrics: {
-                width: reference.measureText('界').width,
-                ascent: reference.measureText('界').actualBoundingBoxAscent,
-                descent: reference.measureText('界').actualBoundingBoxDescent,
-                left: reference.measureText('界').actualBoundingBoxLeft,
-                right: reference.measureText('界').actualBoundingBoxRight,
-                fontAscent: reference.measureText('界').fontBoundingBoxAscent,
-                fontDescent: reference.measureText('界').fontBoundingBoxDescent,
-              },
-              frame: frame.getBoundingClientRect().toJSON(),
-              iframe: window.frameElement?.getBoundingClientRect().toJSON(),
-              iframeTransform: window.frameElement
-                ? getComputedStyle(window.frameElement).transform
-                : undefined,
-              viewport: [window.innerWidth, window.innerHeight, window.devicePixelRatio],
-              image: [image.naturalWidth, image.naturalHeight],
-              history: (window.top as Window & { ghosttyBrowserFileHistory?: unknown[] })
-                .ghosttyBrowserFileHistory,
-              html: frame.outerHTML,
-              domPng: screenshot,
-              canvasPng: canvas.canvas.toDataURL(),
-            }),
-          )
-        }
-        expect(received, `${style} cursor pixel (${x}, ${y})`).toEqual(background)
-      }
+    await expectWideGlyphCursorPaint()
+  })
+
+  it('confines wide-glyph cursor paint with Liberation Mono and WenQuanYi Zen Hei', async ({
+    skip,
+  }) => {
+    const latin = new FontFace('GhosttyCursorLatin', 'local("Liberation Mono")')
+    const wide = new FontFace('GhosttyCursorWide', 'local("WenQuanYi Zen Hei")')
+    try {
+      await Promise.all([latin.load(), wide.load()])
+    } catch {
+      skip('Liberation Mono and WenQuanYi Zen Hei are required for this font-layout regression')
     }
+    document.fonts.add(latin)
+    document.fonts.add(wide)
+    cleanups.push(() => {
+      document.fonts.delete(latin)
+      document.fonts.delete(wide)
+    })
+    const font = {
+      ...probeFont,
+      settings: { ...probeFont.settings, family: 'GhosttyCursorLatin, GhosttyCursorWide' },
+    }
+    await expectWideGlyphCursorPaint(font)
   })
 
   it('retains undamaged rows, repaints selection, and tears down the owned surface', async () => {
