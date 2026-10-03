@@ -87,6 +87,7 @@ for (const name of [
   'comparison-latency.mjs',
   'comparison-render.mjs',
   'comparison-gpu.mjs',
+  'comparison-mac.mjs',
   'comparison-diagnostics.mjs',
 ]) {
   await copyFile(join(root, 'scripts', name), join(output, name))

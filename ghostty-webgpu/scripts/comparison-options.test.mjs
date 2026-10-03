@@ -266,6 +266,7 @@ for (const tracing of [false, true]) {
       tracing,
       gpuCommandTimeout,
       createGpuGate,
+      platform: () => 'linux',
       randomUUID,
       smoke: false,
       repetitions: settings.repetitions,
@@ -323,3 +324,12 @@ for (const tracing of [false, true]) {
     }
   })
 }
+
+test('explicit browser executable preserves paths with spaces and rejects missing values', async () => {
+  const { browserExecutable } = await import('./comparison-options.mjs')
+  assert.equal(browserExecutable([]), undefined)
+  const path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  assert.equal(browserExecutable(['--browser-executable', path]), path)
+  assert.throws(() => browserExecutable(['--browser-executable']))
+  assert.throws(() => browserExecutable(['--browser-executable', '--smoke']))
+})

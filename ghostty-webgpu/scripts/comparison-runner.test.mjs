@@ -22,6 +22,7 @@ const createMeasureBody = new Function(
   'smoke',
   'args',
   'accessibility',
+  'platform',
   `return ${source.slice(start, end)}`,
 )
 
@@ -58,6 +59,7 @@ async function failureArtifacts(testCase, repetition) {
     true,
     [],
     'on',
+    () => 'linux',
   )
   const contexts = new Set()
   const run = {}
