@@ -529,9 +529,21 @@
     "parentThreadId": 1,
     "threadId": 2
   },
+  "apps/server/src/provider/tests/transcript-history.test.ts": {
+    "parent_thread_id": 1,
+    "thread_spawn": 1
+  },
   "apps/server/src/provider/types.ts": {
     "providerThreadId": 1,
     "thread": 1
+  },
+  "apps/server/src/provider/utils/imported-usage.ts": {
+    "parent_thread_id": 2,
+    "thread_spawn": 2
+  },
+  "apps/server/src/provider/utils/transcript-json.ts": {
+    "parent_thread_id": 1,
+    "thread_spawn": 1
   },
   "apps/web/src/features/chat/components/agent-row.tsx": {
     "thread": 1,

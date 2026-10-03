@@ -9,6 +9,13 @@ export function positiveInteger(args, flag, fallback) {
   return number
 }
 
+export function gpuCommandTimeout(settings, tracing) {
+  const key = tracing ? 'gpuTraceCommandTimeoutMilliseconds' : 'gpuCommandTimeoutMilliseconds'
+  const timeout = settings[key]
+  assert(Number.isSafeInteger(timeout) && timeout > 0, `Positive ${key} required`)
+  return timeout
+}
+
 export function analysisArguments(args) {
   const positional = args.filter((arg) => !arg.startsWith('--'))
   assert(
@@ -74,6 +81,22 @@ export function selectedVariants(args, available, fallback) {
     if (counterpart && !selected.includes(counterpart)) selected.push(counterpart)
   }
   return selected
+}
+
+export function outputFixture(args, fixtures) {
+  const names = fixtures.map(({ name }) => name)
+  const selected = selection(args, '--output-fixture', ['ascii'], names)
+  assert(selected.length === 1 && names.includes(selected[0]), '--output-fixture needs one fixture')
+  return selected[0]
+}
+
+export function selectedTracePhases(args, fixtures) {
+  return selection(
+    args,
+    '--trace-phase',
+    ['latency', 'ascii', 'sgr'],
+    ['latency', ...fixtures.map(({ name }) => name)],
+  )
 }
 
 export function selectedPhases(args) {

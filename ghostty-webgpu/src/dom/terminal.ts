@@ -300,7 +300,7 @@ export class Terminal {
     private readonly session: TerminalSession<Event>,
     options: GhosttyWebGpuTerminalFromSessionOptions,
   ) {
-    this.zigFrame = options.zigFrame ?? false
+    this.zigFrame = options.zigFrame ?? true
     this.accessibilityOptions = options.accessibility
     this.autoFit = options.autoFit !== false
     this.copySelection = options.copySelection

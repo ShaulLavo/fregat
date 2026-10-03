@@ -56,7 +56,8 @@
     "subset-font": "^2.9.0",
     "typescript": "7.0.2",
     "typescript-language-server": "6.0.1",
-    "valibot": "^1.5.0"
+    "valibot": "^1.5.0",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
