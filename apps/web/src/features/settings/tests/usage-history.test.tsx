@@ -3,7 +3,7 @@ import { vi } from 'vitest'
 import { formatContextTokens } from '@workspace/client-core/chat/context-usage'
 import { usageTokenCount } from '@workspace/contracts'
 import { createFederationHarness } from '../../../../test/factories/federation'
-import { recordUsageFixture } from '../../../../test/factories/usage'
+import { recordUtilityUsageFixture } from '../../../../test/factories/usage'
 import { renderWithProviders } from '../../../../test/render'
 import { expect, test } from '../../../../test/fixtures'
 import { UsageSection } from '@/features/settings/components/usage-section'
@@ -18,8 +18,8 @@ test('usage page reads its selected owner and refreshes real recorded history wi
 }) => {
   expect(client).toBeDefined()
   const federation = await createFederationHarness(server)
-  await recordUsageFixture(server, 2)
-  const remote = await recordUsageFixture(federation.serverB, 8)
+  await recordUtilityUsageFixture(server, 2)
+  const remote = await recordUtilityUsageFixture(federation.serverB, 8)
   remote.record('unknown', 'unknown-model')
   const owner = queryClientFor(federation.originB)
   const primary = queryClientFor(federation.originA)
@@ -83,11 +83,12 @@ test('cache savings stay unavailable when recorded prices differ inside the sele
   client,
 }) => {
   expect(client).toBeDefined()
-  await recordUsageFixture(server, 2)
+  const recordedAt = new Date().toISOString()
+  await recordUtilityUsageFixture(server, 2, recordedAt)
   try {
-    // A second catalog fetch needs the persisted 24-hour cache to expire.
+    // Expire catalog freshness while keeping both recorded events inside the server's range.
     vi.setSystemTime(Date.now() + 25 * 60 * 60_000)
-    await recordUsageFixture(server, 4)
+    await recordUtilityUsageFixture(server, 4, recordedAt)
     const view = renderWithProviders(<UsageSection />)
     try {
       await waitFor(() =>
