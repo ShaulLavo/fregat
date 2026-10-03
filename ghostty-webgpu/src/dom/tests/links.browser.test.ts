@@ -1,10 +1,19 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { page } from 'vitest/browser'
 import { GhosttyRuntime } from '../../core/runtime.js'
+import type { GhosttyTerminal } from '../../core/terminal.js'
+import {
+  captureNativeLinkSnapshot,
+  captureNativeLinkDiscovery,
+  createProjectedLinkSession,
+  type LinkProjection,
+  type NativeLinkSnapshotSource,
+} from '../../term/link-snapshot.js'
 import type { ProvidedLink } from '../../term/links.js'
 import { TerminalSession } from '../../term/session.js'
-import { createDomLinkController } from '../links.js'
+import { createDomLinkController, type DomLinkSession } from '../links.js'
 import type { CommittedPointerLayout } from '../pointer.js'
+import { Terminal } from '../terminal.js'
 
 let runtime: GhosttyRuntime
 const cleanups: Array<() => void> = []
@@ -27,7 +36,9 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-async function harness() {
+async function harness(
+  adapt?: (session: TerminalSession<Event>, getProjection: () => LinkProjection) => DomLinkSession,
+) {
   const session = await TerminalSession.create<Event>({
     runtime: { kind: 'borrowed', runtime },
     appearance: { grid: { columns: 30, rows: 2 } },
@@ -68,7 +79,7 @@ async function harness() {
     getLayout: () => layout,
     getProjection: () => projection,
     root,
-    session,
+    session: adapt ? adapt(session, () => projection) : session,
   }
   const controller = createDomLinkController(options)
   cleanups.push(() => controller.dispose())
@@ -81,6 +92,16 @@ async function harness() {
     projection: () => projection,
     setProjection: (value: typeof projection) => {
       projection = value
+    },
+    move: (column = 0, row = 0) => {
+      const bounds = canvas.getBoundingClientRect()
+      canvas.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: bounds.left + (column + 0.5) * 10,
+          clientY: bounds.top + (row + 0.5) * 20,
+        }),
+      )
     },
   }
 }
@@ -104,7 +125,6 @@ describe('committed link projection', () => {
     const overlay = view.root.querySelector<HTMLElement>('[role="link"]')!
     overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await expect.poll(() => activated).toBe(1)
-    await page.screenshot({ path: '.artifacts/links-known-good.png' })
   })
 
   it.each(['generation', 'layout', 'revision'] as const)(
@@ -131,3 +151,176 @@ describe('committed link projection', () => {
     },
   )
 })
+
+describe('async link currency and lifecycle', () => {
+  it('awaits actual session currency before showing a hover', async () => {
+    const gate = deferred<void>()
+    let currencyChecks = 0
+    const view = await harness((session) => ({
+      resolveLink: (request) => session.resolveLink(request),
+      isLinkCurrent: async (resolution) => {
+        currencyChecks += 1
+        await gate.promise
+        return session.isLinkCurrent(resolution)
+      },
+      activateLink: (resolution, event) => session.activateLink(resolution, event),
+    }))
+    view.session.registerLinkProvider({
+      provideLinks: () => [
+        {
+          range: { start: 0, end: 9 },
+          activate: () => {},
+        },
+      ],
+    })
+    view.move()
+    await expect.poll(() => currencyChecks).toBe(1)
+    expect(view.root.querySelector('[role="link"]')).toBeNull()
+    expect(view.controller.hasPendingResolution).toBe(true)
+    view.session.write('\u001b[2J\u001b[Hchanged')
+    gate.resolve()
+    await expect.poll(() => view.controller.hasPendingResolution).toBe(false)
+    expect(view.root.querySelector('[role="link"]')).toBeNull()
+  })
+
+  it.each(['projection', 'leave', 'invalidate', 'dispose'] as const)(
+    'does not activate after %s while currency validation awaits',
+    async (change) => {
+      const gate = deferred<void>()
+      let currencyChecks = 0
+      let activations = 0
+      const view = await harness((session) => ({
+        resolveLink: (request) => session.resolveLink(request),
+        isLinkCurrent: async (resolution) => {
+          currencyChecks += 1
+          if (currencyChecks > 1) await gate.promise
+          return session.isLinkCurrent(resolution)
+        },
+        activateLink: (resolution, event) => session.activateLink(resolution, event),
+      }))
+      view.session.registerLinkProvider({
+        provideLinks: () => [
+          {
+            range: { start: 0, end: 9 },
+            activate: () => {
+              activations += 1
+            },
+          },
+        ],
+      })
+      view.move()
+      await expect.poll(() => view.root.querySelector('[role="link"]') !== null).toBe(true)
+      view.root
+        .querySelector<HTMLElement>('[role="link"]')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await expect.poll(() => currencyChecks).toBe(2)
+      if (change === 'projection') view.setProjection({ ...view.projection(), layout: 2 })
+      if (change === 'leave') view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+      if (change === 'invalidate') view.controller.invalidate()
+      if (change === 'dispose') view.controller.dispose()
+      gate.resolve()
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      expect(activations).toBe(0)
+    },
+  )
+
+  it.each(['leave', 'invalidate', 'dispose'] as const)(
+    'does not restore a pending hover or resume discovery after %s',
+    async (change) => {
+      const pending = deferred<readonly ProvidedLink<Event>[]>()
+      let providerCalls = 0
+      const view = await harness()
+      view.session.registerLinkProvider({
+        provideLinks: () => {
+          providerCalls += 1
+          return pending.promise
+        },
+      })
+      view.move()
+      await expect.poll(() => providerCalls).toBe(1)
+      if (change === 'leave') view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+      if (change === 'invalidate') view.controller.invalidate()
+      if (change === 'dispose') view.controller.dispose()
+      pending.resolve([{ range: { start: 0, end: 9 }, activate: () => {} }])
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      expect(view.root.querySelector('[role="link"]')).toBeNull()
+      expect(view.controller.hasPendingResolution).toBe(false)
+      expect(providerCalls).toBe(1)
+    },
+  )
+})
+
+it('renders and activates a real native OSC link in the main terminal', async () => {
+  const root = document.createElement('div')
+  root.style.cssText = 'width:480px;height:120px;background:#151515;color:#eee'
+  document.body.append(root)
+  cleanups.push(() => root.remove())
+  const activations: string[] = []
+  const terminal = await Terminal.create({
+    appearance: { grid: { columns: 40, rows: 4 }, cursor: { blink: false } },
+    links: {
+      activateUri: (uri) => {
+        activations.push(uri)
+      },
+    },
+    runtime: { kind: 'borrowed', runtime },
+  })
+  cleanups.push(() => terminal.dispose())
+  await terminal.open(root)
+  terminal.write(
+    'OSC 8: \u001b]8;;https://native.test\u0007Native link label\u001b]8;;\u0007\r\nBuilt-in URL: https://text.test',
+  )
+  await expect.poll(() => terminal.submittedFrame?.rows[0]?.text.startsWith('OSC 8:')).toBe(true)
+  await expect(terminal.focusNextLink()).resolves.toBe(true)
+  const overlay = root.querySelector<HTMLElement>('[role="link"]')!
+  expect(overlay.getAttribute('aria-label')).toBe('Native link label')
+  overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  await expect.poll(() => activations).toEqual(['https://native.test'])
+  await page.screenshot({ path: '.artifacts/links-real-terminal.png' })
+})
+
+it.each(['link-free', 'late-link'] as const)(
+  'uses one projected discovery batch from the DOM controller for %s',
+  async (kind) => {
+    let batches = 0
+    let hoverRequests = 0
+    const view = await harness((session, getProjection) => {
+      const terminal = Reflect.get(session, 'terminal') as GhosttyTerminal
+      const source: NativeLinkSnapshotSource = {
+        get revision() {
+          return session.revision
+        },
+        get grid() {
+          return session.grid
+        },
+        renderState: session.renderState,
+        linkAt: (column, row) => terminal.linkAt({ x: column, y: row, tag: 'viewport' }),
+      }
+      const host = createProjectedLinkSession({
+        getProjection,
+        resolveLinkSnapshot: async (request) => {
+          hoverRequests += 1
+          return captureNativeLinkSnapshot(source, request, getProjection)
+        },
+        resolveLinkDiscovery: async (request) => {
+          batches += 1
+          return captureNativeLinkDiscovery(source, request, getProjection)
+        },
+      })
+      cleanups.push(() => host.dispose())
+      if (kind === 'late-link')
+        host.registerLinkProvider({
+          provideLinks: (_line, row) => {
+            if (row !== 1) return []
+            return [{ range: { start: 29, end: 29 }, text: 'last cell', activate: () => {} }]
+          },
+        })
+      return host
+    })
+    await expect(view.controller.focusNextLink()).resolves.toBe(kind === 'late-link')
+    expect(batches).toBe(1)
+    expect(hoverRequests).toBe(0)
+    if (kind === 'late-link')
+      expect(view.root.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe('last cell')
+  },
+)
