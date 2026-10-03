@@ -70,6 +70,8 @@ use `capture: true` when a shared window dispatcher must hear idle keys before d
 
 menus can retain their origin element before focus moves. `keys.nodeForElement(origin)` finds its attached node; `keys.dispatchCommandFrom(node, command, args)` runs along that node's path while preserving the current focus and pending chord. removed or foreign nodes and disposed dispatchers decline the command
 
+each command captures handler registrations across its whole node path before delivery. registrations added during a handler wait for the next command; removed registrations and nodes are skipped. each `node.handle` call has its own removal, even when two registrations use the same function
+
 ### display and recording
 
 ```ts
