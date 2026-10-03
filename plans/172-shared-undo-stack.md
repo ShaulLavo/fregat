@@ -1,259 +1,241 @@
-# Plan 172: One shared undo/redo stack
+# Plan 172: Shared undo with an integrated action API
 
 ## Status and authorization
 
-- Status: APPROVED; research done (2026-09-25) — findings, recommendations and proposed phases below;
-  owner questions answered 2026-09-26. "Work items"
-  records a fix to shipped behaviour that the owner ordered 2026-09-26.
-- Phase 2 (routing) DONE 2026-09-26, wave 2 lane W: `UNDO_OWNING_PANES` and `FOCUS_AREAS` in
-  `client-core/src/commands/focus.ts`; session undo and redo bind Mod+Z / Mod+Shift+Z in every
-  other pane, `chat` included on the desktop platforms (the TUI chat pane keeps U / Shift+U).
-  `keymap.test.ts` pins every `FocusArea`. One stack per domain (owner question 3): only the
-  session history takes the app-level key.
-- Work item 1 DONE for the web 2026-09-27: each session action gets its own notice, notices
-  stack, and an action leaves the history when its notice closes. The TUI half is deferred to the
-  TUI redesign (owner, 2026-09-27): the TUI designs its own UX and does not copy the web's notices.
+- Status: Approved. Refreshed 2026-10-03 after the owner reviewed
+  [async-history-stack](https://github.com/kettanaito/async-history-stack).
 - Priority: P2.
-- Planned at: Platform `9f343825`, 2026-09-25. Origin: Plan 126
-  [LIFE-13](126-t3code-alignment/lifecycle.md) owner correction.
+- Original authorization: 2026-09-25, Plan 126
+  [LIFE-13](126-t3code-alignment/lifecycle.md). Owner decisions were resolved 2026-09-26.
+- Owner direction, 2026-10-03: make the integrated action API the default. Expose the smaller
+  operations it uses for cases where explicit composition significantly simplifies the code.
+  Both forms use the same implementation and correctness contracts.
+- Delivered: pane-specific undo routing on 2026-09-26 and web session notice expiry on
+  2026-09-27. The shared controller extraction and workspace bookkeeping migration remain open.
+- TUI notice-lifetime changes remain deferred to the TUI redesign, per the 2026-09-27 decision.
 
 ## Outcome
 
-One undo/redo stack, extracted once and reused: Mod+Z steps back through recent actions and redo
-steps forward again. LIFE-13 (settle, snooze, archive, unpin) is its first consumer. New
-undo features use it. For session actions, Mod+Z acts only while the Undo notice is showing
-(owner question 1); once the notice is gone, Mod+Z does nothing to sessions.
+Provide one reusable implementation for linear operation history, instantiated per domain.
+The default API executes an action, captures its reversible entry, and records it within the
+same serialized operation. Undo and redo use that domain's execution scope and return the next
+valid inverse entry.
 
-## What exists today
+Expose the lower-level execution and recording operations for transactions that benefit from
+explicit control or work whose effects are already accepted. Prefer the integrated API for
+ordinary reversible actions. Use the lower-level form when it significantly simplifies the
+integration. If ordinary actions repeatedly need that form, improve the default API.
 
-- **Server file-tree journal.** `apps/server/src/fs/workspace-edit-journal.ts`: server-owned,
-  persisted per drive, undo and redo, 24 h TTL for stable entries (Plan 136). The client reaches it
-  through `features/editor/state/workspace-edit-service.ts` and `fileTree.undo` in
-  `keymap/workspace-commands.ts`. Editor buffers keep a barrier at a workspace edit.
-- **Editor undo graph.** Plan 121: a graph per buffer in `@singapore-editor/editor`, persisted to
-  IndexedDB for closed files.
-- **Snooze Undo.** `features/chat-mode/hooks/use-session-actions.ts`: a toast action that
-  dispatches `unsnooze`. No redo, no key.
-- **Composer.** Lexical's `HistoryPlugin` (goes with [Plan 171](171-composer-on-our-editor.md)).
-- **Lane L5's LIFE-13.** First step in PR #38, reverted from `main` in `5786feb1`, now on PR #41
-  (`review-again/L5`). It adds `packages/client-core/src/history/undo-stack.ts` (a pure
-  undo/redo pair with a 50-entry limit), `chat-mode/state/session-undo.ts`,
-  `use-session-undo-shortcut.ts` and `keymap/state/undo-barrier.ts`.
-- Mod+Z is bound per pane: `client-core/src/commands/workspace.ts` binds it to the file tree
-  with `yieldsToTextEntry`.
+Preserve the owner's separate-domain decision: session actions and workspace edits have their
+own histories. Focus determines which command handles Mod+Z. An editor or file-tree command
+with empty history keeps ownership of the key.
 
-## Research questions
+## Current code
 
-1. Survey the implementations above: entry shape, inverse capture, redo, limits, expiry,
-   persistence, and failure when the inverse no longer applies.
-2. The shared shape. Is L5's `undo-stack.ts` the core, and what does it lack?
-3. Ownership: which stacks live in the client, which on the server (the journal must stay
-   server-owned), and whether one client stack can front a server one.
-4. Redo and persistence per consumer: does rail undo survive a reload or another device?
-5. How Mod+Z picks the owning surface: focus target first (editor, composer, terminal, tree),
-   then the app-level stack; what happens when the focused surface has nothing to undo.
+The 2026-10-03 audit inspected Platform `6d8e768703c1bfc92091dbdd41c9171d5942f263`.
+Implementation units re-read their owning files before changing them.
 
-Deliverable: the shared shape, the Mod+Z routing rule, and the executable plan for LIFE-13 on it.
+| Consumer             | Current owner and behavior                                                                                                                                        | Work in this plan                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Session lifecycle    | `packages/client-core/src/chat/rail/lifecycle-undo.ts` combines receipt policy and a stateful controller. Web and TUI share it.                                   | Extract generic state and adopt the integrated action API.                                    |
+| Shared stack         | `packages/client-core/src/history/undo-stack.ts` has `emptyUndoStack`, `pushUndo`, `takeHistory`, and `finishHistory`. Lifecycle is its only production consumer. | Add explicit discarded entries and shared removal/update operations.                          |
+| Multi-file edits     | `apps/web/src/features/editor/state/workspace-edit-service.ts` owns two mutable arrays, capped at 20 groups, plus live buffer receipts and server results.        | Share bookkeeping while keeping transaction, recovery, and resource ownership in the service. |
+| File-tree operations | `apps/web/src/features/workspace/state/file-operations.ts` queries the durable server journal and reverses its guarded head.                                      | Preserve server authority and existing scoped mutations.                                      |
+| Editor text and CSV  | Editor owns a branching snapshot graph, persistence, and workspace-edit barriers. CSV uses the same buffer and graph.                                             | Preserve this implementation.                                                                 |
+| Composer editing     | Web uses Lexical history. TUI uses OpenTUI textarea history.                                                                                                      | Composer migration remains in [Plan 171](171-composer-on-our-editor.md).                      |
 
-## Research findings (2026-09-25)
+Lifecycle batches already support partial success, revision rebasing, and selective reversal of
+an older batch when later batches affect different sessions. Each web batch has a five-second
+notice and expires when that notice closes. A claimed reversal remains valid while queued.
+TUI history remains memory-only with its current lifetime.
 
-Read from Platform `origin/main` at `2a0d37ac` (the plan exists only there), lane L5 from
-`origin/review-again/L5` (PR #41, draft), Editor `origin/main` at `e2fd299`, T3 Code at `7a12aff4`,
-VS Code at `c1c5b32e`.
+Workspace groups pin buffer transaction receipts. Eviction, redo invalidation, clear, and stale
+removal release those receipts and durable staging. Failed staging cleanup remains owned by the
+service for retry. Server-epoch replacement clears client workspace history.
 
-Two corrections to "What exists today". Snooze Undo is in `use-session-actions.ts:74–87`;
-`session-rail-store.ts` has no undo. `keymap/state/undo-barrier.ts` is already on `main` (the
-editor's workspace-edit barrier toast); L5 did not add it. L5's branch is also past the
-"latest slot" step: it already has a 50-step stack with redo, server receipts and a restore command.
+The file journal survives restart, enforces path guards and a shared head across windows, and
+retains stable file operations for 24 hours. The client reads that history through TanStack.
 
-### Q1. Survey
+## Scope and boundaries
 
-|                                         | Entry and inverse                                                                                                                                                                                                                                                                                                         | Redo                                                                           | Limit, expiry                                                                                                                                             | Persistence                                                                                                                                           | When the inverse no longer applies                                                                                                                                                                                                                                         |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **File-tree ops** (Plan 136)            | Server manifest: staged legs plus guards (`workspace-edit-journal.ts:186–219`); inverse is a reverse program over the journal                                                                                                                                                                                             | Yes; a new forward op clears the category's redo (`workspace-edit.ts:676–697`) | No count cap. 512 MiB journal, 128 MiB per op (`workspace-edit-journal.ts:32–33`); 24 h after last touch (`:34`, reaped at `workspace-edit.ts:2389–2401`) | Server, per drive, survives restart (`:2499–2507`); every window reads one list (`:367–386`)                                                          | Guards re-checked before reversal (`:780–808`); only the head may reverse (`WORKSPACE_EDIT_NOT_HEAD`, `:741–757`); a later content edit evicts the ops it touches (`:3132–3148`). The client names the stale entry (`features/workspace/state/file-operations.ts:283–316`) |
-| **Workspace edits** (multi-file, agent) | Client `WorkspaceEditGroup` holding live buffer receipts plus the server result (`workspace-edit-service.ts:1330–1337`)                                                                                                                                                                                                   | Yes; mutable `undoStack`/`redoStack` arrays (`:400–404`)                       | 20 groups (`:100`, evicts oldest at `:1338–1341`)                                                                                                         | Memory only. Cleared when the server epoch changes (`:431–441`); receipts tie it to open buffers                                                      | Local reverse fails → `workspace-edit-stale`, the group and every group overlapping its paths are dropped (`:1485–1497`, `:1553–1570`); a partial reversal goes to recovery                                                                                                |
-| **Editor graph** (Plan 121)             | Snapshot per node, not an inverse; a tree with a preferred child per node (`Editor packages/editor/src/history.ts:9–27`)                                                                                                                                                                                                  | Yes, follows the most recently used branch (`:231–238`)                        | 200 retained states, a setting (`history.ts:60`, `editor.history.retainedStates`)                                                                         | IndexedDB for closed files, keyed by content hash; 30 days and a 64 Mi code-unit budget (`settings/keys.ts:450–480`, `history-persistence.ts:32–110`) | Cannot fail inside the buffer. Stops at a workspace-edit barrier and says so (`keymap/state/undo-barrier.ts:13–26`). Stored history is dropped on a hash mismatch                                                                                                          |
-| **Snooze Undo** (`main`)                | None recorded; the toast fires an unconditional `unsnooze`                                                                                                                                                                                                                                                                | No                                                                             | Toast lifetime                                                                                                                                            | None                                                                                                                                                  | Overwrites a concurrent change. L5 kept a failing control for it: another client's new wake time comes back `null` (`plans/126-t3code-alignment/lifecycle-undo-delivery.md` on L5)                                                                                         |
-| **L5 LIFE-13** (PR #41)                 | `{ref, before, restoreCommandId, expectedRevision, restoreRevision}` per row; batches per action (`client-core/src/chat/rail/lifecycle-undo.ts:21–32`). The server keeps `before` in the durable command receipt and restores from it, never from the client (`apps/server/src/orchestration/lifecycle-restore.ts:44–98`) | Yes; the inverse is the restore's own receipt                                  | 50 batches (`history/undo-stack.ts:11`); the notice lasts 5 s, the stack stays                                                                            | Memory, per window (module store, `features/chat-mode/state/session-undo.ts:28–31`)                                                                   | `LIFECYCLE_CONFLICT` on revision mismatch; that row is forgotten in both directions and the other rows proceed. Successful rows rebase the neighbouring entry's revision (`lifecycle-undo.ts:82–104`, `:124–144`)                                                          |
-| **Composer**                            | Lexical `HistoryPlugin` (`features/chat/components/chat-input-editor.tsx:4`)                                                                                                                                                                                                                                              | Yes                                                                            | Lexical default                                                                                                                                           | None                                                                                                                                                  | Its own                                                                                                                                                                                                                                                                    |
-| T3 Code (upstream)                      | Closure per action; one notice, consecutive same-kind actions grouped (`apps/web/src/hooks/showThreadUndoNotice.ts:28–80`)                                                                                                                                                                                                | No                                                                             | Notice lifetime                                                                                                                                           | None                                                                                                                                                  | Claim tokens expire an older undo of the same kind (`threadUndo.ts:16–38`)                                                                                                                                                                                                 |
+Extract the linear-history core in `packages/client-core/src/history/`. Keep lifecycle receipt,
+batch, revision, and navigation policies in the lifecycle adapter. Keep workspace reversal,
+leases, provisional server commits, barriers, and recovery in `WorkspaceEditService`.
 
-Every server-backed undo already follows one rule: the server computes the inverse from something
-durable it recorded (journal stage, command receipt) and applies it only under an optimistic check
-(path guards, `lifecycleRevision`). The client never supplies the prior state. New server-backed
-undo keeps to that rule; this is the part the file journal and L5 share, not code.
+Browser navigation stays with TanStack Router. Editor text branches, cursor selections, and
+anchored jumps retain their domain models. Prompt/search recall, recency lists, git history,
+transcripts, and terminal replay remain separate kinds of history. This plan creates no shared
+recall utility, merged app timeline, new persistence scheme, or client copy of server history.
 
-### Q2. The shared shape
+## Design
 
-**Recommendation: L5's `packages/client-core/src/history/undo-stack.ts` becomes the core**, together
-with the stateful half of `createSessionLifecycleHistory` (`lifecycle-undo.ts:73–146`), which is not
-lifecycle-specific. The core as it stands lacks four things:
+### Integrated action API
 
-1. **Dropped entries are silent.** `pushUndo` slices off the oldest entry and clears redo without
-   returning either (`undo-stack.ts:8–14`). The workspace-edit service has to release both
-   (`workspace-edit-service.ts:1338–1347`), so `pushUndo` returns `{ stack, dropped }`.
-2. **No retain.** `forget` and `rebase` in `lifecycle-undo.ts:82–104` and the path invalidation in
-   `workspace-edit-service.ts:1343–1370` and `:1553–1570` each rewrite both lists by hand. One
-   `retainHistory(stack, keep: (entry) => entry | null)` covers all three.
-3. **The controller is inside the lifecycle adapter.** `subscribe`/`getSnapshot` (which fits
-   `useSyncExternalStore` and a zustand mirror), `record`, `clear`, and `step` with the branch
-   counter that drops a stale finish (`:124–144`) move to `client-core/src/history/undo-history.ts`.
-   The lifecycle file keeps receipts, restore commands and verbs.
-4. **Batches are the adapter's concern.** The generic `step(direction, apply)` takes one entry and
-   `apply` returns its inverse or `null`. The lifecycle adapter's `apply` loops the batch rows,
-   calls `retain` for forget and rebase, and returns the batch of applied rows. That keeps L5's
-   partial-failure behaviour unchanged.
+The intended calling style is:
 
 ```ts
-// client-core/src/history/undo-stack.ts: pure, oldest entry first
-type UndoStack<E> = Readonly<Record<'undo' | 'redo', readonly E[]>>
-pushUndo<E>(stack: UndoStack<E>, entry: E, limit: number): { stack: UndoStack<E>; dropped: readonly E[] }
-takeHistory<E>(stack, direction): { entry: E | undefined; stack: UndoStack<E> }
-finishHistory<E>(stack, direction, inverse: E): UndoStack<E>
-retainHistory<E>(stack, keep: (entry: E) => E | null): { stack: UndoStack<E>; dropped: readonly E[] }
+await sessionHistory.push(async () => {
+  const receipt = await archiveSession(ref)
+  return reversibleSession(receipt)
+})
 
-// client-core/src/history/undo-history.ts: stateful, no React
-createUndoHistory<E>(options: { limit: number; onDrop?: (entries: readonly E[]) => void }): {
-  getSnapshot(): UndoStack<E>; subscribe(listener: () => void): () => void
-  record(entry: E): void; retain(keep: (entry: E) => E | null): void; clear(): void
-  step(direction, apply: (entry: E) => Promise<E | null>): Promise<E | null>
-}
+await sessionHistory.undo()
+await sessionHistory.redo()
 ```
 
-The history does not serialize steps. Its hosts run each step as a TanStack mutation with a
-`scope`, as L5 does (`session-undo.ts:76–91`) and the file tree does (`file-operations.ts:128–160`).
-The limit stays a constant (50), not a setting: nothing a user tunes depends on it.
+These examples specify the call shape; Unit 1 finalizes helper names and types. The action
+returns a reversible entry after its effects settle. An entry can hold typed receipts, metadata,
+and execution functions that close over domain resources. Receipts and cache settlement fit
+naturally inside this API.
 
-What does **not** become this core:
+A successful reversal supplies the next inverse entry. This supports fresh server receipts and
+updated revision checks. Lifecycle execution reads the entry's current metadata so revision
+rebasing does not leave a closure using an obsolete expected revision.
 
-- **The Editor graph.** It stores snapshots, branches, and serializes to IndexedDB; a linear
-  stack of inverses is a strict subset. It stays in `@singapore-editor/editor`.
-- **The file-operation history.** Its stack is the server's list, read through
-  `fileOperationHistoryQuery` with `staleTime: 0` (`file-operations.ts:50–62`). Mirroring it in a
-  client stack would put a second copy of server state beside TanStack.
-- **The server journal.** A crash-safe filesystem transaction log. Nothing in it generalizes past
-  the receipt-plus-check rule above.
+### Lower-level composition
 
-### Q3. Ownership
+Implement the integrated API using the same recording and transition operations exposed to
+explicit integrations. Provide `record`, named `undo` and `redo`, targeted removal/expiry,
+retention/update, and clear operations. Callers supply completed entries and use their existing
+domain execution boundary when explicit composition makes the transaction easier to follow.
 
-| Stack                | Owner                                               | Why                                                                                          |
-| -------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| File-tree operations | Server (journal)                                    | Disk state; several windows share one head; survives restart                                 |
-| Workspace edits      | Client (`WorkspaceEditService`) over server results | Entries hold live buffer receipts that cannot leave the window                               |
-| Session lifecycle    | Client stack of server receipts                     | The server owns the prior state and the conflict check; the client owns ordering and the key |
-| Editor text          | Editor buffer                                       | Per-document graph                                                                           |
-| Composer, inputs     | The element                                         | Native or Lexical                                                                            |
+Keep generic take/finish mechanics inside the controller. Domain adapters define selection,
+dependency checks, rebasing, and reversal outcomes. Both API forms share limits, entry identity,
+invalidation, cleanup accounting, and protection against stale asynchronous finishes.
 
-Can one client stack front a server one? It already does, and without a client copy: the file tree
-reads the server list as a query and reverses its head through a scoped mutation. Session undo is the
-other form, where the client keeps receipt ids and the server decides. Both work because the server
-refuses a stale inverse. No client stack needs to proxy the journal.
+### Scheduling and state ownership
 
-### Q4. Redo and persistence per consumer
+Configure one domain executor for the integrated API. In web and TUI it uses the existing
+TanStack mutation scope and mutation keys. Execute, settle the cache, and record the accepted
+entry before releasing that scope. Undo and redo enter the same scope once.
 
-- File-tree: redo yes; survives reload and restart for 24 h, on every device that talks to that
-  server.
-- Workspace edits: redo yes; lost on reload and on server restart.
-- Editor: redo and branches; closed-file history survives reload in this browser only.
-- Session lifecycle (L5): redo yes; **lost on reload**, per window. Receipts are durable
-  (`orchestration_command_receipts`, no pruning found in `command-receipts.ts`), so keeping
-  `{restoreCommandId, expectedRevision}` in IndexedDB would make undo survive a reload with no
-  server change. Another device would need a server-held per-client stack, which is new. The
-  revision check makes either one safe. **Recommendation:** memory only, as upstream does and L5
-  does; see owner question 2.
+The lower-level form records within its caller's equivalent serialization boundary. Handle
+already accepted external effects under the domain's ordering and validity rules. Avoid nesting
+a second mutation with the same scope behind a mutation that is waiting for it. Introduce no
+history-owned queue or pending flag beside TanStack.
 
-### Q5. How Mod+Z picks the owning surface
+One vanilla zustand store owns observable controller state. React reads it with `useStore` and
+selectors. Remove the lifecycle controller's listener set and separate zustand mirror in the
+same migration. The core keeps no React, application feature, or server imports.
 
-Two facts about the keymap decide the rule:
+### Failure, invalidation, and cleanup
 
-- A binding whose `when` fails is skipped and the **next candidate for the same chord runs**
-  (`Editor packages/editor/src/keymap/runtime.ts:89–99`, fed by `keymap-session.ts:145–155`).
-  Candidates are pane-specific first, then pane-less (`active-bindings.ts:260–272`). A pane-less
-  app Mod+Z would therefore run in the file tree whenever `fileOperationUndoable` is false.
-- `yieldsToTextEntry` keeps a chord off any input, textarea, select or contenteditable
-  (`keymap-session.ts:136–138`, `utils/keyboard-event.ts:13–34`). That covers the Lexical composer,
-  search boxes and Ghostty's textarea. The terminal also claims app chords before Ghostty encodes
-  them (`features/terminal/hooks/use-keybindings.ts:7–12`), so an app Mod+Z bound in the terminal
-  pane would take Ctrl+Z (SIGTSTP) from the shell.
+Define explicit outcomes for applied reversal, no change, stale history, partial success, and
+recovery-required state. Distinguish a rejection with no effects from a failure after effects
+may have committed. Preserve the adapter's recoverable entry and locks when its outcome requires
+recovery. Do not make lifecycle's per-row forget behavior the default for every domain.
 
-**Recommendation: the routing rule.**
+Define when an entry is claimed, removed, replaced by its inverse, or discarded. New forward
+entries clear redo after acceptance. A rejected action without effects preserves existing
+history. Dependent batch changes reverse in reverse application order. Partial application
+returns the actual reversible subset or enters domain recovery.
 
-1. Text entry has focus → its own undo. No app binding claims the key.
-2. The focused pane owns an undo → that pane's command, even when it has nothing to undo. Editor →
-   Editor graph (the barrier toast explains an empty stop); file tree → `fileTree.undo`; terminal →
-   the PTY. **Nothing falls through to the app history.** Otherwise holding Ctrl+Z in the editor
-   would start unarchiving sessions once the text history runs out.
-3. Any other pane → the app history (`workspace.undoSessionAction` today). If it is empty, nothing
-   claims the key.
+Invalidation, expiry, clear, disposal, and server-epoch replacement during an in-flight step
+must prevent stale results from republishing entries. Release resources after their active
+owner settles. A canceled wait or an AbortSignal alone proves no rollback of committed effects.
 
-Mechanism: declare the owning panes once in `client-core/src/commands/`
-(`editor`, `file-tree`, `terminal`, `dialog`, `command-palette`) and bind app undo and redo to
-every other `FocusArea`, never pane-less. L5 hand-lists `global, git, logs, problems, search,
-settings` (L5 `packages/client-core/src/commands/workspace.ts`), so a new pane gets no app undo
-until someone edits the list; deriving the list from the declared set fixes that. L5 also leaves
-out `chat`. Because rule 1 already protects the composer, **Recommendation:** include `chat`, so
-Mod+Z works with focus on the transcript. L5's `keymap.test.ts` case becomes a check over every
-`FocusArea`.
+Pure stack operations return discarded entries explicitly. Include capacity eviction, cleared
+redo, targeted removal, retention, and clear. The owning adapter releases resources and retains
+failed asynchronous cleanup for retry. Unit 1 defines ownership transfer when an entry becomes
+its inverse, so shared resources are released exactly once.
 
-This matches VS Code's shape. Its `UndoCommand` is a `MultiCommand` whose implementations are
-tried by priority, each claiming only when its view has focus
-(`src/vs/editor/browser/editorExtensions.ts:204–251`; explorer at
-`src/vs/workbench/contrib/files/browser/files.contribution.ts:653–679`), with the DOM
-`execCommand('undo')` last (`src/vs/editor/browser/coreCommands.ts:2095–2102`). Platform gets the
-same order from pane-scoped bindings, with no second dispatch mechanism.
+Retain current limits: 50 session batches and 20 workspace groups. Preserve memory-only client
+lifetimes and the server journal's existing retention policy.
 
-### Owner questions
+### Library comparison and dependency decision
 
-1. **Does Mod+Z still undo after the 5 s notice has gone?** LIFE-13's acceptance says no
-   (upstream); your stack correction and L5 say yes, until 50 steps. Options: (a) the stack stays
-   live; (b) entries expire with the notice. **Recommendation: (a)**, and update the LIFE-13
-   acceptance line.
-   Decided 2026-09-26: owner — (b): Mod+Z does not act once the 5 s notice is gone, matching LIFE-13's acceptance and upstream.
-   Confirmed 2026-09-26 (direction audit): owner — "Mod+Z only while the Undo notice is showing (a
-   few seconds). Once the notice is gone, Mod+Z does nothing here." LIFE-13's text in
-   [lifecycle.md](126-t3code-alignment/lifecycle.md) now says the same.
-2. **Should rail undo survive a reload?** Options: (a) memory, per window; (b) IndexedDB, per
-   browser; (c) on the server, across devices. **Recommendation: (a).** (b) can be added later
-   without a server change.
-   Decided 2026-09-26: owner — (a) memory only now; surviving a reload is a low-priority nice-to-have.
-3. **One app timeline or one per domain, once a second app-level consumer exists** (for example
-   workspace edits, which have no key today)? Options: (a) one history instance holding a tagged
-   union, where Mod+Z steps back through whatever happened last; (b) a history per domain, each
-   with its own command. **Recommendation: (a)**, matching "steps back through recent actions".
-   LIFE-13 ships with one domain either way, and the API above supports both.
-   Decided 2026-09-26: owner — (b) one stack per domain, no merged app timeline; this overrides the recommendation.
+Learn from async-history-stack's action-returning-an-inverse API, asynchronous traversal, and
+explicit grouping. The source audit used upstream commit
+[`aa59886419efd252b58697e209258465615a45c1`](https://github.com/kettanaito/async-history-stack/tree/aa59886419efd252b58697e209258465615a45c1).
 
-### Work items
+Bounded source probes found that merged setters `0 → 1 → 2` undo to `1`, because reversal uses
+forward order. A later merged failure can leave an earlier effect applied without an undo entry.
+Automatic merging delays execution until the window ends. These behaviors need different
+contracts for our consumers. Grouping must preserve immediate execution and define partial
+failure and compensation explicitly.
 
-1. **DONE for the web 2026-09-27; TUI deferred to its redesign.** Each batch carries an id and its
-   own Sonner notice (`chat-mode/state/session-undo.ts`); the notice's `onAutoClose`/`onDismiss`
-   expire that batch (`history.expire`), a notice's own Undo/Redo steps its batch, Mod+Z the
-   newest living one, and an undo shows a Redo notice with the same lifetime. The title reads the
-   batch from the store, so a forgotten row lowers the count in place. The Toaster shows every
-   toast when expanded. The TUI rail's U / Shift+U still walk the full history; the owner defers
-   that to the TUI redesign (see "TUI" in `AGENTS.md`). Original order:
-   **Fix the shipped session undo (ordered 2026-09-26).** Lane L5 shipped LIFE-13 with
-   `apps/web/src/features/chat-mode/state/session-undo.ts` keeping its 50-step history live after
-   the 5 s notice closes, so Mod+Z / Mod+Shift+Z still walk it. Change it so session history
-   entries expire with the notice: once no session Undo notice is showing, the session undo and
-   redo bindings do not act (their `when` fails, so the chord falls through). Apply the same rule
-   to the TUI rail's U / Shift+U, which share `client-core/src/chat/rail/lifecycle-undo.ts`.
-   Update `session-undo` unit and DOM tests and the `session-undo` scenario: an undo by key within
-   the notice works, a key press after it closes changes nothing. Can land before the phases below.
+Build on the owned stack and controller. This plan adds no async-history-stack dependency.
+Neither receipts nor closures prevent the integrated API. Avoid another broad library survey;
+resolve remaining contract questions with the two real consumers below.
 
-### Proposed phases
+## Execution checklist
 
-1. **Extract the core on L5's branch before PR #41 lands.** Add `dropped` and `retainHistory` to
-   `undo-stack.ts`; move the controller to `history/undo-history.ts`; make `lifecycle-undo.ts` an
-   adapter; move the stack tests to `client-core/src/history/tests/`. Delete the unused
-   `resetSessionUndo`. Web and TUI both keep their current behaviour.
-2. **Routing.** Add the owning-pane set and derive app undo and redo bindings from it; include `chat`
-   per the Q5 recommendation; pin every `FocusArea` in
-   `keymap.test.ts`.
-3. **Land LIFE-13** on the core: L5's receipts, `session.lifecycle.restore`, migration and UI
-   unchanged, with the acceptance amended per owner question 1. Re-run
-   `scripts/agent/scenarios/session-undo.ts` and the editor, file-tree and search-input undo
-   scenarios.
-4. **Optional: workspace edits on the core.** Replace the two arrays in `WorkspaceEditService`
-   with the pure operations (`onDrop` → `releaseGroup`, invalidation → `retainHistory`), leaving
-   the reverse logic untouched.
+### Delivered behavior
+
+- [x] Route app-level undo through panes that yield ownership, preserving text-entry and pane undo.
+- [x] Give each web session batch its own Undo/Redo notice and expire it when the notice closes.
+- [x] Audit current histories and compare the upstream API and implementation.
+- [x] Record the owner's integrated-default and lower-level-composition direction.
+
+### Unit 1: Specify the entry and execution contracts
+
+- [ ] Define typed entries, inverse results, identity, selection policy, resource ownership, and
+      failure/recovery outcomes from the current lifecycle and workspace consumers.
+- [ ] Specify `push`, `record`, named undo/redo, removal/expiry, retention/update, and clear as two
+      compositions of the same controller operations.
+- [ ] Walk archive, lifecycle batch, and multi-file transaction call sites through both forms.
+      Keep the common action concise and the complex transaction explicit.
+- [ ] Define scope admission, cache settlement, registration, in-flight invalidation, and cleanup
+      order. Prove the integrated and explicit forms each enter one execution scope.
+
+Acceptance: both consumers fit the contract without losing their existing domain guarantees.
+Helper names and types can be chosen here without another owner approval round.
+
+### Unit 2: Extract and prove the shared core
+
+- [ ] Extend pure stack operations with discarded-entry results and retention/update operations.
+- [ ] Extract the controller into `packages/client-core/src/history/undo-history.ts`, using one
+      vanilla zustand store and the configured domain executor.
+- [ ] Implement the default action API from the lower-level operations. Cover successful
+      registration, fresh inverse receipts, rejected actions, and stale in-flight completions.
+- [ ] Verify disposal ownership for eviction, redo clearing, removal, clear, and inverse transfer.
+
+Acceptance: both API forms produce identical history state and cleanup obligations for equivalent
+operations. Execution failures cannot silently turn committed effects into empty history.
+
+### Unit 3: Migrate session actions first
+
+- [ ] Move ordinary archive, settle, snooze, and unpin actions onto the integrated API. Retain
+      explicit composition only where it materially simplifies a batch or navigation integration.
+- [ ] Keep receipt-authoritative restoration, revision rebasing, reverse batch order, partial
+      success, independent-batch selection, claimed entries, and web notice expiry in the adapter.
+- [ ] Migrate web and TUI together onto the shared controller, removing the old listener/store
+      bridge and obsolete stack/controller code. Preserve the TUI's existing lifetime and UX.
+- [ ] Verify undo pressed during an action queues behind acceptance and registration. Verify
+      rejection, conflicts, notice expiry, redo, and repeated reversal return fresh receipts.
+
+Acceptance: ordinary callers use the default API, and current web/TUI semantics remain intact.
+
+### Unit 4: Migrate workspace bookkeeping
+
+- [ ] Reproduce [#493](https://github.com/ShaulLavo/fregat/issues/493), the unconfirmed direct
+      concurrent undo concern, with overlapping undo/redo and a recovery case. Fix it within this
+      unit if confirmed. If ruled out, record the evidence and close the issue with a reason.
+      Keep the issue open if the bounded reproduction is inconclusive.
+- [ ] Replace workspace array bookkeeping with the shared operations. Use the lower-level form
+      where it simplifies provisional server commits, live buffer reversal, and recovery.
+- [ ] Preserve barriers, path invalidation, server-epoch clearing, held leases, cleanup retries,
+      and domain cache settlement. Route direct calls through the same execution guarantees.
+- [ ] Delete superseded bookkeeping and verify no second journal or transaction owner was added.
+
+Acceptance: workspace transactions retain exact recovery and resource behavior while reusing the
+core. The two consumers determine whether the default API needs refinement before wider use.
+
+## Verification and delivery
+
+For each unit, run the narrow tests that cover its plausible failures through the repository's
+heavy runner. Use real state and domain fixtures. Exercise disposal with retained resources,
+not callbacks that merely mirror the implementation.
+
+Use existing lifecycle tests in `packages/client-core/src/chat/rail/tests/` and web session-undo
+tests. Extend workspace edit service tests for explicit composition, failure/recovery, pending
+invalidation, and exact receipt cleanup. Keep tests portable and avoid mocking our own modules.
+
+For the session migration, run the `session-undo` browser scenario. For workspace integration,
+run `file-tree-undo` and `editor-undo-barrier`. Recheck `search-input-undo` when routing or text-entry
+ownership changes. Read the screenshots back. Use `caches` evidence for changed cache settlement.
+Record delivery evidence in `docs/` and completed unit status here.
+
+Before declaring each implementation unit done, run required gates, commit owned paths, push,
+and deploy to the mesh. Server changes require dev verification and the server restart deployment
+path. This planning refresh changes documents only; implementation checkboxes remain open.
