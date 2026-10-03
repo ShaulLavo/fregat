@@ -1,4 +1,4 @@
-import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import * as v from 'valibot'
@@ -29,7 +29,8 @@ afterEach(async () => {
 
 test('real app history GET stays passive, picks up lifecycle refresh, and recovers cached transcripts on restart', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'usage-history-routes-'))
-  roots.push(root)
+  const stateHome = await mkdtemp(path.join(tmpdir(), 'usage-history-state-'))
+  roots.push(root, stateHome)
   const home = path.join(root, 'claude-profile')
   const transcripts = path.join(home, 'projects', 'outside-fregat')
   await mkdir(transcripts, { recursive: true })
@@ -64,6 +65,7 @@ test('real app history GET stays passive, picks up lifecycle refresh, and recove
     homeDirectory: root,
     workspaceRoot: root,
     systemRoot: root,
+    system: { stateHome },
     settings: testSettingsOptions(root),
     themes: { root: path.join(root, 'themes') },
     orchestration: { providerRuntime: false, providerAdapterRegistry: registry },
@@ -99,9 +101,14 @@ test('real app history GET stays passive, picks up lifecycle refresh, and recove
   expect((await read()).totals.tokens).toBe(120)
   expect((await read()).coverage?.scannedAt).toBe(first.coverage?.scannedAt)
   await appUsageHistory(app).refresh()
-  expect((await read()).totals.tokens).toBe(240)
+  const persisted = await read()
+  expect(persisted.totals.tokens).toBe(240)
+  const cacheFile = path.join(stateHome, 'usage', 'transcript-history.sqlite')
+  await access(cacheFile)
   await closeTestApps()
+  await access(cacheFile)
   await rm(file)
+  await expect(access(file)).rejects.toMatchObject({ code: 'ENOENT' })
   registry = new ProviderAdapterRegistry(registryOptions)
   registries.push(registry)
   await registry.reconcile([
@@ -116,7 +123,14 @@ test('real app history GET stays passive, picks up lifecycle refresh, and recove
     orchestration: { ...options.orchestration, providerAdapterRegistry: registry },
   })
   await appUsageHistory(app).initialize()
-  expect((await read()).totals.tokens).toBe(240)
+  const restored = await read()
+  expect(restored.totals.tokens).toBe(240)
+  expect(restored.coverage?.scannedAt).toBe(persisted.coverage?.scannedAt)
+  expect(
+    restored.coverage?.sources.filter((source) => source.sourceKind === 'native-transcript'),
+  ).toEqual(
+    persisted.coverage?.sources.filter((source) => source.sourceKind === 'native-transcript'),
+  )
 })
 
 test('transcript roots use the actual enabled native environments and deduplicate shared homes', async () => {
