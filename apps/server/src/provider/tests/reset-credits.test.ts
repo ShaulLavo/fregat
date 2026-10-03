@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -10,6 +10,7 @@ import { providerResetCreditAttempts } from '../../db/schema'
 import { MockProviderAdapter } from '../adapters/mock'
 import { ProviderResetCredits } from '../reset-credits'
 import { ProviderUsageStore } from '../usage-store'
+import { readProxyUsage } from '../usage-proxy-source'
 import { sessionIdentityErrors } from '../structured-errors'
 import type { ProviderAdapter } from '../types'
 
@@ -28,9 +29,15 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
-async function fixture(consume: (key: string) => Promise<ProviderResetCreditOutcome>) {
+async function fixture(
+  consume: (key: string) => Promise<ProviderResetCreditOutcome>,
+  withProxy = false,
+) {
   const root = await mkdtemp(path.join(tmpdir(), 'reset-credit-'))
   cleanups.push(() => rm(root, { recursive: true, force: true }))
+  const authPath = path.join(root, 'auth.json')
+  if (withProxy)
+    await writeFile(authPath, JSON.stringify({ tokens: { account_id: 'fixture-chatgpt-id' } }))
   const databasePath = path.join(root, 'fixture.sqlite')
   let handle = createMetadataDatabase({ databasePath })
   initializePlatformDatabase(handle.db)
@@ -45,6 +52,7 @@ async function fixture(consume: (key: string) => Promise<ProviderResetCreditOutc
     accountKey: ACCOUNT,
     nativeAccountKey: ACCOUNT,
     splitHomes: false,
+    proxy: false,
     creditId: 'fixture-credit',
     available: 1,
     now: START + 1000,
@@ -67,12 +75,39 @@ async function fixture(consume: (key: string) => Promise<ProviderResetCreditOutc
       enabled: state.enabled,
       claudeCachePath: null,
       credentialFingerprint: null,
+      ...(withProxy ? { codexAuthPath: authPath } : {}),
     }),
   }
-  const store = new ProviderUsageStore(registry, { now: () => state.now })
+  const store = new ProviderUsageStore(registry, {
+    now: () => state.now,
+    ...(withProxy
+      ? {
+          proxySourceKey: () => 'fixture-source',
+          proxyConfigured: () => state.proxy,
+          readProxy: (identityContext: string) =>
+            readProxyUsage({
+              url: 'http://localhost:18317',
+              secret: 'synthetic-key',
+              identityContext,
+              now: () => state.now,
+              fetch: async () =>
+                Response.json({
+                  files: [
+                    {
+                      id: 'fixture-auth',
+                      provider: 'codex',
+                      id_token: { chatgpt_account_id: 'fixture-chatgpt-id' },
+                    },
+                  ],
+                }),
+            }),
+        }
+      : {}),
+  })
   const usage = {
     suspendCollection: (key: string) => store.suspendCollection(key),
     read: () => store.read(),
+    readNativeAccount: (key: string) => store.readNativeAccount(key),
     refreshAccount: vi.fn((key: string) => store.refreshAccount(key)),
   }
   let service = new ProviderResetCredits(handle.db, registry, usage, () => state.now)
@@ -85,6 +120,7 @@ async function fixture(consume: (key: string) => Promise<ProviderResetCreditOutc
       return service
     },
     state,
+    store,
     nativeCalls,
     usage,
     adapter,
@@ -258,3 +294,34 @@ test('restart retries preserve the confirmed credit when the provider advertises
   expect(f.nativeCalls[1]).toEqual(f.nativeCalls[0])
   expect(f.nativeCalls[1]?.creditId).toBe('fixture-credit')
 })
+
+test.each([
+  { splitHomes: false, checkCredits: true },
+  { splitHomes: false, checkCredits: false },
+  { splitHomes: true, checkCredits: false },
+])(
+  'proven grouping preserves native credits and originating reset targets: %j',
+  async ({ splitHomes, checkCredits }) => {
+    const consume = vi.fn(async () => 'reset' as const)
+    const f = await fixture(consume, true)
+    f.state.splitHomes = splitHomes
+    await f.store.refresh()
+    const before = await f.service.readUsage()
+    expect(before.accounts).toHaveLength(1)
+    expect(before.accounts[0]?.resetCredits).toMatchObject({ available: 1, accountKey: ACCOUNT })
+    f.state.proxy = true
+    await f.store.refresh()
+    const grouped = await f.service.readUsage()
+    expect(grouped.accounts).toHaveLength(1)
+    expect(grouped.accounts[0]?.providerInstanceIds).toEqual([INSTANCE, OTHER])
+    if (checkCredits)
+      expect(grouped.accounts[0]?.resetCredits).toEqual(before.accounts[0]?.resetCredits)
+    expect(await f.service.redeem(OTHER, input)).toMatchObject({
+      outcome: 'reset',
+      refresh: 'confirmed',
+    })
+    expect(consume).toHaveBeenCalledTimes(1)
+    expect(f.nativeCalls).toMatchObject([{ accountKey: ACCOUNT, creditId: input.creditId }])
+    expect(f.usage.refreshAccount).toHaveBeenLastCalledWith(splitHomes ? 'different-home' : ACCOUNT)
+  },
+)

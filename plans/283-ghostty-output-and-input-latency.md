@@ -17,9 +17,17 @@
       latency at the presentation of the submitting frame, paired native/xterm ratios, CPU rows
       unresolved below the 10 ms tick. Sustained-output CPU is ASCII-only until #352.
       Result at 17 terminals: output CPU native/xterm 2.10 renderer, 2.29 total.
-- [ ] Frame built in Zig, spike: ASCII and SGR colors, measured against main and xterm.
-- [ ] Frame built in Zig, full move: wide characters, graphemes, cursor, selection, links; delete the
-      JS snapshot and instance builders.
+- [x] Frame built in Zig, spike: ASCII and SGR colors, measured against main and xterm (#429).
+- [x] Native Unicode, graphemes, wide cells, cursor, selection and color glyphs (#462).
+- [x] GPU full move: delete the JavaScript frame/instance builder, opt-out and fallback. WebGL and
+      WebGPU require native frames; bounded atlas exhaustion reports `frame_builder`, retains the
+      submitted frame and unacknowledged damage, and requires a full rebuild on the next request.
+      Shared styled/text row readers remain for Canvas 2D, DOM, accessibility and frame callbacks.
+- [x] Native-only deletion control: one rolling-logs WebGL before/after matrix at 17 terminals,
+      four balanced pairs per quiet window against `b991384e0`. Renderer/total paired xterm ratios
+      remain below one (0.6674/0.8165 after); all 16 cases qualify. Cross-session native total CPU
+      is 40.444 → 40.719% core, a descriptive observation. No CPU benefit or proven no-regression
+      claim. Compact records and source verification: `ghostty-webgpu/docs/benchmarks/linux-native-only-2026-10-03/`.
 - [ ] Input: render on the frame that parses the echo (native starts drawing ~15 ms after parse at
       1 terminal; xterm ~0.5 ms).
 - [ ] Full omarchy run of every measure; regenerate `docs/benchmarks.md`; unblock Plan 285's measurements section.
@@ -76,6 +84,41 @@ Target: each of ours at or below its counterpart. The controlled Linux browser r
 Vulkan and Skia GaneshVulkan. Its disabled Vulkan-via-GL-interop feature does not establish a
 Vulkan-to-GL presentation path. The remaining WebGPU GPU-process gap needs separate Dawn/API
 and presentation attribution; native WebGL versus xterm WebGL isolates our WebGL renderer work.
+
+## macOS (M1/Metal), 2026-10-03
+
+Verified output-only bytes-path matrix on Apple M1, Chrome 154 with ANGLE Metal, frozen runtime
+`2a3f1e25a32617dcf417ab885b366e2cc46c46cc` and benchmark driver
+`36afbf44313c1cd92c6a02c37f216db5e99c5ebc`. Eight windows completed 64 runs with zero lost
+windows, four balanced native/xterm pairs per window. Ratios below are paired medians against
+xterm WebGL, rounded to two decimals; each entry gives renderer CPU then total CPU.
+
+| Renderer | Terminals | Rolling ASCII | Rolling Unicode |
+| -------- | --------- | ------------- | --------------- |
+| WebGL    | 17        | 0.95 / 1.16   | 0.94 / 1.15     |
+| WebGL    | 1         | 0.91 / 0.93   | 0.93 / 0.94     |
+| WebGPU   | 17        | 1.20 / 1.30   | 1.21 / 1.29     |
+| WebGPU   | 1         | 0.98 / 1.01   | 0.98 / 1.01     |
+
+WebGL passes renderer CPU at 17 terminals but loses total CPU. Per-process receipts attribute
+the loss to higher Chrome GPU-process CPU on this Metal backend. GPU-process medians are
+46.5% versus 33.8% of one core for ASCII and 46.2% versus 34.0% for Unicode. Both implementations use
+560×456 terminal backing canvases; xterm has two per terminal. Canvas size does not explain the
+gap. WebGL passes both CPU measures at one terminal. WebGPU loses both at 17 terminals;
+its one-terminal total remains **unresolved** under the conservative CPU bounds.
+
+Custody and independent verification are in
+`/work/reports/ghostty-benchmarks/plan-283/mac-output-20261003-2a3f1e25/coordinator-output-check.json`,
+with per-process receipts in each window's `compact.json`. The proof verifies 140 runtime and
+40 benchmark source files, 26 asset hashes, and all 64 paired CPU records. Darwin's observed
+10 ms clockrate supplies conservative OS comparison bounds; finer CDP resolution is unmeasured.
+Host load is an idle proxy; Metal GPU utilization and hardware execution time are unmeasured.
+This matrix qualifies output CPU only, with no latency or presentation-clock qualification.
+Historical results below remain separate.
+
+- [ ] Pending candidate: controlled GL-command CPU A/B to attribute the 17-terminal GPU-process
+      gap before choosing a renderer change. The receipts establish process CPU attribution;
+      they do not isolate the command or Metal driver cost.
 
 ## Why the M1 targets changed
 
@@ -141,10 +184,10 @@ full render-state copies out of wasm, atlas churn, and input-to-render ordering 
 
 ## Phase 2: Zig/WebAssembly frame spike
 
-Status: Approved. Build the supported render frame directly from Ghostty's render state in the
-existing bridge. JavaScript retains canvas glyph rasterization and GPU calls. The `zigFrame`
-renderer option defaults on for WebGL and off for WebGPU; unsupported frames use the existing
-whole-frame JavaScript path.
+Status: Completed spike; the checks below record its measured revisions. The original spike built
+supported frames directly from Ghostty's render state and retained a selectable JavaScript producer.
+The GPU full move now requires native frames for both WebGL and WebGPU. JavaScript retains browser
+font rasterization and GPU calls; shared row readers serve non-GPU consumers.
 
 - [x] Add persistent WASM cell/glyph records, an atlas index, missing glyph keys and changed ranges.
 - [x] Add the opt-in WebGPU path and direct WASM-memory buffer uploads.
@@ -219,9 +262,10 @@ spike to the full terminal feature set. Measurements use GPU-idle, `--quiet` hea
 
 ### WebGL consumes the Zig frame
 
-Status: Approved. Reuse the existing 64-byte cell and 96-byte glyph records directly in WebGL,
-with changed-range uploads and the existing whole-frame JavaScript fallback. Keep shader and
-record layouts unchanged; additional trailing-blank heuristics wait for measurement.
+Status: Completed milestone (#399). This revision reused the existing 64-byte cell and 96-byte
+glyph records directly in WebGL with changed-range uploads and a whole-frame JavaScript fallback.
+The GPU full move removes that fallback; shader and native record layouts remain unchanged.
+The checks and measurements below describe the historical milestone.
 
 - [x] Make WebGL's supported-subset native producer the default, preserving omitted host options.
 - [x] Upload nonempty changed ranges from fresh WASM views with byte-correct destination offsets.
@@ -248,10 +292,12 @@ record layouts unchanged; additional trailing-blank heuristics wait for measurem
 
 ### Unicode, grapheme, selection and color frames
 
-Status: Approved. Extend the Zig producer to the real shell content that selected whole-frame
-JavaScript fallback: Unicode prompts, wide cells, grapheme clusters, selection and color glyphs.
+Status: Completed milestone (#462). This revision extended the Zig producer to shell content that
+previously selected whole-frame JavaScript fallback: Unicode prompts, wide cells, grapheme clusters,
+selection and color glyphs. The checks and measurements below describe that historical revision.
 Fonts and missing-glyph rasterization remain browser-owned; cell and glyph record layouts stay
-unchanged. Keep the explicit JavaScript producer and atlas-resource recovery path.
+unchanged. That measured revision retained the explicit JavaScript producer. The GPU full move
+removes that producer and preserves bounded native atlas-resource recovery.
 
 - [x] Merge the listener-copy update before freezing the baseline runtime at `4a0adeb1c`.
 - [x] Replace ASCII-only keys with owned full-text keys, width spans, style and resolved brush colors.

@@ -20,7 +20,8 @@ A slow language server must not delay typing, syntax work, or another document.
 
 This document plans the refactor. It does not start production implementation, a branch, a commit,
 or a PR. The planning work covers grounding, competing designs, synthesis, and review. Implementation
-begins only when requested. Reconcile both checkouts and their dirty diffs before executing it.
+begins only when requested. Reconcile canonical Fregat source and owned dirty diffs before execution;
+207 completed package relocation and removed separate Editor checkout integration refs.
 
 Decided 2026-09-25: owner — units 0–1 (baseline and consumer inventory, then buffer publication) are approved to
 start. Units 2–7 stay gated as this plan says: implementation of them begins only when requested.
@@ -31,7 +32,8 @@ This is one of the six remaining wave 2 plans named by the owner on 2026-09-28. 
 wave 2 delivery remains units 0–1; the existing authorization gate on units 2–7 remains.
 The plan refresh authorizes no production implementation beyond those decisions.
 
-Source audit: Platform `cf7bc9343`, Editor `401d30cd`. Editor has concurrent Markdown edits;
+Historical pre-delivery audit, superseded by the unit 1 publication proof above. These findings
+describe September 28, not current missing APIs. Source audit: Platform `cf7bc9343`, Editor `401d30cd`. Editor had concurrent Markdown edits;
 take a fresh dirty diff and linked-build baseline before execution. Findings:
 
 - Unit 1 remains open. `EditorTextBufferChange` in `documentSession.ts` carries `change`,

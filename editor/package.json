@@ -5,6 +5,7 @@
     "packages/*",
     "examples/*"
   ],
+  "type": "module",
   "scripts": {
     "bench:input:paired": "bun run --cwd examples/stress bench:input:paired",
     "dev": "turbo dev",

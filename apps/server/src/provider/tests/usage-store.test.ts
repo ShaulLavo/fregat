@@ -49,6 +49,349 @@ afterEach(async () => {
 
 describe('provider usage store', () => {
   it.each([
+    { nativeId: 'fixture-chatgpt-account', proxyId: 'fixture-chatgpt-account', count: 1 },
+    { nativeId: 'fixture-chatgpt-account', proxyId: 'fixture-other-account', count: 2 },
+    { nativeId: null, proxyId: 'fixture-chatgpt-account', count: 2 },
+    { nativeId: 'fixture-chatgpt-account', proxyId: null, count: 2 },
+    { nativeId: 42, proxyId: 42, count: 2 },
+  ])(
+    'compares actual salted Codex account IDs independently of labels: %j',
+    async ({ nativeId, proxyId, count }) => {
+      const f = await nativeClaudeFixture('codex')
+      await writeFile(
+        path.join(path.dirname(f.cachePath), 'credentials.json'),
+        JSON.stringify({
+          tokens: {
+            account_id: nativeId,
+            id_token: `e30.${Buffer.from(JSON.stringify({ email: 'fixture.native@example.test' })).toString('base64url')}.fixture`,
+          },
+        }),
+      )
+      const nativeCalls = stubUsage(f.registry, WORK, async () => ({
+        kind: 'reading',
+        update: codexUsageUpdate({
+          primary: {
+            usedPercent: 17,
+            windowDurationMins: 300,
+            resetsAt: (START_MS + 300_000) / 1000,
+          },
+        }),
+      }))
+      let proxyCalls = 0
+      let effectiveProxyId = proxyId
+      let proxyHasQuota = true
+      const oldAt = new Date(START_MS - 600_000).toISOString()
+      const options = {
+        cacheFile: path.join(path.dirname(f.cachePath), 'accounts.json'),
+        now: () => f.clock.ms,
+        proxySourceKey: () => 'fixture-proxy-source',
+        readProxy: (identityContext: string) =>
+          readProxyUsage({
+            url: 'http://localhost:18317',
+            secret: 'synthetic-key',
+            identityContext,
+            now: () => f.clock.ms,
+            fetch: async () => {
+              proxyCalls += 1
+              return Response.json({
+                files: [
+                  {
+                    id: 'fixture-auth',
+                    provider: 'codex',
+                    email:
+                      count === 1 ? 'fixture.proxy@example.test' : 'fixture.native@example.test',
+                    id_token: { chatgpt_account_id: effectiveProxyId, plan_type: 'plus' },
+                    disabled: true,
+                    quota: proxyHasQuota
+                      ? {
+                          observed_at: oldAt,
+                          signals: {
+                            'x-codex-primary-used-percent': '89',
+                            'x-codex-primary-window-minutes': '300',
+                            'x-codex-primary-reset-at': new Date(START_MS + 300_000).toISOString(),
+                            'x-codex-secondary-used-percent': '25',
+                            'x-codex-secondary-window-minutes': '10080',
+                          },
+                        }
+                      : undefined,
+                  },
+                ],
+              })
+            },
+          }),
+      }
+      const store = new ProviderUsageStore(f.registry, options)
+      await store.refresh()
+      expect((await store.read()).accounts).toHaveLength(count)
+      if (count === 1) {
+        expect((await store.feed()).accounts[0]!.windows).toHaveLength(2)
+        expect((await store.read()).accounts[0]).toMatchObject({
+          state: 'disabled',
+          providerInstanceIds: [WORK],
+          label: 'fixture.proxy',
+          routing: { active: false },
+          windows: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'primary',
+              usedPercent: 17,
+              observedAt: new Date(START_MS).toISOString(),
+              source: 'codex-account-rate-limits',
+            }),
+            expect.objectContaining({
+              id: 'secondary',
+              usedPercent: 25,
+              observedAt: oldAt,
+              source: 'cliproxy-passive-cache',
+            }),
+          ]),
+        })
+        expect((await store.feed()).accounts[0]!.windows).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              usedPercent: 17,
+              lastSeenAt: new Date(START_MS).toISOString(),
+              source: 'passive-header',
+            }),
+            expect.objectContaining({ usedPercent: 25, lastSeenAt: oldAt, source: 'proxy-state' }),
+          ]),
+        )
+      }
+      await store.close()
+      const restored = new ProviderUsageStore(f.registry, options)
+      expect((await restored.read()).accounts).toHaveLength(count)
+      await restored.read()
+      await restored.feed()
+      expect(proxyCalls).toBe(1)
+      expect(nativeCalls.count).toBe(1)
+      const publicPayload =
+        JSON.stringify(await restored.read()) + JSON.stringify(await restored.feed())
+      expect(publicPayload).not.toMatch(
+        /fixture-chatgpt-account|fixture-other-account|@|synthetic-key|identityContext|identityProof/,
+      )
+      const persisted = await readFile(options.cacheFile, 'utf8')
+      expect(persisted).not.toMatch(
+        /fixture-chatgpt-account|fixture-other-account|@|synthetic-key|id_token/,
+      )
+      if (count === 1) {
+        restored.reconfigure()
+        expect((await restored.read()).accounts).toHaveLength(2)
+        const afterReconfigure = new ProviderUsageStore(f.registry, options)
+        expect((await afterReconfigure.read()).accounts).toHaveLength(2)
+        await afterReconfigure.close()
+        proxyHasQuota = false
+        f.clock.ms += 300_001
+        await restored.refresh()
+        expect((await restored.read()).accounts).toHaveLength(1)
+        expect((await restored.read()).accounts[0]!.windows).toEqual(
+          expect.arrayContaining([expect.objectContaining({ usedPercent: 25, observedAt: oldAt })]),
+        )
+        effectiveProxyId = 'fixture-replacement-proxy'
+        f.clock.ms += 300_001
+        await restored.refresh()
+        expect((await restored.read()).accounts).toHaveLength(2)
+        expect(
+          (await restored.read()).accounts.find(
+            (account) => account.source === 'cli-proxy-management',
+          )!.windows,
+        ).toEqual([])
+      }
+      const context = await readFile(`${options.cacheFile}.identity`, 'utf8')
+      expect(context).toMatch(/^[a-f0-9]{64}$/)
+      expect(persisted).not.toContain(context)
+      await writeFile(`${options.cacheFile}.identity`, 'b'.repeat(64))
+      const changedContext = new ProviderUsageStore(f.registry, options)
+      expect((await changedContext.read()).accounts).toHaveLength(2)
+      await changedContext.close()
+      await writeFile(
+        path.join(path.dirname(f.cachePath), 'credentials.json'),
+        JSON.stringify({ tokens: { account_id: 'fixture-replacement-account' } }),
+      )
+      expect((await restored.read()).accounts).toHaveLength(2)
+      await restored.close()
+      await f.store.close()
+    },
+  )
+
+  it('retains hidden proxy observations across off, restart and same source, and invalidates a different source', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'usage-retention-'))
+    roots.push(root)
+    const registry = { listInstances: () => [], adapter: () => null, usageAccount: () => null }
+    let now = START_MS
+    let key: string | null = 'fixture-original-source'
+    let requests = 0
+    const options = {
+      cacheFile: path.join(root, 'accounts.json'),
+      now: () => now,
+      proxySourceKey: () => key,
+      proxyConfigured: () => key !== null,
+      readProxy: async () => {
+        requests += 1
+        return [
+          {
+            accountKey: `proxy:${'a'.repeat(64)}`,
+            driverKind: v.parse(providerDriverKindSchema, 'codex'),
+            providerInstanceIds: [],
+            planType: 'Pro',
+            checkedAt: new Date(START_MS).toISOString(),
+            source: 'cli-proxy-management',
+            windows: [
+              {
+                id: 'primary',
+                label: 'Session',
+                kind: 'session' as const,
+                usedPercent: 61,
+                resetsAt: new Date(START_MS + 600_000).toISOString(),
+                windowMinutes: 300,
+                observedAt: new Date(START_MS).toISOString(),
+                source: 'cliproxy-passive-cache',
+                status: null,
+              },
+            ],
+          },
+        ]
+      },
+    }
+    const store = new ProviderUsageStore(registry, options)
+    await store.refresh()
+    expect((await store.read()).accounts[0]!.windows[0]!.usedPercent).toBe(61)
+    key = null
+    store.reconfigure()
+    now += 1000_000
+    await store.refresh()
+    expect((await store.read()).accounts).toEqual([])
+    expect((await store.feed()).accounts).toEqual([])
+    expect(requests).toBe(1)
+    await store.close()
+    const restored = new ProviderUsageStore(registry, options)
+    expect((await restored.read()).accounts).toEqual([])
+    await restored.refresh()
+    expect(requests).toBe(1)
+    key = 'fixture-original-source'
+    restored.reconfigure()
+    expect((await restored.read()).accounts[0]).toMatchObject({
+      checkedAt: new Date(START_MS).toISOString(),
+      windows: [
+        {
+          usedPercent: 61,
+          observedAt: new Date(START_MS).toISOString(),
+          freshness: 'reset-passed',
+        },
+      ],
+    })
+    key = 'fixture-different-source'
+    restored.reconfigure()
+    expect((await restored.read()).accounts[0]!.windows).toEqual([])
+    expect(requests).toBe(1)
+    await restored.close()
+  })
+
+  it('discards an in-flight proxy result after off and same-source restoration', async () => {
+    const registry = { listInstances: () => [], adapter: () => null, usageAccount: () => null }
+    let now = START_MS
+    let key: string | null = 'fixture-source'
+    let requests = 0
+    let complete!: (accounts: ProviderAccountUsage[]) => void
+    const previous: ProviderAccountUsage = {
+      accountKey: `proxy:${'a'.repeat(64)}`,
+      driverKind: v.parse(providerDriverKindSchema, 'codex'),
+      providerInstanceIds: [],
+      planType: null,
+      checkedAt: new Date(START_MS).toISOString(),
+      source: 'cli-proxy-management',
+      windows: [
+        {
+          id: 'primary',
+          label: 'Session',
+          kind: 'session',
+          usedPercent: 61,
+          resetsAt: null,
+          windowMinutes: 300,
+          status: null,
+          observedAt: new Date(START_MS).toISOString(),
+          source: 'cliproxy-passive-cache',
+        },
+      ],
+    }
+    const store = new ProviderUsageStore(registry, {
+      now: () => now,
+      proxySourceKey: () => key,
+      proxyConfigured: () => key !== null,
+      readProxy: async () => {
+        requests += 1
+        if (requests === 1) return [previous]
+        return new Promise((resolve) => {
+          complete = resolve
+        })
+      },
+    })
+    await store.refresh()
+    expect((await store.read()).accounts[0]!.windows[0]!.usedPercent).toBe(61)
+    now += 300_001
+    const pending = store.refresh()
+    expect(requests).toBe(2)
+    key = null
+    store.reconfigure()
+    await store.refresh()
+    expect((await store.feed()).accounts).toEqual([])
+    expect(requests).toBe(2)
+    key = 'fixture-source'
+    store.reconfigure()
+    complete([
+      {
+        ...previous,
+        checkedAt: new Date(now).toISOString(),
+        windows: [
+          { ...previous.windows[0]!, usedPercent: 90, observedAt: new Date(now).toISOString() },
+        ],
+      },
+    ])
+    await pending
+    expect((await store.read()).accounts[0]!.windows[0]).toMatchObject({
+      usedPercent: 61,
+      observedAt: new Date(START_MS).toISOString(),
+    })
+    await store.close()
+  })
+
+  it.each(['claude', 'codex'] as const)(
+    'uses local %s metadata labels without quota metadata or exporting email domains',
+    async (kind) => {
+      const f = await nativeClaudeFixture(kind)
+      const credentialPath = path.join(path.dirname(f.cachePath), 'credentials.json')
+      if (kind === 'claude')
+        await writeFile(
+          f.cachePath,
+          JSON.stringify({
+            oauthAccount: {
+              accountUuid: 'fixture-account',
+              emailAddress: 'fixture.person@example.test',
+            },
+          }),
+        )
+      else
+        await writeFile(
+          credentialPath,
+          JSON.stringify({
+            tokens: {
+              id_token: `e30.${Buffer.from(JSON.stringify({ email: 'fixture.person@example.test' })).toString('base64url')}.fixture`,
+            },
+          }),
+        )
+      stubUsage(f.registry, WORK, async () => ({ kind: 'unsupported' }))
+      await f.store.refresh()
+      expect((await f.store.read()).accounts[0]).toMatchObject({
+        label: 'fixture.person',
+        windows: [],
+      })
+      expect((await f.store.feed()).accounts[0]!.label).toBe('fixture.person')
+      expect(JSON.stringify(await f.store.read())).not.toMatch(
+        /@|example.test|fixture-account|id_token/,
+      )
+      await f.store.close()
+    },
+  )
+
+  it.each([
     {
       name: 'exact 60-minute-old cache at defaults',
       age: 3600_000,

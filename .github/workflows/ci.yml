@@ -7,10 +7,10 @@ on:
       - main
   workflow_dispatch:
 
-# GitHub cancels older pending runs in a shared group even with cancellation disabled.
-# PRs share a group; each main commit gets its own.
+# Each ref keeps one running and one pending run; newer pushes replace older pending runs.
+# PRs also cancel their running run; main lets its running run finish.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ startsWith(github.ref, 'refs/pull/') && github.ref || github.sha }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:

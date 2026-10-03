@@ -7,8 +7,8 @@
   line editor is gonna be one of the first ones."
 - Owns: `ghostty-webgpu/` (core and new extension packages), its site, and Platform's terminal
   feature (`apps/web/src/features/terminal/`), the package's only consumer.
-- Versions: every ghostty-webgpu change bumps the patch version, including breaking API changes,
-  until the real launch. Strict semantic versioning starts at launch.
+- Versions: patch bumps only, including public API changes, under the owner's 2026-10-03
+  package-version decision. Update all consumers in the same delivery unit.
 
 ## Outcome
 
@@ -402,9 +402,9 @@ no-Canvas tests still pass.
 
 0 → 1 → 2 (steps in order, each its own PR) → 3 → 4 → 5. Phase 1 can merge before Phase 2
 starts; Phase 3 items can start once Phase 0 lands.
-Every PR gets an independent review before merge and ships a patch bump, including Phases 0–2.
-Extension packages are workspace-only until their publication gates pass; the site and Platform
-consume them from the monorepo.
+Every PR gets an independent review before merge. Phases 0–2 ship with patch bumps and
+matching site/Platform consumers. Standalone package publication keeps the applicable
+[Plan 207](207-one-repo-with-mirrors.md) installation and publication gates.
 
 ## Owner questions
 

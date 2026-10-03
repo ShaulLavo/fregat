@@ -52,32 +52,20 @@ export function hardwareLaunch(host, smoke, smokeHeaded = false) {
   return { headless, arguments: arguments_ }
 }
 
+// The primary is selected automatically; secondary comparisons require explicit selection.
 export const counterparts = {
-  'ghostty-webgpu': 'xterm-webgl',
-  'ghostty-webgl': 'xterm-webgl',
-  'ghostty-canvas': 'ghostty-web',
-  'ghostty-dom': 'xterm-dom',
+  'ghostty-webgpu': ['xterm-webgl'],
+  'ghostty-webgl': ['xterm-webgl'],
+  'ghostty-canvas': ['ghostty-web', 'xterm-dom'],
+  'ghostty-dom': ['xterm-dom'],
 }
 
 export const measurementPhases = ['parser', 'memory', 'idle', 'latency', 'burst', 'output']
 
-export function frameBuilders(args) {
-  assert(
-    !(args.includes('--paired-frame-builders') && args.includes('--frame-builders')),
-    'Choose --frame-builders or --paired-frame-builders',
-  )
-  return selection(
-    args,
-    '--frame-builders',
-    args.includes('--paired-frame-builders') ? ['js', 'zig'] : ['js'],
-    ['js', 'zig'],
-  )
-}
-
 export function selectedVariants(args, available, fallback) {
   const selected = [...selection(args, '--variants', fallback, available)]
   for (const native of selected) {
-    const counterpart = counterparts[native]
+    const counterpart = counterparts[native]?.[0]
     if (counterpart && !selected.includes(counterpart)) selected.push(counterpart)
   }
   return selected
@@ -103,7 +91,7 @@ export function selectedPhases(args) {
   return selection(args, '--phases', measurementPhases, measurementPhases)
 }
 
-export function measurementCases(variants, paths, counts, builders, repetition) {
+export function measurementCases(variants, paths, counts, repetition) {
   const ordered = (values) => {
     const offset = Math.floor(repetition / 2) % values.length
     const rotated = [...values.slice(offset), ...values.slice(0, offset)]
@@ -111,7 +99,7 @@ export function measurementCases(variants, paths, counts, builders, repetition) 
   }
   const treatments = ordered(variants).flatMap((variant) => {
     if (variant !== 'ghostty-webgpu' && variant !== 'ghostty-webgl') return [{ variant }]
-    return ordered(builders).map((frameBuilder) => ({ variant, frameBuilder }))
+    return [{ variant, frameBuilder: 'zig' }]
   })
   return (repetition % 2 ? paths.toReversed() : paths).flatMap((path) =>
     counts.flatMap((count) => treatments.map((treatment) => ({ ...treatment, path, count }))),
