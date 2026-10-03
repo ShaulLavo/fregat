@@ -89,7 +89,7 @@ export function verifyOwnedFilesAtHead(
   }
   for (const expected of inputs.ownedFiles) {
     const actual = gitOwnedFile(repositoryRoot, expectedHead, expected.path)
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    if (!canonicalObjectBytes(actual).equals(canonicalObjectBytes(expected))) {
       throw new NativeContractError(`native owned input differs from ${expectedHead}`)
     }
   }
