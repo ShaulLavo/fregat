@@ -30,6 +30,8 @@ export type FocusNodeContext = KeyContext | KeyContextInit | string
 export type FocusNodeOptions<Source> = {
   readonly parent?: FocusNode<Source> | null
   readonly context?: FocusNodeContext
+  /** Samples live context for each capture, overriding the static context. */
+  readonly readContext?: () => FocusNodeContext
   readonly commands?: Readonly<Record<string, CommandHandler<Source>>>
 }
 /** A place focus can be. Its context joins the stack while focus is on it or inside it. */
@@ -159,7 +161,8 @@ export function createDispatcher<Source = unknown>(
     const path = focusPath()
     const stack: KeyContext[] = []
     for (const state of path) {
-      if (state.context.identifiers.size || state.context.values.size) stack.push(state.context)
+      const context = state.node.context()
+      if (context.identifiers.size || context.values.size) stack.push(context)
     }
     return { path, stack }
   }
@@ -195,7 +198,8 @@ export function createDispatcher<Source = unknown>(
     const node: FocusNode<Source> = {
       id: nextId++,
       parent,
-      context: () => state.context,
+      context: () =>
+        nodeOptions.readContext ? toKeyContext(nodeOptions.readContext()) : state.context,
       setContext: (context) => {
         state.context = toKeyContext(context)
       },
