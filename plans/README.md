@@ -28,6 +28,9 @@ pass and its verification limits. [August log-audit follow-ups](log-audit-follow
 [Wave readiness review](wave-readiness-2026-10-03.md) records the large-program ordering and
 corrected launch dependencies. Upcoming wave order remains in root `PLAN.md`.
 
+[Plan 126 finite closeout](126-t3code-alignment/finite-closeout-2026-10-03.md) reconciles its
+delivered acceptance, monitoring/draft check, named follow-ons and owner-only receipts.
+
 ## Current plan files
 
 | Plan                                                  | Topic                                                                           |
