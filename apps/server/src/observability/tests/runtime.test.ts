@@ -164,6 +164,23 @@ describe('observability runtime', () => {
       expect.objectContaining({ path: '/providers/usage/feed', status: 200, level: 'warn' }),
     )
 
+    const errored = new Elysia()
+    applyObservability(errored)
+    errored.get('/providers/usage/feed', () => {
+      recordRequestError(createInternalError('Synthetic cache failure'))
+      return { recovered: true }
+    })
+    const recovered = await errored.handle(new Request('http://local/providers/usage/feed'))
+    expect(recovered.status).toBe(200)
+    await recovered.text()
+    expect(await flushedEvents(logDir)).toContainEqual(
+      expect.objectContaining({
+        path: '/providers/usage/feed',
+        status: 200,
+        error: expect.any(Object),
+      }),
+    )
+
     const mutation = new Elysia()
     applyObservability(mutation)
     mutation.post('/providers/usage/feed', () => ({ changed: true }))
