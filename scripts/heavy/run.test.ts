@@ -96,26 +96,36 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     expect(record?.version).toMatch(/^[0-9a-f]{9}$/)
   })
 
-  test('stamps the commit checked out where the job ran, null outside git', async () => {
-    const box = runBox()
-    const main = path.join(box.root, 'platform')
-    const mainHead = repository(main)
-    const lane = path.join(box.root, 'lane')
-    git(main, 'worktree', 'add', '-q', '-b', 'lane', lane)
-    git(lane, 'commit', '-q', '--allow-empty', '-m', 'lane')
-    const laneHead = git(lane, 'rev-parse', 'HEAD')
-    mkdirSync(path.join(lane, 'apps', 'tui'), { recursive: true })
-    const otherHead = repository(path.join(box.root, 'mesh'))
-    const outside = path.join(box.root, 'outside')
-    mkdirSync(outside)
+  // Each checkout owns one wrapper launch and test budget; startup costs must not accumulate.
+  test.each(['platform', 'tui', 'mesh', 'outside'] as const)(
+    'stamps the commit checked out where the job ran in %s',
+    async (label) => {
+      const box = runBox()
+      const main = path.join(box.root, 'platform')
+      const mainHead = repository(main)
+      const lane = path.join(box.root, 'lane')
+      git(main, 'worktree', 'add', '-q', '-b', 'lane', lane)
+      git(lane, 'commit', '-q', '--allow-empty', '-m', 'lane')
+      const laneHead = git(lane, 'rev-parse', 'HEAD')
+      const tui = path.join(lane, 'apps', 'tui')
+      mkdirSync(tui, { recursive: true })
+      const mesh = path.join(box.root, 'mesh')
+      const otherHead = repository(mesh)
+      const outside = path.join(box.root, 'outside')
+      mkdirSync(outside)
+      const checkouts = {
+        mesh: { commitHash: otherHead, cwd: mesh },
+        outside: { commitHash: null, cwd: outside },
+        platform: { commitHash: mainHead, cwd: main },
+        tui: { commitHash: laneHead, cwd: tui },
+      }
+      const { commitHash, cwd } = checkouts[label]
 
-    for (const cwd of [main, path.join(lane, 'apps', 'tui'), path.join(box.root, 'mesh'), outside])
-      expect((await heavy(box, path.basename(cwd), ['true'], { cwd, machine: true })).code).toBe(0)
-
-    const commits = Object.fromEntries(records(box).map((r) => [r.label, r.commitHash]))
-    expect(new Set([mainHead, laneHead, otherHead]).size).toBe(3)
-    expect(commits).toEqual({ mesh: otherHead, outside: null, platform: mainHead, tui: laneHead })
-  })
+      expect(new Set([mainHead, laneHead, otherHead]).size).toBe(3)
+      expect((await heavy(box, label, ['true'], { cwd, machine: true })).code).toBe(0)
+      expect(records(box)).toMatchObject([{ commitHash, label }])
+    },
+  )
 
   test('stamps the commit the job started on, not one made while it ran', async () => {
     const box = runBox()
