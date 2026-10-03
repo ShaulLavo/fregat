@@ -246,7 +246,7 @@ record Zed actions that do not apply.
 
 ### Deferred virtualization work
 
-[321](plans/321-virtualization-and-two-axis-tables.md) is Approved and scheduled later,
+[327](plans/327-virtualization-and-two-axis-tables.md) is Approved and scheduled later,
 outside the current execution queue. It requires two-axis data-table virtualization,
 starting with CSV, and measures editor rewrapping, recycled search-editor work and shared-list
 costs before tuning. Keep existing renderer ownership and coordinate with 156, 182 and E052.
