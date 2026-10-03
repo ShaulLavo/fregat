@@ -20,6 +20,7 @@ export type BrowserKeyObserver = {
   readonly reset?: (reason: KeyResetReason) => void
 }
 type ElementAttachment = { readonly node: FocusNode<KeyboardEvent>; readonly depth: number }
+type ObserverRegistration = { readonly observer: BrowserKeyObserver }
 export type BrowserDispatcher = Dispatcher<KeyboardEvent> & {
   /**
    * Ties a node to an element: a key focuses the closest attached element's deepest node.
@@ -39,7 +40,7 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
   const root = options.root ?? globalThis.document
   const platform = options.platform ?? detectPlatform()
   const nodes = new Map<Element, Set<ElementAttachment>>()
-  const observers = new Set<BrowserKeyObserver>()
+  const observers = new Set<ObserverRegistration>()
   let disposed = false
   const doc = 'defaultView' in root ? root : root.ownerDocument
   const dispatcher = createDispatcher<KeyboardEvent>({
@@ -65,7 +66,7 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
 
   function focusFromEvent(event: KeyboardEvent) {
     options.beforeKey?.(event)
-    for (const observer of observers) observer.beforeKey(event)
+    notifyObservers((observer) => observer.beforeKey(event))
     if (!nodes.size || event.type !== 'keydown') return
     for (const target of event.composedPath()) {
       const node = target instanceof Element ? attachedNode(target) : undefined
@@ -88,6 +89,7 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
   function attachedNode(element: Element) {
     let selected: ElementAttachment | undefined
     for (const attachment of nodes.get(element) ?? []) {
+      if (!dispatcher.hasNode(attachment.node)) continue
       if (!selected || attachment.depth >= selected.depth) selected = attachment
     }
     return selected?.node
@@ -107,11 +109,17 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
   }
   function observeKeys(observer: BrowserKeyObserver) {
     if (disposed) return () => {}
-    observers.add(observer)
-    return () => void observers.delete(observer)
+    const registration = { observer }
+    observers.add(registration)
+    return () => void observers.delete(registration)
+  }
+  function notifyObservers(notify: (observer: BrowserKeyObserver) => void) {
+    for (const registration of [...observers]) {
+      if (observers.has(registration)) notify(registration.observer)
+    }
   }
   function reset(reason: KeyResetReason) {
-    for (const observer of observers) observer.reset?.(reason)
+    notifyObservers((observer) => observer.reset?.(reason))
   }
   return {
     ...dispatcher,
