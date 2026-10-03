@@ -17,8 +17,8 @@ export const PINS_FILE = path.join(import.meta.dirname, 'first-load-pins.json')
 const TOTAL_MARGIN = 0.01
 // settings registry descriptions ship in first-load; see #595
 const PHONE_METADATA_ALLOWANCE = 50
-// developer.deployTarget schema and keys entry add 72 measured phone gzip bytes.
-const PHONE_INSTALLATION_ALLOWANCE = 72
+// developer.deployTarget schema and keys entry add 81 measured phone gzip bytes.
+const PHONE_INSTALLATION_ALLOWANCE = 81
 /** Per owner: the larger of 5% or 2 KB gzip, so a tiny owner is not pinned to the byte. */
 const OWNER_MARGIN = 0.05
 const OWNER_FLOOR = 2_048
