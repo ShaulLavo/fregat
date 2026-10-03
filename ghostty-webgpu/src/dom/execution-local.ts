@@ -1,7 +1,11 @@
 import { createGhosttyError } from '../core/error.js'
 import { copiedFrameRow } from '../render/frame-row.js'
 import type { SelectionPoint } from '../core/selection.js'
-import type { ReadLinesOptions, TerminalSelectionFormatOptions } from '../core/types.js'
+import type {
+  CustomOscObservation,
+  ReadLinesOptions,
+  TerminalSelectionFormatOptions,
+} from '../core/types.js'
 import type {
   RendererFrameSnapshot,
   RendererTextFrameSnapshot,
@@ -11,6 +15,7 @@ import type { LinkProvider, LinkResolution } from '../term/links.js'
 import { TerminalSession } from '../term/session.js'
 import type { TerminalSessionKeyOptions } from '../term/session.js'
 import type {
+  TerminalCustomOscSubscription,
   TerminalAppearanceOptions,
   TerminalClipboardWritePolicy,
   TerminalFittedFont,
@@ -55,8 +60,16 @@ function copiedFrame(snapshot: RendererFrameSnapshot): RendererFrameSnapshot {
   })
 }
 
+interface LocalCustomOscOwner {
+  readonly subscription: TerminalCustomOscSubscription
+  readonly observe: (observation: CustomOscObservation) => void
+}
+
 /** The local native actor. Its synchronous operations are private to the main-thread entry. */
 export class LocalTerminalExecution {
+  readonly kind = 'sync' as const
+  private readonly customOscListener: { dispose(): void }
+  private readonly customOscOwners = new Map<number, LocalCustomOscOwner>()
   private disposed = false
   private layout?: SubmittedLayout
   private lastFrame?: RendererTextFrameSnapshot
@@ -66,6 +79,11 @@ export class LocalTerminalExecution {
   private summaryValue?: TerminalSubmittedFrame
 
   constructor(private readonly session: TerminalSession<Event>) {
+    this.customOscListener = session.on('customOSC', (observation) => {
+      const owner = this.customOscOwners.get(observation.number)
+      if (owner?.subscription.generation !== observation.generation) return
+      owner.observe(observation)
+    })
     // Capability getters run with the intent object as their receiver.
     // oxlint-disable-next-line typescript/no-this-alias
     const execution = this
@@ -101,6 +119,27 @@ export class LocalTerminalExecution {
 
   static async create(options: TerminalSessionOptions<Event>): Promise<LocalTerminalExecution> {
     return new LocalTerminalExecution(await TerminalSession.create<Event>(options))
+  }
+
+  observeCustomOsc(
+    number: number,
+    observe: (observation: CustomOscObservation) => void,
+  ): { dispose(): void } {
+    if (this.disposed)
+      throw createGhosttyError('custom_osc.observe', 'The terminal execution has been disposed')
+    if (typeof observe !== 'function')
+      throw createGhosttyError('custom_osc.observe', 'The custom OSC observer must be a function')
+    const subscription = this.session.subscribeCustomOsc(number)
+    const owner = { subscription, observe }
+    this.customOscOwners.get(number)?.subscription.dispose()
+    this.customOscOwners.set(number, owner)
+    return {
+      dispose: () => {
+        if (this.customOscOwners.get(number) !== owner) return
+        this.customOscOwners.delete(number)
+        subscription.dispose()
+      },
+    }
   }
 
   get appearance() {
@@ -384,6 +423,11 @@ export class LocalTerminalExecution {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
+    this.customOscListener.dispose()
+    for (const owner of this.customOscOwners.values()) {
+      owner.subscription.dispose()
+    }
+    this.customOscOwners.clear()
     this.layout = undefined
     this.lastFrame = undefined
     this.lastFullFrame = undefined
