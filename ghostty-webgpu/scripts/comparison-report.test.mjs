@@ -718,7 +718,7 @@ test('portable compaction preserves between-repetition qualifications and bounde
   for (const run of artifact.runs) {
     run.info = { adapter: {} }
     run.gpuWindows = []
-    run.output.frameMetrics = [{ terminal: 0, delta: { zigFrames: 1192, jsFallbackFrames: 8 } }]
+    run.output.frameMetrics = [{ terminal: 0, delta: { zigFrames: 1192 } }]
     run.latency.write = run.variant === 'ghostty-webgpu' ? [1] : [0]
   }
   const compact = await compactEvidence(artifact)
@@ -732,7 +732,7 @@ test('portable compaction preserves between-repetition qualifications and bounde
     assert.deepEqual(run.output.input, input)
     assert.equal(run.output.bytes, 4096)
     assert.equal(run.output.nextChunk, 172)
-    assert.deepEqual(run.output.frameMetrics[0].delta, { zigFrames: 1192, jsFallbackFrames: 8 })
+    assert.deepEqual(run.output.frameMetrics[0].delta, { zigFrames: 1192 })
   }
   assert.deepEqual(pairedRatios(compact), compact.pairedRatios)
   const row = compact.pairedRatios.find(({ metric }) => metric === 'write/p50')
@@ -810,6 +810,25 @@ test('Mac host qualification survives compaction and report generation without N
     if (location === 'gpuWindows') isolated.runs[0].gpuWindows = artifact.runs[0].gpuWindows
     assert.match(markdown(isolated), /does not measure Metal GPU utilization/)
   }
+})
+
+test('failed presentation phase survives compact JSON without becoming a qualified pair', async () => {
+  const artifact = pairedArtifact()
+  artifact.environment.gpu = { gpu: { devices: [], featureStatus: {} } }
+  const failure = {
+    error: 'Presented green glyph timed out',
+    trace: 'failure.trace.json.gz',
+    records: { timeOrigin: 1000, markers: [], spans: [], ownership: [] },
+    sample: {
+      captures: [],
+      captureStream: [{ timestamp: 1009, colors: { red: 0, green: 392 } }],
+    },
+  }
+  artifact.runs[0].error = failure.error
+  artifact.runs[0].latencyFailure = failure
+  const compact = JSON.parse(JSON.stringify(await compactEvidence(artifact)))
+  assert.deepEqual(compact.runs[0].latencyFailure, failure)
+  assert(pairedRatios(compact).every((row) => row.status === 'incomplete'))
 })
 
 test('NVIDIA compaction and report retain utilization and owned/foreign compute-memory evidence', async () => {

@@ -20,7 +20,6 @@ import {
   selection,
   hardwareLaunch,
   browserExecutable,
-  frameBuilders,
   accessibilityMode,
   selectedVariants,
   selectedPhases,
@@ -29,7 +28,7 @@ import {
   outputFixture,
   selectedTracePhases,
 } from './comparison-options.mjs'
-import { presentationLatency } from './comparison-latency.mjs'
+import { presentationResult } from './comparison-latency.mjs'
 import { comparisonLatencyEndpoint } from './comparison-compact.mjs'
 import { createGpuGate } from './comparison-gpu.mjs'
 import { createMacHostGate, macCpuAccounting, macHostSettings } from './comparison-mac.mjs'
@@ -53,7 +52,6 @@ const args = process.argv.slice(2)
 const smoke = args.includes('--smoke')
 const tracing = args.includes('--trace')
 const accessibility = accessibilityMode(args)
-const builders = frameBuilders(args)
 const phases = selectedPhases(args)
 assert(!(tracing && args.includes('--phases')), '--trace uses --trace-phase')
 assert(
@@ -236,7 +234,7 @@ const artifact = {
   counts,
   variants: variantIds,
   phases,
-  frameBuilders: builders,
+  frameBuilders: ['zig'],
   accessibility,
   paths: tracing ? ['bytes'] : writePaths,
   fixtures,
@@ -244,7 +242,7 @@ const artifact = {
   measurementBudgetMilliseconds:
     counts.length *
     (tracing ? 1 : writePaths.length) *
-    measurementCases(variantIds, ['bytes'], [1], builders, 0).length *
+    measurementCases(variantIds, ['bytes'], [1], 0).length *
     (smoke ? 1 : repetitions) *
     s.caseDeadlineMilliseconds,
   startedAt: new Date().toISOString(),
@@ -439,7 +437,7 @@ async function parserOnly(testCase, run, contexts) {
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message))
     await page.goto(
-      `${origin}/?${new URLSearchParams({ accessibility, ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
+      `${origin}/?${new URLSearchParams({ accessibility, ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.evaluate((testCase) => window.__compare.initialize(testCase), testCase)
@@ -584,9 +582,10 @@ async function presentedLatency(page, session, browserSession, run, label, optio
       traced: true,
     }),
   )
-  assert(!phase.error, phase.error)
-  const trace = JSON.parse(gunzipSync(await readFile(join(output, phase.trace))).toString())
-  return { ...presentationLatency(phase, trace.traceEvents), trace: phase.trace }
+  const trace = phase.error
+    ? undefined
+    : JSON.parse(gunzipSync(await readFile(join(output, phase.trace))).toString())
+  return presentationResult(run, phase, trace?.traceEvents)
 }
 
 async function measureBody(testCase, repetition, browserSession, run, contexts) {
@@ -612,7 +611,7 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
   })
   try {
     await page.goto(
-      `${origin}/?${new URLSearchParams({ accessibility, ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}), ...(testCase.frameBuilder === 'zig' ? { zig: '' } : {}) })}`,
+      `${origin}/?${new URLSearchParams({ accessibility, ...(!smoke || args.includes('--smoke-instrumentation') ? { trace: '' } : {}) })}`,
     )
     await page.waitForFunction(() => Boolean(window.__compare))
     await page.bringToFront()
@@ -908,13 +907,7 @@ try {
         throw error
       }
     }
-    const cases = measurementCases(
-      variantIds,
-      tracing ? ['bytes'] : writePaths,
-      counts,
-      builders,
-      repetition,
-    )
+    const cases = measurementCases(variantIds, tracing ? ['bytes'] : writePaths, counts, repetition)
     for (const testCase of cases) {
       if (!smoke && platform() === 'darwin')
         assert(

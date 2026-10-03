@@ -175,6 +175,7 @@ export async function compactEvidence(artifact, directory) {
       status: run.status,
       error: run.error,
       pageErrors: run.pageErrors,
+      latencyFailure: run.latencyFailure,
       gpuIdle: run.gpuIdle,
       adapter: run.info?.adapter,
       refreshPeriod: run.refreshPeriod,

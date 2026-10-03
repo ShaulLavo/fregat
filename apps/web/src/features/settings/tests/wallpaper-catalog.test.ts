@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { http, HttpResponse } from 'msw'
+// Collect the cold server module before the first test's deadline starts.
+import '../../../../test/server'
 import { test, expect } from '../../../../test/fixtures'
 import { server as msw } from '../../../../test/msw/server'
 import { omarchyCatalogWebp, wallpaperPng } from '../../../../test/factories/wallpaper'
