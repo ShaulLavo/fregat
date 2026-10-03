@@ -118,6 +118,7 @@ test('query receipts expose fresh observations between clock ticks while future 
   expect(client).toBeDefined()
   const mountedAt = Date.now()
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+  vi.setSystemTime(mountedAt)
   const account = accountUsageFixture(mountedAt).accounts[0]!
   const initialCoverage = {
     scope: 'local-transcripts' as const,
