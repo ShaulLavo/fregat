@@ -45,6 +45,8 @@ jobs:
         with:
           playwright: ghostty-webgpu/node_modules/.bin/playwright
           browsers: chromium
+      - name: Verify line editor package
+        run: bun run --cwd ghostty-webgpu-line-editor verify
       - name: Verify terminal library and browser package
         run: bun run --cwd ghostty-webgpu verify
       - name: Verify browser package with production npm settings

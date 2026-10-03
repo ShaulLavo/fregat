@@ -304,6 +304,10 @@
       "entry": ["src/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
     },
+    "ghostty-webgpu-line-editor": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
     "ghostty-webgpu/demo": {
       "entry": ["src/client.ts"],
       "project": ["src/**/*.ts"]

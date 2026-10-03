@@ -83,3 +83,11 @@ test('automatic bump branches include the matched Markdown source', () => {
   const branch = steps.find((step) => step.name === 'Open a pull request')
   expect(branch?.run).toContain('branch="tree-sitter-x/$pin-$markdown"')
 })
+
+test('canonical ghostty CI verifies the separate line editor package', () => {
+  const steps = readWorkflow('workspace-libraries.yml').jobs.ghostty!.steps
+  expect(steps.map((step) => step.run)).toContain('bun run --cwd ghostty-webgpu-line-editor verify')
+  const root = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  expect(root.workspaces.packages).toContain('ghostty-webgpu-line-editor')
+  expect(root.scripts['build:workspaces']).toContain('--filter=ghostty-webgpu-line-editor')
+})
