@@ -32,8 +32,8 @@ Keep FIFO for finite jobs and preserve orphan charging, reaping, quiet leases, s
 - [x] Declare separate long-lived servers with `--server` and document a browser scenario targeting the private Vite port, with explicit teardown. Preserve the self-contained finite-owner alternative.
 - [x] Add a typed admission outcome for quiet wait expiry. Release waiting entries on expiry, exceptions and signals. Keep the job's actual exit code and running-hold expiry separate.
 - [x] Extend status and usage output to distinguish quiet admission deadline from running hold expiry. Regenerate the settings reference for the shared bound's description.
-- [ ] Pass process tests for the server dependency cycle, resource denial, FIFO/external-lock obstructions, cancellation and independent running holds, followed by the full heavy suite and required commit gates.
-- [ ] Get independent review, commit by path, push and open the issue-closing PR.
+- [x] Pass process tests for the server dependency cycle, resource denial, FIFO/external-lock obstructions, cancellation and independent running holds, followed by the full heavy suite and required commit gates.
+- [x] Get independent Sol review and commit by path. Push and open the issue-closing PR during delivery.
 - [ ] Owner installs the merged runner, restarts private servers with `--server`, cancels old queued quiet wrappers before invoking their requests again and confirms installed FIFO progress.
 
 ## Verification and acceptance
