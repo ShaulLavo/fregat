@@ -178,7 +178,9 @@ test('Update app lists busy sessions, closing keeps them, and Update now interru
   expect(exits).toEqual([])
 
   await user.click(within(again).getByRole('button', { name: 'Update now' }))
-  expect(await screen.findByText('Updating…')).toBeInTheDocument()
+  expect(
+    await screen.findByRole('button', { name: /Restarting…|Reconnecting…|Waiting for readiness…/ }),
+  ).toBeInTheDocument()
   expect(exits).toHaveLength(1)
   expect(exits[0]?.interrupted.map((session) => session.sessionId).toSorted()).toEqual(
     [SESSION_ID, LATE_SESSION_ID].toSorted(),
@@ -262,7 +264,11 @@ test('a hung automatic restart is bounded and its late acknowledgement cannot ov
       primaryQueryClient().isMutating({ mutationKey: serverUpdateMutationKeys.restart() }),
     ).toBe(0),
   )
-  await waitFor(() => expect(screen.getByText('Updating…')).toHaveAttribute('aria-busy', 'true'))
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: /Restarting…|Reconnecting…|Waiting for readiness…/ }),
+    ).toHaveAttribute('aria-busy', 'true'),
+  )
   expect(updateIntentStore.getState().intent).toMatchObject({
     kind: 'restarting',
     target: expired.target,
@@ -318,18 +324,24 @@ test('a dropped restart reaches bounded exact-target retry when the same server 
 
   await user.click(await screen.findByRole('button', { name: 'Update app' }))
   await waitFor(() => expect(requests).toHaveLength(1))
-  expect(await screen.findByText('Updating…')).toBeInTheDocument()
+  expect(
+    await screen.findByRole('button', { name: /Restarting…|Reconnecting…|Waiting for readiness…/ }),
+  ).toBeInTheDocument()
   const original = updateIntentStore.getState().intent
   expect(original.kind).toBe('restarting')
   if (original.kind !== 'restarting') return
   expect(original.confirmed).toBe(false)
 
   act(() => useEnvironmentsStore.getState().markDisconnected(origin))
-  expect(await screen.findByText('Updating…')).toBeInTheDocument()
+  expect(
+    await screen.findByRole('button', { name: /Restarting…|Reconnecting…|Waiting for readiness…/ }),
+  ).toBeInTheDocument()
 
   // Reconnecting to the same process proves nothing restarted.
   act(() => useEnvironmentsStore.getState().recordHandshake(origin, connected))
-  expect(await screen.findByText('Updating…')).toBeInTheDocument()
+  expect(
+    await screen.findByRole('button', { name: /Restarting…|Reconnecting…|Waiting for readiness…/ }),
+  ).toBeInTheDocument()
   expect(requests).toHaveLength(1)
   await waitFor(() => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(), {
     timeout: 4000,
