@@ -66,7 +66,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       quiet: true,
     })
     await expect.poll(quiet.stderr, { timeout: 10_000 }).toContain('waiting for 1 running job')
-    const behind = start(box, 'behind', ['true'], { jobClass: 'light', machine: true })
+    const behind = start(box, 'behind', ['true'], { jobClass: 'suite', machine: true })
     await expect
       .poll(() => live(box.state, 'queue').map((entry) => entry.label), {
         timeout: 10_000,

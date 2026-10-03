@@ -1417,6 +1417,31 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'heavy', 'jobs', 'class', 'memory', 'estimate', 'ceiling', 'admission'],
   }),
+  'developer.heavyJobQuietPolicy': defineSetting({
+    schema: v.object({
+      allowedClasses: v.array(v.literal('light')),
+      measurementCpus: v.pipe(
+        v.array(v.pipe(v.number(), v.integer(), v.minValue(0))),
+        v.maxLength(0),
+      ),
+      concurrentCpus: v.pipe(
+        v.array(v.pipe(v.number(), v.integer(), v.minValue(0))),
+        v.maxLength(0),
+      ),
+    }),
+    // CPU affinity and additional classes require a separately validated scheduling policy.
+    default: { allowedClasses: ['light'], measurementCpus: [], concurrentCpus: [] },
+    scope: 'machine',
+    widget: 'complex',
+    category: 'Developer',
+    title: 'Quiet job concurrency',
+    details:
+      'Use an empty allowedClasses array to hold new light jobs during measurements. The measurementCpus and concurrentCpus fields currently accept empty arrays, preserving host scheduling. CPU affinity requires a validated scheduling implementation.',
+    description:
+      'Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.',
+    visibility: 'advanced',
+    keywords: ['developer', 'heavy', 'quiet', 'concurrency', 'affinity'],
+  }),
   'developer.heavyJobMemoryReserveMiB': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(65536)),
     default: 2048,

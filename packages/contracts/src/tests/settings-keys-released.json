@@ -42,6 +42,7 @@
     "developer.heavyJobMemoryPressureLimit",
     "developer.heavyJobMemoryReserveMiB",
     "developer.heavyJobQuietHoldSeconds",
+    "developer.heavyJobQuietPolicy",
     "developer.heavyJobStopGraceSeconds",
     "developer.simulatedLatencyMs",
     "editor.codeTheme.dark",

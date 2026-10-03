@@ -25,13 +25,21 @@ bun /work/platform-production/heavy/current/run.js --class browser fixture-check
 
 Stop the server wrapper after the check, including on failure or cancellation. SIGINT or SIGTERM stops its whole slice with the configured grace.
 
-A declared server enters the same FIFO queue and keeps its class estimate, memory ceiling and accounting. Once admitted, it stays outside the quiet drain and holds no shared slot locks. This breaks the cycle where a quiet measurement waits for a server whose browser check is queued behind that measurement. New server requests still wait behind queued jobs and active quiet holds. The flag applies to local jobs and cannot combine with `--quiet` or `--host pi`.
+A declared server enters the same FIFO queue and keeps its class estimate, memory ceiling and accounting. Once admitted, it stays outside the quiet drain and holds no shared slot locks. This breaks the cycle where a quiet measurement waits for a server whose browser check is queued behind that measurement. New server requests keep FIFO among eligible jobs. During an active wrapper quiet hold, declared light servers use the same light-admission rule as finite light jobs. The flag applies to local jobs and cannot combine with `--quiet` or `--host pi`.
 
 A single finite browser job can also own server startup, readiness, browser work and teardown within its slice. Its child commands run directly in that job; the owning job must be able to finish without queuing another heavy job.
 
 ## Quiet measurements
 
-`--quiet` drains finite running jobs and orphan slices, then holds admission while the measurement runs. Existing declared servers keep running. Their unrealized memory estimates, observed memory use and machine pressure still participate in admission. A quiet run records the server identities seen at admission in `serversAtAdmission`; status marks them `server`. Measurements requiring zero server activity need those servers stopped first.
+`--quiet` drains finite running jobs and orphan slices before starting the measurement. Existing declared servers keep running. Their unrealized memory estimates, observed memory use and machine pressure still participate in admission. A quiet run records the server identities seen at admission in `serversAtAdmission`; status marks them `server`. Measurements requiring zero server activity need those servers stopped first.
+
+During an active wrapper quiet hold, new finite light jobs and declared light servers may start. Suite, build, browser, bench and every `--quiet` request remain held. Light jobs pass those held classes while retaining FIFO among eligible light jobs. An earlier eligible light job waiting for resources keeps later light jobs waiting. Outside an active hold, including its initial drain and after its lease expires, admission retains the full FIFO queue. Memory estimates, slice ceilings, reserve, pressure, CPU load, external drain and slot-lock gates apply unchanged.
+
+`developer.heavyJobQuietPolicy` owns the allowed class set and the CPU-set data shape. Its portable baseline is `{ "allowedClasses": ["light"], "measurementCpus": [], "concurrentCpus": [] }`. An empty allowed class set disables concurrent light admission. This release validates light-only class sets and empty CPU sets. It leaves CPU affinity to the host scheduler. Additional classes and inherited CPU affinity require separate validation and implementation; it sets no systemd `AllowedCPUs` property.
+
+Each quiet measurement's single finished JSONL record includes `jobsDuringRun`. This array records every overlapping wrapper launch interval exactly once by job id, including late-entering jobs and jobs that settle before the measurement ends. Each item contains `id`, `label`, `pid`, `cwd`, `sliceRoot`, `class`, `server`, `allowedCpus`, `startedAt` and `endedAt`. A null end means settlement was not observed before the measurement settled. The baseline logs empty `allowedCpus` arrays. Intervals span wrapper launch and whole-slice settlement, so they include startup and cleanup; commands and environment values are excluded.
+
+Launch and settlement serialize through a short `runtime.lock`, separate from admission's asynchronous orphan reconciliation. Active intervals live under `runs/`; each measurement owns an id-keyed journal under `measurements/`. Atomic publication keeps interrupted writes from exposing partial JSON. Finished intervals stay in the measurement journal until its final record is assembled, then its runtime files are removed. A later launch prunes runtime entries whose queue ownership disappeared. Abrupt wrapper death can leave an unknown end; it does not invent a completion time.
 
 Admission and execution each get an independent `developer.heavyJobQuietHoldSeconds` bound (default 600 seconds). The admission clock starts at enqueue and uses monotonic boot time. Expiry releases the request's ticket and returns exit 75, including when earlier jobs, resource pressure, a drain request or exclusive slot locks prevent admission. This also breaks a resource dependency cycle when a quiet request cannot fit beside a server waiting for its queued browser check.
 
@@ -41,9 +49,9 @@ A finite local job arms a transient `<root>-<id>_deadline.service` under `app.sl
 
 The complete service wall bound is **10 seconds startup + runtime + configured grace + 3 seconds stop/cleanup allowance**. Admission's existing `quietUntil` includes that same budget; an ordinary successor waits until the owned sibling processes have drained. A healthy service retains the runtime budget while renewing its heartbeat. A suspended wrapper cannot suspend the service. Arming after scope entry preserves delayed-launch ownership on fd 6. Startup signals abort execution, and a monotonic runtime check rejects a delayed readiness return even while the service remains active during grace or TERM is missed. Normal completion and abortable orphan reaping stop and collect the service.
 
-The admission boundary determines which servers may coexist with a quiet measurement: a server admitted earlier stays eligible to launch and appears in `serversAtAdmission`; new server requests wait for admission during the hold.
+A server admitted earlier stays eligible to launch and appears in `serversAtAdmission`. Declared light servers admitted during the hold appear in `jobsDuringRun`. Other new server classes wait for the hold to end.
 
-External tools can write `drain.request` in the state directory, then take `slot1.lock`, `slot2.lock` and `slot3.lock` exclusively. Finite jobs retain these locks until their processes drain; declared servers hold none. A drain request blocks new admissions for at most one quiet hold. An external lock holder owns its cleanup and duration; `status.js` reports its age.
+External tools can write `drain.request` in the state directory, then take `slot1.lock`, `slot2.lock` and `slot3.lock` exclusively. Finite jobs retain these locks until their processes drain; declared servers hold none. A drain request blocks every new admission, including light work, for at most one quiet hold. Waiting or held exclusive slot locks also block light work. An external lock holder owns its cleanup and duration; `status.js` reports its age. External holders have no wrapper measurement record, so this change adds no attribution or concurrency exception to their holds.
 
 ## Status, records and installation
 
@@ -52,7 +60,7 @@ bun /work/platform-production/heavy/current/status.js
 bun /work/platform-production/heavy/current/report.js --since 1d --by command
 ```
 
-Finished jobs append JSONL to `developer.heavyJobLogDirectory`, including queue time, admission reason, `server`, `serversAtAdmission`, class budget, checkout commit, wall time, CPU time, peak memory and exit code. Fix repeated heavy consumers at their cause.
+Finished jobs append JSONL to `developer.heavyJobLogDirectory`, including queue time, admission reason, `server`, `serversAtAdmission`, `jobsDuringRun`, `allowedCpus`, class budget, checkout commit, wall time, CPU time, peak memory and exit code. Fix repeated heavy consumers at their cause.
 
 The installed bundle stays pinned until explicitly replaced from a clean checkout with `bun scripts/heavy/install.ts`. Source changes and pulls leave the live runner unchanged. Existing running and queued wrappers keep their launch-time behavior. After installing the updated runner, restart private servers with `--server`. Cancel each existing queued quiet wrapper before invoking its request again through the updated runner, so its old FIFO ticket is released. Existing finite jobs can finish normally.
 
