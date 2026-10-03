@@ -60,6 +60,10 @@ const editor = keys.createNode({
 
 `editor.context()` also reads the current context. `readContext` supplies the full context; nodes with static context can update it through `setContext`
 
+multiple nodes can attach to the same element. the deepest node wins; later attachments break equal-depth ties. removing an attachment restores the remaining registrations
+
+hosts can subscribe to the existing browser key pipeline with `keys.observeKeys({ beforeKey, reset })`. `beforeKey(event)` runs once per event offered through `claimKeybinding` or the DOM listeners, before matching consumes claimed releases. a terminal can use it to deliver a release for a press its command sent through native encoding. `reset(reason)` clears held-key bookkeeping on blur, a hidden document, `releaseAll` and disposal. the returned function removes the observer
+
 ### display and recording
 
 ```ts
