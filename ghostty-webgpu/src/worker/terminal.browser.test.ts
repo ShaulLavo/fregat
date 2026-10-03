@@ -770,3 +770,59 @@ it('rejects an unsupported Canvas worker backend with a structured capability fa
     }),
   ).rejects.toMatchObject({ code: 'capability', operation: 'backend' })
 })
+
+describe.each(['webgl', 'webgpu'] as const)('%s ordered output accessibility', (backend) => {
+  it.each(
+    (['write', 'writeln', 'writeAndReadGeometry'] as const).flatMap((operation) => [
+      { operation, following: false, label: 'single output' },
+      { operation, following: true, label: 'queued outputs' },
+    ]),
+  )(
+    '$operation retains output intent across a pre-output refresh submission for $label',
+    async ({ operation, following }) => {
+      const terminal = await WorkerTerminal.create({
+        appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+        backend,
+        fonts: [{ family, source: { url: fontUrl } }],
+        workerUrl: new URL('./tests/output-frame-order.worker.ts', import.meta.url),
+      })
+      active.push(terminal)
+      const root = container()
+      await terminal.open(root)
+      const mirror = root.querySelector('[role="list"][aria-label="Terminal screen"]')!
+      const live = root.querySelector('[aria-live="polite"]')!
+      await eventually(() => mirror.children.length > 0)
+      const before = terminal.submittedFrame!
+      const frames: { frame: number; revision: number; text: string; live: string }[] = []
+      terminal.onFrame(() => {
+        const summary = terminal.submittedFrame!
+        frames.push({
+          frame: summary.frame,
+          revision: summary.nativeRevision,
+          text: mirror.textContent ?? '',
+          live: live.textContent ?? '',
+        })
+      })
+      const refresh = terminal.refresh(0, before.grid.rows - 1)
+      const write = terminal[operation]('ordered output')
+      const next = following ? terminal.write(' tail') : undefined
+      await Promise.all([refresh, write, next])
+      const native = await terminal.readLines(0, 1)
+      const geometry = await terminal.geometry()
+      const expected = following ? 'ordered output tail' : 'ordered output'
+      await eventually(() => mirror.textContent === expected)
+      expect(native[0]?.text).toContain('ordered output')
+      expect(geometry.revision).toBeGreaterThan(before.nativeRevision)
+      expect(frames).toContainEqual({
+        frame: expect.any(Number),
+        revision: before.nativeRevision,
+        text: '',
+        live: '',
+      })
+      expect(live.textContent, JSON.stringify({ native, geometry, frames })).toBe(expected)
+      expect(live.children).toHaveLength(following ? 2 : 1)
+      expect(live.children[0]?.textContent).toBe('ordered output')
+      if (following) expect(live.children[1]?.textContent).toBe(' tail')
+    },
+  )
+})
