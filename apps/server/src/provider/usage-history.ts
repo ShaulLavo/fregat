@@ -14,6 +14,7 @@ import { usageTokenCount } from '@workspace/contracts'
 import { and, eq, gte, ne, sql } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
 import { providerUsageTurns as turns } from '../db/schema'
+import { readSessionCache } from './session-cache'
 import { nativeTranscriptDriverKinds } from './utils/transcript-scan'
 import type { TranscriptRecord } from './utils/transcript-records'
 
@@ -151,6 +152,7 @@ export class ProviderUsageHistoryReader {
       tokens: row ? usageTokenCount(row) : 0,
       turns: row?.turns ?? 0,
       unpricedTokens: row?.unpricedTokens ?? 0,
+      cache: readSessionCache(this.database, sessionId),
     }
   }
 
