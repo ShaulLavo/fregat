@@ -58,8 +58,13 @@ export function useTailFollow({
     setState((previous) => tailFollowArrived(previous, count))
   })
 
-  // Every commit: the height has to be known from the one before the rows arrived.
+  // Every enabled commit: the height has to be known from before the rows arrived.
   useLayoutEffect(() => {
+    if (!enabled) {
+      // Re-enabling starts from the current rows, with a fresh height baseline.
+      previousEdgeKey.current = undefined
+      return
+    }
     const height = scrollRef.current?.scrollHeight ?? 0
     const grown = height - previousHeight.current
     previousHeight.current = height
