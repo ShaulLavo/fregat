@@ -57,7 +57,6 @@ export function defaultPlatformKeyBindings(
   if (preset === 'vscode') {
     const app = vscodeApp.flatMap((row) => {
       if (row.platforms && !row.platforms.includes(platform)) return []
-      if (row.presets && !row.presets.includes('vscode')) return []
       if (!isPlatformCommandId(row.command)) return []
       const context = areaContext(row.pane, row.command)
       return [
