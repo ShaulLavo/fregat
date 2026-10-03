@@ -109,7 +109,7 @@ test('the real app serves its cache-only usage feed without a browser origin or 
   const feed = v.parse(providerUsageFeedSchema, await cached.json())
   expect(feed.accounts[0]).toMatchObject({
     checkedAt: expect.any(String),
-    source: 'proxy-state',
+    source: 'passive-header',
     state: 'ready',
     windows: [
       {

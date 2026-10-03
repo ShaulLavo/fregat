@@ -1,5 +1,9 @@
 # Native Plan Prompts
 
+Completed units 1–2 retain their original evidence prompts. For remaining units, put execution
+checklists in root `plans/` and architecture/research in `docs/`. Root [PLAN.md](../PLAN.md) owns
+current scheduling; the owning breakdown retains its editor-first gate.
+
 One prompt per plan doc from `native-plan-of-plans.md`. Each is self-contained — run in a fresh session. Order matters loosely: 1 → 2 → 4 build on each other; 3 is independent; 5 is a gated skeleton; 6 is cleanup. Fold in any newer recon before firing.
 
 ## Plan 1 — bench harness (DONE — kept for reference; see Bench debt B1–B4 in native-plan-of-plans.md before touching bench numbers)
@@ -27,7 +31,7 @@ Exit criterion of the plan itself: a spike hitting sub-2ms keystroke-to-paint on
 ## Plan 3 — type safety
 
 ```text
-Load the mac-app skill. Read plans/native-plan-of-plans.md (plan 3 row has recon findings), then write docs/native-type-safety.md.
+Load the mac-app skill. Read plans/native-plan-of-plans.md (plan 3 row has recon findings), then write plans/native-type-safety.md.
 
 Facts to build on (verify in code): the platform has zero TypeBox — all runtime schemas are Valibot; ~89 REST endpoints (apps/server/src/app.ts mounts them), 7 of which are SSE streams; auth is an exact Origin-header allowlist (no tokens) so the Swift client must set Origin manually on every request and WS upgrade; /orchestration/rpc WS is fully Valibot-schema'd with kind/method/type discriminators; /terminal and watch-events are small hand-parsed TS unions; /lsp WS is raw LSP JSON-RPC passthrough (no codegen needed — a Swift LSP client just speaks LSP).
 
@@ -39,7 +43,7 @@ Exit: one typed REST call and one typed orchestration WS event flow server→Swi
 ## Plan 4 — tree-sitter + LSP
 
 ```text
-Load the mac-app skill. Read plans/native-plan-of-plans.md and docs/native-editor-internals-research.md, then write docs/native-tree-sitter-lsp.md.
+Load the mac-app skill. Read plans/native-plan-of-plans.md and docs/native-editor-internals-research.md, then write plans/native-tree-sitter-lsp.md.
 
 Port-first inputs, recon-verified from editor/packages/tree-sitter (5,054 LOC): request/response envelope with per-document generation counters; cancellation via Atomics flags in SharedArrayBuffers, checked between worker phases (tree.edit → parse root → changed ranges → parse injections → query flatten, each phase timed); the session tracks snapshotVersion vs parsedSnapshotVersion, refuses viewport range queries while a parse is outstanding, drops stale results by version, and never replays failed requests; tokens return as three transferred Uint32Arrays + interned style palette (syntax/packedTokens.ts); source transfers piece-table-aware in 16KiB chunks with retention tracking. Editor-side scheduling (editor/syntaxController.ts): six latest-only request queues (full/visible/prefetch/warm/highlight/theme); SYNTAX_EDIT_DEBOUNCE_MS=75 with 400ms max; rapid-input secondary work deferred 150–400ms and versioned so superseded keystrokes drop; background warm tiles of 120K chars walking outward from the viewport; per-document caches capped at 6 snapshots / 8M source units. In Swift: Sendable piece-table snapshots delete the transfer/chunking layer entirely; port the versioning, cancellation, latest-only queues, debounce constants, and warm-tile walk as-is. Use SwiftTreeSitter + Neon (ChimeHQ, both maintained); study Chime's three-phase styler (~/Desktop/D/references/Chime/Modules/Highlighting/Highlighter.swift: instant fallback → tree-sitter → async LSP semantic tokens, visible-range-only revalidation) as the pipeline shape, and Runestone's byte-aggregate InputEdit mapping (no string scanning). Do NOT copy CodeEdit's TreeSitterExecutor polling lock. Grammar loading/distribution needs a decision (bundled dylibs vs SPM grammar packages).
 
@@ -51,7 +55,7 @@ Exit: viewport highlighting + live diagnostics in the spike editor. Update the p
 ## Plan 5 — shell skeleton (gated)
 
 ```text
-Load the mac-app skill. Read plans/native-plan-of-plans.md, then write docs/native-shell-platform.md as an explicitly GATED SKELETON — half a page, no detailed design (the editor gate hasn't passed; details would go stale).
+Load the mac-app skill. Read plans/native-plan-of-plans.md, then write plans/native-shell-platform.md as an explicitly GATED SKELETON — half a page, no detailed design (the editor gate hasn't passed; details would go stale).
 
 Record only what's settled: the ghostty model (custom owner-drawn editor surface speaking NSTextInputClient/NSAccessibility; native everything else); AppKit skeleton for window/splits/responder chain with SwiftUI leaves for panels/settings/inspectors (CodeEdit tried SwiftUI at the window root and documentedly reverted — see references/CodeEdit CodeEditWindowController.swift); macOS 26 glass APIs on both frameworks (NSGlassEffectView / .glassEffect()) with the known 26.2 SwiftUI-hosting wart; resizable panels only — tiling was removed from the platform (commit 21d30b57), do not resurrect it; terminal pane embeds libghostty later; .app bundle via swift-bundler when needed. List the questions the real plan must answer post-gate (command routing, workspace/session model, settings stream consumption) without answering them. Update the plan-of-plans status row to "skeleton written, gated".
 ```
@@ -59,7 +63,7 @@ Record only what's settled: the ghostty model (custom owner-drawn editor surface
 ## Plan 6 — dev workflow
 
 ```text
-Load the mac-app skill. Read plans/native-plan-of-plans.md, then write docs/native-dev-workflow.md (short — this plan is mostly done).
+Load the mac-app skill. Read plans/native-plan-of-plans.md, then write plans/native-dev-workflow.md (short — this plan is mostly done).
 
 Record: toolchain requirements and traps (full Xcode 26.6+, the CLT-only failure mode, license acceptance, sudo xcode-select); the command set (swift build / swift test with swift-testing / swift run -c release EditorBench / swift run MacApp); apps/mac stays outside the bun/turbo workspace by design; decisions already made — EditorCore stays in-repo until it hurts (revisit when the app ships), no CI for now (zero users; revisit with plan 5), macOS 26 deployment floor. Decide and document: swift-format vs leaving formatting alone (pick one, wire it or explicitly decline); whether EditorBench results get checked in as dated JSON for regression tracking (recommend yes, tiny). Update the .agents/skills/mac-app/SKILL.md if any command or doctrine changed, and mark the plan-of-plans row done.
 ```

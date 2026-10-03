@@ -179,6 +179,28 @@ test('clearing the proxy URL through settings stops collection while retaining m
   expect(
     after.coverage.sources.filter((entry) => entry.sourceKind === 'native-transcript'),
   ).toEqual(before.coverage.sources.filter((entry) => entry.sourceKind === 'native-transcript'))
+  const restored = await app.handle(
+    new Request('http://local/settings/write', {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        mutationId: 'restore-proxy-source',
+        target: 'user',
+        operations: [{ kind: 'set', key: 'providers.proxyUsageUrl', value: source.url }],
+      }),
+    }),
+  )
+  expect(restored.status).toBe(200)
+  await vi.waitFor(async () => {
+    const returned = (await collector.read()).accounts.find(
+      (account) => account.source === 'cli-proxy-management',
+    )
+    expect(returned).toMatchObject({
+      checkedAt: observedAt,
+      windows: [{ usedPercent: 25, observedAt }],
+    })
+  })
+  expect(nativeProbes).toBe(0)
 })
 
 test.each([
@@ -205,14 +227,14 @@ test.each([
       id: 'private-auth-work.json',
       provider: 'codex',
       email: 'pool.work@example.test',
-      id_token: { chatgpt_plan_type: 'plus' },
+      id_token: { plan_type: 'plus' },
       quota: { observed_at: observedAt, signals: { 'x-codex-primary-used-percent': '6' } },
     },
     {
       id: 'private-auth-personal.json',
       provider: 'codex',
       email: 'pool.personal@example.test',
-      id_token: { chatgpt_plan_type: 'pro' },
+      id_token: { plan_type: 'pro' },
     },
     { id: 'private-auth-claude.json', provider: 'claude' },
   ])
@@ -286,7 +308,7 @@ test.each([
     expect(feed.accounts).toMatchObject([
       {
         id: expect.stringMatching(/^proxy:[a-f0-9]{64}$/),
-        label: 'Proxy · pool.work',
+        label: 'pool.work',
         plan: 'Plus',
         checkedAt: observedAt,
         windows: [{ usedPercent: 6, lastSeenAt: observedAt }],
@@ -294,7 +316,7 @@ test.each([
       },
       {
         id: expect.stringMatching(/^proxy:[a-f0-9]{64}$/),
-        label: 'Proxy · pool.personal',
+        label: 'pool.personal',
         plan: 'Pro',
         state: 'no-data',
         routing: { lastServedAt: null },
@@ -378,3 +400,175 @@ test.each([
   expect((await collector.read()).accounts).toEqual([])
   expect(source.requests).toHaveLength(1)
 })
+
+test.each(['different', 'same'] as const)(
+  '%s-source settings invalidate observations or proofs before held reconciliation and reject late collection',
+  async (transition) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(TRANSCRIPT_FIXTURE_NOW)
+    const root = await mkdtemp(path.join(tmpdir(), 'usage-source-race-'))
+    roots.push(root)
+    const options = testSettingsOptions(root)
+    await mkdir(path.dirname(options.userFilePath!), { recursive: true })
+    await writeFile(
+      options.secretsFilePath!,
+      JSON.stringify({
+        [PROXY_USAGE_MANAGEMENT_KEY_REF]: 'synthetic-management-secret',
+      }),
+      { mode: 0o600 },
+    )
+    const authPath = path.join(root, 'auth.json')
+    await writeFile(authPath, JSON.stringify({ tokens: { account_id: 'fixture-chatgpt-account' } }))
+    const native = v.parse(providerInstanceIdSchema, 'fixture-native')
+    const pending = v.parse(providerInstanceIdSchema, 'fixture-pending')
+    const configuration = {
+      providerInstanceId: native,
+      driverKind: v.parse(providerDriverKindSchema, 'codex'),
+      config: { credentialsPath: authPath },
+    }
+    const creating = Promise.withResolvers<void>()
+    const reconciliation = Promise.withResolvers<void>()
+    const collecting = Promise.withResolvers<void>()
+    const response = Promise.withResolvers<void>()
+    const registry = new ProviderAdapterRegistry({
+      services: { cwd: root },
+      drivers: [
+        {
+          ...mockDriver,
+          driverKind: configuration.driverKind,
+          create: async (input) => {
+            const created = await mockDriver.create(input)
+            Object.assign(created.adapter, {
+              readUsage: async () => ({
+                kind: 'reading',
+                update: { planType: 'plus', windows: [] },
+              }),
+            })
+            return created
+          },
+        },
+        {
+          ...mockDriver,
+          create: async (input) => {
+            if (input.providerInstanceId === pending) {
+              creating.resolve()
+              await reconciliation.promise
+            }
+            return mockDriver.create(input)
+          },
+        },
+      ],
+    })
+    registries.push(registry)
+    await registry.reconcile([configuration])
+    const observedAt = new Date(TRANSCRIPT_FIXTURE_NOW - 60_000).toISOString()
+    const source = startProxyUsageHttpFixture(
+      observedAt,
+      [
+        {
+          id: 'fixture-auth',
+          provider: 'codex',
+          id_token: { chatgpt_account_id: 'fixture-chatgpt-account' },
+          quota: { observed_at: observedAt, signals: { 'x-codex-primary-used-percent': '25' } },
+        },
+      ],
+      async (count) => {
+        if (count !== 2) return
+        collecting.resolve()
+        await response.promise
+      },
+    )
+    const replacement = startProxyUsageHttpFixture(observedAt)
+    sources.push(source, replacement)
+    await writeFile(
+      options.userFilePath!,
+      JSON.stringify({
+        'providers.instances': [configuration],
+        'providers.proxyUsageUrl': source.url,
+      }),
+    )
+    const stateHome = path.join(root, 'state')
+    const app = createTestApp({
+      homeDirectory: root,
+      workspaceRoot: root,
+      systemRoot: root,
+      settings: options,
+      system: { stateHome },
+      themes: { root: path.join(root, 'themes') },
+      orchestration: { providerRuntime: false, providerAdapterRegistry: registry },
+      auth: { allowedOrigins: [origin] },
+      watch: false,
+    })
+    const collector = appUsageCollector(app)
+    const cacheFile = path.join(stateHome, 'usage', 'accounts.json')
+    const cache = async () => JSON.parse(await readFile(cacheFile, 'utf8'))
+    try {
+      await collector.refresh()
+      const known = (await collector.read()).accounts
+      expect(known).toHaveLength(1)
+      expect(known[0]).toMatchObject({
+        providerInstanceIds: [native],
+        windows: [{ usedPercent: 25 }],
+      })
+      expect((await cache()).proxyProofsCurrent).toBe(true)
+      vi.setSystemTime(TRANSCRIPT_FIXTURE_NOW + 900_000)
+      const inFlight = collector.refresh()
+      await collecting.promise
+      const changed = await app.handle(
+        new Request('http://local/settings/write', {
+          method: 'POST',
+          headers: { origin, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            mutationId: `source-${transition}-race`,
+            target: 'user',
+            operations: [
+              {
+                kind: 'set',
+                key: 'providers.proxyUsageUrl',
+                value: transition === 'different' ? replacement.url : source.url,
+              },
+              {
+                kind: 'provider.setEnabled',
+                providerInstanceId: pending,
+                enabled: true,
+                createIfMissing: { driverKind: mockDriver.driverKind },
+              },
+            ],
+          }),
+        }),
+      )
+      expect(changed.status, await changed.text()).toBe(200)
+      await creating.promise
+      expect(replacement.requests).toHaveLength(0)
+      const publicUsage = await app.handle(
+        new Request('http://local/providers/usage', { headers: { origin } }),
+      )
+      expect(publicUsage.status).toBe(200)
+      const visible = (await publicUsage.json()).accounts
+      expect((await cache()).proxyProofsCurrent).toBe(false)
+      const nativeKey = registry.usageAccount(native)!.accountKey
+      expect(
+        visible.some((account: { accountKey: string }) => account.accountKey === nativeKey),
+      ).toBe(true)
+      const quotaRows = visible.flatMap(
+        (account: { windows: Array<{ usedPercent: number }> }) => account.windows,
+      )
+      expect(quotaRows.some((window: { usedPercent: number }) => window.usedPercent === 25)).toBe(
+        transition === 'same',
+      )
+      response.resolve()
+      await inFlight
+      expect((await cache()).proxyProofsCurrent).toBe(false)
+      expect(
+        (await collector.read()).accounts.some((account) => account.accountKey === nativeKey),
+      ).toBe(true)
+      if (transition === 'different')
+        expect((await collector.read()).accounts.flatMap((account) => account.windows)).toEqual([])
+      expect(replacement.requests).toHaveLength(0)
+    } finally {
+      response.resolve()
+      reconciliation.resolve()
+      await registry.reconcile([configuration])
+    }
+  },
+)
