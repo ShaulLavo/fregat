@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { createScriptError } from './structured-errors'
+import { createScriptError } from './structured-errors.ts'
 
 export type DevPackage = {
   readonly name: string

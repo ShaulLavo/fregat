@@ -7,10 +7,31 @@ import {
   thrownErrorMessage,
   toClientError,
   toConnectionError,
+  clientErrorDescription,
 } from '@/lib/client-error-taxonomy'
 import { createEnvironmentProtocolMismatchError } from '@workspace/client-core/environments/utils/structured-errors'
 import { log, observeClientOperation } from '@/lib/client-logging'
 import { sanitizeRecord } from '@workspace/observability/sanitize'
+import { createRpcError } from '@workspace/client-core/transport/rpc-error'
+
+test.each(['NOT_FOUND', 'PERMISSION_DENIED', 'INVALID_PATH', 'FILE_TOO_LARGE'])(
+  '%s preserves the server message and recovery guidance through Eden and RPC errors',
+  (code) => {
+    const payload = {
+      code,
+      message: 'The saved workspace folder could not be found.',
+      why: 'The folder was moved or removed.',
+      fix: 'Choose folder to open its current location.',
+    }
+    const eden = new EdenFetchError(404, { error: payload })
+    for (const input of [eden, createRpcError(eden), { error: payload }]) {
+      const error = toClientError(input)
+      expect(error).toMatchObject(payload)
+      expect(error.category).not.toBe('unknown')
+      expect(clientErrorDescription(error)).toBe(`${payload.message} ${payload.fix}`)
+    }
+  },
+)
 
 test('classifies fetch failures and carries request context into the client error', async () => {
   const error = new TypeError('network error')
