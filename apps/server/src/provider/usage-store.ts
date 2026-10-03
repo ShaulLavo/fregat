@@ -789,10 +789,11 @@ function accountState(
   if (account.source === 'cli-proxy-management' && account.state === 'unknown') return 'unknown'
   if (account.state === 'cooldown' && !account.cooldown) return 'unknown'
   if (account.state === 'cooldown' && account.cooldown) {
-    const current = account.cooldown.until
-      ? Date.parse(account.cooldown.until) > nowMs
-      : nowMs - Date.parse(account.cooldown.observedAt) < staleAfterMs
-    if (current) return 'cooldown'
+    if (!account.cooldown.until) {
+      const observedAt = account.stateObservedAt ?? account.cooldown.observedAt
+      return nowMs - Date.parse(observedAt) < staleAfterMs ? 'cooldown' : 'unknown'
+    }
+    if (Date.parse(account.cooldown.until) > nowMs) return 'cooldown'
   }
   if (!windows.length) return account.checkedAt ? 'unknown' : 'no-data'
   return windows.some(

@@ -155,7 +155,7 @@ describe('provider usage store', () => {
     await store.close()
   })
 
-  it.each(['retry', 'unavailable'] as const)(
+  it.each(['retry', 'unavailable', 'undated-cooldown'] as const)(
     'keeps actual proxy %s restrictions over fresh quota windows',
     async (restriction) => {
       const f = await usageFixture()
@@ -176,6 +176,17 @@ describe('provider usage store', () => {
                     ...(restriction === 'retry'
                       ? { next_retry_after: new Date(START_MS + 600_000).toISOString() }
                       : { unavailable: true }),
+                    ...(restriction === 'undated-cooldown'
+                      ? {
+                          cooldowns: [
+                            {
+                              scope: 'credential',
+                              reason: 'quota',
+                              observed_at: new Date(START_MS - 7_200_000).toISOString(),
+                            },
+                          ],
+                        }
+                      : {}),
                     quota: {
                       observed_at: new Date(START_MS).toISOString(),
                       signals: {
@@ -190,13 +201,69 @@ describe('provider usage store', () => {
       })
       await store.refresh()
       expect((await store.feed()).accounts.at(-1)).toMatchObject({
-        state: restriction === 'retry' ? 'cooldown' : 'unknown',
+        state: restriction === 'unavailable' ? 'unknown' : 'cooldown',
         routing: { active: false },
         windows: [{ usedPercent: 25, lastSeenAt: new Date(START_MS).toISOString() }],
       })
       await store.close()
     },
   )
+
+  it('keeps an aged undated control restriction unknown beside newer quota until fresh ready metadata clears it', async () => {
+    const f = await usageFixture()
+    const base = (await f.store.read()).accounts[0]!
+    const at = new Date(START_MS).toISOString()
+    const cooldown = {
+      reason: 'quota' as const,
+      until: null,
+      observedAt: at,
+      source: 'proxy-state' as const,
+    }
+    let snapshot: ProviderAccountUsage = {
+      ...base,
+      accountKey: `proxy:${'a'.repeat(64)}`,
+      source: 'cli-proxy-management',
+      state: 'cooldown',
+      stateObservedAt: at,
+      checkedAt: at,
+      cooldown,
+      windows: [{ ...window('primary', 20), observedAt: at }],
+    }
+    const store = new ProviderUsageStore(f.registry, {
+      now: () => f.clock.ms,
+      readProxy: async () => [snapshot],
+    })
+    await store.refresh()
+    expect((await store.feed()).accounts.at(-1)!.state).toBe('cooldown')
+    f.clock.ms += 900_000
+    const quotaAt = new Date(f.clock.ms).toISOString()
+    snapshot = {
+      ...snapshot,
+      state: 'ready',
+      stateObservedAt: new Date(START_MS - 1000).toISOString(),
+      cooldown: undefined,
+      checkedAt: quotaAt,
+      windows: [{ ...window('primary', 25), observedAt: quotaAt }],
+    }
+    await store.refresh()
+    expect((await store.read()).accounts.at(-1)).toMatchObject({
+      state: 'unknown',
+      stateObservedAt: at,
+      checkedAt: quotaAt,
+      cooldown,
+      windows: [{ freshness: 'fresh', observedAt: quotaAt }],
+    })
+    f.clock.ms += 300_000
+    snapshot = { ...snapshot, stateObservedAt: new Date(f.clock.ms).toISOString() }
+    await store.refresh()
+    expect((await store.read()).accounts.at(-1)).toMatchObject({
+      state: 'ready',
+      checkedAt: quotaAt,
+      cooldown: null,
+      windows: [{ freshness: 'fresh', observedAt: quotaAt }],
+    })
+    await store.close()
+  })
 
   it('clears explicit null credits while preserving omitted sparse native credits across restart', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'usage-credit-clear-'))
