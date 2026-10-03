@@ -66,6 +66,7 @@ test('production Mac Chromium keeps real keychain and system proxy arguments', (
   }
   expect(chromiumArguments(mac, '/fixtures/profile')).toEqual([
     'about:blank',
+    '--headless=new',
     '--user-data-dir=/fixtures/profile',
     '--profile-directory=Platform',
     '--remote-debugging-pipe',
@@ -90,5 +91,6 @@ test('installed handoff uses app id and launch URL with no CDP or plain app fall
     '--app-launch-url-for-shortcuts-menu-item=http://localhost:123/platform/?workspace=two',
   )
   expect(args).not.toContain('--remote-debugging-pipe')
+  expect(args.some((arg) => arg.startsWith('--headless'))).toBe(false)
   expect(args.some((arg) => arg.startsWith('--app='))).toBe(false)
 })

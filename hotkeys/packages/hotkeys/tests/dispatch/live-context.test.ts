@@ -1,8 +1,14 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createDispatcher, createKeyInput } from '../../src'
+import { createBrowserDispatcher, createDispatcher, createKeyInput } from '../../src'
+import type { BrowserDispatcher } from '../../src'
+
+let browserDispatcher: BrowserDispatcher | undefined
 
 afterEach(() => {
   vi.useRealTimers()
+  browserDispatcher?.dispose()
+  browserDispatcher = undefined
+  document.body.replaceChildren()
 })
 
 function press(key: string) {
@@ -163,4 +169,88 @@ it('uses live context when an ambiguous prefix times out', () => {
   expect(calls).toEqual(['browse'])
   expect(dispatcher.pending()).toBeNull()
   dispatcher.dispose()
+})
+
+it('the reader overrides conflicting static context and setContext in every capture path', () => {
+  const calls: string[] = []
+  const dispatcher = createDispatcher({
+    platform: 'linux',
+    keymap: [
+      { keys: 'Control+B', command: 'static', context: 'Editor && static' },
+      { keys: 'Control+B', command: 'live', context: 'Editor && live && mode == live' },
+    ],
+  })
+  const node = dispatcher.createNode({
+    context: 'Editor static mode=static',
+    readContext: () => ({ identifiers: ['Editor', 'live'], values: { mode: 'live' } }),
+    commands: {
+      static: () => void calls.push('static'),
+      live: () => void calls.push('live'),
+    },
+  })
+  node.focus()
+  expect(node.context().identifiers).toEqual(new Set(['Editor', 'live']))
+  expect(node.context().values).toEqual(new Map([['mode', 'live']]))
+  expect(dispatcher.contextStack().map((context) => [...context.identifiers])).toEqual([
+    ['Editor', 'live'],
+  ])
+  expect(dispatcher.handleKey(press('b'), null)).toBe(true)
+  node.setContext('Editor static mode=static')
+  expect(node.context().identifiers).toEqual(new Set(['Editor', 'live']))
+  expect(dispatcher.contextStack().map((context) => [...context.values])).toEqual([
+    [['mode', 'live']],
+  ])
+  expect(dispatcher.handleKey(press('b'), null)).toBe(true)
+  expect(calls).toEqual(['live', 'live'])
+  dispatcher.dispose()
+})
+
+it('forwarded browser events use live state with one sample per captured node', () => {
+  const input = document.createElement('textarea')
+  document.body.append(input)
+  let canBold = false
+  const calls: string[] = []
+  const readWorkspace = vi.fn(() => 'Workspace')
+  const readEditor = vi.fn(() => ({ identifiers: canBold ? ['Editor', 'canBold'] : ['Editor'] }))
+  const dispatcher = createBrowserDispatcher({
+    platform: 'linux',
+    keymap: [
+      { keys: 'Control+B', command: 'sidebar', context: 'Workspace' },
+      { keys: 'Control+B', command: 'bold', context: 'Editor && canBold' },
+    ],
+  })
+  browserDispatcher = dispatcher
+  const workspace = dispatcher.createNode({
+    context: 'Workspace',
+    readContext: readWorkspace,
+    commands: { sidebar: () => void calls.push('sidebar') },
+  })
+  const editor = dispatcher.createNode({
+    parent: workspace,
+    context: 'Editor',
+    readContext: readEditor,
+    commands: { bold: () => void calls.push('bold') },
+  })
+  dispatcher.attachElement(workspace, document.body)
+  dispatcher.attachElement(editor, input)
+  input.addEventListener('keydown', (event) => {
+    expect(dispatcher.claimKeybinding(event)).toBe(true)
+    expect(dispatcher.claimKeybinding(event)).toBe(true)
+  })
+  for (const available of [false, true]) {
+    canBold = available
+    const event = new KeyboardEvent('keydown', {
+      key: 'b',
+      code: 'KeyB',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    })
+    input.dispatchEvent(event)
+    expect(dispatcher.claimKeybinding(event)).toBe(true)
+  }
+  expect(calls).toEqual(['sidebar', 'bold'])
+  expect(readWorkspace).toHaveBeenCalledTimes(2)
+  expect(readEditor).toHaveBeenCalledTimes(2)
 })
