@@ -20,7 +20,11 @@ async function cacheFile(value: unknown) {
 const observedAtMs = Date.parse('2026-10-02T22:14:00Z')
 function snapshot(accountUuid = 'fixture-current') {
   return {
-    oauthAccount: { accountUuid: 'fixture-current', organizationType: 'claude_max' },
+    oauthAccount: {
+      accountUuid: 'fixture-current',
+      organizationType: 'claude_max',
+      emailAddress: 'fixture.person@example.test',
+    },
     cachedUsageUtilization: {
       accountUuid,
       fetchedAtMs: observedAtMs,
@@ -40,6 +44,7 @@ test('preserves native percentage scale and observation time without exporting a
     probe: {
       kind: 'reading',
       update: {
+        label: 'fixture.person',
         windows: [
           { id: 'five_hour', usedPercent: 19 },
           { id: 'seven_day', usedPercent: 77 },
@@ -49,6 +54,7 @@ test('preserves native percentage scale and observation time without exporting a
   })
   expect(JSON.stringify(reading)).not.toContain('fixture-current')
   expect(JSON.stringify(reading)).not.toContain('undocumented')
+  expect(JSON.stringify(reading)).not.toContain('@example.test')
 })
 
 test.each([
@@ -131,4 +137,22 @@ test('rejects an account mismatch, future observation, malformed percentage and 
   expect(
     await readClaudeUsageCache(path.join(tmpdir(), 'missing-fixture-claude.json'), observedAtMs),
   ).toBeNull()
+})
+
+test.each([
+  undefined,
+  'unsafe name@example.test',
+  'local@@example.test',
+  'person\u200b@example.test',
+])('invalid or absent metadata preserves valid matched quota: %j', async (emailAddress) => {
+  const value = snapshot()
+  const file = await cacheFile({ ...value, oauthAccount: { ...value.oauthAccount, emailAddress } })
+  const reading = await readClaudeUsageCache(file, observedAtMs + 60_000)
+  expect(reading).toMatchObject({
+    probe: { kind: 'reading', update: { windows: [{ usedPercent: 19 }, { usedPercent: 77 }] } },
+  })
+  expect(reading?.probe.kind === 'reading' && reading.probe.update).not.toHaveProperty(
+    'label',
+    expect.any(String),
+  )
 })

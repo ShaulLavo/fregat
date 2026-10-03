@@ -1,4 +1,4 @@
-import { browserTestResponses } from '../../editor/scripts/browser-test-responses'
+import { browserTestResponses } from '../../editor/scripts/browser-test-responses.ts'
 import fs from 'node:fs'
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'

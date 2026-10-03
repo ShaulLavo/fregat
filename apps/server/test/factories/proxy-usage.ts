@@ -1,16 +1,18 @@
 export function startProxyUsageHttpFixture(
   observedAt: string,
   accounts?: readonly Record<string, unknown>[],
+  beforeResponse?: (requestCount: number) => Promise<void>,
 ) {
   const requests: Array<{ method: string; path: string }> = []
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
-    fetch(request) {
+    async fetch(request) {
       const path = new URL(request.url).pathname
       requests.push({ method: request.method, path })
       if (request.method !== 'GET' || path !== '/v0/management/auth-files')
         return Response.json({ unexpected: true }, { status: 404 })
+      await beforeResponse?.(requests.length)
       return Response.json({
         files: accounts ?? [
           {
