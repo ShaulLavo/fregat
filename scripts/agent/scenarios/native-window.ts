@@ -103,7 +103,22 @@ export const nativeWindow: Scenario = {
     const assertClearEdges = async (label: string) => {
       const edges = await readEdges()
       await evidence.json(`${label}-edges.json`, edges)
-      await captureWindowEdges(page, evidence, label)
+      const { boxes, pixels } = await captureWindowEdges(page, evidence, label)
+      for (const box of boxes) {
+        deepStrictEqual(
+          box.borderWidths,
+          ['0px', '0px', '0px', '0px'],
+          `${label} ${box.tag} edge border`,
+        )
+        strictEqual(box.outlineStyle, 'none', `${label} ${box.tag} edge outline`)
+        strictEqual(box.shadow, 'none', `${label} ${box.tag} edge shadow`)
+      }
+      for (const edge of ['top', 'bottom', 'left', 'right'] as const) {
+        const outer = pixels.rows[0]![edge]
+        for (const row of pixels.rows.slice(1)) {
+          deepStrictEqual(row[edge], outer, `${label} ${edge} has no outer pixel seam`)
+        }
+      }
       for (const [edge, elements] of Object.entries(edges)) {
         for (const element of elements) {
           deepStrictEqual(element.border, ['0px', '0px', '0px', '0px'], `${edge} border`)

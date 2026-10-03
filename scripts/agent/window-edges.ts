@@ -24,7 +24,14 @@ export async function captureWindowEdges(page: Page, evidence: Evidence, label: 
           edges,
           rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
           border: [style.borderTop, style.borderRight, style.borderBottom, style.borderLeft],
+          borderWidths: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
           outline: style.outline,
+          outlineStyle: style.outlineStyle,
           outlineOffset: style.outlineOffset,
           shadow: style.boxShadow,
           background: style.backgroundColor,
@@ -61,7 +68,7 @@ export async function captureWindowEdges(page: Page, evidence: Evidence, label: 
       right: Array.from({ length: height }, (_, y) => pixel(width - 1 - offset, y)),
     }))
     const zoom = document.createElement('canvas')
-    zoom.width = width * 4
+    zoom.width = Math.max(width, height) * 4
     zoom.height = 96
     const zoomContext = zoom.getContext('2d')!
     zoomContext.imageSmoothingEnabled = false
@@ -76,4 +83,5 @@ export async function captureWindowEdges(page: Page, evidence: Evidence, label: 
   const { zoom, ...pixels } = sampled
   await evidence.json(`${label}-edge-pixels.json`, pixels)
   await evidence.write(`${label}-edges-zoom.png`, Buffer.from(zoom, 'base64'))
+  return { boxes, pixels }
 }

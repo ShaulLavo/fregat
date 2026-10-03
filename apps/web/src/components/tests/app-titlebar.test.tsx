@@ -100,15 +100,15 @@ test('native macOS traffic-light inset follows full-screen entry, rerender, and 
   act(() => {
     document.documentElement.setAttribute('data-native-fullscreen', '')
     window.dispatchEvent(new Event('platform-native-window-state'))
+    expect(projectArea()).not.toHaveClass('pl-[4.75rem]')
   })
-  expect(projectArea()).not.toHaveClass('pl-[4.75rem]')
   view.rerender(<TitlebarTestProvider store={store} />)
   expect(projectArea()).not.toHaveClass('pl-[4.75rem]')
   act(() => {
     document.documentElement.removeAttribute('data-native-fullscreen')
     window.dispatchEvent(new Event('platform-native-window-state'))
+    expect(projectArea()).toHaveClass('pl-[4.75rem]')
   })
-  expect(projectArea()).toHaveClass('pl-[4.75rem]')
 })
 
 function TitlebarTestProvider({
