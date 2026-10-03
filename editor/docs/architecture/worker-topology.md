@@ -111,8 +111,10 @@ Disposal and restart:
   The renderer owns only worker-local memory; its standalone `dispose()` clears its state reference.
 - The client cancels scheduling, clears its color cache, and reports disposal failures.
 - Late worker messages and errors are ignored by the owner after its worker handle is released.
-- On native worker error, the owner terminates the worker, records `lastError`, and leaves lifecycle
-  `crashed`. Disposing a crashed owner releases the already-cleared handle and resolves.
+- Native worker errors and failed posts share the same cleanup. The original error reaches
+  `onError`, and failed posts return `false`, even when termination fails.
+- Cleanup retains any termination failure after releasing the handle. Subsequent disposal callers
+  share one rejected promise and lifecycle stays `crashed`; successful cleanup lets disposal resolve.
 - There is no automatic restart on the same owner. Recreate the minimap contribution/client to get a
   new worker.
 

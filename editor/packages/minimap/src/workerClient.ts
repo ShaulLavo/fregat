@@ -77,6 +77,7 @@ export class MinimapWorkerOwner {
   private postedRequests = 0
   private lastError: Error | null = null
   private disposalPromise: Promise<void> | null = null
+  private terminationError: Error | null = null
 
   public constructor(private readonly options: MinimapWorkerOwnerOptions) {
     this.worker = this.createWorker()
@@ -107,17 +108,11 @@ export class MinimapWorkerOwner {
   public dispose(): Promise<void> {
     if (this.disposalPromise) return this.disposalPromise
 
-    this.lifecycle = 'disposed'
-    this.disposalPromise = new Promise((resolve, reject) => {
-      try {
-        this.terminateWorker()
-        resolve()
-      } catch (error) {
-        this.lastError = workerRequestError(error)
-        this.lifecycle = 'crashed'
-        reject(this.lastError)
-      }
-    })
+    this.terminateWorker()
+    this.lifecycle = this.terminationError ? 'crashed' : 'disposed'
+    this.disposalPromise = this.terminationError
+      ? Promise.reject(this.terminationError)
+      : Promise.resolve()
     return this.disposalPromise
   }
 
@@ -183,10 +178,16 @@ export class MinimapWorkerOwner {
     this.worker = null
     if (!handle) return
 
-    handle.onmessage = null
-    handle.onerror = null
-    // A busy worker cannot acknowledge disposal; termination releases its owned resources.
-    handle.terminate()
+    try {
+      handle.onmessage = null
+      handle.onerror = null
+      // A busy worker cannot acknowledge disposal; termination releases its owned resources.
+      handle.terminate()
+    } catch (error) {
+      this.terminationError = workerRequestError(error)
+      this.lastError = this.terminationError
+      this.lifecycle = 'crashed'
+    }
   }
 }
 
