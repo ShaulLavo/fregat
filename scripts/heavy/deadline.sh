@@ -5,7 +5,20 @@ set -eu
 slice=$1
 runtime=$2
 grace=$3
+# A healthy watchdog reports each second, including grace; a stopped shell cannot renew it.
+heartbeat_until() {
+  local now until
+  read -r now _ </proc/uptime
+  until=$((10#${now/./} + $1 * 100))
+  while :; do
+    systemd-notify WATCHDOG=1
+    read -r now _ </proc/uptime
+    [ "$((10#${now/./}))" -lt "$until" ] || return 0
+    sleep 1
+  done
+}
+
 systemd-notify --ready
-sleep "$runtime"
+heartbeat_until "$runtime"
 systemctl --user kill --signal=SIGTERM "$slice"
-sleep "$grace"
+heartbeat_until "$grace"
