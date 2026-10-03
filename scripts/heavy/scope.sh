@@ -24,8 +24,10 @@ while [ "${1:-}" = --slice ] || [ "${1:-}" = --grace ] || [ "${1:-}" = --runtime
 done
 out=$1
 shift
-trap : INT TERM HUP
+trap 'exit 125' INT TERM HUP
 if [ -n "$runtime" ]; then
+  read -r started _ </proc/uptime || exit 125
+  deadline=$((10#${started/./} + runtime * 100))
   slice=${HEAVY_JOB_SLICE:?}
   [[ "$slice" =~ ^[a-z0-9]+-[a-z0-9]+\.slice$ ]] || exit 125
   watchdog=${slice%.slice}_deadline.service
@@ -38,7 +40,12 @@ if [ -n "$runtime" ]; then
     -p "ExecStopPost=/usr/bin/env systemctl --user kill --signal=SIGKILL $slice" \
     bash -p "$script" "$slice" "$runtime" "$grace" 3<&- 4<&- 5<&- || exit 125
   systemctl --user is-active --quiet "$watchdog" || exit 125
+  # The service stays active during grace. A late readiness return must also have runtime left,
+  # even if TERM was missed; /proc/uptime is monotonic and reports centiseconds.
+  read -r now _ </proc/uptime || exit 125
+  [ "$((10#${now/./}))" -lt "$deadline" ] || exit 125
 fi
+trap : INT TERM HUP
 "$@" 3<&- 4<&- 5<&-
 rc=$?
 cgroup=/sys/fs/cgroup$(cut -d: -f3- /proc/self/cgroup)

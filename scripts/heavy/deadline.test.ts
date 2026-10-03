@@ -348,44 +348,83 @@ describe.skipIf(!userScopes)('whole-slice deadlines (requires user systemd scope
     }
   }, 25_000)
 
-  test('a delayed readiness return cannot run the command after the watchdog has expired', async () => {
-    const box = deadlineBox()
-    const armed = path.join(box.root, 'armed')
-    const marker = path.join(box.root, 'command-ran')
-    const env = launcher(
-      box,
-      `case " $* " in *" --collect "*) ${systemdRun} "$@" || exit $?; touch ${armed}; trap "" TERM; exec sleep 60;; esac`,
-    )
-    const owned = start(box, 'late-readiness', ['touch', marker], {
-      env,
-      quiet: true,
-      jobClass: 'light',
-      machine: true,
-    })
-    let slice: string | undefined
-    try {
-      await expect.poll(() => existsSync(armed), { timeout: 10_000 }).toBe(true)
-      const [owner] = live(box.state, 'jobs')
-      slice = ownSlice(box.sliceRoot, owner!.id)
-      owned.child.kill('SIGSTOP')
-      await expect
-        .poll(() => readFileSync(`/proc/${owned.child.pid}/status`, 'utf8'), { timeout: 2_000 })
-        .toMatch(/^State:\s+T/m)
-      await expect
-        .poll(() => sliceState(box.sliceRoot, slice!), { timeout: 5_000 })
-        .not.toBe('running')
+  test.each([
+    { name: 'during grace', delay: 2.3, missedTerm: false },
+    { name: 'during grace without a delivered TERM', delay: 2.3, missedTerm: true },
+    { name: 'past whole-slice KILL', delay: 60, missedTerm: false },
+  ])(
+    'a readiness return $name cannot start an expired payload',
+    async ({ delay, missedTerm }) => {
+      const box = deadlineBox()
+      const stranger = deadlineBox()
+      const canaryPid = path.join(stranger.root, 'canary.pid')
+      const canary = start(
+        stranger,
+        'canary',
+        ['bash', '-c', 'echo $$ > "$1"; exec sleep 60', '_', canaryPid],
+        { jobClass: 'light', machine: true },
+      )
+      const armed = path.join(box.root, 'armed')
+      const returned = path.join(box.root, 'returned')
+      const marker = path.join(box.root, 'command-ran')
+      // Suppress both TERM paths to prove the post-readiness clock check independently.
+      const pauseWatchdog = missedTerm
+        ? 'systemctl --user kill --kill-whom=main --signal=SIGSTOP "${HEAVY_JOB_SLICE%.slice}_deadline.service";'
+        : ''
+      const scopeFallback = missedTerm
+        ? `args=("$@"); for i in "\${!args[@]}"; do if [[ "\${args[i]}" = RuntimeMaxSec=* ]]; then args[i]=RuntimeMaxSec=infinity; fi; done; exec ${systemdRun} "\${args[@]}"`
+        : `exec ${systemdRun} "$@"`
+      const env = launcher(
+        box,
+        `case " $* " in *" --collect "*) trap "" TERM; ${systemdRun} "$@" || exit $?; ${pauseWatchdog} touch ${armed}; sleep ${delay}; touch ${returned}; exit 0;; esac\n${scopeFallback}`,
+      )
+      const owned = start(box, 'late-readiness', ['touch', marker], {
+        env,
+        quiet: true,
+        jobClass: 'light',
+        machine: true,
+      })
+      let slice: string | undefined
+      try {
+        await expect
+          .poll(() => existsSync(armed) && existsSync(canaryPid), { timeout: 10_000 })
+          .toBe(true)
+        const [owner] = live(box.state, 'jobs')
+        slice = ownSlice(box.sliceRoot, owner!.id)
+        owned.child.kill('SIGSTOP')
+        await expect
+          .poll(() => readFileSync(`/proc/${owned.child.pid}/status`, 'utf8'), { timeout: 2_000 })
+          .toMatch(/^State:\s+T/m)
+        await expect
+          .poll(() => sliceState(box.sliceRoot, slice!), { timeout: 5_000 })
+          .not.toBe('running')
+        expect(existsSync(returned)).toBe(delay < 3)
+        expect(existsSync(marker)).toBe(false)
+        expect(alive(pidIn(canaryPid))).toBe(true)
+        await expect
+          .poll(() => serviceState(watchdogOf(slice!)), { timeout: 2_000 })
+          .toBe('not-found')
+        console.log(
+          JSON.stringify({
+            event: 'expired-readiness-return',
+            delaySeconds: delay,
+            missedTerm,
+            readinessReturned: existsSync(returned),
+            payloadRan: existsSync(marker),
+            canaryAlive: alive(pidIn(canaryPid)),
+          }),
+        )
+      } finally {
+        if (slice) killSlice(slice)
+        owned.child.kill('SIGCONT')
+        owned.child.kill('SIGTERM')
+        canary.child.kill('SIGTERM')
+        await Promise.all([owned.done, canary.done])
+      }
+      expect((await owned.done).code).toBe(75)
       expect(existsSync(marker)).toBe(false)
-      await expect
-        .poll(() => serviceState(watchdogOf(slice!)), { timeout: 2_000 })
-        .toBe('not-found')
-    } finally {
-      if (slice) killSlice(slice)
-      owned.child.kill('SIGCONT')
-      owned.child.kill('SIGTERM')
-      await owned.done
-    }
-    expect((await owned.done).code).toBe(75)
-    expect(existsSync(marker)).toBe(false)
-    expect(slotsFree(box)).toBe(true)
-  }, 15_000)
+      expect(slotsFree(box)).toBe(true)
+    },
+    15_000,
+  )
 })
