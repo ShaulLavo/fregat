@@ -20,6 +20,8 @@ export const nativeWindow: Scenario = {
       { kind: 'set', key: 'workbench.surface.opacity', value: 80 },
       { kind: 'set', key: 'workbench.surface.blur', value: 24 },
       { kind: 'set', key: 'window.material', value: 'none' },
+      { kind: 'set', key: 'window.transparency', value: 'window' },
+      { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
     ])
     await page.addInitScript({
       content:
@@ -63,6 +65,68 @@ export const nativeWindow: Scenario = {
       (element) => getComputedStyle(element).paddingLeft,
     )
     strictEqual(windowedPadding, '76px')
+    const readEdges = () =>
+      page.evaluate(() => {
+        const width = window.innerWidth
+        const height = window.innerHeight
+        const points = {
+          top: [width / 2, 0],
+          right: [width - 1, height / 2],
+          bottom: [width / 2, height - 1],
+          left: [0, height / 2],
+        }
+        return Object.fromEntries(
+          Object.entries(points).map(([edge, [x, y]]) => [
+            edge,
+            document.elementsFromPoint(x!, y!).map((element) => {
+              const style = getComputedStyle(element)
+              return {
+                tag: element.tagName,
+                className: element.getAttribute('class'),
+                border: [
+                  style.borderTopWidth,
+                  style.borderRightWidth,
+                  style.borderBottomWidth,
+                  style.borderLeftWidth,
+                ],
+                outline: style.outlineStyle,
+                outlineWidth: style.outlineWidth,
+                outlineColor: style.outlineColor,
+                outlineOffset: style.outlineOffset,
+                shadow: style.boxShadow,
+              }
+            }),
+          ]),
+        )
+      })
+    const assertClearEdges = async (label: string) => {
+      const edges = await readEdges()
+      await evidence.json(`${label}-edges.json`, edges)
+      await page.screenshot({ path: evidence.file(`${label}-edges.png`), omitBackground: true })
+      for (const [edge, elements] of Object.entries(edges)) {
+        for (const element of elements) {
+          deepStrictEqual(element.border, ['0px', '0px', '0px', '0px'], `${edge} border`)
+          strictEqual(element.outline, 'none', `${edge} outline`)
+          strictEqual(element.shadow, 'none', `${edge} shadow`)
+        }
+      }
+    }
+    const focusShell = async () => {
+      await page.keyboard.press('Tab')
+      strictEqual(
+        await page.evaluate((selector) => {
+          const shell = document.querySelector(selector)?.closest<HTMLElement>('[aria-busy]')
+          if (!shell) return false
+          shell.focus()
+          return document.activeElement === shell && shell.matches(':focus-visible')
+        }, selectors.desktopFirstScreenSelector),
+        true,
+        'The app shell receives keyboard-visible focus',
+      )
+    }
+    await assertClearEdges('native-none-initial')
+    await focusShell()
+    await assertClearEdges('native-shell-focused')
     await step('native-transparent-root-windowed')
     const readPaint = () =>
       page.evaluate((selector) => {
@@ -147,6 +211,8 @@ export const nativeWindow: Scenario = {
       await selectors.settingsEnumOption(page, label).click()
       await waitForAppearance(80, material)
       const materialPaint = await readPaint()
+      await focusShell()
+      await assertClearEdges(`native-${material}-focused`)
       deepStrictEqual(
         await controlPaint(),
         originalControlPaint,
