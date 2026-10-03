@@ -152,6 +152,7 @@ export function renderRowRuns(
 ): readonly RowRun[] {
   const colors = new CanvasColorCache(theme.minimumContrast)
   const runs: RowRun[] = []
+  const cursorColumn = cursor?.visible && cursor.y === row.y ? cursor.x : undefined
   let currentStyle = ''
   let currentText = ''
   let currentWidth = 0
@@ -172,8 +173,7 @@ export function renderRowRuns(
     if (cell.continuation) continue
     let width = 1
     while (row.cells[index + width]?.continuation) width += 1
-    const paintedCursor =
-      cursor?.visible && cursor.y === row.y && cursor.x === cell.x ? cursor : undefined
+    const paintedCursor = cursorColumn !== undefined && cursorColumn === cell.x ? cursor : undefined
     // Cursor and wide-cell paint stays isolated; font, theme and contrast are fixed for this row.
     const reusable = width === 1 && !paintedCursor
     const style =
