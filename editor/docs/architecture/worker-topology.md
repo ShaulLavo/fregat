@@ -8,12 +8,12 @@ owning disposal, and defining what happens after a worker failure.
 
 ## Summary
 
-| Owner | Package | Cache limit | Restart behavior |
-|---|---|---|---|
-| `TreeSitterWorkerClient` | `@singapore-editor/tree-sitter` | Per worker document cache keeps at most 6 parsed snapshots and at most 8,000,000 retained source units, while preserving the newest 2 snapshots. Owner-side source chunk accounting is per live document and cleared on document disposal, source-cache errors, crash, or owner disposal. | A crash terminates the worker, rejects pending requests, clears owner caches, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically. |
-| `MinimapWorkerOwner` | `@singapore-editor/minimap` | No cross-document worker cache. The client owns one current minimap projection, one queued update, latest token source, style signatures, and a CSS color cache cleared on theme/style invalidation or disposal. | A crash terminates the worker and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the minimap contribution/client. Disposal waits for a worker `disposed` acknowledgement before terminating. |
-| `ShikiWorkerOwner` | `@singapore-editor/core/shiki` | Owner caches theme-request promises by sorted theme key. Worker caches one tokenizer per open document and highlighters by sorted language/theme key. These caches are lifecycle-scoped, not size-bounded. | A crash terminates the worker, rejects pending requests, clears owner theme cache, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically. |
-| `TypeScriptLspWorkerOwner` | `@singapore-editor/typescript-lsp` | No owner-side document cache. The owner tracks posted-message count, listener counts, and last error. The worker owns LSP document/project state for the lifetime of the worker. | A crash posts `$/serverExited` to the client, terminates the worker, clears listeners, and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the LSP transport/session/connection. |
+| Owner                      | Package                            | Cache limit                                                                                                                                                                                                                                                                               | Restart behavior                                                                                                                                                                                                                                           |
+| -------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TreeSitterWorkerClient`   | `@singapore-editor/tree-sitter`    | Per worker document cache keeps at most 6 parsed snapshots and at most 8,000,000 retained source units, while preserving the newest 2 snapshots. Owner-side source chunk accounting is per live document and cleared on document disposal, source-cache errors, crash, or owner disposal. | A crash terminates the worker, rejects pending requests, clears owner caches, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically.                        |
+| `MinimapWorkerOwner`       | `@singapore-editor/minimap`        | No cross-document worker cache. The client owns one current minimap projection, one queued update, latest token source, style signatures, and a CSS color cache cleared on theme/style invalidation or disposal.                                                                          | A crash terminates the worker and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the minimap contribution/client. Disposal detaches listeners, terminates the worker immediately, and settles the disposal promise. |
+| `ShikiWorkerOwner`         | `@singapore-editor/core/shiki`     | Owner caches theme-request promises by sorted theme key. Worker caches one tokenizer per open document and highlighters by sorted language/theme key. These caches are lifecycle-scoped, not size-bounded.                                                                                | A crash terminates the worker, rejects pending requests, clears owner theme cache, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically.                   |
+| `TypeScriptLspWorkerOwner` | `@singapore-editor/typescript-lsp` | No owner-side document cache. The owner tracks posted-message count, listener counts, and last error. The worker owns LSP document/project state for the lifetime of the worker.                                                                                                          | A crash posts `$/serverExited` to the client, terminates the worker, clears listeners, and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the LSP transport/session/connection.                                     |
 
 There is not yet a separate document worker owner. The main-thread document engine remains the
 document truth until that Phase 11 item is implemented.
@@ -23,12 +23,12 @@ document truth until that Phase 11 item is implemented.
 These package-level helpers were removed from the first-party route so callers must own worker
 lifetimes explicitly.
 
-| Runtime | Removed path | Required owner path | Current status |
-|---|---|---|---|
-| Tree-sitter | `registerTreeSitterLanguagesWithWorker`, `parseWithTreeSitter`, `editWithTreeSitter`, `queryRangeWithTreeSitter`, `selectWithTreeSitter`, `disposeTreeSitterDocument`, `disposeTreeSitterWorker`, `inspectTreeSitterWorker` | `TreeSitterWorkerClient` or `createTreeSitterWorkerBackend()` owned by the editor runtime or syntax provider | Removed from the worker client and package index. First-party tests, benchmarks, and structural selection create or receive an owner explicitly. |
-| Shiki tokenizer | `createShikiHighlighterSession`, `loadShikiTheme`, `disposeShikiWorker` | `createShikiWorkerOwner()` owned by the editor runtime, highlighter provider, or diff syntax service | Removed from the worker client and Shiki package index. The Shiki plugin and diff syntax service create owners explicitly. |
-| Minimap | None | `MinimapWorkerOwner` owned by the minimap client | No singleton compatibility path exists. |
-| TypeScript LSP | None | `TypeScriptLspWorkerOwner` owned by the plugin transport or server session | No singleton compatibility path exists. |
+| Runtime         | Removed path                                                                                                                                                                                                                | Required owner path                                                                                          | Current status                                                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tree-sitter     | `registerTreeSitterLanguagesWithWorker`, `parseWithTreeSitter`, `editWithTreeSitter`, `queryRangeWithTreeSitter`, `selectWithTreeSitter`, `disposeTreeSitterDocument`, `disposeTreeSitterWorker`, `inspectTreeSitterWorker` | `TreeSitterWorkerClient` or `createTreeSitterWorkerBackend()` owned by the editor runtime or syntax provider | Removed from the worker client and package index. First-party tests, benchmarks, and structural selection create or receive an owner explicitly. |
+| Shiki tokenizer | `createShikiHighlighterSession`, `loadShikiTheme`, `disposeShikiWorker`                                                                                                                                                     | `createShikiWorkerOwner()` owned by the editor runtime, highlighter provider, or diff syntax service         | Removed from the worker client and Shiki package index. The Shiki plugin and diff syntax service create owners explicitly.                       |
+| Minimap         | None                                                                                                                                                                                                                        | `MinimapWorkerOwner` owned by the minimap client                                                             | No singleton compatibility path exists.                                                                                                          |
+| TypeScript LSP  | None                                                                                                                                                                                                                        | `TypeScriptLspWorkerOwner` owned by the plugin transport or server session                                   | No singleton compatibility path exists.                                                                                                          |
 
 Do not reintroduce package-level worker singletons. New integration code must accept an explicit
 owner, backend, or session factory and must dispose that owner during editor/runtime teardown.
@@ -85,7 +85,6 @@ Inspection:
 
 - `lifecycle`
 - `postedRequests`
-- `disposalAcknowledged`
 - `lastError`
 
 Caches:
@@ -106,12 +105,16 @@ Limits:
 
 Disposal and restart:
 
-- `dispose()` moves the owner to `disposing`, posts `dispose`, and resolves only after the worker
-  responds with `disposed`.
-- After acknowledgement, the owner terminates the worker and marks lifecycle `disposed`.
-- Late non-disposal worker messages are ignored by the disposed client.
-- On native worker error, the owner terminates the worker, rejects any pending disposal promise,
-  records `lastError`, and leaves lifecycle `crashed`.
+- `dispose()` detaches listeners, terminates the worker immediately, and resolves its promise.
+  Repeated calls return the same promise. A termination failure rejects it and records `lastError`.
+- Termination releases the worker's renderer state, canvas contexts, raster, and queued requests.
+  The renderer owns only worker-local memory; its standalone `dispose()` clears its state reference.
+- The client cancels scheduling, clears its color cache, and reports disposal failures.
+- Late worker messages and errors are ignored by the owner after its worker handle is released.
+- Native worker errors and failed posts share the same cleanup. The original error reaches
+  `onError`, and failed posts return `false`, even when termination fails.
+- Cleanup retains any termination failure after releasing the handle. Subsequent disposal callers
+  share one rejected promise and lifecycle stays `crashed`; successful cleanup lets disposal resolve.
 - There is no automatic restart on the same owner. Recreate the minimap contribution/client to get a
   new worker.
 

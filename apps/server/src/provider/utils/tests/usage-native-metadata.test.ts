@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
-import { readNativeUsageLabel } from '../usage-native-metadata'
+import { readNativeUsageMetadata } from '../usage-native-metadata'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -33,16 +33,16 @@ test.each([
   roots.push(root)
   const file = path.join(root, 'metadata.json')
   await writeFile(file, JSON.stringify(codexMetadata(email)))
-  expect(await readNativeUsageLabel(file, 'codex')).toBe(label)
+  expect((await readNativeUsageMetadata(file, 'codex')).label).toBe(label)
   await writeFile(file, JSON.stringify({ oauthAccount: { emailAddress: email } }))
-  expect(await readNativeUsageLabel(file, 'claude')).toBe(label)
+  expect((await readNativeUsageMetadata(file, 'claude')).label).toBe(label)
 })
 
 test('missing, malformed and oversized metadata falls back without exporting contents', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'usage-label-'))
   roots.push(root)
   const file = path.join(root, 'metadata.json')
-  expect(await readNativeUsageLabel(file, 'codex')).toBeUndefined()
+  expect((await readNativeUsageMetadata(file, 'codex')).label).toBeUndefined()
   for (const value of [
     '{',
     'null',
@@ -50,7 +50,24 @@ test('missing, malformed and oversized metadata falls back without exporting con
     'x'.repeat(2 * 1024 * 1024 + 1),
   ]) {
     await writeFile(file, value)
-    expect(await readNativeUsageLabel(file, 'codex')).toBeUndefined()
-    expect(await readNativeUsageLabel(file, 'claude')).toBeUndefined()
+    expect((await readNativeUsageMetadata(file, 'codex')).label).toBeUndefined()
+    expect((await readNativeUsageMetadata(file, 'claude')).label).toBeUndefined()
   }
+})
+
+test('a malformed optional label token preserves a valid native identity proof', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'usage-identity-'))
+  roots.push(root)
+  const file = path.join(root, 'metadata.json')
+  await writeFile(
+    file,
+    JSON.stringify({ tokens: { account_id: 'fixture-account-id', id_token: 'bad.token' } }),
+  )
+  const metadata = await readNativeUsageMetadata(file, 'codex', 'a'.repeat(64))
+  expect(metadata.label).toBeUndefined()
+  expect(metadata.identityProof).toMatch(/^[a-f0-9]{64}$/)
+  expect(JSON.stringify(metadata)).not.toContain('fixture-account-id')
+  expect((await readNativeUsageMetadata(file, 'codex', 'b'.repeat(64))).identityProof).not.toBe(
+    metadata.identityProof,
+  )
 })
