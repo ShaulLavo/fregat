@@ -1,5 +1,5 @@
 import { createError, defineErrorCatalog, EvlogError } from 'evlog'
-import { errorMessage } from '../packages/contracts/src/error-fields'
+import { errorMessage } from '../packages/contracts/src/error-fields.ts'
 
 export const scriptErrors = defineErrorCatalog('scripts', {
   INVALID_INPUT: {

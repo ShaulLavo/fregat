@@ -19,6 +19,7 @@ const swiftShaderDriver = path.join(
 const missingSwiftShader = ghosttyNeedsSwiftShader && !existsSync(swiftShaderDriver)
 
 const configurations = [
+  'apps/web/vite.config.ts',
   'apps/server/vitest.config.ts',
   'apps/web/vitest.config.ts',
   'apps/web/vitest.browser.config.ts',
@@ -49,7 +50,8 @@ for (const loader of ['bundle', 'native'] as const) {
         logger,
         loader,
       )
-      expect(result?.config.test).toBeDefined()
+      expect(result?.config).toBeDefined()
+      if (relative !== 'apps/web/vite.config.ts') expect(result?.config.test).toBeDefined()
       expect(warnings.filter((message) => message.includes("configLoader: 'native'"))).toEqual([])
     },
   )
