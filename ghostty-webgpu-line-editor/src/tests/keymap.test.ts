@@ -41,3 +41,20 @@ test('printable Unicode is inserted while browser command chords stay unclaimed'
   expect(keyCommand({ key: 'v', ctrl: true })).toBeUndefined()
   expect(keyCommand({ key: 'F1' })).toBeUndefined()
 })
+
+test.each([
+  { key: 'C', ctrl: true, shift: true },
+  { key: 'L', ctrl: true, shift: true },
+  { key: 'ArrowLeft', ctrl: true, shift: true },
+  { key: 'b', alt: true, shift: true },
+  { key: 'Tab', shift: true },
+  { key: 'ArrowLeft', shift: true },
+])('shifted unbound command %j stays unclaimed', (stroke) => {
+  expect(keyCommand(stroke)).toBeUndefined()
+})
+
+test('Shift preserves printable text and explicitly bound newline commands', () => {
+  expect(keyCommand({ key: 'A', shift: true })).toEqual({ kind: 'insert', text: 'A' })
+  expect(keyCommand({ key: 'Enter', shift: true })).toEqual({ kind: 'newline' })
+  expect(keyCommand({ key: 'Enter', alt: true })).toEqual({ kind: 'newline' })
+})

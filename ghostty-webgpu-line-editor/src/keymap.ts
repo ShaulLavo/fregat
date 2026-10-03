@@ -67,10 +67,12 @@ const alt: Readonly<Record<string, Action>> = { b: 'word-left', f: 'word-right',
 
 export function keyCommand(stroke: KeyStroke): EditCommand | undefined {
   if (stroke.meta || (stroke.ctrl && stroke.alt)) return undefined
+  if (stroke.shift && (stroke.ctrl || stroke.alt)) return undefined
+  if (stroke.key === 'Enter' && stroke.shift) return { kind: 'newline' }
+  if (stroke.shift && [...stroke.key].length !== 1) return undefined
   if (stroke.ctrl)
     return action(control[stroke.key.length === 1 ? stroke.key.toLowerCase() : stroke.key])
   if (stroke.alt) return action(alt[stroke.key])
-  if (stroke.key === 'Enter' && stroke.shift) return { kind: 'newline' }
   const command = plain[stroke.key]
   if (command) return { kind: command }
   if ([...stroke.key].length === 1 && stroke.key >= ' ') return { kind: 'insert', text: stroke.key }

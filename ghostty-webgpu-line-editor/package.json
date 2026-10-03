@@ -1,6 +1,7 @@
 {
   "name": "ghostty-webgpu-line-editor",
   "version": "0.0.1",
+  "private": true,
   "description": "Readline-style editing for ghostty-webgpu local shells",
   "license": "MIT",
   "files": [

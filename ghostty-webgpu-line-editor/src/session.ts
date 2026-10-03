@@ -1,6 +1,6 @@
 import { History, type HistoryOptions } from './history.js'
 import type { EditCommand } from './keymap.js'
-import { EditModel } from './model.js'
+import { EditModel, type EditSnapshot } from './model.js'
 import { createLineEditorError } from './structured-errors.js'
 
 export type ReadResult =
@@ -38,15 +38,16 @@ interface Candidates {
   values: readonly string[]
 }
 
+const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+
 function commonPrefix(values: readonly string[]): string {
-  const first = values[0] ?? ''
-  // A prefix must end at an editing boundary even if candidate UTF16 sequences diverge.
-  const segments = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(first)]
+  const candidates = values.map((value) =>
+    [...segmenter.segment(value)].map(({ segment }) => segment),
+  )
   let prefix = ''
-  for (const { segment } of segments) {
-    const next = prefix + segment
-    if (!values.every((value) => value.startsWith(next))) break
-    prefix = next
+  for (const [index, segment] of (candidates[0] ?? []).entries()) {
+    if (!candidates.every((candidate) => candidate[index] === segment)) break
+    prefix += segment
   }
   return prefix
 }
@@ -56,6 +57,7 @@ export class ReadSession {
   private state: State = { kind: 'idle' }
   private candidates: Candidates | undefined
   private work: AbortController | undefined
+  private action = 0
   private readonly options: SessionOptions
   private readonly emit: (event: SessionEvent) => void
 
@@ -85,9 +87,9 @@ export class ReadSession {
     if (options.signal?.aborted)
       return Promise.reject(createLineEditorError('READ_ABORTED', { aborted: true }))
     this.model.reset()
-    this.cancelWork()
+    this.action++
     return new Promise((resolve, reject) => {
-      const abort = () => this.abort('READ_ABORTED')
+      const abort = () => this.abort(read)
       const detach = () => options.signal?.removeEventListener('abort', abort)
       const read: Reading = { options, resolve, reject, detach }
       this.state = { kind: 'reading', read }
@@ -96,35 +98,37 @@ export class ReadSession {
         this.emit({ kind: 'change' })
       } catch (cause) {
         detach()
-        if (this.state.kind === 'reading' && this.state.read === read) {
-          this.state = { kind: 'idle' }
-          this.cancelWork()
-        }
         reject(cause)
+        if (!this.isReading(read)) return
+        this.state = { kind: 'idle' }
+        this.cancelWork()
       }
     })
   }
 
   async dispatch(command: EditCommand): Promise<void> {
-    if (!this.active) return
-    if (command.kind === 'complete') return this.complete()
+    if (this.state.kind !== 'reading') return
+    const read = this.state.read
+    if (command.kind === 'clear') {
+      this.emit({ kind: 'clear' })
+      return
+    }
+    const action = ++this.action
+    if (command.kind === 'complete') return this.complete(read, action)
     this.cancelWork()
-    if (command.kind === 'submit') return this.submit()
+    if (!this.currentAction(read, action)) return
+    if (command.kind === 'submit') return this.submit(read, action)
     if (command.kind === 'interrupt') {
       this.model.reset()
       try {
         this.emit({ kind: 'output', text: '^C\r\n' })
       } finally {
-        this.finish({ kind: 'interrupt' })
+        this.finish(read, { kind: 'interrupt' })
       }
       return
     }
     if (command.kind === 'eof' && this.model.snapshot.text === '') {
-      this.finish({ kind: 'end' })
-      return
-    }
-    if (command.kind === 'clear') {
-      this.emit({ kind: 'clear' })
+      this.finish(read, { kind: 'end' })
       return
     }
     this.edit(command)
@@ -136,11 +140,10 @@ export class ReadSession {
     const read = this.state.kind === 'reading' ? this.state.read : undefined
     this.state = { kind: 'disposed' }
     this.model.reset()
+    read?.detach()
+    read?.reject(createLineEditorError('DISPOSED', { state: 'reading' }))
     this.cancelWork()
-    if (!read) return
-    read.detach()
-    read.reject(createLineEditorError('DISPOSED', { state: 'reading' }))
-    this.emit({ kind: 'finish' })
+    if (read) this.emit({ kind: 'finish' })
   }
 
   private edit(command: EditCommand): void {
@@ -193,19 +196,18 @@ export class ReadSession {
     }
   }
 
-  private async complete(): Promise<void> {
-    const complete = this.options.complete
-    if (!complete || this.state.kind !== 'reading') return
-    this.model.acceptSearch()
-    const snapshot = this.model.snapshot
-    if (this.candidates?.revision === snapshot.revision) {
+  private async complete(read: Reading, action: number): Promise<void> {
+    if (this.candidates?.revision === this.model.snapshot.revision) {
       this.emit({ kind: 'candidates', values: this.candidates.values })
       return
     }
     this.cancelWork()
+    if (!this.currentAction(read, action)) return
+    const snapshot = this.acceptSearch(read, action)
+    const complete = this.options.complete
+    if (!snapshot || !complete) return
     const work = new AbortController()
     this.work = work
-    const read = this.state.read
     let values: readonly string[]
     try {
       values = await complete(snapshot.text, snapshot.cursor, work.signal)
@@ -233,11 +235,9 @@ export class ReadSession {
     if (replace) this.emit({ kind: 'change' })
   }
 
-  private async submit(): Promise<void> {
-    if (this.state.kind !== 'reading') return
-    this.model.acceptSearch()
-    const read = this.state.read
-    const snapshot = this.model.snapshot
+  private async submit(read: Reading, action: number): Promise<void> {
+    const snapshot = this.acceptSearch(read, action)
+    if (!snapshot) return
     const work = new AbortController()
     this.work = work
     let complete: boolean
@@ -256,43 +256,62 @@ export class ReadSession {
       return
     }
     this.model.history.add(snapshot.text)
-    this.finish({ kind: 'submit', text: snapshot.text })
+    this.finish(read, { kind: 'submit', text: snapshot.text })
+  }
+
+  private acceptSearch(read: Reading, action: number): EditSnapshot | undefined {
+    const searching = this.model.snapshot.search !== undefined
+    this.model.acceptSearch()
+    const snapshot = this.model.snapshot
+    if (searching) this.emit({ kind: 'change' })
+    if (!this.currentAction(read, action) || this.model.snapshot.revision !== snapshot.revision)
+      return undefined
+    return snapshot
+  }
+
+  private isReading(read: Reading): boolean {
+    return this.state.kind === 'reading' && this.state.read === read
+  }
+
+  private currentAction(read: Reading, action: number): boolean {
+    return this.isReading(read) && this.action === action
   }
 
   private current(read: Reading, revision: number, work: AbortController): boolean {
     return (
-      this.state.kind === 'reading' &&
-      this.state.read === read &&
+      this.isReading(read) &&
       !work.signal.aborted &&
       this.work === work &&
       this.model.snapshot.revision === revision
     )
   }
 
-  private finish(result: ReadResult): void {
-    if (this.state.kind !== 'reading') return
-    const read = this.state.read
+  private finish(read: Reading, result: ReadResult): void {
+    if (!this.isReading(read)) return
+    const action = this.action
     this.state = { kind: 'idle' }
-    this.cancelWork()
     read.detach()
     read.resolve(result)
-    this.emit({ kind: 'finish' })
+    this.cancelWork()
+    if (this.state.kind === 'idle' && this.action === action) this.emit({ kind: 'finish' })
   }
 
-  private abort(code: 'READ_ABORTED' | 'DISPOSED'): void {
-    if (this.state.kind !== 'reading') return
-    const read = this.state.read
+  private abort(read: Reading): void {
+    if (!this.isReading(read)) return
+    const action = this.action
     this.state = { kind: 'idle' }
     this.model.reset()
-    this.cancelWork()
     read.detach()
-    read.reject(createLineEditorError(code, { state: 'reading' }))
-    this.emit({ kind: 'finish' })
+    read.reject(createLineEditorError('READ_ABORTED', { state: 'reading' }))
+    this.cancelWork()
+    if (this.state.kind === 'idle' && this.action === action) this.emit({ kind: 'finish' })
   }
 
   private cancelWork(): void {
-    this.work?.abort()
+    const work = this.work
     this.work = undefined
     this.candidates = undefined
+    // Abort listeners may synchronously start another read or completion.
+    work?.abort()
   }
 }

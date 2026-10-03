@@ -48,11 +48,18 @@ test('history is bounded, ignores adjacent duplicates and restores an edited dra
   history.add('second')
   history.add('third')
   expect(history.entries).toEqual(['second', 'third'])
-  expect(history.previous('draft')).toBe('third')
-  expect(history.previous('third')).toBe('second')
-  expect(history.previous('second')).toBe('second')
-  expect(history.next()).toBe('third')
-  expect(history.next()).toBe('draft')
+  const model = new EditModel(history)
+  model.insert('draft')
+  model.recall('previous')
+  expect(model.snapshot.text).toBe('third')
+  model.recall('previous')
+  expect(model.snapshot.text).toBe('second')
+  model.recall('previous')
+  expect(model.snapshot.text).toBe('second')
+  model.recall('next')
+  expect(model.snapshot.text).toBe('third')
+  model.recall('next')
+  expect(model.snapshot.text).toBe('draft')
 })
 
 test('reverse search repeats backwards and can restore the original draft', () => {
@@ -122,7 +129,10 @@ test('a zero history limit stores no entries', () => {
   const history = new History({ limit: 0, entries: ['old'] })
   history.add('new')
   expect(history.entries).toEqual([])
-  expect(history.previous('draft')).toBe('draft')
+  const model = new EditModel(history)
+  model.insert('draft')
+  model.recall('previous')
+  expect(model.snapshot.text).toBe('draft')
 })
 
 test('host saves serialize and a failed save does not block a later save', async () => {
@@ -174,4 +184,66 @@ test('reverse-search results pass through the same plain-text boundary as recall
   model.search()
   model.insert('echo')
   expect(model.snapshot.text).toBe('echo [31m')
+})
+
+test.each([{ entries: [] }, { entries: ['old'] }])(
+  'Down before browsing preserves the draft with history %j',
+  ({ entries }) => {
+    const model = new EditModel(new History({ entries }))
+    model.insert('echo unfinished')
+    const before = model.snapshot
+    model.recall('next')
+    expect(model.snapshot).toEqual(before)
+  },
+)
+
+test('Down at the newest position preserves a newly edited draft', () => {
+  const model = new EditModel(new History({ entries: ['old'] }))
+  model.insert('draft')
+  model.recall('previous')
+  model.recall('next')
+  model.insert(' edited')
+  model.recall('next')
+  expect(model.snapshot.text).toBe('draft edited')
+})
+
+test('accepting reverse search transfers the selected entry and preserves the draft', () => {
+  const model = new EditModel(new History({ entries: ['zero', 'echo first', 'echo last'] }))
+  model.insert('draft')
+  model.search()
+  model.insert('echo')
+  model.search()
+  model.acceptSearch()
+  model.recall('previous')
+  expect(model.snapshot.text).toBe('zero')
+  for (let index = 0; index < 3; index++) model.recall('next')
+  expect(model.snapshot.text).toBe('draft')
+})
+
+test('refining and shortening reverse search keeps the older matching entry selected', () => {
+  const model = new EditModel(new History({ entries: ['echo first', 'echo last'] }))
+  model.search()
+  model.insert('echo')
+  model.search()
+  model.insert(' ')
+  expect(model.snapshot.text).toBe('echo first')
+  model.delete('backward')
+  expect(model.snapshot.text).toBe('echo first')
+})
+
+test('a shared history append and trim preserve an active navigation snapshot', () => {
+  const history = new History({ limit: 2, entries: ['first', 'second'] })
+  const model = new EditModel(history)
+  model.insert('draft')
+  model.recall('previous')
+  history.add('third')
+  expect(history.entries).toEqual(['second', 'third'])
+  model.recall('previous')
+  expect(model.snapshot.text).toBe('first')
+  model.recall('next')
+  expect(model.snapshot.text).toBe('second')
+  model.recall('next')
+  expect(model.snapshot.text).toBe('draft')
+  model.recall('previous')
+  expect(model.snapshot.text).toBe('third')
 })

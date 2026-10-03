@@ -8,9 +8,13 @@ export interface EditSnapshot {
   readonly revision: number
   readonly search: { readonly query: string; readonly matched: boolean } | undefined
 }
-interface Search {
-  query: string
+interface Navigation {
+  entries: readonly string[]
   index: number
+  draft: string
+}
+interface Search extends Navigation {
+  query: string
   matched: boolean
   original: { text: string; cursor: number }
 }
@@ -27,6 +31,7 @@ export class EditModel {
   private cursor = 0
   private revision = 0
   private searching: Search | undefined
+  private navigation: Navigation | undefined
   private killed = ''
   private lastKill = false
   readonly history: History
@@ -50,7 +55,7 @@ export class EditModel {
     this.cursor = 0
     this.searching = undefined
     this.lastKill = false
-    this.history.reset()
+    this.navigation = undefined
     this.revision++
   }
 
@@ -117,15 +122,28 @@ export class EditModel {
 
   recall(direction: 'previous' | 'next'): void {
     this.acceptSearch()
-    const text = direction === 'previous' ? this.history.previous(this.text) : this.history.next()
+    if (!this.navigation && direction === 'next') return
+    if (!this.navigation) {
+      const entries = this.history.entries
+      this.navigation = { entries, index: entries.length, draft: this.text }
+    }
+    const navigation = this.navigation
+    if (direction === 'previous') navigation.index = Math.max(0, navigation.index - 1)
+    if (direction === 'next')
+      navigation.index = Math.min(navigation.entries.length, navigation.index + 1)
+    const text = navigation.entries[navigation.index] ?? navigation.draft
+    if (navigation.index === navigation.entries.length) this.navigation = undefined
     this.replace(0, this.text.length, text)
   }
 
   search(): void {
     if (!this.searching) {
+      const entries = this.navigation?.entries ?? this.history.entries
       this.searching = {
+        entries,
+        draft: this.navigation?.draft ?? this.text,
         query: '',
-        index: this.history.entries.length,
+        index: this.navigation?.index ?? entries.length,
         matched: true,
         original: { text: this.text, cursor: this.cursor },
       }
@@ -134,7 +152,10 @@ export class EditModel {
   }
 
   acceptSearch(): void {
-    if (!this.searching) return
+    const search = this.searching
+    if (!search) return
+    if (search.index < search.entries.length)
+      this.navigation = { entries: search.entries, index: search.index, draft: search.draft }
     this.searching = undefined
     this.revision++
   }
@@ -150,11 +171,14 @@ export class EditModel {
 
   private updateSearch(before?: number): void {
     const search = this.searching!
-    const found = this.history.find(search.query, before)
-    search.matched = found !== undefined
-    if (found) {
-      search.index = found.index
-      this.replace(0, this.text.length, found.text)
+    const end = before ?? search.index + 1
+    const index = search.entries.findLastIndex(
+      (text, index) => index < end && text.includes(search.query),
+    )
+    search.matched = index >= 0
+    if (index >= 0) {
+      search.index = index
+      this.replace(0, this.text.length, search.entries[index]!)
     }
     this.lastKill = false
     this.revision++

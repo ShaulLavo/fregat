@@ -269,3 +269,223 @@ test('a failing finish observer cannot leave a read unsettled or disposal active
     code: 'line-editor.DISPOSED',
   })
 })
+
+test('shared history keeps each active session navigation and draft independent', async () => {
+  const a = new ReadSession({ history: { entries: ['old'] } })
+  const b = new ReadSession({ history: a.model.history })
+  const first = a.read({ prompt: 'a' })
+  await a.dispatch({ kind: 'insert', text: 'draft A' })
+  await a.dispatch({ kind: 'previous' })
+  const second = b.read({ prompt: 'b' })
+  await b.dispatch({ kind: 'insert', text: 'draft B' })
+  await b.dispatch({ kind: 'previous' })
+  await a.dispatch({ kind: 'next' })
+  expect(a.model.snapshot.text).toBe('draft A')
+  await b.dispatch({ kind: 'next' })
+  expect(b.model.snapshot.text).toBe('draft B')
+  await a.dispatch({ kind: 'submit' })
+  await b.dispatch({ kind: 'submit' })
+  expect(await first).toEqual({ kind: 'submit', text: 'draft A' })
+  expect(await second).toEqual({ kind: 'submit', text: 'draft B' })
+  expect(a.model.history.entries).toEqual(['old', 'draft A', 'draft B'])
+})
+
+test('synchronous work cancellation cannot edit a disposed session or emit another change', async () => {
+  const work = deferred<readonly string[]>()
+  const events: string[] = []
+  const session = new ReadSession(
+    {
+      complete: (_text, _cursor, signal) => {
+        signal.addEventListener('abort', () => session.dispose(), { once: true })
+        return work.promise
+      },
+    },
+    (event) => {
+      events.push(event.kind)
+    },
+  )
+  const read = session.read({ prompt: '$' })
+  const rejected = expect(read).rejects.toMatchObject({ code: 'line-editor.DISPOSED' })
+  const completion = session.dispatch({ kind: 'complete' })
+  await session.dispatch({ kind: 'insert', text: 'late' })
+  expect(session.model.snapshot.text).toBe('')
+  expect(events).toEqual(['change', 'finish'])
+  work.resolve([])
+  await completion
+  await rejected
+})
+
+test('an interrupt output observer cannot finish a replacement read', async () => {
+  const controller = new AbortController()
+  let next: Promise<unknown> | undefined
+  const session = new ReadSession({}, (event) => {
+    if (event.kind !== 'output') return
+    controller.abort()
+    next = session.read({ prompt: 'second' })
+  })
+  const first = session.read({ prompt: 'first', signal: controller.signal })
+  const aborted = expect(first).rejects.toMatchObject({ code: 'line-editor.READ_ABORTED' })
+  await session.dispatch({ kind: 'interrupt' })
+  expect(session.active).toBe(true)
+  expect(session.prompt?.primary).toBe('second')
+  await session.dispatch({ kind: 'insert', text: 'new' })
+  await session.dispatch({ kind: 'submit' })
+  expect(await next).toEqual({ kind: 'submit', text: 'new' })
+  await aborted
+})
+
+test('screen clear preserves an in-flight completeness check and submission', async () => {
+  const work = deferred<boolean>()
+  let signal: AbortSignal | undefined
+  const session = new ReadSession({
+    isComplete: (_text, current) => {
+      signal = current
+      return work.promise
+    },
+  })
+  const read = session.read({ prompt: '$' })
+  await session.dispatch({ kind: 'insert', text: 'done' })
+  const submit = session.dispatch({ kind: 'submit' })
+  const snapshot = session.model.snapshot
+  await session.dispatch({ kind: 'clear' })
+  expect(session.model.snapshot).toEqual(snapshot)
+  expect(signal?.aborted).toBe(false)
+  work.resolve(true)
+  await submit
+  expect(session.active).toBe(false)
+  expect(await read).toEqual({ kind: 'submit', text: 'done' })
+})
+
+test.each([
+  ['e', 'é'],
+  ['é', 'e'],
+  ['👩', '👩‍💻'],
+  ['👩‍💻', '👩'],
+])('common-prefix completion preserves every candidate boundary for %j', async (first, second) => {
+  const session = new ReadSession({ complete: () => [first, second] })
+  const read = session.read({ prompt: '$' })
+  await session.dispatch({ kind: 'complete' })
+  expect(session.model.snapshot.text).toBe('')
+  await session.dispatch({ kind: 'interrupt' })
+  await read
+})
+
+test.each([{ values: [] }, { values: ['echo', 'ls'] }])(
+  'Tab accepting reverse search emits change with candidates %j',
+  async ({ values }) => {
+    const events: string[] = []
+    const session = new ReadSession(
+      { history: { entries: ['echo'] }, complete: () => values },
+      (event) => {
+        events.push(event.kind)
+      },
+    )
+    const read = session.read({ prompt: '$' })
+    await session.dispatch({ kind: 'search' })
+    const before = events.length
+    await session.dispatch({ kind: 'complete' })
+    expect(session.model.snapshot.search).toBeUndefined()
+    expect(events.slice(before)).toEqual(['change'])
+    await session.dispatch({ kind: 'submit' })
+    await read
+  },
+)
+
+test('Tab accepting search notifies before a failing completion callback', async () => {
+  const events: string[] = []
+  const session = new ReadSession(
+    {
+      history: { entries: ['echo'] },
+      complete: () => {
+        throw 'host completion failed'
+      },
+    },
+    (event) => {
+      events.push(event.kind)
+    },
+  )
+  const read = session.read({ prompt: '$' })
+  await session.dispatch({ kind: 'search' })
+  const before = events.length
+  await expect(session.dispatch({ kind: 'complete' })).rejects.toBe('host completion failed')
+  expect(session.model.snapshot.search).toBeUndefined()
+  expect(events.slice(before)).toEqual(['change'])
+  await session.dispatch({ kind: 'submit' })
+  await read
+})
+
+test('a synchronous abort listener keeps its newer completion and supersedes the old command', async () => {
+  const first = deferred<readonly string[]>()
+  const second = deferred<readonly string[]>()
+  let nested: Promise<void> | undefined
+  let signal: AbortSignal | undefined
+  let calls = 0
+  const session = new ReadSession({
+    complete: (_text, _cursor, current) => {
+      if (++calls === 1) {
+        current.addEventListener(
+          'abort',
+          () => {
+            nested = session.dispatch({ kind: 'complete' })
+          },
+          { once: true },
+        )
+        return first.promise
+      }
+      signal = current
+      return second.promise
+    },
+  })
+  const read = session.read({ prompt: '$' })
+  const stale = session.dispatch({ kind: 'complete' })
+  await session.dispatch({ kind: 'insert', text: 'obsolete' })
+  expect(session.model.snapshot.text).toBe('')
+  expect(signal?.aborted).toBe(false)
+  second.resolve(['hello'])
+  await nested
+  expect(session.model.snapshot.text).toBe('hello')
+  first.resolve(['old'])
+  await stale
+  await session.dispatch({ kind: 'submit' })
+  expect(await read).toEqual({ kind: 'submit', text: 'hello' })
+})
+
+test.each([
+  { operation: 'complete', rejected: false },
+  { operation: 'complete', rejected: true },
+  { operation: 'submit', rejected: false },
+  { operation: 'submit', rejected: true },
+] as const)(
+  'stale success and rejection after abort and a new read: %j',
+  async ({ operation, rejected }) => {
+    let resolve!: (value: boolean | readonly string[]) => void
+    let reject!: (cause: unknown) => void
+    const work = new Promise<boolean | readonly string[]>((done, fail) => {
+      resolve = done
+      reject = fail
+    })
+    const options =
+      operation === 'complete'
+        ? { complete: () => work as Promise<readonly string[]> }
+        : { isComplete: () => work as Promise<boolean> }
+    const controller = new AbortController()
+    const session = new ReadSession(options)
+    const first = session.read({ prompt: 'old', signal: controller.signal })
+    const aborted = expect(first).rejects.toMatchObject({ code: 'line-editor.READ_ABORTED' })
+    await session.dispatch({ kind: 'insert', text: 'old' })
+    const stale = session.dispatch({ kind: operation })
+    controller.abort()
+    await aborted
+    const second = session.read({ prompt: 'new' })
+    await session.dispatch({ kind: 'insert', text: 'new' })
+    if (rejected) reject('late host failure')
+    if (!rejected) resolve(operation === 'complete' ? ['overwrite'] : true)
+    await stale
+    expect(session.active).toBe(true)
+    expect(session.model.snapshot.text).toBe('new')
+    expect(session.prompt?.primary).toBe('new')
+    const disposed = expect(second).rejects.toMatchObject({ code: 'line-editor.DISPOSED' })
+    session.dispose()
+    await disposed
+  },
+)

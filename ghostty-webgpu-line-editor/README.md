@@ -1,6 +1,6 @@
 # ghostty-webgpu-line-editor
 
-Readline-style editing for local shells hosted by ghostty-webgpu. Working package name and initial version `0.0.1`. This package is under development and has not been published.
+Readline-style editing for local shells hosted by ghostty-webgpu. Working package name and initial version `0.0.1`. This package is under development and marked private until publication is authorized.
 
 The editing checkpoint provides a browser-independent model, keymap, history and read lifecycle. Native terminal rendering and the `readline()` extension are the next integration unit. The current checkpoint does not attach to a terminal or replace the site's Shell editor.
 
@@ -25,7 +25,7 @@ const result = await pending
 
 Completion candidates are replacements for the whitespace-delimited token before the cursor. A common grapheme prefix extends that token. A second Tab at the same revision emits the candidate list. Hosts that need shell-aware quoting can implement candidate formatting in their callback.
 
-`History` keeps the most recent 100 entries by default and restores the draft after navigation. A host can provide a `HistoryStore` with `load()` and `save(entries)`, call `history.load()` before reading, and use `history.flush()` to await saves. Snapshots passed to the store are frozen, bounded arrays. The package chooses no browser storage key.
+`History` keeps the most recent 100 entries by default. Sessions may share entries and persistence; each `EditModel` owns its navigation snapshot, saved draft and reverse-search position. Navigation restores the draft after the newest entry, and Down before browsing preserves the current draft. A host can provide a `HistoryStore` with `load()` and `save(entries)`, call `history.load()` before reading, and use `history.flush()` to await saves. Snapshots passed to the store are frozen, bounded arrays. The package chooses no browser storage key.
 
 ## Verification
 
