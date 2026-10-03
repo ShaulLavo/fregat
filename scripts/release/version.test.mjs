@@ -2,9 +2,10 @@ import { expect, test } from 'vitest'
 import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { withWorkspace } from './fixture.mjs'
 
-const checkout = new URL('../../', import.meta.url).pathname
+const checkout = fileURLToPath(new URL('../../', import.meta.url))
 const fixture = JSON.parse(
   await readFile(new URL('./editor-fixture.json', import.meta.url), 'utf8'),
 )
@@ -19,7 +20,7 @@ test('version-packages bumps a package and refreshes its Bun lockfile entry', as
       scripts: { 'version-packages': scripts['version-packages'] },
     })
     await put('packages/example', { name: '@release-fixture/example', version: '0.0.1' })
-    await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'dir')
+    await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'junction')
     await mkdir(join(root, '.changeset'))
     await writeFile(
       join(root, '.changeset/config.json'),
@@ -67,7 +68,7 @@ test('versions the public Editor group with versioned and unversioned private ex
     await put('hotkeys/packages/react-hotkeys', { name: '@fregat/react-hotkeys', version: '0.0.0' })
     await put('ghostty-webgpu', { name: 'ghostty-webgpu', version: '0.1.2' })
     await writeFile(join(root, 'bun.lock'), '{}\n')
-    await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'dir')
+    await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'junction')
     await mkdir(join(root, '.changeset'))
     await writeFile(
       join(root, '.changeset/config.json'),
