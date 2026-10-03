@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workspacePatterns } from './workspace-root.ts'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(scriptDir, '..')
@@ -131,7 +132,7 @@ function workspacePackages() {
   const rootPackage = readJsonFile('package.json')
   const packageFiles = []
 
-  for (const pattern of rootPackage.workspaces ?? []) {
+  for (const pattern of workspacePatterns(rootPackage.workspaces)) {
     for (const packageFile of expandWorkspacePattern(pattern)) packageFiles.push(packageFile)
   }
 

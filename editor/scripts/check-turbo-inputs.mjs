@@ -10,7 +10,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { workspaceRoot } from './workspace-root.ts'
+import { workspacePatterns, workspaceRoot } from './workspace-root.ts'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SCANNED_DIRECTORIES = ['src', 'test', 'scripts']
@@ -50,7 +50,7 @@ console.log(`turbo inputs: ${workspaces.length} workspaces, every cross-package 
 
 function readWorkspaces() {
   const manifest = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
-  return manifest.workspaces.flatMap((pattern) => {
+  return workspacePatterns(manifest.workspaces).flatMap((pattern) => {
     const parent = path.join(repoRoot, pattern.replace(/\/\*$/, ''))
     return readdirSync(parent)
       .map((entry) => path.join(parent, entry))
