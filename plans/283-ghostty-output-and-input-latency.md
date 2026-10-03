@@ -246,6 +246,28 @@ record layouts unchanged; additional trailing-blank heuristics wait for measurem
       measured runtime/evidence are tied to `078645300`. Main integration preserves runtime source;
       the coordinator owns merge, and default-on WebGPU follows in its own PR.
 
+### Unicode, grapheme, selection and color frames
+
+Status: Approved. Extend the Zig producer to the real shell content that selected whole-frame
+JavaScript fallback: Unicode prompts, wide cells, grapheme clusters, selection and color glyphs.
+Fonts and missing-glyph rasterization remain browser-owned; cell and glyph record layouts stay
+unchanged. Keep the explicit JavaScript producer and atlas-resource recovery path.
+
+- [x] Merge the listener-copy update before freezing the baseline runtime at `4a0adeb1c`.
+- [x] Replace ASCII-only keys with owned full-text keys, width spans, style and resolved brush colors.
+- [x] Build continuation cells, selection colors and color-atlas records directly in Zig.
+- [x] Share grayscale shapes, bound color history and retry recycled atlas pages in Zig.
+- [x] Prove descriptor memory plateaus, record rebuild frequency, and preserve clean rows through
+      cap retries; check fragmented-atlas recovery and large missing-glyph batches.
+- [x] Pass differential records and real WebGPU/WebGL pixel parity, including cold glyph retries.
+- [x] Preserve cold brush insertion order in a fitting small atlas and keep warmed grayscale sharing.
+- [x] Read back isolated `look` evidence with native counters and zero JavaScript fallback.
+- [ ] Measure four balanced pairs on both GPU backends at 17 terminals, before and after, for
+      rolling Git history and a synthetic Unicode-prompt fixture modeled on the live shell.
+- [ ] Measure the Unicode-prompt fixture at one terminal on WebGL with 2,700 output frames.
+- [ ] Retain Zig/fallback counters, CPU process splits, latency and exact baseline-WASM provenance.
+- [ ] Obtain independent Sol review, commit by path, push and open a PR; leave merge separate.
+
 ### Upload-call coalescing
 
 Status: Approved experiment. Not merging: no CPU gain, so the coalescer does not clear the owner's
