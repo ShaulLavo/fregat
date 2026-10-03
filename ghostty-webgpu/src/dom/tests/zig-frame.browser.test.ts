@@ -1,5 +1,6 @@
 import { afterAll, afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import { page } from 'vitest/browser'
+import { GhosttyResult } from '../../core/abi.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import { ZigFrameBuilder } from '../../core/zig-frame.js'
 import { CanvasGlyphRasterizer } from '../../render/atlas/canvas-rasterizer.js'
@@ -83,6 +84,7 @@ async function hostFixture(
     errors,
     host,
     renderer: renderer!,
+    runtime,
     state: session.renderState,
     terminal,
   }
@@ -274,6 +276,119 @@ it.each(['webgl2', 'webgpu'] as const)(
     expect(native.renderer.metrics.zigFrames).toBeGreaterThan(nativeFrames)
     await expectPainted(native)
     expect(native.terminal.hasPendingTimer).toBe(false)
+  },
+)
+
+it.each(['webgl2', 'webgpu'] as const)(
+  'rebuilds unsubmitted persistent records after a bridge exception (%s)',
+  async (backend) => {
+    const clock = new TestClock()
+    const native = await hostFixture(backend, { columns: 6, rows: 3 }, clock)
+    const flush = () => {
+      while (clock.frames.size > 0) clock.flushFrame()
+    }
+    native.terminal.write('\x1b[?25lABAB\r\nBBBB\r\nlast')
+    flush()
+    const before = await displayedPixels(native.canvas)
+    const build = vi.spyOn(ZigFrameBuilder.prototype, 'build')
+    const acknowledge = vi.spyOn(native.state, 'acknowledge')
+    const submitted = native.renderer.metrics.submittedFrames
+    const uploaded = native.renderer.metrics.instanceUploadOperations
+    const atlasUploads = native.renderer.metrics.atlasUploadOperations
+    const bridgeBuild = native.runtime.bridge.buildFrame.bind(native.runtime.bridge)
+    const fault = vi
+      .spyOn(native.runtime.bridge, 'buildFrame')
+      .mockImplementationOnce((...args) => {
+        expect(bridgeBuild(...args)).toBe(GhosttyResult.Success)
+        return GhosttyResult.OutOfMemory
+      })
+    native.terminal.write('\x1b[1;1HBBBB')
+    let uncaught: unknown
+    try {
+      flush()
+    } catch (cause) {
+      uncaught = cause
+    }
+    expect(build.mock.results[0]?.type).toBe('throw')
+    expect(build.mock.calls[0]?.[0].full).toBe(false)
+    const builder = build.mock.contexts[0] as ZigFrameBuilder
+    const unsubmitted = { cells: builder.cellData.slice(), glyphs: builder.glyphData.slice() }
+    expect(native.renderer.metrics.submittedFrames).toBe(submitted)
+    expect(native.renderer.metrics.instanceUploadOperations).toBe(uploaded)
+    expect(native.renderer.metrics.atlasUploadOperations).toBe(atlasUploads)
+    expect(acknowledge).not.toHaveBeenCalled()
+    expect(await displayedPixels(native.canvas)).toEqual(before)
+    fault.mockRestore()
+    build.mockClear()
+    native.renderer.schedule()
+    flush()
+    expect(build.mock.calls[0]?.[0].full).toBe(true)
+    expect(builder.cellData).toEqual(unsubmitted.cells)
+    expect(builder.glyphData).toEqual(unsubmitted.glyphs)
+    expect(builder.changedRanges()).toEqual(
+      [0, 1, 2].map((row) => ({
+        row,
+        cell: { byteOffset: row * 6 * 64, byteLength: 6 * 64 },
+        glyph: { byteOffset: row * 6 * 96, byteLength: 6 * 96 },
+      })),
+    )
+    expect(native.renderer.metrics.submittedFrames).toBe(submitted + 1)
+    const recovered = await displayedPixels(native.canvas)
+    expect(recovered).not.toEqual(before)
+    native.renderer.clearTextureAtlas()
+    flush()
+    expect(await displayedPixels(native.canvas)).toEqual(recovered)
+    expect(uncaught).toBeUndefined()
+    expect(native.errors).toEqual([
+      expect.objectContaining({
+        cause: expect.objectContaining({ operation: 'bridge_build_frame', result: -1 }),
+      }),
+    ])
+  },
+)
+
+it.each(['webgl2', 'webgpu'] as const)(
+  'reports one scheduled frame error per failure episode and resets after recovery (%s)',
+  async (backend) => {
+    const clock = new TestClock()
+    const native = await hostFixture(backend, { columns: 6, rows: 3 }, clock)
+    const flush = () => {
+      while (clock.frames.size > 0) clock.flushFrame()
+    }
+    native.terminal.write('\x1b[?25lold')
+    flush()
+    const before = await displayedPixels(native.canvas)
+    const submitted = native.renderer.metrics.submittedFrames
+    const acknowledge = vi.spyOn(native.state, 'acknowledge')
+    const fault = vi.spyOn(ZigFrameBuilder.prototype, 'build').mockReturnValue(2)
+    native.terminal.write('\x1b[1;1Hnew')
+    expect(flush).not.toThrow()
+    expect(native.errors).toHaveLength(1)
+    expect(native.errors[0]).toMatchObject({
+      cause: { operation: 'frame_builder' },
+    })
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      native.renderer.schedule()
+      expect(flush).not.toThrow()
+    }
+    expect(native.errors).toHaveLength(1)
+    expect(acknowledge).not.toHaveBeenCalled()
+    expect(native.renderer.metrics.submittedFrames).toBe(submitted)
+    expect(await displayedPixels(native.canvas)).toEqual(before)
+    expect(clock.frames.size).toBe(0)
+    fault.mockRestore()
+    native.renderer.schedule()
+    flush()
+    expect(native.renderer.metrics.submittedFrames).toBe(submitted + 1)
+    const recovered = await displayedPixels(native.canvas)
+    expect(recovered).not.toEqual(before)
+    native.renderer.clearTextureAtlas()
+    flush()
+    expect(await displayedPixels(native.canvas)).toEqual(recovered)
+    vi.spyOn(ZigFrameBuilder.prototype, 'build').mockReturnValue(2)
+    native.terminal.write('\x1b[1;1Hbad')
+    expect(flush).not.toThrow()
+    expect(native.errors).toHaveLength(2)
   },
 )
 
