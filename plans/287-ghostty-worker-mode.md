@@ -9,8 +9,8 @@
   (`apps/web/src/features/terminal/`), which switches to it.
 - Order: starts after Plan 283's Zig frame full move, so the worker carries the new pipeline and
   nothing is ported twice. Coordinates its public API with Plan 286's extension model.
-- Versions: patch-only through launch, including breaking changes. No release-version approval
-  wait; minor and major bumps remain owner decisions.
+- Versions: patch Changesets through launch, including breaking changes. The release workflow
+  assigns package and lockfile versions; source PRs retain the current main versions.
 
 ## Outcome
 
@@ -95,6 +95,8 @@ Platform/site worker migration. Existing main-entry consumers keep their synchro
 that migration. Plan 286 owns extension lifecycle, contribution indexes and new hooks; both tracks
 agree on hook typing before changing shared host files. Its internal scaffold can land independently.
 Public API shipment waits for their agreed hooks; Phases 1–2 continue while that dependency is built.
+Npm publication and dependencies requiring a published package retain
+[207](207-one-repo-with-mirrors.md)'s gates; deferred npm setup does not block monorepo API delivery.
 
 The first owner-boundary PR extracts concrete local native execution, narrow controller intents and
 an explicit submitted-frame summary with the current main public API unchanged. The shared generic

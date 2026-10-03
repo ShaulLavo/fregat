@@ -30,7 +30,7 @@ test('reads only management GETs and sanitizes pooled account snapshots', async 
             path: '/private/credentials/private-file.json',
             status_message: 'sensitive-error',
             status: 'active',
-            id_token: { chatgpt_account_id: 'raw-account', chatgpt_plan_type: 'pro' },
+            id_token: { chatgpt_account_id: 'raw-account', plan_type: 'pro' },
             quota: {
               observed_at: SEEN,
               signals: {
@@ -109,7 +109,7 @@ test('preserves known accounts as no-data without inventing quota from routing o
             success: 200,
             recent_requests: [{ timestamp: SEEN, success: 20 }],
             quota: {},
-            id_token: { chatgpt_plan_type: 'email@example.test' },
+            id_token: { plan_type: 'email@example.test' },
           },
         ],
       }),
@@ -634,3 +634,38 @@ test.each([
   )
   expect(accounts.every((account) => account.routing?.lastServedAt === null)).toBe(true)
 })
+
+test.each(['disabled', 'no-data'] as const)(
+  'uses genuine management plan metadata without quota: %s',
+  async (state) => {
+    const accounts = await readProxyUsage({
+      url: URL,
+      secret: SECRET,
+      now: () => NOW,
+      fetch: async () =>
+        Response.json({
+          files: [
+            {
+              id: 'private-empty.json',
+              provider: 'codex',
+              disabled: state === 'disabled',
+              email: 'fixture.person@example.test',
+              id_token: { chatgpt_account_id: 'private-account-id', plan_type: 'pro' },
+            },
+            { id: 'absent.json', provider: 'codex', disabled: true },
+          ],
+        }),
+    })
+    expect(accounts[0]).toMatchObject({
+      state,
+      windows: [],
+      checkedAt: null,
+      lastSeenAt: null,
+      planType: 'Pro',
+      label: 'fixture.person',
+    })
+    expect(accounts[1]).toMatchObject({ state: 'disabled', windows: [], planType: null })
+    expect(JSON.stringify(accounts)).not.toContain('private-')
+    expect(JSON.stringify(accounts)).not.toContain('@example.test')
+  },
+)

@@ -126,7 +126,7 @@ CommonMark reference implementation (`commonmark/cmark`).
 - **One inline parse per paragraph, capped.** Every `inline` node is its own layer, up to
   `MAX_INJECTION_LAYERS = 256` (`tree-sitter/src/treeSitter/treeSitter.worker.ts:140`), counting
   fences and nested injections in document order. Past the cap everything stays raw: in a
-  300-paragraph file paragraphs 289–300 show `**bold**`, `*em*`, `` `code` `` and `[link](…)`
+  300-paragraph file paragraphs 289–300 show `**bold**`, `*em*`, `` `code` `` and a Markdown link
   unrendered (evidence `/work/tmp/fregat-evidence/20260926T095101Z-scenario-research-176-preview/`).
   `AGENTS.md` has 258 inline nodes; 10 Platform docs exceed the cap.
 - **Injection ranges include child nodes.** The worker injects a node's whole range; tree-sitter's

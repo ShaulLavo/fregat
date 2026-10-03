@@ -6,6 +6,8 @@ import {
 } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 import * as v from 'valibot'
+import { usageAccountLabel } from './utils/usage-account-label'
+import { codexAccountIdentity, rememberProxyUsageIdentity } from './utils/usage-codex-identity'
 
 const CODEX_DRIVER_KIND = v.parse(providerDriverKindSchema, 'codex')
 
@@ -26,6 +28,7 @@ export interface ReadProxyUsageOptions {
   secret: string
   fetch?: UsageFetch
   now?: () => number
+  identityContext?: string
 }
 
 /** Reads passive management caches. Provider probes and queue drains never belong here. */
@@ -50,7 +53,12 @@ export async function readProxyUsage(
       .update(JSON.stringify([origin, 'codex', identity]))
       .digest('hex')}`
     if (accounts.has(accountKey)) throw failure('duplicate-account')
-    accounts.set(accountKey, accountSnapshot(file, accountKey, now, managementObservedAt))
+    const account = accountSnapshot(file, accountKey, now, managementObservedAt)
+    rememberProxyUsageIdentity(
+      account,
+      codexAccountIdentity(object(file.id_token)?.chatgpt_account_id, options.identityContext),
+    )
+    accounts.set(accountKey, account)
   }
   return [...accounts.values()]
 }
@@ -196,10 +204,10 @@ function accountSnapshot(
   return {
     accountKey,
     driverKind: CODEX_DRIVER_KIND,
-    label: shortProxyLabel(file.email),
+    label: usageAccountLabel(file.email),
     providerInstanceIds: [],
     planType: planLabel(
-      signals(quota?.signals)['x-codex-plan-type'] ?? object(file.id_token)?.chatgpt_plan_type,
+      signals(quota?.signals)['x-codex-plan-type'] ?? object(file.id_token)?.plan_type,
     ),
     windows,
     checkedAt: lastSeenAt,
@@ -211,11 +219,6 @@ function accountSnapshot(
     ...(cooldown ? { cooldown } : {}),
     routing: { mode: 'rotating', active, lastServedAt: null },
   }
-}
-
-function shortProxyLabel(value: unknown): string | undefined {
-  const email = text(value)
-  return email?.match(/^([A-Za-z0-9][A-Za-z0-9._+-]{0,63})@[^@\s\p{Cc}\p{Cf}]+$/u)?.[1]
 }
 
 function planLabel(value: unknown): string | null {

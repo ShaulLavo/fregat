@@ -104,7 +104,7 @@ the shown subject until its new snapshot is ready.
 Run the narrow tests for changed owners and `bun run gates`; pre-commit typecheck
 must pass. Browser scenarios use fixture/mock providers only. Put heavy tests,
 scenarios, builds, and deploys through
-`bash /work/tmp/wave-heavy/run.sh "zt-10" -- env PATH="$PATH" <command>`.
+the current heavy wrapper in [AGENTS.md](../AGENTS.md#dev-gates-verification).
 Use an explicit free port for any private dev server and stop it afterward.
 Deploy verified implementation with `bun run deploy`, or
 `bun run deploy --server --restart` when server code changes. Confirm the served release.

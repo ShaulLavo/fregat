@@ -14,7 +14,12 @@ import { TranscriptCoverage } from '@/features/settings/components/transcript-co
 import { usageSourceLabel } from '@/features/settings/utils/usage-source-label'
 import { ProviderAccountUsageDetails } from '@/components/provider-account-usage-details'
 import { composerUsageReadout } from '@/features/chat/utils/usage-meter'
-import { accountsUsageFor, observedUsageLabel, usageWindowState } from '@/lib/provider-usage'
+import {
+  accountsUsageFor,
+  observedUsageLabel,
+  usageAccountLabel,
+  usageWindowState,
+} from '@/lib/provider-usage'
 
 const instance = v.parse(providerInstanceIdSchema, 'usage-group-fixture')
 const now = Date.parse('2026-10-03T12:00:00.000Z')
@@ -259,4 +264,11 @@ test('two windows on one account retain separate ages and freshness', ({ client 
   expect(view.container).toHaveTextContent('Current observation')
   expect(view.container).toHaveTextContent('Reset passed')
   view.unmount()
+})
+
+test('account labels prefer sanitized metadata and keep numbered fallbacks', () => {
+  const account = accountUsageFixture(now).accounts[0]!
+  expect(usageAccountLabel({ ...account, label: 'fixture.person' }, 0)).toBe('fixture.person')
+  expect(usageAccountLabel({ ...account, label: 'fixture.person' }, 1)).toBe('fixture.person')
+  expect(usageAccountLabel(account, 1)).toBe('Codex account 2')
 })
