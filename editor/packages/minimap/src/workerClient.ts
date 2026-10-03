@@ -57,12 +57,11 @@ export type MinimapWorkerClientOptions = {
   readonly reservedLane: () => number
 }
 
-export type MinimapWorkerLifecycleState = 'ready' | 'disposing' | 'disposed' | 'crashed'
+export type MinimapWorkerLifecycleState = 'ready' | 'disposed' | 'crashed'
 
 export type MinimapWorkerOwnerSnapshot = {
   readonly lifecycle: MinimapWorkerLifecycleState
   readonly postedRequests: number
-  readonly disposalAcknowledged: boolean
   readonly lastError: string | null
 }
 
@@ -76,11 +75,9 @@ export class MinimapWorkerOwner {
   private worker: Worker | null = null
   private lifecycle: MinimapWorkerLifecycleState = 'ready'
   private postedRequests = 0
-  private disposalAcknowledged = false
   private lastError: Error | null = null
   private disposalPromise: Promise<void> | null = null
-  private resolveDisposal: (() => void) | null = null
-  private rejectDisposal: ((error: Error) => void) | null = null
+  private terminationError: Error | null = null
 
   public constructor(private readonly options: MinimapWorkerOwnerOptions) {
     this.worker = this.createWorker()
@@ -90,7 +87,6 @@ export class MinimapWorkerOwner {
     return {
       lifecycle: this.lifecycle,
       postedRequests: this.postedRequests,
-      disposalAcknowledged: this.disposalAcknowledged,
       lastError: this.lastError?.message ?? null,
     }
   }
@@ -110,22 +106,13 @@ export class MinimapWorkerOwner {
   }
 
   public dispose(): Promise<void> {
-    if (this.lifecycle === 'disposed') return Promise.resolve()
     if (this.disposalPromise) return this.disposalPromise
 
-    const handle = this.worker
-    if (!handle) {
-      this.finishDisposal()
-      return Promise.resolve()
-    }
-
-    this.lifecycle = 'disposing'
-    this.disposalPromise = new Promise((resolve, reject) => {
-      this.resolveDisposal = resolve
-      this.rejectDisposal = reject
-    })
-    if (!this.post({ type: 'dispose' }))
-      this.rejectDisposal?.(this.lastError ?? workerDisposedError())
+    this.terminateWorker()
+    this.lifecycle = this.terminationError ? 'crashed' : 'disposed'
+    this.disposalPromise = this.terminationError
+      ? Promise.reject(this.terminationError)
+      : Promise.resolve()
     return this.disposalPromise
   }
 
@@ -158,12 +145,8 @@ export class MinimapWorkerOwner {
   }
 
   private readonly handleWorkerMessage = (event: MessageEvent<MinimapWorkerResponse>): void => {
+    if (!this.worker) return
     const response = event.data
-    if (response.type === 'disposed') {
-      this.disposalAcknowledged = true
-      this.finishDisposal()
-      return
-    }
 
     if (response.type === 'error') {
       this.recordError(createWorkerResponseError(response))
@@ -174,6 +157,7 @@ export class MinimapWorkerOwner {
   }
 
   private readonly handleWorkerError = (event: ErrorEvent): void => {
+    if (!this.worker) return
     this.fail(createNativeWorkerError(event))
   }
 
@@ -186,26 +170,24 @@ export class MinimapWorkerOwner {
     this.lastError = error
     this.lifecycle = 'crashed'
     this.terminateWorker()
-    this.rejectDisposal?.(error)
-    this.clearDisposalHandlers()
     this.options.onError?.(error)
   }
 
-  private finishDisposal(): void {
-    this.lifecycle = 'disposed'
-    this.terminateWorker()
-    this.resolveDisposal?.()
-    this.clearDisposalHandlers()
-  }
-
   private terminateWorker(): void {
-    this.worker?.terminate()
+    const handle = this.worker
     this.worker = null
-  }
+    if (!handle) return
 
-  private clearDisposalHandlers(): void {
-    this.resolveDisposal = null
-    this.rejectDisposal = null
+    try {
+      handle.onmessage = null
+      handle.onerror = null
+      // A busy worker cannot acknowledge disposal; termination releases its owned resources.
+      handle.terminate()
+    } catch (error) {
+      this.terminationError = workerRequestError(error)
+      this.lastError = this.terminationError
+      this.lifecycle = 'crashed'
+    }
   }
 }
 
@@ -340,7 +322,7 @@ export class MinimapWorkerClient {
     this.disposed = true
     this.cancelScheduledFlush()
     this.scheduler.dispose()
-    void this.workerOwner.dispose().catch(() => undefined)
+    void this.workerOwner.dispose().catch(this.handleWorkerError)
     this.colorResolver.dispose()
   }
 
@@ -971,10 +953,6 @@ function nonEmptyString(value: string | undefined): string | null {
 function positiveNumberOrNull(value: number): number | null {
   if (value > 0) return value
   return null
-}
-
-function workerDisposedError(): Error {
-  return new Error('Minimap worker is disposed')
 }
 
 function selections(selections: readonly EditorResolvedSelection[]): readonly MinimapSelection[] {
