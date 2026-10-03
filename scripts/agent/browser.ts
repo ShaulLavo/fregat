@@ -310,6 +310,30 @@ async function runScenario(scenario: Scenario, options: Options) {
         ? await openStaticPreview(page, options.url)
         : await open(page, await workspaceUrl(page, options))
     if (!ready) {
+      await evidence.json(
+        'readiness.json',
+        await page
+          .evaluate(() => ({
+            busy: [...document.querySelectorAll('[aria-busy]')].map((node) => ({
+              tag: node.tagName,
+              label: node.getAttribute('aria-label'),
+              busy: node.getAttribute('aria-busy'),
+              colorMode: node.getAttribute('data-color-mode'),
+              slot: node.getAttribute('data-slot'),
+            })),
+            fonts: [...document.fonts].map((face) => ({
+              family: face.family,
+              status: face.status,
+            })),
+          }))
+          .catch(() => ({ unavailable: 'The page changed during readiness capture.' })),
+      )
+      await evidence.json(
+        'caches.json',
+        await page
+          .evaluate(readCaches)
+          .catch(() => ({ unavailable: 'The page changed during cache capture.' })),
+      )
       await page.screenshot({ path: evidence.file('failure.png') })
       if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
       const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
