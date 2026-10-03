@@ -32,7 +32,11 @@ import { fetchFile, fetchTree, writeFileContent } from '@/lib/file-server'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { treeModel } from '@/lib/tree-model'
 
-import { createInProcessClient, createRestartableInProcessClient } from '../client'
+import {
+  createInProcessClient,
+  createObservedInProcessClient,
+  createRestartableInProcessClient,
+} from '../client'
 import { expect, test } from '../fixtures'
 import { makeTestServer, type TestServer } from '../server'
 
@@ -346,6 +350,189 @@ test('undoes and redoes an applied group only while every after stamp matches', 
   expect(await readText(server.root, unopenedPath)).toBe('external history drift')
   expect(harness.service.getSnapshot()).toMatchObject({ canRedo: false, canUndo: false })
 })
+
+test.for(['undo', 'redo'] as const)(
+  'declines concurrent direct %s while the server reversal owns the group',
+  async (direction) => {
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const reversalRename = direction === 'undo' ? 2 : 3
+    await withCustomServer(
+      pausingHistoryDriver(reversalRename, entered, release),
+      async (server) => {
+        const releases: string[] = []
+        setClient(
+          createObservedInProcessClient(server, (request) => {
+            if (new URL(request.url).pathname === '/fs/workspace-edit/release') {
+              releases.push(request.url)
+            }
+          }),
+        )
+        const harness = createHarness()
+        const livePath = 'concurrent-live.ts'
+        const diskPath = 'concurrent-disk.ts'
+        await writeWorkspaceFiles(server.root, [
+          [livePath, 'live'],
+          [diskPath, 'disk'],
+        ])
+        const live = await openDocument(harness, livePath)
+        const uri = fileUri(livePath)
+        const applying = harness.service.onApplyWorkspaceEdit(
+          request(
+            [
+              textOperation(uri, null, 0, 1, 'L'),
+              textOperation(fileUri(diskPath), null, 0, 1, 'D'),
+            ],
+            uri,
+            [currentProvenance(live, uri, 5)],
+          ),
+        )
+        await waitForPhase(harness.service, 'awaiting-confirmation')
+        harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
+        await expect(applying).resolves.toEqual({ status: 'applied' })
+        if (direction === 'redo') await expect(harness.service.undo()).resolves.toBe(true)
+
+        const reversing = harness.service[direction]()
+        await entered.promise
+        let secondResult: boolean | undefined
+        const concurrent = harness.service[direction]().then((result) => {
+          secondResult = result
+          return result
+        })
+        try {
+          expect(harness.service.getSnapshot()).toMatchObject({
+            canRedo: false,
+            canUndo: false,
+            phase: direction === 'undo' ? 'undoing' : 'redoing',
+          })
+          await expect.poll(() => secondResult, { timeout: 1_000 }).toBe(false)
+          expect(releases).toHaveLength(0)
+          if (direction === 'undo') {
+            expect(harness.service.historyBarrierGroup(live.buffer)).not.toBeNull()
+          }
+          expect(harness.service.getSnapshot().phase).toBe(
+            direction === 'undo' ? 'undoing' : 'redoing',
+          )
+        } finally {
+          release.resolve()
+          const [reversed, declined] = await Promise.all([reversing, concurrent])
+          expect(declined).toBe(false)
+          expect(reversed).toBe(true)
+        }
+
+        expect(live.buffer.materializeFullText()).toBe(direction === 'undo' ? 'live' : 'Live')
+        expect(await readText(server.root, diskPath)).toBe(direction === 'undo' ? 'disk' : 'Disk')
+        expectPathsAvailable(harness, [livePath, diskPath])
+        const opposite = direction === 'undo' ? 'redo' : 'undo'
+        await expect(harness.service[opposite]()).resolves.toBe(true)
+        expect(live.buffer.materializeFullText()).toBe(direction === 'undo' ? 'Live' : 'live')
+        expect(await readText(server.root, diskPath)).toBe(direction === 'undo' ? 'Disk' : 'disk')
+        await expect(harness.service[direction]()).resolves.toBe(true)
+        expect(live.buffer.materializeFullText()).toBe(direction === 'undo' ? 'live' : 'Live')
+        expect(await readText(server.root, diskPath)).toBe(direction === 'undo' ? 'disk' : 'Disk')
+        expectPathsAvailable(harness, [livePath, diskPath])
+        expect(releases).toHaveLength(0)
+        harness.service.resetForRoot()
+        await expect.poll(() => releases.length).toBe(1)
+        expect(harness.service.historyBarrierGroup(live.buffer)).toBeNull()
+      },
+    )
+  },
+)
+
+test.for([
+  { direction: 'undo', blocker: 'preparing' },
+  { direction: 'redo', blocker: 'preparing' },
+  { direction: 'undo', blocker: 'recovery-required' },
+  { direction: 'redo', blocker: 'recovery-required' },
+] as const)(
+  'declines direct $direction during $blocker and retains history',
+  async ({ direction, blocker }) => {
+    const failure: PartialWriteFailure = {
+      failCompensation: true,
+      failSecondForward: true,
+      firstRenameCount: 0,
+    }
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    await withCustomServer(partialWriteDriver(failure), async (server) => {
+      const observed = createObservedInProcessClient(server, (request) => {
+        const url = new URL(request.url)
+        if (
+          blocker !== 'preparing' ||
+          url.pathname !== '/fs/stat' ||
+          url.searchParams.get('path') !== 'next.ts'
+        )
+          return
+        entered.resolve()
+        return release.promise
+      })
+      setClient(observed)
+      const harness = createHarness()
+      await writeWorkspaceFiles(server.root, [
+        ['history.ts', 'history'],
+        ['next.ts', 'next'],
+        ['first.ts', 'first'],
+        ['second.ts', 'second'],
+      ])
+      const historyUri = fileUri('history.ts')
+      const applying = harness.service.onApplyWorkspaceEdit(
+        request([textOperation(historyUri, null, 0, 1, 'H')], historyUri),
+      )
+      await waitForPhase(harness.service, 'awaiting-confirmation')
+      harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
+      await expect(applying).resolves.toEqual({ status: 'applied' })
+      if (direction === 'redo') await expect(harness.service.undo()).resolves.toBe(true)
+
+      const nextUri = fileUri(blocker === 'preparing' ? 'next.ts' : 'first.ts')
+      const operations =
+        blocker === 'preparing'
+          ? [textOperation(nextUri, null, 0, 1, 'N')]
+          : [
+              textOperation(nextUri, null, 0, 1, 'F'),
+              textOperation(fileUri('second.ts'), null, 0, 1, 'S'),
+            ]
+      const nextApplying = harness.service.onApplyWorkspaceEdit(request(operations, nextUri))
+      if (blocker === 'preparing') {
+        await entered.promise
+      } else {
+        await waitForPhase(harness.service, 'awaiting-confirmation')
+        harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
+        await expect(nextApplying).resolves.toMatchObject({ status: 'recovery-required' })
+      }
+
+      try {
+        expect(harness.service.getSnapshot()).toMatchObject({
+          phase: blocker,
+          canUndo: false,
+          canRedo: false,
+        })
+        await expect(harness.service[direction]()).resolves.toBe(false)
+        expect(harness.service.getSnapshot().phase).toBe(blocker)
+        expect(await readText(server.root, 'history.ts')).toBe(
+          direction === 'undo' ? 'History' : 'history',
+        )
+      } finally {
+        release.resolve()
+        if (blocker === 'preparing') {
+          await waitForPhase(harness.service, 'awaiting-confirmation')
+          harness.service.cancelPreview(harness.service.getSnapshot().preview!.operationId)
+          await expect(nextApplying).resolves.toEqual({ status: 'cancelled' })
+        }
+      }
+
+      if (blocker === 'recovery-required') {
+        failure.failCompensation = false
+        await expect(harness.service.retryRecovery()).resolves.toBe(true)
+      }
+      await expect(harness.service[direction]()).resolves.toBe(true)
+      expect(await readText(server.root, 'history.ts')).toBe(
+        direction === 'undo' ? 'history' : 'History',
+      )
+      expectPathsAvailable(harness, ['history.ts', 'next.ts', 'first.ts', 'second.ts'])
+    })
+  },
+)
 
 test('evicts the oldest history group at the cap and releases every path', async ({
   client,
@@ -910,6 +1097,28 @@ function pausingCommitDriver(
       entered.resolve()
       await release.promise
       return nodeWorkspaceEditFileSystemDriver.writeFile(target, data, options)
+    },
+  }
+}
+
+function pausingHistoryDriver(
+  reversalRename: number,
+  entered: Deferred<void>,
+  release: Deferred<void>,
+): WorkspaceEditFileSystemDriver {
+  let renameCount = 0
+  return {
+    ...nodeWorkspaceEditFileSystemDriver,
+    async rename(from, to) {
+      if (path.basename(to) !== 'concurrent-disk.ts') {
+        return nodeWorkspaceEditFileSystemDriver.rename(from, to)
+      }
+      renameCount += 1
+      if (renameCount === reversalRename) {
+        entered.resolve()
+        await release.promise
+      }
+      return nodeWorkspaceEditFileSystemDriver.rename(from, to)
     },
   }
 }

@@ -455,7 +455,8 @@ export function createApp(options: AppOptions) {
     proxyInstanceIds: () => usageSettings['providers.proxyUsageProviderInstanceIds'],
     proxyConfigured: () =>
       Boolean(usageSettings['providers.proxyUsageUrl']) && proxyManagementKeyPresent,
-    readProxy: async () => {
+    proxyRequestIntervalHours: () => usageSettings['providers.proxyUsageRequestIntervalHours'],
+    readProxy: async (identityContext, refresh) => {
       const url = usageSettings['providers.proxyUsageUrl']
       const secret = await settings.readSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
       if (!url || !secret)
@@ -467,16 +468,16 @@ export function createApp(options: AppOptions) {
           fix: 'Configure the proxy management address and import its management key.',
           internal: { addressConfigured: Boolean(url), secretConfigured: Boolean(secret) },
         })
-      return readProxyUsage({ url, secret })
+      return readProxyUsage({ url, secret, identityContext, refresh })
     },
   })
   settings.onChange((event) => {
     usageSettings = event.snapshot.values
     proxyManagementKeyPresent = settings.hasServerSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)
+    providerUsage.reconfigure()
     runDetached(
       async () => {
         await reconcileProviderSettings()
-        providerUsage.reconfigure()
         providerTranscriptHistory.reconfigure()
       },
       { area: 'provider', operation: 'usage-reconfigure' },

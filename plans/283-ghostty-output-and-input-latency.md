@@ -85,6 +85,41 @@ Vulkan and Skia GaneshVulkan. Its disabled Vulkan-via-GL-interop feature does no
 Vulkan-to-GL presentation path. The remaining WebGPU GPU-process gap needs separate Dawn/API
 and presentation attribution; native WebGL versus xterm WebGL isolates our WebGL renderer work.
 
+## macOS (M1/Metal), 2026-10-03
+
+Verified output-only bytes-path matrix on Apple M1, Chrome 154 with ANGLE Metal, frozen runtime
+`2a3f1e25a32617dcf417ab885b366e2cc46c46cc` and benchmark driver
+`36afbf44313c1cd92c6a02c37f216db5e99c5ebc`. Eight windows completed 64 runs with zero lost
+windows, four balanced native/xterm pairs per window. Ratios below are paired medians against
+xterm WebGL, rounded to two decimals; each entry gives renderer CPU then total CPU.
+
+| Renderer | Terminals | Rolling ASCII | Rolling Unicode |
+| -------- | --------- | ------------- | --------------- |
+| WebGL    | 17        | 0.95 / 1.16   | 0.94 / 1.15     |
+| WebGL    | 1         | 0.91 / 0.93   | 0.93 / 0.94     |
+| WebGPU   | 17        | 1.20 / 1.30   | 1.21 / 1.29     |
+| WebGPU   | 1         | 0.98 / 1.01   | 0.98 / 1.01     |
+
+WebGL passes renderer CPU at 17 terminals but loses total CPU. Per-process receipts attribute
+the loss to higher Chrome GPU-process CPU on this Metal backend. GPU-process medians are
+46.5% versus 33.8% of one core for ASCII and 46.2% versus 34.0% for Unicode. Both implementations use
+560×456 terminal backing canvases; xterm has two per terminal. Canvas size does not explain the
+gap. WebGL passes both CPU measures at one terminal. WebGPU loses both at 17 terminals;
+its one-terminal total remains **unresolved** under the conservative CPU bounds.
+
+Custody and independent verification are in
+`/work/reports/ghostty-benchmarks/plan-283/mac-output-20261003-2a3f1e25/coordinator-output-check.json`,
+with per-process receipts in each window's `compact.json`. The proof verifies 140 runtime and
+40 benchmark source files, 26 asset hashes, and all 64 paired CPU records. Darwin's observed
+10 ms clockrate supplies conservative OS comparison bounds; finer CDP resolution is unmeasured.
+Host load is an idle proxy; Metal GPU utilization and hardware execution time are unmeasured.
+This matrix qualifies output CPU only, with no latency or presentation-clock qualification.
+Historical results below remain separate.
+
+- [ ] Pending candidate: controlled GL-command CPU A/B to attribute the 17-terminal GPU-process
+      gap before choosing a renderer change. The receipts establish process CPU attribution;
+      they do not isolate the command or Metal driver cost.
+
 ## Why the M1 targets changed
 
 The Apple M1 numbers below are history. Two measured defects made them unreliable:

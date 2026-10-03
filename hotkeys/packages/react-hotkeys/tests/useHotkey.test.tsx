@@ -21,7 +21,7 @@ describe('useHotkey', () => {
 
     renderHook(() => useHotkey('Mod+S', callback, { platform: 'mac' }))
 
-    expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function))
+    expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), false)
 
     addEventListenerSpy.mockRestore()
   })

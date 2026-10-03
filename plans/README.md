@@ -28,6 +28,9 @@ pass and its verification limits. [August log-audit follow-ups](log-audit-follow
 [Wave readiness review](wave-readiness-2026-10-03.md) records the large-program ordering and
 corrected launch dependencies. Upcoming wave order remains in root `PLAN.md`.
 
+[Plan 126 finite closeout](126-t3code-alignment/finite-closeout-2026-10-03.md) reconciles its
+delivered acceptance, monitoring/draft check, named follow-ons and owner-only receipts.
+
 ## Current plan files
 
 | Plan                                                  | Topic                                                                           |
@@ -156,7 +159,7 @@ corrected launch dependencies. Upcoming wave order remains in root `PLAN.md`.
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                             |
 | [287](287-ghostty-worker-mode.md)                     | ghostty-webgpu worker mode: the terminal on an OffscreenCanvas worker           |
 | [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                            |
-| [289](289-proxy-usage-feed.md)                        | Passive AI plans feed and the Mesh TV panel                                     |
+| [289](289-proxy-usage-feed.md)                        | Historical gateway feed, retired producer, and the Mesh TV panel                |
 | [290](290-mesh-device-authorization.md)               | Approve devices before Mesh control                                             |
 | [291](291-mesh-private-services.md)                   | Private temporary apps and reusable floating pill                               |
 | [292](292-mesh-zerotier.md)                           | ZeroTier adoption after authentication                                          |

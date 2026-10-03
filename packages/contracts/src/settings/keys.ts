@@ -1523,7 +1523,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Window',
     title: 'Browser',
     description:
-      'The desktop window engine: auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.',
+      'The desktop window engine: auto uses the native WebKit window on macOS. On Linux, auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.',
     requiresRestart: true,
     keywords: ['window', 'browser', 'chromium', 'webview', 'desktop'],
   }),
@@ -1591,7 +1591,7 @@ export const SETTINGS_REGISTRY = {
     optionTitles: { compositor: 'Window manager', window: 'Transparent window' },
     category: 'Window',
     details:
-      'Transparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.',
+      'Transparent macOS windows enable native Frosted and Glass materials. The native WebKit host is the default macOS window engine. On Linux, window-manager mode uses the installed browser app.',
     description:
       'Choose window-manager transparency or a see-through native window using the system webview.',
     // The window is created once, from this value, before the page exists.
@@ -2009,6 +2009,17 @@ export const SETTINGS_REGISTRY = {
     description: 'Maximum transcript files visited in one local history scan.',
     keywords: ['usage', 'quota', 'cache'],
   }),
+  'providers.proxyUsageRequestIntervalHours': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(24)),
+    default: 1,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Providers',
+    title: 'Pooled Codex usage request interval',
+    description:
+      'Hours between pooled Codex requests. At most one request per account per hour, including failures and restarts. Fresh quota skips requests; three failures pause until newer passive quota arrives.',
+    keywords: ['usage', 'codex', 'proxy', 'quota', 'cap'],
+  }),
   'providers.proxyUsageUrl': defineSetting({
     schema: v.nullable(
       v.pipe(
@@ -2034,7 +2045,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Providers',
     title: 'Proxy usage management address',
     description:
-      'Local CLIProxyAPI management address whose cached Codex quotas Fregat reads. The management key is kept in the secret store.',
+      'Local CLIProxyAPI management address for pooled Codex quotas and capped requests. Its management key is kept in the secret store.',
     keywords: ['usage', 'codex', 'proxy', 'quota'],
   }),
   'providers.proxyUsageProviderInstanceIds': defineSetting({

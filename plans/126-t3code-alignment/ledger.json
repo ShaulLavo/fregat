@@ -1,5 +1,5 @@
 {
-  "warning": "Open implementation groups, not proof of runtime parity. Overlapping UI/server groups share one delivery unit.",
+  "warning": "Finding statuses cover their recorded acceptance scope. Historical evidence and bounded deliveries do not certify the whole alignment program. Use each closeout field and finite-closeout-2026-10-03.md for current work; original execution evidence remains historical.",
   "findings": [
     {
       "id": "EXT-11",
@@ -14,23 +14,38 @@
         "scripts/parity/check.py and source.py pass; 25 negative record/census tests pass",
         "test/parity/t3code/operations.json records 191 explicit unknown mappings; CI checks pinned reference 7445aa733ada33e45289e5aa5055f79142556513",
         "Behavioral mapping, fixtures and wrong-behavior controls remain incomplete",
-        "2026-09-26 audit (status-2026-09-26.md): Decided 2026-09-26: research recommendation — no further work. The operation map existed for paired runtime comparisons, which the owner dropped; the CI parity job, this checker and its negative controls stay as the drift gate. Stays in-progress only because the checker admits verified solely with scenario or paired evidence."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): Decided 2026-09-26: research recommendation \u2014 no further work. The operation map existed for paired runtime comparisons, which the owner dropped; the CI parity job, this checker and its negative controls stay as the drift gate. Stays in-progress only because the checker admits verified solely with scenario or paired evidence."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "retained-drift-gate",
+        "remaining_scope": "No additional implementation queued. Keep the pinned census and existing negative controls; dropped paired runtime mapping is not an execution backlog.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-13",
       "wave": "1",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-13, Acceptance / verification",
       "execution_evidence": [
         "rewind-permissions-delivery.md",
         "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
         "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending",
-        "2026-09-26 audit (status-2026-09-26.md): implemented; session-pull-request-badge shows unknown after a failed lookup. Left: a browser step where a failed lookup offers retry and never create (fake gh). Batch C."
+        "2026-09-26 audit (status-2026-09-26.md): implemented; session-pull-request-badge shows unknown after a failed lookup. Left: a browser step where a failed lookup offers retry and never create (fake gh). Batch C.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: pull-request-lookup-failure 20260926T175209Z proves retry without Create or gh pr create after lookup failure."
       ],
       "report": "adjacent.md",
-      "title": "Preserve failed pull-request lookup as failure"
+      "title": "Preserve failed pull-request lookup as failure",
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-05",
@@ -44,37 +59,60 @@
         "rewind-permissions-delivery.md",
         "/work/tmp/fregat-evidence/20260920T133321Z-scenario-checkpoint-rewind; real Codex native conversation rewind and draft restoration verified",
         "2026-09-25 closed (completion wave bookkeeping): the paired upstream run was the only residue, and the owner dropped it. scripts/agent/scenarios/checkpoint-rewind.ts restored the rewound prompt into the draft at /work/tmp/fregat-evidence/20260920T133321Z-scenario-checkpoint-rewind; not re-run for this flip."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-01",
       "title": "P0: Enforce archive before every active-list classification",
       "report": "lifecycle.md",
       "wave": "1",
-      "status": "in-progress",
-      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-01, Acceptance / verification",
       "execution_evidence": [
         "archive-delivery.md",
         "test/parity/t3code/archive.json",
         "/work/tmp/fregat-evidence/20260920T122707Z-scenario-archive-lifecycle/",
-        "2026-09-26 audit (status-2026-09-26.md): probe today confirmed open-from-archive and reload retention; archive-lifecycle fails on harness defects H4 and H7, not the product. Closes when batch A repairs and re-runs it."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): probe today confirmed open-from-archive and reload retention; archive-lifecycle fails on harness defects H4 and H7, not the product. Closes when batch A repairs and re-runs it.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: archive-lifecycle 20260926T172834Z passed after H4/H7 repairs. Existing archive placement mapping is accepted."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-02",
       "title": "P0: Align archive eligibility and remove automatic unarchive",
       "report": "lifecycle.md",
       "wave": "1",
-      "status": "in-progress",
-      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-02, Acceptance / verification",
       "execution_evidence": [
         "archive-delivery.md",
         "test/parity/t3code/archive.json",
         "/work/tmp/fregat-evidence/20260920T122707Z-scenario-archive-lifecycle/",
-        "2026-09-26 audit (status-2026-09-26.md): as LIFE-01. Decided 2026-09-26: research recommendation — the rail archive browser is an implementation mapping of the upstream Settings list, so placement does not hold the row open."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): as LIFE-01. Decided 2026-09-26: research recommendation \u2014 the rail archive browser is an implementation mapping of the upstream Settings list, so placement does not hold the row open.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: archive-lifecycle 20260926T172834Z; H4/H7 and automatic-unarchive residue are delivered."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-01",
@@ -89,7 +127,14 @@
         "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
         "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending",
         "2026-09-25 closed (completion wave bookkeeping): the paired upstream run was the only residue, and the owner dropped it. scripts/agent/scenarios/checkpoint-rewind.ts passed with a real Codex conversation-only rewind at /work/tmp/fregat-evidence/20260920T133321Z-scenario-checkpoint-rewind; not re-run for this flip. Claude rewind stays unsupported until Plan 145 fork."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-03",
@@ -106,38 +151,61 @@
         "A later MCP rerun is recorded at /work/tmp/fregat-evidence/20260920T135957Z-scenario-mcp-approval/; no real external app grant was made",
         "Remaining: complete supported/unknown/unpopulatable schema comparison and paired upstream runtime execution",
         "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/mcp-approval.ts passed at /work/tmp/fregat-evidence/20260926T094644Z-scenario-mcp-approval after fixture defects H1 and H2 were patched: session and permanent choices survive reload and the exact reply lands. The unknown and unpopulatable schema cases are adapter tests (codex-elicitation.test.ts). Batch A must land the fixture repair to keep this reproducible."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario. H1/H2 fixes and mcp-approval 20260926T172847Z are delivered; no real external app grant was exercised.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-04",
       "title": "Bound retained live delivery and recover from overflow",
       "report": "runtime.md",
       "wave": "1",
-      "status": "in-progress",
-      "evidence_level": "historical-local-evidence; live-overflow-comparison-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-04, Acceptance / verification",
       "execution_evidence": [
         "live-delivery-approvals-delivery.md",
         "Historical release 20260920T132650Z-b915d3e0-plan126-live-delivery includes bounded delivery and acknowledgment recovery",
         "Recorded local tests cover budgets, streams, sockets, client queues and actual engine/client oversized-event recovery",
         "Remaining: live overflow/reconnect recovery and paired upstream runtime comparison; the MCP approval browser run does not verify stream overflow",
-        "2026-09-26 audit (status-2026-09-26.md): implemented; no scenario drives overflow. Left: an overflow scenario that recovers the exact text. Batch C."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): implemented; no scenario drives overflow. Left: an overflow scenario that recovers the exact text. Batch C.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: stream-overflow 20260926T175431Z proves ACK-timeout reconnect, cursor resume and exact single text after reload. Item/byte caps have separate server-test evidence."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-11",
       "title": "Return the native permission-approval response shape",
       "report": "runtime.md",
       "wave": "1",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-11, Acceptance / verification",
       "execution_evidence": [
         "rewind-permissions-delivery.md",
         "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
         "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending",
-        "2026-09-26 audit (status-2026-09-26.md): implemented; tests only. Left: a scenario where the native fixture sends item/permissions/requestApproval and the exact grant reply is checked. Batch C."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): implemented; tests only. Left: a scenario where the native fixture sends item/permissions/requestApproval and the exact grant reply is checked. Batch C.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: native-permission-grant 20260926T174908Z proves the exact requested profile and session scope reply for native request 992."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-06",
@@ -153,8 +221,15 @@
         "Recorded proof covers toast navigation, native Notification construction, favicon count, click/focus cleanup, silent reload and archive; pinned decision comparison covers 900 cases",
         "Push delivery (Plan 142, docs/web-push.md): the server derives the same notices from the shell stream with the shared contracts derivation, skips history, replay, boot recovery and archived sessions, holds pushes while a window is focused, and opens the session on click; apps/server/src/push/tests/session-notices.test.ts and scenario push-session-notice (/work/tmp/fregat-evidence/20260925T134236Z-scenario-push-session-notice)",
         "Remaining: visible operating-system popup and audible output, desktop bridges and badges, cross-machine live navigation, and full upstream runtime comparison",
-        "Decided 2026-09-25: owner — close on the existing scenarios: scripts/agent/scenarios/session-notifications.ts passed at /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications, with the pinned decision comparison (900 cases). OS popup and sound, desktop bridges and badges carry on under EXT-09; push is Plan 142."
-      ]
+        "Decided 2026-09-25: owner \u2014 close on the existing scenarios: scripts/agent/scenarios/session-notifications.ts passed at /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications, with the pinned decision comparison (900 cases). OS popup and sound, desktop bridges and badges carry on under EXT-09; push is Plan 142."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-03",
@@ -169,7 +244,14 @@
         "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open",
         "2026-09-26 audit (status-2026-09-26.md): implemented; session-lifecycle sends a real provider turn and needs H4. Left: move it to a native fixture and add a second owner (connectSecondOwner). Batch B.",
         "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): same-ID two-owner settle/shelf identity, native held-turn snooze and timer wake proved; descriptor/DST and full lifecycle matrix retain their owning acceptance."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Two-owner shelves/held-turn/timer cases and #275 descriptor arrival/removal and DST controls are delivered. Broader target-specific lifecycle acceptance stays with the relevant host/provider follow-on; no descriptor/DST or second-owner implementation remains queued.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-04",
@@ -184,7 +266,14 @@
         "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open",
         "2026-09-26 audit (status-2026-09-26.md): as LIFE-03. Post-pin 1a0c915c (settling closes idle shells) is tracked in delta-2026-09-26.md, batch E.",
         "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): three-row native-provider transport failure proves clear-before-outcomes, exact 2-success/1-failure counts and success-only Undo; stop ordering/whole row is not recertified."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Bulk failure/Undo and #284 durable physical release, both crash windows, re-engagement and contained failure recovery are delivered. Preserve receipt/projection versus physical release coverage; extend only a named target-specific case.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-05",
@@ -201,7 +290,14 @@
         "Cross-owner live ordering remains unproven; full group not runtime-compared",
         "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/session-ordering.ts passed today with the H4 repair at /work/tmp/fregat-evidence/20260926T093837Z-scenario-session-ordering (one owner). Left: two-owner drag step. Batch B.",
         "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): same-ID two-owner pointer/keyboard transitions, distinct active keys and reload ordering proved; order-specific failure rollback remains separate."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Same-ID pointer/keyboard/reload and #275 middle-owner transport rollback and filtered pinned keys are delivered. Any additional target-specific ordering case needs a named acceptance gap; no generic two-owner/rollback rerun queued.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-07",
@@ -216,8 +312,15 @@
         "Historical release 20260920T132650Z-b915d3e0-plan126-live-delivery; /work/tmp/fregat-evidence/20260920T132724Z-scenario-session-unread/summary.md records completed browser verification",
         "Recorded proof covers completion while away, visit acknowledgment, manual unread after reload, timer wake retention and explicit wake acknowledgment; pinned wake comparison covers 189 cases",
         "Remaining: live background-tab visibility, native/mobile controls and full upstream runtime comparison",
-        "Decided 2026-09-25: owner — close on the existing scenarios: scripts/agent/scenarios/session-unread.ts passed at /work/tmp/fregat-evidence/20260920T132724Z-scenario-session-unread, with the pinned wake comparison (189 cases). Native and mobile controls carry on under EXT-09."
-      ]
+        "Decided 2026-09-25: owner \u2014 close on the existing scenarios: scripts/agent/scenarios/session-unread.ts passed at /work/tmp/fregat-evidence/20260920T132724Z-scenario-session-unread, with the pinned wake comparison (189 cases). Native and mobile controls carry on under EXT-09."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-08",
@@ -232,7 +335,14 @@
         "/work/tmp/fregat-evidence/20260920T140044Z-scenario-session-search; single-owner browser passed, distinct two-owner server tests passed; two-owner live unavailable",
         "2026-09-26 audit (status-2026-09-26.md): implemented; session-search sends a real provider turn and session-search-environments expects pre-existing owners. Left: move both onto connectSecondOwner and a native fixture. Batch B.",
         "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): same-ID two-owner native reply search and stale/cache ownership proved; disconnect-partial-search and full filter/archive matrix remain separate."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Native two-owner/stale/cache search and #275 partial-disconnect search are delivered. Remaining target/filter/archive conformance requires an exact missing case; partial-disconnect is not missing implementation.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-09",
@@ -247,7 +357,14 @@
         "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open",
         "Two-owner live run 2026-09-25 (completion wave, lane L5): scripts/agent/scenarios/project-grouping.ts now starts a second throwaway server and connects it as a Remote URL machine (scripts/agent/second-owner.ts); /work/tmp/fregat-evidence/20260925T141833Z-scenario-project-grouping shows repository and repository_path merging both owners with a two-owner delete preview, and separate mode keeping them apart with a one-owner preview. repository_path for subprojects still needs a membership entity: owner question (126 D4, no written recommendation)",
         "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/project-grouping.ts passed on main today at /work/tmp/fregat-evidence/20260926T092830Z-scenario-project-grouping (two owners, all three modes). Left: subproject membership, owner question 1 in the plan."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "authorization-gated",
+        "remaining_scope": "Subprojects are Approved and parked at live repository identity/index and schema/reset gates. Existing two-owner grouping is delivered; no unsupported-subprojects decision is pending.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-10",
@@ -265,7 +382,14 @@
         "Remaining: two-owner live navigation, independently removed failed rows, interruption semantics and full upstream navigation comparison",
         "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/session-navigation.ts passed today with the H4 repair at /work/tmp/fregat-evidence/20260926T093854Z-scenario-session-navigation (one owner). Left: two-owner step with identical session IDs. Batch B.",
         "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): same-ID two-owner archive/delete navigation and three-row middle-failure delete retention proved; independently removed failed rows/full upstream comparison remain separate."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Same-ID owner navigation/partial-delete and #275 failed current deletion and route chosen during pending delete are delivered. Any independently removed failed-row case still needs its exact receipt; dropped paired upstream runs do not block closure.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-11",
@@ -284,7 +408,14 @@
         "Recorded pure context comparison covers 144 pinned cases; linked-source lookup has local policy/process tests only and its deployment is unconfirmed",
         "Live authenticated linked-source lookup 2026-09-25: resolveSessionTitleLinks through the real gh CLI returned the title and body of fregat PR #38 (completion wave, lane L5)",
         "Per-project title models are the chat.projectTextGenerationModels override the title reactor reads; it has no structured write operation, so today it is set in the settings document (its Settings destination is the LIFE-12 Project settings owner question). The provider matrix needs provider accounts and is parked with RUNTIME-02"
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario. Project settings destination #266 is delivered; real-account title behavior stays with the provider matrix.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-12",
@@ -303,15 +434,22 @@
         "Session-owned terminals (completion wave, lane L5): deleting a session removes its agent terminals' saved history and ends any it still owns; worktree shells stay; boot recovery sweeps deleted sessions; a live agent terminal still refuses deletion with SESSION_IN_TERMINAL. Test apps/server/src/terminal/tests/session-terminal-cleanup.test.ts",
         "Remaining: owner-scoped project settings (owner question: no written recommendation for its destination) and full upstream runtime comparison",
         "2026-09-26 audit (status-2026-09-26.md): draft-recovery passed on main today at /work/tmp/fregat-evidence/20260926T092950Z-scenario-draft-recovery; worktree-cleanup-on-delete at /work/tmp/fregat-evidence/20260926T094535Z-scenario-worktree-cleanup-on-delete. Left: Project settings destination, owner question 2 in the plan."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Common actions, draft/deletion and all eight project override rows #266 are delivered. Preserve scoped cleanup ownership; combine exact receipts before promoting the broader row. No Project settings choice or implementation remains pending.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-01",
       "title": "Match queued follow-ups and the default send behavior",
       "report": "interaction.md",
       "wave": "3",
-      "status": "in-progress",
-      "evidence_level": "paired-pure-policy-and-deployed-browser-verified; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-01, Acceptance / verification",
       "execution_evidence": [
         "queue-delivery.md",
@@ -322,16 +460,24 @@
         "Stop restores unsent content; uncertain delivery stays held with exact receipt IDs and Retry delivery, with Restore disabled until confirmation; covered by store and row-interaction tests",
         "Whole lint/format/typecheck/gates/generated/boundaries pass; web 166 files/1420 tests, contracts 26 files/321 tests, parity Python 47 tests pass; unused check retains three unchanged findings documented in queue-delivery.md",
         "Remaining: Stop during attachment preparation before queue admission, non-Codex mid-turn delivery, complete live overflow/connection/ownership/shortcut matrix, INTERACTION-09 source contexts and provider/OS checks; no paired upstream full-workflow claim",
-        "2026-09-26 audit (status-2026-09-26.md): chat-queue passed today after fixture defect H1 at /work/tmp/fregat-evidence/20260926T094128Z-scenario-chat-queue. Left: Stop during attachment preparation, and post-pin 295d7cba (queued messages send while the session is not open; ours drains only from the open composer). Batch D."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): chat-queue passed today after fixture defect H1 at /work/tmp/fregat-evidence/20260926T094128Z-scenario-chat-queue. Left: Stop during attachment preparation, and post-pin 295d7cba (queued messages send while the session is not open; ours drains only from the open composer). Batch D.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: chat-queue-away 20260926T204841Z, chat-queue-stop-upload 20260926T210422Z and chat-queue 20260926T204904Z close batch D queue residue. Non-Codex capability cases remain with RUNTIME-02."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario. Non-Codex boundary delivery remains in RUNTIME-02 supported capability acceptance.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-02",
       "title": "Carry general files and recover staged attachments",
       "report": "interaction.md",
       "wave": "3",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-02, Acceptance / verification",
       "execution_evidence": [
         "attachment-upload-delivery.md",
@@ -339,32 +485,48 @@
         "Historical release 20260920T151610Z-b915d3e0-plan126-titles-files; /work/tmp/fregat-evidence/20260920T152332Z-scenario-file-attachments/summary.md records completed upload, draft reload, native exact-byte consumption, preview and download",
         "Recorded upload/store tests cover interleaved claim/delete, ownership and incomplete streams; question attachment evidence is shared with INTERACTION-04",
         "Remaining: complete pick/drop/paste and concurrent-limit matrix, offline retry and expired-upload recovery, capability-loss and removal races, multi-owner live checks and provider matrix",
-        "2026-09-26 audit (status-2026-09-26.md): file-attachments reaches upload, reload and preview, then Download returns 401: a cross-port document navigation carries no Origin (auth.ts accepts a referrer only for same-origin). Dev and agent:browser only; the mesh is same-origin. Left: that fix plus pick/drop/paste, offline retry and expiry steps. Batch D."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): file-attachments reaches upload, reload and preview, then Download returns 401: a cross-port document navigation carries no Origin (auth.ts accepts a referrer only for same-origin). Dev and agent:browser only; the mesh is same-origin. Left: that fix plus pick/drop/paste, offline retry and expiry steps. Batch D.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: file-attachments 20260926T210331Z proves pick/drop/paste, offline retry, expiry, preview and download. The earlier 401 is historical."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-03",
       "title": "Stash the complete composed message",
       "report": "interaction.md",
       "wave": "3",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-03, Acceptance / verification",
       "execution_evidence": [
         "stash-delivery.md",
         "Historical release 20260920T153923Z-b915d3e0-plan126-stash-notices-history; /work/tmp/fregat-evidence/20260920T154026Z-scenario-chat-stash-context/summary.md records completed image-only stash, image/file swap, reload and native file consumption",
         "Recorded tests cover atomic terminal-context transfer, quota failure, pending preparation, ownership and late restore after navigation",
         "Remaining: INTERACTION-09 review/annotation/citation context, cross-environment live restore and complete paired upstream acceptance",
-        "2026-09-26 audit (status-2026-09-26.md): chat-stash-context passed today after H1 at /work/tmp/fregat-evidence/20260926T094048Z-scenario-chat-stash-context. Left: review and citation context types from INTERACTION-09. Batch F."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): chat-stash-context passed today after H1 at /work/tmp/fregat-evidence/20260926T094048Z-scenario-chat-stash-context. Left: review and citation context types from INTERACTION-09. Batch F.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: chat-assistant-citation 20260926T224550Z and chat-citation-elsewhere 20260926T224321Z prove stash/restore/send with typed citation context. Queue comments have unit evidence; reload-persistent queue has no cited browser scenario."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario. Reload-persistent queued-comment context has unit evidence but no cited browser receipt; verify only when that queue unit changes.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-04",
       "title": "Complete pending-question interactions",
       "report": "interaction.md",
       "wave": "3",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-04, Acceptance / verification",
       "execution_evidence": [
         "async-questions-delivery.md",
@@ -373,20 +535,35 @@
         "/work/tmp/fregat-evidence/20260920T152410Z-scenario-async-questions/summary.md records completed running/idle native answers, image/file delivery, reload and dismissal observed by a second browser page",
         "Guarded digit shortcuts and independent per-question attachment drafts are implemented; native submitted-answer history has local component tests",
         "Remaining: unsent per-question attachments after reload, native answer-history browser proof and complete blocking/async/capability comparison",
-        "2026-09-26 audit (status-2026-09-26.md): async-questions passed today after H1 and H3 at /work/tmp/fregat-evidence/20260926T093239Z-scenario-async-questions. Left: unsent per-question attachments survive reload, and an answer-history browser step. Batch D."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): async-questions passed today after H1 and H3 at /work/tmp/fregat-evidence/20260926T093239Z-scenario-async-questions. Left: unsent per-question attachments survive reload, and an answer-history browser step. Batch D.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: async-questions 20260926T205212Z and question-history 20260926T205849Z prove per-question attachment reload and answer history."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-09",
       "title": "Preserve source context from review, browser annotations, and assistant citations",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "bounded-delivery; scenario-evidence-recorded",
       "acceptance": "interaction.md, INTERACTION-09, Acceptance / verification",
       "execution_evidence": [
         "2026-09-26 audit (status-2026-09-26.md): open. Plan 139 P3 and 140 are on main; browser annotation waits on EXT-07. Batch F."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "engineering-follow-on",
+        "remaining_scope": "Review/finding/citation context is delivered. Browser element/screenshot annotations remain dependent on EXT-07; whole row stays in-progress.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-10",
@@ -399,7 +576,14 @@
       "execution_evidence": [
         "scripts/agent/scenarios/chat-artifact-template.ts passed 2026-09-25 on lane L2: the directive renders one card between its paragraphs and Use appends the template prompt once; malformed, fenced and partial directives stay literal or held (artifact-templates.test.ts). Ported from t3code (MIT).",
         "2026-09-26 audit (status-2026-09-26.md): re-run today: /work/tmp/fregat-evidence/20260926T094356Z-scenario-chat-artifact-template."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-11",
@@ -417,9 +601,16 @@
         "2026-09-25 lane L2: chat.sendShortcut (enter, mod-enter-multiline, mod-enter) and large-paste folding at 32 KB with Ctrl/Cmd+Shift+V inline; scripts/agent/scenarios/chat-composer-editing.ts passed. Open: mobile plain-Enter newline. Rich composition and Lexical removal are parked by the latest owner ruling.",
         "2026-09-25 owner ruling supersedes the earlier deletion instruction: retain Lexical until Editor completes a full Markdown/composer support plan. L2/L7 audit found no such plan in Editor plans/*.md, plans/backlog.json, plans/README.md or TODO.md. packages/markdown/README.md documents live preview only; ordered lists, block quotes, escapes and fenced code blocks remain source text. composerRichTextEnabled waits for a working consumer. No new Editor Markdown plan is part of this wave.",
         "2026-09-25 owner ruling, restated: the row's goal is to delete Lexical and support Markdown as you type; Lexical stays until the editor can carry the composer. That prerequisite is Plan 111 (authorized 2026-09-25 with the composer as its first consumer), replacing the 'no Editor Markdown plan exists' gap recorded above.",
-        "Decided 2026-09-25: owner — ship the mobile plain-Enter newline now, without waiting for the phone shell. Queued work.",
+        "Decided 2026-09-25: owner \u2014 ship the mobile plain-Enter newline now, without waiting for the phone shell. Queued work.",
         "2026-09-26 audit (status-2026-09-26.md): composer-defaults and chat-composer-editing passed today after H1 (/work/tmp/fregat-evidence/20260926T094150Z-scenario-composer-defaults, /work/tmp/fregat-evidence/20260926T094208Z-scenario-chat-composer-editing). Left: Enter on touch (decided, not built), batch D; rich composer waits on Plan 111."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "dependent-follow-on",
+        "remaining_scope": "Touch Return/newline and Send behavior are delivered. Rich composer remains dependent on Plan 171 and its actual widget prerequisites.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-06",
@@ -429,7 +620,14 @@
       "status": "verified",
       "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-06, Acceptance / verification",
-      "execution_evidence": ["scripts/agent/scenarios/manual-compaction.ts"]
+      "execution_evidence": ["scripts/agent/scenarios/manual-compaction.ts"],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-07",
@@ -442,20 +640,35 @@
       "execution_evidence": [
         "scripts/agent/scenarios/chat-usage-meter.ts",
         "2026-09-25 closed (completion wave bookkeeping): Plan 141 Phase 1 (93e65be2) ships the composer plan-usage meter; scripts/agent/scenarios/chat-usage-meter.ts passed at /work/tmp/fregat-evidence/20260925T032254Z-scenario-chat-usage-meter. Reset credits stay with RUNTIME-08."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-08",
       "title": "Support one draft sent to multiple selected models",
       "report": "interaction.md",
       "wave": "4",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-08, Acceptance / verification",
       "execution_evidence": [
         "2026-09-25 lane L2: Shift+select extra models in a new draft; one session per model on its own new worktree from the draft base and branch; failed models stay on the draft with the text; a retried target reuses its command so receipts dedupe a lost acknowledgment. scripts/agent/scenarios/chat-multiple-models.ts passed (two models, two worktrees). Not yet driven: the partial-failure and lost-acknowledgment paths.",
-        "2026-09-26 audit (status-2026-09-26.md): chat-multiple-models passed today after H1 at /work/tmp/fregat-evidence/20260926T094224Z-scenario-chat-multiple-models. Left: partial-failure and lost-acknowledgment steps. Batch D."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): chat-multiple-models passed today after H1 at /work/tmp/fregat-evidence/20260926T094224Z-scenario-chat-multiple-models. Left: partial-failure and lost-acknowledgment steps. Batch D.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: chat-multiple-models-lost-ack 20260926T211458Z proves retry reuses the unconfirmed start without duplicating successful targets."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-12",
@@ -465,20 +678,36 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "interaction.md, INTERACTION-12, Acceptance / verification",
-      "execution_evidence": ["2026-09-26 audit (status-2026-09-26.md): parked with Plan 144."]
+      "execution_evidence": ["2026-09-26 audit (status-2026-09-26.md): parked with Plan 144."],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "parked-follow-on",
+        "remaining_scope": "Workflow phase/script inspection remains with Plan 144.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-02",
       "title": "Add the four missing production provider drivers",
       "report": "runtime.md",
       "wave": "4",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "bounded-delivery; scenario-evidence-recorded",
       "acceptance": "runtime.md, RUNTIME-02, Acceptance / verification",
       "execution_evidence": [
-        "Decided 2026-09-25: owner — build all four drivers (Cursor, Grok, OpenCode, Antigravity). Smoke-test each where an account exists; otherwise ship it marked \"untested\". Missing accounts no longer block the row.",
+        "Decided 2026-09-25: owner \u2014 build all four drivers (Cursor, Grok, OpenCode, Antigravity). Smoke-test each where an account exists; otherwise ship it marked \"untested\". Missing accounts no longer block the row.",
         "2026-09-26 audit (status-2026-09-26.md): open; research and decisions done. Post-pin driver fixes in delta-2026-09-26.md. Batch G."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "engineering-follow-on",
+        "remaining_scope": "Shared ACP transport, OpenCode seam/auth/cwd/catalog and Cursor/bootstrap are delivered. Grok, Antigravity and remaining supported driver capability/account cases remain distinct batches.",
+        "owner_only": [
+          "Real-account authentication/model discovery/completed turns for Cursor, OpenCode, Claude and Codex remain untested here."
+        ],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-05",
@@ -488,7 +717,14 @@
       "status": "verified",
       "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-05, Acceptance / verification",
-      "execution_evidence": ["scripts/agent/scenarios/manual-compaction.ts"]
+      "execution_evidence": ["scripts/agent/scenarios/manual-compaction.ts"],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-06",
@@ -510,7 +746,14 @@
         "Whole-workspace typecheck and lint, structural gates, and changed-file formatting pass. Full unused check retains baseline cache-budget.ts, workspaceEditCategorySchema and normalizeWorkspaceNamespacePath findings; no aggregate verify-green claim",
         "Remaining: CLI-version gating, legacy Claude model-catalog expansion, live Claude/provider-account checks and paired upstream full-workflow evidence. Finding remains in-progress",
         "2026-09-25 closed (completion wave bookkeeping): Plan 138 (f4e6cb70) closed the legacy Claude catalog and CLI version residue; scripts/agent/scenarios/provider-model-options.ts passed at /work/tmp/fregat-evidence/20260925T044005Z-scenario-provider-model-options."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-07",
@@ -525,23 +768,38 @@
         "Actual pinned liveness720transitions, three negative controls; periodic reaper tests pass",
         "Native child live142923: completed parent working, child idle and late metadata/reload remains ready; screenshots inspected",
         "Monitor-only native Codex wire and automatic settlement are not claimed",
-        "Decided 2026-09-25: owner — recheck the monitor-only signal against Codex 0.157 (approved).",
+        "Decided 2026-09-25: owner \u2014 recheck the monitor-only signal against Codex 0.157 (approved).",
         "2026-09-26 audit (status-2026-09-26.md): background-liveness passed today after H1 at /work/tmp/fregat-evidence/20260926T094109Z-scenario-background-liveness. Left: the monitor-only recheck on Codex 0.157 (decided). Batch C.",
         "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): installed0.159.2 exact schema/tag reviewed; scoped backgroundTerminals/list guard preserves ready native process past injected35minutes and releases on empty list. Periodic/race/pending/error boundaries tested. Nonterminal monitor signals, child-owned silent shells after idle and live-account lifecycle remain unverified."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Scoped Codex terminal-list guard and #268 native authoritative roster Working/Monitoring/Ready/reload are delivered. Installed-account/child-shell lifecycle remains unverified. Original ghost-draft cause is unproved; finite fixture attempt is recorded separately.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-08",
       "title": "Publish account usage limits and wire reset-credit redemption",
       "report": "runtime.md",
       "wave": "4",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-08, Acceptance / verification",
       "execution_evidence": [
-        "Decided 2026-09-25: owner — build with boundary fixtures only; nothing is spent until the owner does one live redemption.",
-        "2026-09-26 audit (status-2026-09-26.md): Codex reset credits built with boundary fixtures in 795526b58 (lane L3, #35): confirmation, account-keyed serialization, durable idempotency (migration 38). Left: an agent:browser scenario on the fixture, batch C; the one live redemption is the owner check. Post-pin 3412097b adds Claude banked resets."
-      ]
+        "Decided 2026-09-25: owner \u2014 build with boundary fixtures only; nothing is spent until the owner does one live redemption.",
+        "2026-09-26 audit (status-2026-09-26.md): Codex reset credits built with boundary fixtures in 795526b58 (lane L3, #35): confirmation, account-keyed serialization, durable idempotency (migration 38). Left: an agent:browser scenario on the fixture, batch C; the one live redemption is the owner check. Post-pin 3412097b adds Claude banked resets.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: reset-credit-redemption 20260926T174929Z proves cancellation and exactly-once fixture redemption. Real-account redemption remains owner-only."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": ["Real reset-credit redemption on an owner account remains untested."],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-09",
@@ -559,7 +817,14 @@
         "Reasoning remains activity-domain mapping; full upstream reasoning-message UI and cross-provider live matrix are not claimed",
         "2026-09-25 closed (completion wave bookkeeping): scripts/agent/scenarios/response-delivery.ts passed at /work/tmp/fregat-evidence/20260920T161535Z-scenario-response-delivery, and the leftover reasoning UX is Plan 160's reasoning fold, proven by scripts/agent/scenarios/chat-turn-anatomy.ts at /work/tmp/fregat-evidence/20260925T162417Z-scenario-chat-turn-anatomy.",
         "2026-09-26 audit (status-2026-09-26.md): response-delivery fails on H5 (the scenario looks for a reasoning button; the full text sits in the Thought fold, screenshot /work/tmp/fregat-evidence/20260926T094518Z-scenario-response-delivery). Behaviour holds; batch A repairs the selector."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario. H5 repair and response-delivery 20260926T172903Z are delivered.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "RUNTIME-10",
@@ -572,7 +837,14 @@
       "execution_evidence": [
         "scripts/agent/scenarios/settings-provider-update.ts",
         "2026-09-26 audit (status-2026-09-26.md): re-run today: /work/tmp/fregat-evidence/20260926T094502Z-scenario-settings-provider-update."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario. Disabled-provider Settings repair and enabled fixture version proof are recorded in bounded-closeout-2026-09-30.md; no installed account binary was updated.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-01",
@@ -587,7 +859,14 @@
         "repository-delivery.md",
         "apps/server/src/git/tests/forges.test.ts",
         "/work/tmp/fregat-evidence/20260925T130215Z-scenario-git-merge-request/"
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-02",
@@ -604,7 +883,14 @@
         "apps/server/src/orchestration/tests/pull-request-session.test.ts",
         "packages/contracts/src/tests/pull-request-reference.test.ts",
         "2026-09-26 audit (status-2026-09-26.md): session-pull-request-start passed today at /work/tmp/fregat-evidence/20260926T094551Z-scenario-session-pull-request-start. Left: forge comments, replies, viewed files and review submission on Plan 139 P3 (on main) and Plan 169. Batch I."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "engineering-follow-on",
+        "remaining_scope": "Forge replies/resolution, reactions, reviewers, applicable labels and viewed-file ownership remain. Discussion #267, review #293 and activity #305 are delivered; unsupported forge operations remain explicit.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-03",
@@ -620,7 +906,14 @@
         "apps/server/src/git/tests/clone.test.ts",
         "apps/server/src/git/tests/publish.test.ts",
         "/work/tmp/fregat-evidence/20260925T131311Z-scenario-git-clone-publish/"
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-04",
@@ -630,7 +923,14 @@
       "status": "verified",
       "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-04, Acceptance / verification",
-      "execution_evidence": ["scripts/agent/scenarios/worktree-setup-import.ts"]
+      "execution_evidence": ["scripts/agent/scenarios/worktree-setup-import.ts"],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-05",
@@ -644,7 +944,14 @@
         "terminal-delivery.md: detached lifetime, durable raw history, shared clear and shell restart delivered. Live evidence 20260920T160608Z-scenario-terminal-history; 38 service,16 agent terminal/history,4 TUI attach tests; full attach/host equivalence remains open.",
         "2026-09-26 audit (status-2026-09-26.md): PR #32 (Plan 149) adds host-owned PTYs, restart survival and cursor-based recovery. terminal-history fails today on H6 (second viewer shares a browser context). Left after #32: H6 and a server-restart step. Batch E.",
         "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): actual throwaway API restart preserves shared shell token/history for two viewers; clear/reconnect and explicit replacement shell proved. No production PID, detached TTL/byte-fidelity or desktop certification claimed."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Bounded terminal acceptance #264 is delivered. Additional byte/retention/host coverage belongs to the specific terminal program and delivered host; no restart or two-viewer implementation remains queued here.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-10",
@@ -654,7 +961,14 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "adjacent.md, EXT-10, Acceptance / verification",
-      "execution_evidence": ["2026-09-26 audit (status-2026-09-26.md): parked."]
+      "execution_evidence": ["2026-09-26 audit (status-2026-09-26.md): parked."],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "parked-follow-on",
+        "remaining_scope": "Activity leases, host power policy, resource histories and management measurements remain with their existing observability owner.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-12",
@@ -666,10 +980,17 @@
         "scripts/agent/scenarios/worktree-cleanup-on-delete.ts",
         "repository-delivery.md",
         "apps/server/src/orchestration/tests/worktree-cleanup.test.ts",
-        "2026-09-26 audit (status-2026-09-26.md): worktree-cleanup-on-delete passed today. Left: age/merge/unchanged rules need restore-on-resume, owner question 3; log retention Decided 2026-09-26: research recommendation — machine-scope observability.logRetentionDays, default null, batch E; browser artifacts wait on EXT-07."
+        "2026-09-26 audit (status-2026-09-26.md): worktree-cleanup-on-delete passed today. Left: age/merge/unchanged rules need restore-on-resume, owner question 3; log retention Decided 2026-09-26: research recommendation \u2014 machine-scope observability.logRetentionDays, default null, batch E; browser artifacts wait on EXT-07."
       ],
       "report": "adjacent.md",
-      "title": "Port automatic worktree and storage cleanup policy"
+      "title": "Port automatic worktree and storage cleanup policy",
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Delete-time cleanup and logs.retentionDays are delivered. Owner declined idle restore-on-resume. Browser-artifact retention remains dependent on EXT-07.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-06",
@@ -685,7 +1006,14 @@
         "apps/server/src/orchestration/tests/session-auto-settle.test.ts",
         "/work/tmp/fregat-evidence/20260925T120806Z-scenario-session-auto-settle/",
         "2026-09-26 audit (status-2026-09-26.md): post-pin 01096704 (per-session auto-settle switch) tracked in delta-2026-09-26.md, batch E."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-with-gated-follow-on",
+        "remaining_scope": "Existing global/project auto-settle remains verified. Per-session switch is separately parked behind schema/state-loss authorization; the earlier Plan 132 reset is closed.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-07",
@@ -695,7 +1023,14 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "adjacent.md, EXT-07, Acceptance / verification",
-      "execution_evidence": ["2026-09-26 audit (status-2026-09-26.md): parked."]
+      "execution_evidence": ["2026-09-26 audit (status-2026-09-26.md): parked."],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "parked-follow-on",
+        "remaining_scope": "Browser preview/profile/capture/annotation/device/automation and associated artifact storage remain separately scoped subsystem work.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-08",
@@ -707,7 +1042,14 @@
       "acceptance": "adjacent.md, EXT-08, Acceptance / verification",
       "execution_evidence": [
         "2026-09-26 audit (status-2026-09-26.md): open, unparked 2026-09-25. Batch H."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "authorization-gated",
+        "remaining_scope": "Pairing is delivered. Required scopes/revocation require owner-authorized re-pair of existing device records; relay is later.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-09",
@@ -719,7 +1061,16 @@
       "acceptance": "adjacent.md, EXT-09, Acceptance / verification",
       "execution_evidence": [
         "2026-09-26 audit (status-2026-09-26.md): parked on Plan 143 research and a per-OS matrix."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "host-matrix-follow-on",
+        "remaining_scope": "Plan 114 installed-app gates are delivered, including owner Mac acceptance on 2026-10-03. Remaining native/mobile/OS/distribution cases need their actual host matrix; fixture proof does not certify those devices.",
+        "owner_only": [
+          "Remaining physical device/OS cases require actual devices; completed Plan 114 Mac acceptance is not reopened."
+        ],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-13",
@@ -734,7 +1085,14 @@
         "Real-server DOM tests: components/tests/session-undo.test.tsx (7), state/tests/session-undo.test.tsx (3); keymap pane test in keymap/tests/keymap.test.ts; client-core chat/rail/tests/lifecycle-undo.test.ts (11); TUI archive Undo in agent-rail/tests/rail.test.tsx",
         "Remaining: two-owner live run; upstream reveals the preceding group after an Undo, the plan keeps one slot",
         "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/session-undo.ts re-run on main today, 17 steps passed: /work/tmp/fregat-evidence/20260926T092854Z-scenario-session-undo."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario. Plan 172 retains shared Undo extraction; its original web notice-lifetime fix landed, TUI follows its redesign.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "LIFE-14",
@@ -752,7 +1110,14 @@
         "scripts/agent/scenarios/session-pull-request-badge.ts (evidence /work/tmp/fregat-evidence/20260925T140706Z-scenario-session-pull-request-badge): open, draft, merged, closed and unknown badges on rail rows, none shows nothing, click opens the pull request, long worktree branches never scroll the rail sideways",
         "pull-request-badge-delivery.md",
         "2026-09-26 audit (status-2026-09-26.md): post-pin cb1a3f34 (repository name on linked PRs) tracked in delta-2026-09-26.md, batch E."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario. Repository badge identity is delivered under the accepted hover/accessibility mapping; no new visible spelling is implied.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-13",
@@ -765,7 +1130,14 @@
       "execution_evidence": [
         "scripts/agent/scenarios/chat-background-start.ts passed 2026-09-25 on lane L2: three Ctrl+Enter starts from a New worktree draft on release gave three sessions on three worktrees; the user stayed on an empty draft with the same mode and branch.",
         "2026-09-26 audit (status-2026-09-26.md): re-run today: /work/tmp/fregat-evidence/20260926T094412Z-scenario-chat-background-start."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "INTERACTION-14",
@@ -778,7 +1150,14 @@
       "execution_evidence": [
         "scripts/agent/scenarios/chat-model-favorites.ts passed 2026-09-25 on lane L2: an offered favorite and a retired one (No longer offered) under the picker Favorites rail; hidden models never shown (model-order.test.ts).",
         "2026-09-26 audit (status-2026-09-26.md): re-run today: /work/tmp/fregat-evidence/20260926T094429Z-scenario-chat-model-favorites."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-14",
@@ -793,7 +1172,14 @@
         "repository-delivery.md",
         "apps/server/src/git/tests/auto-pull.test.ts",
         "/work/tmp/fregat-evidence/20260925T113952Z-scenario-git-auto-pull/"
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-15",
@@ -808,32 +1194,54 @@
         "repository-delivery.md",
         "apps/server/src/orchestration/tests/worktree-submodules.test.ts",
         "/work/tmp/fregat-evidence/20260925T113220Z-scenario-git-submodules-init/"
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-16",
       "title": "Balance new sessions across connected machines",
       "report": "adjacent.md",
       "wave": "6",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "bounded-delivery; scenario-evidence-recorded",
       "acceptance": "adjacent.md, EXT-16, Acceptance / verification",
       "execution_evidence": [
-        "Decided 2026-09-25: owner — the balancing preferences use settings scope `application`: they pick where execution happens. No longer parked on 143/144.",
+        "Decided 2026-09-25: owner \u2014 the balancing preferences use settings scope `application`: they pick where execution happens. No longer parked on 143/144.",
         "2026-09-26 audit (status-2026-09-26.md): open, scope decided. Batch H."
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "bounded-delivery-follow-on",
+        "remaining_scope": "Balancing/preferences #272 and the native machine-balancing scenario are delivered. Reconcile any additional named capacity/host case when its owner is scheduled; pairing scopes/revocation remain EXT-08.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-17",
       "title": "Show a usage page with estimated cost and editable model prices",
       "report": "adjacent.md",
       "wave": "4",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-17, Acceptance / verification",
       "execution_evidence": [
-        "2026-09-26 audit (status-2026-09-26.md): Plan 141 Phases 3–4 built the usage page with automatic models.dev pricing; scripts/agent/scenarios/settings-usage.ts passed today at /work/tmp/fregat-evidence/20260926T094442Z-scenario-settings-usage (unknown prices show as unavailable). Editable prices were replaced; owner question 4 decides whether that closes the row."
-      ]
+        "2026-09-26 audit (status-2026-09-26.md): Plan 141 Phases 3\u20134 built the usage page with automatic models.dev pricing; scripts/agent/scenarios/settings-usage.ts passed today at /work/tmp/fregat-evidence/20260926T094442Z-scenario-settings-usage (unknown prices show as unavailable). Editable prices were replaced; owner question 4 decides whether that closes the row.",
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: Owner automatic-pricing decision in ../126-t3code-alignment.md removes the manual-price residue. status-2026-09-26.md settings-usage 20260926T094442Z and status-2026-09-28.md #283 prove usage, import/rescan/reload and unknown-price exclusions; no universal account/pricing certification."
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     },
     {
       "id": "EXT-18",
@@ -848,7 +1256,21 @@
         "repository-delivery.md",
         "apps/server/src/orchestration/tests/worktree-branch-drift.test.ts",
         "/work/tmp/fregat-evidence/20260925T114547Z-scenario-session-branch-drift/"
-      ]
+      ],
+      "closeout": {
+        "reconciled_on": "2026-10-03",
+        "delivery_state": "accepted-scope-delivered",
+        "remaining_scope": "No remaining implementation in the accepted finding scope. Historical evidence is retained; this reconciliation reruns no scenario.",
+        "owner_only": [],
+        "record": "finite-closeout-2026-10-03.md"
+      }
     }
-  ]
+  ],
+  "reconciliation": {
+    "date": "2026-10-03",
+    "baseline": "ea344b775",
+    "historical_evidence_rerun": false,
+    "record": "finite-closeout-2026-10-03.md",
+    "scope": "Finite pre-keymap reconciliation; larger alignment, gated changes and owner-only receipts remain open."
+  }
 }

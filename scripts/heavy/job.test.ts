@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
@@ -70,6 +70,19 @@ test('a finite local job gives the shim its whole-slice runtime budget', () => {
     '--startup',
     String(DEADLINE_START_SECONDS),
   ])
+})
+
+test('a quiet job passes its immutable boot-time deadline to the in-scope guard', () => {
+  const command = localCommand({
+    ...launch,
+    graceSeconds: 1,
+    runtimeLimitSeconds: 9,
+    runtimeDeadline: 123.45,
+    slice: 'heavy-1.slice',
+  })
+  const deadline = command.indexOf('--deadline')
+  expect(deadline).toBeGreaterThan(command.indexOf(SCOPE_SHIM))
+  expect(command.slice(deadline, deadline + 2)).toEqual(['--deadline', '12345'])
 })
 
 const locks = process.platform === 'linux' ? await import('./lock').catch(() => null) : null
@@ -279,6 +292,57 @@ test.for(['show', 'stop'])(
       await expect.poll(() => job.child.exitCode, { timeout: 1500 }).toBe(143)
       expect(await job.done).toBe(143)
       expect(box.lifecycle().map((call) => call.operation)).toEqual(['kill'])
+      assertReleased(box)
+    } finally {
+      await box.cleanup()
+    }
+  },
+)
+
+test.for(['running', 'empty', 'gone'] as const)(
+  'a dead quiet owner with a %s cgroup blocks until manager cleanup completes',
+  { timeout: 10_000 },
+  async (state, context) => {
+    if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+    const box = reaperSandbox(state === 'running' ? 'kill' : 'stop')
+    const id = 'bbbbbbbbbbbb'
+    const slice = box.addSlice(id)
+    const cgroup = path.join(box.cgroups, `${box.sliceRoot}.slice`, slice)
+    if (state === 'empty') writeFileSync(path.join(cgroup, 'cgroup.events'), 'populated 0\n')
+    if (state === 'gone') rmSync(cgroup, { recursive: true })
+    const jobs = path.join(box.state, 'jobs')
+    mkdirSync(jobs)
+    const file = path.join(jobs, `${id}.json`)
+    writeFileSync(
+      file,
+      JSON.stringify({
+        cwd: box.root,
+        estimateBytes: 1,
+        id,
+        jobClass: 'light',
+        label: 'dead-quiet',
+        pid: process.pid,
+        quiet: true,
+        quietUntil: 0,
+        server: false,
+        since: new Date().toISOString(),
+        sliceRoot: box.sliceRoot,
+      }),
+    )
+    try {
+      const successor = box.start(false)
+      await expect
+        .poll(
+          () =>
+            successor.stderr().includes('Quiet lease') ||
+            successor.stderr().includes("started 'reaper'"),
+          { timeout: 8_000 },
+        )
+        .toBe(true)
+      expect(existsSync(file)).toBe(true)
+      expect(successor.stderr()).toContain('Quiet lease')
+      expect(await successor.done).toBe(2)
+      expect(successor.stderr().match(/warn: quiet lease/g)).toHaveLength(1)
       assertReleased(box)
     } finally {
       await box.cleanup()

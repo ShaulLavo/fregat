@@ -7,9 +7,11 @@ runtime=$2
 grace=$3
 # A healthy watchdog reports each second, including grace; a stopped shell cannot renew it.
 heartbeat_until() {
-  local now until
+  local now until budget=${1/./}
+  # The scope emits remaining runtime with two fractional digits; grace stays whole seconds.
+  [[ "$1" = *.* ]] || budget=$(($1 * 100))
   read -r now _ </proc/uptime
-  until=$((10#${now/./} + $1 * 100))
+  until=$((10#${now/./} + 10#$budget))
   while :; do
     systemd-notify WATCHDOG=1
     read -r now _ </proc/uptime

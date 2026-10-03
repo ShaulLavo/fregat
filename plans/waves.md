@@ -25,6 +25,10 @@ and concurrency rules describe their original runs.
 
 ## Upcoming waves
 
+126's bounded Wave 2 scope is closed. The owner's [finite pre-keymap
+pass](126-t3code-alignment/finite-closeout-2026-10-03.md) updates its ledger and disposition;
+the larger alignment program remains in separately scheduled follow-ons.
+
 The [root delivery-wave table](../PLAN.md#upcoming-delivery-waves) schedules preparation,
 command foundation, document foundation, coherent feature batches and broad migrations.
 The [readiness review](wave-readiness-2026-10-03.md) explains placement of the large additions.

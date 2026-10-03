@@ -1,6 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
+import { bootSeconds, sliceState } from './admission'
 import { unlessMissing, unlock, waitLock } from './lock'
 import { live, type Entry } from './queue'
 import type { JobDuringRun } from './record'
@@ -73,6 +74,19 @@ export function finishRun(stateDir: string, id: string): readonly JobDuringRun[]
     )
     removeRun(stateDir, id)
     return jobs
+  })
+}
+
+/** Retained admission ownership alone cannot authorize concurrent light work. */
+export function isActiveQuietRun(stateDir: string, entry: Entry) {
+  if (!entry.quiet || entry.quietDeadline === undefined || bootSeconds() >= entry.quietDeadline)
+    return false
+  return underLock(stateDir, () => {
+    const run = readRuns(stateDir).find((job) => job.id === entry.id && job.quiet)
+    if (!run || run.pid !== entry.pid || run.sliceRoot !== entry.sliceRoot) return false
+    const status = unlessMissing(() => readFileSync(`/proc/${entry.pid}/status`, 'utf8'))
+    if (!status || !/^State:\s+[RSDI]\b/m.test(status)) return false
+    return sliceState(entry.sliceRoot, `${entry.sliceRoot}-${entry.id}.slice`) === 'running'
   })
 }
 

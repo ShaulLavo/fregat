@@ -24,7 +24,10 @@ import {
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderAdapter, ProviderRuntimeEvent } from './types'
 import { readClaudeUsageCache, readClaudeUsageIdentity } from './usage-claude-cache'
-import { readNativeUsageLabel } from './utils/usage-native-metadata'
+import { readNativeUsageMetadata, type NativeUsageMetadata } from './utils/usage-native-metadata'
+import { proxyUsageIdentity, usageIdentityContext } from './utils/usage-codex-identity'
+import { mergeProvenUsageAccounts } from './utils/usage-account-merge'
+import { CodexUsageRequestBudget, type ProxyUsageRefresh } from './usage-proxy-budget'
 import {
   codexWindowPresentation,
   mergeUsageWindows,
@@ -49,6 +52,7 @@ type StoredAccount = {
   unsupported: boolean
   identityFingerprint?: string | null
   credentialFingerprint?: string | null
+  identityProof?: string | null
 }
 export type UsageRefreshPolicy = {
   minIntervalMs: number
@@ -68,6 +72,7 @@ const cacheSchema = v.object({
       attemptedAt: v.nullable(v.pipe(v.number(), v.finite())),
       failed: v.boolean(),
       unsupported: v.boolean(),
+      identityProof: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)))),
       identityFingerprint: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)))),
       credentialFingerprint: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)))),
     }),
@@ -76,7 +81,26 @@ const cacheSchema = v.object({
   proxyAttemptedAt: v.nullable(v.pipe(v.number(), v.finite())),
   proxyFailed: v.boolean(),
   proxySourceKey: v.nullable(v.string()),
+  identityContextHash: v.optional(v.string()),
+  proxyProofsCurrent: v.optional(v.boolean()),
+  proxyIdentityProofs: v.optional(
+    v.record(v.string(), v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/))),
+  ),
 })
+
+type UsageStoreOptions = {
+  now?: () => number
+  cacheFile?: string
+  policy?: () => UsageRefreshPolicy
+  readProxy?: (
+    identityContext: string,
+    refresh: ProxyUsageRefresh,
+  ) => Promise<ProviderAccountUsage[]>
+  proxyRequestIntervalHours?: () => number
+  proxyInstanceIds?: () => ProviderInstanceId[]
+  proxyConfigured?: () => boolean
+  proxySourceKey?: () => string | null
+}
 
 /** Reads never start collection. A lifecycle-owned schedule persists sanitized observations. */
 export class ProviderUsageStore {
@@ -98,35 +122,30 @@ export class ProviderUsageStore {
   private failedWrites = 0
   private suppressedWrites = 0
   private proxySourceKey: string | null = null
+  private proxyGeneration = 0
+  private proxyIdentityGeneration = -1
+  private readonly proxyIdentityProofs = new Map<string, string>()
+  private readonly identityContext: string
+  private readonly identityContextHash: string
   private readonly now: () => number
   private readonly policy: () => UsageRefreshPolicy
   private readonly registry: UsageAccounts
-  private readonly options: {
-    now?: () => number
-    cacheFile?: string
-    policy?: () => UsageRefreshPolicy
-    readProxy?: () => Promise<ProviderAccountUsage[]>
-    proxyInstanceIds?: () => ProviderInstanceId[]
-    proxyConfigured?: () => boolean
-    proxySourceKey?: () => string | null
-  }
+  private readonly options: UsageStoreOptions
+  private readonly proxyBudget: CodexUsageRequestBudget
 
-  constructor(
-    registry: UsageAccounts,
-    options: {
-      now?: () => number
-      cacheFile?: string
-      policy?: () => UsageRefreshPolicy
-      readProxy?: () => Promise<ProviderAccountUsage[]>
-      proxyInstanceIds?: () => ProviderInstanceId[]
-      proxyConfigured?: () => boolean
-      proxySourceKey?: () => string | null
-    } = {},
-  ) {
+  constructor(registry: UsageAccounts, options: UsageStoreOptions = {}) {
     this.registry = registry
     this.options = options
     this.now = options.now ?? Date.now
     this.policy = options.policy ?? (() => DEFAULT_POLICY)
+    this.identityContext = usageIdentityContext(options.cacheFile)
+    this.identityContextHash = createHash('sha256').update(this.identityContext).digest('hex')
+    this.proxyBudget = new CodexUsageRequestBudget(
+      options.cacheFile ? `${options.cacheFile}.codex-requests` : undefined,
+      this.now,
+      options.proxyRequestIntervalHours ?? (() => 1),
+      this.identityContextHash,
+    )
     this.proxySourceKey = this.sourceKey()
     this.hydrate()
   }
@@ -142,13 +161,15 @@ export class ProviderUsageStore {
 
   reconfigure() {
     const key = this.sourceKey()
-    if (key !== this.proxySourceKey) {
+    this.proxyGeneration += 1
+    if (key !== null && key !== this.proxySourceKey) {
       this.proxySourceKey = key
       this.proxyAccounts = []
+      this.proxyIdentityProofs.clear()
       this.proxyAttemptedAt = null
       this.proxyFailed = false
-      this.persist()
     }
+    this.persist()
     if (!this.timer || this.closed) return
     clearTimeout(this.timer)
     this.timer = null
@@ -183,8 +204,23 @@ export class ProviderUsageStore {
     this.persist()
   }
 
+  /** Mutations validate the credential-bound observation before logical account projection. */
+  readNativeAccount(accountKey: string): ProviderAccountUsage | null {
+    const target = this.targets().find((entry) => entry.accountKey === accountKey)
+    return target ? this.snapshot(target) : null
+  }
+
   async read(): Promise<ProviderUsageResult> {
-    const native = this.targets().map((target) => this.snapshot(target))
+    const targets = this.targets()
+    const native = targets.map((target) => this.snapshot(target))
+    const identities = new Map(
+      this.proxyIdentityGeneration === this.proxyGeneration ? this.proxyIdentityProofs : [],
+    )
+    for (const target of targets) {
+      const stored = this.accounts.get(target.accountKey)
+      if (stored?.credentialFingerprint === target.credentialFingerprint && stored?.identityProof)
+        identities.set(target.accountKey, stored.identityProof)
+    }
     const mappings = this.proxyMappings()
     const configured = this.options.proxyConfigured?.() ?? Boolean(this.options.readProxy)
     const proxy =
@@ -205,14 +241,17 @@ export class ProviderUsageStore {
           ]
         : this.proxyAccounts
     return {
-      accounts: [
-        ...native,
-        ...(configured
-          ? proxy.map((account) =>
-              this.withFreshness({ ...account, providerInstanceIds: mappings }),
-            )
-          : []),
-      ],
+      accounts: mergeProvenUsageAccounts(
+        [
+          ...native,
+          ...(configured
+            ? proxy.map((account) =>
+                this.withFreshness({ ...account, providerInstanceIds: mappings }),
+              )
+            : []),
+        ],
+        identities,
+      ),
     }
   }
 
@@ -238,7 +277,7 @@ export class ProviderUsageStore {
           windowMinutes: window.windowMinutes,
           status: feedWindowStatus(window),
           lastSeenAt: window.observedAt ?? null,
-          source: feedAccountSource(account),
+          source: feedWindowSource(account, window),
         })),
         cooldown: account.cooldown ?? null,
         ...(account.credits ? { credits: account.credits } : {}),
@@ -362,14 +401,15 @@ export class ProviderUsageStore {
         : undefined
       this.adoptIdentity(target, identity)
       const metadataPath = target.codexAuthPath ?? target.claudeCachePath
-      const label =
+      const metadata =
         metadataPath && (target.driverKind === 'claude' || target.driverKind === 'codex')
-          ? await readNativeUsageLabel(
+          ? await readNativeUsageMetadata(
               metadataPath,
               target.driverKind === 'claude' ? 'claude' : 'codex',
+              this.identityContext,
             )
-          : undefined
-      this.applyLabel(target, label)
+          : { identityProof: null }
+      this.applyMetadata(target, metadata)
       const cached = target.claudeCachePath
         ? await readClaudeUsageCache(target.claudeCachePath, this.now())
         : null
@@ -412,7 +452,7 @@ export class ProviderUsageStore {
         return false
       }
       this.applyProbe(target, result, new Date(startedAt).toISOString(), source)
-      this.applyLabel(target, label)
+      this.applyMetadata(target, metadata)
       this.markAttempt(target, false)
       this.persist()
       outcome = result.kind
@@ -448,9 +488,11 @@ export class ProviderUsageStore {
     }
   }
 
-  private applyLabel(target: AccountTarget, label: string | undefined) {
+  private applyMetadata(target: AccountTarget, metadata: NativeUsageMetadata) {
     const stored = this.accounts.get(target.accountKey)
-    if (stored && label) stored.snapshot.label = label
+    if (!stored) return
+    stored.identityProof = metadata.identityProof
+    if (metadata.label) stored.snapshot.label = metadata.label
   }
 
   private adoptCredentials(target: AccountTarget) {
@@ -461,6 +503,7 @@ export class ProviderUsageStore {
       snapshot: this.empty(target),
       unsupported: false,
       credentialFingerprint: target.credentialFingerprint,
+      identityProof: null,
     })
   }
 
@@ -623,23 +666,44 @@ export class ProviderUsageStore {
     const wait = this.proxyFailed ? this.policy().failureCooldownMs : this.policy().minIntervalMs
     if (this.proxyAttemptedAt !== null && this.now() - this.proxyAttemptedAt < wait) return
     const sourceKey = this.sourceKey()
+    const generation = this.proxyGeneration
     this.proxyAttemptedAt = this.now()
     this.persist()
+    const refresh: ProxyUsageRefresh = {
+      staleAfterMs: this.policy().staleAfterMs,
+      isCurrent: () =>
+        !this.closed &&
+        this.options.proxyConfigured?.() !== false &&
+        sourceKey === this.sourceKey() &&
+        generation === this.proxyGeneration,
+      latest: (account) => this.latestProxyObservation(account),
+      link: (key, proof) => this.proxyBudget.link(key, proof),
+      reserve: (key, passiveAt) => this.proxyBudget.reserve(key, passiveAt),
+      settle: (reservation, success) => this.proxyBudget.settle(reservation, success),
+    }
     this.proxyProbe = this.options
-      .readProxy()
+      .readProxy(this.identityContext, refresh)
       .then((accounts) => {
-        if (sourceKey !== this.sourceKey()) return
+        if (sourceKey !== this.sourceKey() || generation !== this.proxyGeneration) return
         const valid = accounts.filter((account) => validCachedAccount(account, this.now()))
-        this.proxyAccounts = valid.map((account) =>
-          retainProxyObservations(
-            this.proxyAccounts.find((previous) => previous.accountKey === account.accountKey),
-            account,
-          ),
-        )
+        const proofs = new Map<string, string>()
+        this.proxyAccounts = valid.map((account) => {
+          const proof = proxyUsageIdentity(account)
+          const previousProof = this.proxyIdentityProofs.get(account.accountKey) ?? null
+          if (proof) proofs.set(account.accountKey, proof)
+          const previous =
+            proof === previousProof
+              ? this.proxyAccounts.find((entry) => entry.accountKey === account.accountKey)
+              : undefined
+          return retainProxyObservations(previous, account)
+        })
+        this.proxyIdentityProofs.clear()
+        for (const [key, proof] of proofs) this.proxyIdentityProofs.set(key, proof)
+        this.proxyIdentityGeneration = generation
         this.proxyFailed = false
       })
       .catch(() => {
-        if (sourceKey !== this.sourceKey()) return
+        if (sourceKey !== this.sourceKey() || generation !== this.proxyGeneration) return
         if (!this.proxyFailed)
           recordChatPipelineWarning('chat.pipeline.provider_usage.proxy_failed', {
             outcome: 'cache-retained',
@@ -652,9 +716,35 @@ export class ProviderUsageStore {
           this.reconfigure()
           return
         }
-        this.proxyAttemptedAt = this.now()
+        if (generation === this.proxyGeneration) this.proxyAttemptedAt = this.now()
       })
     return this.proxyProbe
+  }
+
+  private latestProxyObservation(account: ProviderAccountUsage) {
+    const proof = proxyUsageIdentity(account)
+    const cached =
+      this.proxyIdentityGeneration === this.proxyGeneration
+        ? this.proxyAccounts.filter((entry) =>
+            proof
+              ? this.proxyIdentityProofs.get(entry.accountKey) === proof
+              : entry.accountKey === account.accountKey,
+          )
+        : []
+    const native = this.targets().flatMap((target) => {
+      const snapshot = this.snapshot(target)
+      return proof && this.accounts.get(target.accountKey)?.identityProof === proof
+        ? [snapshot]
+        : []
+    })
+    return {
+      ...account,
+      windows: [
+        ...account.windows,
+        ...cached.flatMap((entry) => entry.windows),
+        ...native.flatMap((entry) => entry.windows),
+      ],
+    }
   }
 
   private hydrate() {
@@ -662,12 +752,23 @@ export class ProviderUsageStore {
     try {
       if (statSync(this.options.cacheFile).size > 1024 * 1024) return
       const cache = v.parse(cacheSchema, JSON.parse(readFileSync(this.options.cacheFile, 'utf8')))
+      const validContext = cache.identityContextHash === this.identityContextHash
       for (const account of cache.accounts) {
         if (account.attemptedAt !== null && account.attemptedAt > this.now()) continue
         if (validCachedAccount(account.snapshot, this.now()))
-          this.accounts.set(account.snapshot.accountKey, account)
+          this.accounts.set(account.snapshot.accountKey, {
+            ...account,
+            identityProof: validContext ? account.identityProof : null,
+          })
       }
-      if (cache.proxySourceKey !== this.proxySourceKey) return
+      if (this.proxySourceKey !== null && cache.proxySourceKey !== this.proxySourceKey) return
+      this.proxySourceKey = cache.proxySourceKey
+      if (validContext) {
+        for (const [key, proof] of Object.entries(cache.proxyIdentityProofs ?? {}))
+          this.proxyIdentityProofs.set(key, proof)
+        if (cache.proxyProofsCurrent && this.sourceKey() !== null)
+          this.proxyIdentityGeneration = this.proxyGeneration
+      }
       this.proxyAccounts = cache.proxyAccounts.filter((account) =>
         validCachedAccount(account, this.now()),
       )
@@ -695,6 +796,9 @@ export class ProviderUsageStore {
       proxyAttemptedAt: this.proxyAttemptedAt,
       proxyFailed: this.proxyFailed,
       proxySourceKey: this.proxySourceKey,
+      identityContextHash: this.identityContextHash,
+      proxyProofsCurrent: this.proxyIdentityGeneration === this.proxyGeneration,
+      proxyIdentityProofs: Object.fromEntries(this.proxyIdentityProofs),
     }
     try {
       mkdirSync(path.dirname(this.options.cacheFile), { recursive: true })
@@ -736,6 +840,15 @@ function windowFreshness(
 // Mesh v1 renders these two live-source classes; detailed provenance stays in our API/cache.
 function feedAccountSource(account: ProviderAccountUsage): 'passive-header' | 'proxy-state' {
   return account.source === 'cli-proxy-management' ? 'proxy-state' : 'passive-header'
+}
+
+function feedWindowSource(
+  account: ProviderAccountUsage,
+  window: ProviderAccountUsage['windows'][number],
+): 'passive-header' | 'proxy-state' {
+  if (window.source === 'codex-account-rate-limits' || window.source === 'rate-limit-event')
+    return 'passive-header'
+  return feedAccountSource(account)
 }
 
 function feedAccountLabel(account: ProviderAccountUsage, index: number) {

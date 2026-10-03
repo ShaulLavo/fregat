@@ -3,9 +3,9 @@ import { defineErrorCatalog } from 'evlog'
 export const launcherErrors = defineErrorCatalog('desktop.launcher', {
   DEV_SERVER_UNREACHABLE: {
     status: 503,
-    message: ({ url }: { url: string }) => `The dev server at ${url} did not answer.`,
-    why: 'The desktop opens the shared dev server, which mesh starts on the first connection.',
-    fix: 'Run `bun run dev:serve` once to register it. `mesh serve ls` shows why a registered route failed.',
+    message: 'The development server did not answer.',
+    why: 'The desktop waits for the server at the configured development URL to become ready.',
+    fix: 'Run `bun run dev` from the repository and check its output. Check WEB_HOST, WEB_PORT, FS_HOST and PORT in your development environment.',
   },
   BROWSER_SETTING_INVALID: {
     status: 400,
@@ -18,6 +18,12 @@ export const launcherErrors = defineErrorCatalog('desktop.launcher', {
     message: 'The browser control connection failed.',
     why: 'The browser must answer the desktop control protocol over its private pipe.',
     fix: 'Update the browser or choose another executable in Window settings.',
+  },
+  CDP_COMMAND_FAILED: {
+    status: 502,
+    message: 'The browser rejected an app setup command.',
+    why: 'The browser answered the control connection and reported a setup error.',
+    fix: 'Check the launcher logs for the failed command and its installation details.',
   },
   PWA_UNSUPPORTED: {
     status: 400,
