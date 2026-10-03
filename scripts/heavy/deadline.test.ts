@@ -25,7 +25,7 @@ const ownedSlices: string[] = []
 afterEach(async () => {
   for (const slice of ownedSlices.splice(0)) {
     killSlice(slice)
-    removeSlice(slice)
+    await removeSlice(slice, AbortSignal.timeout(5_000))
   }
   await removeSandboxes()
 })

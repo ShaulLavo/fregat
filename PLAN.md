@@ -85,6 +85,13 @@ work can proceed independently where their files and contracts do not overlap.
 
 ## Next programs
 
+[320](plans/320-compile-time-data.md) is Approved for a compatibility proof followed by
+settings defaults, bundled themes, Unicode bidi derivation and a settings search index.
+Compare existing compile-time tools before migrating consumers; file icons remain a
+conditional feasibility unit. This bounded build/data work can be researched independently,
+with implementation scheduled after its tool, dependency-invalidation and package-consumer
+proofs pass. Coordinate shared build-config edits with active package cutovers.
+
 Each program groups Approved plans that share owners and gates. Grouping does not merge their
 scopes into one package rewrite, lift a gate or approve gated units. Sizes are in the
 [inventory](plans/inventory-2026-09-29.md); each plan keeps its own checklist.
@@ -236,6 +243,14 @@ for their bindings; each plan lists its own dependencies. Vim is plans 274–280
 record Zed actions that do not apply.
 
 ## Other work and boundaries
+
+### Deferred virtualization work
+
+[327](plans/327-virtualization-and-two-axis-tables.md) is Approved and scheduled later,
+outside the current execution queue. It requires two-axis data-table virtualization,
+starting with CSV, and measures editor rewrapping, recycled search-editor work and shared-list
+costs before tuning. Keep existing renderer ownership and coordinate with 156, 182 and E052.
+CSV column windowing is required; a virtualizer replacement depends on a measured comparison.
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their
 statuses here. In particular:
