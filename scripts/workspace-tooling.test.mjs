@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { JSON5 } from 'bun'
 import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
@@ -135,6 +136,14 @@ test('root and standalone terminal install Node types ahead of ancestor packages
       expect(after.stdout).not.toContain(join(ancestor, 'index.d.ts'))
     })
   }
+})
+
+test('terminal workspace version agrees with the root lockfile', async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL('../ghostty-webgpu/package.json', import.meta.url), 'utf8'),
+  )
+  const lockfile = JSON5.parse(await readFile(new URL('../bun.lock', import.meta.url), 'utf8'))
+  expect(lockfile.workspaces['ghostty-webgpu'].version).toBe(manifest.version)
 })
 
 test('terminal native input closure agrees with its package dependencies', () => {
