@@ -262,11 +262,35 @@ unchanged. Keep the explicit JavaScript producer and atlas-resource recovery pat
 - [x] Pass differential records and real WebGPU/WebGL pixel parity, including cold glyph retries.
 - [x] Preserve cold brush insertion order in a fitting small atlas and keep warmed grayscale sharing.
 - [x] Read back isolated `look` evidence with native counters and zero JavaScript fallback.
-- [ ] Measure four balanced pairs on both GPU backends at 17 terminals, before and after, for
+- [x] Measure four balanced pairs on both GPU backends at 17 terminals, before and after, for
       rolling Git history and a synthetic Unicode-prompt fixture modeled on the live shell.
-- [ ] Measure the Unicode-prompt fixture at one terminal on WebGL with 2,700 output frames.
-- [ ] Retain Zig/fallback counters, CPU process splits, latency and exact baseline-WASM provenance.
-- [ ] Obtain independent Sol review, commit by path, push and open a PR; leave merge separate.
+- [x] Measure the Unicode-prompt fixture at one terminal on WebGL with 2,700 output frames.
+- [x] Retain Zig/fallback counters, CPU process splits, latency and exact baseline-WASM provenance.
+- [x] Obtain independent implementation review, commit by path, push and open
+      [draft PR #462](https://github.com/ShaulLavo/fregat/pull/462); leave merge separate.
+- [x] Correct stale native Unicode expectations and font-dependent screen-row isolation; seven
+      focused cases pass, preserving exact native/JavaScript compositor parity and upload bounds.
+- [x] Independently review final source/test repairs and raw measurement evidence: 665 numerical
+      checks, 143 archived source hashes and both frozen asset bundles pass.
+- [ ] Confirm corrected full-browser CI and final committed-head review, then mark the PR ready.
+
+All ten approved windows qualify: 80 runs and 674,400 measured native submissions. Synthetic
+Unicode fallback falls from 166,748 frames to zero. At 17 terminals, native WebGL renderer/total
+CPU falls 46.12%/23.93%; paired native/xterm WebGL ratios are 0.6444/0.8269 and pass. WebGPU
+renderer/total falls 42.06%/15.18%, but total remains 1.5919× xterm WebGL. One-terminal WebGL
+renderer/total ratios are 0.8902/0.9381 and pass. Before/after sessions are separate; historical
+WebGL renderer CPU rises 2.17% descriptively, and no statistically proven no-regression or latency
+improvement is claimed. Every after-window still fails the write-p50 comparator.
+
+Evidence is retained in `ghostty-webgpu/docs/benchmarks/linux-zig-unicode-2026-10-03/`.
+Original correctness proof remains byte-identical in `correctness.json`; measurement verification
+is `verification.json`. `ci-portability.json` records the independently reproduced one-pixel emoji
+ink overhang at the exact CI failure location. Clean logical-row records remain unchanged while
+native/JavaScript whole-frame pixels match exactly. The actual CI-selected glyph bitmap was not
+measured; no production clipping or WASM change was made.
+Timing uses the frozen 7,405-byte bridge; the later 7,408-byte cold-order guard is untimed.
+Their compiled browser JavaScript is identical. Unicode-one-terminal WebGPU, historical-one-terminal
+windows and an additional attribution trace were omitted from the approved matrix.
 
 ### Upload-call coalescing
 

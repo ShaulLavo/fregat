@@ -172,6 +172,15 @@ async function expectParity(pair: Pair, submitted: number): Promise<Uint8Array> 
   return native
 }
 
+function cleanRowRecords(builder: ZigFrameBuilder) {
+  const cells = builder.cellData
+  const glyphs = builder.glyphData
+  return [0, 2].map((row) => ({
+    cells: new Uint8Array(cells.buffer, cells.byteOffset + row * 40 * 64, 40 * 64).slice(),
+    glyphs: new Uint8Array(glyphs.buffer, glyphs.byteOffset + row * 40 * 96, 40 * 96).slice(),
+  }))
+}
+
 for (const backend of ['webgpu', 'webgl2'] as const) {
   describe(`${backend} Zig Unicode compositor parity`, () => {
     it.each([...zigUnicodeFixtures, ...zigGlyphCollisionFixtures])(
@@ -223,25 +232,32 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       expect(await expectParity(pair, 3)).toEqual(before)
     })
 
-    it('keeps clean rows intact through wide missing-glyph retry and continuation erasure', async () => {
-      const pair = await parityFixture(backend, 'first\r\nsecond\r\nlast')
-      flushPair(pair)
-      const before = await expectParity(pair, 1)
-      pair.builds.mockClear()
-      const uploaded = pair.native.renderer.metrics.uploadedBytes
-      writePair(pair, '\x1b[2;1H\x1b[31;44m界é👩‍💻\x1b[0m')
-      expect(pair.builds.mock.results.map((result) => result.value)).toEqual([2, 0])
-      expect(pair.native.renderer.metrics.uploadedBytes - uploaded).toBe(2 * 40 * (64 + 96))
-      const changed = await expectParity(pair, 2)
-      const rowBytes = pair.native.canvas.width * fittedFont().deviceCellHeight * 4
-      expect(changed.subarray(0, rowBytes)).toEqual(before.subarray(0, rowBytes))
-      expect(changed.subarray(rowBytes * 2)).toEqual(before.subarray(rowBytes * 2))
-      writePair(pair, '\x1b[2;2H\x1b[33mX\x1b[0m')
-      const erased = await expectParity(pair, 3)
-      expect(erased).not.toEqual(changed)
-      expect(erased.subarray(0, rowBytes)).toEqual(before.subarray(0, rowBytes))
-      expect(erased.subarray(rowBytes * 2)).toEqual(before.subarray(rowBytes * 2))
-    })
+    it.each([0, -1])(
+      'keeps clean rows intact through wide missing-glyph retry and continuation erasure at baseline offset %i',
+      async (baselineOffset) => {
+        const font = fittedFont()
+        const pair = await parityFixture(backend, 'first\r\nsecond\r\nlast', {
+          font: { ...font, deviceBaseline: font.deviceBaseline + baselineOffset },
+        })
+        flushPair(pair)
+        const before = await expectParity(pair, 1)
+        const builder = pair.builds.mock.contexts.at(-1) as ZigFrameBuilder
+        const cleanRecords = cleanRowRecords(builder)
+        pair.builds.mockClear()
+        const uploaded = pair.native.renderer.metrics.uploadedBytes
+        writePair(pair, '\x1b[2;1H\x1b[31;44m界é👩‍💻\x1b[0m')
+        expect(pair.builds.mock.results.map((result) => result.value)).toEqual([2, 0])
+        expect(pair.native.renderer.metrics.uploadedBytes - uploaded).toBe(2 * 40 * (64 + 96))
+        const changed = await expectParity(pair, 2)
+        expect(changed).not.toEqual(before)
+        // Glyph ink can cross screen-row edges; clean logical rows retain their exact records.
+        expect(cleanRowRecords(builder)).toEqual(cleanRecords)
+        writePair(pair, '\x1b[2;2H\x1b[33mX\x1b[0m')
+        const erased = await expectParity(pair, 3)
+        expect(erased).not.toEqual(changed)
+        expect(cleanRowRecords(builder)).toEqual(cleanRecords)
+      },
+    )
 
     it('matches intrinsic color glyph brush identity, selection and cursor recoloring', async () => {
       const fitted = fittedFont(24, 48, 32)
