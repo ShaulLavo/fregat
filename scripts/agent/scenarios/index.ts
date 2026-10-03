@@ -209,7 +209,7 @@ import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
 import { terminalCancelledStartup } from './terminal-cancelled-startup'
-import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
+import { terminalRenderer, terminalRendererDom, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
@@ -638,6 +638,7 @@ export const scenarios: readonly Scenario[] = [
   terminalCancelledStartup,
   terminalOfflineHost,
   terminalRenderer,
+  terminalRendererDom,
   terminalRendererWebgl,
   bottomPanelPersistence,
   sidebarToggle,
