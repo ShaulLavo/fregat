@@ -43,13 +43,21 @@ export function selection(args, flag, fallback, allowed) {
   return selected
 }
 
-export function hardwareLaunch(host, smoke, smokeHeaded = false) {
-  const headless = host === 'linux' ? !smokeHeaded : smoke && !smokeHeaded
+export function hardwareLaunch(host, smoke, headed = false) {
+  const headless = host === 'linux' ? !headed : smoke && !headed
   const arguments_ =
     host === 'linux' && !smoke
       ? ['--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist']
       : []
   return { headless, arguments: arguments_ }
+}
+
+export function browserExecutable(args) {
+  const index = args.indexOf('--browser-executable')
+  if (index < 0) return undefined
+  const path = args[index + 1]
+  assert(path && !path.startsWith('--'), '--browser-executable needs a path')
+  return path
 }
 
 // The primary is selected automatically; secondary comparisons require explicit selection.

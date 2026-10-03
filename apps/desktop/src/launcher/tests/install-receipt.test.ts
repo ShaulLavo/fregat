@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { mkdtemp, mkdir, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
@@ -30,6 +30,10 @@ test('a verified receipt requires the exact Chrome app resource tree and current
     expect(hasVerifiedInstall(profile, receipt)).toBe(false)
     await mkdir(resources, { recursive: true })
     expect(hasVerifiedInstall(profile, receipt)).toBe(true)
+    const { displayMode: _, ...unconfigured } = receipt
+    await writeFile(path.join(root, 'chromium.installed.json'), JSON.stringify(unconfigured))
+    expect(hasVerifiedInstall(profile, receipt)).toBe(false)
+    rememberVerifiedInstall(profile, receipt)
     expect(
       hasVerifiedInstall(
         profile,
