@@ -1,8 +1,11 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
+import { stopTerminalHost } from '../../../server/src/terminal-host/identity'
+import { hostPaths } from '../../../server/src/terminal-host/protocol'
 
 const SERVER_START_TIMEOUT_MS = 15_000
 const SERVER_STOP_TIMEOUT_MS = 5_000
@@ -50,6 +53,8 @@ async function cleanupServer(server: TrackedServer, runtimeRoot: string) {
   try {
     await stopServer(server)
   } finally {
+    await stopTerminalHost(runtimeRoot)
+    await rm(hostPaths(runtimeRoot).directory, { recursive: true, force: true })
     await rm(runtimeRoot, { recursive: true, force: true })
   }
 }
@@ -85,7 +90,7 @@ async function waitForServer(server: TrackedServer, serverUrl: URL, browserPort:
   let lastError = 'server has not responded yet'
 
   while (Date.now() < deadline) {
-    if (server.process.exitCode !== null) {
+    if (serverExited(server.process)) {
       throw new Error(serverErrorMessage('Browser file server exited before startup', server))
     }
 
@@ -123,7 +128,7 @@ async function assertPortFree(serverUrl: URL, browserPort: string) {
 }
 
 async function stopServer(server: TrackedServer) {
-  if (server.process.exitCode !== null) return
+  if (serverExited(server.process)) return
 
   const exited = waitForExit(server.process)
   server.process.kill('SIGTERM')
@@ -135,12 +140,18 @@ async function stopServer(server: TrackedServer) {
   await exited
 }
 
-type TrackedServer = {
-  output: () => string
-  process: ChildProcessWithoutNullStreams
+type ServerProcess = ChildProcessByStdio<null, Readable, Readable>
+
+function serverExited(process: ServerProcess) {
+  return process.exitCode !== null || process.signalCode !== null
 }
 
-function trackServerOutput(process: ChildProcessWithoutNullStreams): TrackedServer {
+type TrackedServer = {
+  output: () => string
+  process: ServerProcess
+}
+
+function trackServerOutput(process: ServerProcess): TrackedServer {
   const chunks: string[] = []
   const append = (chunk: Buffer) => {
     chunks.push(chunk.toString('utf8'))
@@ -156,7 +167,7 @@ function trackServerOutput(process: ChildProcessWithoutNullStreams): TrackedServ
   }
 }
 
-function waitForExit(process: ChildProcessWithoutNullStreams) {
+function waitForExit(process: ServerProcess) {
   return new Promise<void>((resolve) => {
     process.once('exit', () => resolve())
   })
