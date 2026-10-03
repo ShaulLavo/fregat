@@ -309,7 +309,17 @@ export function useUpdateApp({
     )
   }
 
+  let progressLabel: string | null = null
+  if (intent.kind === 'waiting') progressLabel = 'Waiting to update…'
+  if (intent.kind === 'reload') progressLabel = 'Reloading…'
+  if (intent.kind === 'restarting') {
+    progressLabel = 'Restarting…'
+    if (connection.phase !== 'connected') progressLabel = 'Reconnecting…'
+    else if (intent.confirmed) progressLabel = 'Waiting for readiness…'
+  }
+
   return {
+    progressLabel,
     intent,
     available,
     currentTarget,

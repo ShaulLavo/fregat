@@ -247,7 +247,11 @@ test.each(['old server still running', 'missing live check', 'unavailable descri
     }
     if (failure === 'missing live check') await fixture.promote()
     expect(reloads).toBe(0)
-    expect(await screen.findByText('Updating…')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', {
+        name: /Restarting…|Reconnecting…|Waiting for readiness…/,
+      }),
+    ).toBeInTheDocument()
     await waitFor(
       () => expect(screen.getByRole('button', { name: 'Retry update' })).toBeEnabled(),
       { timeout: 4000 },
@@ -258,7 +262,9 @@ test.each(['old server still running', 'missing live check', 'unavailable descri
     })
     expect(reloads).toBe(0)
     expect(fixture.requests).toHaveLength(1)
-    expect(screen.queryByText('Updating…')).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: /Restarting…|Reconnecting…|Waiting for readiness…/ }),
+    ).toBeNull()
     await user.unhover(screen.getByRole('button', { name: 'Retry update' }))
     await user.hover(screen.getByRole('button', { name: 'Retry update' }))
     expect(await screen.findByText(/within the update time limit/)).toBeVisible()
@@ -409,7 +415,9 @@ test.each(['page-only', 'staged'] as const)(
         name: next === 'page-only' ? 'Reload app' : 'Update app',
       }),
     ).toBeEnabled()
-    expect(screen.queryByText('Updating…')).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: /Restarting…|Reconnecting…|Waiting for readiness…/ }),
+    ).toBeNull()
     if (next === 'page-only') {
       act(() => safety.setState({ dirtyFiles: ['draft.ts'] }))
       await user.click(screen.getByRole('button', { name: 'Reload app' }))
@@ -498,7 +506,7 @@ test('a successful health retry keeps unsaved buffers protected until the last b
   expect(reloads).toBe(0)
   act(() => safety.setState({ dirtyFiles: ['draft.ts'] }))
   await fixture.verdict('passed')
-  expect(await screen.findByRole('button', { name: 'Reload app' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Reloading…' })).toBeDisabled()
   expect(reloads).toBe(0)
   expect(fixture.requests).toHaveLength(1)
   await fixture.refresh()
@@ -539,7 +547,7 @@ test('unsaved buffers defer a healthy target reload and saving the last buffer c
   await fixture.promote()
   await fixture.verdict('passed')
   expect(reloads).toBe(0)
-  expect(await screen.findByRole('button', { name: 'Reload app' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Reloading…' })).toBeDisabled()
 
   act(() => safety.setState({ dirtyFiles: ['other.ts'] }))
   await fixture.refresh()
@@ -566,7 +574,7 @@ test.each(['failed', 'missing'] as const)(
     await fixture.promote()
     act(() => safety.setState({ dirtyFiles: ['draft.ts'] }))
     await fixture.verdict('passed')
-    expect(await screen.findByRole('button', { name: 'Reload app' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Reloading…' })).toBeDisabled()
     const deferred = updateIntentStore.getState().intent
     expect(deferred.kind).toBe('reload')
     if (deferred.kind !== 'reload') return
@@ -641,4 +649,79 @@ test('a failed live check blocks reload even for a skipped policy and keeps its 
   expect(reloads).toBe(0)
   await fixture.refresh()
   expect(reloads).toBe(0)
+})
+
+test('update progress follows intent and connection phases with a sibling Spinner', async () => {
+  const fixture = await releaseFixture()
+  const safety = createStore(() => ({ dirtyFiles: ['draft.ts'] as readonly string[] }))
+  renderWithProviders(<ServerUpdateStatus reload={() => {}} safety={safety} />)
+  const idle = await screen.findByRole('button', { name: 'Update app' })
+  expect(idle).toBeEnabled()
+  expect(screen.queryByRole('status')).toBeNull()
+  const descriptor = await fixture.response()
+  const target = descriptor!.pending!
+
+  const expectProgress = async (label: string) => {
+    const button = await screen.findByRole('button', { name: label })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    const spinner = screen.getByRole('status', { name: label })
+    expect(spinner).toHaveAttribute('data-slot', 'spinner')
+    expect(spinner).toHaveAttribute('data-size', 'sm')
+    expect(button.contains(spinner)).toBe(false)
+    const user = userEvent.setup()
+    await user.hover(button.parentElement!)
+    expect(await screen.findByText(`${label} Save 1 file to reload the app.`)).toHaveTextContent(
+      label,
+    )
+    await user.unhover(button.parentElement!)
+  }
+
+  act(() =>
+    updateIntentStore.getState().setIntent({
+      kind: 'waiting',
+      target,
+      busy: [],
+      gateReadAt: Date.now(),
+    }),
+  )
+  await expectProgress('Waiting to update…')
+  act(() =>
+    updateIntentStore.getState().setIntent({
+      kind: 'restarting',
+      target,
+      confirmed: false,
+      instance: 'server-1',
+      fromRelease: 'running-release',
+    }),
+  )
+  await expectProgress('Restarting…')
+  const keyboard = userEvent.setup()
+  await keyboard.tab()
+  expect(screen.getByRole('button', { name: 'Restarting…' }).parentElement).toHaveFocus()
+  expect(await screen.findByText('Restarting… Save 1 file to reload the app.')).toBeVisible()
+  await keyboard.tab()
+  fixture.disconnect()
+  await expectProgress('Reconnecting…')
+  fixture.reconnect()
+  act(() =>
+    updateIntentStore.getState().setIntent({
+      kind: 'restarting',
+      target,
+      confirmed: true,
+      instance: 'server-1',
+      fromRelease: 'running-release',
+    }),
+  )
+  await expectProgress('Waiting for readiness…')
+  await fixture.promote()
+  await fixture.verdict('passed')
+  await waitFor(() => expect(updateIntentStore.getState().intent.kind).toBe('reload'))
+  await expectProgress('Reloading…')
+  act(() => updateIntentStore.getState().setIntent({ kind: 'failed', target, reason: 'request' }))
+  expect(await screen.findByRole('button', { name: 'Retry update' })).toBeEnabled()
+  expect(screen.queryByRole('status')).toBeNull()
+  act(() => updateIntentStore.getState().setIntent({ kind: 'idle' }))
+  expect(await screen.findByRole('button', { name: 'Reload app' })).toBeEnabled()
+  expect(screen.queryByRole('status')).toBeNull()
 })
