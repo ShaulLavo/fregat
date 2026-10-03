@@ -215,15 +215,54 @@ nothing on it, and attaching many extensions stays cheap. A small cost per _inte
 is acceptable; any cost per _installed_ extension on the keystroke, write or frame path is a design
 bug, not a tuning task. Gates, with counters exact and timings against a same-machine control:
 
-| Gate | Measure                                                                                                           | Required                                                       |
-| ---- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| X1   | Calls into 1,000 extensions that contribute no `input`, per keystroke, paste and IME commit                       | 0                                                              |
-| X2   | Calls into 1,000 extensions with no `frame` or output subscription, per write and per painted frame               | 0                                                              |
-| X3   | Keystroke-to-PTY and write-to-paint latency with 100 and 1,000 inert extensions against none                      | inside the control envelope                                    |
-| X4   | Marginal cost per extra `input` handler that passes, 10 → 1,000 handlers                                          | small and flat (linear, no per-call allocation)                |
-| X5   | Payload objects built for an event no extension subscribes to (frame rows, OSC payloads, geometry)                | 0                                                              |
-| X6   | `Terminal.create` with 100 extensions against none; `terminal.use` and dispose of one extension with 100 attached | inside the control envelope; independent of the count attached |
-| X7   | Memory retained per inert extension after attach                                                                  | a few hundred bytes, measured                                  |
+| Gate | Measure                                                                                             | Required                                                                                   |
+| ---- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| X1   | Calls into 1,000 extensions that contribute no `input`, per keystroke, paste and IME commit         | 0                                                                                          |
+| X2   | Calls into 1,000 extensions with no `frame` or output subscription, per write and per painted frame | 0                                                                                          |
+| X3   | Keystroke-to-PTY and write-to-paint latency with 100 and 1,000 inert extensions against none        | inside the control envelope                                                                |
+| X4   | Marginal cost per extra `input` handler that passes, 10 → 1,000 handlers                            | small and flat (linear, no per-call allocation)                                            |
+| X5   | Payload objects built for an event no extension subscribes to (frame rows, OSC payloads, geometry)  | 0                                                                                          |
+| X6   | Input/write/frame/use/dispose and `Terminal.create` at 0/100/1,000 inert attachments                | Exact per-operation count independence; affine creation counts; preregistered timing bound |
+| X7   | Memory retained per inert extension after attach                                                    | a few hundred bytes, measured                                                              |
+
+**X6 registration (2026-10-03).** The primary gate is exact manager allocation-site/factory,
+extension-callback and payload-work counts: one input, write, frame, attachment or handle disposal
+has identical counts at 0/100/1,000 other inert attachments. Total creation counts must be affine
+in the number attached, with fixed per-attachment work and no installed-count traversal nested
+inside another operation. Fresh handles and independent disposal closures remain required.
+Source-expression counters do not measure realized VM/native allocations or implicit iterators.
+
+The earlier strict observed-minimum/maximum lifecycle windows remain **FAILED**, with every
+upper and lower outlier retained. Their criterion and artifacts stay unchanged. Future timing
+acceptance measures the installed-count contrast directly: membership of every arm in a
+control-extrema range is a different quantity and can reject a faster treatment. This criterion
+revision does not establish a cause for any old outlier or convert an old result to a pass.
+
+Timing registration awaiting owner approval:
+
+- For each non-creation operation separately, candidate limit: the one-sided 95% upper bootstrap
+  bound on the median paired treatment/control ratio is at most 1.10 at both 100 and 1,000 inert.
+  This bounds incremental installed-count overhead; it does not bound total attachment work.
+- Candidate sampling: 40 independent process blocks in one quiet-turn window, with 20,000 paired
+  cluster-bootstrap resamples and seed 286006. Keep all count arms from each process together;
+  retain every completed block and failed operation. No optional stopping or outlier filtering.
+- The unchanged manager driver can supply 40 complete invocations, each retaining its four
+  repetitions and eight lifecycle arms per count. Compute each process's median at each count,
+  then bootstrap the 40 paired log-ratio vectors. This covers combined warmed same-value
+  attach/dispose only. Its passing-input arms cover 0/1,000 inert, not the full requested matrix.
+- Creation timing needs a separate registration after its affine count proof: candidate normalized
+  curvature is `(T1000 - T0 - 10 * (T100 - T0)) / T0`, with a one-sided 95% upper bound at most
+  0.10. The comparison excludes the allowed linear setup cost. Non-positive base measurements,
+  missing arms and harness failures remain failed or inconclusive; none are omitted.
+- Public original-input/write/frame timing, separate use/dispose, fresh-identity attachment and
+  public creation need additional source-pinned operation drivers before full X6 can pass.
+  Existing native-byte/visible-row diagnostics establish state correctness, not latency or
+  compositor presentation. No frame notification substitutes for the Plan 287 paint oracle.
+
+The 10% limits, sample count and estimator are registration candidates, not approved thresholds.
+No new statistical window starts before owner sign-off on the exact operation matrix, source
+pins, driver/launcher, sample count and thresholds. Older accepted tooling and proof sources
+remain frozen; any future operation driver has its own identity.
 
 Harness: a counter test in the package's browser suite and `bun run bench:renderer` workloads with
 0, 100 and 1,000 inert extensions on the hardware adapter. If indexing bookkeeping grows with the
