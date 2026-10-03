@@ -53,7 +53,8 @@ test.each(['.', 'ghostty-webgpu'])('checks committed native inputs inside %s', (
       },
     ],
   }
-  expect(() => verifyOwnedFilesAtHead(family, fixtureInputs, head)).not.toThrow()
+  const loadedInputs = JSON.parse(canonicalObjectBytes(fixtureInputs).toString('utf8'))
+  expect(() => verifyOwnedFilesAtHead(family, loadedInputs, head)).not.toThrow()
 })
 
 test.each(['.', 'ghostty-webgpu'])(
