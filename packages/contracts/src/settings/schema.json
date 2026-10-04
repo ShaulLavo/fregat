@@ -572,6 +572,14 @@
       "minimum": 10,
       "type": "integer"
     },
+    "editor.inactiveAnalysisEntryLimit": {
+      "default": 2,
+      "description": "How many unused document syntax analysis entries the editor keeps across all retained environments. Structural analysis and highlighting each count as one entry.",
+      "markdownDescription": "How many unused document syntax analysis entries the editor keeps across all retained environments. Structural analysis and highlighting each count as one entry.\n\nEach retained document's structural or highlighter session counts once, including each distinct configuration. Checked after analysis and document ownership changes settle. Views and preparation leases protect their entries until release. Obsolete and abandoned entries leave first, then the least recently released entries. The default of 2 can keep a previous document's structural analysis and highlighting warm while another document is active. Set 0 to reclaim every unused entry. Reclaimed analysis is recreated when needed; the document keeps its text and Undo history. This setting counts entries. Memory use depends on the retained documents and providers.",
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    },
     "editor.inputRoute": {
       "default": "edit-context",
       "description": "How typed text reaches the editor. EditContext (Chromium) hands IME, autocorrect and dictation edits to the editor with their exact ranges. Other browsers use a hidden textarea.",

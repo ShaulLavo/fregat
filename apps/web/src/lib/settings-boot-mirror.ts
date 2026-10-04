@@ -53,6 +53,7 @@ const MIRRORED_KEYS = [
   'editor.largeFile.analysisLimitMiCodeUnits',
   'editor.maxTokenizationLineLength',
   'editor.retainedTextBudget',
+  'editor.inactiveAnalysisEntryLimit',
   'editor.history.retainedStates',
   'editor.history.persist',
   'editor.history.persistDays',
