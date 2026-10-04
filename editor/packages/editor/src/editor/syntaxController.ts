@@ -2,6 +2,7 @@ import type {
   EditorDocumentAnalysis,
   EditorRetainedSyntaxSession,
   EditorRetainedHighlighterSession,
+  EditorAnalysisDisplayDemand,
 } from './documentAnalysis'
 import type { DocumentSession, DocumentSessionChange } from '../documentSession'
 import type { DocumentEditChain, DocumentSyncPoint } from './editChain'
@@ -269,6 +270,10 @@ export class EditorSyntaxController {
 
   constructor(private readonly options: EditorSyntaxControllerOptions) {}
 
+  setDisplayDemand(demand: EditorAnalysisDisplayDemand): void {
+    this.retainedSyntax?.setDisplayDemand(demand)
+  }
+
   get status(): EditorSyntaxStatus {
     if (this.syntaxStatus !== 'ready' && this.syntaxStatus !== 'degraded') return this.syntaxStatus
     if (this.usesFallbackFolds || this.foldsCoverViewport()) return this.syntaxStatus
@@ -447,6 +452,7 @@ export class EditorSyntaxController {
     this.observeHighlighterTheme()
     this.syntaxSession = prepared?.structural?.session ?? this.createSyntaxSession(document)
     if (prepared?.structural) this.retainedSyntax = prepared.structural.session
+    this.retainedSyntax?.setDisplayDemand({ kind: 'unknown' })
     this.preparedSyntaxDisposer = prepared?.structural?.dispose ?? null
     this.preparedStructuralContentVersion = prepared?.structural ? this.syntaxContentVersion : null
     this.preparedHighlighterContentVersion = prepared?.highlighter
@@ -844,6 +850,7 @@ export class EditorSyntaxController {
             configurationTag: this.structuralConfigurationTag,
           })
         : null
+    this.retainedSyntax?.setDisplayDemand({ kind: 'unknown' })
     const session =
       this.retainedSyntax ??
       this.options.pluginHost.createSyntaxSession(sessionOptions) ??
@@ -1077,8 +1084,8 @@ export class EditorSyntaxController {
     request.schedule({
       delayMs: options.delayMs ?? 50,
       tags: syntaxWorkTags(documentVersion, contentVersion, kind, range),
-      run: traceEditorPerformanceTask('editor.syntax.range.request', () =>
-        this.loadSyntaxRangeResult(range, kind, { contentVersion }),
+      run: traceEditorPerformanceTask('editor.syntax.range.request', (signal: AbortSignal) =>
+        this.loadSyntaxRangeResult(range, kind, { contentVersion, signal }),
       ),
       apply: traceEditorPerformanceTask('editor.syntax.range.apply', (result, startedAt) => {
         const applied = this.applySyntaxResult(
@@ -1236,7 +1243,11 @@ export class EditorSyntaxController {
   private loadSyntaxRangeResult(
     range: EditorSyntaxRange,
     source: EditorSyntaxLoadSource,
-    options: { readonly contentVersion?: number; readonly updatesDocument?: boolean } = {},
+    options: {
+      readonly contentVersion?: number
+      readonly updatesDocument?: boolean
+      readonly signal?: AbortSignal
+    } = {},
   ): Promise<EditorSyntaxLoadResult> {
     const contentVersion = options.contentVersion ?? this.syntaxContentVersion
     if (!this.syntaxSession?.queryRange) {
@@ -1259,7 +1270,10 @@ export class EditorSyntaxController {
       })
     }
 
-    return this.syntaxSession.queryRange(range).then((result) => ({
+    const result = this.retainedSyntax
+      ? this.retainedSyntax.queryRange(range, { signal: options.signal })
+      : this.syntaxSession.queryRange(range)
+    return result.then((result) => ({
       contentVersion,
       range,
       result,
@@ -1473,8 +1487,11 @@ export class EditorSyntaxController {
     this.warmRangeRequests.schedule({
       delayMs: pending.delayMs,
       tags: syntaxWorkTags(pending.documentVersion, pending.contentVersion, 'warm', range),
-      run: traceEditorPerformanceTask('editor.syntax.warm.request', () =>
-        this.loadSyntaxRangeResult(range, 'warm', { contentVersion: pending.contentVersion }),
+      run: traceEditorPerformanceTask('editor.syntax.warm.request', (signal: AbortSignal) =>
+        this.loadSyntaxRangeResult(range, 'warm', {
+          contentVersion: pending.contentVersion,
+          signal,
+        }),
       ),
       apply: traceEditorPerformanceTask('editor.syntax.warm.apply', (result, startedAt) => {
         if (pending.generation !== this.warmGeneration) return

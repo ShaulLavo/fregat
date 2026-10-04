@@ -13,7 +13,7 @@ export type LatestAsyncRequestOptions<T> = {
   readonly taskClass?: EditorWorkTaskClass
   readonly priority?: EditorWorkPriority
   readonly tags?: EditorWorkTags
-  readonly run: () => Promise<T>
+  readonly run: (signal: AbortSignal) => Promise<T>
   readonly apply: (result: T, startedAt: number) => void
   readonly fail?: (error: unknown, startedAt: number) => void
 }
@@ -57,7 +57,7 @@ export class LatestAsyncRequest<T> {
       maxDelayMs: normalizeDelay(options.maxDelayMs),
       budgetMs: options.budgetMs,
       tags: options.tags,
-      run: options.run,
+      run: (context) => options.run(context.signal),
       apply: (result, context) =>
         this.apply(result as T, options, context.token, context.startedAt),
       fail: (error, context) => this.fail(error, options, context.token, context.startedAt),

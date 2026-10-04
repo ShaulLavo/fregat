@@ -23,6 +23,72 @@ import {
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 
 describe('prepared editor documents', () => {
+  it('promotes preparation interest before release and reuses metadata after reclamation', async () => {
+    const buffer = createEditorTextBuffer('alpha beta')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+    const provider: EditorSyntaxProvider = { createSession: vi.fn(() => syntaxSession()) }
+    const prepared = createEditorPreparedDocument({
+      buffer,
+      analysis,
+      configuredTabSize: 4,
+      tabSizePolicy: 'detect-indentation',
+      documentConfigurationTag: [],
+      documentId: 'file.ts',
+      languageId: 'typescript',
+    })
+    const range = { startIndex: 0, endIndex: 5 }
+    const controller = new AbortController()
+    await prepared.startStage({
+      family: 'structural',
+      provider,
+      configuration: structuralConfiguration,
+      configurationTag: ['tree-sitter', 1],
+      range,
+      abortSignal: controller.signal,
+    })
+    const original = analysis.inspectRetention().entries[0]!
+    expect(original.leaseCount).toBe(1)
+    expect(original.displayDemand).toMatchObject({
+      preparationLeases: 1,
+      frames: 0,
+      preparationRanges: [range],
+    })
+    const observedHandoff: number[] = []
+    const removeListener = controller.signal.removeEventListener.bind(controller.signal)
+    vi.spyOn(controller.signal, 'removeEventListener').mockImplementation((...args) => {
+      observedHandoff.push(analysis.inspectRetention().entries[0]!.leaseCount)
+      expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+      removeListener(...args)
+    })
+    const first = prepared.borrow(match(buffer, provider, null))!.structural!
+    expect(observedHandoff[0]).toBe(2)
+    expect(first.readyResult).not.toBeNull()
+    const promoted = analysis.inspectRetention().entries[0]!
+    expect(promoted).toMatchObject({ leaseCount: 1, lastLeaseReleasedAt: expect.any(Number) })
+    expect(promoted.displayDemand).toMatchObject({ preparationLeases: 0, unknownLeases: 1 })
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+    const second = prepared.borrow(match(buffer, provider, null))!.structural!
+    expect(second.runtimeSessionId).toBe(first.runtimeSessionId)
+    expect(second.readyResult).toBe(first.readyResult)
+    expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(2)
+    first.dispose()
+    second.dispose()
+    expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(0)
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([
+      original.runtimeSessionId,
+    ])
+    const recreated = prepared.borrow(match(buffer, provider, null))!.structural!
+    expect(recreated.runtimeSessionId).not.toBe(original.runtimeSessionId)
+    await recreated.result
+    expect(recreated.readyResult).not.toBeNull()
+    expect(provider.createSession).toHaveBeenCalledTimes(2)
+    expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(1)
+    prepared.dispose()
+    expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(1)
+    recreated.dispose()
+    analysis.dispose()
+  })
+
   it('skips fallback preparation when folding is disabled', async () => {
     const buffer = createEditorTextBuffer('root\n  child\n'.repeat(2_000))
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
@@ -429,7 +495,10 @@ describe('prepared editor documents', () => {
     })
     await Promise.resolve()
 
-    expect(claimed?.structural?.runtimeSessionId).toBe(prepared.runtimeSessionIds().structural[0])
+    expect(claimed?.structural?.runtimeSessionId).toBe(
+      prepared.analysis.inspectRetention().entries.find((entry) => entry.family === 'structural')
+        ?.runtimeSessionId,
+    )
     expect(claimed?.highlighter).toBeNull()
     expect(highlighterSession.dispose).not.toHaveBeenCalled()
     prepared.analysis.dispose()

@@ -1,0 +1,123 @@
+import { describe, expect, it, vi } from 'vitest'
+import {
+  createEditorBufferSession,
+  createEditorTextBuffer,
+  createEditorViewSession,
+} from '../src/documentSession'
+import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
+import type { Editor } from '../src/editor'
+import type { EditorPlugin } from '../src/plugins'
+import {
+  createEmptySyntaxResult,
+  type EditorSyntaxProvider,
+  type EditorSyntaxRange,
+} from '../src/syntax/session'
+import { VirtualizedTextView } from '../src/virtualization'
+import { createVisibleEditor } from './factories/visibleEditor'
+
+function textView(editor: Editor): VirtualizedTextView {
+  const view: unknown = Reflect.get(editor, 'view')
+  if (!(view instanceof VirtualizedTextView))
+    throw new TypeError('Expected the real Editor text view')
+  return view
+}
+
+function mountedRange(editor: Editor): EditorSyntaxRange {
+  const rows = textView(editor).getState().mountedRows
+  return { startIndex: rows[0]!.startOffset, endIndex: rows.at(-1)!.endOffset }
+}
+
+describe('analysis display demand', () => {
+  it('publishes both cached view frames before notifications and tracks layout, folds, edits and clear', async () => {
+    const buffer = createEditorTextBuffer(
+      Array.from({ length: 500 }, (_, index) => `line${index} ${'x'.repeat(90)}\n`).join(''),
+    )
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'frames.ts' })
+    const result = createEmptySyntaxResult({ folds: [{ startLine: 0, endLine: 5 }] })
+    const queryRange = vi.fn(async () => result)
+    const provider: EditorSyntaxProvider = {
+      createSession: vi.fn(() => ({
+        foldingSupport: 'supported',
+        refresh: async () => result,
+        applyChange: async () => result,
+        queryRange,
+        getResult: () => result,
+        getTokens: () => result.tokens,
+        getSnapshotVersion: () => 0,
+        dispose: () => undefined,
+      })),
+    }
+    const warm = analysis.borrowStructural({
+      provider,
+      languageId: 'typescript',
+      includeCaptures: false,
+      includeHighlights: true,
+      syntaxMode: 'range',
+    })!
+    await warm.queryRange({ startIndex: 0, endIndex: buffer.getTextSnapshot().length })
+    warm.dispose()
+    const plugin: EditorPlugin = { activate: (context) => context.registerSyntaxProvider(provider) }
+    const hosts = [document.createElement('div'), document.createElement('div')]
+    hosts.forEach((host) => document.body.appendChild(host))
+    const editors: Editor[] = []
+    let observed = 0
+    const assertFrames = () => {
+      const demand = analysis.inspectRetention().entries[0]!.displayDemand
+      expect(demand).toMatchObject({ unmanagedLeases: 0, unknownLeases: 0, frames: editors.length })
+      expect(demand.ranges).toEqual(editors.map(mountedRange))
+    }
+    try {
+      for (let index = 0; index < 2; index++) {
+        const editor = createVisibleEditor(hosts[index]!, {
+          plugins: [plugin],
+          onChange: () => {
+            if (!editors[index]) return
+            if (analysis.inspectRetention().entries[0]!.leaseCount !== editors.length) return
+            const demand = analysis.inspectRetention().entries[0]!.displayDemand
+            expect(demand.frames + demand.unknownLeases).toBe(editors.length)
+            if (textView(editors[index]!).isRenderingAtomically) {
+              expect(demand.unknownLeases).toBeGreaterThan(0)
+              return
+            }
+            expect(demand.ranges).toContainEqual(mountedRange(editors[index]!))
+            observed++
+          },
+        })
+        editors.push(editor)
+        editor.attachSession(
+          createEditorBufferSession(buffer, createEditorViewSession(buffer, `view${index}`)),
+          { analysis, documentId: 'frames.ts', languageId: 'typescript' },
+        )
+        textView(editor).setScrollMetrics(index * 2400, 72, 400)
+      }
+      assertFrames()
+      expect(observed).toBeGreaterThan(0)
+      expect(analysis.inspectRetention().entries[0]!.displayDemand.ranges[0]).not.toEqual(
+        analysis.inspectRetention().entries[0]!.displayDemand.ranges[1],
+      )
+      editors[0]!.setWordWrap(true)
+      textView(editors[0]!).setScrollMetrics(240, 96, 180)
+      editors[0]!.setFontSize(18)
+      assertFrames()
+      editors[0]!.setSyntaxFolds([{ startLine: 0, endLine: 5 }])
+      editors[0]!.fold(0)
+      assertFrames()
+      editors[0]!.unfold(0)
+      textView(editors[0]!).setScrollMetrics(0, 72, 400)
+      assertFrames()
+      await vi.waitFor(() => expect(queryRange).toHaveBeenCalledTimes(1))
+      editors[0]!.edit({ from: 0, to: 0, text: '!' })
+      assertFrames()
+      editors[0]!.setContent('')
+      assertFrames()
+      editors[0]!.dispose()
+      editors.shift()
+      assertFrames()
+      expect(provider.createSession).toHaveBeenCalledTimes(1)
+    } finally {
+      editors.forEach((editor) => editor.dispose())
+      hosts.forEach((host) => host.remove())
+      analysis.dispose()
+    }
+  })
+})
