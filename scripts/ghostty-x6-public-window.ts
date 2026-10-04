@@ -20,8 +20,9 @@ import { verifyX6Slices } from './ghostty-x6-public-slices.ts'
 import { verifyX6Journal } from './ghostty-x6-public-journal.ts'
 import { verifyPublicCounters, type CountRow } from './ghostty-x6-public-counters.ts'
 import {
-  bindX6Source,
+  bindX6AnalysisSource,
   verifyX6RuntimeReuse,
+  verifyX6AnalysisReuse,
   type SourceBinding,
 } from './ghostty-x6-public-reuse.ts'
 import {
@@ -63,6 +64,7 @@ interface Unit {
   readonly files: Record<string, string>
   readonly sourceBindings: readonly SourceBinding[]
   readonly runtimeReuse: ReturnType<typeof verifyX6RuntimeReuse>
+  readonly correctedAnalysisReuse: ReturnType<typeof verifyX6AnalysisReuse>
   readonly runtimeReuseQualification: {
     readonly file: string
     readonly sha256: string
@@ -101,8 +103,15 @@ interface CompletedRun {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const launcher = fileURLToPath(import.meta.url)
-const [command, inputArgument, outputArgument, argument, reuseArgument, qualificationArgument] =
-  process.argv.slice(2)
+const [
+  command,
+  inputArgument,
+  outputArgument,
+  argument,
+  reuseArgument,
+  qualificationArgument,
+  analysisArgument,
+] = process.argv.slice(2)
 assert(inputArgument && outputArgument)
 const input = resolve(inputArgument)
 const output = resolve(outputArgument)
@@ -160,6 +169,12 @@ async function prepare(): Promise<void> {
   assert.equal(git('status', '--porcelain'), '')
   assert(reuseArgument, 'Exact qualified type-only runtime reuse evidence required')
   const runtimeReuse = verifyX6RuntimeReuse(input, resolve(reuseArgument))
+  assert(analysisArgument, 'Exact corrected analysis build footprint required')
+  const correctedAnalysisReuse = verifyX6AnalysisReuse(input, resolve(analysisArgument))
+  assert.equal(
+    git('merge-base', correctedAnalysisReuse.correctedSourceHead, 'HEAD'),
+    correctedAnalysisReuse.correctedSourceHead,
+  )
   assert(qualificationArgument, 'Independent exact type-reuse custody required')
   const qualificationFile = resolve(qualificationArgument)
   const qualification = readJson<{
@@ -187,7 +202,7 @@ async function prepare(): Promise<void> {
   assert.equal(sourceMap.sources.length, sourceMap.sourcesContent.length)
   for (let index = 0; index < sourceMap.sources.length; index++) {
     const source = resolve(dirname(sourceMapFile), sourceMap.sources[index]!)
-    const binding = bindX6Source(
+    const binding = bindX6AnalysisSource(
       source,
       sourceMap.sourcesContent[index]!,
       readFileSync(source, 'utf8'),
@@ -223,7 +238,9 @@ async function prepare(): Promise<void> {
   mkdirSync(output)
   addTree(files, input)
   addTree(files, runtimeReuse.rebuiltArchive)
+  addTree(files, correctedAnalysisReuse.rebuiltArchive)
   files[runtimeReuse.evidenceFile] = runtimeReuse.evidenceSha256
+  files[correctedAnalysisReuse.footprintFile] = correctedAnalysisReuse.footprintSha256
   files[qualificationFile] = runtimeReuseQualification.sha256
   assert.equal(sourceBindings.length, 80)
   assert.equal(
@@ -252,13 +269,16 @@ async function prepare(): Promise<void> {
     join(root, 'scripts/ghostty-x6-public-drain.ts'),
     join(root, 'scripts/ghostty-x6-public-overlap.ts'),
     join(root, 'scripts/ghostty-x6-public-statistics.ts'),
+    join(root, 'scripts/ghostty-x6-public-statistics.test.ts'),
     join(root, 'scripts/ghostty-x6-public-counters.ts'),
     join(root, 'scripts/ghostty-x6-public-slices.ts'),
+    join(root, 'scripts/ghostty-x6-public-slices.test.ts'),
     join(root, 'scripts/ghostty-x6-public-journal.ts'),
     join(root, 'scripts/ghostty-x6-public-journal.test.ts'),
     join(root, 'scripts/ghostty-x6-public-overlap.test.ts'),
     join(root, 'scripts/ghostty-x6-public-claim.ts'),
     join(root, 'scripts/ghostty-x6-public-reuse.ts'),
+    join(root, 'scripts/ghostty-x6-public-reuse.test.ts'),
     host.quietTurnFile,
     ...['run.js', 'status.js', 'commit'].map((name) => join(host.runnerDirectory, name)),
   ]) {
@@ -295,6 +315,7 @@ async function prepare(): Promise<void> {
     files,
     sourceBindings,
     runtimeReuse,
+    correctedAnalysisReuse,
     runtimeReuseQualification,
     node: {
       path: node,
@@ -332,6 +353,10 @@ async function verifyUnit(unit: Unit): Promise<void> {
   assert.deepEqual(
     verifyX6RuntimeReuse(dirname(dirname(unit.bundle)), unit.runtimeReuse.evidenceFile),
     unit.runtimeReuse,
+  )
+  assert.deepEqual(
+    verifyX6AnalysisReuse(dirname(dirname(unit.bundle)), unit.correctedAnalysisReuse.footprintFile),
+    unit.correctedAnalysisReuse,
   )
   for (const [file, expected] of Object.entries(unit.files))
     assert.equal(digest('sha256', readFileSync(file), 'hex'), expected, file)

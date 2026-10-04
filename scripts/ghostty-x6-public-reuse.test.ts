@@ -3,7 +3,12 @@ import { hash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
-import { bindX6Source, verifyX6RuntimeReuse } from './ghostty-x6-public-reuse.ts'
+import {
+  bindX6Source,
+  bindX6AnalysisSource,
+  verifyX6RuntimeReuse,
+  verifyX6AnalysisReuse,
+} from './ghostty-x6-public-reuse.ts'
 
 const corrected = readFileSync(new URL('./ghostty-x6-public-overlap.ts', import.meta.url), 'utf8')
 // Reconstruct the exact historical fixture; corrected runtime source must fail the old exception.
@@ -41,6 +46,43 @@ test('rejects other files, other type erasures and any additional source delta',
       'interface Other {}',
     ),
   ).toThrow()
+})
+
+test('binds only the separately pinned tree-shaken analysis correction', () => {
+  expect(
+    bindX6AnalysisSource('/checkout/scripts/ghostty-x6-public-overlap.ts', frozen, corrected),
+  ).toMatchObject({
+    classification: 'PINNED TREE-SHAKEN ANALYSIS CORRECTION',
+    frozenSha256: '470165420b429bb36ce056d2e8397af36e8003cf9b7586066278df80f24f3060',
+    currentSha256: '985f31415003181c51631d8ea2638a9ecd50269fb10878d9defa78c2302624c1',
+  })
+  expect(bindX6AnalysisSource('/checkout/other.ts', 'same', 'same').classification).toBe(
+    'BYTE-EQUAL',
+  )
+  expect(() => bindX6AnalysisSource('/checkout/other.ts', frozen, corrected)).toThrow()
+  expect(() =>
+    bindX6AnalysisSource('/checkout/scripts/ghostty-x6-public-overlap.ts', frozen, current),
+  ).toThrow()
+  expect(() =>
+    bindX6AnalysisSource(
+      '/checkout/scripts/ghostty-x6-public-overlap.ts',
+      frozen,
+      corrected + '\n',
+    ),
+  ).toThrow()
+  expect(() =>
+    bindX6AnalysisSource(
+      '/checkout/scripts/ghostty-x6-public-overlap.ts',
+      frozen,
+      corrected.replace('end > start', 'end >= start'),
+    ),
+  ).toThrow()
+})
+
+test('requires the actual fixed build footprint rather than an invented qualification', () => {
+  fixture((accepted, _rebuilt, evidence) => {
+    expect(() => verifyX6AnalysisReuse(accepted, evidence)).toThrow()
+  })
 })
 
 function fixture(run: (accepted: string, rebuilt: string, evidence: string) => void): void {
