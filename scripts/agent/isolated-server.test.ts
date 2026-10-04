@@ -1,8 +1,10 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
+import { tmpdir } from 'node:os'
+import { readLogs } from './logs'
 
 import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
 import { startIsolatedServer, type IsolatedServer } from './isolated-server'
@@ -94,3 +96,42 @@ async function stopHostInNode(server: Pick<IsolatedServer, 'directory' | 'home'>
   const stderr = new Response(child.stderr).text()
   expect(await child.exited, await stderr).toBe(0)
 }
+
+it('preserves accepted client events and the shutdown receipt before removing isolated state', async () => {
+  const evidence = mkdtempSync(path.join(tmpdir(), 'fregat-log-tail-'))
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  vi.stubEnv('OBSERVABILITY_BATCH_INTERVAL_MS', '60000')
+  const since = new Date()
+  let server: IsolatedServer | undefined
+  try {
+    server = await startIsolatedServer(new URL('http://localhost:5214'))
+    const response = await fetch(`${server.origin}/_log/ingest`, {
+      method: 'POST',
+      headers: { origin: 'http://localhost:5214', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        level: 'warn',
+        timestamp: new Date().toISOString(),
+        action: 'verification.tail',
+        area: 'verification',
+        eventId: 'isolated-log-tail',
+      }),
+    })
+    expect(response.status).toBe(204)
+    await response.text()
+    await server.stop({ logs: evidence })
+    const events = await readLogs({ directory: evidence, since })
+    expect(events).toContainEqual(
+      expect.objectContaining({ action: 'verification.tail', level: 'warn', source: 'client' }),
+    )
+    expect(events).toContainEqual(
+      expect.objectContaining({ action: 'server.stop', reason: 'SIGTERM' }),
+    )
+    expect(existsSync(server.directory)).toBe(false)
+    await server.stop()
+    expect(await readLogs({ directory: evidence, since })).toEqual(events)
+  } finally {
+    await server?.stop()
+    vi.unstubAllEnvs()
+    rmSync(evidence, { recursive: true, force: true })
+  }
+}, 40_000)
