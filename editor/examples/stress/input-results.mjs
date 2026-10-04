@@ -154,7 +154,7 @@ export function validateInputResult(result) {
   validateManifest(result.manifest)
   validateConfig(result.config)
   if (result.config.isolation === 'closed-browser-context-per-configuration')
-    validateWarmLifecycle(result)
+    validateWarmInputLifecycle(result)
   const seen = new Set()
   for (const sample of result.samples) validateSample(sample, result, seen)
   const expected = result.config.adaptivePairs
@@ -194,7 +194,10 @@ function validateSample(sample, result, seen) {
   validateObservation(sample, result.config)
 }
 
-function validateWarmLifecycle(result) {
+export function validateWarmInputLifecycle(
+  result,
+  subjects = inputViewModes.flatMap((views) => fixtureIds.map((fixture) => `${fixture}/${views}`)),
+) {
   validateInputBootstrap(result)
   const cleanup = result.cleanup
   record(cleanup, 'configuration cleanup')
@@ -205,12 +208,21 @@ function validateWarmLifecycle(result) {
   )
   same(cleanup.scope, 'configuration', 'cleanup scope')
   text(cleanup.ownerIdentity, 'warm owner identity')
-  integer(cleanup.trackedObjects, 'tracked configuration objects', 15)
+  const warmups = validateWarmupResets(result)
+  for (const sample of result.samples) {
+    const fixture = result.manifest.fixtures.find((entry) => entry.id === sample.fixture)
+    validateWarmReset(sample, result, fixture)
+  }
+  const reloads = [...result.samples, ...warmups].filter((sample) => sample.reset.documentReloaded)
+  const editors = subjects.some((subject) => subject.endsWith('/multiple')) ? 3 : 1
+  const trackedObjects = (subjects.length + reloads.length) * 2 + editors
+  same(cleanup.trackedObjects, trackedObjects, 'tracked configuration objects')
+  same(cleanup.retainedObjects, 0, 'retained configuration objects')
   validateCleanup({ cleanup, views: 'multiple' }, 'configuration', cleanup.trackedObjects)
   if (!Array.isArray(result.startup)) fail('Missing warm startup receipts')
   same(
     result.startup.map((entry) => `${entry.fixture}/${entry.views}`).sort(),
-    fixtureIds.flatMap((fixture) => inputViewModes.map((views) => `${fixture}/${views}`)).sort(),
+    subjects.toSorted(),
     'warm startup coverage',
   )
   for (const [index, entry] of result.startup.entries()) {
@@ -219,6 +231,30 @@ function validateWarmLifecycle(result) {
     same(entry.retained, index !== 0, 'warm startup retention')
   }
   same(result.config.warmupFixture, 'measured', 'warm input fixture')
+}
+
+function validateWarmupResets(result) {
+  if (!Array.isArray(result.warmupResets)) fail('Missing warmup reset receipts')
+  const groups = [
+    ...new Set(
+      result.samples.map((sample) => `${sample.fixture}/${sample.views}/${sample.scenario}`),
+    ),
+  ]
+  const expected = groups.flatMap((group) =>
+    Array.from({ length: result.config.warmups }, (_, index) => `${group}/${-index - 1}`),
+  )
+  same(
+    result.warmupResets
+      .map((sample) => `${sample.fixture}/${sample.views}/${sample.scenario}/${sample.repetition}`)
+      .sort(),
+    expected.sort(),
+    'warmup reset coverage',
+  )
+  for (const sample of result.warmupResets) {
+    const fixture = result.manifest.fixtures.find((entry) => entry.id === sample.fixture)
+    validateWarmReset(sample, result, fixture)
+  }
+  return result.warmupResets
 }
 
 function validateInputBootstrap(result) {

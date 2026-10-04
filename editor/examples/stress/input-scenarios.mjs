@@ -221,6 +221,15 @@ async function runPairedGroup(
         helpers.readMemory,
       )
       if (repetition >= 0) samples[side].push(sample)
+      else
+        (results[side].warmupResets ??= []).push({
+          fixture: sample.fixture,
+          views: sample.views,
+          scenario: sample.scenario,
+          repetition,
+          cleanup: null,
+          reset: sample.reset,
+        })
       console.log(
         JSON.stringify({
           event: 'input.paired.sample',

@@ -4,7 +4,7 @@ import * as v from 'valibot'
 import { expect, it } from 'vitest'
 import { mergeProvenUsageAccounts } from '../usage-account-merge'
 
-it('preserves restrictions and incompatible reset epochs with unique window IDs', () => {
+it('preserves restrictions and one account allowance across newer reset observations', () => {
   const window: ProviderUsageWindow = {
     id: 'primary',
     label: 'Session',
@@ -36,12 +36,11 @@ it('preserves restrictions and incompatible reset epochs with unique window IDs'
       {
         ...window,
         usedPercent: 50,
-        resetsAt: '2026-09-24T12:00:00.000Z',
+        resetsAt: '2026-09-24T10:59:59.000Z',
+        observedAt: '2026-09-24T10:10:00.000Z',
         source: 'cliproxy-passive-cache',
       },
-      { ...window, usedPercent: null, status: 'rejected', source: 'cliproxy-passive-cache' },
-      { ...window, usedPercent: 90, resetsAt: null, source: 'cliproxy-passive-cache' },
-      { ...window, usedPercent: 42, source: 'cliproxy-passive-cache' },
+      { ...window, id: 'bengalfox:primary', usedPercent: 9, source: 'cliproxy-passive-cache' },
     ],
   }
   const [merged] = mergeProvenUsageAccounts(
@@ -52,18 +51,23 @@ it('preserves restrictions and incompatible reset epochs with unique window IDs'
     ]),
   )
   expect(merged).toMatchObject({ state: 'disabled', routing: { active: false } })
-  expect(merged!.windows).toHaveLength(5)
-  expect(new Set(merged!.windows.map((entry) => entry.id)).size).toBe(5)
-  expect(merged!.windows.map((entry) => entry.usedPercent)).toEqual([17, 50, null, 90, 42])
-  expect(merged!.windows.map((entry) => entry.resetsAt)).toEqual([
-    window.resetsAt,
-    '2026-09-24T12:00:00.000Z',
-    window.resetsAt,
-    null,
-    window.resetsAt,
+  expect(merged!.windows).toMatchObject([
+    {
+      id: 'primary',
+      usedPercent: 50,
+      resetsAt: '2026-09-24T10:59:59.000Z',
+      observedAt: '2026-09-24T10:10:00.000Z',
+    },
+    { id: 'bengalfox:primary', usedPercent: 9, observedAt: window.observedAt },
   ])
-  expect(merged!.windows[2]!.status).toBe('rejected')
-  expect(merged!.windows.every((entry) => entry.observedAt === window.observedAt)).toBe(true)
+  const reversed = mergeProvenUsageAccounts(
+    [proxy, native],
+    new Map([
+      ['native', 'same'],
+      ['proxy', 'same'],
+    ]),
+  )
+  expect(reversed[0]!.windows).toEqual(merged!.windows)
   const readyProxy: ProviderAccountUsage = {
     ...proxy,
     accountKey: 'proxy2',

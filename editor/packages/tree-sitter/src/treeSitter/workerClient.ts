@@ -328,6 +328,7 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
       if (!this.worker) return
 
       await this.postRequest({ type: 'disposeDocument', runtimeSessionId }, false)
+      this.sourceChunkRetention.retireDocument(runtimeSessionId)
     })
     void this.trackRuntimeTask(runtimeSessionId, disposal).catch(() => undefined)
   }

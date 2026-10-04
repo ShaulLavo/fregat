@@ -573,3 +573,42 @@ unchanged.
 
 Delivery remains #247, with commit gates and repository typechecks required before its push.
 The repair pass does not merge or rerun benchmark collection.
+
+### Current-identity undo diagnostic repair, 2026-10-04
+
+Status: Approved. The owner authorized the diagnostic repair, benchmark proof rounds and
+Plan 099 units 2–7. The latency prerequisite still requires current-instrument evidence.
+
+The restricted validator counted the initial buffer, analysis owner and three Editors as five
+lifetime objects. An admitted document reload releases two more objects, the replaced buffer
+and analysis owner. The archived 195.706-second diagnostic therefore completed its bursts and
+failed cleanup accounting before publishing a valid comparison. That failure remains archived.
+
+Full and restricted warm receipts now share `validateWarmInputLifecycle`. Its exact expected
+count is `2 × (subject attachments + admitted reloads) + final Editor count`. Warmup reset receipts cover every warmup and contribute their replacement owners.
+The validator checks warmup source readiness, exact tracked counts, zero retained objects,
+bootstrap disposal, listener limits, stopped workers and closed contexts. Existing source/render
+predicates, the pending-minimap exception, products, budgets, sampler and statistic are retained.
+
+- [x] Record six failing-before lifecycle regressions; all 21 focused lifecycle checks pass after repair.
+- [x] Pass all 368 stress tests, stress TypeScript and stress lint. The inherited `src/input-output.ts` spread warning remains.
+- [x] Verify original prerequisite product hashes and their matching external receipt.
+- [x] Regenerate and independently recompute automatic native sensitivity controls under the current identity. Input20 rejects 72/72, frame20 rejects 36/36, and the named floor25 rejects; 30 ms is skipped. Collection costs 521.854 seconds. All six arm cleanups retain zero owners/workers and close contexts.
+- [ ] Complete a five-run alternating quiet A/A and A/B diagnostic pilot on `short-lines/multiple/undo/inputToApplied`; report rejects per arm, median of medians and actual wall.
+- [ ] Review screenshots and every cleanup receipt; retain every rejection and incomplete attempt.
+- [ ] Pass required commit gates, push a review-ready repair/proof PR and hand it to the coordinator.
+
+Five pilot runs per arm bound this first checkpoint within roughly 90 minutes. The requested
+final reliability follow-up remains ten runs per arm; this pilot provides no rejects/10 result. The archived first A/A
+alone cost 195.706 seconds. Each run receives its own quiet admission, and the cohort records
+queue time separately from actual child CLI time. These restricted receipts are diagnostic and
+earn no default, loaded, full-matrix or expanded historical acceptance credit.
+
+Current measurement is `8127db7f5778b19c6e0543defeefefbde388572e176bddf09e1130391be97c25`,
+validation is `0620138886cf2eb6f5c4f1e382fdfefd643f1d45668c680468566296fff9de8c`, and combined
+instrument is `ba80c486f66dabf93af876e6b5fcf64df0c8b6be6aad700ebb094b3bdedd1228`. The first
+public CLI automatically regenerates the full cache, then the host's 600-second quiet lease stops
+its following native positive at 600.082 actual CLI seconds. No complete native matrix exists
+for that attempt. Its cancellation and cache remain preserved in `controls.log`,
+`controls-timing.json` and `sensitivity/` under `/work/tmp/plan282-undo-20261004/`. The cached
+native positive will run separately; none of the incomplete positive earns acceptance credit.

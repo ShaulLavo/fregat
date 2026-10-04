@@ -1,4 +1,5 @@
-import type { ProviderAccountUsage, ProviderUsageWindow } from '@workspace/contracts'
+import type { ProviderAccountUsage } from '@workspace/contracts'
+import { mergeObservedUsageWindows } from './usage-windows'
 
 /** Identity proofs group accounts; labels, mappings and plans never establish equality. */
 export function mergeProvenUsageAccounts(
@@ -41,7 +42,7 @@ function mergeAccount(
     checkedAt: latest(left.checkedAt, right.checkedAt),
     lastSeenAt: latest(left.lastSeenAt ?? left.checkedAt, right.lastSeenAt ?? right.checkedAt),
     providerInstanceIds: [...new Set([...left.providerInstanceIds, ...right.providerInstanceIds])],
-    windows: mergeWindows(left.windows, right.windows),
+    windows: mergeObservedUsageWindows(left.windows, right.windows),
   }
 }
 
@@ -49,41 +50,4 @@ function latest(left: string | null, right: string | null): string | null {
   if (!left) return right
   if (!right) return left
   return Date.parse(left) > Date.parse(right) ? left : right
-}
-
-function mergeWindows(
-  left: readonly ProviderUsageWindow[],
-  right: readonly ProviderUsageWindow[],
-): ProviderUsageWindow[] {
-  const result = [...left]
-  for (const window of right) {
-    const index = result.findIndex((known) => known.id === window.id)
-    if (index === -1) {
-      result.push(window)
-      continue
-    }
-    const known = result[index]!
-    // Native numeric reads use null for allowed; passive proxy caches spell it out.
-    const comparable =
-      known.windowMinutes !== null &&
-      known.windowMinutes === window.windowMinutes &&
-      known.resetsAt !== null &&
-      known.resetsAt === window.resetsAt &&
-      (known.status ?? 'allowed') === (window.status ?? 'allowed') &&
-      !(known.observedAt === window.observedAt && known.usedPercent !== window.usedPercent) &&
-      known.observedAt &&
-      window.observedAt &&
-      known.usedPercent !== null &&
-      window.usedPercent !== null
-    if (!comparable) {
-      const base = `${window.source ?? 'unknown'}:${window.id}`
-      let id = base
-      let suffix = 2
-      while (result.some((entry) => entry.id === id)) id = `${base}:${suffix++}`
-      result.push({ ...window, id })
-      continue
-    }
-    result[index] = Date.parse(known.observedAt!) > Date.parse(window.observedAt!) ? known : window
-  }
-  return result
 }

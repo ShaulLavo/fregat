@@ -9,6 +9,7 @@ import type {
   EditorHighlighterSession,
   EditorHighlightResult,
 } from '../syntax/highlighter'
+import type { EditorTokenInput } from '../syntax/tokenStore'
 import {
   createEditorRuntimeSessionId,
   createEmptySyntaxResult,
@@ -20,6 +21,44 @@ import {
 } from '../syntax/session'
 
 type EditorAnalysisConfigurationTag = readonly (string | number | boolean | null)[]
+type AnalysisRetentionEntry = {
+  readonly family: 'structural' | 'highlighter'
+  readonly runtimeSessionId: string
+  readonly leaseCount: number
+  readonly lastLeaseReleasedAt: number | null
+  readonly revision: number
+  readonly status: EditorAnalysisRead<unknown>['kind']
+  readonly resultCount: number
+  readonly tokenCount: number
+  readonly cachedRangeCount: number
+  readonly pendingRangeCount: number
+  readonly syntaxRecordBackingBytes: number
+}
+type AnalysisRetentionInspection = {
+  readonly entries: readonly AnalysisRetentionEntry[]
+  readonly syntaxRecordBackingBytes: number
+  readonly unmeasuredBytes: readonly (
+    | 'token-store-backing'
+    | 'javascript-objects'
+    | 'provider-sessions'
+    | 'worker-heaps'
+    | 'wasm'
+  )[]
+}
+type AnalysisReclamationOptions = {
+  readonly reason: 'inactive-budget' | 'speculative-abandoned'
+  readonly runtimeSessionIds?: readonly string[]
+}
+type AnalysisReclamation = {
+  readonly reason: AnalysisReclamationOptions['reason']
+  readonly runtimeSessionIds: readonly string[]
+  readonly cachedRangeCount: number
+  readonly pendingRangeCount: number
+}
+type RetentionResult = {
+  readonly tokens: EditorTokenInput
+  readonly records?: EditorSyntaxResult['records']
+}
 export type EditorAnalysisRead<T> =
   | { readonly kind: 'pending'; readonly revision: number }
   | {
@@ -60,6 +99,8 @@ export type EditorDocumentAnalysis = {
   borrowHighlighter(
     request: EditorAnalysisHighlighterRequest,
   ): EditorRetainedHighlighterSession | null
+  inspectRetention(): AnalysisRetentionInspection
+  reclaimInactive(options: AnalysisReclamationOptions): AnalysisReclamation
   dispose(): void
 }
 
@@ -69,14 +110,15 @@ type AnalysisSession<T> = {
   dispose(): void
 }
 
-class AnalysisEntry<T> {
+class AnalysisEntry<T extends RetentionResult> {
   readonly runtimeSessionId: string
   private readonly cancellation = new AbortController()
   private interests = 0
+  private lastRelease: number | null = null
   private queuedRevision = -1
   private generation = 0
   private pendingInterest = new AbortController()
-  private tail: Promise<unknown> = Promise.resolve()
+  private tail: Promise<void> = Promise.resolve()
   private state: EditorAnalysisRead<T>
 
   constructor(
@@ -97,11 +139,34 @@ class AnalysisEntry<T> {
     return this.interests
   }
 
+  get lastLeaseReleasedAt(): number | null {
+    return this.lastRelease
+  }
+
+  get cachedRangeCount(): number {
+    return 0
+  }
+
+  get pendingRangeCount(): number {
+    return 0
+  }
+
+  retainedResults(): readonly T[] {
+    return this.state.kind === 'ready' ? [this.state.result] : []
+  }
+
   lease(signal?: AbortSignal) {
     const lease = leaseCancellation(this.signal, signal)
     if (lease.signal.aborted) return lease
     this.interests++
-    lease.signal.addEventListener('abort', () => this.interests--, { once: true })
+    lease.signal.addEventListener(
+      'abort',
+      () => {
+        this.interests--
+        this.lastRelease = Date.now()
+      },
+      { once: true },
+    )
     return lease
   }
 
@@ -153,7 +218,10 @@ class AnalysisEntry<T> {
       this.assertCurrent(revision, generation)
       return run()
     })
-    this.tail = result.catch(() => undefined)
+    this.tail = result.then(
+      () => undefined,
+      () => undefined,
+    )
     const value = await interruptible(interruptible(result, this.cancellation.signal), interest)
     this.assertCurrent(revision, generation)
     return value
@@ -163,6 +231,7 @@ class AnalysisEntry<T> {
     if (this.cancellation.signal.aborted) return
     this.cancellation.abort()
     this.pendingInterest.abort()
+    this.state = { kind: 'failed', revision: this.buffer.getRevision(), error: cancelled() }
     this.session.dispose()
   }
 
@@ -228,6 +297,29 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       this.structuralSession.queryRange !== undefined &&
       (this.structuralSession.canQueryRange?.() ?? true)
     )
+  }
+
+  override get cachedRangeCount(): number {
+    return this.ranges.size
+  }
+
+  override get pendingRangeCount(): number {
+    return this.queries.size
+  }
+
+  override retainedResults(): readonly EditorSyntaxResult[] {
+    return [
+      ...new Set([
+        ...super.retainedResults(),
+        ...[...this.ranges.values()].map((cached) => cached.result),
+      ]),
+    ]
+  }
+
+  override dispose(): void {
+    this.ranges.clear()
+    this.queries.clear()
+    super.dispose()
   }
 
   readRange(range?: EditorSyntaxRange): EditorAnalysisRead<EditorSyntaxResult> {
@@ -299,6 +391,11 @@ export function createEditorDocumentAnalysis(options: {
       for (const { entry } of highlighters) entry.changed(event)
     })
   }
+  const releaseSubscription = () => {
+    if (structural.length > 0 || highlighters.length > 0) return
+    unsubscribe?.()
+    unsubscribe = undefined
+  }
   return {
     buffer,
     documentId,
@@ -363,19 +460,110 @@ export function createEditorDocumentAnalysis(options: {
       }
       return highlighterLease(found.entry, found.session, request.signal)
     },
-    dispose() {
-      if (disposed) return
-      disposed = true
-      unsubscribe?.()
-      for (const { entry } of structural) entry.dispose()
-      for (const { entry, unsubscribeTheme } of highlighters) {
+    inspectRetention() {
+      const records = new Set<ArrayBufferLike>()
+      const entries = [
+        ...structural.map(({ entry }) => inspectEntry('structural', entry, records)),
+        ...highlighters.map(({ entry }) => inspectEntry('highlighter', entry, records)),
+      ]
+      return {
+        entries,
+        syntaxRecordBackingBytes: backingBytes(records),
+        unmeasuredBytes: [
+          'token-store-backing',
+          'javascript-objects',
+          'provider-sessions',
+          'worker-heaps',
+          'wasm',
+        ],
+      }
+    },
+    reclaimInactive(options) {
+      const requested = options.runtimeSessionIds ? new Set(options.runtimeSessionIds) : null
+      const reclaimed: string[] = []
+      let cachedRangeCount = 0
+      let pendingRangeCount = 0
+      for (const retained of structural.slice()) {
+        const { entry } = retained
+        if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
+        const index = structural.indexOf(retained)
+        if (index < 0) continue
+        structural.splice(index, 1)
+        reclaimed.push(entry.runtimeSessionId)
+        cachedRangeCount += entry.cachedRangeCount
+        pendingRangeCount += entry.pendingRangeCount
+        entry.dispose()
+      }
+      for (const retained of highlighters.slice()) {
+        const { entry, unsubscribeTheme } = retained
+        if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
+        const index = highlighters.indexOf(retained)
+        if (index < 0) continue
+        highlighters.splice(index, 1)
+        reclaimed.push(entry.runtimeSessionId)
         unsubscribeTheme?.()
         entry.dispose()
       }
-      structural.length = 0
-      highlighters.length = 0
+      releaseSubscription()
+      return {
+        reason: options.reason,
+        runtimeSessionIds: reclaimed,
+        cachedRangeCount,
+        pendingRangeCount,
+      }
+    },
+    dispose() {
+      if (disposed) return
+      disposed = true
+      const ownedStructural = structural.splice(0)
+      const ownedHighlighters = highlighters.splice(0)
+      const releaseBuffer = unsubscribe
+      unsubscribe = undefined
+      releaseBuffer?.()
+      for (const { entry } of ownedStructural) entry.dispose()
+      for (const { entry, unsubscribeTheme } of ownedHighlighters) {
+        unsubscribeTheme?.()
+        entry.dispose()
+      }
     },
   }
+}
+
+function inspectEntry(
+  family: AnalysisRetentionEntry['family'],
+  entry: AnalysisEntry<RetentionResult>,
+  sharedRecords: Set<ArrayBufferLike>,
+): AnalysisRetentionEntry {
+  const results = new Set(entry.retainedResults())
+  const tokens = new Set<EditorTokenInput>()
+  const records = new Set<ArrayBufferLike>()
+  for (const result of results) {
+    tokens.add(result.tokens)
+    const backing = result.records?.data.buffer
+    if (!backing) continue
+    records.add(backing)
+    sharedRecords.add(backing)
+  }
+  const state = entry.read()
+  return {
+    family,
+    runtimeSessionId: entry.runtimeSessionId,
+    leaseCount: entry.leaseCount,
+    lastLeaseReleasedAt: entry.lastLeaseReleasedAt,
+    revision: state.revision,
+    status: state.kind,
+    resultCount: results.size,
+    tokenCount: [...tokens].reduce((count, input) => count + input.length, 0),
+    cachedRangeCount: entry.cachedRangeCount,
+    pendingRangeCount: entry.pendingRangeCount,
+    syntaxRecordBackingBytes: backingBytes(records),
+  }
+}
+
+function backingBytes(buffers: ReadonlySet<ArrayBufferLike>): number {
+  let total = 0
+  for (const buffer of buffers) total += buffer.byteLength
+  return total
 }
 
 function structuralLease(
