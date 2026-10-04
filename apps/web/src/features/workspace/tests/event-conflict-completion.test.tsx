@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
@@ -15,13 +15,12 @@ import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { fileSystemKeys } from '@/lib/query-keys'
 import {
   notifyChangedFilesystemConflict,
+  notifyRenamedFilesystemConflict,
   dismissFilesystemConflicts,
-  type WorkspaceConflictContext,
 } from '@/features/workspace/state/event-conflict-adapter'
 import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
 import { expect, test } from '../../../../test/fixtures'
-import { createObservedInProcessClient } from '../../../../test/client'
-import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'
+import { createConflictCompletionFixture } from '../../../../test/factories/conflict-completion'
 
 for (const change of [
   'none',
@@ -36,38 +35,19 @@ for (const change of [
     server,
     client,
   }) => {
-    const entered = Promise.withResolvers<void>()
-    const released = Promise.withResolvers<void>()
-    let holdRead = false
-    let held = false
-    const transport = createObservedInProcessClient(server, async (request) => {
-      if (!holdRead || held || new URL(request.url).pathname !== '/fs/read') return
-      held = true
-      entered.resolve()
-      await released.promise
-    })
-    const path = filesystemPath('toast-conflict.txt')
-    await writeFile(join(server.root, path), 'remote text')
-    const remote = await fetchFile(path, new AbortController().signal, transport)
-    const { application, commands, editor } = await createAddressTestRuntime(transport)
-    const { documentStore, conflictStore } = editor
-    const queryClient = application.getSnapshot().queryClient
-    const documents = documentStore.getState()
-    const destination = documents.ensureLiveEditorDocument(remote)
-    setFileSnapshotQueryData(queryClient, remote)
-    const context: WorkspaceConflictContext = {
-      client: transport,
-      conflictStore,
+    const {
+      commands,
+      editor: { documentStore, conflictStore },
+      path,
+      remote,
       queryClient,
-      discardLiveEditorDocument: commands.discardLiveEditorDocument,
-      ensureUnsyncedEditorDocument: documents.ensureUnsyncedEditorDocument,
-      fetchFile: (target, signal) => fetchFile(target, signal, transport),
-      forceReplaceLiveEditorDocument: documents.forceReplaceLiveEditorDocument,
-      getLiveEditorDocument: documents.getLiveEditorDocument,
-      renameLiveEditorDocument: commands.renameLiveEditorDocument,
-      selectContent: commands.selectContent,
-      setFileOrphaned: documents.setFileOrphaned,
-    }
+      documents,
+      destination,
+      context,
+      entered,
+      released,
+      holdRefetch,
+    } = await createConflictCompletionFixture(server)
     try {
       conflictStore.getState().clearConflicts()
       createEditorBufferSession(destination.buffer).applyText('local ')
@@ -77,7 +57,7 @@ for (const change of [
       fireEvent.click(await screen.findByRole('button', { name: 'Compare' }))
       const conflict = Object.values(conflictStore.getState().conflicts)[0]!
       const resolution = documentStore.getState().getLiveEditorDocument(conflict.diffDocumentKey!)!
-      holdRead = true
+      holdRefetch()
       if (change === 'stale-disk')
         await writeFile(join(server.root, path), 'newer disk before write')
       fireEvent.click(screen.getByRole('button', { name: 'Keep my changes' }))
@@ -173,6 +153,214 @@ for (const change of [
       act(() => createEditorBufferSession(currentDestination.buffer).undo())
       expect(currentDestination.buffer.materializeFullText()).not.toBe(currentText)
     } finally {
+      released.resolve()
+    }
+  })
+}
+
+test('toast completion adopts a normal renamed resolution', async ({ server }) => {
+  const {
+    editor: { conflictStore },
+    path,
+    queryClient,
+    documents,
+    destination,
+    context,
+    entered,
+    released,
+    holdRefetch,
+  } = await createConflictCompletionFixture(server)
+  const renamedPath = filesystemPath('renamed-conflict.txt')
+  try {
+    createEditorBufferSession(destination.buffer).applyText('local ')
+    const localText = destination.buffer.materializeFullText()
+    await rename(join(server.root, path), join(server.root, renamedPath))
+    render(<Toaster />)
+    await act(() => notifyRenamedFilesystemConflict(path, renamedPath, context))
+    fireEvent.click(await screen.findByRole('button', { name: 'Compare' }))
+    const conflict = Object.values(conflictStore.getState().conflicts)[0]!
+    holdRefetch()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep my changes' }))
+    await entered.promise
+    expect(await readFile(join(server.root, renamedPath), 'utf8')).toBe(localText)
+    released.resolve()
+    await waitFor(() =>
+      expect(
+        queryClient.getMutationCache().find({
+          mutationKey: workspaceMutationKeys.resolveConflict(conflict.id),
+        })?.state.status,
+      ).toBe('success'),
+    )
+    expect(conflictStore.getState().conflicts).toEqual({})
+    expect(documents.getLiveEditorDocument(fileDocumentKey(path))).toBeNull()
+    expect(
+      documents.getLiveEditorDocument(fileDocumentKey(renamedPath))?.buffer.materializeFullText(),
+    ).toBe(localText)
+    expect(documents.getLiveEditorDocument(fileDocumentKey(renamedPath))?.buffer.isDirty()).toBe(
+      false,
+    )
+    expect(documents.getLiveEditorDocument(conflict.diffDocumentKey!)).toBeNull()
+    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(path))).toBeUndefined()
+    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(renamedPath))).toMatchObject({
+      content: localText,
+    })
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Compare' })).toBeNull())
+  } finally {
+    released.resolve()
+  }
+})
+
+for (const change of [
+  'query-destination',
+  'adoption-resolution',
+  'cleanup-conflict',
+  'adoption-conflict',
+  'undo-destination',
+  'failed-refetch',
+] as const) {
+  test(`toast completion preserves ${change}`, async ({ server, client }) => {
+    const {
+      editor: { documentStore, conflictStore },
+      path,
+      remote,
+      queryClient,
+      documents,
+      destination,
+      context,
+      entered,
+      released,
+      holdRefetch,
+    } = await createConflictCompletionFixture(server)
+    let stop = () => {}
+    try {
+      createEditorBufferSession(destination.buffer).applyText('local ')
+      const localText = destination.buffer.materializeFullText()
+      render(<Toaster />)
+      act(() => notifyChangedFilesystemConflict(path, remote, context))
+      fireEvent.click(await screen.findByRole('button', { name: 'Compare' }))
+      const conflict = Object.values(conflictStore.getState().conflicts)[0]!
+      const resolution = documents.getLiveEditorDocument(conflict.diffDocumentKey!)!
+      holdRefetch()
+      fireEvent.click(screen.getByRole('button', { name: 'Keep my changes' }))
+      await entered.promise
+      expect(await readFile(join(server.root, path), 'utf8')).toBe(localText)
+      if (change === 'failed-refetch') {
+        await rm(join(server.root, path))
+        released.resolve()
+        await waitFor(() =>
+          expect(
+            queryClient.getMutationCache().find({
+              mutationKey: workspaceMutationKeys.resolveConflict(conflict.id),
+            })?.state.status,
+          ).toBe('error'),
+        )
+        expect(documents.getLiveEditorDocument(fileDocumentKey(path))?.buffer).toBe(
+          destination.buffer,
+        )
+        expect(destination.buffer.materializeFullText()).toBe(localText)
+        expect(documents.getLiveEditorDocument(conflict.diffDocumentKey!)).toBe(resolution)
+        expect(conflictStore.getState().conflicts[conflict.id]).toBe(conflict)
+        expect(screen.getByRole('button', { name: 'Compare' })).toBeVisible()
+        return
+      }
+      let fired = false
+      let newerConflict = conflict
+      let newerText = localText
+      const incoming = await fetchFile(path, new AbortController().signal, client)
+      if (change === 'undo-destination') {
+        const session = createEditorBufferSession(destination.buffer)
+        act(() => {
+          session.breakTypingRun()
+          session.applyText('transient ')
+          session.undo()
+        })
+        expect(destination.buffer.materializeFullText()).toBe(localText)
+      }
+      if (change === 'query-destination') {
+        stop = queryClient.getQueryCache().subscribe((event) => {
+          if (fired || event.type !== 'updated' || event.action.type !== 'success') return
+          if (!event.action.manual || event.query.queryKey[2] !== path) return
+          fired = true
+          const session = createEditorBufferSession(destination.buffer)
+          session.breakTypingRun()
+          session.applyText('listener edit ')
+          newerText = destination.buffer.materializeFullText()
+        })
+      }
+      if (
+        change === 'adoption-conflict' ||
+        change === 'adoption-resolution' ||
+        change === 'cleanup-conflict'
+      ) {
+        stop = documentStore.subscribe(() => {
+          if (fired) return
+          if (
+            change === 'cleanup-conflict' &&
+            documents.getLiveEditorDocument(conflict.diffDocumentKey!)
+          )
+            return
+          if (
+            change !== 'cleanup-conflict' &&
+            documents.getLiveEditorDocument(fileDocumentKey(path))?.buffer.isDirty()
+          )
+            return
+          fired = true
+          if (change === 'adoption-resolution') {
+            createEditorBufferSession(resolution.buffer).applyText('listener resolution ')
+            newerText = resolution.buffer.materializeFullText()
+            return
+          }
+          notifyChangedFilesystemConflict(path, incoming, context)
+          newerConflict = conflictStore.getState().conflicts[conflict.id]!
+        })
+      }
+      released.resolve()
+      await waitFor(() =>
+        expect(
+          queryClient.getMutationCache().find({
+            mutationKey: workspaceMutationKeys.resolveConflict(conflict.id),
+          })?.state.status,
+        ).toBe('success'),
+      )
+      expect(await readFile(join(server.root, path), 'utf8')).toBe(localText)
+      if (change === 'undo-destination' || change === 'query-destination') {
+        expect(fired).toBe(change === 'query-destination')
+        expect(documents.getLiveEditorDocument(fileDocumentKey(path))?.buffer).toBe(
+          destination.buffer,
+        )
+        expect(destination.buffer.materializeFullText()).toBe(newerText)
+        expect(destination.buffer.isDirty()).toBe(true)
+        expect(documents.getLiveEditorDocument(conflict.diffDocumentKey!)).toBe(resolution)
+        expect(queryClient.getQueryState(fileSystemKeys.fileSnapshot(path))?.isInvalidated).toBe(
+          true,
+        )
+      }
+      if (change === 'query-destination') {
+        act(() => createEditorBufferSession(destination.buffer).undo())
+        expect(destination.buffer.materializeFullText()).toBe(localText)
+      }
+      if (change === 'adoption-resolution') {
+        expect(fired).toBe(true)
+        expect(documents.getLiveEditorDocument(conflict.diffDocumentKey!)?.buffer).toBe(
+          resolution.buffer,
+        )
+        expect(resolution.buffer.materializeFullText()).toBe(newerText)
+        expect(resolution.buffer.isDirty()).toBe(true)
+        expect(documents.getLiveEditorDocument(conflict.diffDocumentKey!)).not.toBe(resolution)
+      }
+      if (change === 'adoption-conflict' || change === 'cleanup-conflict') {
+        expect(fired).toBe(true)
+        expect(newerConflict).not.toBe(conflict)
+        expect(newerConflict.toastId).toBe(conflict.toastId)
+        expect(newerConflict.remoteFile).toBe(incoming)
+        expect(documents.getLiveEditorDocument(conflict.diffDocumentKey!)).toBe(
+          change === 'adoption-conflict' ? resolution : null,
+        )
+      }
+      expect(conflictStore.getState().conflicts[conflict.id]).toBe(newerConflict)
+      expect(screen.getByRole('button', { name: 'Compare' })).toBeVisible()
+    } finally {
+      stop()
       released.resolve()
     }
   })
