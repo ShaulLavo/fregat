@@ -29,6 +29,7 @@
     "native/config-resolver/linux-x64",
     "ghostty-vt.wasm",
     "bridge.wasm",
+    "canvas-compose.wasm",
     "README.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"
@@ -70,7 +71,8 @@
       "node": "./dist/config-resolver/index.js"
     },
     "./ghostty-vt.wasm": "./ghostty-vt.wasm",
-    "./bridge.wasm": "./bridge.wasm"
+    "./bridge.wasm": "./bridge.wasm",
+    "./canvas-compose.wasm": "./canvas-compose.wasm"
   },
   "publishConfig": {
     "access": "public",
@@ -78,6 +80,7 @@
   },
   "scripts": {
     "build": "bun run clean && tsc -p tsconfig.build.json",
+    "build:canvas-compose": "bun scripts/build-canvas-compose.ts",
     "build:bridge": "bun scripts/build-bridge.ts",
     "build:config-resolver": "bun scripts/build-config-resolver.ts",
     "config-resolver:bootstrap": "bun scripts/config-resolver-native/generate-native-inputs.ts --write && bun scripts/config-resolver-native/generate-bootstrap.ts --write",
