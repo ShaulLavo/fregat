@@ -25,6 +25,8 @@ export const providerUsageWindowSchema = v.object({
   status: v.nullable(providerUsageWindowStatusSchema),
   observedAt: v.optional(v.nullable(isoDateTimeSchema)),
   source: v.optional(trimmedNonEmptyStringSchema),
+  statusObservedAt: v.optional(v.nullable(isoDateTimeSchema)),
+  statusSource: v.optional(trimmedNonEmptyStringSchema),
   freshness: v.optional(v.picklist(['fresh', 'stale', 'reset-passed', 'unknown'])),
 })
 
