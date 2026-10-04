@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from 'vitest'
+import { commands } from 'vitest/browser'
 import typescript from '@shikijs/langs/typescript'
 import darkPlus from '@shikijs/themes/dark-plus'
 import { Editor } from '../src/editor/Editor'
@@ -26,14 +27,23 @@ const largeText = Array.from(
 
 function shiki() {
   const owner = createShikiWorkerOwner()
-  const provider = createShikiHighlighterProvider({
+  const shikiProvider = createShikiHighlighterProvider({
     workerOwner: owner,
     theme: 'dark-plus',
     resolveLanguage: async () => typescript,
     resolveTheme: async () => ({ ...darkPlus, name: 'dark-plus' }),
   })
+  const sessions: string[] = []
+  const provider: EditorHighlighterProvider = {
+    ...shikiProvider,
+    createSession: (options) => {
+      const session = shikiProvider.createSession(options)
+      if (session && options.runtimeSessionId) sessions.push(options.runtimeSessionId)
+      return session
+    },
+  }
   cleanups.push(() => owner.dispose())
-  return { owner, provider }
+  return { owner, provider, sessions }
 }
 
 function mount(provider: EditorHighlighterProvider) {
@@ -84,8 +94,15 @@ async function frame() {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 }
 
+function sourceRows(host: HTMLElement) {
+  return Array.from(host.querySelectorAll<HTMLElement>('[data-editor-virtual-row]'), (row) => ({
+    row: Number(row.dataset.editorVirtualRow),
+    text: row.textContent,
+  })).toSorted((left, right) => left.row - right.row)
+}
+
 function retained(text: string) {
-  const { owner, provider } = shiki()
+  const { owner, provider, sessions } = shiki()
   const buffer = createEditorTextBuffer(text)
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'shared.ts' })
   cleanups.unshift(() => analysis.dispose())
@@ -93,68 +110,74 @@ function retained(text: string) {
   const lease = analysis.borrowHighlighter({ provider, languageId: 'typescript' })
   if (!lease) throw new TypeError('Real Shiki lease unavailable')
   cleanups.unshift(() => lease.dispose())
-  const attach = () => {
+  const attach = (scrollPosition?: ReturnType<Editor['getScrollPosition']>) => {
     const view = mount(provider)
-    view.editor.attachSession(createEditorBufferSession(buffer), options)
+    view.editor.attachSession(createEditorBufferSession(buffer), { ...options, scrollPosition })
     return view
   }
-  return { owner, provider, buffer, lease, attach }
+  return { owner, provider, sessions, buffer, lease, attach }
 }
 
 test('calibrates complete large shared Shiki paint in two views', async () => {
   const shared = retained(largeText)
   await shared.lease.refresh(shared.buffer.getTextSnapshot())
   const first = shared.attach()
-  const second = shared.attach()
+  const second = shared.attach(first.editor.getScrollPosition())
   await frame()
   const reference = paint(first.host)
   expect(reference.length).toBeGreaterThan(60)
   expect(new Set(reference.map((run) => run.row)).size).toBeGreaterThanOrEqual(10)
   expect(paint(second.host)).toEqual(reference)
+  expect(shared.sessions).toEqual([shared.lease.runtimeSessionId])
   expect(shared.owner.inspect().workerGeneration).toBe(1)
 })
 
-test('paints ready shared Shiki edits in the existing view before copying a split', async () => {
-  const initial = 'export const before = 1\n'
-  const shared = retained(initial)
-  await shared.lease.refresh(shared.buffer.getTextSnapshot())
-  const first = shared.attach()
-  await frame()
-  await shared.owner.awaitIdleFence()
-  const started = performance.now()
-  const session = createEditorBufferSession(shared.buffer)
-  session.setSelection(initial.length, initial.length)
-  session.applyText(largeText)
-  await shared.owner.awaitIdleFence()
-  await shared.lease.refresh(shared.buffer.getTextSnapshot())
-  expect(shared.lease.read()).toMatchObject({ kind: 'ready', revision: 1 })
-  const second = shared.attach()
-  const reference = paint(second.host)
-  console.info(
-    'core-split-evidence',
-    JSON.stringify({
-      elapsed: performance.now() - started,
-      first: paint(first.host),
-      second: reference,
-    }),
-  )
-  expect(reference.length).toBeGreaterThan(60)
-  expect(paint(first.host)).toEqual(reference)
-  expect(shared.buffer.materializeFullText()).toBe(initial + largeText)
-  expect(session.isDirty()).toBe(true)
-  second.editor.dispose()
-  expect(paint(first.host)).toEqual(reference)
-  first.editor.dispatchCommand('undo')
-  await shared.owner.awaitIdleFence()
-  await shared.lease.refresh(shared.buffer.getTextSnapshot())
-  expect(shared.buffer.materializeFullText()).toBe(initial)
-  expect(session.isDirty()).toBe(false)
-  expect(
-    paint(first.host)
-      .map((run) => run.text)
-      .join(''),
-  ).toContain('before')
-})
+test.each(['buffer', 'input'] as const)(
+  'paints ready shared Shiki %s edits before copying a split',
+  async (origin) => {
+    const initial = 'export const before = 1\n'
+    const shared = retained(initial)
+    await shared.lease.refresh(shared.buffer.getTextSnapshot())
+    const first = shared.attach()
+    await frame()
+    await shared.owner.awaitIdleFence()
+    const session = createEditorBufferSession(shared.buffer)
+    if (origin === 'buffer') {
+      session.setSelection(initial.length, initial.length)
+      session.applyText(largeText)
+    } else {
+      first.editor.setSelection(initial.length)
+      first.editor.focus()
+      await commands.proofInsertText(largeText)
+    }
+    await shared.owner.awaitIdleFence()
+    await shared.lease.refresh(shared.buffer.getTextSnapshot())
+    expect(shared.lease.read()).toMatchObject({ kind: 'ready', revision: 1 })
+    const second = shared.attach(first.editor.getScrollPosition())
+    expect(sourceRows(first.host)).toEqual(sourceRows(second.host))
+    const reference = paint(second.host)
+    expect(reference.length).toBeGreaterThan(60)
+    expect(paint(first.host)).toEqual(reference)
+    expect(shared.sessions).toEqual([shared.lease.runtimeSessionId])
+    expect(shared.buffer.materializeFullText()).toBe(initial + largeText)
+    expect(session.isDirty()).toBe(true)
+    const firstSelection = first.editor.getSelections()
+    second.editor.setSelection(initial.length + 5)
+    expect(first.editor.getSelections()).toEqual(firstSelection)
+    second.editor.dispose()
+    expect(paint(first.host)).toEqual(reference)
+    first.editor.dispatchCommand('undo')
+    await shared.owner.awaitIdleFence()
+    await shared.lease.refresh(shared.buffer.getTextSnapshot())
+    expect(shared.buffer.materializeFullText()).toBe(initial)
+    expect(session.isDirty()).toBe(false)
+    expect(
+      paint(first.host)
+        .map((run) => run.text)
+        .join(''),
+    ).toContain('before')
+  },
+)
 
 test('paints real Shiki tokens with plain Editor setup', async () => {
   const { owner, provider } = shiki()

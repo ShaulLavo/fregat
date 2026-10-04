@@ -693,12 +693,15 @@ export class EditorSyntaxController {
     if (this.syntaxContentVersion !== this.preparedStructuralContentVersion) {
       this.refreshStructuralSyntax(documentVersion, change, options)
     }
-    if (this.syntaxContentVersion !== this.preparedHighlighterContentVersion) {
+    if (
+      this.syntaxContentVersion !== this.preparedHighlighterContentVersion &&
+      (!this.retainedHighlighter || change === null)
+    ) {
       this.refreshHighlightTokens(documentVersion, change, options)
     }
   }
 
-  projectCacheForChange(change: DocumentSessionChange): void {
+  acceptChange(change: DocumentSessionChange): void {
     if (change.kind === 'none' || change.kind === 'selection' || change.kind === 'synchronize') {
       return
     }
@@ -706,6 +709,9 @@ export class EditorSyntaxController {
     this.foldCoverage = null
     this.parsedSyntaxContentVersion = null
     this.projectSyntaxRangeCache(change)
+    if (this.retainedHighlighter) {
+      this.refreshHighlightTokens(this.options.getDocumentVersion(), change, { delayMs: 0 })
+    }
   }
 
   refreshVisibleRange(documentVersion: number, options: EditorSyntaxRefreshOptions = {}): void {
