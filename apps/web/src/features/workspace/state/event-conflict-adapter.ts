@@ -228,18 +228,22 @@ async function applyResolvedConflict(
   if (!conflict) return
 
   const isCurrent = captureConflictCompletion(conflict, context)
+  const isResolutionCurrent = conflict.diffDocumentKey
+    ? captureLiveDocument(conflict.diffDocumentKey, context)
+    : () => true
   const file =
     resolution === 'local' ? await applyLocalConflict(conflict, context) : conflict.remoteFile
-  if (!isCurrent()) {
+  const canComplete =
+    isCurrent() && (!file || adoptFilesystemSnapshot(conflict.localPath, file, context))
+  if (!canComplete) {
     await context.queryClient.invalidateQueries({
       exact: true,
       queryKey: fileSystemKeys.fileSnapshot(conflict.remotePath),
     })
     return
   }
-  if (file) adoptFilesystemSnapshot(conflict.localPath, file, context)
   if (!file) discardResolvedEditorFile(conflict.localPath, context)
-  finishConflict(conflict, context)
+  finishConflict(conflict, isResolutionCurrent, context)
 }
 
 function captureConflictCompletion(
@@ -309,15 +313,18 @@ export function adoptFilesystemSnapshot(
     }
     setFileSnapshotQueryData(context.queryClient, file)
     context.selectContent(documentTab(fileDocument(fileResource(file.path))))
-    return
+    return true
   }
   if (localPath !== file.path) {
     context.renameLiveEditorDocument(localPath, file.path)
-    moveFileSnapshotQueryData(context.queryClient, localPath, file.path)
   }
 
+  const isDestinationCurrent = captureLiveDocument(fileDocumentKey(file.path), context)
+  if (localPath !== file.path) moveFileSnapshotQueryData(context.queryClient, localPath, file.path)
   setFileSnapshotQueryData(context.queryClient, file)
+  if (!isDestinationCurrent()) return false
   context.forceReplaceLiveEditorDocument(file)
+  return true
 }
 
 function discardResolvedEditorFile(path: FilesystemPath, context: WorkspaceConflictContext) {
@@ -328,8 +335,13 @@ function discardResolvedEditorFile(path: FilesystemPath, context: WorkspaceConfl
   })
 }
 
-function finishConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
+function finishConflict(
+  conflict: FilesystemConflict,
+  isResolutionCurrent: () => boolean,
+  context: WorkspaceConflictContext,
+) {
   if (context.conflictStore.getState().conflicts[conflict.id] !== conflict) return
+  if (!isResolutionCurrent()) return
   if (conflict.diffDocumentKey) {
     context.discardLiveEditorDocument({
       kind: 'conflict',
@@ -337,6 +349,7 @@ function finishConflict(conflict: FilesystemConflict, context: WorkspaceConflict
       path: conflict.remotePath,
     })
   }
+  if (context.conflictStore.getState().conflicts[conflict.id] !== conflict) return
   if (conflict.toastId) toast.dismiss(conflict.toastId)
 
   context.conflictStore.getState().removeConflict(conflict.id)
