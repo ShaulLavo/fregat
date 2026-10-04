@@ -1,4 +1,3 @@
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { Elysia } from 'elysia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -11,6 +10,7 @@ import { sessionIdSchema } from '@workspace/contracts'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as v from 'valibot'
 
+import { withMcpClient } from '../../testing/mcp-client'
 import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
@@ -43,30 +43,8 @@ function endpoint() {
 
 type Handler = { handle(request: Request): Promise<Response> }
 
-async function callTool(
-  app: Handler,
-  token: string,
-  name: string,
-  args: Record<string, unknown> = {},
-) {
-  const client = new Client(
-    { name: 'platform-test', version: '0' },
-    { versionNegotiation: { mode: { pin: '2026-07-28' } } },
-  )
-  const fetch = (url: string | URL | Request, init?: RequestInit) =>
-    app.handle(
-      new Request(url, {
-        ...init,
-        headers: {
-          ...Object.fromEntries(new Headers(init?.headers)),
-          authorization: `Bearer ${token}`,
-        },
-      }),
-    )
-  await client.connect(new StreamableHTTPClientTransport(new URL(ENDPOINT), { fetch }))
-  const result = await client.callTool({ name, arguments: args })
-  await client.close()
-  return result
+function callTool(app: Handler, token: string, name: string, args: Record<string, unknown> = {}) {
+  return withMcpClient(app, ENDPOINT, token, (client) => client.callTool({ name, arguments: args }))
 }
 
 async function callWorkspaceInfo(app: Handler, token: string) {

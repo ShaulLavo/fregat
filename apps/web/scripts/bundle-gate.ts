@@ -15,8 +15,8 @@ import type { OwnerRow } from './bundle-owners'
 export const PINS_FILE = path.join(import.meta.dirname, 'first-load-pins.json')
 /** Growth the total may take before the gate fails. */
 const TOTAL_MARGIN = 0.01
-// developer.deployTarget schema and keys entry add 242 measured phone gzip bytes.
-const PHONE_INSTALLATION_ALLOWANCE = 242
+// developer.deployTarget schema and keys entry add 136 measured phone gzip bytes.
+const PHONE_INSTALLATION_ALLOWANCE = 136
 /** Per owner: the larger of 5% or 2 KB gzip, so a tiny owner is not pinned to the byte. */
 const OWNER_MARGIN = 0.05
 const OWNER_FLOOR = 2_048
