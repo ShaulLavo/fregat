@@ -8,7 +8,7 @@ import { screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
-import { fetchDiff } from '@/features/git/utils/api'
+import { fetchDiff } from '@/lib/git-diff-query'
 import { fetchBlobDiff } from '@/lib/blob-diff-query'
 import { DiffView } from '@/features/git/components/diff-view'
 import { useDiffDocumentDiffs } from '@/features/git/hooks/use-diff-document-diffs'

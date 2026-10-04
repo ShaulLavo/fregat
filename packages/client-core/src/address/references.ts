@@ -1,11 +1,15 @@
 import {
   GIT_OBJECT_ID_PATTERN,
+  gitSnapshotTargetSchema,
+  type GitSnapshotTarget,
+  type GitRevisionSide,
   isGitFileStatus,
   sessionIdSchema,
   type SessionId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { decodePath, decodeSegment, encodePath, encodeSegment } from './path-token'
+import { toWorkspaceAbsolute, toWorkspaceRelative } from '../files/path'
 
 export type EditorReference =
   | { readonly kind: 'settings' | 'search' }
@@ -13,7 +17,7 @@ export type EditorReference =
   | { readonly kind: 'ref'; readonly ref: string; readonly path: string }
   | {
       readonly kind: 'snapshot'
-      readonly source: 'worktree' | 'staged' | 'branch' | 'historical'
+      readonly source: 'worktree' | 'staged' | 'historical' | 'captured-review'
       readonly revisionToken: string
       readonly path: string
     }
@@ -102,15 +106,13 @@ function snapshotReference(segments: readonly string[]): EditorReference | null 
   if (
     source !== 'worktree' &&
     source !== 'staged' &&
-    source !== 'branch' &&
-    source !== 'historical'
+    source !== 'historical' &&
+    source !== 'captured-review'
   )
     return null
-  if (!revisionToken || !validRevision(revisionToken)) return null
+  if (!revisionToken || !validSnapshotRevision(source, revisionToken)) return null
   const path = decodePath('', segments.slice(2))
-  return path
-    ? { kind: 'snapshot', source, revisionToken: normalizedMetadata(revisionToken), path }
-    : null
+  return path ? { kind: 'snapshot', source, revisionToken, path } : null
 }
 
 function checkpointReference(segments: readonly string[]): EditorReference | null {
@@ -128,12 +130,95 @@ function checkpointReference(segments: readonly string[]): EditorReference | nul
   }
 }
 
-function validRevision(token: string) {
-  const [range] = token.split(',')
-  const objects = range?.split('..') ?? []
-  if (objects.length !== 2 || objects.every((part) => part === '_')) return false
-  if (!objects.every((part) => part === '_' || GIT_OBJECT_ID_PATTERN.test(part))) return false
-  return true
+function validSnapshotRevision(
+  source: Extract<EditorReference, { kind: 'snapshot' }>['source'],
+  token: string,
+) {
+  if (source === 'worktree' || source === 'staged') return token === 'live'
+  return (
+    snapshotTargetForReference(
+      { kind: 'snapshot', source, revisionToken: token, path: 'file' },
+      '/',
+    ) !== null
+  )
+}
+
+export function snapshotTargetForReference(
+  reference: Extract<EditorReference, { kind: 'snapshot' }>,
+  rootPath: string,
+): GitSnapshotTarget | null {
+  const path = toWorkspaceAbsolute(rootPath, reference.path)
+  if (path === null) return null
+  if (reference.source === 'worktree' || reference.source === 'staged')
+    return reference.revisionToken === 'live'
+      ? { kind: 'moving', rootPath, path, changeSource: reference.source }
+      : null
+  const [range, ...extras] = reference.revisionToken.split(',')
+  const sides = range?.split('..') ?? []
+  if (sides.length !== 2) return null
+  const fields = new Map<string, string>()
+  for (const extra of extras) {
+    const equals = extra.indexOf('=')
+    const key = extra.slice(0, equals)
+    const value = decodeSegment(extra.slice(equals + 1))
+    if (equals < 0 || value === null || fields.has(key)) return null
+    fields.set(key, value)
+  }
+  const historical = reference.source === 'historical'
+  if (
+    [...fields.keys()].some((key) => !['s', 'r', ...(historical ? ['c', 'p'] : [])].includes(key))
+  )
+    return null
+  const oldPath = toWorkspaceAbsolute(rootPath, fields.get('r') ?? '')
+  if (oldPath === null) return null
+  const revision = {
+    old: sideForToken(sides[0]),
+    new: sideForToken(sides[1]),
+    oldPath,
+    status: fields.get('s'),
+  }
+  const origin = {
+    id: fields.get('c'),
+    parents: fields.get('p') === '_' ? [] : fields.get('p')?.split('+'),
+  }
+  const parsed = v.safeParse(
+    gitSnapshotTargetSchema,
+    historical
+      ? { kind: 'historical', rootPath, path, revision, origin }
+      : { kind: 'captured-review', rootPath, path, revision },
+  )
+  return parsed.success ? parsed.output : null
+}
+
+export function editorReferenceForSnapshotTarget(
+  target: GitSnapshotTarget,
+): Extract<EditorReference, { kind: 'snapshot' }> | null {
+  const path = toWorkspaceRelative(target.rootPath, target.path)
+  if (!path) return null
+  if (target.kind === 'moving')
+    return { kind: 'snapshot', source: target.changeSource, revisionToken: 'live', path }
+  const oldPath = toWorkspaceRelative(target.rootPath, target.revision.oldPath)
+  if (!oldPath) return null
+  const fields = [`s=${target.revision.status}`, `r=${encodeSegment(oldPath)}`]
+  if (target.kind === 'historical')
+    fields.push(`c=${target.origin.id}`, `p=${target.origin.parents.join('+') || '_'}`)
+  return {
+    kind: 'snapshot',
+    source: target.kind,
+    revisionToken: `${tokenForSide(target.revision.old)}..${tokenForSide(target.revision.new)},${fields.join(',')}`,
+    path,
+  }
+}
+
+function sideForToken(token: string | undefined) {
+  if (token === '_') return { kind: 'missing' }
+  if (token === '?') return { kind: 'unresolved' }
+  return { kind: 'blob', objectId: token }
+}
+
+function tokenForSide(side: GitRevisionSide) {
+  if (side.kind === 'blob') return side.objectId
+  return side.kind === 'missing' ? '_' : '?'
 }
 
 function validTurns(token: string) {
@@ -184,7 +269,7 @@ export const editorReferenceSchema = v.pipe(
     v.object({ kind: v.literal('ref'), ref: v.string(), path: v.string() }),
     v.object({
       kind: v.literal('snapshot'),
-      source: v.picklist(['worktree', 'staged', 'branch', 'historical']),
+      source: v.picklist(['worktree', 'staged', 'historical', 'captured-review']),
       revisionToken: v.string(),
       path: v.string(),
     }),

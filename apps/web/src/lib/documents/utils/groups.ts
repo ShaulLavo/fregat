@@ -12,7 +12,7 @@ import {
   type TabPlacement,
   type TabPlacementResult,
 } from '@/lib/documents/utils/group-types'
-import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
+import { sameTabCapture, sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
 import type { EditorTabRecord, TabContent, TabId } from '@/lib/documents/utils/types'
 
 export function createEditorGroups(id: GroupId = createGroupId()): EditorGroups {
@@ -86,7 +86,15 @@ export function openTabInGroups(
 
   const existingGroup = existingTabGroup(groups, group, tab)
   const existing = existingGroup?.tabs.find((item) => sameTabContent(item.content, tab.content))
-  if (existing && existingGroup) return selectEditorGroupTab(groups, existingGroup.id, existing.id)
+  if (existing && existingGroup) {
+    const next = sameTabCapture(existing.content, tab.content)
+      ? groups
+      : mapGroupTabs(groups, (entry) => {
+          if (entry.id !== existing.id) return entry
+          return { ...entry, content: tab.content }
+        })
+    return selectEditorGroupTab(next, existingGroup.id, existing.id)
+  }
   if (groupForTab(groups, tab.id)) return groups
 
   const root = replaceNode(groups.root, groupId, {
@@ -239,7 +247,7 @@ function uniqueGroupTabs(group: EditorGroup): readonly EditorTabRecord[] {
   return [...byContent.values()]
 }
 
-function normalizedSelection(selected: TabId | null, tabs: readonly EditorTabRecord[]) {
+export function normalizedSelection(selected: TabId | null, tabs: readonly EditorTabRecord[]) {
   if (selected === null || tabs.some((tab) => tab.id === selected)) return selected
   return tabs[0]?.id ?? null
 }

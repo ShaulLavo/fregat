@@ -1,6 +1,6 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import { CommitDetails } from '@/features/git/components/commit-details'
-import { commitDetailsQueryOptions } from '@/features/git/utils/history-query'
+import { commitDetailsQueryOptions } from '@/lib/git-commit-details-query'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { historyRepository } from '../../../../test/factories/git-history'
 import { createRequestGate } from '../../../../test/factories/request-gate'

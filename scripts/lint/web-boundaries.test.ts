@@ -187,6 +187,18 @@ const probes: readonly Probe[] = [
     rules: [],
   },
   {
+    file: 'apps/web/src/lib/documents/utils/git-schemas.ts',
+    source:
+      "import { gitCommitOriginSchema, resolvedGitObjectIdSchema, gitSnapshotTargetSchema } from '@workspace/contracts'; export const schemas = [gitCommitOriginSchema, resolvedGitObjectIdSchema, gitSnapshotTargetSchema]",
+    rules: [],
+  },
+  {
+    file: 'apps/web/src/lib/documents/utils/git-runtime.ts',
+    source:
+      "import { gitSnapshotTargetSchema, executable } from '@workspace/contracts'; export const values = [gitSnapshotTargetSchema, executable]",
+    rules: ['document-dependencies'],
+  },
+  {
     file: 'apps/web/src/lib/documents/utils/contract-type.ts',
     source: "export type Value = import('@workspace/contracts').Value",
     rules: [],

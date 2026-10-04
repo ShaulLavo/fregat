@@ -1,3 +1,4 @@
+import { snapshotTarget } from '../../../../../test/factories/git-diff'
 import { selectEditorGroupTab } from '@/lib/documents/utils/groups'
 import { groupLeaf, groupTree, groupBranch } from '../../../../../test/factories/editor-groups'
 import {
@@ -275,15 +276,20 @@ describe('workspace cache', () => {
     }
   })
 
-  it('preserves an explicitly empty comparison side when the other side names a snapshot', () => {
+  it('preserves an explicit missing side beside an existing snapshot', () => {
     const content = documentTab({
       kind: 'git-diff',
-      source: {
-        kind: 'snapshot',
-        path: filesystemPath('/repo/a.ts'),
-        oldObjectId: '',
-        newObjectId: DOCUMENT_NEW_OBJECT_ID,
-      },
+      source: snapshotTarget({
+        kind: 'captured-review',
+        rootPath: '/repo',
+        path: '/repo/a.ts',
+        revision: {
+          old: { kind: 'missing' },
+          new: { kind: 'blob', objectId: DOCUMENT_NEW_OBJECT_ID },
+          oldPath: '/repo/a.ts',
+          status: 'added',
+        },
+      }),
     })
     const slice: CachedWorkspaceSlice = { ...emptyWorkspaceSlice(), editorHistory: [content] }
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))

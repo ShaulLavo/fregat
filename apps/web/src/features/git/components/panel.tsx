@@ -144,8 +144,10 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
               rootPath={rootPath}
               staged={rows.staged}
               worktree={rows.worktree}
-              loadingPath={loadingDiff?.path}
-              loadingSection={loadingDiff?.source}
+              loadingPath={loadingDiff?.target.path}
+              loadingSection={
+                loadingDiff?.target.kind === 'moving' ? loadingDiff.target.changeSource : undefined
+              }
             />
           </Activity>
         </ToolPane>

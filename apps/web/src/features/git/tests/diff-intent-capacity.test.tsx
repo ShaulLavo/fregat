@@ -1,5 +1,5 @@
 import { waitFor } from '@testing-library/react'
-import { diffQueryOptions } from '@/features/git/utils/diff-query'
+import { diffQueryOptions } from '@/lib/git-diff-query'
 import { startDiffIntent } from '@/lib/intent-prefetch/state/query-intent'
 import {
   registerEnvironmentQueryClient,

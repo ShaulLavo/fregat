@@ -83,26 +83,6 @@ export async function fetchStatus(
   )
 }
 
-export async function fetchDiff(
-  path: string,
-  staged: boolean,
-  signal: AbortSignal | undefined,
-  client: Client,
-) {
-  return observeGitOperation(
-    { ...clientLogContext(client), action: 'git.diff', path, signal, staged },
-    async () => {
-      const response = await client.git.diff.get({
-        query: { path, staged },
-        fetch: { signal },
-      })
-
-      return unwrapGit(response)
-    },
-    (diffs) => ({ diffCount: diffs.length }),
-  )
-}
-
 export async function generateCommitMessage(path: string, signal: AbortSignal, client: Client) {
   return observeGitOperation(
     { ...clientLogContext(client), action: 'git.generate_commit_message', path, signal },

@@ -31,6 +31,20 @@ export {
 } from './workspace-address'
 export { TUI_CLIENT_ORIGIN } from './client-origins'
 export { isValidOrderKey, orderKeyBetween } from './order-key'
+export {
+  resolvedGitObjectIdSchema,
+  resolvedGitCommitIdSchema,
+  gitRevisionSideSchema,
+  gitInputRevisionSchema,
+  gitCommitOriginSchema,
+  gitSnapshotTargetSchema,
+  type ResolvedGitObjectId,
+  type ResolvedGitCommitId,
+  type GitRevisionSide,
+  type GitInputRevision,
+  type GitCommitOrigin,
+  type GitSnapshotTarget,
+} from './git'
 export type {
   GitBaseRefChoice,
   GitBaseRefChoicesResult,

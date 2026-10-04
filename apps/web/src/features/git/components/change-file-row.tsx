@@ -1,4 +1,4 @@
-import { diffQueryOptions } from '@/features/git/utils/diff-query'
+import { diffQueryOptions } from '@/lib/git-diff-query'
 import { use } from 'react'
 import { useGitState } from '@/features/git/state/store'
 import { ChangesContext } from '@/features/git/providers/changes-context'
@@ -18,7 +18,7 @@ export function ChangeFileRow({
   rootPath: string
   row: ChangeRow
 }) {
-  const { opening, openDiff } = useOpenDiffDocument()
+  const { opening, openDiff } = useOpenDiffDocument(rootPath)
   const listbox = use(ChangesContext)
   const id = changeRowId(row)
   const selected = useGitState((state) => state.activeChangeId === id)

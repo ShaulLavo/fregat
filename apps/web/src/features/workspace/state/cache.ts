@@ -46,7 +46,6 @@ import { tabContentKey } from '@/lib/documents/utils/tabs'
 import {
   encodeTabContent,
   decodeTabContent,
-  storedTabContentSchema,
   type StoredTabContent,
 } from '@/lib/documents/utils/storage-codec'
 import type {
@@ -76,7 +75,12 @@ import {
   type SplitId,
   type GroupAxis,
 } from '@/lib/documents/utils/group-types'
-import { allEditorTabs, filterGroupTabs, validEditorGroups } from '@/lib/documents/utils/groups'
+import {
+  allEditorTabs,
+  filterGroupTabs,
+  normalizedSelection,
+  validEditorGroups,
+} from '@/lib/documents/utils/groups'
 
 const WORKSPACE_SLICE_KEY_PREFIX = workspaceCacheStorageKey('workspace:')
 const SEARCH_BUFFER_KEY_PREFIX = workspaceCacheStorageKey('search:')
@@ -237,7 +241,7 @@ const bottomTabSchema = v.union([v.literal('terminal'), v.literal('problems')])
 const tabIdSchema = v.pipe(v.string(), v.minLength(1), v.transform(tabId))
 const editorTabRecordSchema = v.strictObject({
   id: tabIdSchema,
-  content: storedTabContentSchema,
+  content: v.unknown(),
 })
 const scrollPositionSchema = v.strictObject({
   left: v.number(),
@@ -260,7 +264,7 @@ type StoredGroupNode =
   | {
       kind: 'group'
       id: GroupId
-      tabs: { id: TabId; content: StoredTabContent }[]
+      tabs: { id: TabId; content: unknown }[]
       selectedTabId: TabId | null
     }
   | {
@@ -329,11 +333,11 @@ const workbenchLayoutSchema = v.strictObject({
   outerLayout: outerLayoutSchema,
 })
 const workspaceSliceSchema = v.strictObject({
-  editorHistory: v.array(storedTabContentSchema),
-  recentlyClosedTabs: v.array(storedTabContentSchema),
+  editorHistory: v.array(v.unknown()),
+  recentlyClosedTabs: v.array(v.unknown()),
   reopenScrollPositions: v.array(
     v.strictObject({
-      content: storedTabContentSchema,
+      content: v.unknown(),
       position: scrollPositionSchema,
     }),
   ),
@@ -709,14 +713,19 @@ function storedGroupNode(node: GroupNode, root: WorkspaceRoot): StoredGroupNode 
 }
 
 function restoredGroupNode(node: StoredGroupNode, root: WorkspaceRoot): GroupNode {
-  if (node.kind === 'group')
+  if (node.kind === 'group') {
+    const tabs = node.tabs.flatMap((tab) => {
+      const content = decodeTabContent(tab.content, root)
+      return content === null ? [] : [{ id: tab.id, content }]
+    })
     return {
       ...node,
-      tabs: node.tabs.flatMap((tab) => {
-        const content = decodeTabContent(tab.content, root)
-        return content === null ? [] : [{ id: tab.id, content }]
-      }),
+      tabs,
+      selectedTabId: node.tabs.some((tab) => tab.id === node.selectedTabId)
+        ? normalizedSelection(node.selectedTabId, tabs)
+        : node.selectedTabId,
     }
+  }
   const convert = (child: (typeof node.children)[number]) => ({
     size: child.size,
     node: restoredGroupNode(child.node, root),
@@ -732,10 +741,7 @@ function storedContents(root: WorkspaceRoot, contents: readonly TabContent[]): S
   })
 }
 
-function restoredContents(
-  root: WorkspaceRoot,
-  contents: readonly StoredTabContent[],
-): TabContent[] {
+function restoredContents(root: WorkspaceRoot, contents: readonly unknown[]): TabContent[] {
   return uniqueContents(
     contents.flatMap((content) => {
       const decoded = decodeTabContent(content, root)

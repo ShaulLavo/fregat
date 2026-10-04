@@ -1,3 +1,4 @@
+import { admitHistoricalAddress } from '@/features/address/utils/historical-admission'
 import { settingsCategoriesQueryOptions } from '@/features/address/utils/settings-categories-query'
 import { settingsCategoryForSlug } from '@/features/address/utils/settings-category'
 import { editorDocumentToken, emptyAddress } from '@workspace/client-core/address/grammar'
@@ -140,6 +141,14 @@ async function applyCurrentView(
   if (!current()) return superseded()
   const rejectedDocument = documentFailure(intent, chat.rootPath)
   if (rejectedDocument) return { status: 'unavailable', reason: rejectedDocument }
+  const admission = await admitHistoricalAddress(owner.queryClient, chat.rootPath, address)
+  if (!current()) return superseded()
+  if (admission.selectedRejected)
+    return {
+      status: 'unavailable',
+      reason: 'The commit in this link does not contain the requested change.',
+    }
+  options = { ...options, address: { ...intent, address: admission.address } }
   const opened = await openRoot(options, owner, environmentId, chat.rootPath, current, signal)
   if (!current() || opened === 'superseded') return superseded()
   if (opened === 'failed')

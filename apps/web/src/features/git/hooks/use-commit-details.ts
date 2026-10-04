@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { commitDetailsQueryOptions } from '@/features/git/utils/history-query'
+import { commitDetailsQueryOptions } from '@/lib/git-commit-details-query'
 
 export function useCommitDetails(rootPath: string, commit: string) {
   return useQuery({

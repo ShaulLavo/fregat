@@ -1,3 +1,4 @@
+import * as v from 'valibot'
 import type { WorktreeId } from './chat-ids'
 /**
  * Git request/response DTOs that cross the server↔web boundary. Both
@@ -27,6 +28,67 @@ export type GitTreeStatus = Exclude<GitFileStatusValue, 'conflicted' | 'unmodifi
 
 /** Git object ids run 40 hex (SHA-1) through 64 (SHA-256); a fixed-width-40 grammar would reject a SHA-256 repository's ids. */
 export const GIT_OBJECT_ID_PATTERN = /^[0-9a-f]{40,64}$/i
+
+const gitRootSchema = v.pipe(
+  v.string(),
+  v.check((path) => !path.includes('\0')),
+)
+const gitPathSchema = v.pipe(gitRootSchema, v.minLength(1))
+const resolvedGitIdSchema = v.pipe(
+  v.string(),
+  v.regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i),
+  v.check((id) => !/^0+$/.test(id)),
+  v.transform((id) => id.toLowerCase()),
+)
+export const resolvedGitObjectIdSchema = v.pipe(resolvedGitIdSchema, v.brand('ResolvedGitObjectId'))
+export const resolvedGitCommitIdSchema = v.pipe(resolvedGitIdSchema, v.brand('ResolvedGitCommitId'))
+export const gitRevisionSideSchema = v.variant('kind', [
+  v.strictObject({ kind: v.literal('blob'), objectId: resolvedGitObjectIdSchema }),
+  v.strictObject({ kind: v.literal('missing') }),
+  v.strictObject({ kind: v.literal('unresolved') }),
+])
+export const gitInputRevisionSchema = v.strictObject({
+  old: gitRevisionSideSchema,
+  new: gitRevisionSideSchema,
+  oldPath: gitPathSchema,
+  status: v.picklist(GIT_FILE_STATUSES),
+})
+export const gitCommitOriginSchema = v.strictObject({
+  id: resolvedGitCommitIdSchema,
+  parents: v.array(resolvedGitCommitIdSchema),
+})
+export const gitSnapshotTargetSchema = v.variant('kind', [
+  v.strictObject({
+    kind: v.literal('moving'),
+    rootPath: gitRootSchema,
+    path: gitPathSchema,
+    changeSource: v.picklist(['worktree', 'staged']),
+  }),
+  v.strictObject({
+    kind: v.literal('historical'),
+    rootPath: gitRootSchema,
+    path: gitPathSchema,
+    origin: gitCommitOriginSchema,
+    revision: gitInputRevisionSchema,
+  }),
+  v.strictObject({
+    kind: v.literal('captured-review'),
+    rootPath: gitRootSchema,
+    path: gitPathSchema,
+    revision: gitInputRevisionSchema,
+  }),
+])
+export type ResolvedGitObjectId = v.InferOutput<typeof resolvedGitObjectIdSchema>
+export type ResolvedGitCommitId = v.InferOutput<typeof resolvedGitCommitIdSchema>
+export type GitRevisionSide = v.InferOutput<typeof gitRevisionSideSchema>
+export type GitInputRevision = v.InferOutput<typeof gitInputRevisionSchema>
+export type GitCommitOrigin = Readonly<
+  Omit<v.InferOutput<typeof gitCommitOriginSchema>, 'parents'>
+> & { readonly parents: readonly ResolvedGitCommitId[] }
+type GitSnapshotVariant<T> = T extends { origin: GitCommitOrigin }
+  ? Readonly<Omit<T, 'origin'>> & { readonly origin: GitCommitOrigin }
+  : Readonly<T>
+export type GitSnapshotTarget = GitSnapshotVariant<v.InferOutput<typeof gitSnapshotTargetSchema>>
 
 export type GitLineStat = {
   additions: number

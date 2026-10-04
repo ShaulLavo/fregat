@@ -1,7 +1,11 @@
 import type { GitFileDiff } from '@workspace/contracts'
 import type { QueryClient } from '@tanstack/react-query'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
-import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
+import {
+  snapshotComparisonQueryOptions,
+  snapshotComparisonIsAdmitted,
+} from '@/lib/snapshot-comparison-query'
+import { sameSnapshotTarget } from '@/lib/documents/utils/comparisons'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { snapshotComparisonInput } from '@/lib/snapshot-comparison-input'
 import type { SnapshotComparisonLease } from '@/lib/snapshot-comparison'
@@ -32,7 +36,10 @@ export function createSnapshotComparisonOwner(
   }
   function settle(tabId: TabId, binding: Binding) {
     if (disposed || binding.controller.signal.aborted || bindings.get(tabId) !== binding) return
-    const data = queries.getQueryData(blobDiffQueryOptions(binding.comparison).queryKey)
+    if (!snapshotComparisonIsAdmitted(queries, binding.scope.rootPath, binding.comparison)) return
+    const data = queries.getQueryData<readonly GitFileDiff[]>(
+      snapshotComparisonQueryOptions(binding.comparison).queryKey,
+    )
     if (!data) return
     const previous = documents.getState().snapshotComparisonTabs.get(tabId)?.read()
     if (binding.data === data && previous?.kind === 'ready') return
@@ -80,6 +87,7 @@ export function createSnapshotComparisonOwner(
       if (
         previous &&
         sameSubject(previous, scope, comparison) &&
+        sameSnapshotTarget(previous.comparison.target, comparison.target) &&
         (!activate || !previous.controller.signal.aborted)
       ) {
         settle(tabId, previous)

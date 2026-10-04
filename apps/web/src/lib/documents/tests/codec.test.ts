@@ -66,15 +66,10 @@ test('comparison requests retain snapshot revisions and the checkpoint query ada
   if (snapshot.kind !== 'git-diff' || checkpoint.kind !== 'git-diff')
     throw createClientInvariantError('Invalid fixture')
   expect(comparisonRequest(snapshot.source)).toEqual({
-    kind: 'snapshot',
-    query: {
-      path: '/repo/src/a.ts',
-      oldPath: '/repo/src/old.ts',
-      oldObjectId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      newObjectId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    },
+    kind: 'moving',
+    query: { path: '/repo/src/a.ts', staged: false },
   })
-  expect(comparisonShortHash(snapshot.source)).toBe('bbbbbbb')
+  expect(comparisonShortHash(snapshot.source)).toBe('')
   expect(comparisonRequest(checkpoint.source)).toMatchObject({
     kind: 'checkpoint',
     query: {
