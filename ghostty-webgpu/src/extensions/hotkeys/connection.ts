@@ -21,6 +21,8 @@ export function attachTerminalHotkeys(
   terminal: TerminalApi<'sync'>,
   options: TerminalHotkeysOptions = { mode: 'standalone' },
 ): TerminalHotkeyConnection {
+  const readState = () => terminal.inputModes
+  readState()
   let registration: TerminalHotkeyRegistration | undefined
   const connection = terminal.connectInput((input) => {
     if (input.type !== 'key' || !('event' in input)) return 'pass'
@@ -39,7 +41,7 @@ export function attachTerminalHotkeys(
         clipboard,
         hasSelection: () => terminal.getSelection() !== undefined,
         signal: connection.signal,
-        readState: () => terminal.inputModes,
+        readState,
         onError: options.onError ?? ((cause, operation) => console.error(operation, cause)),
       })
     } catch (cause) {

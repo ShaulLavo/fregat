@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { page } from 'vitest/browser'
-import { Terminal as MainTerminal } from '../../dist/index.js'
+import { Terminal as MainTerminal, attachTerminalHotkeys } from '../../dist/index.js'
 import { Terminal as WorkerTerminal, TerminalWorkerError } from '../../dist/worker/index.js'
 import type { TerminalApi } from '../../dist/dom/terminal-api.js'
 import { WebGlTerminalRenderer } from '../../dist/render/webgl/renderer.js'
@@ -790,6 +790,37 @@ it('preserves default worker browser paste keys and native clipboard encoding', 
   expect(event.defaultPrevented).toBe(true)
   await eventually(() => output.length === 1)
   expect(output).toEqual(['\x1b[200~worker clip\x1b[201~'])
+})
+
+it('rejects JavaScript worker hotkeys attachment before starting an asynchronous lease', async () => {
+  const terminal = await create('webgl')
+  let failure: unknown
+  try {
+    Reflect.apply(attachTerminalHotkeys, undefined, [terminal])
+  } catch (cause) {
+    failure = cause
+  }
+  expect(failure).toMatchObject({ code: 'capability', operation: 'inputModes' })
+  let callbacks = 0
+  const connection = terminal.connectInput(() => {
+    callbacks++
+    return 'pass'
+  })
+  expect(connection instanceof Promise).toBe(true)
+  await expect(connection).rejects.toMatchObject({ code: 'capability', operation: 'connectInput' })
+  expect(callbacks).toBe(0)
+  let setup = 0
+  const general = terminal.use({
+    name: 'worker general API observation control',
+    setup: () => {
+      setup++
+      return {}
+    },
+  })
+  expect(general instanceof Promise).toBe(true)
+  const handle = await general
+  expect(setup).toBe(1)
+  handle.dispose()
 })
 
 it('keeps finite input ownership and immediate native mode access on the synchronous host', async () => {

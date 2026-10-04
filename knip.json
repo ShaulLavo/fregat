@@ -302,6 +302,7 @@
       "project": ["src/**/*.{ts,tsx}"]
     },
     "ghostty-webgpu": {
+      "ignoreBinaries": ["zig"],
       "entry": ["src/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
     },

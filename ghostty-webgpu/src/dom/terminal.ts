@@ -1,6 +1,6 @@
 import { createGhosttyError } from '../core/error.js'
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
-import { ExtensionManager } from '../extensions/manager.js'
+import { createExtensionDispatch, ExtensionManager } from '../extensions/manager.js'
 import type {
   Extension,
   ExtensionHandle,
@@ -26,7 +26,7 @@ import type { TerminalSubmittedFrame } from './submitted-frame.js'
 import type { TerminalApi, TerminalResult } from './terminal-api.js'
 import { WorkerTerminalExecution } from '../worker/execution.js'
 import { observeWorkerLayout, workerLayout } from '../worker/layout.js'
-import { workerError } from '../worker/structured-errors.js'
+import { TerminalWorkerError, workerError } from '../worker/structured-errors.js'
 import type {
   TerminalAppearance,
   TerminalAppearanceOptions,
@@ -261,6 +261,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private fittedFont?: TerminalFittedFont
   private readonly fitEnvironment?: Partial<TerminalFitEnvironment>
   private extensions?: ExtensionManager
+  private readonly extensionDispatch = createExtensionDispatch()
   private generation = 0
   private inputOwner?: TerminalInputConnection & { readonly handler: TerminalInputHandler }
   private input?: DomInputController
@@ -278,6 +279,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private readonly pointerHooks?: GhosttyWebGpuTerminalPointerHooks
   private renderer?: GhosttyWebGpuRenderer
   private readonly rendererFactory: GhosttyWebGpuRendererFactory
+  private readonly rendererMode: GhosttyWebGpuTerminalOptions['rendererMode']
   private scrollbar?: TerminalScrollbarController
   private readonly scrollbarOptions?: GhosttyWebGpuTerminalScrollbarOptions
   private readonly scrollbarWidthValue: number
@@ -297,6 +299,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.padding = options.padding
     this.pointerHooks = options.pointerHooks
     this.rendererFactory = options.rendererFactory ?? defaultRendererFactory
+    this.rendererMode = options.rendererMode
     this.scrollbarOptions = options.scrollbar
     this.scrollbarWidthValue = scrollbarWidth(options.scrollbar?.width)
 
@@ -362,6 +365,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
 
   private extensionManager(): ExtensionManager {
     this.extensions ??= new ExtensionManager({
+      dispatch: this.extensionDispatch,
       terminal: this,
       registerLinkProvider:
         this.execution.kind === 'sync'
@@ -393,12 +397,11 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       }
       if (claimed || owner.signal.aborted || this.stateValue !== 'open') return true
     }
-    const manager = this.extensions
-    return (manager?.hasInput ? manager.dispatchInput(input) : false) || this.stateValue !== 'open'
+    return (this.extensionDispatch.input?.(input) ?? false) || this.stateValue !== 'open'
   }
 
   private readonly claimDomKey = (event: KeyboardEvent): boolean => {
-    if (!this.inputOwner && !this.extensions?.hasInput) return false
+    if (!this.inputOwner && !this.extensionDispatch.input) return false
     return this.claimInput({ type: 'key', event })
   }
 
@@ -406,7 +409,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     type: 'paste' | 'text' | 'composition',
     data: TerminalInputData,
   ): boolean => {
-    if (!this.inputOwner && !this.extensions?.hasInput) return false
+    if (!this.inputOwner && !this.extensionDispatch.input) return false
     if (type === 'composition') return this.claimInput({ type, text: data as string })
     return this.claimInput({ type, data })
   }
@@ -707,7 +710,10 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
 
   key(input: TerminalKeyInput): TerminalResult<Mode, TerminalInputResult> {
     this.ensureOpen()
-    if ((this.inputOwner || this.extensions?.hasInput) && this.claimInput({ type: 'key', input }))
+    if (
+      (this.inputOwner || this.extensionDispatch.input) &&
+      this.claimInput({ type: 'key', input })
+    )
       return this.emptyInputResult()
     return this.result(this.execution.key(input))
   }
@@ -939,6 +945,15 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     appearance: TerminalAppearance,
   ): Promise<GhosttyWebGpuRenderer | undefined> {
     if (this.execution.kind === 'async') {
+      if (this.rendererMode && this.rendererMode !== 'auto')
+        throw new TerminalWorkerError({
+          code: 'capability',
+          operation: 'renderer.create',
+          status: 501,
+          why: 'Canvas paint modes run in the main-thread terminal.',
+          fix: 'Use the main terminal entry or automatic worker rendering.',
+          internal: { actor: 'worker', capability: 'canvas2d' },
+        })
       this.execution.setFrameListener((snapshot) => this.handleFrame(snapshot))
       await this.execution.open(
         elements,
@@ -969,13 +984,14 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
         onTextFrame: (snapshot) => this.handleFrame(snapshot),
         needsFrameRows: () => true,
         onRowsChanged: (rows) => {
-          if (!this.emitters.frame.hasListeners && !this.extensions?.hasEvent('frame')) return
+          if (!this.emitters.frame.hasListeners && !this.extensionDispatch.events.frame) return
           this.emitHostEvent('frame', Object.freeze({ rows }))
         },
         replaceCanvas: elements.replaceCanvas
           ? () => this.replaceRendererCanvas(elements)
           : undefined,
         rows: grid.rows,
+        rendererMode: this.rendererMode,
         theme: appearance.rendererTheme,
       },
       elements.signal,
@@ -1375,7 +1391,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.updateFrameUi(this.execution.kind === 'sync' ? this.execution.submit(snapshot) : snapshot)
     if (
       this.execution.kind === 'async' &&
-      (this.emitters.frame.hasListeners || this.extensions?.hasEvent('frame'))
+      (this.emitters.frame.hasListeners || this.extensionDispatch.events.frame)
     )
       this.emitHostEvent('frame', {
         rows: this.execution.submittedFrame?.rowPatches.map((row) => row.y) ?? [],
@@ -1579,8 +1595,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     const emitter = this.emitters[type] as EventEmitter<GhosttyWebGpuTerminalEventMap[TType]>
     if (this.stateValue === 'open') {
       emitter.emit(event)
-      if (this.stateValue === 'open' && this.extensions?.hasEvent(type))
-        this.extensions.emit(type, () => event)
+      if (this.stateValue === 'open') this.extensionDispatch.events[type]?.(event)
       return
     }
     if (this.stateValue !== 'opening') return

@@ -75,7 +75,9 @@ thenables are observed for diagnostics; their completion never changes that inpu
 Immediate and deferred hotkeys setup failures release the lease and its open subscription,
 so a replacement can attach to the same native terminal.
 
-The finite connection requires the synchronous main entry. Worker `connectInput` returns a
+The hotkeys helper checks immediate native-mode authority before acquiring its lease. A JavaScript
+worker attachment fails with its native-mode capability error. The finite connection requires
+the synchronous main entry. Worker `connectInput` returns a
 rejected Promise with a capability error; disposed calls also reject asynchronously. Existing
 worker input and general extension APIs retain their own actor conventions.
 
