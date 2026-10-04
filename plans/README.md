@@ -254,6 +254,9 @@ in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json
 
 ## Supporting work
 
+- [Command foundation delivery](../docs/keymap/command-foundation-delivery.md) records
+  Plans 204–206 and their exact standalone dependency qualification under Plan 207.
+
 - [Monorepo migration delivery](207-migration-completion.md) supports Plan 207. npm publication
   remains separately deferred; this record is not a second Plan 207.
 
