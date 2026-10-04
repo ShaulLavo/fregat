@@ -175,7 +175,10 @@ publication fix precedes pair 03; no failed result was filtered or replayed.
   terminal test suites pass.
 - Settings lists presets `ours`, `zed`, `vscode`, shows unmapped Zed actions and shadowing
   information, and records user bindings with contexts.
-- Keystroke latency is no worse than before (`trace --compare`).
+- The preregistered processing p95 comparison passes across all 280 inputs, with every owning
+  task retained, and candidate processing maximum is ≤8.3 ms.
+- Qualified reported-browser presentation p95 is no worse than baseline. Retain presentation
+  p50 and maximum separately; this criterion makes no 8.3 ms display-latency claim.
 
 ## Out of scope
 
