@@ -1,4 +1,4 @@
-import { use, useCallback } from 'react'
+import { use, useCallback, useMemo } from 'react'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { FileOpenIntentContext } from '@/lib/file-open-intent/providers/context'
@@ -14,18 +14,25 @@ const noInterest: FileOpenIntentInterest = { release() {} }
 /** Prepares one caller's file in its captured editor environment. */
 export function useFileIntent(source: FileOpenIntentSource) {
   const context = use(FileOpenIntentContext)
+  const service = context?.service
+  const preparationIdentity = context?.preparationIdentity
+  // useCallback captures this pair so the compiler keeps preparation identity in its keys.
+  const preparation = useMemo(
+    () => ({ service, preparationIdentity }),
+    [service, preparationIdentity],
+  )
   const master = useSettingValue('prefetch.enabled')
   const enabled = useSettingValue('prefetch.files') && master
-  // Caller lifetime effects depend on this identity, including host context replacement.
+  // Caller lifetime effects depend on this callback identity.
   return useCallback(
     (
       path: FilesystemPath,
       trigger: FileOpenIntentTrigger,
       options: Pick<FileOpenIntent, 'knownSize' | 'rootPath' | 'tabId'> = {},
     ): FileOpenIntentInterest =>
-      enabled && context
-        ? context.service.prepare({ ...options, path, source, trigger })
+      enabled && preparation.service
+        ? preparation.service.prepare({ ...options, path, source, trigger })
         : noInterest,
-    [context, enabled, source],
+    [preparation, enabled, source],
   )
 }
