@@ -5,14 +5,17 @@ checks from Plan 198. Source baseline: Platform `2ac20743c4402b1ee0cdb205e69260b
 Editor source and package exports now live in `editor/packages/` in that same commit. There is no
 external Editor checkout, CI editor-ref, global Bun link or SAB text transport to reconcile.
 
-## Current consumer inventory
+## Foundation consumer inventory
 
-The [complete current scan](consumer-inventory.tsv) contains 340 classified occurrences across
+The September 30 foundation scan contained 340 classified occurrences across
 canonical Editor packages/examples and Platform apps/shared packages: 181 source reads, 59 worker
 or protocol messages, 33 session factories, 29 synchronization cursors, 23 subscriptions/view
 notifications and 15 publication points. Its owner column distinguishes mutation, contribution,
 presentation, domain adapter and host policy. API declarations and example probes are included;
-these counts describe source matches, not active worker or subscription counts.
+these counts describe source matches, not active worker or subscription counts. The
+[October 4 inventory refresh](baseline-and-inventory.md#runtime-preparation-2026-10-04) records
+the current generated [scan](consumer-inventory.tsv), twelve production raw subscriptions and
+the complete same-unit provider caller cutover.
 
 The nine production raw buffer subscriptions are:
 
@@ -31,7 +34,7 @@ The nine production raw buffer subscriptions are:
 The stress `consumers.ts` subscription is an example-only LSP copy probe. Minimap uses view
 contributions; its source delivery remains unit 3 work. Tree-sitter/Shiki delivery and worker
 queues remain provider-owned until unit 2. Snippet tokens and search excerpts own temporary
-provider sessions; their migration remains unit 5. Diff source acquisition/highlighting stays
+provider sessions; their provider cutover belongs to unit 2. Diff source acquisition/highlighting stays
 with the separately owned highlighting lane. Prepared documents already borrow retained analysis
 and use `.borrow()`, not the historical transfer-only `.take()` API; fallback fold-index `.take()`
 is an unrelated handoff.
@@ -110,8 +113,9 @@ Unit 0 remains partial: **5/10 configurations calibrated** at instrument `56c8e7
 and the four remaining configurations never ran. The remaining absolute-threshold matrix is
 superseded by **Plan 282's paired A/B instrument**. See
 [the paired method and historical reference](paired-input-latency.md#historical-reference) for the accepted results and archive locations.
-Units 2–7 remain gated. Chat/workbench pixel-level comparison of every visible token,
+The owner authorized units 2–7 on 2026-10-04; exact performance and host start conditions are
+recorded in the inventory refresh. Chat/workbench pixel-level comparison of every visible token,
 retained parser/WASM byte accounting, an independent inactive
 analysis budget and full memory-pressure/first-frame matrix remain Plan 198 acceptance work. No
-budget was invented from document text size alone. These limitations do not expand authorization
-into Plan 099 units 2–7 or Plan 200's editor-service migration.
+budget was invented from document text size alone. The foundation evidence supplies no additional
+acceptance for Plan 099's runtime migration or Plan 200's editor-service migration.
