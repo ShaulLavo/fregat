@@ -260,7 +260,15 @@ export type TreeSitterWorkerRetentionSnapshot = {
   }
   readonly shared: {
     readonly registeredLanguages: number
-    readonly parserRuntimeInitialized: boolean
+    readonly wasmMemory:
+      | { readonly kind: 'uninitialized' }
+      | {
+          readonly kind: 'committed'
+          /** Current shared Tree-sitter/Markdown linear-memory backing, including allocator capacity. */
+          readonly bytes: number
+          /** WebAssembly pages of 65,536 bytes. */
+          readonly pages: number
+        }
     /** Includes failed runtime promises retained by the worker. */
     readonly runtimeEntries: number
     readonly runtimeCount: number
