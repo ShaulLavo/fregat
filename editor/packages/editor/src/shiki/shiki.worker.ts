@@ -20,6 +20,7 @@ import type {
   ShikiWorkerPreloadRequest,
   ShikiWorkerRequest,
   ShikiWorkerResponse,
+  ShikiWorkerRetentionSnapshot,
   ShikiWorkerTransportResult,
   ShikiWorkerThemeRegistration,
   ShikiWorkerThemeRequest,
@@ -87,7 +88,9 @@ const runRequest = (
     return runDocumentTask(payload.runtimeSessionId, () => Promise.resolve(undefined))
   }
   if (payload.type === 'idleFence') {
-    return Promise.allSettled(Array.from(activeWorkerTasks)).then(() => undefined)
+    return awaitWorkerTasks().then(() =>
+      payload.includeRetention ? inspectRetention() : undefined,
+    )
   }
   if (payload.type === 'theme') {
     return loadTheme(payload)
@@ -103,6 +106,55 @@ const runRequest = (
     disposeAll()
     return undefined
   })
+}
+
+const awaitWorkerTasks = async (): Promise<void> => {
+  while (activeWorkerTasks.size > 0) {
+    await Promise.allSettled(Array.from(activeWorkerTasks))
+  }
+}
+
+const inspectRetention = async (): Promise<ShikiWorkerTransportResult> => {
+  const highlighterResults = await Promise.allSettled(highlighterPromises.values())
+  const highlighters = new Set<HighlighterGeneric<string, string>>()
+  for (const result of highlighterResults) {
+    if (result.status === 'fulfilled') highlighters.add(result.value)
+  }
+  const retainedDocuments = Array.from(documents.values(), (state) => {
+    const lines = state.tokenizer.getTokens()
+    return {
+      documentId: state.documentId,
+      runtimeSessionId: state.runtimeSessionId,
+      sourceUnits: state.tokenizer.getCode().length,
+      lineCount: lines.length,
+      tokenCount: lines.reduce((sum, tokens) => sum + tokens.length, 0),
+    }
+  })
+  const retention: ShikiWorkerRetentionSnapshot = {
+    documentCount: documents.size,
+    tokenizerCount: new Set(Array.from(documents.values(), (state) => state.tokenizer)).size,
+    lineCount: retainedDocuments.reduce((sum, state) => sum + state.lineCount, 0),
+    tokenCount: retainedDocuments.reduce((sum, state) => sum + state.tokenCount, 0),
+    documents: retainedDocuments,
+    shared: {
+      highlighterEntries: highlighterPromises.size,
+      highlighterCount: highlighters.size,
+      highlighters: Array.from(highlighters, (highlighter) => ({
+        languageNames: highlighter.getLoadedLanguages(),
+        themeNames: highlighter.getLoadedThemes(),
+      })),
+    },
+    unmeasuredBytes: [
+      'javascript-objects',
+      'source-strings',
+      'tokenizer-states',
+      'grammars-and-themes',
+      'worker-heap',
+      'wasm-committed',
+      'wasm-allocator-live',
+    ],
+  }
+  return { retention }
 }
 
 const runDocumentTask = (
