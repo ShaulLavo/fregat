@@ -220,6 +220,7 @@ export class WebGpuTextPass {
       const input = slot * GLYPH_INSTANCE_FLOATS
       const output = slot * GPU_GLYPH_INSTANCE_FLOATS
       for (let word = 0; word < 16; word += 1) target[output + word] = source[input + word]!
+      // Native atlas generations remain in CPU records for retained-glyph validation.
       target[output + 16] = source[input + 16]!
       target[output + 17] = source[input + 18]!
       target[output + 18] = source[input + 20]!
