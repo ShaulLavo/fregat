@@ -935,6 +935,25 @@ export const SETTINGS_REGISTRY = {
     category: 'Developer',
     visibility: 'advanced',
   }),
+  'developer.heavyJobQuietPolicy': defineSetting({
+    schema: v.object({
+      allowedClasses: v.array(v.literal('light')),
+      measurementCpus: v.pipe(
+        v.array(v.pipe(v.number(), v.integer(), v.minValue(0))),
+        v.maxLength(0),
+      ),
+      concurrentCpus: v.pipe(
+        v.array(v.pipe(v.number(), v.integer(), v.minValue(0))),
+        v.maxLength(0),
+      ),
+    }),
+    // CPU affinity and additional classes require a separately validated scheduling policy.
+    default: { allowedClasses: ['light'], measurementCpus: [], concurrentCpus: [] },
+    scope: 'machine',
+    widget: 'complex',
+    category: 'Developer',
+    visibility: 'advanced',
+  }),
   'developer.heavyJobMemoryReserveMiB': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(65536)),
     default: 2048,

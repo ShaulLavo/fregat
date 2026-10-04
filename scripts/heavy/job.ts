@@ -163,36 +163,44 @@ export type JobSpec =
  * and, if they are still running after the grace, kills them. `done` settles once they have all
  * exited; the slice and its ceiling are removed however the launch or the job ends.
  */
-export function startJob(job: JobSpec) {
+export function startJob(
+  job: JobSpec,
+  publish = (launch: () => ReturnType<typeof Bun.spawn>) => launch(),
+  onExit = () => {},
+) {
   const unit = `${job.host === 'local' ? job.sliceRoot : 'heavy'}-${job.id}.scope`
   const accountingFile = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `${unit}.accounting`)
   const slice = job.host === 'local' ? jobSlice(job) : null
   const started = performance.now()
   let child: ReturnType<typeof Bun.spawn>
   try {
-    child = Bun.spawn({
-      cmd: launchCommand(job, unit, accountingFile),
-      cwd: job.cwd,
-      env: {
-        ...process.env,
-        ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
-        VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
-      },
-      stdio: [
-        'inherit',
-        'inherit',
-        'inherit',
-        // Server jobs hold no slot locks; the entry lock must still arrive on fd 6.
-        ...(job.host === 'local'
-          ? [
-              job.slotLocks[0] ?? 'ignore',
-              job.slotLocks[1] ?? 'ignore',
-              job.slotLocks[2] ?? 'ignore',
-              job.entryLock,
-            ]
-          : []),
-      ],
-    })
+    // Manager preparation and refused-launch cleanup must stay outside the publication lock.
+    const command = launchCommand(job, unit, accountingFile)
+    child = publish(() =>
+      Bun.spawn({
+        cmd: command,
+        cwd: job.cwd,
+        env: {
+          ...process.env,
+          ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
+          VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
+        },
+        stdio: [
+          'inherit',
+          'inherit',
+          'inherit',
+          // Server jobs hold no slot locks; the entry lock must still arrive on fd 6.
+          ...(job.host === 'local'
+            ? [
+                job.slotLocks[0] ?? 'ignore',
+                job.slotLocks[1] ?? 'ignore',
+                job.slotLocks[2] ?? 'ignore',
+                job.entryLock,
+              ]
+            : []),
+        ],
+      }),
+    )
   } catch (error) {
     if (slice) removeJobSlice(slice)
     throw error
@@ -212,6 +220,7 @@ export function startJob(job: JobSpec) {
 
   const done = child.exited
     .then((): JobOutcome => {
+      onExit()
       const signalCode = child.signalCode
       const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
       const wallMs = Math.round(performance.now() - started)
