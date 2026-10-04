@@ -305,7 +305,7 @@ export async function bootCandidate(release: Release, base = '/') {
     writeFileSync(path.join(release.directory, 'candidate-server.log'), stderr)
     throw error
   } finally {
-    child.kill()
+    child.kill('SIGKILL')
     await child.exited
     rmSync(scratch, { force: true, recursive: true })
   }

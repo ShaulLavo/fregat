@@ -146,9 +146,13 @@ test.each(['/', '/demo/', '/platform-api/'])(
       writeFileSync(
         path.join(server, 'index.js'),
         `
-      import { readFileSync } from 'node:fs'
+      import { readFileSync, writeFileSync } from 'node:fs'
       import path from 'node:path'
-      setTimeout(() => process.exit(0), 1500)
+      process.on('SIGTERM', () => {})
+      setTimeout(() => {
+        writeFileSync('watchdog-fired', '')
+        process.exit(0)
+      }, 1500)
       Bun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch(request) {
         const pathname = new URL(request.url).pathname
         if (pathname === '/release') return Response.json({ release: ${JSON.stringify(release.name)}, server: { release: ${JSON.stringify(release.name)} } })
@@ -159,6 +163,7 @@ test.each(['/', '/demo/', '/platform-api/'])(
     `,
       )
       await expect(bootCandidate(release, base)).resolves.toBeUndefined()
+      expect(existsSync(path.join(directory, 'watchdog-fired'))).toBe(false)
       expect(
         JSON.parse(readFileSync(path.join(directory, 'candidate-check.json'), 'utf8')),
       ).toMatchObject({ ok: true })
