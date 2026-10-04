@@ -440,6 +440,14 @@ describe('tree-sitter worker client language registration cache', () => {
     }
 
     expect(samples).toEqual(Array.from({ length: 40 }, () => baseline))
+    client.disposeDocument('runtime-survivor')
+    await client.awaitRuntimeSessionIdle('runtime-survivor')
+    await client.awaitIdleFence()
+    expect(client.inspect().cache.sourceChunks).toEqual({
+      documents: 0,
+      sentChunks: 0,
+      sourceEpochs: 0,
+    })
     expect(fakeWorkers).toHaveLength(1)
     expect(worker.isTerminated).toBe(false)
     expect(client.inspect().workerGeneration).toBe(1)
@@ -494,6 +502,41 @@ describe('tree-sitter worker client language registration cache', () => {
     worker.resolveRequest(replacementRequest, parseResult(3))
     await expect(replacementParse).resolves.toMatchObject({ snapshotVersion: 3 })
     expect(client.inspect().pendingRequests).toBe(0)
+  })
+
+  it('preserves a newer source request while the disposal acknowledgement is pending', async () => {
+    const client = await loadWorkerClient()
+    await client.warmLanguages([])
+    const worker = fakeWorkerAt(0)
+    const snapshot = createPieceTableSnapshot('const answer = 1;')
+    FakeWorker.autoResolve = false
+    await completeParse(client, worker, parsePayload(snapshot, 1))
+    const oldRequest = parseRequests(worker)[0]!
+    client.disposeDocument('runtime-doc.ts')
+    await flushMicrotasks()
+    const disposal = requestOfType(worker, 'disposeDocument')
+    const nextParse = client.parse(parsePayload(snapshot, 2))
+    await flushMicrotasks()
+    const nextRequest = parseRequests(worker)[1]!
+    expect(nextRequest.payload.source.chunks.length).toBeGreaterThan(0)
+    worker.resolveRequest(disposal)
+    await flushMicrotasks()
+    expect(client.inspect().cache.sourceChunks).toEqual({
+      documents: 1,
+      sentChunks: 0,
+      sourceEpochs: 1,
+    })
+    worker.resolveRequest(oldRequest, parseResult(1))
+    worker.resolveRequest(nextRequest, parseResult(2))
+    await expect(nextParse).resolves.toMatchObject({ snapshotVersion: 2 })
+    FakeWorker.autoResolve = true
+    await client.awaitRuntimeSessionIdle('runtime-doc.ts')
+    await client.awaitIdleFence()
+    expect(client.inspect().cache.sourceChunks).toEqual({
+      documents: 1,
+      sentChunks: 1,
+      sourceEpochs: 1,
+    })
   })
 
   it('requests captures by default and allows compact parse requests', async () => {
