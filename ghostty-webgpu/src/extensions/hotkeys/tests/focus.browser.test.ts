@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createBrowserDispatcher, type KeymapEntry, type KeymapPlatform } from '@fregat/hotkeys'
 import {
   Terminal as MainTerminal,
-  hotkeys,
+  attachTerminalHotkeys,
   terminalDefaultPack,
   terminalShellKeysPack,
 } from '../../../../dist/index.js'
@@ -32,7 +32,7 @@ async function settle(terminal: TerminalApi): Promise<void> {
   await terminal.lineCount()
   await Promise.resolve()
 }
-async function fixture(entry: 'main', platform: KeymapPlatform = 'linux') {
+async function fixture(entry: 'main', platform: KeymapPlatform = 'linux', observe = true) {
   const host = document.createElement('div')
   host.style.cssText = 'width:400px;height:160px;position:relative'
   document.body.append(host)
@@ -51,16 +51,17 @@ async function fixture(entry: 'main', platform: KeymapPlatform = 'linux') {
   let generatedClaims = 0
   terminal.onData((bytes) => output.push(decoder.decode(bytes)))
   terminal.on('error', (error) => errors.push(error))
-  terminal.use({
-    name: 'claim-counter',
-    setup: () => ({
-      input: (input) => {
-        if (input.type === 'key' && 'input' in input) generatedClaims += 1
-        claims += 1
-        return 'pass'
-      },
-    }),
-  })
+  if (observe)
+    terminal.use({
+      name: 'claim-counter',
+      setup: () => ({
+        input: (input) => {
+          if (input.type === 'key' && 'input' in input) generatedClaims += 1
+          claims += 1
+          return 'pass'
+        },
+      }),
+    })
   const clipboard: TerminalClipboard = {
     readText: async () => 'clipboard',
     writeText: async (text) => {
@@ -69,8 +70,13 @@ async function fixture(entry: 'main', platform: KeymapPlatform = 'linux') {
   }
   const common = { clipboard, onError: (cause: unknown) => errors.push(cause) }
   async function standalone(bindings: readonly KeymapEntry[] = []) {
-    const handle = terminal.use(hotkeys({ ...common, mode: 'standalone', platform, bindings }))
-    expect(handle.api.registration).toBeUndefined()
+    const handle = attachTerminalHotkeys(terminal, {
+      ...common,
+      mode: 'standalone',
+      platform,
+      bindings,
+    })
+    expect(handle.registration).toBeUndefined()
     await terminal.open(host)
     terminal.focus()
     return handle
@@ -80,9 +86,13 @@ async function fixture(entry: 'main', platform: KeymapPlatform = 'linux') {
     cleanups.push(() => dispatcher.dispose())
     const parent = dispatcher.createNode({ context: 'Workspace', commands })
     dispatcher.attachElement(parent, host)
-    const handle = terminal.use(
-      hotkeys({ ...common, mode: 'hosted', dispatcher, parent, platform }),
-    )
+    const handle = attachTerminalHotkeys(terminal, {
+      ...common,
+      mode: 'hosted',
+      dispatcher,
+      parent,
+      platform,
+    })
     await terminal.open(host)
     terminal.focus()
     return { dispatcher, parent, handle }
@@ -115,7 +125,38 @@ async function fixture(entry: 'main', platform: KeymapPlatform = 'linux') {
   }
 }
 
-describe.each(['main'] as const)('%s public hotkeys extension', (entry) => {
+describe.each(['main'] as const)('%s public hotkeys connection', (entry) => {
+  it.each(['standalone', 'hosted'] as const)(
+    'owns %s hotkeys without constructing the general manager',
+    async (mode) => {
+      const f = await fixture(entry, 'linux', false)
+      expect(Reflect.get(f.terminal, 'extensions')).toBeUndefined()
+      const connection = mode === 'standalone' ? await f.standalone() : (await f.hosted()).handle
+      expect(connection.registration).toBeDefined()
+      expect(Reflect.get(f.terminal, 'extensions')).toBeUndefined()
+      f.key('keydown', { key: 'a', code: 'KeyA' })
+      f.key('keyup', { key: 'a', code: 'KeyA' })
+      expect(f.output).toEqual(['a'])
+      connection.dispose()
+      expect(Reflect.get(f.terminal, 'extensions')).toBeUndefined()
+      expect(f.terminal.lifecycle).toBe('open')
+      let generalCalls = 0
+      f.terminal.use({
+        name: 'manager observation control',
+        setup: () => ({
+          input: () => {
+            generalCalls++
+            return 'pass'
+          },
+        }),
+      })
+      expect(Reflect.get(f.terminal, 'extensions')).toBeDefined()
+      f.key('keydown', { key: 'b', code: 'KeyB' })
+      expect(generalCalls).toBe(1)
+      expect(f.output).toEqual(['a', 'b'])
+    },
+  )
+
   it('attaches before open and passes unbound input once while a shallower binding owns Ctrl+B', async () => {
     const f = await fixture(entry)
     let calls = 0
@@ -124,7 +165,7 @@ describe.each(['main'] as const)('%s public hotkeys extension', (entry) => {
         calls += 1
       },
     })
-    expect(h.handle.api.registration?.node.parent).toBe(h.parent)
+    expect(h.handle.registration?.node.parent).toBe(h.parent)
     f.key('keydown', { key: 'a', code: 'KeyA' })
     f.key('keyup', { key: 'a', code: 'KeyA' })
     f.key('keydown', { key: 'b', code: 'KeyB', ctrlKey: true })
@@ -135,7 +176,7 @@ describe.each(['main'] as const)('%s public hotkeys extension', (entry) => {
     expect(f.errors).toEqual([])
   })
 
-  it('sends deeper shell pack press, repeat and release once with no extension re-entry', async () => {
+  it('sends deeper shell pack press, repeat and release once with no original-input re-entry', async () => {
     const f = await fixture(entry)
     let calls = 0
     const h = await f.hosted(
@@ -174,7 +215,7 @@ describe.each(['main'] as const)('%s public hotkeys extension', (entry) => {
     await settle(f.terminal)
     expect(f.output).toEqual(expected)
     expect(calls).toBe(0)
-    expect(f.claims() - claims).toBe(2)
+    expect(f.claims() - claims).toBe(0)
     expect(f.generatedClaims()).toBe(0)
     expect([...observed.values()]).toEqual([1, 1, 1])
     expect(f.errors).toEqual([])
@@ -316,7 +357,7 @@ describe.each(['main'] as const)('%s public hotkeys extension', (entry) => {
           source: 'user',
         },
       ])
-      expect(handle.api.registration).toBeDefined()
+      expect(handle.registration).toBeDefined()
       await f.terminal.write('selection')
       f.key('keydown', {
         key: 'a',
@@ -359,21 +400,19 @@ describe.each(['main'] as const)('%s public hotkeys extension', (entry) => {
       expect((await f.terminal.readLines(0, 1))[0]?.text.trim()).toBe('')
       expect(f.terminal.inputModes.mouseReporting).toBe(true)
       handle.dispose()
-      f.terminal.use(
-        hotkeys({
-          mode: 'standalone',
-          platform,
-          bindings: [
-            {
-              keys: platform === 'mac' ? 'Meta+K' : 'Ctrl+Shift+K',
-              command: 'terminal.sendKeystroke',
-              args: { text: 'default overridden' },
-              context: 'Terminal',
-              source: 'user',
-            },
-          ],
-        }),
-      )
+      attachTerminalHotkeys(f.terminal, {
+        mode: 'standalone',
+        platform,
+        bindings: [
+          {
+            keys: platform === 'mac' ? 'Meta+K' : 'Ctrl+Shift+K',
+            command: 'terminal.sendKeystroke',
+            args: { text: 'default overridden' },
+            context: 'Terminal',
+            source: 'user',
+          },
+        ],
+      })
       f.key('keydown', { key: 'k', code: 'KeyK', ...clipboardModifiers })
       f.key('keyup', { key: 'k', code: 'KeyK', ...clipboardModifiers })
       await settle(f.terminal)
@@ -394,13 +433,11 @@ describe.each(['main'] as const)('%s public hotkeys extension', (entry) => {
     const pending = new Promise<string>((resolve) => {
       resolveClipboard = resolve
     })
-    const handle = f.terminal.use(
-      hotkeys({
-        mode: 'standalone',
-        platform: 'linux',
-        clipboard: { readText: () => pending, writeText: async () => {} },
-      }),
-    )
+    const handle = attachTerminalHotkeys(f.terminal, {
+      mode: 'standalone',
+      platform: 'linux',
+      clipboard: { readText: () => pending, writeText: async () => {} },
+    })
     f.terminal.focus()
     f.key('keydown', { key: 'v', code: 'KeyV', ctrlKey: true, shiftKey: true })
     handle.dispose()

@@ -13,13 +13,20 @@
 
 ## Terminal launch contract
 
-Before the coordinated cutover, reconcile [205](205-ghostty-on-fregat-hotkeys.md)'s hotkeys
-extension and hosted focus-node adapter against active [286](286-ghostty-extensions.md)/
-[287](287-ghostty-worker-mode.md) work. Host claim/pass arbitration stays synchronous before
-native input encoding in both terminal entries. Verify app-bound keys are claimed once,
-unhandled and shell-bound keys reach the terminal once, text composition remains intact, and
-native protocol replies bypass host key hooks. Match registration/disposal to the landed host
-API; do not create a second dispatcher or make the whole terminal program a prerequisite.
+The hosted terminal uses [205](205-ghostty-on-fregat-hotkeys.md)'s
+`attachTerminalHotkeys` connection and the existing window dispatcher. Its finite owner claims
+original input synchronously before native encoding. A finite pass reaches explicitly installed
+peer general input contributions, then native once. Generated commands and protocol replies
+bypass original-input owners. Hotkeys attachment never constructs a general extension manager.
+
+Verify app-bound keys are claimed once, unhandled and shell-bound keys reach the terminal once,
+and physical events and text composition retain their ownership. Registration disposal removes
+only the terminal node/observer and its finite lease; the window dispatcher and native owner stay
+live. The main entry supplies immediate native modes. Worker finite connections reject through
+their Promise convention, while landed [286](286-ghostty-extensions.md)/
+[287](287-ghostty-worker-mode.md) public APIs and worker behavior remain peer-owned.
+The valid failed general-manager X6 window remains failed and authorizes no performance claim
+for this connection. Final candidate functional, artifact and latency evidence binds its own source.
 
 ## Why
 

@@ -3,12 +3,15 @@ import { page } from 'vitest/browser'
 import { DomTerminalRenderer, Terminal } from '../../index.js'
 import type { GhosttyWebGpuTerminalOptions, LinkProvider, ProvidedLink } from '../../index.js'
 import type { Extension, ExtensionInput, ExtensionScope, TerminalInputEvent } from '../../index.js'
+import { Terminal as WorkerTerminal } from '../../worker/index.js'
 
 const terminals: Terminal[] = []
+const workerTerminals: WorkerTerminal[] = []
 const hosts: HTMLElement[] = []
 const decoder = new TextDecoder()
 
-afterEach(() => {
+afterEach(async () => {
+  for (const terminal of workerTerminals.splice(0)) await terminal.dispose()
   for (const terminal of terminals.splice(0)) terminal.dispose()
   for (const host of hosts.splice(0)) host.remove()
 })
@@ -284,7 +287,7 @@ describe('public extension links', () => {
           }
         },
       }),
-    ).toThrow('disposed')
+    ).toThrow('LinkResolver.registerProvider called after disposal')
     expect(reads).toBe(2)
     expect(terminal.lifecycle).toBe('disposed')
     expect(scope.signal.aborted).toBe(true)
@@ -414,19 +417,11 @@ describe('public extension activation', () => {
     async ({ init, active }) => {
       const seen: KeyboardEvent[] = []
       let claim = false
-      const terminal = await openTerminal({
-        extensions: [
-          {
-            name: 'original-ime',
-            setup: () => ({
-              input: (input) => {
-                if (input.type !== 'key' || !('event' in input)) return 'pass'
-                seen.push(input.event)
-                return claim ? 'claim' : 'pass'
-              },
-            }),
-          },
-        ],
+      const terminal = await openTerminal()
+      terminal.connectInput((input) => {
+        if (input.type !== 'key' || !('event' in input)) return 'pass'
+        seen.push(input.event)
+        return claim ? 'claim' : 'pass'
       })
       const output: string[] = []
       terminal.onData((data) => output.push(decoder.decode(data)))
@@ -970,6 +965,36 @@ describe('public extension activation', () => {
     expect(event.defaultPrevented).toBe(true)
     expect(output).toEqual([])
   })
+
+  it('broadcasts interested host events and contains a failing error handler', async () => {
+    const clipboardFailure = Symbol('clipboard policy failure')
+    const terminal = await openTerminal({
+      clipboardWrite: () => {
+        throw clipboardFailure
+      },
+    })
+    const titles: string[] = []
+    const publicErrors: unknown[] = []
+    terminal.on('error', ({ cause }) => publicErrors.push(cause))
+    terminal.use({
+      name: 'events',
+      setup: () => ({
+        events: {
+          title: (title) => titles.push(title),
+          error: () => {
+            throw 'extension error handler failure'
+          },
+        },
+      }),
+    })
+    terminal.write('\x1b]0;one\x07')
+    terminal.write('\x1b]0;two\x07')
+    terminal.write('\x1b]52;c;eA==\x07')
+    expect(titles).toEqual(['one', 'two'])
+    expect(publicErrors).toHaveLength(2)
+    expect(publicErrors[0]).toBe(clipboardFailure)
+    expect(publicErrors.at(-1)).toBe('extension error handler failure')
+  })
 })
 
 describe('interested frame delivery', () => {
@@ -1033,4 +1058,317 @@ it('delivers an extension-only frame queued during opening through the host boun
   })
   expect(terminal.lifecycle).toBe('open')
   expect(observed).toContainEqual([0])
+})
+
+async function createWorkerTerminal(): Promise<WorkerTerminal> {
+  const family = 'ExtensionWorkerIntegration'
+  const url = new URL(
+    '../../../site/public/fonts/jetbrains-mono-latin-400-normal.woff2',
+    import.meta.url,
+  ).href
+  const terminal = await WorkerTerminal.create({
+    backend: 'webgl',
+    fonts: [{ family, source: { url } }],
+    appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+    workerUrl: new URL('../../../dist/worker/entry.js', import.meta.url),
+  })
+  workerTerminals.push(terminal)
+  return terminal
+}
+
+function workerContainer(): HTMLDivElement {
+  const host = document.createElement('div')
+  host.style.width = '320px'
+  host.style.height = '120px'
+  document.body.append(host)
+  hosts.push(host)
+  return host
+}
+
+describe('public worker extension integration', () => {
+  it('returns a Promise for every use outcome while setup and owned cleanup stay on the host', async () => {
+    const terminal = await createWorkerTerminal()
+    const order: string[] = []
+    const extension = {
+      name: 'typed worker handle',
+      setup(scope: ExtensionScope) {
+        order.push('setup')
+        scope.own(() => order.push('cleanup'))
+        return { api: { answer: 42 }, osc: {} }
+      },
+    }
+    const installed = terminal.use(extension)
+    expect(installed instanceof Promise).toBe(true)
+    const handle = await installed
+    expect(handle.api.answer).toBe(42)
+    expect(order).toEqual(['setup'])
+    let duplicate: ReturnType<typeof terminal.use> | undefined
+    expect(() => {
+      duplicate = terminal.use(extension)
+    }).not.toThrow()
+    expect(duplicate instanceof Promise).toBe(true)
+    await expect(duplicate).rejects.toThrow('already')
+    handle.dispose()
+    expect(order).toEqual(['setup', 'cleanup'])
+    const reattached = terminal.use(extension)
+    expect(reattached instanceof Promise).toBe(true)
+    await reattached
+    await terminal.dispose()
+    expect(order).toEqual(['setup', 'cleanup', 'setup', 'cleanup'])
+    let disposed: ReturnType<typeof terminal.use> | undefined
+    expect(() => {
+      disposed = terminal.use(extension)
+    }).not.toThrow()
+    expect(disposed instanceof Promise).toBe(true)
+    await expect(disposed).rejects.toThrow()
+  })
+
+  it('rejects setup and contribution failures asynchronously and rolls back their resources', async () => {
+    const terminal = await createWorkerTerminal()
+    const failures: Extension[] = [
+      {
+        name: 'throws',
+        setup: () => {
+          throw new TypeError('setup failed')
+        },
+      },
+      {
+        name: 'invalid OSC number',
+        setup: () => ({ osc: { '-1': () => {} } }),
+      },
+      { name: 'unavailable OSC', setup: () => ({ osc: { 999: () => {} } }) },
+    ]
+    for (const failure of failures) {
+      const cleanup: string[] = []
+      const extension = {
+        name: failure.name,
+        setup(scope: ExtensionScope) {
+          scope.own(() => cleanup.push('disposed'))
+          return failure.setup(scope)
+        },
+      }
+      let result: ReturnType<typeof terminal.use> | undefined
+      expect(() => {
+        result = terminal.use(extension)
+      }).not.toThrow()
+      expect(result instanceof Promise).toBe(true)
+      await expect(result).rejects.toThrow()
+      expect(cleanup).toEqual(['disposed'])
+    }
+    const absent = terminal.use({ name: 'absent OSC', setup: () => ({}) })
+    expect(absent instanceof Promise).toBe(true)
+    await absent
+  })
+
+  it('delivers submitted worker frames to an extension without a public frame listener', async () => {
+    const terminal = await createWorkerTerminal()
+    await terminal.open(workerContainer())
+    const extensionRevisions: number[] = []
+    const publicRevisions: number[] = []
+    const handle = await terminal.use({
+      name: 'worker frame observer',
+      setup: () => ({
+        events: {
+          frame: () => extensionRevisions.push(terminal.submittedFrame!.nativeRevision),
+        },
+      }),
+    })
+    const control = terminal.onFrame(() =>
+      publicRevisions.push(terminal.submittedFrame!.nativeRevision),
+    )
+    const first = await terminal.writeAndReadGeometry('control')
+    await vi.waitFor(() => {
+      expect(publicRevisions).toContain(first.revision)
+      expect(extensionRevisions).toContain(first.revision)
+    })
+    control.dispose()
+    const extensionOnly = await terminal.writeAndReadGeometry('extension only')
+    await vi.waitFor(() => expect(extensionRevisions).toContain(extensionOnly.revision))
+    handle.dispose()
+    const received = extensionRevisions.length
+    const detachedControl = terminal.onFrame(() =>
+      publicRevisions.push(terminal.submittedFrame!.nativeRevision),
+    )
+    const detached = await terminal.writeAndReadGeometry('detached')
+    await vi.waitFor(() => expect(publicRevisions).toContain(detached.revision))
+    expect(extensionRevisions).toHaveLength(received)
+    detachedControl.dispose()
+  })
+
+  it('claims original worker input synchronously before forwarding and preserves later keyless text', async () => {
+    const terminal = await createWorkerTerminal()
+    await terminal.open(workerContainer())
+    const received: TerminalInputEvent[] = []
+    const output: string[] = []
+    terminal.onData((data) => output.push(new TextDecoder().decode(data)))
+    await terminal.use({
+      name: 'original worker input',
+      setup: () => ({
+        input: (event) => {
+          received.push(event)
+          if (event.type === 'text' && event.data === 'native pass') return 'pass'
+          return 'claim'
+        },
+      }),
+    })
+    await terminal.sendInput('native pass')
+    expect(output).toEqual(['native pass'])
+    const text = terminal.sendInput('claimed text')
+    const paste = terminal.paste('claimed paste')
+    const key = terminal.key({
+      action: 'press',
+      code: 'KeyA',
+      composing: false,
+      text: 'a',
+    })
+    expect([text, paste, key].every((result) => result instanceof Promise)).toBe(true)
+    expect((await Promise.all([text, paste, key])).map((bytes) => bytes.length)).toEqual([0, 0, 0])
+    const event = new KeyboardEvent('keydown', {
+      key: 'b',
+      code: 'KeyB',
+      bubbles: true,
+      cancelable: true,
+    })
+    terminal.textarea!.dispatchEvent(event)
+    expect(received.at(-1)).toEqual({ type: 'key', event })
+    expect(event.defaultPrevented).toBe(true)
+    const textarea = terminal.textarea!
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { data: '' }))
+    textarea.value = '中'
+    textarea.dispatchEvent(
+      new InputEvent('input', {
+        data: '中',
+        inputType: 'insertCompositionText',
+        isComposing: true,
+      }),
+    )
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { data: '中' }))
+    textarea.value = '中'
+    textarea.dispatchEvent(
+      new InputEvent('input', {
+        data: '中',
+        inputType: 'insertText',
+        isComposing: false,
+      }),
+    )
+    expect(received.slice(-2)).toEqual([
+      { type: 'composition', text: '中' },
+      { type: 'text', data: '中' },
+    ])
+    await terminal.write('fence')
+    expect(output).toEqual(['native pass'])
+    expect(
+      received.filter((input) => input.type === 'text' && input.data === 'native pass'),
+    ).toHaveLength(1)
+  })
+})
+
+describe('finite original input ownership', () => {
+  it('offers finite ownership first, then interested general input, then native once', async () => {
+    const terminal = await openTerminal()
+    const order: string[] = []
+    const output: string[] = []
+    terminal.onData((bytes) => output.push(decoder.decode(bytes)))
+    terminal.use({
+      name: 'general input',
+      setup: () => ({
+        input: (input) => {
+          order.push('general')
+          return input.type === 'key' && 'event' in input && input.event.key === 'b'
+            ? 'claim'
+            : 'pass'
+        },
+      }),
+    })
+    terminal.connectInput((input) => {
+      order.push('finite')
+      return input.type === 'key' && 'event' in input && input.event.key === 'a' ? 'claim' : 'pass'
+    })
+    const claimed = press(terminal, 'a', 'KeyA')
+    expect(claimed.defaultPrevented).toBe(true)
+    expect(order).toEqual(['finite'])
+    const general = press(terminal, 'b', 'KeyB')
+    expect(general.defaultPrevented).toBe(true)
+    expect(order).toEqual(['finite', 'finite', 'general'])
+    press(terminal, 'c', 'KeyC')
+    expect(order).toEqual(['finite', 'finite', 'general', 'finite', 'general'])
+    expect(output).toEqual(['c'])
+  })
+
+  it('rejects a second finite owner and keeps old disposal from clearing a replacement', async () => {
+    const terminal = await openTerminal()
+    const output: string[] = []
+    terminal.onData((bytes) => output.push(decoder.decode(bytes)))
+    const first = terminal.connectInput(() => 'claim')
+    expect(() => terminal.connectInput(() => 'pass')).toThrow('already has an owner')
+    press(terminal)
+    expect(output).toEqual([])
+    first.dispose()
+    expect(first.signal.aborted).toBe(true)
+    const replacement = terminal.connectInput(() => 'claim')
+    first.dispose()
+    press(terminal)
+    expect(output).toEqual([])
+    replacement.dispose()
+    press(terminal)
+    expect(output).toEqual(['a'])
+    const last = terminal.connectInput(() => 'pass')
+    terminal.dispose()
+    expect(last.signal.aborted).toBe(true)
+    expect(() => terminal.connectInput(() => 'pass')).toThrow('disposed')
+  })
+
+  it.each(['owner', 'terminal'] as const)(
+    'stops forwarding when the finite handler disposes its %s',
+    async (target) => {
+      const terminal = await openTerminal()
+      const output: string[] = []
+      const general = vi.fn(() => 'pass' as const)
+      terminal.onData((bytes) => output.push(decoder.decode(bytes)))
+      terminal.use({ name: 'general after finite', setup: () => ({ input: general }) })
+      const connection = terminal.connectInput(() => {
+        if (target === 'terminal') terminal.dispose()
+        else connection.dispose()
+        return 'pass'
+      })
+      const event = press(terminal)
+      expect(event.defaultPrevented).toBe(true)
+      expect(connection.signal.aborted).toBe(true)
+      expect(general).not.toHaveBeenCalled()
+      expect(output).toEqual([])
+      if (target === 'owner') {
+        press(terminal)
+        expect(general).toHaveBeenCalledTimes(1)
+        expect(output).toEqual(['a'])
+      }
+    },
+  )
+
+  it('claims original text, paste and composition while generated input and native replies bypass ownership', async () => {
+    const terminal = await openTerminal()
+    const seen: TerminalInputEvent[] = []
+    const output: string[] = []
+    terminal.onData((bytes) => output.push(decoder.decode(bytes)))
+    terminal.connectInput((input) => {
+      seen.push(input)
+      return 'claim'
+    })
+    const key = { action: 'press', code: 'KeyQ', text: 'q', composing: false } as const
+    expect(terminal.sendInput('original')).toHaveLength(0)
+    expect(terminal.paste('original paste')).toHaveLength(0)
+    expect(terminal.key(key)).toHaveLength(0)
+    compose(terminal, '中', 'end-only')
+    expect(seen).toEqual([
+      { type: 'text', data: 'original' },
+      { type: 'paste', data: 'original paste' },
+      { type: 'key', input: key },
+      { type: 'composition', text: '中' },
+    ])
+    expect(seen[2]?.type === 'key' && 'input' in seen[2] && seen[2].input).toBe(key)
+    terminal.sendGeneratedInput({ type: 'text', data: 'generated' })
+    terminal.sendGeneratedInput({ type: 'key', input: key })
+    terminal.write('\x1b[5n')
+    expect(output).toEqual(['generated', 'q', '\x1b[0n'])
+    expect(seen).toHaveLength(4)
+  })
 })

@@ -1,18 +1,18 @@
 # Terminal hotkeys
 
-`hotkeys()` is a public host-side extension. It uses `@fregat/hotkeys` with the main terminal native owner. Load it explicitly for an interactive standalone terminal:
+`attachTerminalHotkeys(terminal, options)` owns a finite original-input connection. It uses `@fregat/hotkeys` with the main terminal native owner. Load it explicitly for an interactive standalone terminal:
 
 ```ts
-import { Terminal, hotkeys } from 'ghostty-webgpu'
+import { Terminal, attachTerminalHotkeys } from 'ghostty-webgpu'
 
-const terminal = await Terminal.create({
-  extensions: [hotkeys()],
-})
+const terminal = await Terminal.create()
+const connection = attachTerminalHotkeys(terminal)
 await terminal.open(container)
 ```
 
-Extensions listed during creation attach when the host opens. `terminal.use(hotkeys())` also
-attaches synchronously to an already open terminal. Its handle disposes the registration.
+The connection attaches when the host opens, or synchronously when it is already open.
+Its disposer removes the registration. Terminal disposal aborts the connection and pending
+clipboard work. A second finite connection is rejected while the first owns original input.
 
 ## Standalone bindings
 
@@ -23,7 +23,7 @@ macOS and Ctrl elsewhere: `=`, `Shift++`, `-` and `0`.
 Overrides follow the library's binding format:
 
 ```ts
-hotkeys({
+attachTerminalHotkeys(terminal, {
   mode: 'standalone',
   bindings: [{ keys: 'Ctrl+Q', command: 'terminal.clear', context: 'Terminal', source: 'user' }],
 })
@@ -39,17 +39,15 @@ Clear erases the display and scrollback while preserving native protocol modes.
 Pass the existing window dispatcher and the Workspace parent:
 
 ```ts
-terminal.use(
-  hotkeys({
-    mode: 'hosted',
-    dispatcher: windowKeymap.hotkeys,
-    parent: windowKeymap.parentFor('terminal'),
-    platform,
-  }),
-)
+attachTerminalHotkeys(terminal, {
+  mode: 'hosted',
+  dispatcher: windowKeymap.hotkeys,
+  parent: windowKeymap.parentFor('terminal'),
+  platform,
+})
 ```
 
-The extension adds a `Terminal` focus node and its commands. The host owns all binding data
+The connection adds a `Terminal` focus node and its commands. The host owns all binding data
 and the single matcher/listener. `terminalShellKeysPack` is exported opt-in data for Ctrl+A–Z
 and readline Alt keys. `terminalDefaultPack` is also available to hosted presets.
 
@@ -63,15 +61,22 @@ a deeper `terminal.sendKeystroke` binding sends it to the shell. Arguments are e
 `{ keystroke: string }` or `{ text: string }`. Keystrokes accept the library's `Ctrl+B` notation
 and Zed's `ctrl-b` notation. Invalid arguments decline the command.
 
-Original DOM events arbitrate through the extension's synchronous claim/pass contribution
+Original DOM events arbitrate through the finite synchronous claim/pass owner
 before native encoding. Resolved commands use `sendGeneratedInput`, which sends a
 typed key, text or paste directly to the native execution owner. Native terminal replies bypass
-extension input contributions. Composition remains native text input.
+original-input owners. Composition remains native text input. Programmatic original key, text and paste calls use the
+same claim boundary. A finite claim stops there; a pass reaches any explicitly installed general
+input contribution and then native encoding. Hotkeys attachment creates no general manager.
+The peer-owned `Terminal.use` surface retains its own registration and event semantics.
+
+The finite connection requires the synchronous main entry. Worker `connectInput` returns a
+rejected Promise with a capability error; disposed calls also reject asynchronously. Existing
+worker input and general extension APIs retain their own actor conventions.
 
 The adapter subscribes directly to `dispatcher.observeKeys({ beforeKey, reset })`. It remembers
 native-selected physical presses and forwards their matching release once before the dispatcher
 consumes it. Focus movement retains the original terminal owner. Blur, hidden, `releaseAll`,
-dispatcher disposal and extension disposal clear that ownership. Disposal removes the node,
+dispatcher disposal and connection disposal clear that ownership. Disposal removes the node,
 commands and observer; the terminal execution owner remains in place.
 
 ## Packaging

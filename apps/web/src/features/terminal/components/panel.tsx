@@ -20,7 +20,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { cn } from '@workspace/ui/lib/utils'
-import { hotkeys, type Terminal, type TerminalScrollbar } from 'ghostty-webgpu'
+import { attachTerminalHotkeys, type Terminal, type TerminalScrollbar } from 'ghostty-webgpu'
 import { detectPlatform } from '@fregat/hotkeys'
 import {
   useEffect,
@@ -147,15 +147,13 @@ export function TerminalPanel({
       if (identity !== terminalMountIdentity) return
       terminalRef.current = terminal
       sendInputRef.current = sendInput
-      terminal.use(
-        hotkeys({
-          mode: 'hosted',
-          dispatcher: keymap.hotkeys,
-          parent: keymap.parentFor('terminal'),
-          platform: detectPlatform(),
-          onError: (cause, operation) => reportError({ ...toClientError(cause), operation }),
-        }),
-      )
+      attachTerminalHotkeys(terminal, {
+        mode: 'hosted',
+        dispatcher: keymap.hotkeys,
+        parent: keymap.parentFor('terminal'),
+        platform: detectPlatform(),
+        onError: (cause, operation) => reportError({ ...toClientError(cause), operation }),
+      })
       // At handover rather than at construction: ghostty resolves long after the
       // mount effect started, and this is an effect event, so it sees the
       // current settings rather than the ones the mount began with.

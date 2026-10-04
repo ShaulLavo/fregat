@@ -792,18 +792,18 @@ it('preserves default worker browser paste keys and native clipboard encoding', 
   expect(output).toEqual(['\x1b[200~worker clip\x1b[201~'])
 })
 
-it('keeps extensions and immediate native mode access on the synchronous host', async () => {
+it('keeps finite input ownership and immediate native mode access on the synchronous host', async () => {
   const terminal = await create('webgl')
   let setup = 0
-  const registration = terminal.use({
-    name: 'worker-capability-control',
-    setup: () => {
-      setup++
-      return {}
-    },
+  const registration = terminal.connectInput(() => {
+    setup++
+    return 'pass'
   })
   expect(registration instanceof Promise).toBe(true)
-  await expect(registration).rejects.toMatchObject({ code: 'capability', operation: 'extensions' })
+  await expect(registration).rejects.toMatchObject({
+    code: 'capability',
+    operation: 'connectInput',
+  })
   expect(setup).toBe(0)
   try {
     terminal.inputModes
@@ -815,12 +815,9 @@ it('keeps extensions and immediate native mode access on the synchronous host', 
   await terminal.write('worker authority retained')
   expect((await terminal.readLines(0, 1))[0]?.text).toContain('worker authority retained')
   await terminal.dispose()
-  const disposed = terminal.use({
-    name: 'disposed-worker-control',
-    setup: () => {
-      setup++
-      return {}
-    },
+  const disposed = terminal.connectInput(() => {
+    setup++
+    return 'pass'
   })
   expect(disposed instanceof Promise).toBe(true)
   await expect(disposed).rejects.toThrow('disposed')

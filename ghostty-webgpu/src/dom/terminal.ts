@@ -1,6 +1,12 @@
-import { ExtensionManager } from '../extensions/manager.js'
-import type { Extension, ExtensionHandle, TerminalInputEvent } from '../extensions/types.js'
+import { createGhosttyError } from '../core/error.js'
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
+import { ExtensionManager } from '../extensions/manager.js'
+import type {
+  Extension,
+  ExtensionHandle,
+  TerminalInputEvent,
+  TerminalInputHandler,
+} from '../extensions/types.js'
 import type {
   ReadLinesOptions,
   TerminalGeometry,
@@ -84,6 +90,7 @@ import type {
   GhosttyWebGpuTerminalScrollbarOptions,
   GhosttyWebGpuTerminalSubscription,
   TerminalInputModes,
+  TerminalInputConnection,
   TerminalGeneratedInput,
 } from './types.js'
 
@@ -255,6 +262,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private readonly fitEnvironment?: Partial<TerminalFitEnvironment>
   private extensions?: ExtensionManager
   private generation = 0
+  private inputOwner?: TerminalInputConnection & { readonly handler: TerminalInputHandler }
   private input?: DomInputController
   private readonly inputHooks?: GhosttyWebGpuTerminalInputHooks
   private inputLifecycle?: DomInputLifecycleController
@@ -325,23 +333,59 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     return this.result(this.extensionManager().use(extension))
   }
 
+  connectInput(handler: TerminalInputHandler): TerminalResult<Mode, TerminalInputConnection> {
+    if (this.execution.kind === 'async') {
+      return this.result(
+        Promise.resolve().then(() => {
+          this.ensureActive()
+          throw workerError('capability', 'connectInput', { actor: 'worker' })
+        }),
+      )
+    }
+    this.ensureActive()
+    if (this.inputOwner)
+      throw createGhosttyError('input.connect', 'Terminal original input already has an owner')
+    const controller = new AbortController()
+    const connection = {
+      handler,
+      signal: controller.signal,
+      dispose: () => {
+        if (this.inputOwner === connection) this.inputOwner = undefined
+        controller.abort()
+      },
+    }
+    this.inputOwner = connection
+    return this.result(connection)
+  }
+
   private extensionManager(): ExtensionManager {
-    if (this.execution.kind !== 'sync')
-      throw workerError('capability', 'extensions', { actor: 'worker' })
     this.extensions ??= new ExtensionManager({
       terminal: this,
-      registerLinkProvider: (provider) => this.registerLinkProvider(provider),
+      registerLinkProvider:
+        this.execution.kind === 'sync'
+          ? (provider) => this.registerLinkProvider(provider)
+          : undefined,
       onError: (cause, operation) => this.emitters.error.emit({ cause, operation }),
     })
     return this.extensions
   }
 
   private claimInput(input: TerminalInputEvent): boolean {
-    return this.extensions!.dispatchInput(input) || this.stateValue !== 'open'
+    const owner = this.inputOwner
+    if (owner) {
+      let claimed = false
+      try {
+        claimed = owner.handler(input) === 'claim'
+      } catch (cause) {
+        this.reportError(cause, 'input.owner')
+      }
+      if (claimed || owner.signal.aborted || this.stateValue !== 'open') return true
+    }
+    return (this.extensions?.dispatchInput(input) ?? false) || this.stateValue !== 'open'
   }
 
   private readonly claimDomKey = (event: KeyboardEvent): boolean => {
-    if (!this.extensions?.hasInput) return false
+    if (!this.inputOwner && !this.extensions?.hasInput) return false
     return this.claimInput({ type: 'key', event })
   }
 
@@ -349,7 +393,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     type: 'paste' | 'text' | 'composition',
     data: TerminalInputData,
   ): boolean => {
-    if (!this.extensions?.hasInput) return false
+    if (!this.inputOwner && !this.extensions?.hasInput) return false
     if (type === 'composition') return this.claimInput({ type, text: data as string })
     return this.claimInput({ type, data })
   }
@@ -650,7 +694,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
 
   key(input: TerminalKeyInput): TerminalResult<Mode, TerminalInputResult> {
     this.ensureOpen()
-    if (this.extensions?.hasInput && this.claimInput({ type: 'key', input }))
+    if ((this.inputOwner || this.extensions?.hasInput) && this.claimInput({ type: 'key', input }))
       return this.emptyInputResult()
     return this.result(this.execution.key(input))
   }
@@ -829,6 +873,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.stateValue = 'disposing'
     this.nextGeneration()
     this.pendingEvents.length = 0
+    this.inputOwner?.dispose()
     this.extensions?.dispose()
     this.cleanup.dispose((cause) => this.emitters.error.emit({ cause, operation: 'dispose' }))
     this.accessibility = undefined

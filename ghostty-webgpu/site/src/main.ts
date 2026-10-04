@@ -1,4 +1,4 @@
-import { fitTerminalFont, Terminal, hotkeys } from '../../dist/index.js'
+import { fitTerminalFont, Terminal, attachTerminalHotkeys } from '../../dist/index.js'
 import { GhostDemo } from './demos/ghost.js'
 import { MatrixDemo } from './demos/matrix.js'
 import { ShellDemo } from './demos/shell.js'
@@ -213,7 +213,6 @@ async function boot(): Promise<void> {
   const base = document.baseURI
   performance.mark('ghost:create-start')
   const creating = Terminal.create({
-    extensions: [hotkeys()],
     appearance: {
       cursor: { blink: true, style: 'block' },
       font: { family: FONT_FAMILY, lineHeight: FIT_LINE_HEIGHT, size: firstFontSize },
@@ -234,6 +233,7 @@ async function boot(): Promise<void> {
     return instance
   })
   const [instance] = await Promise.all([created, fonts])
+  attachTerminalHotkeys(instance)
   await instance.open(ui.host)
   performance.mark('ghost:open-resolved')
   terminal = instance

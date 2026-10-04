@@ -104,3 +104,22 @@ own browser coverage. Native device verification keeps its separate execution gr
 The initial `ours` deviation keeps the approved document-navigation keys: Mod+[ and Mod+] dispatch `workspace.navigateBack` and `workspace.navigateForward` at Workspace depth. The four source rows record this choice; `zed` retains the pinned Editor indent/outdent bindings.
 
 An unbound nonprintable chord prefix waits for the next key. Bound prefixes use the continuation timeout; printable text prefixes follow the replay contract. Focus, blur and pointer changes cancel a pending chord.
+
+## Terminal original input connection
+
+The main terminal exposes one `connectInput` lease. `attachTerminalHotkeys` connects the
+existing Terminal focus node and live native modes to that lease, independently of general
+extension registration. It owns its open subscription, key observer and focus-node disposal;
+the hosted window retains its dispatcher and binding data. Standalone terminals own one
+dispatcher with their default pack and authored overrides.
+
+Original DOM key events retain identity and reach the finite owner before native composition
+or byte encoding. Original text, paste and composition commits share the same boundary. A
+finite claim stops forwarding; a pass reaches explicitly interested general contributions and
+then native once. Generated terminal commands and native replies bypass both original-input
+routes. Terminal or connection disposal during a callback stops that event before forwarding.
+
+The landed general extension APIs remain a separate peer-owned surface. Connecting hotkeys
+constructs no manager. The finite lease rejects a second owner and its old disposer cannot
+remove a replacement. Worker finite connections reject asynchronously; this wave does not
+activate worker hotkeys or transfer a failed general-manager performance qualification.

@@ -69,6 +69,11 @@ export type TerminalGeneratedInput =
   | { readonly type: 'text' | 'paste'; readonly data: TerminalInputData }
   | { readonly type: 'composition'; readonly text: string }
 
+export interface TerminalInputConnection {
+  readonly signal: AbortSignal
+  dispose(): void
+}
+
 export interface TerminalInputModes {
   readonly alternateScreen: boolean
   readonly mouseReporting: boolean

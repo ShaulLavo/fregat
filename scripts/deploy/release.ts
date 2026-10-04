@@ -300,11 +300,12 @@ export async function bootCandidate(release: Release, base = '/') {
     expectEqual('asset status', (await fetch(`${origin}/${asset}`)).status, 200)
     expectEqual('health without origin', (await fetch(`${origin}/health`)).status, 401)
   } catch (error) {
+    child.kill('SIGKILL')
     const stderr = await new Response(child.stderr).text()
     writeFileSync(path.join(release.directory, 'candidate-server.log'), stderr)
     throw error
   } finally {
-    child.kill()
+    child.kill('SIGKILL')
     await child.exited
     rmSync(scratch, { force: true, recursive: true })
   }

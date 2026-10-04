@@ -1,4 +1,9 @@
-import { GhosttyRuntime, Terminal, hotkeys, type GhosttyWebGpuRenderer } from 'ghostty-webgpu'
+import {
+  GhosttyRuntime,
+  Terminal,
+  attachTerminalHotkeys,
+  type GhosttyWebGpuRenderer,
+} from 'ghostty-webgpu'
 import { detectPlatform } from '@fregat/hotkeys'
 import { flushSync } from 'react-dom'
 
@@ -59,15 +64,13 @@ export async function createTerminalKeymap(bindings: readonly PlatformKeyBinding
     focusService: focus,
   })
   const errors: unknown[] = []
-  terminal.use(
-    hotkeys({
-      mode: 'hosted',
-      dispatcher: view.result.current.keymap.hotkeys,
-      parent: view.result.current.keymap.parentFor('terminal'),
-      platform: detectPlatform(),
-      onError: (cause) => errors.push(cause),
-    }),
-  )
+  attachTerminalHotkeys(terminal, {
+    mode: 'hosted',
+    dispatcher: view.result.current.keymap.hotkeys,
+    parent: view.result.current.keymap.parentFor('terminal'),
+    platform: detectPlatform(),
+    onError: (cause) => errors.push(cause),
+  })
   flushSync(() => terminal.focus())
 
   return {

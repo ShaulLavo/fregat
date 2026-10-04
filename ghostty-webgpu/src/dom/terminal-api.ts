@@ -1,4 +1,4 @@
-import type { Extension, ExtensionHandle } from '../extensions/types.js'
+import type { Extension, ExtensionHandle, TerminalInputHandler } from '../extensions/types.js'
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
 import type {
   ReadLinesOptions,
@@ -30,6 +30,7 @@ import type {
   GhosttyWebGpuTerminalListener,
   GhosttyWebGpuTerminalSubscription,
   TerminalInputModes,
+  TerminalInputConnection,
   TerminalGeneratedInput,
 } from './types.js'
 
@@ -52,9 +53,10 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   readonly submittedFrame: TerminalSubmittedFrame | undefined
   readonly textarea: HTMLTextAreaElement | undefined
 
-  use<Api = void>(extension: Extension<Api>): TerminalResult<Mode, ExtensionHandle<Api>>
   sendGeneratedInput(input: TerminalGeneratedInput): TerminalResult<Mode, TerminalInputResult>
   open(parent: HTMLElement): Promise<void>
+  connectInput(handler: TerminalInputHandler): TerminalResult<Mode, TerminalInputConnection>
+  use<Api = void>(extension: Extension<Api>): TerminalResult<Mode, ExtensionHandle<Api>>
   on<Type extends GhosttyWebGpuTerminalEventType>(
     type: Type,
     listener: GhosttyWebGpuTerminalListener<Type>,
