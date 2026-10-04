@@ -27,6 +27,8 @@ import { restoreEnvironmentSessionSelection } from '@/features/chat-mode/state/s
 import { resetLanguageServerConnectionPool } from '@/features/editor/state/language-server-connection-pool'
 import { markerStore } from '@/lib/markers/store'
 import { createEditorRuntime, type EditorRuntime } from '@/features/editor/state/runtime'
+import { createInactiveAnalysisRetention } from '@/features/editor/state/inactive-analysis-retention'
+import { inactiveAnalysisEntryLimitFromSettings } from '@/features/editor/utils/inactive-analysis-budget'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { EditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import type { QueryClient } from '@tanstack/react-query'
@@ -47,7 +49,11 @@ import {
   suspendEnvironmentActivity,
 } from '@/lib/environments/state/activity'
 import { primaryQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
-import { subscribeLiveSettings, watchSettingValue } from '@/features/settings/state/live-projection'
+import {
+  readLiveSettingsProjection,
+  subscribeLiveSettings,
+  watchSettingValue,
+} from '@/features/settings/state/live-projection'
 import { setSimulatedLatencyMs } from '@/lib/simulated-latency'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { selectServerConnection } from '@workspace/client-core/environments/state/store'
@@ -305,7 +311,9 @@ export function createApplicationRuntime({
     hasUnsavedDocuments: () =>
       [...environments.values()].some(({ editor }) => editor.hasUnsavedDocuments()),
     dispose() {
+      if (disposed) return
       disposed = true
+      analysisRetention.dispose()
       stopAdmissionWatch()
       stopUpdateGate()
       commandBinding.clear()
@@ -331,6 +339,17 @@ export function createApplicationRuntime({
       markerStore.clear()
     },
   }
+  const analysisRetention = createInactiveAnalysisRetention({
+    enumerate: application.enumerateRetainedEditorAnalyses,
+    subscribe: application.subscribeRetainedEditorAnalyses,
+    queryClient: primaryQueryClient(),
+    readLimit: () =>
+      readLiveSettingsProjection(primaryQueryClient())?.values[
+        'editor.inactiveAnalysisEntryLimit'
+      ] ?? inactiveAnalysisEntryLimitFromSettings(),
+    subscribeLimit: (listener) =>
+      watchSettingValue(primaryQueryClient(), 'editor.inactiveAnalysisEntryLimit', listener),
+  })
   return application
 }
 

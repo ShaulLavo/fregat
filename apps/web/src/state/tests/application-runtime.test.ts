@@ -19,10 +19,90 @@ import { vi } from 'vitest'
 import { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
 import { expect, test } from '../../../test/fixtures'
 import { makeTestServer } from '../../../test/server'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { fetchFile } from '@/lib/file-server'
+import type { EditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import { retentionProvider } from '../../../test/factories/retention-provider'
+import { createTestApplicationRuntime } from '../../../test/factories/application-runtime'
 
 const originA = 'http://localhost:37121'
 const originB = 'http://localhost:37122'
 const root = filesystemPath('repo')
+
+test('retained environment membership stays authoritative through suspension and terminal disposal', async ({
+  server,
+  client,
+  onTestFinished,
+}) => {
+  const previousOrigin = activeServerOrigin()
+  const previousState = useEnvironmentsStore.getState()
+  const second = await makeTestServer({ filesystemWatch: false })
+  const originLeft = 'http://localhost:38131'
+  const originRight = 'http://localhost:38132'
+  const secondClient = createInProcessClient(second)
+  setActiveServerOrigin(originLeft)
+  setClient(client)
+  setActiveServerOrigin(originRight)
+  setClient(secondClient)
+  useEnvironmentsStore.getState().activate(originLeft)
+  await readEnvironmentDescriptor(originLeft, new AbortController().signal)
+  await readEnvironmentDescriptor(originRight, new AbortController().signal)
+  const application = createTestApplicationRuntime()
+  const seen: EditorDocumentAnalysis[][] = []
+  const disposed: EditorDocumentAnalysis[][] = []
+  const stop = application.subscribeRetainedEditorAnalyses(() =>
+    seen.push(Array.from(application.enumerateRetainedEditorAnalyses())),
+  )
+  onTestFinished(async () => {
+    stop()
+    application.dispose()
+    queryClientFor(originLeft).clear()
+    queryClientFor(originRight).clear()
+    useEnvironmentsStore.setState(previousState, true)
+    setActiveServerOrigin(previousOrigin)
+    await second.cleanup()
+  })
+  const path = filesystemPath('retained.ts')
+  await writeFile(join(server.root, path), 'const left = true\n')
+  await writeFile(join(second.root, path), 'const right = true\n')
+  const left = application
+    .getSnapshot()
+    .editor.documentStore.getState()
+    .ensureLiveEditorDocument(await fetchFile(path, new AbortController().signal, client))
+  const leftLease = left.analysis.borrowStructural({
+    languageId: 'typescript',
+    provider: retentionProvider(() =>
+      disposed.push(Array.from(application.enumerateRetainedEditorAnalyses())),
+    ),
+  })!
+  await leftLease.refresh(left.buffer.getTextSnapshot())
+  application.activateEnvironment(originRight)
+  const right = application
+    .getSnapshot()
+    .editor.documentStore.getState()
+    .ensureLiveEditorDocument(await fetchFile(path, new AbortController().signal, secondClient))
+  const rightLease = right.analysis.borrowStructural({
+    languageId: 'typescript',
+    provider: retentionProvider(() =>
+      disposed.push(Array.from(application.enumerateRetainedEditorAnalyses())),
+    ),
+  })!
+  await rightLease.refresh(right.buffer.getTextSnapshot())
+  expect(Array.from(application.enumerateRetainedEditorAnalyses())).toEqual([
+    left.analysis,
+    right.analysis,
+  ])
+  application.activateEnvironment(originLeft)
+  expect(Array.from(application.enumerateRetainedEditorAnalyses())).toEqual([
+    left.analysis,
+    right.analysis,
+  ])
+  application.dispose()
+  expect(seen.at(-1)).toEqual([])
+  expect(disposed).toEqual([[], []])
+  expect(Array.from(application.enumerateRetainedEditorAnalyses())).toEqual([])
+})
 
 test('the active editor serves its census without a React tree, and a machine switch hands it over', async ({
   client,

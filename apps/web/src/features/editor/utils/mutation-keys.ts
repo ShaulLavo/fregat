@@ -7,6 +7,7 @@ export const editorMutationKeys = {
   historyPersist: (key: DocumentKey) => ['editor', 'history', 'persist', key] as const,
   historyPrune: () => ['editor', 'history', 'prune'] as const,
   historyClear: (key: DocumentKey) => ['editor', 'history', 'clear', key] as const,
+  analysisRetention: () => ['editor', 'analysis', 'retention'] as const,
   historyRestore: (key: DocumentKey) => ['editor', 'history', 'restore', key] as const,
   save: (key: DocumentKey) => ['editor', 'save', key] as const,
   saves: () => ['editor', 'save'] as const,
