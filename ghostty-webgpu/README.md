@@ -138,7 +138,8 @@ and reports a capability error for explicit Canvas modes. The two Canvas modes s
 painting and scroll history. Text shaping stays inside each native owner, including the
 terminal's mode-2027 grapheme spans.
 
-The explicit pixel mode is experimental pending headed visual calibration. It lazily loads
+The explicit pixel mode is experimental with correctness coverage. Headed visual calibration
+and performance qualification are pending. It lazily loads
 `canvas-compose.wasm` into independent ordinary WASM memory. Browser rasterization runs on
 stamp-cache misses: the existing glyph model supplies A8 coverage or intrinsic-color RGBA,
 and paths supply A8 coverage. The viewport-bounded cache retains offsets, and one straight
