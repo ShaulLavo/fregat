@@ -349,6 +349,43 @@ describe('VirtualizedTextView', () => {
     expect(mountedAfter).toEqual(mountedBefore)
   })
 
+  it('restores atomic state after a failed flush and delivers the next completed viewport', () => {
+    view.dispose()
+    const failure = new TypeError('content height listener failed')
+    const events: boolean[] = []
+    let fail = false
+    let nestedAtomic = false
+    view = new VirtualizedTextView(container, {
+      rowHeight: 20,
+      overscan: 2,
+      highlightRegistry: mockRegistry,
+      onViewportChange: () => events.push(view.isRenderingAtomically),
+      onContentHeightChange: () => {
+        if (!fail) return
+        view.runAtomicRender(() => view.setScrollMetrics(0, 96, 320))
+        nestedAtomic = view.isRenderingAtomically
+        throw failure
+      },
+    })
+    view.setText('old0\nold1\n')
+    view.setScrollMetrics(0, 72, 400)
+    events.length = 0
+    fail = true
+
+    expect(() => view.runAtomicRender(() => view.setText(createLines(8)))).toThrow(failure)
+
+    expect(nestedAtomic).toBe(true)
+    expect(view.isRenderingAtomically).toBe(false)
+    expect(events).toEqual([])
+    fail = false
+    view.runAtomicRender(() => view.setText('final0\nfinal1'))
+    expect(events).toEqual([false])
+    expect(view.getState().mountedRows.map((row) => row.element.textContent)).toEqual([
+      'final0',
+      'final1',
+    ])
+  })
+
   it('reuses cached browser text metrics for matching editor styles', () => {
     clearBrowserTextMetricsCache()
     const first = document.createElement('div')
