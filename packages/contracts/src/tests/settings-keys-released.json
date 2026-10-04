@@ -58,6 +58,7 @@
     "editor.history.persistBudget",
     "editor.history.persistDays",
     "editor.history.retainedStates",
+    "editor.inactiveAnalysisEntryLimit",
     "editor.inputRoute",
     "editor.largeFile.analysisLimitMiCodeUnits",
     "editor.largeFile.minimapLimitMiCodeUnits",
