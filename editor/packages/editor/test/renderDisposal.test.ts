@@ -268,8 +268,14 @@ it.each([false, true])('finishes terminal teardown when a cell cleanup throws is
   expect(view.getState().mountedRows).toHaveLength(2)
   armed = throws
 
-  if (throws) expect(() => view.dispose()).toThrow(failure)
-  if (!throws) expect(() => view.dispose()).not.toThrow()
+  const observed: unknown[] = []
+  try {
+    view.dispose()
+  } catch (error) {
+    observed.push(error)
+  }
+  expect(observed).toHaveLength(throws ? 1 : 0)
+  if (throws) expect(observed[0]).toBe(failure)
 
   expect(cleanup).toHaveBeenCalledTimes(2)
   expect(view.getState().mountedRows).toEqual([])

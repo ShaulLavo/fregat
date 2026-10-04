@@ -500,7 +500,13 @@ export class VirtualizedTextView {
     if (view.disposed) return
     view.disposed = true
     this.atomicRenderPending = false
-    for (const row of view.rowElements.values()) invalidateRowPresentations(row.element)
+    const rows = new Set(view.rowElements.values())
+    for (const row of view.rowPool) rows.add(row)
+    view.rowElements.clear()
+    view.rowPool.length = 0
+    this.scrollElement.remove()
+    view.styleEl.remove()
+    for (const row of rows) invalidateRowPresentations(row.element)
     this.releaseProvisionalPaint()
     this.pendingReveal = null
     this.cancelContentWidthMeasurement?.()
@@ -524,12 +530,18 @@ export class VirtualizedTextView {
     view.foldMarkerSource = null
     view.foldMarkerByStartRow = new Map()
     view.foldMarkerByKey = new Map()
-    disposeInlineWidgets(view)
-    disposeGutterCells(view)
-    this.scrollElement.remove()
-    view.styleEl.remove()
-    view.rowElements.clear()
-    view.rowPool.length = 0
+    let failure: { readonly error: unknown } | null = null
+    try {
+      disposeInlineWidgets(view)
+    } catch (error) {
+      failure = { error }
+    }
+    try {
+      disposeGutterCells(view, rows)
+    } catch (error) {
+      failure ??= { error }
+    }
+    if (failure) throw failure.error
   }
 
   /** The offset the next text replacement should render at, so a restore costs one pass, not two. */

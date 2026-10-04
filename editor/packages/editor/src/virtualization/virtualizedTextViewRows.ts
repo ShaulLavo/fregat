@@ -345,8 +345,7 @@ function createGutterCell(
 ): HTMLElement | null {
   const cell = contribution.createCell(document)
   if (view.disposed) {
-    contribution.disposeCell?.(cell)
-    cell.remove()
+    disposeGutterCell({ cell, contribution })
     return null
   }
   cell.classList.add(GUTTER_CELL_CLASS)
@@ -357,9 +356,17 @@ function createGutterCell(
   return cell
 }
 
-export function disposeGutterCells(view: VirtualizedTextViewInternal): void {
-  const rows = Array.from(view.rowElements.values()).concat(view.rowPool)
-  for (const row of rows) disposeRowGutterCells(view, row)
+export function disposeGutterCells(
+  view: VirtualizedTextViewInternal,
+  rows: Iterable<MountedVirtualizedTextRow>,
+): void {
+  const owners = contributionMap(view.gutterContributions)
+  const pending = Array.from(rows, (row) => {
+    const cells = takeGutterCellMap(row.gutterCells, owners)
+    setGutterCellList(row, [])
+    return cells
+  }).flat()
+  disposeResourceSnapshot(pending, disposeGutterCell)
 }
 
 export function updateGutterContributions(
@@ -377,26 +384,49 @@ export function updateGutterContributions(
   return true
 }
 
-function disposeRowGutterCells(
-  view: VirtualizedTextViewInternal,
-  row: MountedVirtualizedTextRow,
-): void {
-  const cells = new Map(row.gutterCells)
-  row.gutterCells.clear()
-  setGutterCellList(row, [])
-  disposeGutterCellMap(cells, view.gutterContributions)
+type GutterCellCleanup = {
+  readonly cell: HTMLElement
+  readonly contribution: EditorGutterContribution | null
 }
 
 function disposeGutterCellMap(
   cells: Map<string, HTMLElement>,
   contributions: readonly EditorGutterContribution[],
 ): void {
-  for (const contribution of contributions) {
-    const cell = cells.get(contribution.id)
-    cells.delete(contribution.id)
-    if (cell) contribution.disposeCell?.(cell)
-    cell?.remove()
+  const pending = takeGutterCellMap(cells, contributionMap(contributions))
+  disposeResourceSnapshot(pending, disposeGutterCell)
+}
+
+function takeGutterCellMap(
+  cells: Map<string, HTMLElement>,
+  owners: ReadonlyMap<string, EditorGutterContribution>,
+): readonly GutterCellCleanup[] {
+  const pending = Array.from(cells, ([id, cell]) => ({
+    cell,
+    contribution: owners.get(id) ?? null,
+  }))
+  cells.clear()
+  return pending
+}
+
+function disposeGutterCell({ cell, contribution }: GutterCellCleanup): void {
+  try {
+    contribution?.disposeCell?.(cell)
+  } finally {
+    cell.remove()
   }
+}
+
+function disposeResourceSnapshot<T>(resources: readonly T[], release: (resource: T) => void): void {
+  let failure: { readonly error: unknown } | null = null
+  for (const resource of resources) {
+    try {
+      release(resource)
+    } catch (error) {
+      failure ??= { error }
+    }
+  }
+  if (failure) throw failure.error
 }
 
 function sameGutterContributions(
@@ -712,6 +742,7 @@ function updateRowElement(
   updateGutterRowElement(view, row, item, state)
   if (view.disposed) return
   updateRowTextChunks(view, row, state, state.startOffset, state.inlineMapping, snapshot)
+  if (view.disposed) return
   updateRowFoldPresentation(row, state.foldMarker)
 }
 
@@ -824,6 +855,7 @@ function updateRowElementForSameLineEdit(
     state.inlineMapping,
     snapshot,
   )
+  if (view.disposed) return false
   updateRowFoldPresentation(row, state.foldMarker)
   return editedRowPatchedInPlace
 }
@@ -1183,6 +1215,8 @@ function setInlineRunRowText(
   const placements = runs.widgets
     .filter((run) => run.localStart < window.end && run.localEnd > window.start)
     .map((run) => inlineWidgetPlacement(view, run))
+    .filter((placement) => placement !== null)
+  if (view.disposed) return
   const classes = inlineClassesInWindow(runs.classes, window)
   const leftWidth =
     textPixelsBeforeColumn(view, content, window.start) +
@@ -1530,9 +1564,11 @@ function inlineClassRunElements(
 function inlineWidgetPlacement(
   view: VirtualizedTextViewInternal,
   run: InlineWidgetRun,
-): InlineWidgetPlacement {
+): InlineWidgetPlacement | null {
+  if (view.disposed) return null
   const widgets = inlineWidgets(view)
   const host = widgets.hosts.get(run.id) ?? mountInlineWidget(view, widgets, run)
+  if (!host) return null
   applyInlineWidgetClass(host.element, run.className)
   return { localStart: run.localStart, localEnd: run.localEnd, element: host.element }
 }
@@ -1556,7 +1592,7 @@ function mountInlineWidget(
   view: VirtualizedTextViewInternal,
   widgets: InlineWidgets,
   run: InlineWidgetRun,
-): InlineWidgetHost {
+): InlineWidgetHost | null {
   const element = view.scrollElement.ownerDocument.createElement('span')
   applyInlineWidgetClass(element, run.className)
   element.dataset.editorInlineWidget = run.id
@@ -1565,6 +1601,14 @@ function mountInlineWidget(
   element.setAttribute('contenteditable', 'false')
 
   const mountDisposable = run.render(element) ?? null
+  if (view.disposed) {
+    try {
+      mountDisposable?.dispose()
+    } finally {
+      element.remove()
+    }
+    return null
+  }
   // The callback is only the signal that something moved: re-reading the element keeps a resize and
   // the measurement below on the same box, rather than the content box without its border. It is
   // also the first real width, since nothing has laid this node out until a row paints it in.
@@ -1652,12 +1696,9 @@ function retireInlineWidgets(view: VirtualizedTextViewInternal): void {
     for (const replacement of replacements) live.add(replacement.key ?? replacement.id)
   }
 
-  for (const [id, host] of widgets.hosts) {
-    if (live.has(id)) continue
-
-    disposeInlineWidget(host)
-    widgets.hosts.delete(id)
-  }
+  const pending = Array.from(widgets.hosts).filter(([id]) => !live.has(id))
+  for (const [id] of pending) widgets.hosts.delete(id)
+  disposeResourceSnapshot(pending, ([, host]) => disposeInlineWidget(host))
 }
 
 export function disposeInlineWidgets(view: VirtualizedTextViewInternal): void {
@@ -1665,15 +1706,19 @@ export function disposeInlineWidgets(view: VirtualizedTextViewInternal): void {
   const widgets = inlineWidgetsByView.get(view)
   if (!widgets) return
 
-  for (const host of widgets.hosts.values()) disposeInlineWidget(host)
+  const pending = Array.from(widgets.hosts.values())
   widgets.hosts.clear()
   inlineWidgetsByView.delete(view)
+  disposeResourceSnapshot(pending, disposeInlineWidget)
 }
 
 function disposeInlineWidget(host: InlineWidgetHost): void {
   host.observer?.disconnect()
-  host.mountDisposable?.dispose()
-  host.element.remove()
+  try {
+    host.mountDisposable?.dispose()
+  } finally {
+    host.element.remove()
+  }
 }
 
 function setChunkedRowText(
