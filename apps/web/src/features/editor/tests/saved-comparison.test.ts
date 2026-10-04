@@ -6,7 +6,7 @@ import {
   createEditorPreparedDocument,
 } from '@singapore-editor/core/editor'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
-import { fileDocumentKey, tabId } from '@/lib/documents/utils/identity'
+import { fileDocumentKey, filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import type { SavedComparisonRead } from '@/features/editor/utils/saved-comparison'
 import { vi } from 'vitest'
@@ -250,6 +250,153 @@ test('prepares independent tab interests before publication and releases each wi
   ).toEqual([fixture.document.key])
   expect(second.read().kind).toBe('released')
   expect(fixture.service.state().savedComparisonTabs.size).toBe(0)
+  fixture.service.dispose()
+})
+
+test('invalidates the old-path source on rename and keeps its exact saved input after later edits', async ({
+  server,
+  client,
+}) => {
+  const fixture = await createSavedComparisonFixture(server.root, client)
+  const lease = fixture.acquire()
+  const before = ready(lease.read())
+  const session = createEditorBufferSession(fixture.document.buffer)
+  session.applyText('// ordinary edit\n')
+  const control = ready(lease.read())
+  expect(control.live.revision).toBe(fixture.document.buffer.getRevision())
+  expect(control.live.snapshot).toBe(fixture.document.buffer.getTextSnapshot())
+  const to = filesystemPath('repo/renamed.ts')
+  fixture.service.renameLiveDocument(fixture.path, to)
+  expect(lease.read()).toEqual({ kind: 'unavailable', scope: fixture.scope, saved: before.saved })
+  expect(fixture.service.getLiveDocument(fixture.document.key)).toBeNull()
+  const unavailable = lease.read()
+  session.applyText('// after rename\n')
+  expect(lease.read()).toBe(unavailable)
+  const renamed = fixture.service.getLiveDocument(fileDocumentKey(to))
+  expect(renamed?.buffer).toBe(fixture.document.buffer)
+  expect(renamed?.localRevision).toBe(fixture.document.buffer.getRevision())
+  expect(renamed?.buffer.materializeFullText()).toContain('after rename')
+  expect(control.live.snapshot.materializeFullText()).not.toContain('after rename')
+  fixture.service.dispose()
+})
+
+test('publishes both rename projection paths, restores them on rollback and preserves unrelated interests', async ({
+  server,
+  client,
+}) => {
+  const fixture = await createSavedComparisonFixture(server.root, client)
+  const to = filesystemPath('repo/renamed.ts')
+  const destinationSaved = await fixture.readSavedFile(to, 'export const destination = 7\n')
+  const unrelatedSaved = await fixture.readSavedFile(
+    filesystemPath('repo/unrelated.ts'),
+    'export const unrelated = 8\n',
+  )
+  const store = createEditorDocumentStore({ environmentId: fixture.scope.environmentId })
+  const document = store.getState().ensureLiveEditorDocument(fixture.saved)
+  store.getState().ensureLiveEditorDocument(unrelatedSaved)
+  const request = { scope: fixture.scope, signal: new AbortController().signal }
+  const source = store.getState().acquireSavedComparison({ ...request, saved: fixture.saved })
+  const destination = store
+    .getState()
+    .acquireSavedComparison({ ...request, saved: destinationSaved })
+  const unrelated = store.getState().acquireSavedComparison({ ...request, saved: unrelatedSaved })
+  const sourceBefore = ready(source.read())
+  const unrelatedBefore = ready(unrelated.read())
+  expect(destination.read().kind).toBe('unavailable')
+  const projection = store.getState().prepareWorkspaceDocumentRename(fixture.path, to)
+  expect(projection).not.toBeNull()
+  if (!projection) throw new RangeError('saved comparison rename fixture is unavailable')
+  const publications: [SavedComparisonRead | undefined, SavedComparisonRead | undefined][] = []
+  const stop = store.subscribe((state) => {
+    publications.push([state.savedComparisons.get(source), state.savedComparisons.get(destination)])
+  })
+  try {
+    expect(store.getState().commitWorkspaceDocumentProjection(projection)).toBe(true)
+    expect(publications).toHaveLength(1)
+    expect(publications[0]?.map((read) => read?.kind)).toEqual(['unavailable', 'ready'])
+    const arrived = ready(destination.read())
+    expect(arrived.live.key).toBe(fileDocumentKey(to))
+    expect(arrived.live.buffer).toBe(document.buffer)
+    expect(arrived.live.analysis).toBe(document.analysis)
+    expect(arrived.live.snapshot).toBe(document.buffer.getTextSnapshot())
+    expect(arrived.live.revision).toBe(document.buffer.getRevision())
+    expect(arrived.saved.snapshot).toBe(destinationSaved)
+    expect(unrelated.read()).toBe(unrelatedBefore)
+    const session = createEditorBufferSession(document.buffer)
+    session.applyText('// after commit\n')
+    expect(publications).toHaveLength(2)
+    const edited = ready(destination.read())
+    expect(edited.live.snapshot).toBe(document.buffer.getTextSnapshot())
+    expect(edited.live.revision).toBe(document.buffer.getRevision())
+    expect(edited.live.snapshot.materializeFullText()).toContain('after commit')
+    expect(edited.saved).toBe(arrived.saved)
+    expect(source.read().kind).toBe('unavailable')
+    expect(store.getState().rollbackWorkspaceDocumentProjection(projection)).toBe(true)
+    expect(publications).toHaveLength(3)
+    expect(publications[2]?.map((read) => read?.kind)).toEqual(['ready', 'unavailable'])
+    const restored = ready(source.read())
+    expect(restored.live.key).toBe(document.key)
+    expect(restored.live.buffer).toBe(document.buffer)
+    expect(restored.live.analysis).toBe(document.analysis)
+    expect(restored.live.snapshot).toBe(edited.live.snapshot)
+    expect(restored.live.revision).toBe(edited.live.revision)
+    expect(restored.saved).toBe(sourceBefore.saved)
+    const destinationUnavailable = destination.read()
+    session.applyText('// after rollback\n')
+    expect(publications).toHaveLength(4)
+    const latest = ready(source.read())
+    expect(latest.live.snapshot).toBe(document.buffer.getTextSnapshot())
+    expect(latest.live.revision).toBe(document.buffer.getRevision())
+    expect(latest.live.snapshot.materializeFullText()).toContain('after rollback')
+    expect(latest.saved.snapshot).toBe(fixture.saved)
+    expect(destination.read()).toBe(destinationUnavailable)
+    expect(unrelated.read()).toBe(unrelatedBefore)
+    expect(publications[3]).toEqual([latest, destinationUnavailable])
+  } finally {
+    stop()
+    store.getState().disposeEditorDocuments()
+    fixture.service.dispose()
+  }
+})
+
+test('destination comparison pins the clean renamed buffer and keeps Undo and target stamps canonical', async ({
+  server,
+  client,
+}) => {
+  const fixture = await createSavedComparisonFixture(server.root, client)
+  const source = fixture.acquire()
+  const to = filesystemPath('repo/renamed.ts')
+  const saved = await fixture.readSavedFile(to, 'export const destination = 9\n')
+  const destination = fixture.service.acquireSavedComparison({
+    scope: fixture.scope,
+    saved,
+    signal: new AbortController().signal,
+  })
+  const oldStamp = fixture.service.prepareTargetStamp(fixture.document.key)
+  fixture.service.renameLiveDocument(fixture.path, to)
+  source.release()
+  const arrived = ready(destination.read())
+  const stamp = fixture.service.prepareTargetStamp(fileDocumentKey(to))
+  expect(stamp?.buffer).toBe(fixture.document.buffer)
+  expect(stamp?.bufferRevision).toBe(arrived.live.revision)
+  if (oldStamp) expect(fixture.service.isTargetStampCurrent(oldStamp)).toBe(false)
+  const keepNone = { documentKeys: new Set<never>(), tabIds: new Set<never>() }
+  expect(fixture.service.retain(keepNone).evictedDocumentKeys).toEqual([])
+  createEditorBufferSession(fixture.document.buffer).applyText('// undo me\n')
+  if (stamp) expect(fixture.service.isTargetStampCurrent(stamp)).toBe(false)
+  expect(ready(destination.read()).live.snapshot.materializeFullText()).toContain('undo me')
+  fixture.document.buffer.undo()
+  const undone = ready(destination.read())
+  expect(undone.live.snapshot.materializeFullText()).toBe(
+    materializeFileSnapshotText(fixture.saved),
+  )
+  expect(undone.live.revision).toBe(fixture.document.buffer.getRevision())
+  expect(undone.live.snapshot).toBe(fixture.document.buffer.getTextSnapshot())
+  expect(undone.saved).toBe(arrived.saved)
+  expect(undone.saved.snapshot.version).toBe(saved.version)
+  expect(fixture.service.retain(keepNone).evictedDocumentKeys).toEqual([])
+  destination.release()
+  expect(fixture.service.retain(keepNone).evictedDocumentKeys).toEqual([fileDocumentKey(to)])
   fixture.service.dispose()
 })
 

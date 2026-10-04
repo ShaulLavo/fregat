@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Client } from '@/lib/client'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { fetchFile } from '@/lib/file-server'
 import { WorkspaceDocumentService } from '@/features/editor/state/workspace-document-service'
@@ -22,6 +23,10 @@ export async function createSavedComparisonFixture(root: string, client: Client)
     path,
     acquire: (signal = new AbortController().signal) =>
       service.acquireSavedComparison({ scope, saved, signal }),
+    async readSavedFile(path: FilesystemPath, content: string) {
+      await writeFile(join(root, path), content)
+      return fetchFile(path, new AbortController().signal, client)
+    },
     async refresh(content: string) {
       await writeFile(join(root, path), content)
       return fetchFile(path, new AbortController().signal, client)

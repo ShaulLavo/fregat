@@ -1202,6 +1202,8 @@ export class WorkspaceDocumentService {
       this.viewsByTabId.set(tabId, { ...view, documentKey: toKey, preparedDocument: null })
     }
 
+    this.refreshLiveComparison(fromKey)
+    this.refreshLiveComparison(toKey)
     return { wasDirty }
   }
 
