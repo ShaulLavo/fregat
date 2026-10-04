@@ -145,6 +145,10 @@ type InlineWidgetHost = {
   readonly observer: ResizeObserver | null
 }
 
+type InlineWidgetCleanup = Pick<InlineWidgetHost, 'element' | 'observer'> & {
+  readonly release: (() => void) | null
+}
+
 type InlineWidgetRun = {
   /** The mount's key: the replacement's `key`, else its id. */
   readonly id: string
@@ -343,9 +347,10 @@ function createGutterCell(
   contribution: EditorGutterContribution,
   document: Document,
 ): HTMLElement | null {
+  const release = contribution.disposeCell
   const cell = contribution.createCell(document)
   if (view.disposed) {
-    disposeGutterCell({ cell, contribution })
+    disposeGutterCell({ cell, release: release ? release.bind(contribution, cell) : null })
     return null
   }
   cell.classList.add(GUTTER_CELL_CLASS)
@@ -356,17 +361,17 @@ function createGutterCell(
   return cell
 }
 
-export function disposeGutterCells(
+export function takeGutterCells(
   view: VirtualizedTextViewInternal,
   rows: Iterable<MountedVirtualizedTextRow>,
-): void {
+): () => void {
   const owners = contributionMap(view.gutterContributions)
   const pending = Array.from(rows, (row) => {
     const cells = takeGutterCellMap(row.gutterCells, owners)
     setGutterCellList(row, [])
     return cells
   }).flat()
-  disposeResourceSnapshot(pending, disposeGutterCell)
+  return () => disposeResourceSnapshot(pending, disposeGutterCell)
 }
 
 export function updateGutterContributions(
@@ -386,7 +391,7 @@ export function updateGutterContributions(
 
 type GutterCellCleanup = {
   readonly cell: HTMLElement
-  readonly contribution: EditorGutterContribution | null
+  readonly release: (() => void) | null
 }
 
 function disposeGutterCellMap(
@@ -401,17 +406,17 @@ function takeGutterCellMap(
   cells: Map<string, HTMLElement>,
   owners: ReadonlyMap<string, EditorGutterContribution>,
 ): readonly GutterCellCleanup[] {
-  const pending = Array.from(cells, ([id, cell]) => ({
-    cell,
-    contribution: owners.get(id) ?? null,
-  }))
+  const pending = Array.from(cells, ([id, cell]) => {
+    const owner = owners.get(id)
+    return { cell, release: owner?.disposeCell?.bind(owner, cell) ?? null }
+  })
   cells.clear()
   return pending
 }
 
-function disposeGutterCell({ cell, contribution }: GutterCellCleanup): void {
+function disposeGutterCell({ cell, release }: GutterCellCleanup): void {
   try {
-    contribution?.disposeCell?.(cell)
+    release?.()
   } finally {
     cell.remove()
   }
@@ -1698,24 +1703,33 @@ function retireInlineWidgets(view: VirtualizedTextViewInternal): void {
 
   const pending = Array.from(widgets.hosts).filter(([id]) => !live.has(id))
   for (const [id] of pending) widgets.hosts.delete(id)
-  disposeResourceSnapshot(pending, ([, host]) => disposeInlineWidget(host))
+  const cleanup = pending.map(([, host]) => captureInlineWidgetCleanup(host))
+  disposeResourceSnapshot(cleanup, disposeInlineWidget)
 }
 
-export function disposeInlineWidgets(view: VirtualizedTextViewInternal): void {
+export function takeInlineWidgets(view: VirtualizedTextViewInternal): () => void {
   cancelInlineWidgetRepaint(view)
   const widgets = inlineWidgetsByView.get(view)
-  if (!widgets) return
+  if (!widgets) return () => undefined
 
-  const pending = Array.from(widgets.hosts.values())
+  const pending = Array.from(widgets.hosts.values(), captureInlineWidgetCleanup)
   widgets.hosts.clear()
   inlineWidgetsByView.delete(view)
-  disposeResourceSnapshot(pending, disposeInlineWidget)
+  return () => disposeResourceSnapshot(pending, disposeInlineWidget)
 }
 
-function disposeInlineWidget(host: InlineWidgetHost): void {
+function captureInlineWidgetCleanup(host: InlineWidgetHost): InlineWidgetCleanup {
+  return {
+    element: host.element,
+    observer: host.observer,
+    release: host.mountDisposable?.dispose.bind(host.mountDisposable) ?? null,
+  }
+}
+
+function disposeInlineWidget(host: InlineWidgetCleanup): void {
   host.observer?.disconnect()
   try {
-    host.mountDisposable?.dispose()
+    host.release?.()
   } finally {
     host.element.remove()
   }

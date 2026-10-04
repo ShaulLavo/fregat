@@ -142,8 +142,8 @@ import { BIDI_CONTROL_CODE_POINTS, isSimpleRowText } from '../textCharacters'
 import {
   applyRowHeight,
   captureGutterPaint,
-  disposeGutterCells,
-  disposeInlineWidgets,
+  takeGutterCells,
+  takeInlineWidgets,
   ensureOffsetMounted,
   getMountedRows,
   gutterWidth,
@@ -504,8 +504,8 @@ export class VirtualizedTextView {
     for (const row of view.rowPool) rows.add(row)
     view.rowElements.clear()
     view.rowPool.length = 0
-    this.scrollElement.remove()
-    view.styleEl.remove()
+    const releaseWidgets = takeInlineWidgets(view)
+    const releaseCells = takeGutterCells(view, rows)
     for (const row of rows) invalidateRowPresentations(row.element)
     this.releaseProvisionalPaint()
     this.pendingReveal = null
@@ -517,6 +517,8 @@ export class VirtualizedTextView {
     for (const name of view.rangeHighlightGroups.keys()) clearRangeHighlight(view, name)
     clearTokenHighlights(view)
     view.virtualizer.dispose()
+    this.scrollElement.remove()
+    view.styleEl.remove()
     view.model.projection.dispose()
     view.model.textSnapshot = view.model.projection.textSnapshot
     view.model.textLength = 0
@@ -532,12 +534,12 @@ export class VirtualizedTextView {
     view.foldMarkerByKey = new Map()
     let failure: { readonly error: unknown } | null = null
     try {
-      disposeInlineWidgets(view)
+      releaseWidgets()
     } catch (error) {
       failure = { error }
     }
     try {
-      disposeGutterCells(view, rows)
+      releaseCells()
     } catch (error) {
       failure ??= { error }
     }
