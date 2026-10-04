@@ -618,6 +618,11 @@ export function createEditorDocumentAnalysis(options: {
         textSnapshot: buffer.getTextSnapshot(),
       })
       if (!session) return null
+      if (disposed || request.signal?.aborted) {
+        session.dispose()
+        releaseSubscription()
+        return null
+      }
       found = {
         request: {
           ...request,
@@ -653,6 +658,11 @@ export function createEditorDocumentAnalysis(options: {
         textSnapshot: buffer.getTextSnapshot(),
       })
       if (!session) return null
+      if (disposed || request.signal?.aborted) {
+        session.dispose()
+        releaseSubscription()
+        return null
+      }
       const entry = new AnalysisEntry(buffer, session, runtimeSessionId, retention)
       found = {
         request: {
@@ -662,9 +672,17 @@ export function createEditorDocumentAnalysis(options: {
         },
         session,
         entry,
-        unsubscribeTheme: session.onDidChangeTheme?.(() => entry.refresh()),
+        unsubscribeTheme: undefined,
       }
       highlighters.push(found)
+      const unsubscribeTheme = session.onDidChangeTheme?.(() => entry.refresh())
+      if (disposed || entry.signal.aborted) {
+        unsubscribeTheme?.()
+        entry.dispose()
+        releaseSubscription()
+        return null
+      }
+      found.unsubscribeTheme = unsubscribeTheme
     }
     return highlighterLease(found.entry, found.session, request.signal)
   }
@@ -673,29 +691,33 @@ export function createEditorDocumentAnalysis(options: {
     const reclaimed: string[] = []
     let cachedRangeCount = 0
     let pendingRangeCount = 0
-    for (const retained of structural.slice()) {
-      const { entry } = retained
-      if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
-      const index = structural.indexOf(retained)
-      if (index < 0) continue
-      structural.splice(index, 1)
-      reclaimed.push(entry.runtimeSessionId)
-      cachedRangeCount += entry.cachedRangeCount
-      pendingRangeCount += entry.pendingRangeCount
-      entry.dispose()
+    try {
+      for (const retained of structural.slice()) {
+        const { entry } = retained
+        if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
+        const index = structural.indexOf(retained)
+        if (index < 0) continue
+        structural.splice(index, 1)
+        retention.changed()
+        reclaimed.push(entry.runtimeSessionId)
+        cachedRangeCount += entry.cachedRangeCount
+        pendingRangeCount += entry.pendingRangeCount
+        entry.dispose()
+      }
+      for (const retained of highlighters.slice()) {
+        const { entry, unsubscribeTheme } = retained
+        if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
+        const index = highlighters.indexOf(retained)
+        if (index < 0) continue
+        highlighters.splice(index, 1)
+        retention.changed()
+        reclaimed.push(entry.runtimeSessionId)
+        unsubscribeTheme?.()
+        entry.dispose()
+      }
+    } finally {
+      releaseSubscription()
     }
-    for (const retained of highlighters.slice()) {
-      const { entry, unsubscribeTheme } = retained
-      if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
-      const index = highlighters.indexOf(retained)
-      if (index < 0) continue
-      highlighters.splice(index, 1)
-      reclaimed.push(entry.runtimeSessionId)
-      unsubscribeTheme?.()
-      entry.dispose()
-    }
-    releaseSubscription()
-    if (reclaimed.length > 0) retention.changed()
     return {
       reason: options.reason,
       runtimeSessionIds: reclaimed,
