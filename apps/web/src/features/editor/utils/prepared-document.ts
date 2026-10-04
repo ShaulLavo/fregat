@@ -6,7 +6,6 @@ import {
 import { type EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import {
   createEditorPreparedDocument,
-  createEditorDocumentAnalysis,
   type EditorDocumentAnalysis,
   type EditorPreparedDocument,
   type EditorPreparedTagValue,
@@ -123,7 +122,7 @@ function prepareEditorDocument(
   documentId: string,
   path: string,
   environment: EditorPreparedEnvironment,
-  analysis: EditorDocumentAnalysis = createEditorDocumentAnalysis({ buffer, documentId }),
+  analysis: EditorDocumentAnalysis,
 ): EditorPreparedDocument {
   const languageId = languageIdForFilePath(path)
   const analysisAllowed = documentAnalysisAllowed(

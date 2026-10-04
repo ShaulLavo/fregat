@@ -73,7 +73,7 @@ type MatchedLanguageServerPluginOptions = {
   target: LanguageServerDocumentTarget
   onApplyWorkspaceEdit: OnApplyWorkspaceEdit
   getDiagnosticActions?: LanguageServerDiagnosticActions
-  onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void
+  onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void | (() => void)
   onOpenDefinition?: (target: LanguageServerDefinitionTarget) => void | boolean
   onOpenReferences?: (result: LanguageServerReferencesResult) => void | boolean
   onDidNavigateDiagnostic?: (

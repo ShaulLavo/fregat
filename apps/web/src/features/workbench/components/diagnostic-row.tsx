@@ -1,3 +1,8 @@
+import { useFileIntentLifetime } from '@/lib/file-open-intent/hooks/use-file-intent-lifetime'
+import type {
+  FileOpenIntentInterest,
+  FileOpenIntentTrigger,
+} from '@/lib/file-open-intent/state/service'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { cn } from '@workspace/ui/lib/utils'
@@ -25,12 +30,13 @@ export function DiagnosticRow({
   readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly onFix: () => void
   /** Foresight predicts a press on the row. */
-  readonly onIntent: () => void
+  readonly onIntent: (trigger: FileOpenIntentTrigger) => FileOpenIntentInterest
   readonly onOpen: () => void
 }) {
   const line = row.target.range.start.line + 1
+  const { begin, ...handlers } = useFileIntentLifetime(onIntent)
   const { elementRef } = useForesight<HTMLButtonElement>({
-    callback: onIntent,
+    callback: () => begin('trajectory'),
     hitSlop: INTENT_PREFETCH_HIT_SLOP_PX,
     name: `diagnostic:${row.id}`,
     reactivateAfter: FILE_SNAPSHOT_STALE_MS,
@@ -39,6 +45,7 @@ export function DiagnosticRow({
     <div className={cn('border-l-2', diagnosticRuleClass(row.diagnostic.severity))}>
       <ListRow
         {...rowProps}
+        {...handlers}
         as='button'
         role='treeitem'
         aria-level={2}

@@ -200,7 +200,7 @@ export type LanguageServerAdapterPluginOptions = LanguageServerLaneHostOptions &
   ) => LanguageServerDiagnosticMarkerClaim
   readonly onInteractiveReady?: () => void
   readonly onRequestError?: (serverId: string, method: string, error: unknown) => void
-  readonly onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void
+  readonly onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void | (() => void)
   readonly onOpenDefinition?: (
     target: LanguageServerDefinitionTarget,
     options?: LanguageServerNavigationOptions,
@@ -242,7 +242,7 @@ type LanguageServerResolvedAdapterOptions = {
   readonly onInteractiveReady?: () => void
   readonly onRequestError?: (serverId: string, method: string, error: unknown) => void
   readonly onApplyWorkspaceEdit?: LanguageServerLaneHostOptions['onApplyWorkspaceEdit']
-  readonly onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void
+  readonly onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void | (() => void)
   readonly onOpenDefinition?: (
     target: LanguageServerDefinitionTarget,
     options?: LanguageServerNavigationOptions,

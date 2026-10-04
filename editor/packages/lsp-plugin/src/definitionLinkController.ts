@@ -33,7 +33,7 @@ export type DefinitionLinkControllerOptions = {
   readonly linkHighlightNameNamespace?: string
   readonly navigationTimingNamePrefix?: string
   getActiveDocument(): ActiveDocument | null
-  onDefinitionLinkHover?(target: LanguageServerDefinitionTarget): void
+  onDefinitionLinkHover?(target: LanguageServerDefinitionTarget): void | (() => void)
   onOpenDefinition?(
     target: LanguageServerDefinitionTarget,
     options?: LanguageServerNavigationOptions,
@@ -55,6 +55,7 @@ export class DefinitionLinkController {
   private definitionHoverRequestId = 0
   private lastPointerOffset: number | null = null
   private linkRange: OffsetRange | null = null
+  private definitionLinkDisposer: (() => void) | null = null
   private disposed = false
   private pressParticipant: EditorDisposable | null = null
 
@@ -207,7 +208,17 @@ export class DefinitionLinkController {
     this.linkRange = sourceRange
     this.context.setRangeHighlight(this.linkHighlightName, [sourceRange], LINK_HIGHLIGHT_STYLE)
     this.context.scrollElement.style.cursor = 'pointer'
-    this.options.onDefinitionLinkHover?.(target)
+    const disposer = this.options.onDefinitionLinkHover?.(target)
+    if (!disposer) return
+    if (
+      requestId !== this.definitionHoverRequestId ||
+      active !== this.options.getActiveDocument() ||
+      this.disposed
+    ) {
+      disposer()
+      return
+    }
+    this.definitionLinkDisposer = disposer
   }
 
   private handleNavigationResult(
@@ -286,10 +297,13 @@ export class DefinitionLinkController {
   }
 
   private clearDefinitionLink(): void {
+    const disposer = this.definitionLinkDisposer
+    this.definitionLinkDisposer = null
     this.definitionHoverRequestId += 1
     this.linkRange = null
     this.context.clearRangeHighlight(this.linkHighlightName)
     this.context.scrollElement.style.cursor = ''
+    disposer?.()
   }
 }
 
