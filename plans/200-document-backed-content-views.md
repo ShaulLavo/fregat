@@ -1,8 +1,48 @@
 # Plan 200: Shared documents behind content views
 
-Status: approved, planning requested by the owner on 2026-09-28. Implementation has not started.
+Status: Approved, active execution. Requested by the owner on 2026-09-28.
 Owners: Platform for resource identity, acquisition, retention and product adapters; Editor for
 document attachment and reusable projections. Cross-project order lives in [PLAN.md](../PLAN.md).
+
+## Execution record
+
+As of 2026-10-04, full units completed: 0 of 6. Units 0–5 below retain their execution order and
+unchecked acceptance work. The following partial deliveries are open for review and merge:
+
+- [PR #678](https://github.com/ShaulLavo/fregat/pull/678), head `e9332f10`, is the unit 1
+  compare-with-saved caller pilot. Synchronous source leases retain the current live buffer and
+  analysis, exact committed snapshots, and a distinct saved disk snapshot through the existing
+  workspace document owner. Save and Undo keep their current authority. The rename and rollback
+  review finding is under correction. Other comparison callers and full unit 1 acceptance remain open.
+- [PR #675](https://github.com/ShaulLavo/fregat/pull/675), head `73632614`, supplies the Plan 197
+  immutable source syntax prerequisite through borrowed readers. Its grammar admission finding
+  fix is pushed and awaits the coordinator's narrow check. This prerequisite leaves Plan 200's
+  comparison ownership, attachment and caller migration work open.
+- [PR #681](https://github.com/ShaulLavo/fregat/pull/681), head `0b11d6ef`, supplies part of unit 4:
+  captured disk provenance and complete or partial coverage at the bounded-read response and
+  existing preview query adapter. Independent review is pending. Renderer and source-owner
+  binding, text attachment ownership and Markdown buffer verification remain open.
+
+These heads require independent approval and green current-head CI before merge. The execution
+record makes no merged-delivery claim for them. [PR #661](https://github.com/ShaulLavo/fregat/pull/661)
+landed final runtime document disposal in `725f4d29a`; the
+[Plan 198 foundation record](198-document-owned-editor-analysis.md#landed-code-and-remaining-proof)
+separately records landed publication and retained analysis contracts with remaining acceptance.
+
+The pilot's frozen headless fixture records zero selected loading or blank frames on the corrected
+warm opening and revisits. Cold initial and newly saved syntax still has plain frames and pending
+readiness qualification. The token audit limits old results to parity with the tested DOM reference.
+Token completeness and compatible-ready attachment require Plan 198's corrected independent oracle,
+including source, revision, configuration, coverage and complete decoration checks. Atomic refresh
+and full Plan 200 acceptance remain unproven.
+
+Remaining work includes full live and immutable comparison ownership, existing-method attachment
+with independent view anchors for every diff caller, captured conflict and WorkspaceEdit preview
+sources with leases and stale-write refusal, and preview source reuse. Concrete source revision/range
+handoffs to 182 and composer draft ownership handoffs to 171 remain later unit 4 work. Execution
+preserves the existing `openDocument` and `syncText` paths and immutable 197 readers. Full immutable
+Editor buffers, a new core projection API, a universal registry, a second syntax cache and generic
+099 units 2–7 remain outside this authorization.
 
 ## Outcome
 

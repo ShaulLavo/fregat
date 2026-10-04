@@ -4274,7 +4274,7 @@ export class Editor {
       }))
     }
     this.withOperation((operation) => {
-      this.syntax.projectCacheForChange(change)
+      this.syntax.acceptChange(change)
       const renderStart = nowMs()
       measureEditorPerformance('editor.renderSessionChange', () => this.renderSessionChange(change))
       invalidateRowRectMeasurements()
