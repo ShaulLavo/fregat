@@ -818,6 +818,7 @@ export class EditorSyntaxController {
     if (change.kind === 'none' || change.kind === 'selection' || change.kind === 'synchronize') {
       return
     }
+    this.stoppedWarm = null
     this.syntaxContentVersion += 1
     this.foldCoverage = null
     this.parsedSyntaxContentVersion = null
@@ -1167,6 +1168,7 @@ export class EditorSyntaxController {
   }
 
   private disposeSyntaxSession(): void {
+    this.stoppedWarm = null
     this.syntaxRequests.cancel()
     this.rangeRequests.cancel()
     this.prefetchRangeRequests.cancel()
@@ -2087,6 +2089,7 @@ export class EditorSyntaxController {
   }
 
   private advanceInitialHighlightConfigurationGeneration(): number {
+    this.stoppedWarm = null
     this.initialHighlightConfigurationGeneration += 1
     this.pendingInitialHighlightThemeTerminal = null
     return this.initialHighlightConfigurationGeneration

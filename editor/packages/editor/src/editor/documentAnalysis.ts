@@ -1039,7 +1039,12 @@ function structuralLease(
         : entry.readRange(range ?? demand),
     dispose: lease.dispose,
   }
-  structuralLeaseOwners.set(retained, { entry, signal: lease.signal })
+  if (!lease.signal.aborted) {
+    structuralLeaseOwners.set(retained, { entry, signal: lease.signal })
+    lease.signal.addEventListener('abort', () => structuralLeaseOwners.delete(retained), {
+      once: true,
+    })
+  }
   return retained
 }
 

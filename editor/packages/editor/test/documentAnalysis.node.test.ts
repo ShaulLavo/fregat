@@ -15,6 +15,52 @@ import {
 } from '../src/syntax/session'
 
 describe('active range retention', () => {
+  it('releases the actual private lease binding when its signal closes', () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'lease-binding' })
+    const original = WeakMap.prototype.set
+    const observed: { map: WeakMap<WeakKey, unknown> | null } = { map: null }
+    const capture = (map: WeakMap<WeakKey, unknown>, value: unknown) => {
+      if (
+        typeof value !== 'object' ||
+        value === null ||
+        !('entry' in value) ||
+        !('signal' in value)
+      )
+        return
+      if (value.signal instanceof AbortSignal) observed.map = map
+    }
+    WeakMap.prototype.set = function (
+      this: WeakMap<WeakKey, unknown>,
+      key: WeakKey,
+      value: unknown,
+    ) {
+      capture(this, value)
+      return original.call(this, key, value)
+    }
+    let lease: ReturnType<typeof analysis.borrowStructural> = null
+    try {
+      lease = analysis.borrowStructural({
+        provider: { createSession: () => createEmptySyntaxSession() },
+        languageId: 'typescript',
+      })
+    } finally {
+      WeakMap.prototype.set = original
+    }
+    const binding = observed.map
+    if (!binding || !lease) throw new TypeError('Controlled lease binding observation unavailable')
+    try {
+      expect(binding.has(lease)).toBe(true)
+      lease.dispose()
+      expect(binding.has(lease)).toBe(false)
+      analysis.reclaimInactive({ reason: 'inactive-budget' })
+      expect(binding.has(lease)).toBe(false)
+      expect(analysis.inspectRetention().entries).toEqual([])
+    } finally {
+      analysis.dispose()
+    }
+  })
+
   it('joins the current retry generation while the obsolete queued query settles', async () => {
     const buffer = createEditorTextBuffer('alpha')
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'retry-head' })

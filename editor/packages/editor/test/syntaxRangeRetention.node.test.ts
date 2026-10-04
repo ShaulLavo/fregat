@@ -257,6 +257,52 @@ describe('syntax range contributor lifetime', () => {
       analysis.dispose()
     }
   })
+
+  it.each(['clear', 'replace', 'dispose', 'configuration', 'text-change'] as const)(
+    'releases the old stopped-warm snapshot on %s',
+    async (boundary) => {
+      const buffer = createEditorTextBuffer('x\n'.repeat(250_000))
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: boundary })
+      const provider = {
+        createSession: () => ({
+          ...createEmptySyntaxSession(),
+          queryRange: async (range: EditorSyntaxRange) => ({
+            ...createEmptySyntaxResult({ requestedRanges: [range] }),
+            tokens: EditorTokenStore.fromTokens([
+              { start: range.startIndex, end: range.startIndex + 1, style: { color: 'warm' } },
+            ]),
+          }),
+        }),
+      }
+      const view = createView(buffer, analysis, provider, { startIndex: 0, endIndex: 512 })
+      try {
+        view.syntax.refresh(1, null, { delayMs: 0 })
+        await vi.waitFor(() => expect(view.syntax.copyTokens.startAt(0)).toBe(120_000))
+        expect(Reflect.get(view.syntax, 'stoppedWarm')).not.toBeNull()
+        if (boundary === 'clear') view.syntax.clearDocument()
+        if (boundary === 'dispose') view.syntax.dispose()
+        if (boundary === 'configuration') view.syntax.reloadSyntaxSession()
+        if (boundary === 'replace') {
+          const session = createEditorBufferSession(buffer)
+          view.syntax.startDocument({
+            analysis,
+            documentId: 'replacement',
+            languageId: 'typescript',
+            snapshot: session.getSnapshot(),
+            textSnapshot: session.getTextSnapshot(),
+          })
+        }
+        if (boundary === 'text-change') {
+          const change = createEditorBufferSession(buffer).applyText('!')
+          view.syntax.acceptChange(change)
+        }
+        expect(Reflect.get(view.syntax, 'stoppedWarm')).toBeNull()
+      } finally {
+        view.dispose()
+        analysis.dispose()
+      }
+    },
+  )
 })
 
 function createView(
