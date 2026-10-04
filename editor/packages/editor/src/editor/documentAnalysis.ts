@@ -198,8 +198,12 @@ class AnalysisEntry<T extends RetentionResult> {
   }
 
   async current(): Promise<T> {
-    this.synchronize()
     const revision = this.buffer.getRevision()
+    const expectedGeneration = this.queuedRevision === revision ? this.generation : null
+    // Synchronous publication must enqueue its captured changes before a read repairs the head.
+    await Promise.resolve()
+    this.assertCurrent(revision, expectedGeneration ?? this.generation)
+    this.synchronize()
     const generation = this.generation
     await interruptible(this.tail, this.pendingInterest.signal)
     this.assertCurrent(revision, generation)

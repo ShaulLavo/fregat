@@ -12,6 +12,110 @@ import {
 } from '../src/syntax/session'
 
 describe('retained document analysis', () => {
+  it('queues captured nested publications before an earlier eager reader repairs the head', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const view = createEditorBufferSession(buffer)
+    const reads: Promise<unknown>[] = []
+    let lease: ReturnType<ReturnType<typeof createEditorDocumentAnalysis>['borrowHighlighter']> =
+      null
+    buffer.subscribe((event) => {
+      if (event.revisionAfter === 1) view.applyText('?')
+      if (lease) reads.push(lease.applyChange(event.change))
+    })
+    const calls: string[] = []
+    const provider: EditorHighlighterProvider = {
+      createSession: () => ({
+        refresh: async (snapshot) => {
+          calls.push(`refresh:${snapshot.materializeFullText()}`)
+          return { tokens: EditorTokenStore.empty() }
+        },
+        applyChange: async (change) => {
+          calls.push(`edit:${change.textSnapshot.materializeFullText()}`)
+          return { tokens: EditorTokenStore.empty() }
+        },
+        dispose: () => undefined,
+      }),
+    }
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'nested-eager.md' })
+    lease = analysis.borrowHighlighter({ provider, languageId: 'markdown' })
+    expect(lease).not.toBeNull()
+    await lease!.refresh(buffer.getTextSnapshot())
+    view.applyText('!')
+    await Promise.all([...reads, lease!.refresh(buffer.getTextSnapshot())])
+    expect(calls).toEqual(['refresh:alpha', 'edit:alpha!', 'edit:alpha!?'])
+    expect(lease!.read()).toMatchObject({ kind: 'ready', revision: 2 })
+    analysis.dispose()
+  })
+
+  it.each(['caller-abort', 'owner-dispose'] as const)(
+    'settles %s before the current-read publication boundary without a new session',
+    async (reason) => {
+      const buffer = createEditorTextBuffer('alpha')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'microtask-cancel.md' })
+      const gate = deferred<{ tokens: EditorTokenStore }>()
+      const refresh = vi.fn(() => gate.promise)
+      const dispose = vi.fn()
+      const provider: EditorHighlighterProvider = {
+        createSession: vi.fn(() => ({ refresh, applyChange: refresh, dispose })),
+      }
+      const interest = new AbortController()
+      const lease = analysis.borrowHighlighter({
+        provider,
+        languageId: 'markdown',
+        signal: interest.signal,
+      })!
+      const pending = lease.refresh(buffer.getTextSnapshot())
+      const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      if (reason === 'caller-abort') interest.abort()
+      if (reason === 'owner-dispose') analysis.dispose()
+      await rejected
+      gate.resolve({ tokens: EditorTokenStore.empty() })
+      if (reason === 'caller-abort') {
+        const survivor = analysis.borrowHighlighter({ provider, languageId: 'markdown' })!
+        await survivor.refresh(buffer.getTextSnapshot())
+        expect(survivor.read().kind).toBe('ready')
+        survivor.dispose()
+      }
+      expect(lease.read().kind).toBe('failed')
+      expect(provider.createSession).toHaveBeenCalledTimes(1)
+      analysis.dispose()
+      expect(dispose).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('cancels a queued-generation read when theme refresh supersedes it during publication', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'microtask-theme.md' })
+    const gate = deferred<{ tokens: EditorTokenStore }>()
+    const listeners = new Set<() => void>()
+    const current = {
+      tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: 'new' } }]),
+    }
+    const refresh = vi.fn(() => Promise.resolve(current)).mockImplementationOnce(() => gate.promise)
+    const provider: EditorHighlighterProvider = {
+      createSession: () => ({
+        refresh,
+        applyChange: refresh,
+        dispose: () => undefined,
+        onDidChangeTheme: (listener) => {
+          listeners.add(listener)
+          return () => {
+            listeners.delete(listener)
+          }
+        },
+      }),
+    }
+    const lease = analysis.borrowHighlighter({ provider, languageId: 'markdown' })!
+    const old = lease.refresh(buffer.getTextSnapshot())
+    const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
+    for (const listener of listeners) listener()
+    await rejected
+    gate.resolve({ tokens: EditorTokenStore.empty() })
+    expect(await lease.refresh(buffer.getTextSnapshot())).toBe(current)
+    expect(refresh).toHaveBeenCalledTimes(2)
+    analysis.dispose()
+  })
+
   it.each([
     ['structural-session', false],
     ['structural-session', true],
