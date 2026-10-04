@@ -30,6 +30,8 @@ export type Entry = {
   /** A `--quiet` job: it drains finite jobs, for at most one quiet hold. */
   readonly quiet: boolean
   readonly server: boolean
+  /** CPU affinity ids; the baseline policy accepts only empty sets. */
+  readonly allowedCpus?: readonly number[]
   /** A queued quiet request's deadline, in boot seconds; independent of its running lease. */
   readonly quietAdmissionUntil?: number
   /** The expected wall deadline in boot seconds; ownership and slice cleanup gate admission. */

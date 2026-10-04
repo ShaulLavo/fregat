@@ -52,7 +52,7 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   readonly submittedFrame: TerminalSubmittedFrame | undefined
   readonly textarea: HTMLTextAreaElement | undefined
 
-  use<Api = void>(extension: Extension<Api>): ExtensionHandle<Api>
+  use<Api = void>(extension: Extension<Api>): TerminalResult<Mode, ExtensionHandle<Api>>
   sendGeneratedInput(input: TerminalGeneratedInput): TerminalResult<Mode, TerminalInputResult>
   open(parent: HTMLElement): Promise<void>
   on<Type extends GhosttyWebGpuTerminalEventType>(

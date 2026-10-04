@@ -6,30 +6,44 @@ import { localOpenSsh, sshPassphrase, waitUntil } from './factories/openssh'
 
 const scenario = process.argv[2]
 const cancellation = scenario === 'cancel-password' || scenario === 'expire-password'
-const ssh = await localOpenSsh(cancellation)
+const ssh = await localOpenSsh(cancellation, undefined, scenario === 'forwarding')
 process.env.PATH = ssh.environment.PATH
+if (ssh.diagnostics) {
+  delete process.env.SSH_AUTH_SOCK
+  delete process.env.SSH_AGENT_PID
+}
 const prompts: string[] = []
 let cancelled = 0
 const auth = await createSshAuthentication({
-  request: async (prompt) => {
-    prompts.push(prompt.kind)
-    if (prompt.kind === 'confirmation') return 'yes'
-    if (scenario === 'expire-password') await Bun.sleep(30)
-    return cancellation ? null : sshPassphrase
-  },
+  request: ({ kind }) =>
+    ssh.diagnostics ? ssh.diagnostics.answer(kind, () => answer(kind)) : answer(kind),
   onCancel: () => {
     cancelled += 1
   },
+}).catch(async (error) => {
+  await ssh.diagnostics?.publish()
+  await ssh.close()
+  throw error
 })
 const forwards: SshForward[] = []
 
 try {
   if (cancellation) await verifyCancellation()
   else await verifyForwarding()
+} catch (error) {
+  await ssh.diagnostics?.publish()
+  throw error
 } finally {
   await Promise.allSettled(forwards.map((forward) => forward.close()))
   await auth.close()
   await ssh.close()
+}
+
+async function answer(kind: 'confirmation' | 'secret') {
+  prompts.push(kind)
+  if (kind === 'confirmation') return 'yes'
+  if (scenario === 'expire-password') await Bun.sleep(30)
+  return cancellation ? null : sshPassphrase
 }
 
 async function command() {

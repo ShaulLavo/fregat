@@ -1,8 +1,9 @@
+import { presentSetting } from '../settings/documentation'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 
 import { defaultSettingsDocument } from '../settings/defaults-document'
-import { descriptorFor, SETTING_IDS } from '../settings/keys'
+import { SETTING_IDS } from '../settings/keys'
 
 /** The document is JSONC with full-line comments only, so stripping them leaves JSON. */
 function parsedDefaults(): Record<string, unknown> {
@@ -20,9 +21,9 @@ describe('defaultSettingsDocument', () => {
 
     expect(Object.keys(parsed)).toEqual(SETTING_IDS)
     for (const id of SETTING_IDS) {
-      const result = v.safeParse(descriptorFor(id).schema, parsed[id])
+      const result = v.safeParse(presentSetting(id).schema, parsed[id])
       expect(result.success, id).toBe(true)
-      expect(parsed[id]).toEqual(descriptorFor(id).default)
+      expect(parsed[id]).toEqual(presentSetting(id).default)
     }
   })
 
@@ -33,7 +34,7 @@ describe('defaultSettingsDocument', () => {
       const at = lines.findIndex((line) => line.startsWith(`  ${JSON.stringify(id)}:`))
       expect(at, id).toBeGreaterThan(0)
       const comment = commentAbove(lines, at)
-      const descriptor = descriptorFor(id)
+      const descriptor = presentSetting(id)
       expect(comment, id).toContain(`// ${descriptor.description.split(' ')[0]}`)
       expect(comment, id).toMatch(new RegExp(`// Scope: ${descriptor.scope} \\(`))
       expect(comment.includes('// Takes effect after a restart.'), id).toBe(

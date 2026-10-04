@@ -145,7 +145,7 @@ its unrelated temporary-file read warnings are tracked in Fregat issue 568.
       `terminal.shellKeys`; a Mod+K chord started in the editor cancels on focus change.
 - [ ] Measure: keystroke `trace --compare` before and after, typing in a large file inside the
       8.3 ms budget.
-- [ ] Deploy with `bun run deploy`, or `--server --restart` if server code changed.
+- [ ] Deploy with `bun run install-release`, or `--server --restart` if server code changed.
 
 ## Acceptance
 

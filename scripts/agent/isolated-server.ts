@@ -25,6 +25,7 @@ import { hostPaths } from '../../apps/server/src/terminal-host/protocol'
 import { allowedOriginsForWebPort, isPortAvailable, selectAvailablePort } from '../runtime-network'
 import { linkWallpaperLibrary, productionStateHome } from '../state-home'
 import { createScriptError } from '../structured-errors'
+import { fixtureReadiness } from './fixture-readiness'
 import { scratchRoot as defaultScratchRoot } from './paths'
 
 const SERVER_ROOT = path.resolve(import.meta.dirname, '../../apps/server')
@@ -256,7 +257,9 @@ async function waitForHealth(
   const deadline = Date.now() + START_TIMEOUT_MS
   while (Date.now() < deadline) {
     if (child.exitCode !== null) break
-    const healthy = await fetch(`${origin}/health`, { headers: { origin: webOrigin } }).then(
+    const healthy = await fixtureReadiness(new URL(origin), webOrigin, {
+      signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+    }).then(
       (response) => response.ok,
       () => false,
     )

@@ -1,4 +1,6 @@
 import { unzipSync } from 'fflate'
+import { sanitizeErrorCause } from '../observability/logging'
+import { isEvlogError } from '../observability/structured-errors'
 import * as v from 'valibot'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -7,6 +9,7 @@ import { fontOperationFailed, readBinaryFile, readJsonFile } from './cache-files
 import { isValidFontName } from './contracts'
 import type { Fetcher, FontSubsetter } from './fetcher'
 import { Inflight } from './inflight'
+import { fontErrors } from './structured-errors'
 
 export type FontLinks = Record<string, string>
 
@@ -77,20 +80,33 @@ export class NerdFontProvider {
   }
 
   private async readFont(fontName: string) {
-    await this.ensureCacheDirectories()
+    let stage = 'cache_read'
+    try {
+      await this.ensureCacheDirectories()
+      const cachedFontPath = path.join(this.fontDirectory, `${fontName}.ttf`)
+      const cachedFont = await readBinaryFile(cachedFontPath)
+      if (cachedFont) return cachedFont
 
-    const cachedFontPath = path.join(this.fontDirectory, `${fontName}.ttf`)
-    const cachedFont = await readBinaryFile(cachedFontPath)
-    if (cachedFont) return cachedFont
+      stage = 'download'
+      const zipBuffer = await this.downloadFontZip(latestArchiveUrl(fontName))
+      if (!zipBuffer) return null
 
-    const zipBuffer = await this.downloadFontZip(latestArchiveUrl(fontName))
-    if (!zipBuffer) return null
+      stage = 'archive'
+      const fontBuffer = extractRegularFont(zipBuffer)
+      if (!fontBuffer) return null
 
-    const fontBuffer = await extractRegularFont(zipBuffer)
-    if (!fontBuffer) return null
-
-    await writeFile(cachedFontPath, fontBuffer)
-    return fontBuffer
+      stage = 'cache_write'
+      await writeFile(cachedFontPath, fontBuffer)
+      return fontBuffer
+    } catch (cause) {
+      if (isEvlogError(cause)) throw cause
+      throw fontErrors.UNAVAILABLE({
+        internal: {
+          stage,
+          cause: cause instanceof Error ? sanitizeErrorCause(cause) : { type: typeof cause },
+        },
+      })
+    }
   }
 
   async preview(fontName: string, previewText: string, textHash: string) {
@@ -114,7 +130,10 @@ export class NerdFontProvider {
   private async downloadFontZip(zipUrl: string) {
     const response = await this.fetcher(zipUrl, { signal: AbortSignal.timeout(ARCHIVE_TIMEOUT_MS) })
     if (response.status === 404) return null
-    if (!response.ok) throw fontOperationFailed('failed to download font archive', response)
+    if (!response.ok)
+      throw fontErrors.UNAVAILABLE({
+        internal: { stage: 'download', upstreamStatus: response.status },
+      })
 
     return Buffer.from(await response.arrayBuffer())
   }

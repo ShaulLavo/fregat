@@ -1,3 +1,4 @@
+import { presentationFor } from '../settings/presentation'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 
@@ -83,7 +84,7 @@ describe('settings mutation schemas', () => {
       key: 'providers.proxyUsageProviderInstanceIds',
       value: ['codex-proxy-a', 'codex-proxy-b'],
     } as const
-    expect(descriptorFor(input.key).widget).toBe('complex')
+    expect(presentationFor(input.key).widget).toBe('complex')
     expect(parseRequest([input]).success).toBe(true)
     const result = applyIdempotently(
       { 'providers.proxyUsageProviderInstanceIds': ['codex-proxy-old'] },
@@ -106,7 +107,7 @@ describe('settings mutation schemas', () => {
       key: 'environments.loadPreferences',
       value,
     }
-    expect(descriptorFor(input.key).widget).toBe('record')
+    expect(presentationFor(input.key).widget).toBe('record')
     expect(parseRequest([input]).success).toBe(true)
     const result = applyIdempotently({ 'files.showHidden': true }, operation(input))
     expect(result.raw).toEqual({

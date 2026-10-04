@@ -163,11 +163,18 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     applyPaletteStylesheet(globalThis.document, paletteStylesheet(renderedPalette))
   }, [renderedPalette])
 
+  const fontRefs = fontsInUse(appearanceValues)
   const fonts = useQueries({
-    queries: fontsInUse(appearanceValues).map((ref) => fontQueryOptions(ref)),
+    queries: fontRefs.map((ref) => fontQueryOptions(ref)),
   })
-  const appearancePending =
-    confirmedQuery.isPending || palettePending || fonts.some((font) => font.isPending)
+  // Supplemental glyphs can arrive after paint; only the selected text faces hold appearance.
+  const textFontsPending = fonts.some(
+    (font, index) =>
+      font.isPending &&
+      (fontRefs[index] === appearanceValues['workbench.fontFamily'] ||
+        fontRefs[index] === appearanceValues['editor.fontFamily']),
+  )
+  const appearancePending = confirmedQuery.isPending || palettePending || textFontsPending
 
   const confirmedValues = confirmedQuery.data?.values
 

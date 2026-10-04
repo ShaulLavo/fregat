@@ -1,7 +1,7 @@
+import { presentSetting } from '@workspace/contracts/settings/documentation'
 import {
   WORKTREE_SUBMODULE_MODES,
   type ModelSelection,
-  descriptorFor,
   type ProjectOverrideSettingId,
   type ScalarSettingId,
   type SetProjectOverrideOperation,
@@ -135,7 +135,7 @@ export function projectRowTitle(row: ProjectSettingRow) {
 }
 
 export function projectRowDescription(row: ProjectSettingRow) {
-  return descriptorFor(row.global).description
+  return presentSetting(row.global).description
 }
 
 const ON_OFF: readonly ProjectChoice[] = [

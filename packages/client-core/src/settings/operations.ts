@@ -1,7 +1,6 @@
 import {
   jsonEqual,
   resolveThemeSettings,
-  settingRowIds,
   themePartPatch,
   themePartSlot,
   type ColorMode,
@@ -55,10 +54,11 @@ export function resetSettingOperations(
   },
   target: SettingsWriteTarget,
   shownMode: ColorMode,
+  rowKeys: readonly SettingId[],
 ): readonly SettingsOperation[] {
   const theme = settings.values['workbench.theme']
   const slot = theme && target === 'user' ? themePartSlot(key, shownMode) : null
-  if (!theme || !slot) return [{ kind: 'reset', keys: settingRowIds(key) }]
+  if (!theme || !slot) return [{ kind: 'reset', keys: rowKeys }]
   const uncustomize: SettingsOperation = { kind: 'theme.uncustomize', id: theme.id, ...slot }
   const stray = settings.layers.some(
     (layer) => layer.id === 'user' && Object.hasOwn(layer.raw, key),

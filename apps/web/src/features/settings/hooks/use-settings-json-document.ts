@@ -1,14 +1,13 @@
-import type { SettingsSnapshot } from '@workspace/contracts'
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
-import { useSettingsScope, type SettingsScope } from '@/features/settings/state/scope-store'
+import { useSettingsScope } from '@/features/settings/state/scope-store'
 import { useSettingsView } from '@/features/settings/state/view-store'
 import type { TabContent, TabId } from '@/lib/documents/utils/types'
 import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
-import { defaultsLayerFile } from '@/features/settings/utils/defaults-file'
+import { useDefaultsFile } from '@/features/settings/hooks/use-defaults-file'
 
 /**
  * Seeds and attaches the buffer behind the settings tab's JSON view.
@@ -34,7 +33,12 @@ export function useSettingsJsonDocument(tabId: TabId, content: TabContent) {
   const settings = useSettingsDocument(useQueryClient())
   const active = content.kind === 'settings' && view === 'json'
   const key = active ? documentKey(settingsJsonDocument(scope)) : null
-  const file = active ? layerFile(settings.data, scope) : undefined
+  const defaults = useDefaultsFile(active && scope === 'default')
+  const layer =
+    scope === 'default'
+      ? defaults.data
+      : settings.data?.layers.find((layer) => layer.id === scope)?.file
+  const file = active ? layer : undefined
   const ensureSettingsDocument = useEditorDocumentState((state) => state.ensureSettingsDocument)
   const ensureEditorViewForDocument = useEditorDocumentState(
     (state) => state.ensureEditorViewForDocument,
@@ -77,11 +81,4 @@ export function useSettingsJsonDocument(tabId: TabId, content: TabContent) {
 
     ensureEditorViewForDocument(tabId, key)
   }, [key, ensureEditorViewForDocument, hasDocument, tabId])
-}
-
-// The defaults tab has no layer on the server: its text is the registry, rendered here.
-function layerFile(snapshot: SettingsSnapshot | undefined, scope: SettingsScope) {
-  if (scope === 'default') return defaultsLayerFile()
-
-  return snapshot?.layers.find((layer) => layer.id === scope)?.file
 }

@@ -1,7 +1,7 @@
 import { EvlogError } from 'evlog'
 import { expect, test } from 'vitest'
 
-import { parseDeployArgs } from './args'
+import { parseInstallArgs } from './args'
 import {
   busyText,
   requestRestart,
@@ -144,20 +144,20 @@ test("the server's refusal keeps its code, why and fix", () => {
 })
 
 test('the deploy flags pick a command', () => {
-  expect(parseDeployArgs(['--restart'])).toEqual({
+  expect(parseInstallArgs(['--restart'])).toEqual({
     kind: 'restart',
     request: { interrupt: false },
     liveCheck: true,
   })
-  expect(parseDeployArgs(['--restart', '--interrupt', '--skip-live-check'])).toEqual({
+  expect(parseInstallArgs(['--restart', '--interrupt', '--skip-live-check'])).toEqual({
     kind: 'restart',
     request: { interrupt: true },
     liveCheck: false,
   })
-  const both = parseDeployArgs(['--server', '--restart'])
-  expect(both.kind === 'deploy' && both.options.restart).toEqual({ interrupt: false })
-  const staged = parseDeployArgs(['--server'])
-  expect(staged.kind === 'deploy' && staged.options.restart).toBeNull()
-  expect(() => parseDeployArgs(['--interrupt'])).toThrow('Add --restart')
-  expect(() => parseDeployArgs(['--rollback', '--restart'])).toThrow('Drop --restart')
+  const both = parseInstallArgs(['--server', '--restart'])
+  expect(both.kind === 'install' && both.options.restart).toEqual({ interrupt: false })
+  const staged = parseInstallArgs(['--server'])
+  expect(staged.kind === 'install' && staged.options.restart).toBeNull()
+  expect(() => parseInstallArgs(['--interrupt'])).toThrow('Add --restart')
+  expect(() => parseInstallArgs(['--rollback', '--restart'])).toThrow('Drop --restart')
 })

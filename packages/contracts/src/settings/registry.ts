@@ -171,6 +171,29 @@ export type SettingDescriptor<TSchema extends v.GenericSchema = v.GenericSchema>
   readonly deprecationReason?: string
 }
 
+export type SettingDocumentation = Pick<
+  SettingDescriptor,
+  'description' | 'details' | 'title' | 'optionTitles' | 'keywords'
+>
+
+export type SettingPresentation = Pick<
+  SettingDescriptor,
+  | 'widget'
+  | 'category'
+  | 'visibility'
+  | 'rowOwner'
+  | 'requiresRestart'
+  | 'readOnlyReason'
+  | 'deprecationReason'
+>
+
+export type SettingDefinition<TSchema extends v.GenericSchema = v.GenericSchema> = Omit<
+  SettingDescriptor<TSchema>,
+  keyof SettingDocumentation | keyof SettingPresentation
+>
+
+type PresentedSetting = SettingDefinition & Partial<SettingDocumentation & SettingPresentation>
+
 /**
  * Identity function whose only job is to bind `default` and `widget` to `schema`.
  *
@@ -183,17 +206,23 @@ export type SettingDescriptor<TSchema extends v.GenericSchema = v.GenericSchema>
  * `SettingDescriptor.widget`. A conditional type is unmeasurable for variance,
  * so putting `WidgetFor<v.InferOutput<TSchema>>` on the field makes `TSchema`
  * invariant and every entry stops satisfying
- * `Readonly<Record<string, SettingDescriptor>>`. Constraining the argument
+ * `Readonly<Record<string, SettingDefinition>>`. Constraining the argument
  * catches the same mistake at the same place and leaves the descriptor type
  * assignable.
  */
 export function defineSetting<TSchema extends v.GenericSchema>(
   descriptor: SettingDescriptor<TSchema> & { readonly widget: WidgetFor<v.InferOutput<TSchema>> },
-): SettingDescriptor<TSchema> {
-  return descriptor
+): SettingDescriptor<TSchema>
+export function defineSetting<TSchema extends v.GenericSchema>(
+  definition: SettingDefinition<TSchema>,
+): SettingDefinition<TSchema>
+export function defineSetting<TSchema extends v.GenericSchema>(
+  definition: SettingDefinition<TSchema> & Partial<SettingDocumentation & SettingPresentation>,
+): SettingDefinition<TSchema> & Partial<SettingDocumentation & SettingPresentation> {
+  return definition
 }
 
-export type SettingsRegistryShape = Readonly<Record<string, SettingDescriptor>>
+export type SettingsRegistryShape = Readonly<Record<string, SettingDefinition>>
 
 /**
  * The typed document a registry produces. `SettingsValues` is this applied to
@@ -221,7 +250,9 @@ export type RegistryProblem = {
  * Not run at module load: the package declares `sideEffects: false`, and a
  * throwing import would make that a lie.
  */
-export function registryProblems(registry: SettingsRegistryShape): RegistryProblem[] {
+export function registryProblems(
+  registry: Readonly<Record<string, PresentedSetting>>,
+): RegistryProblem[] {
   const problems: RegistryProblem[] = []
 
   for (const [id, descriptor] of Object.entries(registry)) {
@@ -260,9 +291,9 @@ export function registryProblems(registry: SettingsRegistryShape): RegistryProbl
  * and the one a reader of the registry cannot see.
  */
 function rowOwnerProblems(
-  registry: SettingsRegistryShape,
+  registry: Readonly<Record<string, PresentedSetting>>,
   id: string,
-  descriptor: SettingDescriptor,
+  descriptor: PresentedSetting,
 ): RegistryProblem[] {
   const owner = descriptor.rowOwner
   if (owner === undefined) return []
@@ -285,9 +316,9 @@ function rowOwnerProblems(
  * leave the child disabled forever or indented under nothing.
  */
 function dependsOnProblems(
-  registry: SettingsRegistryShape,
+  registry: Readonly<Record<string, PresentedSetting>>,
   id: string,
-  descriptor: SettingDescriptor,
+  descriptor: PresentedSetting,
 ): RegistryProblem[] {
   const parentId = descriptor.dependsOn
   if (parentId === undefined) return []

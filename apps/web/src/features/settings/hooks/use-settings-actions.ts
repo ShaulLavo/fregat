@@ -14,7 +14,6 @@ import {
   errorNumberField,
   errorStringField,
   layerAllowsScope,
-  settingRowIds,
   type KeybindingOverride,
   type ModelRef,
   type MachineDefinition,
@@ -183,10 +182,17 @@ export function useSettingsActions(owner?: QueryClient) {
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.append', entry }]),
     deleteKeybinding: (index: number, expected: readonly KeybindingOverride[]) =>
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.delete', index, expected }]),
-    resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
+    resetSetting: (
+      key: SettingId,
+      rowKeys: readonly SettingId[],
+      target: SettingsWriteTarget = 'user',
+    ) => {
       const current = projection()
-      if (!current) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      return submit(target, resetSettingOperations(key, current, target, shownMode(current.values)))
+      if (!current) return submit(target, [{ kind: 'reset', keys: rowKeys }])
+      return submit(
+        target,
+        resetSettingOperations(key, current, target, shownMode(current.values), rowKeys),
+      )
     },
     setColorTheme,
     setKeybinding: (

@@ -38,4 +38,4 @@ Run `bun run agent:browser scenario session-rail-attention` and `look` through t
 
 ## Delivery
 
-Apply `typescript-best-practices`, the design rules, and `verify-fregat`. Run the narrow checks and required gates. Commit owned files, push, and `bun run deploy`. Record the deployed commit and read-back evidence in this plan and root roadmap. This plan makes no performance claim and requires no live-agent launch.
+Apply `typescript-best-practices`, the design rules, and `verify-fregat`. Run the narrow checks and required gates. Commit owned files, push, and `bun run install-release`. Record the deployed commit and read-back evidence in this plan and root roadmap. This plan makes no performance claim and requires no live-agent launch.

@@ -1,5 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
+import { NERD_SYMBOLS_FONT } from '@workspace/contracts'
+import { fontQueryOptions } from '@/lib/fonts/state/queries'
 
 import { expect, test } from '../../../../test/fixtures'
 import { settingsSnapshot } from '../../../../test/factories/settings'
@@ -96,6 +98,31 @@ test('appearance stays busy until confirmed settings and fonts settle', async ({
   rendered.unmount()
   resetSettingsSnapshotAdmission(rendered.queryClient)
   rendered.queryClient.clear()
+})
+
+test('optional symbols can stay pending while the appearance becomes ready', async ({ client }) => {
+  expect(client).toBeDefined()
+  const queryClient = createTestQueryClient()
+  const held = Promise.withResolvers<string | null>()
+  const options = fontQueryOptions(NERD_SYMBOLS_FONT)
+  // Hold the external download, preserving the real query's key and lifetime.
+  const pending = queryClient.query({ ...options, queryFn: () => held.promise })
+  const rendered = renderWithProviders(<div aria-label='Appearance readiness probe' />, {
+    queryClient,
+  })
+  const appearance = rendered
+    .getByLabelText('Appearance readiness probe')
+    .closest('[data-color-mode]')
+  try {
+    await waitFor(() => expect(appearance?.getAttribute('aria-busy')).toBe('false'))
+    expect(queryClient.getQueryState(options.queryKey)?.status).toBe('pending')
+  } finally {
+    held.resolve(null)
+    await pending
+    rendered.unmount()
+    resetSettingsSnapshotAdmission(queryClient)
+    queryClient.clear()
+  }
 })
 
 function wrapper(queryClient: ReturnType<typeof createTestQueryClient>) {
