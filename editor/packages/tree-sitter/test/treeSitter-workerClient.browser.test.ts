@@ -6,21 +6,29 @@ import {
   applyBatchToPieceTable,
   createAnchorSelection,
   createPieceTableSnapshot,
+  createDocumentTextSnapshot,
   createSelectionSet,
   insertIntoPieceTable,
   resolveSelection,
   type TextEdit,
 } from '@singapore-editor/core/document'
 import { reclaimPieceTableText } from '@singapore-editor/core/testing'
+import { toEditorTokenStore } from '@singapore-editor/core/syntax'
 import {
   expandTreeSitterSelection,
+  createTreeSitterSyntaxProvider,
   resolveTreeSitterLanguageContribution,
   selectTreeSitterToken,
   shrinkTreeSitterSelection,
   TreeSitterWorkerClient,
   type TreeSitterLanguageId,
+  type TreeSitterWorkerRetentionSnapshot,
 } from '../src'
 import { createTreeSitterEditPayload } from '../src/session.ts'
+import type {
+  TreeSitterWorkerRequestPayload,
+  TreeSitterWorkerResponse,
+} from '../src/treeSitter/types'
 
 describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () => {
   let workerClient: TreeSitterWorkerClient
@@ -1176,3 +1184,425 @@ async function compareIncrementalInjectionsWithFullParse(
   expect(incremental.injections).toEqual(full.injections)
   return { initial, incremental, full }
 }
+
+describe('real tree-sitter retention', () => {
+  const clients = new Set<TreeSitterWorkerClient>()
+  const client = () => {
+    const owner = new TreeSitterWorkerClient()
+    clients.add(owner)
+    return owner
+  }
+
+  afterEach(async () => {
+    await Promise.all(Array.from(clients, (owner) => owner.dispose()))
+    clients.clear()
+  })
+
+  it('retention inspection leaves an unstarted or disposed worker absent', async () => {
+    const owner = client()
+    expect(await owner.inspectRetention()).toBeNull()
+    await owner.awaitIdleFence()
+    expect(owner.inspect()).toMatchObject({ lifecycle: 'idle', workerGeneration: 0 })
+    await owner.dispose()
+    expect(await owner.inspectRetention()).toBeNull()
+    expect(owner.inspect()).toMatchObject({ lifecycle: 'disposed', workerGeneration: 0 })
+  })
+})
+
+describe('fenced tree-sitter retention', () => {
+  let owner: TreeSitterWorkerClient
+
+  beforeEach(() => {
+    owner = new TreeSitterWorkerClient()
+  })
+  afterEach(async () => {
+    await owner.dispose()
+  })
+
+  const retention = async (): Promise<TreeSitterWorkerRetentionSnapshot> => {
+    const result = await owner.inspectRetention()
+    if (!result) throw new TypeError('Expected a live worker retention snapshot')
+    return result
+  }
+
+  const register = async () => {
+    const descriptors = await Promise.all(
+      TREE_SITTER_LANGUAGE_CONTRIBUTIONS.map(resolveTreeSitterLanguageContribution),
+    )
+    await owner.registerLanguages(descriptors)
+    return descriptors
+  }
+
+  it('retention counts actual snapshots and chunks outside the current source cache', async ({
+    annotate,
+  }) => {
+    await register()
+    const firstText = 'const first = 1;\n'
+    const nextText = 'const next = 2;\n'
+    const request = {
+      documentId: 'shared.ts',
+      runtimeSessionId: 'retained',
+      languageId: 'typescript',
+    }
+    const first = owner.parse({
+      ...request,
+      snapshotVersion: 1,
+      snapshot: createPieceTableSnapshot(firstText),
+    })
+    const firstRetention = await retention()
+    expect((await first)?.tokensPacked?.starts.length).toBeGreaterThan(0)
+    expect(firstRetention).toMatchObject({ documentCount: 1, snapshotCount: 1, treeCount: 1 })
+    expect(firstRetention.source).toEqual({
+      documentCount: 1,
+      cacheEntries: 1,
+      cacheChunkCount: 1,
+      snapshotChunkCount: 1,
+      chunkCount: 1,
+      chunkUnits: firstText.length,
+    })
+
+    await owner.parse({
+      ...request,
+      snapshotVersion: 2,
+      snapshot: createPieceTableSnapshot(nextText),
+    })
+    const both = await retention()
+    expect(both).toMatchObject({
+      documentCount: 1,
+      snapshotCount: 2,
+      treeCount: 2,
+      markdownDocumentCount: 0,
+    })
+    expect(both.source).toEqual({
+      documentCount: 1,
+      cacheEntries: 1,
+      cacheChunkCount: 1,
+      snapshotChunkCount: 2,
+      chunkCount: 2,
+      chunkUnits: firstText.length + nextText.length,
+    })
+    expect(both.documents).toEqual([
+      {
+        runtimeSessionId: 'retained',
+        snapshots: [
+          {
+            snapshotVersion: 2,
+            languageId: 'typescript',
+            sourceUnits: nextText.length,
+            layerCount: 1,
+            treeCount: 1,
+            markdownDocumentCount: 0,
+          },
+          {
+            snapshotVersion: 1,
+            languageId: 'typescript',
+            sourceUnits: firstText.length,
+            layerCount: 1,
+            treeCount: 1,
+            markdownDocumentCount: 0,
+          },
+        ],
+      },
+    ])
+    expect(both.unmeasuredBytes).toContain('wasm-allocator-live')
+    expect(JSON.stringify(both)).not.toContain(firstText)
+    expect(JSON.stringify(both)).not.toContain('shared.ts')
+
+    owner.disposeDocument('retained')
+    const released = await retention()
+    expect(released).toMatchObject({
+      documentCount: 0,
+      snapshotCount: 0,
+      treeCount: 0,
+      markdownDocumentCount: 0,
+    })
+    expect(released.source).toEqual({
+      documentCount: 0,
+      cacheEntries: 0,
+      cacheChunkCount: 0,
+      snapshotChunkCount: 0,
+      chunkCount: 0,
+      chunkUnits: 0,
+    })
+    expect(released.shared).toEqual(both.shared)
+    await annotate('snapshot and source resource counts', {
+      contentType: 'application/json',
+      bodyEncoding: 'utf-8',
+      body: JSON.stringify({ firstRetention, both, released }),
+    })
+  })
+
+  it('retention fences empty, pending, disposed and recreated documents over 40 shared-client cycles', async ({
+    annotate,
+  }) => {
+    const descriptors = await register()
+    const descriptor = descriptors.find((language) => language.id === 'typescript')
+    if (!descriptor) throw new TypeError('Expected the TypeScript fixture grammar')
+    await owner.warmLanguages([
+      { ...descriptor, id: 'broken', wasmUrl: 'data:application/wasm;base64,AA==' },
+    ])
+    const warm = await retention()
+    expect(warm).toMatchObject({ documentCount: 0, snapshotCount: 0, treeCount: 0 })
+    expect(warm.shared).toMatchObject({
+      parserRuntimeInitialized: true,
+      runtimeEntries: 1,
+      runtimeCount: 0,
+      parserCount: 0,
+      languageCount: 0,
+      queryCount: 0,
+    })
+    const snapshot = createPieceTableSnapshot('const survivor = true;\n')
+    const request = { documentId: 'shared.ts', languageId: 'typescript', snapshotVersion: 1 }
+    const survivor = await owner.parse({ ...request, runtimeSessionId: 'survivor', snapshot })
+    expect(survivor?.captures.length).toBeGreaterThan(0)
+    const baseline = await retention()
+    expect(baseline).toMatchObject({ documentCount: 1, snapshotCount: 1, treeCount: 1 })
+    expect(baseline.shared).toMatchObject({
+      runtimeEntries: 2,
+      runtimeCount: 1,
+      parserCount: 1,
+      languageCount: 1,
+    })
+    expect(baseline.shared.queryCount).toBeGreaterThan(0)
+    const acquisitions = []
+    const samples = []
+    for (let cycle = 0; cycle < 40; cycle++) {
+      const runtimeSessionId = `cycle-${cycle}`
+      const pending = owner.parse({
+        ...request,
+        runtimeSessionId,
+        snapshot: cycle === 0 ? createPieceTableSnapshot('') : snapshot,
+      })
+      const retained = await retention()
+      acquisitions.push(retained)
+      expect(await pending).toBeDefined()
+      expect(retained).toMatchObject({ documentCount: 2, snapshotCount: 2, treeCount: 2 })
+      expect(retained.source.chunkCount).toBe(cycle === 0 ? 1 : 2)
+      owner.disposeDocument(runtimeSessionId)
+      samples.push(await retention())
+    }
+    expect(samples).toEqual(Array.from({ length: 40 }, () => baseline))
+    const pending = owner.parse({ ...request, runtimeSessionId: 'pending-disposal', snapshot })
+    owner.disposeDocument('pending-disposal')
+    await pending
+    expect(await retention()).toEqual(baseline)
+    const recreated = await owner.parse({ ...request, runtimeSessionId: 'recreated', snapshot })
+    expect(recreated?.tokensPacked).toEqual(survivor?.tokensPacked)
+    owner.disposeDocument('recreated')
+    expect(await retention()).toEqual(baseline)
+    const surviving = await owner.queryRange({
+      ...request,
+      runtimeSessionId: 'survivor',
+      includeCaptures: true,
+      range: { startIndex: 0, endIndex: snapshot.length },
+    })
+    expect(surviving?.tokensPacked).toEqual(survivor?.tokensPacked)
+    owner.disposeDocument('survivor')
+    const released = await retention()
+    expect(released).toMatchObject({
+      documentCount: 0,
+      snapshotCount: 0,
+      treeCount: 0,
+      markdownDocumentEntries: 0,
+      markdownDocumentCount: 0,
+      injectedMarkdownDocumentCount: 0,
+    })
+    expect(released.source).toEqual({
+      documentCount: 0,
+      cacheEntries: 0,
+      cacheChunkCount: 0,
+      snapshotChunkCount: 0,
+      chunkCount: 0,
+      chunkUnits: 0,
+    })
+    expect(released.shared).toEqual(baseline.shared)
+    await owner.dispose()
+    expect(await owner.inspectRetention()).toBeNull()
+    expect(owner.inspect().workerGeneration).toBe(1)
+    await annotate('all 40 fenced resource samples', {
+      contentType: 'application/json',
+      bodyEncoding: 'utf-8',
+      body: JSON.stringify({ warm, baseline, acquisitions, samples, released }),
+    })
+  })
+
+  it('retention counts root and injected Markdown wrappers separately from layer trees', async ({
+    annotate,
+  }) => {
+    await register()
+    const text = '~~~mdx\n# Nested **heading**\n~~~\n'
+    const parsed = await owner.parse({
+      documentId: 'nested.md',
+      runtimeSessionId: 'markdown',
+      languageId: 'markdown',
+      snapshotVersion: 1,
+      snapshot: createPieceTableSnapshot(text),
+    })
+    expect(parsed?.injections.some((injection) => injection.languageId === 'mdx')).toBe(true)
+    expect(parsed?.records?.data.length).toBeGreaterThan(0)
+    const retained = await retention()
+    expect(retained).toMatchObject({
+      documentCount: 1,
+      snapshotCount: 1,
+      treeCount: 1,
+      markdownDocumentEntries: 1,
+      markdownDocumentCount: 2,
+      injectedMarkdownDocumentCount: 1,
+    })
+    expect(retained.documents[0]?.snapshots).toEqual([
+      {
+        snapshotVersion: 1,
+        languageId: 'markdown',
+        sourceUnits: text.length,
+        layerCount: 1,
+        treeCount: 1,
+        markdownDocumentCount: 2,
+      },
+    ])
+    expect(retained.shared).toMatchObject({ runtimeCount: 1, parserCount: 1, languageCount: 1 })
+    expect(retained.unmeasuredResources).toContain('markdown-tree-handles')
+    owner.disposeDocument('markdown')
+    const empty = await retention()
+    expect(empty).toMatchObject({
+      documentCount: 0,
+      snapshotCount: 0,
+      treeCount: 0,
+      markdownDocumentEntries: 0,
+      markdownDocumentCount: 0,
+      injectedMarkdownDocumentCount: 0,
+    })
+    expect(empty.shared).toEqual(retained.shared)
+    await annotate('Markdown resource counts', {
+      contentType: 'application/json',
+      bodyEncoding: 'utf-8',
+      body: JSON.stringify({ retained, empty }),
+    })
+  })
+})
+
+it('retention keeps ordinary real-worker fences unchanged and leaves parser initialization absent', async () => {
+  const worker = new Worker(new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url), {
+    type: 'module',
+  })
+  let id = 0
+  const request = (payload: TreeSitterWorkerRequestPayload): Promise<TreeSitterWorkerResponse> =>
+    new Promise((resolve, reject) => {
+      worker.onmessage = (event: MessageEvent<TreeSitterWorkerResponse>) => resolve(event.data)
+      worker.onerror = reject
+      worker.postMessage({ id: ++id, payload })
+    })
+  try {
+    const ordinary = await request({ type: 'idleFence' })
+    expect(ordinary).toEqual({ id: 1, ok: true, result: undefined })
+    const inspected = await request({ type: 'idleFence', includeRetention: true })
+    if (!inspected.ok || !inspected.result || !('retention' in inspected.result))
+      throw new TypeError('Expected a real-worker retention reply')
+    expect(inspected.result.retention).toMatchObject({
+      documentCount: 0,
+      snapshotCount: 0,
+      treeCount: 0,
+      shared: {
+        parserRuntimeInitialized: false,
+        runtimeEntries: 0,
+        runtimeCount: 0,
+        parserCount: 0,
+        languageCount: 0,
+        queryCount: 0,
+      },
+    })
+    expect(await request({ type: 'idleFence' })).toEqual({ id: 3, ok: true, result: undefined })
+  } finally {
+    worker.terminate()
+  }
+})
+
+it('retention observes shared provider acquisition and late registration after a session is disposed', async () => {
+  const owner = new TreeSitterWorkerClient()
+  const provider = createTreeSitterSyntaxProvider({ backend: owner })
+  const contribution = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find(
+    (language) => language.id === 'typescript',
+  )
+  if (!contribution) throw new TypeError('Expected the TypeScript fixture language')
+  provider.registerLanguage(contribution)
+  const descriptor = await resolveTreeSitterLanguageContribution(contribution)
+  const releases: ((value: typeof descriptor) => void)[] = []
+  const registration = new Promise<typeof descriptor>((resolve) => releases.push(resolve))
+  provider.registerLanguage({ id: 'late-typescript', load: () => registration })
+  const snapshot = createPieceTableSnapshot('const value = true;\n')
+  const textSnapshot = createDocumentTextSnapshot(snapshot)
+  const acquire = (runtimeSessionId: string, languageId = 'typescript') => {
+    const session = provider.createSession({
+      documentId: 'shared.ts',
+      runtimeSessionId,
+      languageId,
+      snapshot,
+      textSnapshot,
+    })
+    if (!session) throw new TypeError('Expected a fixture syntax session')
+    return session
+  }
+  const survivor = acquire('provider-survivor')
+  const pending = acquire('provider-pending', 'late-typescript')
+  const late = pending.refresh(textSnapshot)
+  pending.dispose()
+  try {
+    const initial = await survivor.refresh(textSnapshot)
+    expect(initial.tokens?.length).toBeGreaterThan(0)
+    const baseline = await owner.inspectRetention()
+    expect(baseline?.documents.map((document) => document.runtimeSessionId)).toEqual([
+      'provider-survivor',
+    ])
+    for (const release of releases) release(descriptor)
+    const abandoned = await late
+    expect(abandoned.tokens?.length).toBe(0)
+    const afterLate = await owner.inspectRetention()
+    expect(afterLate?.documents).toEqual(baseline?.documents)
+    expect(afterLate?.source).toEqual(baseline?.source)
+    const first = acquire('provider-first')
+    await first.refresh(textSnapshot)
+    first.dispose()
+    expect((await owner.inspectRetention())?.documents).toEqual(baseline?.documents)
+    const recreated = acquire('provider-recreated')
+    const next = await recreated.refresh(textSnapshot)
+    expect(toEditorTokenStore(next.tokens).toTokens()).toEqual(
+      toEditorTokenStore(initial.tokens).toTokens(),
+    )
+    expect(next.captures).toEqual(initial.captures)
+    expect(next.folds).toEqual(initial.folds)
+    expect(next.errors).toEqual(initial.errors)
+    recreated.dispose()
+    expect((await owner.inspectRetention())?.documents).toEqual(baseline?.documents)
+    survivor.dispose()
+    expect(await owner.inspectRetention()).toMatchObject({
+      documentCount: 0,
+      snapshotCount: 0,
+      treeCount: 0,
+    })
+  } finally {
+    for (const release of releases) release(descriptor)
+    pending.dispose()
+    survivor.dispose()
+    await owner.dispose()
+  }
+})
+
+it('retention settles pending startup after owner disposal without recreating a worker', async () => {
+  const owner = new TreeSitterWorkerClient()
+  const contribution = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find(
+    (language) => language.id === 'typescript',
+  )
+  if (!contribution) throw new TypeError('Expected the TypeScript fixture language')
+  const descriptor = await resolveTreeSitterLanguageContribution(contribution)
+  const startup = owner.registerLanguages([descriptor])
+  const settledStartup = startup.catch((error: unknown) => error)
+  const inspection = owner.inspectRetention()
+  await owner.dispose()
+  expect(await settledStartup).toBeInstanceOf(Error)
+  expect(await inspection).toBeNull()
+  expect(await owner.inspectRetention()).toBeNull()
+  expect(owner.inspect()).toMatchObject({
+    lifecycle: 'disposed',
+    workerGeneration: 1,
+    pendingRequests: 0,
+  })
+})

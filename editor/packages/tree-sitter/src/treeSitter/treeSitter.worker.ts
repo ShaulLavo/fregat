@@ -57,6 +57,7 @@ import type {
   TreeSitterWorkerRequest,
   TreeSitterWorkerResult,
   TreeSitterWorkerResponse,
+  TreeSitterWorkerRetentionSnapshot,
 } from './types'
 
 type Runtime = {
@@ -3022,7 +3023,11 @@ const executeRequest = (request: TreeSitterWorkerRequest): Promise<TreeSitterWor
   if (payload.type === 'runtimeBarrier') {
     return awaitRuntimeTasks(payload.runtimeSessionId)
   }
-  if (payload.type === 'idleFence') return awaitAllWorkerTasks()
+  if (payload.type === 'idleFence') {
+    return awaitAllWorkerTasks().then(() =>
+      payload.includeRetention ? inspectRetention() : undefined,
+    )
+  }
   if (payload.type === 'disposeDocument') {
     markRuntimeSessionDisposed(payload.runtimeSessionId)
     return awaitRuntimeTasks(payload.runtimeSessionId).then(() => {
@@ -3086,6 +3091,143 @@ const awaitRuntimeTasks = (runtimeSessionId: string): Promise<TreeSitterWorkerRe
 
 const awaitAllWorkerTasks = (): Promise<TreeSitterWorkerResult> =>
   Promise.allSettled(Array.from(activeWorkerTasks)).then(() => undefined)
+
+type SourceChunk = TreeSitterPieceTableInput['chunks'][number]['source']
+
+type RetentionResources = {
+  readonly snapshots: Set<ParsedDocument>
+  readonly trees: Set<Tree>
+  readonly markdown: Set<MarkdownDocument>
+  readonly injectedMarkdown: Set<MarkdownDocument>
+  readonly sourceChunks: Set<SourceChunk>
+}
+
+const inspectSnapshotRetention = (
+  snapshot: ParsedDocument,
+  resources: RetentionResources,
+): TreeSitterWorkerRetentionSnapshot['documents'][number]['snapshots'][number] => {
+  resources.snapshots.add(snapshot)
+  const trees = new Set<Tree>()
+  const markdown = new Set<MarkdownDocument>()
+  if (snapshot.markdown) markdown.add(snapshot.markdown)
+  for (const chunk of snapshot.source.chunks) resources.sourceChunks.add(chunk.source)
+  for (const layer of snapshot.layers) {
+    trees.add(layer.tree)
+    resources.trees.add(layer.tree)
+    const injected = injectedMarkdown.get(layer.tree)
+    if (!injected) continue
+    markdown.add(injected.document)
+    resources.injectedMarkdown.add(injected.document)
+  }
+  for (const document of markdown) resources.markdown.add(document)
+  return {
+    snapshotVersion: snapshot.snapshotVersion,
+    languageId: snapshot.languageId,
+    sourceUnits: snapshot.source.length,
+    layerCount: snapshot.layers.length,
+    treeCount: trees.size,
+    markdownDocumentCount: markdown.size,
+  }
+}
+
+const inspectSourceRetention = (
+  snapshotChunks: ReadonlySet<SourceChunk>,
+): TreeSitterWorkerRetentionSnapshot['source'] => {
+  const cachedChunks = new Set<SourceChunk>()
+  let cacheEntries = 0
+  for (const cache of sourceCache.values()) {
+    cacheEntries += cache.size
+    for (const chunk of cache.values()) cachedChunks.add(chunk)
+  }
+  const chunks = new Set(snapshotChunks)
+  for (const chunk of cachedChunks) chunks.add(chunk)
+  let chunkUnits = 0
+  for (const chunk of chunks) chunkUnits += chunk.length
+  return {
+    documentCount: sourceCache.size,
+    cacheEntries,
+    cacheChunkCount: cachedChunks.size,
+    snapshotChunkCount: snapshotChunks.size,
+    chunkCount: chunks.size,
+    chunkUnits,
+  }
+}
+
+const inspectSharedRetention = async (): Promise<TreeSitterWorkerRetentionSnapshot['shared']> => {
+  const results = await Promise.allSettled(runtimePromises.values())
+  const runtimes = new Set<Runtime>()
+  for (const result of results) {
+    if (result.status === 'fulfilled') runtimes.add(result.value)
+  }
+  const parsers = new Set<Parser>()
+  const languages = new Set<Language>()
+  const queries = new Set<Query>()
+  for (const runtime of runtimes) {
+    parsers.add(runtime.parser)
+    languages.add(runtime.language)
+    if (runtime.highlightQuery) queries.add(runtime.highlightQuery)
+    if (runtime.foldQuery) queries.add(runtime.foldQuery)
+    if (runtime.injectionQuery) queries.add(runtime.injectionQuery)
+  }
+  const initialization = await Promise.allSettled(parserInitPromise ? [parserInitPromise] : [])
+  return {
+    registeredLanguages: languageDescriptors.size,
+    parserRuntimeInitialized: initialization[0]?.status === 'fulfilled',
+    runtimeEntries: runtimePromises.size,
+    runtimeCount: runtimes.size,
+    parserCount: parsers.size,
+    languageCount: languages.size,
+    queryCount: queries.size,
+    runtimes: Array.from(runtimes, (runtime) => ({
+      languageId: runtime.descriptor.id,
+      highlightQueryCount: Number(runtime.highlightQuery !== null),
+      foldQueryCount: Number(runtime.foldQuery !== null),
+      injectionQueryCount: Number(runtime.injectionQuery !== null),
+    })),
+  }
+}
+
+const inspectRetention = async (): Promise<{
+  readonly retention: TreeSitterWorkerRetentionSnapshot
+}> => {
+  const shared = await inspectSharedRetention()
+  const resources: RetentionResources = {
+    snapshots: new Set(),
+    trees: new Set(),
+    markdown: new Set(),
+    injectedMarkdown: new Set(),
+    sourceChunks: new Set(),
+  }
+  for (const state of markdownDocuments.values()) resources.markdown.add(state.document)
+  const documents = Array.from(documentCaches, ([runtimeSessionId, cache]) => ({
+    runtimeSessionId,
+    snapshots: cache.snapshots.map((snapshot) => inspectSnapshotRetention(snapshot, resources)),
+  }))
+  return {
+    retention: {
+      documentCount: documentCaches.size,
+      snapshotCount: resources.snapshots.size,
+      treeCount: resources.trees.size,
+      markdownDocumentEntries: markdownDocuments.size,
+      markdownDocumentCount: resources.markdown.size,
+      injectedMarkdownDocumentCount: resources.injectedMarkdown.size,
+      documents,
+      source: inspectSourceRetention(resources.sourceChunks),
+      shared,
+      unmeasuredResources: ['markdown-parser-language-query-handles', 'markdown-tree-handles'],
+      unmeasuredBytes: [
+        'javascript-objects',
+        'source-strings',
+        'grammars-parsers-queries',
+        'trees',
+        'markdown-documents',
+        'worker-heap',
+        'wasm-committed',
+        'wasm-allocator-live',
+      ],
+    },
+  }
+}
 
 const workerScope = globalThis as typeof globalThis & {
   readonly importScripts?: unknown

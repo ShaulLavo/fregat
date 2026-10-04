@@ -121,13 +121,10 @@ const inspectRetention = async (): Promise<ShikiWorkerTransportResult> => {
     if (result.status === 'fulfilled') highlighters.add(result.value)
   }
   const retainedDocuments = Array.from(documents.values(), (state) => {
-    const lines = state.tokenizer.getTokens()
     return {
       documentId: state.documentId,
       runtimeSessionId: state.runtimeSessionId,
-      sourceUnits: state.tokenizer.getCode().length,
-      lineCount: lines.length,
-      tokenCount: lines.reduce((sum, tokens) => sum + tokens.length, 0),
+      ...state.tokenizer.inspectRetention(),
     }
   })
   const retention: ShikiWorkerRetentionSnapshot = {
