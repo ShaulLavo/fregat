@@ -145,6 +145,10 @@ type InlineWidgetHost = {
   readonly observer: ResizeObserver | null
 }
 
+type InlineWidgetCleanup = Pick<InlineWidgetHost, 'element' | 'observer'> & {
+  readonly release: (() => void) | null
+}
+
 type InlineWidgetRun = {
   /** The mount's key: the replacement's `key`, else its id. */
   readonly id: string
@@ -181,11 +185,15 @@ export function renderRows(
   snapshot: FixedRowVirtualizerSnapshot,
   onRemoveSlot: (rowSlotId: number) => void,
 ): void {
+  if (view.disposed) return
   const updatePass = createRowUpdatePass(view, snapshot.virtualItems)
+  if (view.disposed) return
   applyTotalHeight(view, snapshot)
   updateContentWidth(view, snapshot.virtualItems)
   retireInlineWidgets(view)
+  if (view.disposed) return
   reconcileRows(view, snapshot.virtualItems, snapshot, updatePass, onRemoveSlot)
+  if (view.disposed) return
   renderHiddenCharacters(view)
 }
 
@@ -196,11 +204,17 @@ function reconcileRows(
   updatePass: RowUpdatePass,
   onRemoveSlot: (rowSlotId: number) => void,
 ): void {
+  const contributions = view.gutterContributions
   const reusableRows = releaseRowsOutside(view, items)
   for (const item of items) {
     mountOrUpdateRow(view, item, reusableRows, snapshot, updatePass)
+    if (view.disposed) break
   }
 
+  if (view.disposed) {
+    for (const row of reusableRows) disposeUnownedRow(row, contributions)
+    return
+  }
   removeReusableRows(view, reusableRows, onRemoveSlot)
 }
 
@@ -218,13 +232,29 @@ function mountOrUpdateRow(
   }
 
   const row = reusableRows.pop() ?? view.rowPool.pop() ?? createRow(view)
+  if (!row) return
+  const contributions = view.gutterContributions
   const gutterParent = view.gutterContributions.length > 0 ? view.gutterElement : null
   restoreRowElements(row, view.spacer, gutterParent)
   updateRow(view, row, item, snapshot, updatePass)
+  if (view.disposed) {
+    disposeUnownedRow(row, contributions)
+    return
+  }
   view.rowElements.set(item.index, row)
 }
 
-function createRow(view: VirtualizedTextViewInternal): MountedVirtualizedTextRow {
+function disposeUnownedRow(
+  row: MountedVirtualizedTextRow,
+  contributions: readonly EditorGutterContribution[],
+): void {
+  disposeGutterCellMap(row.gutterCells, contributions)
+  invalidateRowPresentations(row.element)
+  row.element.remove()
+  row.gutterElement.remove()
+}
+
+function createRow(view: VirtualizedTextViewInternal): MountedVirtualizedTextRow | null {
   const document = view.scrollElement.ownerDocument
   const element = document.createElement('div')
   const gutterElement = document.createElement('div')
@@ -234,6 +264,7 @@ function createRow(view: VirtualizedTextViewInternal): MountedVirtualizedTextRow
   const hiddenCharactersLayerElement = document.createElement('div')
   const textNode = document.createTextNode('')
   const gutterCells = createGutterCells(view, document)
+  if (view.disposed) return null
 
   element.className = 'editor-virtualized-row'
   gutterElement.className = 'editor-virtualized-gutter-row'
@@ -300,10 +331,14 @@ function createGutterCells(
   document: Document,
 ): Map<string, HTMLElement> {
   const cells = new Map<string, HTMLElement>()
-  for (const contribution of view.gutterContributions) {
-    cells.set(contribution.id, createGutterCell(view, contribution, document))
+  const contributions = view.gutterContributions
+  for (const contribution of contributions) {
+    const cell = createGutterCell(view, contribution, document)
+    if (!cell) break
+    cells.set(contribution.id, cell)
   }
 
+  if (view.disposed) disposeGutterCellMap(cells, contributions)
   return cells
 }
 
@@ -311,8 +346,13 @@ function createGutterCell(
   view: VirtualizedTextViewInternal,
   contribution: EditorGutterContribution,
   document: Document,
-): HTMLElement {
+): HTMLElement | null {
+  const release = contribution.disposeCell
   const cell = contribution.createCell(document)
+  if (view.disposed) {
+    disposeGutterCell({ cell, release: release ? release.bind(contribution, cell) : null })
+    return null
+  }
   cell.classList.add(GUTTER_CELL_CLASS)
   if (contribution.className) cell.classList.add(contribution.className)
   cell.dataset.editorGutterContribution = contribution.id
@@ -321,9 +361,17 @@ function createGutterCell(
   return cell
 }
 
-export function disposeGutterCells(view: VirtualizedTextViewInternal): void {
-  const rows = Array.from(view.rowElements.values()).concat(view.rowPool)
-  for (const row of rows) disposeRowGutterCells(view, row)
+export function takeGutterCells(
+  view: VirtualizedTextViewInternal,
+  rows: Iterable<MountedVirtualizedTextRow>,
+): () => void {
+  const owners = contributionMap(view.gutterContributions)
+  const pending = Array.from(rows, (row) => {
+    const cells = takeGutterCellMap(row.gutterCells, owners)
+    setGutterCellList(row, [])
+    return cells
+  }).flat()
+  return () => disposeResourceSnapshot(pending, disposeGutterCell)
 }
 
 export function updateGutterContributions(
@@ -341,16 +389,49 @@ export function updateGutterContributions(
   return true
 }
 
-function disposeRowGutterCells(
-  view: VirtualizedTextViewInternal,
-  row: MountedVirtualizedTextRow,
+type GutterCellCleanup = {
+  readonly cell: HTMLElement
+  readonly release: (() => void) | null
+}
+
+function disposeGutterCellMap(
+  cells: Map<string, HTMLElement>,
+  contributions: readonly EditorGutterContribution[],
 ): void {
-  for (const contribution of view.gutterContributions) {
-    const cell = row.gutterCells.get(contribution.id)
-    if (cell) contribution.disposeCell?.(cell)
+  const pending = takeGutterCellMap(cells, contributionMap(contributions))
+  disposeResourceSnapshot(pending, disposeGutterCell)
+}
+
+function takeGutterCellMap(
+  cells: Map<string, HTMLElement>,
+  owners: ReadonlyMap<string, EditorGutterContribution>,
+): readonly GutterCellCleanup[] {
+  const pending = Array.from(cells, ([id, cell]) => {
+    const owner = owners.get(id)
+    return { cell, release: owner?.disposeCell?.bind(owner, cell) ?? null }
+  })
+  cells.clear()
+  return pending
+}
+
+function disposeGutterCell({ cell, release }: GutterCellCleanup): void {
+  try {
+    release?.()
+  } finally {
+    cell.remove()
   }
-  row.gutterCells.clear()
-  setGutterCellList(row, [])
+}
+
+function disposeResourceSnapshot<T>(resources: readonly T[], release: (resource: T) => void): void {
+  let failure: { readonly error: unknown } | null = null
+  for (const resource of resources) {
+    try {
+      release(resource)
+    } catch (error) {
+      failure ??= { error }
+    }
+  }
+  if (failure) throw failure.error
 }
 
 function sameGutterContributions(
@@ -431,6 +512,7 @@ function addCurrentGutterCells(
   for (const contribution of view.gutterContributions) {
     const cell =
       row.gutterCells.get(contribution.id) ?? createGutterCell(view, contribution, document)
+    if (!cell || view.disposed) return
     row.gutterCells.set(contribution.id, cell)
     row.gutterElement.appendChild(cell)
     cells.push(cell)
@@ -602,6 +684,7 @@ function updateRow(
     const state = mountedRowUpdateState(view, row, updatePass)
     updateCursorLineContentClass(view, row, state.cursorVirtualLine)
     updateGutterRowElement(view, row, item, state)
+    if (view.disposed) return
     updateMountedRowPaintFacts(row, state)
     return
   }
@@ -612,6 +695,7 @@ function updateRow(
   if (replacing) invalidateRowPresentations(row.element)
   try {
     updateRowElement(view, row, item, state, snapshot)
+    if (view.disposed) return
     updateMountedRowPaintFacts(row, state)
     updateMutableRow(row, {
       bufferRow: state.bufferRow,
@@ -633,7 +717,7 @@ function updateRow(
       chunkKey: rowChunkKey(view, state, snapshot, state.inlineMapping),
     })
   } finally {
-    if (replacing) completeRowPresentation(row.element)
+    if (replacing && !view.disposed) completeRowPresentation(row.element)
   }
 }
 
@@ -661,7 +745,9 @@ function updateRowElement(
   updateCursorLineContentClass(view, row, state.cursorVirtualLine)
   updateRowInlineKindClasses(row, state.kind === 'text' ? state.inlineMapping : null)
   updateGutterRowElement(view, row, item, state)
+  if (view.disposed) return
   updateRowTextChunks(view, row, state, state.startOffset, state.inlineMapping, snapshot)
+  if (view.disposed) return
   updateRowFoldPresentation(row, state.foldMarker)
 }
 
@@ -725,6 +811,7 @@ function updateRowAfterSameLineEdit(
       patch,
       snapshot,
     )
+    if (view.disposed) return false
     updateMountedRowPaintFacts(row, state)
     updateMutableRow(row, {
       bufferRow: state.bufferRow,
@@ -747,7 +834,7 @@ function updateRowAfterSameLineEdit(
     })
     return editedRowPatchedInPlace
   } finally {
-    if (replacing) completeRowPresentation(row.element)
+    if (replacing && !view.disposed) completeRowPresentation(row.element)
   }
 }
 
@@ -762,6 +849,7 @@ function updateRowElementForSameLineEdit(
   updateRowFrame(view, row, item)
   applyRowDecoration(view, row, item.index)
   updateGutterRowElement(view, row, item, state)
+  if (view.disposed) return false
   const editedRowPatchedInPlace = updateRowTextForSameLineEdit(
     view,
     row,
@@ -772,6 +860,7 @@ function updateRowElementForSameLineEdit(
     state.inlineMapping,
     snapshot,
   )
+  if (view.disposed) return false
   updateRowFoldPresentation(row, state.foldMarker)
   return editedRowPatchedInPlace
 }
@@ -1131,6 +1220,8 @@ function setInlineRunRowText(
   const placements = runs.widgets
     .filter((run) => run.localStart < window.end && run.localEnd > window.start)
     .map((run) => inlineWidgetPlacement(view, run))
+    .filter((placement) => placement !== null)
+  if (view.disposed) return
   const classes = inlineClassesInWindow(runs.classes, window)
   const leftWidth =
     textPixelsBeforeColumn(view, content, window.start) +
@@ -1478,9 +1569,11 @@ function inlineClassRunElements(
 function inlineWidgetPlacement(
   view: VirtualizedTextViewInternal,
   run: InlineWidgetRun,
-): InlineWidgetPlacement {
+): InlineWidgetPlacement | null {
+  if (view.disposed) return null
   const widgets = inlineWidgets(view)
   const host = widgets.hosts.get(run.id) ?? mountInlineWidget(view, widgets, run)
+  if (!host) return null
   applyInlineWidgetClass(host.element, run.className)
   return { localStart: run.localStart, localEnd: run.localEnd, element: host.element }
 }
@@ -1504,7 +1597,7 @@ function mountInlineWidget(
   view: VirtualizedTextViewInternal,
   widgets: InlineWidgets,
   run: InlineWidgetRun,
-): InlineWidgetHost {
+): InlineWidgetHost | null {
   const element = view.scrollElement.ownerDocument.createElement('span')
   applyInlineWidgetClass(element, run.className)
   element.dataset.editorInlineWidget = run.id
@@ -1513,6 +1606,14 @@ function mountInlineWidget(
   element.setAttribute('contenteditable', 'false')
 
   const mountDisposable = run.render(element) ?? null
+  if (view.disposed) {
+    try {
+      mountDisposable?.dispose()
+    } finally {
+      element.remove()
+    }
+    return null
+  }
   // The callback is only the signal that something moved: re-reading the element keeps a resize and
   // the measurement below on the same box, rather than the content box without its border. It is
   // also the first real width, since nothing has laid this node out until a row paints it in.
@@ -1600,28 +1701,38 @@ function retireInlineWidgets(view: VirtualizedTextViewInternal): void {
     for (const replacement of replacements) live.add(replacement.key ?? replacement.id)
   }
 
-  for (const [id, host] of widgets.hosts) {
-    if (live.has(id)) continue
+  const pending = Array.from(widgets.hosts).filter(([id]) => !live.has(id))
+  for (const [id] of pending) widgets.hosts.delete(id)
+  const cleanup = pending.map(([, host]) => captureInlineWidgetCleanup(host))
+  disposeResourceSnapshot(cleanup, disposeInlineWidget)
+}
 
-    disposeInlineWidget(host)
-    widgets.hosts.delete(id)
+export function takeInlineWidgets(view: VirtualizedTextViewInternal): () => void {
+  cancelInlineWidgetRepaint(view)
+  const widgets = inlineWidgetsByView.get(view)
+  if (!widgets) return () => undefined
+
+  const pending = Array.from(widgets.hosts.values(), captureInlineWidgetCleanup)
+  widgets.hosts.clear()
+  inlineWidgetsByView.delete(view)
+  return () => disposeResourceSnapshot(pending, disposeInlineWidget)
+}
+
+function captureInlineWidgetCleanup(host: InlineWidgetHost): InlineWidgetCleanup {
+  return {
+    element: host.element,
+    observer: host.observer,
+    release: host.mountDisposable?.dispose.bind(host.mountDisposable) ?? null,
   }
 }
 
-export function disposeInlineWidgets(view: VirtualizedTextViewInternal): void {
-  cancelInlineWidgetRepaint(view)
-  const widgets = inlineWidgetsByView.get(view)
-  if (!widgets) return
-
-  for (const host of widgets.hosts.values()) disposeInlineWidget(host)
-  widgets.hosts.clear()
-  inlineWidgetsByView.delete(view)
-}
-
-function disposeInlineWidget(host: InlineWidgetHost): void {
+function disposeInlineWidget(host: InlineWidgetCleanup): void {
   host.observer?.disconnect()
-  host.mountDisposable?.dispose()
-  host.element.remove()
+  try {
+    host.release?.()
+  } finally {
+    host.element.remove()
+  }
 }
 
 function setChunkedRowText(
@@ -2176,6 +2287,7 @@ function updateGutterContributionCells(
     if (!cell) continue
 
     contribution.updateCell(cell, state)
+    if (view.disposed) return
     updateCursorLineGutterCellClass(view, cell, contribution.id, state.cursorLine)
   }
 }
@@ -2604,7 +2716,9 @@ export function updateGutterWidthIfNeeded(view: VirtualizedTextViewInternal): vo
 
 function applyGutterWidth(view: VirtualizedTextViewInternal): void {
   const widths = gutterContributionWidthMap(view)
+  if (view.disposed) return
   const laneWidth = fixedGutterWidth(view) + totalGutterContributionWidth(widths)
+  if (view.disposed) return
   const leadingInset = laneWidth > 0 ? view.gutterLeadingInset : 0
   const nextWidth = leadingInset + laneWidth
   view.currentGutterLeadingInset = leadingInset
@@ -2651,6 +2765,7 @@ function gutterContributionWidthMap(
   const context = gutterWidthContext(view)
   for (const contribution of view.gutterContributions) {
     widths.set(contribution.id, gutterContributionWidth(contribution, context))
+    if (view.disposed) break
   }
   return widths
 }
@@ -3216,8 +3331,8 @@ export function paintProvisionalRows(
   view.rowElements.clear()
   for (const row of paint.rows) {
     const slot = view.rowPool.pop() ?? createRow(view)
-    slots.push(slot)
-    if (paintProvisionalRow(view, slot, row, paint)) continue
+    if (slot) slots.push(slot)
+    if (slot && paintProvisionalRow(view, slot, row, paint)) continue
     for (const created of slots) releaseProvisionalSlot(view, created)
     return null
   }
