@@ -115,6 +115,27 @@ describe('NerdFontProvider', () => {
     await expect(service.font('NoSuchFont')).resolves.toBeNull()
   })
 
+  it.each([
+    ['upstream denial', async () => new Response('denied', { status: 403 }), 'download'],
+    [
+      'transport failure',
+      async () => {
+        throw new TypeError('fetch failed')
+      },
+      'download',
+    ],
+    ['invalid archive', async () => new Response('invalid archive'), 'archive'],
+  ] as const)('reports %s as a structured unavailable font', async (_, fetcher, stage) => {
+    const service = provider({ cacheRoot: await fixtureRoot(), fetcher })
+    await expect(service.font('NerdFontsSymbolsOnly')).rejects.toMatchObject({
+      code: 'fonts.UNAVAILABLE',
+      statusCode: 503,
+      internal: expect.objectContaining({ stage }),
+      why: expect.stringMatching(/\S/),
+      fix: expect.stringMatching(/\S/),
+    })
+  })
+
   it('rejects invalid font names before fetching', async () => {
     let fetchCount = 0
     const service = provider({

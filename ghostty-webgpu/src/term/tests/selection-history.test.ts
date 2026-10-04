@@ -117,6 +117,61 @@ describe('native selection and history requests', () => {
     )
   })
 
+  it('accepts queued own selection revisions and fences external output and a new gesture', async () => {
+    const { session, requests } = await native()
+    session.write('abcdefgh')
+    const identity = requests.selectionSnapshot()
+    const press = {
+      position: { x: 0, y: 0 },
+      viewport: { x: 0, y: 0 },
+      repeatDistance: 10,
+      repeatIntervalNanoseconds: 500_000_000n,
+      timeNanoseconds: 1n,
+    }
+    const drag = {
+      geometry: { cellWidth: 10, columns: 8, paddingLeft: 0, screenHeight: 60 },
+      position: { x: 20, y: 0 },
+      viewport: { x: 2, y: 0 },
+    }
+    requests.selectionPress(press, identity)
+    requests.selectionDrag(drag, identity)
+    requests.selectionDrag(
+      { ...drag, position: { x: 40, y: 0 }, viewport: { x: 4, y: 0 } },
+      identity,
+    )
+    expect(requests.selectionRelease(drag.viewport, identity).dragged).toBe(true)
+    expect(requests.getSelection()).toContain('abcd')
+    expect(() => requests.selectionPress(press, identity)).toThrow('identity changed')
+    const newer = requests.selectionSnapshot()
+    requests.selectionPress({ ...press, timeNanoseconds: 1_000_000_000n }, newer)
+    requests.selectionDrag(drag, newer)
+    session.write('external')
+    expect(() => requests.selectionDrag(drag, newer)).toThrow('identity changed')
+    expect(() => requests.selectionRelease(drag.viewport, newer)).toThrow('identity changed')
+  })
+
+  it('invalidates a gesture projection when a selection observer writes reentrantly', async () => {
+    const { session, requests } = await native()
+    session.write('abcdefgh')
+    const identity = requests.selectionSnapshot()
+    const press = {
+      position: { x: 0, y: 0 },
+      viewport: { x: 0, y: 0 },
+      repeatDistance: 10,
+      repeatIntervalNanoseconds: 500_000_000n,
+      timeNanoseconds: 1n,
+    }
+    const drag = {
+      geometry: { cellWidth: 10, columns: 8, paddingLeft: 0, screenHeight: 60 },
+      position: { x: 20, y: 0 },
+      viewport: { x: 2, y: 0 },
+    }
+    requests.selectionPress(press, identity)
+    session.on('selection', () => session.write('external'))
+    requests.selectionDrag(drag, identity)
+    expect(() => requests.selectionRelease(drag.viewport, identity)).toThrow('identity changed')
+  })
+
   it('copies borrowed coordinates before their owner changes them', () => {
     const borrowed = { start: { x: 1, y: 2 }, end: { x: 3, y: 4 }, rectangle: false }
     const owned = ownedSelectionCoordinates(borrowed)

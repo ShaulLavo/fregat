@@ -26,6 +26,7 @@ export interface TerminalAccessibilityController {
   update(
     snapshot: RendererTextFrameSnapshot,
     scrollbar: Readonly<TerminalScrollbar>,
+    submittedOutput?: boolean,
   ): TerminalAccessibilityUpdate
 }
 
@@ -37,8 +38,10 @@ interface AccessibilityRow {
 
 interface PreviousFrame {
   readonly byIdentity: ReadonlyMap<string, string>
+  readonly length: number
   readonly offset: number
   readonly rows: readonly AccessibilityRow[]
+  readonly snapshot: RendererTextFrameSnapshot
   readonly total: number
 }
 
@@ -157,13 +160,16 @@ function frameByIdentity(rows: readonly AccessibilityRow[]): ReadonlyMap<string,
 }
 
 function previousFrame(
+  snapshot: RendererTextFrameSnapshot,
   rows: readonly AccessibilityRow[],
   scrollbar: Readonly<TerminalScrollbar>,
 ): PreviousFrame {
   return {
     byIdentity: frameByIdentity(rows),
+    length: scrollbar.length,
     offset: scrollbar.offset,
     rows: rows.map((row) => ({ ...row })),
+    snapshot,
     total: scrollbar.total,
   }
 }
@@ -259,17 +265,28 @@ class OwnedTerminalAccessibility implements TerminalAccessibilityController {
   update(
     snapshot: RendererTextFrameSnapshot,
     scrollbar: Readonly<TerminalScrollbar>,
+    submittedOutput?: boolean,
   ): TerminalAccessibilityUpdate {
     if (this.disposed) return { announced: false, full: false, updatedRows: 0 }
     validateScrollbar(scrollbar)
+    const previous = this.previous
+    // Replaying the displayed subject must preserve output waiting for its next submission.
+    if (
+      previous?.snapshot === snapshot &&
+      previous.length === scrollbar.length &&
+      previous.offset === scrollbar.offset &&
+      previous.total === scrollbar.total
+    )
+      return { announced: false, full: false, updatedRows: 0 }
     const rows = normalizeRows(snapshot.rows, scrollbar)
     const full = this.requiresFullUpdate(rows, scrollbar)
     this.resizeRows(rows.length)
     const updatedRows = this.updateRows(rows, scrollbar, full)
     this.updateCursor(snapshot, scrollbar, rows)
-    const announced = this.announcePendingOutput(rows, scrollbar)
-    this.previous = previousFrame(rows, scrollbar)
-    this.outputPending = false
+    if (submittedOutput === true) this.outputPending = true
+    const announced = submittedOutput !== false && this.announcePendingOutput(rows, scrollbar)
+    this.previous = previousFrame(snapshot, rows, scrollbar)
+    if (submittedOutput !== false) this.outputPending = false
     return { announced, full, updatedRows }
   }
 

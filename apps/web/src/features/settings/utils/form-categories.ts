@@ -1,6 +1,7 @@
+import { presentationFor } from '@workspace/contracts/settings/presentation'
 import type { PlatformName } from '@workspace/client-core/commands/chord'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
-import { descriptorFor, settingParentId, type SettingId } from '@workspace/contracts'
+import { settingParentId, type SettingId } from '@workspace/contracts'
 
 import { isSettingAvailable, settingEnvironment } from '@/features/settings/utils/availability'
 import { MCP_CATEGORY, matchesMcpSearch } from '@/features/settings/utils/mcp'
@@ -33,7 +34,7 @@ export function formCategories(
     matched.push('keybindings.overrides')
   const visible = matched.filter(
     (id) =>
-      (descriptorFor(id).visibility ?? 'user') !== 'internal' &&
+      (presentationFor(id).visibility ?? 'user') !== 'internal' &&
       isSettingAvailable(id, environment),
   )
   // The push switch renders inside the push section, beside the devices it sends to.
@@ -95,7 +96,7 @@ function groupByCategory(ids: readonly SettingId[]): Map<string, SettingId[]> {
   const categories = new Map<string, SettingId[]>()
 
   for (const id of ids) {
-    const category = descriptorFor(id).category
+    const category = presentationFor(id).category
     const existing = categories.get(category)
     if (existing) {
       existing.push(id)

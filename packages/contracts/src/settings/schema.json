@@ -260,11 +260,40 @@
     },
     "developer.deployRestartWaitMinutes": {
       "default": 30,
-      "description": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.",
-      "markdownDescription": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.\n\nThirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.",
+      "description": "Minutes to wait for busy sessions. --interrupt ends them and restarts.",
       "maximum": 1440,
       "minimum": 1,
       "type": "integer"
+    },
+    "developer.deployTarget": {
+      "anyOf": [
+        {
+          "properties": {
+            "meshHost": {
+              "pattern": "^[a-zA-Z\\d][\\w.-]*(?![\\s\\S])",
+              "type": "string"
+            },
+            "meshOrigin": {
+              "type": "string"
+            },
+            "meshRoute": {
+              "pattern": "^\\/(?:[\\w-]+\\/)*[\\w-]*(?![\\s\\S])",
+              "type": "string"
+            },
+            "productionRoot": {
+              "pattern": "^(?!\\/+$)(?!.*\\/\\.\\.?(?:\\/|$))\\/[^\\s%\"'$\\\\\\0]{1,4095}(?![\\s\\S])",
+              "type": "string"
+            }
+          },
+          "required": ["meshHost", "meshOrigin", "meshRoute", "productionRoot"],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Install releases and pair through Mesh and systemd."
     },
     "developer.devServerIdleMinutes": {
       "default": 15,
@@ -419,6 +448,41 @@
       "maximum": 7200,
       "minimum": 1,
       "type": "integer"
+    },
+    "developer.heavyJobQuietPolicy": {
+      "default": {
+        "allowedClasses": ["light"],
+        "concurrentCpus": [],
+        "measurementCpus": []
+      },
+      "description": "Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.",
+      "markdownDescription": "Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.\n\nUse an empty allowedClasses array to hold new light jobs during measurements. The measurementCpus and concurrentCpus fields currently accept empty arrays, preserving host scheduling. CPU affinity requires a validated scheduling implementation.",
+      "properties": {
+        "allowedClasses": {
+          "items": {
+            "const": "light"
+          },
+          "type": "array"
+        },
+        "concurrentCpus": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 0,
+          "type": "array"
+        },
+        "measurementCpus": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 0,
+          "type": "array"
+        }
+      },
+      "required": ["allowedClasses", "concurrentCpus", "measurementCpus"],
+      "type": "object"
     },
     "developer.heavyJobStopGraceSeconds": {
       "default": 10,

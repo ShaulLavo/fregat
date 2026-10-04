@@ -9,6 +9,7 @@ interface TerminalSelectionPoint {
 }
 
 export interface TerminalSelectionProjection {
+  readonly client?: TerminalSelectionPoint
   readonly geometry: {
     readonly cellWidth: number
     readonly columns: number

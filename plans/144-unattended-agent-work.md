@@ -362,7 +362,7 @@ Phase 1, lane A Phases 2–3.
   schedules (`keepsProcess`); the sweep and a `schedules.changed` event log the sleeping count.
   The shell carries `sleepingUntil`, the rail reads `sleeping`, and a completed turn still
   notifies. Restart lists sleeping sessions (`BusySessionState` `sleeping`, "Sleeping; its wake-ups
-  end"); `bun run deploy --restart` waits out other busy sessions, then ends sleeping ones' schedules
+  end"); `bun run install-release --restart` waits out other busy sessions, then ends sleeping ones' schedules
   without waiting. Replacing the Claude query (model, effort, mode, folder) warns in the timeline.
   The chat headers show `SchedulesButton` (moon, wake time, list from
   `GET /providers/sessions/:id/schedules`, "Cancel schedules" = `session.runtime.stop`). The mock

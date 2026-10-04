@@ -114,6 +114,8 @@ function job(fields: Partial<HeavyJobRecord>): HeavyJobRecord {
     quiet: false,
     server: false,
     serversAtAdmission: [],
+    allowedCpus: [],
+    jobsDuringRun: [],
     quietHoldExpired: false,
     repo: '/work/projects/platform',
     requestId: String(sequence),

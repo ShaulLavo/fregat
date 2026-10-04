@@ -208,7 +208,7 @@ Exercise the migrated search toggles and one toolbar toggle through `control-pol
 - [ ] Commit implementation by explicit paths and push from the shared checkout. Do not stash,
       switch branches, restore files, or reset other sessions' work. A rejected push uses
       `git pull --rebase`, then push again, preserving unrelated changes.
-- [ ] Deploy web changes with `bun run deploy`. Verify `/platform/release` and the changed controls
+- [ ] Deploy web changes with `bun run install-release`. Verify `/platform/release` and the changed controls
       on the mesh. A server deployment is not part of this plan.
 - [ ] Update the plan status according to the current plan-index convention. Record remaining limits.
 
@@ -230,7 +230,7 @@ tests for the plausible failures above; avoid class-string snapshots or broad te
 | Visual capture            | `bun run agent:browser look`                                                              | App ready; screenshot read back                                        |
 | Required gates            | `bun run gates`                                                                           | Exit 0; no new exceptions masking these changes                        |
 | Whitespace                | `git diff --check`                                                                        | No errors                                                              |
-| Web deployment            | `bun run deploy`                                                                          | Live check succeeds; release matches shipped change                    |
+| Web deployment            | `bun run install-release`                                                                 | Live check succeeds; release matches shipped change                    |
 
 Create and register `control-polish` and its focused browser test before running those new commands.
 Keep scenario selectors in `scripts/agent/selectors.ts`. Use isolated state for actions that change

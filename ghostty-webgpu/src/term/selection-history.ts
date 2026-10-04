@@ -65,6 +65,8 @@ export function assertSelectionIdentity(
 }
 
 export class NativeSelectionHistory {
+  private projection?: { readonly base: SelectionIdentity; revision: number }
+
   constructor(
     private readonly session: TerminalSession<Event>,
     private readonly context: () => Omit<SelectionIdentity, 'revision'>,
@@ -112,22 +114,22 @@ export class NativeSelectionHistory {
   }
 
   selectionPress(input: TerminalSelectionPressInput, expected?: SelectionIdentity) {
-    this.checkProjection(expected)
-    return Object.freeze({ ...this.session.selectionPress(input) })
+    this.projection = undefined
+    return this.updateGesture(expected, () => this.session.selectionPress(input))
   }
   selectionDrag(input: TerminalSelectionDragInput, expected?: SelectionIdentity) {
-    this.checkProjection(expected)
-    return Object.freeze({ ...this.session.selectionDrag(input) })
+    return this.updateGesture(expected, () => this.session.selectionDrag(input))
   }
   selectionAutoscrollTick(input: TerminalSelectionDragInput, expected?: SelectionIdentity) {
-    this.checkProjection(expected)
-    return Object.freeze({ ...this.session.selectionAutoscrollTick(input) })
+    return this.updateGesture(expected, () => this.session.selectionAutoscrollTick(input))
   }
   selectionRelease(input?: TerminalSelectionReleaseInput, expected?: SelectionIdentity) {
     this.checkProjection(expected)
+    this.projection = undefined
     return Object.freeze({ ...this.session.selectionRelease(input) })
   }
   resetSelectionGesture(): void {
+    this.projection = undefined
     this.session.resetSelectionGesture()
   }
 
@@ -166,7 +168,49 @@ export class NativeSelectionHistory {
     return Object.freeze({ ...identity, lineCount, lines, scrollbar })
   }
 
+  private updateGesture(
+    expected: SelectionIdentity | undefined,
+    invoke: () => ReturnType<TerminalSession<Event>['selectionDrag']>,
+  ) {
+    if (!expected) {
+      this.projection = undefined
+      return Object.freeze({ ...invoke() })
+    }
+    this.checkProjection(expected)
+    const before = this.identity()
+    const offset = this.session.scrollbar.offset
+    const update = invoke()
+    const after = this.identity()
+    const changed = update.selectionChanged || offset !== this.session.scrollbar.offset
+    if (
+      before.generation !== after.generation ||
+      before.layout !== after.layout ||
+      after.revision !== before.revision + Number(changed)
+    )
+      this.projection = undefined
+    if (this.projection) this.projection.revision = after.revision
+    return Object.freeze({ ...update })
+  }
+
   private checkProjection(expected: SelectionIdentity | undefined): void {
-    if (expected) assertSelectionIdentity(expected, this.identity())
+    const actual = this.identity()
+    const projection = this.projection
+    // Only this gesture's own contiguous selection revisions preserve its displayed projection.
+    if (
+      expected &&
+      projection &&
+      actual.generation === projection.base.generation &&
+      actual.layout === projection.base.layout &&
+      actual.revision === projection.revision &&
+      expected.generation === actual.generation &&
+      expected.layout === actual.layout &&
+      expected.revision >= projection.base.revision &&
+      expected.revision <= projection.revision
+    )
+      return
+    this.projection = undefined
+    if (!expected) return
+    assertSelectionIdentity(expected, actual)
+    this.projection = { base: actual, revision: actual.revision }
   }
 }

@@ -10,7 +10,7 @@ type RunOptions = {
 export type RunResult = { code: number; stdout: string }
 
 export function log(step: string, message: string) {
-  console.log(`[deploy] ${step}: ${message}`)
+  console.log(`[release] ${step}: ${message}`)
 }
 
 /** Runs a command to completion and captures stdout; stderr joins the log or the terminal. */

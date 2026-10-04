@@ -1,3 +1,5 @@
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { addressQueryKeys } from '@/features/address/utils/query-keys'
 import {
   testTabContents,
   testTabContent,
@@ -129,3 +131,32 @@ test('a short link expands once and preserves its explicit panel', async () => {
   expect(writes.replaces).toEqual([])
   writes.restore()
 })
+
+test('ordinary boot leaves the Settings category resource unloaded', async () => {
+  primaryQueryClient().removeQueries({ queryKey: addressQueryKeys.settingsCategories })
+  seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`] })
+  const { application, navigation } = await renderAddressHarness({
+    initialEntries: [`${BASE}/f/a.ts`],
+  })
+  await waitForNavigation(navigation)
+  expect(
+    application.getSnapshot().queryClient.getQueryState(addressQueryKeys.settingsCategories),
+  ).toBeUndefined()
+})
+
+test.each([
+  ['Providers', 'Providers'],
+  ['unknown-category', null],
+])(
+  'filtered Settings boot resolves %s through the retained category resource',
+  async (slug, category) => {
+    const { application, navigation } = await renderAddressHarness({
+      initialEntries: [`/~-/workbench/settings?tabs=@&settings=${slug}`],
+    })
+    await waitForNavigation(navigation)
+    expect(readSettingsCategory()).toBe(category)
+    expect(
+      application.getSnapshot().queryClient.getQueryData(addressQueryKeys.settingsCategories),
+    ).toContain('Providers')
+  },
+)

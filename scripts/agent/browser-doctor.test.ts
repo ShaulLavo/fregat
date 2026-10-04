@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 import { checkoutRoot } from './paths'
+import { chromiumUnavailable } from './browser-prerequisites'
+
+const it = test.skipIf(chromiumUnavailable)
 
 const cases = [
   { mode: 'healthy', code: 0, consoleCapture: true },
@@ -24,7 +27,7 @@ const cases = [
   { mode: 'release503', code: 1, consoleCapture: true },
 ] as const
 
-test.each(cases)('doctor classifies $mode through the real CLI', async (fixture) => {
+it.each(cases)('doctor classifies $mode through the real CLI', async (fixture) => {
   const scratch = await mkdtemp(path.join(tmpdir(), 'fregat-doctor-test-'))
   let releaseRequests = 0
   let startupCompleted = false

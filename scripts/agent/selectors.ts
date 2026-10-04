@@ -684,6 +684,11 @@ export const selectors = {
   mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   settingsShowAll: (page: Page) => page.getByRole('button', { name: 'Show all settings' }),
+  settingsCategoryFilter: (page: Page, category: string) =>
+    page.getByRole('button', {
+      name: `Clear the ${category} filter and show every setting`,
+      exact: true,
+    }),
   settingsCategoryHeading: (page: Page, name: string) =>
     page.getByRole('heading', { name, exact: true }),
   projectSettingsSection: (page: Page, title: string) =>

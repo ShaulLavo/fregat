@@ -1,3 +1,4 @@
+import { settingRowIds } from '@workspace/contracts/settings/presentation'
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -88,7 +89,7 @@ export function ShortcutActions({ customized, report }: { customized: boolean; r
             <HoldButton
               onConfirm={() => {
                 setConfirmAnchor(null)
-                resetSetting('keybindings.overrides', scope)
+                resetSetting('keybindings.overrides', settingRowIds('keybindings.overrides'), scope)
               }}
             >
               Hold to reset all shortcuts
