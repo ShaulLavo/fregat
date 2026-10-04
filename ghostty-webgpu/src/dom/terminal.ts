@@ -297,14 +297,14 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       this.elementsValue = elements
       this.cleanup.add(() => elements.dispose())
     }
-    if (this.execution.kind === 'sync')
-      this.execution.setClipboardWritePolicy(
-        createDomClipboardPolicyAdapter({
-          onError: (cause, operation) => this.reportError(cause, operation),
-          policy: options.clipboardWrite,
-        }),
-      )
     try {
+      if (this.execution.kind === 'sync')
+        this.execution.setClipboardWritePolicy(
+          createDomClipboardPolicyAdapter({
+            onError: (cause, operation) => this.reportError(cause, operation),
+            policy: options.clipboardWrite,
+          }),
+        )
       if (options.extensions?.length) this.extensionManager().install(options.extensions)
     } catch (cause) {
       this.dispose()
@@ -330,24 +330,26 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       throw workerError('capability', 'extensions', { actor: 'worker' })
     this.extensions ??= new ExtensionManager({
       terminal: this,
-      reservedOsc: new Set([0, 2, 8, 52, 133]),
+      registerLinkProvider: (provider) => this.registerLinkProvider(provider),
       onError: (cause, operation) => this.emitters.error.emit({ cause, operation }),
     })
     return this.extensions
   }
 
   private claimInput(input: TerminalInputEvent): boolean {
-    if (!this.extensions?.hasInput) return false
-    return this.extensions.dispatchInput(input) || this.stateValue !== 'open'
+    return this.extensions!.dispatchInput(input) || this.stateValue !== 'open'
   }
 
-  private readonly claimDomKey = (event: KeyboardEvent): boolean =>
-    this.claimInput({ type: 'key', event })
+  private readonly claimDomKey = (event: KeyboardEvent): boolean => {
+    if (!this.extensions?.hasInput) return false
+    return this.claimInput({ type: 'key', event })
+  }
 
   private readonly claimText = (
     type: 'paste' | 'text' | 'composition',
     data: TerminalInputData,
   ): boolean => {
+    if (!this.extensions?.hasInput) return false
     if (type === 'composition') return this.claimInput({ type, text: data as string })
     return this.claimInput({ type, data })
   }
@@ -648,7 +650,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
 
   key(input: TerminalKeyInput): TerminalResult<Mode, TerminalInputResult> {
     this.ensureOpen()
-    if (this.claimInput({ type: 'key', input })) return this.emptyInputResult()
+    if (this.extensions?.hasInput && this.claimInput({ type: 'key', input }))
+      return this.emptyInputResult()
     return this.result(this.execution.key(input))
   }
 
@@ -908,8 +911,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
         onTextFrame: (snapshot) => this.handleFrame(snapshot),
         needsFrameRows: () => true,
         onRowsChanged: (rows) => {
-          if (!this.emitters.frame.hasListeners) return
-          this.emitters.frame.emit(Object.freeze({ rows: rows }))
+          if (!this.emitters.frame.hasListeners && !this.extensions?.hasEvent('frame')) return
+          this.emitHostEvent('frame', Object.freeze({ rows }))
         },
         replaceCanvas: elements.replaceCanvas
           ? () => this.replaceRendererCanvas(elements)
@@ -1312,7 +1315,10 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private handleFrame(snapshot: RendererTextFrameSnapshot): void {
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     this.updateFrameUi(this.execution.kind === 'sync' ? this.execution.submit(snapshot) : snapshot)
-    if (this.execution.kind === 'async' && this.emitters.frame.hasListeners)
+    if (
+      this.execution.kind === 'async' &&
+      (this.emitters.frame.hasListeners || this.extensions?.hasEvent('frame'))
+    )
       this.emitHostEvent('frame', {
         rows: this.execution.submittedFrame?.rowPatches.map((row) => row.y) ?? [],
       })
@@ -1520,7 +1526,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       return
     }
     if (this.stateValue !== 'opening') return
-    this.pendingEvents.push(() => emitter.emit(event))
+    this.pendingEvents.push(() => this.emitHostEvent(type, event))
   }
 
   private flushPendingEvents(): void {
