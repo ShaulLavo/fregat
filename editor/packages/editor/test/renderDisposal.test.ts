@@ -201,11 +201,11 @@ it.each([false, true])(
     view.setText(text)
     view.setScrollMetrics(0, 120, 400)
     const row = view.getState().mountedRows[0]!.element
-    let returned: HTMLElement | null = null
+    const returned: HTMLElement[] = []
     let terminalText: string | null = null
     const cleanup = vi.fn()
     const render = vi.fn((element: HTMLElement) => {
-      returned = element
+      returned.push(element)
       element.appendChild(document.createElement('img'))
       if (disposeInside) {
         view.dispose()
@@ -231,14 +231,52 @@ it.each([false, true])(
     view.dispose()
     expect(cleanup).toHaveBeenCalledOnce()
     expect(render).toHaveBeenCalledOnce()
-    expect(returned).not.toBeNull()
-    expect(returned?.parentNode).toBeNull()
+    expect(returned).toHaveLength(1)
+    expect(returned[0]?.parentNode).toBeNull()
     if (disposeInside) expect(row.textContent).toBe(terminalText)
     expect(view.getState().mountedRows).toEqual([])
     expect(Reflect.get(view, 'cancelContentWidthMeasurement')).toBeNull()
     expect(view.isRenderingAtomically).toBe(false)
   },
 )
+
+it.each([false, true])('finishes terminal teardown when a cell cleanup throws is %s', (throws) => {
+  const host = container()
+  const failure = new TypeError('external cleanup failure')
+  let armed = false
+  const cleanup = vi.fn(() => {
+    if (!armed) return
+    armed = false
+    throw failure
+  })
+  const view = new VirtualizedTextView(host, {
+    rowHeight: 20,
+    overscan: 0,
+    gutterContributions: [
+      {
+        id: 'lifecycle',
+        width: () => 20,
+        createCell: (document) => document.createElement('div'),
+        updateCell: () => undefined,
+        disposeCell: cleanup,
+      },
+    ],
+  })
+  releases.push(() => view.dispose())
+  view.setText('old0\nold1')
+  view.setScrollMetrics(0, 120, 400)
+  expect(view.getState().mountedRows).toHaveLength(2)
+  armed = throws
+
+  if (throws) expect(() => view.dispose()).toThrow(failure)
+  if (!throws) expect(() => view.dispose()).not.toThrow()
+
+  expect(cleanup).toHaveBeenCalledTimes(2)
+  expect(view.getState().mountedRows).toEqual([])
+  expect(host.contains(view.scrollElement)).toBe(false)
+  view.dispose()
+  expect(cleanup).toHaveBeenCalledTimes(2)
+})
 
 it.each([false, true])(
   'detaches retiring widget ownership before terminal cleanup is %s',
