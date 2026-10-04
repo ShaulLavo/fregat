@@ -37,7 +37,8 @@
       "turbo": "2.11.5",
       "knip": "6.38.0",
       "playwright": "1.63.0",
-      "@types/bun": "1.4.2"
+      "@types/bun": "1.4.2",
+      "@fregat/hotkeys": "0.0.3"
     }
   },
   "scripts": {

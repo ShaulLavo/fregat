@@ -388,6 +388,7 @@ export class MinimapWorkerClient {
       key: MINIMAP_QUIET_FLUSH_KEY,
       taskClass: 'background-derived',
       priority: 'low',
+      defer: true,
       delayMs: MINIMAP_UPDATE_QUIET_DELAY_MS,
       maxDelayMs: MINIMAP_UPDATE_MAX_DELAY_MS,
       tags: { configuration: 'quiet', version: this.latestSnapshot.textVersion },

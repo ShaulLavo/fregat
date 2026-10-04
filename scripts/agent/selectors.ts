@@ -717,13 +717,46 @@ export const selectors = {
     page.locator('[data-settings-header]').getByText(/^\d+ settings?$/),
   shortcutsSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
+  shortcutActions: (page: Page) =>
+    page.getByRole('button', { name: 'Shortcut actions', exact: true }),
+  shortcutReportCopy: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Copy shortcut report', exact: true }),
+  shortcutMetadataLoading: (page: Page) =>
+    page.getByRole('status', { name: 'Loading preset report', exact: true }),
+  shortcutMetadataError: (page: Page) =>
+    page.getByText('The preset report could not be loaded.', { exact: true }),
+  shortcutMetadataReload: (page: Page) =>
+    page.getByRole('button', { name: 'Reload app', exact: true }),
+  shortcutUnmapped: (page: Page) => page.getByRole('button', { name: /^Unmapped Zed actions/ }),
   shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
-  shortcutRow: (page: Page, command: string, keys?: string) =>
+  shortcutRow: (page: Page, command: string, keys?: string, context?: string) =>
     page.locator(
-      `[data-shortcut-command="${command}"]${keys ? `[data-shortcut-keys="${keys}"]` : ''}`,
+      `[data-shortcut-command="${command}"]${keys ? `[data-shortcut-keys="${keys}"]` : ''}${context !== undefined ? `[data-shortcut-context="${context}"]` : ''}`,
     ),
   shortcutRecorder: (page: Page, title: string) =>
     page.getByRole('textbox', { name: `Press the new shortcut for ${title}`, exact: true }),
+  shortcutContext: (page: Page) =>
+    page.getByRole('textbox', { name: 'Shortcut context', exact: true }),
+  shortcutSave: (page: Page) => page.getByRole('button', { name: 'Save', exact: true }),
+  shortcutPresetTabs: (page: Page) =>
+    page.getByRole('tablist', { name: 'Keyboard mode', exact: true }),
+  shortcutPresetRow: (page: Page, command: string) =>
+    page.locator(`[data-shortcut-command="${command}"][data-shortcut-source="default"]`).first(),
+  shortcutEntries: (page: Page) =>
+    page.getByRole('button', { name: /^Authored bindings and reservations/ }),
+  shortcutEntryKeys: (page: Page) =>
+    page.getByRole('textbox', { name: 'Authored binding keys', exact: true }),
+  shortcutEntryContext: (page: Page) =>
+    page.getByRole('textbox', { name: 'Authored binding context', exact: true }),
+  shortcutEntryKind: (page: Page) =>
+    page.getByRole('combobox', { name: 'Binding entry kind', exact: true }),
+  shortcutEntryUnbindOption: (page: Page) =>
+    page.getByRole('option', { name: 'Unbind command', exact: true }),
+  shortcutEntryCommand: (page: Page) =>
+    page.getByRole('textbox', { name: 'Command to unbind', exact: true }),
+  shortcutEntryAdd: (page: Page) => page.getByRole('button', { name: 'Add entry', exact: true }),
+  shortcutEntryDelete: (page: Page, index: number) =>
+    page.getByRole('button', { name: `Delete authored binding ${index + 1}`, exact: true }),
   shortcutFilter: (page: Page, name: 'All' | 'Custom' | 'Conflicts' | 'Unassigned') =>
     page.getByRole('tab', { name: new RegExp(`^${name}`) }),
   shortcutRecordKeys: (page: Page) =>
@@ -1140,6 +1173,7 @@ export const selectors = {
     page
       .getByRole('tree', { name: 'Problems', exact: true })
       .locator('[role="treeitem"][aria-level="2"]'),
+  pendingChord: (page: Page) => page.locator('[data-slot="keymap-pending"]'),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
   editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
   editorFindCount: (page: Page) => page.locator('.editor-find-count'),

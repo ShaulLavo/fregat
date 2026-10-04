@@ -1,4 +1,4 @@
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createStringTextSnapshot } from '../src/documentTextSnapshot'
@@ -12,12 +12,11 @@ import {
 import type { TextEdit } from '../src/tokens'
 import { Editor } from '../src/editor/Editor'
 import {
-  defaultEditorKeyBindings,
-  defaultEditorKeymapLayers,
-  editorCommandPackForCommand,
-  filterEditorKeymapLayersByCommandPacks,
-  readonlySafeEditorCommandPacks,
-} from '../src/editor/keymap'
+  defaultKeyBindings,
+  commandCategory,
+  readonlyCommands,
+  keyboardEvent,
+} from './factories/keymap'
 import { registerEditorLanguageConfiguration } from '../src/editor/languageConfiguration'
 import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import type { ResolvedSelection } from '../src/selections'
@@ -71,39 +70,28 @@ class MockHighlight extends Set<Range> {}
  */
 function pressOn(editor: Editor, keyName: string, chord: Chord): void {
   const mac = detectPlatform() === 'mac'
-
-  editorElement(editor).dispatchEvent(
-    new KeyboardEvent('keydown', {
-      bubbles: true,
-      cancelable: true,
-      key: keyName,
-      altKey: chord.alt === true,
-      ctrlKey: chord.mod === true && !mac,
-      metaKey: chord.mod === true && mac,
-      shiftKey: chord.shift === true,
-    }),
-  )
-}
-
-/** The commands a host still binds once it has narrowed the keymap for a document nobody may edit. */
-function readonlyCommands(platform: 'mac' | 'windows' | 'linux'): readonly EditorCommandId[] {
-  return filterEditorKeymapLayersByCommandPacks(
-    defaultEditorKeymapLayers(platform),
-    readonlySafeEditorCommandPacks,
-  ).flatMap((layer) => layer.bindings.map((binding) => binding.command))
+  const init = {
+    bubbles: true,
+    cancelable: true,
+    key: keyName,
+    altKey: chord.alt === true,
+    ctrlKey: chord.mod === true && !mac,
+    metaKey: chord.mod === true && mac,
+    shiftKey: chord.shift === true,
+  }
+  editorElement(editor).dispatchEvent(keyboardEvent('keydown', init))
+  editorElement(editor).dispatchEvent(keyboardEvent('keyup', init))
 }
 
 describe('reindent command wiring', () => {
   // A pack is what carries a binding into a layer and the dispatch predicate is what routes the id,
   // so a command missing from either is one no keystroke reaches.
   it.each(REINDENT_COMMAND_IDS)('gives %s a pack, a chord and a route', (command) => {
-    expect(editorCommandPackForCommand(command)).toBe('advanced-editing')
+    expect(commandCategory(command)).toBe('advanced-editing')
     expect(isEditorDocumentSelectionEditCommand(command)).toBe(true)
 
     for (const platform of ['mac', 'windows', 'linux'] as const) {
-      expect(defaultEditorKeyBindings(platform).map((binding) => binding.command)).toContain(
-        command,
-      )
+      expect(defaultKeyBindings(platform).map((binding) => binding.command)).toContain(command)
       // Rewriting indentation is an edit, so narrowing a keymap to what a reader may press drops it.
       expect(readonlyCommands(platform)).not.toContain(command)
     }

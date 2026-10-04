@@ -1,0 +1,489 @@
+[
+  {
+    "command": "workspace.fixDiagnostic",
+    "pane": "problems",
+    "keys": "Mod+."
+  },
+  {
+    "command": "workspace.toggleCheckpointChange",
+    "pane": "git",
+    "keys": "Mod+Backspace"
+  },
+  {
+    "command": "workspace.undoSessionAction",
+    "pane": "chat",
+    "platforms": ["linux", "mac", "windows"],
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Z"
+  },
+  {
+    "command": "workspace.undoSessionAction",
+    "pane": "git",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Z"
+  },
+  {
+    "command": "workspace.undoSessionAction",
+    "pane": "global",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Z"
+  },
+  {
+    "command": "workspace.undoSessionAction",
+    "pane": "logs",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Z"
+  },
+  {
+    "command": "workspace.undoSessionAction",
+    "pane": "problems",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Z"
+  },
+  {
+    "command": "workspace.undoSessionAction",
+    "pane": "search",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Z"
+  },
+  {
+    "command": "workspace.undoSessionAction",
+    "pane": "settings",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Z"
+  },
+  {
+    "command": "workspace.redoSessionAction",
+    "pane": "chat",
+    "platforms": ["linux", "mac", "windows"],
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Shift+Z"
+  },
+  {
+    "command": "workspace.redoSessionAction",
+    "pane": "git",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Shift+Z"
+  },
+  {
+    "command": "workspace.redoSessionAction",
+    "pane": "global",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Shift+Z"
+  },
+  {
+    "command": "workspace.redoSessionAction",
+    "pane": "logs",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Shift+Z"
+  },
+  {
+    "command": "workspace.redoSessionAction",
+    "pane": "problems",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Shift+Z"
+  },
+  {
+    "command": "workspace.redoSessionAction",
+    "pane": "search",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Shift+Z"
+  },
+  {
+    "command": "workspace.redoSessionAction",
+    "pane": "settings",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Shift+Z"
+  },
+  {
+    "command": "fileTree.undo",
+    "pane": "file-tree",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Z"
+  },
+  {
+    "command": "fileTree.redo",
+    "pane": "file-tree",
+    "preventDefault": true,
+    "yieldsToTextEntry": true,
+    "keys": "Mod+Shift+Z"
+  },
+  {
+    "command": "workspace.showQuickAccess",
+    "preventDefault": true,
+    "stopPropagation": true,
+    "vscodeCommandId": "workbench.action.quickOpen",
+    "keys": "Mod+P"
+  },
+  {
+    "command": "workspace.showCommandPalette",
+    "preventDefault": true,
+    "stopPropagation": true,
+    "vscodeCommandId": "workbench.action.showCommands",
+    "keys": "Mod+Shift+P"
+  },
+  {
+    "command": "workspace.showCommandPalette",
+    "preventDefault": true,
+    "stopPropagation": true,
+    "vscodeCommandId": "workbench.action.showCommands",
+    "keys": "F1"
+  },
+  {
+    "command": "workspace.showSettings",
+    "preventDefault": true,
+    "stopPropagation": true,
+    "vscodeCommandId": "workbench.action.openSettings",
+    "keys": "Mod+,"
+  },
+  {
+    "command": "workspace.showSettings",
+    "vscodeCommandId": "workbench.action.openGlobalKeybindings",
+    "keys": "Mod+K Mod+S"
+  },
+  {
+    "command": "workspace.gotoSymbol",
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.gotoSymbol",
+    "keys": "Mod+Shift+O"
+  },
+  {
+    "command": "workspace.saveFile",
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.files.save",
+    "keys": "Mod+S"
+  },
+  {
+    "command": "workspace.historyBack",
+    "pane": "editor",
+    "preventDefault": true,
+    "keys": "Mod+Alt+Z"
+  },
+  {
+    "command": "workspace.historyForward",
+    "pane": "editor",
+    "preventDefault": true,
+    "keys": "Mod+Alt+Shift+Z"
+  },
+  {
+    "command": "workspace.addSelectionToChat",
+    "pane": "editor",
+    "preventDefault": true,
+    "keys": "Mod+L"
+  },
+  {
+    "command": "workspace.toggleSidebarVisibility",
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.toggleSidebarVisibility",
+    "keys": "Mod+B"
+  },
+  {
+    "command": "workspace.togglePanel",
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.togglePanel",
+    "keys": "Mod+J"
+  },
+  {
+    "command": "workspace.focusFirstEditorGroup",
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.focusFirstEditorGroup",
+    "keys": "Mod+1"
+  },
+  {
+    "command": "workspace.focusSecondEditorGroup",
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.focusSecondEditorGroup",
+    "keys": "Mod+2"
+  },
+  {
+    "command": "workspace.focusThirdEditorGroup",
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.focusThirdEditorGroup",
+    "keys": "Mod+3"
+  },
+  {
+    "command": "workspace.focusFileTree",
+    "preventDefault": true,
+    "keys": "Mod+Shift+E"
+  },
+  {
+    "command": "workspace.findInFileTree",
+    "pane": "file-tree",
+    "preventDefault": true,
+    "keys": "Mod+F"
+  },
+  {
+    "command": "workspace.navigateBack",
+    "keys": "Mod+["
+  },
+  {
+    "command": "workspace.navigateForward",
+    "keys": "Mod+]"
+  },
+  {
+    "command": "workspace.newTerminal",
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.terminal.new",
+    "keys": "Mod+`"
+  },
+  {
+    "command": "workspace.focusNextTerminal",
+    "pane": "terminal",
+    "preventDefault": true,
+    "keys": "Mod+PageDown"
+  },
+  {
+    "command": "workspace.focusPreviousTerminal",
+    "pane": "terminal",
+    "preventDefault": true,
+    "keys": "Mod+PageUp"
+  },
+  {
+    "command": "workspace.toggleDiffViewMode",
+    "keys": "Mod+Shift+D"
+  },
+  {
+    "command": "workspace.toggleUiMode",
+    "preventDefault": true,
+    "keys": "Mod+Shift+M"
+  },
+  {
+    "command": "workspace.selectThemeBundle",
+    "vscodeCommandId": "workbench.action.selectTheme",
+    "keys": "Mod+K Mod+T"
+  },
+  {
+    "command": "workspace.newSession",
+    "preventDefault": true,
+    "keys": "Mod+Alt+N"
+  },
+  {
+    "command": "workspace.nextItem",
+    "preventDefault": true,
+    "keys": "Mod+Alt+]"
+  },
+  {
+    "command": "workspace.nextItem",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.nextEditor",
+    "keys": "Mod+Alt+ArrowRight"
+  },
+  {
+    "command": "workspace.nextItem",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.nextEditor",
+    "keys": "Mod+PageDown"
+  },
+  {
+    "command": "workspace.previousItem",
+    "preventDefault": true,
+    "keys": "Mod+Alt+["
+  },
+  {
+    "command": "workspace.previousItem",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.previousEditor",
+    "keys": "Mod+Alt+ArrowLeft"
+  },
+  {
+    "command": "workspace.previousItem",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.previousEditor",
+    "keys": "Mod+PageUp"
+  },
+  {
+    "command": "workspace.toggleSessionRail",
+    "preventDefault": true,
+    "keys": "Mod+Alt+B"
+  },
+  {
+    "command": "workspace.selectItem1",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex1",
+    "keys": "Control+1"
+  },
+  {
+    "command": "workspace.selectItem1",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex1",
+    "keys": "Alt+1"
+  },
+  {
+    "command": "workspace.selectItem1",
+    "preventDefault": true,
+    "keys": "Mod+Alt+1"
+  },
+  {
+    "command": "workspace.selectItem2",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex2",
+    "keys": "Control+2"
+  },
+  {
+    "command": "workspace.selectItem2",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex2",
+    "keys": "Alt+2"
+  },
+  {
+    "command": "workspace.selectItem2",
+    "preventDefault": true,
+    "keys": "Mod+Alt+2"
+  },
+  {
+    "command": "workspace.selectItem3",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex3",
+    "keys": "Control+3"
+  },
+  {
+    "command": "workspace.selectItem3",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex3",
+    "keys": "Alt+3"
+  },
+  {
+    "command": "workspace.selectItem3",
+    "preventDefault": true,
+    "keys": "Mod+Alt+3"
+  },
+  {
+    "command": "workspace.selectItem4",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex4",
+    "keys": "Control+4"
+  },
+  {
+    "command": "workspace.selectItem4",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex4",
+    "keys": "Alt+4"
+  },
+  {
+    "command": "workspace.selectItem4",
+    "preventDefault": true,
+    "keys": "Mod+Alt+4"
+  },
+  {
+    "command": "workspace.selectItem5",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex5",
+    "keys": "Control+5"
+  },
+  {
+    "command": "workspace.selectItem5",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex5",
+    "keys": "Alt+5"
+  },
+  {
+    "command": "workspace.selectItem5",
+    "preventDefault": true,
+    "keys": "Mod+Alt+5"
+  },
+  {
+    "command": "workspace.selectItem6",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex6",
+    "keys": "Control+6"
+  },
+  {
+    "command": "workspace.selectItem6",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex6",
+    "keys": "Alt+6"
+  },
+  {
+    "command": "workspace.selectItem6",
+    "preventDefault": true,
+    "keys": "Mod+Alt+6"
+  },
+  {
+    "command": "workspace.selectItem7",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex7",
+    "keys": "Control+7"
+  },
+  {
+    "command": "workspace.selectItem7",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex7",
+    "keys": "Alt+7"
+  },
+  {
+    "command": "workspace.selectItem7",
+    "preventDefault": true,
+    "keys": "Mod+Alt+7"
+  },
+  {
+    "command": "workspace.selectItem8",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex8",
+    "keys": "Control+8"
+  },
+  {
+    "command": "workspace.selectItem8",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.openEditorAtIndex8",
+    "keys": "Alt+8"
+  },
+  {
+    "command": "workspace.selectItem8",
+    "preventDefault": true,
+    "keys": "Mod+Alt+8"
+  },
+  {
+    "command": "workspace.selectItem9",
+    "platforms": ["mac"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.lastEditorInGroup",
+    "keys": "Control+9"
+  },
+  {
+    "command": "workspace.selectItem9",
+    "platforms": ["linux", "windows"],
+    "preventDefault": true,
+    "vscodeCommandId": "workbench.action.lastEditorInGroup",
+    "keys": "Alt+9"
+  },
+  {
+    "command": "workspace.selectItem9",
+    "preventDefault": true,
+    "keys": "Mod+Alt+9"
+  }
+]

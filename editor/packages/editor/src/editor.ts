@@ -85,26 +85,29 @@ export type {
 export type { EditorCommandContext, EditorCommandId } from './editor/commands'
 export type { EditorAnyCommandId } from './editor/commandCatalog'
 export {
-  defaultEditorCommandPacks,
-  defaultEditorKeyBindings,
-  defaultEditorKeymapLayers,
-  editorCommandPackForCommand,
-  editorKeyBindings,
-  editorKeyBindingsFromLayers,
-  editorKeymapLayerForCommandPack,
-  editorKeymapLayers,
-  editorKeymapLayersForBindings,
-  editorKeymapLayersForCommandPacks,
-  filterEditorKeymapLayersByCommandPacks,
-  readonlySafeEditorCommandPacks,
-} from './editor/keymap'
+  baseEditorKeymap,
+  defaultEditorPacks,
+  vscodeNavigationPack,
+  vscodeSelectionPack,
+  vscodeEditingPack,
+  vscodeAdvancedEditingPack,
+  vscodeMultiCursorPack,
+  vscodeFindPack,
+  vscodeFoldingPack,
+  vscodeLspNavigationPack,
+  vscodeLspEditingPack,
+  vscodeInlineSuggestPack,
+  suggestPack,
+  markdownPack,
+  readonlyDiffPack,
+} from './keymap/presets'
+export type { EditorKeymapOptions, EditorKeymapPack } from './keymap/presets'
 export type {
-  EditorCommandPack,
-  EditorKeyBinding,
-  EditorKeymapLayer,
-  EditorKeymapLayerSource,
-  EditorKeymapOptions,
-} from './editor/keymap'
+  EditorHotkeysHost,
+  EditorKeymapContext,
+  EditorKeymapMetadata,
+  EditorKeymapNodeOptions,
+} from './editor/hotkeys'
 export type {
   EditorMergeConflictFeature,
   EditorMergeConflictPluginOptions,
@@ -201,3 +204,5 @@ export type {
   EditorRetainedSyntaxSession,
   EditorRetainedHighlighterSession,
 } from './editor/documentAnalysis'
+
+export { editorCommandMutates, editorCommandDeclaration } from './editor/commandCatalog'

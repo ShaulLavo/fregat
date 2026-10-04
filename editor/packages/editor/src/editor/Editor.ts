@@ -3,7 +3,7 @@ import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextVi
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
 import type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
 import { decodePaintSnapshot, encodePaintSnapshot } from './paintSnapshot'
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import {
   documentSessionChangeTextSnapshot,
   getDocumentMutationLeaseState,
@@ -25,8 +25,8 @@ import type { IndentationFoldIndex } from './indentationFoldIndex'
 import { EditorFoldState } from './foldState'
 import { anchorManualFolds, resolveManualFolds, type EditorViewFoldState } from '../viewFolds'
 import { guessedTabSize } from './indentationGuess'
-import { EditorKeymapController } from './keymap'
-import type { EditorKeymapContext } from '../keymap/conditions'
+import { EditorHotkeys, type EditorKeymapNodeOptions } from './hotkeys'
+import type { EditorKeymapContext } from './hotkeys'
 import { InputSelectionController } from './inputSelectionController'
 import { defaultRtlMoveVisually } from './navigationTargets'
 import { EditorSyntaxController } from './syntaxController'
@@ -59,6 +59,7 @@ import {
 import type { EditorCommandContext, EditorCommandId } from './commands'
 import {
   EDITOR_COMMANDS,
+  editorCommandDeclaration,
   isEditorCommandId,
   type EditorAnyCommandId,
   type EditorCommandDeclaration,
@@ -184,7 +185,6 @@ import {
   type EditorOverlaySide,
   type EditorPlugin,
   type EditorPressParticipant,
-  type EditorKeyParticipant,
   type EditorCursorStyle,
   type EditorSelectionRange,
   type EditorTextAnchor,
@@ -375,7 +375,7 @@ export class Editor {
     EditorDecorationContributionProvider,
     EditorDecorationContribution
   >()
-  private readonly keymap: EditorKeymapController
+  private readonly keymap: EditorHotkeys
   private readonly environmentRegistrations = new EditorDisposableStore()
   private readonly viewContributions: EditorViewContributionController
   private readonly secondaryWork = new EditorSecondaryWorkScheduler()
@@ -679,7 +679,6 @@ export class Editor {
       getTextSnapshot: () => this.getTextSnapshot(),
       canEditDocument: () => this.canEditDocument(),
       acceptsText: () => [...this.textGates].every((accepts) => accepts()),
-      offerKey: (event) => this.offerKey(event),
       beginPointerJump: () => {
         this.cursorHistoryForSession()
         const location = this.captureJump()
@@ -711,6 +710,8 @@ export class Editor {
         this.applyRequestedSelections(selections, timingName, revealOffset),
     })
     this.commandRouter = new EditorCommandRouter({
+      newline: (context) => this.inputSelection.applyNewlineCommand(context),
+      clipboard: (command, context) => this.inputSelection.applyClipboardCommand(command, context),
       history: (command, context) => this.inputSelection.applyHistoryCommand(command, context),
       cursorHistory: (command) => this.applyCursorHistory(command),
       jumpHistory: (command) => this.applyJumpHistory(command),
@@ -757,10 +758,12 @@ export class Editor {
     this.createInitialEditorFeatureContributions(
       this.pluginHost.getEditorFeatureContributionProviders(),
     )
-    this.keymap = new EditorKeymapController({
+    this.keymap = new EditorHotkeys({
       target: this.el,
-      input: this.view.inputElement,
-      captureContext: () => this.getKeymapContext(),
+      hotkeys: options.hotkeys,
+      parent: options.hotkeysParent,
+      readContext: () => this.readHotkeysContext(),
+      commands: this.getCommandDeclarations().map((command) => command.id),
       keymap: options.keymap,
       dispatch: (command, context) => this.dispatchCommand(command, context),
     })
@@ -805,6 +808,10 @@ export class Editor {
         this.addCommandContributionProvider(provider),
       onCommandContributionProviderRemoved: (provider) =>
         this.removeCommandContributionProvider(provider),
+      onContributedCommandsChanged: () => {
+        if (this.disposed) return
+        this.keymap.updateCommands(this.getCommandDeclarations().map((command) => command.id))
+      },
       onCapabilityContributionProviderAdded: (provider) =>
         this.addCapabilityContributionProvider(provider),
       onCapabilityContributionProviderRemoved: (provider) =>
@@ -1316,7 +1323,33 @@ export class Editor {
     }
   }
 
-  /** A key is true while any of the contributions that registered it says so. */
+  /** The dispatcher and focus node that own this editor's keyboard commands. */
+  getHotkeysHost() {
+    return this.keymap.host
+  }
+
+  registerKeymapNode(options: EditorKeymapNodeOptions) {
+    const commands = Object.fromEntries(
+      Object.entries(options.commands).map(([command, handle]) => [
+        command,
+        (invocation: Parameters<typeof handle>[0]) =>
+          this.refusesMutation(command) ? false : handle(invocation),
+      ]),
+    )
+    return this.keymap.registerNode({ ...options, commands })
+  }
+
+  private readHotkeysContext() {
+    const booleans = this.getKeymapContext()
+    const identifiers = ['Editor', ...Object.keys(booleans).filter((key) => booleans[key])]
+    const documentExtension = this.documentId?.match(/\.([^./]+)$/)?.[1]?.toLowerCase()
+    const extension = this.options.keymapContext?.extension ?? documentExtension
+    return {
+      identifiers,
+      values: { mode: this.options.keymapContext?.mode ?? 'full', ...(extension && { extension }) },
+    }
+  }
+
   private contributedKeymapContext(): Record<string, boolean> {
     const context: Record<string, boolean> = {}
     for (const [key, readers] of this.keymapContextKeys) context[key] = anyReaderHolds(readers)
@@ -1469,6 +1502,7 @@ export class Editor {
 
   private inlineReplacementContext(): EditorInlineReplacementContext {
     return {
+      registerKeymapNode: (options) => this.registerKeymapNode(options),
       textSnapshot: this.getTextSnapshot(),
       languageId: this.languageId,
       captures: this.syntaxCaptures,
@@ -2094,7 +2128,7 @@ export class Editor {
 
   dispatchCommand(command: EditorAnyCommandId, context: EditorCommandContext = {}): boolean {
     if (this.view.isProvisional) return false
-    if (this.refusesContributedMutation(command)) return false
+    if (this.refusesMutation(command)) return false
     const scope = beginEditorPerformanceCommand(command)
     try {
       return this.dispatchCommandInOperation(command, context)
@@ -2111,10 +2145,9 @@ export class Editor {
     return [...EDITOR_COMMANDS, ...this.pluginHost.getContributedCommands()]
   }
 
-  // A built-in mutation is refused by its own handler and by the keymap's writable condition; a
-  // contributed one only says it mutates in its declaration.
-  private refusesContributedMutation(command: EditorAnyCommandId): boolean {
-    if (isEditorCommandId(command)) return false
+  private refusesMutation(command: string): boolean {
+    if (isEditorCommandId(command))
+      return editorCommandDeclaration(command).mutates && !this.canEditDocument()
     const declared = this.pluginHost.getContributedCommands().find((entry) => entry.id === command)
     return declared?.mutates === true && !this.canEditDocument()
   }
@@ -3290,8 +3323,6 @@ export class Editor {
       registerCommand: (command, handler) =>
         this.claimedBy(claims, () => this.registerCommandHandler(command, handler)),
       refreshInputs: () => this.viewContributions?.refreshInputs(),
-      registerKeyParticipant: (participant) =>
-        this.claimedBy(claims, () => this.registerKeyParticipant(participant)),
       registerTextGate: (accepts) => this.claimedBy(claims, () => this.registerTextGate(accepts)),
       setCursorStyle: (style) => this.setCursorStyle(style),
       container,
@@ -3306,6 +3337,8 @@ export class Editor {
         this.claimedBy(claims, () => this.registerPressParticipant(participant)),
       registerNonCaretRows: (isNonCaret) =>
         this.claimedBy(claims, () => this.registerNonCaretRows(isNonCaret)),
+      registerKeymapNode: (options) =>
+        this.claimedBy(claims, () => this.registerKeymapNode(options)),
       registerKeymapContextKey: (key, read) =>
         this.claimedBy(claims, () => this.registerKeymapContextKey(key, read)),
       getFeature: (key) => this.getFeature(key),
@@ -3912,42 +3945,11 @@ export class Editor {
   }
 
   private readonly pressParticipants = new Set<EditorPressParticipant>()
-  private readonly keyParticipants = new Set<EditorKeyParticipant>()
   private readonly textGates = new Set<() => boolean>()
-
-  private registerKeyParticipant(participant: EditorKeyParticipant): EditorDisposable {
-    this.keyParticipants.add(participant)
-    return this.claimForContribution(disposableOnce(() => this.keyParticipants.delete(participant)))
-  }
 
   private registerTextGate(accepts: () => boolean): EditorDisposable {
     this.textGates.add(accepts)
     return this.claimForContribution(disposableOnce(() => this.textGates.delete(accepts)))
-  }
-
-  // Owner decision (Plan 122 Q2, c): printable keys reach a participant first; a chord with Ctrl,
-  // Cmd or Alt stays with the host's keymap, so app shortcuts keep working in a modal view.
-  private offerKey(event: KeyboardEvent): boolean {
-    if (this.keyParticipants.size === 0) return false
-    if (event.ctrlKey || event.metaKey || event.altKey) return false
-    const context = this.getKeymapContext()
-    for (const participant of [...this.keyParticipants]) {
-      if (this.keyConsumedBy(participant, event, context)) return true
-    }
-    return false
-  }
-
-  private keyConsumedBy(
-    participant: EditorKeyParticipant,
-    event: KeyboardEvent,
-    context: EditorKeymapContext,
-  ): boolean {
-    try {
-      return participant(event, context) === 'consume'
-    } catch (error) {
-      this.logContributionFailure('view', 'key', error)
-      return false
-    }
   }
 
   private setCursorStyle(style: EditorCursorStyle): void {

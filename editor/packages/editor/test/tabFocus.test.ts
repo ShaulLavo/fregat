@@ -1,12 +1,8 @@
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { Editor } from '../src/editor/Editor'
-import {
-  defaultEditorKeyBindings,
-  editorCommandPackForCommand,
-  editorKeymapLayerForCommandPack,
-} from '../src/editor/keymap'
+import { defaultKeyBindings, commandCategory } from './factories/keymap'
 import { EDITOR_OPTION_DESCRIPTORS } from '../src/editor/optionDescriptors'
 import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import { editorElement } from './editorElement'
@@ -142,9 +138,9 @@ describe('tab-focus mode', () => {
 
   it('takes a chord on every platform, and one the platform has left', () => {
     for (const platform of ['mac', 'windows', 'linux'] as const) {
-      const hotkey = defaultEditorKeyBindings(platform).find(
+      const hotkey = defaultKeyBindings(platform).find(
         (binding) => binding.command === 'editor.action.toggleTabFocusMode',
-      )?.chord[0]
+      )?.keys[0]
       expect(hotkey, platform).toEqual({
         key: 'M',
         ctrl: true,
@@ -154,13 +150,11 @@ describe('tab-focus mode', () => {
   })
 
   it('travels in the same pack as the key it hands back', () => {
-    expect(editorCommandPackForCommand('editor.action.toggleTabFocusMode')).toBe('text-editing')
+    expect(commandCategory('editor.action.toggleTabFocusMode')).toBe('text-editing')
 
     // A host that offers Tab offers the way out of it in the same breath, and one that offers
     // neither cannot end up shipping only the trap.
-    const commands = editorKeymapLayerForCommandPack('text-editing').bindings.map(
-      (binding) => binding.command,
-    )
+    const commands = defaultKeyBindings().map((binding) => binding.command)
     expect(commands).toContain('indentSelection')
     expect(commands).toContain('editor.action.toggleTabFocusMode')
   })
@@ -200,8 +194,8 @@ describe('tab-focus mode', () => {
    */
   function pressDefaultChord(command: 'editor.action.toggleTabFocusMode'): KeyboardEvent {
     const platform = detectPlatform()
-    const hotkey = defaultEditorKeyBindings(platform).find((binding) => binding.command === command)
-      ?.chord[0]
+    const hotkey = defaultKeyBindings(platform).find((binding) => binding.command === command)
+      ?.keys[0]
     if (hotkey === undefined || typeof hotkey === 'string' || hotkey.key === undefined) {
       throw new Error(`${command} has no default chord on ${platform}`)
     }

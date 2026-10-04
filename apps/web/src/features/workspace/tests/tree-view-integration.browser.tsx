@@ -1,6 +1,7 @@
 import '@workspace/ui/globals.css'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
+import { createTreeTestRoot } from '../../../../test/factories/tree-command-root'
 import { flushSync } from 'react-dom'
 import { useEffect, useEffectEvent, useState } from 'react'
 
@@ -24,7 +25,7 @@ describe('tree view React integration', () => {
   it('renders the model and reports selection changes', async () => {
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
 
     function Harness() {
       const [selectedPaths, setSelectedPaths] = useState<readonly string[]>(['src/a.ts'])
@@ -69,7 +70,7 @@ describe('tree view React integration', () => {
   it('syncs git status option changes into the stable model', async () => {
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
 
     function Harness() {
       const [gitStatus, setGitStatus] = useState<readonly GitStatusEntry[]>([])
@@ -107,7 +108,7 @@ describe('tree view React integration', () => {
   it('syncs density changes into the stable model and virtualized geometry', async () => {
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
     const capturedModels: { first: TreeViewModel | null; latest: TreeViewModel | null } = {
       first: null,
       latest: null,
@@ -162,7 +163,7 @@ describe('tree view React integration', () => {
   it('projects loading paths onto their virtualized rows', async () => {
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
     const treeModel = new TreeViewModel({
       initialExpansion: 'open',
       paths: ['src/', 'src/a.ts', 'src/b.ts'],
@@ -189,7 +190,7 @@ describe('tree view React integration', () => {
   it('draws each file row with its glyph from the document sprite, in its hue', async () => {
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
     const treeModel = new TreeViewModel({
       initialExpansion: 'open',
       paths: ['unknown.xyz', 'src/index.ts'],
@@ -211,7 +212,7 @@ describe('tree view React integration', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
     const treeModel = new TreeViewModel({
       initialExpansion: 'open',
       paths: ['src/', 'src/a.ts'],
@@ -235,7 +236,7 @@ describe('tree view React integration', () => {
   it('resets view hook state when the public wrapper replaces its model', async () => {
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
     const firstModel = new TreeViewModel({
       initialSearchQuery: 'first',
       paths: ['first.ts'],
@@ -297,7 +298,7 @@ describe('tree view React integration', () => {
   it('keeps a right-click context menu mounted across incidental controller renders', async () => {
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
     const mounts: FileTreeContextMenuItem[] = []
     const menus: TreeRowMenuHandle[] = []
     const treeModel = new TreeViewModel({
@@ -339,7 +340,7 @@ describe('tree view React integration', () => {
   it('opens the focused row menu from Shift+F10 and closes through its handle', async () => {
     const container = document.createElement('main')
     document.body.append(container)
-    root = createRoot(container)
+    root = createTreeTestRoot(container)
     const menus: TreeRowMenuHandle[] = []
     const treeModel = new TreeViewModel({
       initialExpansion: 'open',

@@ -14,8 +14,8 @@ commit and passes its live check. Existing standalone checkouts remain untouched
 ## Execution
 
 - [x] Read the workflow principles and capture the clean main baseline (`f4c8833e6`).
-- [x] Separate source migration from npm publication. Keep plans 204–206 as subsequent
-      feature work; their cross-family dependencies require the deferred hotkeys publication.
+- [x] Separate source migration from npm publication. Plans 204–206 use local workspaces;
+      their mirrors separately qualify standalone dependency installation under Plan 207.
 - [x] Audit package manifests, toolchain configuration, verification coverage and mirrors.
 - [x] Align shared tooling and add checks for the concrete gaps found by the audit.
 - [x] Make the hotkeys mirror independently installable and verifiable.

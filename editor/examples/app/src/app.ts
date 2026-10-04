@@ -1,4 +1,5 @@
-import { createModalEditingPlugin } from './modal/modalPlugin'
+import { defaultEditorPacks } from '@singapore-editor/core/keymap'
+import { createModalEditingPlugin, modalPack } from './modal/modalPlugin'
 import { createMergeConflictPlugin, Editor, type EditorPlugin } from '@singapore-editor/core/editor'
 import { createDiffPlugin } from '@singapore-editor/diff'
 import '@singapore-editor/core/style.css'
@@ -127,6 +128,7 @@ export function mountApp(): void {
   )
   const diffPlugins: readonly EditorPlugin[] = languagePlugins.concat(liveDiff, sharedPlugins)
   const editor = new Editor(editorPane.editorHost, {
+    keymap: { packs: [...defaultEditorPacks, ...(modal.length ? [modalPack] : [])] },
     cursorLineHighlight: {
       gutterNumber: true,
       gutterBackground: ['fold-gutter'],

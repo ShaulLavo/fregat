@@ -1,7 +1,8 @@
 /** @jsxImportSource react */
 import '@workspace/ui/globals.css'
 import { flushSync } from 'react-dom'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
+import { createTreeTestRoot } from '../../../../test/factories/tree-command-root'
 import { expect, vi } from 'vitest'
 import { commands } from 'vitest/browser'
 
@@ -13,6 +14,7 @@ import {
 import { useEffect, useEffectEvent } from 'react'
 
 import { TreeHost } from '@/features/workspace/components/tree-host'
+import type { KeybindingPreset } from '@workspace/client-core/commands/metadata'
 import type { TreeRowMenuHandle } from '@/features/workspace/utils/tree-row-menu-open'
 import type {
   FileTreeContextMenuItem,
@@ -101,7 +103,10 @@ export async function unmountParityTree() {
  * folders, a retained filter, rename, drag and a right-click menu.
  */
 export async function mountParityTree(
-  options: Partial<FileTreeOptions> & { readonly height?: number } = {},
+  options: Partial<FileTreeOptions> & {
+    readonly height?: number
+    readonly preset?: KeybindingPreset
+  } = {},
 ): Promise<Mounted> {
   const events: ParityEvents = {
     drops: [],
@@ -110,7 +115,7 @@ export async function mountParityTree(
     selections: [],
     menus: [],
   }
-  const { height = 360, ...modelOptions } = options
+  const { height = 360, preset = 'vscode', ...modelOptions } = options
   const model = new TreeViewModel({
     flattenEmptyDirectories: true,
     initialExpansion: 'closed',
@@ -134,7 +139,7 @@ export async function mountParityTree(
   container.style.height = `${height}px`
   container.style.width = '360px'
   document.body.append(container)
-  root = createRoot(container)
+  root = createTreeTestRoot(container, preset)
   flushSync(() => {
     root?.render(
       <TreeHost

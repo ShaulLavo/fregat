@@ -1,3 +1,6 @@
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
+import { useCommandShortcut } from '@/keymap/hooks/use-command-shortcut'
+import { Kbd } from '@workspace/ui/components/kbd'
 import { useStatus } from '@/features/git/hooks/use-status'
 import { useReconcileCommitProgress } from '@/features/git/hooks/use-reconcile-commit-progress'
 import { TickerText } from '@/components/ticker-text'
@@ -13,7 +16,7 @@ import {
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { useId, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useId, type ChangeEvent } from 'react'
 
 import { useCommitAction } from '@/features/git/hooks/use-commit-action'
 import { useGenerateCommitMessage } from '@/features/git/hooks/use-generate-commit-message'
@@ -41,20 +44,24 @@ export function CommitControls({
   const showSyncChanges = canSyncChanges(repository, hasLocalChanges)
   const inputDisabled = commit.isPending || syncChanges.isPending || showSyncChanges
   const generationErrorId = useId()
+  const commitShortcut = useCommandShortcut('git.commit')
   let generationLabel = 'Generate commit message'
   if (generation.isPending) generationLabel = 'Cancel commit message generation'
   if (generation.isCancelling) generationLabel = 'Cancelling commit message…'
   let generationStatus = 'Generating commit message…'
   if (generation.isCancelling) generationStatus = 'Cancelling commit message…'
 
-  function handleCommitKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (!confirmed || showSyncChanges) return
-    if (!event.metaKey && !event.ctrlKey) return
-    if (event.key !== 'Enter') return
-
-    event.preventDefault()
-    commit.submit()
-  }
+  const commitRef = useKeymapNode({
+    area: 'git',
+    context: 'GitCommit',
+    commands: {
+      'git.commit': () => {
+        if (!confirmed || inputDisabled) return false
+        commit.submit()
+        return true
+      },
+    },
+  })
 
   function handleMessageChange(event: ChangeEvent<HTMLInputElement>) {
     generation.clearError()
@@ -72,7 +79,7 @@ export function CommitControls({
             className='h-full text-xs font-medium'
             disabled={inputDisabled}
             onChange={handleMessageChange}
-            onKeyDown={handleCommitKeyDown}
+            ref={commitRef}
             placeholder='Commit message'
             value={showSyncChanges ? '' : commit.message}
           />
@@ -141,7 +148,7 @@ export function CommitControls({
               <CheckIcon className='size-(--icon-size-sm)' />
             )}
             Commit
-            <span className='text-primary-foreground/65 text-3xs touch:hidden'>⌘↵</span>
+            {commitShortcut ? <Kbd className='touch:hidden'>{commitShortcut}</Kbd> : null}
           </Button>
         )}
       </PaneBar>

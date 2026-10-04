@@ -1,6 +1,9 @@
 import { assertEnvironmentWritable } from '@/lib/environments/state/availability'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
-import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
+import {
+  SETTINGS_MUTATION_KEY,
+  settingsMutationKeys,
+} from '@/features/settings/utils/mutation-keys'
 import { nowMs } from '@workspace/utils/timing'
 import { shownColorMode, type ThemeBundle, type ThemeId } from '@workspace/contracts'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
@@ -11,6 +14,7 @@ import {
   errorNumberField,
   errorStringField,
   layerAllowsScope,
+  type KeybindingOverride,
   type ModelRef,
   type MachineDefinition,
   type ProviderInstanceConfig,
@@ -27,7 +31,6 @@ import { mutationOptions, type QueryClient } from '@tanstack/react-query'
 import { runMutation } from '@/lib/mutations/run'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
-import type { PlatformCommandId } from '@/keymap/types'
 import {
   discardFailedSettingsIntent,
   failSettingsIntent,
@@ -62,7 +65,10 @@ import {
   themeCustomization,
   themePartWriteOperation,
 } from '@workspace/client-core/settings/operations'
-import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
+import {
+  admitSettingsMutationResult,
+  refreshConfirmedSettings,
+} from '@/features/settings/state/snapshot-admission'
 import { annotateClientError, clientErrorMetadata } from '@/lib/client-error-context'
 import { log } from '@/lib/client-logging'
 import { clientInstanceId } from '@/lib/instance-id'
@@ -170,8 +176,12 @@ export function useSettingsActions(owner?: QueryClient) {
       const keys = SETTING_IDS.filter((key) => layerAllowsScope(target, descriptorFor(key).scope))
       return submit(target, [{ kind: 'reset', keys }])
     },
-    resetKeybinding: (command: PlatformCommandId) =>
-      submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command }]),
+    resetKeybinding: (command: string, context?: string) =>
+      submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command, context }]),
+    appendKeybinding: (entry: KeybindingOverride) =>
+      submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.append', entry }]),
+    deleteKeybinding: (index: number, expected: readonly KeybindingOverride[]) =>
+      submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.delete', index, expected }]),
     resetSetting: (
       key: SettingId,
       rowKeys: readonly SettingId[],
@@ -185,9 +195,14 @@ export function useSettingsActions(owner?: QueryClient) {
       )
     },
     setColorTheme,
-    /** The command's complete list; an empty list or `null` unbinds it. */
-    setKeybinding: (command: PlatformCommandId, keys: readonly string[] | null) =>
-      submit(targetFor('keybindings.overrides'), [{ command, keys, kind: 'keybinding.set' }]),
+    setKeybinding: (
+      command: string,
+      keys: readonly string[] | null,
+      options: { readonly context?: string; readonly defaultKeys?: readonly string[] } = {},
+    ) =>
+      submit(targetFor('keybindings.overrides'), [
+        { command, keys, ...options, kind: 'keybinding.set' },
+      ]),
     setModelHidden: (ref: ModelRef, hidden: boolean) =>
       submit(targetFor('models.hidden'), [{ hidden, kind: 'model.setHidden', ref }]),
     setModelFavorite: (ref: ModelRef, favorite: boolean) =>
@@ -208,16 +223,24 @@ export function useSettingsActions(owner?: QueryClient) {
 // Module scope, run through runMutation: one mutation per write, with no observer per caller.
 function sendSettingsIntent(queryClient: QueryClient, client: Client, entry: ActiveSettingsIntent) {
   // Failures are handled in onError; the rejected promise has no other reader.
-  runMutation(queryClient, settingsTransportOptions(queryClient, client), entry).catch(
+  runMutation(queryClient, settingsTransportOptions(queryClient, client, entry), entry).catch(
     () => undefined,
   )
 }
 
-function settingsTransportOptions(queryClient: QueryClient, client: Client) {
+function settingsTransportOptions(
+  queryClient: QueryClient,
+  client: Client,
+  active: ActiveSettingsIntent,
+) {
   return mutationOptions({
     mutationFn: (entry: ActiveSettingsIntent) =>
       transportAndAdmitSettingsIntent(queryClient, entry, client),
-    mutationKey: SETTINGS_MUTATION_KEY,
+    mutationKey: active.patch.request.operations.some((operation) =>
+      operation.kind.startsWith('keybinding.'),
+    )
+      ? settingsMutationKeys.keybindings
+      : SETTINGS_MUTATION_KEY,
     onError: (error, entry) => {
       logSettingsMutationFailure(entry, error)
       if (settingsIntentStatus(entry.intentId) === 'acknowledged') return
@@ -288,8 +311,13 @@ async function transportAndAdmitSettingsIntent(
     }
     throw createClientInvariantError('Settings mutation could not establish an active epoch')
   } catch (error) {
-    annotateSettingsTransportError(entry, startedAt, error)
-    throw error
+    try {
+      if (errorStringField(error, 'code') === 'settings.KEYBINDINGS_STALE')
+        await refreshConfirmedSettings(queryClient)
+    } finally {
+      annotateSettingsTransportError(entry, startedAt, error)
+      throw error
+    }
   }
 }
 

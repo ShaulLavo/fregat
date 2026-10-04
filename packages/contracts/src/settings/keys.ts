@@ -466,6 +466,11 @@ export const SETTINGS_REGISTRY = {
     default: 'edit-context',
     scope: 'application',
   }),
+  'terminal.shellKeys': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+  }),
   'terminal.integrated.fontSize': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(6), v.maxValue(72)),
     default: 12,
@@ -1019,19 +1024,16 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
   }),
   'keybindings.preset': defineSetting({
-    schema: v.picklist(['default', 'vscode'] as const),
-    default: 'default',
+    schema: v.picklist(['ours', 'zed', 'vscode'] as const),
+    default: 'ours',
     scope: 'application',
   }),
   'keybindings.overrides': defineSetting({
     schema: keybindingOverridesSchema,
-    default: {},
+    default: [],
     // A binding can invoke any app command, which puts this on the execution
     // side of the scope rule despite looking like pure preference.
     scope: 'application',
-    // The one key that merges rather than replaces: a later layer should be able
-    // to bind a command without dropping every other binding the user set.
-    merge: 'record',
   }),
 } satisfies Readonly<Record<string, SettingDefinition>>
 

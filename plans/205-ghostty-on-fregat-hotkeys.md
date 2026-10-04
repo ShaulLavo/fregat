@@ -38,24 +38,36 @@ nothing; the host's terminal layer decides which keys go to the shell, following
 - **Host path:** `claimKeybinding` moves to the library; Platform's capture listener on the
   terminal host (`apps/web/src/features/terminal`) is replaced in 206 by node registration.
 
-## Integration with terminal extensions and worker mode
+## Original input ownership and execution modes
 
-[286](286-ghostty-extensions.md) moves matching/default bindings into a hotkeys extension;
-core retains a claim/pass input hook. [287](287-ghostty-worker-mode.md) keeps setup, focus-node
-registration and input claims synchronous on the host in both entries, before native encoding
-is queued. Native protocol replies bypass these hooks.
+`Terminal.connectInput(handler)` leases one finite original-input owner for the main entry.
+`attachTerminalHotkeys(terminal, options)` owns that lease, the open subscription and the
+existing standalone or hosted focus registration. It never constructs the general extension
+manager. Original DOM and programmatic key/text/paste/composition input arbitrate synchronously
+before native encoding; generated commands and native protocol replies bypass the owner.
 
-Retarget the matcher/default packs below to that extension. A standalone terminal attaches its
-own dispatcher through the extension; a hosted terminal registers a focus node in the window
-owner through a host adapter and binds no second matcher. `terminal.sendKeystroke` hands the
-key to native encoding only after synchronous claim/pass arbitration. Registration disposal
-removes bindings and the focus node without replacing the native execution owner.
+The finite owner runs first. A claim stops forwarding. A pass reaches any explicitly interested
+peer general input contribution, then native encoding. A second finite owner is rejected.
+Disposal aborts the lease, removes its registration and observer, and leaves the window
+dispatcher and native execution owner intact. Old disposal cannot remove a replacement lease.
 
-At launch, reconcile the exact landed 286/287 host hook and extension APIs with their active
-owners. Coordinate shared host files and include both main/worker entries in input acceptance.
-This needs their relevant contract, not completion of every extension or worker phase.
+The landed public `Terminal.use` and creation extension APIs remain owned by
+[286](286-ghostty-extensions.md). Hotkeys callers use the finite connection directly; they do
+not activate that general route. The valid failed general-manager performance window remains
+failed and supplies no activation evidence for this plan's input connection.
+
+The finite connection requires synchronous native mode access in the main entry. A worker
+connection rejects through its Promise return convention. Existing worker general extensions,
+input queues, press/release, paste and lifecycle remain peer-owned under
+[287](287-ghostty-worker-mode.md). This plan makes no worker-hotkeys activation claim.
 
 ## Steps
+
+Execution started 2026-10-03 in the command-foundation wave. The terminal producer owns the
+adapter, packs and minimum host connection needed by this plan, preserving active 286/287
+scaffold contracts. Plan 206 owns final caller integration, review and shipping. Local development
+uses the hotkeys workspace; exact standalone installation is qualified under Plan 207 while npm
+remains deferred.
 
 - [ ] Link `@fregat/hotkeys`; port the current bindings to a pack and the dispatcher, with the
       existing hotkey tests passing.

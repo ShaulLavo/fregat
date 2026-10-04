@@ -486,6 +486,11 @@ export const SETTINGS_DOCUMENTATION = {
       'How typed text reaches the editor. EditContext (Chromium) hands IME, autocorrect and dictation edits to the editor with their exact ranges. Other browsers use a hidden textarea.',
     keywords: ['input', 'ime', 'editcontext', 'composition', 'autocorrect', 'textarea'],
   },
+  'terminal.shellKeys': {
+    title: 'Shell keys',
+    description: 'Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell.',
+    keywords: ['terminal', 'shell', 'readline', 'shortcut', 'keybinding'],
+  },
   'terminal.integrated.fontSize': {
     description: 'Terminal font size in pixels.',
     keywords: ['terminal', 'font', 'size'],
@@ -1017,17 +1022,17 @@ export const SETTINGS_DOCUMENTATION = {
     keywords: ['model', 'favorite', 'star', 'pin', 'picker'],
   },
   'keybindings.preset': {
-    optionTitles: { default: 'Platform', vscode: 'VS Code' },
+    optionTitles: { ours: 'Ours', zed: 'Zed', vscode: 'VS Code' },
     title: 'Keyboard mode',
     description:
-      'The set of shortcuts your own changes build on. VS Code uses VS Code’s shortcuts. Platform starts from those and adds its own keys for tabs, chats and sidebar panels.',
-    keywords: ['keybinding', 'shortcut', 'preset', 'vscode', 'keymap'],
+      'The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts.',
+    keywords: ['keybinding', 'shortcut', 'preset', 'zed', 'vscode', 'keymap'],
   },
   'keybindings.overrides': {
     title: 'Shortcuts',
-    description: 'Every command and its keys.',
+    description: 'Shortcuts and the focus contexts where they apply.',
     details:
-      'In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.',
+      'An ordered list of {keys, command, context?} or {keys, unbind, context?}. A null command reserves the keys; unbind removes the named key and command pair. Context is a focus predicate such as Editor or Workspace > Terminal. User bindings win at equal depth; deeper bindings take precedence.',
     keywords: ['keybinding', 'shortcut', 'hotkey', 'chord', 'keymap'],
   },
 } satisfies { readonly [K in SettingId]: SettingDocumentation }

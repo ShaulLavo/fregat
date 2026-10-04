@@ -13,6 +13,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@fregat/hotkeys": "catalog:",
     "@opentui/core": "catalog:",
     "@opentui/react": "catalog:",
     "@singapore-editor/core": "workspace:*",

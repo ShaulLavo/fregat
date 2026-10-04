@@ -207,14 +207,14 @@ stays safe to read, share and export.
 
 ## Keyboard shortcuts
 
-| Setting                 | Default     | Scope       | What it does                                                                                                                                                           |
-| ----------------------- | ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keybindings.preset`    | `"default"` | application | The set of shortcuts your own changes build on. VS Code uses VS Code’s shortcuts. Platform starts from those and adds its own keys for tabs, chats and sidebar panels. |
-| `keybindings.overrides` | `{}`        | application | Every command and its keys.                                                                                                                                            |
+| Setting                 | Default  | Scope       | What it does                                                                                                                                       |
+| ----------------------- | -------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `keybindings.preset`    | `"ours"` | application | The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts. |
+| `keybindings.overrides` | `[]`     | application | Shortcuts and the focus contexts where they apply.                                                                                                 |
 
 ### Details
 
-- `keybindings.overrides`: In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.
+- `keybindings.overrides`: An ordered list of {keys, command, context?} or {keys, unbind, context?}. A null command reserves the keys; unbind removes the named key and command pair. Context is a focus predicate such as Editor or Workspace > Terminal. User bindings win at equal depth; deeper bindings take precedence.
 
 ## Language servers
 
@@ -327,11 +327,12 @@ stays safe to read, share and export.
 
 ## Terminal
 
-| Setting                              | Default | Scope  | What it does                                            |
-| ------------------------------------ | ------- | ------ | ------------------------------------------------------- |
-| `terminal.integrated.fontSize`       | `12`    | window | Terminal font size in pixels.                           |
-| `terminal.integrated.scrollback`     | `10000` | window | How many lines of output the terminal keeps.            |
-| `terminal.integrated.cursorBlinking` | `true`  | window | Blink the terminal cursor while the terminal has focus. |
+| Setting                              | Default | Scope       | What it does                                                               |
+| ------------------------------------ | ------- | ----------- | -------------------------------------------------------------------------- |
+| `terminal.shellKeys`                 | `false` | application | Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell. |
+| `terminal.integrated.fontSize`       | `12`    | window      | Terminal font size in pixels.                                              |
+| `terminal.integrated.scrollback`     | `10000` | window      | How many lines of output the terminal keeps.                               |
+| `terminal.integrated.cursorBlinking` | `true`  | window      | Blink the terminal cursor while the terminal has focus.                    |
 
 ## Window
 

@@ -1,7 +1,7 @@
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
-import { presetPlatformKeyBindings } from '@/keymap/default-bindings'
+import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { shortcutRows } from '@/features/settings/utils/shortcut-rows'
 
 /** Every command's shortcut row under the current preset and overrides, on this host. */
@@ -9,13 +9,14 @@ export function useShortcutRows() {
   const overrides = useSettingValue('keybindings.overrides')
   const preset = useSettingValue('keybindings.preset')
   const platform = detectPlatform()
-  const defaults = presetPlatformKeyBindings(platform, preset)
+  const shellKeys = useSettingValue('terminal.shellKeys')
+  const defaults = defaultPlatformKeyBindings(platform, preset, shellKeys)
 
   return {
     defaults,
     overrides,
     platform,
     preset,
-    rows: shortcutRows(defaults.bindings, overrides, platform),
+    rows: shortcutRows(defaults, overrides, platform),
   }
 }

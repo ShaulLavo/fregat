@@ -47,7 +47,7 @@ export const markdownAuthoring: Scenario = {
       await page.keyboard.press('ArrowDown')
       await page.keyboard.press('Home')
       await page.keyboard.press('Shift+End')
-      await page.keyboard.press('Control+b')
+      await runPaletteCommand(page, 'Toggle Markdown bold')
       await step('bold-command')
       await saveAndCheck(page, file, '# Authoring\n\n**alpha beta**\n')
       await step('bold-saved')
@@ -96,6 +96,8 @@ export const markdownAuthoring: Scenario = {
       await selectors.markdownRenderedPane(page).getByText('third', { exact: true }).waitFor()
       await step('third-before-save')
       await saveAndCheck(page, file, '- first\n- second\n- third')
+      await page.keyboard.press('Home')
+      await page.keyboard.press('Shift+End')
       await page.keyboard.press('Tab')
       await page.keyboard.press('Shift+Tab')
       await saveAndCheck(page, file, '- first\n- second\n- third')
@@ -121,7 +123,7 @@ export const markdownAuthoring: Scenario = {
       await page.keyboard.press('ArrowRight')
       await page.keyboard.press('ArrowRight')
       for (let index = 0; index < 5; index++) await page.keyboard.press('Shift+ArrowRight')
-      await page.keyboard.press('Control+b')
+      await runPaletteCommand(page, 'Toggle Markdown bold')
       await selectors.markdownRenderedPane(page).getByText('world', { exact: true }).waitFor()
       await step('partial-formatting')
       await saveAndCheck(page, file, 'hello **world**')
@@ -135,7 +137,7 @@ export const markdownAuthoring: Scenario = {
       await replaceContent(page, 'foobar')
       await page.keyboard.press('Control+Home')
       for (let index = 0; index < 3; index++) await page.keyboard.press('Shift+ArrowRight')
-      await page.keyboard.press('Control+i')
+      await runPaletteCommand(page, 'Toggle Markdown italic')
       await selectors.markdownRenderedPane(page).getByText('foo', { exact: true }).waitFor()
       await step('intraword-italic')
       await saveAndCheck(page, file, '*foo*bar')
@@ -198,7 +200,7 @@ async function caretAt(page: Page, offset: number) {
 
 // Bold waits for fresh syntax records after an edit, so saving before the row changes races it.
 async function boldAndSave(page: Page, file: string, text: string) {
-  await page.keyboard.press('Control+b')
+  await runPaletteCommand(page, 'Toggle Markdown bold')
   await selectors.editorRows(page).filter({ hasText: text }).first().waitFor()
   await saveAndCheck(page, file, text)
 }

@@ -1,6 +1,7 @@
 export const importSourcesQueryKey = ['settings', 'session-import', 'sources'] as const
 
 export const settingsQueryKeys = {
+  shortcutMetadata: ['settings', 'shortcut-metadata'] as const,
   defaultsFile: ['settings', 'defaults-file'] as const,
   pageModule: ['settings', 'page-module'] as const,
   fontCatalog: ['fonts', 'catalog'],

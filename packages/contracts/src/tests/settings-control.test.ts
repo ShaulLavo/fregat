@@ -46,8 +46,10 @@ describe('settingControl', () => {
 
   it('parses a structured value rather than casting it', () => {
     // Value-less, like `models`: the section sources its own rows from the
-    // keymap, so the stored record tells the control nothing.
-    expect(settingControl('keybindings.overrides', { 'workspace.saveFile': ['Mod+S'] })).toEqual({
+    // keymap, so the stored list tells the control nothing.
+    expect(
+      settingControl('keybindings.overrides', [{ keys: 'Mod+S', command: 'workspace.saveFile' }]),
+    ).toEqual({
       widget: 'keybindings',
     })
     expect(settingControl('providers.instances', [])).toEqual({ widget: 'providers', value: [] })

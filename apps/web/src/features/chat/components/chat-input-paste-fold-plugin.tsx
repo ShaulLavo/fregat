@@ -1,13 +1,10 @@
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import { foldChatInputPaste } from '@/features/chat/utils/input-editor-actions'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { COMMAND_PRIORITY_HIGH, KEY_DOWN_COMMAND, PASTE_COMMAND } from 'lexical'
+import { COMMAND_PRIORITY_HIGH, PASTE_COMMAND } from 'lexical'
 import { useEffect, useRef } from 'react'
 
-import {
-  isPasteAsTextShortcut,
-  nextPastedTextFileName,
-  pastedTextFolds,
-} from '@/features/chat/utils/pasted-text'
+import { nextPastedTextFileName, pastedTextFolds } from '@/features/chat/utils/pasted-text'
 
 /**
  * Folds a large text paste into a `pasted-text.txt` attachment. A Lexical command, not
@@ -23,15 +20,20 @@ export function ChatInputPasteFoldPlugin({
   const pasteInlineUntil = useRef(0)
   const foldedNames = useRef(new Set<string>())
 
-  useEffect(() => {
-    const unregisterKeyDown = editor.registerCommand(
-      KEY_DOWN_COMMAND,
-      (event) => {
-        if (isPasteAsTextShortcut(event)) pasteInlineUntil.current = Date.now() + 1_000
-        return false
+  useKeymapNode({
+    area: 'chat',
+    context: 'Composer',
+    element: () => editor.getRootElement(),
+    commands: {
+      'chat.pasteAsText': () => {
+        if (!editor.isEditable() || editor.isComposing()) return false
+        pasteInlineUntil.current = Date.now() + 1_000
+        return true
       },
-      COMMAND_PRIORITY_HIGH,
-    )
+    },
+  })
+
+  useEffect(() => {
     const unregisterPaste = editor.registerCommand(
       PASTE_COMMAND,
       (event) => {
@@ -51,7 +53,6 @@ export function ChatInputPasteFoldPlugin({
     )
 
     return () => {
-      unregisterKeyDown()
       unregisterPaste()
     }
   }, [editor, onFiles])

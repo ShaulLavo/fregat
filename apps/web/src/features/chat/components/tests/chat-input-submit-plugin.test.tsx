@@ -1,7 +1,9 @@
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { KEY_ENTER_COMMAND, type LexicalEditor } from 'lexical'
-import { useEffect } from 'react'
+import { ContentEditable } from '@lexical/react/LexicalContentEditable'
+import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
+import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
+import { act, fireEvent, screen } from '@testing-library/react'
+import { detectPlatform } from '@fregat/hotkeys'
 
 import { ChatInputSubmitPlugin } from '@/features/chat/components/chat-input-submit-plugin'
 import { expect, test } from '../../../../../test/fixtures'
@@ -37,19 +39,28 @@ test('an IME Enter is swallowed rather than prevented, so the commit still lands
 test('Ctrl/Cmd+Enter requests the alternate intent while Enter keeps the default', () => {
   const composer = renderComposer()
   composer.pressEnter({})
-  composer.pressEnter({ ctrlKey: true })
-  composer.pressEnter({ metaKey: true })
+  composer.pressEnter(detectPlatform() === 'mac' ? { metaKey: true } : { ctrlKey: true })
   composer.pressEnter({ shiftKey: true })
-  expect(composer.intents).toEqual([false, true, true])
+  expect(composer.intents).toEqual([false, true])
 })
 
-function renderComposer() {
-  const state = { editor: null as LexicalEditor | null, submits: 0, intents: [] as boolean[] }
+test('completion Enter belongs to the widget and does not submit', () => {
+  const composer = renderComposer({ menuOpen: true })
+  composer.pressEnter({})
+  expect(composer.completions).toBe(1)
+  expect(composer.submits).toBe(0)
+})
 
-  function captureEditor(editor: LexicalEditor) {
-    state.editor = editor
-  }
+test('a disabled composer declines submission', () => {
+  const composer = renderComposer({ disabled: true })
+  composer.pressEnter({})
+  expect(composer.submits).toBe(0)
+})
 
+function renderComposer(
+  options: { readonly disabled?: boolean; readonly menuOpen?: boolean } = {},
+) {
+  const state = { submits: 0, intents: [] as boolean[], completions: 0 }
   renderWithProviders(
     <LexicalComposer
       initialConfig={{
@@ -59,11 +70,17 @@ function renderComposer() {
         },
       }}
     >
-      <CaptureEditor onReady={captureEditor} />
+      <PlainTextPlugin
+        contentEditable={<ContentEditable aria-label='Submit composer' />}
+        ErrorBoundary={LexicalErrorBoundary}
+      />
       <ChatInputSubmitPlugin
-        commandMenuOpen={false}
-        disabled={false}
-        onCommandMenuCommit={() => false}
+        commandMenuOpen={options.menuOpen ?? false}
+        disabled={options.disabled ?? false}
+        onCommandMenuCommit={() => {
+          state.completions += 1
+          return true
+        }}
         onCommandMenuMove={() => false}
         onSubmitRequest={async (alternate = false) => {
           state.intents.push(alternate)
@@ -73,14 +90,17 @@ function renderComposer() {
       />
     </LexicalComposer>,
   )
-
+  const root = screen.getByRole('textbox', { name: 'Submit composer' })
+  act(() => root.focus())
   return {
     pressEnter(init: KeyboardEventInit) {
-      // Cancelable, or `preventDefault` is a no-op and the swallow/prevent
-      // distinction this suite asserts on could never be observed.
-      const event = new KeyboardEvent('keydown', { cancelable: true, key: 'Enter', ...init })
-      state.editor?.dispatchCommand(KEY_ENTER_COMMAND, event)
-
+      const event = new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Enter',
+        ...init,
+      })
+      act(() => fireEvent(root, event))
       return event
     },
     get intents() {
@@ -89,15 +109,8 @@ function renderComposer() {
     get submits() {
       return state.submits
     },
+    get completions() {
+      return state.completions
+    },
   }
-}
-
-function CaptureEditor({ onReady }: { readonly onReady: (editor: LexicalEditor) => void }) {
-  const [editor] = useLexicalComposerContext()
-
-  useEffect(() => {
-    onReady(editor)
-  }, [editor, onReady])
-
-  return null
 }

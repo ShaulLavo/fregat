@@ -898,38 +898,72 @@
       "type": "string"
     },
     "keybindings.overrides": {
-      "additionalProperties": {
+      "default": [],
+      "description": "Shortcuts and the focus contexts where they apply.",
+      "items": {
         "anyOf": [
           {
-            "items": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^\\S+(?: \\S+)?$",
-              "type": "string"
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "anyOf": [
+                  {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "context": {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              "keys": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^\\S+(?: \\S+)?$",
+                "type": "string"
+              }
             },
-            "maxItems": 8,
-            "type": "array"
+            "required": ["command", "keys"],
+            "type": "object"
           },
           {
-            "type": "null"
+            "additionalProperties": false,
+            "properties": {
+              "context": {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              "keys": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^\\S+(?: \\S+)?$",
+                "type": "string"
+              },
+              "unbind": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": ["keys", "unbind"],
+            "type": "object"
           }
         ]
       },
-      "default": {},
-      "description": "Every command and its keys.",
-      "markdownDescription": "Every command and its keys.\n\nIn settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.",
-      "propertyNames": {
-        "maxLength": 120,
-        "minLength": 1,
-        "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]*$",
-        "type": "string"
-      },
-      "type": "object"
+      "markdownDescription": "Shortcuts and the focus contexts where they apply.\n\nAn ordered list of {keys, command, context?} or {keys, unbind, context?}. A null command reserves the keys; unbind removes the named key and command pair. Context is a focus predicate such as Editor or Workspace > Terminal. User bindings win at equal depth; deeper bindings take precedence.",
+      "type": "array"
     },
     "keybindings.preset": {
-      "default": "default",
-      "description": "The set of shortcuts your own changes build on. VS Code uses VS Code’s shortcuts. Platform starts from those and adds its own keys for tabs, chats and sidebar panels.",
-      "enum": ["default", "vscode"],
+      "default": "ours",
+      "description": "The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts.",
+      "enum": ["ours", "vscode", "zed"],
       "type": "string"
     },
     "logs.defaultTimeRange": {
@@ -1518,6 +1552,11 @@
       "maximum": 500000,
       "minimum": 0,
       "type": "integer"
+    },
+    "terminal.shellKeys": {
+      "default": false,
+      "description": "Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell.",
+      "type": "boolean"
     },
     "tui.theme.colors": {
       "default": "theme",

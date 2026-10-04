@@ -1,3 +1,4 @@
+import type { EditorKeymapPack } from '@singapore-editor/core/keymap'
 import {
   nextWordOffset,
   previousWordOffset,
@@ -27,9 +28,31 @@ const WORD_WINDOW = 4096
  * A bounded modal editing proof built only on public exports (Editor E028): normal and insert
  * modes, h j k l w b 0 $, counts, d with a motion, dd, diw, Escape and u.
  */
+const modalRows = [
+  ...Array.from({ length: 95 }, (_, index) => String.fromCharCode(index + 32)),
+  'Escape',
+].flatMap((key) =>
+  [false, true].map((shift): EditorKeymapPack['linux'][number] => ({
+    keys: [{ key, shift }],
+    command: 'example.modal.stroke',
+    context: 'Editor && !EditorWidget && modalNormal',
+  })),
+)
+const escapeRow = {
+  keys: 'Escape',
+  command: 'example.modal.stroke',
+  context: 'Editor && !EditorWidget && modalInsert',
+}
+export const modalPack: EditorKeymapPack = {
+  linux: [...modalRows, escapeRow],
+  mac: [...modalRows, escapeRow],
+  windows: [...modalRows, escapeRow],
+}
+
 export function createModalEditingPlugin(): EditorPlugin {
   return createPlugin({
     name: 'example.modal',
+    commands: [{ id: 'example.modal.stroke', title: 'Run modal editing key', mutates: false }],
     view(scope) {
       const mode = scope.state<ModalState>(NORMAL)
       // A new document, or focus leaving the view, drops a half-typed command; the mode stays.
@@ -37,12 +60,18 @@ export function createModalEditingPlugin(): EditorPlugin {
         if (mode.get().kind === 'normal') mode.set(NORMAL)
       }
       scope.watch(documentInput, () => cancelPending())
-      scope.keyParticipant((event) => {
-        if (!modalHandles(mode.get(), event.key)) return 'delegate'
+      scope.own(
+        scope.view.registerKeymapContextKey('modalNormal', () => mode.get().kind === 'normal'),
+      )
+      scope.own(
+        scope.view.registerKeymapContextKey('modalInsert', () => mode.get().kind === 'insert'),
+      )
+      scope.handle('example.modal.stroke', ({ event }) => {
+        if (!event || !modalHandles(mode.get(), event.key)) return false
         const step = modalStep(mode.get(), event.key)
         mode.set(step.state)
         run(scope, step.action)
-        return 'consume'
+        return true
       })
       scope.textGate(() => mode.get().kind === 'insert')
       scope.watch(mode.input, (state) => {

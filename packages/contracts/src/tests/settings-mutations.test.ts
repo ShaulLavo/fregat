@@ -356,34 +356,80 @@ describe('settings operation reducer', () => {
     expect(result.touchedSettingIds).toEqual(['editor.fontSize', 'editor.lineHeight'])
   })
 
-  it('sets one keybinding and preserves unrelated command entries', () => {
+  it('replaces one exact context and targets only removed preset pairs', () => {
     const raw = {
-      'keybindings.overrides': {
-        'workspace.open': ['Mod+O'],
-        'future.command': ['Mod+9'],
-      },
+      'keybindings.overrides': [
+        { keys: 'F6', command: 'workspace.save', context: 'Workspace' },
+        { keys: 'F7', command: 'workspace.save', context: 'Editor' },
+        { keys: 'F8', command: 'future.command', context: 'Editor' },
+        { keys: 'F9', command: null, context: 'Editor' },
+      ],
     }
     const result = applyIdempotently(raw, {
       kind: 'keybinding.set',
       command: 'workspace.save',
+      context: 'Editor',
       keys: ['Mod+S'],
+      defaultKeys: ['Mod+S', 'F2'],
     })
-
-    expect(result.raw['keybindings.overrides']).toEqual({
-      'workspace.open': ['Mod+O'],
-      'future.command': ['Mod+9'],
-      'workspace.save': ['Mod+S'],
-    })
+    expect(result.raw['keybindings.overrides']).toEqual([
+      raw['keybindings.overrides'][0],
+      raw['keybindings.overrides'][2],
+      raw['keybindings.overrides'][3],
+      { keys: 'F2', unbind: 'workspace.save', context: 'Editor' },
+      { keys: 'Mod+S', command: 'workspace.save', context: 'Editor' },
+    ])
   })
 
-  it('removes one keybinding and deletes the default-empty collection', () => {
-    const result = applyIdempotently(
-      { 'keybindings.overrides': { 'workspace.save': ['Mod+S'] }, untouched: true },
-      { kind: 'keybinding.remove', command: 'workspace.save' },
+  it('clears contextual keys with targeted unbinds and reset removes those rows', () => {
+    const cleared = applyIdempotently(
+      { untouched: true },
+      {
+        kind: 'keybinding.set',
+        command: 'workspace.save',
+        context: 'Editor',
+        keys: null,
+        defaultKeys: ['Mod+S'],
+      },
     )
+    expect(cleared.raw['keybindings.overrides']).toEqual([
+      { keys: 'Mod+S', unbind: 'workspace.save', context: 'Editor' },
+    ])
+    const reset = applyIdempotently(cleared.raw, {
+      kind: 'keybinding.remove',
+      command: 'workspace.save',
+      context: 'Editor',
+    })
+    expect(reset.raw).toEqual({ untouched: true })
+    expect(reset.touchedSettingIds).toEqual(['keybindings.overrides'])
+  })
 
-    expect(result.raw).toEqual({ untouched: true })
-    expect(result.touchedSettingIds).toEqual(['keybindings.overrides'])
+  it('appends reservations in authored order and deletes exactly one index', () => {
+    const entry = { keys: 'F9', command: null, context: 'Terminal' }
+    const appended = applySettingsOperations(
+      { 'keybindings.overrides': [{ keys: 'F8', command: 'future.command' }] },
+      [operation({ kind: 'keybinding.append', entry })],
+    )
+    expect(appended.raw['keybindings.overrides']).toEqual([
+      { keys: 'F8', command: 'future.command' },
+      entry,
+    ])
+    const deleted = applySettingsOperations(appended.raw, [
+      {
+        kind: 'keybinding.delete',
+        index: 0,
+        expected: [{ keys: 'F8', command: 'future.command' }, entry],
+      },
+    ])
+    expect(deleted.raw['keybindings.overrides']).toEqual([entry])
+    const stale = applySettingsOperations(deleted.raw, [
+      {
+        kind: 'keybinding.delete',
+        index: 0,
+        expected: [{ keys: 'F8', command: 'future.command' }, entry],
+      },
+    ])
+    expect(stale.raw['keybindings.overrides']).toEqual([entry])
   })
 
   it('sets model membership without disturbing other refs or their order', () => {
@@ -659,6 +705,32 @@ describe('theme part removal', () => {
 })
 
 describe('settings mutation resources', () => {
+  it('separates exact contexts while list append/delete lock the entire collection', () => {
+    const root = settingsOperationResourceKeys({
+      kind: 'keybinding.set',
+      command: 'workspace.save',
+      keys: ['F8'],
+      context: 'Workspace',
+    })[0]!
+    const editor = settingsOperationResourceKeys({
+      kind: 'keybinding.remove',
+      command: 'workspace.save',
+      context: 'Editor',
+    })[0]!
+    const appended = settingsOperationResourceKeys({
+      kind: 'keybinding.append',
+      entry: { keys: 'F9', command: null },
+    })[0]!
+    const deleted = settingsOperationResourceKeys({
+      kind: 'keybinding.delete',
+      index: 0,
+      expected: [],
+    })[0]!
+    expect(settingsMutationResourcesIntersect(root, editor)).toBe(false)
+    expect(settingsMutationResourcesIntersect(root, appended)).toBe(true)
+    expect(settingsMutationResourcesIntersect(editor, deleted)).toBe(true)
+  })
+
   it('distinguishes collection members but intersects a reset with any member', () => {
     const save = settingsOperationResourceKeys(
       operation({ kind: 'keybinding.set', command: 'workspace.save', keys: ['Mod+S'] }),

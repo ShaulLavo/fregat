@@ -1,7 +1,7 @@
 {
   "reading": "disk",
-  "scriptGzip": 1735134,
-  "phoneScriptGzip": 1421202,
+  "scriptGzip": 1754768,
+  "phoneScriptGzip": 1449825,
   "owners": {
     "node_modules": 505079,
     "editor": 350240,
@@ -17,7 +17,7 @@
     "apps/web/src/features/git": 39461,
     "packages/tree": 35779,
     "packages/ui": 33910,
-    "apps/web/src/keymap": 23689,
+    "apps/web/src/keymap": 34532,
     "apps/web/src/components": 25617,
     "apps/web/src/state": 18765,
     "apps/web/src/features/settings": 13409,
@@ -34,7 +34,8 @@
     "virtual": 1469,
     "apps/web/src": 818,
     "packages/utils": 794,
-    "apps/web/src/features/file-picker": 83
+    "apps/web/src/features/file-picker": 83,
+    "hotkeys/packages": 6942
   },
   "history": [
     {
@@ -126,6 +127,12 @@
       "scriptGzip": 1738735,
       "phoneScriptGzip": 1435154,
       "reason": "Shared account and allowance-window details serve the composer and Usage settings with mapped accounts, independent observations, routing, provider credits and reset grants. Measured components owner gzip 22965 -> 25617 (+2652). Re-pin this owner only; desktop and phone total pins, every other owner pin and gate margins remain unchanged."
+    },
+    {
+      "at": "2026-10-04T00:02:57.276Z",
+      "scriptGzip": 1754768,
+      "phoneScriptGzip": 1449825,
+      "reason": "Command foundation source 9dfe97a58 after synchronous preset projection and lazy Settings report metadata: actual disk desktop gzip 1,830,773 -> 1,754,768 (-76,005), phone conversation 1,525,666 -> 1,449,825 (-75,841), compared with prior candidate c5748d40. Matched main 913f79f3 measures 1,738,901 desktop / 1,435,433 phone conversation; residual growth is 15,867 / 14,392 bytes. Shared synchronous Hotkeys/main-host/Editor dispatch and active preset tables retain this bounded startup cost. Record desktop/phone totals and only keymap 23,689 -> 34,532 plus new hotkeys/packages 6,942 weighted owner estimates; owner shares are not intrinsic additive gzip totals. All other owner pins, existing history, gate margins and phone allowance remain unchanged. The original unchanged-gate FAIL is retained in the bundle-unit/vscode-candidate evidence."
     }
   ]
 }

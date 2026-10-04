@@ -315,6 +315,10 @@ export const SETTINGS_PRESENTATION = {
     requiresRestart: true,
     visibility: 'advanced',
   },
+  'terminal.shellKeys': {
+    widget: 'boolean',
+    category: 'Terminal',
+  },
   'terminal.integrated.fontSize': {
     widget: 'number',
     category: 'Terminal',

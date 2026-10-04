@@ -351,10 +351,13 @@ describe('collection intent', () => {
     ])
 
     const values = store.snapshot().values
-    expect(values['keybindings.overrides']).toMatchObject({
-      'command.one': ['Mod+1'],
-      'command.two': ['Mod+2'],
-    })
+    expect(values['keybindings.overrides']).toHaveLength(2)
+    expect(values['keybindings.overrides']).toEqual(
+      expect.arrayContaining([
+        { keys: 'Mod+1', command: 'command.one' },
+        { keys: 'Mod+2', command: 'command.two' },
+      ]),
+    )
     expect(values['models.hidden']).toEqual(expect.arrayContaining([alpha, beta]))
     expect(values['providers.instances']).toEqual(
       expect.arrayContaining([
@@ -362,6 +365,64 @@ describe('collection intent', () => {
         expect.objectContaining({ enabled: false, providerInstanceId: providerTwo }),
       ]),
     )
+  })
+
+  it.each([
+    ['command.one', 'command.two'],
+    ['command.two', 'command.one'],
+  ])('retains committed authored keybinding precedence from %s to %s', async (first, second) => {
+    const root = await tempRoot()
+    const store = createStore(root)
+    for (const command of [first, second]) {
+      await store.write({
+        mutationId: `authored-${command}`,
+        operations: [{ command, keys: ['Mod+K'], kind: 'keybinding.set' }],
+        target: 'user',
+      })
+    }
+    expect(store.snapshot().values['keybindings.overrides']).toEqual([
+      { keys: 'Mod+K', command: first },
+      { keys: 'Mod+K', command: second },
+    ])
+  })
+
+  it('preserves concurrent writes to the same command in different exact contexts', async () => {
+    const root = await tempRoot()
+    const store = createStore(root)
+    await Promise.all(
+      ['Workspace', 'Editor'].map((context, index) =>
+        store.write({
+          mutationId: `binding-context-${index}`,
+          target: 'user',
+          operations: [
+            {
+              kind: 'keybinding.set',
+              command: 'workspace.saveFile',
+              keys: [`F${index + 6}`],
+              context,
+              defaultKeys: ['Mod+S'],
+            },
+          ],
+        }),
+      ),
+    )
+    expect(store.snapshot().values['keybindings.overrides']).toEqual(
+      expect.arrayContaining([
+        { keys: 'Mod+S', unbind: 'workspace.saveFile', context: 'Workspace' },
+        { keys: 'F6', command: 'workspace.saveFile', context: 'Workspace' },
+        { keys: 'Mod+S', unbind: 'workspace.saveFile', context: 'Editor' },
+        { keys: 'F7', command: 'workspace.saveFile', context: 'Editor' },
+      ]),
+    )
+    await store.write({
+      mutationId: 'binding-context-reset',
+      target: 'user',
+      operations: [{ kind: 'keybinding.remove', command: 'workspace.saveFile', context: 'Editor' }],
+    })
+    expect(store.snapshot().values['keybindings.overrides']).toEqual([
+      { keys: 'Mod+S', unbind: 'workspace.saveFile', context: 'Workspace' },
+      { keys: 'F6', command: 'workspace.saveFile', context: 'Workspace' },
+    ])
   })
 
   it('treats model order as one atomic last-writer-wins register', async () => {

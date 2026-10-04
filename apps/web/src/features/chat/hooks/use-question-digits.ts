@@ -1,4 +1,4 @@
-import { useHotkeys } from '@tanstack/react-hotkeys'
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import type { UserInputQuestion } from '@workspace/contracts'
 
 export function useQuestionDigits(
@@ -6,11 +6,19 @@ export function useQuestionDigits(
   enabled: boolean,
   select: (value: string) => void,
 ) {
-  useHotkeys(
-    (question?.options ?? []).slice(0, 9).map((option, index) => ({
-      hotkey: { key: String(index + 1) },
-      callback: () => select(option.value),
-      options: { enabled, ignoreInputs: true, stopPropagation: false },
-    })),
-  )
+  return useKeymapNode({
+    area: 'chat',
+    context: { identifiers: enabled ? ['Question'] : [] },
+    commands: Object.fromEntries(
+      Array.from({ length: 9 }, (_, index): readonly [string, () => boolean] => [
+        `question.select${index + 1}`,
+        () => {
+          const option = question?.options[index]
+          if (!enabled || !option) return false
+          select(option.value)
+          return true
+        },
+      ]),
+    ),
+  })
 }

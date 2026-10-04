@@ -1,3 +1,4 @@
+import { commandFoundation } from './command-foundation'
 import { unknownWorkspaceSettings } from './unknown-workspace-settings'
 import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
@@ -245,6 +246,7 @@ import { settingsDependentRow } from './settings-dependent-row'
 import { settingsTokenizationLimit } from './settings-tokenization-limit'
 import { settingsRowDetails } from './settings-row-details'
 import { settingsKeybindings } from './settings-keybindings'
+import { settingsShortcutMetadata } from './settings-shortcut-metadata'
 import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
@@ -648,6 +650,7 @@ export const scenarios: readonly Scenario[] = [
   terminalRendererWebgl,
   bottomPanelPersistence,
   sidebarToggle,
+  commandFoundation,
   itemNavigation,
   shortcutHints,
   editorAddToChat,
@@ -676,6 +679,7 @@ export const scenarios: readonly Scenario[] = [
   settingsTokenizationLimit,
   settingsRowDetails,
   settingsKeybindings,
+  settingsShortcutMetadata,
   tailFollow,
   checkpointRestore,
   filePickerBrowse,

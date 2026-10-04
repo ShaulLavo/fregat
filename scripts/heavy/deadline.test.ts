@@ -54,6 +54,87 @@ function deadlineBox(seconds = 2) {
 }
 
 const pidIn = (file: string) => Number(readFileSync(file, 'utf8').trim())
+function processObservation(pid: number) {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
+    return {
+      pid,
+      exists: alive(pid),
+      state: fields[0] ?? null,
+      parent: fields[1] ?? null,
+      start: fields[19] ?? null,
+      cgroup: readFileSync(`/proc/${pid}/cgroup`, 'utf8').trim(),
+    }
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !('code' in error) ||
+      (error.code !== 'ENOENT' && error.code !== 'ESRCH')
+    )
+      throw error
+    return { pid, exists: alive(pid), state: null, parent: null, start: null, cgroup: null }
+  }
+}
+
+function executing(observation: ReturnType<typeof processObservation>, start: string | null) {
+  return (
+    observation.exists &&
+    start !== null &&
+    observation.start === start &&
+    observation.state !== null &&
+    observation.state !== 'Z' &&
+    observation.state !== 'X'
+  )
+}
+
+const processObservationUnavailable =
+  process.platform !== 'linux' || !existsSync('/proc/self/stat') || !Bun.which('bash')
+if (processObservationUnavailable)
+  console.info('Process execution calibration requires Linux procfs and Bash.')
+
+test.skipIf(processObservationUnavailable)(
+  'process execution observation distinguishes an unreaped child from its live owner',
+  async () => {
+    const box = sandbox()
+    const nestedPid = path.join(box.root, 'child.pid')
+    const release = path.join(box.root, 'release')
+    const parent = Bun.spawn(
+      [
+        'bash',
+        '-c',
+        'bash -c \'until [ -e "$1" ]; do sleep 0.02; done\' _ "$1" & echo $! > "$2"; kill -STOP $$; wait',
+        '_',
+        release,
+        nestedPid,
+      ],
+      { stdout: 'ignore', stderr: 'pipe' },
+    )
+    try {
+      await expect.poll(() => existsSync(nestedPid), { timeout: 2_000 }).toBe(true)
+      const original = processObservation(pidIn(nestedPid))
+      expect(executing(original, original.start)).toBe(true)
+      const owner = processObservation(parent.pid)
+      expect(executing(owner, owner.start)).toBe(true)
+      writeFileSync(release, '')
+      await expect
+        .poll(() => processObservation(pidIn(nestedPid)).state, { timeout: 2_000 })
+        .toBe('Z')
+      const zombie = processObservation(pidIn(nestedPid))
+      console.log(
+        JSON.stringify({ event: 'process-execution-calibration', owner, original, zombie }),
+      )
+      expect(alive(zombie.pid)).toBe(true)
+      expect(zombie.start).toBe(original.start)
+      expect(executing(zombie, original.start)).toBe(false)
+      expect(executing(processObservation(parent.pid), owner.start)).toBe(true)
+    } finally {
+      writeFileSync(release, '')
+      parent.kill('SIGCONT')
+      await parent.exited
+    }
+  },
+)
 const systemdRun = userScopes ? Bun.which('systemd-run') : null
 const watchdogOf = (slice: string) => `${slice.slice(0, -'.slice'.length)}_deadline.service`
 const serviceState = (service: string) =>
@@ -424,14 +505,28 @@ kill -STOP $$
         .toBe(true)
       const owner = live(box.state, 'jobs').find((entry) => entry.label === 'frozen-startup')!
       slice = ownSlice(box.sliceRoot, owner.id)
+      const originalNested = processObservation(pidIn(nestedPid))
+      expect(originalNested.cgroup).toContain(slice)
+      expect(executing(originalNested, originalNested.start)).toBe(true)
       owned.child.kill('SIGSTOP')
       await expect
         .poll(() => sliceState(box.sliceRoot, slice!), {
           timeout: (DEADLINE_START_SECONDS + 3) * 1000,
         })
         .not.toBe('running')
+      console.log(
+        JSON.stringify({
+          event: 'frozen-before-ready-observation',
+          frozen: processObservation(pidIn(frozen)),
+          nested: processObservation(pidIn(nestedPid)),
+          originalNested,
+          canary: processObservation(pidIn(canaryPid)),
+          slice: sliceState(box.sliceRoot, slice),
+          payloadRan: existsSync(marker),
+        }),
+      )
       expect(alive(pidIn(frozen))).toBe(false)
-      expect(alive(pidIn(nestedPid))).toBe(false)
+      expect(executing(processObservation(pidIn(nestedPid)), originalNested.start)).toBe(false)
       expect(existsSync(marker)).toBe(false)
       expect(alive(pidIn(canaryPid))).toBe(true)
       await expect

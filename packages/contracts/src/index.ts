@@ -526,6 +526,9 @@ export {
 } from './lsp-protocol'
 export {
   keybindingChordSchema,
+  keybindingContextSchema,
+  keybindingOverrideSchema,
+  keybindingOverridesSchema,
   keybindingListSchema,
   MAX_KEYBINDINGS_PER_COMMAND,
   lspFeatureRanksOverrideSchema,
@@ -538,6 +541,7 @@ export {
   providerInstanceConfigsSchema,
   REDACTED_SETTINGS_VALUE,
   semanticTokenServerOverridesSchema,
+  type KeybindingOverride,
   type KeybindingOverrides,
   type LspLanguageServerLists,
   type LspServerOverride,
@@ -627,6 +631,8 @@ export {
   settingsRawWriteResultSchema,
   type NonSecretProviderEnvironmentVariable,
   type NonSecretProviderSeed,
+  type AppendKeybindingOperation,
+  type DeleteKeybindingOperation,
   type RemoveKeybindingOperation,
   type ResetSettingsOperation,
   type ScalarSettingId,

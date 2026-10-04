@@ -10,7 +10,8 @@ import type {
 } from '@/keymap/define-command'
 import type { CommandBus, CommandInvocation } from '@/keymap/state/command-bus'
 import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
-import type { PendingChordLabel } from '@singapore-editor/core/keymap'
+import type { PendingChordLabel } from '@fregat/hotkeys'
+import type { WindowKeymap } from '@/keymap/state/window-keymap'
 import type { FocusTargetToken } from '@/lib/focus/state/service'
 
 export type PlatformCommandBus = CommandBus<
@@ -24,7 +25,7 @@ export type PlatformCommandBus = CommandBus<
 export type CommandContextValue = {
   readonly bindings: readonly PlatformKeyBinding[]
   readonly bus: PlatformCommandBus
-  readonly claimKeybinding: (event: KeyboardEvent) => boolean
+  readonly keymap: WindowKeymap
   readonly closePalette: (restoreOrigin: boolean) => void
   readonly openWorkspaceRoot: (rootPath: WorkspaceRoot) => Promise<OpenWorkspaceRootResult>
   readonly paletteOpen: boolean

@@ -1,3 +1,4 @@
+import { detectPlatform } from '@fregat/hotkeys'
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
@@ -37,7 +38,7 @@ test('the badge stays out of the way until something is stashed', () => {
   expect(screen.queryByRole('button', { name: /Stashed prompts/ })).toBeNull()
 })
 
-test('⌘S parks the composer prompt and empties the composer', async () => {
+test('Mod+S parks the composer prompt and empties the composer', async () => {
   const composer = renderComposer()
 
   composer.type('rewrite the ingestion reactor')
@@ -46,6 +47,16 @@ test('⌘S parks the composer prompt and empties the composer', async () => {
   expect(stashedPrompts()).toEqual(['rewrite the ingestion reactor'])
   expect(composer.text).toBe('')
   expect(await screen.findByRole('button', { name: 'Stashed prompts: 1' })).toBeVisible()
+})
+
+test('stash yields when focus has left the composer', async () => {
+  const composer = renderComposer()
+  composer.type('keep typing here')
+  act(() => screen.getByTestId('composer').blur())
+  const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
+  await userEvent.keyboard(`{${modifier}>}s{/${modifier}}`)
+  expect(stashedPrompts()).toEqual([])
+  expect(composer.text).toBe('keep typing here')
 })
 
 test('restoring puts the prompt back and spends the stash entry', async () => {
@@ -157,10 +168,9 @@ function renderComposer() {
     queryClient: rendered.queryClient,
     navigate: (target: ChatInputDraftTarget) => rendered.rerender(element(target)),
     async pressStashShortcut() {
-      // The listener only fires for the composer the keystroke came from, so the
-      // editor has to hold focus exactly as it does in the app.
       screen.getByTestId('composer').focus()
-      await userEvent.keyboard('{Meta>}s{/Meta}')
+      const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
+      await userEvent.keyboard(`{${modifier}>}s{/${modifier}}`)
     },
     get text() {
       const editor = state.editor

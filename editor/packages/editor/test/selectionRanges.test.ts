@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 
 import { Editor } from '../src/editor'
-import { defaultEditorKeyBindings, editorCommandPackForCommand } from '../src/editor/keymap'
+import { defaultKeyBindings, commandCategory, keyboardEvent } from './factories/keymap'
 import type { EditorPlugin } from '../src/plugins'
 import { createDocumentSession, type DocumentSession } from '../src/public/document'
 import { resetEditorInstanceCount } from '../src/public/testing'
@@ -192,12 +192,10 @@ describe('smart select', () => {
   it.each(['editor.action.smartSelect.expand', 'editor.action.smartSelect.shrink'] as const)(
     'gives %s a pack and a default binding on every platform',
     (command) => {
-      expect(editorCommandPackForCommand(command)).toBe('selection')
+      expect(commandCategory(command)).toBe('selection')
 
       for (const platform of ['mac', 'windows', 'linux'] as const) {
-        expect(defaultEditorKeyBindings(platform).map((binding) => binding.command)).toContain(
-          command,
-        )
+        expect(defaultKeyBindings(platform).map((binding) => binding.command)).toContain(command)
       }
     },
   )
@@ -240,13 +238,16 @@ function smartSelectModifier(): KeyboardEventInit {
 }
 
 function dispatchSmartSelectKey(key: string): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', {
+  const init = {
     bubbles: true,
     cancelable: true,
     key,
     ...smartSelectModifier(),
-  })
-  ;(document.querySelector('.editor-virtualized') as HTMLElement).dispatchEvent(event)
+  }
+  const event = keyboardEvent('keydown', init)
+  const element = document.querySelector('.editor-virtualized') as HTMLElement
+  element.dispatchEvent(event)
+  element.dispatchEvent(keyboardEvent('keyup', init))
   return event
 }
 

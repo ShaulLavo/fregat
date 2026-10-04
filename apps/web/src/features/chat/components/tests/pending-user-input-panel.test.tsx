@@ -227,14 +227,26 @@ test('native callback questions do not offer dismissal', () => {
 
 test('number shortcuts select visible choices but ignore editable fields and modifiers', async () => {
   renderPanel([requestedActivity([{ ...framework(), allowOther: true }])])
+  act(() => screen.getByRole('button', { name: 'Vitest' }).focus())
   await userEvent.keyboard('2')
   expect(screen.getByRole('button', { name: 'Bun test' })).toHaveAttribute('aria-pressed', 'true')
   await userEvent.click(screen.getByLabelText('Other'))
   await userEvent.keyboard('1')
   expect(screen.getByLabelText('Other')).toHaveValue('1')
-  await userEvent.click(screen.getByRole('status'))
+  act(() => screen.getByRole('button', { name: 'Bun test' }).focus())
   await userEvent.keyboard('{Control>}1{/Control}')
   expect(screen.getByRole('button', { name: 'Vitest' })).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('question digits yield outside the card and decline missing options', async () => {
+  renderPanel([requestedActivity([framework()])])
+  await userEvent.keyboard('2')
+  expect(screen.getByRole('button', { name: 'Bun test' })).toHaveAttribute('aria-pressed', 'false')
+  act(() => screen.getByRole('button', { name: 'Vitest' }).focus())
+  await userEvent.keyboard('9')
+  expect(screen.getByRole('button', { name: 'Vitest' })).toHaveAttribute('aria-pressed', 'false')
+  await userEvent.keyboard('2')
+  expect(screen.getByRole('button', { name: 'Bun test' })).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('number shortcuts answer only the visible request when two requests are pending', async () => {
@@ -256,6 +268,7 @@ test('number shortcuts answer only the visible request when two requests are pen
 
   expect(screen.getAllByRole('region', { name: 'Agent question' })).toHaveLength(1)
   expect(screen.queryByText('Second pending question?')).not.toBeInTheDocument()
+  act(() => screen.getByRole('button', { name: 'Vitest' }).focus())
   await userEvent.keyboard('2')
   await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
   expect(dispatched).toHaveLength(1)

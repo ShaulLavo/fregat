@@ -92,15 +92,14 @@ type ValueWidget<TValue> =
   | (TValue extends readonly ModelRef[] ? 'models' : never)
   | (TValue extends Readonly<Record<string, MachineDefinition>> ? 'machines' : never)
   | (TValue extends Readonly<Record<string, string | null>> ? 'record' : never)
-  | (TValue extends Readonly<Record<string, readonly string[] | null>> ? 'keybindings' : never)
+  | (TValue extends readonly import('../settings').KeybindingOverride[] ? 'keybindings' : never)
 
 /**
  * How two layers combine for one key.
  *
  * `replace` is right for almost everything: a later layer wins outright.
  * `record` is opt-in for keyed maps where a workspace should be able to add an
- * entry without erasing the user's — `keybindings.overrides` is the case that
- * motivates it.
+ * entry while keeping entries from earlier layers.
  */
 type SettingMerge = 'replace' | 'record'
 
