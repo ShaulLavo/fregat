@@ -3544,7 +3544,19 @@
         },
         {
           "kind": "type",
+          "name": "EditorAnalysisDisplayDemand",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorAnalysisHighlighterRequest",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorAnalysisRangeInterest",
           "source": "packages/editor/src/editor/documentAnalysis.ts",
           "via": "packages/editor/src/editor.ts"
         },
