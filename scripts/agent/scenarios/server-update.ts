@@ -36,7 +36,7 @@ async function completeTurn(root: string) {
   await waitForNativeEvent(root, 'control', 'The native fixture must observe complete')
 }
 
-/** Links `pending` the way `deploy --server` does, then signals the server the way it does. */
+/** Links `pending` the way `install-release --server` does, then signals the server the way it does. */
 export async function stageRelease(server: IsolatedServer) {
   const release = join(server.productionRoot, 'releases', STAGED)
   await mkdir(join(release, 'server'), { recursive: true })

@@ -44,7 +44,11 @@ function release(name: string, config: Record<string, unknown> = {}) {
   writeFileSync(path.join(directory, 'web/index.html'), '')
   writeFileSync(
     path.join(directory, 'build-config.json'),
-    JSON.stringify({ source: '/work/checkout', ...config }),
+    JSON.stringify({
+      source: path.join(root, 'checkout'),
+      meshUrl: 'https://contributor.example/demo/',
+      ...config,
+    }),
   )
   symlinkSync(modules, path.join(directory, 'server/node_modules'))
   symlinkSync(modules, path.join(directory, 'node_modules'))
@@ -156,13 +160,14 @@ test('a valid release is promoted and its live check starts outside the service'
     '--expand-environment=no',
     '--unit=platform-live-check-B',
   ])
-  expect(argv).toContain('--working-directory=/work/checkout')
+  expect(argv).toContain(`--working-directory=${path.join(root, 'checkout')}`)
   expect(argv).toContain(
     `--property=ExecStopPost=-${process.execPath} ${path.join(root, 'bin/promote.ts')} notify`,
   )
-  const script = argv.indexOf('/work/checkout/scripts/deploy/live-check.mjs')
+  const script = argv.indexOf(path.join(root, 'checkout/scripts/deploy/live-check.mjs'))
   expect(argv[script - 1]).toMatch(/node$/)
   expect(argv.slice(script + 1)).toEqual([
+    '--target=https://contributor.example/demo/',
     '--release=B',
     `--out=${next}`,
     `--baseline=${path.join(live, 'live-check.json')}`,
@@ -184,13 +189,20 @@ test('a release deployed with --skip-live-check is promoted without a check', ()
 })
 
 test('the inline check runs in the checkout without waiting for a restart', () => {
-  const target = { name: 'B', directory: '/r/B', previous: null, source: '/work/checkout' }
+  const target = {
+    name: 'B',
+    directory: '/r/B',
+    previous: null,
+    source: path.join(root, 'checkout'),
+    meshUrl: 'https://contributor.example/demo/',
+  }
   const command = liveCheckCommand(target, '/srv/platform', 0)
 
-  expect(command.cwd).toBe('/work/checkout')
+  expect(command.cwd).toBe(path.join(root, 'checkout'))
   expect(command.env.PATH).toBe(process.env.PATH)
   expect(command.argv.slice(1)).toEqual([
-    '/work/checkout/scripts/deploy/live-check.mjs',
+    path.join(root, 'checkout/scripts/deploy/live-check.mjs'),
+    '--target=https://contributor.example/demo/',
     '--release=B',
     '--out=/r/B',
     '--baseline=',

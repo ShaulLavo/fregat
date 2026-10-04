@@ -84,22 +84,22 @@ test('a phone first load that grew past its margin fails on the phone total', ()
   expect(result.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 620_000 }])
 })
 
-test('phone uses the same total margin without a metadata allowance', () => {
+test('phone schema and keys entry get 138 measured bytes while total and owner limits stay fixed', () => {
   const atLimit: GateReport = {
     ...baseline,
-    phoneFirstLoad: { scriptGzip: 606_000 },
-    phoneSessionFirstLoad: { scriptGzip: 606_000 },
+    phoneFirstLoad: { scriptGzip: 606_138 },
+    phoneSessionFirstLoad: { scriptGzip: 606_138 },
   }
   const result = checkFirstLoad(atLimit, pins)
   expect(result.passed).toBe(true)
-  expect(result.phone).toEqual({ pinned: 600_000, now: 606_000, limit: 606_000 })
+  expect(result.phone).toEqual({ pinned: 600_000, now: 606_138, limit: 606_138 })
   expect(result.total.limit).toBe(1_010_000)
 
   const overPhone = checkFirstLoad(
-    { ...atLimit, phoneSessionFirstLoad: { scriptGzip: 606_001 } },
+    { ...atLimit, phoneSessionFirstLoad: { scriptGzip: 606_139 } },
     pins,
   )
-  expect(overPhone.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 606_001 }])
+  expect(overPhone.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 606_139 }])
   const overOwner = checkFirstLoad(
     { ...atLimit, owners: [{ owner: 'features/chat', firstLoadGzip: 126_001 }] },
     pins,

@@ -15,7 +15,7 @@ import { createTestApp, createTestDatabase } from '../server'
 const origin = 'http://localhost:5173'
 const model = { providerInstanceId: 'codex', model: 'gpt-5-codex' }
 
-/** `<root>/pending` → `<root>/releases/<name>`, the way `deploy --server` stages it. */
+/** `<root>/pending` → `<root>/releases/<name>`, the way `install-release --server` stages it. */
 export async function stageRelease(root: string, name: string) {
   const release = path.join(root, 'releases', name)
   await mkdir(release, { recursive: true })

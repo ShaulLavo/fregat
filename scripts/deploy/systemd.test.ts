@@ -145,7 +145,13 @@ test('a server that cannot take the signal fails without a restart', async () =>
 
 test('a rollback restart launches its check first and waits for the target name', async () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'deploy-restart-'))
-  const target = { name: 'A', directory, previous: null, source: '/work/checkout' }
+  const target = {
+    name: 'A',
+    directory,
+    previous: null,
+    source: path.join(directory, 'checkout'),
+    meshUrl: 'https://contributor.example/demo/',
+  }
   const server = scripted({
     body: (calls) => (calls.includes(`restart ${unit}`) ? running('A') : running('B')),
   })
@@ -160,7 +166,13 @@ test('a rollback restart launches its check first and waits for the target name'
 })
 
 test('a restart that never reports the target name fails', async () => {
-  const target = { name: 'A', directory: '/nonexistent', previous: null, source: '/x' }
+  const target = {
+    name: 'A',
+    directory: '/nonexistent',
+    previous: null,
+    source: '/x',
+    meshUrl: 'https://contributor.example/demo/',
+  }
   const server = scripted({ body: () => running('B') })
 
   await expect(restartInto(target, false, server.control)).rejects.toThrow(
