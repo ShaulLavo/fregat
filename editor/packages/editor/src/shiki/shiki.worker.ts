@@ -130,6 +130,8 @@ const inspectRetention = async (): Promise<ShikiWorkerTransportResult> => {
   const retention: ShikiWorkerRetentionSnapshot = {
     documentCount: documents.size,
     tokenizerCount: new Set(Array.from(documents.values(), (state) => state.tokenizer)).size,
+    retiredRuntimeCount: disposedRuntimeSessions.size,
+    retiredRuntimeLimit: MAX_DISPOSED_RUNTIME_SESSIONS,
     lineCount: retainedDocuments.reduce((sum, state) => sum + state.lineCount, 0),
     tokenCount: retainedDocuments.reduce((sum, state) => sum + state.tokenCount, 0),
     documents: retainedDocuments,

@@ -114,6 +114,9 @@ export type ShikiWorkerRequestPayload =
 export type ShikiWorkerRetentionSnapshot = {
   readonly documentCount: number
   readonly tokenizerCount: number
+  /** Session identifiers retained after document disposal. */
+  readonly retiredRuntimeCount: number
+  readonly retiredRuntimeLimit: number
   readonly lineCount: number
   readonly tokenCount: number
   readonly documents: readonly {
