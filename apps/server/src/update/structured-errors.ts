@@ -5,7 +5,7 @@ export const updateErrors = defineErrorCatalog('update', {
     status: 409,
     message: 'No update is staged.',
     why: 'Restart switches the server to a waiting update, and no deploy has prepared one.',
-    fix: 'Stage a release with bun run deploy --server, then restart.',
+    fix: 'Stage a release with bun run install-release --server, then restart.',
   },
   STAGED_RELEASE_CHANGED: {
     status: 409,

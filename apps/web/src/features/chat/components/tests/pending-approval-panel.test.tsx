@@ -132,7 +132,7 @@ test('only the oldest approval is shown and resolving it reveals the next reques
 })
 
 test('the complete approval detail is keyboard accessible without truncation', () => {
-  const detail = `bun run build\n${'echo checking workspace\n'.repeat(30)}bun run deploy`
+  const detail = `bun run build\n${'echo checking workspace\n'.repeat(30)}bun run install-release`
   renderPanel([
     sessionActivity({
       payload: {

@@ -1,3 +1,4 @@
+import { deployTargetSchema } from './deploy-target'
 import { LOG_TIME_RANGES } from '../log-dashboard'
 import { modelSelectionSchema } from '../orchestration-runtime'
 import { DEFAULT_CODEX_PROVIDER_SETTINGS } from '../provider'
@@ -888,12 +889,20 @@ export const SETTINGS_REGISTRY = {
     category: 'Developer',
     visibility: 'advanced',
   }),
+  'developer.deployTarget': defineSetting({
+    schema: v.nullable(deployTargetSchema),
+    default: null,
+    scope: 'machine',
+    widget: 'complex',
+    category: 'Developer',
+    visibility: 'advanced',
+  }),
   'developer.deployRestartWaitMinutes': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1440)),
     // Long enough for a typical agent turn to finish; a session busy for longer is stuck or
     // background work, which the caller should interrupt on purpose.
     default: 30,
-    // Machine scope: `bun run deploy --restart` reads it from this machine's production home.
+    // Machine scope: `bun run install-release --restart` reads it from this machine's production home.
     scope: 'machine',
     widget: 'number',
     category: 'Developer',

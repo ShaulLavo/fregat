@@ -674,12 +674,13 @@ export const SETTINGS_DOCUMENTATION = {
       'Seconds between checks for an available web update while the app is visible. Refresh applies the update when you choose.',
     keywords: ['developer', 'deploy', 'update', 'refresh'],
   },
+  'developer.deployTarget': {
+    title: 'Installation target',
+    description: 'Install releases and pair through Mesh and systemd.',
+  },
   'developer.deployRestartWaitMinutes': {
-    title: 'Deploy restart wait',
-    details:
-      'Thirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.',
-    description:
-      'Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.',
+    title: 'Restart wait',
+    description: 'Minutes to wait for busy sessions. --interrupt ends them and restarts.',
     keywords: ['developer', 'deploy', 'restart', 'update', 'busy', 'wait'],
   },
   'developer.heavyJobLogDirectory': {

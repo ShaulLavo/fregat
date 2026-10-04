@@ -260,11 +260,40 @@
     },
     "developer.deployRestartWaitMinutes": {
       "default": 30,
-      "description": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.",
-      "markdownDescription": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.\n\nThirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.",
+      "description": "Minutes to wait for busy sessions. --interrupt ends them and restarts.",
       "maximum": 1440,
       "minimum": 1,
       "type": "integer"
+    },
+    "developer.deployTarget": {
+      "anyOf": [
+        {
+          "properties": {
+            "meshHost": {
+              "pattern": "^[a-zA-Z\\d][\\w.-]*(?![\\s\\S])",
+              "type": "string"
+            },
+            "meshOrigin": {
+              "type": "string"
+            },
+            "meshRoute": {
+              "pattern": "^\\/(?:[\\w-]+\\/)*[\\w-]*(?![\\s\\S])",
+              "type": "string"
+            },
+            "productionRoot": {
+              "pattern": "^(?!\\/+$)(?!.*\\/\\.\\.?(?:\\/|$))\\/[^\\s%\"'$\\\\\\0]{1,4095}(?![\\s\\S])",
+              "type": "string"
+            }
+          },
+          "required": ["meshHost", "meshOrigin", "meshRoute", "productionRoot"],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Install releases and pair through Mesh and systemd."
     },
     "developer.devServerIdleMinutes": {
       "default": 15,

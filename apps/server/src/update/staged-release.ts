@@ -25,7 +25,7 @@ export function approveRestart(root: string, staged: StagedRelease) {
   renameSync(temporary, destination)
 }
 
-/** `<root>/pending`, the release `deploy --server` staged, unless the server already runs it. */
+/** `<root>/pending`, the release `install-release --server` staged, unless the server already runs it. */
 export function readStagedRelease(
   root: string | null,
   serverRelease: string | null,
