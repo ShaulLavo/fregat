@@ -27,15 +27,13 @@ export class DeviceOwner {
     let released = false
     return {
       device,
-      retire: () => {
-        if (this.current === entry) this.current = undefined
-      },
+      retire: () => this.retireEntry(entry),
       release: async () => {
         if (released) return
         released = true
         entry.reservations -= 1
         if (entry.reservations !== 0) return
-        if (this.current === entry) this.current = undefined
+        this.retireEntry(entry)
         try {
           await device.queue.onSubmittedWorkDone()
         } catch {}
@@ -54,15 +52,11 @@ export class DeviceOwner {
     void entry.device.then(
       (device) => {
         void device.lost.then(
-          () => {
-            if (this.current === entry) this.current = undefined
-          },
+          () => this.retireEntry(entry),
           () => {},
         )
       },
-      () => {
-        if (this.current === entry) this.current = undefined
-      },
+      () => this.retireEntry(entry),
     )
     return entry
   }
