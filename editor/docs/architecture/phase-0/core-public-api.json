@@ -6364,6 +6364,12 @@
         },
         {
           "kind": "type",
+          "name": "IncrementalTokenizerRetentionSnapshot",
+          "source": "packages/editor/src/shiki/tokenizer.ts",
+          "via": "packages/editor/src/shiki/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "IncrementalTokenizerSnapshot",
           "source": "packages/editor/src/shiki/tokenizer.ts",
           "via": "packages/editor/src/shiki/index.ts"
@@ -6462,6 +6468,12 @@
           "kind": "type",
           "name": "ShikiWorkerOwnerSnapshot",
           "source": "packages/editor/src/shiki/workerClient.ts",
+          "via": "packages/editor/src/shiki/index.ts"
+        },
+        {
+          "kind": "type",
+          "name": "ShikiWorkerRetentionSnapshot",
+          "source": "packages/editor/src/shiki/workerTypes.ts",
           "via": "packages/editor/src/shiki/index.ts"
         },
         {

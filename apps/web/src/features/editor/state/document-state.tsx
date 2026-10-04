@@ -49,6 +49,13 @@ type CreateEditorDocumentStoreOptions = {
 }
 
 type EditorDocumentStoreActions = {
+  acquireSnapshotComparison: (
+    request: import('@/lib/snapshot-comparison').SnapshotComparisonRequest,
+  ) => import('@/lib/snapshot-comparison').SnapshotComparisonLease
+  prepareSnapshotComparisonTab: (
+    tabId: TabId,
+    request: import('@/lib/snapshot-comparison').SnapshotComparisonRequest,
+  ) => import('@/lib/snapshot-comparison').SnapshotComparisonLease
   prepareSavedComparisonTab: (
     tabId: TabId,
     request: import('@/features/editor/utils/saved-comparison').SavedComparisonRequest,
@@ -209,6 +216,9 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
 
       return {
         ...service.state(),
+        acquireSnapshotComparison: (request) => service.acquireSnapshotComparison(request),
+        prepareSnapshotComparisonTab: (tabId, request) =>
+          service.prepareSnapshotComparisonTab(tabId, request),
         prepareSavedComparisonTab: (tabId, request) =>
           service.prepareSavedComparisonTab(tabId, request),
         acquireSavedComparison: (request) => service.acquireSavedComparison(request),

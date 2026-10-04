@@ -1,3 +1,4 @@
+import type { SnapshotComparison } from '@/lib/documents/utils/snapshot-comparison'
 import { isDirtyLiveEditorDocument } from '@/features/editor/utils/save'
 import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
 import {
@@ -613,9 +614,18 @@ export function createEditorActivation(
   documentStore: EditorDocumentStoreApi,
   rootOwner: Pick<FileOpenIntentServiceOwner, 'setRoot'>,
   prepareSavedComparison?: (path: FilesystemPath, tabId: TabId) => void,
+  prepareSnapshotComparison?: (comparison: SnapshotComparison, tabId: TabId) => void,
 ): EditorActivation {
   return {
     activate: (content, tabId) => {
+      if (
+        content.kind === 'document' &&
+        content.document.kind === 'git-diff' &&
+        content.document.source.kind === 'snapshot'
+      ) {
+        prepareSnapshotComparison?.(content.document.source, tabId)
+        return null
+      }
       if (content.kind === 'document' && content.document.kind === 'compare-saved') {
         prepareSavedComparison?.(content.document.file.path, tabId)
         return null

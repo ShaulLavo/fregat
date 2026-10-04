@@ -200,6 +200,7 @@ type TreeSitterRuntimeBarrierRequest = {
 
 type TreeSitterIdleFenceRequest = {
   readonly type: 'idleFence'
+  readonly includeRetention?: true
 }
 
 type TreeSitterDisposeRequest = {
@@ -224,7 +225,70 @@ export type TreeSitterWorkerResult =
   | TreeSitterParseAckResult
   | TreeSitterRangeResult
   | TreeSitterSelectionResult
+  | { readonly retention: TreeSitterWorkerRetentionSnapshot }
   | undefined
+
+export type TreeSitterWorkerRetentionSnapshot = {
+  readonly documentCount: number
+  readonly snapshotCount: number
+  /** Unique generic layer Tree objects. Markdown internal trees are unavailable. */
+  readonly treeCount: number
+  readonly markdownDocumentEntries: number
+  readonly markdownDocumentCount: number
+  readonly injectedMarkdownDocumentCount: number
+  readonly documents: readonly {
+    readonly runtimeSessionId: string
+    readonly snapshots: readonly {
+      readonly snapshotVersion: number
+      readonly languageId: TreeSitterLanguageId
+      /** Logical UTF-16 length of this snapshot. */
+      readonly sourceUnits: number
+      readonly layerCount: number
+      readonly treeCount: number
+      readonly markdownDocumentCount: number
+    }[]
+  }[]
+  readonly source: {
+    readonly documentCount: number
+    readonly cacheEntries: number
+    readonly cacheChunkCount: number
+    readonly snapshotChunkCount: number
+    /** Unique chunk objects reachable from the cache or retained snapshots. */
+    readonly chunkCount: number
+    /** Sum of chunk UTF-16 lengths, without inferring string allocation bytes. */
+    readonly chunkUnits: number
+  }
+  readonly shared: {
+    readonly registeredLanguages: number
+    readonly parserRuntimeInitialized: boolean
+    /** Includes failed runtime promises retained by the worker. */
+    readonly runtimeEntries: number
+    readonly runtimeCount: number
+    readonly parserCount: number
+    readonly languageCount: number
+    readonly queryCount: number
+    readonly runtimes: readonly {
+      readonly languageId: TreeSitterLanguageId
+      readonly highlightQueryCount: number
+      readonly foldQueryCount: number
+      readonly injectionQueryCount: number
+    }[]
+  }
+  readonly unmeasuredResources: readonly (
+    | 'markdown-parser-language-query-handles'
+    | 'markdown-tree-handles'
+  )[]
+  readonly unmeasuredBytes: readonly (
+    | 'javascript-objects'
+    | 'source-strings'
+    | 'grammars-parsers-queries'
+    | 'trees'
+    | 'markdown-documents'
+    | 'worker-heap'
+    | 'wasm-committed'
+    | 'wasm-allocator-live'
+  )[]
+}
 
 export type TreeSitterWorkerRequest = {
   readonly id: number
