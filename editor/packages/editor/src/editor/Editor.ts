@@ -920,6 +920,7 @@ export class Editor {
       return
     }
     this.syncViewEditability()
+    this.publishSyntaxDisplayDemand()
     this.options.onPresentationChange?.('provisional')
     this.observeSnapshotAppearance()
     this.recordSnapshotAdmission('admitted')
@@ -1024,6 +1025,7 @@ export class Editor {
     this.snapshotSettled = true
     this.view.commitProvisionalPaint()
     this.syncViewEditability()
+    this.publishSyntaxDisplayDemand()
     if (this.session) this.viewContributions.notify('document', null)
     if (this.session) this.syntax.notifyBaseTextPainted()
     this.options.onPresentationChange?.(this.getPresentationState())
@@ -1071,6 +1073,7 @@ export class Editor {
       return false
     } finally {
       this.committingPresentation = false
+      this.publishSyntaxDisplayDemand()
     }
   }
 
@@ -3988,6 +3991,7 @@ export class Editor {
     change?: DocumentSessionChange | null,
     also: readonly EditorViewContributionUpdateKind[] = [],
   ): void {
+    this.publishSyntaxDisplayDemand()
     if (!this.viewContributions || this.committingPresentation) return
     if (this.view.isProvisional) {
       if (this.invalidateIncompatibleSnapshot()) return
@@ -4124,12 +4128,14 @@ export class Editor {
   private readonly readViewport = (): EditorViewportSnapshot => this.view.getViewport()
 
   private readonly handleViewportScroll = (): void => {
+    this.publishSyntaxDisplayDemand()
     if (this.committingPresentation || this.view.isProvisional) return
     this.reportScroll()
     this.viewContributions?.notifyViewport(this.readViewport)
   }
 
   private readonly handleViewportChange = (): void => {
+    this.publishSyntaxDisplayDemand()
     this.updateSyntaxScrollTracking()
     const visibleRange = this.visibleSyntaxRange()
     this.syntax.refreshVisibleRange(this.documentVersion, {
@@ -4158,6 +4164,32 @@ export class Editor {
       VISIBLE_SYNTAX_OVERSCAN_CHARS,
       VISIBLE_SYNTAX_OVERSCAN_CHARS,
     )
+  }
+
+  private publishSyntaxDisplayDemand(): void {
+    if (!this.syntax) return
+    const session = editorBufferSession(this.session)
+    if (
+      !session ||
+      this.preparingDocument ||
+      this.committingPresentation ||
+      this.view.isProvisional ||
+      this.view.isRenderingAtomically ||
+      this.textSnapshot !== session.buffer.getTextSnapshot()
+    ) {
+      this.syntax.setDisplayDemand({ kind: 'unknown' })
+      return
+    }
+    const range = this.syntaxRangeAroundMountedRows(0, 0)
+    if (!range) {
+      this.syntax.setDisplayDemand({ kind: 'unknown' })
+      return
+    }
+    this.syntax.setDisplayDemand({
+      kind: 'frame',
+      snapshot: session.buffer.getTextSnapshot(),
+      ranges: [range],
+    })
   }
 
   private visibleSyntaxPrefetchRange(): EditorSyntaxRange | null {
@@ -4403,6 +4435,7 @@ export class Editor {
       )
     }
     const passChange = coalescedPassChange(flush, finalChange)
+    this.publishSyntaxDisplayDemand()
     this.sessionOptions.onChange?.(passChange)
     measureEditorPerformance('editor.notifyViewContributions', () =>
       this.notifyViewContributions(
@@ -4698,11 +4731,13 @@ export class Editor {
   }
 
   private notifyChange(change: DocumentSessionChange | null): void {
+    this.publishSyntaxDisplayDemand()
     this.notifyEditorFeatureContributions(change)
     this.options.onChange?.(this.getState(), change)
   }
 
   private notifyChangeWithTiming(change: DocumentSessionChange): void {
+    this.publishSyntaxDisplayDemand()
     const notifyStart = nowMs()
     const state = this.getState()
     const timedChange = appendTiming(change, 'editor.notify', notifyStart)

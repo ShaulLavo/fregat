@@ -1,11 +1,22 @@
 # Plan 198: Keep editor analysis with the document
 
-Status: Approved; implementation partly landed. Foundations publication, cancellation,
-configuration, range and retention contract proofs merged in
-[PR #203](https://github.com/ShaulLavo/fregat/pull/203) (`cf4e84419`) and shipped in web release
-`20260930T153009Z-cf4e8441-main` on 2026-09-30. The full acceptance matrix below remains open:
-chat/workbench pixel-level token comparison, retained parser/WASM byte accounting, an inactive
-analysis budget, the memory-pressure/first-frame matrix and physical hardware. See [current proof and limits](../docs/document-contributions/foundations-publication-proof.md). The owner superseded the fixed “first after wave 2” priority on 2026-09-28.
+Status: Approved, active execution. Foundations publication, cancellation,
+configuration, range and retention contracts landed in
+[PR #203](https://github.com/ShaulLavo/fregat/pull/203) (`cf4e84419`).
+The current document foundation wave has shipped these source units:
+
+- [PR #659](https://github.com/ShaulLavo/fregat/pull/659), `7f18c08e59af715cf2ba384c20703accb85a9731`: truthful range capability and synchronous compatible ready attachment.
+- [PR #660](https://github.com/ShaulLavo/fregat/pull/660), `ec18def2b2100203307173871b223278a2f46009`: disposed worker source metadata reclamation.
+- [PR #661](https://github.com/ShaulLavo/fregat/pull/661), `725f4d29a9352d4b7432445f21addaf551034f5c`: final runtime document disposal.
+- [PR #664](https://github.com/ShaulLavo/fregat/pull/664), `219bebd86a0a4a0f956893f257d6a3196f721f2c`: reversible inactive analysis reclamation, retention inspection, reentrant terminal disposal and result release.
+- [PR #666](https://github.com/ShaulLavo/fregat/pull/666), `dd900b4725301ed28af316885493f570c4408228`: complete shared Shiki paint and canonical cold incremental publication.
+
+The next bounded unit separates displayed frame demand, preparation pins and query waiters,
+while keeping active-entry caches conservatively pinned. Active optional-range pruning,
+the measured global inactive-entry policy, chat/workbench pixel comparison, dirty-buffer/Undo/
+two-view/cancellation/retained-environment acceptance, allocator/WASM accounting and physical
+hardware verification remain open. Source units establish their own evidence; they do not
+close the full acceptance matrix below. See [current proof and limits](../docs/document-contributions/foundations-publication-proof.md).
 Schedule by the [current dependency order](../PLAN.md#wave-2-closeout-and-dependency-order).
 Owners: Editor for analysis and view attachment; Platform for document retention and file opening.
 

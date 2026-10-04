@@ -7,7 +7,6 @@ import type { EditorTextBuffer } from '../documentSession'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type { EditorHighlighterProvider, EditorHighlightResult } from '../syntax/highlighter'
 import {
-  createEmptySyntaxResult,
   type EditorSyntaxLanguageId,
   type EditorSyntaxProvider,
   type EditorSyntaxRange,
@@ -194,8 +193,8 @@ export function createEditorPreparedDocument(
     },
     runtimeSessionIds() {
       return {
-        highlighter: highlighter?.runtimeSessionId ? [highlighter.runtimeSessionId] : [],
-        structural: structural?.runtimeSessionId ? [structural.runtimeSessionId] : [],
+        highlighter: highlighter?.session ? [highlighter.session.runtimeSessionId] : [],
+        structural: structural?.session ? [structural.session.runtimeSessionId] : [],
       }
     },
     borrow(expected) {
@@ -211,7 +210,12 @@ export function createEditorPreparedDocument(
         lineStarts,
         tabSize,
         fallbackFoldIndex: fallback.take(
-          structuralTransfer !== null && structuralOwnsFolds(structural, options.languageId),
+          structuralTransfer !== null &&
+            fallbackFoldReason({
+              languageId: options.languageId,
+              session: structuralTransfer.session,
+              status: structural?.failed() ? 'error' : 'loading',
+            }) === null,
         ),
         structural: structuralTransfer,
         highlighter: highlighterTransfer,
@@ -380,7 +384,7 @@ function createStructuralStage(
   }
 
   const configurationTag = checkedTag(request.configurationTag)
-  const session = options.analysis.borrowStructural({
+  let session = options.analysis.borrowStructural({
     provider: request.provider,
     configurationTag: request.configurationTag,
     languageId: options.languageId,
@@ -390,12 +394,16 @@ function createStructuralStage(
   })
   if (!session) return createMissingStructuralStage(request.abortSignal, 'failed')
 
-  const stage = createStageOwner<EditorSyntaxResult>(session, request.abortSignal)
+  session.setDisplayDemand({ kind: 'preparation', snapshot: textSnapshot, ranges: [request.range] })
+  const stage = createStageOwner<EditorSyntaxResult>(() => {
+    session?.dispose()
+    session = null
+  }, request.abortSignal)
   if (stage.disposed()) return createMissingStructuralStage(request.abortSignal, 'aborted')
 
   const result = session.refresh(textSnapshot).then(() => {
-    if (!session.queryRange) return session.getResult()
-    return session.queryRange(request.range)
+    if (!session) throw new DOMException('Prepared stage disposed', 'AbortError')
+    return session.queryRange(request.range, { signal: request.abortSignal })
   })
   const tracked = stage.track(result)
   return {
@@ -405,9 +413,10 @@ function createStructuralStage(
     outcome: outcomeFor(tracked, stage),
     provider: request.provider,
     range: request.range,
-    result: tracked,
     runtimeSessionId: session.runtimeSessionId,
-    session,
+    get session() {
+      return session
+    },
   }
 }
 
@@ -421,14 +430,17 @@ function createHighlighterStage(
   }
 
   const configurationTag = checkedTag(request.configurationTag)
-  const session = options.analysis.borrowHighlighter({
+  let session = options.analysis.borrowHighlighter({
     provider: request.provider,
     configurationTag: request.configurationTag,
     languageId: options.languageId,
   })
   if (!session) return createMissingHighlighterStage(request.abortSignal, 'failed')
 
-  const stage = createStageOwner<EditorHighlightResult>(session, request.abortSignal)
+  const stage = createStageOwner<EditorHighlightResult>(() => {
+    session?.dispose()
+    session = null
+  }, request.abortSignal)
   if (stage.disposed()) return createMissingHighlighterStage(request.abortSignal, 'aborted')
 
   const tracked = stage.track(session.refresh(textSnapshot))
@@ -438,13 +450,14 @@ function createHighlighterStage(
     outcome: outcomeFor(tracked, stage),
     provider: request.provider,
     range: 'full' as const,
-    result: tracked,
     runtimeSessionId: session.runtimeSessionId,
-    session,
+    get session() {
+      return session
+    },
   }
 }
 
-function createStageOwner<TResult>(session: { dispose(): void }, abortSignal: AbortSignal) {
+function createStageOwner<TResult>(releaseSession: () => void, abortSignal: AbortSignal) {
   let disposed = false
   let failed = false
   let readyResult: TResult | null = null
@@ -455,7 +468,8 @@ function createStageOwner<TResult>(session: { dispose(): void }, abortSignal: Ab
     if (disposed) return
     disposed = true
     abortSignal.removeEventListener('abort', abort)
-    session.dispose()
+    readyResult = null
+    releaseSession()
   }
   abortSignal.addEventListener('abort', abort, { once: true })
   if (abortSignal.aborted) abort()
@@ -466,12 +480,11 @@ function createStageOwner<TResult>(session: { dispose(): void }, abortSignal: Ab
     disposed: () => disposed,
     failed: () => failed,
     readyResult: () => readyResult,
-    track: (result: Promise<TResult>): Promise<TResult> =>
+    track: (result: Promise<TResult>): Promise<void> =>
       result.then(
         (value) => {
           if (disposed) throw new DOMException('Prepared stage disposed', 'AbortError')
           readyResult = value
-          return value
         },
         (error: unknown) => {
           failed = true
@@ -487,7 +500,11 @@ function outcomeFor<T>(
 ): Promise<EditorPreparedStageOutcome> {
   return result.then(
     () => (stage.disposed() ? 'stale' : 'ready'),
-    () => (stage.abortSignal.aborted ? 'aborted' : 'failed'),
+    (): EditorPreparedStageOutcome => {
+      if (stage.abortSignal.aborted) return 'aborted'
+      if (stage.disposed()) return 'stale'
+      return 'failed'
+    },
   )
 }
 
@@ -506,10 +523,8 @@ function createMissingStructuralStage(
     provider: null,
     range: null,
     readyResult: () => null,
-    result: Promise.resolve(createEmptySyntaxResult()),
     runtimeSessionId: '',
     session: null,
-    track: <T>(result: Promise<T>) => result,
   }
 }
 
@@ -527,10 +542,8 @@ function createMissingHighlighterStage(
     provider: null,
     range: null,
     readyResult: () => null,
-    result: Promise.resolve({ tokens: [] }),
     runtimeSessionId: '',
     session: null,
-    track: <T>(result: Promise<T>) => result,
   }
 }
 
@@ -539,7 +552,7 @@ function borrowStructural(
   expected: EditorPreparedDocumentMatch,
   analysis: EditorDocumentAnalysis,
 ): EditorPreparedStructuralBorrow | null {
-  if (!stage?.session || !stage.provider || !stage.configuration || !stage.range) return null
+  if (!stage?.provider || !stage.configuration || !stage.range) return null
   if (stage.provider !== expected.structuralProvider) return disposeStage(stage)
   if (!sameStructuralConfiguration(stage.configuration, expected.structuralConfiguration)) {
     return disposeStage(stage)
@@ -554,6 +567,8 @@ function borrowStructural(
     configurationTag: stage.configurationTag,
   })
   if (!session) return null
+  session.setDisplayDemand({ kind: 'unknown' })
+  stage.dispose()
   const range = stage.range
   const result = session
     .refresh(analysis.buffer.getTextSnapshot())
@@ -562,7 +577,7 @@ function borrowStructural(
   return borrowWithReadyResult(
     {
       family: 'structural' as const,
-      runtimeSessionId: stage.runtimeSessionId,
+      runtimeSessionId: session.runtimeSessionId,
       provider: stage.provider,
       configuration: stage.configuration,
       configurationTag: stage.configurationTag,
@@ -583,7 +598,7 @@ function borrowHighlighter(
   expected: EditorPreparedDocumentMatch,
   analysis: EditorDocumentAnalysis,
 ): EditorPreparedHighlighterBorrow | null {
-  if (!stage?.session || !stage.provider) return null
+  if (!stage?.provider) return null
   if (stage.provider !== expected.highlighterProvider) return disposeStage(stage)
   if (!sameTag(stage.configurationTag, expected.highlighterConfigurationTag)) {
     return disposeStage(stage)
@@ -594,12 +609,13 @@ function borrowHighlighter(
     configurationTag: stage.configurationTag,
   })
   if (!session) return null
+  stage.dispose()
   const result = session.refresh(analysis.buffer.getTextSnapshot())
   void result.catch(() => undefined)
   return borrowWithReadyResult(
     {
       family: 'highlighter' as const,
-      runtimeSessionId: stage.runtimeSessionId,
+      runtimeSessionId: session.runtimeSessionId,
       provider: stage.provider,
       configurationTag: stage.configurationTag,
       range: 'full' as const,
