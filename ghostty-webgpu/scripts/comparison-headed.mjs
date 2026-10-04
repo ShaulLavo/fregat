@@ -472,6 +472,59 @@ async function devtoolsEndpoint(profile, child) {
   assert.fail('Owned Chrome CDP startup timed out')
 }
 
+export async function finishOwnedLaunchCleanup({
+  child,
+  server,
+  profile,
+  cleanup,
+  exitTimeoutMilliseconds = 3000,
+}) {
+  const exited = () => !child || child.exitCode !== null || child.signalCode !== null
+  let onExit
+  try {
+    if (!exited()) {
+      await boundedSmokeOperation(
+        () =>
+          new Promise((resolve) => {
+            onExit = resolve
+            child.once('exit', onExit)
+          }),
+        exitTimeoutMilliseconds,
+      )
+    }
+  } catch (error) {
+    cleanup.browserExitError = String(error)
+  } finally {
+    if (onExit) child.off('exit', onExit)
+  }
+  cleanup.browserExited = exited()
+  try {
+    if (server) {
+      server.closeAllConnections()
+      await boundedSmokeOperation(
+        () =>
+          new Promise((resolve, reject) =>
+            server.close((error) => (error ? reject(error) : resolve())),
+          ),
+        2000,
+      )
+    }
+    cleanup.serverClosed = true
+  } catch (error) {
+    cleanup.serverCloseError = String(error)
+  }
+  try {
+    await rm(profile, { recursive: true })
+    cleanup.profileRemoved = true
+  } catch (error) {
+    cleanup.profileRemoveError = String(error)
+  }
+  assert(cleanup.serverClosed, 'Owned fixture server cleanup failed')
+  assert(cleanup.profileRemoved, 'Owned Chrome profile cleanup failed')
+  assert(cleanup.browserExited, 'Owned browser exit must be observed')
+  return cleanup
+}
+
 export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, observeWindow }) {
   assert.equal(process.platform, 'linux', 'This fixed Wayland/Vulkan launch recipe requires Linux')
   assert(typeof observeWindow === 'function', 'Actual compositor backend observer required')
@@ -585,25 +638,11 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       }
     }
     evidence.cleanup.processes = await ownedProcessStates(owned)
+    await finishOwnedLaunchCleanup({ child, server, profile, cleanup: evidence.cleanup })
     assert(
       evidence.cleanup.processes.every((entry) => !entry.alive),
       'Owned Chrome processes survived cleanup',
     )
-    evidence.cleanup.browserExited = !child || child.exitCode !== null || child.signalCode !== null
-    assert(evidence.cleanup.browserExited, 'Owned browser exit must be observed')
-    if (server) {
-      server.closeAllConnections()
-      await boundedSmokeOperation(
-        () =>
-          new Promise((resolve, reject) =>
-            server.close((error) => (error ? reject(error) : resolve())),
-          ),
-        2000,
-      )
-    }
-    evidence.cleanup.serverClosed = true
-    await rm(profile, { recursive: true })
-    evidence.cleanup.profileRemoved = true
     return evidence.cleanup
   }
   try {

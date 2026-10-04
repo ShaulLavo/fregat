@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -10,6 +11,7 @@ import {
   assertHeadedHardware,
   assertHeadedSurfaceTransport,
   headedLaunchArguments,
+  finishOwnedLaunchCleanup,
   ownedProcessAlive,
   ownedProcessStates,
   settleOwnedWindowGeometry,
@@ -655,4 +657,78 @@ test('physical Vulkan adapter facts cannot override an observed incompatible nat
     () => assertHeadedSurfaceTransport(undefined),
     /Observed Chrome diagnostics required/,
   )
+})
+
+test('cleanup waits for the owned child exit notification before asserting it', async () => {
+  const profile = await mkdtemp(join(tmpdir(), 'headed-exit-test-'))
+  const child = new EventEmitter()
+  child.exitCode = null
+  child.signalCode = null
+  const cleanup = {}
+  const server = {
+    closeAllConnections() {
+      cleanup.connectionsClosed = true
+    },
+    close(done) {
+      done()
+    },
+  }
+  const pending = finishOwnedLaunchCleanup({ child, server, profile, cleanup })
+  setImmediate(() => {
+    child.exitCode = 0
+    child.emit('exit', 0, null)
+  })
+  await pending
+  assert.equal(cleanup.browserExited, true)
+  assert.equal(cleanup.connectionsClosed, true)
+  assert.equal(cleanup.serverClosed, true)
+  assert.equal(cleanup.profileRemoved, true)
+  assert.equal(child.listenerCount('exit'), 0)
+  await assert.rejects(readFile(profile), { code: 'ENOENT' })
+})
+
+test('missing child exit notification still closes the server and removes its owned profile', async () => {
+  const profile = await mkdtemp(join(tmpdir(), 'headed-exit-timeout-'))
+  const child = new EventEmitter()
+  child.exitCode = null
+  child.signalCode = null
+  const cleanup = {}
+  const server = {
+    closeAllConnections() {
+      cleanup.connectionsClosed = true
+    },
+    close(done) {
+      done()
+    },
+  }
+  await assert.rejects(
+    finishOwnedLaunchCleanup({ child, server, profile, cleanup, exitTimeoutMilliseconds: 20 }),
+    /Owned browser exit must be observed/,
+  )
+  assert.equal(cleanup.browserExited, false)
+  assert.equal(cleanup.connectionsClosed, true)
+  assert.equal(cleanup.serverClosed, true)
+  assert.equal(cleanup.profileRemoved, true)
+  assert.equal(typeof cleanup.browserExitError, 'string')
+  assert.equal(child.listenerCount('exit'), 0)
+  await assert.rejects(readFile(profile), { code: 'ENOENT' })
+})
+
+test('server close failure still removes the owned profile', async () => {
+  const profile = await mkdtemp(join(tmpdir(), 'headed-server-error-'))
+  const cleanup = {}
+  const server = {
+    closeAllConnections() {},
+    close(done) {
+      done({ code: 'EIO' })
+    },
+  }
+  await assert.rejects(
+    finishOwnedLaunchCleanup({ server, profile, cleanup }),
+    /fixture server cleanup failed/,
+  )
+  assert.equal(cleanup.browserExited, true)
+  assert.equal(cleanup.profileRemoved, true)
+  assert.equal(typeof cleanup.serverCloseError, 'string')
+  await assert.rejects(readFile(profile), { code: 'ENOENT' })
 })
