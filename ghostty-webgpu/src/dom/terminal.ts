@@ -343,6 +343,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       )
     }
     this.ensureActive()
+    if (typeof handler !== 'function')
+      throw createGhosttyError('input.connect', 'Input owner must be a function')
     if (this.inputOwner)
       throw createGhosttyError('input.connect', 'Terminal original input already has an owner')
     const controller = new AbortController()
@@ -375,13 +377,24 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (owner) {
       let claimed = false
       try {
-        claimed = owner.handler(input) === 'claim'
+        const decision: unknown = owner.handler(input)
+        if (decision !== 'claim' && decision !== 'pass') {
+          void Promise.resolve(decision).catch((cause: unknown) =>
+            this.reportError(cause, 'input.owner'),
+          )
+          throw createGhosttyError(
+            'input.owner',
+            'Input owner must return claim or pass synchronously',
+          )
+        }
+        claimed = decision === 'claim'
       } catch (cause) {
         this.reportError(cause, 'input.owner')
       }
       if (claimed || owner.signal.aborted || this.stateValue !== 'open') return true
     }
-    return (this.extensions?.dispatchInput(input) ?? false) || this.stateValue !== 'open'
+    const manager = this.extensions
+    return (manager?.hasInput ? manager.dispatchInput(input) : false) || this.stateValue !== 'open'
   }
 
   private readonly claimDomKey = (event: KeyboardEvent): boolean => {

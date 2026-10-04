@@ -126,6 +126,88 @@ async function fixture(entry: 'main', platform: KeymapPlatform = 'linux', observ
 }
 
 describe.each(['main'] as const)('%s public hotkeys connection', (entry) => {
+  it('rejects a JavaScript nonfunction before taking finite input ownership', async () => {
+    const f = await fixture(entry, 'linux', false)
+    expect(() => Reflect.apply(f.terminal.connectInput, f.terminal, [null])).toThrow(
+      'Input owner must be a function',
+    )
+    const connection = f.terminal.connectInput(() => 'pass')
+    connection.dispose()
+    expect(Reflect.get(f.terminal, 'extensions')).toBeUndefined()
+  })
+
+  it.each(['invalid', 'resolved', 'rejected'] as const)(
+    'reports a %s decision and continues synchronously without retroactive claims',
+    async (kind) => {
+      const f = await fixture(entry, 'linux', false)
+      await f.terminal.open(f.host)
+      const failure = Symbol('finite owner rejected result')
+      Reflect.apply(f.terminal.connectInput, f.terminal, [
+        () => {
+          if (kind === 'rejected') return Promise.reject(failure)
+          if (kind === 'resolved') return Promise.resolve('claim')
+          return 'invalid'
+        },
+      ])
+      let generalCalls = 0
+      f.terminal.use({
+        name: 'pass continuation',
+        setup: () => ({
+          input: () => {
+            generalCalls++
+            return 'pass'
+          },
+        }),
+      })
+      f.key('keydown', { key: 'a', code: 'KeyA' })
+      expect(generalCalls).toBe(1)
+      expect(f.output).toEqual(['a'])
+      await settle(f.terminal)
+      expect(f.output).toEqual(['a'])
+      expect(f.errors[0]).toMatchObject({
+        operation: 'input.owner',
+        cause: { message: 'Input owner must return claim or pass synchronously' },
+      })
+      expect(f.errors).toHaveLength(kind === 'rejected' ? 2 : 1)
+      if (kind === 'rejected')
+        expect(f.errors[1]).toMatchObject({ cause: failure, operation: 'input.owner' })
+    },
+  )
+
+  it.each(['before', 'after'] as const)(
+    'releases failed %s-open attachment and its subscription',
+    async (when) => {
+      const f = await fixture(entry, 'linux', false)
+      if (when === 'after') await f.terminal.open(f.host)
+      const failure = Symbol('clipboard setup failure')
+      let reads = 0
+      const attach = () =>
+        attachTerminalHotkeys(f.terminal, {
+          mode: 'standalone',
+          get clipboard(): never {
+            reads++
+            throw failure
+          },
+        })
+      if (when === 'after') expect(attach).toThrow(failure)
+      else {
+        const failed = attach()
+        await f.terminal.open(f.host)
+        expect(failed.registration).toBeUndefined()
+        expect(f.errors).toEqual([
+          expect.objectContaining({ cause: failure, operation: 'event.open' }),
+        ])
+      }
+      expect(reads).toBe(1)
+      const replacement = attachTerminalHotkeys(f.terminal)
+      expect(replacement.registration).toBeDefined()
+      replacement.dispose()
+      const finite = f.terminal.connectInput(() => 'pass')
+      finite.dispose()
+      expect(Reflect.get(f.terminal, 'extensions')).toBeUndefined()
+    },
+  )
+
   it.each(['standalone', 'hosted'] as const)(
     'owns %s hotkeys without constructing the general manager',
     async (mode) => {

@@ -1,4 +1,5 @@
 import type { TerminalApi } from '../../dom/terminal-api.js'
+import type { GhosttyWebGpuTerminalSubscription } from '../../dom/types.js'
 import {
   registerTerminalHotkeys,
   type TerminalHotkeyOwnership,
@@ -25,23 +26,30 @@ export function attachTerminalHotkeys(
     if (input.type !== 'key' || !('event' in input)) return 'pass'
     return registration?.claim(input.event) ?? 'pass'
   })
+  let opened: GhosttyWebGpuTerminalSubscription | undefined
+  connection.signal.addEventListener('abort', () => opened?.dispose(), { once: true })
   function attach(element: HTMLElement): void {
     if (registration || connection.signal.aborted) return
-    const clipboard = options.clipboard ?? element.ownerDocument.defaultView?.navigator.clipboard
-    registration = registerTerminalHotkeys({
-      ...options,
-      element,
-      terminal,
-      clipboard,
-      hasSelection: () => terminal.getSelection() !== undefined,
-      signal: connection.signal,
-      readState: () => terminal.inputModes,
-      onError: options.onError ?? ((cause, operation) => console.error(operation, cause)),
-    })
+    try {
+      const clipboard = options.clipboard ?? element.ownerDocument.defaultView?.navigator.clipboard
+      registration = registerTerminalHotkeys({
+        ...options,
+        element,
+        terminal,
+        clipboard,
+        hasSelection: () => terminal.getSelection() !== undefined,
+        signal: connection.signal,
+        readState: () => terminal.inputModes,
+        onError: options.onError ?? ((cause, operation) => console.error(operation, cause)),
+      })
+    } catch (cause) {
+      connection.dispose()
+      throw cause
+    }
   }
-  const opened = terminal.on('open', attach)
-  connection.signal.addEventListener('abort', () => opened.dispose(), { once: true })
   try {
+    opened = terminal.on('open', attach)
+    if (connection.signal.aborted) opened.dispose()
     if (terminal.element && terminal.lifecycle === 'open') attach(terminal.element)
   } catch (cause) {
     connection.dispose()

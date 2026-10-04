@@ -69,6 +69,12 @@ same claim boundary. A finite claim stops there; a pass reaches any explicitly i
 input contribution and then native encoding. Hotkeys attachment creates no general manager.
 The peer-owned `Terminal.use` surface retains its own registration and event semantics.
 
+A finite handler must be a function returning exactly `claim` or `pass` synchronously.
+Invalid decisions report a contract error and continue through the pass path. Rejected
+thenables are observed for diagnostics; their completion never changes that input decision.
+Immediate and deferred hotkeys setup failures release the lease and its open subscription,
+so a replacement can attach to the same native terminal.
+
 The finite connection requires the synchronous main entry. Worker `connectInput` returns a
 rejected Promise with a capability error; disposed calls also reject asynchronously. Existing
 worker input and general extension APIs retain their own actor conventions.
