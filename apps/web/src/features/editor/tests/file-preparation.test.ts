@@ -220,6 +220,34 @@ test('document creation returns the canonical replacement installed by a members
   source.release()
 })
 
+test('delete rollback restores bookkeeping before a membership callback edits its buffer', async ({
+  server,
+  client,
+  onTestFinished,
+}) => {
+  const path = filesystemPath('rollback-admission.ts')
+  await writeFile(join(server.root, path), 'const restored = true\n')
+  const file = await fetchFile(path, new AbortController().signal, client)
+  const documents = new WorkspaceDocumentService()
+  onTestFinished(() => documents.dispose())
+  const before = documents.ensureLiveDocument(file)
+  const projection = documents.prepareDeleteProjection(path)!
+  expect(documents.commitProjection(projection)).toBe(true)
+  const stop = documents.subscribeEditorAnalyses(() => {
+    const current = documents.getLiveDocument(before.key)
+    if (current) createEditorBufferSession(current.buffer).applyText(' edited')
+  })
+  onTestFinished(stop)
+  expect(documents.rollbackProjection(projection)).toBe(true)
+  const current = documents.getLiveDocument(before.key)!
+  expect(current.buffer).toBe(before.buffer)
+  expect(current.buffer.materializeFullText()).toBe('const restored = true\n edited')
+  expect(current.localRevision).toBe(current.buffer.getRevision())
+  expect(documents.state().dirtyDocumentKeys.has(current.key)).toBe(true)
+  expect(documents.state().documentContentRevisions[current.key]).toBe(current.contentRevision)
+  expect(current.buffer.canUndo()).toBe(true)
+})
+
 test('canonical preparation pins independently protect text until each caller releases', async ({
   server,
   client,

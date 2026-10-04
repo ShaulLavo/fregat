@@ -619,11 +619,9 @@ export class WorkspaceDocumentService {
     const record = existing
       ? this.replacementDocument(file, existing, cleanClaim)
       : this.createFileDocument(file, cleanClaim)
-    this.setContentRevision(record.key, record.contentRevision)
-    this.deleteDirtyKey(record.key)
-    this.setLiveDocument(record)
+    this.installLiveDocument(record)
     if (record.buffer !== existing?.buffer) this.rebindViewsForDocument(record.key)
-    return record
+    return this.getRequiredLiveDocument(record.key)
   }
 
   acquireFilePreparation(
@@ -690,10 +688,9 @@ export class WorkspaceDocumentService {
     }
 
     const record = this.createUnsyncedDocument(input)
-    this.setLiveDocument(record)
-    this.setContentRevision(key, record.contentRevision)
+    this.installLiveDocument(record)
     this.rebindViewsForDocument(key)
-    return record
+    return this.getRequiredLiveDocument(key)
   }
 
   ensureSettingsDocument(
@@ -714,9 +711,8 @@ export class WorkspaceDocumentService {
       target,
       sync: { kind: 'settings', revision: snapshot.revision, state: 'idle' },
     }
-    this.setLiveDocument(record)
-    this.setContentRevision(key, record.contentRevision)
-    return record
+    this.installLiveDocument(record)
+    return this.getRequiredLiveDocument(key)
   }
 
   ensureViewForDocument(
@@ -798,9 +794,7 @@ export class WorkspaceDocumentService {
 
     const record = this.replacementDocument(file, existing)
 
-    this.setLiveDocument(record)
-    this.setContentRevision(record.key, record.contentRevision)
-    this.deleteDirtyKey(record.key)
+    this.installLiveDocument(record)
     if (record.buffer !== existing?.buffer) this.rebindViewsForDocument(record.key)
     return { changed: true, wasDirty }
   }
@@ -1298,7 +1292,7 @@ export class WorkspaceDocumentService {
     const buffer = createHistoryBuffer(text)
     buffer.markClean()
     const contentRevision = contentRevisionForText(text)
-    this.setLiveDocument({
+    this.installLiveDocument({
       ...document,
       analysis: createEditorDocumentAnalysis({ buffer, documentId: document.key }),
       buffer,
@@ -1306,8 +1300,6 @@ export class WorkspaceDocumentService {
       localRevision: buffer.getRevision(),
       sync,
     })
-    this.setContentRevision(document.key, contentRevision)
-    this.deleteDirtyKey(document.key)
     this.rebindViewsForDocument(document.key)
     return true
   }
@@ -1703,6 +1695,10 @@ export class WorkspaceDocumentService {
   private rollbackDeleteProjection(projection: WorkspaceDocumentDeleteProjection): boolean {
     if (this.liveDocumentsByKey.has(projection.document.key)) return false
 
+    if (projection.contentRevision !== undefined) {
+      this.setContentRevision(projection.document.key, projection.contentRevision)
+    }
+    if (projection.dirty) this.addDirtyKey(projection.document.key)
     this.setLiveDocument({
       ...projection.document,
       analysis: createEditorDocumentAnalysis({
@@ -1710,14 +1706,16 @@ export class WorkspaceDocumentService {
         documentId: projection.document.key,
       }),
     })
-    if (projection.contentRevision !== undefined) {
-      this.setContentRevision(projection.document.key, projection.contentRevision)
-    }
-    if (projection.dirty) this.addDirtyKey(projection.document.key)
     for (const view of projection.views) {
       this.viewsByTabId.set(view.tabId, { ...view, preparedDocument: null })
     }
     return true
+  }
+
+  private installLiveDocument(document: LiveEditorDocument): void {
+    this.setContentRevision(document.key, document.contentRevision)
+    this.setDirty(document.key, document.buffer.isDirty())
+    this.setLiveDocument(document)
   }
 
   private setLiveDocument(document: LiveEditorDocument): void {

@@ -46,6 +46,9 @@ test.for(['late-release', 'admission-release'] as const)(
     })
     clock.startNext()
     await transport.entered
+    const activeFailure = expect(ensureFileSnapshotQuery(queryClient, path)).rejects.toMatchObject({
+      status: 404,
+    })
     if (mode === 'late-release') interest.release()
     await clock.settled()
     expect(queryClient.getQueryState(queryKey)?.fetchStatus).toBe('fetching')
@@ -54,13 +57,18 @@ test.for(['late-release', 'admission-release'] as const)(
     clock.startNext()
     await clock.settled()
     const claim = fixture.owner.service.claimLive(next)
+    expect(claim).not.toBeNull()
     expect(claim?.preparedDocument).not.toBeNull()
     claim?.preparedDocument?.dispose()
     claim?.release()
     expect(queryClient.getQueryState(queryKey)?.fetchStatus).toBe('fetching')
     transport.release()
+    await activeFailure
     await expect.poll(() => queryClient.getQueryState(queryKey)?.status).toBe('error')
     expect(queryClient.getQueryState(queryKey)?.error).toMatchObject({ status: 404 })
+    expect(
+      transport.requests.filter((request) => new URL(request.url).pathname === '/fs/read'),
+    ).toHaveLength(2)
     expect(fixture.owner.service.claimLive(path)).toBeNull()
   },
 )

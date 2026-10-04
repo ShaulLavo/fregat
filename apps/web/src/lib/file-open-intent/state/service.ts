@@ -1906,13 +1906,11 @@ function awaitPreparationInterest<T>(
   operation: Promise<T>,
   signal: AbortSignal,
 ): Promise<T | null> {
-  if (signal.aborted) return Promise.resolve(null)
   return new Promise((resolve, reject) => {
     const release = () => {
       signal.removeEventListener('abort', release)
       resolve(null)
     }
-    signal.addEventListener('abort', release, { once: true })
     operation.then(
       (value) => {
         signal.removeEventListener('abort', release)
@@ -1923,6 +1921,11 @@ function awaitPreparationInterest<T>(
         reject(error)
       },
     )
+    if (signal.aborted) {
+      release()
+      return
+    }
+    signal.addEventListener('abort', release, { once: true })
   })
 }
 
