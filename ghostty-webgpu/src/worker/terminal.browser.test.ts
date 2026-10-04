@@ -1064,9 +1064,15 @@ it.each([1.5, 2.25])(
       const terminal = await create('webgl')
       const host = container()
       await terminal.open(host)
+      await terminal.setFont({ size: 18 })
       await terminal.write('fractional geometry')
-      await eventually(() => !!terminal.submittedFrame)
+      await eventually(() => terminal.submittedFrame?.font.settings.size === 18)
       const canvas = terminal.canvas!
+      const initial = terminal.submittedFrame!
+      expect(
+        canvas.style.width !== `${initial.grid.columns * initial.font.cssCellWidth}px` ||
+          canvas.style.height !== `${initial.grid.rows * initial.font.cssCellHeight}px`,
+      ).toBe(true)
       widthSetter = spyOnStyleSetter(canvas.style, 'width')
       heightSetter = spyOnStyleSetter(canvas.style, 'height')
       const before = terminal.submittedFrame!.frame
@@ -1074,8 +1080,8 @@ it.each([1.5, 2.25])(
       await eventually(() => terminal.submittedFrame!.frame > before)
       expect(widthSetter).not.toHaveBeenCalled()
       expect(heightSetter).not.toHaveBeenCalled()
-      await terminal.setFont({ size: 18 })
-      await eventually(() => terminal.submittedFrame!.font.settings.size === 18)
+      await terminal.setFont({ size: 20 })
+      await eventually(() => terminal.submittedFrame!.font.settings.size === 20)
       expect(widthSetter.mock.calls.length + heightSetter.mock.calls.length).toBeGreaterThan(0)
       widthSetter.mockClear()
       heightSetter.mockClear()
