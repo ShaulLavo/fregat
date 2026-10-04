@@ -447,7 +447,8 @@ class BrowserLinkController implements DomLinkController {
     scope: LinkScope,
   ): Promise<void> {
     try {
-      const current = await this.options.session.isLinkCurrent(resolution)
+      const currency = this.options.session.isLinkCurrent(resolution)
+      const current = currency instanceof Promise ? await currency : currency
       if (!current || !this.isScopeCurrent(scope) || this.currentResolution !== resolution) return
       await this.options.session.activateLink(resolution, event)
     } catch (cause) {
