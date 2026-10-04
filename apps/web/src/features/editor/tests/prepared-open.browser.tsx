@@ -390,7 +390,9 @@ test('delivers an imperative row prediction through the real Foresight manager',
   }
 
   try {
-    registry.sync([{ element: target, row }], (intent) => intents.push(intent))
+    registry.sync([{ element: target, row }], (intent) => {
+      intents.push(intent)
+    })
     expect(ForesightManager.instance.getManagerData.registeredElements.get(target)).toMatchObject({
       meta: { treePath: 'src/imperative.ts' },
       name: 'file-tree:src/imperative.ts',

@@ -1,3 +1,9 @@
+import { useCallback } from 'react'
+import { useFileIntentLifetime } from '@/lib/file-open-intent/hooks/use-file-intent-lifetime'
+import type {
+  FileOpenIntentInterest,
+  FileOpenIntentTrigger,
+} from '@/lib/file-open-intent/state/service'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { cn } from '@workspace/ui/lib/utils'
@@ -25,12 +31,15 @@ export function DiagnosticRow({
   readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly onFix: () => void
   /** Foresight predicts a press on the row. */
-  readonly onIntent: () => void
+  readonly onIntent: (trigger: FileOpenIntentTrigger) => FileOpenIntentInterest
   readonly onOpen: () => void
 }) {
   const line = row.target.range.start.line + 1
+  // useFileIntentLifetime keys cleanup on the row's captured preparation action.
+  const prepare = useCallback((trigger: FileOpenIntentTrigger) => onIntent(trigger), [onIntent])
+  const lifetime = useFileIntentLifetime(prepare)
   const { elementRef } = useForesight<HTMLButtonElement>({
-    callback: onIntent,
+    callback: () => lifetime.begin('trajectory'),
     hitSlop: INTENT_PREFETCH_HIT_SLOP_PX,
     name: `diagnostic:${row.id}`,
     reactivateAfter: FILE_SNAPSHOT_STALE_MS,
@@ -49,6 +58,10 @@ export function DiagnosticRow({
           rowProps.onClick(event)
           onOpen()
         }}
+        onPointerEnter={lifetime.onPointerEnter}
+        onPointerLeave={lifetime.onPointerLeave}
+        onFocus={lifetime.onFocus}
+        onBlur={lifetime.onBlur}
         ref={elementRef}
       >
         <span className='text-muted-foreground'>

@@ -1,20 +1,18 @@
-import { useEffect, useEffectEvent } from 'react'
+import { useEffect } from 'react'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
 import type { FileOpenIntentSource } from '@/lib/file-open-intent/state/service'
 
-/** Prepares the file behind a list's active row each time the row changes. */
+/** Holds the file behind a list's active row until that row or its environment changes. */
 export function useActiveRowFileIntent(
   path: FilesystemPath | null,
   source: FileOpenIntentSource,
   knownSize?: number,
 ) {
   const prepare = useFileIntent(source)
-  const prepareActive = useEffectEvent((next: FilesystemPath) =>
-    prepare(next, 'active-row', { knownSize }),
-  )
-
   useEffect(() => {
-    if (path) prepareActive(path)
-  }, [path])
+    if (!path) return
+    const interest = prepare(path, 'active-row', { knownSize })
+    return () => interest.release()
+  }, [path, knownSize, prepare])
 }

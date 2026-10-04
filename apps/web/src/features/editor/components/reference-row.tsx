@@ -1,3 +1,8 @@
+import { useCallback } from 'react'
+import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
+import { useFileIntentLifetime } from '@/lib/file-open-intent/hooks/use-file-intent-lifetime'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FileOpenIntentTrigger } from '@/lib/file-open-intent/state/service'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
@@ -19,6 +24,13 @@ export function ReferenceRow({
 }) {
   const line = target.range.start.line + 1
   const preview = referencePreview(document, target)
+  const prepareFile = useFileIntent('references')
+  // useFileIntentLifetime keys cleanup on this path independently of the pane's active row.
+  const prepare = useCallback(
+    (trigger: FileOpenIntentTrigger) => prepareFile(filesystemPath(target.path), trigger),
+    [prepareFile, target.path],
+  )
+  const lifetime = useFileIntentLifetime(prepare)
 
   return (
     <ListRow
@@ -33,6 +45,10 @@ export function ReferenceRow({
         onOpenReference(target)
       }}
       onMouseEnter={() => onPreviewReference(target)}
+      onPointerEnter={lifetime.onPointerEnter}
+      onPointerLeave={lifetime.onPointerLeave}
+      onFocus={lifetime.onFocus}
+      onBlur={lifetime.onBlur}
     >
       <span className='text-muted-foreground text-2xs text-right font-mono tabular-nums'>
         {line}
