@@ -51,7 +51,7 @@ export function ShortcutsToolbar({
   onSearch: (search: ShortcutSearch) => void
   platform: PlatformName
   ref?: Ref<HTMLDivElement>
-  report: string
+  report: string | null
   search: ShortcutSearch
 }) {
   const keyboardSeen = useKeyboardSeen()
