@@ -804,19 +804,23 @@ for (const scenario of [
   'late-transport',
   'truncated-transport',
 ]) {
-  test(`actual launch and cleanup respect external ${scenario} boundaries`, async () => {
-    const execute = promisify(execFile)
-    const script = new URL('./fixtures/headed-launch-boundaries.mjs', import.meta.url)
-    const { stdout } = await execute(
-      process.execPath,
-      ['--experimental-vm-modules', fileURLToPath(script), scenario],
-      {
-        timeout: 15000,
-        maxBuffer: 1_000_000,
-      },
-    )
-    const result = JSON.parse(stdout)
-    assert.equal(result.mockedExternalBoundariesOnly, true)
-    assert.equal(result.realChromeLaunches, 0)
-  })
+  test(
+    `actual launch and cleanup respect external ${scenario} boundaries`,
+    { timeout: 20_000 },
+    async () => {
+      const execute = promisify(execFile)
+      const script = new URL('./fixtures/headed-launch-boundaries.mjs', import.meta.url)
+      const { stdout } = await execute(
+        process.execPath,
+        ['--experimental-vm-modules', fileURLToPath(script), scenario],
+        {
+          timeout: 15000,
+          maxBuffer: 1_000_000,
+        },
+      )
+      const result = JSON.parse(stdout)
+      assert.equal(result.mockedExternalBoundariesOnly, true)
+      assert.equal(result.realChromeLaunches, 0)
+    },
+  )
 }
