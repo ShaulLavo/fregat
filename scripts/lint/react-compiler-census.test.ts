@@ -102,7 +102,7 @@ test('is wired into the repository: a script entry, the verify chain and CI', ()
     'node scripts/lint/react-compiler-census.mjs --check',
   )
   expect(manifest.scripts.verify).toContain('bun run design:census && bun run compiler:census')
-  expect(manifest.scripts['test:scripts']).toContain('scripts/lint/react-compiler-census.test.ts')
+  expect(manifest.scripts['test:scripts']).toContain('--config vitest.scripts.config.mjs')
   const workflow = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8')
   expect(workflow).toContain('run: bun run compiler:census')
 })

@@ -105,7 +105,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 
 ## Deployment
 
-- Deployment is an optional integration that needs explicit authorization. `bun run deploy` currently targets the owner's machine layout (making its target configurable is tracked separately); outside that setup, don't run it. When authorized, verify server changes before deploying them and confirm the served release afterwards.
+- `bun run build-release` builds a portable release anyone can make. Installing one is an optional local integration that needs explicit authorization: `bun run install-release` installs onto the machine target set in `developer.deployTarget` (see `docs/development.md`) and refuses without it. When authorized, verify server changes before installing them and confirm the served release afterwards.
 - Desktop windows, browser tabs and remote clients share the machine server. The launcher reuses the recorded service and release; closing or uninstalling a client leaves shared services and terminals running. Packaged service activation and updates follow [Plan 114](plans/114-installed-app.md).
 - The release endpoint under the configured base path (`GET <base>/release`) reports the served release, commit and dirty count, plus `pending`, `phase` and `liveCheck` for a staged update.
 - Editor packages live in `editor/packages/`; the terminal library lives in `ghostty-webgpu/`. Both are root Bun workspaces mirrored to their standalone repositories. Change their source here, follow each folder's `AGENTS.md`, and run `bun run build:workspaces` before checking consumers. CI builds those workspaces from this checkout.

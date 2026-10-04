@@ -1,14 +1,10 @@
+import { settingRowIds } from '@workspace/contracts/settings/presentation'
 import { useStore } from 'zustand'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import { resetSettingOperations } from '@workspace/client-core/settings/operations'
-import {
-  settingRowIds,
-  errorStringField,
-  type SettingId,
-  type SettingsWriteTarget,
-} from '@workspace/contracts'
+import { errorStringField, type SettingId, type SettingsWriteTarget } from '@workspace/contracts'
 import { useEffect, useRef, useState } from 'react'
 
 import { Select } from '@/components/select'
@@ -206,7 +202,13 @@ export function SettingsBrowser({
         if (selectedId)
           owner.submit(
             target,
-            resetSettingOperations(selectedId, snapshot, target, theme.appearance),
+            resetSettingOperations(
+              selectedId,
+              snapshot,
+              target,
+              theme.appearance,
+              settingRowIds(selectedId),
+            ),
             'tui.settings.reset',
           )
       },

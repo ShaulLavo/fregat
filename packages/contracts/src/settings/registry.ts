@@ -177,10 +177,23 @@ export type SettingDocumentation = Pick<
   'description' | 'details' | 'title' | 'optionTitles' | 'keywords'
 >
 
+export type SettingPresentation = Pick<
+  SettingDescriptor,
+  | 'widget'
+  | 'category'
+  | 'visibility'
+  | 'rowOwner'
+  | 'requiresRestart'
+  | 'readOnlyReason'
+  | 'deprecationReason'
+>
+
 export type SettingDefinition<TSchema extends v.GenericSchema = v.GenericSchema> = Omit<
   SettingDescriptor<TSchema>,
-  keyof SettingDocumentation
+  keyof SettingDocumentation | keyof SettingPresentation
 >
+
+type PresentedSetting = SettingDefinition & Partial<SettingDocumentation & SettingPresentation>
 
 /**
  * Identity function whose only job is to bind `default` and `widget` to `schema`.
@@ -202,11 +215,11 @@ export function defineSetting<TSchema extends v.GenericSchema>(
   descriptor: SettingDescriptor<TSchema> & { readonly widget: WidgetFor<v.InferOutput<TSchema>> },
 ): SettingDescriptor<TSchema>
 export function defineSetting<TSchema extends v.GenericSchema>(
-  definition: SettingDefinition<TSchema> & { readonly widget: WidgetFor<v.InferOutput<TSchema>> },
+  definition: SettingDefinition<TSchema>,
 ): SettingDefinition<TSchema>
 export function defineSetting<TSchema extends v.GenericSchema>(
-  definition: SettingDefinition<TSchema> & Partial<SettingDocumentation>,
-): SettingDefinition<TSchema> & Partial<SettingDocumentation> {
+  definition: SettingDefinition<TSchema> & Partial<SettingDocumentation & SettingPresentation>,
+): SettingDefinition<TSchema> & Partial<SettingDocumentation & SettingPresentation> {
   return definition
 }
 
@@ -239,7 +252,7 @@ export type RegistryProblem = {
  * throwing import would make that a lie.
  */
 export function registryProblems(
-  registry: Readonly<Record<string, SettingDefinition & Partial<SettingDocumentation>>>,
+  registry: Readonly<Record<string, PresentedSetting>>,
 ): RegistryProblem[] {
   const problems: RegistryProblem[] = []
 
@@ -279,9 +292,9 @@ export function registryProblems(
  * and the one a reader of the registry cannot see.
  */
 function rowOwnerProblems(
-  registry: SettingsRegistryShape,
+  registry: Readonly<Record<string, PresentedSetting>>,
   id: string,
-  descriptor: SettingDefinition,
+  descriptor: PresentedSetting,
 ): RegistryProblem[] {
   const owner = descriptor.rowOwner
   if (owner === undefined) return []
@@ -304,9 +317,9 @@ function rowOwnerProblems(
  * leave the child disabled forever or indented under nothing.
  */
 function dependsOnProblems(
-  registry: SettingsRegistryShape,
+  registry: Readonly<Record<string, PresentedSetting>>,
   id: string,
-  descriptor: SettingDefinition,
+  descriptor: PresentedSetting,
 ): RegistryProblem[] {
   const parentId = descriptor.dependsOn
   if (parentId === undefined) return []

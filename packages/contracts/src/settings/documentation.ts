@@ -1,5 +1,6 @@
 import { descriptorFor, type SettingId, type SettingsRegistry } from './keys'
-import type { SettingDocumentation } from './registry'
+import { presentationFor } from './presentation'
+import type { SettingDocumentation, SettingPresentation } from './registry'
 
 export const SETTINGS_DOCUMENTATION = {
   'chat.followUpBehavior': {
@@ -1033,7 +1034,7 @@ export const SETTINGS_DOCUMENTATION = {
 
 export function presentSetting<K extends SettingId>(
   id: K,
-): SettingsRegistry[K] & SettingDocumentation {
+): SettingsRegistry[K] & SettingPresentation & SettingDocumentation {
   const documentation: SettingDocumentation = SETTINGS_DOCUMENTATION[id]
-  return { ...descriptorFor(id), ...documentation }
+  return { ...descriptorFor(id), ...presentationFor(id), ...documentation }
 }

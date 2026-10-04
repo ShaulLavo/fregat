@@ -1,7 +1,7 @@
+import { presentationFor } from '@workspace/contracts/settings/presentation'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import { useTerminalDimensions } from '@opentui/react'
 import {
-  descriptorFor,
   errorStringField,
   type SettingId,
   type SettingsSnapshot,
@@ -52,7 +52,7 @@ export function SettingsEditor({
   const [failure, setFailure] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const choices = settingChoices(id)
-  const widget = descriptorFor(id).widget
+  const widget = presentationFor(id).widget
   const multiline = !choices && !['number', 'string', 'font'].includes(widget)
   const commands = useCommands()
   useCommandFocus(

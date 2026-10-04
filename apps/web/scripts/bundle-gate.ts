@@ -15,8 +15,6 @@ import type { OwnerRow } from './bundle-owners'
 export const PINS_FILE = path.join(import.meta.dirname, 'first-load-pins.json')
 /** Growth the total may take before the gate fails. */
 const TOTAL_MARGIN = 0.01
-// developer.deployTarget settings descriptor and schema add 138 measured phone gzip bytes.
-const PHONE_INSTALLATION_ALLOWANCE = 138
 /** Per owner: the larger of 5% or 2 KB gzip, so a tiny owner is not pinned to the byte. */
 const OWNER_MARGIN = 0.05
 const OWNER_FLOOR = 2_048
@@ -36,7 +34,7 @@ export type Pins = {
 }
 
 export type GateReport = {
-  readonly eagerSettingsDocumentation: readonly string[]
+  readonly eagerSettingsMetadata: readonly string[]
   readonly firstLoad: { readonly scriptGzip: number }
   readonly phoneFirstLoad: { readonly scriptGzip: number }
   readonly phoneSessionFirstLoad: { readonly scriptGzip: number }
@@ -59,25 +57,24 @@ export function checkFirstLoad(report: GateReport, pins: Pins): GateResult {
   const phone = totalAgainst(
     pins.phoneScriptGzip,
     Math.max(report.phoneFirstLoad.scriptGzip, report.phoneSessionFirstLoad.scriptGzip),
-    PHONE_INSTALLATION_ALLOWANCE,
   )
   const owners = report.owners.flatMap((row) => ownerGrowth(row, pins.owners[row.owner] ?? 0))
   // A grown owner explains a grown total; the total is named only when no owner is.
   const totalFailures =
     total.now > total.limit && owners.length === 0 ? [totalFailure('(total)', total)] : []
   const phoneFailures = phone.now > phone.limit ? [totalFailure('(phone total)', phone)] : []
-  const documentationFailures = report.eagerSettingsDocumentation.map((owner) => ({
+  const metadataFailures = report.eagerSettingsMetadata.map((owner) => ({
     owner,
     pinned: 0,
     now: 1,
   }))
-  const failures = [...owners, ...totalFailures, ...phoneFailures, ...documentationFailures]
+  const failures = [...owners, ...totalFailures, ...phoneFailures, ...metadataFailures]
   const passed = total.now <= total.limit && failures.length === 0
   return { total, phone, failures, passed }
 }
 
-function totalAgainst(pinned: number, now: number, allowance = 0): Total {
-  return { pinned, now, limit: Math.round(pinned * (1 + TOTAL_MARGIN)) + allowance }
+function totalAgainst(pinned: number, now: number): Total {
+  return { pinned, now, limit: Math.round(pinned * (1 + TOTAL_MARGIN)) }
 }
 
 function totalFailure(owner: string, total: Total): GateFailure {

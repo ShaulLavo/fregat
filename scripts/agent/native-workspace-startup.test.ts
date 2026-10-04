@@ -11,9 +11,12 @@ import { checkoutRoot, scratchPath } from './paths'
 import { isolatedNativeScenario } from './scenarios/native-provider-verification'
 import { selectors, waitForApp } from './selectors'
 import { launchBrowser } from './browser-launch'
+import { chromiumUnavailable } from './browser-prerequisites'
 import type { Browser } from 'playwright'
 
-test('native fixture opens its workspace before reloading its provider snapshot', async () => {
+const it = test.skipIf(chromiumUnavailable)
+
+it('native fixture opens its workspace before reloading its provider snapshot', async () => {
   const scratch = await mkdtemp(scratchPath('fregat-native-startup-'))
   const port = await selectAvailablePort({
     preferredPort: 5496,
