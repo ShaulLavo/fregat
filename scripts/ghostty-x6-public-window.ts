@@ -17,6 +17,7 @@ import { acquireX6Drain, releaseX6Drain, type DrainReceipt } from './ghostty-x6-
 import { auditX6Overlap, type IntervalBlock, type RunnerJob } from './ghostty-x6-public-overlap.ts'
 import { analyzeX6, x6Protocol } from './ghostty-x6-public-statistics.ts'
 import { verifyX6Slices } from './ghostty-x6-public-slices.ts'
+import { verifyX6Journal } from './ghostty-x6-public-journal.ts'
 import { verifyPublicCounters, type CountRow } from './ghostty-x6-public-counters.ts'
 import {
   bindX6Source,
@@ -253,6 +254,9 @@ async function prepare(): Promise<void> {
     join(root, 'scripts/ghostty-x6-public-statistics.ts'),
     join(root, 'scripts/ghostty-x6-public-counters.ts'),
     join(root, 'scripts/ghostty-x6-public-slices.ts'),
+    join(root, 'scripts/ghostty-x6-public-journal.ts'),
+    join(root, 'scripts/ghostty-x6-public-journal.test.ts'),
+    join(root, 'scripts/ghostty-x6-public-overlap.test.ts'),
     join(root, 'scripts/ghostty-x6-public-claim.ts'),
     join(root, 'scripts/ghostty-x6-public-reuse.ts'),
     host.quietTurnFile,
@@ -462,6 +466,15 @@ async function drive(unit: Unit, mode: 'startup' | 'block'): Promise<void> {
   assert.equal(cleanup, 'released')
 }
 
+function verifyCompletedJournal(directory: string, jobs: readonly RunnerJob[]): void {
+  verifyX6Journal(
+    jobs,
+    ['journal-before-hold.json', 'journal-after-hold.json'].map((file) =>
+      readJson<Readonly<Record<string, RunnerJob>>>(join(directory, file)),
+    ),
+  )
+}
+
 async function launch(mode: 'startup' | 'block'): Promise<void> {
   const unit = readJson<Unit>(input)
   await verifyUnit(unit)
@@ -516,7 +529,13 @@ async function launch(mode: 'startup' | 'block'): Promise<void> {
   assert.equal(completed[0]!.exitCode, 0)
   assert.equal(completed[0]!.quietHoldExpired, false)
   // The runner removes its live journal on completion; the completed record owns the final overlap list.
-  assert(Array.isArray(completed[0]!.jobsDuringRun), 'Complete actual overlap journal required')
+  try {
+    verifyCompletedJournal(output, completed[0]!.jobsDuringRun)
+    save(output, 'journal-verification.json', { passed: true })
+  } catch (cause) {
+    save(output, 'journal-verification.json', { passed: false, cause: String(cause) })
+    if (mode === 'startup') throw cause
+  }
   if (mode === 'startup') {
     assert.equal(
       readJson<{ passed: boolean }>(join(output, 'block-00/platform-verification.json')).passed,
@@ -591,9 +610,9 @@ async function analyzeWindow(): Promise<void> {
     'All original 40 process vectors required; no replay or filtering',
   )
   const record = readJson<CompletedRun>(join(output, 'actual-heavy-job-record.json'))
-  assert(Array.isArray(record.jobsDuringRun), 'Actual complete jobsDuringRun required')
   const descriptive = analyzeX6(blocks)
   save(output, 'descriptive-result.json', descriptive)
+  verifyCompletedJournal(output, record.jobsDuringRun)
   assert.equal(record.exitCode, 0)
   assert.equal(record.quietHoldExpired, false)
   const finished = readJson<{ endedAt: string }>(join(output, 'driver-finished.json'))

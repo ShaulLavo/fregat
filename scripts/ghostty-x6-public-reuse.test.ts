@@ -5,7 +5,12 @@ import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { bindX6Source, verifyX6RuntimeReuse } from './ghostty-x6-public-reuse.ts'
 
-const current = readFileSync(new URL('./ghostty-x6-public-overlap.ts', import.meta.url), 'utf8')
+const corrected = readFileSync(new URL('./ghostty-x6-public-overlap.ts', import.meta.url), 'utf8')
+// Reconstruct the exact historical fixture; corrected runtime source must fail the old exception.
+const current = corrected.replace(
+  'assert(end > start, `Runner job ${job.id} unresolved zero-width or reversed interval`)',
+  'assert(end >= start, `Runner job ${job.id} interval`)',
+)
 const frozen = current.replace('interface ClockMapping', 'export interface ClockMapping')
 
 test('binds byte identity separately from the exact pinned type-export deletion', () => {
@@ -23,6 +28,9 @@ test('binds byte identity separately from the exact pinned type-export deletion'
 
 test('rejects other files, other type erasures and any additional source delta', () => {
   expect(() => bindX6Source('/checkout/other.ts', frozen, current)).toThrow()
+  expect(() =>
+    bindX6Source('/checkout/scripts/ghostty-x6-public-overlap.ts', frozen, corrected),
+  ).toThrow()
   expect(() =>
     bindX6Source('/checkout/scripts/ghostty-x6-public-overlap.ts', frozen, current + '\n'),
   ).toThrow()

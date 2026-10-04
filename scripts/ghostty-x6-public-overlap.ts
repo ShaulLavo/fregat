@@ -119,7 +119,7 @@ function jobInterval(job: RunnerJob, windowEndedAtMilliseconds: number): Interva
   const end =
     job.endedAt === null ? Math.max(start, windowEndedAtMilliseconds) : Date.parse(job.endedAt)
   assert(Number.isFinite(start) && Number.isFinite(end), `Runner job ${job.id} timestamps`)
-  assert(end >= start, `Runner job ${job.id} interval`)
+  assert(end > start, `Runner job ${job.id} unresolved zero-width or reversed interval`)
   return { start: epochNanoseconds(start), end: epochNanoseconds(end) }
 }
 

@@ -120,6 +120,21 @@ it('clips an ongoing actual job at window end and uses half-open boundaries', ()
   expect(result.jobsDuringRun[0]!.endedAt).toBeNull()
 })
 
+it('stops classification for runner intervals rounded to zero width', () => {
+  const data = blocks()
+  const row = data[0]!.rows.find(
+    (item) => item.operation === 'public-dom-key' && item.inert === 100,
+  )!
+  expect(
+    auditX6Overlap(data, [job(row.startedAtMilliseconds, row.endedAtMilliseconds)], epoch + 200_000)
+      .valid,
+  ).toBe(false)
+  const rounded = job(row.startedAtMilliseconds + 0.1, row.startedAtMilliseconds + 0.9)
+  expect(rounded.endedAt).toBe(rounded.startedAt)
+  expect(() => auditX6Overlap(data, [rounded], epoch + 200_000)).toThrow(/zero-width/)
+  expect(() => auditX6Overlap(data, [job(epoch, null)], epoch)).toThrow(/zero-width/)
+})
+
 it('rejects missing observations, duplicate job IDs and invalid timestamps', () => {
   const data = blocks()
   expect(() => auditX6Overlap(data.slice(1), [], epoch + 200_000)).toThrow()
