@@ -21,6 +21,25 @@ import {
 } from '../syntax/session'
 
 type EditorAnalysisConfigurationTag = readonly (string | number | boolean | null)[]
+export type EditorAnalysisDisplayDemand =
+  | { readonly kind: 'unmanaged' }
+  | { readonly kind: 'unknown' }
+  | {
+      readonly kind: 'frame' | 'preparation'
+      readonly snapshot: DocumentTextSnapshot
+      readonly ranges: readonly EditorSyntaxRange[]
+    }
+export type EditorAnalysisRangeInterest = { readonly signal?: AbortSignal }
+type AnalysisDisplayInspection = {
+  readonly unmanagedLeases: number
+  readonly unknownLeases: number
+  readonly frames: number
+  readonly preparationLeases: number
+  readonly preparationRanges: readonly EditorSyntaxRange[]
+  readonly ranges: readonly EditorSyntaxRange[]
+  readonly queryWaiters: number
+  readonly queryRanges: readonly EditorSyntaxRange[]
+}
 type AnalysisRetentionEntry = {
   readonly family: 'structural' | 'highlighter'
   readonly runtimeSessionId: string
@@ -33,6 +52,7 @@ type AnalysisRetentionEntry = {
   readonly cachedRangeCount: number
   readonly pendingRangeCount: number
   readonly syntaxRecordBackingBytes: number
+  readonly displayDemand: AnalysisDisplayInspection
 }
 type AnalysisRetentionInspection = {
   readonly entries: readonly AnalysisRetentionEntry[]
@@ -69,8 +89,13 @@ export type EditorAnalysisRead<T> =
     }
   | { readonly kind: 'failed'; readonly revision: number; readonly error: unknown }
 
-export type EditorRetainedSyntaxSession = EditorSyntaxSession & {
+export type EditorRetainedSyntaxSession = Omit<EditorSyntaxSession, 'queryRange'> & {
   readonly runtimeSessionId: string
+  setDisplayDemand(demand: EditorAnalysisDisplayDemand): void
+  queryRange(
+    range: EditorSyntaxRange,
+    interest?: EditorAnalysisRangeInterest,
+  ): Promise<EditorSyntaxResult>
   read(range?: EditorSyntaxRange): EditorAnalysisRead<EditorSyntaxResult>
 }
 export type EditorRetainedHighlighterSession = EditorHighlighterSession & {
@@ -149,6 +174,19 @@ class AnalysisEntry<T extends RetentionResult> {
 
   get pendingRangeCount(): number {
     return 0
+  }
+
+  inspectDisplayDemand(): AnalysisDisplayInspection {
+    return {
+      unmanagedLeases: this.leaseCount,
+      unknownLeases: 0,
+      frames: 0,
+      preparationLeases: 0,
+      preparationRanges: [],
+      ranges: [],
+      queryWaiters: 0,
+      queryRanges: [],
+    }
   }
 
   retainedResults(): readonly T[] {
@@ -281,6 +319,11 @@ class AnalysisEntry<T extends RetentionResult> {
 }
 
 class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
+  private readonly displayed = new Map<AbortSignal, EditorAnalysisDisplayDemand>()
+  private readonly queryWaiters = new Map<
+    AbortSignal,
+    { snapshot: DocumentTextSnapshot; range: EditorSyntaxRange }
+  >()
   private ranges = new Map<
     string,
     { revision: number; range: EditorSyntaxRange; result: EditorSyntaxResult }
@@ -303,6 +346,78 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     )
   }
 
+  registerDisplayDemand(signal: AbortSignal): void {
+    if (signal.aborted) return
+    this.displayed.set(signal, { kind: 'unmanaged' })
+    signal.addEventListener('abort', () => this.displayed.delete(signal), { once: true })
+  }
+
+  setDisplayDemand(signal: AbortSignal, demand: EditorAnalysisDisplayDemand): void {
+    if (signal.aborted) return
+    const stored =
+      demand.kind === 'frame' || demand.kind === 'preparation'
+        ? {
+            ...demand,
+            ranges: demand.ranges.map((range) => boundedRange(range, demand.snapshot.length)),
+          }
+        : demand
+    this.displayed.set(signal, stored)
+  }
+
+  override inspectDisplayDemand(): AnalysisDisplayInspection {
+    let unmanagedLeases = 0
+    let unknownLeases = 0
+    let frames = 0
+    let preparationLeases = 0
+    const ranges: EditorSyntaxRange[] = []
+    const preparationRanges: EditorSyntaxRange[] = []
+    const snapshot = this.buffer.getTextSnapshot()
+    for (const demand of this.displayed.values()) {
+      if (demand.kind === 'unmanaged') {
+        unmanagedLeases++
+        continue
+      }
+      if (demand.kind === 'unknown' || demand.snapshot !== snapshot) {
+        unknownLeases++
+        continue
+      }
+      if (demand.kind === 'preparation') {
+        preparationLeases++
+        preparationRanges.push(...demand.ranges)
+        continue
+      }
+      frames++
+      ranges.push(...demand.ranges)
+    }
+    const queryRanges = [...this.queryWaiters.values()]
+      .filter((waiter) => waiter.snapshot === snapshot)
+      .map((waiter) => waiter.range)
+    return {
+      unmanagedLeases,
+      unknownLeases,
+      frames,
+      preparationLeases,
+      preparationRanges,
+      ranges,
+      queryWaiters: this.queryWaiters.size,
+      queryRanges,
+    }
+  }
+
+  waitForRange(range: EditorSyntaxRange, signal: AbortSignal): Promise<EditorSyntaxResult> {
+    if (signal.aborted) return Promise.reject(cancelled())
+    this.queryWaiters.set(signal, {
+      snapshot: this.buffer.getTextSnapshot(),
+      range: boundedRange(range, this.buffer.getTextSnapshot().length),
+    })
+    const release = () => this.queryWaiters.delete(signal)
+    signal.addEventListener('abort', release, { once: true })
+    return interruptible(this.range(range), signal).finally(() => {
+      release()
+      signal.removeEventListener('abort', release)
+    })
+  }
+
   override get cachedRangeCount(): number {
     return this.ranges.size
   }
@@ -321,6 +436,8 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   }
 
   override dispose(): void {
+    this.displayed.clear()
+    this.queryWaiters.clear()
     this.ranges.clear()
     this.queries.clear()
     super.dispose()
@@ -433,10 +550,12 @@ export function createEditorDocumentAnalysis(options: {
       if (disposed || request.signal?.aborted) return null
       let found = highlighters.find((candidate) => sameRequest(candidate.request, request))
       if (found?.entry.read().kind === 'failed' && found.entry.leaseCount === 0) {
-        found.unsubscribeTheme?.()
-        found.entry.dispose()
-        highlighters.splice(highlighters.indexOf(found), 1)
-        found = undefined
+        const failed = found
+        highlighters.splice(highlighters.indexOf(failed), 1)
+        failed.unsubscribeTheme?.()
+        failed.entry.dispose()
+        if (disposed || request.signal?.aborted) return null
+        found = highlighters.find((candidate) => sameRequest(candidate.request, request))
       }
       subscribe()
       if (!found) {
@@ -561,6 +680,7 @@ function inspectEntry(
     cachedRangeCount: entry.cachedRangeCount,
     pendingRangeCount: entry.pendingRangeCount,
     syntaxRecordBackingBytes: backingBytes(records),
+    displayDemand: entry.inspectDisplayDemand(),
   }
 }
 
@@ -575,11 +695,13 @@ function structuralLease(
   signal?: AbortSignal,
 ): EditorRetainedSyntaxSession {
   const lease = entry.lease(signal)
+  entry.registerDisplayDemand(lease.signal)
   let demand: EditorSyntaxRange | undefined
   const result = () => (demand ? entry.range(demand) : entry.current())
   const current = () => lease.wait(result)
   return {
     runtimeSessionId: entry.runtimeSessionId,
+    setDisplayDemand: (demand) => entry.setDisplayDemand(lease.signal, demand),
     get foldingSupport() {
       return entry.structuralSession.foldingSupport
     },
@@ -590,9 +712,10 @@ function structuralLease(
       }),
     applyChange: current,
     canQueryRange: () => entry.read().kind === 'ready' && entry.canQueryRange(),
-    queryRange(range) {
+    queryRange(range, interest = {}) {
       demand = range
-      return current()
+      const waiter = leaseCancellation(lease.signal, interest.signal)
+      return entry.waitForRange(range, waiter.signal).finally(waiter.dispose)
     },
     getResult: () => {
       const state = entry.readRange(demand)

@@ -309,6 +309,7 @@ export class VirtualizedTextView {
   private viewportVisible = false
   private atomicRenderDepth = 0
   private atomicRenderPending = false
+  private flushingAtomicRender = false
   private applyingEdit = false
   private contentHeight = -1
   private readonly onContentHeightChange: ((height: number) => void) | null
@@ -725,7 +726,7 @@ export class VirtualizedTextView {
   }
 
   get isRenderingAtomically(): boolean {
-    return this.atomicRenderDepth > 0
+    return this.atomicRenderDepth > 0 || this.flushingAtomicRender
   }
 
   public setText(
@@ -1583,7 +1584,7 @@ export class VirtualizedTextView {
   private renderSnapshot(snapshot: FixedRowVirtualizerSnapshot): void {
     if (this.view.provisional) {
       this.freezeProvisionalScroll()
-      this.view.onViewportChange?.()
+      this.reportViewportChange()
       return
     }
     if (this.atomicRenderDepth > 0 || this.applyingEdit) {
@@ -1619,7 +1620,7 @@ export class VirtualizedTextView {
     updateSpacerWidth(view, snapshot.viewportWidth)
     const key = rowsKey(view, snapshot)
     if (key === view.lastRenderedRowsKey) {
-      view.onViewportChange?.()
+      this.reportViewportChange()
       this.flushPendingReveal()
       return
     }
@@ -1630,8 +1631,13 @@ export class VirtualizedTextView {
     renderTokenHighlights(view)
     for (const name of view.rangeHighlightGroups.keys()) renderRangeHighlight(view, name)
     renderSelectionHighlight(view)
-    view.onViewportChange?.()
+    this.reportViewportChange()
     this.flushPendingReveal()
+  }
+
+  private reportViewportChange(): void {
+    if (this.flushingAtomicRender) return
+    this.view.onViewportChange?.()
   }
 
   private synchronizeScrollPaint(
@@ -1652,7 +1658,14 @@ export class VirtualizedTextView {
     if (this.atomicRenderDepth > 0 || this.applyingEdit || !this.atomicRenderPending) return
 
     this.atomicRenderPending = false
-    this.renderSnapshot(this.view.virtualizer.getSnapshot())
+    const wasFlushing = this.flushingAtomicRender
+    this.flushingAtomicRender = true
+    try {
+      this.renderSnapshot(this.view.virtualizer.getSnapshot())
+    } finally {
+      this.flushingAtomicRender = wasFlushing
+    }
+    if (!wasFlushing) this.reportViewportChange()
   }
 
   /**

@@ -23,6 +23,230 @@ import {
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 
 describe('prepared editor documents', () => {
+  it.each(['structural', 'highlighter'] as const)(
+    'marks pending %s promotion stale while the mounted view receives its shared result',
+    async (family) => {
+      const buffer = createEditorTextBuffer('const value = 1;\n')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+      const result = {
+        ...createEmptySyntaxResult(),
+        tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: 'blue' } }]),
+      }
+      const completion = deferred<typeof result>()
+      const refresh = vi.fn(() => completion.promise)
+      const structuralSession = {
+        ...syntaxSession(),
+        refresh,
+        queryRange: vi.fn(async () => result),
+      }
+      const highlighterSession = { ...highlightSession(), refresh }
+      const structuralProvider: EditorSyntaxProvider = {
+        createSession: vi.fn(() => structuralSession),
+      }
+      const highlighterProvider: EditorHighlighterProvider = {
+        createSession: vi.fn(() => highlighterSession),
+      }
+      const prepared = createEditorPreparedDocument({
+        buffer,
+        analysis,
+        configuredTabSize: 4,
+        tabSizePolicy: 'detect-indentation',
+        documentConfigurationTag: [],
+        documentId: 'file.ts',
+        languageId: 'typescript',
+      })
+      const signal = new AbortController().signal
+      const outcome =
+        family === 'structural'
+          ? prepared.startStage({
+              family,
+              provider: structuralProvider,
+              configuration: { ...structuralConfiguration, includeHighlights: true },
+              configurationTag: ['tree-sitter', 1],
+              range: { startIndex: 0, endIndex: buffer.getTextSnapshot().length },
+              abortSignal: signal,
+            })
+          : prepared.startStage({
+              family,
+              provider: highlighterProvider,
+              configurationTag: ['shiki', 'dark'],
+              range: 'full',
+              abortSignal: signal,
+            })
+      await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
+      expect(analysis.inspectRetention().entries[0]).toMatchObject({
+        leaseCount: 1,
+        status: 'pending',
+      })
+      const runtimeId = analysis.inspectRetention().entries[0]!.runtimeSessionId
+      const releaseLeaseCounts: number[] = []
+      const removeListener = signal.removeEventListener.bind(signal)
+      vi.spyOn(signal, 'removeEventListener').mockImplementation((...args) => {
+        releaseLeaseCounts.push(analysis.inspectRetention().entries[0]!.leaseCount)
+        removeListener(...args)
+      })
+      const host = document.createElement('div')
+      document.body.appendChild(host)
+      const plugin: EditorPlugin = {
+        activate: (context) =>
+          family === 'structural'
+            ? context.registerSyntaxProvider(structuralProvider)
+            : context.registerHighlighter(highlighterProvider),
+      }
+      const editor = createVisibleEditor(host, { plugins: [plugin] })
+      try {
+        editor.attachSession(
+          createEditorBufferSession(buffer, createEditorViewSession(buffer, 'promoted-view')),
+          {
+            preparedDocument: prepared,
+            documentId: 'file.ts',
+            languageId: 'typescript',
+            documentConfigurationTag: [],
+            structuralConfigurationTag: ['tree-sitter', 1],
+            highlighterConfigurationTag: ['shiki', 'dark'],
+          },
+        )
+        expect(releaseLeaseCounts[0]).toBe(2)
+        const originalOutcome = await outcome
+        expect(analysis.inspectRetention().entries[0]).toMatchObject({
+          leaseCount: 1,
+          runtimeSessionId: runtimeId,
+        })
+        expect(signal.aborted).toBe(false)
+        completion.resolve(result)
+        await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('painted'))
+        expect(analysis.inspectRetention().entries[0]!.status).toBe('ready')
+        expect(refresh).toHaveBeenCalledTimes(1)
+        if (family === 'structural') {
+          expect(structuralProvider.createSession).toHaveBeenCalledTimes(1)
+          expect(structuralSession.queryRange).toHaveBeenCalledTimes(1)
+          expect(structuralSession.dispose).not.toHaveBeenCalled()
+        } else {
+          expect(highlighterProvider.createSession).toHaveBeenCalledTimes(1)
+          expect(highlighterSession.dispose).not.toHaveBeenCalled()
+        }
+        expect(originalOutcome).toBe('stale')
+      } finally {
+        completion.resolve(result)
+        editor.dispose()
+        prepared.dispose()
+        analysis.dispose()
+        host.remove()
+      }
+    },
+  )
+
+  it('calibrates ready and actual failed preparation outcomes before promotion', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+    const ready = fixedPreparedDocument(buffer)
+    const failed = createEditorPreparedDocument({
+      buffer,
+      analysis,
+      configuredTabSize: 4,
+      tabSizePolicy: 'fixed',
+      documentConfigurationTag: [],
+      documentId: 'file.ts',
+      languageId: 'typescript',
+    })
+    const failingProvider: EditorHighlighterProvider = {
+      createSession: () => ({
+        ...highlightSession(),
+        refresh: async () => {
+          throw new TypeError('Controlled external provider failure')
+        },
+      }),
+    }
+    await expect(
+      ready.startStage({
+        family: 'highlighter',
+        provider: { createSession: () => highlightSession() },
+        configurationTag: [],
+        range: 'full',
+        abortSignal: new AbortController().signal,
+      }),
+    ).resolves.toBe('ready')
+    await expect(
+      failed.startStage({
+        family: 'highlighter',
+        provider: failingProvider,
+        configurationTag: [],
+        range: 'full',
+        abortSignal: new AbortController().signal,
+      }),
+    ).resolves.toBe('failed')
+    ready.dispose()
+    ready.analysis.dispose()
+    failed.dispose()
+    analysis.dispose()
+  })
+
+  it('promotes preparation interest before release and reuses metadata after reclamation', async () => {
+    const buffer = createEditorTextBuffer('alpha beta')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+    const provider: EditorSyntaxProvider = { createSession: vi.fn(() => syntaxSession()) }
+    const prepared = createEditorPreparedDocument({
+      buffer,
+      analysis,
+      configuredTabSize: 4,
+      tabSizePolicy: 'detect-indentation',
+      documentConfigurationTag: [],
+      documentId: 'file.ts',
+      languageId: 'typescript',
+    })
+    const range = { startIndex: 0, endIndex: 5 }
+    const controller = new AbortController()
+    await prepared.startStage({
+      family: 'structural',
+      provider,
+      configuration: structuralConfiguration,
+      configurationTag: ['tree-sitter', 1],
+      range,
+      abortSignal: controller.signal,
+    })
+    const original = analysis.inspectRetention().entries[0]!
+    expect(original.leaseCount).toBe(1)
+    expect(original.displayDemand).toMatchObject({
+      preparationLeases: 1,
+      frames: 0,
+      preparationRanges: [range],
+    })
+    const observedHandoff: number[] = []
+    const removeListener = controller.signal.removeEventListener.bind(controller.signal)
+    vi.spyOn(controller.signal, 'removeEventListener').mockImplementation((...args) => {
+      observedHandoff.push(analysis.inspectRetention().entries[0]!.leaseCount)
+      expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+      removeListener(...args)
+    })
+    const first = prepared.borrow(match(buffer, provider, null))!.structural!
+    expect(observedHandoff[0]).toBe(2)
+    expect(first.readyResult).not.toBeNull()
+    const promoted = analysis.inspectRetention().entries[0]!
+    expect(promoted).toMatchObject({ leaseCount: 1, lastLeaseReleasedAt: expect.any(Number) })
+    expect(promoted.displayDemand).toMatchObject({ preparationLeases: 0, unknownLeases: 1 })
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+    const second = prepared.borrow(match(buffer, provider, null))!.structural!
+    expect(second.runtimeSessionId).toBe(first.runtimeSessionId)
+    expect(second.readyResult).toBe(first.readyResult)
+    expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(2)
+    first.dispose()
+    second.dispose()
+    expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(0)
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([
+      original.runtimeSessionId,
+    ])
+    const recreated = prepared.borrow(match(buffer, provider, null))!.structural!
+    expect(recreated.runtimeSessionId).not.toBe(original.runtimeSessionId)
+    await recreated.result
+    expect(recreated.readyResult).not.toBeNull()
+    expect(provider.createSession).toHaveBeenCalledTimes(2)
+    expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(1)
+    prepared.dispose()
+    expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(1)
+    recreated.dispose()
+    analysis.dispose()
+  })
+
   it('skips fallback preparation when folding is disabled', async () => {
     const buffer = createEditorTextBuffer('root\n  child\n'.repeat(2_000))
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
@@ -429,7 +653,10 @@ describe('prepared editor documents', () => {
     })
     await Promise.resolve()
 
-    expect(claimed?.structural?.runtimeSessionId).toBe(prepared.runtimeSessionIds().structural[0])
+    expect(claimed?.structural?.runtimeSessionId).toBe(
+      prepared.analysis.inspectRetention().entries.find((entry) => entry.family === 'structural')
+        ?.runtimeSessionId,
+    )
     expect(claimed?.highlighter).toBeNull()
     expect(highlighterSession.dispose).not.toHaveBeenCalled()
     prepared.analysis.dispose()

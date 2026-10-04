@@ -33,6 +33,38 @@ describe('LatestAsyncRequest', () => {
     vi.useRealTimers()
   })
 
+  it('forwards independent scheduler cancellation to each started request', async () => {
+    vi.useFakeTimers()
+    const first = createDeferred<string>()
+    const second = createDeferred<string>()
+    const signals: AbortSignal[] = []
+    const request = new LatestAsyncRequest<string>()
+    request.schedule({
+      run: (signal) => {
+        signals.push(signal)
+        return first.promise
+      },
+      apply: () => undefined,
+    })
+    flushSchedulerTicks()
+    expect(signals[0]?.aborted).toBe(false)
+    request.schedule({
+      run: (signal) => {
+        signals.push(signal)
+        return second.promise
+      },
+      apply: () => undefined,
+    })
+    expect(signals[0]?.aborted).toBe(true)
+    flushSchedulerTicks()
+    expect(signals[1]?.aborted).toBe(false)
+    request.dispose()
+    expect(signals[1]?.aborted).toBe(true)
+    first.resolve('first')
+    second.resolve('second')
+    await flushMicrotasks()
+  })
+
   it('applies only the latest request result', async () => {
     vi.useFakeTimers()
     const first = createDeferred<string>()
