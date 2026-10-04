@@ -44,12 +44,15 @@ describe('definition link caller lifetime', () => {
 
   it('detaches an old disposer before reentrant departure starts a new target', async () => {
     const events: string[] = []
-    const secondEntered = deferred<void>()
+    let resolveSecondEntered: () => void = () => undefined
+    const secondEntered = new Promise<void>((resolve) => {
+      resolveSecondEntered = resolve
+    })
     let editor: ConnectedEditor
     editor = await connectedEditor('const value = other', 6, {
       onDefinitionLinkHover: (target) => {
         events.push(`enter:${target.path}`)
-        if (target.path === 'second.ts') secondEntered.resolve()
+        if (target.path === 'second.ts') resolveSecondEntered()
         return () => {
           events.push(`leave:${target.path}`)
           if (target.path !== 'first.ts') return
@@ -64,7 +67,7 @@ describe('definition link caller lifetime', () => {
     await editor.awaitRequest('textDocument/definition', 2)
     expect(events).toEqual(['enter:first.ts', 'leave:first.ts'])
     editor.answerDefinition([{ uri: 'file:///second.ts', range: singleLineRange(0, 5) }])
-    await secondEntered.promise
+    await secondEntered
     expect(events).toEqual(['enter:first.ts', 'leave:first.ts', 'enter:second.ts'])
     editor.dispose()
     expect(events).toEqual([
@@ -93,12 +96,4 @@ function depart(
   if (departure === 'document') return editor.replaceText('const next = 2')
   if (departure === 'navigation') return editor.runCommand('editor.action.goToDefinition')
   return editor.dispose()
-}
-
-function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((settle) => {
-    resolve = settle
-  })
-  return { promise, resolve }
 }
