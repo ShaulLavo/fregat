@@ -1,4 +1,3 @@
-import { useCallback } from 'react'
 import { useFileIntentLifetime } from '@/lib/file-open-intent/hooks/use-file-intent-lifetime'
 import type {
   FileOpenIntentInterest,
@@ -35,9 +34,7 @@ export function DiagnosticRow({
   readonly onOpen: () => void
 }) {
   const line = row.target.range.start.line + 1
-  // useFileIntentLifetime keys cleanup on the row's captured preparation action.
-  const prepare = useCallback((trigger: FileOpenIntentTrigger) => onIntent(trigger), [onIntent])
-  const lifetime = useFileIntentLifetime(prepare)
+  const lifetime = useFileIntentLifetime(onIntent)
   const { elementRef } = useForesight<HTMLButtonElement>({
     callback: () => lifetime.begin('trajectory'),
     hitSlop: INTENT_PREFETCH_HIT_SLOP_PX,
