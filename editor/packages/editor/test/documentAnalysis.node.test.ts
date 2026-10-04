@@ -5,12 +5,113 @@ import { EditorTokenStore } from '../src/syntax/tokenStore'
 import type { EditorHighlighterProvider } from '../src/syntax/highlighter'
 import {
   createEmptySyntaxResult,
+  createEmptySyntaxSession,
   type EditorSyntaxProvider,
   type EditorSyntaxRange,
   type EditorSyntaxResult,
 } from '../src/syntax/session'
 
 describe('retained document analysis', () => {
+  it.each([
+    ['structural-session', false],
+    ['structural-session', true],
+    ['highlighter-session', false],
+    ['highlighter-session', true],
+    ['highlighter-theme', false],
+    ['highlighter-theme', true],
+  ] as const)(
+    'releases every owned session with %s callbacks and reclamation reentrancy %s',
+    async (boundary, reentrant) => {
+      const buffer = createEditorTextBuffer('alpha')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reentrant.md' })
+      const listeners = new Set<() => void>()
+      let reclaimed = false
+      const reenter = () => {
+        if (!reentrant || reclaimed) return
+        reclaimed = true
+        analysis.reclaimInactive({ reason: 'inactive-budget' })
+        analysis.dispose()
+      }
+      const idle = () => undefined
+      const disposeFirst = vi.fn(boundary === 'highlighter-theme' ? idle : reenter)
+      const disposeSecond = vi.fn()
+      const unsubscribeFirst = vi.fn(boundary === 'highlighter-theme' ? reenter : idle)
+      const unsubscribeSecond = vi.fn()
+      const firstTheme = (listener: () => void) => {
+        listeners.add(listener)
+        return () => {
+          listeners.delete(listener)
+          unsubscribeFirst()
+        }
+      }
+      const secondTheme = (listener: () => void) => {
+        listeners.add(listener)
+        return () => {
+          listeners.delete(listener)
+          unsubscribeSecond()
+        }
+      }
+      let created = 0
+      const structural: EditorSyntaxProvider = {
+        createSession: () => ({
+          ...createEmptySyntaxSession(),
+          dispose: created++ === 0 ? disposeFirst : disposeSecond,
+        }),
+      }
+      const refresh = async () => ({ tokens: EditorTokenStore.empty() })
+      const highlighter: EditorHighlighterProvider = {
+        createSession: () => {
+          const first = created++ === 0
+          return {
+            refresh,
+            applyChange: refresh,
+            dispose: first ? disposeFirst : disposeSecond,
+            onDidChangeTheme: first ? firstTheme : secondTheme,
+          }
+        },
+      }
+      const first =
+        boundary === 'structural-session'
+          ? analysis.borrowStructural({ provider: structural, languageId: 'markdown' })!
+          : analysis.borrowHighlighter({ provider: highlighter, languageId: 'markdown' })!
+      const survivor =
+        boundary === 'structural-session'
+          ? analysis.borrowStructural({
+              provider: structural,
+              languageId: 'markdown',
+              configurationTag: ['survivor'],
+            })!
+          : analysis.borrowHighlighter({
+              provider: highlighter,
+              languageId: 'markdown',
+              configurationTag: ['survivor'],
+            })!
+      await Promise.all([
+        first.refresh(buffer.getTextSnapshot()),
+        survivor.refresh(buffer.getTextSnapshot()),
+      ])
+      first.dispose()
+      expect(survivor.read().kind).toBe('ready')
+      expect(analysis.inspectRetention().entries).toHaveLength(2)
+      analysis.dispose()
+
+      expect(created).toBe(2)
+      expect(disposeFirst).toHaveBeenCalledTimes(1)
+      expect(disposeSecond).toHaveBeenCalledTimes(1)
+      expect(listeners.size).toBe(0)
+      expect(survivor.read().kind).toBe('failed')
+      if (boundary !== 'structural-session') {
+        expect(unsubscribeFirst).toHaveBeenCalledTimes(1)
+        expect(unsubscribeSecond).toHaveBeenCalledTimes(1)
+      }
+      expect(analysis.inspectRetention().entries).toEqual([])
+      expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+      analysis.dispose()
+      expect(disposeFirst).toHaveBeenCalledTimes(1)
+      expect(disposeSecond).toHaveBeenCalledTimes(1)
+    },
+  )
+
   it('calibrates retained configuration and range growth with two surviving view leases', async () => {
     const buffer = createEditorTextBuffer('alpha beta gamma delta '.repeat(10))
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'growth.md' })

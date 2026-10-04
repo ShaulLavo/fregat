@@ -118,7 +118,7 @@ class AnalysisEntry<T extends RetentionResult> {
   private queuedRevision = -1
   private generation = 0
   private pendingInterest = new AbortController()
-  private tail: Promise<unknown> = Promise.resolve()
+  private tail: Promise<void> = Promise.resolve()
   private state: EditorAnalysisRead<T>
 
   constructor(
@@ -218,7 +218,10 @@ class AnalysisEntry<T extends RetentionResult> {
       this.assertCurrent(revision, generation)
       return run()
     })
-    this.tail = result.catch(() => undefined)
+    this.tail = result.then(
+      () => undefined,
+      () => undefined,
+    )
     const value = await interruptible(interruptible(result, this.cancellation.signal), interest)
     this.assertCurrent(revision, generation)
     return value
@@ -512,15 +515,16 @@ export function createEditorDocumentAnalysis(options: {
     dispose() {
       if (disposed) return
       disposed = true
-      unsubscribe?.()
+      const ownedStructural = structural.splice(0)
+      const ownedHighlighters = highlighters.splice(0)
+      const releaseBuffer = unsubscribe
       unsubscribe = undefined
-      for (const { entry } of structural) entry.dispose()
-      for (const { entry, unsubscribeTheme } of highlighters) {
+      releaseBuffer?.()
+      for (const { entry } of ownedStructural) entry.dispose()
+      for (const { entry, unsubscribeTheme } of ownedHighlighters) {
         unsubscribeTheme?.()
         entry.dispose()
       }
-      structural.length = 0
-      highlighters.length = 0
     },
   }
 }
