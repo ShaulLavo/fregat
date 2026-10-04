@@ -67,7 +67,9 @@
       "outputs": ["dist/**"]
     },
     "ghostty-webgpu-site#build": {
-      "dependsOn": ["^build", "ghostty-webgpu#build"]
+      "dependsOn": ["^build", "ghostty-webgpu#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
