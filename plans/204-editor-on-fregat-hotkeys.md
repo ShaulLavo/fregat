@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: APPROVED 2026-09-29, requested by the owner. Depends on
+- Status: DELIVERED 2026-10-04 in [PR #603](https://github.com/ShaulLavo/fregat/pull/603).
+  Installed release and live verification passed. Approved by the owner on 2026-09-29. Depends on
   [203](203-fregat-hotkeys.md). Runs in parallel with [205](205-ghostty-on-fregat-hotkeys.md);
   [206](206-platform-one-keymap.md) consumes both.
 - Decisions: [Keymap architecture](../docs/keymap/architecture.md). Research:
@@ -12,6 +13,14 @@
   and TUI caller before deleting the old options, runtime and exports in that same completed
   change. Prepare and test 204/205 in parallel; ship their integration with 206 without
   compatibility shims or an intermediate release that breaks current callers.
+
+## Delivery evidence
+
+The [command foundation delivery record](../docs/keymap/command-foundation-delivery.md)
+records the integrated source, independent review, green CI, exact standalone family proof,
+and qualified large-file comparison. Installed release
+`20261004T102110Z-fa40610d-main-c24b3184` passed its live check on 2026-10-04.
+npm setup remains deferred.
 
 ## Outcome
 
@@ -57,17 +66,16 @@ family source and pack snapshots; Plan 206 owns final caller integration, review
 Local development uses the hotkeys workspace. Exact standalone family installation is qualified
 under Plan 207 while npm remains deferred.
 
-- [ ] Link `@fregat/hotkeys`; add the node registration and standalone dispatcher behind the
-      current options, with the existing chord browser tests
+- [x] Link `@fregat/hotkeys`; add the node registration and standalone dispatcher with the existing chord browser tests
       (`packages/editor/test/chords.browser.test.ts`) passing on it.
-- [ ] Convert packs to data with predicates; replace the `keymap-bindings.baseline.json` test with
+- [x] Convert packs to data with predicates; replace the `keymap-bindings.baseline.json` test with
       one snapshot per exported pack.
-- [ ] Split the base keymap from the packs; default standalone packs exclude Markdown.
-- [ ] Convert the raw key sites to commands one at a time, each with its existing tests passing.
-- [ ] Remove `enabled`, `defaultBindings`, the old runtime, trie, conditions and re-export routes;
+- [x] Split the base keymap from the packs; default standalone packs exclude Markdown.
+- [x] Convert the raw key sites to commands one at a time, each with its existing tests passing.
+- [x] Remove `enabled`, `defaultBindings`, the old runtime, trie, conditions and re-export routes;
       update `packages/editor/README.md` "Chords and host keymaps", the Markdown README and the
       lsp-plugin note about hosts binding suggest commands.
-- [ ] Diff package: pass its read-only pack set through the new options.
+- [x] Diff package: pass its read-only pack set through the new options.
 
 ## Acceptance
 

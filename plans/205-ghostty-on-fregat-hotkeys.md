@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: APPROVED 2026-09-29, requested by the owner. Depends on
+- Status: DELIVERED 2026-10-04 in [PR #603](https://github.com/ShaulLavo/fregat/pull/603).
+  Installed release and live verification passed. Approved by the owner on 2026-09-29. Depends on
   [203](203-fregat-hotkeys.md). Runs in parallel with [204](204-editor-on-fregat-hotkeys.md);
   [206](206-platform-one-keymap.md) consumes it.
 - Decisions: [Keymap architecture](../docs/keymap/architecture.md). Research:
@@ -11,6 +12,14 @@
 - Work happens in Fregat's `ghostty-webgpu/` after [207](207-one-repo-with-mirrors.md) moves it
   there. Prepare with 204 and coordinate hosted-consumer adoption with 206; migrate callers
   and delete replaced APIs in the same completed cutover.
+
+## Delivery evidence
+
+The [command foundation delivery record](../docs/keymap/command-foundation-delivery.md)
+records the integrated source, independent review, green CI, exact standalone family proof,
+and qualified large-file comparison. Installed release
+`20261004T102110Z-fa40610d-main-c24b3184` passed its live check on 2026-10-04.
+npm setup remains deferred.
 
 ## Outcome
 
@@ -64,18 +73,18 @@ input queues, press/release, paste and lifecycle remain peer-owned under
 ## Steps
 
 Execution started 2026-10-03 in the command-foundation wave. The terminal producer owns the
-adapter, packs and minimum host connection needed by this plan, preserving active 286/287
-scaffold contracts. Plan 206 owns final caller integration, review and shipping. Local development
+adapter, packs and minimum host connection needed by this plan, preserving landed 286/287
+public contracts. Plan 206 owns final caller integration, review and shipping. Local development
 uses the hotkeys workspace; exact standalone installation is qualified under Plan 207 while npm
 remains deferred.
 
-- [ ] Link `@fregat/hotkeys`; port the current bindings to a pack and the dispatcher, with the
+- [x] Link `@fregat/hotkeys`; port the current bindings to a pack and the dispatcher, with the
       existing hotkey tests passing.
-- [ ] Add the node API and `terminal.sendKeystroke`; test that unbound keys reach the PTY and a
+- [x] Add the node API and `terminal.sendKeystroke`; test that unbound keys reach the PTY and a
       host-bound key does not unless the terminal layer sends it.
-- [ ] Export the default pack and the shell-keys pack; document both in the README.
-- [ ] Delete `src/dom/hotkeys.ts` and the custom key handler path the pack replaces.
-- [ ] Run the repo's browser tests, including WebKit/Firefox via
+- [x] Export the default pack and the shell-keys pack; document both in the README.
+- [x] Delete `src/dom/hotkeys.ts` and the custom key handler path the pack replaces.
+- [x] Run the repo's browser tests, including WebKit/Firefox via
       `scripts/playwright-webkit-arch.sh` where the repo requires it.
 
 ## Acceptance
@@ -84,8 +93,8 @@ remains deferred.
   object overrides one.
 - Hosted: with a host binding Ctrl+B in `Workspace` and no terminal binding, Ctrl+B reaches the
   host; with the shell-keys pack, Ctrl+B reaches the shell.
-- Tests and build pass; Platform's current terminal still works against the pinned build until
-  206 switches it.
+- Tests and build pass; Platform's hosted terminal uses the shared dispatcher and finite
+  original-input connection after the coordinated 206 cutover.
 
 ## Out of scope
 
