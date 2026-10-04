@@ -10,6 +10,8 @@ import type { EditorPlugin } from '../src/plugins'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxProvider,
+  type EditorSyntaxSession,
+  type FoldRange,
   type EditorSyntaxRange,
 } from '../src/syntax/session'
 import { VirtualizedTextView } from '../src/virtualization'
@@ -33,10 +35,17 @@ describe('analysis display demand', () => {
       Array.from({ length: 500 }, (_, index) => `line${index} ${'x'.repeat(90)}\n`).join(''),
     )
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'frames.ts' })
-    const result = createEmptySyntaxResult({ folds: [{ startLine: 0, endLine: 5 }] })
+    const fold: FoldRange = {
+      startLine: 0,
+      endLine: 5,
+      startIndex: 0,
+      endIndex: buffer.getTextSnapshot().lineRange(5).end,
+      type: 'block',
+    }
+    const result = { ...createEmptySyntaxResult(), folds: [fold] }
     const queryRange = vi.fn(async () => result)
     const provider: EditorSyntaxProvider = {
-      createSession: vi.fn(() => ({
+      createSession: vi.fn((): EditorSyntaxSession => ({
         foldingSupport: 'supported',
         refresh: async () => result,
         applyChange: async () => result,
@@ -99,10 +108,24 @@ describe('analysis display demand', () => {
       textView(editors[0]!).setScrollMetrics(240, 96, 180)
       editors[0]!.setFontSize(18)
       assertFrames()
-      editors[0]!.setSyntaxFolds([{ startLine: 0, endLine: 5 }])
-      editors[0]!.fold(0)
+      editors[0]!.setSyntaxFolds([fold])
+      textView(editors[0]!).setScrollMetrics(0, 96, 400)
+      const unfoldedRange = mountedRange(editors[0]!)
+      expect(editors[0]!.fold(0)).toBe(true)
+      expect(
+        textView(editors[0]!)
+          .getState()
+          .foldMarkers.filter((marker) => marker.collapsed)
+          .map((marker) => marker.startRow),
+      ).toEqual([0])
+      expect(mountedRange(editors[0]!)).not.toEqual(unfoldedRange)
       assertFrames()
-      editors[0]!.unfold(0)
+      expect(editors[0]!.unfold(0)).toBe(true)
+      expect(
+        textView(editors[0]!)
+          .getState()
+          .foldMarkers.filter((marker) => marker.collapsed),
+      ).toEqual([])
       textView(editors[0]!).setScrollMetrics(0, 72, 400)
       assertFrames()
       await vi.waitFor(() => expect(queryRange).toHaveBeenCalledTimes(1))
