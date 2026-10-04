@@ -66,6 +66,14 @@ export const mermaidSelectors = {
 }
 export const editorRowSelector = '[data-editor-virtual-row]'
 export const sharedTokenHighlightPrefix = 'editor-shared-token-'
+export const editorTokenPaintSelectors = {
+  viewportSelector: editorViewportSelector,
+  rowSelector: '.editor-virtualized-row',
+  excludedLayers:
+    '.editor-virtualized-selection-layer,.editor-virtualized-hidden-character-layer,' +
+    '.editor-virtualized-fold-placeholder,.editor-virtualized-gutter-row',
+  highlightPrefix: sharedTokenHighlightPrefix,
+} as const
 /** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
 export const decodeSelectors = {
   active: '.editor-decode-active',
