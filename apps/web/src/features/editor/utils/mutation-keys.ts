@@ -11,6 +11,7 @@ export const editorMutationKeys = {
   save: (key: DocumentKey) => ['editor', 'save', key] as const,
   saves: () => ['editor', 'save'] as const,
   diffSyntaxPrepare: () => ['editor', 'diff-syntax', 'prepare'] as const,
+  savedComparison: (scope: string) => ['editor', 'saved-comparison', 'adopt', scope] as const,
 }
 
 export const EDITOR_SAVE_SCOPE = 'editor.save'

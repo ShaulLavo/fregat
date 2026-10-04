@@ -20,7 +20,11 @@ export function readDevSources(webRoot: string): readonly DevPackage[] {
   const editors = Object.keys(dependencies).filter((name) => name.startsWith('@singapore-editor/'))
   if (editors.length === 0) throw createScriptError('No editor dependencies found in the web app.')
 
-  return [...editors.map((name) => readEditorPackage(webRoot, name)), readGhosttyPackage(webRoot)]
+  return [
+    ...editors.map((name) => readEditorPackage(webRoot, name)),
+    readHotkeysPackage(webRoot),
+    readGhosttyPackage(webRoot),
+  ]
 }
 
 export function sourceAliases(packages: readonly DevPackage[]) {
@@ -95,6 +99,13 @@ function readEditorPackage(webRoot: string, name: string): DevPackage {
   }
   if (!entries.has(name)) throw createScriptError(`Missing source entry for ${name}.`)
 
+  return { name, root, checkout: checkoutRoot(root), entries }
+}
+
+function readHotkeysPackage(webRoot: string): DevPackage {
+  const name = '@fregat/hotkeys'
+  const root = packageRoot(webRoot, name)
+  const entries = new Map([[name, requiredFile(root, 'src/index.ts')]])
   return { name, root, checkout: checkoutRoot(root), entries }
 }
 

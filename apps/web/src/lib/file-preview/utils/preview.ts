@@ -1,3 +1,5 @@
+import type { fetchFileHead } from '@/lib/file-server'
+
 /** Moving through a list reads nothing until the selection rests this long. */
 export const PREVIEW_SETTLE_MS = 120
 
@@ -14,14 +16,19 @@ const IMAGE_EXTENSIONS = new Set([
   'webp',
 ])
 
+type FileHead = Awaited<ReturnType<typeof fetchFileHead>>
+
 export type PreviewContent =
-  | {
+  | (Readonly<Pick<FileHead, 'size' | 'truncated'>> & {
       readonly kind: 'text'
       readonly text: string
-      /** The whole file's bytes; `text` is its head when `truncated`. */
-      readonly size: number
-      readonly truncated: boolean
-    }
+      readonly source: {
+        readonly origin: string
+        readonly path: FileHead['path']
+        readonly capture: Readonly<FileHead['capture']>
+      }
+      readonly coverage: Readonly<FileHead['coverage']>
+    })
   | { readonly kind: 'binary' }
 
 /** The whole extension, lowercased; it doubles as the highlighter's language alias. */

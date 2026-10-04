@@ -18,11 +18,7 @@ import { EDITOR_SNIPPET_TOKENS_FEATURE } from '@singapore-editor/core/extensions
 import type { EditorToken } from '@singapore-editor/core/syntax'
 import { createDiffGutterContribution } from './diffGutter'
 import { diffInlineHighlightRanges, diffRowDecorations } from './diffRows'
-import {
-  DiffSyntaxController,
-  type PreparedDiffSyntaxInput,
-  type PreparedDiffSyntaxSource,
-} from './diffSyntax'
+import { DiffSyntaxController, type PreparedDiffSyntaxInput } from './diffSyntax'
 import {
   diffGutterDigits,
   type DiffGutterDigits,
@@ -62,11 +58,11 @@ export type DiffPlugin = EditorPlugin & {
   /**
    * `document` mode: the file to project. The host owns the editor's text — §C3. `prepared`
    * streams from `prepareDiffSyntax` for this file paint with the first rows, and a preparation
-   * still running is awaited in place of a second parse; the plugin owns them.
+   * still running is awaited in place of a second parse. The plugin disposes each reader interest.
    */
   setFile(file: DiffFile | null, prepared?: PreparedDiffSyntaxInput): void
-  /** The current file's parsed streams, handed to the caller; empty while a parse is running. */
-  releasePreparedSyntax(): readonly PreparedDiffSyntaxSource[]
+  /** Releases syntax interests while retaining this pane's rows and shared expansion. */
+  releaseSyntax(): void
   getRows(): readonly DiffRenderRow[]
   /** Both sides in row order. Cached until the file or expansion state changes. */
   getStackedRows(): readonly DiffRenderRow[]
@@ -140,7 +136,7 @@ export function createDiffPlugin(options: DiffPluginOptions): DiffPlugin {
       return runtime.activate(context)
     },
     setFile: (file, prepared) => runtime.setFile(file, prepared),
-    releasePreparedSyntax: () => runtime.releasePreparedSyntax(),
+    releaseSyntax: () => runtime.releaseSyntax(),
     getRows: () => runtime.getRows(),
     getStackedRows: () => runtime.getStackedRows(),
     getTokens: () => runtime.getTokens(),
@@ -279,8 +275,8 @@ class DiffPluginRuntime {
     this.notifyRows()
   }
 
-  releasePreparedSyntax(): readonly PreparedDiffSyntaxSource[] {
-    return this.syntax.release()
+  releaseSyntax(): void {
+    this.syntax.release()
   }
 
   getRows(): readonly DiffRenderRow[] {

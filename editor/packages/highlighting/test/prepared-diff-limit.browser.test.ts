@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { createTextDiff, type PreparedDiffSyntaxSource } from '@singapore-editor/diff'
+import { createTextDiff, type DiffSyntaxSourceReader } from '@singapore-editor/diff'
 import { createHighlightingService, type HighlightingThemeSource } from '../src/index'
 
 test('prepared diff sessions use the configured cap and recolor under the next request cap', async () => {
@@ -47,7 +47,7 @@ test('prepared diff sessions use the configured cap and recolor under the next r
     oldFile: { path: 'review.ts', languageId: 'typescript', text: 'const longer = 1\n' },
     newFile: { path: 'review.ts', languageId: 'typescript', text: 'const longer = 2\n' },
   })
-  let sources: readonly PreparedDiffSyntaxSource[] = []
+  let sources: readonly DiffSyntaxSourceReader[] = []
   let shown: { dispose(): void } | null = null
   try {
     expect(await service.prepareDiff(file, source)).toBe(true)
@@ -59,7 +59,6 @@ test('prepared diff sessions use the configured cap and recolor under the next r
             sources = next
           })
         },
-        releasePreparedSyntax: () => sources,
       },
       file,
       'stacked',

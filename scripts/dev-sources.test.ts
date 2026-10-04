@@ -6,7 +6,9 @@ import { readDevSources, sourcePaths, writeDevTypeConfig } from './dev-sources'
 
 const sourceTest = test.extend<{ web: string }>({
   web: async ({ task }, provide) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), `platform-dev-sources-${task.id}-`))
+    const root = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), `platform-dev-sources-${task.id}-`)),
+    )
     writeFile(
       root,
       'package.json',
@@ -21,6 +23,12 @@ const sourceTest = test.extend<{ web: string }>({
     )
     writeFile(root, 'node_modules/@singapore-editor/core/src/index.ts')
     writeFile(root, 'node_modules/@singapore-editor/core/src/public/document.ts')
+    writeFile(
+      root,
+      'node_modules/@fregat/hotkeys/package.json',
+      JSON.stringify({ exports: { '.': { import: './dist/index.js' } } }),
+    )
+    writeFile(root, 'node_modules/@fregat/hotkeys/src/index.ts')
     writeFile(root, 'node_modules/ghostty-webgpu/package.json', '{}')
     for (const file of [
       'src/index.ts',
@@ -43,6 +51,9 @@ sourceTest(
   ({ web }) => {
     const packages = readDevSources(web)
     const paths = sourcePaths(packages)
+    expect(paths['@fregat/hotkeys']).toEqual([
+      path.join(web, 'node_modules/@fregat/hotkeys/src/index.ts'),
+    ])
     expect(paths['@singapore-editor/core/document']).toEqual([
       path.join(web, 'node_modules/@singapore-editor/core/src/public/document.ts'),
     ])
