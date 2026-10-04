@@ -880,6 +880,7 @@ for (const scenario of [
   'launch-native-contradiction',
   'launch-no-resize',
   'launch-calibration-target',
+  'healthy-delayed-calibration',
 ]) {
   test(
     `actual launch and cleanup respect external ${scenario} boundaries`,

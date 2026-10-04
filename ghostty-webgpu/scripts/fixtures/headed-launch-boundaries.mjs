@@ -20,12 +20,14 @@ const scenarios = [
   'launch-native-contradiction',
   'launch-no-resize',
   'launch-calibration-target',
+  'healthy-delayed-calibration',
 ]
 assert(scenarios.includes(scenario))
 const geometryScenario = scenario.startsWith('launch-')
 let nativeSize = geometryScenario ? { width: 922, height: 1030 } : { width: 480, height: 560 }
 let windowState = 'normal'
 let resized = false
+let delayedCalibrationRead = false
 const scripts = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(join(scripts, 'comparison-presentation.mjs'))
 const { PNG } = require('pngjs')
@@ -80,7 +82,7 @@ function spawn(command, args) {
   if (
     scenario === 'orphan-descendant' ||
     scenario.includes('transport') ||
-    scenario === 'healthy' ||
+    scenario.startsWith('healthy') ||
     geometryScenario
   )
     processes.set(gpuPid, {
@@ -300,7 +302,20 @@ const page = {
     handler({ url: new URL(url).pathname + new URL(url).search }, response)
     vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], pageContext)
   },
-  evaluate: async (fn, input) => vm.runInContext('(' + fn.toString() + ')', pageContext)(input),
+  evaluate: async (fn, input) => {
+    const result = vm.runInContext('(' + fn.toString() + ')', pageContext)(input)
+    if (
+      scenario === 'healthy-delayed-calibration' &&
+      windowState === 'maximized' &&
+      !delayedCalibrationRead
+    ) {
+      delayedCalibrationRead = true
+      pageContext.innerWidth = 1468
+      pageContext.innerHeight = 1071
+      events.push('delayed-calibration-page-delivered')
+    }
+    return result
+  },
 }
 session.send = async (method, parameters) => {
   if (method === 'Browser.setWindowBounds') {
@@ -309,8 +324,10 @@ session.send = async (method, parameters) => {
       windowState = 'maximized'
       if (scenario !== 'launch-calibration-target') {
         nativeSize = { width: 1500, height: 1200 }
-        pageContext.innerWidth = 1468
-        pageContext.innerHeight = 1071
+        if (scenario !== 'healthy-delayed-calibration') {
+          pageContext.innerWidth = 1468
+          pageContext.innerHeight = 1071
+        }
       }
       events.push('calibration-maximized')
       return {}
@@ -481,7 +498,7 @@ try {
       size: { ...nativeSize },
     }),
   }
-  if (scenario.includes('transport') || scenario === 'healthy')
+  if (scenario.includes('transport') || scenario.startsWith('healthy'))
     evidence = await entry.namespace.runHeadedPresentationSmoke(options)
   else {
     ownedPage = await entry.namespace.launchOwnedHeadedBrowser(options)
@@ -545,11 +562,14 @@ if (geometryScenario) {
   assert.equal(evidence.geometry, undefined)
   assert.equal(processes.size, 0)
 }
-if (scenario === 'healthy') {
+if (scenario.startsWith('healthy')) {
   assert.equal(failure, undefined)
   assert.equal(evidence.status, 'PASS_SETUP_ONLY')
   assert.equal(evidence.geometryCalibration.calibrationOnly, true)
-  assert.equal(evidence.geometryCalibration.observations.length, 2)
+  assert.equal(
+    evidence.geometryCalibration.observations.length,
+    scenario === 'healthy-delayed-calibration' ? 3 : 2,
+  )
   assert.deepEqual({ ...evidence.nativeContentInsets }, { width: 32, height: 129 })
   assert.deepEqual({ ...evidence.geometry.nativeContentSize }, { width: 320, height: 440 })
   assert.equal(evidence.geometryResize.observed, true)
