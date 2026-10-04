@@ -25,6 +25,7 @@ export type {
   CreateIncrementalTokenizerResult,
   IncrementalTokenizer,
   IncrementalTokenizerSnapshot,
+  IncrementalTokenizerRetentionSnapshot,
   LineTokens,
   StatesEqualFn,
   TokenizeLineFn,
@@ -51,6 +52,7 @@ export type {
   ShikiWorkerLanguageRegistration,
   ShikiWorkerThemeRegistration,
   ShikiWorkerTransportResult,
+  ShikiWorkerRetentionSnapshot,
 } from './workerTypes'
 export type {
   ShikiHighlighterSessionOptions,
