@@ -165,20 +165,17 @@ describe('prepared diff syntax', () => {
 
   function fakeView() {
     const shown: PreparedDiffSyntaxInput[] = []
-    let owned: Awaited<PreparedDiffSyntaxInput> = []
     return {
       shown,
       view: {
         setFile: (_file: unknown, prepared: PreparedDiffSyntaxInput = []) => {
           shown.push(prepared)
-          void Promise.resolve(prepared).then((sources) => (owned = sources))
         },
-        releasePreparedSyntax: () => owned,
       },
     }
   }
 
-  test('a kept preparation paints the view, which hands it back when it leaves', async () => {
+  test('a kept preparation lends readers to the view and stays owned when it leaves', async () => {
     const highlighting = service()
     const file = diff('1')
     expect(await highlighting.prepareDiff(file, palette)).toBe(true)
@@ -201,7 +198,7 @@ describe('prepared diff syntax', () => {
     const highlighting = service()
     const file = diff('2')
     const preparing = highlighting.prepareDiff(file, palette)
-    expect(highlighting.inspect().diffs.running).toBe(1)
+    expect(highlighting.inspect().diffs.running).toBe(2)
     const { shown, view } = fakeView()
     const shownDiff = highlighting.showDiff(view, file, 'stacked', palette)
     expect(shown[0]).toBeInstanceOf(Promise)

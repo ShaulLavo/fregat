@@ -25,6 +25,8 @@ it('preserves restrictions and one account allowance across newer reset observat
     state: 'ready',
     source: 'codex-account-rate-limits',
     windows: [window],
+    credits: { balance: 1000, unlimited: false },
+    creditsObservedAt: '2026-09-24T10:15:00.000Z',
   }
   const proxy: ProviderAccountUsage = {
     ...native,
@@ -32,6 +34,8 @@ it('preserves restrictions and one account allowance across newer reset observat
     source: 'cli-proxy-management',
     state: 'disabled',
     routing: { mode: 'single', active: false, lastServedAt: null },
+    credits: { balance: 0, unlimited: false },
+    creditsObservedAt: '2026-09-24T10:05:00.000Z',
     windows: [
       {
         ...window,
@@ -51,6 +55,10 @@ it('preserves restrictions and one account allowance across newer reset observat
     ]),
   )
   expect(merged).toMatchObject({ state: 'disabled', routing: { active: false } })
+  expect(merged).toMatchObject({
+    credits: native.credits,
+    creditsObservedAt: native.creditsObservedAt,
+  })
   expect(merged!.windows).toMatchObject([
     {
       id: 'primary',
