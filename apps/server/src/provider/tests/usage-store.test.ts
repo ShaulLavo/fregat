@@ -28,6 +28,7 @@ import {
 } from '../../observability/runtime'
 import {
   codexUsageUpdate,
+  claudeUsageProbe,
   type ProviderUsageProbe,
   type ProviderUsageReading,
 } from '../utils/usage-windows'
@@ -49,6 +50,147 @@ afterEach(async () => {
 })
 
 describe('provider usage store', () => {
+  it('one proven native owner serves a minute quota read while the proxy defers its duplicate', async () => {
+    const f = await nativeClaudeFixture('codex')
+    await writeFile(
+      path.join(path.dirname(f.cachePath), 'credentials.json'),
+      JSON.stringify({ tokens: { account_id: 'fixture-account' } }),
+    )
+    let held: Promise<ProviderUsageProbe> | null = null
+    stubUsage(
+      f.registry,
+      WORK,
+      async () => held ?? reading([{ ...window('primary', 17), windowMinutes: 300 }]),
+    )
+    let requests = 0
+    let notifyProxy: (() => void) | undefined
+    const store = new ProviderUsageStore(f.registry, {
+      now: () => f.clock.ms,
+      cacheFile: path.join(path.dirname(f.cachePath), 'accounts.json'),
+      proxyCurrentIntervalMs: () => 60_000,
+      readProxy: async (identityContext, refresh) => {
+        const result = await readProxyUsage({
+          identityContext,
+          refresh,
+          url: 'http://localhost:18317',
+          secret: 'synthetic-key',
+          now: () => f.clock.ms,
+          fetch: async (input) => {
+            if (new URL(String(input)).pathname === '/v0/management/auth-files')
+              return Response.json({
+                files: [
+                  {
+                    id: 'fixture-auth',
+                    auth_index: 'fixture-selector',
+                    provider: 'codex',
+                    status: 'active',
+                    id_token: { chatgpt_account_id: 'fixture-account' },
+                  },
+                ],
+              })
+            requests += 1
+            return Response.json({
+              status_code: 200,
+              body: JSON.stringify({
+                rate_limit: { primary_window: { used_percent: 17, limit_window_seconds: 18000 } },
+              }),
+            })
+          },
+        })
+        notifyProxy?.()
+        return result
+      },
+    })
+    await store.refresh()
+    const before = requests
+    f.clock.ms += 60_000
+    const response = Promise.withResolvers<ProviderUsageProbe>()
+    held = response.promise
+    const proxyDone = Promise.withResolvers<void>()
+    notifyProxy = () => proxyDone.resolve()
+    const pending = store.refresh()
+    await proxyDone.promise
+    expect(requests).toBe(before)
+    response.resolve(reading([{ ...window('primary', 17), windowMinutes: 300 }]))
+    await pending
+    expect((await store.read()).accounts).toHaveLength(1)
+    expect((await store.read()).accounts[0]!.windows[0]!.observedAt).toBe(
+      new Date(f.clock.ms).toISOString(),
+    )
+    await store.close()
+    await f.store.close()
+  })
+
+  it('bounds a longer Claude native interval by the full quota refresh interval', async () => {
+    const f = await nativeClaudeFixture()
+    await f.writeCache('fixture-old-account', 'fixture-old-account', START_MS - 7_200_000, 3)
+    const calls = stubUsage(f.registry, WORK, async () => reading([window('five_hour', 4)]))
+    const store = new ProviderUsageStore(f.registry, {
+      now: () => f.clock.ms,
+      policy: () => ({
+        minIntervalMs: 7_200_000,
+        failureCooldownMs: 600_000,
+        staleAfterMs: 900_000,
+      }),
+      proxyRequestIntervalHours: () => 1,
+    })
+    await store.refresh()
+    expect(calls.count).toBe(1)
+    f.clock.ms += 3_600_000 - 1
+    await store.refresh()
+    expect(calls.count).toBe(1)
+    f.clock.ms += 1
+    await store.refresh()
+    expect(calls.count).toBe(2)
+    await store.close()
+    await f.store.close()
+  })
+
+  it('preserves full Claude quota reads, accepts intervening partial cache data, and dates unchanged returned windows', async () => {
+    const f = await nativeClaudeFixture()
+    await f.writeCache('fixture-old-account', 'fixture-old-account', START_MS - 7_200_000, 3)
+    const probe = claudeUsageProbe({
+      rate_limits_available: true,
+      subscription_type: 'max',
+      rate_limits: {
+        five_hour: { utilization: 4, resets_at: new Date(START_MS + 3_600_000).toISOString() },
+        seven_day: { utilization: 100, resets_at: new Date(START_MS + 604_800_000).toISOString() },
+      },
+    }).probe
+    const calls = stubUsage(f.registry, WORK, async () => probe)
+    const store = new ProviderUsageStore(f.registry, {
+      now: () => f.clock.ms,
+      policy: () => ({ minIntervalMs: 300_000, failureCooldownMs: 600_000, staleAfterMs: 900_000 }),
+      proxyRequestIntervalHours: () => 1,
+    })
+    await store.refresh()
+    expect(calls.count).toBe(1)
+    expect((await store.read()).accounts[0]!.windows.map((window) => window.observedAt)).toEqual([
+      new Date(START_MS).toISOString(),
+      new Date(START_MS).toISOString(),
+    ])
+    f.clock.ms += 60_000
+    await store.refresh()
+    expect(calls.count).toBe(1)
+    f.clock.ms += 60_000
+    await f.writeCache('fixture-old-account', 'fixture-old-account', f.clock.ms, 5)
+    await store.refresh()
+    expect(calls.count).toBe(1)
+    expect((await store.read()).accounts[0]!.windows).toMatchObject([
+      { id: 'five_hour', usedPercent: 5, observedAt: new Date(f.clock.ms).toISOString() },
+      { id: 'seven_day', usedPercent: 100, observedAt: new Date(START_MS).toISOString() },
+    ])
+    f.clock.ms = START_MS + 300_000
+    await store.refresh()
+    expect(calls.count).toBe(2)
+    expect((await store.read()).accounts[0]!.windows.map((window) => window.observedAt)).toEqual([
+      new Date(f.clock.ms).toISOString(),
+      new Date(f.clock.ms).toISOString(),
+    ])
+    await store.close()
+    await f.store.close()
+  })
+
   it('discards persisted aggregate model aliases and preserves explicitly scoped allowance ages', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'usage-obsolete-model-cache-'))
     roots.push(root)

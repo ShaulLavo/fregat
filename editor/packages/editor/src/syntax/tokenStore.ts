@@ -14,6 +14,16 @@ export type EditorTokenStoreOrigin = {
   readonly keepsLiveRanges: boolean
 }
 
+export type EditorTokenStoreRetentionSnapshot = {
+  readonly storeCount: number
+  readonly tokenCount: number
+  readonly segmentCount: number
+  readonly backingBufferCount: number
+  /** Full retained buffers, deduplicated across all stores and overlapping views. */
+  readonly backingBytes: number
+  readonly unmeasuredBytes: readonly ('javascript-objects' | 'styles')[]
+}
+
 /** What a host may hand in: a store, or object tokens converted at the boundary. */
 export type EditorTokenInput = EditorTokenStore | readonly EditorToken[]
 
@@ -98,6 +108,33 @@ export class EditorTokenStore {
 
   static empty(): EditorTokenStore {
     return EditorTokenStore.EMPTY
+  }
+
+  static inspectRetention(stores: Iterable<EditorTokenStore>): EditorTokenStoreRetentionSnapshot {
+    const retained = new Set(stores)
+    const buffers = new Set<ArrayBufferLike>()
+    let tokenCount = 0
+    let segmentCount = 0
+    for (const store of retained) {
+      tokenCount += store.length
+      segmentCount += store.segments.length
+      if (store.maxEnds) buffers.add(store.maxEnds.buffer)
+      for (const segment of store.segments) {
+        buffers.add(segment.starts.buffer)
+        buffers.add(segment.ends.buffer)
+        buffers.add(segment.styleIds.buffer)
+      }
+    }
+    let backingBytes = 0
+    for (const buffer of buffers) backingBytes += buffer.byteLength
+    return {
+      storeCount: retained.size,
+      tokenCount,
+      segmentCount,
+      backingBufferCount: buffers.size,
+      backingBytes,
+      unmeasuredBytes: ['javascript-objects', 'styles'],
+    }
   }
 
   /** Takes ownership of the packed arrays; nothing may write to them afterwards. */
