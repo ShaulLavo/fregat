@@ -2,6 +2,7 @@ import type { Browser } from 'playwright'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { checkoutRoot } from './paths'
 
 // Playwright's --disable-dev-shm-usage makes Chromium keep shared memory as fully allocated files in
@@ -23,9 +24,23 @@ async function loadPlaywright() {
   return import('playwright')
 }
 
-export async function browserAvailable(engine: Engine): Promise<boolean> {
+export async function browserAvailable(
+  engine: Engine,
+  headed = false,
+  notifications = false,
+): Promise<boolean> {
   const playwright = await loadPlaywright()
-  return existsSync(playwright[engine].executablePath())
+  if (engine !== 'chromium' || headed || notifications)
+    return existsSync(playwright[engine].executablePath())
+  // executablePath() exposes full Chromium; the pinned launch registry resolves its headless shell.
+  const core = createRequire(import.meta.resolve('playwright'))(
+    'playwright-core/lib/coreBundle',
+  ) as {
+    registry: { registry: { findExecutable(name: string): { executablePath(): string } } }
+  }
+  return existsSync(
+    core.registry.registry.findExecutable('chromium-headless-shell').executablePath(),
+  )
 }
 
 export async function launchBrowser(
