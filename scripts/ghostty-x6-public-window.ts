@@ -515,8 +515,8 @@ async function launch(mode: 'startup' | 'block'): Promise<void> {
   save(output, 'actual-heavy-job-record.json', completed[0])
   assert.equal(completed[0]!.exitCode, 0)
   assert.equal(completed[0]!.quietHoldExpired, false)
-  const journal = join(unit.host.stateDirectory, 'measurements', `${run.id}.json`)
-  copyFileSync(journal, join(output, 'journal-completed.json'))
+  // The runner removes its live journal on completion; the completed record owns the final overlap list.
+  assert(Array.isArray(completed[0]!.jobsDuringRun), 'Complete actual overlap journal required')
   if (mode === 'startup') {
     assert.equal(
       readJson<{ passed: boolean }>(join(output, 'block-00/platform-verification.json')).passed,
