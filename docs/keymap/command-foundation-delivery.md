@@ -100,7 +100,8 @@ and settings remain unchanged. Application, family and agent source remain exact
 
 ## Served release
 
-The owner ran `bun run install-release --server --restart --interrupt` from clean main.
+The coordinator ran the approved `bun run install-release --server --restart --interrupt`
+installation from clean main.
 The installer exited 0 and serves release `20261004T102110Z-fa40610d-main-c24b3184`.
 Both web and server report commit
 [`fa40610d9c4fdf865c6e3d4a1684d45d75cbdd67`](https://github.com/ShaulLavo/fregat/commit/fa40610d9c4fdf865c6e3d4a1684d45d75cbdd67),
