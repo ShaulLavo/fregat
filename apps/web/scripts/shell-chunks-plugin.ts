@@ -1,6 +1,6 @@
 import path from 'node:path'
 import type { Plugin, ResolvedConfig, Rolldown } from 'vite'
-import { createScriptError } from '../../../scripts/structured-errors'
+import { createScriptError } from '../../../scripts/structured-errors.ts'
 
 /** Each lazy shell's root module, by the kind the boot script picks (src/lib/shell/utils/kind.ts). */
 export const SHELL_ENTRIES = {

@@ -44,7 +44,32 @@ Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun r
 
 The family folders are mirrored to their standalone repositories. Make library changes here and follow `editor/AGENTS.md` and `ghostty-webgpu/AGENTS.md` for their package rules.
 
-## the shared dev server
+## CI turnaround
+
+PR library checks follow the changed family and shared build inputs. Root configuration, patches, workflow actions, scripts, and Turbo global dependencies select every family. Changes confined to app or shared app-package sources leave library checks skipped. Main and manual CI runs validate every family.
+
+Standalone families share one runner. Each uses a fresh `git archive` export and independent install outside the checkout. Editor also installs a second export with hoisted dependencies and checks tree-sitter runtime identity.
+
+The CI verdict summary separates each completed job's queue and execution seconds. It also reports run creation to verdict runner start, including the initial Changes queue. On reruns, that total starts at the original run creation. The diagnostic step can fail without changing the verdict.
+
+To compare two and four web shards at the same branch head, dispatch `ci.yml` with `web_shards=4`, wait for completion, then dispatch with `web_shards=2`. Keep the branch head fixed and repeat under comparable overlapping PR activity. Compare the final CI completion timestamp against run creation, along with the queue table. PR and main runs keep four shards until the measurements support a change.
+
+```bash
+gh workflow run ci.yml --ref <branch> -f web_shards=4
+gh workflow run ci.yml --ref <branch> -f web_shards=2
+```
+
+Each web shard uploads a `web-timings-*` artifact for 14 days. Download reports from several successful runs, then refresh weights using all their paths:
+
+```bash
+bun apps/web/scripts/shard-durations.ts <report-1.json> <report-2.json> <report-3.json>
+```
+
+The updater normalizes checkout paths and records the median duration per file. The current weights cover 777 files from successful CI runs [37149185179](https://github.com/ShaulLavo/fregat/actions/runs/37149185179), [37148852375](https://github.com/ShaulLavo/fregat/actions/runs/37148852375), and [37148631038](https://github.com/ShaulLavo/fregat/actions/runs/37148631038). Each file has three samples, extracted from Vitest's per-file log durations.
+
+Editor retains `--concurrency=1` and the existing Core and Stress cache settings. In run 37149185179, Core reported 117.81 seconds, Textbuffer 54.30 seconds, and Stress 36.00 seconds. A parallelism experiment must bound Vitest workers and keep browser-sensitive tasks serialized, then compare execution and reliability at the same commit.
+
+## optional Mesh dev server
 
 on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh route named `:5173`. mesh holds 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds vite and the api on `127.0.0.1`. the first connection starts it and holds requests until both ports answer; an open tab counts as use, and once nothing has been connected for `developer.devServerIdleMinutes` (15 by default) mesh stops it. rerun `dev:serve` after changing that setting
 
@@ -52,14 +77,14 @@ on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh rou
 
 ## desktop app
 
-The launcher selects an installed Chromium app (Chrome first under automatic selection) or Fregat's native system-webview window. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
+The launcher automatically selects Fregat’s native WebKit window on macOS and prefers an installed Chrome app on Linux. An explicit browser executable selects the installed Chromium path. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
 
 `bun run app:mac` builds a self-contained `Fregat.app` on macOS. Production clients share one machine server per state home. Installation reuses a matching service or registers the OS-activated service; closing or uninstalling the browser app keeps that service, mesh routes and terminals. [Plan 114](../plans/114-installed-app.md) records the approved installation, picker and native-window contracts.
 
-## shipping it
+## installation-specific deployment
+
+Deployment is optional. The current `bun run deploy` command targets the owner's installation and requires authorization and its local operational setup. The procedure below describes that installation. Other installations need their own deployment procedure.
 
 `bun run deploy` builds the web app, verifies the candidate, swaps a symlink and runs a headless check against the live url. nothing restarts, so open terminals and agent sessions survive it. server changes need `bun run deploy --server`, which stages the release; the app shows "Update available" and the server restarts when someone clicks Restart. `bun run deploy --server --restart` sends that request itself: it waits for running sessions to finish (`developer.deployRestartWaitMinutes`, 30 by default), then restarts and waits for the live check. `--interrupt` ends busy turns and restarts at once, which a deploy run from inside a Platform chat needs because its own turn counts as busy. a restart ends every live session, so do not reach for `--server` on web-only work
 
-`bun run deploy --rollback` moves back one release. `GET /platform/release` answers whether a change actually landed, reporting the served release, its commit, and the dirty-file count it was built from
-
-the route still says `platform`. renaming it costs a restart, and a restart costs every open session, so it waits for a moment when that is free
+`bun run deploy --rollback` moves back one release. the release endpoint under the configured application base path reports the served release, its commit, and the dirty-file count it was built from

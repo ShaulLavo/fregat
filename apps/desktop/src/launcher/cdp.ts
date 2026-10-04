@@ -1,6 +1,7 @@
 import { closeSync, writeSync } from 'node:fs'
 import { isRecord } from '@workspace/utils/objects'
 import { launcherErrors } from './structured-errors'
+import { protocolErrorFacts } from './protocol-error'
 
 export type CdpEvent = { method: string; params: Record<string, unknown>; sessionId?: string }
 type Pending = {
@@ -126,15 +127,13 @@ export class CdpClient {
       clearTimeout(pending.timer)
       if (isRecord(message.error)) {
         pending.reject(
-          this.failure('request-error', {
-            id: message.id,
-            method: pending.method,
-            // Classify known protocol facts without retaining browser messages containing URLs.
-            protocolReason: protocolReason(message.error.message),
-            protocolCode:
-              typeof message.error.code === 'number' && Number.isFinite(message.error.code)
-                ? message.error.code
-                : null,
+          launcherErrors.CDP_COMMAND_FAILED({
+            internal: {
+              reason: 'request-error',
+              id: message.id,
+              method: pending.method,
+              ...protocolErrorFacts(message.error),
+            },
           }),
         )
         return
@@ -164,13 +163,6 @@ export class CdpClient {
   private failure(reason: string, facts: Record<string, unknown> = {}) {
     return launcherErrors.CDP_FAILED({ internal: { reason, ...facts } })
   }
-}
-
-function protocolReason(message: unknown) {
-  if (typeof message !== 'string') return 'other'
-  if (message.startsWith('Unknown web-app manifest id ')) return 'unknown-app'
-  if (message === 'Webapps are not available in current profile.') return 'pwa-unavailable'
-  return 'other'
 }
 
 export function cdpPipe(writeFd: number, readFd: number) {

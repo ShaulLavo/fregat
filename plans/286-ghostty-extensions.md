@@ -26,7 +26,7 @@ already has. A third party can write an extension against the public API alone.
 
 Clones in `references/` (gitignored): `xterm.js` (c58ea36), `local-echo` (8d0b7f5),
 `xterm-readline` (0268a50, the maintained repo is strtok/xterm-readline), `ghostty-web` (1858a59),
-`ghostty` (83edd49; our wasm pins c8554f2).
+`ghostty` (83edd49; the native OSC prerequisite pins official 7b11f3d).
 
 ### xterm.js addons
 
@@ -102,8 +102,8 @@ From the macOS app, apprt and VT layer (`references/ghostty`):
   notifications, OSC 9;4 progress, OSC 52 clipboard (reads too) and the kitty keyboard protocol.
   Our bridge (`src/core/bridge.ts`, `src/core/types.ts:101–109`) exposes title, bell and clipboard
   writes, but not prompt marks, cwd, notifications or progress.
-- Upstream since our pin adds semantic-prompt callbacks and a C search API with cell ranges; the
-  pin has the lower-level Zig search pieces only.
+- Research against the original c8554f2 pin found newer semantic-prompt callbacks and a C search
+  API with cell ranges. Extension integration of these native APIs remains later work.
 - Kitty graphics is disabled for `wasm32-freestanding`, our target (`src/terminal/build_options.zig:155–165`);
   Sixel is not implemented. Images are not available without upstream work.
 - App-level, not for a library: quick terminal, splits and tabs, the command palette UI, secure
@@ -146,6 +146,50 @@ disposables (`editor/packages/editor/src/plugins.ts`, `createPlugin.ts`); capabi
 single-owner or multi-provider (`editor/src/editor/Editor.ts`). The terminal takes that shape
 without the Editor's composition machinery.
 
+## Native custom OSC pin prerequisite
+
+Status: **Approved. Native prerequisite integrated with the landed lifecycle contracts.**
+
+The prerequisite preserves the actual main package and lockfile versions and carries its own
+`ghostty-webgpu` patch changeset. Integration includes the landed #494 squash
+`fffe237f9fdbf020647e3bb64e19fad8c1bffc16`, preserving its attachment lifetime and typed API
+contracts. Native build inputs and WASM bytes match the approved native checkpoint; resolver
+records use the current input closure. Public X6 remains failed/held, and full Phase 0 is pending.
+
+- [x] Build the official introducing revision
+      `7b11f3dca034d8d24369ad3856afe57946d7902a`, parent
+      `ed350cbb4be3523e66016ceecd3be92b61334755`, after the merged Zig-only frame change
+      `81b09d4b0dff5f5f39a54df0320a9bdf770572df`. No upstream patch or fork is used.
+      The smallest proven candidate builds with Zig 0.16.0 without production ABI adaptation.
+- [x] Regenerate the checked-in WASM with `bun run build:wasm`. Its generated
+      `ghostty-webgpu/ghostty-vt.provenance.json` records the official source tree, Git archive and
+      codeload archive digests, compiler executable, build-input hashes and artifact hashes.
+      Rebuilding preserves the bridge byte-for-byte and keeps the frame ABI unchanged.
+- [x] Observe native unknown OSC callbacks through real writes. Portable tests install a
+      test-only native function-table callback, copy borrowed content before returning, and cover
+      split chunks, BEL, split ST, truncation, CAN and SUB cancellation. Native ST notification
+      occurs at ESC; the following backslash completes the escape without a second callback.
+      Callback code never reenters `vt_write` on the same terminal.
+- [x] Count native allocations through a test allocator. Capture defaults to zero. A callback
+      with the default limit captures nothing and allocates nothing; the 2048-byte OSC path also
+      allocates nothing. A larger capture provides the allocating positive control.
+- [x] Preserve recognized OSC title, hyperlink and color behavior, including malformed
+      core-owned numbers. OSC 52 stays denied by default and write-only when accepted; read queries
+      produce no clipboard reply and no browser read callback or grant is added.
+- [x] Preserve paired native mode 2027 widths, enabled/disabled: woman-technologist 2/4,
+      CJK 4/4, combining accent 1/1, heart plus variation selector 2/1. Cell content, damage and
+      cursor tests use the real checked-in native artifacts. The old pin reports zero custom OSC
+      callbacks and the new pin reports both BEL and ST; the APC positive control works on both.
+- [x] Add portable unit/provenance gates to `test:unit`, which runs in the Libraries CI job and
+      the standalone package verification. The test callback and allocator remain internal tests.
+- [x] Reconcile with landed predecessors #475, #477 and #494, preserve actual main release
+      metadata, add a patch changeset and regenerate resolver records for the changed VT pin input.
+      The native resolver keeps its own upstream pin and excludes package version metadata.
+- [ ] Merge the native prerequisite after independent integration review.
+- [ ] Activate host extensions and deliver subscriptions across both execution entries.
+- [ ] Complete X1–X7 and the full Phase 0 done-when. This prerequisite claims native correctness
+      only, with no hardware timing, worker synchronous interception or worker query-reply claim.
+
 ## Phase 0: the extension contract and core hooks
 
 An extension is a value with a name and a `setup` function. `setup` runs once per terminal it
@@ -158,14 +202,16 @@ interface Extension<Api = void> {
   setup(scope: ExtensionScope): Contributions<Api>
 }
 
-interface Contributions<Api> {
+interface HookContributions {
   readonly input?: (event: TerminalInputEvent) => 'claim' | 'pass'
   readonly events?: Partial<TerminalEventHandlers> // resize, frame, title, bell, prompt, cwd, …
-  readonly osc?: Readonly<Record<number, OscHandler>>
+  readonly osc?: Readonly<Record<number, OscObserver>>
   readonly links?: LinkProvider
   readonly commands?: Readonly<Record<string, TerminalCommand>>
-  readonly api?: Api
 }
+
+type Contributions<Api = void> = HookContributions &
+  ([Api] extends [void] ? { readonly api?: Api } : { readonly api: Api })
 
 // A host lists extensions up front; arrays are presets and flatten in order.
 const terminal = await Terminal.create({ extensions: [browserPreset(), links(fileLinks)] })
@@ -213,15 +259,65 @@ nothing on it, and attaching many extensions stays cheap. A small cost per _inte
 is acceptable; any cost per _installed_ extension on the keystroke, write or frame path is a design
 bug, not a tuning task. Gates, with counters exact and timings against a same-machine control:
 
-| Gate | Measure                                                                                                           | Required                                                       |
-| ---- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| X1   | Calls into 1,000 extensions that contribute no `input`, per keystroke, paste and IME commit                       | 0                                                              |
-| X2   | Calls into 1,000 extensions with no `frame` or output subscription, per write and per painted frame               | 0                                                              |
-| X3   | Keystroke-to-PTY and write-to-paint latency with 100 and 1,000 inert extensions against none                      | inside the control envelope                                    |
-| X4   | Marginal cost per extra `input` handler that passes, 10 → 1,000 handlers                                          | small and flat (linear, no per-call allocation)                |
-| X5   | Payload objects built for an event no extension subscribes to (frame rows, OSC payloads, geometry)                | 0                                                              |
-| X6   | `Terminal.create` with 100 extensions against none; `terminal.use` and dispose of one extension with 100 attached | inside the control envelope; independent of the count attached |
-| X7   | Memory retained per inert extension after attach                                                                  | a few hundred bytes, measured                                  |
+| Gate | Measure                                                                                             | Required                                                                                                 |
+| ---- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| X1   | Calls into 1,000 extensions that contribute no `input`, per keystroke, paste and IME commit         | 0                                                                                                        |
+| X2   | Calls into 1,000 extensions with no `frame` or output subscription, per write and per painted frame | 0                                                                                                        |
+| X3   | Keystroke-to-PTY and write-to-paint latency with 100 and 1,000 inert extensions against none        | inside the control envelope                                                                              |
+| X4   | Marginal cost per extra `input` handler that passes, 10 → 1,000 handlers                            | small and flat (linear, no per-call allocation)                                                          |
+| X5   | Payload objects built for an event no extension subscribes to (frame rows, OSC payloads, geometry)  | 0                                                                                                        |
+| X6   | Input/write/frame/use/dispose at 0/100/1,000; `Terminal.create` also at 1 inert attachment          | Exact steady-state independence; fixed activation plus affine attachment counts; registered timing bound |
+| X7   | Memory retained per inert extension after attach                                                    | a few hundred bytes, measured                                                                            |
+
+**X6 registration (2026-10-03).** Complete the exact primary matrix before freezing a new unified
+operation driver: separately reset public use and single-handle disposal, count fresh identities
+and setup calls, and inventory host/session/native-adapter extension-payload factories with
+observable interested controls. One steady-state input, write, frame, attachment or handle disposal
+has identical counts at 0/100/1,000 other inert attachments. Source-categorized creation counts
+follow `core + I[N > 0] * K + B * N`: the N=1 activation control identifies fixed manager
+activation K, while per-attachment factory/setup work B stays constant for N>=1. Lazy activation
+is retained. Cold first public use is reported separately; a warmed zero-inert control may activate
+and dispose one seed before resetting counters, leaving zero installed inert attachments. The
+cold cost remains visible. Fresh handles and independent disposal closures remain required.
+Source-expression counters do not measure realized VM/native allocations or implicit iterators.
+
+Custom OSC native/public positive controls are a **pending separate subgate** until the #573
+native prerequisite and public routing/capability land and qualify. The current public checkpoint
+cannot observe that positive; other operations proceed without claiming OSC coverage. Owned
+tool-only AST instrumentation may cover host/session/native-adapter sources; shared production
+paths stay unchanged.
+
+The earlier strict observed-minimum/maximum lifecycle windows remain **FAILED**, with every
+upper and lower outlier retained. Their criterion and artifacts stay unchanged. Future timing
+acceptance measures the installed-count contrast directly: membership of every arm in a
+control-extrema range is a different quantity and can reject a faster treatment. This criterion
+revision does not establish a cause for any old outlier or convert an old result to a pass.
+
+Approved prospective protocol order: exact counters first, then a frozen unified driver and one
+registered quiet-turn window. Final registration awaits the completed primary evidence and all
+source/driver/launcher/native pins; the owner may tighten the 1.10 bound before that registration.
+
+- For each steady-state non-creation operation separately, compute per-process paired median
+  log ratios for 100/0 and 1,000/0. The one-sided 95% upper bootstrap ratio bound is at most 1.10
+  at both counts. This bounds installed-count overhead; cold first-use activation stays separate.
+- Run 40 independent Node process blocks in one quiet-turn window. Use 20,000 whole paired-vector
+  bootstrap resamples and seed 286006, keeping each process's count arms together. Retain every
+  block and failed operation. No optional stopping, block drops, outlier filtering or GC correction.
+- The unchanged #533 driver covers combined warmed same-value attach/dispose and passing input
+  at 0/1,000 only. Do not repeat it as the new qualification: the new unified driver must cover
+  the required public operation matrix with its own frozen proof identity.
+- Creation includes N=0/1/100/1,000 and reports
+  `(T1000 - T1 - (999 / 99) * (T100 - T1)) / T0`, with a one-sided 95% upper bound at most 0.10.
+  Also report `K_time = T1 - T0` with its confidence interval so activation remains visible.
+  Non-positive base measurements, missing arms and harness failures stay failed or inconclusive.
+- Public original-input/write/frame, separate use/dispose, fresh-identity attachment and public
+  creation must be covered before the non-OSC matrix can qualify. Existing native-byte/visible-row
+  diagnostics establish state correctness. No frame notification substitutes for the Plan 287
+  paint oracle; compositor/hardware latency and the pending OSC subgate remain unqualified.
+
+No new statistical window starts before final registration of the completed counter matrix,
+source pins, driver/launcher, sample count and thresholds. Older accepted tooling, proof sources
+and failed windows remain frozen; the prospective criterion does not reinterpret them.
 
 Harness: a counter test in the package's browser suite and `bun run bench:renderer` workloads with
 0, 100 and 1,000 inert extensions on the hardware adapter. If indexing bookkeeping grows with the
@@ -232,16 +328,72 @@ Core hooks this phase adds, each with a test extension that uses it without priv
 - **Input.** User keys, pastes and IME commits pass through `input` contributions before encoding.
   `onData` today mixes user input with protocol replies (`term/session.ts:1562–1617`); split them
   so replies never reach an input handler.
-- **Live geometry.** Synchronous grid size, cursor position and cell metrics from the session,
-  not the last painted frame.
-- **Cell width.** `terminal.measure(text)` returns libghostty-vt's cell width for a string, by
-  grapheme cluster and honoring mode 2027, so no extension re-derives Unicode width.
+- **Live geometry.** Authoritative grid size, cursor position and cell metrics from the terminal
+  owner. The main-thread entry returns values; the worker entry returns Promises. Rendering and
+  input placement use the explicit last-submitted frame summary.
+- **Cell width.** `terminal.measure(text)` returns libghostty-vt's cell width for plain text,
+  honoring live mode 2027. Extensions await its value or Promise. Cluster segmentation and widths
+  come from the native Unicode exports. Measurement batching must let a line editor compute
+  wrapping in one owner request.
 - **Output.** `terminal.write` stays the only output path; extensions coordinate output through
   their own API (the line editor's `printAbove`), never by wrapping `write`.
 
 Done when: test extensions claim input, read geometry, measure `👩‍💻` and CJK text, register an
 OSC handler and a duplicate (rejected), and dispose cleanly on terminal dispose and on their own;
 a throwing `setup` leaves nothing behind; gates X1–X7 pass.
+
+### Shared API agreement with Plan 287
+
+Authoritative method families stay synchronous in the main-thread entry; the worker entry
+returns Promises under the same method names. Extensions await terminal operations so their code
+handles either result. Extension `setup`, `use`, input claims and closures stay synchronous on the
+host/main thread. Presets accept nested readonly arrays. A non-void extension API is required in its
+contributions, so `handle.api` preserves its declared type. Plan 287 owns the shared
+`TerminalApi<Mode>` contract; the internal scope and manager use its default `sync | async`
+convention. This is a type contract for the actual entries, with no execution facade.
+
+Authoritative `measure`, geometry, `lineCount`, `readLines`, `getSelection`,
+`selectionCoordinates`, `frameSnapshot`, `captureViewport` and mutations follow the entry's
+sync/async contract. The explicit last-submitted `FrameSummary` supplies synchronous renderer and
+input-placement geometry. Host elements, subscriptions, focus, blur and local DOM registrations
+stay synchronous, including `visibleLines`, a paint-version-guarded displayed-frame read.
+Inherently asynchronous host methods such as `open` retain their Promise results in both entries.
+Appearance snapshots update on execution acknowledgement. Disposal invalidates the host immediately;
+the worker Promise resolves after owner cleanup. Common create options remove borrowed native
+runtimes, while low-level native APIs stay local.
+
+Custom OSC contributions are **observers returning void** for native-parsed unsupported/custom
+numbers. Duplicate and core-owned numbers are rejected. Subscription changes and output use an
+ordered owner channel; closures stay on the host. Built-in protocols retain native ownership.
+OSC 52 keeps the current denied-by-default, write-only bridge. Immutable execution policy controls
+immediate acceptance; browser completion reports errors separately. Browser clipboard reads or
+grants remain outside this work. Plan 287 verifies native read-query behavior before and after its
+conversion.
+
+At the pinned `c8554f28e0efe2f5595f32020371c34b25ec628f`, the unknown-sequence callback reports
+APC only. Native custom OSC delivery needs an upstream-pin prerequisite after PR #470's final
+recovery change merges. Plan 286 owns that prerequisite; output is never reparsed in TypeScript.
+The shipped native Unicode exports already measure graphemes and codepoints. Live mode 2027
+selects their interpretation: `👩‍💻` is two cells when enabled and four when disabled. The current
+native default is disabled.
+
+### Phase 0 implementation checklist
+
+- [x] Internal lifecycle/index scaffold in `ghostty-webgpu/src/extensions/`: typed contributions,
+      identity-based attachment, nested presets, transactional rollback, lazy scoped resources,
+      interested-only indexes, reentrant dispatch and reverse disposal. Node tests exercise the
+      manager with the real main terminal; type assertions also accept the async shared contract.
+      Core supplies the reserved OSC-number set at integration.
+- [ ] Public export and host activation after Plan 287's sync/async entry contracts land.
+- [ ] Original key/paste/IME hooks before encoding, with protocol replies bypassing arbitration.
+- [ ] Authoritative geometry and mode-aware native measurement with a batched wrapping contract.
+- [ ] Native custom OSC prerequisite, subscription delivery and observer tests in both entries.
+- [ ] X1–X7 full gates. Scaffold tests count 100/1,000 inert attachments and 10/100/1,000 interested
+      handlers, but these are internal structural tests. Browser input/output/frame counters,
+      hardware control envelopes, native payload-allocation counters and retained-memory proof remain
+      pending. No browser, hardware timing or memory gate is claimed by the scaffold.
+- [ ] Phase 0 done-when. The internal scaffold bumps the package patch version and regenerates
+      native resolver provenance; it adds no root export, consumer activation or deployment.
 
 ## Phase 1: the line editor
 

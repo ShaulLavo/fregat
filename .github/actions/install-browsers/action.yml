@@ -12,6 +12,10 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Verify Ubuntu package source setup
+      shell: bash
+      run: bun --bun vitest run "$GITHUB_ACTION_PATH/action.test.ts" --environment node
+
     - name: Configure Ubuntu package downloads
       id: apt
       shell: bash
@@ -20,7 +24,7 @@ runs:
         BROWSERS: ${{ inputs.browsers }}
       run: |
         set -euo pipefail
-        sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://mirrors.edge.kernel.org/ubuntu|g' /etc/apt/apt-mirrors.txt
+        sudo sed -i '\|^http://azure\.archive\.ubuntu\.com/ubuntu/|d' /etc/apt/apt-mirrors.txt
         archives="/tmp/playwright-apt"
         install -d -m 0755 "$archives"
         sudo install -d -o _apt -g root -m 0700 "$archives/partial"

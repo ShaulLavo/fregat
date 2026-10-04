@@ -34,6 +34,15 @@ export interface DeviceAttributes {
   }
 }
 
+/** Owned bytes captured from an unsupported native OSC callback. */
+export interface CustomOscObservation {
+  readonly number: number
+  readonly generation: number
+  readonly payload: Uint8Array
+  readonly terminator: 'bel' | 'st'
+  readonly truncated: boolean
+}
+
 export interface TerminalSize {
   columns: number
   rows: number
@@ -238,4 +247,34 @@ export interface RenderCursorSnapshot {
   style: TerminalCursorStyle
   viewport?: RenderCursorViewport
   visible: boolean
+}
+
+/** A live native sample; revision belongs to the execution owner, not a submitted frame. */
+export interface TerminalGeometry {
+  readonly revision: number
+  readonly columns: number
+  readonly rows: number
+  readonly cellWidth: number
+  readonly cellHeight: number
+  readonly cursor: Readonly<TerminalCursor>
+  readonly scrollbar: Readonly<TerminalScrollbar>
+  readonly graphemeClustering: boolean
+  readonly autowrap: boolean
+}
+
+/** Half-open UTF16 source range measured using the native printing mode. */
+export interface TerminalPrintingUnit {
+  readonly start: number
+  readonly end: number
+  readonly cells: number
+}
+
+export interface TerminalMeasuredText {
+  readonly cells: number
+  readonly units: readonly TerminalPrintingUnit[]
+}
+
+export interface TerminalTextMeasurement {
+  readonly geometry: TerminalGeometry
+  readonly texts: readonly TerminalMeasuredText[]
 }

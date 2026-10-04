@@ -13,6 +13,10 @@ const workflowSchema = v.object({
     v.string(),
     v.object({
       uses: v.optional(v.string()),
+      if: v.optional(v.string()),
+      with: v.optional(v.record(v.string(), v.unknown())),
+      outputs: v.optional(v.record(v.string(), v.string())),
+      strategy: v.optional(v.record(v.string(), v.unknown())),
       needs: v.optional(v.union([v.string(), v.array(v.string())])),
       defaults: v.optional(runDefaults),
       steps: v.optional(
@@ -24,6 +28,7 @@ const workflowSchema = v.object({
             uses: v.optional(v.string()),
             run: v.optional(v.string()),
             'working-directory': v.optional(v.string()),
+            'continue-on-error': v.optional(v.boolean()),
             with: v.optional(v.record(v.string(), v.unknown())),
           }),
         ),

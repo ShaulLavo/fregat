@@ -23,6 +23,29 @@ async function fixtureRepo() {
 }
 
 describe('worktree provisioning', () => {
+  it('reads attached and detached metadata when a tag shares the branch name', async () => {
+    const fixture = await fixtureRepo()
+    await runGit(fixture.root, ['tag', 'main'])
+    const head = (await runGit(fixture.root, ['rev-parse', '--verify', 'HEAD'])).stdout.trim()
+    const mutations: string[] = []
+    fixture.git.subscribeMutations(async (root) => {
+      mutations.push(root)
+    })
+    expect(await fixture.worktrees.metadata({ path: fixture.root })).toEqual({
+      branch: 'main',
+      headCommit: head,
+    })
+    await runGit(fixture.root, ['checkout', '--detach', 'HEAD'])
+    expect(await fixture.worktrees.metadata({ path: fixture.root })).toEqual({
+      branch: null,
+      headCommit: head,
+    })
+    expect(mutations).toEqual([])
+    const runner = await fixture.git.repositoryRunner(fixture.root)
+    await runner.run(['symbolic-ref', '--quiet', 'HEAD', 'refs/heads/main'])
+    expect(mutations).toEqual([fixture.root])
+  })
+
   it('records the local source branch when a tag has the same name', async () => {
     const fixture = await fixtureRepo()
     await runGit(fixture.root, ['tag', 'main'])

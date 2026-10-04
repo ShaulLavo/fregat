@@ -67,6 +67,7 @@ test.each(['initialized', 'removed'] as const)(
       )
     }
     const first = await fixture.register()
+    await fixture.engine.providerRuntimeIdle()
     const [original] = (await fixture.engine.readModelSnapshot()).projects.values()
     if (change === 'removed') await rm(path.join(fixture.checkout, '.git'), { recursive: true })
     if (change === 'initialized')
