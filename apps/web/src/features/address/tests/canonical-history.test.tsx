@@ -12,14 +12,21 @@ import {
 import { createTestNavigation } from '../../../../test/factories/navigation'
 import { navigationWorkspace } from '../../../../test/factories/navigation-workspace'
 
-for (const extra of ['', '&probe=goto']) {
-  test(`canonical boot settles and retains history state with query suffix ${extra || 'control'}`, async ({
+for (const { name, query } of [
+  { name: 'recognized parameters', query: 'tabs=-&side=git&log.find=keep&editorPerfTrace=1' },
+  {
+    name: 'an unknown parameter',
+    query: 'tabs=-&side=git&log.find=keep&editorPerfTrace=1&probe=goto',
+  },
+  { name: 'reordered parameters', query: 'tabs=-&side=git&editorPerfTrace=1&log.find=keep' },
+]) {
+  test(`canonical boot settles and retains history state with ${name}`, async ({
     client,
     server,
   }) => {
     const workspace = await navigationWorkspace(client, server)
     seedWorkspaceCache(workspace)
-    const href = `${workspace.base}?tabs=-&side=git&log.find=keep&editorPerfTrace=1${extra}`
+    const href = `${workspace.base}?${query}`
     const navigation = createTestNavigation({
       initialEntries: [`${workspace.base}/f/a.ts`, href],
     })
