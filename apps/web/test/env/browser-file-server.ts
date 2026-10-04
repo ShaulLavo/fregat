@@ -6,6 +6,7 @@ import type { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { stopTerminalHost } from '../../../server/src/terminal-host/identity'
 import { hostPaths } from '../../../server/src/terminal-host/protocol'
+import { fixtureReadiness } from '../../../../scripts/agent/fixture-readiness'
 
 const SERVER_START_TIMEOUT_MS = 15_000
 const SERVER_STOP_TIMEOUT_MS = 5_000
@@ -95,12 +96,12 @@ async function waitForServer(server: TrackedServer, serverUrl: URL, browserPort:
     }
 
     try {
-      const response = await fetch(new URL('/health', serverUrl), {
-        headers: { origin: `http://127.0.0.1:${browserPort}` },
+      const response = await fixtureReadiness(serverUrl, `http://127.0.0.1:${browserPort}`, {
+        signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
       })
       if (response.ok) return
 
-      lastError = `health returned ${response.status}`
+      lastError = `startup check returned ${response.status}`
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error)
     }
@@ -111,8 +112,7 @@ async function waitForServer(server: TrackedServer, serverUrl: URL, browserPort:
   throw new Error(serverErrorMessage(`Browser file server did not start: ${lastError}`, server))
 }
 
-// The readiness poll only asks the port for /health, so a server left over from an earlier run
-// would answer it and every test would run against that stale build.
+// A server left over from an earlier run would answer startup probes and serve a stale build.
 async function assertPortFree(serverUrl: URL, browserPort: string) {
   const answered = await fetch(new URL('/health', serverUrl), {
     headers: { origin: `http://127.0.0.1:${browserPort}` },

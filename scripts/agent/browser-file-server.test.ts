@@ -14,6 +14,10 @@ import {
 } from '../../apps/server/src/terminal-host/identity'
 import { launchHost } from '../../apps/server/src/terminal-host/launch'
 import { hostPaths } from '../../apps/server/src/terminal-host/protocol'
+import { createTestTerminalHost } from '../../apps/server/src/terminal-host/testing'
+import { closeTestApps, createTestApp } from '../../apps/server/test/server'
+import { testSettingsOptions } from '../../apps/server/src/settings/testing'
+import { fixtureReadiness } from './fixture-readiness'
 
 it.skipIf(process.platform === 'win32').each([
   ['running', 'running'],
@@ -105,6 +109,82 @@ it.skipIf(process.platform === 'win32').each([
       if (home) await rm(hostPaths(home).directory, { recursive: true, force: true })
       await rm(scratch, { recursive: true, force: true })
       vi.unstubAllEnvs()
+    }
+  },
+  40_000,
+)
+
+it.skipIf(process.platform === 'win32')(
+  'waits for API orphan recovery before admitting fixture shells',
+  async () => {
+    const host = await createTestTerminalHost()
+    const launching = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const recoveryRequested = Promise.withResolvers<void>()
+    const apiClient = new TerminalHostClient({
+      stateRoot: host.stateRoot,
+      env: { ...process.env, XDG_RUNTIME_DIR: path.dirname(host.paths.directory) },
+      launch: async (argv, env) => {
+        launching.resolve()
+        await release.promise
+        host.hosts.push(
+          Bun.spawn([...argv], { env, detached: true, stdio: ['ignore', 'ignore', 'inherit'] }),
+        )
+      },
+    })
+    const app = createTestApp({
+      systemRoot: host.stateRoot,
+      homeDirectory: host.stateRoot,
+      watch: false,
+      settings: testSettingsOptions(host.stateRoot),
+      terminal: { hostClient: apiClient },
+    })
+    const origin = 'http://localhost:5173'
+    try {
+      await launching.promise
+      // Health answers while real host startup and its orphan snapshot are still blocked.
+      const health = await app.handle(new Request('http://local/health', { headers: { origin } }))
+      expect(health.status).toBe(200)
+      let settled = false
+      const ready = fixtureReadiness(new URL('http://local'), origin, {
+        fetcher: (input, init) => {
+          const request = new Request(input, init)
+          if (new URL(request.url).pathname === '/terminal/clear') recoveryRequested.resolve()
+          return app.handle(request)
+        },
+      }).then((response) => {
+        settled = true
+        return response
+      })
+      const first = await Promise.race([
+        ready.then(() => 'ready'),
+        recoveryRequested.promise.then(() => 'recovery'),
+      ])
+      expect(first).toBe('recovery')
+      expect(settled).toBe(false)
+      release.resolve()
+      expect((await ready).ok).toBe(true)
+
+      const shell = await host.client.spawn({
+        key: 'fixture-cleanup',
+        command: ['/bin/sh', '-c', 'sleep 60'],
+        onData: () => {},
+      })
+      void shell.exited.catch(() => {})
+      const shellStart = processStart(shell.pid)
+      assert(shellStart)
+      // A second operation has the same settled snapshot and leaves the fixture shell alive.
+      const checked = await fixtureReadiness(new URL('http://local'), origin, {
+        fetcher: (input, init) => app.handle(new Request(input, init)),
+      })
+      expect(checked.ok).toBe(true)
+      expect(processStart(shell.pid)).toBe(shellStart)
+    } finally {
+      release.resolve()
+      await apiClient.host().catch(() => {})
+      await closeTestApps()
+      apiClient.close()
+      await host.close()
     }
   },
   40_000,
