@@ -3,6 +3,7 @@ import { activatedSocket, privateSocket, restrictPrivateSocket, startRelay } fro
 const port = Number(process.argv[2])
 const activated = activatedSocket()
 if (!activated) throw new Error('started without an activated socket')
+await Bun.sleep(Number(process.argv[4] ?? 0))
 // The test owns this directory and removes it, even after killing this process.
 const socket = privateSocket({ XDG_RUNTIME_DIR: process.argv[3] })
 const encoder = new TextEncoder()

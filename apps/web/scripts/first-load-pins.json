@@ -13,7 +13,7 @@
     "apps/web/src/features/chat-mode": 49789,
     "apps/web/src/features/search": 43977,
     "packages/contracts": 43985,
-    "apps/web/src/features/workbench": 41332,
+    "apps/web/src/features/workbench": 43448,
     "apps/web/src/features/git": 39461,
     "packages/tree": 35779,
     "packages/ui": 33910,
@@ -133,6 +133,12 @@
       "scriptGzip": 1754768,
       "phoneScriptGzip": 1449825,
       "reason": "Command foundation source 9dfe97a58 after synchronous preset projection and lazy Settings report metadata: actual disk desktop gzip 1,830,773 -> 1,754,768 (-76,005), phone conversation 1,525,666 -> 1,449,825 (-75,841), compared with prior candidate c5748d40. Matched main 913f79f3 measures 1,738,901 desktop / 1,435,433 phone conversation; residual growth is 15,867 / 14,392 bytes. Shared synchronous Hotkeys/main-host/Editor dispatch and active preset tables retain this bounded startup cost. Record desktop/phone totals and only keymap 23,689 -> 34,532 plus new hotkeys/packages 6,942 weighted owner estimates; owner shares are not intrinsic additive gzip totals. All other owner pins, existing history, gate margins and phone allowance remain unchanged. The original unchanged-gate FAIL is retained in the bundle-unit/vscode-candidate evidence."
+    },
+    {
+      "at": "2026-10-04T23:05:22Z",
+      "scriptGzip": 1751287,
+      "phoneScriptGzip": 1443558,
+      "reason": "Accepted PR717 diagnostic caller lifetimes after deleting the redundant callback and grouping the existing event handlers. Actual matched main 518168b89c95b3a5d3da6693dfb756055b51025f and host 5f550c61e26968059ffc0c2c0d4dfd3f71838cfa include the full PR cost: desktop 1747365 -> 1751287 (+3922), phone conversation 1440385 -> 1443558 (+3173), Workbench weighted owner 43373 -> 43448 (+75), rendered bytes 273019 -> 273418 (+399), same 120 first-load modules. Module attribution is diagnostic-row 3195 -> 3592 (+397) and diagnostics-panel 6649 -> 6651 (+2); other Workbench modules retain their rendered bytes. Shared chunk compression also redistributes the weighted estimate. Re-pin only Workbench 41332 -> 43448 for this intended growth under the existing policy. Preserve desktop and phone total pins, all other owner pins, existing history and the 1% total and 5%/2 KiB owner margins. Original f6 CI gate FAIL is preserved in ci717-f6-first-load.log; the matched-source unchanged-gate FAIL is preserved in delivery717-unchanged-gate-receipt.log. Paired reports and module attribution are delivery717-bundle-actual-main518.json, delivery717-bundle-matched518.json and delivery717-workbench-attribution.json."
     }
   ]
 }

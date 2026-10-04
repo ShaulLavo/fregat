@@ -1225,6 +1225,35 @@ describe('fenced tree-sitter retention', () => {
     return result
   }
 
+  const sharedResources = (shared: TreeSitterWorkerRetentionSnapshot['shared']) => {
+    const { wasmMemory: _wasmMemory, ...resources } = shared
+    return resources
+  }
+
+  const expectSharedRetention = (
+    actual: TreeSitterWorkerRetentionSnapshot['shared'],
+    expected: TreeSitterWorkerRetentionSnapshot['shared'],
+  ) => {
+    expect(sharedResources(actual)).toEqual(sharedResources(expected))
+    expect(actual.wasmMemory.kind).toBe(expected.wasmMemory.kind)
+    if (expected.wasmMemory.kind === 'uninitialized') return
+    if (actual.wasmMemory.kind !== 'committed')
+      throw new TypeError('Expected committed parser memory')
+    expect(actual.wasmMemory.bytes).toBeGreaterThanOrEqual(expected.wasmMemory.bytes)
+    expect(actual.wasmMemory.pages * 65_536).toBe(actual.wasmMemory.bytes)
+  }
+
+  const expectRetention = (
+    actual: TreeSitterWorkerRetentionSnapshot,
+    expected: TreeSitterWorkerRetentionSnapshot,
+  ) => {
+    expect({ ...actual, shared: sharedResources(actual.shared) }).toEqual({
+      ...expected,
+      shared: sharedResources(expected.shared),
+    })
+    expectSharedRetention(actual.shared, expected.shared)
+  }
+
   const register = async () => {
     const descriptors = await Promise.all(
       TREE_SITTER_LANGUAGE_CONTRIBUTIONS.map(resolveTreeSitterLanguageContribution),
@@ -1232,6 +1261,66 @@ describe('fenced tree-sitter retention', () => {
     await owner.registerLanguages(descriptors)
     return descriptors
   }
+
+  it('retention observes fresh committed memory shared by Tree-sitter and Markdown', async ({
+    annotate,
+  }) => {
+    await register()
+    const survivorRequest = {
+      documentId: 'survivor.ts',
+      runtimeSessionId: 'memory-survivor',
+      languageId: 'typescript',
+      snapshotVersion: 1,
+    }
+    const survivorSnapshot = createPieceTableSnapshot('const survivor = true;\n')
+    const survivor = await owner.parse({ ...survivorRequest, snapshot: survivorSnapshot })
+    expect(survivor?.captures.length).toBeGreaterThan(0)
+    const baseline = await retention()
+    expect(baseline.shared.wasmMemory.kind).toBe('committed')
+    if (baseline.shared.wasmMemory.kind !== 'committed')
+      throw new TypeError('Expected initialized parser memory')
+    expect(baseline.shared.wasmMemory.bytes).toBeGreaterThan(0)
+    expect(baseline.shared.wasmMemory.bytes).toBeLessThanOrEqual(32 * 1024 * 1024)
+    expect(baseline.shared.wasmMemory.pages * 65_536).toBe(baseline.shared.wasmMemory.bytes)
+    expect(baseline.unmeasuredBytes).not.toContain('wasm-committed')
+    expect(baseline.unmeasuredBytes).toContain('wasm-allocator-live')
+
+    const text = '# Heading\n\n' + 'a'.repeat(baseline.shared.wasmMemory.bytes)
+    const pending = owner.parse({
+      documentId: 'growth.md',
+      runtimeSessionId: 'memory-growth',
+      languageId: 'markdown',
+      snapshotVersion: 1,
+      snapshot: createPieceTableSnapshot(text),
+    })
+    const grown = await retention()
+    expect((await pending)?.records?.data.length).toBeGreaterThan(0)
+    expect(grown).toMatchObject({ documentCount: 2, markdownDocumentCount: 1 })
+    expect(grown.shared.wasmMemory.kind).toBe('committed')
+    if (grown.shared.wasmMemory.kind !== 'committed')
+      throw new TypeError('Expected shared Markdown parser memory')
+    expect(grown.shared.wasmMemory.bytes).toBeGreaterThan(baseline.shared.wasmMemory.bytes)
+    expect(grown.shared.wasmMemory.pages * 65_536).toBe(grown.shared.wasmMemory.bytes)
+    expect(grown.shared).toMatchObject({ runtimeCount: 1, parserCount: 1, languageCount: 1 })
+
+    owner.disposeDocument('memory-growth')
+    const released = await retention()
+    expect(released.documents).toEqual(baseline.documents)
+    expect(released.source).toEqual(baseline.source)
+    expect(released.shared).toEqual(grown.shared)
+    const surviving = await owner.queryRange({
+      ...survivorRequest,
+      includeCaptures: true,
+      range: { startIndex: 0, endIndex: survivorSnapshot.length },
+    })
+    expect(surviving?.tokensPacked).toEqual(survivor?.tokensPacked)
+    expect(owner.inspect().workerGeneration).toBe(1)
+    await annotate('shared committed memory growth with a live survivor', {
+      contentType: 'application/json',
+      bodyEncoding: 'utf-8',
+      body: JSON.stringify({ baseline, grown, released }),
+    })
+  })
 
   it('retention counts actual snapshots and chunks outside the current source cache', async ({
     annotate,
@@ -1324,7 +1413,7 @@ describe('fenced tree-sitter retention', () => {
       chunkCount: 0,
       chunkUnits: 0,
     })
-    expect(released.shared).toEqual(both.shared)
+    expectSharedRetention(released.shared, both.shared)
     await annotate('snapshot and source resource counts', {
       contentType: 'application/json',
       bodyEncoding: 'utf-8',
@@ -1344,7 +1433,7 @@ describe('fenced tree-sitter retention', () => {
     const warm = await retention()
     expect(warm).toMatchObject({ documentCount: 0, snapshotCount: 0, treeCount: 0 })
     expect(warm.shared).toMatchObject({
-      parserRuntimeInitialized: true,
+      wasmMemory: { kind: 'committed' },
       runtimeEntries: 1,
       runtimeCount: 0,
       parserCount: 0,
@@ -1381,15 +1470,16 @@ describe('fenced tree-sitter retention', () => {
       owner.disposeDocument(runtimeSessionId)
       samples.push(await retention())
     }
-    expect(samples).toEqual(Array.from({ length: 40 }, () => baseline))
+    expect(samples).toHaveLength(40)
+    for (const sample of samples) expectRetention(sample, baseline)
     const pending = owner.parse({ ...request, runtimeSessionId: 'pending-disposal', snapshot })
     owner.disposeDocument('pending-disposal')
     await pending
-    expect(await retention()).toEqual(baseline)
+    expectRetention(await retention(), baseline)
     const recreated = await owner.parse({ ...request, runtimeSessionId: 'recreated', snapshot })
     expect(recreated?.tokensPacked).toEqual(survivor?.tokensPacked)
     owner.disposeDocument('recreated')
-    expect(await retention()).toEqual(baseline)
+    expectRetention(await retention(), baseline)
     const surviving = await owner.queryRange({
       ...request,
       runtimeSessionId: 'survivor',
@@ -1415,7 +1505,7 @@ describe('fenced tree-sitter retention', () => {
       chunkCount: 0,
       chunkUnits: 0,
     })
-    expect(released.shared).toEqual(baseline.shared)
+    expectSharedRetention(released.shared, baseline.shared)
     await owner.dispose()
     expect(await owner.inspectRetention()).toBeNull()
     expect(owner.inspect().workerGeneration).toBe(1)
@@ -1471,7 +1561,7 @@ describe('fenced tree-sitter retention', () => {
       markdownDocumentCount: 0,
       injectedMarkdownDocumentCount: 0,
     })
-    expect(empty.shared).toEqual(retained.shared)
+    expectSharedRetention(empty.shared, retained.shared)
     await annotate('Markdown resource counts', {
       contentType: 'application/json',
       bodyEncoding: 'utf-8',
@@ -1480,7 +1570,9 @@ describe('fenced tree-sitter retention', () => {
   })
 })
 
-it('retention keeps ordinary real-worker fences unchanged and leaves parser initialization absent', async () => {
+it('retention keeps ordinary real-worker fences unchanged and leaves parser initialization absent', async ({
+  annotate,
+}) => {
   const worker = new Worker(new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url), {
     type: 'module',
   })
@@ -1502,7 +1594,7 @@ it('retention keeps ordinary real-worker fences unchanged and leaves parser init
       snapshotCount: 0,
       treeCount: 0,
       shared: {
-        parserRuntimeInitialized: false,
+        wasmMemory: { kind: 'uninitialized' },
         runtimeEntries: 0,
         runtimeCount: 0,
         parserCount: 0,
@@ -1510,7 +1602,14 @@ it('retention keeps ordinary real-worker fences unchanged and leaves parser init
         queryCount: 0,
       },
     })
+    expect(inspected.result.retention.shared.wasmMemory).toEqual({ kind: 'uninitialized' })
+    expect(inspected.result.retention.unmeasuredBytes).toContain('wasm-committed')
     expect(await request({ type: 'idleFence' })).toEqual({ id: 3, ok: true, result: undefined })
+    await annotate('uninitialized real-worker scalar retention', {
+      contentType: 'application/json',
+      bodyEncoding: 'utf-8',
+      body: JSON.stringify(inspected.result.retention),
+    })
   } finally {
     worker.terminate()
   }
