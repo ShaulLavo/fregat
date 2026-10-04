@@ -45,7 +45,7 @@ export type IsolatedServer = {
   /** How long the supervisor waits after a Restart exit before starting the server again. */
   restartDelayMs: number
   signal(signal: NodeJS.Signals): void
-  stop(): Promise<void>
+  stop(options?: { readonly logs: string }): Promise<void>
 }
 
 /**
@@ -145,10 +145,10 @@ export async function startIsolatedServer(
     void supervise(child)
   }
   void supervise(child)
-  const stop = () => {
+  const stop: IsolatedServer['stop'] = (options) => {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
-    return (stopping ??= stopServer(child, directory))
+    return (stopping ??= stopServer(child, directory, options?.logs))
   }
   const onSignal = (signal: NodeJS.Signals) => {
     void stop().finally(() => process.kill(process.pid, signal))
@@ -214,8 +214,6 @@ export function isolatedServerEnv(input: {
   const env: Record<string, string | undefined> = {
     ...process.env,
     FS_HOST: '127.0.0.1',
-    // The run copies this log before the server stops, so a 5 s batch would drop the run's tail.
-    OBSERVABILITY_BATCH_INTERVAL_MS: '200',
     FS_METADATA_DB: path.join(home, 'fs-metadata.sqlite'),
     OBSERVABILITY_DIR: logs,
     PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
@@ -274,7 +272,7 @@ async function waitForHealth(
   )
 }
 
-async function stopServer(child: Bun.Subprocess, directory: string) {
+async function stopServer(child: Bun.Subprocess, directory: string, logs?: string) {
   if (child.exitCode === null) {
     child.kill('SIGTERM')
     const stopped = await Promise.race([
@@ -285,6 +283,16 @@ async function stopServer(child: Bun.Subprocess, directory: string) {
     await child.exited
   }
   await stopTerminalHost(path.join(directory, 'home'))
+  if (logs) copyServerLogs(directory, logs)
   rmSync(hostPaths(path.join(directory, 'home')).directory, { force: true, recursive: true })
   rmSync(directory, { force: true, recursive: true })
+}
+
+function copyServerLogs(directory: string, destination: string) {
+  const source = path.join(directory, 'logs')
+  if (!existsSync(source)) return
+  mkdirSync(destination, { recursive: true })
+  for (const name of readdirSync(source)) {
+    if (name.endsWith('.jsonl')) copyFileSync(path.join(source, name), path.join(destination, name))
+  }
 }
