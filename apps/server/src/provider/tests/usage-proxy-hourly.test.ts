@@ -1,6 +1,6 @@
 import { once } from 'node:events'
 import { readFile, stat, writeFile } from 'node:fs/promises'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { readFsLogs } from 'evlog/fs'
 import {
   flushObservability,
@@ -11,10 +11,195 @@ import { CodexUsageRequestBudget } from '../usage-proxy-budget'
 import { PROXY_USAGE_NOW as NOW, proxyUsageFixture } from '../../testing/proxy-usage'
 
 const HOUR = 3_600_000
+const MINUTE = 60_000
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => {
   await resetObservabilityForTests()
   await Promise.all(cleanup.splice(0).map((close) => close()))
+})
+
+test('an enabled pooled account gets genuine minute reads even when its cached quota is unchanged', async () => {
+  const f = await proxyUsageFixture(cleanup)
+  f.currentIntervalMs = MINUTE
+  f.files[0]!.quota = {
+    observed_at: new Date(NOW - MINUTE).toISOString(),
+    signals: {
+      'x-codex-primary-used-percent': '44',
+      'x-codex-primary-window-minutes': '10080',
+    },
+  }
+  const store = f.makeStore()
+  await store.refresh()
+  expect(f.requests).toBe(1)
+  const before = (await store.read()).accounts[0]!.windows[0]!.observedAt
+  f.now = NOW + MINUTE - 1
+  await store.refresh()
+  expect(f.requests).toBe(1)
+  f.now = NOW + MINUTE
+  await store.refresh()
+  expect(f.requests).toBe(2)
+  expect((await store.read()).accounts[0]!.windows[0]).toMatchObject({
+    usedPercent: 37,
+    observedAt: new Date(NOW + MINUTE).toISOString(),
+  })
+  expect((await store.read()).accounts[0]!.windows[0]!.observedAt).not.toBe(before)
+})
+
+test('minute collection wakes at the durable quota deadline after management latency changes', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(NOW)
+  const f = await proxyUsageFixture(cleanup)
+  f.currentIntervalMs = MINUTE
+  f.collectorIntervalMs = MINUTE
+  let first = true
+  f.beforeManagementResponse = async () => {
+    if (!first) return
+    first = false
+    await new Promise<void>((resolve) => setTimeout(resolve, 20))
+  }
+  const store = f.makeStore(() => Date.now())
+  try {
+    store.start()
+    await vi.advanceTimersByTimeAsync(20)
+    expect(f.requests).toBe(1)
+    await vi.advanceTimersByTimeAsync(MINUTE)
+    expect(f.requests).toBe(2)
+    expect((await store.read()).accounts[0]!.windows[0]!.observedAt).toBe(
+      new Date(NOW + MINUTE + 20).toISOString(),
+    )
+  } finally {
+    await store.close()
+    vi.useRealTimers()
+  }
+})
+
+test('an old successful hour reservation adopts the enabled account minute cadence after restart', async () => {
+  const f = await proxyUsageFixture(cleanup)
+  const old = f.makeStore()
+  await old.refresh()
+  expect(f.requests).toBe(1)
+  await old.close()
+  f.currentIntervalMs = MINUTE
+  f.now = NOW + 2 * MINUTE
+  const current = f.makeStore()
+  await current.refresh()
+  expect(f.requests).toBe(2)
+  expect((await current.read()).accounts[0]!.windows[0]!.observedAt).toBe(
+    new Date(NOW + 2 * MINUTE).toISOString(),
+  )
+})
+
+test.each([
+  { balance: '12345.6789012300', has_credits: true, unlimited: false, expected: 12345.67890123 },
+  { balance: '0', has_credits: false, unlimited: false, expected: 0 },
+  { balance: '0', has_credits: true, unlimited: true, expected: 0 },
+])('full quota reads preserve authentic credit observations: %j', async (credits) => {
+  const f = await proxyUsageFixture(cleanup)
+  f.currentIntervalMs = MINUTE
+  f.response = {
+    plan_type: 'pro',
+    rate_limit: {
+      primary_window: {
+        used_percent: 44,
+        reset_at: NOW / 1000 + 604800,
+        limit_window_seconds: 604800,
+      },
+      secondary_window: null,
+    },
+    credits: {
+      balance: credits.balance,
+      has_credits: credits.has_credits,
+      unlimited: credits.unlimited,
+    },
+  }
+  const store = f.makeStore()
+  await store.refresh()
+  expect((await store.read()).accounts[0]).toMatchObject({
+    credits: { balance: credits.expected, unlimited: credits.unlimited },
+    creditsObservedAt: new Date(NOW).toISOString(),
+  })
+  f.files[0]!.quota = {
+    observed_at: new Date(NOW + MINUTE / 2).toISOString(),
+    signals: { 'x-codex-primary-used-percent': '44', 'x-codex-primary-window-minutes': '10080' },
+  }
+  f.now = NOW + MINUTE / 2
+  await store.refresh()
+  expect((await store.read()).accounts[0]).toMatchObject({
+    credits: { balance: credits.expected, unlimited: credits.unlimited },
+    creditsObservedAt: new Date(NOW).toISOString(),
+  })
+  f.now = NOW + MINUTE
+  await store.refresh()
+  expect((await store.read()).accounts[0]!.creditsObservedAt).toBe(
+    new Date(NOW + MINUTE).toISOString(),
+  )
+  expect((await store.feed()).accounts[0]!.credits).toEqual({
+    balance: credits.expected,
+    unlimited: credits.unlimited,
+  })
+})
+
+test('a parked pooled account gets an hourly full read despite continuing fresh cache metadata', async () => {
+  const f = await proxyUsageFixture(cleanup)
+  f.currentIntervalMs = MINUTE
+  f.files[0]!.disabled = true
+  const store = f.makeStore()
+  await store.refresh()
+  expect(f.requests).toBe(1)
+  f.now = NOW + MINUTE
+  await store.refresh()
+  expect(f.requests).toBe(1)
+  f.files[0]!.quota = {
+    observed_at: new Date(NOW + HOUR - MINUTE).toISOString(),
+    signals: { 'x-codex-primary-used-percent': '37' },
+  }
+  f.now = NOW + HOUR
+  await store.refresh()
+  expect(f.requests).toBe(2)
+  expect((await store.read()).accounts[0]!.windows[0]!.observedAt).toBe(
+    new Date(NOW + HOUR).toISOString(),
+  )
+})
+
+test('a quota response for another account cannot refresh quota or credit data', async () => {
+  const f = await proxyUsageFixture(cleanup)
+  f.currentIntervalMs = MINUTE
+  const store = f.makeStore()
+  await store.refresh()
+  const previous = (await store.read()).accounts[0]!
+  f.response = {
+    account_id: 'synthetic-other-account',
+    plan_type: 'pro',
+    rate_limit: {
+      primary_window: { used_percent: 50, limit_window_seconds: 300, reset_at: NOW / 1000 + 3600 },
+    },
+    credits: { has_credits: true, unlimited: false, balance: '100' },
+  }
+  f.now = NOW + MINUTE
+  await store.refresh()
+  expect((await store.read()).accounts[0]!.windows).toEqual(previous.windows)
+  expect((await store.read()).accounts[0]!.credits).toBeUndefined()
+})
+
+test('a genuine credit-only read preserves omitted quota window ages', async () => {
+  const f = await proxyUsageFixture(cleanup)
+  f.currentIntervalMs = MINUTE
+  const store = f.makeStore()
+  await store.refresh()
+  const priorWindows = (await store.read()).accounts[0]!.windows
+  f.response = {
+    plan_type: 'pro',
+    rate_limit: null,
+    credits: { has_credits: true, unlimited: false, balance: '12.5' },
+  }
+  f.now = NOW + MINUTE
+  await store.refresh()
+  const account = (await store.read()).accounts[0]!
+  expect(account.windows).toEqual(priorWindows)
+  expect(account).toMatchObject({
+    credits: { balance: 12.5, unlimited: false },
+    creditsObservedAt: new Date(NOW + MINUTE).toISOString(),
+  })
 })
 
 test('missing pooled Codex usage uses exactly the T3 usage request and truthful provenance', async () => {
@@ -71,7 +256,7 @@ test('missing pooled Codex usage uses exactly the T3 usage request and truthful 
   expect(saved).not.toContain('synthetic-management-secret')
 })
 
-test('fresh passive account skips requests while stale and missing accounts are independently bounded', async () => {
+test('fresh cached quotas join full reads while every account remains independently bounded', async () => {
   const f = await proxyUsageFixture(cleanup)
   f.files = ['fresh', 'stale', 'missing'].map((id) => ({
     id,
@@ -91,24 +276,28 @@ test('fresh passive account skips requests while stale and missing accounts are 
   }))
   const store = f.makeStore()
   await Promise.all([store.refresh(), store.refresh(), store.refresh()])
-  expect(f.requests).toBe(2)
-  expect(f.payloads).toMatchObject([{ auth_index: 'stale' }, { auth_index: 'missing' }])
+  expect(f.requests).toBe(3)
+  expect(f.payloads).toMatchObject([
+    { auth_index: 'fresh' },
+    { auth_index: 'stale' },
+    { auth_index: 'missing' },
+  ])
   f.now = NOW + 1000
   await store.refresh()
-  expect(f.requests).toBe(2)
+  expect(f.requests).toBe(3)
   await store.close()
   const restarted = f.makeStore()
   await restarted.refresh()
-  expect(f.requests).toBe(2)
+  expect(f.requests).toBe(3)
   f.now = NOW + HOUR - 1
   await restarted.refresh()
   expect(f.requests).toBe(3)
   f.now = NOW + HOUR
   await restarted.refresh()
-  expect(f.requests).toBe(5)
+  expect(f.requests).toBe(6)
 })
 
-test('failed requests consume the persisted hourly cap, back off and give up without changing old ages', async () => {
+test('failed requests stay durably bounded and hourly recovery retains actual old quota ages', async () => {
   const f = await proxyUsageFixture(cleanup)
   const observedAt = new Date(NOW - 2 * HOUR).toISOString()
   f.files[0]!.quota = { observed_at: observedAt, signals: { 'x-codex-primary-used-percent': '19' } }
@@ -128,14 +317,14 @@ test('failed requests consume the persisted hourly cap, back off and give up wit
   expect(f.requests).toBe(2)
   f.now = NOW + 2 * HOUR
   await store.refresh()
-  expect(f.requests).toBe(2)
+  expect(f.requests).toBe(3)
   f.now = NOW + 3 * HOUR
   await store.refresh()
-  expect(f.requests).toBe(3)
+  expect(f.requests).toBe(4)
   f.now = NOW + 20 * HOUR
   await store.refresh()
   await store.refresh()
-  expect(f.requests).toBe(3)
+  expect(f.requests).toBe(5)
   expect((await store.read()).accounts[0]).toMatchObject({
     checkedAt: observedAt,
     windows: [{ observedAt, usedPercent: 19 }],
@@ -188,7 +377,6 @@ test('disabled accounts get a fresh reading while keeping disabled routing and t
   expect((await store.read()).accounts[0]).toMatchObject({
     state: 'disabled',
     routing: { mode: 'rotating', active: false, lastServedAt: null },
-    credits: null,
     windows: [
       { freshness: 'fresh', resetsAt: new Date(NOW + HOUR).toISOString() },
       { freshness: 'fresh', resetsAt: new Date(NOW + 168 * HOUR).toISOString() },
@@ -220,9 +408,10 @@ test('two concurrent owners share the durable cap and duplicates share one ident
 })
 
 test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
-  'invalid interval %s still permits at most one request per hour',
+  'invalid full interval %s keeps parked-account requests hourly',
   async (interval) => {
     const f = await proxyUsageFixture(cleanup)
+    f.files[0]!.disabled = true
     f.intervalHours = interval
     const store = f.makeStore()
     await store.refresh()
@@ -251,7 +440,7 @@ test('a larger configured interval persists when a restart lowers the setting', 
   expect(f.requests).toBe(2)
 })
 
-test('newer passive observations rearm give-up without bypassing the durable deadline', async () => {
+test('newer passive observations recover failure cycles within the scheduled full-read bound', async () => {
   const f = await proxyUsageFixture(cleanup)
   f.status = 401
   const store = f.makeStore()
@@ -267,11 +456,11 @@ test('newer passive observations rearm give-up without bypassing the durable dea
     signals: { 'x-codex-primary-used-percent': '23' },
   }
   await store.refresh()
-  expect(f.requests).toBe(3)
+  expect(f.requests).toBe(4)
   f.status = 200
   f.now = NOW + 7 * HOUR
   await store.refresh()
-  expect(f.requests).toBe(4)
+  expect(f.requests).toBe(5)
 })
 
 test('a corrupt budget fails closed across restarts', async () => {
@@ -419,7 +608,7 @@ test('a changed private identity context keeps the longest deferred deadline', a
   const restarted = f.makeStore()
   f.now = NOW + 3 * HOUR - 1
   await restarted.refresh()
-  expect(f.requests).toBe(2)
+  expect(f.requests).toBe(3)
   f.status = 200
   f.now = NOW + 3 * HOUR
   await restarted.refresh()
