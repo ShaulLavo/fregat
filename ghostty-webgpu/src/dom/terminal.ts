@@ -1428,6 +1428,13 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private updateFrameUi(snapshot: RendererTextFrameSnapshot): void {
     this.lastFrame = snapshot
     const summary = this.execution.submittedFrame
+    const canvas = this.elementsValue?.canvas
+    if (summary && canvas && this.execution.kind === 'async') {
+      const width = `${summary.grid.columns * summary.font.cssCellWidth}px`
+      const height = `${summary.grid.rows * summary.font.cssCellHeight}px`
+      if (canvas.style.width !== width) canvas.style.width = width
+      if (canvas.style.height !== height) canvas.style.height = height
+    }
     const scrollbar = summary?.scrollbar ?? this.execution.scrollbar
     if (summary) this.updatePreeditAppearance(summary.font, summary.theme)
     this.runUiOperation('frame.caret', () => this.positionTextarea(snapshot))
