@@ -128,3 +128,37 @@ it('a callback requesting another paint keeps that work in the next ordinary dis
   f.run()
   expect(f.events).toEqual(['submit:1', 'commit:first', 'submit:1', 'commit:next', 'notify:next'])
 })
+
+it('a clean or error notification barrier commits accepted peers before running external code', () => {
+  const f = fixture()
+  f.coordinator.requestFrame(() => f.coordinator.submit(f.frame('peer')))
+  f.coordinator.requestFrame(() => {
+    f.coordinator.flushPending()
+    f.events.push('external-notification')
+  })
+  f.run()
+  expect(f.events).toEqual(['submit:1', 'commit:peer', 'notify:peer', 'external-notification'])
+})
+
+it('mixed device queue failures report only after accepted peers have committed', () => {
+  const f = fixture()
+  const failedDevice = {
+    queue: {
+      submit() {
+        throw new TypeError('other queue failed')
+      },
+    },
+  } as unknown as GPUDevice
+  const peer = f.frame('peer')
+  const failed = {
+    ...f.frame('failed'),
+    device: failedDevice,
+    failed: () => {
+      f.events.push(`error-after-peer:${f.events.includes('commit:peer')}`)
+    },
+  }
+  f.coordinator.requestFrame(() => f.coordinator.submit(peer))
+  f.coordinator.requestFrame(() => f.coordinator.submit(failed))
+  f.run()
+  expect(f.events).toEqual(['submit:1', 'commit:peer', 'error-after-peer:true', 'notify:peer'])
+})

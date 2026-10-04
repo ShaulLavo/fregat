@@ -417,6 +417,8 @@ export class WebGpuTerminalRenderer {
     const next = copyFittedFont(font)
     if (fittedFontsEqual(this.font, next)) return
     const geometryChanged = !fittedFontGeometryEquals(this.font, next)
+    this.coordinator?.flushOwner(this)
+    if (this.disposed) return
     this.font = next
     if (geometryChanged) this.rebuildGeometryResources()
     this.rasterizer = this.createRasterizer()
@@ -432,6 +434,7 @@ export class WebGpuTerminalRenderer {
 
   resize(grid: RendererGridSize): void {
     this.coordinator?.flushOwner(this)
+    if (this.disposed) return
     const next = normalizeRendererGrid(grid)
     if (this.gridEquals(next)) return
     for (const row of this.overlayRows) {
@@ -543,7 +546,8 @@ export class WebGpuTerminalRenderer {
     this.needsFullRebuild = true
     if (this.frameFailed) return
     this.frameFailed = true
-    this.onError?.(cause)
+    this.coordinator?.flushPending()
+    if (!this.disposed) this.onError?.(cause)
   }
 
   private drawZigFrame(damage: RenderStateDirty): void {
@@ -554,7 +558,8 @@ export class WebGpuTerminalRenderer {
       damage === RenderStateDirty.False &&
       this.overlayRows.size === 0
     ) {
-      this.frames.notifyCleanUpdate()
+      this.coordinator?.flushPending()
+      if (!this.disposed) this.frames.notifyCleanUpdate()
       return
     }
     let builder = this.zigBuilder
@@ -737,11 +742,14 @@ export class WebGpuTerminalRenderer {
 
   private resetAtlasResources(): void {
     this.coordinator?.flushOwner(this)
+    if (this.disposed) return
     this.zigBuilder?.clearGlyphs()
     this.atlas.invalidateAll()
   }
 
   private rebuildGeometryResources(): void {
+    this.coordinator?.flushOwner(this)
+    if (this.disposed) return
     this.resizeCanvas()
     this.configureContext(this.device)
     this.replaceTextPass()
@@ -768,6 +776,7 @@ export class WebGpuTerminalRenderer {
 
   private replaceTextPass(): void {
     this.coordinator?.flushOwner(this)
+    if (this.disposed) return
     const replacement = this.createTextPass()
     replacement.syncAtlas(this.atlasTextures)
     this.textPass.destroy()

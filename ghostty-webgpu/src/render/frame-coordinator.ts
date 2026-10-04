@@ -50,8 +50,12 @@ export class FrameCoordinator implements RenderSchedulerClock {
     this.pending.push(frame)
   }
 
+  flushPending(): void {
+    this.flush()
+  }
+
   flushOwner(owner: object): void {
-    if (this.pending.some((frame) => frame.owner === owner)) this.flush()
+    if (this.pending.some((frame) => frame.owner === owner)) this.flushPending()
   }
 
   private runFrame(): void {
@@ -77,10 +81,14 @@ export class FrameCoordinator implements RenderSchedulerClock {
       groups.set(frame.device, group)
     }
     const submitted: FrameSubmission[] = []
+    const failures: { frame: FrameSubmission; cause: unknown }[] = []
     for (const [device, group] of groups) {
-      submitted.push(...this.submitGroup(device, group))
+      const result = this.submitGroup(device, group)
+      if (result.kind === 'submitted') submitted.push(...result.frames)
+      else failures.push(...result.frames.map((frame) => ({ frame, cause: result.cause })))
     }
     const committed = submitted.filter((frame) => this.invoke(() => frame.commit()))
+    for (const failure of failures) this.invoke(() => failure.frame.failed(failure.cause))
     for (const frame of committed) this.invoke(() => frame.notify())
     this.flush()
   }
@@ -88,13 +96,14 @@ export class FrameCoordinator implements RenderSchedulerClock {
   private submitGroup(
     device: GPUDevice,
     frames: readonly FrameSubmission[],
-  ): readonly FrameSubmission[] {
+  ):
+    | { kind: 'submitted'; frames: readonly FrameSubmission[] }
+    | { kind: 'failed'; frames: readonly FrameSubmission[]; cause: unknown } {
     try {
       device.queue.submit(frames.map((frame) => frame.command))
-      return frames
+      return { kind: 'submitted', frames }
     } catch (cause) {
-      for (const frame of frames) this.invoke(() => frame.failed(cause))
-      return []
+      return { kind: 'failed', frames, cause }
     }
   }
 
