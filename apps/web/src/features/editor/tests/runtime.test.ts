@@ -1,6 +1,6 @@
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { materializeFileSnapshotText, type FileSnapshot } from '@/lib/file-snapshot'
-import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { filesystemPath, settingsJsonDocument, tabId } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import type { StandaloneDocumentRef } from '@/lib/documents/utils/types'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
@@ -233,8 +233,17 @@ test('final disposal releases shared prepared interests before analysis and pres
       .getState()
       .ensureEditorViewForDocument(tabId('second'), document.key, claim)
     createEditorBufferSession(document.buffer).applyText(' edited')
+    runtime.documentStore.getState().markWorkspaceDocumentRecoveryConflict([path], 'final')
+    const settings = runtime.documentStore
+      .getState()
+      .ensureSettingsDocument(settingsJsonDocument('user'), {
+        content: '{}',
+        revision: 'settings-v1',
+      })
     const releasePrepared = vi.spyOn(prepared, 'dispose')
     const releaseAnalysis = vi.spyOn(document.analysis, 'dispose')
+    const releaseSettings = vi.spyOn(settings.analysis, 'dispose')
+    runtime.resume()
     runtime.suspend()
     expect(releasePrepared).not.toHaveBeenCalled()
     expect(releaseAnalysis).not.toHaveBeenCalled()
@@ -244,6 +253,7 @@ test('final disposal releases shared prepared interests before analysis and pres
 
     expect(releasePrepared).toHaveBeenCalledOnce()
     expect(releaseAnalysis).toHaveBeenCalledOnce()
+    expect(releaseSettings).toHaveBeenCalledOnce()
     expect(releasePrepared.mock.invocationCallOrder[0]).toBeLessThan(
       releaseAnalysis.mock.invocationCallOrder[0]!,
     )

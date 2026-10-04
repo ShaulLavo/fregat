@@ -122,6 +122,7 @@ test('final runtime disposal preserves another runtime borrowing the real shared
     expect(resultA.tokens.length).toBeGreaterThan(0)
     expect(resultB.tokens.length).toBeGreaterThan(0)
 
+    a.resume()
     a.suspend()
     const retained = documentA.analysis.borrowHighlighter(request)
     expect(retained?.runtimeSessionId).toBe(leaseA.runtimeSessionId)
