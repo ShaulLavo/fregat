@@ -44,7 +44,7 @@ describe('definition link caller lifetime', () => {
 
   it('detaches an old disposer before reentrant departure starts a new target', async () => {
     const events: string[] = []
-    const secondEntered = Promise.withResolvers<void>()
+    const secondEntered = deferred<void>()
     let editor: ConnectedEditor
     editor = await connectedEditor('const value = other', 6, {
       onDefinitionLinkHover: (target) => {
@@ -93,4 +93,12 @@ function depart(
   if (departure === 'document') return editor.replaceText('const next = 2')
   if (departure === 'navigation') return editor.runCommand('editor.action.goToDefinition')
   return editor.dispose()
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((settle) => {
+    resolve = settle
+  })
+  return { promise, resolve }
 }
