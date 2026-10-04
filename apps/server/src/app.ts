@@ -456,6 +456,7 @@ export function createApp(options: AppOptions) {
     proxyConfigured: () =>
       Boolean(usageSettings['providers.proxyUsageUrl']) && proxyManagementKeyPresent,
     proxyRequestIntervalHours: () => usageSettings['providers.proxyUsageRequestIntervalHours'],
+    proxyCurrentIntervalMs: () => usageSettings['providers.codexUsageRefreshSeconds'] * 1000,
     readProxy: async (identityContext, refresh) => {
       const url = usageSettings['providers.proxyUsageUrl']
       const secret = await settings.readSecret(PROXY_USAGE_MANAGEMENT_KEY_REF)

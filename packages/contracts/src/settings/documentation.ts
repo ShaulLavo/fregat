@@ -954,10 +954,16 @@ export const SETTINGS_DOCUMENTATION = {
     keywords: ['provider', 'acp', 'timeout'],
   },
   'providers.usageRefreshSeconds': {
-    title: 'Usage refresh interval',
+    title: 'Native usage refresh interval',
     description:
-      'Minimum seconds between native account usage requests. Usage reads return persisted observations.',
+      'Seconds between native Claude and other provider usage reads. Claude also respects the full quota refresh interval as its maximum wait. Cached observations can update between quota requests. Feed reads return persisted observations.',
     keywords: ['usage', 'quota', 'cache'],
+  },
+  'providers.codexUsageRefreshSeconds': {
+    title: 'Enabled Codex quota interval',
+    description:
+      'Seconds between genuine quota reads for enabled Codex accounts. The full quota refresh interval bounds their maximum wait. Parked accounts use the full interval. Feed reads return persisted observations.',
+    keywords: ['usage', 'codex', 'quota'],
   },
   'providers.usageFailureCooldownSeconds': {
     title: 'Usage failure cooldown',
@@ -985,9 +991,9 @@ export const SETTINGS_DOCUMENTATION = {
     keywords: ['usage', 'quota', 'cache'],
   },
   'providers.proxyUsageRequestIntervalHours': {
-    title: 'Pooled Codex usage request interval',
+    title: 'Full quota refresh interval',
     description:
-      'Hours between pooled Codex requests. At most one request per account per hour, including failures and restarts. Fresh quota skips requests; three failures pause until newer passive quota arrives.',
+      'Hours between parked Codex full quota reads and the maximum wait between enabled Codex or Claude quota reads. Enabled Codex and Claude can refresh sooner at their own intervals. Failed reads back off and resume by the full refresh interval.',
     keywords: ['usage', 'codex', 'proxy', 'quota', 'cap'],
   },
   'providers.proxyUsageUrl': {

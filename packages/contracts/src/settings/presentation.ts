@@ -682,6 +682,10 @@ export const SETTINGS_PRESENTATION = {
     widget: 'number',
     category: 'Providers',
   },
+  'providers.codexUsageRefreshSeconds': {
+    widget: 'number',
+    category: 'Providers',
+  },
   'providers.usageFailureCooldownSeconds': {
     widget: 'number',
     category: 'Providers',

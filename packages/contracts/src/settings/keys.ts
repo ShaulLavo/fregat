@@ -947,6 +947,11 @@ export const SETTINGS_REGISTRY = {
     default: 300,
     scope: 'machine',
   }),
+  'providers.codexUsageRefreshSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(60), v.maxValue(86400)),
+    default: 60,
+    scope: 'machine',
+  }),
   'providers.usageFailureCooldownSeconds': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(60), v.maxValue(86400)),
     default: 600,

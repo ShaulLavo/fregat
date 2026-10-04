@@ -118,6 +118,7 @@
     "prefetch.enabled",
     "prefetch.files",
     "providers.acpOperationTimeoutMs",
+    "providers.codexUsageRefreshSeconds",
     "providers.instances",
     "providers.proxyUsageProviderInstanceIds",
     "providers.proxyUsageRequestIntervalHours",

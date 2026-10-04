@@ -20,6 +20,7 @@ export type {
   TreeSitterInjectionInfo,
   TreeSitterParseResult,
   TreeSitterPoint,
+  TreeSitterWorkerRetentionSnapshot,
 } from './treeSitter/types'
 export {
   canUseTreeSitterWorker,

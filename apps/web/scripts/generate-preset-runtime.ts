@@ -18,7 +18,9 @@ export function registeredPresetCommandIds(): ReadonlySet<string> {
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath))
   assert.deepEqual(parsed.errors, [], 'The web TypeScript configuration must be valid.')
   const filename = fileURLToPath(new URL('../src/keymap/types.ts', import.meta.url))
-  const program = ts.createProgram([filename], parsed.options)
+  const host = ts.createCompilerHost(parsed.options)
+  host.jsDocParsingMode = ts.JSDocParsingMode.ParseForTypeErrors
+  const program = ts.createProgram([filename], parsed.options, host)
   const source = program.getSourceFile(filename)
   assert(source, 'The web command types must be readable.')
   const declaration = source.statements

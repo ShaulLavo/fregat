@@ -109,6 +109,8 @@ const probeWindowSchema = v.object({
   ),
 })
 const probeSchema = v.object({
+  account_id: v.optional(v.nullable(v.string())),
+  credits: v.optional(v.unknown()),
   plan_type: v.optional(v.string()),
   rate_limit: v.nullable(
     v.object({
@@ -130,13 +132,20 @@ async function refreshAccount(
   const refresh = options.refresh
   const selector = text(file.auth_index)
   if (!refresh || !refresh.isCurrent()) return account
+  if (refresh.nativeReadPending(account)) return account
   const key = account.accountKey.slice('proxy:'.length)
   if (proof && !refresh.link(key, proof)) return account
   if (!selector) return account
   const now = options.now ?? Date.now
   const latest = refresh.latest(account) ?? account
   const observations = [...currentWindows, ...latest.windows]
-  if (observations.some((window) => freshWindow(window, now(), refresh.staleAfterMs)))
+  const intervalMs = refresh.requestIntervalMs(account)
+  if (
+    observations.some(
+      (window) =>
+        window.source === 'codex-account-rate-limits' && freshWindow(window, now(), intervalMs),
+    )
+  )
     return account
   const passiveTimes = observations.flatMap((window) =>
     window.source !== 'cliproxy-usage-probe' && window.observedAt
@@ -144,7 +153,7 @@ async function refreshAccount(
       : [],
   )
   const passiveAt = passiveTimes.length ? Math.max(...passiveTimes) : null
-  const reservation = refresh.reserve(key, passiveAt)
+  const reservation = refresh.reserve(key, passiveAt, intervalMs)
   if (!reservation || !refresh.isCurrent()) return account
   const startedAt = now()
   let outcome = 'transport-failed'
@@ -180,6 +189,13 @@ async function refreshAccount(
     }
     if (typeof raw.body !== 'string') throw failure('provider-usage-body')
     const usage = v.parse(probeSchema, JSON.parse(raw.body))
+    if (
+      usage.account_id &&
+      proof &&
+      codexAccountIdentity(usage.account_id, options.identityContext) !== proof
+    )
+      throw failure('provider-usage-account')
+    const credits = probeCredits(usage.credits)
     const observedAt = new Date(startedAt).toISOString()
     const windows: ProviderUsageWindow[] = []
     for (const [id, window] of [
@@ -195,13 +211,15 @@ async function refreshAccount(
         usedPercent: window.used_percent,
         windowMinutes: minutes,
         resetsAt: window.reset_at ? new Date(window.reset_at * 1000).toISOString() : null,
-        status: window.used_percent === 100 ? 'rejected' : null,
+        status: probeWindowStatus(window.used_percent, credits?.covered ?? false),
         observedAt,
         source: 'cliproxy-usage-probe',
+        statusObservedAt: observedAt,
+        statusSource: 'cliproxy-usage-probe',
         freshness: 'unknown',
       })
     }
-    if (!windows.length) {
+    if (!windows.length && !credits) {
       outcome = 'no-windows'
       throw failure('provider-usage-windows')
     }
@@ -211,6 +229,7 @@ async function refreshAccount(
       lastSeenAt: observedAt,
       planType: planLabel(usage.plan_type) ?? account.planType,
       windows: mergeUsageWindows(account.windows, windows),
+      ...(credits ? { credits: credits.value, creditsObservedAt: observedAt } : {}),
     })
     outcome = 'reading'
     success = true
@@ -233,6 +252,39 @@ async function refreshAccount(
     if (!success && outcome !== 'generation-discard' && reservation.failures === 1)
       recordChatPipelineWarning('chat.pipeline.provider_usage.proxy_probe', fields)
     else recordChatPipelineInfo('chat.pipeline.provider_usage.proxy_probe', fields)
+  }
+}
+
+function probeWindowStatus(usedPercent: number, covered: boolean): ProviderUsageWindow['status'] {
+  if (usedPercent < 100) return null
+  return covered ? 'warning' : 'rejected'
+}
+
+function probeCredits(value: unknown) {
+  const parsed = v.safeParse(
+    v.object({
+      has_credits: v.boolean(),
+      unlimited: v.boolean(),
+      balance: v.union([
+        v.pipe(v.number(), v.finite(), v.minValue(0)),
+        v.pipe(
+          v.string(),
+          v.trim(),
+          v.regex(/^\d+(?:\.\d+)?$/),
+          v.toNumber(),
+          v.finite(),
+          v.minValue(0),
+        ),
+      ]),
+    }),
+    value,
+  )
+  if (!parsed.success) return null
+  const credits = parsed.output
+  if (!credits.has_credits && !credits.unlimited && credits.balance !== 0) return null
+  return {
+    value: { balance: credits.balance, unlimited: credits.unlimited },
+    covered: credits.has_credits || credits.unlimited,
   }
 }
 
@@ -403,7 +455,7 @@ function accountSnapshot(
     state,
     stateObservedAt: new Date(now).toISOString(),
     source: 'cli-proxy-management',
-    credits,
+    ...(credits ? { credits, creditsObservedAt: creditsAt } : {}),
     ...(cooldown ? { cooldown } : {}),
     routing: { mode: 'rotating', active, lastServedAt: null },
   }

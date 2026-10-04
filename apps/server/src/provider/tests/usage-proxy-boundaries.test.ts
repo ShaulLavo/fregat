@@ -1,4 +1,6 @@
 import { afterEach, expect, test } from 'vitest'
+import { readFile } from 'node:fs/promises'
+import * as v from 'valibot'
 import { CodexUsageRequestBudget } from '../usage-proxy-budget'
 import { PROXY_USAGE_NOW as NOW, proxyUsageFixture } from '../../testing/proxy-usage'
 
@@ -26,7 +28,7 @@ test.each(['disappears', 'appears'] as const)(
 )
 
 test.each([false, true])(
-  'fresh passive alias suppresses the shared account request regardless of row order (%s)',
+  'fresh passive aliases share one genuine full-account request regardless of row order (%s)',
   async (freshFirst) => {
     const f = await proxyUsageFixture(cleanup)
     const freshAlias = {
@@ -44,8 +46,8 @@ test.each([false, true])(
     f.files = freshFirst ? [freshAlias, ...f.files] : [...f.files, freshAlias]
     const store = f.makeStore()
     await store.refresh()
-    expect(f.requests).toBe(0)
-    expect((await store.read()).accounts[0]?.windows[0]?.usedPercent).toBe(19)
+    expect(f.requests).toBe(1)
+    expect((await store.read()).accounts[0]?.windows[0]?.usedPercent).toBe(37)
   },
 )
 
@@ -118,7 +120,7 @@ test.each(['fresh', 'blocked'] as const)(
   },
 )
 
-test('proof and alias transitions keep failure counts and the longest deadline', async () => {
+test('proof and alias transitions keep failures while hourly recovery remains available', async () => {
   const f = await proxyUsageFixture(cleanup)
   f.status = 401
   delete f.files[0]!.id_token
@@ -134,7 +136,7 @@ test('proof and alias transitions keep failure counts and the longest deadline',
   f.files = [{ ...f.files[0], id: 'synthetic-other-file', auth_index: 'other-selector' }]
   f.now = NOW + 3 * HOUR - 1
   await store.refresh()
-  expect(f.requests).toBe(2)
+  expect(f.requests).toBe(3)
   await store.close()
   delete f.files[0]!.id_token
   const restarted = f.makeStore()
@@ -143,7 +145,7 @@ test('proof and alias transitions keep failure counts and the longest deadline',
   expect(f.requests).toBe(3)
   f.now = NOW + 20 * HOUR
   await restarted.refresh()
-  expect(f.requests).toBe(3)
+  expect(f.requests).toBe(4)
 })
 
 test('joining separately reserved aliases keeps both failure counts and the longest floor', async () => {
@@ -179,7 +181,7 @@ test('joining separately reserved aliases keeps both failure counts and the long
   expect(f.requests).toBe(3)
   f.now = NOW + 100 * HOUR
   await restarted.refresh()
-  expect(f.requests).toBe(3)
+  expect(f.requests).toBe(4)
 })
 
 test('settling an earlier alias request cannot reset merged failures at the same timestamp', async () => {
@@ -202,8 +204,15 @@ test('settling an earlier alias request cannot reset merged failures at the same
   expect(budget.link(first, proof)).toBe(true)
   expect(budget.link(second, proof)).toBe(true)
   budget.settle(reservation, true)
-  now = NOW + 2 * HOUR
+  const persisted = v.parse(
+    v.object({ accounts: v.record(v.string(), v.object({ failures: v.number() })) }),
+    JSON.parse(await readFile(`${f.cacheFile}.codex-requests`, 'utf8')),
+  )
+  expect(persisted.accounts[proof]?.failures).toBe(3)
+  now = NOW + HOUR - 1
   expect(budget.reserve(proof, null)).toBeNull()
+  now = NOW + 2 * HOUR
+  expect(budget.reserve(proof, null)).toMatchObject({ failures: 1 })
 })
 
 test.each([59, 61, 18001, 31536001])(

@@ -24,6 +24,7 @@ const budgetSchema = v.object({
         v.maxValue(CODEX_USAGE_MAX_FAILURES),
       ),
       passiveAt: v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0))),
+      intervalMs: v.optional(v.pipe(v.number(), v.finite(), v.minValue(1))),
     }),
   ),
 })
@@ -33,8 +34,10 @@ export type ProxyUsageRefresh = {
   staleAfterMs: number
   isCurrent(): boolean
   latest(account: ProviderAccountUsage): ProviderAccountUsage | undefined
+  nativeReadPending(account: ProviderAccountUsage): boolean
+  requestIntervalMs(account: ProviderAccountUsage): number
   link(key: string, proof: string): boolean
-  reserve(key: string, passiveAt: number | null): ProxyUsageReservation | null
+  reserve(key: string, passiveAt: number | null, intervalMs: number): ProxyUsageReservation | null
   settle(reservation: ProxyUsageReservation, success: boolean): void
 }
 
@@ -71,6 +74,7 @@ export class CodexUsageRequestBudget {
                 nextAttemptAt: Math.max(previous.nextAttemptAt, known.nextAttemptAt),
                 failures: Math.min(CODEX_USAGE_MAX_FAILURES, previous.failures + known.failures),
                 passiveAt: Math.max(previous.passiveAt ?? 0, known.passiveAt ?? 0) || null,
+                intervalMs: Math.max(previous.intervalMs ?? 0, known.intervalMs ?? 0) || undefined,
               }
             : previous
         }
@@ -81,37 +85,71 @@ export class CodexUsageRequestBudget {
     )
   }
 
-  reserve(key: string, passiveAt: number | null): ProxyUsageReservation | null {
+  reserve(
+    key: string,
+    passiveAt: number | null,
+    requestedIntervalMs?: number,
+    deferred?: (key: string, deadline: number) => void,
+  ): ProxyUsageReservation | null {
     return this.update((budget) => {
       const canonicalKey = budget.aliases[key] ?? key
       const now = this.now()
       const known = budget.accounts[canonicalKey]
-      let failures = known?.failures ?? 0
-      if (passiveAt !== null && passiveAt > (known?.passiveAt ?? 0)) failures = 0
-      if (known && (now < known.nextAttemptAt || now - known.attemptedAt < HOUR_MS)) return null
-      if (failures >= CODEX_USAGE_MAX_FAILURES) return null
       const configured = this.intervalHours()
       const hours = Number.isFinite(configured) ? Math.max(1, configured) : 1
+      const fullIntervalMs = hours * HOUR_MS
+      const intervalMs =
+        requestedIntervalMs && Number.isFinite(requestedIntervalMs)
+          ? Math.min(fullIntervalMs, Math.max(1, requestedIntervalMs))
+          : fullIntervalMs
+      let failures = known?.failures ?? 0
+      if (passiveAt !== null && passiveAt > (known?.passiveAt ?? 0)) failures = 0
+      const wait =
+        failures >= CODEX_USAGE_MAX_FAILURES
+          ? fullIntervalMs
+          : Math.min(fullIntervalMs, intervalMs * 2 ** Math.max(0, failures - 1))
+      const deadline = known ? known.attemptedAt + wait : now
+      const inheritedFloor =
+        known && intervalMs >= fullIntervalMs && (known.intervalMs ?? 0) > intervalMs
+          ? known.nextAttemptAt
+          : deadline
+      const nextAttemptAt = Math.max(deadline, inheritedFloor)
+      if (now < nextAttemptAt) {
+        deferred?.(canonicalKey, nextAttemptAt)
+        return null
+      }
+      if (failures >= CODEX_USAGE_MAX_FAILURES) failures = 0
       budget.accounts[canonicalKey] = {
         attemptedAt: now,
-        nextAttemptAt: now + hours * HOUR_MS * 2 ** failures,
+        nextAttemptAt: now + Math.min(fullIntervalMs, intervalMs * 2 ** failures),
         failures: failures + 1,
         passiveAt: passiveAt ?? known?.passiveAt ?? null,
+        intervalMs,
       }
       return { key: canonicalKey, attemptedAt: now, failures: failures + 1 }
     })
   }
 
   settle(reservation: ProxyUsageReservation, success: boolean) {
-    if (!success) return
-    this.update((budget) => {
+    return this.update((budget) => {
       const key = budget.aliases[reservation.key] ?? reservation.key
       const known = budget.accounts[key]
       if (known?.attemptedAt !== reservation.attemptedAt || known.failures !== reservation.failures)
         return null
-      known.failures = 0
-      return true
+      if (success) {
+        known.failures = 0
+        known.nextAttemptAt =
+          known.attemptedAt + (known.intervalMs ?? this.intervalHours() * HOUR_MS)
+      }
+      if (known.failures >= CODEX_USAGE_MAX_FAILURES)
+        known.nextAttemptAt = known.attemptedAt + this.fullIntervalMs()
+      return { key, nextAttemptAt: known.nextAttemptAt }
     })
+  }
+
+  private fullIntervalMs() {
+    const configured = this.intervalHours()
+    return (Number.isFinite(configured) ? Math.max(1, configured) : 1) * HOUR_MS
   }
 
   private update<T>(apply: (budget: Budget) => T | null): T | null {
