@@ -5,8 +5,11 @@ import type { FileSnapshot } from '@/lib/file-snapshot'
 
 type PreparedOpenClaimBase = {
   readonly buffer: EditorTextBuffer
+  readonly documentKey: DocumentKey
+  readonly localRevision: number
   readonly path: FilesystemPath
   readonly snapshot: PieceTableSnapshot
+  release(): void
 }
 
 export type PreparedCleanFileOpenClaim = PreparedOpenClaimBase & {
@@ -17,9 +20,7 @@ export type PreparedCleanFileOpenClaim = PreparedOpenClaimBase & {
 }
 
 export type PreparedLiveFileOpenClaim = PreparedOpenClaimBase & {
-  readonly documentKey: DocumentKey
   readonly kind: 'live'
-  readonly localRevision: number
   readonly preparedDocument: EditorPreparedDocument | null
 }
 

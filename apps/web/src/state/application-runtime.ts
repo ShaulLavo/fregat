@@ -28,6 +28,7 @@ import { resetLanguageServerConnectionPool } from '@/features/editor/state/langu
 import { markerStore } from '@/lib/markers/store'
 import { createEditorRuntime, type EditorRuntime } from '@/features/editor/state/runtime'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import type { EditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import type { QueryClient } from '@tanstack/react-query'
 import type { EditorPreparedEnvironment } from '@/features/editor/utils/prepared-document'
 import {
@@ -59,6 +60,7 @@ type RetainedEnvironment = {
   readonly stopCachePersistence: () => void
   readonly stopSpellcheckWords: () => void
   readonly stopReloadSafety: () => void
+  readonly stopAnalysisMembership: () => void
   readonly unsubscribeRoot: () => void
 }
 
@@ -88,6 +90,10 @@ export function createApplicationRuntime({
   const commandBinding = createCommandRuntimeBinding()
   const reloadSafety = createReloadSafetyStore()
   const environments = new Map<EnvironmentId, RetainedEnvironment>()
+  const analysisListeners = new Set<() => void>()
+  const notifyRetainedEditorAnalyses = () => {
+    for (const listener of analysisListeners) listener()
+  }
   let current: RetainedEnvironment
   let started = false
   let disposed = false
@@ -137,6 +143,9 @@ export function createApplicationRuntime({
       queryClient,
       editor,
       stopSearchReload,
+      stopAnalysisMembership: editor.documentStore
+        .getState()
+        .subscribeEditorAnalyses(notifyRetainedEditorAnalyses),
       stopReloadSafety: editor.documentStore.subscribe(
         (state) => state.dirtyDocumentKeys,
         syncReloadSafety,
@@ -212,6 +221,19 @@ export function createApplicationRuntime({
     connections,
     reloadSafety,
     commandBinding,
+    *enumerateRetainedEditorAnalyses(): Iterable<EditorDocumentAnalysis> {
+      const visited = new Set<EditorDocumentAnalysis>()
+      for (const { editor } of environments.values()) {
+        yield* uniqueEditorAnalyses(
+          editor.documentStore.getState().enumerateEditorAnalyses(),
+          visited,
+        )
+      }
+    },
+    subscribeRetainedEditorAnalyses(listener: () => void): () => void {
+      analysisListeners.add(listener)
+      return () => analysisListeners.delete(listener)
+    },
     getSnapshot: () => current,
     getEnvironment: (environmentId: EnvironmentId) => environments.get(environmentId),
     getEditorForWorkspace(workspace: EditorWorkspaceStoreApi) {
@@ -233,7 +255,9 @@ export function createApplicationRuntime({
       const next =
         environments.get(environmentId) ??
         createEnvironment(origin, readWorkspaceCache(environmentScopedStorage(environmentId)))
+      const inserted = !environments.has(environmentId)
       environments.set(environmentId, next)
+      if (inserted) notifyRetainedEditorAnalyses()
       syncReloadSafety()
       if (current === next) return
       commandBinding.clear()
@@ -288,7 +312,12 @@ export function createApplicationRuntime({
       stopLatency()
       stopMachines()
       connections.stop()
-      for (const environment of environments.values()) {
+      const retained = [...environments.values()]
+      for (const environment of retained) environment.stopAnalysisMembership()
+      environments.clear()
+      notifyRetainedEditorAnalyses()
+      analysisListeners.clear()
+      for (const environment of retained) {
         suspendEnvironmentActivity(environment.origin)
         environment.unsubscribeRoot()
         environment.stopReloadSafety()
@@ -298,7 +327,6 @@ export function createApplicationRuntime({
         environment.editor.dispose()
         environment.queryClient.unmount()
       }
-      environments.clear()
       resetLanguageServerConnectionPool()
       markerStore.clear()
     },
@@ -313,4 +341,15 @@ function refusedBeforeHandshake(origin: string) {
   const connection = selectServerConnection(useEnvironmentsStore.getState(), origin)
   const refused = connection.phase === 'identity-drift' || connection.phase === 'protocol-mismatch'
   return refused && connection.generation === 0
+}
+
+function* uniqueEditorAnalyses(
+  analyses: Iterable<EditorDocumentAnalysis>,
+  visited: Set<EditorDocumentAnalysis>,
+): Iterable<EditorDocumentAnalysis> {
+  for (const analysis of analyses) {
+    if (visited.has(analysis)) continue
+    visited.add(analysis)
+    yield analysis
+  }
 }

@@ -12,6 +12,10 @@ import { createBinaryFileError, createClientInvariantError } from '@/lib/structu
 import { contentRevisionForText, fileContentRevision } from '@/features/editor/utils/text-snapshot'
 import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
 import type { PreparedFileOpenClaim } from '@/lib/file-open-intent/types'
+import type {
+  FileOpenIntentPreparationSource,
+  FileOpenIntentPreparationSourceInput,
+} from '@/lib/file-open-intent/state/service'
 import { documentKey, fileDocument, fileDocumentKey } from '@/lib/documents/utils/identity'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import { tabDocuments } from '@/lib/documents/utils/tabs'
@@ -278,6 +282,8 @@ export class WorkspaceDocumentService {
   private dirtyContentRevision = 0
   private pathOwnershipRevision = 0
   private readonly liveDocumentsByKey = new Map<DocumentKey, LiveEditorDocument>()
+  private readonly preparationPins = new Map<EditorTextBuffer, Set<object>>()
+  private readonly analysisListeners = new Set<() => void>()
   private readonly documentKeysByBuffer = new Map<EditorTextBuffer, DocumentKey>()
   private readonly unsubscribeByBuffer = new Map<EditorTextBuffer, () => void>()
   private readonly recoveryConflictByBuffer = new Map<
@@ -458,6 +464,8 @@ export class WorkspaceDocumentService {
     this.scrollPositionSeeds.clear()
     this.pathReservations.clear()
     this.ownershipRevisionByPath.clear()
+    this.preparationPins.clear()
+    this.analysisListeners.clear()
   }
 
   /**
@@ -480,6 +488,7 @@ export class WorkspaceDocumentService {
   private isUnevictableDocument(documentKey: DocumentKey): boolean {
     const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
+    if (this.preparationPins.has(document.buffer)) return true
     for (const input of this.savedComparisons.values()) {
       if (input.kind === 'ready' && input.live.buffer === document.buffer) return true
     }
@@ -564,6 +573,7 @@ export class WorkspaceDocumentService {
     const resource = filesystemResource(document?.target)
     const wasDirty = this.isDirtyDocument(documentKey)
     const hadLiveDocument = this.liveDocumentsByKey.delete(documentKey)
+    if (hadLiveDocument) this.notifyEditorAnalyses()
     if (document) this.detachPreviousBuffer(document)
     if (hadLiveDocument) {
       this.pathOwnershipRevision += 1
@@ -616,13 +626,58 @@ export class WorkspaceDocumentService {
     return record
   }
 
+  acquireFilePreparation(
+    input: FileOpenIntentPreparationSourceInput,
+  ): FileOpenIntentPreparationSource | null {
+    if (this.sourceOwnerDisposed) return null
+    const document =
+      input.kind === 'live-document'
+        ? this.liveDocumentsByKey.get(input.documentKey)
+        : this.ensureLiveDocument(input.file)
+    if (!document) return null
+    const { buffer } = document
+    if (this.liveDocumentsByKey.get(document.key)?.buffer !== buffer) return null
+    const token = {}
+    const pins = this.preparationPins.get(buffer) ?? new Set<object>()
+    pins.add(token)
+    this.preparationPins.set(buffer, pins)
+    return {
+      document,
+      release: () => {
+        if (!pins.delete(token)) return
+        if (pins.size === 0 && this.preparationPins.get(buffer) === pins)
+          this.preparationPins.delete(buffer)
+      },
+    }
+  }
+
+  *enumerateEditorAnalyses(): Iterable<EditorDocumentAnalysis> {
+    for (const document of this.liveDocumentsByKey.values()) yield document.analysis
+  }
+
+  subscribeEditorAnalyses(listener: () => void): () => void {
+    this.analysisListeners.add(listener)
+    return () => this.analysisListeners.delete(listener)
+  }
+
+  private notifyEditorAnalyses(): void {
+    for (const listener of this.analysisListeners) listener()
+  }
+
   ensureView(
     tabId: TabId,
     file: FileSnapshot,
     claim: PreparedFileOpenClaim | null = null,
   ): LiveEditorViewDocument {
-    const document = this.ensureLiveDocument(file, claim)
-    return this.ensureViewForDocument(tabId, document.key, claim)
+    try {
+      const document = this.ensureLiveDocument(file, claim)
+      return this.attachViewForDocument(tabId, document.key, claim)
+    } catch (error) {
+      claim?.preparedDocument?.dispose()
+      throw error
+    } finally {
+      claim?.release()
+    }
   }
 
   ensureUnsyncedDocument(input: UnsyncedLiveEditorDocumentInput): LiveEditorDocument {
@@ -667,6 +722,21 @@ export class WorkspaceDocumentService {
     tabId: TabId,
     documentKey: DocumentKey,
     claim: PreparedFileOpenClaim | null = null,
+  ): LiveEditorViewDocument {
+    try {
+      return this.attachViewForDocument(tabId, documentKey, claim)
+    } catch (error) {
+      claim?.preparedDocument?.dispose()
+      throw error
+    } finally {
+      claim?.release()
+    }
+  }
+
+  private attachViewForDocument(
+    tabId: TabId,
+    documentKey: DocumentKey,
+    claim: PreparedFileOpenClaim | null,
   ): LiveEditorViewDocument {
     const document = this.getRequiredLiveDocument(documentKey)
     const resource = filesystemResource(document.target)
@@ -1287,6 +1357,7 @@ export class WorkspaceDocumentService {
     const contentRevision = this.documentContentRevisions[fromKey]
 
     this.liveDocumentsByKey.delete(fromKey)
+    if (document) this.preparationPins.delete(document.buffer)
     this.documentContentRevisions = omitKey(this.documentContentRevisions, fromKey)
     this.renameDirtyKey(fromKey, toKey)
 
@@ -1299,6 +1370,7 @@ export class WorkspaceDocumentService {
       }
       this.liveDocumentsByKey.set(toKey, renamed)
       this.documentKeysByBuffer.set(document.buffer, toKey)
+      this.notifyEditorAnalyses()
       this.pathOwnershipRevision += 1
       this.advancePathOwnership(from)
       this.advancePathOwnership(to)
@@ -1649,9 +1721,9 @@ export class WorkspaceDocumentService {
 
   private setLiveDocument(document: LiveEditorDocument): void {
     const previous = this.liveDocumentsByKey.get(document.key)
-    if (previous?.buffer !== document.buffer) this.detachPreviousBuffer(previous)
-
     this.liveDocumentsByKey.set(document.key, document)
+    if (previous?.analysis !== document.analysis) this.notifyEditorAnalyses()
+    if (previous?.buffer !== document.buffer) this.detachPreviousBuffer(previous)
     this.refreshLiveComparison(document.key)
     if (!previous) {
       this.pathOwnershipRevision += 1
@@ -1669,6 +1741,7 @@ export class WorkspaceDocumentService {
 
   private detachPreviousBuffer(document: LiveEditorDocument | undefined): void {
     if (!document) return
+    this.preparationPins.delete(document.buffer)
     document.analysis.dispose()
     this.detachBuffer(document.buffer)
   }
@@ -1990,8 +2063,6 @@ function preparedDocumentForClaim(
   if (!claim?.preparedDocument) return null
   if (!preparedClaimMatchesDocument(document, claim)) {
     claim.preparedDocument.dispose()
-    if (claim.kind === 'clean' && claim.buffer !== document.buffer)
-      claim.preparedDocument.analysis.dispose()
     return null
   }
 
@@ -2005,10 +2076,9 @@ function preparedClaimMatchesDocument(
   if (filesystemResource(document.target)?.path !== claim.path) return false
   if (document.buffer !== claim.buffer) return false
   if (document.buffer.getSnapshot() !== claim.snapshot) return false
-  if (claim.kind === 'live') {
-    if (document.key !== claim.documentKey) return false
-    return document.localRevision === claim.localRevision
-  }
+  if (document.key !== claim.documentKey) return false
+  if (document.localRevision !== claim.localRevision) return false
+  if (claim.kind === 'live') return true
   if (document.sync.kind !== 'file') return false
 
   return document.sync.fileVersion === claim.fileVersion
