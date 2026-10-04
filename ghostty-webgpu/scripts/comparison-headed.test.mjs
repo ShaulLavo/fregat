@@ -12,6 +12,7 @@ import {
   assertHeadedSurfaceTransport,
   headedLaunchArguments,
   finishOwnedLaunchCleanup,
+  matchingGlRendererIdentity,
   ownedProcessAlive,
   ownedProcessStates,
   settleOwnedWindowGeometry,
@@ -731,4 +732,30 @@ test('server close failure still removes the owned profile', async () => {
   assert.equal(cleanup.profileRemoved, true)
   assert.equal(typeof cleanup.serverCloseError, 'string')
   await assert.rejects(readFile(profile), { code: 'ENOENT' })
+})
+
+test('observed page OpenGL identity qualifies when only browser diagnostics expose the driver suffix', () => {
+  const browser =
+    'ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 3060 Ti/PCIe/SSE2, OpenGL 4.5.0 NVIDIA 610.57.04)'
+  const page = 'ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 3060 Ti/PCIe/SSE2, OpenGL 4.5.0)'
+  const identity = matchingGlRendererIdentity(browser, page)
+  assert.equal(identity.vendor, 'NVIDIA Corporation')
+  assert.equal(identity.deviceDescription, 'NVIDIA GeForce RTX 3060 Ti/PCIe/SSE2')
+  assert.equal(identity.openGlVersion, '4.5.0')
+  assert.equal(identity.driverLabel, 'NVIDIA 610.57.04')
+  assert.deepEqual(identity.rawRendererStrings, { browser, page })
+  assert.deepEqual(matchingGlRendererIdentity(browser, browser).rawRendererStrings, {
+    browser,
+    page: browser,
+  })
+  for (const rejected of [
+    page.replace('NVIDIA Corporation', 'Other vendor'),
+    page.replace('RTX 3060 Ti', 'RTX 3070'),
+    page.replace('4.5.0', '4.6.0'),
+    page.replace('RTX 3060 Ti', 'llvmpipe'),
+    browser.replace('610.57.04', 'other driver'),
+    page.replace('OpenGL', 'Vulkan'),
+  ])
+    assert.throws(() => matchingGlRendererIdentity(browser, rejected))
+  assert.throws(() => matchingGlRendererIdentity(page, browser), /driver identities must match/)
 })

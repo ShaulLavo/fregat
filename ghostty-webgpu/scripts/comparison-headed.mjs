@@ -69,6 +69,38 @@ export function observedVulkanRenderer(renderer) {
   }
 }
 
+export function observedGlRenderer(renderer) {
+  assert(typeof renderer === 'string', 'Actual OpenGL renderer string required')
+  const parsed = renderer.match(
+    /^ANGLE \(([^,]+), (.+), OpenGL (\d+\.\d+(?:\.\d+)?)(?: ([^()]+))?\)$/,
+  )
+  assert(
+    parsed && !/swiftshader|llvmpipe|softpipe|lavapipe|software/i.test(renderer),
+    'Structured hardware ANGLE OpenGL identity required',
+  )
+  return {
+    vendor: parsed[1],
+    deviceDescription: parsed[2],
+    angleBackend: 'OpenGL',
+    openGlVersion: parsed[3],
+    driverLabel: parsed[4] ?? null,
+  }
+}
+
+export function matchingGlRendererIdentity(browserRenderer, pageRenderer) {
+  const browser = observedGlRenderer(browserRenderer)
+  const page = observedGlRenderer(pageRenderer)
+  for (const key of ['vendor', 'deviceDescription', 'angleBackend', 'openGlVersion'])
+    assert.equal(page[key], browser[key], 'Page and browser OpenGL identity must match')
+  if (page.driverLabel !== null)
+    assert.equal(
+      page.driverLabel,
+      browser.driverLabel,
+      'Observed OpenGL driver identities must match',
+    )
+  return { ...browser, rawRendererStrings: { browser: browserRenderer, page: pageRenderer } }
+}
+
 export function assertHeadedSurfaceTransport(stderr) {
   assert.equal(typeof stderr, 'string', 'Observed Chrome diagnostics required')
   assert(
