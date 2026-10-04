@@ -9,7 +9,11 @@ import { defineErrorCatalog } from 'evlog'
 import * as v from 'valibot'
 import { usageAccountLabel } from './utils/usage-account-label'
 import { codexAccountIdentity, rememberProxyUsageIdentity } from './utils/usage-codex-identity'
-import { codexWindowPresentation, mergeUsageWindows } from './utils/usage-windows'
+import {
+  codexWindowPresentation,
+  mergeObservedUsageWindows,
+  mergeUsageWindows,
+} from './utils/usage-windows'
 import { CODEX_USAGE_MAX_FAILURES, type ProxyUsageRefresh } from './usage-proxy-budget'
 import {
   recordChatPipelineInfo,
@@ -359,10 +363,10 @@ function accountSnapshot(
   now: number,
   managementObservedAt: string | null,
 ): ProviderAccountUsage {
-  const windows = quotaWindows(file.quota, '', now)
+  let windows = quotaWindows(file.quota, now)
   for (const [model, quota] of Object.entries(object(file.model_quotas) ?? {})) {
     if (!/^gpt-\d[a-z0-9._-]{0,48}$/.test(model)) continue
-    windows.push(...quotaWindows(quota, `model:${model}:`, now))
+    windows = mergeObservedUsageWindows(windows, quotaWindows(quota, now))
   }
   const quota = object(file.quota)
   const creditsAt = timestamp(quota?.observed_at, now)
@@ -490,7 +494,7 @@ function cachedCredits(
   return { balance, unlimited: unlimited === 'true' }
 }
 
-function quotaWindows(value: unknown, namespace: string, now: number): ProviderUsageWindow[] {
+function quotaWindows(value: unknown, now: number): ProviderUsageWindow[] {
   const quota = object(value)
   const observedAt = timestamp(quota?.observed_at, now)
   if (!observedAt) return []
@@ -507,7 +511,7 @@ function quotaWindows(value: unknown, namespace: string, now: number): ProviderU
       const window = cachedWindow(
         values,
         `${prefix}-${position}`,
-        `${namespace}${extra}${position}`,
+        `${extra}${position}`,
         observedAt,
         now,
       )
@@ -516,7 +520,7 @@ function quotaWindows(value: unknown, namespace: string, now: number): ProviderU
       if (existing?.windowMinutes != null && window.windowMinutes === null) continue
       windows.set(window.id, window)
     }
-    const idPrefix = `${namespace}${extra}`
+    const idPrefix = extra
     const statusOnly = cachedWindow(values, prefix, `${idPrefix}quota`, observedAt, now)
     if (!statusOnly) continue
     const scoped = [...windows.values()].filter((window) => window.id.startsWith(idPrefix))
@@ -557,7 +561,6 @@ function cachedWindow(
   }
   const namespace = id
     .slice(0, id.lastIndexOf(':') + 1)
-    .replace('model:', '')
     .replaceAll(':', ' ')
     .trim()
   if (namespace) label = `${namespace} ${label}`
