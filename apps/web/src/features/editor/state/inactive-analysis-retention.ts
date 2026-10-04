@@ -25,7 +25,7 @@ export function createInactiveAnalysisRetention({
   const options = mutationOptions({
     mutationKey: editorMutationKeys.analysisRetention(),
     scope: { id: 'editor.analysis.retention' },
-    mutationFn: () => {
+    mutationFn: async () => {
       if (disposed) return null
       return reconcileInactiveAnalysis({ enumerate, classify: () => 'warm', limit: readLimit() })
     },
