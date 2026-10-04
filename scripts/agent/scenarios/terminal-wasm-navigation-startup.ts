@@ -38,21 +38,30 @@ export const terminalWasmNavigationStartup: Scenario = {
       })
     })
     const held = Promise.withResolvers<Route>()
+    let heldRequest: Route | undefined
     const artifact = '**/bridge.wasm'
-    await page.route(artifact, (route) => held.resolve(route), { times: 1 })
+    await page.route(
+      artifact,
+      (route) => {
+        heldRequest = route
+        held.resolve(route)
+      },
+      { times: 1 },
+    )
     try {
-      await page.reload({ waitUntil: 'domcontentloaded' })
-      const request = await held.promise
+      const requested = page.waitForRequest(async (request) => {
+        if (!new URL(request.url()).pathname.endsWith('/bridge.wasm')) return false
+        return (await held.promise).request() === request
+      })
+      await Promise.all([requested, page.reload({ waitUntil: 'domcontentloaded' })])
       await waitForApp(page)
       await step('pending-wasm')
       const destination = new URL(page.url())
       destination.searchParams.set('editorPerfTrace', '1')
       await page.goto(destination.href, { waitUntil: 'domcontentloaded' })
-      void request.abort('aborted').catch(() => undefined)
       await waitForApp(page)
       await terminalCanvas.waitFor()
       await step('destination-terminal')
-      await evidence.json('startup-checkpoints.json', checkpoints)
       const departure = checkpoints.find((checkpoint) => checkpoint.kind === 'departure')
       ok(departure, 'The held startup document performed a native departure')
       const document = checkpoints.filter(
@@ -71,7 +80,12 @@ export const terminalWasmNavigationStartup: Scenario = {
         'A departing document starts no further WASM acquisition',
       )
     } finally {
-      await page.unroute(artifact)
+      try {
+        await evidence.json('startup-checkpoints.json', checkpoints)
+      } finally {
+        await heldRequest?.abort('aborted').catch(() => undefined)
+        await page.unroute(artifact)
+      }
     }
   },
 }
