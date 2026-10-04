@@ -594,9 +594,9 @@ predicates, the pending-minimap exception, products, budgets, sampler and statis
 - [x] Pass all 368 stress tests, stress TypeScript and stress lint. The inherited `src/input-output.ts` spread warning remains.
 - [x] Verify original prerequisite product hashes and their matching external receipt.
 - [x] Regenerate and independently recompute automatic native sensitivity controls under the current identity. Input20 rejects 72/72, frame20 rejects 36/36, and the named floor25 rejects; 30 ms is skipped. Collection costs 521.854 seconds. All six arm cleanups retain zero owners/workers and close contexts.
-- [ ] Complete a five-run alternating quiet A/A and A/B diagnostic pilot on `short-lines/multiple/undo/inputToApplied`; report rejects per arm, median of medians and actual wall.
-- [ ] Review screenshots and every cleanup receipt; retain every rejection and incomplete attempt.
-- [ ] Pass required commit gates, push a review-ready repair/proof PR and hand it to the coordinator.
+- [x] Complete a five-run alternating quiet A/A and A/B diagnostic pilot on `short-lines/multiple/undo/inputToApplied`; each arm rejects 1/5, with median of medians -0.250/+0.150 ms and 1,980.480 seconds of cohort wall.
+- [x] Review the first restricted A/A screenshots and every cleanup receipt; retain every rejection and incomplete attempt.
+- [x] Pass required commit gates, push repair PR #674 and complete independent review; merged at `2d6cec741878ddc06dfa61b8f5845f072da81b73`.
 
 Five pilot runs per arm bound this first checkpoint within roughly 90 minutes. The requested
 final reliability follow-up remains ten runs per arm; this pilot provides no rejects/10 result. The archived first A/A
@@ -611,4 +611,40 @@ public CLI automatically regenerates the full cache, then the host's 600-second 
 its following native positive at 600.082 actual CLI seconds. No complete native matrix exists
 for that attempt. Its cancellation and cache remain preserved in `controls.log`,
 `controls-timing.json` and `sensitivity/` under `/work/tmp/plan282-undo-20261004/`. The cached
-native positive will run separately; none of the incomplete positive earns acceptance credit.
+native positive subsequently passes separately; none of the incomplete positive earns acceptance credit.
+
+### Readiness follow-up fence, 2026-10-04
+
+Under measurement `8127db7f`, the complete quiet default passes 216/216 in 801.845 actual CLI
+seconds. Loaded default passes 216/216 in 209.253 seconds. The original nine selected loaded
+A/A keys and the added native short-lines/multiple applied-undo key each reject 0/10; one
+unselected ordinary/single applied-undo rejection remains recorded. Quiet historical
+native/disabled/Tree-sitter/Shiki and loaded native/disabled/Tree-sitter comparisons complete.
+These receipts retain their original identity.
+
+The predeclared ten-configuration full CLI stops after 782.141 seconds during excluded minimap
+short-lines/single typing setup. Native, disabled, Tree-sitter and Shiki each pass 108/108 before
+the stop. The minimap source is current and the latest render follows its source generation,
+but render 395 is pending while 393 is accepted. No complete full artifact or 45-minute target
+verdict exists. `full-window-01.log`, `full-admission.json` and `full-checkpoint.json` preserve
+the error and partial artifacts under `/work/tmp/plan282-undo-20261004/`.
+
+Consumer settlement waits for minimap acceptance, then yields 50 ms for follow-up requests.
+Its final readiness check omitted minimap, so a new render could remain pending when it returned.
+The minimap wait also omitted the source generation. Two external receipt-transition probes
+and deterministic regressions reproduce both early returns with the real settlement function.
+The repair requires an accepted latest render after the latest source update and rechecks that
+condition after the yield, retaining the 120-second deadline and final source-equality checks.
+
+`src/inputConsumers.ts` belongs to measurement in the actual instrument manifest. The repair
+creates a new identity; the old cache and receipts are preserved under `8127db7f`. Capture,
+statistics, workload, worker interception, products and budgets remain unchanged. Configurations
+with minimap disabled short-circuit the added predicate and execute the prior settlement logic.
+The coordinator will decide explicit reuse scope from the impact audit; old receipts will keep
+their original identity.
+
+- [x] Reproduce both readiness returns before repair; pass all 372 stress tests, stress TypeScript and lint after repair.
+- [ ] Complete commit gates, independent review and freeze the post-hook repair source.
+- [ ] Regenerate native controls and collect required current default/full and selected loaded A/A proofs.
+- [ ] Complete current proofs for the five minimap-backed configurations; audit unaffected reference evidence before further collections.
+- [ ] Predeclare a separate quiet undo classification cohort of ten runs per arm under repaired measurement `34109579`; report the preserved five-per-arm `8127db7f` pilot separately, including both rejections. Keep every cohort diagnostic and keep identities separate.
