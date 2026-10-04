@@ -500,7 +500,11 @@ function outcomeFor<T>(
 ): Promise<EditorPreparedStageOutcome> {
   return result.then(
     () => (stage.disposed() ? 'stale' : 'ready'),
-    () => (stage.abortSignal.aborted ? 'aborted' : 'failed'),
+    (): EditorPreparedStageOutcome => {
+      if (stage.abortSignal.aborted) return 'aborted'
+      if (stage.disposed()) return 'stale'
+      return 'failed'
+    },
   )
 }
 
