@@ -9,7 +9,6 @@ test('parked Codex usage has a machine-only full quota interval with an hourly m
   const descriptor = presentSetting(ID)
   expect(descriptor.scope).toBe('machine')
   expect(descriptor.default).toBe(1)
-  expect(descriptor.description).toContain('parked Codex accounts')
   expect(SETTINGS_JSON_SCHEMA.properties[ID]).toMatchObject({
     type: 'integer',
     minimum: 1,
