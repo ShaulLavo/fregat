@@ -203,6 +203,8 @@ export type {
   EditorAnalysisHighlighterRequest,
   EditorRetainedSyntaxSession,
   EditorRetainedHighlighterSession,
+  EditorAnalysisDisplayDemand,
+  EditorAnalysisRangeInterest,
 } from './editor/documentAnalysis'
 
 export { editorCommandMutates, editorCommandDeclaration } from './editor/commandCatalog'

@@ -15,6 +15,7 @@ import { bootSeconds, sliceState } from './admission'
 import { DEADLINE_START_SECONDS, SCOPE_SHIM, stopTimeoutSeconds } from './job'
 import { tryLock, unlock } from './lock'
 import { live } from './queue'
+import { quietFailureReceipt } from './quiet-receipts'
 
 import {
   alive,
@@ -960,6 +961,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     expect(runtime.stdout.toString().trim()).toBe('3s')
     quiet.child.kill('SIGSTOP')
     let next: ReturnType<typeof start> | undefined
+    let expired: ReturnType<typeof spawnSync> | undefined
     try {
       await expect
         .poll(() => readFileSync(`/proc/${quiet.child.pid}/status`, 'utf8'), {
@@ -967,7 +969,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         })
         .toMatch(/^State:\s+T/m)
       await expect.poll(bootSeconds, { timeout: 5_000 }).toBeGreaterThan(owner.quietDeadline!)
-      const expired = spawnSync('systemctl', ['--user', 'stop', scope])
+      expired = spawnSync('systemctl', ['--user', 'stop', scope])
       expect(expired.status).toBe(0)
       await expect.poll(() => unitActive(scope), { timeout: 10_000 }).toBe(false)
       writeFileSync(
@@ -984,6 +986,19 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       expect(sliceState(box.sliceRoot, slice)).not.toBe('running')
       quiet.child.kill('SIGCONT')
       expect((await next.done).code).toBe(0)
+    } catch (error) {
+      console.error(
+        '[quiet-fixture-failure]',
+        JSON.stringify(
+          quietFailureReceipt({
+            box,
+            jobs: { quiet, next },
+            units: [scope, slice],
+            manager: expired,
+          }),
+        ),
+      )
+      throw error
     } finally {
       quiet.child.kill('SIGCONT')
       next?.child.kill('SIGTERM')
@@ -1180,6 +1195,12 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         writeFileSync(releaseNext, '')
         expect((await next.done).code).toBe(0)
         if (ordinary) expect((await ordinary.done).code).toBe(0)
+      } catch (error) {
+        console.error(
+          '[quiet-fixture-failure]',
+          JSON.stringify(quietFailureReceipt({ box, jobs: { delayed, next, ordinary } })),
+        )
+        throw error
       } finally {
         writeFileSync(releaseNext, '')
         next?.child.kill('SIGTERM')

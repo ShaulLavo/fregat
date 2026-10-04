@@ -12,6 +12,151 @@ import {
 } from '../src/syntax/session'
 
 describe('retained document analysis', () => {
+  it.each([
+    'ordinary',
+    'terminal-unsubscribe',
+    'survivor-unsubscribe',
+    'survivor-dispose',
+  ] as const)(
+    'replaces failed inactive highlighters safely through %s callbacks',
+    async (boundary) => {
+      const buffer = createEditorTextBuffer('alpha')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reborrow.md' })
+      const disposed: number[] = []
+      let created = 0
+      const survivor: { current: ReturnType<typeof analysis.borrowHighlighter> } = { current: null }
+      let reentered = false
+      const reenter = () => {
+        if (reentered) return
+        reentered = true
+        if (boundary === 'terminal-unsubscribe') {
+          analysis.dispose()
+          return
+        }
+        survivor.current = analysis.borrowHighlighter({ provider, languageId: 'markdown' })
+      }
+      const provider: EditorHighlighterProvider = {
+        createSession: () => {
+          const id = ++created
+          const refresh = async () => {
+            if (id === 1) throw new TypeError('Controlled external provider failure')
+            return { tokens: EditorTokenStore.empty() }
+          }
+          return {
+            refresh,
+            applyChange: refresh,
+            onDidChangeTheme: () => () => {
+              if (id === 1 && boundary.endsWith('unsubscribe')) reenter()
+            },
+            dispose: () => {
+              disposed.push(id)
+              if (id === 1 && boundary === 'survivor-dispose') reenter()
+            },
+          }
+        },
+      }
+      const first = analysis.borrowHighlighter({ provider, languageId: 'markdown' })!
+      await expect(first.refresh(buffer.getTextSnapshot())).rejects.toBeInstanceOf(TypeError)
+      first.dispose()
+      const replacement = analysis.borrowHighlighter({ provider, languageId: 'markdown' })
+      if (boundary === 'terminal-unsubscribe') {
+        expect(replacement).toBeNull()
+        expect(created).toBe(1)
+        expect(analysis.inspectRetention().entries).toEqual([])
+      } else {
+        expect(replacement).not.toBeNull()
+        await replacement!.refresh(buffer.getTextSnapshot())
+        expect(created).toBe(2)
+        expect(analysis.inspectRetention().entries).toHaveLength(1)
+        if (survivor.current)
+          expect(replacement!.runtimeSessionId).toBe(survivor.current.runtimeSessionId)
+      }
+      analysis.dispose()
+      expect(disposed).toEqual(boundary === 'terminal-unsubscribe' ? [1] : [1, 2])
+      expect(analysis.inspectRetention().entries).toEqual([])
+    },
+  )
+
+  it('keeps displayed, preparation and unmanaged leases separate from range queries', async () => {
+    const buffer = createEditorTextBuffer('alpha beta gamma delta')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'demand.md' })
+    const parser = provider()
+    const request = { provider: parser.provider, languageId: 'markdown' }
+    const left = analysis.borrowStructural(request)!
+    const right = analysis.borrowStructural(request)!
+    const preparation = analysis.borrowStructural(request)!
+    const external = analysis.borrowStructural(request)!
+    const snapshot = buffer.getTextSnapshot()
+    const first = { startIndex: 0, endIndex: 5 }
+    const second = { startIndex: 6, endIndex: 10 }
+    left.setDisplayDemand({ kind: 'frame', snapshot, ranges: [first] })
+    right.setDisplayDemand({ kind: 'frame', snapshot, ranges: [second] })
+    preparation.setDisplayDemand({ kind: 'preparation', snapshot, ranges: [first] })
+    await left.queryRange({ startIndex: 11, endIndex: 16 })
+    const inspect = () => analysis.inspectRetention().entries[0]!.displayDemand
+    expect(inspect()).toEqual({
+      unmanagedLeases: 1,
+      unknownLeases: 0,
+      frames: 2,
+      ranges: [first, second],
+      preparationLeases: 1,
+      preparationRanges: [first],
+      queryWaiters: 0,
+      queryRanges: [],
+    })
+    left.setDisplayDemand({ kind: 'frame', snapshot, ranges: [second] })
+    expect(inspect().ranges).toEqual([second, second])
+    left.dispose()
+    preparation.dispose()
+    expect(inspect()).toMatchObject({ frames: 1, preparationLeases: 0, ranges: [second] })
+    createEditorBufferSession(buffer).applyText('!')
+    expect(inspect()).toMatchObject({ unmanagedLeases: 1, unknownLeases: 1, frames: 0, ranges: [] })
+    external.dispose()
+    right.setDisplayDemand({ kind: 'unknown' })
+    expect(inspect()).toMatchObject({ unmanagedLeases: 0, unknownLeases: 1 })
+    analysis.dispose()
+  })
+
+  it.each(['abort', 'lease-dispose'] as const)(
+    'releases one %s waiter while another shares the same provider query',
+    async (reason) => {
+      const buffer = createEditorTextBuffer('alpha beta')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'waiters.md' })
+      const parser = provider()
+      const gate = deferred<EditorSyntaxResult>()
+      parser.ranges.mockImplementationOnce(() => gate.promise)
+      const request = { provider: parser.provider, languageId: 'markdown' }
+      const left = analysis.borrowStructural(request)!
+      const right = analysis.borrowStructural(request)!
+      await left.refresh(buffer.getTextSnapshot())
+      const range = { startIndex: 0, endIndex: 5 }
+      right.setDisplayDemand({ kind: 'frame', snapshot: buffer.getTextSnapshot(), ranges: [range] })
+      const controller = new AbortController()
+      const canceled = left.queryRange(range, { signal: controller.signal })
+      const rejected = expect(canceled).rejects.toMatchObject({ name: 'AbortError' })
+      const survivor = right.queryRange(range)
+      await vi.waitFor(() => expect(parser.ranges).toHaveBeenCalledTimes(1))
+      expect(analysis.inspectRetention().entries[0]!.displayDemand.queryWaiters).toBe(2)
+      if (reason === 'abort') controller.abort()
+      if (reason === 'lease-dispose') left.dispose()
+      await rejected
+      expect(analysis.inspectRetention().entries[0]!.displayDemand).toMatchObject({
+        frames: 1,
+        ranges: [range],
+        queryWaiters: 1,
+        queryRanges: [range],
+      })
+      const result = createEmptySyntaxResult({ requestedRanges: [range] })
+      gate.resolve(result)
+      expect(await survivor).toBe(result)
+      expect(right.read(range)).toMatchObject({ kind: 'ready', result })
+      expect(parser.ranges).toHaveBeenCalledTimes(1)
+      expect(parser.create).toHaveBeenCalledTimes(1)
+      expect(analysis.inspectRetention().entries[0]!.displayDemand.queryWaiters).toBe(0)
+      analysis.dispose()
+    },
+  )
+
   it('queues captured nested publications before an earlier eager reader repairs the head', async () => {
     const buffer = createEditorTextBuffer('alpha')
     const view = createEditorBufferSession(buffer)
