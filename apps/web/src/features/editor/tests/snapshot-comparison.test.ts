@@ -18,12 +18,11 @@ for (const kind of ['worktree', 'staged', 'historical'] as const) {
     client,
   }) => {
     const fixture = await createSnapshotComparisonFixture(server.root, client)
-    const input =
-      kind === 'worktree'
-        ? fixture.input
-        : kind === 'staged'
-          ? fixture.stagedInput
-          : fixture.historicalInput
+    const input = {
+      worktree: fixture.input,
+      staged: fixture.stagedInput,
+      historical: fixture.historicalInput,
+    }[kind]
     const service = new WorkspaceDocumentService(() => undefined, fixture.scope.environmentId)
     const file = await fetchFile(fixture.path, new AbortController().signal, client)
     const live = service.ensureLiveDocument(file)
