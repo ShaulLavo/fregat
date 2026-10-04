@@ -2,32 +2,26 @@ import type { FileHandle } from 'node:fs/promises'
 import { FsError } from '../fs/errors'
 
 import { McpServer } from '@modelcontextprotocol/server'
+import { toStandardJsonSchema } from '@valibot/to-json-schema'
 import * as v from 'valibot'
 
 import { openGrantFile } from './boundary'
 import { platformReadTools } from './tool-names'
 import type { McpGrant } from './grants'
-import { toolInput } from './input-schema'
 
 /** A hard bound on both scanned file bytes and returned text, including line-range reads. */
 const READ_LIMIT_BYTES = 512 * 1024
 
-const readFileInput = toolInput(
+const readFileInput = toStandardJsonSchema(
   v.object({
-    path: v.pipe(v.string(), v.minLength(1)),
+    path: v.pipe(
+      v.string(),
+      v.minLength(1),
+      v.description('Relative to the checkout, or absolute inside it.'),
+    ),
     startLine: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
     endLine: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
   }),
-  {
-    type: 'object',
-    additionalProperties: false,
-    required: ['path'],
-    properties: {
-      path: { type: 'string', description: 'Relative to the checkout, or absolute inside it.' },
-      startLine: { type: 'integer', minimum: 1 },
-      endLine: { type: 'integer', minimum: 1 },
-    },
-  },
 )
 
 /** One server per request: the grant is the whole of its state, and nothing outlives the call. */

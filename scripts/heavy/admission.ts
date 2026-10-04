@@ -3,7 +3,7 @@ import { availableParallelism } from 'node:os'
 import path from 'node:path'
 
 import { tryLock, unlessMissing, unlock } from './lock'
-import type { DeadJob } from './queue'
+import type { DeadJob, Entry } from './queue'
 
 const MiB = 2 ** 20
 
@@ -67,6 +67,26 @@ export function decide(
 export function decideQuiet(running: number): Decision {
   if (running === 0) return { admit: true, reason: 'the machine is quiet' }
   return { admit: false, reason: `quiet: waiting for ${running} running job(s) to finish` }
+}
+
+type QuietEntry = Pick<Entry, 'id' | 'quiet' | 'jobClass'>
+
+export function allowedDuringQuiet(entry: QuietEntry, allowedClasses: readonly string[]) {
+  return !entry.quiet && allowedClasses.includes(entry.jobClass)
+}
+
+/** During a wrapper hold, held classes yield their queue positions to eligible jobs only. */
+export function jobsAhead(
+  queue: readonly QuietEntry[],
+  waiting: QuietEntry,
+  quietActive: boolean,
+  allowedClasses: readonly string[],
+) {
+  const eligible =
+    quietActive && allowedDuringQuiet(waiting, allowedClasses)
+      ? queue.filter((entry) => allowedDuringQuiet(entry, allowedClasses))
+      : queue
+  return eligible.findIndex((entry) => entry.id === waiting.id)
 }
 
 export function readReadings(procRoot: string): Readings {

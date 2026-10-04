@@ -130,6 +130,35 @@ context replacement still invalidate prior pixels.
 Canvas 2D, DOM, accessibility, selection/copy and frame callbacks retain their shared row readers.
 Styled snapshots and text-only rows describe those consumers; GPU rendering reads native records.
 
+## Canvas paint modes
+
+`Terminal.create({ rendererMode })` and `WebGpuTerminalRendererOptions.rendererMode`
+select `auto`, `canvas2d-fill-text`, or `canvas2d-pixels`. The worker entry accepts `auto`
+and reports a capability error for explicit Canvas modes. The two Canvas modes share native cell ownership, row damage, cursor
+painting and scroll history. Text shaping stays inside each native owner, including the
+terminal's mode-2027 grapheme spans.
+
+The explicit pixel mode is experimental with correctness coverage. Headed visual calibration
+and performance qualification are pending. It lazily loads
+`canvas-compose.wasm` into independent ordinary WASM memory. Browser rasterization runs on
+stamp-cache misses: the existing glyph model supplies A8 coverage or intrinsic-color RGBA,
+and paths supply A8 coverage. The viewport-bounded cache retains offsets, and one straight
+RGBA8 framebuffer aliases the `ImageData` submitted for coalesced dirty rows. The default
+fillText mode performs no compositor download, compilation or framebuffer allocation.
+
+Composition quantizes after each operation. Effective alpha is nearest-integer
+`sourceAlpha * opacity / 65535`; A8 additionally includes `coverage / 255` in that same
+rounding operation. For effective alpha `a`, destination alpha `d`, and source/destination
+straight color channels `s` and `c`, the denominator is `a * 255 + d * (255 - a)`.
+Output color is nearest-integer `(s * a * 255 + c * d * (255 - a)) / denominator`, and
+output alpha is nearest-integer `denominator / 255`. Half ties round upward, zero effective
+alpha preserves all destination bytes, and clear writes RGBA zero. Scalar and SIMD tests
+compare this contract exactly; retained-f32 comparisons report quantization error separately.
+
+Rebuild the checked-in compositor with `bun run build:canvas-compose`, using Bun and Zig
+0.16.0 or newer. `--scalar --output <file>` builds the independent scalar test arm. This
+Canvas-local asset changes neither the pinned native Ghostty build nor its ABI.
+
 ## comparisons
 
 From this package, use `bun run bench:compare -- --headed --bundle /path/to/bundle`
@@ -157,6 +186,56 @@ newlines and tabs are rejected; this API measures widths and does not predict wr
 resulting cursor and geometry before publishing output observers. A colored prompt can establish
 its edit origin with this single operation. Observers may subsequently write more output; the
 returned sample retains the prompt write's revision and cursor.
+
+## extensions and original input
+
+Extensions are host-side values with synchronous `setup(scope)`. `Terminal.create({ extensions })`
+installs readonly recursive presets in encounter order before opening. `terminal.use(extension)`
+returns a synchronous typed `{ api, dispose }` handle from the main entry and a Promise of that handle
+from the worker entry. Worker setup and validation failures reject that Promise. Setup and handle
+disposal remain synchronous host transactions.
+
+```ts
+import { Terminal, type Extension } from 'ghostty-webgpu'
+
+const inputGate: Extension<{ setBlocked(value: boolean): void }> = {
+  name: 'input-gate',
+  setup: () => {
+    let blocked = false
+    return {
+      api: {
+        setBlocked: (value) => {
+          blocked = value
+        },
+      },
+      input: () => (blocked ? 'claim' : 'pass'),
+    }
+  },
+}
+
+const terminal = await Terminal.create()
+const gate = terminal.use(inputGate)
+gate.api.setBlocked(true)
+```
+
+Each attachment receives its own scope, lazy abort signal and owned cleanup stack. One value can
+attach to several terminals; duplicate identity on the same terminal is rejected. Detaching permits
+a fresh attachment. Setup and preset failures roll back acquired resources. Terminal disposal removes
+attachments and owned cleanup in reverse order. Owned cleanup runs once; handle and terminal disposal
+are idempotent.
+
+`input` receives the original DOM key event, programmatic key input, paste/text data or committed
+composition text before native normalization and encoding. The first `claim` stops dispatch and PTY
+emission. Passing input uses the existing native encoder, including keyboard and bracketed-paste modes.
+DOM claims and default prevention are synchronous. Native protocol replies remain observable through
+`data` and bypass input claims. Contributions under `events` receive the public host event payloads;
+only interested handlers are indexed and frame payloads are constructed when observed.
+
+Public custom OSC observation requires numeric reservation metadata and a host subscription adapter.
+This checkpoint rejects nonempty OSC contributions and rolls back their setup. Native Session OSC
+observation is available separately. Named-command and contributed-link registries remain internal;
+explicit `registerLinkProvider` continues to work. Native width and geometry methods keep their
+synchronous-main and Promise-worker return conventions. Setup closures stay on the host.
 
 ## more
 

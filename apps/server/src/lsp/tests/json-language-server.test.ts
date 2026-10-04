@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { SETTINGS_JSON_SCHEMA, descriptorFor } from '@workspace/contracts'
+import { SETTINGS_JSON_SCHEMA } from '@workspace/contracts'
+import { presentSetting } from '@workspace/contracts/settings/documentation'
 
 import { encodeLspStdioMessage, LspStdioMessageReader } from '../stdio-rpc'
 
@@ -53,7 +54,7 @@ describe('JSON language server against the generated settings schema', () => {
       textDocument: { uri: USER_ID },
     })
     expect(hoverText(hover).replaceAll('\\', '')).toContain(
-      descriptorFor('editor.fontSize').description,
+      presentSetting('editor.fontSize').description,
     )
 
     const workspaceText = '{\n  "workbench.colorTheme": ""\n}'

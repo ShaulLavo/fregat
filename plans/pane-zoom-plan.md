@@ -114,6 +114,6 @@ Run `bun run agent:browser scenario pane-zoom` against the existing dev server. 
 
 Finish with a physical trackpad pinch check on the target browser. Record browser, device, and whether the gesture arrived as Ctrl-wheel. If the automation environment cannot supply physical input, mark that check pending explicitly. Add another event path only if the actual supported environment demonstrates a need, and prevent double handling.
 
-Run the relevant typecheck, boundary lint, design census, and generated-settings checks. Deploy the completed web change with `bun run deploy --slug=pane-zoom --reason='Independent pane zoom'`. Use the server-restart option only if implementation actually requires server changes. Verify `/platform/release` and retain the live-check output.
+Run the relevant typecheck, boundary lint, design census, and generated-settings checks. Deploy the completed web change with `bun run install-release --slug=pane-zoom --reason='Independent pane zoom'`. Use the server-restart option only if implementation actually requires server changes. Verify `/platform/release` and retain the live-check output.
 
 Report the browser evidence directory, measured independence and restoration results, physical trackpad result, and served release. Completion requires readable, independently scaled panes with intact input and scrolling, not just a changing percentage.

@@ -232,7 +232,7 @@ hunk.patch)` (16 hex), scoped by session, turns and whitespace mode. A hunk is a
   including the overlap refusal.
 - Logs: one wide event per undo and per review send (hunk count, outcome, refusal reason); no
   diff text in logs.
-- Deploy with `bun run deploy --server` for phases that change the server.
+- Deploy with `bun run install-release --server` for phases that change the server.
 
 ## Out of scope and not copied
 

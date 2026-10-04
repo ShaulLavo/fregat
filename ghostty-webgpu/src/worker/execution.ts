@@ -41,6 +41,9 @@ export class WorkerTerminalExecution {
   private readonly generation = 1
   private control = 0
   private output = 0
+  private readonly outputControls = new Set<number>()
+  private submittedOutputValue = false
+  private submittedProducerOutput = 0
   private nextId = 0
   private state?: WorkerState
   private summary?: TerminalSubmittedFrame
@@ -136,6 +139,14 @@ export class WorkerTerminalExecution {
   get submittedFrame(): TerminalSubmittedFrame | undefined {
     return this.summary
   }
+  get selectionIdentity(): LocalTerminalExecution['selectionIdentity'] {
+    const summary = this.summary
+    if (!summary) return undefined
+    return { generation: this.generation, layout: summary.layout, revision: summary.nativeRevision }
+  }
+  get submittedOutput(): boolean {
+    return this.submittedOutputValue
+  }
   get backend() {
     return this.state?.backend
   }
@@ -183,6 +194,8 @@ export class WorkerTerminalExecution {
       command,
       args,
     } as WorkerRequest
+    if (command === 'write' || command === 'writeln' || command === 'writeAndReadGeometry')
+      this.outputControls.add(request.control)
     try {
       this.port.postMessage(request, transfer)
     } catch {
@@ -208,10 +221,27 @@ export class WorkerTerminalExecution {
         )
         return
       }
+      // Producer submissions advance independently of the host's requested output fence.
+      this.submittedOutputValue = message.output > this.submittedProducerOutput
+      this.submittedProducerOutput = message.output
+      for (const control of this.outputControls) {
+        if (control > message.control) break
+        this.submittedOutputValue = true
+        this.outputControls.delete(control)
+      }
+      if (this.state)
+        this.state = freezeWorkerValue({ ...this.state, mouseTracking: message.mouseTracking })
       this.summary = freezeWorkerValue(message.summary)
       this.projection = freezeWorkerValue(message.snapshot)
       this.frameListener?.(this.textFrame()!)
       return
+    }
+    // FIFO delivery has already handled frames preceding this acknowledgement.
+    let retained = false
+    for (const control of this.outputControls) {
+      if (control > message.control) break
+      if (retained) this.outputControls.delete(control)
+      retained = true
     }
     this.state = freezeWorkerValue(message.state)
     if (message.type === 'event') {
@@ -342,6 +372,30 @@ export class WorkerTerminalExecution {
     return this.request('captureViewport', args)
   }
 
+  selectionSnapshot(...args: Parameters<LocalTerminalExecution['selectionSnapshot']>) {
+    return this.request('selectionSnapshot', args)
+  }
+
+  readonly selectionGesture = {
+    resetSelectionGesture: () => this.request('resetSelectionGesture', []),
+    selectionPress: (...args: Parameters<LocalTerminalExecution['selectionPress']>) =>
+      this.request('selectionPress', args),
+    selectionDrag: (...args: Parameters<LocalTerminalExecution['selectionDrag']>) =>
+      this.request('selectionDrag', args),
+    selectionAutoscrollTick: (
+      ...args: Parameters<LocalTerminalExecution['selectionAutoscrollTick']>
+    ) => this.request('selectionAutoscrollTick', args),
+    selectionRelease: (...args: Parameters<LocalTerminalExecution['selectionRelease']>) =>
+      this.request('selectionRelease', args),
+  }
+  readonly pointer = {
+    mouse: (input: Parameters<LocalTerminalExecution['mouse']>[0]) =>
+      this.request('mouse', [input, this.selectionIdentity]),
+    mouseTracking: () => this.confirmed().mouseTracking,
+    resetMouseTracking: () => this.request('resetMouseTracking', []),
+    scrollBy: (delta: number) => this.scrollBy(delta),
+  }
+
   readonly focus = {
     setFocused: (focused: boolean) => this.observe(this.request('focused', [focused]), 'focus'),
   }
@@ -383,6 +437,7 @@ export class WorkerTerminalExecution {
     this.port.close()
     for (const emitter of this.emitters.values()) emitter.dispose()
     this.frameListener = undefined
+    this.outputControls.clear()
     this.summary = undefined
     this.projection = undefined
   }

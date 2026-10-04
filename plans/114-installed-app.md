@@ -442,7 +442,7 @@ the shared server, then explicit server unregister/reinstall with state retained
 
 #### Existing mesh infrastructure and remote mode
 
-`scripts/deploy/systemd/platform-prod.service`, rendered through `scripts/deploy/mesh.ts`, already
+`scripts/deploy/systemd/platform-prod.service`, rendered through `scripts/install-release.ts`, already
 runs the production server on 3301 with restart/backoff, `WEB_ROOT`, structured log configuration,
 `ExecStartPre` promotion and `current` releases. It is a user service enabled under `default.target`,
 not currently a socket-activated service. The mesh `/platform` route provides the stable HTTPS
@@ -808,7 +808,7 @@ The checkout-root derivation in `launcher/index.ts` stays for development runs o
 `scripts/deploy/release.ts` takes its root from `scripts/deploy/config.ts`, fixed to
 `/work/platform-production`, and `createRelease`, `stagePending` and `swapCurrent` take no root. A2
 extracts root-parameterized release creation, staging and atomic link operations; the app passes
-its `server.releaseRoot`, and `bun run deploy` keeps `/work/platform-production` and its mesh live
+its `server.releaseRoot`, and `bun run install-release` keeps `/work/platform-production` and its mesh live
 check. The app's promotion skips the systemd and checkout live check and runs the server's own
 readiness probe (`GET /system/identity`).
 

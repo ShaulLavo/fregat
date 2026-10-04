@@ -1,3 +1,4 @@
+import { settingControl } from '@workspace/contracts/settings/control'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
@@ -11,7 +12,7 @@ import {
   tabId,
 } from '@/lib/documents/utils/identity'
 import { screen, waitFor, within } from '@testing-library/react'
-import { settingControl, type SettingId } from '@workspace/contracts'
+import { type SettingId } from '@workspace/contracts'
 import userEvent from '@testing-library/user-event'
 import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core/document'
 

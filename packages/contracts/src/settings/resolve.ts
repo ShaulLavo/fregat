@@ -7,7 +7,7 @@ import { THEME_PART_KEYS } from '../themes/part-keys'
 import {
   applySettingDependencies,
   type RegistryValues,
-  type SettingDescriptor,
+  type SettingDefinition,
   type SettingScope,
   type SettingsRegistryShape,
 } from './registry'
@@ -349,7 +349,7 @@ function accept(
   id: string,
   rawValue: unknown,
 ): Acceptance {
-  const descriptor: SettingDescriptor | undefined = registry[id]
+  const descriptor: SettingDefinition | undefined = registry[id]
   if (!descriptor) {
     return { ok: false, diagnostic: { kind: 'unknown-key', id, layer: layer.id } }
   }

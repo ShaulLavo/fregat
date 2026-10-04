@@ -1,7 +1,7 @@
 import { createGhosttyError } from '../core/error.js'
 import type { TerminalApi } from '../dom/terminal-api.js'
 import type { GhosttyWebGpuTerminalEventMap } from '../dom/types.js'
-import type { LinkProvider } from '../term/links.js'
+import type { LinkProvider, LinkProviderRegistration } from '../term/links.js'
 import type {
   Contributions,
   Extension,
@@ -145,6 +145,10 @@ class Attachment implements ExtensionScope, ExtensionHandle<unknown> {
   }
 
   register(cleanup: () => void): void {
+    if (this.disposed) {
+      cleanup()
+      return
+    }
     ;(this.registrations ??= []).push(cleanup)
   }
 
@@ -170,9 +174,20 @@ class Attachment implements ExtensionScope, ExtensionHandle<unknown> {
   }
 }
 
+export interface ExtensionDispatch {
+  input?: (event: TerminalInputEvent) => boolean
+  readonly events: Partial<Record<EventType, (event: unknown) => void>>
+}
+
+export function createExtensionDispatch(): ExtensionDispatch {
+  return { input: undefined, events: Object.create(null) as ExtensionDispatch['events'] }
+}
+
 export interface ExtensionManagerOptions {
+  readonly dispatch?: ExtensionDispatch
   readonly terminal: TerminalApi
-  readonly reservedOsc: ReadonlySet<number>
+  readonly reservedOsc?: ReadonlySet<number>
+  readonly registerLinkProvider?: (provider: LinkProvider<Event>) => LinkProviderRegistration
   readonly onError: ErrorSink
 }
 
@@ -187,9 +202,11 @@ export class ExtensionManager {
   private readonly links = new HookList<LinkProvider<Event>>()
   private last?: Attachment
   private disposed = false
+  private readonly dispatch: ExtensionDispatch
 
   constructor(private readonly options: ExtensionManagerOptions) {
     this.terminal = options.terminal
+    this.dispatch = options.dispatch ?? createExtensionDispatch()
   }
 
   get hasInput(): boolean {
@@ -350,7 +367,7 @@ export class ExtensionManager {
     this.ensureActive()
     if (attachment.disposed)
       throw createGhosttyError('extension.use', 'Extension was disposed during setup')
-    if (input) attachment.register(this.input.append(input))
+    if (input) this.registerInput(attachment, input)
     if (events)
       for (const [type, handler] of events)
         this.registerEvent(attachment, type as EventType, handler as EventHandler)
@@ -365,17 +382,28 @@ export class ExtensionManager {
         this.commands.set(name, command)
         attachment.register(() => this.commands.delete(name))
       }
-    if (links) attachment.register(this.links.append(links))
+    if (links) {
+      const registration = this.options.registerLinkProvider?.(links)
+      if (registration) attachment.register(() => registration.dispose())
+      this.ensureActive()
+      if (attachment.disposed)
+        throw createGhosttyError('extension.use', 'Extension was disposed during setup')
+      attachment.register(this.links.append(links))
+    }
     attachment.complete(api)
   }
 
   private validateOsc(entries: readonly [string, OscObserver][]): void {
+    const reserved = this.options.reservedOsc
+    if (entries.length > 0 && !reserved) {
+      throw createGhosttyError('extension.use', 'Custom OSC observation is unavailable')
+    }
     for (const [key, observer] of entries) {
       const number = Number(key)
       if (!Number.isSafeInteger(number) || number < 0 || String(number) !== key) {
         throw createGhosttyError('extension.use', 'OSC number must be a non-negative safe integer')
       }
-      if (this.options.reservedOsc.has(number) || this.osc.has(number)) {
+      if (reserved?.has(number) || this.osc.has(number)) {
         throw createGhosttyError('extension.use', `OSC ${number} already has an owner`)
       }
       validateFunction(observer, 'OSC')
@@ -391,16 +419,30 @@ export class ExtensionManager {
     }
   }
 
+  private registerInput(attachment: Attachment, handler: TerminalInputHandler): void {
+    const remove = this.input.append(handler)
+    this.dispatch.input ??= (event) => this.dispatchInput(event)
+    attachment.register(() => {
+      remove()
+      if (!this.input.first) this.dispatch.input = undefined
+    })
+  }
+
   private registerEvent(attachment: Attachment, type: EventType, handler: EventHandler): void {
     let list = this.events.get(type)
     if (!list) {
       list = new HookList<EventHandler>()
       this.events.set(type, list)
+      const interested = list
+      this.dispatch.events[type] = (event) =>
+        dispatch(interested, event, invokeHandler, this.reportError, 'extension.event')
     }
     const remove = list.append(handler)
     attachment.register(() => {
       remove()
-      if (!list.first) this.events.delete(type)
+      if (list.first) return
+      this.events.delete(type)
+      delete this.dispatch.events[type]
     })
   }
 }
