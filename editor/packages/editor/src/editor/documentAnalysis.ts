@@ -619,8 +619,11 @@ export function createEditorDocumentAnalysis(options: {
       })
       if (!session) return null
       if (disposed || request.signal?.aborted) {
-        session.dispose()
-        releaseSubscription()
+        try {
+          session.dispose()
+        } finally {
+          releaseSubscription()
+        }
         return null
       }
       found = {
@@ -659,8 +662,11 @@ export function createEditorDocumentAnalysis(options: {
       })
       if (!session) return null
       if (disposed || request.signal?.aborted) {
-        session.dispose()
-        releaseSubscription()
+        try {
+          session.dispose()
+        } finally {
+          releaseSubscription()
+        }
         return null
       }
       const entry = new AnalysisEntry(buffer, session, runtimeSessionId, retention)

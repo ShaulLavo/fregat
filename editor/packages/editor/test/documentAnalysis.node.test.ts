@@ -13,6 +13,59 @@ import {
 
 describe('analysis retention notifications', () => {
   it.each(['structural', 'highlighter'] as const)(
+    'releases empty buffer membership when aborted %s construction cleanup throws',
+    (family) => {
+      const buffer = createEditorTextBuffer('alpha')
+      const subscribe = buffer.subscribe.bind(buffer)
+      const releases = vi.fn()
+      buffer.subscribe = (listener) => {
+        const release = subscribe(listener)
+        return () => {
+          releases()
+          release()
+        }
+      }
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: `${family}-cleanup` })
+      const abort = new AbortController()
+      const listener = vi.fn()
+      analysis.subscribeRetention(listener)
+      const failure = new TypeError('Controlled external constructor cleanup failure')
+      const dispose = vi.fn(() => {
+        throw failure
+      })
+      const structural = {
+        createSession: () => {
+          abort.abort()
+          return { ...createEmptySyntaxSession(), dispose }
+        },
+      }
+      const highlighter = {
+        createSession: () => {
+          abort.abort()
+          const refresh = async () => ({ tokens: EditorTokenStore.empty() })
+          return { refresh, applyChange: refresh, dispose }
+        },
+      }
+      const request = { languageId: null, signal: abort.signal }
+      let observed: unknown
+      try {
+        if (family === 'structural') analysis.borrowStructural({ ...request, provider: structural })
+        if (family === 'highlighter')
+          analysis.borrowHighlighter({ ...request, provider: highlighter })
+      } catch (error) {
+        observed = error
+      }
+      expect(observed).toBe(failure)
+      expect(analysis.inspectRetention().entries).toEqual([])
+      expect(dispose).toHaveBeenCalledTimes(1)
+      expect(releases).toHaveBeenCalledTimes(1)
+      expect(listener).not.toHaveBeenCalled()
+      analysis.dispose()
+      expect(releases).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each(['structural', 'highlighter'] as const)(
     'discards %s sessions when construction disposes the owner or aborts the request',
     async (family) => {
       for (const action of ['ordinary', 'dispose-owner', 'abort-request'] as const) {
