@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { readCaches } from './cache-snapshot'
 import { copyFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
@@ -310,6 +311,30 @@ async function runScenario(scenario: Scenario, options: Options) {
         ? await openStaticPreview(page, options.url)
         : await open(page, await workspaceUrl(page, options))
     if (!ready) {
+      await evidence.json(
+        'readiness.json',
+        await page
+          .evaluate(() => ({
+            busy: [...document.querySelectorAll('[aria-busy]')].map((node) => ({
+              tag: node.tagName,
+              label: node.getAttribute('aria-label'),
+              busy: node.getAttribute('aria-busy'),
+              colorMode: node.getAttribute('data-color-mode'),
+              slot: node.getAttribute('data-slot'),
+            })),
+            fonts: [...document.fonts].map((face) => ({
+              family: face.family,
+              status: face.status,
+            })),
+          }))
+          .catch(() => ({ unavailable: 'The page changed during readiness capture.' })),
+      )
+      await evidence.json(
+        'caches.json',
+        await page
+          .evaluate(readCaches)
+          .catch(() => ({ unavailable: 'The page changed during cache capture.' })),
+      )
       await page.screenshot({ path: evidence.file('failure.png') })
       if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
       const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
@@ -587,66 +612,6 @@ async function dumpCaches(options: Options) {
     await writeSummary(evidence, lines)
     return 0
   })
-}
-
-function readCaches() {
-  type AnyQuery = {
-    queryKey: unknown
-    state: { status: string; fetchStatus: string; dataUpdatedAt: number }
-    isStale(): boolean
-    getObserversCount(): number
-  }
-  type AnyMutation = {
-    options: { mutationKey?: unknown; scope?: { id: string } }
-    state: { status: string; variables: unknown }
-  }
-  type AnyClient = {
-    getQueryCache(): { getAll(): AnyQuery[] }
-    getMutationCache(): { getAll(): AnyMutation[] }
-  }
-  const registry = globalThis as {
-    __fregatQueryClients?: Map<string, AnyClient>
-    __fregatResourceQueryClient?: AnyClient
-  }
-  const clients = [...(registry.__fregatQueryClients ?? new Map<string, AnyClient>())].map(
-    ([origin, client]) => ({ scope: 'environment', label: origin, origin, client }),
-  )
-  if (registry.__fregatResourceQueryClient)
-    clients.push({
-      scope: 'resources',
-      label: 'Browser resources',
-      origin: '',
-      client: registry.__fregatResourceQueryClient,
-    })
-  const compact = (value: unknown) => {
-    const text = JSON.stringify(value) ?? String(value)
-    return text.length > 80 ? `${text.slice(0, 77)}…` : text
-  }
-  return clients.map(({ scope, label, origin, client }) => ({
-    scope,
-    label,
-    origin: origin || null,
-    queries: client
-      .getQueryCache()
-      .getAll()
-      .map((query) => ({
-        key: compact(query.queryKey),
-        status: query.state.status,
-        fetchStatus: query.state.fetchStatus,
-        stale: query.isStale(),
-        observers: query.getObserversCount(),
-        updatedAgoMs: query.state.dataUpdatedAt ? Date.now() - query.state.dataUpdatedAt : null,
-      })),
-    mutations: client
-      .getMutationCache()
-      .getAll()
-      .map((mutation) => ({
-        key: compact(mutation.options.mutationKey ?? null),
-        status: mutation.state.status,
-        scope: mutation.options.scope?.id ?? null,
-        variables: compact(mutation.state.variables),
-      })),
-  }))
 }
 
 async function bundleInjected(name: string) {

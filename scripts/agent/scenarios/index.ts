@@ -1,3 +1,6 @@
+import { commandFoundation } from './command-foundation'
+import { unknownWorkspaceSettings } from './unknown-workspace-settings'
+import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
 import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
@@ -209,7 +212,8 @@ import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
 import { terminalCancelledStartup } from './terminal-cancelled-startup'
-import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
+import { terminalWasmCancelledStartup } from './terminal-wasm-cancelled-startup'
+import { terminalRenderer, terminalRendererDom, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
@@ -242,6 +246,7 @@ import { settingsDependentRow } from './settings-dependent-row'
 import { settingsTokenizationLimit } from './settings-tokenization-limit'
 import { settingsRowDetails } from './settings-row-details'
 import { settingsKeybindings } from './settings-keybindings'
+import { settingsShortcutMetadata } from './settings-shortcut-metadata'
 import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
@@ -453,6 +458,8 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  unknownWorkspaceSettings,
+  releaseInstallationSettings,
   nativeWindow,
   installedApp,
   binaryFileOpen,
@@ -636,11 +643,14 @@ export const scenarios: readonly Scenario[] = [
   editorOfflineResync,
   terminalBackground,
   terminalCancelledStartup,
+  terminalWasmCancelledStartup,
   terminalOfflineHost,
   terminalRenderer,
+  terminalRendererDom,
   terminalRendererWebgl,
   bottomPanelPersistence,
   sidebarToggle,
+  commandFoundation,
   itemNavigation,
   shortcutHints,
   editorAddToChat,
@@ -669,6 +679,7 @@ export const scenarios: readonly Scenario[] = [
   settingsTokenizationLimit,
   settingsRowDetails,
   settingsKeybindings,
+  settingsShortcutMetadata,
   tailFollow,
   checkpointRestore,
   filePickerBrowse,

@@ -1,10 +1,15 @@
 {
   "name": "editor-workspace",
   "private": true,
-  "workspaces": [
-    "packages/*",
-    "examples/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "examples/*"
+    ],
+    "catalog": {
+      "@fregat/hotkeys": "https://github.com/ShaulLavo/fregat/releases/download/hotkeys-0.0.2-68d8aaf6f631-260650623e7e/fregat-hotkeys-0.0.2-68d8aaf6f631-260650623e7e.tgz"
+    }
+  },
   "type": "module",
   "scripts": {
     "bench:input:paired": "bun run --cwd examples/stress bench:input:paired",
@@ -38,5 +43,8 @@
     "typescript-api": "npm:typescript@6.0.3",
     "vite": "8.3.1"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.2",
+  "patchedDependencies": {
+    "vitest@5.0.2": "patches/vitest@5.0.2.patch"
+  }
 }

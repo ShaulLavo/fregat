@@ -1,3 +1,5 @@
+import { effectiveTerminalBindings } from '@/commands/utils/bindings'
+import { recordedSettingOperation } from '@/settings/utils/recording'
 import { act } from 'react'
 import { writeFile } from 'node:fs/promises'
 
@@ -13,9 +15,13 @@ test.for([{ keys: 'F8' }, { keys: null }])(
     await session.refresh()
     const state = session.getSnapshot()
     if (state.kind !== 'ready') return expect.unreachable('Expected ready session')
-    const submission = state.owner.submit('user', [
-      { kind: 'keybinding.set', command: 'workspace.dismiss', keys: keys === null ? null : [keys] },
-    ])
+    const operation = recordedSettingOperation(
+      'workspace.dismiss',
+      keys,
+      effectiveTerminalBindings([], true).bindings,
+    )
+    if (!operation) return expect.unreachable('Expected shortcut write')
+    const submission = state.owner.submit('user', [operation])
     if (submission.kind === 'submitted') await submission.settled
     const frame = await renderTui(
       <Application
@@ -71,9 +77,13 @@ test('a rebound Dismiss key cancels a settings editor', async ({ server }) => {
   await session.refresh()
   const state = session.getSnapshot()
   if (state.kind !== 'ready') return expect.unreachable('Expected ready session')
-  const submission = state.owner.submit('user', [
-    { kind: 'keybinding.set', command: 'workspace.dismiss', keys: ['F8'] },
-  ])
+  const operation = recordedSettingOperation(
+    'workspace.dismiss',
+    'F8',
+    effectiveTerminalBindings([], true).bindings,
+  )
+  if (!operation) return expect.unreachable('Expected shortcut write')
+  const submission = state.owner.submit('user', [operation])
   if (submission.kind === 'submitted') await submission.settled
   const frame = await renderTui(
     <Application
@@ -120,9 +130,13 @@ test('a rebound Dismiss key returns from a narrow file preview before closing Fi
   await session.refresh()
   const state = session.getSnapshot()
   if (state.kind !== 'ready') return expect.unreachable('Expected ready session')
-  const submission = state.owner.submit('user', [
-    { kind: 'keybinding.set', command: 'workspace.dismiss', keys: ['F8'] },
-  ])
+  const operation = recordedSettingOperation(
+    'workspace.dismiss',
+    'F8',
+    effectiveTerminalBindings([], true).bindings,
+  )
+  if (!operation) return expect.unreachable('Expected shortcut write')
+  const submission = state.owner.submit('user', [operation])
   if (submission.kind === 'submitted') await submission.settled
   const frame = await renderTui(
     <Application

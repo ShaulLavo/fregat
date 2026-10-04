@@ -358,6 +358,7 @@ export class LinkResolver<TEvent = unknown> {
     if (typeof provider.provideLinks !== 'function') {
       throw new TypeError('provider.provideLinks must be a function')
     }
+    this.ensureActive('registerProvider')
     const token = Symbol('link-provider')
     this.providers.push({ provider, token })
     this.invalidate()
@@ -367,15 +368,19 @@ export class LinkResolver<TEvent = unknown> {
     })
   }
 
-  async resolve(requestValue: LinkRequest): Promise<LinkResolution<TEvent>> {
+  async resolve(
+    requestValue: LinkRequest,
+    isRequestCurrent?: () => boolean,
+  ): Promise<LinkResolution<TEvent>> {
     this.ensureActive('resolve')
     const request = normalizeRequest(requestValue)
     const generation = this.invalidate()
+    if (!this.canContinue(generation, isRequestCurrent)) return { generation }
     const osc8 = resolveOsc8<TEvent>(request)
     if (osc8) return { generation, hit: osc8 }
     const providers = this.providers.slice()
-    const provided = await this.resolveProviders(providers, request, generation)
-    if (generation !== this.generationValue || this.disposed) return { generation }
+    const provided = await this.resolveProviders(providers, request, generation, isRequestCurrent)
+    if (!this.canContinue(generation, isRequestCurrent)) return { generation }
     if (provided) return { generation, hit: provided }
     return { generation, hit: resolveBuiltInUrl<TEvent>(request) }
   }
@@ -430,11 +435,14 @@ export class LinkResolver<TEvent = unknown> {
   private async resolveProvider(
     entry: ProviderEntry<TEvent>,
     request: NormalizedRequest,
+    isRequestCurrent?: () => boolean,
   ): Promise<LinkHit<TEvent> | undefined> {
     try {
       const links = await entry.provider.provideLinks(request.line, request.row)
+      if (isRequestCurrent?.() === false) return undefined
       return resolveProvidedLink(links, request, entry.token)
     } catch (cause) {
+      if (isRequestCurrent?.() === false) return undefined
       this.reportError({
         cause,
         operation: 'provide',
@@ -449,13 +457,19 @@ export class LinkResolver<TEvent = unknown> {
     providers: readonly ProviderEntry<TEvent>[],
     request: NormalizedRequest,
     generation: number,
+    isRequestCurrent?: () => boolean,
   ): Promise<LinkHit<TEvent> | undefined> {
     for (const entry of providers) {
-      const hit = await this.resolveProvider(entry, request)
-      if (generation !== this.generationValue || this.disposed) return undefined
+      if (!this.canContinue(generation, isRequestCurrent)) return undefined
+      const hit = await this.resolveProvider(entry, request, isRequestCurrent)
+      if (!this.canContinue(generation, isRequestCurrent)) return undefined
       if (hit) return hit
     }
     return undefined
+  }
+
+  private canContinue(generation: number, isRequestCurrent?: () => boolean): boolean {
+    return !this.disposed && generation === this.generationValue && (isRequestCurrent?.() ?? true)
   }
 
   private reportError(error: LinkResolverError): void {

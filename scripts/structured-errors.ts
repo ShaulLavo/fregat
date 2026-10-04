@@ -32,22 +32,22 @@ export const scriptErrors = defineErrorCatalog('scripts', {
   NOTHING_STAGED: {
     status: 409,
     message: 'No release is staged to restart into.',
-    why: '`--restart` promotes the release `deploy --server` staged, and there is none.',
-    fix: 'Run `bun run deploy --server --restart` to build, stage and restart in one step.',
+    why: '`--restart` promotes the release `install-release --server` staged, and there is none.',
+    fix: 'Run `bun run install-release --server --restart` to build, stage and restart in one step.',
   },
   RESTART_BUSY: {
     status: 409,
     message: ({ count, minutes }: { count: number; minutes: number }) =>
       `${count} session${count === 1 ? '' : 's'} stayed busy for ${minutes} minutes, so the server kept running.`,
     why: 'A restart ends running turns, so `--restart` waits for them to finish, as the Restart button does.',
-    fix: 'Run `bun run deploy --restart` again later, or add `--interrupt` to end those turns now. Inside a Platform chat your own turn counts as busy, so use `--interrupt` there.',
+    fix: 'Run `bun run install-release --restart` again later, or add `--interrupt` to end those turns now. Inside a Platform chat your own turn counts as busy, so use `--interrupt` there.',
   },
   HEAVY_INSTALL_DIRTY: {
     status: 409,
     message: ({ source, changes }: { source: string; changes: number }) =>
       `${source} has ${changes} uncommitted change${changes === 1 ? '' : 's'}, so the heavy-job wrapper was not installed.`,
     why: 'Every session runs the installed wrapper, so it is built only from a committed tree whose commit names it.',
-    fix: 'Install from a clean worktree at the merged commit: `git worktree add <dir> origin/main`, `bun install --frozen-lockfile`, then `bun scripts/heavy/install.ts` there.',
+    fix: 'Install from a clean worktree at the merged commit: `git worktree add <dir> origin/main`, `bun install --frozen-lockfile`, then `bun scripts/heavy/install.ts --root=<directory>` there.',
   },
   HEAVY_INSTALL_COMMIT: {
     status: 409,
@@ -69,6 +69,13 @@ export const scriptErrors = defineErrorCatalog('scripts', {
       `${slice} is outside the slice root ${root}, so it was left running.`,
     why: 'A wrapper stops only ownerless slices under its own root; slices under another root belong to another state directory.',
     fix: 'Report this as a bug in scripts/heavy: the reaper was handed a slice it does not own.',
+  },
+  HEAVY_QUIET_BLOCKED: {
+    status: 409,
+    message: ({ label, slice, state }: { label: string; slice: string; state: string }) =>
+      `Quiet lease '${label}' remains held by ${slice} (${state}); this admission reached its wait limit.`,
+    why: 'A successor starts once the predecessor releases its bookkeeping lock and its slice is inactive and empty.',
+    fix: 'Stop the listed slice with `systemctl --user stop <slice>`. Resume or stop its suspended wrapper, then submit the job again.',
   },
   HEAVY_SLICE_FAILED: {
     status: 502,

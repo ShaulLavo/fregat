@@ -1,3 +1,4 @@
+import { presentationFor } from '@workspace/contracts/settings/presentation'
 import {
   providerEnabledOperation,
   themePartWriteOperation,
@@ -29,7 +30,8 @@ export function settingEditDisabledReason(
   if (!enabled) return 'Reconnect before editing settings.'
   if (!id) return 'Select a setting first.'
   const descriptor = descriptorFor(id)
-  if (descriptor.readOnlyReason) return descriptor.readOnlyReason
+  const { readOnlyReason } = presentationFor(id)
+  if (readOnlyReason) return readOnlyReason
   if (!layerAllowsScope(target, descriptor.scope))
     return 'This setting can only be changed in user settings.'
   return settingDependencyNote(id, values)
@@ -52,12 +54,12 @@ export function settingDraft(
   const layer = snapshot.layers.find((entry) => entry.id === target)
   const value =
     id === 'providers.instances' ? snapshot.values[id] : (layer?.raw[id] ?? snapshot.values[id])
-  if (['string', 'font', 'multiline'].includes(descriptorFor(id).widget)) return String(value)
+  if (['string', 'font', 'multiline'].includes(presentationFor(id).widget)) return String(value)
   return JSON.stringify(value, null, 2)
 }
 
 function parseSettingDraft(id: SettingId, draft: string) {
-  const widget = descriptorFor(id).widget
+  const widget = presentationFor(id).widget
   const value: unknown = ['string', 'font', 'multiline'].includes(widget)
     ? draft
     : JSON.parse(draft)
@@ -74,8 +76,8 @@ function settingOperations(
   const current = snapshot.layers.find((entry) => entry.id === target)?.raw[id]
   if (id === 'lsp.servers' || id === 'lsp.languageServers' || id === 'lsp.semanticTokens.servers')
     return null
-  if (id === 'environments.machines') return keyedOperations(current, value, 'machine')
-  if (id === 'keybindings.overrides') return keyedOperations(current, value, 'keybinding')
+  if (id === 'environments.machines') return machineOperations(current, value)
+  if (id === 'keybindings.overrides') return null
   if (id === 'models.order') return [operation({ kind: 'model.setOrder', order: value })]
   if (id === 'models.hidden') return modelMembershipOperations(current, value, 'hidden')
   if (id === 'models.favorites') return modelMembershipOperations(current, value, 'favorite')
@@ -121,12 +123,12 @@ export async function saveSettingDraft({
 }
 
 export function choiceDraft(id: SettingId, value: string) {
-  return descriptorFor(id).widget === 'boolean' ? value : JSON.stringify(value)
+  return presentationFor(id).widget === 'boolean' ? value : JSON.stringify(value)
 }
 
 export function settingChoices(id: SettingId) {
   const schema = descriptorFor(id).schema
-  if (descriptorFor(id).widget === 'boolean') return ['true', 'false']
+  if (presentationFor(id).widget === 'boolean') return ['true', 'false']
   if ('options' in schema && Array.isArray(schema.options)) return schema.options.map(String)
   return null
 }
@@ -135,29 +137,16 @@ function operation(input: unknown): SettingsOperation {
   return v.parse(settingsOperationSchema, input)
 }
 
-function keyedOperations(previous: unknown, next: unknown, kind: 'machine' | 'keybinding') {
+function machineOperations(previous: unknown, next: unknown) {
   const current = v.parse(v.optional(v.record(v.string(), v.unknown()), {}), previous)
   const values = v.parse(v.record(v.string(), v.unknown()), next)
   const removed = Object.keys(current).filter((key) => !(key in values))
   const changed = Object.entries(values).filter(
     ([key, value]) => JSON.stringify(current[key]) !== JSON.stringify(value),
   )
-  const removals = removed.map((key) =>
-    operation(
-      kind === 'machine'
-        ? { kind: 'machine.remove', name: key }
-        : { kind: 'keybinding.remove', command: key },
-    ),
-  )
   return [
-    ...removals,
-    ...changed.map(([key, value]) =>
-      operation(
-        kind === 'machine'
-          ? { kind: 'machine.set', name: key, machine: value }
-          : { kind: 'keybinding.set', command: key, keys: value },
-      ),
-    ),
+    ...removed.map((name) => operation({ kind: 'machine.remove', name })),
+    ...changed.map(([name, machine]) => operation({ kind: 'machine.set', name, machine })),
   ]
 }
 

@@ -1,3 +1,4 @@
+import { presentSetting } from '../settings/documentation'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import {
@@ -15,49 +16,53 @@ import { defineSetting, registryProblems } from '../settings/registry'
 import {
   keybindingChordSchema,
   keybindingOverridesSchema,
-  MAX_KEYBINDINGS_PER_COMMAND,
   lspServerOverridesSchema,
   MAX_KEYBINDING_CHORD_STROKES,
   modelRefListSchema,
   providerInstanceConfigsSchema,
 } from '../settings'
 
-describe('keybinding chord shape', () => {
-  it.each([['Mod+S'], ['Mod+K Mod+S', 'F1'], [], null])('accepts %j', (keys) => {
-    expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': keys }).success).toBe(
-      true,
-    )
+describe('contextual keybinding shape', () => {
+  it('accepts ordered command, reservation and targeted-unbind entries', () => {
+    const entries = [
+      { keys: 'Mod+B', command: 'workspace.toggleSidebar', context: 'Workspace' },
+      { keys: 'Mod+K Mod+S', command: null, context: 'Editor && writable' },
+      { keys: 'Mod+B', unbind: 'future::command', context: 'Workspace > Editor' },
+    ]
+    expect(v.parse(keybindingOverridesSchema, entries)).toEqual(entries)
   })
-
-  it.each(['Mod+K Mod+S Mod+X', '', '  ', 'Mod+K  Mod+S', 'Mod+K\tMod+S'])('rejects %s', (keys) => {
-    expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': [keys] }).success).toBe(
-      false,
-    )
+  it.each(['Editor &&', 'Editor ??? writable', '', ' '])(
+    'rejects invalid context %s',
+    (context) => {
+      expect(
+        v.safeParse(keybindingOverridesSchema, [{ keys: 'F8', command: 'future.command', context }])
+          .success,
+      ).toBe(false)
+    },
+  )
+  it('rejects mixed command/unbind entries and the obsolete record', () => {
+    expect(
+      v.safeParse(keybindingOverridesSchema, [
+        { keys: 'F8', command: null, unbind: 'future.command' },
+      ]).success,
+    ).toBe(false)
+    expect(
+      v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': ['Mod+S'] }).success,
+    ).toBe(false)
   })
-
   it('keeps the schema stroke cap equal to the recorder cap', () => {
     const accepted = Array.from({ length: MAX_KEYBINDING_CHORD_STROKES }, () => 'Mod+K').join(' ')
     expect(v.safeParse(keybindingChordSchema, accepted).success).toBe(true)
     expect(v.safeParse(keybindingChordSchema, `${accepted} Mod+S`).success).toBe(false)
   })
-
-  it('rejects a bare string where the list belongs, and a list past the cap', () => {
-    expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': 'Mod+S' }).success).toBe(
-      false,
-    )
-    const tooMany = Array.from(
-      { length: MAX_KEYBINDINGS_PER_COMMAND + 1 },
-      (_, index) => `F${index + 1}`,
-    )
-    expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': tooMany }).success).toBe(
-      false,
-    )
-  })
-
-  it('limits the stored shortcut length', () => {
-    expect(v.safeParse(keybindingChordSchema, 'K'.repeat(64)).success).toBe(true)
-    expect(v.safeParse(keybindingChordSchema, 'K'.repeat(65)).success).toBe(false)
-  })
+  it.each(['Mod+K Mod+S Mod+X', '', '  ', 'Mod+K  Mod+S', 'Mod+K\tMod+S'])(
+    'rejects malformed chord %s',
+    (keys) => {
+      expect(
+        v.safeParse(keybindingOverridesSchema, [{ keys, command: 'workspace.saveFile' }]).success,
+      ).toBe(false)
+    },
+  )
 })
 
 /**
@@ -81,20 +86,22 @@ const _serversAreOverrides: SettingsValues['lsp.servers'] = v.parse(lspServerOve
   typescript: { disabled: true, features: { completion: 5, semanticTokens: null } },
   'custom-lsp': { command: ['custom-lsp-server', '--stdio'], extensions: ['.custom'] },
 })
-const _overridesAreNullableStrings: SettingsValues['keybindings.overrides'] = {
-  'workspace.saveFile': ['Mod+S', 'F2'],
-  'workspace.saveAllFiles': null,
-}
+const _overridesAreContextualList: SettingsValues['keybindings.overrides'] = [
+  { keys: 'Mod+S', command: 'workspace.saveFile', context: 'Editor' },
+  { keys: 'F2', command: null },
+]
 
-// @ts-expect-error a keybinding override is a list of strings or null, never a number
-const _overrideRejectsNumber: SettingsValues['keybindings.overrides'] = { 'a.b': 3 }
+const _overrideRejectsNumber: SettingsValues['keybindings.overrides'] = [
+  // @ts-expect-error keys must be a chord string
+  { keys: 3, command: 'a.b' },
+]
 // @ts-expect-error the instance list is an array, not a bare object
 const _instancesRejectObject: SettingsValues['providers.instances'] = { providerInstanceId: 'x' }
 // @ts-expect-error keys not in the registry have no type
 const _unknownKeyHasNoType: SettingsValues['editor.notRegistered'] = 13
 
 void _instancesAreProviderConfigs
-void _overridesAreNullableStrings
+void _overridesAreContextualList
 void _hiddenIsModelRefList
 void _serversAreOverrides
 void _overrideRejectsNumber
@@ -345,15 +352,24 @@ describe('settings registry', () => {
 it('keeps executable keymap presets application-scoped and restricted to implemented packs', () => {
   const descriptor = descriptorFor('keybindings.preset')
   expect(descriptor.scope).toBe('application')
-  expect(descriptor.default).toBe('default')
-  expect(v.safeParse(descriptor.schema, 'default').success).toBe(true)
+  expect(descriptor.default).toBe('ours')
+  expect(v.safeParse(descriptor.schema, 'ours').success).toBe(true)
+  expect(v.safeParse(descriptor.schema, 'zed').success).toBe(true)
+  expect(v.safeParse(descriptor.schema, 'default').success).toBe(false)
   expect(v.safeParse(descriptor.schema, 'vscode').success).toBe(true)
   expect(v.safeParse(descriptor.schema, 'vim').success).toBe(false)
 })
 
+it('keeps shell key execution application-scoped and opt-in', () => {
+  const descriptor = descriptorFor('terminal.shellKeys')
+  expect(descriptor.scope).toBe('application')
+  expect(descriptor.default).toBe(false)
+  expect(v.safeParse(descriptor.schema, true).success).toBe(true)
+})
+
 describe('window material', () => {
   it('is adjacent to transparency and defaults to a rendering-only window enum', () => {
-    const setting = descriptorFor('window.material')
+    const setting = presentSetting('window.material')
     expect(DEFAULT_SETTING_VALUES['window.material']).toBe('none')
     expect(setting).toMatchObject({
       scope: 'window',

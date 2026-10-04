@@ -419,7 +419,6 @@ async function mountHarness() {
       <AppProviders
         application={fixture.application}
         navigation={fixture.navigation}
-        command={false}
         queryClient={queryClient}
       >
         <EditorStateProvider>

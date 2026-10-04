@@ -14,19 +14,17 @@ Decided 2026-09-25: owner — unparked. Rebase the plan on the [E050 host contra
 
 Progress 2026-09-26 (wave 2, lane E1, with Platform Plan 122 phase 4): steps 1–4 and 6 are done.
 `EDITOR_COMMANDS` (`packages/editor/src/editor/commandCatalog.ts`) declares every built-in's id, title,
-category, mutation policy and VS Code ids; the id union, `editorCommandMutates` and the command packs
-derive from it, and a captured fixture checks every preset binds the same keys. Contributed commands
+category, mutation policy and VS Code ids; the id union and `editorCommandMutates` derive from it; named packs declare shortcuts separately. Contributed commands
 are `createPlugin({ commands })` declarations under the plugin's name; dispatch, readonly refusal,
 listing (`Editor.getCommandDeclarations`) and removal share one identity. `docs/commands.md` is
 generated (`bun run commands:reference`) and checked by `health`. Step 5: Platform's client-core
-builds its editor table from the catalog. Left: preset bindings declared in the catalog (they stay in
-`keymap/presets.ts`, organized by pack), typed command arguments, and Platform's runtime segment for
+builds its editor table from the catalog. Left: typed command arguments and Platform's runtime segment for
 contributed commands in the palette, keybinding table and recorder.
 
 ## Outcome
 
 Give every Editor command one authoritative declaration for its ID, human name, description,
-category, mutation policy, and preset bindings. Hosts can list commands that have no binding
+category, mutation policy, and typed arguments. Named hotkeys packs own preset bindings. Hosts can list commands that have no binding
 and show the same name in a command palette, shortcut recorder, and generated reference.
 
 Adding a built-in command must not require independently updating a string union, a mutation
@@ -35,15 +33,17 @@ and instantiated for the correct editor view.
 
 ## Current code
 
-[commands.ts](../editor/packages/editor/src/editor/commands.ts) still declares `EditorCommandId` as
-a finite union. Its `EditorCommandContext` carries only an optional keyboard event.
+[commands.ts](../editor/packages/editor/src/editor/commands.ts) re-exports `EditorCommandId`, derived from
+the catalog. Its `EditorCommandContext` carries an optional keyboard event; typed arguments remain
+part of the host command contract work.
 [EditorCommandRouter](../editor/packages/editor/src/editor/commandRouter.ts) dispatches built-ins
 and accepts registered handlers. Plugin registration currently uses that same finite ID type.
 
 [Keymap presets](../editor/packages/editor/src/keymap/presets.ts) already own default and VS Code
-bindings, ordered layers, and command packs. [conditions.ts](../editor/packages/editor/src/keymap/conditions.ts)
-classifies mutating commands. [The public keymap entry](../editor/packages/editor/src/public/keymap.ts)
-already exposes the reusable chord runtime. Preserve that runtime and its cancellation rules.
+bindings and named pack data. The catalog classifies mutating commands. [The public keymap entry](../editor/packages/editor/src/public/keymap.ts)
+exports named pack data and metadata. Plans [204](204-editor-on-fregat-hotkeys.md) and
+[206](206-platform-one-keymap.md) assign the runtime to `@fregat/hotkeys`; the old runtime,
+layer helpers, and their exports are removed in that cutover.
 
 The wishlist's claim that titles and categories exist nowhere is stale across the project.
 Platform has [Editor command declarations](../apps/web/src/keymap/editor-commands.ts),
@@ -72,8 +72,8 @@ A declaration describes handler ownership as built-in or contributed. Built-in i
 must be exhaustive over its IDs. A contributed command has metadata even before its provider
 is available. Availability remains contextual and separate from whether the command is known.
 
-Declare default and VS Code bindings by preset in the authoritative data. Preserve ordered
-fallbacks, command packs, conditions, and the distinction between no binding and unavailable.
+Declare default and VS Code bindings in explicit named hotkeys packs, separate from command metadata. Preserve
+ordered fallbacks, context predicates, and the distinction between no binding and unavailable.
 Derive mutation classification from declarations so a new edit command cannot bypass readonly
 checks because another list was forgotten.
 
@@ -105,12 +105,12 @@ Define duplicate ID rejection and intentional override policy before migrating t
 
 Build Editor with `bun run build` from `packages/editor`. Run the focused existing checks with
 `bun run test --project node test/keymap-public.node.test.ts` and
-`bun run test --project dom test/keymap-runtime.test.ts test/public-api.test.ts`.
+`bun run test --project dom test/hostedHotkeys.test.ts test/public-api.test.ts`.
 These checks catch broken public imports, changed layer precedence, and changed chord handling.
 
 Add catalog checks for missing IDs, duplicate IDs, a mutable command marked readonly-safe,
 and unbound commands omitted from the metadata list. Assert preset results against the
-captured baseline so reorganizing declarations does not silently rebind commands.
+named pack snapshots so reorganizing declarations does not silently rebind commands.
 
 Use a real browser for the contributed command's focused-view dispatch and removal. A second
 editor must retain its own handlers. Verify that one plugin command invocation makes one undo

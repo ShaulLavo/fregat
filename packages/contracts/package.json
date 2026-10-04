@@ -1,6 +1,6 @@
 {
   "name": "@workspace/contracts",
-  "version": "0.0.0",
+  "version": "0.0.4",
   "private": true,
   "type": "module",
   "sideEffects": false,
@@ -8,7 +8,11 @@
     ".": "./src/index.ts",
     "./error-fields": "./src/error-fields.ts",
     "./text-encoding": "./src/text-encoding.ts",
-    "./file-response": "./src/file-response.ts"
+    "./file-response": "./src/file-response.ts",
+    "./settings/presentation": "./src/settings/presentation.ts",
+    "./settings/control": "./src/settings/control.ts",
+    "./settings/documentation": "./src/settings/documentation.ts",
+    "./settings/defaults-document": "./src/settings/defaults-document.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -19,6 +23,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fregat/hotkeys": "catalog:",
     "@workspace/observability": "workspace:*",
     "@workspace/utils": "workspace:*",
     "culori": "^4.0.2",

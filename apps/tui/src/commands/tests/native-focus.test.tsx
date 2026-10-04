@@ -1,3 +1,5 @@
+import { effectiveTerminalBindings } from '@/commands/utils/bindings'
+import { recordedSettingOperation } from '@/settings/utils/recording'
 import { act } from 'react'
 import { Application } from '@/components/application'
 import { createTestSettingsSession } from '../../../test/factories/session'
@@ -69,10 +71,11 @@ test('saved key overrides update real keyboard dispatch and palette labels immed
   )
   try {
     await act(async () => {
-      const submission = state.owner.submit('user', [
-        { kind: 'keybinding.set', command: 'workspace.showCommandPalette', keys: ['F7'] },
-        { kind: 'keybinding.set', command: 'workspace.showSettings', keys: ['F8'] },
-      ])
+      const defaults = effectiveTerminalBindings([], true).bindings
+      const palette = recordedSettingOperation('workspace.showCommandPalette', 'F7', defaults)
+      const settings = recordedSettingOperation('workspace.showSettings', 'F8', defaults)
+      if (!palette || !settings) return expect.unreachable('Expected shortcut writes')
+      const submission = state.owner.submit('user', [palette, settings])
       if (submission.kind === 'submitted') await submission.settled
     })
     await act(async () => {
@@ -110,9 +113,13 @@ test.for(['F10', null])(
     const state = session.getSnapshot()
     expect(state.kind).toBe('ready')
     if (state.kind !== 'ready') return
-    const submission = state.owner.submit('user', [
-      { kind: 'keybinding.set', command: 'workspace.quit', keys: keys === null ? null : [keys] },
-    ])
+    const operation = recordedSettingOperation(
+      'workspace.quit',
+      keys,
+      effectiveTerminalBindings([], true).bindings,
+    )
+    if (!operation) return expect.unreachable('Expected shortcut write')
+    const submission = state.owner.submit('user', [operation])
     if (submission.kind === 'submitted') await submission.settled
     let exits = 0
     const frame = await renderTui(
@@ -143,9 +150,13 @@ test.for(['F10', null])(
       expect(exits).toBe(keys === 'F10' ? 1 : 0)
       const beforeDefault = exits
       await act(async () => {
-        const reset = state.owner.submit('user', [
-          { kind: 'keybinding.remove', command: 'workspace.quit' },
-        ])
+        const operation = recordedSettingOperation(
+          'workspace.quit',
+          undefined,
+          effectiveTerminalBindings([], true).bindings,
+        )
+        if (!operation) return expect.unreachable('Expected shortcut reset')
+        const reset = state.owner.submit('user', [operation])
         if (reset.kind === 'submitted') await reset.settled
       })
       await act(async () => {

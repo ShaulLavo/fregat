@@ -254,6 +254,20 @@ export class WorkspaceDocumentService {
 
   constructor(private readonly onStateChange: () => void = () => undefined) {}
 
+  dispose(): void {
+    const prepared = new Set<EditorPreparedDocument>()
+    for (const view of this.viewsByTabId.values()) {
+      if (view.preparedDocument) prepared.add(view.preparedDocument)
+    }
+    this.viewsByTabId.clear()
+    for (const document of prepared) document.dispose()
+    for (const key of this.liveDocumentsByKey.keys()) this.removeLiveDocument(key)
+    this.viewScrollPositionSeeds.clear()
+    this.scrollPositionSeeds.clear()
+    this.pathReservations.clear()
+    this.ownershipRevisionByPath.clear()
+  }
+
   /**
    * The documents `retain` keeps whatever the keep set says — dirty buffers,
    * non-`file` syncs, and paths it cannot reach. Their text is unavoidable, so the

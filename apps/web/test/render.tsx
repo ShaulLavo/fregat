@@ -23,7 +23,6 @@ import { activeServerOrigin, getClient } from '@/lib/client'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 import { CommandBusProvider } from '@/keymap/providers/bus-provider'
 import { createCommandRuntimeBinding } from '@/keymap/state/runtime-binding'
-import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { ActiveEnvironmentApplication } from '@/components/active-environment-application'
 import { ApplicationRuntimeProvider } from '@/providers/application-runtime-provider'
 import { createApplicationRuntime, type ApplicationRuntime } from '@/state/application-runtime'
@@ -274,11 +273,9 @@ export function renderApplication(
         <ApplicationRuntimeProvider application={application}>
           <EnvironmentConnectionsContext value={application.connections}>
             <FocusProvider>
-              <HotkeysProvider>
-                <CommandBusProvider binding={application.commandBinding}>
-                  <ActiveEnvironmentApplication>{ui}</ActiveEnvironmentApplication>
-                </CommandBusProvider>
-              </HotkeysProvider>
+              <CommandBusProvider binding={application.commandBinding}>
+                <ActiveEnvironmentApplication>{ui}</ActiveEnvironmentApplication>
+              </CommandBusProvider>
             </FocusProvider>
           </EnvironmentConnectionsContext>
         </ApplicationRuntimeProvider>

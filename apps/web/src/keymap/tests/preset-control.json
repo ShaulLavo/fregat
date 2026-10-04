@@ -1,0 +1,154 @@
+{
+  "source": "fd1729638c6c7fc1b78244f05a4acba7dfa66ea8",
+  "inventory": {
+    "zed": "0c53c85e654c23a8e68b4bec1b645386a56d9e64238e9f5fd9a384f0183b6555",
+    "ours": "71f0e03f491811728f443cef2187747aeb2f792fdf9052ecdc27d9d66173ba08",
+    "rows": 1885
+  },
+  "bindings": [
+    {
+      "platform": "linux",
+      "preset": "ours",
+      "shellKeys": false,
+      "count": 353,
+      "bindings": "75c56bb9d5b6f41999f7931afac367772b97e019423870dc77c2702c14c9914e",
+      "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
+    },
+    {
+      "platform": "linux",
+      "preset": "ours",
+      "shellKeys": true,
+      "count": 400,
+      "bindings": "f697e03f71348f45eaea74bd7a5fb3e85e549fab5573f11c716323fd883ac7c8",
+      "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
+    },
+    {
+      "platform": "linux",
+      "preset": "zed",
+      "shellKeys": false,
+      "count": 353,
+      "bindings": "be9e9cda6d5cdd796af20c6a1348b45254a651f397a723d47cc6c31b8fb6132d",
+      "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
+    },
+    {
+      "platform": "linux",
+      "preset": "zed",
+      "shellKeys": true,
+      "count": 400,
+      "bindings": "487fadd8f702f5f33355b5e54538a1627f0874a98e82bbbac8b110b00766cda8",
+      "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
+    },
+    {
+      "platform": "linux",
+      "preset": "vscode",
+      "shellKeys": false,
+      "count": 302,
+      "bindings": "a3aec3bec044fb44acf56d2814906b195b8907c28321536bde0cb36119bde144",
+      "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "platform": "linux",
+      "preset": "vscode",
+      "shellKeys": true,
+      "count": 349,
+      "bindings": "671354657d8a967315dc3978e10f21d198a6105f4982ef66b4aec62b9dc913d2",
+      "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "platform": "mac",
+      "preset": "ours",
+      "shellKeys": false,
+      "count": 371,
+      "bindings": "56007eab96c01c79d56bd2706abdd35f08ebd9777e61d45acc3593afcc01186c",
+      "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
+    },
+    {
+      "platform": "mac",
+      "preset": "ours",
+      "shellKeys": true,
+      "count": 418,
+      "bindings": "0996b10e8202829905fdee6a027450905c733bf67cd2ae3e1f8c31943c0c8f3e",
+      "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
+    },
+    {
+      "platform": "mac",
+      "preset": "zed",
+      "shellKeys": false,
+      "count": 371,
+      "bindings": "79718d30b6c401eb459ccd0865a2fbca2426eff193968395bcde0bf3a9458215",
+      "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
+    },
+    {
+      "platform": "mac",
+      "preset": "zed",
+      "shellKeys": true,
+      "count": 418,
+      "bindings": "1b207dbfa7d047ca24b55271499cc813b2f9fcf4bc37ea04354fdbd2e81c4b91",
+      "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
+    },
+    {
+      "platform": "mac",
+      "preset": "vscode",
+      "shellKeys": false,
+      "count": 308,
+      "bindings": "b1b8f977ed47df79038f3b530166fbe4313c911fd0a79e39c965fa1e9899cdcd",
+      "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "platform": "mac",
+      "preset": "vscode",
+      "shellKeys": true,
+      "count": 355,
+      "bindings": "c0651794f8a9ed06c6b8939331ab32b37eae08e3b37f8cb02115dae4e85d98f3",
+      "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "platform": "windows",
+      "preset": "ours",
+      "shellKeys": false,
+      "count": 353,
+      "bindings": "4af6d2affaece3911c8dd2e787094ae9c6d124989fd6564d99b46925fe278ea7",
+      "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
+    },
+    {
+      "platform": "windows",
+      "preset": "ours",
+      "shellKeys": true,
+      "count": 400,
+      "bindings": "6982ac6dd1769ed3c91b499f1072b89a7a7f186fa24931ef6eb1a51b05189467",
+      "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
+    },
+    {
+      "platform": "windows",
+      "preset": "zed",
+      "shellKeys": false,
+      "count": 353,
+      "bindings": "d303ede19e26c13f901efd77ab0ba91544600d588c95d76395cf59c227ef579d",
+      "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
+    },
+    {
+      "platform": "windows",
+      "preset": "zed",
+      "shellKeys": true,
+      "count": 400,
+      "bindings": "7582ec9ee0147eb05ddd10f8f95565b847104a54634f91bfa29a6477fdc2a4ce",
+      "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
+    },
+    {
+      "platform": "windows",
+      "preset": "vscode",
+      "shellKeys": false,
+      "count": 300,
+      "bindings": "60ad364873ae10a92121fb7638a10778425f5574bc2ca1ecae0e0b367f101883",
+      "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "platform": "windows",
+      "preset": "vscode",
+      "shellKeys": true,
+      "count": 347,
+      "bindings": "88434255ad405bf6235f6d85260625851194db106a61fbddd9de915813d686a8",
+      "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  ]
+}

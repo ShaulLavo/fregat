@@ -82,13 +82,13 @@ with every Platform tab closed. Tapping it opens that session.
   map). A script cannot make a trusted notification click, so the second records the worker's
   `openWindow` and `focus` calls and then loads the opened route.
 
-## Owner checks
+## Device checks
 
-- iOS: on the iPhone, open `https://omarchy.mesh.shaulavo.dev/platform/`, Share › Add to Home
+- iOS: on the iPhone, open the installation's HTTPS URL, Share › Add to Home
   Screen, open it from there, Settings › search "push", Turn on for this device, Send test. This
-  also answers whether the Tailscale HTTPS origin is accepted.
+  also checks whether the browser accepts the installation's HTTPS origin.
 - Android Chrome: the same without the Home Screen step.
-- Desktop Chrome or Firefox against the mesh, with a real push service.
+- Desktop Chrome or Firefox against the installation's HTTPS URL, with a real push service.
 - Session notices: turn on Push session notifications, close every Platform tab, let a session
   finish, and tap the notification.
 

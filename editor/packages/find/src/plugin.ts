@@ -213,6 +213,7 @@ class EditorFindViewContribution implements EditorViewContribution {
 
   private createWidgetOptions(): EditorFindWidgetOptions {
     return {
+      registerKeymapNode: (options) => this.context.registerKeymapNode(options),
       onSearchInput: (value) => this.controller.setSearchString(value),
       onReplaceInput: (value) => this.controller.setReplaceString(value),
       onToggleReplace: () => this.controller.toggleReplace(),

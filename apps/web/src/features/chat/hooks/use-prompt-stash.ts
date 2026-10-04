@@ -1,7 +1,8 @@
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import { SKIP_DOM_SELECTION_TAG } from 'lexical'
 import { useStore } from 'zustand'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { use, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { use, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { errorMessage } from '@/lib/error-message'
 import { $setChatInputText } from '../utils/input-editor-actions'
@@ -53,22 +54,18 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
     onError: (error) => toastError(errorMessage(error, 'Could not transfer the message stash.')),
   })
   const { mutate } = mutation
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (
-        !['s', 'S'].includes(event.key) ||
-        event.altKey ||
-        event.shiftKey ||
-        !(event.metaKey || event.ctrlKey)
-      )
-        return
-      if (!editor.getRootElement()?.contains(document.activeElement)) return
-      event.preventDefault()
-      mutate({ target: draftTarget, action: { kind: 'stash' } })
-    }
-    window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [draftTarget, editor, mutate])
+  useKeymapNode({
+    area: 'chat',
+    context: 'Composer',
+    element: () => editor.getRootElement(),
+    commands: {
+      'chat.stashPrompt': () => {
+        if (!activeTarget.current || !editor.isEditable()) return false
+        mutate({ target: draftTarget, action: { kind: 'stash' } })
+        return true
+      },
+    },
+  })
   return {
     entries,
     pending: mutation.isPending,

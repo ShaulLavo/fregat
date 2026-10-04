@@ -4,6 +4,14 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import { readWorkflow } from './workflow-fixtures'
 
+test('desktop bundle tests run after the workspace library build', () => {
+  const steps = readWorkflow('macos-app.yml').jobs.bundle!.steps
+  const build = steps.findIndex((step) => step.run === 'bun run build:workspaces')
+  const tests = steps.findIndex((step) => step.run?.includes('bundle.test.ts'))
+  expect(build).toBeGreaterThanOrEqual(0)
+  expect(tests).toBeGreaterThan(build)
+})
+
 test('release rebuild paths work with two nested family checkouts', () => {
   const workflow = readWorkflow('ghostty-config-resolver.yml')
   const job = workflow.jobs['release-rebuild']!

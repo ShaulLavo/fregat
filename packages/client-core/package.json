@@ -1,6 +1,6 @@
 {
   "name": "@workspace/client-core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
@@ -15,6 +15,7 @@
     "./settings/read": "./src/settings/read.ts",
     "./settings/search": "./src/settings/search.ts",
     "./settings/humanize": "./src/settings/humanize.ts",
+    "./settings/diagnostic-label": "./src/settings/diagnostic-label.ts",
     "./transport/orchestration-rpc-client": "./src/transport/orchestration-rpc-client.ts",
     "./transport/rpc-host": "./src/transport/rpc-host.ts",
     "./transport/streams": "./src/transport/streams.ts",
@@ -123,12 +124,13 @@
     "./settings/operations": "./src/settings/operations.ts",
     "./commands/recent-commands": "./src/commands/recent-commands.ts",
     "./chat/activity-visibility": "./src/chat/activity-visibility.ts",
-    "./commands/bindings": "./src/commands/bindings.ts",
     "./chat/worktrees/actions": "./src/chat/worktrees/actions.ts",
     "./chat/worktrees/confirmation": "./src/chat/worktrees/confirmation.ts",
     "./chat/earlier-pages": "./src/chat/earlier-pages.ts",
     "./history/undo-stack": "./src/history/undo-stack.ts",
-    "./files/read-session": "./src/files/read-session.ts"
+    "./files/read-session": "./src/files/read-session.ts",
+    "./commands/node": "./src/commands/node.ts",
+    "./commands/chat": "./src/commands/chat.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -140,10 +142,10 @@
   },
   "dependencies": {
     "@elysia/eden": "^1.4.10",
+    "@fregat/hotkeys": "catalog:",
     "@shikijs/themes": "4.4.3",
     "@singapore-editor/core": "workspace:*",
     "@singapore-editor/diff": "workspace:*",
-    "@tanstack/hotkeys": "^0.10.0",
     "@tanstack/query-core": "^5.104.0",
     "@workspace/contracts": "workspace:*",
     "@workspace/utils": "workspace:*",

@@ -1,8 +1,10 @@
+import type { EditorViewContributionContext } from '@singapore-editor/core/extensions'
 import type { InlineReplacementSpec } from '@singapore-editor/core/rendering'
 import type { TextReadSnapshot } from '@singapore-editor/core/document'
 import type { MarkdownSpan } from './linkDestination'
 
 export type MarkdownLinkOptions = {
+  readonly registerKeymapNode?: EditorViewContributionContext['registerKeymapNode']
   readonly openLink?: (href: string) => void
 }
 
@@ -80,9 +82,6 @@ function linkMount(
     anchor.rel = 'noopener noreferrer'
     anchor.addEventListener('pointerdown', (event) => event.stopPropagation())
     anchor.addEventListener('mousedown', (event) => event.stopPropagation())
-    anchor.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') event.stopPropagation()
-    })
     anchor.addEventListener('click', (event) => {
       event.stopPropagation()
       if (!options.openLink) return
@@ -90,6 +89,16 @@ function linkMount(
       options.openLink(link.href)
     })
     container.append(anchor)
+    return options.registerKeymapNode?.({
+      element: anchor,
+      context: 'EditorWidget MarkdownLink',
+      commands: {
+        'markdown.openLink': () => {
+          anchor.click()
+          return true
+        },
+      },
+    })
   }
 }
 

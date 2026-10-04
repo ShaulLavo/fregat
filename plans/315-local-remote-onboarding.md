@@ -45,4 +45,4 @@ Acceptance means both paths end at a usable workspace on the advertised machine.
 
 ## Delivery
 
-Use `typescript-best-practices`, `tanstack-query-best-practices`, and `verify-fregat`. Run narrow tests and required gates through the heavy wrapper. Commit owned paths, push, and deploy through the mesh. Any server change needs dev verification and `bun run deploy --server --restart`; web-only work uses `bun run deploy`. Record the mock choice, evidence links, shipped commit, and remaining platform limitations in this plan and root roadmap.
+Use `typescript-best-practices`, `tanstack-query-best-practices`, and `verify-fregat`. Run narrow tests and required gates through the heavy wrapper. Commit owned paths, push, and deploy through the mesh. Any server change needs dev verification and `bun run install-release --server --restart`; web-only work uses `bun run install-release`. Record the mock choice, evidence links, shipped commit, and remaining platform limitations in this plan and root roadmap.

@@ -1,3 +1,4 @@
+import { settingRowIds } from '@workspace/contracts/settings/presentation'
 import { customizesThemePart, shownColorMode, themePartSlot } from '@workspace/contracts'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import {
@@ -5,7 +6,6 @@ import {
   inspectSetting,
   layerAllowsScope,
   SETTINGS_LAYER_ORDER,
-  settingRowIds,
   type SettingId,
   type SettingInspection as SettingInspectionResult,
   type SettingScope,

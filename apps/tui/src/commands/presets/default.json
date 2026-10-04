@@ -1,0 +1,413 @@
+[
+  {
+    "command": "workspace.undoSessionAction",
+    "keys": "U",
+    "pane": "chat"
+  },
+  {
+    "command": "workspace.redoSessionAction",
+    "keys": "Shift+U",
+    "pane": "chat"
+  },
+  {
+    "command": "workspace.showQuickAccess",
+    "keys": "Mod+P",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.showCommandPalette",
+    "keys": "F1",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.showCommandPalette",
+    "keys": "Mod+K P",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.showCommandPalette",
+    "keys": "Mod+Shift+P",
+    "pane": "any",
+    "terminalProtocol": "kitty"
+  },
+  {
+    "command": "workspace.showSettings",
+    "keys": "Mod+K S",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.openSearchEditor",
+    "keys": "Mod+K F",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.quickOpenView",
+    "keys": "Mod+K V",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.focusEditor",
+    "keys": "Mod+K I",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.focusFileTree",
+    "keys": "Mod+K E",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.focusGit",
+    "keys": "Mod+K G",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.navigateBack",
+    "keys": "Mod+K B",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.navigateForward",
+    "keys": "Mod+K N",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.revealChat",
+    "keys": "Mod+K R",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.revealTerminal",
+    "keys": "Mod+K T",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.newSession",
+    "keys": "Mod+N",
+    "pane": "any"
+  },
+  {
+    "command": "editor.find",
+    "keys": "Mod+F",
+    "pane": "editor"
+  },
+  {
+    "command": "editor.findNext",
+    "keys": "F3",
+    "pane": "editor"
+  },
+  {
+    "command": "editor.findPrevious",
+    "keys": "Shift+F3",
+    "pane": "editor"
+  },
+  {
+    "command": "editor.action.goToDefinition",
+    "keys": "F12",
+    "pane": "editor"
+  },
+  {
+    "command": "editor.action.showHover",
+    "keys": "Mod+K H",
+    "pane": "editor"
+  },
+  {
+    "command": "workspace.reconnect",
+    "keys": "Mod+R",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.quit",
+    "keys": "Mod+C",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.quit",
+    "keys": "Mod+K Q",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.suspend",
+    "keys": "Mod+Z",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.focusNextPane",
+    "keys": "Tab",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.focusPreviousPane",
+    "keys": "Shift+Tab",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.dismiss",
+    "keys": "Escape",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.showShortcutHelp",
+    "keys": "?",
+    "pane": "any"
+  },
+  {
+    "command": "settings.edit",
+    "keys": "F2",
+    "pane": "settings"
+  },
+  {
+    "command": "settings.nextScope",
+    "keys": "F3",
+    "pane": "settings"
+  },
+  {
+    "command": "settings.reset",
+    "keys": "F4",
+    "pane": "settings"
+  },
+  {
+    "command": "settings.retry",
+    "keys": "F5",
+    "pane": "settings"
+  },
+  {
+    "command": "settings.discard",
+    "keys": "F6",
+    "pane": "settings"
+  },
+  {
+    "command": "dialog.confirm",
+    "keys": "F2",
+    "pane": "dialog"
+  },
+  {
+    "command": "workspace.openWorkbench",
+    "keys": "Mod+K W",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.changeProject",
+    "keys": "Mod+K O",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.showProblems",
+    "keys": "Mod+K D",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.showLogs",
+    "keys": "Mod+K L",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.toggleSidebar",
+    "keys": "Mod+K U",
+    "pane": "any"
+  },
+  {
+    "command": "workspace.goToLine",
+    "keys": "Mod+K J",
+    "pane": "editor"
+  },
+  {
+    "command": "workspace.editFile",
+    "keys": "Mod+K X",
+    "pane": "editor"
+  },
+  {
+    "command": "terminal.new",
+    "keys": "Mod+K N",
+    "pane": "terminal"
+  },
+  {
+    "command": "terminal.close",
+    "keys": "Mod+K W",
+    "pane": "terminal"
+  },
+  {
+    "command": "terminal.next",
+    "keys": "Mod+K ArrowRight",
+    "pane": "terminal"
+  },
+  {
+    "command": "terminal.previous",
+    "keys": "Mod+K ArrowLeft",
+    "pane": "terminal"
+  },
+  {
+    "command": "terminal.attach",
+    "keys": "Mod+K A",
+    "pane": "terminal"
+  },
+  {
+    "command": "terminal.clear",
+    "keys": "Mod+K L",
+    "pane": "terminal"
+  },
+  {
+    "command": "terminal.copy",
+    "keys": "Mod+K C",
+    "pane": "terminal"
+  },
+  {
+    "command": "terminal.paste",
+    "keys": "Mod+K V",
+    "pane": "terminal"
+  },
+  {
+    "command": "git.next",
+    "keys": "Mod+K ArrowDown",
+    "pane": "git"
+  },
+  {
+    "command": "git.previous",
+    "keys": "Mod+K ArrowUp",
+    "pane": "git"
+  },
+  {
+    "command": "git.open",
+    "keys": "Mod+K O",
+    "pane": "git"
+  },
+  {
+    "command": "git.stage",
+    "keys": "Mod+K A",
+    "pane": "git"
+  },
+  {
+    "command": "git.unstage",
+    "keys": "Mod+K U",
+    "pane": "git"
+  },
+  {
+    "command": "git.commit",
+    "keys": "Mod+K C",
+    "pane": "git"
+  },
+  {
+    "command": "git.refresh",
+    "keys": "Mod+K R",
+    "pane": "git"
+  },
+  {
+    "command": "git.toggleDiff",
+    "keys": "Mod+K D",
+    "pane": "git"
+  },
+  {
+    "command": "git.expandDiff",
+    "keys": "Mod+K X",
+    "pane": "git"
+  },
+  {
+    "command": "search.next",
+    "keys": "Mod+K ArrowDown",
+    "pane": "search"
+  },
+  {
+    "command": "search.previous",
+    "keys": "Mod+K ArrowUp",
+    "pane": "search"
+  },
+  {
+    "command": "search.open",
+    "keys": "Mod+K O",
+    "pane": "search"
+  },
+  {
+    "command": "search.refresh",
+    "keys": "Mod+K R",
+    "pane": "search"
+  },
+  {
+    "command": "logs.next",
+    "keys": "Mod+K ArrowDown",
+    "pane": "logs"
+  },
+  {
+    "command": "logs.previous",
+    "keys": "Mod+K ArrowUp",
+    "pane": "logs"
+  },
+  {
+    "command": "logs.open",
+    "keys": "Mod+K O",
+    "pane": "logs"
+  },
+  {
+    "command": "logs.refresh",
+    "keys": "Mod+K R",
+    "pane": "logs"
+  },
+  {
+    "command": "logs.pause",
+    "keys": "Mod+K P",
+    "pane": "logs"
+  },
+  {
+    "command": "fileTree.newFile",
+    "keys": "Mod+K N",
+    "pane": "file-tree"
+  },
+  {
+    "command": "fileTree.newFolder",
+    "keys": "Mod+K M",
+    "pane": "file-tree"
+  },
+  {
+    "command": "fileTree.rename",
+    "keys": "Mod+K R",
+    "pane": "file-tree"
+  },
+  {
+    "command": "fileTree.delete",
+    "keys": "Mod+K D",
+    "pane": "file-tree"
+  },
+  {
+    "command": "fileTree.refresh",
+    "keys": "Mod+K F",
+    "pane": "file-tree"
+  },
+  {
+    "command": "chat.focusInput",
+    "keys": "Mod+K C",
+    "pane": "any"
+  },
+  {
+    "command": "chat.openModelPicker",
+    "keys": "Mod+K M",
+    "pane": "any"
+  },
+  {
+    "command": "agent.railNext",
+    "keys": "J",
+    "pane": "chat"
+  },
+  {
+    "command": "agent.railPrevious",
+    "keys": "K",
+    "pane": "chat"
+  },
+  {
+    "command": "agent.railFilter",
+    "keys": "/",
+    "pane": "chat"
+  },
+  {
+    "command": "agent.railMenu",
+    "keys": "Shift+F10",
+    "pane": "chat"
+  },
+  {
+    "command": "agent.mark",
+    "keys": "M",
+    "pane": "chat"
+  },
+  {
+    "command": "agent.markRange",
+    "keys": "Shift+M",
+    "pane": "chat"
+  }
+]

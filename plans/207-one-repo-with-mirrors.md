@@ -2,7 +2,9 @@
 
 ## Status and authorization
 
-- Status: SOURCE MIGRATION DELIVERED 2026-09-30. npm publication remains deferred.
+- Status: SOURCE MIGRATION DELIVERED 2026-09-30. Command foundation standalone
+  qualification completed 2026-10-04. Overall delivery remains ongoing while npm
+  account setup, initial publication and trusted publishing remain deferred.
 - The owner authorized final fixes and merging PR #199 on 2026-09-30. Mirror pushes must
   fast-forward without force; integration edits may change the split commit ids.
 - Owner decision: all code we write for Fregat lives in the Fregat monorepo. Flagship packages
@@ -32,13 +34,40 @@ The owner requested complete source migration, tooling alignment and CI verifica
 2026-09-30, with all npm setup and publication deferred until that work is finished. The
 execution checklist is [migration completion](207-migration-completion.md).
 
-Source import and npm publication are separate delivery units. Before 204/205 add a
-cross-family hotkeys dependency, prove that the exact mirrored Editor/ghostty folder
-installs and builds without sibling workspaces. `workspace:*` rewriting during npm publish
-does not prove standalone mirror installation. Select and test a dependency arrangement
-that supports both root workspaces and exact mirrors; publish the required hotkeys version
-before mirroring a consumer commit that needs it. Record the first-publication and trusted
-publisher gates without blocking unrelated source-import work on every package release.
+Source import, Git mirroring and npm publication are separate delivery units. The owner
+renewed npm deferral on 2026-10-03. Local development and root CI use the neighboring hotkeys
+workspace; neither needs an npm login or publication. A mirror copies one family folder, so
+its standalone installation needs a separately available dependency source.
+
+Before 204/205 mirror a hotkeys consumer, prove that the exact Editor/ghostty family folder
+installs and builds without sibling workspaces. Consumer manifests use `catalog:`: Fregat's
+root catalog selects the local exact-version workspace; each standalone family catalog selects
+an immutable package artifact built from reviewed hotkeys source. Record its source commit,
+version and digest, and test cold installation of both actual migrated families. An npm version
+can replace that artifact in the separately scheduled publication phase.
+
+The 2026-10-03 Bun 1.4.2 structural proof selected the local workspace with zero artifact
+requests, then installed each isolated family fixture with one artifact fetch and a passing
+runtime smoke check. This qualified the resolution arrangement before final family qualification. Receipt:
+`/work/reports/command-foundation-2026-10-03/publication/catalog-resolution-proof.json`.
+
+## Command foundation standalone qualification (2026-10-04)
+
+[PR #603](https://github.com/ShaulLavo/fregat/pull/603) completed the exact migrated-family
+installation gate. The [delivery record](../docs/keymap/command-foundation-delivery.md)
+pins all three family trees, final source, cold caches and real packed consumers.
+Root's local catalog selects workspace core version 0.0.3. Editor and Ghostty's independent
+family catalogs select the immutable hosted core version 0.0.2, built from reviewed source
+`68d8aaf6f631` and verified with SHA256
+`260650623e7e78d4533cbed8ea4f50882dba4873125d49af43ce294ec977f470`.
+All 41 installed core payload files match that artifact after every family check.
+
+Editor health, Turbo input validation and packed runtime passed. Ghostty 0.3.12 passed its
+fresh cold build, types, lint, format, installed helpers, three actual renderer backends and
+packed TypeScript 7 Bundler, TypeScript 5 Bundler and Node10 consumers with WASM and Canvas.
+The unchanged Hotkeys family carries its exact-tree cold and local packed core/React proof.
+No npm account, publication or trusted-publisher action was needed. Those actions remain
+separately deferred.
 
 ## Why
 
@@ -254,5 +283,5 @@ recursion cap on imported history. No force push was used.
 Release `20260930T072758Z-f1b47731-main` passed the live check. Editor, language-service and
 terminal browser evidence was inspected in `/work/tmp/monorepo-completion/browser/`.
 The [completion checklist](207-migration-completion.md) records the remaining automatic
-mirror correction check. npm remains disabled and deferred; plans 204–206 remain subsequent
-feature work, including cross-family consumers that need the first hotkeys publication.
+mirror correction check. npm remains disabled and deferred. Plans 204–206 use local workspaces
+inside Fregat and qualify the separate standalone dependency source before mirroring consumers.

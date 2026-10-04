@@ -115,19 +115,19 @@ test('every item resolves through the platform command registry', () => {
 
 test('the navigate and edit items route to the editor command handlers', () => {
   expect(commands('navigate')).toEqual([
-    'editor.goToDefinition',
-    'editor.editor.action.goToTypeDefinition',
-    'editor.editor.action.goToImplementation',
-    'editor.editor.action.goToReferences',
-    'editor.editor.action.peekDefinition',
-    'editor.editor.action.revealDefinitionAside',
+    'editor.action.goToDefinition',
+    'editor.action.goToTypeDefinition',
+    'editor.action.goToImplementation',
+    'editor.action.goToReferences',
+    'editor.action.peekDefinition',
+    'editor.action.revealDefinitionAside',
   ])
   expect(commands('edit')).toEqual([
-    'editor.editor.action.changeAll',
-    'editor.editor.action.commentLine',
-    'editor.editor.action.blockComment',
-    'editor.editor.action.rename',
-    'editor.editor.action.formatDocument',
+    'editor.action.changeAll',
+    'editor.action.commentLine',
+    'editor.action.blockComment',
+    'editor.action.rename',
+    'editor.action.formatDocument',
   ])
 })
 

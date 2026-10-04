@@ -31,6 +31,8 @@ jobs:
         with:
           node-version: 24
       - run: bun install --frozen-lockfile
+      - name: Build workspace libraries
+        run: bun run build:workspaces
       - name: Check native compiler
         run: xcrun --find clang
       - name: Build macOS webview host

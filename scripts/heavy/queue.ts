@@ -30,13 +30,14 @@ export type Entry = {
   /** A `--quiet` job: it drains finite jobs, for at most one quiet hold. */
   readonly quiet: boolean
   readonly server: boolean
+  /** CPU affinity ids; the baseline policy accepts only empty sets. */
+  readonly allowedCpus?: readonly number[]
   /** A queued quiet request's deadline, in boot seconds; independent of its running lease. */
   readonly quietAdmissionUntil?: number
-  /**
-   * A running quiet job's lease, in boot seconds: by then systemd has ended its scope, so its
-   * claim on the machine lapses even if its wrapper is suspended and cannot release it.
-   */
+  /** The expected wall deadline in boot seconds; ownership and slice cleanup gate admission. */
   readonly quietUntil?: number
+  /** Absolute payload deadline in boot seconds; its producer's pinned shim enforces it. */
+  readonly quietDeadline?: number
   readonly cwd: string
   readonly pid: number
   /** When it joined the queue, then when it started. */

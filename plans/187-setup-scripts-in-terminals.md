@@ -68,4 +68,4 @@ Foreground setup still gates the first turn; stop, retry and the setup card keep
   background beside the first turn; the sentinel under posix and fish.
 - `scenario worktree-setup-import` extended: the setup terminal opens from the card, shows the
   output, Ctrl+C cancels, a failure stays open. Screenshots read, evidence directory named.
-- `bun run gates`; `bun run deploy --server`.
+- `bun run gates`; `bun run install-release --server`.

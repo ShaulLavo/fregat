@@ -1,11 +1,11 @@
+import { defaultKeyBindings, keyboardEvent } from './factories/keymap'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detectPlatform, parseHotkey, rawHotkeyToParsedHotkey } from '@tanstack/hotkeys'
+import { detectPlatform, parseHotkey, rawHotkeyToParsedHotkey } from '@fregat/hotkeys'
 import { createEditorFindPlugin } from '../../find/src/index.ts'
 import { createFoldGutterPlugin, createLineGutterPlugin } from '../../gutters/src/index.ts'
 import {
   createEditorLoggingPlugin,
   createMergeConflictPlugin,
-  defaultEditorKeyBindings,
   Editor,
   type EditorChangeHandler,
   type EditorCommandId,
@@ -241,8 +241,13 @@ class MockResizeObserver implements ResizeObserver {
   disconnect(): void {
     this.observed.clear()
   }
-
-  emit(target: Element, size: { readonly height?: number; readonly width?: number }): void {
+  emit(
+    target: Element,
+    size: {
+      readonly height?: number
+      readonly width?: number
+    },
+  ): void {
     const height = size.height ?? 0
     const width = size.width ?? 0
     this.callback([resizeObserverEntry(target, width, height)], this)
@@ -395,7 +400,7 @@ function editorInput(): HTMLTextAreaElement {
 }
 
 function dispatchEditorKey(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', {
+  const event = keyboardEvent('keydown', {
     bubbles: true,
     cancelable: true,
     key,
@@ -593,9 +598,7 @@ function wordNavigationModifier(): KeyboardEventInit {
  */
 function dispatchDefaultKey(command: EditorCommandId): KeyboardEvent {
   const platform = detectPlatform()
-  const chord = defaultEditorKeyBindings(platform).find(
-    (binding) => binding.command === command,
-  )?.chord
+  const chord = defaultKeyBindings(platform).find((binding) => binding.command === command)?.keys
   if (!chord) throw new Error(`${command} has no default chord on ${platform}`)
   const events = chord.map((hotkey) => {
     const parsed =
@@ -603,12 +606,15 @@ function dispatchDefaultKey(command: EditorCommandId): KeyboardEvent {
         ? parseHotkey(hotkey, platform)
         : rawHotkeyToParsedHotkey(hotkey, platform)
     if (parsed.key === undefined) throw new Error(`${command} has a physical-code chord`)
-    return dispatchEditorKey(parsed.key, {
+    const init = {
       altKey: parsed.alt,
       ctrlKey: parsed.ctrl,
       metaKey: parsed.meta,
       shiftKey: parsed.shift,
-    })
+    }
+    const event = dispatchEditorKey(parsed.key, init)
+    editorRoot().dispatchEvent(keyboardEvent('keyup', { bubbles: true, key: parsed.key, ...init }))
+    return event
   })
   return events[events.length - 1]!
 }
@@ -691,7 +697,7 @@ function rangeLength(range: EditorSyntaxRange | undefined): number {
 }
 
 function hasLongSyntaxRange(ranges: readonly EditorSyntaxRange[]): boolean {
-  return ranges.some((range) => rangeLength(range) > 200_000)
+  return ranges.some((range) => rangeLength(range) > 200000)
 }
 
 function selectionRanges(): HTMLElement[] {
@@ -1259,7 +1265,7 @@ describe('Editor', () => {
     it('reveals the selection by default', () => {
       const root = editorRoot()
       const text = Array.from({ length: 80 }, (_value, index) => `line ${index}`).join('\n')
-      mockEditorViewport(root, 80, 40, 2_000)
+      mockEditorViewport(root, 80, 40, 2000)
       editor.setText(text)
       editor.setSelection(0)
       root.scrollTop = 0
@@ -1272,7 +1278,7 @@ describe('Editor', () => {
     it('can update selection without revealing it', () => {
       const root = editorRoot()
       const text = Array.from({ length: 80 }, (_value, index) => `line ${index}`).join('\n')
-      mockEditorViewport(root, 80, 40, 2_000)
+      mockEditorViewport(root, 80, 40, 2000)
       editor.setText(text)
       editor.setSelection(0)
       root.scrollTop = 0
@@ -1986,8 +1992,7 @@ describe('Editor', () => {
       }
       editor.dispose()
       editor = createVisibleEditor(container, { plugins: [plugin] })
-
-      const text = Array.from({ length: 10_000 }, (_, row) => `line ${row}`).join('\n')
+      const text = Array.from({ length: 10000 }, (_, row) => `line ${row}`).join('\n')
       editor.openDocument({ documentId: 'long.txt', text })
       const context = requireViewContributionContext(contributionContext)
 
@@ -2112,7 +2117,10 @@ describe('Editor', () => {
       editor.dispose()
       editor = createVisibleEditor(container, { plugins: [plugin] })
       editor.setText(Array.from({ length: 400 }, (_value, row) => `${row} `.repeat(80)).join('\n'))
-      const positions: { readonly top: number; readonly left: number }[] = []
+      const positions: {
+        readonly top: number
+        readonly left: number
+      }[] = []
       const subscription = editor.onDidScroll((position) => positions.push(position))
 
       requireViewContributionContext(requester).setScrollPosition({ top: 300, left: 40 })
@@ -3452,7 +3460,7 @@ describe('Editor', () => {
     it('opens long documents without revealing the initial end selection', () => {
       const root = editorRoot()
       const text = Array.from({ length: 80 }, (_value, index) => `line ${index}`).join('\n')
-      mockEditorViewport(root, 80, 40, 2_000)
+      mockEditorViewport(root, 80, 40, 2000)
 
       editor.setText(text)
 
@@ -3817,7 +3825,9 @@ describe('Editor', () => {
 
     it('can disable default keymap bindings', () => {
       editor.dispose()
-      editor = createVisibleEditor(container, { keymap: { enabled: false } })
+      editor = createVisibleEditor(container, {
+        keymap: { packs: [], bindings: [{ keys: 'ArrowLeft', command: null, context: 'Editor' }] },
+      })
       editor.setText('abc')
 
       dispatchEditorKey('ArrowLeft')
@@ -3828,13 +3838,8 @@ describe('Editor', () => {
     it('skips keymap change logs for equivalent keymap options', () => {
       const events: EditorLogEvent[] = []
       const keymap = (): EditorKeymapOptions => ({
-        defaultBindings: false,
-        layers: [
-          {
-            bindings: [{ command: 'cursorLeft', chord: ['ArrowLeft'] }],
-            id: 'test.navigation',
-          },
-        ],
+        packs: [],
+        bindings: [{ command: 'cursorLeft', keys: ['ArrowLeft'] }],
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
@@ -4398,17 +4403,12 @@ describe('Editor', () => {
       editor.dispose()
       editor = createVisibleEditor(container, {
         keymap: {
-          defaultBindings: false,
-          layers: [
+          packs: [],
+          bindings: [
             {
-              bindings: [
-                {
-                  command: 'addNextOccurrence',
-                  chord: [{ key: 'D', mod: true }],
-                  preventDefault: true,
-                },
-              ],
-              id: 'test.prevent-default',
+              command: 'addNextOccurrence',
+              keys: [{ key: 'D', mod: true }],
+              preventDefault: true,
             },
           ],
         },
@@ -5651,7 +5651,7 @@ describe('Editor', () => {
       const caret = lastRow * 8 + 4
       const probe = createDocumentSession(text)
       probe.setSelection(0)
-      mockEditorViewport(editorRoot(), 200, 200, 2_000)
+      mockEditorViewport(editorRoot(), 200, 200, 2000)
       editor.attachSession(probe)
 
       // Whatever this viewport makes a page worth, taken off a plain page move so the rectangle can
@@ -5771,7 +5771,7 @@ describe('Editor', () => {
         Array.from({ length: rows }, () => 'alpha bravo').join('\n'),
       )
       session.setSelection(4)
-      mockEditorViewport(editorRoot(), 200, 200, 5_000)
+      mockEditorViewport(editorRoot(), 200, 200, 5000)
       editor.attachSession(session)
 
       for (let press = 1; press < rows; press += 1) dispatchDefaultKey('cursorColumnSelectDown')
@@ -6117,7 +6117,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 20_000 },
+        { length: 20000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6128,8 +6128,7 @@ describe('Editor', () => {
       })
       await flushSyntaxDebounce()
       const initialRangeCount = ranges.length
-
-      editor.setScrollPosition({ top: 300_000, left: 0 })
+      editor.setScrollPosition({ top: 300000, left: 0 })
       await flushSyntaxDebounce()
       const scrolledRanges = ranges.slice(initialRangeCount)
 
@@ -6162,7 +6161,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 20_000 },
+        { length: 20000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6175,7 +6174,7 @@ describe('Editor', () => {
       const rangeCountAfterOpen = ranges.length
 
       editor.edit({ from: 0, to: 0, text: '\n' })
-      editor.setScrollPosition({ top: 300_000, left: 0 })
+      editor.setScrollPosition({ top: 300000, left: 0 })
       await flushTimers()
       await flushMicrotasks()
 
@@ -6204,7 +6203,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 60_000 },
+        { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6215,8 +6214,7 @@ describe('Editor', () => {
       })
       await flushSyntaxDebounce()
       const rangeCountBeforeScroll = ranges.length
-
-      editor.setScrollPosition({ top: 900_000, left: 0 })
+      editor.setScrollPosition({ top: 900000, left: 0 })
       await flushSyntaxDebounce()
 
       expect(hasLongSyntaxRange(ranges.slice(rangeCountBeforeScroll))).toBe(true)
@@ -6234,7 +6232,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 60_000 },
+        { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6245,13 +6243,11 @@ describe('Editor', () => {
       })
       await flushSyntaxDebounce()
       const rangeCountBeforeTeleport = ranges.length
-
-      editor.setScrollPosition({ top: 900_000, left: 0 })
+      editor.setScrollPosition({ top: 900000, left: 0 })
       const urgentRange = ranges[rangeCountBeforeTeleport]
       await flushSyntaxDebounce()
       const postTeleportRanges = ranges.slice(rangeCountBeforeTeleport)
-
-      expect(rangeLength(urgentRange)).toBeLessThan(120_000)
+      expect(rangeLength(urgentRange)).toBeLessThan(120000)
       expect(hasLongSyntaxRange(postTeleportRanges)).toBe(true)
     })
 
@@ -6284,7 +6280,7 @@ describe('Editor', () => {
         plugins: withTestLanguagePlugins(plugin),
       })
       const text = Array.from(
-        { length: 60_000 },
+        { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6295,14 +6291,12 @@ describe('Editor', () => {
       })
       await flushSyntaxDebounce()
       const rangeCountBeforeTeleport = ranges.length
-
-      requireViewContributionContext(contributionContext).setScrollPosition({ top: 900_000 })
+      requireViewContributionContext(contributionContext).setScrollPosition({ top: 900000 })
       const urgentRange = ranges[rangeCountBeforeTeleport]
       await flushSyntaxDebounce()
       const postTeleportRanges = ranges.slice(rangeCountBeforeTeleport)
-
-      expect(editor.getScrollPosition().top).toBe(900_000)
-      expect(rangeLength(urgentRange)).toBeLessThan(120_000)
+      expect(editor.getScrollPosition().top).toBe(900000)
+      expect(rangeLength(urgentRange)).toBeLessThan(120000)
       expect(hasLongSyntaxRange(postTeleportRanges)).toBe(true)
     })
 
@@ -6326,7 +6320,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 60_000 },
+        { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6336,13 +6330,12 @@ describe('Editor', () => {
         text,
       })
       await flushSyntaxDebounce()
-
-      editor.setScrollPosition({ top: 300_000, left: 0 })
+      editor.setScrollPosition({ top: 300000, left: 0 })
       await flushSyntaxDebounce()
       expect(ranges).toHaveLength(0)
 
       canQueryRange = true
-      editor.setScrollPosition({ top: 250_000, left: 0 })
+      editor.setScrollPosition({ top: 250000, left: 0 })
 
       expect(ranges).toHaveLength(1)
       expect(ranges[0]?.startIndex).toBeGreaterThan(0)
@@ -6366,7 +6359,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 60_000 },
+        { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6378,13 +6371,12 @@ describe('Editor', () => {
       await flushSyntaxDebounce()
       const rangeCountBeforeTeleport = ranges.length
       deferRangeQueries = true
-
-      editor.setScrollPosition({ top: 900_000, left: 0 })
+      editor.setScrollPosition({ top: 900000, left: 0 })
       await new Promise((resolve) => setTimeout(resolve, 40))
       await flushMicrotasks()
 
       expect(ranges).toHaveLength(rangeCountBeforeTeleport + 1)
-      expect(rangeLength(ranges[rangeCountBeforeTeleport])).toBeLessThan(120_000)
+      expect(rangeLength(ranges[rangeCountBeforeTeleport])).toBeLessThan(120000)
 
       pendingRanges[0]?.resolve(createSyntaxResult([]))
       await flushMicrotasks()
@@ -6392,7 +6384,7 @@ describe('Editor', () => {
       await flushMicrotasks()
 
       expect(ranges.length).toBeGreaterThan(rangeCountBeforeTeleport + 1)
-      expect(rangeLength(ranges.at(-1))).toBeGreaterThan(200_000)
+      expect(rangeLength(ranges.at(-1))).toBeGreaterThan(200000)
     })
 
     it('warms non-visible syntax tiles in the background', async () => {
@@ -6407,7 +6399,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 60_000 },
+        { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6420,10 +6412,10 @@ describe('Editor', () => {
       await flushSyntaxDebounce()
 
       const warmedTile = ranges.find(
-        (range) => range.startIndex >= 120_000 && rangeLength(range) <= 120_000,
+        (range) => range.startIndex >= 120000 && rangeLength(range) <= 120000,
       )
       expect(warmedTile).toBeDefined()
-      expect(ranges).not.toContainEqual({ startIndex: 0, endIndex: 120_000 })
+      expect(ranges).not.toContainEqual({ startIndex: 0, endIndex: 120000 })
     })
 
     it('keeps fold paint pending when the viewport moves before its first structural result', async () => {
@@ -6447,7 +6439,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 60_000 },
+        { length: 60000 },
         (_, index) => `const line${index} = ${index};`,
       ).join('\n')
       editor.openDocument({
@@ -6456,7 +6448,7 @@ describe('Editor', () => {
         text,
       })
       await vi.waitFor(() => expect(pending).toHaveLength(1))
-      editor.setScrollPosition({ top: 900_000, left: 0 })
+      editor.setScrollPosition({ top: 900000, left: 0 })
       const firstRange = pending[0]!
       events.length = 0
       firstRange.result.resolve(createSyntaxResult([]))
@@ -6468,7 +6460,7 @@ describe('Editor', () => {
           event.snapshot?.foldMarkers.some((marker) => marker.key.includes(':indent:')),
         ),
       ).toBe(false)
-      const currentRange = pending.find((entry) => entry.range.startIndex > 800_000)!
+      const currentRange = pending.find((entry) => entry.range.startIndex > 800000)!
       expect(currentRange).toBeDefined()
       currentRange.result.resolve(createSyntaxResult([]))
       await vi.waitFor(() => expect(events.at(-1)?.snapshot?.syntaxStatus).toBe('ready'))
@@ -6481,7 +6473,7 @@ describe('Editor', () => {
       const prefix = 'if (x) {\n  y();\n}\n'
       const text =
         prefix +
-        Array.from({ length: 60_000 }, (_value, index) => `const line${index} = ${index};`).join(
+        Array.from({ length: 60000 }, (_value, index) => `const line${index} = ${index};`).join(
           '\n',
         )
       const fold = {
@@ -6520,7 +6512,7 @@ describe('Editor', () => {
       await flushSyntaxDebounce()
 
       expect(
-        ranges.some((range) => range.startIndex >= 120_000 && rangeLength(range) <= 120_000),
+        ranges.some((range) => range.startIndex >= 120000 && rangeLength(range) <= 120000),
       ).toBe(true)
       expect(latestFoldMarkers(events)).toHaveLength(1)
     })
@@ -6548,7 +6540,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 20_000 },
+        { length: 20000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6561,8 +6553,7 @@ describe('Editor', () => {
       const rangeCountAfterOpen = ranges.length
       const initialToken = tokenSnapshotFromLastEvent(events)[0]
       expect(initialToken).toMatchObject({ start: 10, end: 15 })
-
-      editor.setScrollPosition({ top: 300_000, left: 0 })
+      editor.setScrollPosition({ top: 300000, left: 0 })
       await flushSyntaxDebounce()
       const tokens = tokenSnapshotFromLastEvent(events)
       const scrolledRanges = ranges.slice(rangeCountAfterOpen)
@@ -6599,7 +6590,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 20_000 },
+        { length: 20000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6610,8 +6601,7 @@ describe('Editor', () => {
       })
       await flushSyntaxDebounce()
       const initialToken = tokenSnapshotFromLastEvent(events)[0]
-
-      editor.setScrollPosition({ top: 300_000, left: 0 })
+      editor.setScrollPosition({ top: 300000, left: 0 })
       const rangeCountAfterScrollAway = await flushSyntaxUntilSettled(() => ranges.length)
 
       editor.setScrollPosition({ top: 0, left: 0 })
@@ -6641,7 +6631,7 @@ describe('Editor', () => {
         }),
       )
       const text = Array.from(
-        { length: 20_000 },
+        { length: 20000 },
         (_value, index) => `const line${index} = ${index};`,
       ).join('\n')
 
@@ -6651,7 +6641,7 @@ describe('Editor', () => {
         text,
       })
       await flushSyntaxDebounce()
-      editor.setScrollPosition({ top: 300_000, left: 0 })
+      editor.setScrollPosition({ top: 300000, left: 0 })
       await flushSyntaxDebounce()
 
       editor.setSelection(5, 5, { reveal: false })
@@ -8042,6 +8032,13 @@ describe('Editor', () => {
 })
 
 /** The text `edit` leaves behind, which a detached `applyEdit` is handed alongside the edit. */
-function after(text: string, edit: { from: number; to: number; text: string }) {
+function after(
+  text: string,
+  edit: {
+    from: number
+    to: number
+    text: string
+  },
+) {
   return createStringTextSnapshot(text.slice(0, edit.from) + edit.text + text.slice(edit.to))
 }

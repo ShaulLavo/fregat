@@ -98,7 +98,7 @@ until it is on `main`. The settings registry is fine to add keys to; regenerate 
 `git worktree remove /work/worktrees/platform/<lane>` (the branch stays for the PR).
 
 **After merging** (owner, or a session asked to): from `/work/projects/platform`, `git pull`,
-then `bun run deploy --server --slug=<lane>`, then `GET /platform/release`.
+then `bun run install-release --server --slug=<lane>`, then `GET /platform/release`.
 
 ## Every run of a lane
 

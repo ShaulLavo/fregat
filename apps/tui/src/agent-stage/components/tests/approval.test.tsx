@@ -23,7 +23,7 @@ test.for([false, true])(
       <CommandProvider
         scope={{ screen: 'chat', environmentId: 'test', projectId: null }}
         handlers={{}}
-        overrides={{}}
+        overrides={[]}
         onError={(error) => expect.unreachable(String(error))}
       >
         <Approval

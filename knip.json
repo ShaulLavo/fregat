@@ -22,6 +22,7 @@
         "src/fs/watch-worker.ts",
         "src/fs/tests/fixtures/crashing-watch-worker.ts",
         "src/system/tests/fixtures/activated-server.ts",
+        "src/system/tests/fixtures/file-lock-write-failure.ts",
         "test/factories/claude-ipc.cjs",
         "src/installation/remote-support.ts",
         "src/terminal-host/main.ts",
@@ -50,7 +51,6 @@
         "scripts/chat-scroll-proof.mjs",
         "scripts/chat-scroll-proof-entry.mjs",
         "scripts/chat-snapshot-benchmark.ts",
-        "scripts/keymap-baseline.mjs",
         "scripts/verify-federated-environments.mjs",
         "scripts/verify-web-design.mjs",
         "scripts/syntax-coverage.ts",
@@ -71,7 +71,6 @@
         "check-editor-backlog.mjs",
         "agent/browser.ts",
         "agent/desktop-display.ts",
-        "claude-gpt/run.ts",
         "large-file/bench.ts",
         "heavy/pi/launch.ts",
         "heavy/pi/run.ts",
@@ -81,7 +80,8 @@
         "agent/injected/style-marks.ts",
         "agent/fixtures/fake-*.mjs",
         "agent/logs.ts",
-        "deploy/mesh.ts",
+        "install-release.ts",
+        "build-release.ts",
         "deploy/live-check.mjs",
         "deploy/systemd/promote.ts",
         "desktop-dev.ts",
@@ -120,10 +120,11 @@
         "parity/snooze.ts",
         "parity/wake.ts"
       ],
-      "ignoreBinaries": ["flock", "ssh-keygen", "systemd-run", "taskset"]
+      "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
-      "ignoreDependencies": ["typescript-api"]
+      "ignoreDependencies": ["typescript-api"],
+      "vitest": { "config": ["vitest.scripts.config.mjs"] }
     },
     "apps/tui": {
       "entry": [
@@ -301,8 +302,13 @@
       "project": ["src/**/*.{ts,tsx}"]
     },
     "ghostty-webgpu": {
+      "ignoreBinaries": ["zig"],
       "entry": ["src/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
+    },
+    "ghostty-webgpu-line-editor": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
     },
     "ghostty-webgpu/demo": {
       "entry": ["src/client.ts"],

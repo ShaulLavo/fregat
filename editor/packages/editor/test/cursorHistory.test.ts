@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { Editor } from '../src/editor'
-import { defaultEditorKeyBindings, editorCommandPackForCommand } from '../src/editor/keymap'
+import { defaultKeyBindings, commandCategory } from './factories/keymap'
 import { createDocumentSession, type DocumentSession } from '../src/public/document'
 import { resetEditorInstanceCount } from '../src/public/testing'
 import { resolveSelection } from '../src/selections'
@@ -272,14 +272,14 @@ describe('cursor history', () => {
   it('is on the default keymap', () => {
     // Reachable only by a host calling the method by hand is the same as not
     // shipped, and the command pack it belongs to decides that.
-    const commands = defaultEditorKeyBindings().map((binding) => binding.command)
+    const commands = defaultKeyBindings().map((binding) => binding.command)
 
     expect(commands).toContain('cursorUndo')
     expect(commands).toContain('cursorRedo')
     // And they belong to a pack, so a host that rebinds them keeps them: an
     // unclassified command is dropped from every layer built from bindings.
-    expect(editorCommandPackForCommand('cursorUndo')).toBe('text-editing')
-    expect(editorCommandPackForCommand('cursorRedo')).toBe('text-editing')
+    expect(commandCategory('cursorUndo')).toBe('text-editing')
+    expect(commandCategory('cursorRedo')).toBe('text-editing')
   })
 
   it('drops entries that address a document the editor no longer holds', () => {

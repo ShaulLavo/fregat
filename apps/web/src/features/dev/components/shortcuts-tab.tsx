@@ -1,4 +1,4 @@
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 
@@ -6,14 +6,14 @@ import { Section } from '@/features/dev/components/section'
 import { ShortcutRecorder } from '@/features/settings/components/shortcut-recorder'
 import { ShortcutRow } from '@/features/settings/components/shortcut-row'
 import { shortcutRows } from '@/features/settings/utils/shortcut-rows'
-import { presetPlatformKeyBindings } from '@/keymap/default-bindings'
+import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 
 // Two custom chords, one clash and one removal, the states the page has to draw.
-const FIXTURE_OVERRIDES = {
-  'workspace.goToLine': ['Mod+P'],
-  'workspace.togglePanel': ['Mod+Alt+J'],
-  'workspace.saveAllFiles': null,
-} as const
+const FIXTURE_OVERRIDES = [
+  { command: 'workspace.goToLine', keys: 'Mod+P', context: 'Workspace' },
+  { command: 'workspace.togglePanel', keys: 'Mod+Alt+J', context: 'Workspace' },
+  { unbind: 'workspace.saveAllFiles', keys: 'Mod+Alt+S', context: 'Workspace' },
+] as const
 
 const SHOWN = [
   'workspace.showCommandPalette',
@@ -28,7 +28,7 @@ const SHOWN = [
 /** The shortcuts editor's rows and recorder over fixture overrides, at desk and phone width. */
 export function ShortcutsTab() {
   const platform = detectPlatform()
-  const defaults = presetPlatformKeyBindings(platform, 'default').bindings
+  const defaults = defaultPlatformKeyBindings(platform, 'ours')
   const all = shortcutRows(defaults, FIXTURE_OVERRIDES, platform)
   const rows = SHOWN.flatMap((command) => all.filter((row) => row.command === command))
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)

@@ -1,6 +1,7 @@
+import { SETTING_ROW_IDS } from '@workspace/contracts/settings/presentation'
 import { testRender } from '@opentui/react/test-utils'
 import { act } from 'react'
-import { SETTING_ROW_IDS } from '@workspace/contracts'
+
 import { settingRowTitle } from '@workspace/client-core/settings/humanize'
 
 import { Application } from '@/components/application'

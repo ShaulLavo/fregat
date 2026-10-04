@@ -1,3 +1,4 @@
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import { errorMessage } from '@/lib/error-message'
 import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
@@ -104,15 +105,7 @@ import { useDirectoryLoad } from '@/features/file-picker/hooks/use-directory-loa
 import { useRecentEntries } from '@/features/file-picker/hooks/use-recent-entries'
 import { usePlaces } from '@/features/file-picker/hooks/use-places'
 import { useServerInfoForOpen } from '@/features/file-picker/hooks/use-server-info-for-open'
-import {
-  isBackShortcut,
-  isForwardShortcut,
-  isGoToFolderShortcut,
-  isGoUpShortcut,
-  isOpenShortcut,
-  isToggleHiddenShortcut,
-  listCountLabel,
-} from '@/features/file-picker/utils/keyboard'
+import { listCountLabel } from '@/features/file-picker/utils/keyboard'
 import {
   sortFilePickerEntries,
   type FileListSort,
@@ -361,13 +354,6 @@ export function FilePickerDialog({
     settingsActions.setSetting('files.showHidden', !showHidden, hiddenWriteTarget)
   }
 
-  function leaveDirectory(event: KeyboardEvent<HTMLElement>) {
-    if (!session.canGoUp) return
-
-    event.preventDefault()
-    navigateTo(pickerParentPath(session.currentPath))
-  }
-
   function chooseSelected() {
     if (!selectedPickable) return
 
@@ -480,42 +466,58 @@ export function FilePickerDialog({
     if (pickable) commitPick(pickable)
   }
 
-  function historyChord(event: KeyboardEvent<HTMLDivElement>) {
-    if (isBackShortcut(event)) return goBack
-    if (isForwardShortcut(event)) return goForward
-    if (isOpenShortcut(event)) return openSelected
-    return null
-  }
+  const pickerRef = useKeymapNode({
+    area: 'dialog',
+    context: 'FilePicker',
+    commands: {
+      'filePicker.navigateBack': ({ source }) => {
+        if (!open || openingPopupTrigger(source?.target ?? null) || !session.backPath) return false
+        goBack()
+        return true
+      },
+      'filePicker.navigateForward': ({ source }) => {
+        if (!open || openingPopupTrigger(source?.target ?? null) || !session.forwardPath)
+          return false
+        goForward()
+        return true
+      },
+      'filePicker.openSelected': ({ source }) => {
+        if (
+          !open ||
+          openingPopupTrigger(source?.target ?? null) ||
+          !focusedEntry ||
+          listInteractionPending
+        )
+          return false
+        if (!isDirectoryEntry(focusedEntry) && !toPickedEntry(focusedEntry, mode, activeAccept))
+          return false
+        openSelected()
+        return true
+      },
+      'filePicker.goToFolder': ({ source }) => {
+        if (!open || openingPopupTrigger(source?.target ?? null)) return false
+        pathInput.open()
+        return true
+      },
+      'filePicker.toggleHidden': ({ source }) => {
+        if (!open || openingPopupTrigger(source?.target ?? null) || hiddenSettingDisabled)
+          return false
+        toggleHiddenFiles()
+        return true
+      },
+      'filePicker.goUp': ({ source }) => {
+        if (!open || openingPopupTrigger(source?.target ?? null) || !session.canGoUp) return false
+        navigateTo(pickerParentPath(session.currentPath))
+        return true
+      },
+    },
+  })
 
   function handleDialogKeyDownCapture(event: KeyboardEvent<HTMLDivElement>) {
     if (event.target instanceof Node && !event.currentTarget.contains(event.target)) return
     // A descendant popup (type filter, new-folder) can still have focus on its trigger while its
     // popup opens; the dialog must yield to it so Escape closes only the innermost layer.
     if (openingPopupTrigger(event.target)) return
-    const chord = historyChord(event)
-    if (chord) {
-      event.preventDefault()
-      event.stopPropagation()
-      chord()
-      return
-    }
-    if (isGoToFolderShortcut(event)) {
-      event.preventDefault()
-      event.stopPropagation()
-      pathInput.open()
-      return
-    }
-    if (isToggleHiddenShortcut(event)) {
-      event.preventDefault()
-      event.stopPropagation()
-      toggleHiddenFiles()
-      return
-    }
-    if (isGoUpShortcut(event)) {
-      leaveDirectory(event)
-      event.stopPropagation()
-      return
-    }
     if (event.key !== 'Escape') return
     if (pathInput.isEditing) {
       event.preventDefault()
@@ -693,6 +695,7 @@ export function FilePickerDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
         className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden p-0 text-sm max-sm:h-dvh max-sm:w-full max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[max(env(safe-area-inset-bottom),var(--keyboard-inset,0px))] sm:max-w-none'
+        ref={pickerRef}
         onKeyDownCapture={handleDialogKeyDownCapture}
         showCloseButton={false}
       >

@@ -1,0 +1,58 @@
+[
+  {
+    "index": 329,
+    "identity": {
+      "platform": "linux",
+      "keys": "Ctrl+[",
+      "upstreamCommand": "editor::Outdent",
+      "upstreamContext": "Editor"
+    },
+    "fields": {
+      "context": "Workspace",
+      "command": "workspace.navigateBack",
+      "deviation": "Plan 206 authorizes Mod+[ and Mod+] for document navigation while an Editor has focus."
+    }
+  },
+  {
+    "index": 330,
+    "identity": {
+      "platform": "linux",
+      "keys": "Ctrl+]",
+      "upstreamCommand": "editor::Indent",
+      "upstreamContext": "Editor"
+    },
+    "fields": {
+      "context": "Workspace",
+      "command": "workspace.navigateForward",
+      "deviation": "Plan 206 authorizes Mod+[ and Mod+] for document navigation while an Editor has focus."
+    }
+  },
+  {
+    "index": 1276,
+    "identity": {
+      "platform": "mac",
+      "keys": "Meta+[",
+      "upstreamCommand": "editor::Outdent",
+      "upstreamContext": "Editor"
+    },
+    "fields": {
+      "context": "Workspace",
+      "command": "workspace.navigateBack",
+      "deviation": "Plan 206 authorizes Mod+[ and Mod+] for document navigation while an Editor has focus."
+    }
+  },
+  {
+    "index": 1277,
+    "identity": {
+      "platform": "mac",
+      "keys": "Meta+]",
+      "upstreamCommand": "editor::Indent",
+      "upstreamContext": "Editor"
+    },
+    "fields": {
+      "context": "Workspace",
+      "command": "workspace.navigateForward",
+      "deviation": "Plan 206 authorizes Mod+[ and Mod+] for document navigation while an Editor has focus."
+    }
+  }
+]

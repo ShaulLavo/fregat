@@ -340,12 +340,6 @@
         },
         {
           "kind": "type",
-          "name": "EditorCommandPack",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "type",
           "name": "EditorCommentTokens",
           "source": "packages/editor/src/public/extensions.ts",
           "via": "packages/editor/src/index.ts"
@@ -562,6 +556,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorHotkeysHost",
+          "source": "packages/editor/src/editor/hotkeys.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorIndentationRules",
           "source": "packages/editor/src/public/extensions.ts",
           "via": "packages/editor/src/index.ts"
@@ -610,26 +610,32 @@
         },
         {
           "kind": "type",
-          "name": "EditorKeyBinding",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "EditorKeymapContext",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
           "kind": "type",
-          "name": "EditorKeymapLayer",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "EditorKeymapMetadata",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
           "kind": "type",
-          "name": "EditorKeymapLayerSource",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "EditorKeymapNodeOptions",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
           "kind": "type",
           "name": "EditorKeymapOptions",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorKeymapPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
@@ -1714,6 +1720,12 @@
         },
         {
           "kind": "unknown",
+          "name": "baseEditorKeymap",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "beginReverseDocumentTransactionSequence",
           "source": "packages/editor/src/public/document.ts",
           "via": "packages/editor/src/index.ts"
@@ -1954,20 +1966,8 @@
         },
         {
           "kind": "unknown",
-          "name": "defaultEditorCommandPacks",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "defaultEditorKeyBindings",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "defaultEditorKeymapLayers",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "defaultEditorPacks",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
@@ -2068,50 +2068,8 @@
         },
         {
           "kind": "unknown",
-          "name": "editorCommandPackForCommand",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
           "name": "EditorDecorationStore",
           "source": "packages/editor/src/public/extensions.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeyBindings",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeyBindingsFromLayers",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayerForCommandPack",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayers",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayersForBindings",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayersForCommandPacks",
-          "source": "packages/editor/src/editor/keymap.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
@@ -2130,12 +2088,6 @@
           "kind": "unknown",
           "name": "EditorTokenStore",
           "source": "packages/editor/src/syntax/tokenStore.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "filterEditorKeymapLayersByCommandPacks",
-          "source": "packages/editor/src/editor/keymap.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
@@ -2184,6 +2136,12 @@
           "kind": "unknown",
           "name": "lightenEditorColor",
           "source": "packages/editor/src/public/rendering.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "markdownPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
@@ -2254,8 +2212,8 @@
         },
         {
           "kind": "unknown",
-          "name": "readonlySafeEditorCommandPacks",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "readonlyDiffPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
@@ -2380,6 +2338,12 @@
         },
         {
           "kind": "unknown",
+          "name": "suggestPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "suspiciousCharacterRanges",
           "source": "packages/editor/src/editor.ts",
           "via": "packages/editor/src/index.ts"
@@ -2400,6 +2364,66 @@
           "kind": "unknown",
           "name": "treeSitterCapturesToEditorTokens",
           "source": "packages/editor/src/public/syntax.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeAdvancedEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeFindPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeFoldingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeInlineSuggestPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeLspEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeLspNavigationPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeMultiCursorPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeNavigationPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeSelectionPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/index.ts"
         }
       ],
@@ -3610,12 +3634,6 @@
         },
         {
           "kind": "type",
-          "name": "EditorCommandPack",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "type",
           "name": "EditorCursorLineHighlightOptions",
           "source": "packages/editor/src/virtualization/virtualizedTextViewTypes.ts",
           "via": "packages/editor/src/editor.ts"
@@ -3760,6 +3778,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorHotkeysHost",
+          "source": "packages/editor/src/editor/hotkeys.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorInitialHighlightStatus",
           "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/editor.ts"
@@ -3790,26 +3814,32 @@
         },
         {
           "kind": "type",
-          "name": "EditorKeyBinding",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "EditorKeymapContext",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "type",
-          "name": "EditorKeymapLayer",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "EditorKeymapMetadata",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "type",
-          "name": "EditorKeymapLayerSource",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "EditorKeymapNodeOptions",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "type",
           "name": "EditorKeymapOptions",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorKeymapPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4300,6 +4330,12 @@
         },
         {
           "kind": "unknown",
+          "name": "baseEditorKeymap",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "bracketJumpTargetOffset",
           "source": "packages/editor/src/editor/bracketMatching.ts",
           "via": "packages/editor/src/editor.ts"
@@ -4372,20 +4408,8 @@
         },
         {
           "kind": "unknown",
-          "name": "defaultEditorCommandPacks",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "defaultEditorKeyBindings",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "defaultEditorKeymapLayers",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "defaultEditorPacks",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4426,56 +4450,26 @@
         },
         {
           "kind": "unknown",
-          "name": "editorCommandPackForCommand",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "editorCommandDeclaration",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "unknown",
-          "name": "editorKeyBindings",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeyBindingsFromLayers",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayerForCommandPack",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayers",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayersForBindings",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayersForCommandPacks",
-          "source": "packages/editor/src/editor/keymap.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "filterEditorKeymapLayersByCommandPacks",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "editorCommandMutates",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "unknown",
           "name": "findBracketMatchAtCaret",
           "source": "packages/editor/src/editor/bracketMatching.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "markdownPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4492,8 +4486,8 @@
         },
         {
           "kind": "unknown",
-          "name": "readonlySafeEditorCommandPacks",
-          "source": "packages/editor/src/editor/keymap.ts",
+          "name": "readonlyDiffPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4522,8 +4516,74 @@
         },
         {
           "kind": "unknown",
+          "name": "suggestPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "suspiciousCharacterRanges",
           "source": "packages/editor/src/unicodeHighlight.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeAdvancedEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeFindPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeFoldingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeInlineSuggestPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeLspEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeLspNavigationPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeMultiCursorPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeNavigationPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeSelectionPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/editor.ts"
         }
       ],
@@ -4824,18 +4884,6 @@
           "kind": "type",
           "name": "EditorInput",
           "source": "packages/editor/src/createPlugin.ts",
-          "via": "packages/editor/src/public/extensions.ts"
-        },
-        {
-          "kind": "type",
-          "name": "EditorKeyDecision",
-          "source": "packages/editor/src/plugins.ts",
-          "via": "packages/editor/src/public/extensions.ts"
-        },
-        {
-          "kind": "type",
-          "name": "EditorKeyParticipant",
-          "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
@@ -5308,6 +5356,12 @@
         },
         {
           "kind": "unknown",
+          "name": "createEditorWidgetKeymap",
+          "source": "packages/editor/src/editor/hotkeys.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "createPlugin",
           "source": "packages/editor/src/createPlugin.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -5506,12 +5560,6 @@
       "exports": [
         {
           "kind": "type",
-          "name": "ChordOutcome",
-          "source": "packages/editor/src/keymap/types.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
           "name": "EditorAnyCommandId",
           "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/public/keymap.ts"
@@ -5531,7 +5579,7 @@
         {
           "kind": "type",
           "name": "EditorCommandPack",
-          "source": "packages/editor/src/keymap/presets.ts",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
@@ -5548,32 +5596,26 @@
         },
         {
           "kind": "type",
-          "name": "EditorKeyBinding",
-          "source": "packages/editor/src/keymap/presets.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "EditorKeyCondition",
-          "source": "packages/editor/src/keymap/conditions.ts",
+          "name": "EditorHotkeysHost",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
           "kind": "type",
           "name": "EditorKeymapContext",
-          "source": "packages/editor/src/keymap/conditions.ts",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
           "kind": "type",
-          "name": "EditorKeymapLayer",
-          "source": "packages/editor/src/keymap/presets.ts",
+          "name": "EditorKeymapMetadata",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
           "kind": "type",
-          "name": "EditorKeymapLayerSource",
-          "source": "packages/editor/src/keymap/presets.ts",
+          "name": "EditorKeymapNodeOptions",
+          "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
@@ -5584,85 +5626,19 @@
         },
         {
           "kind": "type",
-          "name": "KeyChord",
-          "source": "packages/editor/src/keymap/types.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "KeymapBinding",
-          "source": "packages/editor/src/keymap/types.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "KeymapEdge",
-          "source": "packages/editor/src/keymap/trie.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "KeymapNode",
-          "source": "packages/editor/src/keymap/trie.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "KeymapPlatform",
-          "source": "packages/editor/src/keymap/types.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "KeymapRuntime",
-          "source": "packages/editor/src/keymap/types.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "KeymapRuntimeOptions",
-          "source": "packages/editor/src/keymap/types.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "KeymapSequenceEvent",
-          "source": "packages/editor/src/keymap/types.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "type",
-          "name": "PendingChordLabel",
-          "source": "packages/editor/src/keymap/types.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "buildKeymapTrie",
-          "source": "packages/editor/src/keymap/trie.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "createKeymapRuntime",
-          "source": "packages/editor/src/keymap/runtime.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "defaultEditorCommandPacks",
+          "name": "EditorKeymapPack",
           "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
           "kind": "unknown",
-          "name": "defaultEditorKeyBindings",
+          "name": "baseEditorKeymap",
           "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
           "kind": "unknown",
-          "name": "defaultEditorKeymapLayers",
+          "name": "defaultEditorPacks",
           "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
@@ -5681,61 +5657,7 @@
         {
           "kind": "unknown",
           "name": "editorCommandMutates",
-          "source": "packages/editor/src/keymap/conditions.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorCommandPackForCommand",
-          "source": "packages/editor/src/keymap/presets.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeyBindings",
-          "source": "packages/editor/src/keymap/presets.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeyBindingsFromLayers",
-          "source": "packages/editor/src/keymap/presets.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeyConditionMatches",
-          "source": "packages/editor/src/keymap/conditions.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayerForCommandPack",
-          "source": "packages/editor/src/keymap/presets.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayers",
-          "source": "packages/editor/src/keymap/presets.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayersForBindings",
-          "source": "packages/editor/src/keymap/presets.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "editorKeymapLayersForCommandPacks",
-          "source": "packages/editor/src/keymap/presets.ts",
-          "via": "packages/editor/src/public/keymap.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "filterEditorKeymapLayersByCommandPacks",
-          "source": "packages/editor/src/keymap/presets.ts",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
@@ -5746,25 +5668,79 @@
         },
         {
           "kind": "unknown",
-          "name": "presetEditorKeymapLayers",
+          "name": "markdownPack",
           "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
           "kind": "unknown",
-          "name": "readonlySafeEditorCommandPacks",
+          "name": "readonlyDiffPack",
           "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
           "kind": "unknown",
-          "name": "trieStep",
-          "source": "packages/editor/src/keymap/trie.ts",
+          "name": "suggestPack",
+          "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
           "kind": "unknown",
-          "name": "vscodeEditorKeyBindings",
+          "name": "vscodeAdvancedEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeFindPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeFoldingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeInlineSuggestPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeLspEditingPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeLspNavigationPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeMultiCursorPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeNavigationPack",
+          "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "vscodeSelectionPack",
           "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/public/keymap.ts"
         }

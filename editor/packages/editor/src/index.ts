@@ -190,19 +190,29 @@ export type {
   SemanticTokenStyles,
 } from './public/syntax'
 export {
-  defaultEditorCommandPacks,
-  defaultEditorKeyBindings,
-  defaultEditorKeymapLayers,
-  editorCommandPackForCommand,
-  editorKeyBindings,
-  editorKeyBindingsFromLayers,
-  editorKeymapLayerForCommandPack,
-  editorKeymapLayers,
-  editorKeymapLayersForBindings,
-  editorKeymapLayersForCommandPacks,
-  filterEditorKeymapLayersByCommandPacks,
-  readonlySafeEditorCommandPacks,
-} from './editor/keymap'
+  baseEditorKeymap,
+  defaultEditorPacks,
+  vscodeNavigationPack,
+  vscodeSelectionPack,
+  vscodeEditingPack,
+  vscodeAdvancedEditingPack,
+  vscodeMultiCursorPack,
+  vscodeFindPack,
+  vscodeFoldingPack,
+  vscodeLspNavigationPack,
+  vscodeLspEditingPack,
+  vscodeInlineSuggestPack,
+  suggestPack,
+  markdownPack,
+  readonlyDiffPack,
+} from './keymap/presets'
+export type { EditorKeymapOptions, EditorKeymapPack } from './keymap/presets'
+export type {
+  EditorHotkeysHost,
+  EditorKeymapContext,
+  EditorKeymapMetadata,
+  EditorKeymapNodeOptions,
+} from './editor/hotkeys'
 export type {
   AnchorBias,
   AnchorLiveness,
@@ -294,13 +304,6 @@ export type {
   EditorSyntaxStatus,
   HighlightRegistry,
 } from './editor'
-export type {
-  EditorCommandPack,
-  EditorKeyBinding,
-  EditorKeymapLayer,
-  EditorKeymapLayerSource,
-  EditorKeymapOptions,
-} from './editor/keymap'
 export type {
   EditorCapabilityContribution,
   EditorCapabilityContributionContext,

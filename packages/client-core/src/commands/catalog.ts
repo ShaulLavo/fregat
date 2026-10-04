@@ -1,3 +1,8 @@
+import {
+  localCommandMetadata,
+  questionCommandMetadata,
+  terminalSendKeystrokeMetadata,
+} from './node'
 import { chatCommandMetadata } from './chat'
 import { settingsCommandMetadata } from './settings'
 import { editorCommandMetadata } from './editor'
@@ -9,6 +14,9 @@ import { selectItemMetadata, sidebarPanelMetadata, workspaceCommandMetadata } fr
 import type { CommandMetadata } from './metadata'
 
 export const commandMetadata = [
+  ...localCommandMetadata,
+  ...questionCommandMetadata,
+  terminalSendKeystrokeMetadata,
   ...Object.values(workspaceCommandMetadata),
   ...Object.values(editorCommandMetadata),
   ...Object.values(environmentCommandMetadata),

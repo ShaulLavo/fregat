@@ -526,6 +526,9 @@ export {
 } from './lsp-protocol'
 export {
   keybindingChordSchema,
+  keybindingContextSchema,
+  keybindingOverrideSchema,
+  keybindingOverridesSchema,
   keybindingListSchema,
   MAX_KEYBINDINGS_PER_COMMAND,
   lspFeatureRanksOverrideSchema,
@@ -538,6 +541,7 @@ export {
   providerInstanceConfigsSchema,
   REDACTED_SETTINGS_VALUE,
   semanticTokenServerOverridesSchema,
+  type KeybindingOverride,
   type KeybindingOverrides,
   type LspLanguageServerLists,
   type LspServerOverride,
@@ -560,9 +564,7 @@ export {
   isSettingId,
   settingParentId,
   SETTING_IDS,
-  SETTING_ROW_IDS,
   SETTINGS_REGISTRY,
-  settingRowIds,
   settingsValuesSchema,
   type SettingId,
   type SettingsValues,
@@ -574,7 +576,6 @@ export {
   type ReadonlyJsonValue,
   type SettingsJsonSchema,
 } from './settings/schema'
-export { settingControl, type SettingControl } from './settings/control'
 export {
   COLOR_THEME_MODES,
   DEFAULT_COLOR_THEME,
@@ -591,10 +592,6 @@ export {
   isWorkbenchFeel,
   type WorkbenchFeel,
 } from './settings/boot-defaults'
-export {
-  DEFAULT_SETTINGS_DOCUMENT_REVISION,
-  defaultSettingsDocument,
-} from './settings/defaults-document'
 export {
   deriveWriteTarget,
   inspectSetting,
@@ -634,6 +631,8 @@ export {
   settingsRawWriteResultSchema,
   type NonSecretProviderEnvironmentVariable,
   type NonSecretProviderSeed,
+  type AppendKeybindingOperation,
+  type DeleteKeybindingOperation,
   type RemoveKeybindingOperation,
   type ResetSettingsOperation,
   type ScalarSettingId,

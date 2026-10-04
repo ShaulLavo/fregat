@@ -1,11 +1,12 @@
 import '@workspace/ui/globals.css'
 import '@singapore-editor/core/style.css'
+import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createKeymapEditor } from '../../../test/factories/keymap-editor'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import { commands } from 'vitest/browser'
 import { binding } from '../../../test/factories/key-binding'
-import { detectPlatform } from '@tanstack/react-hotkeys'
+import { detectPlatform } from '@fregat/hotkeys'
 import {
   useEffect,
   useState,
@@ -14,7 +15,8 @@ import {
 } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, expect, test } from 'vitest'
+import { cleanup } from '@testing-library/react'
 
 import { EditorTabActionsProvider } from '@/features/editor/providers/tab-actions-provider'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../test/factories/editor-state-provider'
@@ -22,6 +24,8 @@ import { MenuSurface } from '@/keymap/menus/components/surface'
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 import { actionItem, section } from '@/keymap/menus/utils/model'
 import { useCommand } from '@/keymap/hooks/use-command'
+import { createUndoBarrierPlugin } from '@/keymap/state/undo-barrier'
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import { CommandProvider } from '@/keymap/providers/command-provider'
 import type { CommandDispatchTicket } from '@/keymap/state/command-bus'
 import type { PlatformKeyBinding } from '@/keymap/types'
@@ -57,7 +61,8 @@ type TrustedKeyRecord = {
 const trustedKeyBindings: readonly PlatformKeyBinding[] = [
   binding('F2', { command: 'workspace.focusEditor' }),
   binding('F3', { command: 'workspace.toggleWallpaper' }),
-  binding('F4', { command: null }),
+  binding('F4', { command: 'workspace.toggleWallpaper' }),
+  binding('F4', { command: null, source: 'user' }),
 ]
 
 let root: Root | null = null
@@ -68,6 +73,7 @@ let trustedKeyRecords: TrustedKeyRecord[] = []
 let nativeEditors: ReturnType<typeof createKeymapEditor>[] = []
 
 afterEach(() => {
+  cleanup()
   for (const editor of nativeEditors) editor.dispose()
   nativeEditors = []
   flushSync(() => root?.unmount())
@@ -85,7 +91,7 @@ test('shared editor and app prefixes dispatch once through real editor input', a
   const bindings = [
     binding('Mod+K Mod+A', {
       command: 'editor.selectAll',
-      pane: 'editor',
+      context: 'Editor',
       platform: detectPlatform(),
     }),
     binding('Mod+K Mod+S', { command: 'workspace.toggleWallpaper', platform: detectPlatform() }),
@@ -106,50 +112,59 @@ test('shared editor and app prefixes dispatch once through real editor input', a
       },
     },
   )
-  const target = createKeymapEditor(view.result.current.focus, { key: 'shared' })
+  const target = createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+    key: 'shared',
+  })
   nativeEditors.push(target)
   target.editor.focus()
   await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
   expect(target.editor.getKeymapContext().hasSelection).toBe(false)
   await commands.proofKeyPress({ key: 'ControlOrMeta+a' })
   expect(target.editor.getKeymapContext().hasSelection).toBe(true)
-  expect(target.dispatched).toEqual(['selectAll'])
   await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
   await commands.proofKeyPress({ key: 'ControlOrMeta+s' })
   expect(calls).toEqual([false])
-  expect(target.dispatched).toEqual(['selectAll'])
   expect(target.editor.materializeFullText()).toBe('first line\nsecond line\nthird line')
   view.unmount()
 })
 
 test('conditional chord alternatives read real selection again on the second stroke', async () => {
-  const chord = { pane: 'editor' as const, platform: detectPlatform() }
+  const chord = { platform: detectPlatform() }
   const bindings: readonly PlatformKeyBinding[] = [
     {
-      ...binding('Mod+K Mod+X', { ...chord, command: 'editor.indentSelection' }),
-      editorWhen: ['hasSelection'],
+      ...binding('Mod+K Mod+X', {
+        ...chord,
+        command: 'editor.selectAll',
+        context: 'Editor && !findVisible',
+      }),
     },
     {
-      ...binding('Mod+K Mod+X', { ...chord, command: 'editor.selectAll' }),
-      editorWhen: ['!findVisible'],
+      ...binding('Mod+K Mod+X', {
+        ...chord,
+        command: 'editor.indentSelection',
+        context: 'Editor && hasSelection',
+      }),
     },
   ]
   const view = renderHookWithProviders(
     () => ({ command: useCommand(), focus: useFocusService() }),
     { command: { bindings } },
   )
-  const target = createKeymapEditor(view.result.current.focus, { key: 'conditional' })
+  const target = createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+    key: 'conditional',
+  })
   nativeEditors.push(target)
   target.editor.focus()
   target.editor.setSelection(0, 5)
   await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
   target.editor.setSelection(0)
   await commands.proofKeyPress({ key: 'ControlOrMeta+x' })
-  expect(target.dispatched).toEqual(['selectAll'])
   expect(target.editor.getKeymapContext().hasSelection).toBe(true)
   await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
   await commands.proofKeyPress({ key: 'ControlOrMeta+x' })
-  expect(target.dispatched).toEqual(['selectAll', 'indentSelection'])
+  expect(target.editor.materializeFullText()).toMatch(
+    /^\s+first line\n\s+second line\n\s+third line$/,
+  )
   view.unmount()
 })
 
@@ -157,7 +172,7 @@ test('moving between real editors in one pane cancels the pending owner', async 
   const bindings = [
     binding('Mod+K Mod+A', {
       command: 'editor.selectAll',
-      pane: 'editor',
+      context: 'Editor',
       platform: detectPlatform(),
     }),
   ]
@@ -165,8 +180,12 @@ test('moving between real editors in one pane cancels the pending owner', async 
     () => ({ command: useCommand(), focus: useFocusService() }),
     { command: { bindings } },
   )
-  const first = createKeymapEditor(view.result.current.focus, { key: 'first' })
-  const second = createKeymapEditor(view.result.current.focus, { key: 'second' })
+  const first = createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+    key: 'first',
+  })
+  const second = createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+    key: 'second',
+  })
   nativeEditors.push(first, second)
   first.editor.focus()
   await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
@@ -181,7 +200,9 @@ test('moving between real editors in one pane cancels the pending owner', async 
 
 test('real editor navigation and deletion work while nested inputs keep their own editing', async () => {
   const view = renderHookWithProviders(() => ({ command: useCommand(), focus: useFocusService() }))
-  const target = createKeymapEditor(view.result.current.focus, { key: 'editing' })
+  const target = createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+    key: 'editing',
+  })
   nativeEditors.push(target)
   target.editor.focus()
   target.editor.setSelection(0)
@@ -211,12 +232,71 @@ test('real editor navigation and deletion work while nested inputs keep their ow
   view.unmount()
 })
 
+test('a real Find field owns select-all, deletion and undo while its close command remains hosted', async () => {
+  const view = renderHookWithProviders(() => ({ command: useCommand(), focus: useFocusService() }))
+  const target = createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+    key: 'find-field',
+    plugins: [createEditorFindPlugin()],
+  })
+  nativeEditors.push(target)
+  target.editor.focus()
+  const before = target.editor.materializeFullText()
+  expect(target.editor.dispatchCommand('find')).toBe(true)
+  const input = target.container.querySelector<HTMLInputElement>('input[aria-label="Find"]')
+  expect(input).not.toBeNull()
+  if (!input) expect.fail('Missing real Find field')
+  input.value = 'local query'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.focus()
+  await commands.proofKeyPress({ key: 'ControlOrMeta+a' })
+  expect(input.selectionStart).toBe(0)
+  expect(input.selectionEnd).toBe(input.value.length)
+  await commands.proofKeyPress({ key: 'Backspace' })
+  expect(input.value).toBe('')
+  await commands.proofKeyPress({ key: 'ControlOrMeta+z' })
+  expect(target.editor.materializeFullText()).toBe(before)
+  await commands.proofKeyPress({ key: 'Escape' })
+  expect(target.editor.getKeymapContext().findVisible).toBe(false)
+  view.unmount()
+})
+
+test('hosted keyboard undo runs the existing barrier contribution before document history', async () => {
+  const view = renderHookWithProviders(() => ({ command: useCommand(), focus: useFocusService() }))
+  let notifications = 0
+  const target = createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+    key: 'undo-barrier',
+    plugins: [
+      createUndoBarrierPlugin(() => {
+        notifications++
+      }),
+    ],
+  })
+  nativeEditors.push(target)
+  target.editor.focus()
+  const before = target.editor.materializeFullText()
+  await commands.proofKeyPress({ key: 'ControlOrMeta+z' })
+  expect(notifications).toBe(1)
+  expect(target.editor.materializeFullText()).toBe(before)
+  expect(target.editor.dispatchCommand('insertNewlineAndIndent')).toBe(true)
+  expect(target.editor.materializeFullText()).not.toBe(before)
+  await commands.proofKeyPress({ key: 'ControlOrMeta+z' })
+  expect(notifications).toBe(2)
+  expect(target.editor.materializeFullText()).toBe(before)
+  await commands.proofKeyPress({ key: 'ControlOrMeta+Shift+z' })
+  expect(target.editor.materializeFullText()).not.toBe(before)
+  target.editor.setPlugins([])
+  await commands.proofKeyPress({ key: 'ControlOrMeta+z' })
+  expect(target.editor.materializeFullText()).toBe(before)
+  expect(notifications).toBe(2)
+  view.unmount()
+})
+
 test('Tab focus mode lets a native editor release and regain Tab editing', async () => {
   const bindings = [
     ...defaultPlatformKeyBindings(),
     binding('Control+Alt+F8', {
-      command: 'editor.editor.action.toggleTabFocusMode',
-      pane: 'editor',
+      command: 'editor.action.toggleTabFocusMode',
+      context: 'Editor',
       platform: detectPlatform(),
     }),
   ]
@@ -224,7 +304,9 @@ test('Tab focus mode lets a native editor release and regain Tab editing', async
     () => ({ command: useCommand(), focus: useFocusService() }),
     { command: { bindings } },
   )
-  const target = createKeymapEditor(view.result.current.focus, { key: 'tab' })
+  const target = createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+    key: 'tab',
+  })
   nativeEditors.push(target)
   const next = document.createElement('input')
   document.body.append(next)
@@ -245,15 +327,23 @@ test('Tab focus mode lets a native editor release and regain Tab editing', async
 
 test('read-only diff, search, and settings targets keep navigation and never mutate a writable sibling', async () => {
   const view = renderHookWithProviders(() => ({ command: useCommand(), focus: useFocusService() }))
-  const writable = createKeymapEditor(view.result.current.focus, { key: 'writable' })
+  const writable = createKeymapEditor(
+    view.result.current.focus,
+    view.result.current.command.keymap,
+    { key: 'writable' },
+  )
   nativeEditors.push(writable)
   writable.editor.focus()
   for (const surface of ['diff', 'search-result', 'settings'] as const) {
-    const readonly = createKeymapEditor(view.result.current.focus, {
-      key: surface,
-      surface,
-      writable: false,
-    })
+    const readonly = createKeymapEditor(
+      view.result.current.focus,
+      view.result.current.command.keymap,
+      {
+        key: surface,
+        surface,
+        writable: false,
+      },
+    )
     nativeEditors.push(readonly)
     readonly.editor.focus()
     readonly.editor.setSelection(0)
@@ -270,20 +360,32 @@ test('read-only diff, search, and settings targets keep navigation and never mut
   view.unmount()
 })
 
-test('trusted keys suppress only synchronous claims and reserved chords', async () => {
+test('trusted keys suppress synchronous claims and let null overrides reach native input', async () => {
+  const calls: boolean[] = []
   const view = renderHookWithProviders(() => useCommand(), {
-    command: { bindings: trustedKeyBindings },
+    command: {
+      bindings: trustedKeyBindings,
+      runtime: {
+        settings: {
+          setWallpaperEnabled: (enabled) => {
+            calls.push(enabled)
+            return { kind: 'noop' }
+          },
+        },
+      },
+    },
   })
-  const dispatch = vi.spyOn(view.result.current.bus, 'dispatch')
   const target = document.createElement('button')
   document.body.append(target)
   const recordKey = (event: KeyboardEvent) =>
-    trustedKeyRecords.push({
-      defaultPrevented: event.defaultPrevented,
-      key: event.key,
-      trusted: event.isTrusted,
-    })
-  document.addEventListener('keydown', recordKey)
+    setTimeout(() =>
+      trustedKeyRecords.push({
+        defaultPrevented: event.defaultPrevented,
+        key: event.key,
+        trusted: event.isTrusted,
+      }),
+    )
+  window.addEventListener('keydown', recordKey, true)
   target.focus()
 
   await commands.proofKeyPress({ key: 'F2' })
@@ -294,16 +396,17 @@ test('trusted keys suppress only synchronous claims and reserved chords', async 
   expect(trustedKeyRecords).toEqual([
     { defaultPrevented: false, key: 'F2', trusted: true },
     { defaultPrevented: true, key: 'F3', trusted: true },
-    { defaultPrevented: true, key: 'F4', trusted: true },
+    { defaultPrevented: false, key: 'F4', trusted: true },
   ])
-  expect(dispatch.mock.calls.map(([command]) => command)).toEqual(['workspace.toggleWallpaper'])
-  document.removeEventListener('keydown', recordKey)
+  expect(calls).toEqual([false])
+  window.removeEventListener('keydown', recordKey, true)
   view.unmount()
 })
 
-test('trusted chord completion, unmatched text and expiry preserve the focused input', async () => {
+test('trusted chord completion, replayed unmatched text and bound-prefix expiry preserve input focus', async () => {
   const calls: boolean[] = []
   const bindings = [
+    binding('Mod+K', { command: 'workspace.toggleWallpaper', platform: detectPlatform() }),
     binding('Mod+K Mod+S', { command: 'workspace.toggleWallpaper', platform: detectPlatform() }),
     binding('Mod+S', { command: 'workspace.toggleWallpaper', platform: detectPlatform() }),
   ]
@@ -333,14 +436,14 @@ test('trusted chord completion, unmatched text and expiry preserve the focused i
 
   try {
     await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
-    await expect.poll(() => view.result.current.pendingChord?.keys).toBe('Mod+K')
+    await expect.poll(() => view.result.current.pendingChord).not.toBeNull()
     await commands.proofKeyDown({ key: 'x' })
     await commands.proofKeyDown({ key: 'x' })
     await commands.proofKeyUp({ key: 'x' })
-    expect(input.value).toBe('keep')
-    expect(reachedInput).toEqual([])
+    expect(input.value).toBe('keepxx')
+    expect(reachedInput).toEqual(['x', 'x'])
     expect(view.result.current.pendingChord).toBeNull()
-    expect(calls).toEqual([])
+    expect(calls).toEqual([false])
 
     await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
     await commands.proofKeyDown({ key: modifier })
@@ -348,15 +451,15 @@ test('trusted chord completion, unmatched text and expiry preserve the focused i
     await commands.proofKeyDown({ key: 's' })
     await commands.proofKeyUp({ key: 's' })
     await commands.proofKeyUp({ key: modifier })
-    expect(input.value).toBe('keep')
-    expect(calls).toEqual([false])
+    expect(input.value).toBe('keepxx')
+    expect(calls).toEqual([false, false])
 
     await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
     await expect.poll(() => view.result.current.pendingChord, { timeout: 6_000 }).toBeNull()
     await commands.proofKeyPress({ key: 'x' })
-    expect(input.value).toBe('keepx')
-    expect(reachedInput).toEqual(['x'])
-    expect(calls).toEqual([false])
+    expect(input.value).toBe('keepxxx')
+    expect(reachedInput).toEqual(['x', 'x', 'x'])
+    expect(calls).toEqual([false, false, false])
   } finally {
     await commands.proofKeyUp({ key: 'x' })
     await commands.proofKeyUp({ key: 's' })
@@ -377,12 +480,12 @@ test('deepest event target wins and read-only focus cannot fall through', async 
           bindings: [
             binding('Mod+K Mod+A', {
               command: 'editor.selectAll',
-              pane: 'editor',
+              context: 'Editor',
               platform: detectPlatform(),
             }),
             binding('Mod+K Mod+Z', {
               command: 'editor.undo',
-              pane: 'editor',
+              context: 'Editor',
               platform: detectPlatform(),
             }),
           ],
@@ -471,15 +574,6 @@ test('palette and settings restore only after their modal targets depart', async
     kind: 'editor',
     surface: 'document',
   })
-
-  await commands.proofKeyPress({ key: 'ControlOrMeta+k' })
-  await expect
-    .poll(() => document.querySelector('output')?.textContent)
-    .toContain('Waiting for the next key')
-  expect(document.querySelector('[role="dialog"]')).toBeNull()
-  await commands.proofKeyPress({ key: 'ControlOrMeta+s' })
-  await expect.poll(() => document.querySelectorAll('[role="dialog"]').length).toBe(1)
-  await expect.poll(() => document.querySelector('output')?.textContent).toBe('')
 })
 
 test('a palette opened before its module loads keeps focus and restores its origin', async () => {
@@ -587,7 +681,22 @@ function EditorRoutingHarness() {
 }
 
 function useEditorTarget(key: string, writable: boolean) {
-  return useFocusTarget<HTMLElement>({
+  const keymapRef = useKeymapNode({
+    area: 'editor',
+    context: 'Editor',
+    commands: {
+      selectAll: () => {
+        editorDispatches.push(`${key}:selectAll`)
+        return true
+      },
+      undo: () => {
+        if (!writable) return false
+        editorDispatches.push(`${key}:undo`)
+        return true
+      },
+    },
+  })
+  const focus = useFocusTarget<HTMLElement>({
     area: 'editor',
     capabilities: {
       editor: {
@@ -606,6 +715,13 @@ function useEditorTarget(key: string, writable: boolean) {
       return true
     },
   })
+  return {
+    ...focus,
+    ref: (element: HTMLElement | null) => {
+      focus.ref(element)
+      keymapRef(element)
+    },
+  }
 }
 
 function mountOverlayOrigins() {
@@ -756,7 +872,11 @@ test.each(['input', 'textarea', 'contenteditable', 'editor'])(
     editable.contentEditable = 'true'
     document.body.append(target, editable)
     const editor =
-      kind === 'editor' ? createKeymapEditor(view.result.current.focus, { key: 'fkeys' }) : null
+      kind === 'editor'
+        ? createKeymapEditor(view.result.current.focus, view.result.current.command.keymap, {
+            key: 'fkeys',
+          })
+        : null
     if (editor) nativeEditors.push(editor)
     if (editor) editor.editor.focus()
     else if (kind === 'contenteditable') editable.focus()

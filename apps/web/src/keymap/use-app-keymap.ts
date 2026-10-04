@@ -1,56 +1,42 @@
-import { useLayoutEffect, useMemo, useState } from 'react'
-
+import { useEffectEvent, useLayoutEffect, useState } from 'react'
+import { createStore } from 'zustand/vanilla'
+import { useStore } from 'zustand'
+import type { PendingChordLabel } from '@fregat/hotkeys'
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
-import { createPlatformKeymapSession } from '@/keymap/state/keymap-session'
+import { createWindowKeymap, type WindowKeymap } from '@/keymap/state/window-keymap'
 import type { PlatformKeyBinding } from '@/keymap/types'
-import { appKeyBindingsForPane } from '@/keymap/utils/app-bindings'
-import type { PendingChordLabel } from '@singapore-editor/core/keymap'
-import type { FocusArea, FocusService, FocusTargetToken } from '@/lib/focus/state/service'
+import type { FocusService } from '@/lib/focus/state/service'
 
 export function useAppKeymap({
   bindings,
   bus,
   focus,
-  focusedPane,
-  focusedTarget = null,
 }: {
   readonly bindings: readonly PlatformKeyBinding[]
   readonly bus: Pick<PlatformCommandBus, 'capture'>
-  readonly focus?: FocusService
-  readonly focusedPane: FocusArea
-  readonly focusedTarget?: FocusTargetToken | null
+  readonly focus: FocusService
 }) {
-  const [pendingChord, setPendingChord] = useState<PendingChordLabel | null>(null)
-  // Table identity must remain stable while the pending label renders.
-  // Manual, because the effects below depend on it and the compiler's cache is a cache, not an
-  // identity guarantee: a recompute would rebind every shortcut.
-  const activeBindings = useMemo(
-    () => appKeyBindingsForPane(bindings, focusedPane),
-    [bindings, focusedPane],
+  const [state] = useState(() =>
+    createStore<{
+      readonly keymap: WindowKeymap | null
+      readonly pendingChord: PendingChordLabel | null
+    }>(() => ({ keymap: null, pendingChord: null })),
   )
-  // Key ownership must survive focus/table changes until the corresponding keyup.
-  const [session] = useState(() =>
-    createPlatformKeymapSession({
+  const keymap = useStore(state, (snapshot) => snapshot.keymap)
+  const pendingChord = useStore(state, (snapshot) => snapshot.pendingChord)
+  const create = useEffectEvent(() =>
+    createWindowKeymap({
+      bindings,
       bus,
       focus,
-      focusedPane,
-      focusedTarget,
-      onPendingChange: setPendingChord,
-      bindings: activeBindings,
+      onPendingChange: (pendingChord) => state.setState({ pendingChord }),
     }),
   )
-
   useLayoutEffect(() => {
-    session.update({
-      bus,
-      focus,
-      focusedPane,
-      focusedTarget,
-      onPendingChange: setPendingChord,
-      bindings: activeBindings,
-    })
-  }, [bus, focus, focusedPane, focusedTarget, session, activeBindings])
-  useLayoutEffect(() => session.mount(), [session])
-
-  return { claimKeybinding: session.claimKeybinding, pendingChord }
+    const current = create()
+    state.setState({ keymap: current })
+    return () => current.dispose()
+  }, [bus, focus, state])
+  useLayoutEffect(() => keymap?.updateBindings(bindings), [bindings, keymap])
+  return { keymap, pendingChord }
 }

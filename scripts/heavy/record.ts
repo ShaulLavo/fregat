@@ -3,7 +3,17 @@ import path from 'node:path'
 
 import type { Entry } from './queue'
 
-export type ServerAtAdmission = Pick<Entry, 'id' | 'label' | 'pid' | 'cwd' | 'sliceRoot'>
+export type ServerAtAdmission = Pick<Entry, 'id' | 'label' | 'pid' | 'cwd' | 'sliceRoot'> & {
+  readonly allowedCpus: readonly number[]
+}
+
+/** A wrapper launch interval; null end means settlement was not observed during this run. */
+export type JobDuringRun = ServerAtAdmission & {
+  readonly class: string
+  readonly server: boolean
+  readonly startedAt: string
+  readonly endedAt: string | null
+}
 
 /** One finished heavy job, as one line of `<logDir>/<UTC date>.jsonl`. */
 export type HeavyJobRecord = {
@@ -38,6 +48,10 @@ export type HeavyJobRecord = {
   readonly server: boolean
   /** Declared servers already admitted when this job acquired its queue place. */
   readonly serversAtAdmission: readonly ServerAtAdmission[]
+  /** CPU affinity ids; empty uses the host's scheduling policy. */
+  readonly allowedCpus: readonly number[]
+  /** Every other wrapper launch interval observed while this quiet measurement ran. */
+  readonly jobsDuringRun: readonly JobDuringRun[]
   /** A quiet job stopped because its hold ran out; it has to queue again. */
   readonly quietHoldExpired: boolean
   readonly unit: string

@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: APPROVED 2026-09-29, requested by the owner. Depends on
+- Status: DELIVERED 2026-10-04 in [PR #603](https://github.com/ShaulLavo/fregat/pull/603).
+  Installed release and live verification passed. Approved by the owner on 2026-09-29. Depends on
   [203](203-fregat-hotkeys.md), [204](204-editor-on-fregat-hotkeys.md) and
   [205](205-ghostty-on-fregat-hotkeys.md).
 - Decisions: [Keymap architecture](../docs/keymap/architecture.md). Research:
@@ -13,13 +14,20 @@
 
 ## Terminal launch contract
 
-Before the coordinated cutover, reconcile [205](205-ghostty-on-fregat-hotkeys.md)'s hotkeys
-extension and hosted focus-node adapter against active [286](286-ghostty-extensions.md)/
-[287](287-ghostty-worker-mode.md) work. Host claim/pass arbitration stays synchronous before
-native input encoding in both terminal entries. Verify app-bound keys are claimed once,
-unhandled and shell-bound keys reach the terminal once, text composition remains intact, and
-native protocol replies bypass host key hooks. Match registration/disposal to the landed host
-API; do not create a second dispatcher or make the whole terminal program a prerequisite.
+The hosted terminal uses [205](205-ghostty-on-fregat-hotkeys.md)'s
+`attachTerminalHotkeys` connection and the existing window dispatcher. Its finite owner claims
+original input synchronously before native encoding. A finite pass reaches explicitly installed
+peer general input contributions, then native once. Generated commands and protocol replies
+bypass original-input owners. Hotkeys attachment never constructs a general extension manager.
+
+Verify app-bound keys are claimed once, unhandled and shell-bound keys reach the terminal once,
+and physical events and text composition retain their ownership. Registration disposal removes
+only the terminal node/observer and its finite lease; the window dispatcher and native owner stay
+live. The main entry supplies immediate native modes. Worker finite connections reject through
+their Promise convention, while landed [286](286-ghostty-extensions.md)/
+[287](287-ghostty-worker-mode.md) public APIs and worker behavior remain peer-owned.
+The valid failed general-manager X6 window remains failed and authorizes no performance claim
+for this connection. Final candidate functional, artifact and latency evidence binds its own source.
 
 ## Why
 
@@ -101,22 +109,63 @@ requirements with this ownership before implementing its remaining catalog work.
 
 ## Steps
 
-- [ ] Translate Zed's default keymaps into `zed` and `ours`; list unmapped actions.
-- [ ] Wire the dispatcher and contexts from the focus service; port the command bus to handle
+### Execution 2026-10-03
+
+Status: Delivered 2026-10-04, with inspected installation and live release.
+The owner requested the wave through completion and renewed npm deferral.
+The integrated 204/205/206 release has all callers migrated,
+the replaced APIs removed, independent review, green CI and inspected deployment. Document
+runtime work, native clients, icon work and the TUI redesign stay in their separately scheduled
+programs.
+
+The Editor and terminal producers prepared isolated source branches. A single integration owner
+combined them with the window/TUI dispatcher, preset translation, settings and raw shortcut
+lanes. The coordinator completed plan reconciliation, reviewed package artifacts, merges and shipping.
+The terminal lane preserved the landed 286/287 host contracts needed here; their whole programs
+remain independent. Exact standalone family installation passed its gate under Plan 207.
+
+- [x] Pin the source inventory and old host binding tables.
+- [x] Capture the 20,000-line typing baseline and read its screenshot.
+- [x] Reproduce Markdown Mod+B formatting while the sidebar remains visible; read the screenshot.
+- [x] Prove root workspace versus isolated-family catalog resolution with no npm publication.
+- [x] Integrate final Editor, terminal, settings and raw-handler source, and remove obsolete APIs.
+- [x] Qualify actual isolated family installation from the final reviewed dependency artifact.
+- [x] Run the required scenario, input ownership and typing comparison checks; inspect evidence.
+- [x] Complete independent review, fix findings, pass all 21 PR checks and merge PR #603.
+- [x] Inspect the served release after installation and restart.
+
+Execution receipts: `/work/reports/command-foundation-2026-10-03/`. The baseline Markdown
+scenario completed at `/work/tmp/fregat-evidence/20261003T163951Z-scenario-markdown-authoring/`;
+its unrelated temporary-file read warnings are tracked in Fregat issue 568.
+
+### Delivery checklist
+
+- [x] Translate Zed's default keymaps into `zed` and `ours`; list unmapped actions.
+- [x] Wire the dispatcher and contexts from the focus service; port the command bus to handle
       node commands; keep `bun run gates` green.
-- [ ] Register editors and terminals as nodes (204, 205); delete the hosted keymap and capture
+- [x] Register editors and terminals as nodes (204, 205); delete the hosted keymap and capture
       listener.
-- [ ] New overrides and preset settings; build the binding-shadow report in Platform from
+- [x] New overrides and preset settings; build the binding-shadow report in Platform from
       `bindingsForInput` and show it in Settings. The library deliberately exposes no report API.
-- [ ] Raw handler audit and conversions; `use-question-digits` onto a context.
-- [ ] TUI matcher onto the library.
-- [ ] Scenarios in `scripts/agent/scenarios/` with selectors in `scripts/agent/selectors.ts`:
+- [x] Raw handler audit and conversions; `use-question-digits` onto a context.
+- [x] TUI matcher onto the library.
+- [x] Scenarios in `scripts/agent/scenarios/` with selectors in `scripts/agent/selectors.ts`:
       Mod+B toggles the sidebar with a Markdown file focused; Mod+[ navigates back from an editor
       under `ours`; Ctrl+B reaches the shell in a Linux terminal under the default layer and with
       `terminal.shellKeys`; a Mod+K chord started in the editor cancels on focus change.
-- [ ] Measure: keystroke `trace --compare` before and after, typing in a large file inside the
+- [x] Measure: keystroke `trace --compare` before and after, typing in a large file inside the
       8.3 ms budget.
-- [ ] Deploy with `bun run deploy`, or `--server --restart` if server code changed.
+- [x] Inspect the completed `bun run install-release --server --restart` live release.
+
+### Delivery evidence
+
+The [delivery record](../docs/keymap/command-foundation-delivery.md) pins final source
+`6da512054154358ed6e9e0681884bf38ddd91f85`, merged main
+`8d4694a20e79fada7acc2b0e97e0fe80762480c5`, exact family qualification and registered
+large-file pair 03. All 280 inputs, including five newlines, meet the processing criteria.
+Candidate processing p95 is 4.567 ms and maximum is 6.565 ms; reported-browser presentation
+p95 is 64.629 ms. Pair 02 remains a valid failed maximum result. The reviewed minimap
+publication fix precedes pair 03; no failed result was filtered or replayed.
 
 ## Acceptance
 
@@ -126,8 +175,15 @@ requirements with this ownership before implementing its remaining catalog work.
   terminal test suites pass.
 - Settings lists presets `ours`, `zed`, `vscode`, shows unmapped Zed actions and shadowing
   information, and records user bindings with contexts.
-- Keystroke latency is no worse than before (`trace --compare`).
+- The preregistered processing p95 comparison passes across all 280 inputs, with every owning
+  task retained, and candidate processing maximum is ≤8.3 ms.
+- Qualified reported-browser presentation p95 is no worse than baseline. Retain presentation
+  p50 and maximum separately; this criterion makes no 8.3 ms display-latency claim.
 
 ## Out of scope
 
 The TUI's keymap design (its own redesign plan), Markdown formatting UI, a Vim pack.
+
+The initial `ours` deviation keeps the approved document-navigation keys: Mod+[ and Mod+] dispatch `workspace.navigateBack` and `workspace.navigateForward` at Workspace depth. The four source rows record this choice; `zed` retains the pinned Editor indent/outdent bindings.
+
+Chord cancellation retains Plan 203: an unbound nonprintable prefix waits for its next key; a bound prefix expires and executes after the continuation timeout. Focus, blur and pointer changes cancel the pending owner.

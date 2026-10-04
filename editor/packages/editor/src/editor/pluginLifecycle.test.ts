@@ -122,7 +122,7 @@ describe('editor plugin lifecycle', () => {
         void Promise.resolve().then(() =>
           context.registerCommandContribution({
             createContribution: (commands) =>
-              commands.registerCommand('goToDefinition', () => {
+              commands.registerCommand('editor.action.goToDefinition', () => {
                 calls += 1
                 return true
               }),
@@ -134,10 +134,10 @@ describe('editor plugin lifecycle', () => {
     editor.setPlugins([plugin])
     await Promise.resolve()
     await Promise.resolve()
-    expect(editor.dispatchCommand('goToDefinition')).toBe(true)
+    expect(editor.dispatchCommand('editor.action.goToDefinition')).toBe(true)
     editor.setPlugins([])
 
-    expect(editor.dispatchCommand('goToDefinition')).toBe(false)
+    expect(editor.dispatchCommand('editor.action.goToDefinition')).toBe(false)
     expect(calls).toBe(1)
     editor.dispose()
   })
@@ -379,7 +379,7 @@ describe('editor plugin lifecycle', () => {
     editor.addPlugin(owner.plugin)
     editor.addPlugin(conflicting.plugin)
 
-    expect(editor.dispatchCommand('goToDefinition')).toBe(true)
+    expect(editor.dispatchCommand('editor.action.goToDefinition')).toBe(true)
     expect(owner.calls).toBe(1)
     expect(conflicting.calls).toBe(0)
     expect(events.some((event) => event.action === 'editor.contribution.factory_failed')).toBe(true)
@@ -518,10 +518,13 @@ describe('editor plugin lifecycle', () => {
       activate: (context) =>
         context.registerCommandContribution({
           createContribution: (commandContext) => {
-            const registration = commandContext.registerCommand('goToDefinition', () => {
-              calls += 1
-              return true
-            })
+            const registration = commandContext.registerCommand(
+              'editor.action.goToDefinition',
+              () => {
+                calls += 1
+                return true
+              },
+            )
             return { dispose: () => registration.dispose() }
           },
         }),
@@ -529,12 +532,12 @@ describe('editor plugin lifecycle', () => {
 
     const lease = editor.addPlugin(plugin)
 
-    expect(editor.dispatchCommand('goToDefinition')).toBe(true)
+    expect(editor.dispatchCommand('editor.action.goToDefinition')).toBe(true)
     expect(calls).toBe(1)
 
     lease.dispose()
 
-    expect(editor.dispatchCommand('goToDefinition')).toBe(false)
+    expect(editor.dispatchCommand('editor.action.goToDefinition')).toBe(false)
     expect(calls).toBe(1)
 
     editor.dispose()
@@ -861,10 +864,13 @@ function createCommandPlugin(name: string): {
       activate: (context) =>
         context.registerCommandContribution({
           createContribution: (commandContext) => {
-            const registration = commandContext.registerCommand('goToDefinition', () => {
-              state.calls += 1
-              return true
-            })
+            const registration = commandContext.registerCommand(
+              'editor.action.goToDefinition',
+              () => {
+                state.calls += 1
+                return true
+              },
+            )
             return { dispose: () => registration.dispose() }
           },
         }),

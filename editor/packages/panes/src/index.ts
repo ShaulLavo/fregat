@@ -1,3 +1,9 @@
+import {
+  createBrowserDispatcher,
+  type BrowserDispatcher,
+  type FocusNode,
+  type Binding,
+} from '@fregat/hotkeys'
 import './style.css'
 
 export type ResizablePaneOrientation = 'horizontal' | 'vertical'
@@ -26,6 +32,8 @@ export type ResizablePaneHandleContext = {
 export type ResizablePaneHandleFactory = (context: ResizablePaneHandleContext) => HTMLElement
 
 export type ResizablePaneGroupOptions = {
+  readonly hotkeys?: BrowserDispatcher
+  readonly hotkeysParent?: FocusNode<KeyboardEvent>
   readonly id?: string
   readonly orientation?: ResizablePaneOrientation
   readonly panes: readonly ResizablePane[]
@@ -50,7 +58,7 @@ type MountedHandle = {
   readonly id: string
   readonly element: HTMLElement
   readonly index: number
-  readonly onKeyDown: (event: KeyboardEvent) => void
+  readonly disposeHotkeys: () => void
   readonly onPointerDown: (event: PointerEvent) => void
   readonly onPointerEnter: () => void
   readonly onPointerLeave: () => void
@@ -70,6 +78,37 @@ type DragState = {
 
 type LayoutApplyMode = 'silent' | 'change' | 'changed' | 'both'
 
+export const paneHandlePack = [
+  { keys: 'F6', command: 'panes.focusNextHandle', context: 'PaneHandle && !DisabledPane' },
+  {
+    keys: 'Shift+F6',
+    command: 'panes.focusPreviousHandle',
+    context: 'PaneHandle && !DisabledPane',
+  },
+  {
+    keys: 'ArrowLeft',
+    command: 'panes.resizeSmaller',
+    context: 'PaneHandle && HorizontalPane && !DisabledPane',
+  },
+  {
+    keys: 'ArrowRight',
+    command: 'panes.resizeLarger',
+    context: 'PaneHandle && HorizontalPane && !DisabledPane',
+  },
+  {
+    keys: 'ArrowUp',
+    command: 'panes.resizeSmaller',
+    context: 'PaneHandle && VerticalPane && !DisabledPane',
+  },
+  {
+    keys: 'ArrowDown',
+    command: 'panes.resizeLarger',
+    context: 'PaneHandle && VerticalPane && !DisabledPane',
+  },
+  { keys: 'Home', command: 'panes.resizeMinimum', context: 'PaneHandle && !DisabledPane' },
+  { keys: 'End', command: 'panes.resizeMaximum', context: 'PaneHandle && !DisabledPane' },
+] as const satisfies readonly Binding[]
+
 const DEFAULT_KEYBOARD_STEP = 5
 const FLOAT_TOLERANCE = 0.001
 let nextPaneGroupId = 0
@@ -83,6 +122,9 @@ export class ResizablePaneGroup {
   private readonly disabled: boolean
   private readonly panes: readonly NormalizedPane[]
   private readonly handles: MountedHandle[] = []
+  private readonly hotkeys: BrowserDispatcher
+  private readonly hotkeysParent?: FocusNode<KeyboardEvent>
+  private readonly ownHotkeys: boolean
   private readonly onDocumentPointerMove = (event: PointerEvent): void => {
     this.handleDocumentPointerMove(event)
   }
@@ -97,6 +139,10 @@ export class ResizablePaneGroup {
 
   public constructor(container: HTMLElement, options: ResizablePaneGroupOptions) {
     this.container = container
+    this.hotkeys = options.hotkeys ?? createBrowserDispatcher({ root: container })
+    this.hotkeysParent = options.hotkeysParent
+    this.ownHotkeys = !options.hotkeys
+    if (this.ownHotkeys) this.hotkeys.setKeymap(paneHandlePack)
     this.document = container.ownerDocument
     this.groupId = options.id ?? `editor-pane-group-${nextPaneGroupId++}`
     this.orientation = options.orientation ?? 'horizontal'
@@ -131,6 +177,7 @@ export class ResizablePaneGroup {
     this.uninstallDocumentDragListeners()
     for (const handle of this.handles) disposeHandle(handle)
     this.handles.length = 0
+    if (this.ownHotkeys) this.hotkeys.dispose()
     for (const pane of this.panes) unmountPane(pane)
     unmountContainer(this.container)
   }
@@ -170,14 +217,29 @@ export class ResizablePaneGroup {
       id,
       element,
       index,
-      onKeyDown: (event) => this.handleKeyDown(handle, event),
+      disposeHotkeys: () => {
+        detach()
+        node.remove()
+      },
       onPointerDown: (event) => this.handlePointerDown(handle, event),
       onPointerEnter: () => setHandleState(handle, 'hover'),
       onPointerLeave: () => setHandleState(handle, 'inactive'),
       onBlur: () => setHandleState(handle, 'inactive'),
       onFocus: () => setHandleState(handle, 'focus'),
     }
-    element.addEventListener('keydown', handle.onKeyDown)
+    const node = this.hotkeys.createNode({
+      parent: this.hotkeysParent,
+      context: `PaneHandle ${this.orientation === 'horizontal' ? 'HorizontalPane' : 'VerticalPane'} ${this.disabled ? 'DisabledPane' : ''}`,
+      commands: {
+        'panes.focusNextHandle': () => this.focusSiblingHandle(handle, false),
+        'panes.focusPreviousHandle': () => this.focusSiblingHandle(handle, true),
+        'panes.resizeSmaller': () => this.resizeHandle(handle, -this.keyboardStep),
+        'panes.resizeLarger': () => this.resizeHandle(handle, this.keyboardStep),
+        'panes.resizeMinimum': () => this.resizeHandle(handle, -100),
+        'panes.resizeMaximum': () => this.resizeHandle(handle, 100),
+      },
+    })
+    const detach = this.hotkeys.attachElement(node, element)
     element.addEventListener('pointerdown', handle.onPointerDown)
     element.addEventListener('pointerenter', handle.onPointerEnter)
     element.addEventListener('pointerleave', handle.onPointerLeave)
@@ -231,20 +293,11 @@ export class ResizablePaneGroup {
     if (drag.changed) this.onLayoutChanged?.(this.getLayout())
   }
 
-  private handleKeyDown(handle: MountedHandle, event: KeyboardEvent): void {
-    if (this.disabled) return
-    if (event.key === 'F6') {
-      event.preventDefault()
-      this.focusSiblingHandle(handle, event.shiftKey)
-      return
-    }
-
-    const delta = keyboardDelta(event, this.orientation, this.keyboardStep)
-    if (delta === null) return
-
-    event.preventDefault()
+  private resizeHandle(handle: MountedHandle, delta: number): boolean {
+    if (this.disabled) return false
     const changed = this.applyHandleDelta(handle.index, delta, this.layout, 'both')
     if (changed) setHandleState(handle, 'focus')
+    return true
   }
 
   private focusSiblingHandle(handle: MountedHandle, reverse: boolean): void {
@@ -426,7 +479,7 @@ function applyHandleOrientationStyle(
 }
 
 function disposeHandle(handle: MountedHandle): void {
-  handle.element.removeEventListener('keydown', handle.onKeyDown)
+  handle.disposeHotkeys()
   handle.element.removeEventListener('pointerdown', handle.onPointerDown)
   handle.element.removeEventListener('pointerenter', handle.onPointerEnter)
   handle.element.removeEventListener('pointerleave', handle.onPointerLeave)
@@ -709,29 +762,6 @@ function calculateHandleAria(options: {
     max: maxLayout[pane.id] ?? pane.maxSize,
     now,
   }
-}
-
-function keyboardDelta(
-  event: KeyboardEvent,
-  orientation: ResizablePaneOrientation,
-  keyboardStep: number,
-): number | null {
-  if (event.key === 'Home') return -100
-  if (event.key === 'End') return 100
-  if (orientation === 'horizontal') return horizontalKeyboardDelta(event.key, keyboardStep)
-  return verticalKeyboardDelta(event.key, keyboardStep)
-}
-
-function horizontalKeyboardDelta(key: string, keyboardStep: number): number | null {
-  if (key === 'ArrowLeft') return -keyboardStep
-  if (key === 'ArrowRight') return keyboardStep
-  return null
-}
-
-function verticalKeyboardDelta(key: string, keyboardStep: number): number | null {
-  if (key === 'ArrowUp') return -keyboardStep
-  if (key === 'ArrowDown') return keyboardStep
-  return null
 }
 
 function nextFocusableHandle(

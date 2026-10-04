@@ -47,12 +47,20 @@ export function ShortcutMenu({
         ) : null}
         <DropdownMenuItem
           disabled={!bound}
-          onClick={() => setKeybinding(row.command, shortcutListWith(row, { remove: true }))}
+          onClick={() =>
+            setKeybinding(row.command, shortcutListWith(row, { remove: true }), {
+              context: row.context,
+              defaultKeys: row.defaultKeys,
+            })
+          }
         >
           Remove shortcut
           {keyboardSeen ? <Kbd className='ml-auto'>Delete</Kbd> : null}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!changed} onClick={() => resetKeybinding(row.command)}>
+        <DropdownMenuItem
+          disabled={!changed}
+          onClick={() => resetKeybinding(row.command, row.context)}
+        >
           Reset to default
         </DropdownMenuItem>
         <DropdownMenuSeparator />

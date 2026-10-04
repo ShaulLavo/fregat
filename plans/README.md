@@ -159,7 +159,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                             |
 | [287](287-ghostty-worker-mode.md)                     | ghostty-webgpu worker mode: the terminal on an OffscreenCanvas worker           |
 | [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                            |
-| [289](289-proxy-usage-feed.md)                        | Passive AI plans feed and the Mesh TV panel                                     |
+| [289](289-proxy-usage-feed.md)                        | Historical gateway feed, retired producer, and the Mesh TV panel                |
 | [290](290-mesh-device-authorization.md)               | Approve devices before Mesh control                                             |
 | [291](291-mesh-private-services.md)                   | Private temporary apps and reusable floating pill                               |
 | [292](292-mesh-zerotier.md)                           | ZeroTier adoption after authentication                                          |
@@ -253,6 +253,9 @@ in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json
 | [workspace-search-next-steps.md](workspace-search-next-steps.md)                               | Workspace search delivery and remaining UI verification                                |
 
 ## Supporting work
+
+- [Command foundation delivery](../docs/keymap/command-foundation-delivery.md) records
+  Plans 204–206 and their exact standalone dependency qualification under Plan 207.
 
 - [Monorepo migration delivery](207-migration-completion.md) supports Plan 207. npm publication
   remains separately deferred; this record is not a second Plan 207.

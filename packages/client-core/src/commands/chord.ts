@@ -5,10 +5,10 @@ import {
   validateHotkey,
   type ParsedHotkey,
   type RawHotkey,
-} from '@tanstack/hotkeys'
+} from '@fregat/hotkeys'
 import { MAX_KEYBINDING_CHORD_STROKES } from '@workspace/contracts'
 
-import type { KeyChord } from '@singapore-editor/core/keymap'
+import type { KeyChord } from '@fregat/hotkeys'
 
 export type PlatformName = ReturnType<typeof detectPlatform>
 
@@ -45,19 +45,6 @@ export function parsedChord(keys: string, platform: PlatformName): KeyChord {
 
 export function normalizedChord(keys: string, platform: PlatformName = detectPlatform()): string {
   return chordKeys(parsedChord(keys, platform), platform)
-}
-
-export function keysConflict(a: string, b: string): boolean {
-  if (a === b) return true
-  if (a.length < b.length) return b.startsWith(a) && b[a.length] === ' '
-
-  return a.startsWith(b) && a[b.length] === ' '
-}
-
-export function isChordPrefix(keys: string, table: readonly { readonly keys: string }[]): boolean {
-  return table.some(
-    (binding) => binding.keys.length > keys.length && keysConflict(keys, binding.keys),
-  )
 }
 
 /** Null for a physical `[Code]` stroke, which `isBindableChord` rejects. */

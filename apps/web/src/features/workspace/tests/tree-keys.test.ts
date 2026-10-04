@@ -4,20 +4,11 @@ import {
   BLOCKED_CONTEXT_MENU_NAV_KEYS,
   canKeyUseStickyKeyboardState,
   isSearchOpenSeedKey,
-  isSpaceSelectionKey,
   type TreeKeyboardEventLike,
 } from '@/features/workspace/utils/tree-keys'
 import { isContextMenuKey as isContextMenuOpenKey } from '@workspace/utils/keyboard'
 
 describe('file tree keyboard classification', () => {
-  it.each([
-    { code: 'Space', key: ' ' },
-    { code: '', key: ' ' },
-    { code: '', key: 'Spacebar' },
-  ])('recognizes the $key space variant', ({ code, key }) => {
-    expect(isSpaceSelectionKey(keyEvent({ code, key }))).toBe(true)
-  })
-
   it.each(['a', 'Z', '7', 'é'])('accepts %s as a printable search seed', (key) => {
     expect(isSearchOpenSeedKey(keyEvent({ key }))).toBe(true)
   })
@@ -42,11 +33,8 @@ describe('file tree keyboard classification', () => {
     },
   )
 
-  it('allows sticky inspection for menu and modified-space keys', () => {
+  it('allows sticky inspection for menu keys', () => {
     expect(canKeyUseStickyKeyboardState(keyEvent({ key: 'F10', shiftKey: true }), true)).toBe(true)
-    expect(canKeyUseStickyKeyboardState(keyEvent({ code: 'Space', ctrlKey: true }), false)).toBe(
-      true,
-    )
   })
 
   it.each(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp'])(

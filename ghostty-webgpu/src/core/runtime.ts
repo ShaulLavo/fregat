@@ -57,6 +57,8 @@ function validateExports(exports: WebAssembly.Exports): GhosttyWasmExports {
     '__indirect_function_table',
     'ghostty_cell_get',
     'ghostty_terminal_get',
+    'ghostty_unicode_codepoint_width',
+    'ghostty_unicode_grapheme_width',
     'ghostty_terminal_new',
     'ghostty_terminal_vt_write',
     'ghostty_render_state_update',
@@ -66,7 +68,8 @@ function validateExports(exports: WebAssembly.Exports): GhosttyWasmExports {
     if (name in exports) continue
     throw createGhosttyError('wasm.instantiate', `libghostty-vt export is missing: ${name}`)
   }
-  return exports as GhosttyWasmExports
+  // V8 gives raw exports instance-specific shapes; a plain record shares the callout shape.
+  return Object.freeze({ ...exports }) as GhosttyWasmExports
 }
 
 export class GhosttyRuntime {

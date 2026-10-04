@@ -1,9 +1,8 @@
 import {
-  defaultEditorCommandPacks,
-  editorCommandPackForCommand,
-  editorKeymapLayerForCommandPack,
-  readonlySafeEditorCommandPacks,
-} from '@singapore-editor/core/editor'
+  defaultEditorPacks,
+  vscodeLspEditingPack,
+  readonlyDiffPack,
+} from '@singapore-editor/core/keymap'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LspWorkspace } from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
@@ -229,17 +228,16 @@ describe('editor.action.autoFix', () => {
   })
 
   it('is bound to a key of its own', () => {
-    const linux = editorKeymapLayerForCommandPack('lsp-editing', 'linux')
-    const mac = editorKeymapLayerForCommandPack('lsp-editing', 'mac')
+    const linux = vscodeLspEditingPack.linux
+    const mac = vscodeLspEditingPack.mac
 
-    expect(linux.bindings.map((binding) => binding.command)).toContain('editor.action.autoFix')
-    expect(mac.bindings.map((binding) => binding.command)).toContain('editor.action.autoFix')
+    expect(linux.map((binding) => binding.command)).toContain('editor.action.autoFix')
+    expect(mac.map((binding) => binding.command)).toContain('editor.action.autoFix')
   })
 
   it('is classified into a pack the default keymap carries and a reader does not', () => {
-    expect(editorCommandPackForCommand('editor.action.autoFix')).toBe('lsp-editing')
-    expect(defaultEditorCommandPacks).toContain('lsp-editing')
-    expect(readonlySafeEditorCommandPacks).not.toContain('lsp-editing')
+    expect(defaultEditorPacks).toContain(vscodeLspEditingPack)
+    expect(readonlyDiffPack.linux.map((row) => row.command)).not.toContain('editor.action.autoFix')
   })
 
   it('dispatches the complete preferred fix with its owning lane', async () => {

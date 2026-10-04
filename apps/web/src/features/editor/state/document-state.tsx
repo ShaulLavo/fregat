@@ -48,6 +48,7 @@ type CreateEditorDocumentStoreOptions = {
 }
 
 type EditorDocumentStoreActions = {
+  disposeEditorDocuments: () => void
   deleteLiveEditorDocument: (documentKey: DocumentKey) => DeleteLiveEditorDocumentResult
   ensureEditorView: (
     tabId: TabId,
@@ -200,6 +201,10 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
 
       return {
         ...service.state(),
+        disposeEditorDocuments: () => {
+          service.dispose()
+          publish()
+        },
         deleteLiveEditorDocument: (documentKey) => {
           const result = service.deleteLiveDocument(documentKey)
           publish()

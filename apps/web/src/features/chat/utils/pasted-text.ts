@@ -5,15 +5,6 @@ export const PASTED_TEXT_ATTACHMENT_THRESHOLD_BYTES = 32 * 1024
 
 const encoder = new TextEncoder()
 
-/** Ctrl/Cmd+Shift+V, the usual paste-as-plain-text chord, keeps a large paste inline. */
-export function isPasteAsTextShortcut(
-  event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'key' | 'metaKey' | 'shiftKey'>,
-) {
-  if (event.key.toLowerCase() !== 'v' || !event.shiftKey || event.altKey) return false
-
-  return event.ctrlKey !== event.metaKey
-}
-
 /** Byte-based: a character count understates what Unicode-heavy text costs. */
 export function pastedTextFolds(text: string, bypass: boolean) {
   if (bypass || text.length === 0) return false

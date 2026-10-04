@@ -54,6 +54,7 @@ export class SignatureHelpController {
   public constructor(private readonly options: SignatureHelpControllerOptions) {
     this.context = options.context
     this.tooltip = createTooltipController({
+      registerKeymapNode: (options) => this.context.registerKeymapNode(options),
       classNamespace: options.tooltipClassNamespace ?? 'lsp-plugin',
       document: this.context.container.ownerDocument,
       reentryElement: this.context.scrollElement,

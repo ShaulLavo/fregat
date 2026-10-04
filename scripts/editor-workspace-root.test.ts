@@ -9,60 +9,63 @@ import { expect, test } from 'vitest'
 
 const repository = path.resolve(import.meta.dirname, '..')
 
-test.each(['editor', 'singapore', 'nested'])(
-  'Editor scripts find their workspace in %s',
-  (layout) => {
-    const root = mkdtempSync(path.join(tmpdir(), 'platform-editor-root-'))
-    const family = path.join(root, layout === 'nested' ? 'editor' : layout)
-    const parserSource = 'github:ShaulLavo/tree-sitter-x#' + '1'.repeat(40)
-    const manifest = { workspaces: ['packages/*'], name: 'editor-workspace', parserSource }
-    mkdirSync(path.join(family, 'scripts'), { recursive: true })
-    mkdirSync(path.join(family, 'packages'), { recursive: true })
-    writeFileSync(path.join(family, 'package.json'), JSON.stringify(manifest))
-    writeFileSync(path.join(family, 'turbo.json'), JSON.stringify({ tasks: {} }))
-    // A lockfile beside a standalone checkout does not make its parent the workspace.
-    writeFileSync(path.join(root, 'bun.lock'), '{}')
+test.each([
+  ['editor', 'array'],
+  ['singapore', 'array'],
+  ['nested', 'array'],
+  ['editor', 'catalog'],
+  ['singapore', 'catalog'],
+  ['nested', 'catalog'],
+])('Editor scripts find their workspace in %s with a %s manifest', (layout, shape) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'platform-editor-root-'))
+  const family = path.join(root, layout === 'nested' ? 'editor' : layout)
+  const parserSource = 'github:ShaulLavo/tree-sitter-x#' + '1'.repeat(40)
+  const workspaces =
+    shape === 'array'
+      ? ['packages/*']
+      : { packages: ['packages/*'], catalog: { '@fregat/hotkeys': '0.0.2' } }
+  const manifest = { workspaces, name: 'editor-workspace', parserSource }
+  mkdirSync(path.join(family, 'scripts'), { recursive: true })
+  mkdirSync(path.join(family, 'packages'), { recursive: true })
+  writeFileSync(path.join(family, 'package.json'), JSON.stringify(manifest))
+  writeFileSync(path.join(family, 'turbo.json'), JSON.stringify({ tasks: {} }))
+  // A lockfile beside a standalone checkout does not make its parent the workspace.
+  writeFileSync(path.join(root, 'bun.lock'), '{}')
+  writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({ workspaces: ['other/*'], parserSource }),
+  )
+  if (layout === 'nested') {
     writeFileSync(
       path.join(root, 'package.json'),
-      JSON.stringify({ workspaces: ['other/*'], parserSource }),
+      JSON.stringify({
+        workspaces: { packages: ['editor/packages/*', 'editor/examples/*'] },
+        parserSource,
+      }),
     )
-    if (layout === 'nested') {
-      writeFileSync(
-        path.join(root, 'package.json'),
-        JSON.stringify({
-          workspaces: { packages: ['editor/packages/*', 'editor/examples/*'] },
-          parserSource,
-        }),
-      )
-      writeFileSync(path.join(root, 'turbo.json'), JSON.stringify({ tasks: {} }))
-    }
-    const scripts = ['check-turbo-inputs.mjs', 'workspace-root.ts']
-    for (const file of scripts) {
-      copyFileSync(
-        path.join(repository, 'editor/scripts', file),
-        path.join(family, 'scripts', file),
-      )
-    }
-    try {
-      const check = Bun.spawnSync(['bun', 'scripts/check-turbo-inputs.mjs'], { cwd: family })
-      expect(check.exitCode, check.stderr.toString()).toBe(0)
-      const result = Bun.spawnSync(
-        [
-          'bun',
-          '-e',
-          'import { workspaceRoot } from "./scripts/workspace-root.ts"; console.log(workspaceRoot)',
-        ],
-        { cwd: family },
-      )
-      expect(result.exitCode, result.stderr.toString()).toBe(0)
-      expect(path.resolve(result.stdout.toString().trim())).toBe(
-        layout === 'nested' ? root : family,
-      )
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  },
-)
+    writeFileSync(path.join(root, 'turbo.json'), JSON.stringify({ tasks: {} }))
+  }
+  const scripts = ['check-turbo-inputs.mjs', 'workspace-root.ts']
+  for (const file of scripts) {
+    copyFileSync(path.join(repository, 'editor/scripts', file), path.join(family, 'scripts', file))
+  }
+  try {
+    const check = Bun.spawnSync(['bun', 'scripts/check-turbo-inputs.mjs'], { cwd: family })
+    expect(check.exitCode, check.stderr.toString()).toBe(0)
+    const result = Bun.spawnSync(
+      [
+        'bun',
+        '-e',
+        'import { workspaceRoot } from "./scripts/workspace-root.ts"; console.log(workspaceRoot)',
+      ],
+      { cwd: family },
+    )
+    expect(result.exitCode, result.stderr.toString()).toBe(0)
+    expect(path.resolve(result.stdout.toString().trim())).toBe(layout === 'nested' ? root : family)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
 
 const runtime = 'f73fbfd866b94a33791afff08a7278546b1771a2'
 const markdown = '4505683e843b71ef2d0cb3938eb0c9a503c28147'

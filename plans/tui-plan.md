@@ -411,8 +411,8 @@ These changes build on the completed [session domain](../docs/session-domain.md)
 
 - **Plan 077** is complete and deleted (commit `c8e05123`); the transport and environment seams
   are stable and can be extracted into `client-core`.
-- The [shared chord keymap](../docs/keymap/delivery.md) is complete. The TUI can consume its pure modules;
-  the former delivery restriction on `keymap/**` no longer applies.
+- The [shared keymap architecture](../docs/keymap/architecture.md) assigns the DOM-free hotkeys
+  core and terminal adapter to the TUI. Plan206 replaces its matcher while preserving TUI defaults.
 - The [native PTY and binary transport](../docs/terminal.md) are available for slice 081 (§7.5).
 - **Plan 068** is complete. New consumers use the [session domain](../docs/session-domain.md): raw
   session UUIDs, protocol v5, worktree ownership, and projected attention. Its plan-file deletion

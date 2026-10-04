@@ -34,6 +34,7 @@ export type Pins = {
 }
 
 export type GateReport = {
+  readonly eagerSettingsMetadata: readonly string[]
   readonly firstLoad: { readonly scriptGzip: number }
   readonly phoneFirstLoad: { readonly scriptGzip: number }
   readonly phoneSessionFirstLoad: { readonly scriptGzip: number }
@@ -62,7 +63,12 @@ export function checkFirstLoad(report: GateReport, pins: Pins): GateResult {
   const totalFailures =
     total.now > total.limit && owners.length === 0 ? [totalFailure('(total)', total)] : []
   const phoneFailures = phone.now > phone.limit ? [totalFailure('(phone total)', phone)] : []
-  const failures = [...owners, ...totalFailures, ...phoneFailures]
+  const metadataFailures = report.eagerSettingsMetadata.map((owner) => ({
+    owner,
+    pinned: 0,
+    now: 1,
+  }))
+  const failures = [...owners, ...totalFailures, ...phoneFailures, ...metadataFailures]
   const passed = total.now <= total.limit && failures.length === 0
   return { total, phone, failures, passed }
 }
