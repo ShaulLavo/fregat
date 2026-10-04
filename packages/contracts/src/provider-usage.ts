@@ -25,6 +25,8 @@ export const providerUsageWindowSchema = v.object({
   status: v.nullable(providerUsageWindowStatusSchema),
   observedAt: v.optional(v.nullable(isoDateTimeSchema)),
   source: v.optional(trimmedNonEmptyStringSchema),
+  statusObservedAt: v.optional(v.nullable(isoDateTimeSchema)),
+  statusSource: v.optional(trimmedNonEmptyStringSchema),
   freshness: v.optional(v.picklist(['fresh', 'stale', 'reset-passed', 'unknown'])),
 })
 
@@ -48,6 +50,7 @@ export const providerAccountUsageSchema = v.object({
   state: v.optional(v.picklist(['ready', 'cooldown', 'disabled', 'no-data', 'unknown'])),
   /** Management control-state observation is independent of quota-window age. */
   stateObservedAt: v.optional(v.nullable(isoDateTimeSchema)),
+  creditsObservedAt: v.optional(v.nullable(isoDateTimeSchema)),
   credits: v.optional(
     v.nullable(
       v.object({

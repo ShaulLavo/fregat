@@ -794,5 +794,42 @@ child CLI spans 600.082 seconds and exits 1 after cancellation; the heavy runner
 75 timeout verdict. No complete native matrix or positive verdict exists. The failed command
 and all completed raw controls remain in `controls.log`, `controls-timing.json`,
 `sensitivity-{input,frame,frame-25ms}.json.gz` and the aggregate `sensitivity/` cache.
-The cached positive is a separate bounded run. This stop changes neither a statistical verdict
+The cached positive subsequently passes in a separate bounded run. This stop changes neither a statistical verdict
 nor a budget, and the incomplete positive earns no acceptance credit.
+
+### Minimap readiness return race
+
+The subsequent complete quiet default passes Platform and native, 216/216, in 801.845 actual CLI
+seconds. Loaded native+disabled passes 216/216 in 209.253 seconds with eight declared load workers
+and complete stop/await cleanup. The ten selected loaded A/A keys each reject 0/10. One unselected
+native ordinary/single applied-undo rejection is preserved separately. The exact quiet undo pilot
+rejects 1/5 per A/A and original A/B arm, with median of medians -0.250 and +0.150 ms respectively;
+its sign reversal does not demonstrate a stable A/B-only cost. Ten runs per arm remain pending,
+retaining the pilot cases. These are receipts under measurement `8127db7f`, with unchanged budgets.
+
+The first predeclared full CLI aborts at 782.141 seconds during minimap short-lines/single typing
+setup. Native, disabled, Tree-sitter and Shiki each pass all 108 blocking keys first. The excluded
+minimap configuration still requires source/render readiness: source is current, source generation
+33 matches the latest requested render, and render 395 is pending while 393 is accepted. The
+full artifact is absent, so neither remaining positives nor the 2,700-second full target is proved.
+The exact error, CLI receipt and four complete raw artifacts remain under
+`/work/tmp/plan282-undo-20261004/full-window-01*`; `full-checkpoint.json` records the incomplete window.
+The failed minimap arm publishes no strict object-cleanup receipt. Its owned processes exit after
+the awaited session-close attempts and outer browser/runtime cleanup; the four completed
+configurations retain their strict cleanup receipts.
+
+The readiness loop waits for minimap acceptance, yields 50 ms, then tests only syntax readiness.
+A follow-up render can become pending during that yield. Its minimap predicate also accepts an
+old render after the source generation advances. Real settlement-function probes and two
+deterministic failing-before regressions reproduce these early returns. The repair checks both
+source generation and latest accepted sequence, then rechecks after the yield. The existing
+120-second deadline, final source equality and pending-undo exception remain in force. All
+372 stress tests, stress TypeScript and lint pass after repair; lint retains the existing spread warning.
+
+The actual manifest classifies `src/inputConsumers.ts` as measurement-owned. Repaired-identity
+controls, required matrix timings, selected loaded A/A and affected minimap-backed proofs remain
+to collect after independent review. The source audit finds no change to capture, sampling,
+statistics, workload, interception, package products or budgets. With minimap disabled, the added
+predicate short-circuits and the prior readiness logic is unchanged. Any coordinator-approved reuse
+of unaffected reference evidence will retain its explicit old identity. No repaired-identity
+acceptance is claimed here.

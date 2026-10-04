@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import {
   analysisLimitCodeUnits,
   inputConsumerConfiguration,
@@ -58,4 +58,67 @@ test('same-tier fixture changes retain their consumer owners', async () => {
     consumers.inputConsumersForFixture(null, 'short-lines', analysisLimitCodeUnits + 1),
   ).toBeNull()
   await owner.dispose()
+})
+
+test.each([
+  ['render', { latestRender: 395, renderAfterSource: 34 }],
+  ['source', {}],
+])('minimap waits for a follow-up %s after initial acceptance', async (_, transition) => {
+  vi.useFakeTimers()
+  const worker = {
+    terminated: false,
+    minimap: true,
+    sourceUpdates: 33,
+    renderAfterSource: 33,
+    latestRender: 393,
+    acceptedRender: 393,
+  }
+  vi.stubGlobal('__inputWorkerProof', [worker])
+  const owner = consumers.createInputConsumers('minimap', 'short-lines', 1_000_000)
+  let completed = false
+  const settled = owner.settle([]).then((result) => {
+    completed = true
+    return result
+  })
+  setTimeout(() => Object.assign(worker, { sourceUpdates: 34 }, transition), 20)
+  setTimeout(() => Object.assign(worker, { latestRender: 395, renderAfterSource: 34 }), 80)
+  setTimeout(() => Object.assign(worker, { acceptedRender: 395 }), 100)
+  try {
+    await vi.advanceTimersByTimeAsync(50)
+    expect(completed).toBe(false)
+    await vi.advanceTimersByTimeAsync(150)
+    expect(completed).toBe(true)
+    await settled
+    expect(worker.acceptedRender).toBe(worker.latestRender)
+    expect(worker.renderAfterSource).toBe(worker.sourceUpdates)
+  } finally {
+    await vi.runAllTimersAsync()
+    await owner.dispose()
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  }
+})
+
+test.each(['native', 'disabled'])('%s readiness does not read minimap receipts', async (id) => {
+  vi.useFakeTimers()
+  vi.stubGlobal('__inputWorkerProof', [
+    {
+      terminated: false,
+      minimap: true,
+      get latestRender() {
+        return expect.unreachable('Unexpected minimap receipt read')
+      },
+    },
+  ])
+  const owner = consumers.createInputConsumers(id, 'short-lines', 1_000_000)
+  const settled = owner.settle([])
+  try {
+    await vi.advanceTimersByTimeAsync(50)
+    await expect(settled).resolves.toMatchObject({ configuration: { minimap: false } })
+  } finally {
+    await vi.runAllTimersAsync()
+    await owner.dispose()
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  }
 })

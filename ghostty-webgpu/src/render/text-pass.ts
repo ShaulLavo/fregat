@@ -1,8 +1,16 @@
 import type { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from './instances/types.js'
-import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from './instances/layout.js'
+import { planUploadRanges } from './instances/upload-ranges.js'
+import {
+  CELL_INSTANCE_BYTES,
+  GLYPH_INSTANCE_BYTES,
+  GLYPH_INSTANCE_FLOATS,
+} from './instances/layout.js'
 import { cellShader } from './shaders/cell.wgsl.js'
 import { glyphShader } from './shaders/glyph.wgsl.js'
+
+const GPU_GLYPH_INSTANCE_FLOATS = 20
+const GPU_GLYPH_INSTANCE_BYTES = GPU_GLYPH_INSTANCE_FLOATS * Uint32Array.BYTES_PER_ELEMENT
 
 export interface TextPassMetrics {
   draws: number
@@ -43,6 +51,8 @@ export class WebGpuTextPass {
   private readonly cellBuffer: GPUBuffer
   private readonly device: GPUDevice
   private readonly glyphBuffer: GPUBuffer
+  private readonly glyphUploadWords: Uint32Array
+  private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
   private glyphBindGroup?: GPUBindGroup
   private readonly instanceCount: number
@@ -60,7 +70,8 @@ export class WebGpuTextPass {
     this.device = options.device
     this.instanceCount = options.instanceCount
     this.cellBuffer = this.createStorageBuffer(options.instanceCount * CELL_INSTANCE_BYTES)
-    this.glyphBuffer = this.createStorageBuffer(options.instanceCount * GLYPH_INSTANCE_BYTES)
+    this.glyphBuffer = this.createStorageBuffer(options.instanceCount * GPU_GLYPH_INSTANCE_BYTES)
+    this.glyphUploadWords = new Uint32Array(options.instanceCount * GPU_GLYPH_INSTANCE_FLOATS)
     this.viewportBuffer = options.device.createBuffer({
       size: 16,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
@@ -92,17 +103,28 @@ export class WebGpuTextPass {
     return this.glyphBindGroupCreationCountValue
   }
 
+  get frameUploadedBytes(): number {
+    return this.frameUploadedBytesValue
+  }
+
   uploadFrame(
-    data: { cellData: Float32Array; glyphData: Float32Array },
+    data: { readonly cellData: Float32Array; readonly glyphData: Float32Array },
     updates: readonly RowInstanceUpdate[],
   ): number {
-    const operationsBefore = this.metrics.uploadOperations
-    for (const update of updates) {
-      if (update.cell.byteLength > 0) this.writeRange(this.cellBuffer, data.cellData, update.cell)
-      if (update.glyph.byteLength > 0)
-        this.writeRange(this.glyphBuffer, data.glyphData, update.glyph)
+    this.frameUploadedBytesValue = 0
+    const plan = planUploadRanges(updates)
+    const cellData = data.cellData
+    const glyphData = data.glyphData
+    for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
+    const glyphWords = new Uint32Array(glyphData.buffer, glyphData.byteOffset, glyphData.length)
+    for (const range of plan.glyph) {
+      this.packGlyphRange(glyphWords, range)
+      this.writeRange(this.glyphBuffer, this.glyphUploadWords, {
+        byteOffset: (range.byteOffset / GLYPH_INSTANCE_BYTES) * GPU_GLYPH_INSTANCE_BYTES,
+        byteLength: (range.byteLength / GLYPH_INSTANCE_BYTES) * GPU_GLYPH_INSTANCE_BYTES,
+      })
     }
-    return this.metrics.uploadOperations - operationsBefore
+    return plan.cell.length + plan.glyph.length
   }
 
   submit(view: GPUTextureView, copy?: TextPassCopy): void {
@@ -187,9 +209,28 @@ export class WebGpuTextPass {
     })
   }
 
+  private packGlyphRange(
+    source: Uint32Array,
+    range: { readonly byteLength: number; readonly byteOffset: number },
+  ): void {
+    const first = range.byteOffset / GLYPH_INSTANCE_BYTES
+    const end = first + range.byteLength / GLYPH_INSTANCE_BYTES
+    const target = this.glyphUploadWords
+    for (let slot = first; slot < end; slot += 1) {
+      const input = slot * GLYPH_INSTANCE_FLOATS
+      const output = slot * GPU_GLYPH_INSTANCE_FLOATS
+      for (let word = 0; word < 16; word += 1) target[output + word] = source[input + word]!
+      // Native atlas generations remain in CPU records for retained-glyph validation.
+      target[output + 16] = source[input + 16]!
+      target[output + 17] = source[input + 18]!
+      target[output + 18] = source[input + 20]!
+      target[output + 19] = source[input + 22]!
+    }
+  }
+
   private writeRange(
     buffer: GPUBuffer,
-    data: Float32Array,
+    data: Float32Array | Uint32Array,
     range: { byteLength: number; byteOffset: number },
   ): void {
     if (range.byteLength === 0) return
@@ -200,6 +241,7 @@ export class WebGpuTextPass {
       data.byteOffset + range.byteOffset,
       range.byteLength,
     )
+    this.frameUploadedBytesValue += range.byteLength
     this.metrics.uploadedBytes += range.byteLength
     this.metrics.uploadOperations += 1
   }

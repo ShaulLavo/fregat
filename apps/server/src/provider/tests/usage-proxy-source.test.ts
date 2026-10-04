@@ -120,12 +120,12 @@ test('preserves known accounts as no-data without inventing quota from routing o
     windows: [],
     checkedAt: null,
     lastSeenAt: null,
-    credits: null,
     routing: { active: true, lastServedAt: null },
   })
+  expect(accounts[0]?.credits).toBeUndefined()
 })
 
-test('keeps independent ages, expired resets, model windows and non-five-hour primary durations', async () => {
+test('keeps independent ages, expired resets, distinct quota windows and non-five-hour primary durations', async () => {
   const accounts = await readProxyUsage({
     url: URL,
     secret: SECRET,
@@ -147,7 +147,10 @@ test('keeps independent ages, expired resets, model windows and non-five-hour pr
               },
             },
             model_quotas: {
-              'gpt-5': { observed_at: SEEN, signals: { 'x-codex-primary-used-percent': '5' } },
+              'gpt-5': {
+                observed_at: SEEN,
+                signals: { 'x-codex-bengalfox-primary-used-percent': '5' },
+              },
               'private@example.test': {
                 observed_at: SEEN,
                 signals: { 'x-codex-primary-used-percent': '6' },
@@ -160,10 +163,57 @@ test('keeps independent ages, expired resets, model windows and non-five-hour pr
   expect(accounts[0]?.windows).toMatchObject([
     { id: 'primary', kind: 'other', label: '60m', freshness: 'reset-passed', usedPercent: 20 },
     { id: 'secondary', freshness: 'unknown', observedAt: '2026-10-03T10:00:00.000Z' },
-    { id: 'model:gpt-5:primary', label: 'gpt-5 Quota', freshness: 'unknown' },
+    { id: 'bengalfox:primary', label: 'bengalfox Quota', freshness: 'unknown' },
   ])
   expect(accounts[0]?.lastSeenAt).toBe(SEEN)
   expect(JSON.stringify(accounts)).not.toContain('private@')
+})
+
+test('model caches contribute account headers once while distinct quota headers keep their own IDs', async () => {
+  const quota = {
+    observed_at: SEEN,
+    signals: {
+      'x-codex-primary-used-percent': '44',
+      'x-codex-primary-window-minutes': '10080',
+      'x-codex-primary-reset-at': '1791690150',
+    },
+  }
+  const accounts = await readProxyUsage({
+    url: URL,
+    secret: SECRET,
+    now: () => NOW,
+    fetch: async () =>
+      Response.json({
+        files: [
+          {
+            id: 'fixture',
+            provider: 'codex',
+            quota,
+            model_quotas: {
+              'gpt-6.1-sol': quota,
+              'gpt-5': {
+                observed_at: '2026-10-03T11:00:00Z',
+                signals: {
+                  'x-codex-primary-used-percent': '43',
+                  'x-codex-primary-window-minutes': '10080',
+                  'x-codex-primary-reset-at': '1791690151',
+                  'x-codex-bengalfox-primary-used-percent': '9',
+                  'x-codex-bengalfox-primary-window-minutes': '10080',
+                  'x-codex-code-review-primary-used-percent': '11',
+                  'x-codex-code-review-primary-window-minutes': '10080',
+                },
+              },
+            },
+          },
+        ],
+      }),
+  })
+  expect(accounts[0]!.windows).toMatchObject([
+    { id: 'primary', usedPercent: 44, observedAt: SEEN },
+    { id: 'bengalfox:primary', usedPercent: 9, observedAt: '2026-10-03T11:00:00.000Z' },
+    { id: 'code-review:primary', usedPercent: 11, observedAt: '2026-10-03T11:00:00.000Z' },
+  ])
+  expect(accounts[0]!.windows).toHaveLength(3)
 })
 
 test('rejects invalid observations and percentages without guessing 0 or 100', async () => {
@@ -434,7 +484,7 @@ test('credits cover exhausted windows only with a valid observed balance', async
   })
   expect(accounts[0]?.windows[0]?.status).toBe('warning')
   expect(accounts[1]?.windows[0]?.status).toBe('rejected')
-  expect(accounts[1]?.credits).toBeNull()
+  expect(accounts[1]?.credits).toBeUndefined()
 })
 
 test('sanitizes explicitly observed cooldowns and preserves missing observation time', async () => {

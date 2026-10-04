@@ -612,9 +612,14 @@ export function createEditorActivation(
   fileOpenIntent: FileOpenIntentActivation,
   documentStore: EditorDocumentStoreApi,
   rootOwner: Pick<FileOpenIntentServiceOwner, 'setRoot'>,
+  prepareSavedComparison?: (path: FilesystemPath, tabId: TabId) => void,
 ): EditorActivation {
   return {
     activate: (content, tabId) => {
+      if (content.kind === 'document' && content.document.kind === 'compare-saved') {
+        prepareSavedComparison?.(content.document.file.path, tabId)
+        return null
+      }
       if (content.kind !== 'document' || content.document.kind !== 'file') return null
       const filePath = content.document.resource.path
 

@@ -70,7 +70,8 @@ export function createInputConsumers(id: string, fixture: string, length: number
       const quiet = () =>
         (tree?.inspect().pendingRequests ?? 0) === 0 &&
         (shiki?.inspect().pendingRequests ?? 0) === 0 &&
-        tokensLive()
+        tokensLive() &&
+        (!configuration.minimap || minimapRendersAccepted())
       // Syntax sessions start lazily; a fence taken before they start resolves with nothing done.
       await waitForInputReady(
         'initial highlights',
@@ -145,6 +146,8 @@ export function inputConsumersForFixture(
 type WorkerProof = {
   readonly terminated: boolean
   readonly minimap: boolean
+  readonly sourceUpdates: number
+  readonly renderAfterSource: number
   readonly latestRender: number
   readonly acceptedRender: number
 }
@@ -157,7 +160,9 @@ function minimapRendersAccepted() {
     (worker) =>
       worker.terminated ||
       !worker.minimap ||
-      (worker.latestRender > 0 && worker.acceptedRender === worker.latestRender),
+      (worker.renderAfterSource === worker.sourceUpdates &&
+        worker.latestRender > 0 &&
+        worker.acceptedRender === worker.latestRender),
   )
 }
 
