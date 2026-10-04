@@ -143,6 +143,50 @@ describe('retained document analysis', () => {
     analysis.dispose()
   })
 
+  it('preserves provider range readiness while a full result is retained', async () => {
+    const buffer = createEditorTextBuffer('alpha beta')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'range-capability.md' })
+    let rangeReady = false
+    const parser = provider(undefined, () => rangeReady)
+    const lease = analysis.borrowStructural({ provider: parser.provider, languageId: 'markdown' })!
+    const result = await lease.refresh(buffer.getTextSnapshot())
+    const range = { startIndex: 0, endIndex: 5 }
+
+    expect(lease.canQueryRange?.()).toBe(false)
+    expect(lease.read(range)).toMatchObject({ kind: 'ready', result })
+    expect(await lease.queryRange!(range)).toBe(result)
+    expect(parser.ranges).not.toHaveBeenCalled()
+
+    rangeReady = true
+    expect(lease.canQueryRange?.()).toBe(true)
+    expect(lease.read(range).kind).toBe('pending')
+    await lease.queryRange!(range)
+    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range)
+    expect(lease.read(range).kind).toBe('ready')
+    analysis.dispose()
+  })
+
+  it('keeps a completed base fallback out of the bounded range cache', async () => {
+    const buffer = createEditorTextBuffer('alpha beta')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'pending-capability.md' })
+    const ready = deferred<EditorSyntaxResult>()
+    let rangeReady = false
+    const parser = provider(ready.promise, () => rangeReady)
+    const lease = analysis.borrowStructural({ provider: parser.provider, languageId: 'markdown' })!
+    const range = { startIndex: 0, endIndex: 5 }
+    const pending = lease.queryRange!(range)
+    const result = createEmptySyntaxResult()
+    ready.resolve(result)
+
+    expect(await pending).toBe(result)
+    expect(parser.ranges).not.toHaveBeenCalled()
+    rangeReady = true
+    expect(lease.read(range).kind).toBe('pending')
+    await lease.queryRange!(range)
+    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range)
+    analysis.dispose()
+  })
+
   it('clips retained viewport demand when an edit shortens the document', async () => {
     const buffer = createEditorTextBuffer('alpha beta gamma')
     const view = createEditorBufferSession(buffer)
@@ -325,7 +369,7 @@ describe('retained document analysis', () => {
   })
 })
 
-function provider(initial?: Promise<EditorSyntaxResult>) {
+function provider(initial?: Promise<EditorSyntaxResult>, canQueryRange?: () => boolean) {
   const dispose = vi.fn()
   const edits = vi.fn(async (_change: import('../src/documentSession').DocumentSessionChange) =>
     createEmptySyntaxResult(),
@@ -338,6 +382,7 @@ function provider(initial?: Promise<EditorSyntaxResult>) {
     refresh: () => initial ?? Promise.resolve(createEmptySyntaxResult()),
     applyChange: edits,
     queryRange: ranges,
+    canQueryRange,
     getResult: () => createEmptySyntaxResult(),
     getTokens: () => [],
     getSnapshotVersion: () => 1,

@@ -223,6 +223,13 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     super(buffer, structuralSession, runtimeSessionId)
   }
 
+  canQueryRange(): boolean {
+    return (
+      this.structuralSession.queryRange !== undefined &&
+      (this.structuralSession.canQueryRange?.() ?? true)
+    )
+  }
+
   readRange(range?: EditorSyntaxRange): EditorAnalysisRead<EditorSyntaxResult> {
     const state = this.read()
     if (!range || state.kind !== 'ready') return state
@@ -235,7 +242,7 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
           candidate.range.endIndex >= range.endIndex,
       )
     if (cached?.revision === state.revision) return { ...state, result: cached.result }
-    if (!this.structuralSession.queryRange) return state
+    if (!this.canQueryRange()) return state
     return { kind: 'pending', revision: state.revision }
   }
 
@@ -248,10 +255,14 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     const key = `${revision}:${rangeKey(range)}`
     const existing = this.queries.get(key)
     if (existing) return existing
-    const pending = this.query(
-      () => this.structuralSession.queryRange?.(range) ?? this.current(),
-    ).then((result) => {
-      if (this.buffer.getRevision() === revision)
+    let queried = false
+    const pending = this.query(() => {
+      const current = this.readRange(range)
+      if (current.kind === 'ready') return Promise.resolve(current.result)
+      queried = true
+      return this.structuralSession.queryRange?.(range) ?? this.current()
+    }).then((result) => {
+      if (queried && this.buffer.getRevision() === revision)
         this.ranges.set(rangeKey(range), { revision, range, result })
       return result
     })
@@ -386,7 +397,7 @@ function structuralLease(
         return result()
       }),
     applyChange: current,
-    canQueryRange: () => entry.read().kind === 'ready',
+    canQueryRange: () => entry.read().kind === 'ready' && entry.canQueryRange(),
     queryRange(range) {
       demand = range
       return current()

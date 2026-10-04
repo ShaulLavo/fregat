@@ -1,8 +1,15 @@
-import { afterEach, expect, test } from 'vitest'
-import { commands } from 'vitest/browser'
+import { afterEach, expect, test, vi } from 'vitest'
+import { commands, page } from 'vitest/browser'
 import { Editor } from '../src/editor/Editor'
+import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/public/document'
 import type { EditorInitialPaintEvent } from '../src/plugins'
+import {
+  createEmptySyntaxResult,
+  type EditorSyntaxProvider,
+  type EditorSyntaxSession,
+} from '../src/syntax/session'
+import { EditorTokenStore } from '../src/syntax/tokenStore'
 import { createError } from '../src/logging/evlog'
 import {
   createTreeSitterSyntaxPlugin,
@@ -227,6 +234,65 @@ test('ends a failed grammar load in an observable terminal state with text still
   )
   expect((await rowPixels(view.host)).ink).toBeGreaterThan(20)
   expect(grammar.parsedSessions).toEqual([])
+})
+
+test('paints retained full tokens immediately when the provider cannot query ranges', async () => {
+  const buffer = createEditorTextBuffer('const answer = 4;')
+  const result = {
+    ...createEmptySyntaxResult(),
+    tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: '#ff0000' } }]),
+  }
+  const queryRange = vi.fn(async () => createEmptySyntaxResult())
+  const provider: EditorSyntaxProvider = {
+    createSession: vi.fn(
+      () =>
+        ({
+          foldingSupport: 'supported',
+          refresh: async () => result,
+          applyChange: async () => result,
+          canQueryRange: () => false,
+          queryRange,
+          getResult: () => result,
+          getTokens: () => result.tokens,
+          getSnapshotVersion: () => 1,
+          dispose: () => undefined,
+        }) satisfies EditorSyntaxSession,
+    ),
+  }
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'retained.ts' })
+  releases.push(() => analysis.dispose())
+  const warm = analysis.borrowStructural({
+    provider,
+    languageId: 'typescript',
+    includeHighlights: true,
+    includeCaptures: false,
+    syntaxMode: 'range',
+  })!
+  await warm.refresh(buffer.getTextSnapshot())
+  warm.dispose()
+  const host = document.createElement('div')
+  host.id = `first-paint-${nextHostId++}`
+  host.style.cssText = 'width:600px;height:120px;display:flex'
+  document.body.append(host)
+  hosts.push(host)
+  const editor = new Editor(host, {
+    lineHeight: 20,
+    plugins: [{ activate: (context) => context.registerSyntaxProvider(provider) }],
+  })
+  editors.push(editor)
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  editor.attachSession(createEditorBufferSession(buffer), {
+    analysis,
+    documentId: 'retained.ts',
+    languageId: 'typescript',
+  })
+
+  expect(editor.getState().initialHighlightStatus).toBe('painted')
+  expect(highlightedText(host)).toContain('const')
+  expect((await rowPixels(host)).red).toBeGreaterThan(20)
+  expect(provider.createSession).toHaveBeenCalledTimes(1)
+  expect(queryRange).not.toHaveBeenCalled()
+  await page.elementLocator(host).screenshot()
 })
 
 test('disposes a waiting session without parsing it and preserves the simultaneous editor', async () => {
