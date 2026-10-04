@@ -88,43 +88,53 @@ function executing(observation: ReturnType<typeof processObservation>, start: st
   )
 }
 
-test('process execution observation distinguishes an unreaped child from its live owner', async () => {
-  const box = sandbox()
-  const nestedPid = path.join(box.root, 'child.pid')
-  const release = path.join(box.root, 'release')
-  const parent = Bun.spawn(
-    [
-      'bash',
-      '-c',
-      'bash -c \'until [ -e "$1" ]; do sleep 0.02; done\' _ "$1" & echo $! > "$2"; kill -STOP $$; wait',
-      '_',
-      release,
-      nestedPid,
-    ],
-    { stdout: 'ignore', stderr: 'pipe' },
-  )
-  try {
-    await expect.poll(() => existsSync(nestedPid), { timeout: 2_000 }).toBe(true)
-    const original = processObservation(pidIn(nestedPid))
-    expect(executing(original, original.start)).toBe(true)
-    const owner = processObservation(parent.pid)
-    expect(executing(owner, owner.start)).toBe(true)
-    writeFileSync(release, '')
-    await expect
-      .poll(() => processObservation(pidIn(nestedPid)).state, { timeout: 2_000 })
-      .toBe('Z')
-    const zombie = processObservation(pidIn(nestedPid))
-    console.log(JSON.stringify({ event: 'process-execution-calibration', owner, original, zombie }))
-    expect(alive(zombie.pid)).toBe(true)
-    expect(zombie.start).toBe(original.start)
-    expect(executing(zombie, original.start)).toBe(false)
-    expect(executing(processObservation(parent.pid), owner.start)).toBe(true)
-  } finally {
-    writeFileSync(release, '')
-    parent.kill('SIGCONT')
-    await parent.exited
-  }
-})
+const processObservationUnavailable =
+  process.platform !== 'linux' || !existsSync('/proc/self/stat') || !Bun.which('bash')
+if (processObservationUnavailable)
+  console.info('Process execution calibration requires Linux procfs and Bash.')
+
+test.skipIf(processObservationUnavailable)(
+  'process execution observation distinguishes an unreaped child from its live owner',
+  async () => {
+    const box = sandbox()
+    const nestedPid = path.join(box.root, 'child.pid')
+    const release = path.join(box.root, 'release')
+    const parent = Bun.spawn(
+      [
+        'bash',
+        '-c',
+        'bash -c \'until [ -e "$1" ]; do sleep 0.02; done\' _ "$1" & echo $! > "$2"; kill -STOP $$; wait',
+        '_',
+        release,
+        nestedPid,
+      ],
+      { stdout: 'ignore', stderr: 'pipe' },
+    )
+    try {
+      await expect.poll(() => existsSync(nestedPid), { timeout: 2_000 }).toBe(true)
+      const original = processObservation(pidIn(nestedPid))
+      expect(executing(original, original.start)).toBe(true)
+      const owner = processObservation(parent.pid)
+      expect(executing(owner, owner.start)).toBe(true)
+      writeFileSync(release, '')
+      await expect
+        .poll(() => processObservation(pidIn(nestedPid)).state, { timeout: 2_000 })
+        .toBe('Z')
+      const zombie = processObservation(pidIn(nestedPid))
+      console.log(
+        JSON.stringify({ event: 'process-execution-calibration', owner, original, zombie }),
+      )
+      expect(alive(zombie.pid)).toBe(true)
+      expect(zombie.start).toBe(original.start)
+      expect(executing(zombie, original.start)).toBe(false)
+      expect(executing(processObservation(parent.pid), owner.start)).toBe(true)
+    } finally {
+      writeFileSync(release, '')
+      parent.kill('SIGCONT')
+      await parent.exited
+    }
+  },
+)
 const systemdRun = userScopes ? Bun.which('systemd-run') : null
 const watchdogOf = (slice: string) => `${slice.slice(0, -'.slice'.length)}_deadline.service`
 const serviceState = (service: string) =>
