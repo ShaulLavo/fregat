@@ -3,7 +3,6 @@ import path from 'node:path'
 
 import {
   checkoutRoot,
-  currentLink,
   meshHost,
   meshRoute,
   meshUrl,
@@ -37,7 +36,7 @@ import {
 } from './deploy/install-layout'
 import { stampWebRelease } from './deploy/web-release'
 import { log, output, run } from './deploy/run'
-import { parseMeshRoutes } from './deploy/routes'
+import { matchesMeshRoute, parseMeshRoutes } from './deploy/routes'
 import { parseInstallArgs, type InstallOptions, type RestartRequest } from './deploy/args'
 import { requestRestart, requireStaged } from './deploy/restart'
 import { installUnit, notifyServer, restartInto, waitForServerRelease } from './deploy/systemd'
@@ -373,22 +372,17 @@ async function preflight() {
 async function assertMeshRoute() {
   const table = await output(['mesh', 'serve', 'ls'])
   const routes = parseMeshRoutes(table)
-  if (
-    routes.some(
-      (route) =>
-        route.route === meshRoute &&
-        route.host === meshHost &&
-        route.kind === 'proxy' &&
-        route.target === String(serverPort),
-    )
-  )
-    return
+  if (routes.some((route) => matchesMeshRoute(route, meshRoute, meshUrl, serverPort))) return
 
-  throw createScriptError(
-    `Mesh does not route ${meshRoute} to port ${serverPort}. Run:\n` +
-      `  mesh unserve ${meshRoute}\n  mesh serve ${meshHost} ${serverPort} --at ${meshRoute} --isolate\n` +
-      `Then retry. (${serverUnit} listens on ${serverPort}; current link: ${currentLink})`,
-  )
+  throw createScriptError('The configured installation URL requires an exact Mesh proxy route.', {
+    why: 'The published Mesh URL, route, kind or target differs from the installation target.',
+    fix: 'Inspect mesh serve ls and developer.deployTarget, then align the intended installation target.',
+    internal: {
+      routeCount: routes.length,
+      requiredPort: serverPort,
+      configuredHostLabelPresent: routes.some((route) => route.host === meshHost),
+    },
+  })
 }
 
 function slugFor(slug: string | undefined, branch: string) {
