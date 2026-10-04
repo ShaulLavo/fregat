@@ -43,26 +43,41 @@ export class StampCache {
     this.entryBudget = Math.max(1, Math.floor(this.budget / 64))
   }
 
-  get(key: string, rasterize: () => GlyphBitmap | undefined): ResidentStamp | undefined {
-    if (this.entries.has(key)) {
-      const old = this.entries.get(key)
-      this.entries.delete(key)
-      this.entries.set(key, old)
-      this.metrics.hits += 1
-      return old
-    }
+  get(
+    key: string,
+    rasterize: () => GlyphBitmap | undefined,
+    clip?: readonly [number, number, number, number],
+  ): ResidentStamp | undefined {
+    let entryKey = `full:${key}`
+    if (this.entries.has(entryKey)) return this.hit(entryKey)
+    const clippedKey = clip ? `clip:${JSON.stringify([key, clip])}` : undefined
+    if (clippedKey && this.entries.has(clippedKey)) return this.hit(clippedKey)
     this.metrics.misses += 1
     this.metrics.rasterCalls += 1
-    const bitmap = rasterize()
+    let bitmap = rasterize()
+    const rawBytes = bitmap?.pixels.byteLength ?? 0
+    this.metrics.rasterPayloadBytes += rawBytes
+    if (bitmap) this.validate(bitmap)
+    if (rawBytes > this.budget) {
+      if (!clip)
+        throw createGhosttyError('canvas.stamp', 'Canvas raster stamp exceeds the viewport extent')
+      bitmap = this.crop(bitmap!, clip)
+      entryKey = clippedKey!
+    }
     const bytes = bitmap?.pixels.byteLength ?? 0
-    this.metrics.rasterPayloadBytes += bytes
-    if (bytes > this.budget)
-      throw createGhosttyError('canvas.stamp', 'Canvas raster stamp exceeds the viewport extent')
     this.reserve(bytes)
     const entry = bitmap ? this.store(bitmap) : undefined
-    this.entries.set(key, entry)
+    this.entries.set(entryKey, entry)
     this.metrics.residentBytes += bytes
     this.metrics.residentEntries = this.entries.size
+    return entry
+  }
+
+  private hit(key: string): ResidentStamp | undefined {
+    const entry = this.entries.get(key)
+    this.entries.delete(key)
+    this.entries.set(key, entry)
+    this.metrics.hits += 1
     return entry
   }
 
@@ -82,17 +97,55 @@ export class StampCache {
     this.entryBudget = 0
   }
 
-  private store(bitmap: GlyphBitmap): ResidentStamp {
-    const bytes = bitmap.pixels.byteLength
+  private validate(bitmap: GlyphBitmap): void {
     const channels = bitmap.kind === 'grayscale' ? 1 : 4
     if (
       !Number.isSafeInteger(bitmap.width) ||
       !Number.isSafeInteger(bitmap.height) ||
+      !Number.isSafeInteger(bitmap.offsetX) ||
+      !Number.isSafeInteger(bitmap.offsetY) ||
+      !Number.isSafeInteger(bitmap.offsetX + bitmap.width) ||
+      !Number.isSafeInteger(bitmap.offsetY + bitmap.height) ||
       bitmap.width <= 0 ||
       bitmap.height <= 0 ||
-      bytes !== bitmap.width * bitmap.height * channels
+      bitmap.pixels.byteLength !== bitmap.width * bitmap.height * channels
     )
       throw createGhosttyError('canvas.stamp', 'Canvas raster stamp has invalid dimensions')
+  }
+
+  private crop(
+    bitmap: GlyphBitmap,
+    clip: readonly [number, number, number, number],
+  ): GlyphBitmap | undefined {
+    if (
+      !clip.every(Number.isSafeInteger) ||
+      clip[2] < 0 ||
+      clip[3] < 0 ||
+      !Number.isSafeInteger(clip[0] + clip[2]) ||
+      !Number.isSafeInteger(clip[1] + clip[3])
+    )
+      throw createGhosttyError('canvas.stamp', 'Canvas raster clip has invalid dimensions')
+    const left = Math.max(bitmap.offsetX, clip[0])
+    const top = Math.max(bitmap.offsetY, clip[1])
+    const width = Math.min(bitmap.offsetX + bitmap.width, clip[0] + clip[2]) - left
+    const height = Math.min(bitmap.offsetY + bitmap.height, clip[1] + clip[3]) - top
+    if (width <= 0 || height <= 0) return undefined
+    const channels = bitmap.kind === 'grayscale' ? 1 : 4
+    const bytes = width * height * channels
+    if (bytes > this.budget)
+      throw createGhosttyError('canvas.stamp', 'Canvas raster stamp exceeds the viewport extent')
+    const pixels = new Uint8Array(bytes)
+    const stride = width * channels
+    for (let row = 0; row < height; row += 1) {
+      const start = ((top - bitmap.offsetY + row) * bitmap.width + left - bitmap.offsetX) * channels
+      pixels.set(bitmap.pixels.subarray(start, start + stride), row * stride)
+    }
+    return { ...bitmap, offsetX: left, offsetY: top, width, height, pixels }
+  }
+
+  private store(bitmap: GlyphBitmap): ResidentStamp {
+    const bytes = bitmap.pixels.byteLength
+    const channels = bitmap.kind === 'grayscale' ? 1 : 4
     const offset = this.storage.allocate(bytes)
     try {
       const buffer = this.storage.memory.buffer

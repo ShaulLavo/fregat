@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { GhosttyRuntime } from '../../core/runtime.js'
+import { fitTerminalFont } from '../../dom/fit.js'
 import { canonicalRendererTheme, mergeRendererTheme } from '../config.js'
 import { TestClock } from '../webgl/tests/fixture.js'
 import { CanvasTerminalRenderer } from './renderer.js'
@@ -15,10 +16,10 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-async function native(content: string) {
+async function native(content: string, columns = 24, rows = 4) {
   const runtime = await GhosttyRuntime.create()
   cleanups.push(() => runtime.dispose())
-  const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+  const terminal = runtime.createTerminal({ columns, rows })
   const state = runtime.createRenderState(terminal)
   terminal.write(content)
   state.update()
@@ -262,3 +263,76 @@ it('rejects framebuffer reallocation during synchronous presentation and dispose
   target.dispose()
   expect(() => target.frame.getImage()).toThrow('unavailable')
 })
+
+it.each([
+  ['canvas2d-fill-text', 0],
+  ['canvas2d-fill-text', -1],
+  ['canvas2d-pixels', 0],
+  ['canvas2d-pixels', -1],
+] as const)(
+  'settles a clipped family owner in a tiny %s viewport with letter spacing %s',
+  async (rendererMode, letterSpacing) => {
+    const { state, terminal } = await native('\x1b[?25l\x1b[?2027h👨‍👩‍👧‍👦', 2, 1)
+    const font = fitTerminalFont(
+      document,
+      {
+        family: 'monospace',
+        size: 16,
+        weight: 400,
+        boldWeight: 700,
+        lineHeight: 1,
+        letterSpacing,
+      },
+      1,
+    )
+    const canvas = document.createElement('canvas')
+    const clock = new TestClock()
+    let frames = 0
+    const renderer = await CanvasTerminalRenderer.create({
+      canvas,
+      columns: 2,
+      rows: 1,
+      font,
+      renderState: state,
+      schedulerClock: clock,
+      rendererMode,
+      theme: {
+        background: { r: 0, g: 0, b: 0 },
+        foreground: { r: 255, g: 255, b: 255 },
+        minimumContrast: 1,
+      },
+      onFrame: () => {
+        frames += 1
+      },
+    })
+    cleanups.push(() => renderer.dispose())
+    expect(() => clock.flushFrame()).not.toThrow()
+    expect(frames).toBe(1)
+    expect(renderer.hasPendingFrame).toBe(false)
+    const output = canvas.getContext('2d')!
+    const first = output.getImageData(0, 0, canvas.width, canvas.height).data
+    expect(first.some((channel, index) => index % 4 !== 3 && channel > 0)).toBe(true)
+    const readback = vi.spyOn(OffscreenCanvasRenderingContext2D.prototype, 'getImageData')
+    renderer.refreshRows(0, 0)
+    clock.flushFrame()
+    expect(frames).toBe(2)
+    expect(renderer.hasPendingFrame).toBe(false)
+    expect(output.getImageData(0, 0, canvas.width, canvas.height).data).toEqual(first)
+    expect(readback).not.toHaveBeenCalled()
+    readback.mockRestore()
+    for (const columns of [8, 2]) {
+      terminal.resize({ columns, rows: 1 })
+      expect(() => renderer.resize({ columns, rows: 1 })).not.toThrow()
+      expect(renderer.hasPendingFrame).toBe(false)
+    }
+    expect(frames).toBe(4)
+    expect(output.getImageData(0, 0, canvas.width, canvas.height).data).toEqual(first)
+    document.body.append(canvas)
+    cleanups.push(() => canvas.remove())
+    await page.screenshot({
+      element: canvas,
+      path: `../../../.artifacts/canvas-clipped-${rendererMode}-${letterSpacing}.png`,
+      scale: 'css',
+    })
+  },
+)

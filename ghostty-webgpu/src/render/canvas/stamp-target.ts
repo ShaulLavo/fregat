@@ -269,7 +269,11 @@ export class StampTarget implements PixelTarget, PaintTarget {
     if (!font) throw createGhosttyError('canvas.glyph', 'Canvas glyph font is unavailable')
     const key = JSON.stringify(['glyph', this.fontIdentity, input])
     // The shared rasterizer's own JS cache dies with the miss, leaving viewport-bounded resident stamps.
-    const stamp = this.cache.get(key, () => new CanvasGlyphRasterizer({ font }).rasterize(input))
+    const stamp = this.cache.get(
+      key,
+      () => new CanvasGlyphRasterizer({ font }).rasterize(input),
+      this.stampClip(x, y),
+    )
     if (stamp) this.compose(stamp, x, y, packed(this.fillStyle))
   }
 
@@ -312,8 +316,10 @@ export class StampTarget implements PixelTarget, PaintTarget {
       this.lineWidth,
       this.state.dash,
     ])
-    const stamp = this.cache.get(key, () =>
-      this.rasterPrimitive(kind, shape, relative, width, height),
+    const stamp = this.cache.get(
+      key,
+      () => this.rasterPrimitive(kind, shape, relative, width, height),
+      this.stampClip(left, top),
     )
     if (stamp)
       this.compose(stamp, left, top, packed(kind === 'fill' ? this.fillStyle : this.strokeStyle))
@@ -349,6 +355,11 @@ export class StampTarget implements PixelTarget, PaintTarget {
     const pixels = new Uint8Array(width * height)
     for (let i = 0; i < pixels.length; i++) pixels[i] = image.data[i * 4 + 3]!
     return { width, height, offsetX: 0, offsetY: 0, kind: 'grayscale', pixels }
+  }
+
+  private stampClip(x: number, y: number): Rect {
+    const [left, top, width, height] = intersect(this.state.clip, [0, 0, this.width, this.height])
+    return [left - x, top - y, width, height]
   }
 
   private compose(stamp: ResidentStamp, x: number, y: number, tint: number): void {
