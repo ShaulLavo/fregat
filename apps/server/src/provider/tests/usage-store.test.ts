@@ -2,6 +2,7 @@ import path from 'node:path'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import {
+  providerAccountUsageSchema,
   providerDriverKindSchema,
   providerInstanceIdSchema,
   sessionIdSchema,
@@ -48,6 +49,125 @@ afterEach(async () => {
 })
 
 describe('provider usage store', () => {
+  it('discards persisted aggregate model aliases and preserves explicitly scoped allowance ages', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'usage-obsolete-model-cache-'))
+    roots.push(root)
+    const registry = { listInstances: () => [], adapter: () => null, usageAccount: () => null }
+    const observedAt = new Date(START_MS).toISOString()
+    const options = {
+      cacheFile: path.join(root, 'accounts.json'),
+      now: () => START_MS,
+      readProxy: async () => [
+        {
+          accountKey: `proxy:${'a'.repeat(64)}`,
+          driverKind: v.parse(providerDriverKindSchema, 'codex'),
+          providerInstanceIds: [],
+          planType: 'Pro',
+          source: 'cli-proxy-management',
+          checkedAt: observedAt,
+          windows: [{ ...window('primary', 100), observedAt }],
+        },
+      ],
+    }
+    const store = new ProviderUsageStore(registry, options)
+    await store.refresh()
+    await store.close()
+    const cache = v.parse(
+      v.looseObject({ proxyAccounts: v.array(providerAccountUsageSchema) }),
+      JSON.parse(await readFile(options.cacheFile, 'utf8')),
+    )
+    cache.proxyAccounts[0]!.windows.push({
+      ...window('model:gpt-6.1-sol:primary', 90),
+      observedAt: new Date(START_MS - 3_600_000).toISOString(),
+      source: 'cliproxy-passive-cache',
+    })
+    const scopedAt = new Date(START_MS - 3_600_000).toISOString()
+    cache.proxyAccounts[0]!.windows.push({
+      ...window('model:gpt-5:code-review:primary', 9),
+      observedAt: scopedAt,
+      source: 'cliproxy-passive-cache',
+    })
+    await writeFile(options.cacheFile, JSON.stringify(cache))
+    const restarted = new ProviderUsageStore(registry, options)
+    const account = (await restarted.feed()).accounts[0]!
+    expect(account.windows).toHaveLength(2)
+    expect(account.windows[0]).toMatchObject({
+      id: 'weekly',
+      usedPercent: 100,
+      lastSeenAt: observedAt,
+    })
+    expect(account.windows[1]).toMatchObject({
+      id: 'code-review:weekly',
+      usedPercent: 9,
+      lastSeenAt: scopedAt,
+    })
+    await restarted.close()
+  })
+
+  it.each([-1000, -3_600_000, 7 * 24 * 3_600_000])(
+    'accepts a newer proxy observation when its reset moves by %i ms',
+    async (resetChange) => {
+      const registry = { listInstances: () => [], adapter: () => null, usageAccount: () => null }
+      let now = START_MS
+      const originalReset = START_MS + 7 * 24 * 3_600_000
+      let observedAt = new Date(now).toISOString()
+      let resetsAt = new Date(originalReset).toISOString()
+      let usedPercent = 2
+      const store = new ProviderUsageStore(registry, {
+        now: () => now,
+        readProxy: async () => [
+          {
+            accountKey: `proxy:${'a'.repeat(64)}`,
+            driverKind: v.parse(providerDriverKindSchema, 'codex'),
+            providerInstanceIds: [],
+            planType: 'Pro',
+            checkedAt: observedAt,
+            source: 'cli-proxy-management',
+            windows: [{ ...window('primary', usedPercent), observedAt, resetsAt }],
+          },
+        ],
+      })
+      await store.refresh()
+      expect((await store.feed()).accounts[0]!.windows[0]!.usedPercent).toBe(2)
+      now += 600_000
+      observedAt = new Date(now).toISOString()
+      resetsAt = new Date(originalReset + resetChange).toISOString()
+      usedPercent = 4
+      await store.refresh()
+      const latest = (await store.feed()).accounts[0]!.windows[0]!
+      expect(latest).toMatchObject({ usedPercent: 4, resetsAt, lastSeenAt: observedAt })
+      observedAt = new Date(START_MS).toISOString()
+      resetsAt = new Date(originalReset + 14 * 24 * 3_600_000).toISOString()
+      usedPercent = 99
+      now += 600_000
+      await store.refresh()
+      expect((await store.feed()).accounts[0]!.windows[0]).toMatchObject({
+        usedPercent: latest.usedPercent,
+        resetsAt: latest.resetsAt,
+        lastSeenAt: latest.lastSeenAt,
+      })
+      await store.close()
+    },
+  )
+
+  it('accepts newer native reset corrections and ignores delayed older counters', async () => {
+    const f = await usageFixture()
+    const originalReset = new Date(START_MS + 3_600_000).toISOString()
+    f.store.accept(limitsEvent(WORK, [{ ...window('five_hour', 2), resetsAt: originalReset }]))
+    f.clock.ms += 60_000
+    const observedAt = new Date(f.clock.ms).toISOString()
+    const resetsAt = new Date(START_MS + 3_600_000 - 1000).toISOString()
+    f.store.accept({
+      ...limitsEvent(WORK, [{ ...window('five_hour', 4), resetsAt }]),
+      createdAt: observedAt,
+    })
+    f.store.accept(limitsEvent(WORK, [{ ...window('five_hour', 99), resetsAt: originalReset }]))
+    expect((await f.store.read()).accounts[0]!.windows).toMatchObject([
+      { usedPercent: 4, observedAt, resetsAt },
+    ])
+    await f.store.close()
+  })
+
   it.each([
     { nativeId: 'fixture-chatgpt-account', proxyId: 'fixture-chatgpt-account', count: 1 },
     { nativeId: 'fixture-chatgpt-account', proxyId: 'fixture-other-account', count: 2 },
@@ -604,7 +724,7 @@ describe('provider usage store', () => {
     { primary: 10080, secondary: 10080, ids: ['weekly:primary', 'weekly:secondary'] },
     { primary: null, secondary: null, ids: ['other:primary', 'other:secondary'] },
   ])(
-    'projects actual proxy and model durations without rekeying or redating: %j',
+    'projects provider durations once across copied model caches without rekeying or redating: %j',
     async (scenario) => {
       const f = await usageFixture()
       const observedAt = new Date(START_MS - 60_000).toISOString()
@@ -645,30 +765,22 @@ describe('provider usage store', () => {
       })
       await store.refresh()
       const raw = (await store.read()).accounts.at(-1)!
-      expect(raw.windows.map(({ id }) => id)).toEqual([
-        'primary',
-        'secondary',
-        'model:gpt-6.1-sol:primary',
-        'model:gpt-6.1-sol:secondary',
-      ])
+      expect(raw.windows.map(({ id }) => id)).toEqual(['primary', 'secondary'])
       const before = JSON.stringify(raw.windows)
       for (let read = 0; read < 2; read += 1) {
         const account = (await store.feed()).accounts.at(-1)!
-        expect(account.windows.map(({ id }) => id)).toEqual([
-          ...scenario.ids,
-          ...scenario.ids.map((id) => `model:gpt-6.1-sol:${id}`),
-        ])
+        expect(account.windows.map(({ id }) => id)).toEqual(scenario.ids)
         expect(account.label).toBe('fixture.person')
         expect(account.source).toBe('proxy-state')
-        expect(account.windows.map(({ source }) => source)).toEqual(Array(4).fill('proxy-state'))
+        expect(account.windows.map(({ source }) => source)).toEqual(Array(2).fill('proxy-state'))
         expect(account.windows.map(({ lastSeenAt }) => lastSeenAt)).toEqual(
-          Array(4).fill(observedAt),
+          Array(2).fill(observedAt),
         )
         expect(account.windows[0]).toMatchObject({
           usedPercent: 65,
           resetsAt: new Date(START_MS - 60_000 + 3600_000).toISOString(),
         })
-        expect(new Set(account.windows.map(({ id }) => id)).size).toBe(4)
+        expect(new Set(account.windows.map(({ id }) => id)).size).toBe(2)
         expect(JSON.stringify(account)).not.toContain('@example.test')
         expect(requests).toBe(1)
       }

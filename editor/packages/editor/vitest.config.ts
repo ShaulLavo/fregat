@@ -38,7 +38,6 @@ export default defineConfig({
           exclude: ['web-tree-sitter', 'tree-sitter-md'],
           include: [
             '@fregat/hotkeys',
-            '@tanstack/store',
             'diff',
             '@shikijs/engine-oniguruma',
             '@shikijs/engine-oniguruma/wasm-inlined',

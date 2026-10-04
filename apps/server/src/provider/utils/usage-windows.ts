@@ -292,7 +292,7 @@ export function mergeUsageWindows<Windows extends readonly ProviderUsageWindow[]
   for (const reading of update) {
     const existing = merged.get(reading.id)
     const next = mergedWindow(existing, reading)
-    if (!next || (existing && sameWindow(existing, next))) continue
+    if (existing && sameWindow(existing, next)) continue
 
     merged.set(reading.id, next)
     changed = true
@@ -302,10 +302,107 @@ export function mergeUsageWindows<Windows extends readonly ProviderUsageWindow[]
   return sortUsageWindows([...merged.values()])
 }
 
+export function mergeObservedUsageWindows(
+  previous: readonly ProviderUsageWindow[],
+  update: readonly ProviderUsageWindow[],
+): ProviderUsageWindow[] {
+  const merged = new Map(previous.map((window) => [window.id, datedStatus(window)]))
+  for (const reading of update) {
+    const known = merged.get(reading.id)
+    const next = datedStatus(reading)
+    merged.set(reading.id, known ? mergedObservation(known, next) : next)
+  }
+  return [...merged.values()]
+}
+
+function datedStatus(window: ProviderUsageWindow): ProviderUsageWindow {
+  return {
+    ...window,
+    statusObservedAt: window.statusObservedAt ?? window.observedAt ?? null,
+    statusSource: window.statusSource ?? window.source,
+  }
+}
+
+function mergedObservation(known: ProviderUsageWindow, reading: ProviderUsageWindow) {
+  if (known.resetsAt && reading.resetsAt && known.resetsAt !== reading.resetsAt) {
+    const order =
+      timeOrder(latestObservation(reading), latestObservation(known)) ||
+      statusOrder(reading, known) ||
+      readingOrder(reading, known)
+    return order > 0 ? reading : known
+  }
+  const newer = readingOrder(reading, known) > 0 ? reading : known
+  const older = newer === reading ? known : reading
+  const next = mergedWindow(older, newer)
+  const retainsPercent = newer.usedPercent === null && next.usedPercent !== null
+  const status = statusOrder(reading, known) > 0 ? reading : known
+  return {
+    ...next,
+    observedAt: retainsPercent ? older.observedAt : newer.observedAt,
+    source: retainsPercent ? older.source : newer.source,
+    status: status.status,
+    statusObservedAt: status.statusObservedAt,
+    statusSource: status.statusSource,
+  }
+}
+
+function readingOrder(left: ProviderUsageWindow, right: ProviderUsageWindow) {
+  return (
+    timeOrder(left.observedAt, right.observedAt) ||
+    observationPriority(left.source) - observationPriority(right.source) ||
+    (left.usedPercent ?? -1) - (right.usedPercent ?? -1) ||
+    windowOrder(left, right)
+  )
+}
+
+function statusOrder(left: ProviderUsageWindow, right: ProviderUsageWindow) {
+  return (
+    timeOrder(left.statusObservedAt, right.statusObservedAt) ||
+    observationPriority(left.statusSource) - observationPriority(right.statusSource) ||
+    statusPriority(left.status) - statusPriority(right.status) ||
+    (left.statusSource ?? '').localeCompare(right.statusSource ?? '') ||
+    windowOrder(left, right)
+  )
+}
+
+function statusPriority(status: ProviderUsageWindow['status']) {
+  if (status === 'rejected') return 3
+  if (status === 'warning') return 2
+  return status === 'allowed' ? 1 : 0
+}
+
+function windowOrder(left: ProviderUsageWindow, right: ProviderUsageWindow) {
+  return (
+    (left.resetsAt ?? '').localeCompare(right.resetsAt ?? '') ||
+    (left.windowMinutes ?? -1) - (right.windowMinutes ?? -1) ||
+    (left.source ?? '').localeCompare(right.source ?? '') ||
+    left.label.localeCompare(right.label) ||
+    left.kind.localeCompare(right.kind)
+  )
+}
+
+function latestObservation(window: ProviderUsageWindow) {
+  return timeOrder(window.statusObservedAt, window.observedAt) > 0
+    ? window.statusObservedAt
+    : window.observedAt
+}
+
+function timeOrder(left: string | null | undefined, right: string | null | undefined) {
+  const leftAt = left ? Date.parse(left) : Number.NEGATIVE_INFINITY
+  const rightAt = right ? Date.parse(right) : Number.NEGATIVE_INFINITY
+  if (leftAt === rightAt) return 0
+  return leftAt > rightAt ? 1 : -1
+}
+
+function observationPriority(source: string | undefined) {
+  if (source === 'rate-limit-event' || source === 'codex-account-rate-limits') return 2
+  return source === 'cliproxy-passive-cache' ? 1 : 0
+}
+
 function mergedWindow(
   existing: ProviderUsageWindow | undefined,
   reading: ProviderUsageReading,
-): ProviderUsageWindow | null {
+): ProviderUsageWindow {
   const sameEpoch =
     !reading.resetsAt || !existing?.resetsAt || reading.resetsAt === existing.resetsAt
   const usedPercent = reading.usedPercent ?? (sameEpoch ? existing?.usedPercent : null) ?? null
@@ -325,7 +422,7 @@ const KIND_ORDER: Record<ProviderUsageWindowKind, number> = {
   other: 3,
 }
 
-function sortUsageWindows(windows: ProviderUsageWindow[]) {
+export function sortUsageWindows(windows: readonly ProviderUsageWindow[]) {
   return windows.toSorted(
     (left, right) =>
       KIND_ORDER[left.kind] - KIND_ORDER[right.kind] || left.id.localeCompare(right.id),
