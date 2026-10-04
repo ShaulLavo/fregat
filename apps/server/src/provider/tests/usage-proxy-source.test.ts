@@ -120,9 +120,9 @@ test('preserves known accounts as no-data without inventing quota from routing o
     windows: [],
     checkedAt: null,
     lastSeenAt: null,
-    credits: null,
     routing: { active: true, lastServedAt: null },
   })
+  expect(accounts[0]?.credits).toBeUndefined()
 })
 
 test('keeps independent ages, expired resets, distinct quota windows and non-five-hour primary durations', async () => {
@@ -484,7 +484,7 @@ test('credits cover exhausted windows only with a valid observed balance', async
   })
   expect(accounts[0]?.windows[0]?.status).toBe('warning')
   expect(accounts[1]?.windows[0]?.status).toBe('rejected')
-  expect(accounts[1]?.credits).toBeNull()
+  expect(accounts[1]?.credits).toBeUndefined()
 })
 
 test('sanitizes explicitly observed cooldowns and preserves missing observation time', async () => {

@@ -16,7 +16,7 @@ import {
 
 /**
  * A diff prepared on intent paints coloured with its first rows: the plugin adopts the prepared
- * streams instead of scheduling a parse, and hands them back when the view leaves.
+ * streams instead of scheduling a parse, and releases its readers when the view leaves.
  */
 
 describe('prepared diff syntax', () => {
@@ -43,6 +43,27 @@ describe('prepared diff syntax', () => {
     expect(backend.sessions).toBe(sessions)
   })
 
+  it('plain syntax release disposes owned sessions while retaining rows and expansion', async () => {
+    const backend = countingBackend()
+    const file = typescriptDiff()
+    const prepared = await prepareDiffSyntax(file, { backend: backend.backend })
+    const plugin = createDiffPlugin({ mode: 'document', syntaxBackend: backend.backend })
+    plugin.setFile(file, prepared)
+    const key = plugin.getRows().find((row) => row.expandKey)?.expandKey
+    expect(key).toBeDefined()
+    if (!key) return
+    plugin.toggleRegion(key)
+    const rows = plugin.getRows()
+    plugin.releaseSyntax()
+    expect(plugin.getTokens()).toEqual([])
+    expect(plugin.getRows()).toBe(rows)
+    expect(plugin.getExpandedRegions().has(key)).toBe(true)
+    expect(backend.disposed).toBe(2)
+    plugin.releaseSyntax()
+    plugin.setFile(null)
+    expect(backend.disposed).toBe(2)
+  })
+
   it('parses and disposes prepared streams that do not cover the pane side', async () => {
     const backend = countingBackend()
     const file = typescriptDiff()
@@ -59,36 +80,6 @@ describe('prepared diff syntax', () => {
     expect(backend.disposed).toBe(1)
     await flushUntil(() => plugin.isSyntaxReady())
     expect(tokenTexts(plugin.getTokens(), joinRenderLines(plugin.getRows()))).toEqual(['old'])
-  })
-
-  it('releases the parsed streams to a later view of the same file', async () => {
-    const backend = countingBackend()
-    const file = typescriptDiff()
-    const first = createDiffPlugin({
-      mode: 'document',
-      side: 'stacked',
-      syntaxBackend: backend.backend,
-    })
-    first.setFile(file)
-    expect(first.releasePreparedSyntax()).toEqual([])
-    await flushUntil(() => first.isSyntaxReady())
-
-    const released = first.releasePreparedSyntax()
-    first.setFile(null)
-    expect(released).toHaveLength(2)
-    expect(backend.disposed).toBe(0)
-
-    const sessions = backend.sessions
-    const second = createDiffPlugin({
-      mode: 'document',
-      side: 'stacked',
-      syntaxBackend: backend.backend,
-    })
-    second.setFile(file, released)
-    expect(second.getTokens()).toHaveLength(2)
-    second.setFile(null)
-    expect(backend.sessions).toBe(sessions)
-    expect(backend.disposed).toBe(2)
   })
 
   it('keeps prepared streams coloured across a theme change, adopted or not', async () => {
@@ -136,6 +127,28 @@ describe('prepared diff syntax', () => {
     expect(backend.sessions).toBe(2)
   })
 
+  it('rejects an older preparation when the same file object is attached again', async () => {
+    const theme = themedBackend()
+    const file = typescriptDiff()
+    const older = await prepareDiffSyntax(file, { backend: theme.backend })
+    const newer = await prepareDiffSyntax(file, { backend: theme.backend })
+    const first = Promise.withResolvers<Awaited<ReturnType<typeof prepareDiffSyntax>>>()
+    const second = Promise.withResolvers<Awaited<ReturnType<typeof prepareDiffSyntax>>>()
+    const plugin = createDiffPlugin({ mode: 'document', syntaxBackend: theme.backend })
+    plugin.setFile(file, first.promise)
+    plugin.setFile(file, second.promise)
+    first.resolve(older)
+    await flushPromises()
+    expect(plugin.isSyntaxReady()).toBe(false)
+    expect(plugin.getTokens()).toEqual([])
+    second.resolve(newer)
+    await flushUntil(() => plugin.isSyntaxReady())
+    expect(plugin.getTokens()).toHaveLength(2)
+    expect(theme.listeners.size).toBe(2)
+    plugin.setFile(null)
+    expect(theme.listeners.size).toBe(0)
+  })
+
   it('disposes a late preparation for a file the view has left', async () => {
     const backend = countingBackend()
     const file = typescriptDiff()
@@ -157,24 +170,6 @@ describe('prepared diff syntax', () => {
     await flushPromises()
 
     expect(backend.disposed).toBe(2)
-  })
-
-  it('keeps projecting released streams across an expansion toggle', async () => {
-    const backend = countingBackend()
-    const plugin = createDiffPlugin({
-      mode: 'document',
-      side: 'stacked',
-      syntaxBackend: backend.backend,
-    })
-    plugin.setFile(typescriptDiff())
-    await flushUntil(() => plugin.isSyntaxReady())
-    const tokens = plugin.getTokens()
-
-    expect(plugin.releasePreparedSyntax()).toHaveLength(2)
-    const hunk = plugin.getRows().find((row) => row.type === 'hunk')
-    if (hunk?.expandKey) plugin.toggleRegion(hunk.expandKey)
-
-    expect(plugin.getTokens().length).toBe(tokens.length)
   })
 
   it.each(['empty', 'disabled', 'overlay'] as const)(

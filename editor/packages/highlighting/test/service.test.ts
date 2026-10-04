@@ -42,3 +42,37 @@ describe('highlightingGrammar', () => {
     expect(highlightingGrammar('no-such-language')).toBeNull()
   })
 })
+
+test('terminal disposal rejects reentrant diff callbacks and shares one completion', async () => {
+  const service = createHighlightingService()
+  const { createTextDiff } = await import('@singapore-editor/diff')
+  const file = createTextDiff({
+    oldFile: { path: 'terminal.js', text: 'const a = 1;' },
+    newFile: { path: 'terminal.js', text: 'const a = 2;' },
+  })
+  const observed: unknown[] = []
+  let nested: Promise<void> | undefined
+  service.showDiff(
+    {
+      setFile() {},
+      releaseSyntax() {
+        observed.push(service.inspect().disposed)
+        try {
+          service.syntaxProvider()
+          observed.push('admitted')
+        } catch (error) {
+          observed.push(error)
+        }
+        nested = service.dispose()
+      },
+    },
+    file,
+    'stacked',
+    { current: () => ({ format: 'editor' }) },
+  )
+  const disposal = service.dispose()
+  await disposal
+  await nested
+  expect(observed).toEqual([true, expect.objectContaining({ code: 'disposed' })])
+  expect(nested).toBe(disposal)
+})

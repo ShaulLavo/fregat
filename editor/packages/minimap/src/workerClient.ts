@@ -210,6 +210,7 @@ export class MinimapWorkerClient {
   private latestLayoutSignature = ''
   private latestThemeSignature = ''
   private latestSnapshot: EditorViewSnapshot
+  private latestDocumentSummary: MinimapDocumentSummaryBaseline
   private latestViewport: EditorViewportSnapshot
   private postedViewport: MinimapViewport | null = null
   private latestFullDocumentSnapshot: EditorViewSnapshot | null = null
@@ -226,6 +227,7 @@ export class MinimapWorkerClient {
     this.reservedLane = options.reservedLane
     this.externalDecorations = options.decorations
     this.latestSnapshot = options.snapshot
+    this.latestDocumentSummary = snapshotSummaryBaseline(options.snapshot)
     this.latestViewport = options.snapshot.viewport
     this.latestTokenSource = options.snapshot.tokens
     this.colorResolver = new ColorResolver(options.host.colorScope)
@@ -251,8 +253,11 @@ export class MinimapWorkerClient {
       return
     }
 
-    const previousSnapshot = this.latestSnapshot
+    const previousSummary = this.latestDocumentSummary
     this.latestSnapshot = snapshot
+    if (kind === 'content' || kind === 'document' || kind === 'clear') {
+      this.latestDocumentSummary = snapshotSummaryBaseline(snapshot)
+    }
     if (kind === 'viewport') {
       this.latestViewport = snapshot.viewport
       const layoutUpdated = this.postLayoutIfNeeded(snapshot)
@@ -261,7 +266,7 @@ export class MinimapWorkerClient {
       return
     }
 
-    const update = createPendingUpdate(snapshot, kind, change, previousSnapshot)
+    const update = createPendingUpdate(snapshot, kind, change, previousSummary)
     this.latestViewport = snapshot.viewport
     this.applyImmediateViewport()
     this.queueUpdate(update)
@@ -312,7 +317,7 @@ export class MinimapWorkerClient {
 
     this.externalDecorations = decorations
     this.queueUpdate(
-      createPendingUpdate(this.latestSnapshot, 'decorations', null, this.latestSnapshot),
+      createPendingUpdate(this.latestSnapshot, 'decorations', null, this.latestDocumentSummary),
     )
   }
 
@@ -1381,10 +1386,10 @@ function createPendingUpdate(
   snapshot: EditorViewSnapshot,
   kind: string,
   change: EditorContributionChange | null | undefined,
-  previousSnapshot: EditorViewSnapshot,
+  previousSummary: MinimapDocumentSummaryBaseline,
 ): PendingMinimapUpdate {
   const base = basePendingUpdate(snapshot, kind)
-  if (kind === 'content') return contentPendingUpdate(base, change, previousSnapshot)
+  if (kind === 'content') return contentPendingUpdate(base, change, previousSummary)
   if (kind === 'document' || kind === 'clear') {
     return { ...base, replaceDocument: true, reason: kind }
   }
@@ -1474,7 +1479,7 @@ function basePendingUpdate(snapshot: EditorViewSnapshot, kind: string): PendingM
 function contentPendingUpdate(
   base: PendingMinimapUpdate,
   change: EditorContributionChange | null | undefined,
-  previousSnapshot: EditorViewSnapshot,
+  previousSummary: MinimapDocumentSummaryBaseline,
 ): PendingMinimapUpdate {
   const edits = incrementalTextEdits(change)
   if (!edits) {
@@ -1484,9 +1489,9 @@ function contentPendingUpdate(
   return {
     ...base,
     edits,
-    previousDocumentSummary: snapshotSummaryBaseline(previousSnapshot),
+    previousDocumentSummary: previousSummary,
     syncSelection: true,
-    tokenSourceAfterEdits: tokenSourceAfterEdits(change, previousSnapshot, base.snapshot),
+    tokenSourceAfterEdits: tokenSourceAfterEdits(change, previousSummary.lineStarts, base.snapshot),
     reason: edits.length === 1 ? 'content.edit' : 'content.edits',
   }
 }
@@ -1532,11 +1537,11 @@ function compareTextEdits(left: TextEdit, right: TextEdit): number {
 
 function tokenSourceAfterEdits(
   change: EditorContributionChange | null | undefined,
-  previousSnapshot: EditorViewSnapshot,
+  previousLineStarts: MinimapLineStarts,
   nextSnapshot: EditorViewSnapshot,
 ): EditorTokenStore | null {
   if (!change) return null
-  if (!editsPreserveLineStructure(change.edits, previousSnapshot.lineStartsView)) return null
+  if (!editsPreserveLineStructure(change.edits, previousLineStarts)) return null
   return nextSnapshot.tokens
 }
 
