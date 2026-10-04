@@ -4,6 +4,7 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { act, fireEvent, screen } from '@testing-library/react'
 import { detectPlatform } from '@fregat/hotkeys'
+import { vi } from 'vitest'
 
 import { ChatInputSubmitPlugin } from '@/features/chat/components/chat-input-submit-plugin'
 import { expect, test } from '../../../../../test/fixtures'
@@ -42,6 +43,22 @@ test('Ctrl/Cmd+Enter requests the alternate intent while Enter keeps the default
   composer.pressEnter(detectPlatform() === 'mac' ? { metaKey: true } : { ctrlKey: true })
   composer.pressEnter({ shiftKey: true })
   expect(composer.intents).toEqual([false, true])
+})
+
+test('Enter sends and Shift+Enter adds a line when the primary pointer is touch', () => {
+  const media = window.matchMedia('(hover: none) and (pointer: coarse)')
+  Object.defineProperty(media, 'matches', { value: true })
+  const matchMedia = vi.spyOn(window, 'matchMedia').mockReturnValue(media)
+  try {
+    const composer = renderComposer()
+    composer.pressEnter({ shiftKey: true })
+    expect(composer.submits).toBe(0)
+    const event = composer.pressEnter({})
+    expect(composer.intents).toEqual([false])
+    expect(event.defaultPrevented).toBe(true)
+  } finally {
+    matchMedia.mockRestore()
+  }
 })
 
 test('completion Enter belongs to the widget and does not submit', () => {

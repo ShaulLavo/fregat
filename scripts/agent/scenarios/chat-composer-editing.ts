@@ -6,7 +6,7 @@ import { isolatedNativeScenario, withUserSetting } from './native-provider-verif
 export const chatComposerEditing = isolatedNativeScenario({
   name: 'chat-composer-editing',
   description:
-    'With chat.sendShortcut set to mod-enter, Enter adds a line and Ctrl+Enter sends the two-line message. On a touch device Return adds a line under any shortcut and the Send button sends. A 40 KB paste folds into pasted-text.txt, and Ctrl+Shift+V pastes it inline. Restores the setting.',
+    'With chat.sendShortcut set to mod-enter, Enter adds a line and Ctrl+Enter sends the two-line message. On a touch device Shift+Enter adds a line and Enter sends. A 40 KB paste folds into pasted-text.txt, and Ctrl+Shift+V pastes it inline. Restores the setting.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, orchestration }) {
     const composer = selectors.chatMessage(page)
@@ -43,8 +43,7 @@ export const chatComposerEditing = isolatedNativeScenario({
     await step('ctrl-shift-v-pastes-inline')
     await composer.fill('')
 
-    // A phone's Return adds a line whatever the send shortcut; the Send button sends. The turn
-    // above waits on the fixture's approval, which is declined first so the send is admitted.
+    // Finish the fixture's approval so the next send is admitted.
     await selectors.appApprovalDecision(page, 'Decline').click()
     await selectors.appApproval(page).waitFor({ state: 'hidden', timeout: 30_000 })
     const touch = await page.context().newCDPSession(page)
@@ -59,15 +58,15 @@ export const chatComposerEditing = isolatedNativeScenario({
       await page.keyboard.press('Control+A')
       await page.keyboard.press('Backspace')
       await page.keyboard.type('touch one')
-      await page.keyboard.press('Enter')
+      await page.keyboard.press('Shift+Enter')
       await page.keyboard.type('touch two')
       await page.waitForTimeout(300)
       strictEqual((await composer.innerText()).trim(), 'touch one\ntouch two')
       strictEqual(await messages.getByText('touch two', { exact: false }).count(), 0)
-      await step('touch-return-adds-a-line')
-      await selectors.chatSend(page).click()
+      await step('touch-shift-enter-adds-a-line')
+      await page.keyboard.press('Enter')
       await messages.getByText('touch two', { exact: false }).waitFor({ timeout: 30_000 })
-      await step('touch-send-button-sends')
+      await step('touch-enter-sends')
     } finally {
       await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false })
       await touch.detach()

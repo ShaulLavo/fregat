@@ -99,6 +99,7 @@ import { chatFindingSource } from './chat-finding-source'
 import { chatReviewContext } from './chat-review-context'
 import { chatMultipleModelsLostAck } from './chat-multiple-models-lost-ack'
 import { chatComposerEditing } from './chat-composer-editing'
+import { chatComposerSend } from './chat-composer-send'
 import { chatArtifactTemplate } from './chat-artifact-template'
 import { chatModelFavorites } from './chat-model-favorites'
 import { chatBackgroundStart } from './chat-background-start'
@@ -508,6 +509,7 @@ export const scenarios: readonly Scenario[] = [
   chatReviewContext,
   chatMultipleModelsLostAck,
   chatComposerEditing,
+  chatComposerSend,
   chatArtifactTemplate,
   chatModelFavorites,
   chatBackgroundStart,

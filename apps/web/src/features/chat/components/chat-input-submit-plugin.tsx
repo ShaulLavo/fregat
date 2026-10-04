@@ -47,7 +47,6 @@ export function ChatInputSubmitPlugin({
               prompt: editor.getEditorState().read(() => $readChatInputTextSnapshot().text),
               sendShortcut,
               shiftKey: source.shiftKey,
-              touch: touchKeyboard(),
             })
           : 'send'
         if (intent === 'newline') return false
@@ -152,9 +151,4 @@ function handleMenuMoveCommand(
   event?.preventDefault()
   event?.stopPropagation()
   return true
-}
-
-/** A device whose main pointer is a finger: its on-screen keyboard has no Shift+Return habit. */
-function touchKeyboard() {
-  return window.matchMedia('(hover: none) and (pointer: coarse)').matches
 }
