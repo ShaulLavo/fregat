@@ -48,11 +48,38 @@ describe('analysis display demand', () => {
       }
       const host = document.createElement('div')
       document.body.appendChild(host)
+      let currentView: VirtualizedTextView | null = null
+      const viewportUpdates: {
+        atomic: boolean
+        height: number
+        width: number
+        text: string
+        rows: readonly (string | null)[]
+      }[] = []
       const plugin: EditorPlugin = {
-        activate: (context) => context.registerSyntaxProvider(provider),
+        activate: (context) => [
+          context.registerSyntaxProvider(provider),
+          context.registerViewContribution({
+            createContribution: () => ({
+              inputs: ['viewport'],
+              update: (snapshot) => {
+                if (!currentView) return
+                viewportUpdates.push({
+                  atomic: currentView.isRenderingAtomically,
+                  height: snapshot.viewport.clientHeight,
+                  width: snapshot.viewport.clientWidth,
+                  text: snapshot.textSnapshot.readRange(0, snapshot.textSnapshot.length),
+                  rows: currentView.getState().mountedRows.map((row) => row.element.textContent),
+                })
+              },
+              dispose: () => undefined,
+            }),
+          }),
+        ],
       }
       const editor = createVisibleEditor(host, { plugins: [plugin] })
       const view = textView(editor)
+      currentView = view
       view.setScrollMetrics(0, 72, 400)
       editor.attachSession(createEditorBufferSession(buffer), {
         analysis,
@@ -66,6 +93,12 @@ describe('analysis display demand', () => {
         ranges: [{ startIndex: 0, endIndex: oldText.length }],
       })
       expect(view.getState().mountedRows[0]!.element.textContent).toBe('old0')
+      viewportUpdates.length = 0
+      view.setScrollMetrics(0, 96, 320)
+      expect(viewportUpdates).toHaveLength(1)
+      expect(viewportUpdates[0]).toMatchObject({ atomic: false, height: 96, width: 320 })
+      view.setScrollMetrics(0, 72, 400)
+      viewportUpdates.length = 0
       const observations: { atomic: boolean; oldDOM: boolean; frames: number; unknown: number }[] =
         []
       let entered = false
@@ -81,6 +114,7 @@ describe('analysis display demand', () => {
           view.runAtomicRender(() => view.setScrollMetrics(0, 96, 320))
         }
         editor.setTokens([])
+        expect(viewportUpdates).toHaveLength(0)
         observations.push({
           atomic: view.isRenderingAtomically,
           oldDOM,
@@ -103,6 +137,15 @@ describe('analysis display demand', () => {
         if (reentry === 'nested-layout')
           expect(view.getState()).toMatchObject({ viewportHeight: 96, viewportWidth: 320 })
         expect(observations).toEqual([{ atomic: true, oldDOM: true, frames: 0, unknown: 1 }])
+        expect(viewportUpdates).toEqual([
+          {
+            atomic: false,
+            height: reentry === 'nested-layout' ? 96 : 72,
+            width: reentry === 'nested-layout' ? 320 : 400,
+            text: nextText,
+            rows: [...Array.from({ length: 8 }, (_, index) => `new${index}`), ''],
+          },
+        ])
       } finally {
         subscription.dispose()
         editor.dispose()
