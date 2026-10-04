@@ -804,8 +804,10 @@ seconds. Loaded native+disabled passes 216/216 in 209.253 seconds with eight dec
 and complete stop/await cleanup. The ten selected loaded A/A keys each reject 0/10. One unselected
 native ordinary/single applied-undo rejection is preserved separately. The exact quiet undo pilot
 rejects 1/5 per A/A and original A/B arm, with median of medians -0.250 and +0.150 ms respectively;
-its sign reversal does not demonstrate a stable A/B-only cost. Ten runs per arm remain pending,
-retaining the pilot cases. These are receipts under measurement `8127db7f`, with unchanged budgets.
+its sign reversal does not demonstrate a stable A/B-only cost. These are receipts under
+measurement `8127db7f`, with unchanged budgets. A separate predeclared cohort of ten fresh runs
+per arm is required under repaired measurement `34109579`. Report the preserved five-per-arm
+`8127db7f` pilot separately, including both rejections; different identities cannot form one cohort.
 
 The first predeclared full CLI aborts at 782.141 seconds during minimap short-lines/single typing
 setup. Native, disabled, Tree-sitter and Shiki each pass all 108 blocking keys first. The excluded

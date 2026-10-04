@@ -647,4 +647,4 @@ their original identity.
 - [ ] Complete commit gates, independent review and freeze the post-hook repair source.
 - [ ] Regenerate native controls and collect required current default/full and selected loaded A/A proofs.
 - [ ] Complete current proofs for the five minimap-backed configurations; audit unaffected reference evidence before further collections.
-- [ ] Continue the quiet undo classification with saved cases 1–5 and fixed cases 6–10, preserving both pilot rejections and diagnostic status.
+- [ ] Predeclare a separate quiet undo classification cohort of ten runs per arm under repaired measurement `34109579`; report the preserved five-per-arm `8127db7f` pilot separately, including both rejections. Keep every cohort diagnostic and keep identities separate.
