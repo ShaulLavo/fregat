@@ -26,6 +26,66 @@ import type {
 } from '../src/types'
 
 describe('MinimapWorkerClient', () => {
+  it('projects clipped UTF-16 summaries and sparse edits through the bounded reader', () => {
+    const runtime = installMinimapRuntime()
+    const host = createHost()
+    const initialText = 'ab😀\r\ncdefghijkl\n尾'
+    const initial = snapshot({}, { text: initialText })
+    const initialReads = vi.spyOn(initial.textSnapshot, 'readRange')
+    initial.lineStartsView.toArray = () => expect.unreachable('View line index was materialized')
+    let client: MinimapWorkerClient | null = null
+    try {
+      client = new MinimapWorkerClient({
+        host,
+        options: resolveMinimapOptions({ maxColumn: 4 }),
+        snapshot: initial,
+        decorations: [],
+        onLayoutWidth: vi.fn(),
+        reservedLane: () => 0,
+      })
+      const worker = runtime.workers[0]!
+      const opened = worker.postMessage.mock.calls
+        .map(([request]) => request)
+        .find((request) => request.type === 'openDocument')
+      if (!opened) expect.unreachable('Worker document was not opened')
+      expect(opened.document).toMatchObject({
+        textLength: 18,
+        lineStarts: [0, 6, 17],
+        lines: [
+          { text: 'ab😀', length: 5 },
+          { text: 'cdef', length: 10 },
+          { text: '尾', length: 1 },
+        ],
+      })
+      expect(initialReads.mock.calls.reduce((sum, [from, to]) => sum + to - from, 0)).toBe(9)
+      worker.send(renderedResponse(1))
+      worker.postMessage.mockClear()
+
+      const next = snapshot({}, { text: 'ab😀\r\ncdXefghijkl\n尾' })
+      const nextReads = vi.spyOn(next.textSnapshot, 'readRange')
+      next.lineStartsView.toArray = () => expect.unreachable('View line index was materialized')
+      client.update(next, 'content', documentEdit({ from: 8, to: 8, text: 'X' }, ''))
+      runtime.flushAnimationFrames()
+      const edited = worker.postMessage.mock.calls
+        .map(([request]) => request)
+        .find((request) => request.type === 'applyEdit')
+      if (!edited) expect.unreachable('Worker edit was not applied')
+      expect(edited.document.summaryPatch).toMatchObject({
+        textLength: 19,
+        startLine: 1,
+        deleteCount: 1,
+        lines: [{ text: 'cdXe', length: 11 }],
+      })
+      expect(edited.document.summaryPatch.lineStarts).toBeUndefined()
+      expect(nextReads.mock.calls.reduce((sum, [from, to]) => sum + to - from, 0)).toBe(4)
+    } finally {
+      client?.dispose()
+      host.root.remove()
+      host.colorScope.remove()
+      runtime.restore()
+    }
+  })
+
   it('exposes worker lifecycle and terminates immediately on disposal', () => {
     const runtime = installMinimapRuntime()
     try {
