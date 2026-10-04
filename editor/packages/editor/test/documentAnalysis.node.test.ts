@@ -115,7 +115,8 @@ describe('analysis retention notifications', () => {
                 refresh,
                 applyChange: refresh,
                 dispose: boundary === 'highlighter-dispose' ? fail : () => undefined,
-                onDidChangeTheme: () => fail,
+                onDidChangeTheme: () =>
+                  boundary === 'highlighter-unsubscribe' ? fail : () => undefined,
               }),
             },
           })
