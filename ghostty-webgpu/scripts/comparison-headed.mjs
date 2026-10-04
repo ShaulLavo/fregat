@@ -307,6 +307,18 @@ export async function ownedProcessStates(owned, read = readFile) {
   )
 }
 
+export function observedNativeContentInsets(page, nativeSize) {
+  const insets = {
+    width: nativeSize.width - page.width * page.dpr,
+    height: nativeSize.height - page.height * page.dpr,
+  }
+  assert(
+    Object.values(insets).every((value) => Number.isSafeInteger(value) && value >= 0),
+    'Observed native content insets must be nonnegative device pixels',
+  )
+  return insets
+}
+
 export async function settleOwnedWindowGeometry({
   page,
   session,
@@ -316,7 +328,22 @@ export async function settleOwnedWindowGeometry({
   smokeId,
   targetId,
   windowId,
+  viewport,
+  deviceScaleFactor,
+  nativeContentInsets,
 }) {
+  assert(
+    viewport && viewport.width > 0 && viewport.height > 0,
+    'Registered inner viewport required',
+  )
+  assert(deviceScaleFactor > 0, 'Registered actual DPR required')
+  assert(
+    nativeContentInsets &&
+      Object.values(nativeContentInsets).every(
+        (value) => Number.isSafeInteger(value) && value >= 0,
+      ),
+    'Observed native content insets required',
+  )
   const snapshots = []
   let previous
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -346,18 +373,28 @@ export async function settleOwnedWindowGeometry({
     assert.equal(compositor.mapped, true, 'Owned compositor window must be mapped')
     assert.equal(compositor.hidden, false, 'Owned compositor window must be visible')
     assert.equal(compositor.xwayland, false, 'Native Wayland window required')
+    const nativeContentSize = {
+      width: compositor.size?.width - nativeContentInsets.width,
+      height: compositor.size?.height - nativeContentInsets.height,
+    }
     const matches =
-      facts.dpr === 1 &&
+      facts.dpr === deviceScaleFactor &&
       facts.visibility === 'visible' &&
-      facts.width >= 320 &&
-      facts.height >= 320 &&
-      facts.outerWidth === window.bounds.width &&
-      facts.outerHeight === window.bounds.height &&
-      facts.outerWidth === compositor.size?.width &&
-      facts.outerHeight === compositor.size?.height
-    snapshots.push({ page: facts, window, compositorSize: compositor.size })
-    const current = matches ? JSON.stringify(snapshots.at(-1)) : null
-    if (current && current === previous) return { page: facts, window, compositor, snapshots }
+      facts.width === viewport.width &&
+      facts.height === viewport.height &&
+      nativeContentSize.width === viewport.width * deviceScaleFactor &&
+      nativeContentSize.height === viewport.height * deviceScaleFactor
+    snapshots.push({ page: facts, window, compositorSize: compositor.size, nativeContentSize })
+    const content = {
+      width: facts.width,
+      height: facts.height,
+      dpr: facts.dpr,
+      visibility: facts.visibility,
+      nativeContentSize,
+    }
+    const current = matches ? JSON.stringify(content) : null
+    if (current && current === previous)
+      return { page: facts, window, compositor, snapshots, nativeContentSize, nativeContentInsets }
     previous = current
     await pause(50)
   }
@@ -887,6 +924,8 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     )
     evidence.ownedProcesses = owned
     evidence.actualBackend = actualBackend
+    const nativeContentInsets = observedNativeContentInsets(facts, compositor.size)
+    evidence.nativeContentInsets = nativeContentInsets
     const geometry = await settleOwnedWindowGeometry({
       page,
       session: pageSession,
@@ -896,6 +935,9 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       smokeId: evidence.smokeId,
       targetId: target.targetId,
       windowId: window.windowId,
+      viewport: { width: facts.width, height: facts.height },
+      deviceScaleFactor: facts.dpr,
+      nativeContentInsets,
     })
     evidence.geometry = geometry
     const ownership = {
