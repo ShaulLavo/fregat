@@ -1,14 +1,73 @@
 import { expect, test } from 'vitest'
 import { JSON5 } from 'bun'
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { withWorkspace } from './release/fixture.mjs'
 
 const script = fileURLToPath(new URL('./workspace-tooling.mjs', import.meta.url))
 const catalog = { typescript: '7.0.2', vitest: '5.0.2', 'typescript-api': 'npm:typescript@~6.0.3' }
+const checkout = fileURLToPath(new URL('../', import.meta.url))
+
+async function scriptTestFiles(root) {
+  const manifest = JSON.parse(await readFile(join(checkout, 'package.json'), 'utf8'))
+  const command = manifest.scripts['test:scripts'].replace('vitest run', 'vitest list')
+  const result = spawnSync(
+    'bun',
+    ['exec', `${command} --filesOnly --json --root ${JSON.stringify(root)}`],
+    {
+      cwd: checkout,
+      encoding: 'utf8',
+    },
+  )
+  expect(result.status, result.stdout + result.stderr).toBe(0)
+  return JSON.parse(result.stdout)
+    .map(({ file }) => relative(root, file).replaceAll('\\', '/'))
+    .sort()
+}
+
+test('test:scripts discovers every script suite through the root route', async () => {
+  const files = await readdir(join(checkout, 'scripts'), { recursive: true })
+  const expected = files
+    .map((file) => file.replaceAll('\\', '/'))
+    .filter((file) => !file.split('/').includes('node_modules') && /\.test\.(ts|mjs)$/.test(file))
+    .map((file) => `scripts/${file}`)
+    .sort()
+  const discovered = await scriptTestFiles(checkout)
+  expect(discovered.filter((file) => file.startsWith('scripts/'))).toEqual(expected)
+})
+
+test('test:scripts picks up future nested ts and mjs suites without collecting other owners', async () => {
+  await withWorkspace(async ({ root }) => {
+    const files = [
+      'scripts/direct.test.ts',
+      'scripts/nested/deep.test.mjs',
+      'scripts/nested/deep.test.ts',
+      'scripts/nested/ignored.spec.ts',
+      'scripts/nested/ignored.browser.tsx',
+      'scripts/node_modules/dependency/ignored.test.ts',
+      'apps/server/unregistered.test.ts',
+      'apps/web/scripts/shard-durations.test.ts',
+    ]
+    for (const file of files) {
+      await mkdir(dirname(join(root, file)), { recursive: true })
+      await writeFile(join(root, file), '')
+    }
+    await copyFile(
+      join(checkout, 'vitest.scripts.config.mjs'),
+      join(root, 'vitest.scripts.config.mjs'),
+    )
+    await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'junction')
+    expect(await scriptTestFiles(root)).toEqual([
+      'apps/web/scripts/shard-durations.test.ts',
+      'scripts/direct.test.ts',
+      'scripts/nested/deep.test.mjs',
+      'scripts/nested/deep.test.ts',
+    ])
+  })
+})
 
 async function prepare({ root, put }) {
   await put('.', {

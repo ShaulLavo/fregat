@@ -13,18 +13,27 @@ export const ENGINES = ['chromium', 'firefox', 'webkit'] as const
 
 export type Engine = (typeof ENGINES)[number]
 
-export async function launchBrowser(
-  engine: Engine,
-  headed: boolean,
-  notifications = false,
-): Promise<Browser> {
+async function loadPlaywright() {
   const cache = '/work/cache/ms-playwright'
   if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(cache)) {
     process.env.PLAYWRIGHT_BROWSERS_PATH = cache
   }
   // Imported here: Playwright fixes its browser directory when it loads, and Bun loads a static
   // import before any code in this file runs.
-  const playwright = await import('playwright')
+  return import('playwright')
+}
+
+export async function browserAvailable(engine: Engine): Promise<boolean> {
+  const playwright = await loadPlaywright()
+  return existsSync(playwright[engine].executablePath())
+}
+
+export async function launchBrowser(
+  engine: Engine,
+  headed: boolean,
+  notifications = false,
+): Promise<Browser> {
+  const playwright = await loadPlaywright()
   const { chromium } = playwright
   if (engine !== 'chromium') return playwright[engine].launch({ headless: !headed })
   // Playwright hides scrollbars by default. Users have them, and a scrollbar that appears with
