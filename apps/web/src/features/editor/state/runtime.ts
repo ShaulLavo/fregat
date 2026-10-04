@@ -291,6 +291,7 @@ export function createEditorRuntime({
       historyPersistence.dispose()
       fileOpenIntentOwner.disposeNow()
       workspaceEditService.dispose()
+      documentStore.getState().disposeEditorDocuments()
     },
     hasUnsavedDocuments() {
       const state = documentStore.getState()

@@ -1,9 +1,18 @@
 import chatModelSource from '../../../../../../packages/contracts/src/chat-model.ts?raw'
 import { expect, test } from 'vitest'
+import { QueryClient } from '@tanstack/react-query'
+import { createTestEditorRuntime } from '../../../../test/factories/editor-runtime'
+import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { fetchFile } from '@/lib/file-server'
+import { getClient } from '@/lib/client'
+import { createClientInvariantError } from '@/lib/structured-errors'
 import { createEditorRuntimeSessionId } from '@singapore-editor/core/syntax'
 import { createEditorLoggingPlugin, type EditorLogEvent } from '@singapore-editor/core/logging'
 import { Editor } from '@singapore-editor/core/editor'
-import { createPieceTableSnapshot } from '@singapore-editor/core/document'
+import {
+  createEditorBufferSession,
+  createPieceTableSnapshot,
+} from '@singapore-editor/core/document'
 import { createHighlightingPlugin, createHighlightingService } from '@singapore-editor/highlighting'
 import {
   resolveTreeSitterLanguageContribution,
@@ -79,6 +88,67 @@ test('highlights TypeScript under an imported theme through the highlighting ser
   } finally {
     editor.dispose()
     container.remove()
+    await service.dispose()
+  }
+})
+
+test('final runtime disposal preserves another runtime borrowing the real shared highlighter', async () => {
+  const service = createHighlightingService({ resolveTheme: resolveEditorShikiThemeRegistration })
+  const provider = service.highlighterProvider({
+    current: () => ({ format: 'vscode', id: 'github-dark' }),
+  })
+  const queriesA = new QueryClient()
+  const queriesB = new QueryClient()
+  const a = createTestEditorRuntime(queriesA)
+  const b = createTestEditorRuntime(queriesB)
+
+  try {
+    const file = await fetchFile(
+      filesystemPath('repo/src/editor-tab-a.ts'),
+      new AbortController().signal,
+      getClient(),
+    )
+    const documentA = a.documentStore.getState().ensureEditorView(tabId('worker-a'), file)
+    const documentB = b.documentStore.getState().ensureEditorView(tabId('worker-b'), file)
+    const request = { provider, languageId: 'typescript' }
+    const leaseA = documentA.analysis.borrowHighlighter(request)
+    const leaseB = documentB.analysis.borrowHighlighter(request)
+    if (!leaseA || !leaseB) throw createClientInvariantError('The real highlighter has no session.')
+    expect(leaseA.runtimeSessionId).not.toBe(leaseB.runtimeSessionId)
+    const [resultA, resultB] = await Promise.all([
+      leaseA.refresh(documentA.buffer.getTextSnapshot()),
+      leaseB.refresh(documentB.buffer.getTextSnapshot()),
+    ])
+    expect(resultA.tokens.length).toBeGreaterThan(0)
+    expect(resultB.tokens.length).toBeGreaterThan(0)
+
+    a.resume()
+    a.suspend()
+    const retained = documentA.analysis.borrowHighlighter(request)
+    expect(retained?.runtimeSessionId).toBe(leaseA.runtimeSessionId)
+    retained?.dispose()
+    a.dispose()
+    expect(documentA.analysis.borrowHighlighter(request)).toBeNull()
+    await service.awaitRuntimeSessionIdle(leaseA.runtimeSessionId)
+    expect(service.inspect().disposed).toBe(false)
+    expect(service.inspect().shiki?.lifecycle).toBe('ready')
+
+    createEditorBufferSession(documentB.buffer).applyText('\nexport const survivor = 42\n')
+    const currentB = await leaseB.refresh(documentB.buffer.getTextSnapshot())
+    expect(currentB.tokens.length).toBeGreaterThan(0)
+    expect(leaseB.read()).toMatchObject({
+      kind: 'ready',
+      revision: documentB.buffer.getRevision(),
+    })
+    b.dispose()
+    expect(documentB.analysis.borrowHighlighter(request)).toBeNull()
+    await service.awaitRuntimeSessionIdle(leaseB.runtimeSessionId)
+    expect(service.inspect().shiki?.lifecycle).toBe('ready')
+  } finally {
+    a.dispose()
+    b.dispose()
+    queriesA.clear()
+    queriesB.clear()
     await service.dispose()
   }
 })
