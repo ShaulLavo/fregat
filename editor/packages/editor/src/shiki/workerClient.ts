@@ -24,6 +24,7 @@ import type {
   ShikiWorkerRequest,
   ShikiWorkerRequestPayload,
   ShikiWorkerResponse,
+  ShikiWorkerRetentionSnapshot,
   ShikiWorkerThemeRegistration,
   ShikiWorkerTransportResult,
 } from './workerTypes'
@@ -236,6 +237,13 @@ export class ShikiWorkerOwner {
     if (!this.worker) return
 
     await this.postRequest({ type: 'idleFence' }, false)
+  }
+
+  /** Settles existing work and reads the live worker; null means no worker is retained. */
+  public async inspectRetention(): Promise<ShikiWorkerRetentionSnapshot | null> {
+    await this.awaitClientTasks()
+    const result = await this.postRequest({ type: 'idleFence', includeRetention: true }, false)
+    return result?.retention ?? null
   }
 
   public dispose(): Promise<void> {

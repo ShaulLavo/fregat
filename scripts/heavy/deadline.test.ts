@@ -633,7 +633,8 @@ kill -STOP $$
         jobClass: 'light',
         machine: true,
       })
-      expect((await owned.done).code).toBe(125)
+      const result = await owned.done
+      expect(result.code, result.stderr).toBe(125)
       expect(existsSync(marker)).toBe(false)
       expect(slotsFree(box)).toBe(true)
       expect(
