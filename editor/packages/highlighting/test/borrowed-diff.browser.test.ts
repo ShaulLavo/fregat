@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { createDiffPlugin, createTextDiff } from '@singapore-editor/diff'
+import { createDiffPlugin, createTextDiff, prepareDiffSyntax } from '@singapore-editor/diff'
 import { createHighlightingService, type HighlightingThemeSource } from '../src/index'
 
 const listeners = new Set<() => void>()
@@ -18,6 +18,7 @@ const file = () =>
 
 function workerBoundary() {
   const sent: string[] = []
+  const opened: string[] = []
   let color = '#ff0000'
   const service = createHighlightingService({
     resolveTheme: async () => ({
@@ -32,6 +33,7 @@ function workerBoundary() {
       const postMessage = worker.postMessage.bind(worker)
       worker.postMessage = (message) => {
         sent.push(message.payload.type)
+        if (message.payload.type === 'open') opened.push(message.payload.lang)
         postMessage(message)
       }
       return worker
@@ -40,12 +42,56 @@ function workerBoundary() {
   return {
     service,
     sent,
+    opened,
     recolor(next: string) {
       color = next
       for (const listener of listeners) listener()
     },
   }
 }
+
+test.each([
+  ['typescript', 'ts', 'tsx'],
+  ['javascript', 'js', 'jsx'],
+])(
+  'equal %s text preserves the real %s and %s grammar dispatch',
+  async (languageId, plain, react) => {
+    const { service, opened } = workerBoundary()
+    const backend = service.documentBackend(theme)
+    const first = createTextDiff({
+      oldFile: { path: `input.${plain}`, text: 'const before = <Before />;', languageId },
+      newFile: { path: `input.${plain}`, text: 'const after = <After />;', languageId },
+    })
+    const next = { ...first, path: `input.${react}` }
+    const plugin = createDiffPlugin({ mode: 'document', syntaxBackend: backend })
+    const reference = createDiffPlugin({ mode: 'document', syntaxBackend: backend })
+    let shown: { dispose(): void } | undefined
+    try {
+      const standalone = await prepareDiffSyntax(next, { backend })
+      expect(opened).toEqual([react, react])
+      reference.setFile(next, standalone)
+      expect(reference.isSyntaxReady()).toBe(true)
+      const expected = reference.getTokens()
+      reference.setFile(null)
+      opened.length = 0
+
+      expect(await service.prepareDiff(first, theme)).toBe(true)
+      expect(opened).toEqual([languageId, languageId])
+      expect(service.canPrepareDiff({ ...first }, theme)).toBe(false)
+      expect(service.canPrepareDiff(next, theme)).toBe(true)
+      shown = service.showDiff(plugin, next, 'stacked', theme)
+      await expect.poll(() => plugin.isSyntaxReady()).toBe(true)
+      expect(opened).toEqual([languageId, languageId, react, react])
+      expect(plugin.getTokens().length).toBeGreaterThan(0)
+      expect(plugin.getTokens()).toEqual(expected)
+    } finally {
+      shown?.dispose()
+      plugin.setFile(null)
+      reference.setFile(null)
+      await service.dispose()
+    }
+  },
+)
 
 test('known-good real worker prepared view paints synchronously and retains its owner', async () => {
   const { service, sent } = workerBoundary()

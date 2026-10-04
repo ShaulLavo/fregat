@@ -19,7 +19,10 @@ function diff(text = collisionA) {
   })
 }
 
-function providerBoundary(gate = Promise.resolve()) {
+function providerBoundary(
+  gate = Promise.resolve(),
+  documentColor?: (documentId: string) => string,
+) {
   const counts = { sessions: 0, refreshes: 0, disposed: 0 }
   const backend: DiffSyntaxBackend = {
     kind: 'highlighter',
@@ -32,7 +35,14 @@ function providerBoundary(gate = Promise.resolve()) {
           const text = options.textSnapshot.readRange(0, options.textSnapshot.length)
           return {
             tokens: EditorTokenStore.fromTokens([
-              { start: 0, end: 5, style: { color: text === collisionB ? 'blue' : 'red' } },
+              {
+                start: 0,
+                end: 5,
+                style: {
+                  color:
+                    documentColor?.(options.documentId) ?? (text === collisionB ? 'blue' : 'red'),
+                },
+              },
             ]),
           }
         }
@@ -84,6 +94,33 @@ describe('exact diff syntax store', () => {
     } finally {
       store.dispose()
     }
+  })
+
+  test.each([
+    ['input.ts', 'input.tsx', 'typescript'],
+    ['input.js', 'input.jsx', 'javascript'],
+    ['first/input.ts', 'second/input.ts', 'typescript'],
+    ['first.custom', 'second.custom', 'custom-language'],
+  ])('provider paths %s and %s qualify equal text with %s', async (path, nextPath, languageId) => {
+    const store = new DiffSyntaxStore()
+    const { backend, counts } = providerBoundary(Promise.resolve(), (documentId) => documentId)
+    const view = plugin(backend)
+    const first = { ...diff(), path, languageId }
+    const next = { ...first, path: nextPath }
+    try {
+      await store.prepare(first, scope, backend)
+      expect(store.canPrepare({ ...first }, scope, backend)).toBe(false)
+      expect(store.canPrepare(next, scope, backend)).toBe(true)
+      const shown = store.show(view, next, 'stacked', scope, backend)
+      await vi.waitFor(() => expect(view.isSyntaxReady()).toBe(true))
+      expect(view.getTokens()[0]?.style.color).toBe(`${nextPath}#diff-old`)
+      expect(counts.sessions).toBe(4)
+      shown.dispose()
+    } finally {
+      view.setFile(null)
+      store.dispose()
+    }
+    expect(counts.disposed).toBe(4)
   })
 
   test('equal-length FNV collision never admits the other source tokens', async () => {

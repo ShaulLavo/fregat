@@ -31,7 +31,8 @@ type SourceEntry = {
   readonly scope: string
   readonly backend: DiffSyntaxBackend
   readonly side: SourceSide
-  readonly language: string
+  readonly path: string
+  readonly languageId: DiffFile['languageId']
   readonly lines: readonly string[]
   readonly cancellation: AbortController
   readonly ready: Promise<PreparedDiffSyntaxSource | null>
@@ -214,7 +215,8 @@ export class DiffSyntaxStore {
       scope,
       backend,
       side,
-      language: file.languageId ?? file.path,
+      path: file.path,
+      languageId: file.languageId,
       lines: side === 'old' ? file.oldLines : file.newLines,
       cancellation,
       interests: 0,
@@ -257,9 +259,9 @@ export class DiffSyntaxStore {
     backend: DiffSyntaxBackend,
   ): SourceEntry | undefined {
     const lines = side === 'old' ? file.oldLines : file.newLines
-    const language = file.languageId ?? file.path
     for (const entry of this.entries) {
-      if (entry.scope !== scope || entry.side !== side || entry.language !== language) continue
+      if (entry.scope !== scope || entry.side !== side) continue
+      if (entry.path !== file.path || entry.languageId !== file.languageId) continue
       if (entry.backend.kind !== backend.kind || entry.backend.provider !== backend.provider)
         continue
       if (sameLines(entry.lines, lines)) return entry
