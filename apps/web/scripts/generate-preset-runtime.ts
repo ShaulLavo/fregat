@@ -2,13 +2,51 @@ import assert from 'node:assert/strict'
 import { format } from 'oxfmt'
 import formatOptions from '../../../.oxfmtrc.json'
 import { readFile, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import ts from 'typescript-api'
 import { isBindableChord } from '@workspace/client-core/commands/chord'
-import { isPlatformCommandId } from '../src/keymap/table'
-import { zed } from '../src/keymap/presets/inventory'
+import { isCommandId } from '@workspace/client-core/commands/catalog'
+import zed from '../src/keymap/presets/zed.json'
 import patches from '../src/keymap/presets/ours-patches.json'
 import type { RuntimeRow } from '../src/keymap/presets/runtime'
 
+export function registeredPresetCommandIds(): ReadonlySet<string> {
+  const configPath = fileURLToPath(new URL('../tsconfig.app.json', import.meta.url))
+  const config = ts.readConfigFile(configPath, ts.sys.readFile)
+  assert.equal(config.error, undefined, 'The web TypeScript configuration must be readable.')
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath))
+  assert.deepEqual(parsed.errors, [], 'The web TypeScript configuration must be valid.')
+  const filename = fileURLToPath(new URL('../src/keymap/types.ts', import.meta.url))
+  const program = ts.createProgram([filename], parsed.options)
+  const source = program.getSourceFile(filename)
+  assert(source, 'The web command types must be readable.')
+  const declaration = source.statements
+    .filter(ts.isTypeAliasDeclaration)
+    .find((entry) => entry.name.text === 'PlatformCommandId')
+  assert(declaration, 'PlatformCommandId must declare the live web command IDs.')
+  const type = program.getTypeChecker().getTypeAtLocation(declaration)
+  assert(
+    type.isUnion(),
+    'PlatformCommandId must resolve to literal IDs. Install dependencies and build the workspaces first.',
+  )
+  return new Set(
+    type.types.map((member) => {
+      assert(
+        member.isStringLiteral(),
+        'Every PlatformCommandId must resolve to a literal ID. Install dependencies and build the workspaces first.',
+      )
+      assert(
+        isCommandId(member.value),
+        'Every web command must belong to the shared command catalog.',
+      )
+      return member.value
+    }),
+  )
+}
+
 export async function presetRuntimeSource(): Promise<string> {
+  const commands = registeredPresetCommandIds()
   for (const patch of patches) {
     const row = zed[patch.index]
     assert(row, `Missing preset row ${patch.index}`)
@@ -18,12 +56,7 @@ export async function presetRuntimeSource(): Promise<string> {
   const rows = zed.flatMap((row, index): RuntimeRow[] => {
     if ('reserved' in row && row.reserved && row.context && row.reason === null)
       return [[index, row.platform, row.keys, null, row.context, row.upstreamCommand]]
-    if (
-      !row.command ||
-      !row.context ||
-      !isPlatformCommandId(row.command) ||
-      !isBindableChord(row.keys)
-    )
+    if (!row.command || !row.context || !commands.has(row.command) || !isBindableChord(row.keys))
       return []
     const fields: readonly [number, string, string, string, string, string] = [
       index,
