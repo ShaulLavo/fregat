@@ -42,6 +42,7 @@ import {
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
 import { notifyServerExit } from '@/features/editor/utils/notify-server-exit'
 import { serverExitFields } from '@/features/editor/utils/server-exit-fields'
+import { reportRequestError } from '@/features/editor/utils/request-errors'
 import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { markerStore } from '@/lib/markers/store'
@@ -274,9 +275,7 @@ function liveLanguageServerLane({
     },
     onInteractiveReady: () => statusSource.setServerInteractiveReady(match.serverId),
     onRequestError: (method, error) => {
-      log.error({
-        action: 'lsp.request_failed',
-        area: 'lsp',
+      reportRequestError({
         error,
         method,
         serverId: match.serverId,
