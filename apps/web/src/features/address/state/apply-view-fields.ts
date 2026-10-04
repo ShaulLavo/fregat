@@ -1,9 +1,7 @@
 import { readTerminalNamespace } from '@/lib/terminal-namespace'
 import type { Address } from '@workspace/client-core/address/grammar'
-import { descriptorFor, SETTING_IDS } from '@workspace/contracts'
 import type { AddressApplyReason } from '@/features/address/state/apply-view'
 import { setPhoneScreen } from '@/lib/shell/state/store'
-import { settingsCategoryForSlug } from '@/features/address/utils/settings-category'
 import { searchStateFor } from '@/features/address/utils/search-params'
 import { logsFiltersFor } from '@/features/address/utils/logs-params'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
@@ -25,12 +23,14 @@ import {
 } from '@/features/workbench/utils/panels'
 
 export function applyAddressFields({
+  settingsCategory,
   address,
   workspaceStore,
   searchStore,
   rootPath,
   reason,
 }: {
+  readonly settingsCategory: string | null
   readonly address: Address
   readonly workspaceStore: EditorWorkspaceStoreApi
   readonly searchStore: SearchBufferStoreApi
@@ -41,7 +41,7 @@ export function applyAddressFields({
   const mode = address.mode ?? (reason === 'boot' ? null : 'workbench')
   if (mode) state.setUiMode(mode)
   setPhoneScreen(address.screen)
-  if (address.settings || reason !== 'boot') applySettingsCategory(address)
+  if (address.settings || reason !== 'boot') selectSettingsCategory(settingsCategory)
   if (reason === 'traverse') {
     if (address.mode === 'chat' && address.editor && address.tool === 'editor')
       state.setChatModePanels(showChatModeToolTab(state.chatModePanels, 'editor'))
@@ -78,13 +78,6 @@ function applyTool(address: Address, store: EditorWorkspaceStoreApi, reason: Add
     address.tool
       ? showChatModeToolTab(state.chatModePanels, tool)
       : { ...state.chatModePanels, activeToolTab: tool },
-  )
-}
-
-function applySettingsCategory(address: Address) {
-  const categories = SETTING_IDS.map((id) => descriptorFor(id).category)
-  selectSettingsCategory(
-    address.settings ? settingsCategoryForSlug(address.settings, categories) : null,
   )
 }
 

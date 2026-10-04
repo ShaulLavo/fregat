@@ -92,7 +92,7 @@ Register the named scenario in `scripts/agent/scenarios/index.ts`. Run it with `
 `bun run agent:browser look`; read screenshots back and report the evidence directory.
 Any private dev server takes an explicit free `--port` and stops afterward. Run `bun run gates`
 and typecheck changed packages. Commit by path, push, and ship through the mesh using
-`bun run deploy` or `bun run deploy --server --restart` for server changes. Performance claims
+`bun run install-release` or `bun run install-release --server --restart` for server changes. Performance claims
 require `trace --compare` and render counts before and after.
 
 ## Out of scope

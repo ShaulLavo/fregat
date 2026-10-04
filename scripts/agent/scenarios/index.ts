@@ -1,3 +1,5 @@
+import { unknownWorkspaceSettings } from './unknown-workspace-settings'
+import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
 import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
@@ -209,7 +211,8 @@ import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
 import { terminalCancelledStartup } from './terminal-cancelled-startup'
-import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
+import { terminalWasmCancelledStartup } from './terminal-wasm-cancelled-startup'
+import { terminalRenderer, terminalRendererDom, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
@@ -453,6 +456,8 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  unknownWorkspaceSettings,
+  releaseInstallationSettings,
   nativeWindow,
   installedApp,
   binaryFileOpen,
@@ -636,8 +641,10 @@ export const scenarios: readonly Scenario[] = [
   editorOfflineResync,
   terminalBackground,
   terminalCancelledStartup,
+  terminalWasmCancelledStartup,
   terminalOfflineHost,
   terminalRenderer,
+  terminalRendererDom,
   terminalRendererWebgl,
   bottomPanelPersistence,
   sidebarToggle,

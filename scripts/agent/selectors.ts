@@ -684,6 +684,11 @@ export const selectors = {
   mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   settingsShowAll: (page: Page) => page.getByRole('button', { name: 'Show all settings' }),
+  settingsCategoryFilter: (page: Page, category: string) =>
+    page.getByRole('button', {
+      name: `Clear the ${category} filter and show every setting`,
+      exact: true,
+    }),
   settingsCategoryHeading: (page: Page, name: string) =>
     page.getByRole('heading', { name, exact: true }),
   projectSettingsSection: (page: Page, title: string) =>
@@ -1144,6 +1149,8 @@ export const selectors = {
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
+  terminalDomRows: (page: Page) =>
+    selectors.terminalSurface(page).first().locator('.ghostty-webgpu-frame [data-row]'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
   paletteLoading: (page: Page) => page.getByRole('status', { name: 'Loading commands' }),
   pickerLoading: (page: Page) => page.getByRole('status', { name: 'Loading file picker' }),

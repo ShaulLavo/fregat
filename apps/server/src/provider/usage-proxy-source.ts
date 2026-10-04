@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import {
+  providerAccountUsageSchema,
   providerDriverKindSchema,
   type ProviderAccountUsage,
   type ProviderUsageWindow,
@@ -8,6 +9,12 @@ import { defineErrorCatalog } from 'evlog'
 import * as v from 'valibot'
 import { usageAccountLabel } from './utils/usage-account-label'
 import { codexAccountIdentity, rememberProxyUsageIdentity } from './utils/usage-codex-identity'
+import { codexWindowPresentation, mergeUsageWindows } from './utils/usage-windows'
+import { CODEX_USAGE_MAX_FAILURES, type ProxyUsageRefresh } from './usage-proxy-budget'
+import {
+  recordChatPipelineInfo,
+  recordChatPipelineWarning,
+} from '../orchestration/orchestration-logging'
 
 const CODEX_DRIVER_KIND = v.parse(providerDriverKindSchema, 'codex')
 
@@ -29,12 +36,14 @@ export interface ReadProxyUsageOptions {
   fetch?: UsageFetch
   now?: () => number
   identityContext?: string
+  refresh?: ProxyUsageRefresh
 }
 
-/** Reads passive management caches. Provider probes and queue drains never belong here. */
+/** The lifecycle collector may refresh stale Codex quotas through a durable request budget. */
 export async function readProxyUsage(
   options: ReadProxyUsageOptions,
 ): Promise<ProviderAccountUsage[]> {
+  if (options.refresh && !options.refresh.isCurrent()) return []
   const origin = managementOrigin(options.url, options.secret)
   const now = (options.now ?? Date.now)()
   const fetcher = options.fetch ?? fetch
@@ -42,7 +51,11 @@ export async function readProxyUsage(
   const files = object(value)?.files
   const managementObservedAt = timestamp(object(value)?.observed_at, now)
   if (!Array.isArray(files)) throw failure('auth-files-schema')
-  const accounts = new Map<string, ProviderAccountUsage>()
+  const entries = new Map<
+    string,
+    { file: JsonObject; account: ProviderAccountUsage; proof: string | null }
+  >()
+  const groupWindows = new Map<string, ProviderUsageWindow[]>()
   for (const value of files) {
     const file = object(value)
     // Claude logins must never be pooled; even cached Claude rows stay outside this source.
@@ -52,15 +65,176 @@ export async function readProxyUsage(
     const accountKey = `proxy:${createHash('sha256')
       .update(JSON.stringify([origin, 'codex', identity]))
       .digest('hex')}`
-    if (accounts.has(accountKey)) throw failure('duplicate-account')
+    if (entries.has(accountKey)) throw failure('duplicate-account')
     const account = accountSnapshot(file, accountKey, now, managementObservedAt)
-    rememberProxyUsageIdentity(
-      account,
-      codexAccountIdentity(object(file.id_token)?.chatgpt_account_id, options.identityContext),
+    const proof = codexAccountIdentity(
+      object(file.id_token)?.chatgpt_account_id,
+      options.identityContext,
     )
-    accounts.set(accountKey, account)
+    rememberProxyUsageIdentity(account, proof)
+    entries.set(accountKey, { file, account, proof })
+    const group = proof ?? accountKey
+    const windows = groupWindows.get(group) ?? []
+    windows.push(...account.windows)
+    groupWindows.set(group, windows)
   }
-  return [...accounts.values()]
+  const accounts: ProviderAccountUsage[] = []
+  for (const { file, account, proof } of entries.values()) {
+    const refreshed = await refreshAccount(
+      options,
+      origin,
+      file,
+      account,
+      proof,
+      groupWindows.get(proof ?? account.accountKey)!,
+      fetcher,
+    )
+    rememberProxyUsageIdentity(refreshed, proof)
+    accounts.push(refreshed)
+  }
+  return accounts
+}
+
+const probeWindowSchema = v.object({
+  used_percent: v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100)),
+  reset_at: v.optional(
+    v.nullable(v.pipe(v.number(), v.finite(), v.minValue(1), v.maxValue(253402300799))),
+  ),
+  limit_window_seconds: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(31536000)),
+  ),
+})
+const probeSchema = v.object({
+  plan_type: v.optional(v.string()),
+  rate_limit: v.nullable(
+    v.object({
+      primary_window: v.optional(v.nullable(probeWindowSchema)),
+      secondary_window: v.optional(v.nullable(probeWindowSchema)),
+    }),
+  ),
+})
+
+async function refreshAccount(
+  options: ReadProxyUsageOptions,
+  origin: string,
+  file: JsonObject,
+  account: ProviderAccountUsage,
+  proof: string | null,
+  currentWindows: readonly ProviderUsageWindow[],
+  fetcher: UsageFetch,
+): Promise<ProviderAccountUsage> {
+  const refresh = options.refresh
+  const selector = text(file.auth_index)
+  if (!refresh || !refresh.isCurrent()) return account
+  const key = account.accountKey.slice('proxy:'.length)
+  if (proof && !refresh.link(key, proof)) return account
+  if (!selector) return account
+  const now = options.now ?? Date.now
+  const latest = refresh.latest(account) ?? account
+  const observations = [...currentWindows, ...latest.windows]
+  if (observations.some((window) => freshWindow(window, now(), refresh.staleAfterMs)))
+    return account
+  const passiveTimes = observations.flatMap((window) =>
+    window.source !== 'cliproxy-usage-probe' && window.observedAt
+      ? [Date.parse(window.observedAt)]
+      : [],
+  )
+  const passiveAt = passiveTimes.length ? Math.max(...passiveTimes) : null
+  const reservation = refresh.reserve(key, passiveAt)
+  if (!reservation || !refresh.isCurrent()) return account
+  const startedAt = now()
+  let outcome = 'transport-failed'
+  let statusCode: number | undefined
+  let success = false
+  try {
+    const accountId = object(file.id_token)?.chatgpt_account_id
+    const raw = object(
+      await management(origin, options.secret, fetcher, {
+        auth_index: selector,
+        method: 'GET',
+        url: 'https://chatgpt.com/backend-api/wham/usage',
+        header: {
+          Authorization: 'Bearer $TOKEN$',
+          'Content-Type': 'application/json',
+          'OpenAI-Beta': 'codex-1',
+          Originator: 'Codex Desktop',
+          ...(proof ? { 'Chatgpt-Account-Id': accountId } : {}),
+        },
+      }),
+    )
+    if (!refresh.isCurrent()) {
+      outcome = 'generation-discard'
+      return account
+    }
+    outcome = 'invalid-response'
+    if (typeof raw?.status_code !== 'number' || !Number.isInteger(raw.status_code))
+      throw failure('provider-usage-response')
+    statusCode = raw.status_code
+    if (statusCode < 200 || statusCode >= 300) {
+      outcome = 'provider-refused'
+      throw failure('provider-usage-status')
+    }
+    if (typeof raw.body !== 'string') throw failure('provider-usage-body')
+    const usage = v.parse(probeSchema, JSON.parse(raw.body))
+    const observedAt = new Date(startedAt).toISOString()
+    const windows: ProviderUsageWindow[] = []
+    for (const [id, window] of [
+      ['primary', usage.rate_limit?.primary_window],
+      ['secondary', usage.rate_limit?.secondary_window],
+    ] as const) {
+      if (!window) continue
+      const minutes =
+        window.limit_window_seconds === undefined ? null : window.limit_window_seconds / 60
+      windows.push({
+        id,
+        ...codexWindowPresentation(minutes),
+        usedPercent: window.used_percent,
+        windowMinutes: minutes,
+        resetsAt: window.reset_at ? new Date(window.reset_at * 1000).toISOString() : null,
+        status: window.used_percent === 100 ? 'rejected' : null,
+        observedAt,
+        source: 'cliproxy-usage-probe',
+        freshness: 'unknown',
+      })
+    }
+    if (!windows.length) {
+      outcome = 'no-windows'
+      throw failure('provider-usage-windows')
+    }
+    const projected = v.parse(providerAccountUsageSchema, {
+      ...account,
+      checkedAt: observedAt,
+      lastSeenAt: observedAt,
+      planType: planLabel(usage.plan_type) ?? account.planType,
+      windows: mergeUsageWindows(account.windows, windows),
+    })
+    outcome = 'reading'
+    success = true
+    return projected
+  } catch {
+    return account
+  } finally {
+    refresh.settle(reservation, success)
+    const fields = {
+      driverKind: 'codex',
+      source: 'cliproxy-usage-probe',
+      outcome,
+      providerRequests: 1,
+      ...(statusCode === undefined ? {} : { statusCode }),
+      durationMs: now() - startedAt,
+      failedAttempts: success ? 0 : reservation.failures,
+      recoveredFailures: success ? reservation.failures - 1 : 0,
+      gaveUp: !success && reservation.failures >= CODEX_USAGE_MAX_FAILURES,
+    }
+    if (!success && outcome !== 'generation-discard' && reservation.failures === 1)
+      recordChatPipelineWarning('chat.pipeline.provider_usage.proxy_probe', fields)
+    else recordChatPipelineInfo('chat.pipeline.provider_usage.proxy_probe', fields)
+  }
+}
+
+function freshWindow(window: ProviderUsageWindow, now: number, staleAfterMs: number) {
+  if (!window.observedAt || (window.resetsAt && Date.parse(window.resetsAt) <= now)) return false
+  return now - Date.parse(window.observedAt) < staleAfterMs
 }
 
 function failure(constraint: string) {
@@ -87,12 +261,22 @@ function managementOrigin(value: string, secret: string) {
   }
 }
 
-async function management(origin: string, secret: string, fetcher: UsageFetch): Promise<unknown> {
+async function management(
+  origin: string,
+  secret: string,
+  fetcher: UsageFetch,
+  body?: unknown,
+): Promise<unknown> {
   try {
-    const response = await fetcher(new URL('/v0/management/auth-files', origin), {
-      method: 'GET',
+    const endpoint = body === undefined ? 'auth-files' : 'api-call'
+    const response = await fetcher(new URL(`/v0/management/${endpoint}`, origin), {
+      method: body === undefined ? 'GET' : 'POST',
       redirect: 'error',
-      headers: { Authorization: `Bearer ${secret}` },
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(15_000),
     })
     if (!response.ok) throw failure('management-http-status')

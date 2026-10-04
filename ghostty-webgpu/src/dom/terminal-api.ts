@@ -1,6 +1,8 @@
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
 import type {
   ReadLinesOptions,
+  TerminalGeometry,
+  TerminalTextMeasurement,
   TerminalLine,
   TerminalSelectionFormatOptions,
 } from '../core/types.js'
@@ -19,6 +21,7 @@ import type {
   TerminalMutationResult,
   TerminalTheme,
 } from '../term/types.js'
+import type { TerminalSubmittedFrame } from './submitted-frame.js'
 import type {
   GhosttyWebGpuTerminalDiagnostics,
   GhosttyWebGpuTerminalEventType,
@@ -42,6 +45,7 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   readonly hasPendingLinkResolution: boolean
   readonly hasPendingTimer: boolean
   readonly lifecycle: GhosttyWebGpuTerminalLifecycle
+  readonly submittedFrame: TerminalSubmittedFrame | undefined
   readonly textarea: HTMLTextAreaElement | undefined
 
   open(parent: HTMLElement): Promise<void>
@@ -59,6 +63,10 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   setAccessibilityEnabled(enabled: boolean): boolean
   visibleLines(): readonly string[]
 
+  geometry(): TerminalResult<Mode, TerminalGeometry>
+  measure(text: string): TerminalResult<Mode, number>
+  measureTexts(texts: readonly string[]): TerminalResult<Mode, TerminalTextMeasurement>
+  writeAndReadGeometry(data: TerminalInputData): TerminalResult<Mode, TerminalGeometry>
   frameSnapshot(): TerminalResult<Mode, RendererFrameSnapshot | undefined>
   captureViewport(): TerminalResult<Mode, string | undefined>
   lineCount(): TerminalResult<Mode, number>

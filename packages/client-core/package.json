@@ -1,6 +1,6 @@
 {
   "name": "@workspace/client-core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "sideEffects": false,
@@ -15,6 +15,7 @@
     "./settings/read": "./src/settings/read.ts",
     "./settings/search": "./src/settings/search.ts",
     "./settings/humanize": "./src/settings/humanize.ts",
+    "./settings/diagnostic-label": "./src/settings/diagnostic-label.ts",
     "./transport/orchestration-rpc-client": "./src/transport/orchestration-rpc-client.ts",
     "./transport/rpc-host": "./src/transport/rpc-host.ts",
     "./transport/streams": "./src/transport/streams.ts",

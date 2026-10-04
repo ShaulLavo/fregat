@@ -298,7 +298,7 @@ Plan 126 RUNTIME-08 is closed on it; the owner's live redemption is the only thi
   `bun run agent:browser look` on the composer with a warning-state window; add a scenario under
   `scripts/agent/scenarios/` and selectors in `scripts/agent/selectors.ts`.
 - `bun run logs` shows the snapshot event with window kinds.
-- Server changes deploy with `bun run deploy --server`.
+- Server changes deploy with `bun run install-release --server`.
 
 ## Out of scope and not copied
 

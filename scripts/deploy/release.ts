@@ -13,8 +13,7 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { checkoutRoot, currentLink, pendingLink, productionRoot, webBase } from './config'
-import * as operations from './release-operations'
+import { checkoutRoot } from '../checkout-root'
 import { replaceLink } from './release-operations'
 export type { Release } from './release-operations'
 import type { Release } from './release-operations'
@@ -49,8 +48,6 @@ export type BuildConfig = Checkout & {
   liveCheck?: boolean
 }
 
-const webPackage = path.join(checkoutRoot, 'apps/web')
-const serverPackage = path.join(checkoutRoot, 'apps/server')
 const productionEnv = {
   ...Bun.env,
   BUN_ENV: 'production',
@@ -95,47 +92,27 @@ export function porcelainPaths(status: string) {
   return paths
 }
 
-export function createRelease(checkout: Checkout, slug: string) {
-  return operations.createRelease(productionRoot, checkout.commit, slug)
-}
-
-export function currentRelease() {
-  return operations.currentRelease(productionRoot)
-}
-
-export function pendingRelease() {
-  return operations.pendingRelease(productionRoot)
-}
-
-export function stagePending(release: Release) {
-  const replaced = pendingRelease()
-  operations.stagePending(productionRoot, release)
-  const note = replaced ? `, replacing ${path.basename(replaced)}` : ''
-  log('stage', `${pendingLink} → ${release.name}${note}`)
-}
-
-export function removePending() {
-  return operations.removePending(productionRoot)
-}
-
-export async function buildWeb(release: Release, base = webBase) {
+export async function buildWeb(release: Release, base = '/', execute = run, root = checkoutRoot) {
   log('web', 'build workspaces')
   await runOrFail(
     ['bun', 'run', 'build:workspaces'],
-    checkoutRoot,
+    root,
     path.join(release.directory, 'web-workspaces.log'),
+    execute,
   )
   log('web', 'typecheck')
   await runOrFail(
     ['bunx', 'tsc', '--build'],
-    webPackage,
+    path.join(root, 'apps/web'),
     path.join(release.directory, 'web-typecheck.log'),
+    execute,
   )
   log('web', `vite build → ${release.web}`)
   await runOrFail(
     ['bun', '--bun', 'vite', 'build', '--base', base, '--outDir', release.web],
-    webPackage,
+    path.join(root, 'apps/web'),
     path.join(release.directory, 'web-build.log'),
+    execute,
   )
   stampWebRelease(release.web, release.name)
 }
@@ -186,16 +163,19 @@ export async function buildServer(
   release: Release,
   dependencies: 'checkout' | 'installed' = 'checkout',
   cpu = process.arch,
+  execute = run,
+  root = checkoutRoot,
 ) {
   log('server', 'build')
   await runOrFail(
     ['bun', 'run', 'build'],
-    serverPackage,
+    path.join(root, 'apps/server'),
     path.join(release.directory, 'server-build.log'),
+    execute,
   )
-  cpSync(path.join(serverPackage, 'dist'), release.server, { recursive: true })
-  bundleNativePicker(release)
-  await writeRuntimeManifest(release.server, path.join(checkoutRoot, 'bun.lock'))
+  cpSync(path.join(root, 'apps/server/dist'), release.server, { recursive: true })
+  bundleNativePicker(release, root)
+  await writeRuntimeManifest(release.server, path.join(root, 'bun.lock'))
   if (dependencies === 'checkout') {
     linkServerDependencies(release)
     return
@@ -208,6 +188,7 @@ export async function buildServer(
     ['bun', 'install', '--production', '--frozen-lockfile', '--cpu', cpu],
     path.join(release.server, 'runtime'),
     path.join(release.directory, 'runtime-install.log'),
+    execute,
   )
   symlinkSync('runtime/node_modules', path.join(release.server, 'node_modules'))
   symlinkSync('server/runtime/node_modules', path.join(release.directory, 'node_modules'))
@@ -215,9 +196,9 @@ export async function buildServer(
 
 // The server finds the chooser helper at server/native/; a host without the toolchain ships none
 // and the server reports no native chooser, so the deploy itself still succeeds.
-function bundleNativePicker(release: Release) {
+function bundleNativePicker(release: Release, root: string) {
   try {
-    const built = buildNative(path.join(checkoutRoot, 'apps/desktop'))
+    const built = buildNative(path.join(root, 'apps/desktop'))
     if (!built) return log('server', 'native chooser helper: none for this platform')
     mkdirSync(path.join(release.server, 'native'), { recursive: true })
     cpSync(built, path.join(release.server, 'native', 'platform-webview'))
@@ -238,7 +219,10 @@ export function copyServer(release: Release, from: string) {
 // packages at runtime relative to its own path, exactly as `apps/server/dist`
 // does, so the release borrows the checkout's installed dependencies.
 function linkServerDependencies(release: Release) {
-  replaceLink(path.join(release.server, 'node_modules'), path.join(serverPackage, 'node_modules'))
+  replaceLink(
+    path.join(release.server, 'node_modules'),
+    path.join(checkoutRoot, 'apps/server/node_modules'),
+  )
   replaceLink(path.join(release.directory, 'node_modules'), path.join(checkoutRoot, 'node_modules'))
 }
 
@@ -256,20 +240,18 @@ export function readBuildConfig(directory: string): BuildConfig | null {
   return JSON.parse(readFileSync(file, 'utf8')) as BuildConfig
 }
 
-export async function verifyCandidateFiles(release: Release) {
+export async function verifyCandidateFiles(release: Release, base = '/') {
   const html = readFileSync(path.join(release.web, 'index.html'), 'utf8')
   const problems = [
-    !html.includes(`src="${webBase}assets/`) &&
-      `index.html does not load assets from ${webBase}assets/`,
-    /(?:src|href)="\/assets\//.test(html) && 'index.html references root /assets/',
-    html.includes('platform-api') && 'index.html still names the platform-api route',
+    !html.includes(`src="${base}assets/`) && `index.html does not load assets from ${base}assets/`,
+    base !== '/' && /(?:src|href)="\/assets\//.test(html) && 'index.html references root /assets/',
     html.includes('%DEV%') && 'index.html kept the %DEV% placeholder',
     html.includes('%BASE_URL%') && 'index.html kept the %BASE_URL% placeholder',
     !readdirSync(path.join(release.web, 'assets')).some((file) => file.endsWith('.wasm')) &&
       'no wasm artifact in web/assets',
     !existsSync(path.join(release.server, 'index.js')) && 'server/index.js is missing',
     ...(await missingReleaseFiles(release.server)).map(
-      (file) => `server/${file} is missing; deploy with --server to rebuild the server`,
+      (file) => `server/${file} is missing; install with --server to rebuild the server`,
     ),
   ].filter((problem): problem is string => typeof problem === 'string')
   if (problems.length === 0) return
@@ -280,7 +262,7 @@ export async function verifyCandidateFiles(release: Release) {
 }
 
 /** Boots the candidate server on a free port with throwaway state and reads it back. */
-export async function bootCandidate(release: Release) {
+export async function bootCandidate(release: Release, base = '/') {
   const scratch = path.join(tmpdir(), `platform-deploy-${release.name}`)
   rmSync(scratch, { force: true, recursive: true })
   mkdirSync(scratch, { recursive: true })
@@ -311,18 +293,19 @@ export async function bootCandidate(release: Release) {
       headers: { 'sec-fetch-dest': 'document' },
     })
     expectEqual('document status', page.status, 200)
-    if (!(await page.text()).includes(`${webBase}assets/`))
+    if (!(await page.text()).includes(`${base}assets/`))
       throw createScriptError('Candidate page has no assets.')
-    const asset = html(release.web).match(/src="\/platform\/(assets\/[^"]+)"/)?.[1]
+    const asset = html(release.web).match(new RegExp(`src="${base}(assets/[^"]+)"`))?.[1]
     if (!asset) throw createScriptError('Candidate page names no entry script.')
     expectEqual('asset status', (await fetch(`${origin}/${asset}`)).status, 200)
     expectEqual('health without origin', (await fetch(`${origin}/health`)).status, 401)
   } catch (error) {
+    child.kill('SIGKILL')
     const stderr = await new Response(child.stderr).text()
     writeFileSync(path.join(release.directory, 'candidate-server.log'), stderr)
     throw error
   } finally {
-    child.kill()
+    child.kill('SIGKILL')
     await child.exited
     rmSync(scratch, { force: true, recursive: true })
   }
@@ -330,16 +313,6 @@ export async function bootCandidate(release: Release) {
     path.join(release.directory, 'candidate-check.json'),
     `${JSON.stringify({ ok: true, port }, null, 2)}\n`,
   )
-}
-
-export function swapCurrent(release: Release) {
-  operations.swapCurrent(productionRoot, release)
-  log('swap', `${currentLink} → ${release.name}`)
-}
-
-export function pointCurrentAt(directory: string) {
-  operations.pointCurrentAt(productionRoot, directory)
-  log('swap', `${currentLink} → ${path.basename(directory)}`)
 }
 
 function html(web: string) {
@@ -379,8 +352,8 @@ async function freePort() {
   return port
 }
 
-async function runOrFail(command: string[], cwd: string, logFile: string) {
-  const result = await run(command, { cwd, env: productionEnv, log: logFile })
+async function runOrFail(command: string[], cwd: string, logFile: string, execute = run) {
+  const result = await execute(command, { cwd, env: productionEnv, log: logFile })
   if (result.code === 0) return
 
   throw createScriptError(`${command.join(' ')} failed with exit ${result.code}. See ${logFile}`)

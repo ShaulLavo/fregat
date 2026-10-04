@@ -3,6 +3,7 @@ import * as v from 'valibot'
 import { isRecord } from '@workspace/utils/objects'
 import { providerInstanceConfigsSchema, type ProviderInstanceConfig } from '../settings'
 import { descriptorFor, type SettingId, type SettingValue } from './keys'
+import { presentationFor } from './presentation'
 
 /**
  * What the record widget can edit: string keys to a string or an explicit
@@ -48,7 +49,8 @@ export type SettingControl =
   | { readonly widget: 'unsupported' }
 
 export function settingControl(id: SettingId, value: SettingValue<SettingId>): SettingControl {
-  const { schema, widget } = descriptorFor(id)
+  const { schema } = descriptorFor(id)
+  const { widget } = presentationFor(id)
 
   if (widget === 'theme') return { widget }
   if (widget === 'wallpaper') {

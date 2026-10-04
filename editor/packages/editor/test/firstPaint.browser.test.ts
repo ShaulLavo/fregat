@@ -92,11 +92,18 @@ function open(grammar: ReturnType<typeof delayedGrammar>, text = 'const answer =
   document.body.append(host)
   hosts.push(host)
   const paints: EditorInitialPaintEvent[] = []
+  let settleHighlight = (_event: EditorInitialPaintEvent) => {}
+  const highlightSettled = new Promise<EditorInitialPaintEvent>((resolve) => {
+    settleHighlight = resolve
+  })
   const editor = new Editor(host, {
     lineHeight: 20,
     plugins: [grammar.plugin],
     cursorLineHighlight: { rowBackground: false },
-    onInitialPaint: (event) => paints.push(event),
+    onInitialPaint: (event) => {
+      paints.push(event)
+      if (event.phase === 'highlight-settled') settleHighlight(event)
+    },
   })
   editors.push(editor)
   const buffer = createEditorTextBuffer(text)
@@ -104,7 +111,7 @@ function open(grammar: ReturnType<typeof delayedGrammar>, text = 'const answer =
     documentId: 'shared.ts',
     languageId: 'typescript',
   })
-  return { editor, host, buffer, paints }
+  return { editor, host, buffer, paints, highlightSettled }
 }
 
 async function visibleBeforeReady(
@@ -124,7 +131,8 @@ async function visibleBeforeReady(
 }
 
 async function highlighted(view: ReturnType<typeof open>, token: string) {
-  await expect.poll(() => view.editor.getState().initialHighlightStatus).toBe('painted')
+  expect(await view.highlightSettled).toMatchObject({ status: 'painted' })
+  expect(view.editor.getState().initialHighlightStatus).toBe('painted')
   expect(view.editor.getState().syntaxStatus).toBe('ready')
   await expect.poll(() => highlightedText(view.host)).toContain(token)
   const pixels = await rowPixels(view.host)
@@ -207,7 +215,8 @@ test('ends a failed grammar load in an observable terminal state with text still
   await visibleBeforeReady(view, grammar)
   grammar.fail()
 
-  await expect.poll(() => view.editor.getState().initialHighlightStatus).toBe('error')
+  expect(await view.highlightSettled).toMatchObject({ status: 'error' })
+  expect(view.editor.getState().initialHighlightStatus).toBe('error')
   expect(view.editor.getState().syntaxStatus).toBe('error')
   expect(view.paints).toContainEqual(
     expect.objectContaining({
@@ -247,33 +256,38 @@ test('disposes a waiting session without parsing it and preserves the simultaneo
   expect(grammar.worker.inspect().lifecycle).toBe('disposed')
 })
 
-test('adopts only the replacement document and current theme after delayed readiness', async () => {
-  const grammar = delayedGrammar()
-  const view = open(grammar, 'const old = 7;')
-  await visibleBeforeReady(view, grammar)
-  const replacement = createEditorTextBuffer('const replacement = 987;')
-  view.editor.attachSession(createEditorBufferSession(replacement), {
-    documentId: 'replacement.ts',
-    languageId: 'typescript',
-  })
-  view.editor.setTheme({
-    backgroundColor: '#ffffff',
-    foregroundColor: '#222222',
-    syntax: { number: '#ff0000' },
-  })
-  grammar.release()
-
-  const pixels = await highlighted(view, '987')
-  expect(pixels.red).toBeGreaterThan(20)
-  expect(highlightedText(view.host)).not.toContain('7')
-  expect(view.editor.materializeFullText()).toBe('const replacement = 987;')
-  const settled = view.paints.filter((event) => event.phase === 'highlight-settled')
-  expect(settled).toEqual([
-    expect.objectContaining({
+test.each([0, 1200])(
+  'adopts only the replacement document and current theme after delayed readiness (%i ms)',
+  async (readinessDelayMs) => {
+    const grammar = delayedGrammar()
+    const view = open(grammar, 'const old = 7;')
+    await visibleBeforeReady(view, grammar)
+    const replacement = createEditorTextBuffer('const replacement = 987;')
+    view.editor.attachSession(createEditorBufferSession(replacement), {
       documentId: 'replacement.ts',
-      status: 'painted',
-    }),
-  ])
-  await grammar.worker.awaitIdleFence()
-  expect(grammar.worker.inspect().cache.sourceChunks.documents).toBe(1)
-})
+      languageId: 'typescript',
+    })
+    view.editor.setTheme({
+      backgroundColor: '#ffffff',
+      foregroundColor: '#222222',
+      syntax: { number: '#ff0000' },
+    })
+    // Hold readiness beyond expect.poll's default one-second window in the slow case.
+    const releaseTimer = setTimeout(grammar.release, readinessDelayMs)
+    releases.push(() => clearTimeout(releaseTimer))
+
+    const pixels = await highlighted(view, '987')
+    expect(pixels.red).toBeGreaterThan(20)
+    expect(highlightedText(view.host)).not.toContain('7')
+    expect(view.editor.materializeFullText()).toBe('const replacement = 987;')
+    const settled = view.paints.filter((event) => event.phase === 'highlight-settled')
+    expect(settled).toEqual([
+      expect.objectContaining({
+        documentId: 'replacement.ts',
+        status: 'painted',
+      }),
+    ])
+    await grammar.worker.awaitIdleFence()
+    expect(grammar.worker.inspect().cache.sourceChunks.documents).toBe(1)
+  },
+)

@@ -1,4 +1,4 @@
-import { defaultSettingsDocument } from '@workspace/contracts'
+import { defaultSettingsDocument } from '@workspace/contracts/settings/defaults-document'
 import { useEffect, useState } from 'react'
 
 import { Dialog } from '@/components/dialog'

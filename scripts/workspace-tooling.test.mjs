@@ -1,14 +1,73 @@
 import { expect, test } from 'vitest'
 import { JSON5 } from 'bun'
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { withWorkspace } from './release/fixture.mjs'
 
 const script = fileURLToPath(new URL('./workspace-tooling.mjs', import.meta.url))
 const catalog = { typescript: '7.0.2', vitest: '5.0.2', 'typescript-api': 'npm:typescript@~6.0.3' }
+const checkout = fileURLToPath(new URL('../', import.meta.url))
+
+async function scriptTestFiles(root) {
+  const manifest = JSON.parse(await readFile(join(checkout, 'package.json'), 'utf8'))
+  const command = manifest.scripts['test:scripts'].replace('vitest run', 'vitest list')
+  const result = spawnSync(
+    'bun',
+    ['exec', `${command} --filesOnly --json --root ${JSON.stringify(root)}`],
+    {
+      cwd: checkout,
+      encoding: 'utf8',
+    },
+  )
+  expect(result.status, result.stdout + result.stderr).toBe(0)
+  return JSON.parse(result.stdout)
+    .map(({ file }) => relative(root, file).replaceAll('\\', '/'))
+    .sort()
+}
+
+test('test:scripts discovers every script suite through the root route', async () => {
+  const files = await readdir(join(checkout, 'scripts'), { recursive: true })
+  const expected = files
+    .map((file) => file.replaceAll('\\', '/'))
+    .filter((file) => !file.split('/').includes('node_modules') && /\.test\.(ts|mjs)$/.test(file))
+    .map((file) => `scripts/${file}`)
+    .sort()
+  const discovered = await scriptTestFiles(checkout)
+  expect(discovered.filter((file) => file.startsWith('scripts/'))).toEqual(expected)
+})
+
+test('test:scripts picks up future nested ts and mjs suites without collecting other owners', async () => {
+  await withWorkspace(async ({ root }) => {
+    const files = [
+      'scripts/direct.test.ts',
+      'scripts/nested/deep.test.mjs',
+      'scripts/nested/deep.test.ts',
+      'scripts/nested/ignored.spec.ts',
+      'scripts/nested/ignored.browser.tsx',
+      'scripts/node_modules/dependency/ignored.test.ts',
+      'apps/server/unregistered.test.ts',
+      'apps/web/scripts/shard-durations.test.ts',
+    ]
+    for (const file of files) {
+      await mkdir(dirname(join(root, file)), { recursive: true })
+      await writeFile(join(root, file), '')
+    }
+    await copyFile(
+      join(checkout, 'vitest.scripts.config.mjs'),
+      join(root, 'vitest.scripts.config.mjs'),
+    )
+    await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'junction')
+    expect(await scriptTestFiles(root)).toEqual([
+      'apps/web/scripts/shard-durations.test.ts',
+      'scripts/direct.test.ts',
+      'scripts/nested/deep.test.mjs',
+      'scripts/nested/deep.test.ts',
+    ])
+  })
+})
 
 async function prepare({ root, put }) {
   await put('.', {
@@ -158,3 +217,37 @@ test('terminal native input closure agrees with its package dependencies', () =>
   expect(result.status, result.stdout + result.stderr).toBe(0)
   expect(['bootstrap', 'assembled']).toContain(result.stdout.trim())
 })
+
+test.each(['editor', 'ghostty-webgpu', 'hotkeys'])(
+  'keeps the shared Vitest patch inside the %s standalone export',
+  async (family) => {
+    await withWorkspace(async (fixture) => {
+      await prepare(fixture)
+      const key = 'vitest@5.0.2'
+      const patch = 'patches/vitest@5.0.2.patch'
+      const source = 'shared Vitest patch\n'
+      const root = await fixture.read('.')
+      await fixture.put('.', { ...root, patchedDependencies: { [key]: patch } })
+      await mkdir(join(fixture.root, 'patches'))
+      await writeFile(join(fixture.root, patch), source)
+      for (const name of ['editor', 'ghostty-webgpu', 'hotkeys']) {
+        await fixture.put(name, { name, patchedDependencies: { [key]: patch } })
+        await mkdir(join(fixture.root, name, 'patches'))
+        await writeFile(join(fixture.root, name, patch), source)
+      }
+      await fixture.put(family, { name: family })
+      const missing = run(fixture.root)
+      expect(missing.status).not.toBe(0)
+      expect(missing.stderr).toContain(`${family}/package.json: patch ${key}`)
+      expect(run(fixture.root, '--write').status).toBe(0)
+      expect((await fixture.read(family)).patchedDependencies[key]).toBe(patch)
+      await writeFile(join(fixture.root, family, patch), 'stale patch\n')
+      const stale = run(fixture.root)
+      expect(stale.status).not.toBe(0)
+      expect(stale.stderr).toContain(`${family}/${patch} must match the root patch`)
+      expect(run(fixture.root, '--write').status).toBe(0)
+      expect(await readFile(join(fixture.root, family, patch), 'utf8')).toBe(source)
+      expect(run(fixture.root).status).toBe(0)
+    })
+  },
+)
