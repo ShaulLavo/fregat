@@ -19,6 +19,7 @@ import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
 import { renderWithProviders } from '../../../../../test/render'
 import { createObservedInProcessClient } from '../../../../../test/client'
 import { installTestClient } from '../../../../../test/factories/client-binding'
+import { activeEnvironmentId } from '@/lib/environments/state/domain'
 
 // The second of the two mount sites, and the harsher one: both sides are read live, so every
 // keystroke rebuilds the `DiffFile` and pushes a new buffer. Its own logic is the three notices and
@@ -48,6 +49,35 @@ test('a buffer that matches disk says there is nothing to compare', async ({ cli
   await renderCompare(server.root, { buffer: SAVED })
 
   expect(await screen.findByText('No unsaved changes.')).toBeInTheDocument()
+})
+
+test('two comparison mounts pin one clean source and release their interests independently', async ({
+  client,
+  server,
+}) => {
+  void client
+  const { store, rerender, unmount } = await renderCompare(server.root, {
+    buffer: SAVED,
+    copies: 2,
+  })
+  await waitFor(() => expect(store.getState().savedComparisons.size).toBe(2))
+  const sources = [...store.getState().savedComparisons.values()]
+  const first = sources[0]
+  const second = sources[1]
+  expect(first?.kind).toBe('ready')
+  expect(second?.kind).toBe('ready')
+  if (first?.kind !== 'ready' || second?.kind !== 'ready') return
+  expect(first.live.buffer).toBe(second.live.buffer)
+  expect(first.live.analysis).toBe(second.live.analysis)
+  expect(first.saved.snapshot).toBe(second.saved.snapshot)
+  store.getState().retainEditorDocuments({ documentKeys: new Set(), tabIds: new Set() })
+  expect(store.getState().getLiveEditorDocument(first.live.key)?.buffer).toBe(first.live.buffer)
+  rerender(compareMounts(store, 1))
+  await waitFor(() => expect(store.getState().savedComparisons.size).toBe(1))
+  unmount()
+  expect(store.getState().savedComparisons.size).toBe(0)
+  store.getState().retainEditorDocuments({ documentKeys: new Set(), tabIds: new Set() })
+  expect(store.getState().getLiveEditorDocument(first.live.key)).toBeNull()
 })
 
 test('a save updates the saved side while later edits keep their own text', async ({
@@ -106,12 +136,15 @@ test('shows loading while the saved file read is pending', async ({ client, serv
   }
 })
 
-async function renderCompare(root: string, { buffer }: { buffer: string | null }) {
+async function renderCompare(
+  root: string,
+  { buffer, copies = 1 }: { buffer: string | null; copies?: number },
+) {
   stubHighlightApi()
   await mkdir(path.join(root, 'repo'), { recursive: true })
   await writeFile(path.join(root, FILE), SAVED)
 
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: activeEnvironmentId() })
   if (buffer !== null) {
     store.getState().ensureLiveEditorDocument({
       content: buffer,
@@ -124,16 +157,23 @@ async function renderCompare(root: string, { buffer }: { buffer: string | null }
 
   // One provider, not the app's whole `EditorStateProvider`: the store has to be reachable from
   // here to stand a buffer up in it, and that provider builds its own.
-  const rendered = renderWithProviders(
-    <EditorDocumentStateContext.Provider value={store}>
-      <CompareSavedView
-        languageHost={testDiffLanguageHost}
-        path={filesystemPath(FILE)}
-        rootPath={filesystemPath('repo')}
-      />
-    </EditorDocumentStateContext.Provider>,
-  )
+  const rendered = renderWithProviders(compareMounts(store, copies))
   return { ...rendered, store }
+}
+
+function compareMounts(store: ReturnType<typeof createEditorDocumentStore>, copies: number) {
+  return (
+    <EditorDocumentStateContext.Provider value={store}>
+      {Array.from({ length: copies }, (_, index) => (
+        <CompareSavedView
+          key={index}
+          languageHost={testDiffLanguageHost}
+          path={filesystemPath(FILE)}
+          rootPath={filesystemPath('repo')}
+        />
+      ))}
+    </EditorDocumentStateContext.Provider>
+  )
 }
 
 function diffRowTexts() {
