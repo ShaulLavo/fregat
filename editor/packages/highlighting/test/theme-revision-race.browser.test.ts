@@ -3,7 +3,7 @@ import {
   createPieceTableSnapshot,
 } from '@singapore-editor/core/document'
 import type { VscodeThemeRegistration } from '@singapore-editor/core/shiki'
-import { createTextDiff, type PreparedDiffSyntaxSource } from '@singapore-editor/diff'
+import { createTextDiff, type DiffSyntaxSourceReader } from '@singapore-editor/diff'
 import { expect, test, vi } from 'vitest'
 import { createHighlightingService, type HighlightingThemeSource } from '../src/index'
 
@@ -60,13 +60,12 @@ async function fixture() {
     newFile: { path: 'p.ts', languageId: 'typescript', text: 'const p = 2\n' },
   })
   expect(await highlighting.prepareDiff(file, source)).toBe(true)
-  let sources: readonly PreparedDiffSyntaxSource[] = []
+  let sources: readonly DiffSyntaxSourceReader[] = []
   const shown = highlighting.showDiff(
     {
       setFile: (_file, prepared = []) => {
         void Promise.resolve(prepared).then((s) => (sources = s))
       },
-      releasePreparedSyntax: () => sources,
     },
     file,
     'new',

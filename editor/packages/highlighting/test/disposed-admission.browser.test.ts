@@ -16,7 +16,6 @@ function recordingView() {
     view: {
       setFile: (_file: unknown, prepared: PreparedDiffSyntaxInput = []) =>
         void shown.push(prepared),
-      releasePreparedSyntax: () => [],
     },
   }
 }

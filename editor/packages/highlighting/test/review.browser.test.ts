@@ -6,9 +6,9 @@ import type { VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 import {
   createTextDiff,
   type PreparedDiffSyntaxInput,
-  type PreparedDiffSyntaxSource,
+  type DiffSyntaxSourceReader,
 } from '@singapore-editor/diff'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
 
 import {
@@ -110,12 +110,11 @@ describe('content revisions', () => {
       newFile: { path: 'p.ts', languageId: 'typescript', text: 'const p = 2\n' },
     })
     expect(await highlighting.prepareDiff(file, source)).toBe(true)
-    let sources: readonly PreparedDiffSyntaxSource[] = []
+    let sources: readonly DiffSyntaxSourceReader[] = []
     const shown = highlighting.showDiff(
       {
         setFile: (_file, prepared = []) =>
           void Promise.resolve(prepared).then((s) => (sources = s)),
-        releasePreparedSyntax: () => sources,
       },
       file,
       'new',
@@ -248,21 +247,18 @@ describe('prepared diffs after disposal', () => {
     })
 
   function holdingView() {
-    let owned: readonly PreparedDiffSyntaxSource[] = []
     let claim: PreparedDiffSyntaxInput = []
     return {
       claimed: () => Promise.resolve(claim),
       view: {
         setFile: (_file: unknown, prepared: PreparedDiffSyntaxInput = []) => {
           claim = prepared
-          void Promise.resolve(prepared).then((sources) => (owned = sources))
         },
-        releasePreparedSyntax: () => owned,
       },
     }
   }
 
-  test('a view detached after disposal disposes its parse instead of refilling the store', async () => {
+  test('terminal disposal releases active readers and never refills the store', async () => {
     const highlighting = service()
     const file = diff('1')
     expect(await highlighting.prepareDiff(file, palette)).toBe(true)
@@ -270,12 +266,12 @@ describe('prepared diffs after disposal', () => {
     const shown = highlighting.showDiff(view, file, 'stacked', palette)
     const sources = await claimed()
     expect(sources).toHaveLength(2)
-    const disposals = sources.map((source) => vi.spyOn(source, 'dispose'))
 
     await highlighting.dispose()
+    expect(highlighting.inspect().diffs).toMatchObject({ prepared: 0, borrowed: 0, viewed: 0 })
+    for (const source of sources) source.dispose()
     shown.dispose()
     expect(highlighting.inspect().diffs.prepared).toBe(0)
-    for (const disposal of disposals) expect(disposal).toHaveBeenCalled()
   })
 
   test('a preparation that settles after disposal is disposed and never kept', async () => {
