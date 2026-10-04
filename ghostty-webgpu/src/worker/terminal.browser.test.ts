@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { Terminal as MainTerminal, attachTerminalHotkeys } from '../../dist/index.js'
 import { Terminal as WorkerTerminal, TerminalWorkerError } from '../../dist/worker/index.js'
@@ -1017,4 +1017,28 @@ describe.each(['webgl', 'webgpu'] as const)('%s producer output accessibility', 
       }
     },
   )
+})
+
+it.each([1, 2])('commits worker canvas CSS geometry at pixel ratio %s', async (ratio) => {
+  vi.stubGlobal('devicePixelRatio', ratio)
+  try {
+    const terminal = await create('webgl')
+    await terminal.open(container())
+    await terminal.write('geometry')
+    await eventually(() => !!terminal.submittedFrame)
+    const summary = terminal.submittedFrame!
+    expect(summary.font.pixelRatio).toBe(ratio)
+    const canvas = terminal.canvas!
+    const rect = canvas.getBoundingClientRect()
+    expect(rect.width).toBeCloseTo(
+      summary.grid.columns * summary.font.cssCellWidth +
+        summary.padding.left +
+        summary.padding.right,
+    )
+    expect(rect.height).toBeCloseTo(
+      summary.grid.rows * summary.font.cssCellHeight + summary.padding.top + summary.padding.bottom,
+    )
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })
