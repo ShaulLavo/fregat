@@ -24,7 +24,7 @@ export async function readClaudeUsageCache(
   nowMs: number,
 ): Promise<{
   observedAt: string
-  probe: ProviderUsageProbe
+  probe: Extract<ProviderUsageProbe, { kind: 'reading' }>
 } | null> {
   try {
     if ((await stat(filePath)).size > 2 * 1024 * 1024) return null
