@@ -142,8 +142,8 @@ import { BIDI_CONTROL_CODE_POINTS, isSimpleRowText } from '../textCharacters'
 import {
   applyRowHeight,
   captureGutterPaint,
-  disposeGutterCells,
-  disposeInlineWidgets,
+  takeGutterCells,
+  takeInlineWidgets,
   ensureOffsetMounted,
   getMountedRows,
   gutterWidth,
@@ -378,6 +378,7 @@ export class VirtualizedTextView {
     this.editContext =
       inputElement instanceof HTMLTextAreaElement ? null : createEditContext(inputElement)
     this.view = {
+      disposed: false,
       provisional: false,
       scrollElement,
       viewport,
@@ -496,7 +497,16 @@ export class VirtualizedTextView {
 
   public dispose(): void {
     const view = this.view
-    for (const row of view.rowElements.values()) invalidateRowPresentations(row.element)
+    if (view.disposed) return
+    view.disposed = true
+    this.atomicRenderPending = false
+    const rows = new Set(view.rowElements.values())
+    for (const row of view.rowPool) rows.add(row)
+    view.rowElements.clear()
+    view.rowPool.length = 0
+    const releaseWidgets = takeInlineWidgets(view)
+    const releaseCells = takeGutterCells(view, rows)
+    for (const row of rows) invalidateRowPresentations(row.element)
     this.releaseProvisionalPaint()
     this.pendingReveal = null
     this.cancelContentWidthMeasurement?.()
@@ -507,6 +517,8 @@ export class VirtualizedTextView {
     for (const name of view.rangeHighlightGroups.keys()) clearRangeHighlight(view, name)
     clearTokenHighlights(view)
     view.virtualizer.dispose()
+    this.scrollElement.remove()
+    view.styleEl.remove()
     view.model.projection.dispose()
     view.model.textSnapshot = view.model.projection.textSnapshot
     view.model.textLength = 0
@@ -520,12 +532,18 @@ export class VirtualizedTextView {
     view.foldMarkerSource = null
     view.foldMarkerByStartRow = new Map()
     view.foldMarkerByKey = new Map()
-    disposeInlineWidgets(view)
-    disposeGutterCells(view)
-    this.scrollElement.remove()
-    view.styleEl.remove()
-    view.rowElements.clear()
-    view.rowPool.length = 0
+    let failure: { readonly error: unknown } | null = null
+    try {
+      releaseWidgets()
+    } catch (error) {
+      failure = { error }
+    }
+    try {
+      releaseCells()
+    } catch (error) {
+      failure ??= { error }
+    }
+    if (failure) throw failure.error
   }
 
   /** The offset the next text replacement should render at, so a restore costs one pass, not two. */
@@ -977,6 +995,7 @@ export class VirtualizedTextView {
     applyRowHeight(view, rowHeightValue)
     view.gutterWidthDirty = true
     updateGutterWidthIfNeeded(view)
+    if (view.disposed) return
     view.lastRenderedRowsKey = ''
     if (this.refreshWrapWidth()) return
     updateVirtualizerRows(view)
@@ -1582,6 +1601,7 @@ export class VirtualizedTextView {
   }
 
   private renderSnapshot(snapshot: FixedRowVirtualizerSnapshot): void {
+    if (this.view.disposed) return
     if (this.view.provisional) {
       this.freezeProvisionalScroll()
       this.reportViewportChange()
@@ -1596,6 +1616,7 @@ export class VirtualizedTextView {
     this.synchronizeScrollPaint(snapshot)
     this.view.viewport.setViewportSize(snapshot.viewportWidth, snapshot.viewportHeight)
     this.reportContentHeight(snapshot.totalSize)
+    if (view.disposed) return
     const visible = snapshot.viewportHeight > 0
     if (visible) {
       const first = snapshot.virtualItems[0]?.index ?? 0
@@ -1609,6 +1630,7 @@ export class VirtualizedTextView {
       return
     }
     updateGutterWidthIfNeeded(view)
+    if (view.disposed) return
     if (visible && this.refreshWrapWidth(snapshot.viewportWidth)) return
     if (!visible) {
       this.cancelContentWidthMeasurement?.()
@@ -1627,6 +1649,7 @@ export class VirtualizedTextView {
 
     view.lastRenderedRowsKey = key
     renderRows(view, snapshot, (rowSlotId) => deleteTokenRangesForRow(view, rowSlotId))
+    if (view.disposed) return
     this.applyKnownContentWidths(snapshot)
     renderTokenHighlights(view)
     for (const name of view.rangeHighlightGroups.keys()) renderRangeHighlight(view, name)
@@ -1636,7 +1659,7 @@ export class VirtualizedTextView {
   }
 
   private reportViewportChange(): void {
-    if (this.flushingAtomicRender) return
+    if (this.view.disposed || this.flushingAtomicRender) return
     this.view.onViewportChange?.()
   }
 
@@ -1648,7 +1671,7 @@ export class VirtualizedTextView {
   }
 
   private flushPendingReveal(): void {
-    if (!this.viewportVisible || !this.pendingReveal) return
+    if (this.view.disposed || !this.viewportVisible || !this.pendingReveal) return
 
     const pending = this.pendingReveal
     this.reveal(pending.offset, pending.block, pending.affinity)
@@ -1695,7 +1718,7 @@ export class VirtualizedTextView {
   }
 
   private scheduleContentWidthMeasurement(): void {
-    if (this.cancelContentWidthMeasurement) return
+    if (this.view.disposed || this.cancelContentWidthMeasurement) return
 
     const win = this.scrollElement.ownerDocument.defaultView
     if (!win) return
@@ -1767,6 +1790,7 @@ export class VirtualizedTextView {
       patch,
       snapshot,
     )
+    if (view.disposed) return
     view.sameLineTokenEdit = {
       rowIndex: patch.rowIndex,
       editedRowPatchedInPlace,
