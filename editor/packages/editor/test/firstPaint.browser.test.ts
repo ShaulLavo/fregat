@@ -1,8 +1,15 @@
-import { afterEach, expect, test } from 'vitest'
-import { commands } from 'vitest/browser'
+import { afterEach, expect, test, vi } from 'vitest'
+import { commands, page } from 'vitest/browser'
 import { Editor } from '../src/editor/Editor'
+import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/public/document'
 import type { EditorInitialPaintEvent } from '../src/plugins'
+import {
+  createEmptySyntaxResult,
+  type EditorSyntaxProvider,
+  type EditorSyntaxSession,
+} from '../src/syntax/session'
+import { EditorTokenStore } from '../src/syntax/tokenStore'
 import { createError } from '../src/logging/evlog'
 import {
   createTreeSitterSyntaxPlugin,
@@ -76,6 +83,7 @@ function delayedGrammar() {
   })
   return {
     plugin: createTreeSitterSyntaxPlugin(provider),
+    provider,
     worker,
     disposedSessions,
     parsedSessions,
@@ -227,6 +235,126 @@ test('ends a failed grammar load in an observable terminal state with text still
   )
   expect((await rowPixels(view.host)).ink).toBeGreaterThan(20)
   expect(grammar.parsedSessions).toEqual([])
+})
+
+test('paints retained full tokens immediately when the provider cannot query ranges', async () => {
+  const buffer = createEditorTextBuffer('const answer = 4;')
+  const result = {
+    ...createEmptySyntaxResult(),
+    tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: '#ff0000' } }]),
+  }
+  const queryRange = vi.fn(async () => createEmptySyntaxResult())
+  const provider: EditorSyntaxProvider = {
+    createSession: vi.fn(
+      () =>
+        ({
+          foldingSupport: 'supported',
+          refresh: async () => result,
+          applyChange: async () => result,
+          canQueryRange: () => false,
+          queryRange,
+          getResult: () => result,
+          getTokens: () => result.tokens,
+          getSnapshotVersion: () => 1,
+          dispose: () => undefined,
+        }) satisfies EditorSyntaxSession,
+    ),
+  }
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'retained.ts' })
+  releases.push(() => analysis.dispose())
+  const warm = analysis.borrowStructural({
+    provider,
+    languageId: 'typescript',
+    includeHighlights: true,
+    includeCaptures: false,
+    syntaxMode: 'range',
+  })!
+  await warm.refresh(buffer.getTextSnapshot())
+  warm.dispose()
+  const host = document.createElement('div')
+  host.id = `first-paint-${nextHostId++}`
+  host.style.cssText = 'width:600px;height:120px;display:flex'
+  document.body.append(host)
+  hosts.push(host)
+  const editor = new Editor(host, {
+    lineHeight: 20,
+    plugins: [{ activate: (context) => context.registerSyntaxProvider(provider) }],
+  })
+  editors.push(editor)
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  editor.attachSession(createEditorBufferSession(buffer), {
+    analysis,
+    documentId: 'retained.ts',
+    languageId: 'typescript',
+  })
+
+  expect(editor.getState().initialHighlightStatus).toBe('painted')
+  expect(highlightedText(host)).toContain('const')
+  expect((await rowPixels(host)).red).toBeGreaterThan(20)
+  expect(provider.createSession).toHaveBeenCalledTimes(1)
+  expect(queryRange).not.toHaveBeenCalled()
+  await page.elementLocator(host).screenshot()
+})
+
+test('reclaims inactive real parser sessions while the shared provider remains usable', async () => {
+  const grammar = delayedGrammar()
+  grammar.release()
+  const buffer = createEditorTextBuffer('const reclaimed = 1;')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reclaimed.ts' })
+  const survivorBuffer = createEditorTextBuffer('const survivor = 2;')
+  const survivorView = createEditorBufferSession(survivorBuffer)
+  const survivorAnalysis = createEditorDocumentAnalysis({
+    buffer: survivorBuffer,
+    documentId: 'survivor.ts',
+  })
+  releases.push(
+    () => analysis.dispose(),
+    () => survivorAnalysis.dispose(),
+  )
+  const request = {
+    provider: grammar.provider,
+    languageId: 'typescript',
+    includeHighlights: true,
+    includeCaptures: false,
+    syntaxMode: 'range' as const,
+  }
+  const survivor = survivorAnalysis.borrowStructural(request)!
+  await survivor.queryRange!({ startIndex: 0, endIndex: survivorBuffer.getTextSnapshot().length })
+  const left = analysis.borrowStructural(request)!
+  const right = analysis.borrowStructural(request)!
+  const range = { startIndex: 0, endIndex: buffer.getTextSnapshot().length }
+  await Promise.all([left.queryRange!(range), right.queryRange!(range)])
+  left.dispose()
+  expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+  expect(right.read(range).kind).toBe('ready')
+  right.dispose()
+  analysis.reclaimInactive({ reason: 'inactive-budget' })
+  await grammar.worker.awaitIdleFence()
+
+  for (let cycle = 0; cycle < 10; cycle++) {
+    const survivorChunks = grammar.worker.inspect().cache.sourceChunks.sentChunks
+    const lease = analysis.borrowStructural(request)!
+    const result = await lease.queryRange!(range)
+    expect(result.tokens.length).toBeGreaterThan(0)
+    lease.dispose()
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([
+      lease.runtimeSessionId,
+    ])
+    await grammar.worker.awaitIdleFence()
+    expect(analysis.inspectRetention().entries).toEqual([])
+    expect(grammar.worker.inspect().cache.sourceChunks.sentChunks).toBe(survivorChunks)
+    expect(grammar.worker.inspect().pendingRequests).toBe(0)
+    survivorView.applyText(' ')
+    await survivor.refresh(survivorBuffer.getTextSnapshot())
+    expect(survivor.read()).toMatchObject({ kind: 'ready', revision: survivorBuffer.getRevision() })
+  }
+
+  survivor.dispose()
+  analysis.dispose()
+  survivorAnalysis.dispose()
+  await grammar.worker.awaitIdleFence()
+  expect(grammar.worker.inspect().cache.sourceChunks.sentChunks).toBe(0)
+  expect(grammar.worker.inspect().pendingRequests).toBe(0)
 })
 
 test('disposes a waiting session without parsing it and preserves the simultaneous editor', async () => {

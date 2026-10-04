@@ -5,6 +5,7 @@ import {
   claudeUsageProbe,
   claudeUsageUpdate,
   codexUsageUpdate,
+  mergeObservedUsageWindows,
   mergeUsageWindows,
   stoppingUsageWindow,
   usageLimitMessage,
@@ -224,6 +225,123 @@ describe('mergeUsageWindows', () => {
     const previous = [session, weekly]
 
     expect(mergeUsageWindows(previous, [{ ...session, resetsAt: null }])).toBe(previous)
+  })
+
+  it('keeps the percentage age for a newer status-only observation in the same epoch', () => {
+    const observedAt = '2026-09-24T10:00:00.000Z'
+    const known = { ...session, observedAt, source: 'codex-account-rate-limits' }
+    expect(
+      mergeObservedUsageWindows(
+        [known],
+        [
+          {
+            ...session,
+            status: 'warning',
+            usedPercent: null,
+            observedAt: '2026-09-24T10:10:00.000Z',
+            source: 'cliproxy-passive-cache',
+          },
+        ],
+      ),
+    ).toMatchObject([{ usedPercent: 20, observedAt, source: known.source, status: 'warning' }])
+  })
+
+  it('clears an earlier epoch percentage when a newer status-only observation changes reset', () => {
+    const observedAt = '2026-09-24T10:10:00.000Z'
+    expect(
+      mergeObservedUsageWindows(
+        [{ ...session, observedAt: '2026-09-24T10:00:00.000Z' }],
+        [
+          {
+            ...session,
+            usedPercent: null,
+            status: 'rejected',
+            resetsAt: '2026-09-24T11:00:00.000Z',
+            observedAt,
+          },
+        ],
+      ),
+    ).toMatchObject([{ usedPercent: null, observedAt, resetsAt: '2026-09-24T11:00:00.000Z' }])
+  })
+
+  it('uses a native observation over a copied proxy snapshot at the same instant in either order', () => {
+    const native = {
+      ...session,
+      observedAt: '2026-09-24T10:00:00.000Z',
+      source: 'codex-account-rate-limits',
+    }
+    const proxy = { ...native, usedPercent: 90, source: 'cliproxy-passive-cache' }
+    expect(mergeObservedUsageWindows([native], [proxy])).toMatchObject([native])
+    expect(mergeObservedUsageWindows([proxy], [native])).toMatchObject([native])
+  })
+
+  it('keeps an authoritative native rejection over copied numeric data at the same instant', () => {
+    const native: ProviderUsageWindow = {
+      ...session,
+      usedPercent: null,
+      status: 'rejected',
+      observedAt: '2026-09-24T10:00:00.000Z',
+      source: 'rate-limit-event',
+    }
+    const proxy = { ...session, observedAt: native.observedAt, source: 'cliproxy-passive-cache' }
+    const forward = mergeObservedUsageWindows([native], [proxy])
+    expect(forward).toEqual(mergeObservedUsageWindows([proxy], [native]))
+    expect(forward).toMatchObject([
+      {
+        usedPercent: 20,
+        status: 'rejected',
+        observedAt: native.observedAt,
+        statusSource: native.source,
+      },
+    ])
+  })
+
+  it('resolves equal-time copied cache conflicts conservatively in either arrival order', () => {
+    const numeric = {
+      ...session,
+      source: 'cliproxy-passive-cache',
+      observedAt: '2026-09-24T10:00:00.000Z',
+    }
+    const rejected: ProviderUsageWindow = { ...numeric, usedPercent: 100, status: 'rejected' }
+    const forward = mergeObservedUsageWindows([numeric], [rejected])
+    expect(forward).toEqual(mergeObservedUsageWindows([rejected], [numeric]))
+    expect(forward).toMatchObject([{ usedPercent: 100, status: 'rejected' }])
+  })
+
+  it('keeps newer rejection authority while accepting an intermediate delayed numeric counter', () => {
+    const numeric = {
+      ...session,
+      source: 'cliproxy-passive-cache',
+      observedAt: '2026-09-24T10:00:00.000Z',
+    }
+    const statusAt = '2026-09-24T10:10:00.000Z'
+    const rejected: ProviderUsageWindow = {
+      ...numeric,
+      usedPercent: null,
+      status: 'rejected',
+      observedAt: statusAt,
+    }
+    const latest = mergeObservedUsageWindows([numeric], [rejected])
+    const delayed = { ...numeric, usedPercent: 25, observedAt: '2026-09-24T10:05:00.000Z' }
+    const merged = mergeObservedUsageWindows(latest, [delayed])
+    expect(merged).toMatchObject([
+      {
+        usedPercent: 25,
+        observedAt: delayed.observedAt,
+        status: 'rejected',
+        statusObservedAt: statusAt,
+        statusSource: numeric.source,
+      },
+    ])
+    const recovered = { ...numeric, usedPercent: 30, observedAt: '2026-09-24T10:15:00.000Z' }
+    expect(mergeObservedUsageWindows(merged, [recovered])).toMatchObject([
+      {
+        usedPercent: 30,
+        observedAt: recovered.observedAt,
+        status: 'allowed',
+        statusObservedAt: recovered.observedAt,
+      },
+    ])
   })
 })
 

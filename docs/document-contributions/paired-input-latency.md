@@ -1,6 +1,6 @@
 # Paired native input latency
 
-Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses historical budgets with a declared 5 ms loaded Tree-sitter blocking floor and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Corrected-identity controls pass; actual default completes in 855.026 seconds and passes 215/216 blocking keys. The one Platform applied-undo rejection remains unclassified: either a real #224 large-file undo cost or noise. The coordinator approves shipping this result with that open key and follow-ups recorded; the runner's failing verdict stays unchanged. Full timing and expanded loaded proofs remain follow-ups. Units 2–7 still require their separate implementation authorization. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
+Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses historical budgets with a declared 5 ms loaded Tree-sitter blocking floor and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Corrected-identity controls pass; actual default completes in 855.026 seconds and passes 215/216 blocking keys. The one Platform applied-undo rejection remains unclassified: either a real #224 large-file undo cost or noise. The coordinator approves shipping this result with that open key and follow-ups recorded; the runner's failing verdict stays unchanged. Full timing and expanded loaded proofs remain follow-ups. The owner approved units 2–7 on 2026-10-04; their latency prerequisite remains pending. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
 
 ## Run the comparison
 
@@ -744,3 +744,55 @@ A/B median of medians and actual wall. These measurements do not justify changin
 sampling rule. Loaded Tree, compositions, loaded Platform and full-matrix wall proofs remain
 explicit follow-ups. Collection stops; #247 is handed ready to the coordinator for independent
 review, without merging.
+
+### Current-identity undo repair, 2026-10-04
+
+The owner approved the repair, its proof rounds and Plan 099 units 2–7. The performance
+prerequisite remains pending. The old 855.026-second default retains its failing verdict and
+original identity; the failed 195.706-second diagnostic remains archived.
+
+The restricted count omitted replaced buffers and analysis owners. Full and restricted receipts
+now share an exact lifetime validator. Each subject attachment and admitted document reload
+contributes one buffer and one analysis owner; the final Editor count is one or three. Warmup
+reset receipts cover every warmup, including reloads outside measured samples. Zero retained
+objects, current reset source, accepted render, listener limits, worker shutdown, bootstrap
+disposal and context closure remain required. Six targeted regressions fail before the repair;
+all 21 focused lifecycle checks and 368 full stress tests pass afterward. Stress TypeScript and
+lint pass, with the inherited `src/input-output.ts` spread warning.
+
+The restricted diagnostic pilot uses five alternating A/A and A/B runs on exactly
+`short-lines/multiple/undo/inputToApplied`. A/A uses the unchanged prerequisite candidate on
+both sides. A/B uses the original prerequisite baseline and candidate. Their source hashes are
+`5e2b88cd7caaa770b279513956e666c44ceac8489a370a1d71366744966d1618` and
+`e5c6046921524097a47c5dcf38fd2d5c34fbc1eb4384e9cf5c9d9cfe5245fb6e`; both retain external
+receipt `a71e25fffb81a474bf8eb5434213af2def69582fce1fa4ffeae9d71cdb0ab893`.
+The applied budget stays `0.800000011920929` ms. The production p95 statistic, nominal
+bootstrap intervals, key-local AB/BA order and strict two-or-four stopping policy are unchanged.
+Five pilot runs per arm bound the first checkpoint. The requested final reliability follow-up
+remains ten runs per arm; the pilot earns no rejects/10 or expanded acceptance credit.
+
+Current proof artifacts are under `/work/tmp/plan282-undo-20261004/`. Failing-before and passing
+contract logs are under `/work/reports/plan099-unblock-20261004/latency-proof/`.
+
+Measurement `8127db7f5778b19c6e0543defeefefbde388572e176bddf09e1130391be97c25`, validation
+`0620138886cf2eb6f5c4f1e382fdfefd643f1d45668c680468566296fff9de8c`, and combined instrument
+`ba80c486f66dabf93af876e6b5fcf64df0c8b6be6aad700ebb094b3bdedd1228` include the independent
+review repairs and this lifecycle repair. The public runner automatically writes a fresh cache.
+Its raw controls independently recompute:
+
+| Control                 | Actual collection seconds | Result                                |
+| ----------------------- | ------------------------: | ------------------------------------- |
+| Input 20 ms             |                   170.212 | 72/72 synchronous keys reject         |
+| Frame 20 ms             |                   168.333 | 36/36 frame keys reject               |
+| Named frame floor 25 ms |                   183.308 | Named key rejects; 30 ms skipped      |
+| Total collection        |                   521.854 | Schema-4 cache independently verified |
+
+All six control-arm cleanup receipts retain zero objects, zero live workers, zero hosts and zero
+pending frames; both contexts close in each control. Bootstrap disposal and listener limits pass.
+The host stops the following native positive at its 600-second quiet execution limit. The actual
+child CLI spans 600.082 seconds and exits 1 after cancellation; the heavy runner reports its
+75 timeout verdict. No complete native matrix or positive verdict exists. The failed command
+and all completed raw controls remain in `controls.log`, `controls-timing.json`,
+`sensitivity-{input,frame,frame-25ms}.json.gz` and the aggregate `sensitivity/` cache.
+The cached positive is a separate bounded run. This stop changes neither a statistical verdict
+nor a budget, and the incomplete positive earns no acceptance credit.

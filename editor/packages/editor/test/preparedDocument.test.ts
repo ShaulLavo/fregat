@@ -599,6 +599,66 @@ describe('prepared editor documents', () => {
     },
   )
 
+  it('attaches a retained full structural result before ranges become available', async () => {
+    const buffer = createEditorTextBuffer('const value = 1;\n')
+    const result = {
+      ...createEmptySyntaxResult(),
+      tokens: EditorTokenStore.fromTokens([
+        { start: 0, end: 5, style: { color: 'retained-full-token' } },
+      ]),
+    }
+    const session: EditorSyntaxSession = {
+      ...syntaxSession(),
+      canQueryRange: () => false,
+      refresh: vi.fn(async () => result),
+      getResult: () => result,
+      getTokens: () => result.tokens,
+    }
+    const provider: EditorSyntaxProvider = { createSession: vi.fn(() => session) }
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+    const warm = analysis.borrowStructural({
+      provider,
+      languageId: 'typescript',
+      includeCaptures: false,
+      includeHighlights: true,
+      syntaxMode: 'range',
+    })!
+    await warm.refresh(buffer.getTextSnapshot())
+    warm.dispose()
+    const colors: Array<readonly (string | undefined)[]> = []
+    const plugin: EditorPlugin = {
+      activate: (context) => [
+        context.registerSyntaxProvider(provider),
+        context.registerViewContribution({
+          createContribution: () => ({
+            update: (snapshot) =>
+              colors.push(snapshot.tokens.toTokens().map((token) => token.style.color)),
+            dispose: () => undefined,
+          }),
+        }),
+      ],
+    }
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const editor = createVisibleEditor(container, { plugins: [plugin] })
+    colors.length = 0
+    try {
+      editor.attachSession(createEditorBufferSession(buffer), {
+        analysis,
+        documentId: 'file.ts',
+        languageId: 'typescript',
+      })
+      expect(colors[0]).toEqual(['retained-full-token'])
+      expect(colors).not.toContainEqual([])
+      expect(provider.createSession).toHaveBeenCalledTimes(1)
+      expect(session.queryRange).not.toHaveBeenCalled()
+    } finally {
+      editor.dispose()
+      analysis.dispose()
+      container.remove()
+    }
+  })
+
   it('publishes prepared tab size and fallback folds with the first document snapshot', () => {
     const buffer = createEditorTextBuffer('root\n  child\n    grandchild\nnext\n')
     const snapshots: Array<{

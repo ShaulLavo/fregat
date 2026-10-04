@@ -127,6 +127,50 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     expect(result?.captures.length).toBeGreaterThan(0)
   })
 
+  it('bounds source metadata after 40 real-worker runtime disposals', async () => {
+    const snapshot = createPieceTableSnapshot('const answer = 1;\n')
+    const payload = {
+      documentId: 'shared.ts',
+      languageId: 'typescript',
+      snapshotVersion: 1,
+      snapshot,
+    }
+    const survivor = await workerClient.parse({ ...payload, runtimeSessionId: 'runtime-survivor' })
+    expect(survivor?.captures.length).toBeGreaterThan(0)
+    const baseline = workerClient.inspect().cache.sourceChunks
+    expect(baseline).toEqual({ documents: 1, sentChunks: 1, sourceEpochs: 0 })
+    const samples = []
+
+    for (let cycle = 0; cycle < 40; cycle++) {
+      const runtimeSessionId = `runtime-cycle-${cycle}`
+      const parsed = await workerClient.parse({ ...payload, runtimeSessionId })
+      expect(parsed?.captures).toEqual(survivor?.captures)
+      expect(workerClient.inspect().cache.sourceChunks.sentChunks).toBe(2)
+      workerClient.disposeDocument(runtimeSessionId)
+      await workerClient.awaitRuntimeSessionIdle(runtimeSessionId)
+      await workerClient.awaitIdleFence()
+      samples.push(workerClient.inspect().cache.sourceChunks)
+    }
+
+    expect(samples).toEqual(Array.from({ length: 40 }, () => baseline))
+    const result = await workerClient.queryRange({
+      ...payload,
+      runtimeSessionId: 'runtime-survivor',
+      includeCaptures: true,
+      range: { startIndex: 0, endIndex: snapshot.length },
+    })
+    expect(result?.captures).toEqual(survivor?.captures)
+    workerClient.disposeDocument('runtime-survivor')
+    await workerClient.awaitRuntimeSessionIdle('runtime-survivor')
+    await workerClient.awaitIdleFence()
+    expect(workerClient.inspect()).toMatchObject({
+      lifecycle: 'ready',
+      pendingRequests: 0,
+      workerGeneration: 1,
+      cache: { sourceChunks: { documents: 0, sentChunks: 0, sourceEpochs: 0 } },
+    })
+  })
+
   it('parses copied original survivors through a warmed worker source cache', async () => {
     const prefix = 'const 名前 = "🎉";\n'
     const deleted = '// retired text\n'.repeat(4096)

@@ -349,7 +349,7 @@ export class WebGpuTerminalRenderer {
   }
 
   notifyScroll(): void {
-    this.invalidateAll()
+    this.refreshRows(0, this.grid.rows - 1)
   }
 
   notifyWrite(): void {
@@ -689,9 +689,7 @@ export class WebGpuTerminalRenderer {
     this.metrics.instanceUploadOperations += instanceUploadOperations
     this.metrics.rebuiltRows += updates.length
     this.metrics.submittedFrames += 1
-    for (const update of updates) {
-      this.metrics.uploadedBytes += update.cell.byteLength + update.glyph.byteLength
-    }
+    this.metrics.uploadedBytes += this.textPass.frameUploadedBytes
   }
 
   private replaceTextPass(): void {

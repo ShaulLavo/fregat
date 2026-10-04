@@ -17,6 +17,7 @@ import {
   inputViewModes,
   summarizeInputResult,
   validateInputResult,
+  validateWarmInputLifecycle,
 } from '../input-results.mjs'
 
 function result(id = 'control-1', duration = 10) {
@@ -1379,10 +1380,40 @@ function warmResult() {
       rejectedSource: null,
     }
   }
+  run.warmupResets = run.samples
+    .filter((sample) => sample.repetition === 0)
+    .map((sample) => ({
+      fixture: sample.fixture,
+      views: sample.views,
+      scenario: sample.scenario,
+      repetition: -1,
+      cleanup: null,
+      reset: structuredClone(sample.reset),
+    }))
   return run
 }
 
 describe('warm configuration lifecycle', () => {
+  it('accounts exactly for a restricted multiple-view undo subject and all reset generations', () => {
+    const run = warmResult()
+    run.config.pendingMinimapSource = true
+    const selected = (sample) =>
+      sample.fixture === 'short-lines' && sample.views === 'multiple' && sample.scenario === 'undo'
+    run.samples = run.samples.filter(selected)
+    run.warmupResets = run.warmupResets.filter(selected)
+    run.startup = [{ ...run.startup[4], retained: false }]
+    run.cleanup.trackedObjects = 5
+    const subjects = ['short-lines/multiple']
+    expect(() => validateWarmInputLifecycle(run, subjects)).not.toThrow()
+    for (const sample of [...run.samples, ...run.warmupResets]) {
+      sample.reset.documentReloaded = true
+      sample.reset.rejectedSource = [{ current: false, renderedAfterSource: true }]
+    }
+    run.cleanup.trackedObjects = 11
+    expect(() => validateWarmInputLifecycle(run, subjects)).not.toThrow()
+    run.cleanup.trackedObjects = 5
+    expect(() => validateWarmInputLifecycle(run, subjects)).toThrow(/tracked configuration objects/)
+  })
   it('requires complete startup, reset and final disposal receipts', () => {
     expect(validateInputResult(warmResult())).toBeTruthy()
   })
@@ -1439,9 +1470,56 @@ describe('warm configuration lifecycle', () => {
     )
     sample.reset.documentReloaded = true
     sample.reset.rejectedSource = [{ current: false, renderedAfterSource: true }]
+    run.cleanup.trackedObjects += 2
     expect(validateInputResult(run)).toBeTruthy()
     sample.reset.rejectedSource[0].current = true
     expect(() => validateInputResult(run)).toThrow(/rejected source receipt/)
+  })
+  it('counts replacement buffer and analysis owners from measured resets', () => {
+    const run = warmResult()
+    run.config.pendingMinimapSource = true
+    const sample = run.samples.find(
+      (entry) => entry.fixture === 'short-lines' && entry.scenario === 'undo',
+    )
+    sample.reset.documentReloaded = true
+    sample.reset.rejectedSource = [{ current: false, renderedAfterSource: true }]
+    run.cleanup.trackedObjects = 17
+    expect(validateInputResult(run)).toBeTruthy()
+    run.cleanup.trackedObjects = 15
+    expect(() => validateInputResult(run)).toThrow(/tracked configuration objects/)
+  })
+  it('counts replacement owners from unmeasured warmup resets', () => {
+    const run = warmResult()
+    run.config.pendingMinimapSource = true
+    const warmup = run.warmupResets.find(
+      (entry) => entry.fixture === 'short-lines' && entry.scenario === 'undo',
+    )
+    warmup.reset.documentReloaded = true
+    warmup.reset.rejectedSource = [{ current: false, renderedAfterSource: true }]
+    run.cleanup.trackedObjects = 17
+    expect(validateInputResult(run)).toBeTruthy()
+    run.cleanup.trackedObjects = 15
+    expect(() => validateInputResult(run)).toThrow(/tracked configuration objects/)
+  })
+  it('rejects unexplained lifetime owners', () => {
+    const run = warmResult()
+    run.cleanup.trackedObjects += 2
+    expect(() => validateInputResult(run)).toThrow(/tracked configuration objects/)
+  })
+  it('rejects missing warmup reset coverage', () => {
+    const run = warmResult()
+    run.warmupResets.pop()
+    expect(() => validateInputResult(run)).toThrow(/warmup reset coverage/)
+  })
+  it('validates source readiness for warmup resets', () => {
+    const run = warmResult()
+    run.warmupResets[0].reset.sourceCurrent = false
+    expect(() => validateInputResult(run)).toThrow(/reset consumer source/)
+  })
+  it('rejects retained configuration owners after disposal', () => {
+    const run = warmResult()
+    run.cleanup.retainedObjects = 1
+    expect(() => validateInputResult(run)).toThrow(/retained configuration objects/)
   })
   it('keeps an already current source warm without a document reload', () => {
     const run = warmResult()
