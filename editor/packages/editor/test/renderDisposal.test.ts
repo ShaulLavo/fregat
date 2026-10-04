@@ -152,3 +152,39 @@ it('ends Editor height notifications and contribution delivery at disposal', () 
   expect(view.isRenderingAtomically).toBe(false)
   expect(view.getState().mountedRows).toEqual([])
 })
+
+it('ends a same-line gutter update before changing the disposed row', () => {
+  const host = container()
+  let armed = false
+  const cleanup = vi.fn()
+  const view = new VirtualizedTextView(host, {
+    rowHeight: 20,
+    overscan: 0,
+    gutterContributions: [
+      {
+        id: 'lifecycle',
+        width: () => 20,
+        createCell: (document) => document.createElement('div'),
+        updateCell: () => {
+          if (!armed) return
+          armed = false
+          view.dispose()
+        },
+        disposeCell: cleanup,
+      },
+    ],
+  })
+  releases.push(() => view.dispose())
+  view.setText('old0\nold1')
+  view.setScrollMetrics(0, 120, 400)
+  const row = view.getState().mountedRows[0]!
+  const before = row.element.textContent
+  armed = true
+
+  view.applyEdit({ from: 0, to: 0, text: '!' }, '!old0\nold1')
+
+  expect(row.element.textContent).toBe(before)
+  expect(view.getState().mountedRows).toEqual([])
+  expect(cleanup).toHaveBeenCalledTimes(2)
+  expect(view.isRenderingAtomically).toBe(false)
+})
