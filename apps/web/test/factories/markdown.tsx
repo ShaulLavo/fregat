@@ -2,6 +2,7 @@ import {
   ChatWorkspaceRootContext,
   type ChatWorkspaceRoot,
 } from '@/features/chat/providers/workspace-root-context'
+import type { ReactNode } from 'react'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -36,12 +37,33 @@ export function renderMarkdown(
     readonly workspaceRoot?: ChatWorkspaceRoot | null
   } = {},
 ) {
-  return renderWithProviders(
+  return renderChatWorkspaceContent(<AssistantMarkdown streaming={streaming} text={text} />, {
+    application,
+    workspaceRoot,
+  })
+}
+
+export function renderChatWorkspaceContent(
+  content: ReactNode,
+  {
+    application,
+    workspaceRoot = null,
+  }: {
+    readonly application?: ApplicationRuntime
+    readonly workspaceRoot?: ChatWorkspaceRoot | null
+  } = {},
+) {
+  const view = renderWithProviders(chatWorkspaceContent(content, workspaceRoot), { application })
+  return {
+    ...view,
+    rerenderContent: (next: ReactNode) => view.rerender(chatWorkspaceContent(next, workspaceRoot)),
+  }
+}
+
+function chatWorkspaceContent(content: ReactNode, workspaceRoot: ChatWorkspaceRoot | null) {
+  return (
     <TestEditorStateProvider>
-      <ChatWorkspaceRootContext value={workspaceRoot}>
-        <AssistantMarkdown streaming={streaming} text={text} />
-      </ChatWorkspaceRootContext>
-    </TestEditorStateProvider>,
-    { application },
+      <ChatWorkspaceRootContext value={workspaceRoot}>{content}</ChatWorkspaceRootContext>
+    </TestEditorStateProvider>
   )
 }

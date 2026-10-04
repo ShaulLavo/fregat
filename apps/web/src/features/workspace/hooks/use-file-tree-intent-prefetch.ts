@@ -9,7 +9,7 @@ import {
 } from '@/features/workspace/utils/intent-prefetch-registry'
 import { createIdleScheduler } from '@/features/workspace/utils/intent-prefetch-scheduler'
 import { FILE_SNAPSHOT_STALE_MS } from '@/lib/file-snapshot-query-cache'
-import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
+import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
 import type { FileOpenIntentTrigger } from '@/lib/file-open-intent/state/service'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
@@ -29,7 +29,7 @@ export function useFileTreeIntentPrefetch({
   rootPath,
   tree,
 }: FileTreeIntentPrefetchOptions) {
-  const { service: fileOpenIntent } = useFileOpenIntent()
+  const prepareFile = useFileIntent('file-tree')
   const { prefetchDirectory } = useFileTreeActions()
   const modelRef = useRef(model)
 
@@ -48,20 +48,31 @@ export function useFileTreeIntentPrefetch({
       const intent = fileTreeFileOpenIntent(rootPath, entry, trigger)
       if (!intent) return
 
-      fileOpenIntent.prepare(intent)
+      const interest = prepareFile(intent.path, trigger, {
+        knownSize: intent.knownSize,
+        rootPath: intent.rootPath,
+      })
+      return () => interest.release()
     },
   )
 
-  // Arrow keys move focus without a pointer; the row they land on is the next Enter.
+  // Tree focus owns an interest independently of each rendered row.
   useEffect(() => {
     let focused = tree.getFocusedPath()
-    return tree.subscribe(() => {
+    let release = focused ? prefetchTreePath(canonicalTreePath(focused), 'focus') : undefined
+    const unsubscribe = tree.subscribe(() => {
       const next = tree.getFocusedPath()
       if (next === focused) return
+      const previous = release
       focused = next
-      if (next) prefetchTreePath(canonicalTreePath(next), 'focus')
+      release = next ? prefetchTreePath(canonicalTreePath(next), 'focus') : undefined
+      previous?.()
     })
-  }, [tree])
+    return () => {
+      unsubscribe()
+      release?.()
+    }
+  }, [tree, model, rootPath, prepareFile])
 
   const syncRegistrations = useEffectEvent((registry: IntentPrefetchRegistry<string>) => {
     registry.sync(tree.getRowElements().map(fileTreeRowTarget), prefetchTreePath)
@@ -84,7 +95,7 @@ export function useFileTreeIntentPrefetch({
       schedule.cancel()
       registry.clear()
     }
-  }, [rootPath, tree])
+  }, [rootPath, tree, model, prepareFile])
 }
 
 function fileTreeRowTarget({ element, path }: TreeRowElement): IntentPrefetchTarget<string> {

@@ -1,9 +1,11 @@
 import { FileCodeIcon } from '@phosphor-icons/react'
 import { cn } from '@workspace/ui/lib/utils'
-import { use, type MouseEvent } from 'react'
+import { use, useCallback, type MouseEvent } from 'react'
 
 import type { MarkdownFileReference } from '@/features/chat/utils/markdown-file-links'
 import { MarkdownFileLinkContext } from '@/features/chat/providers/markdown-file-link-context'
+import { useFileIntentLifetime } from '@/lib/file-open-intent/hooks/use-file-intent-lifetime'
+import type { FileOpenIntentTrigger } from '@/lib/file-open-intent/state/service'
 import { requireContext } from '@/lib/require-context'
 
 /**
@@ -26,6 +28,13 @@ export function AssistantMarkdownFileLink({
   requireContext(link, 'AssistantMarkdownFileLink must be used within MarkdownFileLinkContext')
   const { openFileReference, prepareFileReference } = link
 
+  // useFileIntentLifetime keys cleanup on this reference and captured preparation root.
+  const prepare = useCallback(
+    (trigger: FileOpenIntentTrigger) => prepareFileReference(reference, trigger),
+    [prepareFileReference, reference],
+  )
+  const lifetime = useFileIntentLifetime(prepare)
+
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault()
     event.stopPropagation()
@@ -43,7 +52,10 @@ export function AssistantMarkdownFileLink({
       href={reference.path}
       title={referenceTitle(reference)}
       onClick={handleClick}
-      onPointerEnter={() => prepareFileReference(reference)}
+      onPointerEnter={lifetime.onPointerEnter}
+      onPointerLeave={lifetime.onPointerLeave}
+      onFocus={lifetime.onFocus}
+      onBlur={lifetime.onBlur}
     >
       <FileCodeIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0 self-center' />
       <span className='truncate'>{label}</span>

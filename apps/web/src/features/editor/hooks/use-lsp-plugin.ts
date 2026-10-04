@@ -110,11 +110,12 @@ export function useLanguageServerPlugin({
       target,
       onApplyWorkspaceEdit,
       onDefinitionLinkHover: (definition) => {
-        fileOpenIntent.prepare({
+        const interest = fileOpenIntent.prepare({
           path: filesystemPath(definition.path),
           rootPath: filesystemPath(rootPath),
           source: 'definition',
         })
+        return interest.release
       },
       onOpenDefinition,
       onOpenReferences,
