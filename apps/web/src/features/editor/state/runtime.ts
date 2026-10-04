@@ -128,6 +128,7 @@ export function createEditorRuntime({
           tab.id,
           { environmentId: storage.environmentId, rootPath: workspace.rootPath },
           target.source,
+          { activate: false },
         )
       }
     }

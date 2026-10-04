@@ -527,6 +527,19 @@ test('normal four-project navigation retains three snapshot interests and explic
       expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(Math.min(index + 1, 3))
     }
     expect(runtime.workspaceStore.getState().parkedWorkspaces.size).toBe(3)
+    const retained = [...runtime.documentStore.getState().snapshotComparisons.values()]
+    expect(
+      retained.flatMap((read) =>
+        read.kind === 'ready'
+          ? [{ scope: read.input.scope, path: read.input.comparison.path }]
+          : [],
+      ),
+    ).toEqual(
+      ['repo-2', 'repo-3', 'repo-4'].map((rootPath) => ({
+        scope: { ...f.scope, rootPath },
+        path: `${rootPath}/source.ts`,
+      })),
+    )
     const firstKey = blobDiffQueryOptions(f.comparison).queryKey
     const warmData = queries.getQueryData(firstKey)
     expect(warmData).toBeDefined()
@@ -540,7 +553,10 @@ test('normal four-project navigation retains three snapshot interests and explic
     const read =
       selected && runtime.documentStore.getState().snapshotComparisonTabs.get(selected.id)?.read()
     expect(read?.kind).toBe('ready')
-    if (read?.kind === 'ready') expect(read.input.scope).toEqual(f.scope)
+    if (read?.kind === 'ready') {
+      expect(read.input.scope).toEqual(f.scope)
+      expect(read.input.comparison).toEqual(f.comparison)
+    }
     expect(queries.getQueryData(firstKey)).toBe(warmData)
     expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(3)
   } finally {
