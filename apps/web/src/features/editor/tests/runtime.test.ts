@@ -1,11 +1,12 @@
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { materializeFileSnapshotText, type FileSnapshot } from '@/lib/file-snapshot'
-import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { filesystemPath, settingsJsonDocument, tabId } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import type { StandaloneDocumentRef } from '@/lib/documents/utils/types'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
+import { createEditorPreparedDocument } from '@singapore-editor/core/editor'
 import { QueryClient } from '@tanstack/react-query'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -21,6 +22,7 @@ import { createInProcessClient } from '../../../../test/client'
 import { createDeferredFileWriteClient } from '../../../../test/factories/deferred-file-write-client'
 import { expect, test } from '../../../../test/fixtures'
 import { makeTestServer } from '../../../../test/server'
+import { vi } from 'vitest'
 
 const preparation = {
   appliedThemeContentHash: null,
@@ -151,6 +153,120 @@ test('retains dirty buffers, editor views, and undo history through A/B/A at the
     b.dispose()
     queriesA.clear()
     queriesB.clear()
+  }
+})
+
+test('document removal disposes its analysis and preserves externally held text and undo', async ({
+  server,
+  client,
+}) => {
+  const path = filesystemPath('released.ts')
+  await writeFile(join(server.root, path), 'saved')
+  const file = await fetchFile(path, new AbortController().signal, client)
+  const queryClient = new QueryClient()
+  registerEnvironmentQueryClient(queryClient, 'http://localhost:7077', client)
+  const runtime = createEditorRuntime({
+    storage: testScopedStorage,
+    preparation,
+    queryClient,
+    workspaceCache: readWorkspaceCache(testScopedStorage),
+  })
+
+  try {
+    const document = runtime.documentStore.getState().ensureLiveEditorDocument(file)
+    createEditorBufferSession(document.buffer).applyText(' edited')
+    const release = vi.spyOn(document.analysis, 'dispose')
+    runtime.documentStore.getState().deleteLiveEditorDocument(document.key)
+
+    expect(release).toHaveBeenCalledOnce()
+    expect(document.buffer.materializeFullText()).toBe('saved edited')
+    document.buffer.undo()
+    expect(document.buffer.materializeFullText()).toBe('saved')
+    runtime.dispose()
+    expect(release).toHaveBeenCalledOnce()
+  } finally {
+    runtime.dispose()
+    queryClient.clear()
+  }
+})
+
+test('final disposal releases shared prepared interests before analysis and preserves held buffers', async ({
+  server,
+  client,
+}) => {
+  const path = filesystemPath('disposed.ts')
+  await writeFile(join(server.root, path), 'saved')
+  const file = await fetchFile(path, new AbortController().signal, client)
+  const queryClient = new QueryClient()
+  registerEnvironmentQueryClient(queryClient, 'http://localhost:7077', client)
+  const runtime = createEditorRuntime({
+    storage: testScopedStorage,
+    preparation,
+    queryClient,
+    workspaceCache: readWorkspaceCache(testScopedStorage),
+  })
+
+  try {
+    const document = runtime.documentStore.getState().ensureLiveEditorDocument(file)
+    const prepared = createEditorPreparedDocument({
+      analysis: document.analysis,
+      buffer: document.buffer,
+      documentId: document.key,
+      configuredTabSize: 4,
+      documentConfigurationTag: [],
+      languageId: 'typescript',
+      tabSizePolicy: 'fixed',
+    })
+    const claim = {
+      buffer: document.buffer,
+      documentKey: document.key,
+      kind: 'live' as const,
+      localRevision: document.localRevision,
+      path,
+      preparedDocument: prepared,
+      snapshot: document.buffer.getSnapshot(),
+    }
+    runtime.documentStore
+      .getState()
+      .ensureEditorViewForDocument(tabId('first'), document.key, claim)
+    runtime.documentStore
+      .getState()
+      .ensureEditorViewForDocument(tabId('second'), document.key, claim)
+    createEditorBufferSession(document.buffer).applyText(' edited')
+    runtime.documentStore.getState().markWorkspaceDocumentRecoveryConflict([path], 'final')
+    const settings = runtime.documentStore
+      .getState()
+      .ensureSettingsDocument(settingsJsonDocument('user'), {
+        content: '{}',
+        revision: 'settings-v1',
+      })
+    const releasePrepared = vi.spyOn(prepared, 'dispose')
+    const releaseAnalysis = vi.spyOn(document.analysis, 'dispose')
+    const releaseSettings = vi.spyOn(settings.analysis, 'dispose')
+    runtime.resume()
+    runtime.suspend()
+    expect(releasePrepared).not.toHaveBeenCalled()
+    expect(releaseAnalysis).not.toHaveBeenCalled()
+
+    runtime.dispose()
+    runtime.dispose()
+
+    expect(releasePrepared).toHaveBeenCalledOnce()
+    expect(releaseAnalysis).toHaveBeenCalledOnce()
+    expect(releaseSettings).toHaveBeenCalledOnce()
+    expect(releasePrepared.mock.invocationCallOrder[0]).toBeLessThan(
+      releaseAnalysis.mock.invocationCallOrder[0]!,
+    )
+    expect(runtime.documentStore.getState().liveDocumentsByKey).toEqual({})
+    expect(runtime.documentStore.getState().viewsByTabId).toEqual({})
+    expect(runtime.documentStore.getState().dirtyDocumentKeys.size).toBe(0)
+    expect(document.buffer.materializeFullText()).toBe('saved edited')
+    document.buffer.undo()
+    expect(document.buffer.materializeFullText()).toBe('saved')
+    expect(runtime.documentStore.getState().liveDocumentsByKey).toEqual({})
+  } finally {
+    runtime.dispose()
+    queryClient.clear()
   }
 })
 

@@ -46,6 +46,26 @@ class Transport {
 }
 
 describe('tree-sitter source chunk eviction', () => {
+  it('rejects an old acknowledgement after retirement resets the source epoch', () => {
+    const retention = new TreeSitterSourceChunkRetention()
+    const snapshot = createPieceTableSnapshot('const answer = 1;')
+    const oldSource = retention.createDescriptor('doc', snapshot)
+    const oldRequest = retention.createRequest('doc', oldSource)
+    retention.invalidateDocument('doc')
+    retention.markRequestSent(oldRequest)
+    expect(retention.inspect()).toEqual({ documents: 1, sentChunks: 0, sourceEpochs: 1 })
+    retention.retireDocument('doc')
+    expect(retention.inspect()).toEqual({ documents: 0, sentChunks: 0, sourceEpochs: 0 })
+
+    const source = retention.createDescriptor('doc', snapshot)
+    const request = retention.createRequest('doc', source)
+    expect(request.epoch).toBe(oldRequest.epoch)
+    retention.markRequestSent(oldRequest)
+    expect(retention.inspect().sentChunks).toBe(0)
+    retention.markRequestSent(request)
+    expect(retention.inspect()).toEqual({ documents: 1, sentChunks: 1, sourceEpochs: 0 })
+  })
+
   it('keeps the worker to the chunks of the latest descriptor', () => {
     const transport = new Transport()
     let snapshot = createPieceTableSnapshot('prefix suffix')

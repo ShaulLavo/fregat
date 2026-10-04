@@ -5,12 +5,376 @@ import { EditorTokenStore } from '../src/syntax/tokenStore'
 import type { EditorHighlighterProvider } from '../src/syntax/highlighter'
 import {
   createEmptySyntaxResult,
+  createEmptySyntaxSession,
   type EditorSyntaxProvider,
   type EditorSyntaxRange,
   type EditorSyntaxResult,
 } from '../src/syntax/session'
 
 describe('retained document analysis', () => {
+  it.each([
+    ['structural-session', false],
+    ['structural-session', true],
+    ['highlighter-session', false],
+    ['highlighter-session', true],
+    ['highlighter-theme', false],
+    ['highlighter-theme', true],
+  ] as const)(
+    'releases every owned session with %s callbacks and reclamation reentrancy %s',
+    async (boundary, reentrant) => {
+      const buffer = createEditorTextBuffer('alpha')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reentrant.md' })
+      const listeners = new Set<() => void>()
+      let reclaimed = false
+      const reenter = () => {
+        if (!reentrant || reclaimed) return
+        reclaimed = true
+        analysis.reclaimInactive({ reason: 'inactive-budget' })
+        analysis.dispose()
+      }
+      const idle = () => undefined
+      const disposeFirst = vi.fn(boundary === 'highlighter-theme' ? idle : reenter)
+      const disposeSecond = vi.fn()
+      const unsubscribeFirst = vi.fn(boundary === 'highlighter-theme' ? reenter : idle)
+      const unsubscribeSecond = vi.fn()
+      const firstTheme = (listener: () => void) => {
+        listeners.add(listener)
+        return () => {
+          listeners.delete(listener)
+          unsubscribeFirst()
+        }
+      }
+      const secondTheme = (listener: () => void) => {
+        listeners.add(listener)
+        return () => {
+          listeners.delete(listener)
+          unsubscribeSecond()
+        }
+      }
+      let created = 0
+      const structural: EditorSyntaxProvider = {
+        createSession: () => ({
+          ...createEmptySyntaxSession(),
+          dispose: created++ === 0 ? disposeFirst : disposeSecond,
+        }),
+      }
+      const refresh = async () => ({ tokens: EditorTokenStore.empty() })
+      const highlighter: EditorHighlighterProvider = {
+        createSession: () => {
+          const first = created++ === 0
+          return {
+            refresh,
+            applyChange: refresh,
+            dispose: first ? disposeFirst : disposeSecond,
+            onDidChangeTheme: first ? firstTheme : secondTheme,
+          }
+        },
+      }
+      const first =
+        boundary === 'structural-session'
+          ? analysis.borrowStructural({ provider: structural, languageId: 'markdown' })!
+          : analysis.borrowHighlighter({ provider: highlighter, languageId: 'markdown' })!
+      const survivor =
+        boundary === 'structural-session'
+          ? analysis.borrowStructural({
+              provider: structural,
+              languageId: 'markdown',
+              configurationTag: ['survivor'],
+            })!
+          : analysis.borrowHighlighter({
+              provider: highlighter,
+              languageId: 'markdown',
+              configurationTag: ['survivor'],
+            })!
+      await Promise.all([
+        first.refresh(buffer.getTextSnapshot()),
+        survivor.refresh(buffer.getTextSnapshot()),
+      ])
+      first.dispose()
+      expect(survivor.read().kind).toBe('ready')
+      expect(analysis.inspectRetention().entries).toHaveLength(2)
+      analysis.dispose()
+
+      expect(created).toBe(2)
+      expect(disposeFirst).toHaveBeenCalledTimes(1)
+      expect(disposeSecond).toHaveBeenCalledTimes(1)
+      expect(listeners.size).toBe(0)
+      expect(survivor.read().kind).toBe('failed')
+      if (boundary !== 'structural-session') {
+        expect(unsubscribeFirst).toHaveBeenCalledTimes(1)
+        expect(unsubscribeSecond).toHaveBeenCalledTimes(1)
+      }
+      expect(analysis.inspectRetention().entries).toEqual([])
+      expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+      analysis.dispose()
+      expect(disposeFirst).toHaveBeenCalledTimes(1)
+      expect(disposeSecond).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('calibrates retained configuration and range growth with two surviving view leases', async () => {
+    const buffer = createEditorTextBuffer('alpha beta gamma delta '.repeat(10))
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'growth.md' })
+    const parser = provider()
+    const request = { provider: parser.provider, languageId: 'markdown' }
+    const left = analysis.borrowStructural(request)!
+    const right = analysis.borrowStructural(request)!
+    const leftRange = { startIndex: 0, endIndex: 1 }
+    const rightRange = { startIndex: 2, endIndex: 3 }
+    const [leftResult, rightResult] = await Promise.all([
+      left.queryRange!(leftRange),
+      right.queryRange!(rightRange),
+    ])
+    const configurations: string[] = []
+    for (let index = 0; index < 20; index++) {
+      const lease = analysis.borrowStructural({ ...request, configurationTag: [index] })!
+      configurations.push(lease.runtimeSessionId)
+      await lease.refresh(buffer.getTextSnapshot())
+      lease.dispose()
+    }
+    for (let index = 10; index < 50; index++) {
+      await left.queryRange!({ startIndex: index, endIndex: index + 1 })
+    }
+
+    expect(parser.create).toHaveBeenCalledTimes(21)
+    expect(parser.dispose).not.toHaveBeenCalled()
+    for (let index = 10; index < 50; index++) {
+      await left.queryRange!({ startIndex: index, endIndex: index + 1 })
+    }
+    expect(await left.queryRange!(leftRange)).toBe(leftResult)
+    expect(right.getResult()).toBe(rightResult)
+    expect(parser.ranges).toHaveBeenCalledTimes(42)
+    const reopened = analysis.borrowStructural({ ...request, configurationTag: [0] })!
+    expect(reopened.runtimeSessionId).toBe(configurations[0])
+    expect(parser.create).toHaveBeenCalledTimes(21)
+    reopened.dispose()
+    left.dispose()
+    expect(right.read(rightRange).kind).toBe('ready')
+    analysis.dispose()
+    expect(parser.dispose).toHaveBeenCalledTimes(21)
+  })
+
+  it('reclaims inactive configurations without releasing active views or text history', async () => {
+    const buffer = createEditorTextBuffer('alpha beta')
+    const view = createEditorBufferSession(buffer)
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reclaim.md' })
+    const parser = provider()
+    const request = { provider: parser.provider, languageId: 'markdown' }
+    const left = analysis.borrowStructural(request)!
+    const right = analysis.borrowStructural(request)!
+    await Promise.all([
+      left.queryRange!({ startIndex: 0, endIndex: 5 }),
+      right.queryRange!({ startIndex: 6, endIndex: 10 }),
+    ])
+    const old = analysis.borrowStructural({ ...request, configurationTag: ['old'] })!
+    await old.queryRange!({ startIndex: 0, endIndex: 5 })
+    old.dispose()
+    view.applyText('!')
+    await right.refresh(buffer.getTextSnapshot())
+    const snapshot = buffer.getTextSnapshot()
+    const revision = buffer.getRevision()
+
+    expect(analysis.inspectRetention().entries).toHaveLength(2)
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([
+      old.runtimeSessionId,
+    ])
+    expect(parser.dispose).toHaveBeenCalledTimes(1)
+    expect(buffer.getTextSnapshot()).toBe(snapshot)
+    expect(buffer.getRevision()).toBe(revision)
+    expect(right.read().kind).toBe('ready')
+    left.dispose()
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+    expect(right.read().kind).toBe('ready')
+    right.dispose()
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([
+      right.runtimeSessionId,
+    ])
+    expect(analysis.inspectRetention().entries).toEqual([])
+    expect(parser.dispose).toHaveBeenCalledTimes(2)
+    view.undo()
+    expect(buffer.materializeFullText()).toBe('alpha beta')
+    view.redo()
+    expect(buffer.materializeFullText()).toBe('alpha beta!')
+    const recreated = analysis.borrowStructural(request)!
+    expect(recreated.runtimeSessionId).not.toBe(right.runtimeSessionId)
+    await recreated.refresh(buffer.getTextSnapshot())
+    expect(recreated.read()).toMatchObject({ kind: 'ready', revision: buffer.getRevision() })
+    recreated.dispose()
+    analysis.dispose()
+    analysis.dispose()
+    expect(parser.dispose).toHaveBeenCalledTimes(3)
+  })
+
+  it('inspects shared record backing without charging token or provider allocations', async () => {
+    const buffer = createEditorTextBuffer('alpha beta')
+    const backing = new ArrayBuffer(256)
+    const tokens = EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: 'red' } }])
+    const result = {
+      ...createEmptySyntaxResult(),
+      records: { languageId: 'markdown', data: new Uint32Array(backing, 0, 4) },
+      tokens,
+    }
+    const parser = provider(Promise.resolve(result))
+    parser.ranges.mockResolvedValue({
+      ...result,
+      records: { languageId: 'markdown', data: new Uint32Array(backing, 16, 4) },
+    })
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'backing.md' })
+    const left = analysis.borrowStructural({ provider: parser.provider, languageId: 'markdown' })!
+    const right = analysis.borrowStructural({
+      provider: parser.provider,
+      languageId: 'markdown',
+      configurationTag: ['other'],
+    })!
+    await left.queryRange!({ startIndex: 0, endIndex: 5 })
+    await right.refresh(buffer.getTextSnapshot())
+    const inspection = analysis.inspectRetention()
+    expect(inspection.entries).toMatchObject([
+      {
+        leaseCount: 1,
+        resultCount: 2,
+        tokenCount: 1,
+        cachedRangeCount: 1,
+        syntaxRecordBackingBytes: 256,
+      },
+      {
+        leaseCount: 1,
+        resultCount: 1,
+        tokenCount: 1,
+        cachedRangeCount: 0,
+        syntaxRecordBackingBytes: 256,
+      },
+    ])
+    expect(inspection.syntaxRecordBackingBytes).toBe(256)
+    expect(inspection.unmeasuredBytes).toEqual([
+      'token-store-backing',
+      'javascript-objects',
+      'provider-sessions',
+      'worker-heaps',
+      'wasm',
+    ])
+    left.dispose()
+    expect(analysis.inspectRetention().entries[0]?.lastLeaseReleasedAt).toEqual(expect.any(Number))
+    const receipt = analysis.reclaimInactive({ reason: 'inactive-budget' })
+    expect(receipt).toMatchObject({
+      runtimeSessionIds: [left.runtimeSessionId],
+      cachedRangeCount: 1,
+    })
+    expect(analysis.inspectRetention().syntaxRecordBackingBytes).toBe(256)
+    right.dispose()
+    analysis.reclaimInactive({ reason: 'inactive-budget' })
+    expect(analysis.inspectRetention().syntaxRecordBackingBytes).toBe(0)
+    analysis.dispose()
+  })
+
+  it('preserves every cached range while any view still borrows the configuration', async () => {
+    const buffer = createEditorTextBuffer('alpha beta gamma')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'active-ranges.md' })
+    const parser = provider()
+    const request = { provider: parser.provider, languageId: 'markdown' }
+    const left = analysis.borrowStructural(request)!
+    const right = analysis.borrowStructural(request)!
+    const first = { startIndex: 0, endIndex: 5 }
+    const second = { startIndex: 6, endIndex: 10 }
+    const leftResult = await left.queryRange!(first)
+    const rightResult = await right.queryRange!(second)
+    await left.queryRange!({ startIndex: 11, endIndex: 16 })
+    left.dispose()
+
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+    expect(right.read(first)).toMatchObject({ kind: 'ready', result: leftResult })
+    expect(right.read(second)).toMatchObject({ kind: 'ready', result: rightResult })
+    expect(analysis.inspectRetention().entries).toMatchObject([
+      { leaseCount: 1, cachedRangeCount: 3 },
+    ])
+    expect(parser.ranges).toHaveBeenCalledTimes(3)
+    right.dispose()
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).cachedRangeCount).toBe(3)
+    expect(analysis.inspectRetention().entries).toEqual([])
+    analysis.dispose()
+  })
+
+  it('selectively reclaims abandoned pending work and rejects late publication', async () => {
+    const buffer = createEditorTextBuffer('alpha beta')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'abandoned.md' })
+    const ready = deferred<EditorSyntaxResult>()
+    const parser = provider(ready.promise)
+    const abandoned = analysis.borrowStructural({
+      provider: parser.provider,
+      languageId: 'markdown',
+    })!
+    const survivor = analysis.borrowStructural({
+      provider: parser.provider,
+      languageId: 'markdown',
+      configurationTag: ['survivor'],
+    })!
+    const pending = abandoned.queryRange!({ startIndex: 0, endIndex: 5 })
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    abandoned.dispose()
+    await rejected
+    expect(
+      analysis.reclaimInactive({
+        reason: 'speculative-abandoned',
+        runtimeSessionIds: [abandoned.runtimeSessionId, survivor.runtimeSessionId],
+      }),
+    ).toMatchObject({ runtimeSessionIds: [abandoned.runtimeSessionId], pendingRangeCount: 1 })
+    expect(parser.dispose).toHaveBeenCalledTimes(1)
+    ready.resolve(createEmptySyntaxResult())
+    await survivor.refresh(buffer.getTextSnapshot())
+    expect(abandoned.read().kind).toBe('failed')
+    expect(analysis.inspectRetention().entries).toMatchObject([
+      { runtimeSessionId: survivor.runtimeSessionId, leaseCount: 1 },
+    ])
+    survivor.dispose()
+    expect(
+      analysis.reclaimInactive({ reason: 'inactive-budget', runtimeSessionIds: [] })
+        .runtimeSessionIds,
+    ).toEqual([])
+    analysis.dispose()
+    expect(parser.dispose).toHaveBeenCalledTimes(2)
+  })
+
+  it('releases idle theme subscriptions and buffer subscriptions before recreating sessions', async () => {
+    const buffer = createEditorTextBuffer('alpha beta')
+    const subscribe = vi.spyOn(buffer, 'subscribe')
+    const listeners = new Set<() => void>()
+    const refresh = vi.fn(async () => ({ tokens: EditorTokenStore.empty() }))
+    const dispose = vi.fn()
+    const highlighter: EditorHighlighterProvider = {
+      createSession: () => ({
+        refresh,
+        applyChange: refresh,
+        dispose,
+        onDidChangeTheme: (listener) => {
+          listeners.add(listener)
+          return () => {
+            listeners.delete(listener)
+          }
+        },
+      }),
+    }
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'subscriptions.md' })
+    const request = { provider: highlighter, languageId: 'markdown' }
+    for (let cycle = 0; cycle < 20; cycle++) {
+      const lease = analysis.borrowHighlighter(request)!
+      await lease.refresh(buffer.getTextSnapshot())
+      lease.dispose()
+      expect(listeners.size).toBe(1)
+      expect(analysis.inspectRetention().entries).toHaveLength(1)
+      expect(Reflect.get(buffer, 'subscribers')).toBe(1)
+      analysis.reclaimInactive({ reason: 'inactive-budget' })
+      expect(listeners.size).toBe(0)
+      expect(analysis.inspectRetention().entries).toEqual([])
+      expect(Reflect.get(buffer, 'subscribers')).toBe(0)
+      expect(dispose).toHaveBeenCalledTimes(cycle + 1)
+      expect(subscribe).toHaveBeenCalledTimes(cycle + 1)
+      analysis.reclaimInactive({ reason: 'inactive-budget' })
+      expect(dispose).toHaveBeenCalledTimes(cycle + 1)
+    }
+    analysis.dispose()
+    expect(dispose).toHaveBeenCalledTimes(20)
+  })
+
   it('applies every captured event when a preceding listener commits a newer head', async () => {
     const buffer = createEditorTextBuffer('a')
     const view = createEditorBufferSession(buffer)

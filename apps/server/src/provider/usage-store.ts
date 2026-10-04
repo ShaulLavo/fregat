@@ -30,7 +30,8 @@ import { mergeProvenUsageAccounts } from './utils/usage-account-merge'
 import { CodexUsageRequestBudget, type ProxyUsageRefresh } from './usage-proxy-budget'
 import {
   codexWindowPresentation,
-  mergeUsageWindows,
+  mergeObservedUsageWindows,
+  sortUsageWindows,
   type ProviderUsageProbe,
   type ProviderUsageUpdate,
 } from './utils/usage-windows'
@@ -567,34 +568,14 @@ export class ProviderUsageStore {
     }
     const previous = stored.snapshot
     const updates = update.windows
-      .filter((reading) => {
-        if (!validWindow(reading, observedAt, this.now())) return false
-        const known = previous.windows.find((window) => window.id === reading.id)
-        if (!known?.observedAt) return true
-        if (
-          reading.resetsAt &&
-          known.resetsAt &&
-          Date.parse(reading.resetsAt) < Date.parse(known.resetsAt)
-        )
-          return false
-        const delta = Date.parse(observedAt) - Date.parse(known.observedAt)
-        return (
-          delta > 0 ||
-          (delta === 0 && (known.source !== 'rate-limit-event' || source === 'rate-limit-event'))
-        )
-      })
-      .map((reading) => {
-        const known = previous.windows.find((window) => window.id === reading.id)
-        const retainsPercent =
-          reading.usedPercent === null &&
-          known?.usedPercent != null &&
-          (!reading.resetsAt || reading.resetsAt === known.resetsAt)
-        return {
-          ...reading,
-          source: retainsPercent ? known.source : source,
-          observedAt: retainsPercent ? known.observedAt : observedAt,
-        }
-      })
+      .filter((reading) => validWindow(reading, observedAt, this.now()))
+      .map((reading) => ({
+        ...reading,
+        source,
+        observedAt,
+        statusObservedAt: observedAt,
+        statusSource: source,
+      }))
     const newer = !previous.checkedAt || Date.parse(observedAt) >= Date.parse(previous.checkedAt)
     const checkedAt = newer ? observedAt : previous.checkedAt
     this.accounts.set(target.accountKey, {
@@ -606,7 +587,7 @@ export class ProviderUsageStore {
         source: newer ? source : previous.source,
         planType: newer ? (update.planType ?? previous.planType) : previous.planType,
         label: newer ? (update.label ?? previous.label) : previous.label,
-        windows: mergeUsageWindows(previous.windows, updates),
+        windows: sortUsageWindows(mergeObservedUsageWindows(previous.windows, updates)),
         credits:
           newer && update.credits !== undefined ? update.credits : (previous.credits ?? null),
       },
@@ -769,9 +750,9 @@ export class ProviderUsageStore {
         if (cache.proxyProofsCurrent && this.sourceKey() !== null)
           this.proxyIdentityGeneration = this.proxyGeneration
       }
-      this.proxyAccounts = cache.proxyAccounts.filter((account) =>
-        validCachedAccount(account, this.now()),
-      )
+      this.proxyAccounts = cache.proxyAccounts
+        .filter((account) => validCachedAccount(account, this.now()))
+        .map(normalizeProxyCache)
       this.proxyAttemptedAt =
         cache.proxyAttemptedAt !== null && cache.proxyAttemptedAt <= this.now()
           ? cache.proxyAttemptedAt
@@ -954,13 +935,27 @@ function validWindow(
 ) {
   if (!v.safeParse(providerUsageWindowSchema, window).success) return false
   if (
-    [window.id, window.label, window.source ?? 'unknown'].some(
+    [window.id, window.label, window.source ?? 'unknown', window.statusSource ?? 'unknown'].some(
       (value) => Buffer.byteLength(value) > 128 || /[\p{Cc}\p{Cf}]/u.test(value),
     )
   )
     return false
   if (window.resetsAt && !validTimestamp(window.resetsAt)) return false
+  if (window.statusObservedAt && !validObservedAt(window.statusObservedAt, nowMs)) return false
   return observedAt === null ? window.usedPercent === null : validObservedAt(observedAt, nowMs)
+}
+
+function normalizeProxyCache(account: ProviderAccountUsage): ProviderAccountUsage {
+  const windows = account.windows.flatMap((window) => {
+    if (!window.id.startsWith('model:')) return [window]
+    const scoped = /^model:[^:]+:((bengalfox|code-review):(?:primary|secondary|quota))$/.exec(
+      window.id,
+    )
+    if (!scoped) return []
+    const { label } = codexWindowPresentation(window.windowMinutes)
+    return [{ ...window, id: scoped[1]!, label: `${scoped[2]} ${label}` }]
+  })
+  return { ...account, windows: mergeObservedUsageWindows([], windows) }
 }
 
 function retainProxyObservations(
@@ -975,17 +970,6 @@ function retainProxyObservations(
   const stateAt = account.stateObservedAt ?? account.checkedAt
   const newerState =
     !previousStateAt || Boolean(stateAt && Date.parse(stateAt) >= Date.parse(previousStateAt))
-  const updates = account.windows.filter((window) => {
-    const known = previous.windows.find((entry) => entry.id === window.id)
-    if (!known?.observedAt) return true
-    return Boolean(
-      window.observedAt &&
-      Date.parse(window.observedAt) >= Date.parse(known.observedAt) &&
-      (!window.resetsAt ||
-        !known.resetsAt ||
-        Date.parse(window.resetsAt) >= Date.parse(known.resetsAt)),
-    )
-  })
   const control = newerState ? account : previous
   return {
     ...previous,
@@ -994,7 +978,7 @@ function retainProxyObservations(
     stateObservedAt: control.stateObservedAt,
     routing: control.routing,
     cooldown: control.cooldown ?? null,
-    windows: mergeUsageWindows(previous.windows, updates),
+    windows: mergeObservedUsageWindows(previous.windows, account.windows),
   }
 }
 

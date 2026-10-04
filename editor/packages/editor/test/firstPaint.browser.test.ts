@@ -83,6 +83,7 @@ function delayedGrammar() {
   })
   return {
     plugin: createTreeSitterSyntaxPlugin(provider),
+    provider,
     worker,
     disposedSessions,
     parsedSessions,
@@ -293,6 +294,67 @@ test('paints retained full tokens immediately when the provider cannot query ran
   expect(provider.createSession).toHaveBeenCalledTimes(1)
   expect(queryRange).not.toHaveBeenCalled()
   await page.elementLocator(host).screenshot()
+})
+
+test('reclaims inactive real parser sessions while the shared provider remains usable', async () => {
+  const grammar = delayedGrammar()
+  grammar.release()
+  const buffer = createEditorTextBuffer('const reclaimed = 1;')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reclaimed.ts' })
+  const survivorBuffer = createEditorTextBuffer('const survivor = 2;')
+  const survivorView = createEditorBufferSession(survivorBuffer)
+  const survivorAnalysis = createEditorDocumentAnalysis({
+    buffer: survivorBuffer,
+    documentId: 'survivor.ts',
+  })
+  releases.push(
+    () => analysis.dispose(),
+    () => survivorAnalysis.dispose(),
+  )
+  const request = {
+    provider: grammar.provider,
+    languageId: 'typescript',
+    includeHighlights: true,
+    includeCaptures: false,
+    syntaxMode: 'range' as const,
+  }
+  const survivor = survivorAnalysis.borrowStructural(request)!
+  await survivor.queryRange!({ startIndex: 0, endIndex: survivorBuffer.getTextSnapshot().length })
+  const left = analysis.borrowStructural(request)!
+  const right = analysis.borrowStructural(request)!
+  const range = { startIndex: 0, endIndex: buffer.getTextSnapshot().length }
+  await Promise.all([left.queryRange!(range), right.queryRange!(range)])
+  left.dispose()
+  expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([])
+  expect(right.read(range).kind).toBe('ready')
+  right.dispose()
+  analysis.reclaimInactive({ reason: 'inactive-budget' })
+  await grammar.worker.awaitIdleFence()
+
+  for (let cycle = 0; cycle < 10; cycle++) {
+    const survivorChunks = grammar.worker.inspect().cache.sourceChunks.sentChunks
+    const lease = analysis.borrowStructural(request)!
+    const result = await lease.queryRange!(range)
+    expect(result.tokens.length).toBeGreaterThan(0)
+    lease.dispose()
+    expect(analysis.reclaimInactive({ reason: 'inactive-budget' }).runtimeSessionIds).toEqual([
+      lease.runtimeSessionId,
+    ])
+    await grammar.worker.awaitIdleFence()
+    expect(analysis.inspectRetention().entries).toEqual([])
+    expect(grammar.worker.inspect().cache.sourceChunks.sentChunks).toBe(survivorChunks)
+    expect(grammar.worker.inspect().pendingRequests).toBe(0)
+    survivorView.applyText(' ')
+    await survivor.refresh(survivorBuffer.getTextSnapshot())
+    expect(survivor.read()).toMatchObject({ kind: 'ready', revision: survivorBuffer.getRevision() })
+  }
+
+  survivor.dispose()
+  analysis.dispose()
+  survivorAnalysis.dispose()
+  await grammar.worker.awaitIdleFence()
+  expect(grammar.worker.inspect().cache.sourceChunks.sentChunks).toBe(0)
+  expect(grammar.worker.inspect().pendingRequests).toBe(0)
 })
 
 test('disposes a waiting session without parsing it and preserves the simultaneous editor', async () => {

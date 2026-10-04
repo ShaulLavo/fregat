@@ -9,12 +9,222 @@ pass. Its [Not done](#not-done) section describes that checkpoint, not the curre
 Closeout, 2026-10-01: unit 0 is partial, **5/10 configurations calibrated** at instrument `56c8e77fb`.
 The harness is delivered; `native`, `disabled`, `tree-sitter`, `shiki` and `minimap` are accepted.
 `tree-sitter-shiki` failed its holdout; four other configurations never ran. The remaining
-absolute-threshold matrix is superseded by **Plan 282's paired A/B instrument**. Units 2–7 remain
-gated. See [the historical reference](paired-input-latency.md#historical-reference) for results and evidence.
+absolute-threshold matrix is superseded by **Plan 282's paired A/B instrument**. The owner approved
+units 2–7 on 2026-10-04. Production start still needs accepted performance and exact host proof.
+See [the historical reference](paired-input-latency.md#historical-reference) for results and evidence.
 
 Probe scripts and raw output live in `/work/tmp/research/099/`: `scan.ts` (inventory scan) and
 `inventory.tsv` (its 296 rows), `publication.ts` and `publication.json`, `head-read.ts`, and
 `probe/` (browser probe) with `consumers-baseline.json`.
+
+## Runtime preparation, 2026-10-04
+
+Source identity: canonical Fregat `0f6a1edcff995260dad0e49a69b63a29c4540bc8`, clean production
+source in the preparation worktree. All Editor packages are local root workspaces. Frozen dependency
+installation and all 25 `build:workspaces` tasks pass. This refresh adds inventory/proof tooling and
+records owner approval; it creates no production contribution runtime. Earlier source/payload
+measurements below retain their original identity and date.
+
+### Rerunnable source inventory
+
+From the repository root, run:
+
+```sh
+bun run documents:inventory --check
+bun run documents:inventory --write
+```
+
+The script resolves the checkout from its own location, lists Git-tracked sources and reads each
+file once with Node. It covers all Editor packages, Editor examples, Platform apps and shared
+packages. It excludes dependencies, built artifacts,
+tests, browser-test files and benchmark directories. Example benchmark source remains included.
+It writes [consumer-inventory.tsv](consumer-inventory.tsv), including source text, line, owner,
+migration family and an explanatory note. Standard output without a flag supports comparison
+without writing. `--check` detects drift in the complete generated file.
+
+The current scan has 597 classified matches: 26 publication points, 26 subscriptions/view
+notifications, 106 factories/borrows/declarations, 65 worker/protocol messages, 252 source reads,
+33 cursor reads, 56 source-state declarations/recovery paths and 33 private/debug/built imports.
+These are source matches, including declarations and calibrated examples. They are separate from
+live session counts. The scan classifies every match by its owning family. The `unit` column records
+the family's migration, and the deletion table below distinguishes generic source state from
+domain and presentation state. Agent-session factories, demo messages, file-watcher messages,
+spelling word messages and the TUI's independent text are explicitly outside Editor document delivery.
+
+This is a reviewable source scan, not the unit 7 import/AST enforcement check. Source matches do
+not prove runtime byte cost, session cardinality or performance. File ownership and the traces
+below supply the semantic interpretation. The widened scan includes JS benchmark imports, optional
+`buffer?.subscribe`, borrowing APIs, the highlighting service's Tree-sitter snippet session,
+the exported syntax fallback factory, storage/debug reads and source-history fields that the
+historical scanner omitted. Counts from the two scans cannot establish growth or deletion.
+
+### Current publication and raw subscriptions
+
+`PieceTableEditorTextBuffer.publish` at `documentSession.ts:1726` is the sole accepted mutation
+publication operation. Its ten calls cover edit, Undo, Redo, checkout, clear/restore history,
+prepared commit, receipt reversal, sequence reversal and logical-only commit. Its fan-out at
+`:1772` dispatches captured frames. `DocumentEditChain` remains the sole edit history and keeps
+128 entries. `changesSince(point, scope, current)` already supports a captured endpoint. Unit 2
+can expose a checked base/target reader over that implementation without adding another journal.
+
+There are twelve production raw buffer subscriptions and one stress example. Preserve essential
+view/input and host policy notifications. Move document contribution demand into the same
+document owner as each family migrates.
+
+| Caller                                                   | Current source contract                            | Migration                                                               |
+| -------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------- |
+| Core `editor/Editor.ts:3615`                             | Captured publication for synchronous view update   | Preserve view notification; unit 2 removes its provider source fallback |
+| Core `editor/documentAnalysis.ts:297`                    | One captured-frame subscription per analysis owner | Extend this owner for unit 2; preserve Plan 198 leases/results          |
+| Core `historyViewer.ts:137`                              | Latest undo graph, independent of edit frame       | Preserve synchronous presentation                                       |
+| LSP `document.ts:104`, `bufferSync.ts:36`                | Captured source/protocol snapshot                  | Unit 4 retained synchronization                                         |
+| Platform `workspace-document-service.ts:1440`            | Captured revision/dirty metadata                   | Preserve host transaction policy                                        |
+| Platform `language-server-documents.ts:59`               | Captured source length for analysis admission      | Preserve host admission; unit 4 migrates lane delivery                  |
+| Platform `use-editor-visible-snapshot.ts:133`            | Captured dirtiness invalidates saved paint         | Preserve saved-paint policy                                             |
+| Platform `markdown-preview-pane.tsx:59`                  | Latest immutable external-store read               | Preserve synchronous source projection                                  |
+| Platform `use-document-feature-tier.ts:11`               | Latest source length and settings                  | Preserve feature-size admission                                         |
+| Platform `csv-table.tsx:33`, `csv-history-action.tsx:21` | Latest text or undo availability                   | Preserve CSV presentation/history; audit secondary parse work in unit 5 |
+| Stress `consumers.ts:77`                                 | Example-only protocol copy probe                   | Update its runtime attachment with the affected examples                |
+
+### Unit 2 start conditions
+
+The owner approved units 2–7, benchmark repairs and acceptance proofs in this session on October 4.
+That clears the authorization restriction in the September decisions. It supplies no latency,
+memory or first-frame acceptance by itself.
+
+| Required contract                                               | State at this source identity                                                                                                         | Production-start implication                                                                                              |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Exact paired instrument and frozen baseline/candidate products  | Plan 282 repair/acceptance is in the sibling lane; accepted identity has not been relayed                                             | Wait for the coordinator's accepted receipts and selected workload scope. Historical controls earn no new-identity credit |
+| Canonical captured publication                                  | Landed in #203; 154 focused tests pass in this refresh                                                                                | Reuse `EditorTextBufferChange`, snapshots and edit chain                                                                  |
+| Scoped document/tab identity and captured operation ownership   | Plans 098/097 delivered; `documentKey`, targets and operation-issued sources are authoritative                                        | Bind runtime identity to retained buffer incarnation and environment, preserving captured WorkspaceEdit ordering          |
+| Retained analysis and prepared borrowing                        | Landed; `WorkspaceDocumentService` creates analysis beside the buffer, preparer receives it, `preparedDocument.borrow` creates leases | Extend `EditorDocumentAnalysis`; no second handle or preparation registry                                                 |
+| Retained structural range readiness and final runtime disposal  | #659 and #661 landed before this baseline                                                                                             | Preserve their ready/pending distinction and final-release order                                                          |
+| Complete first-frame observation and dirty two-view Shiki paint | #662 is open/draft; #666 is open and repairs its 7/70 versus 70/70 split failure                                                      | Integrate the owned repair/probe and verify the host attachment contract before public cutover. Reuse their work          |
+| Disposed Tree-sitter source metadata                            | #660 is open, with 40-cycle surviving-runtime proof                                                                                   | Reconcile the source-retirement fix before replacing its owner; carry its regression into the common delivery path        |
+| Inactive analysis reclamation                                   | #664 is open; inspection/reclaim covers zero-lease sessions and preserves active entries                                              | Reuse the existing handle API if landed. Active-range pruning, host budget and parser/WASM bytes remain unproven          |
+| Standalone highlighting and prepared-diff service ownership     | Plan 197 delivered; service owns engine selection, workers and `DiffSyntaxStore`                                                      | Migrate through this service, preserving borrowed service lifetime and its bounded prepared-side store                    |
+| Historical complete blobs and partial-source admission          | Platform checkpoint `withCheckpointSources` and `DiffPane` guard landed; Editor `diffSyntax` still accepts patch lines                | Editor's typed complete/partial boundary and common source registration are unit 2 work                                   |
+| Shared content acquisition for every comparison/preview         | Plan 200 remains approved and unimplemented                                                                                           | Preserve its source semantics; its whole migration is outside this start gate                                             |
+
+The open docwave PRs have focused evidence, not broad Plan 198 acceptance. Chat/workbench crossing,
+reload/font loading, physical hardware, memory pressure, independent host inactive-analysis budget,
+active-range pruning and total parser/WASM memory remain Plan 198 work. Their absence cannot be
+reported as a completed guarantee or silently made a prerequisite for every unrelated unit 2 edit.
+The coordinator owns acceptance and integration of prerequisite work.
+
+### Unit 2 caller cutover and deletions
+
+All source positions below refer to the recorded source identity. The generated TSV supplies every
+matching line in each family. A family marked unit 2 moves with the public providers in that unit.
+Snippet and excerpt callers cannot be deferred to unit 5 after their provider factories disappear.
+
+| Family and entry points                                                                                            | Same-unit replacement/deletion                                                                                                                                                       | Keep                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Core `documentAnalysis.ts:311,:343`; syntax controller `:835,:1020`                                                | Existing analysis owner admits typed document operations and shared source delivery; remove view-owned fallback session creation                                                     | Configuration partitioning, borrowed leases, ready result/snapshot pairs and per-view range demand                                   |
+| Syntax controller `structuralDispatchPoint`, `highlightDispatchPoint`, `composeSkippedChanges` (`:216,:217,:2322`) | Delete feature source cursors/composition after runtime dispatch supplies exact deltas                                                                                               | Syntax/range scheduling, structural readiness, paint/configuration admission and retry policy                                        |
+| `plugins.ts:1393,:1423`, `syntax/session.ts:176`, `syntax/highlighter.ts:32`                                       | Replace public raw session factories with registered typed operations; migrate every consumer before deletion                                                                        | Provider precedence and distinct structural/highlight capabilities                                                                   |
+| `editor/runtime.ts:45,:51`, export in `editor.ts:49`                                                               | Remove global session-factory fallback and its export after callers use document registration                                                                                        | Ordinary `new Editor(element)` and plugin options, with internal owner creation                                                      |
+| Tree-sitter `session.ts:72,:177`; `source.ts`, `sourceChunkRetention.ts`, `workerClient.ts:229,:265,:560`          | Move source attachment, epochs, sent chunks and exact base/target progress into common worker delivery. Delete piece-descriptor/debug imports and main-thread snapshot-diff recovery | Grammar/query state, tree edit coordinates, injections, bounded parser strings, atomic cancellation and packed results               |
+| Shiki `workerClient.ts:394,:573,:584`                                                                              | Delete feature snapshot baseline, equality check and snapshot-diff fallback; common delivery establishes exact source before tokenization                                            | Tokenizer analysis revision/state, language/theme acquisition, recolor and packed token transport                                    |
+| Prepared `preparedDocument.ts:383,:424,:550,:591`; Platform `prepared-document.ts:126,:134`                        | Bind preparation/pinned work and adoption to existing runtime leases; remove replaced source initialization                                                                          | Current `borrow` ownership, configuration matching and once-only release. Transfer-only `take` is already gone                       |
+| Diff `diffSyntax.ts:499,:520,:595`; highlighting `diffs.ts`                                                        | Register complete immutable sides and obtain typed operations; delete direct backend factories and generated-row-as-source parsing                                                   | `DiffSyntaxStore`, theme subscriptions, per-side identity and row projection. Partial sources yield explicit unsupported syntax      |
+| Snippet `snippetTokensFeature.ts:92–98`; highlighting `service.ts:407`                                             | Use a transient runtime scope for provider-backed snippets; delete their raw factories                                                                                               | Exact submitted-text offset mapping, bounded transient ownership; Shiki stateless snippet highlighting may retain its domain request |
+| Platform `result-syntax-cache.ts:77`; `result-syntax-plugin.ts:37`                                                 | Replace direct excerpt parser session and its provider wrapper with a runtime-owned immutable source/demand                                                                          | Excerpt range mapping and bounded completed-result reuse                                                                             |
+| React/Solid wrappers, ordinary examples and stress `firstPaint`, `boundary`, `geometry`, `copies`                  | Migrate provider registrations and ownership inputs, including calibrated probe providers                                                                                            | No required document setup for simple Editor; independent view/selection/scroll state                                                |
+
+Units 3–5 retain their own full caller sets: minimap `workerDocumentState` and clipped projections
+in unit 3; LSP `DocumentSyncLane.syncPoint`, browser TypeScript VFS and external URI/version/barrier
+state in unit 4; Find `elsewhereSyncPoint`, merge conflicts `parsedPoint`, semantic
+`syncPointsByTextVersion` and live diff-overlay rebuilds in unit 5. Protocol versions and derived
+projection indexes remain domain state. Storage-owned internal imports, inspector debug imports,
+and reclamation benchmark `dist` imports stay with their existing owners. E057's SAB text deletion
+is complete; the current Tree-sitter descriptor contains strings. Atomic cancellation is separate.
+
+### Executable first-unit outline
+
+The caller shape is `analysis.contributions.request(operation, input, demand)`, with current
+structural/highlighter conveniences delegated to it. Use the plan's `DocumentRevision`,
+`DocumentRead`, `DocumentOperation<Input, Result>`, `ContributionDemand<Result>` and
+`ContributionTask<Result>` contracts. `changesBetween(base, target, scope)` validates issued
+revision ownership, then delegates to `DocumentEditChain.changesSince(base.point, scope,
+target.point)`. A source advance is either an exact snapshot reset or a delta with exact
+base/target points. Applied-source acknowledgement never implies completed analysis.
+
+| Module                                                 | Shape to implement                                                                                                                |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `src/documentSession.ts`                               | Captured revision acquisition and bounded exact interval access over the existing buffer                                          |
+| `src/editor/editChain.ts`                              | Existing 128-entry history, exact base/target composition and unavailable result                                                  |
+| `src/editor/documentAnalysis.ts`                       | Existing analysis handle owns contributions, provider/configuration bindings, interest and result admission                       |
+| `src/editor/documentContributions.ts` (new)            | Typed operation factories, issued revisions/audiences and settled outcome contract, exported through existing public entry points |
+| `src/editor/documentDelivery.ts` (new, private)        | Endpoint generations, acknowledged source point, pins, reset admission and disposal, owned by analysis                            |
+| `src/document/workerReader.ts` (new, DOM-free/private) | Ordinary reset/advance/release protocol and worker-local immutable reader, reused by both workers                                 |
+| Existing Tree-sitter/Shiki modules                     | Private domain bindings and analysis state; preserve independent workers                                                          |
+
+These paths are the implementation outline, not unused files added by this preparation. Stable
+provider/configuration keys retain compatible bindings; runtime environment and buffer incarnation
+prevent cross-owner sharing. The delivery module has no independent public resource or journal.
+
+1. Extend `editor/documentAnalysis.ts` as the document-owned coordinator. Place typed operation,
+   revision, audience and outcome contracts under core's existing public document/syntax exports.
+   Use runtime-issued identity bound to buffer incarnation and the existing `DocumentSyncPoint`.
+   Keep current structural/highlighter convenience calls over those operations.
+2. Extend `editor/editChain.ts` and `documentSession.ts` with checked exact base/target access,
+   reusing the existing bounded endpoint implementation. A revision owner pins an immutable read;
+   unavailable history returns an explicit reset/unavailable outcome. Capture source and operation
+   input at admission. A newer head never retargets pinned work.
+3. Put endpoint source progress and private ordinary worker reader protocol below that owner.
+   Model detached/attached/disposed endpoint generations and reset/advance/release/acknowledgement
+   as distinct messages. Acknowledged source progress and parser/tokenizer analysis progress have
+   separate states. Keep independent executors and `EditorWorkScheduler` task policy.
+4. Implement the reader with Tree-sitter and Shiki together. Preserve incremental domain state,
+   parser read batching and packed result transfer. Bring every caller in the table onto registration,
+   including transient snippet, prepared, diff and search scopes. Preserve the highlighting service's
+   ownership and make complete versus partial syntax input explicit in Editor.
+5. Create the internal owner automatically on simple Editor construction/owned-buffer replacement.
+   Borrow an explicit host's existing analysis owner when attached. Dispose only internally owned
+   resources; detaching one view releases that view's demand. Preserve synchronous text/input.
+6. Delete each replaced cursor, reset policy and public source factory in the same cutover. Add real
+   worker proof for exact pinned reads after the head advances, wrong base/reset, UTF-16 chunks,
+   sparse edits, worker replacement, stale completions, two views, prepared adoption and partial
+   diff refusal. Reuse the docwave regressions rather than copying their implementations.
+7. Build all workspace exports, run affected core/provider/framework/Platform checks, verify real
+   first-frame/source output, and compare the affected frozen products using accepted Plan 282
+   identity. Measure source reads/payloads and bounded retention independently of latency. No
+   improvement claim follows from the source inventory or a successful build.
+
+The selected extension follows the existing owner. A separate public document wrapper was already
+rejected in Plan 198, and a worker-message wrapper leaves generic cursor/reset decisions with each
+feature. Neither supplies this migration's one-owner contract.
+
+### Current focused verification
+
+After `bun install --frozen-lockfile` and `bun run build:workspaces`, core's configured Vitest command
+passes 154 tests in six files:
+
+```sh
+bun run --cwd editor/packages/editor test -- test/documentPublication.node.test.ts test/documentAnalysis.node.test.ts test/documentSession.test.ts test/editChain.test.ts test/publicationContributions.test.ts test/preparedDocument.test.ts
+```
+
+These checks cover exact nested publication, mutation/transaction paths, eventless segment rotation,
+mounted frame readers, bounded edit history, prepared borrowing, configuration/range isolation,
+stale replies and owner disposal. They validate delivered publication/analysis contracts. They do
+not implement or accept the unit 2 worker reader, a complete first-frame matrix or new performance.
+
+Twenty LSP document/buffer synchronization tests pass through the configured package script:
+
+```sh
+bun run --cwd editor/packages/lsp-plugin test -- test/documentSync.test.ts test/bufferSync.test.ts
+```
+
+From `apps/web`, the configured Node project passes 36 runtime, preparation, retention and
+WorkspaceEdit checks:
+
+```sh
+bun --bun vitest run --project node src/features/editor/tests/runtime.test.ts src/features/editor/tests/prepared-document.test.ts src/features/editor/tests/document-retention.test.ts src/features/editor/tests/workspace-text-change.test.ts
+```
+
+The local raw logs are `/work/reports/plan099-unblock-20261004/runtime-evidence/`.
+All heavy checks use the local runner. This preparation changes source inventory and documentation,
+so new browser rendering, latency measurements and package release changes are outside its proof.
 
 ## Baseline identity
 
