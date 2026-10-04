@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { page } from 'vitest/browser'
 import { DomTerminalRenderer, Terminal } from '../../index.js'
-import type { GhosttyWebGpuTerminalOptions } from '../../index.js'
+import type { GhosttyWebGpuTerminalOptions, LinkProvider, ProvidedLink } from '../../index.js'
 import type { Extension, ExtensionInput, ExtensionScope, TerminalInputEvent } from '../../index.js'
 import { Terminal as WorkerTerminal } from '../../worker/index.js'
 
@@ -15,7 +16,10 @@ afterEach(async () => {
   for (const host of hosts.splice(0)) host.remove()
 })
 
-async function openTerminal(options: GhosttyWebGpuTerminalOptions = {}): Promise<Terminal> {
+async function openTerminal(
+  options: GhosttyWebGpuTerminalOptions = {},
+  beforeOpen?: (terminal: Terminal) => void,
+): Promise<Terminal> {
   const host = document.createElement('div')
   host.style.width = '320px'
   host.style.height = '120px'
@@ -26,6 +30,7 @@ async function openTerminal(options: GhosttyWebGpuTerminalOptions = {}): Promise
     ...options,
   })
   terminals.push(terminal)
+  beforeOpen?.(terminal)
   await terminal.open(host)
   return terminal
 }
@@ -76,6 +81,250 @@ function compose(
     )
   }
 }
+
+describe('public extension links', () => {
+  it('resolves one contributed provider on the classic public link surface', async () => {
+    const terminal = await openTerminal()
+    terminal.writeAndReadGeometry('link')
+    await vi.waitFor(() => {
+      expect(terminal.submittedFrame?.nativeRevision).toBe(terminal.geometry().revision)
+      expect(terminal.visibleLines()[0]).toMatch(/^link/)
+    })
+    const activate = vi.fn()
+    const classic = vi.fn(() => [{ range: { start: 0, end: 3 }, activate }])
+    const registration = terminal.registerLinkProvider({ provideLinks: classic })
+    const classicFocused = await terminal.focusNextLink()
+    expect({ calls: classic.mock.calls.length, focused: classicFocused }).toEqual({
+      calls: 1,
+      focused: true,
+    })
+    registration.dispose()
+
+    const contributed = vi.fn(() => [{ range: { start: 0, end: 3 }, activate }])
+    terminal.use({ name: 'public-links', setup: () => ({ links: { provideLinks: contributed } }) })
+    const focused = await terminal.focusNextLink()
+    expect({ calls: contributed.mock.calls.length, focused }).toEqual({ calls: 1, focused: true })
+    expect(document.activeElement).toBe(terminal.element?.querySelector('[role="link"]'))
+    await page.screenshot({
+      element: terminal.element!,
+      path: '../../../../.artifacts/review-public-extension-link.png',
+      scale: 'css',
+    })
+  })
+
+  it('keeps nested presets, classic registration and use in encounter order across opening', async () => {
+    const calls: string[] = []
+    const activate = vi.fn()
+    const provider = (name: string, hit = false): LinkProvider<Event> => ({
+      provideLinks: () => {
+        calls.push(name)
+        return hit ? [{ range: { start: 0, end: 3 }, text: name, activate }] : undefined
+      },
+    })
+    const extension = (name: string): Extension => ({
+      name,
+      setup: () => ({ links: provider(name) }),
+    })
+    const terminal = await openTerminal(
+      { extensions: [extension('preset-first'), [extension('preset-second')]] },
+      (created) => {
+        expect(created.lifecycle).toBe('created')
+        created.registerLinkProvider(provider('classic-before'))
+        created.use(extension('use-before'))
+      },
+    )
+    terminal.use({ name: 'use-after', setup: () => ({ links: provider('use-after', true) }) })
+    terminal.registerLinkProvider(provider('classic-after', true))
+    terminal.writeAndReadGeometry('link')
+    await vi.waitFor(() => expect(terminal.visibleLines()[0]).toMatch(/^link/))
+    await expect(terminal.focusNextLink()).resolves.toBe(true)
+    expect(calls).toEqual([
+      'preset-first',
+      'preset-second',
+      'classic-before',
+      'use-before',
+      'use-after',
+    ])
+    expect(terminal.element?.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+      'use-after',
+    )
+  })
+
+  it('removes focused links once on detach and restores the next classic provider', async () => {
+    const terminal = await openTerminal()
+    const activate = vi.fn()
+    const provideLinks = vi.fn(() => [{ range: { start: 0, end: 3 }, activate }])
+    const extension: Extension = {
+      name: 'detached-links',
+      setup: () => ({ links: { provideLinks } }),
+    }
+    const handle = terminal.use(extension)
+    const classic = vi.fn(() => [{ range: { start: 0, end: 3 }, text: 'classic', activate }])
+    const registration = terminal.registerLinkProvider({ provideLinks: classic })
+    terminal.writeAndReadGeometry('link')
+    await vi.waitFor(() => expect(terminal.visibleLines()[0]).toMatch(/^link/))
+    await expect(terminal.focusNextLink()).resolves.toBe(true)
+    const overlay = terminal.element?.querySelector('[role="link"]')!
+    expect(document.activeElement).toBe(overlay)
+    expect(provideLinks).toHaveBeenCalledTimes(1)
+    expect(classic).not.toHaveBeenCalled()
+    handle.dispose()
+    handle.dispose()
+    expect(terminal.element?.querySelector('[role="link"]')).toBeNull()
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(activate).not.toHaveBeenCalled()
+    await expect(terminal.focusNextLink()).resolves.toBe(true)
+    expect(provideLinks).toHaveBeenCalledTimes(1)
+    expect(classic).toHaveBeenCalledTimes(1)
+    expect(terminal.element?.querySelector('[role="link"]')?.getAttribute('aria-label')).toBe(
+      'classic',
+    )
+    registration.dispose()
+    const replacement = terminal.use(extension)
+    handle.dispose()
+    await expect(terminal.focusNextLink()).resolves.toBe(true)
+    expect(provideLinks).toHaveBeenCalledTimes(2)
+    replacement.dispose()
+    await expect(terminal.focusNextLink()).resolves.toBe(false)
+    expect(provideLinks).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['detach', 'teardown'] as const)(
+    'discards a pending extension link result after %s',
+    async (action) => {
+      const terminal = await openTerminal()
+      let finish!: (links: readonly ProvidedLink<Event>[]) => void
+      const pending = new Promise<readonly ProvidedLink<Event>[]>((resolve) => {
+        finish = resolve
+      })
+      const provideLinks = vi.fn(() => pending)
+      const cleanup = vi.fn()
+      let signal!: AbortSignal
+      const handle = terminal.use({
+        name: 'pending-links',
+        setup: (scope) => {
+          signal = scope.signal
+          scope.own(cleanup)
+          return { links: { provideLinks } }
+        },
+      })
+      terminal.writeAndReadGeometry('link')
+      await vi.waitFor(() => expect(terminal.visibleLines()[0]).toMatch(/^link/))
+      const root = terminal.element!
+      const discovery = terminal.focusNextLink()
+      expect(provideLinks).toHaveBeenCalledTimes(1)
+      expect(terminal.hasPendingLinkResolution).toBe(true)
+      if (action === 'detach') handle.dispose()
+      if (action === 'teardown') terminal.dispose()
+      finish([{ range: { start: 0, end: 3 }, activate: vi.fn() }])
+      await expect(discovery).resolves.toBe(false)
+      expect(root.querySelector('[role="link"]')).toBeNull()
+      expect(terminal.hasPendingLinkResolution).toBe(false)
+      expect(signal.aborted).toBe(true)
+      handle.dispose()
+      expect(cleanup).toHaveBeenCalledTimes(1)
+      expect(provideLinks).toHaveBeenCalledTimes(1)
+      if (action === 'detach') await expect(terminal.focusNextLink()).resolves.toBe(false)
+      expect(provideLinks).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('rolls back links and other hooks when public registry validation fails', async () => {
+    const terminal = await openTerminal()
+    const failure = new TypeError('registry validation failure')
+    const cleanup = vi.fn()
+    const input = vi.fn(() => 'pass' as const)
+    const title = vi.fn()
+    const provideLinks = vi.fn(() => [{ range: { start: 0, end: 3 }, activate: vi.fn() }])
+    let reads = 0
+    const provider: LinkProvider<Event> = {
+      get provideLinks() {
+        reads += 1
+        if (reads === 2) throw failure
+        return provideLinks
+      },
+    }
+    let scope!: ExtensionScope
+    const extension: Extension = {
+      name: 'registration-failure',
+      setup: (owned) => {
+        scope = owned
+        owned.own(cleanup)
+        return { links: provider, input, events: { title } }
+      },
+    }
+    expect(() => terminal.use(extension)).toThrow(failure)
+    expect(scope.signal.aborted).toBe(true)
+    expect(cleanup).toHaveBeenCalledTimes(1)
+    terminal.sendInput('input')
+    terminal.writeAndReadGeometry('\u001b]2;title\u0007link')
+    await vi.waitFor(() => expect(terminal.visibleLines()[0]).toMatch(/^link/))
+    await expect(terminal.focusNextLink()).resolves.toBe(false)
+    expect(provideLinks).not.toHaveBeenCalled()
+    expect(input).not.toHaveBeenCalled()
+    expect(title).not.toHaveBeenCalled()
+    const replacement = terminal.use(extension)
+    await expect(terminal.focusNextLink()).resolves.toBe(true)
+    replacement.dispose()
+    expect(cleanup).toHaveBeenCalledTimes(2)
+  })
+
+  it('releases late registrations when a provider accessor disposes the terminal', async () => {
+    const terminal = await openTerminal()
+    const cleanup = vi.fn()
+    const provideLinks = vi.fn(() => undefined)
+    let reads = 0
+    let scope!: ExtensionScope
+    expect(() =>
+      terminal.use({
+        name: 'reentrant-registration',
+        setup: (owned) => {
+          scope = owned
+          owned.own(cleanup)
+          return {
+            links: {
+              get provideLinks() {
+                reads += 1
+                if (reads === 2) terminal.dispose()
+                return provideLinks
+              },
+            },
+          }
+        },
+      }),
+    ).toThrow('disposed')
+    expect(reads).toBe(2)
+    expect(terminal.lifecycle).toBe('disposed')
+    expect(scope.signal.aborted).toBe(true)
+    expect(cleanup).toHaveBeenCalledTimes(1)
+    expect(provideLinks).not.toHaveBeenCalled()
+  })
+
+  it('keeps inert contribution getters untouched during links, input and output', async () => {
+    const reads = vi.fn()
+    const terminal = await openTerminal({
+      extensions: Array.from({ length: 3 }, (_, index) => ({
+        name: `inert-${index}`,
+        setup: () => ({
+          get links() {
+            reads()
+            return undefined
+          },
+        }),
+      })),
+    })
+    const provideLinks = vi.fn(() => [{ range: { start: 0, end: 3 }, activate: vi.fn() }])
+    terminal.use({ name: 'interested-links', setup: () => ({ links: { provideLinks } }) })
+    expect(reads).toHaveBeenCalledTimes(3)
+    terminal.sendInput('input')
+    press(terminal)
+    terminal.writeAndReadGeometry('link')
+    await vi.waitFor(() => expect(terminal.visibleLines()[0]).toMatch(/^link/))
+    await expect(terminal.focusNextLink()).resolves.toBe(true)
+    expect(provideLinks).toHaveBeenCalledTimes(1)
+    expect(reads).toHaveBeenCalledTimes(3)
+  })
+})
 
 describe('public extension activation', () => {
   it.each(['input-first', 'end-first'] as const)(

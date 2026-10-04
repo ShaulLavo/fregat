@@ -326,6 +326,10 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private extensionManager(): ExtensionManager {
     this.extensions ??= new ExtensionManager({
       terminal: this,
+      registerLinkProvider:
+        this.execution.kind === 'sync'
+          ? (provider) => this.registerLinkProvider(provider)
+          : undefined,
       // Handler failures reach host diagnostics without redispatching a failing extension event.
       onError: (cause, operation) => this.emitters.error.emit({ cause, operation }),
     })

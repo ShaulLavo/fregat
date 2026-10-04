@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Terminal } from '../../index.js'
 import { createLinkLineSnapshot } from '../../term/links.js'
+import type { LinkProvider } from '../../term/links.js'
 import { ExtensionManager } from '../manager.js'
 import type {
   Extension,
@@ -576,6 +577,51 @@ describe('interested-only hook indexes', () => {
     handle.dispose()
     manager.visitLinks((provider) => providers.push(provider))
     expect(providers).toEqual([second])
+  })
+
+  it('disposes a late host registration once without resurrecting any contribution', () => {
+    const provider = { provideLinks: () => undefined }
+    const dispose = vi.fn()
+    const cleanup = vi.fn()
+    const hostErrors = vi.fn()
+    let local!: ExtensionManager
+    const registerLinkProvider = vi.fn((actual: LinkProvider<Event>) => {
+      expect(actual).toBe(provider)
+      local.dispose()
+      return { token: Symbol('host-link'), dispose }
+    })
+    local = new ExtensionManager({ terminal, registerLinkProvider, onError: hostErrors })
+    let signal!: AbortSignal
+    expect(() =>
+      local.use({
+        name: 'late-host-links',
+        setup: (scope) => {
+          signal = scope.signal
+          scope.own(cleanup)
+          return {
+            links: provider,
+            input: () => 'claim',
+            events: { title: vi.fn() },
+            commands: { linked: vi.fn() },
+          }
+        },
+      }),
+    ).toThrow('disposed')
+    expect(registerLinkProvider).toHaveBeenCalledTimes(1)
+    expect(dispose).toHaveBeenCalledTimes(1)
+    expect(cleanup).toHaveBeenCalledTimes(1)
+    expect(signal.aborted).toBe(true)
+    const visit = vi.fn()
+    local.visitLinks(visit)
+    expect(visit).not.toHaveBeenCalled()
+    expect(local.hasInput).toBe(false)
+    expect(local.hasEvent('title')).toBe(false)
+    expect(local.command('linked')).toBeUndefined()
+    local.dispose()
+    local.dispose()
+    expect(dispose).toHaveBeenCalledTimes(1)
+    expect(cleanup).toHaveBeenCalledTimes(1)
+    expect(hostErrors).toHaveBeenCalledTimes(1)
   })
 
   it('reports handler errors and continues broadcast or input arbitration', async () => {

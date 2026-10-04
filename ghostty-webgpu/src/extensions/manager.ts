@@ -1,7 +1,7 @@
 import { createGhosttyError } from '../core/error.js'
 import type { TerminalApi } from '../dom/terminal-api.js'
 import type { GhosttyWebGpuTerminalEventMap } from '../dom/types.js'
-import type { LinkProvider } from '../term/links.js'
+import type { LinkProvider, LinkProviderRegistration } from '../term/links.js'
 import type {
   Contributions,
   Extension,
@@ -145,6 +145,10 @@ class Attachment implements ExtensionScope, ExtensionHandle<unknown> {
   }
 
   register(cleanup: () => void): void {
+    if (this.disposed) {
+      cleanup()
+      return
+    }
     ;(this.registrations ??= []).push(cleanup)
   }
 
@@ -173,6 +177,7 @@ class Attachment implements ExtensionScope, ExtensionHandle<unknown> {
 export interface ExtensionManagerOptions {
   readonly terminal: TerminalApi
   readonly reservedOsc?: ReadonlySet<number>
+  readonly registerLinkProvider?: (provider: LinkProvider<Event>) => LinkProviderRegistration
   readonly onError: ErrorSink
 }
 
@@ -365,7 +370,14 @@ export class ExtensionManager {
         this.commands.set(name, command)
         attachment.register(() => this.commands.delete(name))
       }
-    if (links) attachment.register(this.links.append(links))
+    if (links) {
+      const registration = this.options.registerLinkProvider?.(links)
+      if (registration) attachment.register(() => registration.dispose())
+      this.ensureActive()
+      if (attachment.disposed)
+        throw createGhosttyError('extension.use', 'Extension was disposed during setup')
+      attachment.register(this.links.append(links))
+    }
     attachment.complete(api)
   }
 
