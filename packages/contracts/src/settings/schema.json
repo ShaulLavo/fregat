@@ -449,6 +449,41 @@
       "minimum": 1,
       "type": "integer"
     },
+    "developer.heavyJobQuietPolicy": {
+      "default": {
+        "allowedClasses": ["light"],
+        "concurrentCpus": [],
+        "measurementCpus": []
+      },
+      "description": "Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.",
+      "markdownDescription": "Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.\n\nUse an empty allowedClasses array to hold new light jobs during measurements. The measurementCpus and concurrentCpus fields currently accept empty arrays, preserving host scheduling. CPU affinity requires a validated scheduling implementation.",
+      "properties": {
+        "allowedClasses": {
+          "items": {
+            "const": "light"
+          },
+          "type": "array"
+        },
+        "concurrentCpus": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 0,
+          "type": "array"
+        },
+        "measurementCpus": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 0,
+          "type": "array"
+        }
+      },
+      "required": ["allowedClasses", "concurrentCpus", "measurementCpus"],
+      "type": "object"
+    },
     "developer.heavyJobStopGraceSeconds": {
       "default": 10,
       "description": "Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.",

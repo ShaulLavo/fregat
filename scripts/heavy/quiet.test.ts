@@ -1,10 +1,18 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
 import { bootSeconds, sliceState } from './admission'
-import { DEADLINE_START_SECONDS, stopTimeoutSeconds } from './job'
+import { DEADLINE_START_SECONDS, SCOPE_SHIM, stopTimeoutSeconds } from './job'
 import { tryLock, unlock } from './lock'
 import { live } from './queue'
 
@@ -47,6 +55,471 @@ function quietBox(holdSeconds: number) {
 const sleeper = (seconds: number) => ['bash', '-c', `echo started; sleep ${seconds}`]
 
 describe.skipIf(!userScopes)('quiet holds', () => {
+  test('a surviving payload keeps its interval during cleanup without granting new light admission', async () => {
+    const box = quietBox(600)
+    const cleanup = path.join(box.root, 'cleanup')
+    const releaseCleanup = path.join(box.root, 'release-cleanup')
+    const releasePayload = path.join(box.root, 'release-payload')
+    const bin = path.join(box.root, 'bin')
+    mkdirSync(bin)
+    writeFileSync(
+      path.join(bin, 'systemctl'),
+      `#!/bin/bash\nif [[ "$2" == stop && "$3" == *_deadline.service ]]; then\n touch '${cleanup}'\n ${until(releaseCleanup)}\nfi\nexport PATH="$HEAVY_FIXTURE_MANAGER_PATH"\nexec systemctl "$@"\n`,
+      { mode: 0o755 },
+    )
+    const quiet = start(
+      box,
+      'surviving-payload',
+      ['bash', '-c', `echo active; ${until(releasePayload)}`],
+      {
+        quiet: true,
+        jobClass: 'bench',
+        machine: true,
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          HEAVY_FIXTURE_MANAGER_PATH: process.env.PATH,
+        },
+      },
+    )
+    let next: ReturnType<typeof start> | undefined
+    try {
+      await expect.poll(quiet.stdout, { timeout: 5_000 }).toContain('active')
+      expect(
+        (await start(box, 'known-active', ['true'], { jobClass: 'light', machine: true }).done)
+          .code,
+      ).toBe(0)
+      expect(recordOf(box, 'known-active')).toBeDefined()
+      const owner = live(box.state, 'jobs').find((job) => job.label === 'surviving-payload')!
+      const runtimeFile = path.join(box.state, 'runs', `${owner.id}.json`)
+      const journalFile = path.join(box.state, 'measurements', `${owner.id}.json`)
+      const interval = JSON.parse(readFileSync(runtimeFile, 'utf8'))
+      const children = readFileSync(`/proc/${owner.pid}/task/${owner.pid}/children`, 'utf8')
+      const primary = Number(children.trim().split(' ')[0])
+      expect(readFileSync(`/proc/${primary}/cmdline`, 'utf8')).toContain(SCOPE_SHIM)
+      process.kill(primary, 'SIGKILL')
+      await expect.poll(() => existsSync(cleanup), { timeout: 5_000 }).toBe(true)
+      expect(existsSync(`/proc/${primary}`)).toBe(false)
+      expect(sliceState(box.sliceRoot, `${box.sliceRoot}-${owner.id}.slice`)).toBe('running')
+      expect(readFileSync(`/proc/${owner.pid}/status`, 'utf8')).toMatch(/^State:\s+[RSDI]\b/m)
+      expect(owner.quietDeadline!).toBeGreaterThan(bootSeconds())
+      expect(live(box.state, 'jobs').some((job) => job.id === owner.id)).toBe(true)
+      expect(JSON.parse(readFileSync(runtimeFile, 'utf8'))).toMatchObject({
+        endedAt: null,
+        startedAt: interval.startedAt,
+      })
+      expect(existsSync(journalFile)).toBe(true)
+      expect(recordOf(box, 'surviving-payload')).toBeUndefined()
+      next = start(box, 'after-populated-cleanup', ['echo', 'cleanup-settled'], {
+        jobClass: 'light',
+        machine: true,
+      })
+      await expect
+        .poll(next.stderr, { timeout: 5_000 })
+        .toContain("quiet hold by 'surviving-payload'")
+      expect(next.stdout()).toBe('')
+      expect(recordOf(box, 'after-populated-cleanup')).toBeUndefined()
+      writeFileSync(releaseCleanup, '')
+      expect((await quiet.done).code).not.toBe(0)
+      expect((await next.done).code).toBe(0)
+      expect(next.stdout()).toContain('cleanup-settled')
+      expect(sliceState(box.sliceRoot, `${box.sliceRoot}-${owner.id}.slice`)).not.toBe('running')
+      expect(existsSync(runtimeFile)).toBe(false)
+      expect(existsSync(journalFile)).toBe(false)
+      expect(recordOf(box, 'surviving-payload')!.jobsDuringRun.map((job) => job.label)).toEqual([
+        'known-active',
+      ])
+    } finally {
+      writeFileSync(releaseCleanup, '')
+      writeFileSync(releasePayload, '')
+      await Promise.all([quiet.done, next?.done])
+    }
+  }, 20_000)
+
+  test('a quiet deadline crossed during runtime mutex contention keeps light queued until settlement', async () => {
+    const box = quietBox(600)
+    const releaseQuiet = path.join(box.root, 'release-quiet')
+    const quiet = start(
+      box,
+      'mutex-deadline',
+      ['bash', '-c', `echo active; ${until(releaseQuiet)}`],
+      {
+        quiet: true,
+        jobClass: 'bench',
+        machine: true,
+      },
+    )
+    let next: ReturnType<typeof start> | undefined
+    let lock: number | null = null
+    let entryFile: string | undefined
+    let entryText = ''
+    try {
+      await expect.poll(quiet.stdout, { timeout: 5_000 }).toContain('active')
+      expect(
+        (await start(box, 'known-active', ['true'], { jobClass: 'light', machine: true }).done)
+          .code,
+      ).toBe(0)
+      const owner = live(box.state, 'jobs').find((job) => job.label === 'mutex-deadline')!
+      entryFile = path.join(box.state, 'jobs', `${owner.id}.json`)
+      entryText = readFileSync(entryFile, 'utf8')
+      lock = tryLock(path.join(box.state, 'runtime.lock'))
+      expect(lock).not.toBeNull()
+      const deadline = bootSeconds() + 2
+      writeFileSync(entryFile, JSON.stringify({ ...owner, quietDeadline: deadline }))
+      next = start(box, 'after-mutex-deadline', ['echo', 'settled-light'], {
+        jobClass: 'light',
+        machine: true,
+      })
+      await expect
+        .poll(
+          () => {
+            if (next!.stderr().includes("quiet hold by 'mutex-deadline'")) return true
+            return readFileSync(`/proc/${next!.child.pid}/wchan`, 'utf8').includes(
+              'locks_lock_inode_wait',
+            )
+          },
+          { timeout: 1_500 },
+        )
+        .toBe(true)
+      expect(bootSeconds()).toBeLessThan(deadline)
+      await expect.poll(() => bootSeconds(), { timeout: 3_000 }).toBeGreaterThan(deadline)
+      unlock(lock!)
+      lock = null
+      // Observe a complete admission polling interval after releasing the expired holder.
+      await expect
+        .poll(
+          () => {
+            if (next!.stdout()) return 'started'
+            return bootSeconds() > deadline + 1.5 ? 'held' : 'checking'
+          },
+          { timeout: 3_000 },
+        )
+        .toBe('held')
+      expect(next.stdout()).toBe('')
+      expect(recordOf(box, 'after-mutex-deadline')).toBeUndefined()
+      expect(live(box.state, 'jobs').some((job) => job.id === owner.id)).toBe(true)
+      writeFileSync(releaseQuiet, '')
+      expect((await quiet.done).code).toBe(0)
+      expect((await next.done).code).toBe(0)
+      expect(next.stdout()).toContain('settled-light')
+      expect(recordOf(box, 'mutex-deadline')!.jobsDuringRun.map((job) => job.label)).toEqual([
+        'known-active',
+      ])
+    } finally {
+      if (lock !== null) unlock(lock)
+      if (entryFile && entryText && existsSync(entryFile)) writeFileSync(entryFile, entryText)
+      writeFileSync(releaseQuiet, '')
+      await Promise.all([quiet.done, next?.done])
+    }
+  }, 20_000)
+
+  test.each(['cancelled', 'expired admission'])(
+    'runtime mutex contention leaves a %s request bounded while the mutex remains held',
+    async (mode) => {
+      const box = quietBox(600)
+      const releaseQuiet = path.join(box.root, 'release-quiet')
+      const quiet = start(
+        box,
+        'mutex-bounded',
+        ['bash', '-c', `echo active; ${until(releaseQuiet)}`],
+        {
+          quiet: true,
+          jobClass: 'bench',
+          machine: true,
+        },
+      )
+      let next: ReturnType<typeof start> | undefined
+      let lock: number | null = null
+      try {
+        await expect.poll(quiet.stdout, { timeout: 5_000 }).toContain('active')
+        expect(
+          (await start(box, 'known-active', ['true'], { jobClass: 'light', machine: true }).done)
+            .code,
+        ).toBe(0)
+        writeSettings(box, {
+          'developer.heavyJobClasses': classes,
+          'developer.heavyJobQuietHoldSeconds': 2,
+          'developer.heavyJobStopGraceSeconds': 1,
+        })
+        lock = tryLock(path.join(box.state, 'runtime.lock'))
+        expect(lock).not.toBeNull()
+        next = start(box, 'bounded-waiter', ['echo', 'unexpected-launch'], {
+          quiet: mode === 'expired admission',
+          jobClass: mode === 'expired admission' ? 'bench' : 'light',
+          machine: true,
+        })
+        await expect
+          .poll(
+            () => {
+              if (next!.stderr().includes("quiet hold by 'mutex-bounded'")) return true
+              return readFileSync(`/proc/${next!.child.pid}/wchan`, 'utf8').includes(
+                'locks_lock_inode_wait',
+              )
+            },
+            { timeout: 1_500 },
+          )
+          .toBe(true)
+        if (mode === 'cancelled') next.child.kill('SIGTERM')
+        await expect
+          .poll(() => next!.child.exitCode, { timeout: 3_000 })
+          .toBe(mode === 'cancelled' ? 143 : 75)
+        expect((await next.done).code).toBe(mode === 'cancelled' ? 143 : 75)
+        expect(next.stdout()).toBe('')
+        expect(recordOf(box, 'bounded-waiter')).toBeUndefined()
+        expect(live(box.state, 'queue')).toEqual([])
+        expect(tryLock(path.join(box.state, 'runtime.lock'))).toBeNull()
+        expect(quiet.child.exitCode).toBeNull()
+      } finally {
+        if (lock !== null) unlock(lock)
+        writeFileSync(releaseQuiet, '')
+        await Promise.all([quiet.done, next?.done])
+      }
+    },
+    15_000,
+  )
+
+  test('light eligibility starts after quiet preparation and ends before manager cleanup settles', async () => {
+    const box = quietBox(600)
+    const gates = Object.fromEntries(
+      ['prepared', 'prepare-release', 'finished', 'cleanup', 'cleanup-release'].map((name) => [
+        name,
+        path.join(box.root, name),
+      ]),
+    )
+    const bin = path.join(box.root, 'bin')
+    mkdirSync(bin)
+    writeFileSync(
+      path.join(bin, 'systemctl'),
+      `#!/bin/bash\nif [[ "$*" == *"set-property"* ]]; then\n touch '${gates.prepared}'\n ${until(gates['prepare-release']!)}\nfi\nif [[ "$2" == stop && "$3" == *.slice ]]; then\n touch '${gates.cleanup}'\n ${until(gates['cleanup-release']!)}\nfi\nexport PATH="$HEAVY_FIXTURE_MANAGER_PATH"\nexec systemctl "$@"\n`,
+      { mode: 0o755 },
+    )
+    const quiet = start(
+      box,
+      'preparing',
+      ['bash', '-c', `echo active; ${until(gates.finished!)}`],
+      {
+        quiet: true,
+        jobClass: 'bench',
+        machine: true,
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          HEAVY_FIXTURE_MANAGER_PATH: process.env.PATH,
+        },
+      },
+    )
+    const children = [quiet]
+    try {
+      await expect.poll(() => existsSync(gates.prepared!), { timeout: 8_000 }).toBe(true)
+      const owner = live(box.state, 'jobs')[0]!
+      expect(existsSync(path.join(box.state, 'runs', `${owner.id}.json`))).toBe(false)
+      const light = start(box, 'eligible-light', ['echo', 'light-active'], {
+        jobClass: 'light',
+        machine: true,
+      })
+      children.push(light)
+      await expect.poll(light.stderr, { timeout: 5_000 }).toContain("quiet hold by 'preparing'")
+      expect(light.stdout()).toBe('')
+      writeFileSync(gates['prepare-release']!, '')
+      await expect.poll(quiet.stdout, { timeout: 5_000 }).toContain('active')
+      await expect.poll(light.stdout, { timeout: 5_000 }).toContain('light-active')
+      expect((await light.done).code).toBe(0)
+      writeFileSync(gates.finished!, '')
+      await expect.poll(() => existsSync(gates.cleanup!), { timeout: 5_000 }).toBe(true)
+      expect(sliceState(box.sliceRoot, `${box.sliceRoot}-${owner.id}.slice`)).not.toBe('running')
+      expect(live(box.state, 'jobs').some((entry) => entry.id === owner.id)).toBe(true)
+      const next = start(box, 'after-cleanup', ['echo', 'cleanup-settled'], {
+        jobClass: 'light',
+        machine: true,
+      })
+      children.push(next)
+      await expect.poll(next.stderr, { timeout: 5_000 }).toContain("quiet hold by 'preparing'")
+      expect(next.stdout()).toBe('')
+      writeFileSync(gates['cleanup-release']!, '')
+      expect((await quiet.done).code).toBe(0)
+      expect((await next.done).code).toBe(0)
+      expect(next.stdout()).toContain('cleanup-settled')
+      expect(recordOf(box, 'preparing')!.jobsDuringRun.map((job) => job.label)).toEqual([
+        'eligible-light',
+      ])
+    } finally {
+      for (const gate of ['prepare-release', 'finished', 'cleanup-release'])
+        writeFileSync(gates[gate]!, '')
+      await Promise.all(children.map((child) => child.done))
+    }
+  }, 25_000)
+
+  test.each(['suspended', 'expired', 'stale'])(
+    'a %s quiet owner with a populated slice cannot grant light eligibility',
+    async (mode) => {
+      const box = quietBox(600)
+      const releaseQuiet = path.join(box.root, 'release-quiet')
+      const quiet = start(box, 'guarded', ['bash', '-c', `echo active; ${until(releaseQuiet)}`], {
+        quiet: true,
+        jobClass: 'bench',
+        machine: true,
+      })
+      let next: ReturnType<typeof start> | undefined
+      let entryFile: string | undefined
+      let runtimeFile: string | undefined
+      let entryText = ''
+      let runtimeText = ''
+      try {
+        await expect.poll(quiet.stdout, { timeout: 5_000 }).toContain('active')
+        expect(
+          (await start(box, 'known-active', ['true'], { jobClass: 'light', machine: true }).done)
+            .code,
+        ).toBe(0)
+        const owner = live(box.state, 'jobs').find((job) => job.label === 'guarded')!
+        entryFile = path.join(box.state, 'jobs', `${owner.id}.json`)
+        runtimeFile = path.join(box.state, 'runs', `${owner.id}.json`)
+        entryText = readFileSync(entryFile, 'utf8')
+        runtimeText = readFileSync(runtimeFile, 'utf8')
+        if (mode === 'expired')
+          writeFileSync(entryFile, JSON.stringify({ ...owner, quietDeadline: bootSeconds() - 1 }))
+        if (mode === 'stale')
+          writeFileSync(runtimeFile, JSON.stringify({ ...JSON.parse(runtimeText), pid: -1 }))
+        if (mode === 'suspended') {
+          quiet.child.kill('SIGSTOP')
+          await expect
+            .poll(() => readFileSync(`/proc/${owner.pid}/status`, 'utf8'))
+            .toMatch(/^State:\s+T/m)
+        }
+        expect(sliceState(box.sliceRoot, `${box.sliceRoot}-${owner.id}.slice`)).toBe('running')
+        next = start(box, 'guarded-light', ['echo', 'released-light'], {
+          jobClass: 'light',
+          machine: true,
+        })
+        await expect.poll(next.stderr, { timeout: 5_000 }).toContain("quiet hold by 'guarded'")
+        expect(next.stdout()).toBe('')
+        expect(recordOf(box, 'guarded-light')).toBeUndefined()
+        writeFileSync(entryFile, entryText)
+        writeFileSync(runtimeFile, runtimeText)
+        quiet.child.kill('SIGCONT')
+        await expect.poll(next.stdout, { timeout: 5_000 }).toContain('released-light')
+        expect((await next.done).code).toBe(0)
+        expect(quiet.child.exitCode).toBeNull()
+      } finally {
+        if (entryFile && entryText) writeFileSync(entryFile, entryText)
+        if (runtimeFile && runtimeText) writeFileSync(runtimeFile, runtimeText)
+        quiet.child.kill('SIGCONT')
+        writeFileSync(releaseQuiet, '')
+        await Promise.all([quiet.done, next?.done])
+      }
+    },
+    20_000,
+  )
+
+  test.each(['completed', 'cancelled'])(
+    'a %s measurement settles independently of a delayed light manager launch',
+    async (mode) => {
+      const box = quietBox(600)
+      const control = start(box, 'control', ['echo', 'control'], {
+        jobClass: 'light',
+        machine: true,
+      })
+      expect((await control.done).code).toBe(0)
+      expect(control.stdout()).toContain('control')
+      expect(recordOf(box, 'control')).toBeDefined()
+      const releaseQuiet = path.join(box.root, 'release-quiet')
+      const releaseSpanning = path.join(box.root, 'release-spanning')
+      const releaseProperty = path.join(box.root, 'release-property')
+      const propertyEntered = path.join(box.root, 'property-entered')
+      const quiet = start(
+        box,
+        'measurement',
+        ['bash', '-c', `echo measuring; ${until(releaseQuiet)}`],
+        { quiet: true, jobClass: 'bench', machine: true },
+      )
+      const children = [quiet]
+      try {
+        await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('measuring')
+        const short = start(box, 'short-light', ['echo', 'short'], {
+          jobClass: 'light',
+          machine: true,
+        })
+        children.push(short)
+        expect((await short.done).code).toBe(0)
+        const spanning = start(
+          box,
+          'spanning-light',
+          ['bash', '-c', `echo spanning; ${until(releaseSpanning)}`],
+          { jobClass: 'light', machine: true },
+        )
+        children.push(spanning)
+        await expect.poll(spanning.stdout, { timeout: 8_000 }).toContain('spanning')
+        const bin = path.join(box.root, 'bin')
+        mkdirSync(bin)
+        const systemctl = path.join(bin, 'systemctl')
+        writeFileSync(
+          systemctl,
+          `#!/bin/bash\nif [[ "$*" == *"set-property"* ]]; then\n touch '${propertyEntered}'\n ${until(releaseProperty)}\nfi\nexport PATH="$HEAVY_FIXTURE_MANAGER_PATH"\nexec systemctl "$@"\n`,
+        )
+        const managerPath = process.env.PATH ?? ''
+        chmodSync(systemctl, 0o755)
+        const delayed = start(box, 'manager-delayed-light', ['echo', 'delayed'], {
+          jobClass: 'light',
+          machine: true,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${managerPath}`,
+            HEAVY_FIXTURE_MANAGER_PATH: managerPath,
+          },
+        })
+        children.push(delayed)
+        await expect.poll(() => existsSync(propertyEntered), { timeout: 8_000 }).toBe(true)
+        expect(delayed.stdout()).toBe('')
+        expect(
+          live(box.state, 'jobs')
+            .map((job) => job.label)
+            .sort(),
+        ).toEqual(['manager-delayed-light', 'measurement', 'spanning-light'])
+        let settled = false
+        void quiet.done.then(() => (settled = true))
+        if (mode === 'cancelled') quiet.child.kill('SIGTERM')
+        if (mode === 'completed') writeFileSync(releaseQuiet, '')
+        await expect.poll(() => settled, { timeout: 5_000 }).toBe(true)
+        expect((await quiet.done).code).toBe(mode === 'completed' ? 0 : 143)
+        const measurement = recordOf(box, 'measurement')!
+        expect(measurement.jobsDuringRun.map((job) => job.label).sort()).toEqual([
+          'short-light',
+          'spanning-light',
+        ])
+        expect(new Set(measurement.jobsDuringRun.map((job) => job.id)).size).toBe(2)
+        expect(measurement.jobsDuringRun.find((job) => job.label === 'short-light')).toMatchObject({
+          endedAt: expect.any(String),
+          allowedCpus: [],
+        })
+        expect(
+          measurement.jobsDuringRun.find((job) => job.label === 'spanning-light'),
+        ).toMatchObject({
+          endedAt: null,
+          allowedCpus: [],
+        })
+        expect(readFileSync(path.join(box.state, 'quiet.holder'), 'utf8')).toBe('')
+        expect(existsSync(path.join(box.state, 'runs', `${measurement.requestId}.json`))).toBe(
+          false,
+        )
+        expect(
+          live(box.state, 'jobs')
+            .map((job) => job.label)
+            .sort(),
+        ).toEqual(['manager-delayed-light', 'spanning-light'])
+        expect(existsSync(releaseProperty)).toBe(false)
+        expect(recordOf(box, 'manager-delayed-light')).toBeUndefined()
+        writeFileSync(releaseProperty, '')
+        expect((await delayed.done).code).toBe(0)
+      } finally {
+        writeFileSync(releaseProperty, '')
+        writeFileSync(releaseQuiet, '')
+        writeFileSync(releaseSpanning, '')
+        quiet.child.kill('SIGTERM')
+        await Promise.all(children.map((child) => child.done))
+      }
+    },
+    30_000,
+  )
+
   test('a quiet job waits for running jobs to drain, and jobs queued behind it wait for it', async () => {
     const box = quietBox(600)
     const releaseRunning = path.join(box.root, 'release-running')
@@ -67,7 +540,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       quiet: true,
     })
     await expect.poll(quiet.stderr, { timeout: 10_000 }).toContain('waiting for 1 running job')
-    const behind = start(box, 'behind', ['true'], { jobClass: 'light', machine: true })
+    const behind = start(box, 'behind', ['true'], { jobClass: 'suite', machine: true })
     await expect
       .poll(() => live(box.state, 'queue').map((entry) => entry.label), {
         timeout: 10_000,
@@ -600,7 +1073,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         quiet.child.kill('SIGCONT')
         expect((await quiet.done).code).toBe(75)
         await expect.poll(next.stdout, { timeout: 5_000 }).toContain('started')
-        ordinary = start(box, 'after-next', ['true'], { jobClass: 'light', machine: true })
+        ordinary = start(box, 'after-next', ['true'], { jobClass: 'suite', machine: true })
         await expect.poll(ordinary.stderr, { timeout: 5_000 }).toContain('quiet hold')
         expect(alive(canary.child.pid!)).toBe(true)
         expect(canary.child.exitCode).toBeNull()
@@ -700,7 +1173,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         expect(recordOf(box, 'delayed')).toMatchObject({ quietHoldExpired: true })
         await expect.poll(next.stdout, { timeout: 5_000 }).toContain('started')
         if (quietSuccessor) {
-          ordinary = start(box, 'ordinary', ['true'], { jobClass: 'light', machine: true })
+          ordinary = start(box, 'ordinary', ['true'], { jobClass: 'suite', machine: true })
           await expect.poll(ordinary.stderr, { timeout: 5_000 }).toContain('quiet hold')
         }
         expect(next.child.exitCode).toBeNull()

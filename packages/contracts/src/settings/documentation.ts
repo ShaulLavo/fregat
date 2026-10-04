@@ -697,6 +697,14 @@ export const SETTINGS_DOCUMENTATION = {
       'Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.',
     keywords: ['developer', 'heavy', 'jobs', 'class', 'memory', 'estimate', 'ceiling', 'admission'],
   },
+  'developer.heavyJobQuietPolicy': {
+    title: 'Quiet job concurrency',
+    details:
+      'Use an empty allowedClasses array to hold new light jobs during measurements. The measurementCpus and concurrentCpus fields currently accept empty arrays, preserving host scheduling. CPU affinity requires a validated scheduling implementation.',
+    description:
+      'Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.',
+    keywords: ['developer', 'heavy', 'quiet', 'concurrency', 'affinity'],
+  },
   'developer.heavyJobMemoryReserveMiB': {
     title: 'Heavy job memory reserve',
     description:

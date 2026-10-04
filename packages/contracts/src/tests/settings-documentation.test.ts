@@ -27,3 +27,19 @@ test('presentation preserves the registered schema, default and policy', () => {
     expect(descriptor.description).toBe(SETTINGS_DOCUMENTATION[id].description)
   }
 })
+
+test('quiet concurrency presents its accepted copy with the advanced machine policy', () => {
+  expect(presentSetting('developer.heavyJobQuietPolicy')).toMatchObject({
+    title: 'Quiet job concurrency',
+    details:
+      'Use an empty allowedClasses array to hold new light jobs during measurements. The measurementCpus and concurrentCpus fields currently accept empty arrays, preserving host scheduling. CPU affinity requires a validated scheduling implementation.',
+    description:
+      'Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.',
+    keywords: ['developer', 'heavy', 'quiet', 'concurrency', 'affinity'],
+    scope: 'machine',
+    widget: 'complex',
+    category: 'Developer',
+    visibility: 'advanced',
+    default: { allowedClasses: ['light'], measurementCpus: [], concurrentCpus: [] },
+  })
+})
