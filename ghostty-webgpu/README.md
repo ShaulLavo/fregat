@@ -132,8 +132,9 @@ Styled snapshots and text-only rows describe those consumers; GPU rendering read
 
 ## Canvas paint modes
 
-`WebGpuTerminalRendererOptions.rendererMode` selects `auto`, `canvas2d-fill-text`, or
-`canvas2d-pixels`. The two Canvas modes share native cell ownership, row damage, cursor
+`Terminal.create({ rendererMode })` and `WebGpuTerminalRendererOptions.rendererMode`
+select `auto`, `canvas2d-fill-text`, or `canvas2d-pixels`. The worker entry accepts `auto`
+and reports a capability error for explicit Canvas modes. The two Canvas modes share native cell ownership, row damage, cursor
 painting and scroll history. Text shaping stays inside each native owner, including the
 terminal's mode-2027 grapheme spans.
 

@@ -58,7 +58,17 @@ it.each([1, 2])(
     const rasterText = vi.spyOn(OffscreenCanvasRenderingContext2D.prototype, 'fillText')
     const readback = vi.spyOn(OffscreenCanvasRenderingContext2D.prototype, 'getImageData')
     const submit = vi.spyOn(output, 'putImageData')
+    const glyphs = vi.spyOn(target, 'glyph')
     draw()
+    expect(
+      glyphs.mock.calls
+        .filter(([input]) => input.text.includes('👩') || input.text === '💻')
+        .map(([input, x, y]) => [input.text, input.cellSpan, x, y]),
+    ).toEqual([
+      ['👩‍', 2, 30 * dpr, 0],
+      ['💻', 2, 50 * dpr, 0],
+      ['👩‍💻', 2, 0, 20 * dpr],
+    ])
     expect(rasterText.mock.calls.length).toBeGreaterThan(0)
     expect(readback.mock.calls.length).toBeGreaterThan(0)
     const first = target.frame.getImage()
@@ -226,7 +236,7 @@ it('rebuilds pixels and native font state after Canvas restoration events', asyn
   const output = canvas.getContext('2d')!
   const expected = output.getImageData(0, 0, canvas.width, canvas.height).data
   canvas.dispatchEvent(new Event('contextlost', { cancelable: true }))
-  renderer.schedule()
+  renderer.refreshRows(0, 3)
   expect(() => clock.flushFrame()).toThrow('awaiting restoration')
   output.reset()
   canvas.dispatchEvent(new Event('contextrestored'))

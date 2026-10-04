@@ -638,18 +638,17 @@ describe('CanvasTerminalRenderer', () => {
 
 describe('compatible renderer selection', () => {
   it('releases an acquired device and falls back when the WebGPU context is unavailable', async () => {
-    const backingCanvas = createCanvas()
-    const fakeCanvas = {
-      getContext: (type: string) => (type === '2d' ? backingCanvas.getContext('2d') : null),
-      height: 1,
-      style: backingCanvas.style,
-      width: 1,
-    } as unknown as HTMLCanvasElement
+    const canvas = createCanvas()
+    const getContext = canvas.getContext.bind(canvas)
+    Object.defineProperty(canvas, 'getContext', {
+      configurable: true,
+      value: (type: string) => (type === '2d' ? getContext('2d') : null),
+    })
     const clock = new FakeClock()
     const source = new FakeRenderState([row(0, [cell(0), cell(1)]), row(1, [cell(0), cell(1)])])
     const destroy = vi.fn()
     const renderer = await createCompatibleTerminalRenderer({
-      ...options(fakeCanvas, source, clock),
+      ...options(canvas, source, clock),
       deviceFactory: () => Promise.resolve({ destroy } as unknown as GPUDevice),
     })
 
