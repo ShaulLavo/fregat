@@ -877,6 +877,9 @@ for (const scenario of [
   'profile-init',
   'late-transport',
   'truncated-transport',
+  'launch-native-contradiction',
+  'launch-no-resize',
+  'launch-calibration-target',
 ]) {
   test(
     `actual launch and cleanup respect external ${scenario} boundaries`,

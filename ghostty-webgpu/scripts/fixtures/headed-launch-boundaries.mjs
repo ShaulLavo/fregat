@@ -17,8 +17,15 @@ const scenarios = [
   'profile-init',
   'late-transport',
   'truncated-transport',
+  'launch-native-contradiction',
+  'launch-no-resize',
+  'launch-calibration-target',
 ]
 assert(scenarios.includes(scenario))
+const geometryScenario = scenario.startsWith('launch-')
+let nativeSize = geometryScenario ? { width: 922, height: 1030 } : { width: 480, height: 560 }
+let windowState = 'normal'
+let resized = false
 const scripts = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(join(scripts, 'comparison-presentation.mjs'))
 const { PNG } = require('pngjs')
@@ -70,7 +77,12 @@ function spawn(command, args) {
     birth: '100',
     argv: [command, ...args],
   })
-  if (scenario === 'orphan-descendant' || scenario.includes('transport') || scenario === 'healthy')
+  if (
+    scenario === 'orphan-descendant' ||
+    scenario.includes('transport') ||
+    scenario === 'healthy' ||
+    geometryScenario
+  )
     processes.set(gpuPid, {
       parent: browserPid,
       group: browserPid,
@@ -260,8 +272,8 @@ const gl = {
   },
 }
 const pageContext = vm.createContext({
-  innerWidth: 320,
-  innerHeight: 440,
+  innerWidth: geometryScenario ? 500 : 320,
+  innerHeight: geometryScenario ? 431 : 440,
   outerWidth: 480,
   outerHeight: 560,
   devicePixelRatio: 1,
@@ -290,7 +302,42 @@ const page = {
   },
   evaluate: async (fn, input) => vm.runInContext('(' + fn.toString() + ')', pageContext)(input),
 }
-session.send = async (method) => {
+session.send = async (method, parameters) => {
+  if (method === 'Browser.setWindowBounds') {
+    assert.equal(parameters.windowId, 7)
+    if (parameters.bounds.windowState === 'maximized') {
+      windowState = 'maximized'
+      if (scenario !== 'launch-calibration-target') {
+        nativeSize = { width: 1500, height: 1200 }
+        pageContext.innerWidth = 1468
+        pageContext.innerHeight = 1071
+      }
+      events.push('calibration-maximized')
+      return {}
+    }
+    if (parameters.bounds.windowState === 'normal') {
+      windowState = 'normal'
+      return {}
+    }
+    assert.equal(windowState, 'normal')
+    assert.deepEqual(
+      { ...parameters.bounds },
+      {
+        width: pageContext.devicePixelRatio * (geometryScenario ? 500 : 320) + 32,
+        height: pageContext.devicePixelRatio * (geometryScenario ? 431 : 440) + 129,
+      },
+    )
+    if (scenario === 'launch-no-resize') {
+      events.push('target-resize-request-ignored')
+      return {}
+    }
+    nativeSize = geometryScenario ? { width: 922, height: 1030 } : { ...parameters.bounds }
+    pageContext.innerWidth = geometryScenario ? 500 : 320
+    pageContext.innerHeight = geometryScenario ? 431 : 440
+    resized = true
+    events.push('target-resize')
+    return {}
+  }
   if (method === 'Browser.getVersion')
     return {
       product: 'Chrome/123.0.0.0',
@@ -338,7 +385,7 @@ session.send = async (method) => {
   if (method === 'Browser.getWindowForTarget')
     return {
       windowId: 7,
-      bounds: { width: 480, height: 560, windowState: 'normal' },
+      bounds: { width: nativeSize.width, height: nativeSize.height, windowState },
     }
   if (method === 'Page.startScreencast') {
     screencast = true
@@ -424,13 +471,14 @@ try {
   const options = {
     executablePath: executable,
     taskRoot,
+    viewport: geometryScenario ? { width: 500, height: 431 } : { width: 320, height: 440 },
     observeWindow: async (input) => ({
       browserPid: input.browserPid,
       backend: 'wayland',
       mapped: true,
       hidden: false,
       xwayland: false,
-      size: { width: 480, height: 560 },
+      size: { ...nativeSize },
     }),
   }
   if (scenario.includes('transport') || scenario === 'healthy')
@@ -484,8 +532,28 @@ if (scenario.includes('transport')) {
   assert(failure, 'Late incompatible transport must reject successful readback')
   assert.notEqual(evidence?.status, 'PASS_SETUP_ONLY')
 }
+if (geometryScenario) {
+  assert(failure, 'Production launch must reject contradiction or an unobserved native resize')
+  const reuse = scenario === 'launch-calibration-target'
+  assert.match(failure, reuse ? /must require a native resize/ : /geometry did not settle/)
+  assert.equal(resized, scenario === 'launch-native-contradiction')
+  assert.deepEqual(
+    { ...evidence.nativeContentInsets },
+    reuse ? { width: 422, height: 599 } : { width: 32, height: 129 },
+  )
+  assert.equal(evidence.geometryResize.observations.length, reuse ? 0 : 20)
+  assert.equal(evidence.geometry, undefined)
+  assert.equal(processes.size, 0)
+}
 if (scenario === 'healthy') {
   assert.equal(failure, undefined)
   assert.equal(evidence.status, 'PASS_SETUP_ONLY')
+  assert.equal(evidence.geometryCalibration.calibrationOnly, true)
+  assert.equal(evidence.geometryCalibration.observations.length, 2)
+  assert.deepEqual({ ...evidence.nativeContentInsets }, { width: 32, height: 129 })
+  assert.deepEqual({ ...evidence.geometry.nativeContentSize }, { width: 320, height: 440 })
+  assert.equal(evidence.geometryResize.observed, true)
+  assert.equal(evidence.geometryResize.observations.length, 2)
+  assert(events.indexOf('calibration-maximized') < events.indexOf('target-resize'))
   assert.equal(processes.size, 0)
 }

@@ -319,6 +319,21 @@ export function observedNativeContentInsets(page, nativeSize) {
   return insets
 }
 
+async function observedPageGeometry(page) {
+  return await boundedSmokeOperation(
+    () =>
+      page.evaluate(() => ({
+        width: innerWidth,
+        height: innerHeight,
+        outerWidth,
+        outerHeight,
+        dpr: devicePixelRatio,
+        visibility: document.visibilityState,
+      })),
+    1000,
+  )
+}
+
 export async function settleOwnedWindowGeometry({
   page,
   session,
@@ -331,6 +346,7 @@ export async function settleOwnedWindowGeometry({
   viewport,
   deviceScaleFactor,
   nativeContentInsets,
+  onObservation,
 }) {
   assert(
     viewport && viewport.width > 0 && viewport.height > 0,
@@ -347,18 +363,7 @@ export async function settleOwnedWindowGeometry({
   const snapshots = []
   let previous
   for (let attempt = 0; attempt < 20; attempt++) {
-    const facts = await boundedSmokeOperation(
-      () =>
-        page.evaluate(() => ({
-          width: innerWidth,
-          height: innerHeight,
-          outerWidth,
-          outerHeight,
-          dpr: devicePixelRatio,
-          visibility: document.visibilityState,
-        })),
-      1000,
-    )
+    const facts = await observedPageGeometry(page)
     const window = await boundedSmokeOperation(
       () => session.send('Browser.getWindowForTarget', { targetId }),
       1000,
@@ -367,16 +372,19 @@ export async function settleOwnedWindowGeometry({
       () => observeWindow({ browserPid, browserIdentity, smokeId, windowId }),
       2500,
     )
+    const nativeContentSize = {
+      width: compositor.size?.width - nativeContentInsets.width,
+      height: compositor.size?.height - nativeContentInsets.height,
+    }
+    const snapshot = { page: facts, window, compositorSize: compositor.size, nativeContentSize }
+    snapshots.push(snapshot)
+    onObservation?.(snapshot)
     assert.equal(window.windowId, windowId, 'Owned window changed during readiness')
     assert.equal(compositor.browserPid, browserPid, 'Compositor window owner changed')
     assert.equal(compositor.backend, 'wayland', 'Actual Wayland window required during readiness')
     assert.equal(compositor.mapped, true, 'Owned compositor window must be mapped')
     assert.equal(compositor.hidden, false, 'Owned compositor window must be visible')
     assert.equal(compositor.xwayland, false, 'Native Wayland window required')
-    const nativeContentSize = {
-      width: compositor.size?.width - nativeContentInsets.width,
-      height: compositor.size?.height - nativeContentInsets.height,
-    }
     const matches =
       facts.dpr === deviceScaleFactor &&
       facts.visibility === 'visible' &&
@@ -384,7 +392,6 @@ export async function settleOwnedWindowGeometry({
       facts.height === viewport.height &&
       nativeContentSize.width === viewport.width * deviceScaleFactor &&
       nativeContentSize.height === viewport.height * deviceScaleFactor
-    snapshots.push({ page: facts, window, compositorSize: compositor.size, nativeContentSize })
     const content = {
       width: facts.width,
       height: facts.height,
@@ -638,9 +645,22 @@ export async function finishOwnedLaunchCleanup({
   return cleanup
 }
 
-export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, observeWindow }) {
+export async function launchOwnedHeadedBrowser({
+  executablePath,
+  taskRoot,
+  observeWindow,
+  viewport,
+}) {
   assert.equal(process.platform, 'linux', 'This fixed Wayland/Vulkan launch recipe requires Linux')
   assert(typeof observeWindow === 'function', 'Actual compositor backend observer required')
+  assert(
+    viewport &&
+      Number.isSafeInteger(viewport.width) &&
+      Number.isSafeInteger(viewport.height) &&
+      viewport.width >= 320 &&
+      viewport.height >= 320,
+    'Registered inner viewport must contain the control fixture',
+  )
   assert(
     !/\s/.test(taskRoot) && !/\s/.test(executablePath),
     'No argument spaces: rewritten OS command lines cannot recover execve boundaries',
@@ -924,9 +944,7 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     )
     evidence.ownedProcesses = owned
     evidence.actualBackend = actualBackend
-    const nativeContentInsets = observedNativeContentInsets(facts, compositor.size)
-    evidence.nativeContentInsets = nativeContentInsets
-    const geometry = await settleOwnedWindowGeometry({
+    const geometryOptions = {
       page,
       session: pageSession,
       observeWindow,
@@ -935,10 +953,81 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       smokeId: evidence.smokeId,
       targetId: target.targetId,
       windowId: window.windowId,
-      viewport: { width: facts.width, height: facts.height },
       deviceScaleFactor: facts.dpr,
+    }
+    evidence.geometryCalibration = {
+      requestedWindowState: 'maximized',
+      calibrationOnly: true,
+      observations: [],
+    }
+    await boundedSmokeOperation(
+      () =>
+        pageSession.send('Browser.setWindowBounds', {
+          windowId: window.windowId,
+          bounds: { windowState: 'maximized' },
+        }),
+      2000,
+    )
+    const calibrationFacts = await observedPageGeometry(page)
+    const calibrationWindow = await boundedSmokeOperation(
+      () => observeWindow(geometryOptions),
+      2500,
+    )
+    evidence.geometryCalibration.observedPage = calibrationFacts
+    evidence.geometryCalibration.observedCompositor = calibrationWindow
+    const nativeContentInsets = observedNativeContentInsets(
+      calibrationFacts,
+      calibrationWindow.size,
+    )
+    evidence.nativeContentInsets = nativeContentInsets
+    const calibration = await settleOwnedWindowGeometry({
+      ...geometryOptions,
+      viewport: { width: calibrationFacts.width, height: calibrationFacts.height },
       nativeContentInsets,
+      onObservation: (snapshot) => evidence.geometryCalibration.observations.push(snapshot),
     })
+    evidence.geometryCalibration.stable = calibration
+    assert(
+      calibration.window.bounds.windowState === 'maximized' ||
+        calibration.compositor.client?.floating === false,
+      'Observed maximized or tiled calibration window required',
+    )
+    const requestedBounds = {
+      width: viewport.width * facts.dpr + nativeContentInsets.width,
+      height: viewport.height * facts.dpr + nativeContentInsets.height,
+    }
+    evidence.geometryResize = { viewport, requestedBounds, observed: false, observations: [] }
+    assert(
+      requestedBounds.width !== calibration.compositor.size.width ||
+        requestedBounds.height !== calibration.compositor.size.height,
+      'Qualification target must require a native resize after calibration',
+    )
+    await boundedSmokeOperation(
+      () =>
+        pageSession.send('Browser.setWindowBounds', {
+          windowId: window.windowId,
+          bounds: { windowState: 'normal' },
+        }),
+      2000,
+    )
+    await boundedSmokeOperation(
+      () =>
+        pageSession.send('Browser.setWindowBounds', {
+          windowId: window.windowId,
+          bounds: requestedBounds,
+        }),
+      2000,
+    )
+    const geometry = await settleOwnedWindowGeometry({
+      ...geometryOptions,
+      viewport,
+      nativeContentInsets,
+      onObservation: (snapshot) => evidence.geometryResize.observations.push(snapshot),
+    })
+    evidence.geometryResize.observed =
+      geometry.compositor.size.width !== calibration.compositor.size.width ||
+      geometry.compositor.size.height !== calibration.compositor.size.height
+    assert(evidence.geometryResize.observed, 'Native resize after calibration must be observed')
     evidence.geometry = geometry
     const ownership = {
       targetId: target.targetId,
