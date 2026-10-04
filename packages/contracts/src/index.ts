@@ -560,9 +560,7 @@ export {
   isSettingId,
   settingParentId,
   SETTING_IDS,
-  SETTING_ROW_IDS,
   SETTINGS_REGISTRY,
-  settingRowIds,
   settingsValuesSchema,
   type SettingId,
   type SettingsValues,
@@ -574,7 +572,6 @@ export {
   type ReadonlyJsonValue,
   type SettingsJsonSchema,
 } from './settings/schema'
-export { settingControl, type SettingControl } from './settings/control'
 export {
   COLOR_THEME_MODES,
   DEFAULT_COLOR_THEME,

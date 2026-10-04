@@ -1,3 +1,4 @@
+import { presentationFor } from '@workspace/contracts/settings/presentation'
 import {
   providerEnabledOperation,
   themePartWriteOperation,
@@ -29,7 +30,8 @@ export function settingEditDisabledReason(
   if (!enabled) return 'Reconnect before editing settings.'
   if (!id) return 'Select a setting first.'
   const descriptor = descriptorFor(id)
-  if (descriptor.readOnlyReason) return descriptor.readOnlyReason
+  const { readOnlyReason } = presentationFor(id)
+  if (readOnlyReason) return readOnlyReason
   if (!layerAllowsScope(target, descriptor.scope))
     return 'This setting can only be changed in user settings.'
   return settingDependencyNote(id, values)
@@ -52,12 +54,12 @@ export function settingDraft(
   const layer = snapshot.layers.find((entry) => entry.id === target)
   const value =
     id === 'providers.instances' ? snapshot.values[id] : (layer?.raw[id] ?? snapshot.values[id])
-  if (['string', 'font', 'multiline'].includes(descriptorFor(id).widget)) return String(value)
+  if (['string', 'font', 'multiline'].includes(presentationFor(id).widget)) return String(value)
   return JSON.stringify(value, null, 2)
 }
 
 function parseSettingDraft(id: SettingId, draft: string) {
-  const widget = descriptorFor(id).widget
+  const widget = presentationFor(id).widget
   const value: unknown = ['string', 'font', 'multiline'].includes(widget)
     ? draft
     : JSON.parse(draft)
@@ -121,12 +123,12 @@ export async function saveSettingDraft({
 }
 
 export function choiceDraft(id: SettingId, value: string) {
-  return descriptorFor(id).widget === 'boolean' ? value : JSON.stringify(value)
+  return presentationFor(id).widget === 'boolean' ? value : JSON.stringify(value)
 }
 
 export function settingChoices(id: SettingId) {
   const schema = descriptorFor(id).schema
-  if (descriptorFor(id).widget === 'boolean') return ['true', 'false']
+  if (presentationFor(id).widget === 'boolean') return ['true', 'false']
   if ('options' in schema && Array.isArray(schema.options)) return schema.options.map(String)
   return null
 }

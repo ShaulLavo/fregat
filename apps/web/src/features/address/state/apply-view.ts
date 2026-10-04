@@ -1,3 +1,5 @@
+import { settingsCategoriesQueryOptions } from '@/features/address/utils/settings-categories-query'
+import { settingsCategoryForSlug } from '@/features/address/utils/settings-category'
 import { editorDocumentToken, emptyAddress } from '@workspace/client-core/address/grammar'
 import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/address/workspace'
@@ -35,6 +37,7 @@ export type AddressApplyResult =
   | { readonly status: 'unavailable' | 'superseded'; readonly reason: string }
 
 type ApplyOptions = {
+  readonly settingsCategory?: string | null
   readonly application: ApplicationRuntime
   readonly address: AddressIntent
   readonly reason: AddressApplyReason
@@ -98,6 +101,14 @@ async function applyCurrentView(
   const current = () =>
     options.isCurrent() && !signal.aborted && application.getSnapshot() === owner
   if (!current()) return superseded()
+  const settingsCategory = address.settings
+    ? settingsCategoryForSlug(
+        address.settings,
+        await owner.queryClient.query(settingsCategoriesQueryOptions),
+      )
+    : null
+  if (!current()) return superseded()
+  options = { ...options, settingsCategory }
   if (!address.workspace) return { status: 'applied', reason }
   if (address.workspace === NO_WORKSPACE_TOKEN) return applyFolderless(options, owner, trace)
 
@@ -272,6 +283,7 @@ function applyOwnedView(
       complete: options.address.source === 'command',
     })
   applyAddressFields({
+    settingsCategory: options.settingsCategory ?? null,
     address: options.address.address,
     workspaceStore: editor.workspaceStore,
     searchStore: editor.searchBufferStore,

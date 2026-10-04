@@ -42,7 +42,7 @@ type PackageIdentity = {
 
 type Report = {
   readonly dir: string
-  readonly eagerSettingsDocumentation: readonly string[]
+  readonly eagerSettingsMetadata: readonly string[]
   /** Includes boot screens and the emitted preload helpers the phone executes. */
   readonly phoneSessionFirstLoad: {
     readonly scriptGzip: number
@@ -109,7 +109,7 @@ function runBuild(): void {
   if (result.exitCode !== 0) process.exit(result.exitCode)
 }
 
-export function settingsDocumentationInStartup(
+export function settingsMetadataInStartup(
   chunks: readonly Pick<BundleStatsChunk, 'fileName' | 'modules'>[],
   files: readonly { readonly fileName: string }[],
 ): string[] {
@@ -120,7 +120,7 @@ export function settingsDocumentationInStartup(
     .filter(
       (module) =>
         module.renderedLength > 0 &&
-        /\/settings\/(documentation|defaults-document)\.ts$/u.test(module.id),
+        /\/settings\/(documentation|defaults-document|presentation|control)\.ts$/u.test(module.id),
     )
     .map((module) => module.id)
 }
@@ -142,7 +142,7 @@ function buildReport(dir: string): Report {
   if (!stats) {
     return {
       dir,
-      eagerSettingsDocumentation: [],
+      eagerSettingsMetadata: [],
       phoneFirstLoad,
       phoneSessionFirstLoad,
       firstLoad: { scriptGzip, stylesheetGzip, files },
@@ -158,7 +158,7 @@ function buildReport(dir: string): Report {
   const packages = attributePackages(stats.chunks, firstLoadNames)
   return {
     dir,
-    eagerSettingsDocumentation: settingsDocumentationInStartup(stats.chunks, [
+    eagerSettingsMetadata: settingsMetadataInStartup(stats.chunks, [
       ...files,
       ...phoneFiles,
       ...phoneSessionFiles,

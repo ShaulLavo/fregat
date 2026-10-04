@@ -1,5 +1,6 @@
+import { SETTING_ROW_IDS, settingRowIds } from '@workspace/contracts/settings/presentation'
 import { presentSetting } from '@workspace/contracts/settings/documentation'
-import { SETTING_ROW_IDS, settingRowIds, type SettingId } from '@workspace/contracts'
+import { type SettingId } from '@workspace/contracts'
 
 import { settingRowTitle } from './humanize'
 

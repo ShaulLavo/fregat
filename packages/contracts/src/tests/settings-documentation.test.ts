@@ -1,10 +1,12 @@
 import { expect, test } from 'vitest'
 import { SETTINGS_DOCUMENTATION, presentSetting } from '../settings/documentation'
 import { descriptorFor, SETTING_IDS } from '../settings/keys'
+import { SETTINGS_PRESENTATION, presentationFor } from '../settings/presentation'
 import { registryProblems } from '../settings/registry'
 
 test('every registered setting has one documentation entry', () => {
   expect(Object.keys(SETTINGS_DOCUMENTATION)).toEqual(SETTING_IDS)
+  expect(Object.keys(SETTINGS_PRESENTATION)).toEqual(SETTING_IDS)
 })
 
 test('startup definitions contain no setting prose or display titles', () => {
@@ -24,6 +26,11 @@ test('presentation preserves the registered schema, default and policy', () => {
     expect(descriptor.schema).toBe(definition.schema)
     expect(descriptor.default).toBe(definition.default)
     expect(descriptor.scope).toBe(definition.scope)
+    expect(descriptor.merge).toBe(definition.merge)
+    expect(descriptor.sensitive).toBe(definition.sensitive)
+    expect(descriptor.dependsOn).toBe(definition.dependsOn)
+    expect(descriptor).toMatchObject(SETTINGS_PRESENTATION[id])
+    expect(presentationFor(id)).toBe(SETTINGS_PRESENTATION[id])
     expect(descriptor.description).toBe(SETTINGS_DOCUMENTATION[id].description)
   }
 })
