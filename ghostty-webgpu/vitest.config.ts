@@ -10,6 +10,8 @@ export default defineConfig({
       'scripts/wasm-provenance.test.ts',
       'scripts/comparison-source.test.ts',
       'scripts/browser-file-roots.test.ts',
+      'scripts/renderer-smoke-dependency.test.ts',
+      'scripts/package-tarball.test.ts',
       'site/src/**/*.test.ts',
       'scripts/config-resolver-native/*.test.ts',
       'demo/**/*.test.ts',
