@@ -200,8 +200,8 @@ class AnalysisEntry<T extends RetentionResult> {
   private readonly cancellation = new AbortController()
   private interests = 0
   private lastRelease: number | null = null
-  private queuedRevision = -1
-  private generation = 0
+  protected queuedRevision = -1
+  protected generation = 0
   private pendingInterest = new AbortController()
   private tail: Promise<void> = Promise.resolve()
   private state: EditorAnalysisRead<T>
@@ -394,6 +394,9 @@ type PendingRangeQuery = {
   readonly range: EditorSyntaxRange
   readonly promise: Promise<EditorSyntaxResult>
   admission: 'cache' | 'return-only'
+  work:
+    | { readonly kind: 'queued'; readonly generation: number | null }
+    | { readonly kind: 'running'; readonly generation: number }
 }
 
 const structuralLeaseOwners = new WeakMap<
@@ -496,9 +499,7 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       }
       intervals.push(...demand.ranges)
       const contributors = this.contributors.get(signal)
-      if (contributors) {
-        for (const contributor of contributors) this.protectContributor(contributor, protectedSlots)
-      }
+      if (contributors) this.protectContributors(contributors, protectedSlots)
       if (!contributors || demand.kind === 'preparation')
         this.protectIntersecting(demand.ranges, protectedSlots)
       this.protectLookup(demand.ranges, protectedSlots)
@@ -518,6 +519,13 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     for (const [key, cached] of this.ranges) {
       if (!protectedSlots.has(cached)) this.ranges.delete(key)
     }
+  }
+
+  private protectContributors(
+    contributors: readonly RetainedRangeContributor[],
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    for (const contributor of contributors) this.protectContributor(contributor, protectedSlots)
   }
 
   private protectContributor(
@@ -548,8 +556,7 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       if (
         ranges.some(
           (range) =>
-            rangesIntersect(range, cached.range) ||
-            cached.result.folds.some((fold) => rangesIntersect(range, fold)),
+            rangesIntersect(range, cached.range) || foldResultIntersects(cached.result, range),
         )
       )
         protectedSlots.add(cached)
@@ -677,8 +684,11 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     const state = this.readRange(range)
     if (state.kind === 'ready') return Promise.resolve(state.result)
     const revision = this.buffer.getRevision()
-    const key = `${revision}:${rangeKey(range)}`
-    const existing = this.queries.get(key)
+    const generation = this.queuedRevision === revision ? this.generation : null
+    const key = `${revision}:${generation ?? 'publication'}:${rangeKey(range)}`
+    const existing = [...this.queries.values()].find((query) =>
+      this.compatibleQuery(query, revision, range),
+    )
     if (existing) {
       this.trimOptionalRanges()
       return existing.promise
@@ -689,7 +699,9 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       revision,
       range,
       admission: 'cache',
+      work: { kind: 'queued', generation },
       promise: this.query(() => {
+        pending.work = { kind: 'running', generation: this.generation }
         const current = this.readRange(range)
         if (current.kind === 'ready') return Promise.resolve(current.result)
         queried = true
@@ -716,11 +728,26 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     return pending.promise
   }
 
+  private compatibleQuery(
+    query: PendingRangeQuery,
+    revision: number,
+    range: EditorSyntaxRange,
+  ): boolean {
+    return (
+      query.revision === revision &&
+      query.snapshot === this.buffer.getTextSnapshot() &&
+      rangeKey(query.range) === rangeKey(range) &&
+      (query.work.generation === null || query.work.generation === this.generation)
+    )
+  }
+
   private canAdmitRange(key: string, query: PendingRangeQuery): boolean {
     return (
       !this.signal.aborted &&
       this.queries.get(key) === query &&
       query.admission === 'cache' &&
+      query.work.kind === 'running' &&
+      query.work.generation === this.generation &&
       query.revision === this.buffer.getRevision() &&
       query.snapshot === this.buffer.getTextSnapshot()
     )
@@ -1129,4 +1156,8 @@ function rangesIntersect(left: EditorSyntaxRange, right: EditorSyntaxRange): boo
 }
 function rangeContains(outer: EditorSyntaxRange, inner: EditorSyntaxRange): boolean {
   return outer.startIndex <= inner.startIndex && outer.endIndex >= inner.endIndex
+}
+
+function foldResultIntersects(result: EditorSyntaxResult, range: EditorSyntaxRange): boolean {
+  return result.folds.some((fold) => rangesIntersect(range, fold))
 }

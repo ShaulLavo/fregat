@@ -303,11 +303,7 @@ export class EditorSyntaxController {
   private rangeContributors(
     demand: EditorAnalysisDisplayDemand,
   ): readonly CachedSyntaxFoldRange[] | null {
-    if (
-      demand.kind !== 'frame' ||
-      this.rangeTokenOwner?.snapshot !== demand.snapshot ||
-      this.highlighterSession
-    )
+    if (demand.kind !== 'frame' || demand.snapshot !== this.options.getSession()?.getTextSnapshot())
       return null
     const contributors = this.cachedSyntaxFoldRanges.slice()
     if (this.rangeCopyOwner?.store === this.copyTokens)
@@ -317,13 +313,7 @@ export class EditorSyntaxController {
   }
 
   private trimRangeCache(demand: EditorAnalysisDisplayDemand): boolean {
-    if (
-      demand.kind !== 'frame' ||
-      this.highlighterSession ||
-      this.rangeTokenOwner?.store !== this.currentTokens ||
-      this.rangeTokenOwner.snapshot !== demand.snapshot
-    )
-      return false
+    if (demand.kind !== 'frame') return false
     if (demand.snapshot !== this.options.getSession()?.getTextSnapshot()) return false
     const visible = this.options.getVisibleSyntaxRange()
     const ranges = visible ? appendCachedSyntaxRange(demand.ranges, visible) : demand.ranges
@@ -336,16 +326,20 @@ export class EditorSyntaxController {
     )
       return false
     const oldCache = this.cachedSyntaxFoldRanges
-    const tokenContributors = oldCache.filter((cached) =>
-      cached.tokenRanges.some((range) =>
-        ranges.some((protectedRange) => syntaxRangesIntersect(range, protectedRange)),
-      ),
-    )
+    const rangeOwned =
+      !this.highlighterSession &&
+      this.rangeTokenOwner?.store === this.currentTokens &&
+      this.rangeTokenOwner.snapshot === demand.snapshot
+    const tokenContributors = rangeOwned
+      ? oldCache.filter((cached) => syntaxRangeListsIntersect(cached.tokenRanges, ranges))
+      : []
     const foldContributors = activeFoldContributors(oldCache, ranges)
     const retained = new Set([...tokenContributors, ...foldContributors])
     const nextCache = oldCache.filter((cached) => retained.has(cached))
     const coverage = intersectSyntaxRanges(
-      tokenContributors.flatMap((cached) => cached.tokenRanges),
+      rangeOwned
+        ? tokenContributors.flatMap((cached) => cached.tokenRanges)
+        : this.cachedSyntaxRanges,
       ranges,
     )
     const removed =
@@ -353,13 +347,13 @@ export class EditorSyntaxController {
     this.cachedSyntaxFoldRanges = nextCache
     this.cachedSyntaxRanges = coverage
     let changed = false
-    if (removed) {
+    if (removed && rangeOwned) {
       const tokens = compactSyntaxRangeTokens(this.currentTokens, coverage)
       this.currentTokens = tokens
       this.rangeTokenOwner = { store: tokens, snapshot: demand.snapshot }
-      this.stopOptionalWarm(demand.snapshot)
       changed = true
     }
+    if (removed) this.stopOptionalWarm(demand.snapshot)
     this.lastRangeTrim = {
       snapshot: demand.snapshot,
       ranges,
@@ -497,6 +491,12 @@ export class EditorSyntaxController {
     const tokens = highlighterResult?.tokens ?? toEditorTokenStore(structuralTokens ?? [])
 
     this.currentTokens = tokens
+    const structural = prepared?.structural
+    const read = structural?.session.read(structural.range)
+    this.rangeTokenOwner =
+      !prepared?.highlighter && read?.kind === 'ready' && read.result === structuralResult
+        ? { store: tokens, snapshot: read.snapshot }
+        : null
     this.preparedInitialTokensInstalled = Boolean(highlighterResult || structuralTokens)
     if (highlighterResult?.theme !== undefined) this.setHighlighterTheme(highlighterResult.theme)
     return tokens
@@ -901,7 +901,8 @@ export class EditorSyntaxController {
     if (!seedRange) return
     const snapshot = this.options.getSession()?.getTextSnapshot()
     if (
-      this.stoppedWarm?.snapshot === snapshot &&
+      this.stoppedWarm &&
+      this.stoppedWarm.snapshot === snapshot &&
       this.stoppedWarm.configurationGeneration === this.initialHighlightConfigurationGeneration
     )
       return
@@ -1445,6 +1446,13 @@ export class EditorSyntaxController {
     }
     const result = loadResult.result
     if (loadResult.updatesDocument) this.markSyntaxDocumentCurrent(loadResult.contentVersion)
+    const snapshot = this.options.getSession()?.getTextSnapshot()
+    const canOwnRanges =
+      this.rangeTokenOwner?.store === this.currentTokens ||
+      this.currentTokens.length === 0 ||
+      (snapshot &&
+        loadResult.range?.startIndex === 0 &&
+        loadResult.range.endIndex >= snapshot.length)
     const nextTokens = this.highlighterSession
       ? this.currentTokens
       : this.syntaxTokensForResult(result.tokens, loadResult.range)
@@ -1474,9 +1482,8 @@ export class EditorSyntaxController {
     if (!this.highlighterSession) {
       const status: SettledHighlightStatus = result.degraded ? 'degraded' : 'painted'
       const copyTokens = loadResult.range ? toEditorTokenStore(result.tokens) : nextTokens
-      this.rangeTokenOwner = contributor
-        ? { store: nextTokens, snapshot: contributor.snapshot }
-        : null
+      this.rangeTokenOwner =
+        contributor && canOwnRanges ? { store: nextTokens, snapshot: contributor.snapshot } : null
       this.rangeCopyOwner = contributor ? { store: copyTokens, contributor } : null
       this.commitInitialHighlightStatus(
         status,
@@ -1658,7 +1665,11 @@ export class EditorSyntaxController {
   }
 
   private applyCachedSyntaxFolds(range: EditorSyntaxRange): void {
-    const folds = cachedSyntaxFoldsForRange(range, this.cachedSyntaxFoldRanges)
+    const folds = cachedSyntaxFoldsForRange(
+      range,
+      this.cachedSyntaxFoldRanges,
+      this.cachedSyntaxRanges,
+    )
     if (!folds) return
 
     this.foldCoverage = { kind: 'range', range }
@@ -2347,8 +2358,8 @@ const lineBreakCount = (text: string): number => {
 const cachedSyntaxFoldsForRange = (
   range: EditorSyntaxRange,
   cachedRanges: readonly CachedSyntaxFoldRange[],
+  coverageRanges: readonly EditorSyntaxRange[],
 ): readonly FoldRange[] | null => {
-  const coverageRanges = cachedRanges.map((cachedRange) => cachedRange.range)
   if (syntaxRangeCoverage(range, coverageRanges) !== 'full') return null
 
   const foldsByKey = new Map<string, FoldRange>()
@@ -2564,4 +2575,11 @@ function compactSyntaxRangeTokens(
     )
   }
   return EditorTokenStore.fromTokens(tokens)
+}
+
+function syntaxRangeListsIntersect(
+  left: readonly EditorSyntaxRange[],
+  right: readonly EditorSyntaxRange[],
+): boolean {
+  return left.some((range) => right.some((other) => syntaxRangesIntersect(range, other)))
 }
