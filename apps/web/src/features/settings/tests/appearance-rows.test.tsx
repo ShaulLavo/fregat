@@ -1,14 +1,17 @@
 import { settingRowIds } from '@workspace/contracts/settings/presentation'
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   BUNDLED_THEMES,
   DEFAULT_SETTING_VALUES,
+  settingsMutationRequestSchema,
+  type SettingsMutationRequest,
   type SettingsOperation,
+  type SettingsSnapshot,
 } from '@workspace/contracts'
 
-import { getClient } from '@/lib/client'
-import { renderWithProviders } from '../../../../test/render'
+import { activeServerOrigin, getClient } from '@/lib/client'
+import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
 import { expect, test } from '../../../../test/fixtures'
 import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
@@ -19,6 +22,15 @@ import { selectSettingsView } from '@/features/settings/state/view-store'
 import { SettingsPage } from '../components/page'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { Button } from '@workspace/ui/components/button'
+
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { parse } from 'valibot'
+import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { createObservedInProcessClient } from '../../../../test/client'
+import { createRequestGate } from '../../../../test/factories/request-gate'
+import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 
 // The whole settings page renders here; a shared CI runner takes about 6x a workstation.
 const SLOW_RENDER_TIMEOUT_MS = 60_000
@@ -256,11 +268,17 @@ test(
   SLOW_RENDER_TIMEOUT_MS,
 )
 
-function ResetTwoPartsButton() {
+function ResetTwoPartsButton({
+  onReset,
+}: {
+  readonly onReset: (submissions: readonly SettingsSubmission[]) => void
+}) {
   const { resetSetting } = useSettingsActions()
   const resetBoth = () => {
-    resetSetting(KEY, settingRowIds(KEY))
-    resetSetting('workbench.surface.blur', settingRowIds('workbench.surface.blur'))
+    onReset([
+      resetSetting(KEY, settingRowIds(KEY)),
+      resetSetting('workbench.surface.blur', settingRowIds('workbench.surface.blur')),
+    ])
   }
   return (
     <Button size='sm' onClick={resetBoth}>
@@ -271,7 +289,7 @@ function ResetTwoPartsButton() {
 
 test(
   'two resets of different parts sent together both apply',
-  async ({ client }) => {
+  async ({ client, server }) => {
     expect(client).toBeDefined()
     await seed([
       { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
@@ -282,20 +300,86 @@ test(
         mode: 'dark',
         patch: { palette: 'sage', material: { contentOpacity: 20, blur: 3 } },
       },
+      {
+        kind: 'theme.customize',
+        id: THEME.id,
+        mode: 'light',
+        patch: { material: { contentOpacity: 30, blur: 5 } },
+      },
     ])
+    const requests: SettingsMutationRequest[] = []
+    const secondReset = createRequestGate(() => requests.length === 2)
+    const observed = createObservedInProcessClient(server, async (request) => {
+      if (request.method !== 'POST' || new URL(request.url).pathname !== '/settings/write') return
+      requests.push(parse(settingsMutationRequestSchema, await request.clone().json()))
+      return secondReset.beforeRequest(request)
+    })
+    const queryClient = createTestQueryClient()
+    registerEnvironmentQueryClient(queryClient, activeServerOrigin(), observed)
+    const submissions = Promise.withResolvers<readonly SettingsSubmission[]>()
     renderWithProviders(
       <>
         <SettingsPage />
-        <ResetTwoPartsButton />
+        <ResetTwoPartsButton onReset={submissions.resolve} />
       </>,
+      { queryClient },
     )
     expect(await contentSlider()).toHaveAttribute('aria-valuenow', '20')
+    expect(
+      queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document())?.values['workbench.theme']
+        ?.id,
+    ).toBe(THEME.id)
 
     await userEvent.click(screen.getByRole('button', { name: 'Reset two' }))
-
-    await waitFor(async () =>
-      expect((await userLayer()).halves).toEqual({ dark: { palette: 'sage' } }),
+    const resets = await submissions.promise
+    const settled = Promise.all(
+      resets.map((reset) => (reset.kind === 'submitted' ? reset.settled : 'noop')),
     )
+    try {
+      expect(resets.map((reset) => reset.kind)).toEqual(['submitted', 'submitted'])
+      await secondReset.entered
+      const writes = queryClient.getMutationCache().findAll({
+        mutationKey: SETTINGS_MUTATION_KEY,
+        exact: true,
+      })
+      expect(writes.map((write) => write.state.status)).toEqual(['success', 'pending'])
+      expect(requests.map((request) => request.target)).toEqual(['user', 'user'])
+      expect(requests.map((request) => request.operations)).toEqual([
+        [
+          {
+            kind: 'theme.uncustomize',
+            id: THEME.id,
+            mode: 'dark',
+            part: 'material.contentOpacity',
+          },
+        ],
+        [{ kind: 'theme.uncustomize', id: THEME.id, mode: 'dark', part: 'material.blur' }],
+      ])
+      expect((await userLayer()).halves).toEqual({
+        dark: { palette: 'sage', material: { blur: 3 } },
+        light: { material: { contentOpacity: 30, blur: 5 } },
+      })
+      selectSettingsScope('workspace')
+    } finally {
+      await act(async () => {
+        secondReset.release()
+        await expect(settled).resolves.toEqual(['acknowledged', 'acknowledged'])
+      })
+    }
+
+    const expected = {
+      dark: { palette: 'sage' },
+      light: { material: { contentOpacity: 30, blur: 5 } },
+    }
+    expect((await userLayer()).halves).toEqual(expected)
+    expect(
+      queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document())?.values[
+        'workbench.theme.customizations'
+      ][THEME.id],
+    ).toEqual(expected)
+    expect(
+      JSON.parse(await readFile(path.join(server.root, '.platform-test', 'settings.json'), 'utf8')),
+    ).toHaveProperty(['workbench.theme.customizations', THEME.id], expected)
   },
   SLOW_RENDER_TIMEOUT_MS,
 )

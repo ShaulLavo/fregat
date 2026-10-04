@@ -48,18 +48,26 @@ export async function proxyUsageFixture(cleanup: Array<() => Promise<void>>) {
   let status = 200
   let beforeResponse: (() => Promise<void>) | undefined
   let intervalHours = 1
+  let currentIntervalMs: number | undefined
+  let collectorIntervalMs = 1
+  let beforeManagementResponse: (() => Promise<void>) | undefined
   let requests = 0
   let managementReads = 0
   const payloads: unknown[] = []
   const cacheFile = path.join(root, 'accounts.json')
-  const makeStore = () => {
+  const makeStore = (clock = () => now) => {
     const options = {
       cacheFile,
-      now: () => now,
-      policy: () => ({ minIntervalMs: 1, failureCooldownMs: 1, staleAfterMs: 900_000 }),
+      now: clock,
+      policy: () => ({
+        minIntervalMs: collectorIntervalMs,
+        failureCooldownMs: 1,
+        staleAfterMs: 900_000,
+      }),
       proxySourceKey: () => source,
       proxyConfigured: () => source !== null,
       proxyRequestIntervalHours: () => intervalHours,
+      proxyCurrentIntervalMs: () => currentIntervalMs ?? intervalHours * 3_600_000,
       readProxy: async (
         identityContext: string,
         refresh?: Parameters<typeof readProxyUsage>[0]['refresh'],
@@ -69,12 +77,13 @@ export async function proxyUsageFixture(cleanup: Array<() => Promise<void>>) {
           secret,
           identityContext,
           refresh,
-          now: () => now,
+          now: clock,
           fetch: async (input, init) => {
             const pathname = new URL(String(input)).pathname
             expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${secret}`)
             expect(init?.redirect).toBe('error')
             if (pathname === '/v0/management/auth-files') {
+              await beforeManagementResponse?.()
               expect(init?.method).toBe('GET')
               managementReads += 1
               return Response.json({ files })
@@ -137,6 +146,15 @@ export async function proxyUsageFixture(cleanup: Array<() => Promise<void>>) {
     root,
     set intervalHours(value: number) {
       intervalHours = value
+    },
+    set currentIntervalMs(value: number) {
+      currentIntervalMs = value
+    },
+    set collectorIntervalMs(value: number) {
+      collectorIntervalMs = value
+    },
+    set beforeManagementResponse(value: (() => Promise<void>) | undefined) {
+      beforeManagementResponse = value
     },
     get requests() {
       return requests
