@@ -19,6 +19,11 @@ import { analyzeX6, x6Protocol } from './ghostty-x6-public-statistics.ts'
 import { verifyX6Slices } from './ghostty-x6-public-slices.ts'
 import { verifyPublicCounters, type CountRow } from './ghostty-x6-public-counters.ts'
 import {
+  bindX6Source,
+  verifyX6RuntimeReuse,
+  type SourceBinding,
+} from './ghostty-x6-public-reuse.ts'
+import {
   claimX6Window,
   verifyX6WindowClaim,
   type ReplacementClaim,
@@ -53,6 +58,13 @@ interface Unit {
   readonly counterVerificationSha256: string
   readonly protocol: typeof x6Protocol
   readonly files: Record<string, string>
+  readonly sourceBindings: readonly SourceBinding[]
+  readonly runtimeReuse: ReturnType<typeof verifyX6RuntimeReuse>
+  readonly runtimeReuseQualification: {
+    readonly file: string
+    readonly sha256: string
+    readonly checkpointHead: string
+  }
   readonly node: { readonly path: string; readonly version: string; readonly sha256: string }
   readonly bun: { readonly path: string; readonly version: string; readonly sha256: string }
   readonly host: Host
@@ -86,7 +98,8 @@ interface CompletedRun {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const launcher = fileURLToPath(import.meta.url)
-const [command, inputArgument, outputArgument, argument] = process.argv.slice(2)
+const [command, inputArgument, outputArgument, argument, reuseArgument, qualificationArgument] =
+  process.argv.slice(2)
 assert(inputArgument && outputArgument)
 const input = resolve(inputArgument)
 const output = resolve(outputArgument)
@@ -142,7 +155,28 @@ async function prepare(): Promise<void> {
   const manifest = readJson<Manifest>(join(input, 'manifest.json'))
   assert.equal(git('merge-base', manifest.actualBase, 'HEAD'), manifest.actualBase)
   assert.equal(git('status', '--porcelain'), '')
+  assert(reuseArgument, 'Exact qualified type-only runtime reuse evidence required')
+  const runtimeReuse = verifyX6RuntimeReuse(input, resolve(reuseArgument))
+  assert(qualificationArgument, 'Independent exact type-reuse custody required')
+  const qualificationFile = resolve(qualificationArgument)
+  const qualification = readJson<{
+    authorReceipt: string
+    authorReceiptSha256: string
+    toolingCheckpoint: { head: string }
+  }>(qualificationFile)
+  assert.equal(qualification.authorReceipt, runtimeReuse.evidenceFile)
+  assert.equal(qualification.authorReceiptSha256, runtimeReuse.evidenceSha256)
+  assert.equal(
+    git('merge-base', qualification.toolingCheckpoint.head, 'HEAD'),
+    qualification.toolingCheckpoint.head,
+  )
+  const runtimeReuseQualification = {
+    file: qualificationFile,
+    sha256: digest('sha256', readFileSync(qualificationFile), 'hex'),
+    checkpointHead: qualification.toolingCheckpoint.head,
+  }
   const files: Record<string, string> = {}
+  const sourceBindings: SourceBinding[] = []
   const sourceMapFile = join(input, 'uninstrumented/entry.mjs.map')
   const sourceMap = readJson<{ sources: readonly string[]; sourcesContent: readonly string[] }>(
     sourceMapFile,
@@ -150,12 +184,13 @@ async function prepare(): Promise<void> {
   assert.equal(sourceMap.sources.length, sourceMap.sourcesContent.length)
   for (let index = 0; index < sourceMap.sources.length; index++) {
     const source = resolve(dirname(sourceMapFile), sourceMap.sources[index]!)
-    assert.equal(
+    const binding = bindX6Source(
+      source,
+      sourceMap.sourcesContent[index]!,
       readFileSync(source, 'utf8'),
-      sourceMap.sourcesContent[index],
-      `Reuse exact accepted bundle source ${source}`,
     )
-    files[source] = digest('sha256', readFileSync(source), 'hex')
+    sourceBindings.push(binding)
+    files[source] = binding.currentSha256
   }
   const verificationFile = join(input, 'counter-verification.json')
   const rawCounters = readJson<{ rows: readonly CountRow[] }>(
@@ -179,6 +214,14 @@ async function prepare(): Promise<void> {
   )
   mkdirSync(output)
   addTree(files, input)
+  addTree(files, runtimeReuse.rebuiltArchive)
+  files[runtimeReuse.evidenceFile] = runtimeReuse.evidenceSha256
+  files[qualificationFile] = runtimeReuseQualification.sha256
+  assert.equal(sourceBindings.length, 80)
+  assert.equal(
+    sourceBindings.filter((binding) => binding.classification === 'BYTE-EQUAL').length,
+    79,
+  )
   for (const [file, expected] of Object.entries(manifest.artifacts))
     assert.equal(files[join(input, file)], expected)
   for (const [file, expected] of Object.entries(manifest.sourceHashes)) {
@@ -204,6 +247,7 @@ async function prepare(): Promise<void> {
     join(root, 'scripts/ghostty-x6-public-counters.ts'),
     join(root, 'scripts/ghostty-x6-public-slices.ts'),
     join(root, 'scripts/ghostty-x6-public-claim.ts'),
+    join(root, 'scripts/ghostty-x6-public-reuse.ts'),
     host.quietTurnFile,
     ...['run.js', 'status.js', 'commit'].map((name) => join(host.runnerDirectory, name)),
   ]) {
@@ -238,6 +282,9 @@ async function prepare(): Promise<void> {
     counterVerificationSha256: digest('sha256', readFileSync(verificationFile), 'hex'),
     protocol: x6Protocol,
     files,
+    sourceBindings,
+    runtimeReuse,
+    runtimeReuseQualification,
     node: {
       path: node,
       version: nodeVersion.stdout.trim(),
@@ -270,6 +317,10 @@ async function verifyUnit(unit: Unit): Promise<void> {
   assert.equal(unit.sourceHead, git('rev-parse', 'HEAD'))
   assert.equal(git('status', '--porcelain'), '')
   assert.deepEqual(unit.protocol, x6Protocol)
+  assert.deepEqual(
+    verifyX6RuntimeReuse(dirname(dirname(unit.bundle)), unit.runtimeReuse.evidenceFile),
+    unit.runtimeReuse,
+  )
   for (const [file, expected] of Object.entries(unit.files))
     assert.equal(digest('sha256', readFileSync(file), 'hex'), expected, file)
   assert.equal(digest('sha256', readFileSync(unit.node.path), 'hex'), unit.node.sha256)
