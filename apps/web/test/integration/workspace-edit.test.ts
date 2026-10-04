@@ -352,7 +352,7 @@ test('undoes and redoes an applied group only while every after stamp matches', 
 })
 
 test.for(['undo', 'redo'] as const)(
-  'declines concurrent direct %s while the server reversal owns the group',
+  'declines forward edits and concurrent direct %s while the server reversal owns the group',
   async (direction) => {
     const entered = deferred<void>()
     const release = deferred<void>()
@@ -374,6 +374,7 @@ test.for(['undo', 'redo'] as const)(
         await writeWorkspaceFiles(server.root, [
           [livePath, 'live'],
           [diskPath, 'disk'],
+          ['forward.ts', 'forward'],
         ])
         const live = await openDocument(harness, livePath)
         const uri = fileUri(livePath)
@@ -394,12 +395,34 @@ test.for(['undo', 'redo'] as const)(
 
         const reversing = harness.service[direction]()
         await entered.promise
+        const forwardController = new AbortController()
+        let forwardResult:
+          | Awaited<ReturnType<typeof harness.service.onApplyWorkspaceEdit>>
+          | undefined
+        const forward = harness.service
+          .onApplyWorkspaceEdit({
+            ...request([textOperation(fileUri('forward.ts'), null, 0, 1, 'F')], uri, []),
+            signal: forwardController.signal,
+          })
+          .then((result) => {
+            forwardResult = result
+            return result
+          })
         let secondResult: boolean | undefined
         const concurrent = harness.service[direction]().then((result) => {
           secondResult = result
           return result
         })
         try {
+          expect(harness.service.getSnapshot().phase).toBe(
+            direction === 'undo' ? 'undoing' : 'redoing',
+          )
+          await expect
+            .poll(() => forwardResult, { timeout: 1_000 })
+            .toMatchObject({
+              status: 'failed',
+              code: 'workspace-edit-busy',
+            })
           expect(harness.service.getSnapshot()).toMatchObject({
             canRedo: false,
             canUndo: false,
@@ -414,14 +437,16 @@ test.for(['undo', 'redo'] as const)(
             direction === 'undo' ? 'undoing' : 'redoing',
           )
         } finally {
+          forwardController.abort()
           release.resolve()
-          const [reversed, declined] = await Promise.all([reversing, concurrent])
+          const [reversed, declined] = await Promise.all([reversing, concurrent, forward])
           expect(declined).toBe(false)
           expect(reversed).toBe(true)
         }
 
         expect(live.buffer.materializeFullText()).toBe(direction === 'undo' ? 'live' : 'Live')
         expect(await readText(server.root, diskPath)).toBe(direction === 'undo' ? 'disk' : 'Disk')
+        expect(await readText(server.root, 'forward.ts')).toBe('forward')
         expectPathsAvailable(harness, [livePath, diskPath])
         const opposite = direction === 'undo' ? 'redo' : 'undo'
         await expect(harness.service[opposite]()).resolves.toBe(true)
