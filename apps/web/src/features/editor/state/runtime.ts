@@ -9,7 +9,9 @@ import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
 import { fileDocument } from '@/lib/documents/utils/identity'
-import type { FilesystemPath } from '@/lib/documents/utils/types'
+import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
+import { allEditorTabs } from '@/lib/documents/utils/groups'
+import { createSnapshotComparisonOwner } from '@/features/editor/state/snapshot-comparison-owner'
 import type { ScopedWorktreeRef } from '@workspace/contracts'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import {
@@ -107,6 +109,31 @@ export function createEditorRuntime({
     queryClient,
     subscribeLiveDocuments: (listener) => documentStore.subscribe(() => listener()),
   })
+  const snapshotComparisonOwner = createSnapshotComparisonOwner(documentStore, queryClient)
+  const syncSnapshotComparisons = () => {
+    const state = workspaceStore.getState()
+    const workspaces = [...state.parkedWorkspaces].map(([rootPath, slice]) => ({
+      rootPath: filesystemPath(rootPath),
+      panels: slice.workbenchPanels,
+    }))
+    if (state.rootFolder)
+      workspaces.push({ rootPath: state.rootFolder.path, panels: state.workbenchPanels })
+    const keep = new Set<TabId>()
+    for (const workspace of workspaces) {
+      for (const tab of allEditorTabs(workspace.panels.editorGroups)) {
+        const target = tab.content.kind === 'document' ? tab.content.document : null
+        if (target?.kind !== 'git-diff' || target.source.kind !== 'snapshot') continue
+        keep.add(tab.id)
+        snapshotComparisonOwner.prepare(
+          tab.id,
+          { environmentId: storage.environmentId, rootPath: workspace.rootPath },
+          target.source,
+        )
+      }
+    }
+    snapshotComparisonOwner.retain(keep)
+  }
+  syncSnapshotComparisons()
   const editorActivation = createEditorActivation(
     fileOpenIntentOwner.activation,
     documentStore,
@@ -122,6 +149,15 @@ export function createEditorRuntime({
         saved,
         signal: new AbortController().signal,
       })
+    },
+    (comparison, tabId) => {
+      const rootPath = workspaceStore.getState().rootFolder?.path
+      if (rootPath)
+        snapshotComparisonOwner.prepare(
+          tabId,
+          { environmentId: storage.environmentId, rootPath },
+          comparison,
+        )
     },
   )
   const documentSyncController = new LanguageServerDocumentSyncController()
@@ -193,6 +229,15 @@ export function createEditorRuntime({
     recoveryDiscovery = { generation, promise }
   }
   const subscriptions = [
+    workspaceStore.subscribe((state, previous) => {
+      if (
+        state.workbenchPanels === previous.workbenchPanels &&
+        state.parkedWorkspaces === previous.parkedWorkspaces &&
+        state.rootFolder === previous.rootFolder
+      )
+        return
+      syncSnapshotComparisons()
+    }),
     documentStore.subscribe((state) => state.liveDocumentsByKey, retainLanguageServers),
     workspaceStore.subscribe((state, previous) => {
       if (
@@ -305,6 +350,7 @@ export function createEditorRuntime({
       historyPersistence.dispose()
       fileOpenIntentOwner.disposeNow()
       workspaceEditService.dispose()
+      snapshotComparisonOwner.dispose()
       documentStore.getState().disposeEditorDocuments()
     },
     hasUnsavedDocuments() {

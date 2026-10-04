@@ -12,6 +12,7 @@ import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
 import type { FilesystemPath, GitComparison, TabId } from '@/lib/documents/utils/types'
 import { useDiffDocumentDiffs } from '../hooks/use-diff-document-diffs'
+import { useSnapshotComparison } from '@/features/git/hooks/use-snapshot-comparison'
 import { diffFileNotice, emptyDiffNotice, unrenderableDiffNotice } from '../utils/diff-presentation'
 import { editorDiffFiles, renderableDiffFile } from '@workspace/client-core/git/diff-files'
 import { DiffLineCommentAction } from './diff-line-comment-action'
@@ -37,7 +38,18 @@ export function DiffView({
   rootPath: FilesystemPath
   tabId?: TabId
 }) {
-  const { diffs, failure, pending } = useDiffDocumentDiffs(comparison)
+  const query = useDiffDocumentDiffs(comparison)
+  const { diffs } = query
+  const adoption = useSnapshotComparison(
+    comparison.kind === 'snapshot' ? comparison : null,
+    rootPath,
+    diffs,
+    query.pending,
+    tabId,
+  )
+  const source = adoption.read
+  const failure = query.failure ?? adoption.failure
+  const pending = query.pending || (comparison.kind === 'snapshot' && !source && !failure)
   const mode = useSettingValue('editor.diff.viewMode')
   const containerRef = useRef<HTMLDivElement | null>(null)
   // One store, read by both split panes and by the comment layer. The layer does
@@ -48,10 +60,14 @@ export function DiffView({
   const hunkSource = comparison.kind === 'snapshot' ? 'text' : 'patch'
   // Stable identity is required: this is pushed into the plugin, and a fresh
   // array each render would re-project the diff and throw away scroll position.
-  const files = useMemo(
-    () => editorDiffFiles(diffs, languageIdForFilePath, hunkSource),
-    [diffs, hunkSource],
+  const checkpointFiles = useMemo(
+    () =>
+      comparison.kind === 'snapshot'
+        ? []
+        : editorDiffFiles(diffs, languageIdForFilePath, hunkSource),
+    [comparison.kind, diffs, hunkSource],
   )
+  const files = comparison.kind === 'snapshot' ? (source?.input.display ?? []) : checkpointFiles
   // A file with hunks wins; a hunkless one is drawn only when it carries whole-file text, which is
   // what a pure rename looks like once the server sends the blob. A binary entry has neither and
   // still falls through to a notice — "we got diffs" is not the same as "there is something to
