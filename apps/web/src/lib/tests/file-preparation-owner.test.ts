@@ -4,7 +4,11 @@ import { join } from 'node:path'
 import { QueryClient } from '@tanstack/react-query'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
-import { ensureFileSnapshotQuery, fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
+import {
+  ensureFileSnapshotQuery,
+  fileSnapshotPathFromQueryKey,
+  fileSnapshotQueryOptions,
+} from '@/lib/file-snapshot-query-cache'
 import { createPlatformFileOpenPreparer } from '@/features/editor/utils/prepared-document'
 import { expect, test } from '../../../test/fixtures'
 import { createGatedMutationClient } from '../../../test/factories/gated-mutation-client'
@@ -13,6 +17,53 @@ import {
   preparationEnvironment,
   preparationRuntime,
 } from '../../../test/factories/file-preparation'
+
+test.for(['late-release', 'admission-release'] as const)(
+  '$0 observes a rejected shared read while the local queue advances',
+  async (mode, { server, onTestFinished }) => {
+    await mkdir(join(server.root, 'repo'))
+    const path = filesystemPath('repo/missing.ts')
+    const next = filesystemPath('repo/next.ts')
+    await writeFile(join(server.root, next), 'const next = true\n')
+    const transport = createGatedMutationClient(server, '/fs/read')
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    registerEnvironmentQueryClient(queryClient, server.origin, transport.client)
+    const clock = preparationRuntime()
+    const fixture = filePreparationOwner({ queryClient, runtime: clock.runtime })
+    fixture.owner.setRoot(filesystemPath('repo'))
+    fixture.owner.connect()
+    const interest = fixture.owner.service.prepare({ path, source: 'file-tree' })
+    const { queryKey } = fileSnapshotQueryOptions(path)
+    const stop = queryClient.getQueryCache().subscribe((event) => {
+      if (mode !== 'admission-release' || event.type !== 'updated') return
+      if (fileSnapshotPathFromQueryKey(event.query.queryKey) !== path) return
+      if (event.query.state.fetchStatus === 'fetching') interest.release()
+    })
+    onTestFinished(() => {
+      stop()
+      transport.release()
+      fixture.dispose()
+    })
+    clock.startNext()
+    await transport.entered
+    if (mode === 'late-release') interest.release()
+    await clock.settled()
+    expect(queryClient.getQueryState(queryKey)?.fetchStatus).toBe('fetching')
+    fixture.owner.service.prepare({ path: next, source: 'quick-open' })
+    expect(clock.queued()).toBe(1)
+    clock.startNext()
+    await clock.settled()
+    const claim = fixture.owner.service.claimLive(next)
+    expect(claim?.preparedDocument).not.toBeNull()
+    claim?.preparedDocument?.dispose()
+    claim?.release()
+    expect(queryClient.getQueryState(queryKey)?.fetchStatus).toBe('fetching')
+    transport.release()
+    await expect.poll(() => queryClient.getQueryState(queryKey)?.status).toBe('error')
+    expect(queryClient.getQueryState(queryKey)?.error).toMatchObject({ status: 404 })
+    expect(fixture.owner.service.claimLive(path)).toBeNull()
+  },
+)
 
 test('independent caller release preserves a held shared query and survivor preparation', async ({
   server,
