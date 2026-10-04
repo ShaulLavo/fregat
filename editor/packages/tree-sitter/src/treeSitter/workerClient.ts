@@ -19,6 +19,7 @@ import type {
   TreeSitterWorkerRequestPayload,
   TreeSitterWorkerResponse,
   TreeSitterWorkerResult,
+  TreeSitterWorkerRetentionSnapshot,
 } from './types'
 import type { PieceTableSnapshot } from '@singapore-editor/core/document'
 
@@ -123,6 +124,7 @@ export type TreeSitterBackend = {
   disposeDocument(runtimeSessionId: string): void
   awaitRuntimeSessionIdle?(runtimeSessionId: string): Promise<void>
   awaitIdleFence?(): Promise<void>
+  inspectRetention?(): Promise<TreeSitterWorkerRetentionSnapshot | null>
   dispose?(): Promise<void>
 }
 
@@ -345,6 +347,15 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     if (!this.worker) return Promise.resolve()
 
     await this.postRequest({ type: 'idleFence' }, false)
+  }
+
+  /** Null means no live worker, including an unstarted, unsupported or disposed owner. */
+  public async inspectRetention(): Promise<TreeSitterWorkerRetentionSnapshot | null> {
+    await this.awaitClientTasks()
+    if (!this.worker) return null
+
+    const result = await this.postRequest({ type: 'idleFence', includeRetention: true }, false)
+    return result && 'retention' in result ? result.retention : null
   }
 
   public dispose(): Promise<void> {

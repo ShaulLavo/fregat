@@ -26,6 +26,13 @@ import type {
   UnsyncedDocumentRef,
 } from '@/lib/documents/utils/types'
 
+import type {
+  SnapshotComparisonInput,
+  SnapshotComparisonLease,
+  SnapshotComparisonRead,
+  SnapshotComparisonRequest,
+  SnapshotComparisonRefresh,
+} from '@/lib/snapshot-comparison'
 import type { FileSnapshot } from '@/lib/file-snapshot'
 import type { EnvironmentId } from '@workspace/contracts'
 import type {
@@ -219,7 +226,21 @@ export type UnsyncedLiveEditorDocumentInput = {
   readonly target: UnsyncedDocumentRef
 }
 
+type SnapshotComparisonGroup = {
+  current: Extract<SnapshotComparisonRead, { kind: 'ready' }>
+  readonly interests: Map<SnapshotComparisonLease, SnapshotComparisonInterest>
+  refresh: SnapshotComparisonRefresh | null
+}
+type SnapshotComparisonInterest = {
+  current: SnapshotComparisonRead
+  group: SnapshotComparisonGroup | null
+  refresh: SnapshotComparisonRefresh | null
+  stop: () => void
+}
+
 export type WorkspaceDocumentServiceState = {
+  snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease>
+  snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead>
   savedComparisonTabs: ReadonlyMap<TabId, SavedComparisonLease>
   savedComparisons: ReadonlyMap<SavedComparisonLease, SavedComparisonRead>
   documentContentRevisions: Readonly<Record<DocumentKey, string>>
@@ -240,6 +261,14 @@ type SavedComparisonInterest = {
 }
 
 export class WorkspaceDocumentService {
+  private snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease> = new Map()
+  private snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead> =
+    new Map()
+  private readonly snapshotGroups = new Map<string, SnapshotComparisonGroup>()
+  private readonly snapshotInterests = new Map<
+    SnapshotComparisonLease,
+    SnapshotComparisonInterest
+  >()
   private savedComparisonTabs: ReadonlyMap<TabId, SavedComparisonLease> = new Map()
   private savedComparisons: ReadonlyMap<SavedComparisonLease, SavedComparisonRead> = new Map()
   private readonly comparisonInterests = new Map<SavedComparisonLease, SavedComparisonInterest>()
@@ -279,6 +308,80 @@ export class WorkspaceDocumentService {
     private readonly onStateChange: () => void = () => undefined,
     private readonly environmentId: EnvironmentId | null = null,
   ) {}
+
+  acquireSnapshotComparison(request: SnapshotComparisonRequest): SnapshotComparisonLease {
+    return this.createSnapshotComparisonInterest(request)
+  }
+
+  private createSnapshotComparisonInterest(
+    { input, signal }: SnapshotComparisonRequest,
+    tabId?: TabId,
+  ): SnapshotComparisonLease {
+    this.assertComparisonOwner(input.scope)
+    const entry: SnapshotComparisonInterest = {
+      current: {
+        kind: 'released',
+        reason: this.sourceOwnerDisposed ? 'owner-disposed' : 'interest-ended',
+      },
+      group: null,
+      refresh: null,
+      stop: () => undefined,
+    }
+    const lease: SnapshotComparisonLease = {
+      read: () => entry.current,
+      requestRefresh: () => {
+        const request = { lease }
+        if (entry.group) {
+          entry.refresh = request
+          entry.group.refresh = request
+        }
+        return request
+      },
+      refresh: (next, request) => this.refreshSnapshotComparison(lease, next, request),
+      release: () => this.releaseSnapshotComparison(lease, 'interest-ended'),
+    }
+    if (this.sourceOwnerDisposed || signal.aborted) return lease
+    const key = snapshotGroupKey(input)
+    const group = this.snapshotGroups.get(key) ?? {
+      current: { kind: 'ready' as const, input },
+      interests: new Map(),
+      refresh: null,
+    }
+    this.snapshotGroups.set(key, group)
+    if (group.current.input !== input) this.publishSnapshotInput(group, input)
+    entry.group = group
+    entry.current = group.current
+    group.interests.set(lease, entry)
+    this.snapshotInterests.set(lease, entry)
+    const release = () => lease.release()
+    signal.addEventListener('abort', release, { once: true })
+    entry.stop = () => signal.removeEventListener('abort', release)
+    this.snapshotComparisons = new Map(this.snapshotComparisons).set(lease, entry.current)
+    if (tabId) this.snapshotComparisonTabs = new Map(this.snapshotComparisonTabs).set(tabId, lease)
+    this.onStateChange()
+    return lease
+  }
+
+  prepareSnapshotComparisonTab(
+    tabId: TabId,
+    request: SnapshotComparisonRequest,
+  ): SnapshotComparisonLease {
+    this.assertComparisonOwner(request.input.scope)
+    if (this.sourceOwnerDisposed || request.signal.aborted)
+      return this.acquireSnapshotComparison(request)
+    const previous = this.snapshotComparisonTabs.get(tabId)
+    const read = previous?.read()
+    if (
+      previous &&
+      read?.kind === 'ready' &&
+      snapshotGroupKey(read.input) === snapshotGroupKey(request.input)
+    ) {
+      if (read.input !== request.input) previous.refresh(request.input, previous.requestRefresh())
+      return previous
+    }
+    previous?.release()
+    return this.createSnapshotComparisonInterest(request, tabId)
+  }
 
   acquireSavedComparison({ scope, saved, signal }: SavedComparisonRequest): SavedComparisonLease {
     this.assertComparisonOwner(scope)
@@ -340,6 +443,8 @@ export class WorkspaceDocumentService {
 
   dispose(): void {
     this.sourceOwnerDisposed = true
+    for (const lease of this.snapshotInterests.keys())
+      this.releaseSnapshotComparison(lease, 'owner-disposed')
     for (const lease of this.comparisonInterests.keys())
       this.releaseSavedComparison(lease, 'owner-disposed')
     const prepared = new Set<EditorPreparedDocument>()
@@ -415,6 +520,9 @@ export class WorkspaceDocumentService {
     documentKeys: ReadonlySet<DocumentKey>
     tabIds: ReadonlySet<TabId>
   }): { evictedDocumentKeys: DocumentKey[]; evictedTabIds: TabId[] } {
+    for (const [tabId, lease] of this.snapshotComparisonTabs) {
+      if (!tabIds.has(tabId)) lease.release()
+    }
     for (const [tabId, lease] of this.savedComparisonTabs) {
       if (!tabIds.has(tabId)) lease.release()
     }
@@ -594,6 +702,7 @@ export class WorkspaceDocumentService {
   }
 
   removeView(tabId: TabId): boolean {
+    this.snapshotComparisonTabs.get(tabId)?.release()
     this.savedComparisonTabs.get(tabId)?.release()
     const view = this.viewsByTabId.get(tabId)
     if (!view) return false
@@ -1241,6 +1350,12 @@ export class WorkspaceDocumentService {
   }
 
   copyView(from: TabId, to: TabId): void {
+    const snapshot = this.snapshotComparisonTabs.get(from)?.read()
+    if (snapshot?.kind === 'ready')
+      this.prepareSnapshotComparisonTab(to, {
+        input: snapshot.input,
+        signal: new AbortController().signal,
+      })
     const comparison = this.savedComparisonTabs.get(from)?.read()
     if (comparison && comparison.kind !== 'released')
       this.prepareSavedComparisonTab(to, {
@@ -1276,6 +1391,8 @@ export class WorkspaceDocumentService {
     const previous = this.cachedState
     const viewsByTabId = recordFromMap(this.viewsByTabId, previous?.viewsByTabId)
     const next: WorkspaceDocumentServiceState = {
+      snapshotComparisonTabs: this.snapshotComparisonTabs,
+      snapshotComparisons: this.snapshotComparisons,
       savedComparisonTabs: this.savedComparisonTabs,
       savedComparisons: this.savedComparisons,
       documentContentRevisions: this.documentContentRevisions,
@@ -1614,6 +1731,73 @@ export class WorkspaceDocumentService {
     this.deleteDirtyKey(document.key)
   }
 
+  private refreshSnapshotComparison(
+    lease: SnapshotComparisonLease,
+    input: SnapshotComparisonInput,
+    request: SnapshotComparisonRefresh,
+  ): boolean {
+    const entry = this.snapshotInterests.get(lease)
+    if (
+      !entry?.group ||
+      entry.refresh !== request ||
+      entry.group.refresh !== request ||
+      request.lease !== lease
+    )
+      return false
+    if (
+      input.scope.environmentId !== this.environmentId ||
+      snapshotGroupKey(input) !== snapshotGroupKey(entry.group.current.input)
+    )
+      return false
+    entry.refresh = null
+    entry.group.refresh = null
+    this.publishSnapshotInput(entry.group, input)
+    this.onStateChange()
+    return true
+  }
+
+  private publishSnapshotInput(
+    group: SnapshotComparisonGroup,
+    input: SnapshotComparisonInput,
+  ): void {
+    group.refresh = null
+    const read = { kind: 'ready' as const, input }
+    group.current = read
+    const reads = new Map(this.snapshotComparisons)
+    for (const [interest, member] of group.interests) {
+      member.current = read
+      reads.set(interest, read)
+    }
+    this.snapshotComparisons = reads
+  }
+
+  private releaseSnapshotComparison(
+    lease: SnapshotComparisonLease,
+    reason: 'interest-ended' | 'owner-disposed',
+  ): void {
+    const entry = this.snapshotInterests.get(lease)
+    if (!entry?.group) return
+    entry.stop()
+    const group = entry.group
+    if (group.refresh?.lease === lease) group.refresh = null
+    group.interests.delete(lease)
+    if (group.interests.size === 0)
+      this.snapshotGroups.delete(snapshotGroupKey(group.current.input))
+    entry.group = null
+    entry.refresh = null
+    entry.current = { kind: 'released', reason }
+    this.snapshotInterests.delete(lease)
+    const reads = new Map(this.snapshotComparisons)
+    reads.delete(lease)
+    this.snapshotComparisons = reads
+    const tabs = new Map(this.snapshotComparisonTabs)
+    for (const [tabId, interest] of tabs) {
+      if (interest === lease) tabs.delete(tabId)
+    }
+    this.snapshotComparisonTabs = tabs
+    if (!this.sourceOwnerDisposed) this.onStateChange()
+  }
+
   private comparisonRead(
     scope: SavedComparisonScope,
     saved: FileSnapshot,
@@ -1870,4 +2054,8 @@ function assertTextFile(file: FileSnapshot): void {
   if (supportsTextFile(file)) return
   if (isPdfFile(file.path)) throw pdfError('TEXT_UNAVAILABLE', file.size, 'registration')
   throw createBinaryFileError(file.size)
+}
+
+function snapshotGroupKey(input: SnapshotComparisonInput): string {
+  return JSON.stringify([input.scope.rootPath, input.subject])
 }
