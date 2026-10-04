@@ -18,7 +18,8 @@ export const RETENTION_COUNT_PROTOCOL = {
   expectedInactiveEntryLimit: 2,
   negativeControlLimit: Number.MAX_SAFE_INTEGER,
   explicitTrimLimit: 0,
-  workingDocumentCount: 5,
+  workingDocumentCount: 7,
+  geometry: { height: 240, width: 600, maximumRenderedRows: 36 },
   successfulCycleMarker: 'protocol-cycle-complete',
   arms: [
     'idle-inspector-calibration',
@@ -52,6 +53,8 @@ export const RETENTION_COUNT_PROTOCOL = {
     'two-disjoint-active-view-fold-matrix',
     'terminal-inspector-in-flight-rejection',
     'plain-editor',
+    'preparation-expiry',
+    'preparation-promotion',
     'qualified-source-stack-and-current-CI',
     'hardware-Chrome-input',
     'Mac-WebKit-Safari',

@@ -1,4 +1,9 @@
-import { expect } from 'vitest'
+import { expect, vi } from 'vitest'
+import {
+  EditorSecondaryViewScheduler,
+  type EditorSecondaryScheduleWorkOptions,
+  type EditorSecondaryScheduledWorkHandle,
+} from '@singapore-editor/core/secondary-views'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { Editor, type EditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
@@ -23,6 +28,7 @@ import { settingsSnapshot } from './settings'
 import { fixtureEnvironmentId } from './chat'
 import {
   inactiveBound,
+  RETENTION_COUNT_PROTOCOL,
   retentionFixtureText,
   type RetentionFixture,
 } from './retention-count-policy-protocol'
@@ -31,6 +37,180 @@ type Analysis = EditorDocumentAnalysis
 type Structural = NonNullable<ReturnType<Analysis['borrowStructural']>>
 type Highlighter = NonNullable<ReturnType<Analysis['borrowHighlighter']>>
 type Pair = { readonly structural: Structural; readonly highlighter: Highlighter }
+
+function observeRetentionWork() {
+  const handles = new Set<EditorSecondaryScheduledWorkHandle>()
+  const frames = new Set<number>()
+  const requests: {
+    family: string
+    type: string
+    runtimeSessionId: string | null
+    provenance: string
+    scheduledKeys: string[]
+  }[] = []
+  const reads: { fullTextReads: number; sourceBytesRead: number; provenance: string }[] = []
+  let generation = 0
+  let provenance = 'application'
+  const previousTrace = Reflect.get(globalThis, '__editorPerfTrace')
+  const previousDiagnostics = Reflect.get(globalThis, '__EDITOR_PERFORMANCE_DIAGNOSTICS__')
+  Reflect.set(globalThis, '__editorPerfTrace', {})
+  Reflect.set(globalThis, '__EDITOR_PERFORMANCE_DIAGNOSTICS__', (input: unknown) => {
+    if (typeof previousDiagnostics === 'function') previousDiagnostics(input)
+    if (
+      typeof input !== 'object' ||
+      input === null ||
+      !('name' in input) ||
+      input.name !== 'textSnapshot.read'
+    )
+      return
+    if (!('detail' in input) || typeof input.detail !== 'object' || input.detail === null) return
+    const detail = input.detail
+    if (!('fullTextReads' in detail) || typeof detail.fullTextReads !== 'number') return
+    if (!('sourceBytesRead' in detail) || typeof detail.sourceBytesRead !== 'number') return
+    reads.push({
+      fullTextReads: detail.fullTextReads,
+      sourceBytesRead: detail.sourceBytesRead,
+      provenance,
+    })
+  })
+  const schedule = EditorSecondaryViewScheduler.prototype.schedule
+  const scheduleSpy = vi
+    .spyOn(EditorSecondaryViewScheduler.prototype, 'schedule')
+    .mockImplementation(function <T>(
+      this: EditorSecondaryViewScheduler,
+      options: EditorSecondaryScheduleWorkOptions<T>,
+    ) {
+      const handle = schedule.bind(this)(options)
+      handles.add(handle)
+      generation++
+      return handle
+    })
+  const nativeFrame = globalThis.requestAnimationFrame.bind(globalThis)
+  const nativeCancel = globalThis.cancelAnimationFrame.bind(globalThis)
+  const frameSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+    let id = 0
+    id = nativeFrame((time) => {
+      frames.delete(id)
+      generation++
+      try {
+        callback(time)
+      } finally {
+        generation++
+      }
+    })
+    frames.add(id)
+    generation++
+    return id
+  })
+  const cancelSpy = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id) => {
+    if (frames.delete(id)) generation++
+    nativeCancel(id)
+  })
+  const nativeMark = performance.mark.bind(performance)
+  const markSpy = vi.spyOn(performance, 'mark').mockImplementation((name, options) => {
+    const mark = nativeMark(name, options)
+    if (name !== 'editor.worker.request') return mark
+    const detail: unknown = mark.detail
+    if (
+      typeof detail !== 'object' ||
+      detail === null ||
+      !('family' in detail) ||
+      !('type' in detail)
+    )
+      return mark
+    if (typeof detail.family !== 'string' || typeof detail.type !== 'string') return mark
+    const runtimeSessionId =
+      'runtimeSessionId' in detail && typeof detail.runtimeSessionId === 'string'
+        ? detail.runtimeSessionId
+        : null
+    const inspector = detail.type === 'idleFence' || detail.type === 'runtimeBarrier'
+    requests.push({
+      family: detail.family,
+      type: detail.type,
+      runtimeSessionId,
+      provenance: inspector ? 'verifier-inspector' : provenance,
+      scheduledKeys: Array.from(handles)
+        .filter((handle) => handle.isActive())
+        .map((handle) => handle.key),
+    })
+    if (!inspector) generation++
+    return mark
+  })
+  function snapshot() {
+    for (const handle of handles) if (!handle.isActive()) handles.delete(handle)
+    return {
+      generation,
+      frames: frames.size,
+      scheduled: Array.from(handles, (handle) => ({
+        key: handle.key,
+        token: handle.token,
+        active: handle.isActive(),
+      })),
+      issuedRequests: requests.length,
+      sourceReads: reads.length,
+    }
+  }
+  return {
+    snapshot,
+    receipt: () => ({ requests, reads, state: snapshot() }),
+    publication() {
+      generation++
+    },
+    frame: () => new Promise<void>((resolve) => nativeFrame(() => resolve())),
+    verifierRead<T>(read: () => T) {
+      const previous = provenance
+      provenance = 'verifier-source-read'
+      try {
+        return read()
+      } finally {
+        provenance = previous
+      }
+    },
+    async interval<T>(run: () => T, settle: () => Promise<void>) {
+      const requestStart = requests.length
+      const readStart = reads.length
+      provenance = 'attachment-causal-work'
+      try {
+        const value = run()
+        await settle()
+        return {
+          value,
+          requests: requests.slice(requestStart),
+          reads: reads.slice(readStart),
+          observation: snapshot(),
+        }
+      } finally {
+        provenance = 'application'
+      }
+    },
+    calibrate() {
+      const scheduler = new EditorSecondaryViewScheduler()
+      const handle = scheduler.schedule({
+        key: 'verification-delayed-control',
+        taskClass: 'idle-cache',
+        delayMs: 120,
+        run: () => undefined,
+      })
+      const delayed = snapshot()
+      handle.cancel()
+      scheduler.dispose()
+      expect(
+        delayed.scheduled.some(
+          (work) => work.key === 'verification-delayed-control' && work.active,
+        ),
+      ).toBe(true)
+      return delayed
+    },
+    restore() {
+      scheduleSpy.mockRestore()
+      frameSpy.mockRestore()
+      cancelSpy.mockRestore()
+      markSpy.mockRestore()
+      Reflect.set(globalThis, '__editorPerfTrace', previousTrace)
+      Reflect.set(globalThis, '__EDITOR_PERFORMANCE_DIAGNOSTICS__', previousDiagnostics)
+    },
+  }
+}
 
 export async function retentionCountHost(fixture: RetentionFixture) {
   const [language, theme] = await Promise.all([
@@ -54,6 +234,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     )
   }
   setLimit(DEFAULT_SETTING_VALUES['editor.inactiveAnalysisEntryLimit'])
+  const observation = observeRetentionWork()
   const application = createApplicationRuntime({
     workspaceCache: emptyWorkspaceState(),
     preparation: {
@@ -128,6 +309,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
   application.activateEnvironment(survivorOrigin.origin)
   const survivorEditor = application.getSnapshot().editor
   const b = createDocument('b')
+  const secondaryWorking = [createDocument('x'), createDocument('y')]
   application.activateEnvironment(initialOrigin)
   const aSession = createEditorBufferSession(a.buffer)
   const bSession = createEditorBufferSession(b.buffer)
@@ -135,7 +317,42 @@ export async function retentionCountHost(fixture: RetentionFixture) {
   aSession.applyText('dirty ')
   const dirtyRevision = a.buffer.getRevision()
   const dirtySnapshot = a.buffer.getSnapshot()
-  const views = new Set<{ dispose(): void }>()
+  const stopPublications = Array.from(application.enumerateRetainedEditorAnalyses(), (analysis) =>
+    analysis.subscribeRetention(() => observation.publication()),
+  )
+  const views = new Set<{ dispose(): void; geometry(): ReturnType<typeof viewGeometry> }>()
+
+  function viewGeometry(container: HTMLElement, name: string) {
+    const scroll = container.querySelector('.editor-virtualized')
+    if (!(scroll instanceof HTMLElement))
+      throw new TypeError('The real Editor scroll element is unavailable')
+    return {
+      name,
+      containerHeight: container.clientHeight,
+      scrollClientHeight: scroll.clientHeight,
+      scrollBoxHeight: scroll.getBoundingClientRect().height,
+      scrollHeight: scroll.scrollHeight,
+      renderedRows: scroll.querySelectorAll('.editor-virtualized-row').length,
+    }
+  }
+
+  function assertGeometry() {
+    const geometry = viewGeometries()
+    for (const value of geometry) {
+      expect(value.containerHeight).toBe(RETENTION_COUNT_PROTOCOL.geometry.height)
+      expect(value.scrollBoxHeight).toBe(RETENTION_COUNT_PROTOCOL.geometry.height)
+      expect(value.scrollClientHeight).toBeGreaterThan(0)
+      expect(value.scrollClientHeight).toBeLessThanOrEqual(RETENTION_COUNT_PROTOCOL.geometry.height)
+      expect(value.renderedRows).toBeGreaterThan(0)
+      expect(value.renderedRows).toBeLessThanOrEqual(
+        RETENTION_COUNT_PROTOCOL.geometry.maximumRenderedRows,
+      )
+    }
+    return geometry
+  }
+  function viewGeometries() {
+    return Array.from(views, (view) => view.geometry())
+  }
 
   function borrow(analysis: Analysis, tag = 'fixed'): Pair {
     const structural = analysis.borrowStructural({
@@ -159,8 +376,10 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     const wrapper = window.document.createElement('div')
     const container = window.document.createElement('div')
     wrapper.dataset.retentionView = name
-    wrapper.style.height = '240px'
-    wrapper.style.width = '600px'
+    wrapper.style.height = `${RETENTION_COUNT_PROTOCOL.geometry.height}px`
+    wrapper.style.width = `${RETENTION_COUNT_PROTOCOL.geometry.width}px`
+    container.style.cssText =
+      'display: flex; height: 100%; min-height: 0; min-width: 0; overflow: hidden; width: 100%;'
     wrapper.append(container)
     window.document.body.append(wrapper)
     const editor = new Editor(container, {
@@ -175,6 +394,11 @@ export async function retentionCountHost(fixture: RetentionFixture) {
         },
       ],
     })
+    const scroll = container.querySelector('.editor-virtualized')
+    if (!(scroll instanceof HTMLElement))
+      throw new TypeError('The real Editor scroll element is unavailable')
+    scroll.style.minHeight = '0'
+    scroll.style.minWidth = '0'
     editor.attachSession(createEditorBufferSession(document.buffer), {
       analysis: document.analysis,
       documentId: document.analysis.documentId,
@@ -184,6 +408,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     })
     const view = {
       editor,
+      geometry: () => viewGeometry(container, name),
       dispose() {
         views.delete(view)
         try {
@@ -204,7 +429,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     await pair.structural.queryRange({ startIndex: 0, endIndex: 2048 })
   }
   async function settle() {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    await observation.frame()
     await Promise.resolve()
     await expect
       .poll(() =>
@@ -231,6 +456,16 @@ export async function retentionCountHost(fixture: RetentionFixture) {
           .some((mutation) => mutation.state.status === 'pending'),
       )
       .toBe(false)
+    await expect
+      .poll(() => {
+        const state = observation.snapshot()
+        return state.frames + state.scheduled.length
+      })
+      .toBe(0)
+    await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
+    await expect
+      .poll(() => tree.inspect().pendingRequests + shiki.inspect().pendingRequests)
+      .toBe(0)
   }
   function census() {
     const owners = Array.from(new Set(application.enumerateRetainedEditorAnalyses()))
@@ -252,15 +487,20 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     }
   }
   async function sample(arm: string, cycle: number, pairs: readonly Pair[] = []) {
-    await settle()
+    let settlementFailure: string | null = null
+    try {
+      await settle()
+    } catch (error) {
+      settlementFailure = String(error)
+    }
+    const consistentGeneration = observation.snapshot().generation
     const generationsBefore = [tree.inspect().workerGeneration, shiki.inspect().workerGeneration]
     const [treeWorker, shikiWorker] = await Promise.all([
       tree.inspectRetention(),
       shiki.inspectRetention(),
     ])
-    await settle()
     const generationsAfter = [tree.inspect().workerGeneration, shiki.inspect().workerGeneration]
-    expect(generationsAfter).toEqual(generationsBefore)
+    const finalObservation = observation.snapshot()
     const tokenStores = pairs.flatMap((pair) => {
       const read = pair.highlighter.read()
       return read.kind === 'ready' ? [read.result.tokens] : []
@@ -272,6 +512,19 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       fixture: fixture.id,
       ...count,
       fixtureOwnedViews: views.size,
+      viewGeometry: viewGeometries(),
+      observation: finalObservation,
+      point: {
+        consistent:
+          settlementFailure === null &&
+          finalObservation.generation === consistentGeneration &&
+          finalObservation.scheduled.length === 0 &&
+          finalObservation.frames === 0 &&
+          generationsAfter.every((generation, index) => generation === generationsBefore[index]),
+        generationBeforeInspectors: consistentGeneration,
+        generationAfterInspectors: finalObservation.generation,
+        settlementFailure,
+      },
       workerGenerations: {
         beforeInspectors: generationsBefore,
         afterFrameAndWorkerFences: generationsAfter,
@@ -312,9 +565,14 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     a,
     b,
     working,
+    secondaryWorking,
+    fixtureId: fixture.id,
+    expectedSource: source,
+    observation,
     borrow,
     release,
     createView,
+    assertGeometry,
     refresh,
     settle,
     census,
@@ -336,11 +594,13 @@ export async function retentionCountHost(fixture: RetentionFixture) {
         for (const view of views) view.dispose()
         application.dispose()
       } finally {
+        for (const stop of stopPublications) stop()
         await Promise.all([tree.dispose(), shiki.dispose()])
         useEnvironmentsStore.setState(previousEnvironments, true)
         if (previousSettings === undefined)
           queries.removeQueries({ queryKey: settingsKeys.document(), exact: true })
         else queries.setQueryData(settingsKeys.document(), previousSettings)
+        observation.restore()
       }
     },
   }

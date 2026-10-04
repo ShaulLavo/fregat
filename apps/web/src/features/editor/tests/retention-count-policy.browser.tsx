@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest'
+import { expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
 import '@singapore-editor/core/style.css'
 import { pieceTableSnapshotsHaveSameText } from '@singapore-editor/textbuffer'
@@ -24,6 +24,15 @@ async function record(sample: unknown) {
       : { sample, observedAt: new Date().toISOString() }
   if (typeof commands.retentionSample === 'function') await commands.retentionSample(observed)
   else console.info('retention-count-sample', JSON.stringify(observed))
+  if (
+    typeof sample === 'object' &&
+    sample !== null &&
+    'point' in sample &&
+    typeof sample.point === 'object' &&
+    sample.point !== null &&
+    'consistent' in sample.point
+  )
+    expect(sample.point.consistent).toBe(true)
 }
 
 async function configuration() {
@@ -82,6 +91,8 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
   const b = host.borrow(host.b.analysis)
   let bView: ReturnType<Host['createView']> | null = null
   try {
+    await verifyText(host, host.a, `dirty ${host.expectedSource}`, 'canonical-a-ingested-dirty', 0)
+    await verifyText(host, host.b, host.expectedSource, 'canonical-b-ingested', 0)
     await verifyIdleInspectors(host, b, fixture.id)
     bView = host.createView('b', host.b)
     await verifyProviderBaseline(host, fixture)
@@ -89,12 +100,24 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
     const bIds = [b.structural.runtimeSessionId, b.highlighter.runtimeSessionId]
     await record(await host.sample('baseline-active-b', 0, [b]))
     await verifyActualViews(host, b, bView, fixture.id)
+    await record({
+      fixture: fixture.id,
+      arm: 'actual-geometry-before-cycles',
+      cycle: 0,
+      geometry: host.assertGeometry(),
+    })
     const bEntries = activeRuntimeIds(host.b.analysis)
     for (let cycle = 1; cycle <= cycles; cycle++) {
       await verifyCycle(host, b, bIds, cycle)
       expect(activeRuntimeIds(host.b.analysis)).toEqual(bEntries)
+      await record({
+        kind: RETENTION_COUNT_PROTOCOL.successfulCycleMarker,
+        fixture: fixture.id,
+        cycle,
+      })
     }
     await verifyRangeHistory(host, b, cycles)
+    await verifyGlobalEnvironments(host, b, cycles)
     await verifyPendingFailed(host, b, cycles)
     await verifyGrowthControl(host, b, cycles)
     host.application.getSnapshot().editor.dispose()
@@ -105,9 +128,34 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
         languageId: fixture.language,
       }),
     ).toBeNull()
+    host.bSession.setSelection(0)
+    host.bSession.breakTypingRun()
     host.bSession.applyText('survivor ')
     await host.refresh(b, host.b.analysis)
     expect([b.structural.runtimeSessionId, b.highlighter.runtimeSessionId]).toEqual(bIds)
+    await verifyText(
+      host,
+      host.b,
+      `survivor ${'b '.repeat(cycles)}${host.expectedSource}`,
+      'canonical-b-survivor-edit',
+      cycles,
+    )
+    host.bSession.undo()
+    await verifyText(
+      host,
+      host.b,
+      `${'b '.repeat(cycles)}${host.expectedSource}`,
+      'canonical-b-survivor-undo',
+      cycles,
+    )
+    host.bSession.redo()
+    await verifyText(
+      host,
+      host.b,
+      `survivor ${'b '.repeat(cycles)}${host.expectedSource}`,
+      'canonical-b-survivor-redo',
+      cycles,
+    )
     await record(await host.sample('environment-release-b-survives', cycles, [b]))
     bView.dispose()
     host.release(b)
@@ -123,6 +171,12 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
     bView?.dispose()
     host.release(b)
     await host.dispose()
+    await record({
+      fixture: fixture.id,
+      arm: 'observation-owner-release',
+      cycle: cycles,
+      ...host.observation.receipt(),
+    })
   }
   const terminal = {
     fixture: fixture.id,
@@ -153,30 +207,22 @@ async function verifyCycle(host: Host, b: Pair, bIds: readonly string[], cycle: 
   await record(warm)
   expect(warm.bound.passes).toBe(true)
   expect(warm.inactiveEntries).toBe(DEFAULT_SETTING_VALUES['editor.inactiveAnalysisEntryLimit'])
-  const snapshot = host.a.buffer.getTextSnapshot()
-  const fullText = vi.spyOn(snapshot, 'materializeFullText')
-  const beforePending = [host.tree.inspect().pendingRequests, host.shiki.inspect().pendingRequests]
-  const reborrowed = host.borrow(host.a.analysis)
+  const interval = await host.observation.interval(() => host.borrow(host.a.analysis), host.settle)
+  const reborrowed = interval.value
   const warmObservation = {
     fixture: warm.fixture,
     cycle,
     arm: 'synchronous-warm-attachment',
     runtimeIds: [reborrowed.structural.runtimeSessionId, reborrowed.highlighter.runtimeSessionId],
     reads: [reborrowed.structural.read().kind, reborrowed.highlighter.read().kind],
-    fullTextReads: fullText.mock.calls.length,
-    pendingWorkerRequestsBefore: beforePending,
-    pendingWorkerRequestsAfter: [
-      host.tree.inspect().pendingRequests,
-      host.shiki.inspect().pendingRequests,
-    ],
-    synchronousReadyRead: true,
+    requests: interval.requests,
+    sourceReads: interval.reads,
+    completion: interval.observation,
   }
-  fullText.mockRestore()
   await record(warmObservation)
   expect(warmObservation.runtimeIds).toEqual(ids)
   expect(warmObservation.reads).toEqual(['ready', 'ready'])
-  expect(warmObservation.fullTextReads).toBe(0)
-  expect(warmObservation.pendingWorkerRequestsAfter).toEqual(beforePending)
+  assertWarmInterval(interval)
   host.release(reborrowed)
   for (const document of host.working) {
     const pressure = host.borrow(document.analysis, `configuration-${cycle}`)
@@ -202,21 +248,54 @@ async function verifyCycle(host: Host, b: Pair, bIds: readonly string[], cycle: 
   host.release(cold)
   expect(host.a.buffer.getRevision()).toBe(host.dirtyRevision)
   expect(host.a.buffer.isDirty()).toBe(true)
+  await verifyText(
+    host,
+    host.a,
+    `dirty ${host.expectedSource}`,
+    'canonical-a-after-pressure',
+    cycle,
+  )
   expect(pieceTableSnapshotsHaveSameText(host.a.buffer.getSnapshot(), host.dirtySnapshot)).toBe(
     true,
   )
   host.aSession.undo()
+  await verifyText(host, host.a, host.expectedSource, 'canonical-a-undo', cycle)
   expect(host.a.buffer.isDirty()).toBe(false)
   expect(pieceTableSnapshotsHaveSameText(host.a.buffer.getSnapshot(), host.savedSnapshot)).toBe(
     true,
   )
   host.aSession.redo()
+  await verifyText(host, host.a, `dirty ${host.expectedSource}`, 'canonical-a-redo', cycle)
   expect(pieceTableSnapshotsHaveSameText(host.a.buffer.getSnapshot(), host.dirtySnapshot)).toBe(
     true,
   )
   host.dirtyRevision = host.a.buffer.getRevision()
   host.bSession.setSelection(0)
+  host.bSession.breakTypingRun()
   host.bSession.applyText('b ')
+  await verifyText(
+    host,
+    host.b,
+    `${'b '.repeat(cycle)}${host.expectedSource}`,
+    'canonical-b-edit',
+    cycle,
+  )
+  host.bSession.undo()
+  await verifyText(
+    host,
+    host.b,
+    `${'b '.repeat(cycle - 1)}${host.expectedSource}`,
+    'canonical-b-undo',
+    cycle,
+  )
+  host.bSession.redo()
+  await verifyText(
+    host,
+    host.b,
+    `${'b '.repeat(cycle)}${host.expectedSource}`,
+    'canonical-b-redo',
+    cycle,
+  )
   await host.refresh(b, host.b.analysis)
   expect([b.structural.runtimeSessionId, b.highlighter.runtimeSessionId]).toEqual(bIds)
   expect(b.structural.read().revision).toBe(host.b.buffer.getRevision())
@@ -230,11 +309,6 @@ async function verifyCycle(host: Host, b: Pair, bIds: readonly string[], cycle: 
   expect(end.shikiWorker?.retiredRuntimeCount).toBeLessThanOrEqual(
     end.shikiWorker?.retiredRuntimeLimit ?? 0,
   )
-  await record({
-    kind: RETENTION_COUNT_PROTOCOL.successfulCycleMarker,
-    fixture: end.fixture,
-    cycle,
-  })
 }
 
 function activeRuntimeIds(analysis: Host['a']['analysis']) {
@@ -243,6 +317,43 @@ function activeRuntimeIds(analysis: Host['a']['analysis']) {
     .entries.filter((entry) => entry.leaseCount > 0)
     .map((entry) => entry.runtimeSessionId)
     .sort()
+}
+
+async function verifyText(
+  host: Host,
+  document: Host['a'],
+  expected: string,
+  arm: string,
+  cycle: number,
+) {
+  const actual = host.observation.verifierRead(() => {
+    const snapshot = document.buffer.getTextSnapshot()
+    return snapshot.readRange(0, snapshot.length)
+  })
+  const [expectedSha256, observedSha256] = await Promise.all([
+    contentHash(expected),
+    contentHash(actual),
+  ])
+  await record({
+    fixture: host.fixtureId,
+    documentId: document.analysis.documentId,
+    arm,
+    cycle,
+    expectedUnits: expected.length,
+    observedUnits: actual.length,
+    expectedSha256,
+    observedSha256,
+    provenance: 'independent-fixture-text-and-intended-edits',
+  })
+  expect(observedSha256).toBe(expectedSha256)
+  expect(actual).toBe(expected)
+}
+
+async function contentHash(text: string) {
+  const bytes = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)),
+  )
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 async function verifyIdleInspectors(host: Host, b: Pair, fixture: string) {
@@ -254,6 +365,11 @@ async function verifyIdleInspectors(host: Host, b: Pair, fixture: string) {
     host.shiki.inspectRetention(),
   ])
   const after = { tree: host.tree.inspect(), shiki: host.shiki.inspect() }
+  const scheduledNegative = host.observation.calibrate()
+  const readNegative = await host.observation.interval(() => {
+    const snapshot = host.a.buffer.getTextSnapshot()
+    snapshot.readRange(0, snapshot.length)
+  }, host.settle)
   await record({
     fixture,
     arm: 'idle-inspector-calibration',
@@ -262,6 +378,12 @@ async function verifyIdleInspectors(host: Host, b: Pair, fixture: string) {
     after,
     treeWorker,
     shikiWorker,
+    scheduledNegative,
+    fullRangeReadNegative: {
+      requests: readNegative.requests,
+      reads: readNegative.reads,
+      observation: readNegative.observation,
+    },
   })
   expect(before.tree.pendingRequests).toBe(0)
   expect(before.shiki.pendingRequests).toBe(0)
@@ -269,6 +391,7 @@ async function verifyIdleInspectors(host: Host, b: Pair, fixture: string) {
   expect(after.shiki.pendingRequests).toBe(0)
   expect(after.tree.workerGeneration).toBe(before.tree.workerGeneration)
   expect(after.shiki.workerGeneration).toBe(before.shiki.workerGeneration)
+  expect(readNegative.reads.reduce((sum, read) => sum + read.fullTextReads, 0)).toBeGreaterThan(0)
 }
 
 async function verifyProviderBaseline(host: Host, fixture: RetentionRun['fixtures'][number]) {
@@ -334,6 +457,39 @@ async function verifyGrowthControl(host: Host, b: Pair, cycle: number) {
   expect(trimmed.activeEntries).toBeGreaterThanOrEqual(2)
 }
 
+async function verifyGlobalEnvironments(host: Host, b: Pair, cycle: number) {
+  host.setLimit(0)
+  await host.settle()
+  host.setLimit(Number.MAX_SAFE_INTEGER)
+  const left = host.working[0]
+  const right = host.secondaryWorking[0]
+  if (!left || !right) throw new TypeError('Two retained environment fixture owners are required')
+  for (const document of [left, right]) {
+    const pair = host.borrow(document.analysis, 'global-environment-pressure')
+    await host.refresh(pair, document.analysis)
+    host.release(pair)
+  }
+  const before = await host.sample('both-environments-retained-negative', cycle, [b])
+  await record(before)
+  expect(before.inactiveEntries).toBe(4)
+  expect(
+    left.analysis.inspectRetention().entries.filter((entry) => entry.leaseCount === 0),
+  ).toHaveLength(2)
+  expect(
+    right.analysis.inspectRetention().entries.filter((entry) => entry.leaseCount === 0),
+  ).toHaveLength(2)
+  expect(before.ownerCount).toBe(RETENTION_COUNT_PROTOCOL.workingDocumentCount)
+  expect(before.bound.passes).toBe(false)
+  host.setLimit(RETENTION_COUNT_PROTOCOL.expectedInactiveEntryLimit)
+  const global = await host.sample('both-environments-global-trim', cycle, [b])
+  await record(global)
+  expect(global.inactiveEntries).toBe(2)
+  expect(global.bound.passes).toBe(true)
+  expect(Array.from(host.application.enumerateRetainedEditorAnalyses())).toContain(left.analysis)
+  expect(Array.from(host.application.enumerateRetainedEditorAnalyses())).toContain(right.analysis)
+  expect(Array.from(host.application.enumerateRetainedEditorAnalyses())).toContain(host.b.analysis)
+}
+
 async function verifyActualViews(
   host: Host,
   b: Pair,
@@ -371,31 +527,28 @@ async function verifyActualViews(
     first.dispose()
     second.dispose()
     await host.settle()
-    const snapshot = host.a.buffer.getTextSnapshot()
-    const materialize = vi.spyOn(snapshot, 'materializeFullText')
-    const warm = host.createView('a-warm')
+    const interval = await host.observation.interval(() => host.createView('a-warm'), host.settle)
+    const warm = interval.value
     try {
       const reused = host.a.analysis
         .inspectRetention()
         .entries.filter((entry) => entry.leaseCount > 0)
         .map((entry) => entry.runtimeSessionId)
         .sort()
-      const reads = materialize.mock.calls.length
-      materialize.mockRestore()
       await record({
         fixture,
         arm: 'actual-editor-synchronous-warm-attachment',
         cycle: 0,
         previousRuntimeIds: ids,
         runtimeIds: reused,
-        fullTextReads: reads,
-        attachmentReturnedSynchronously: true,
+        requests: interval.requests,
+        sourceReads: interval.reads,
+        completion: interval.observation,
       })
       expect(reused).toEqual(ids)
-      expect(reads).toBe(0)
+      assertWarmInterval(interval)
       expect(bView.editor.getSelections()).toEqual(bSelection)
     } finally {
-      materialize.mockRestore()
       warm.dispose()
     }
   } finally {
@@ -404,11 +557,33 @@ async function verifyActualViews(
   }
 }
 
+function assertWarmInterval(interval: Awaited<ReturnType<Host['observation']['interval']>>) {
+  const mandatory = interval.requests
+    .filter((request) => request.provenance !== 'verifier-inspector')
+    .filter(
+      (request) =>
+        request.type !== 'queryRange' ||
+        !request.scheduledKeys.some(
+          (key) => key.includes('warmRange') || key.includes('prefetchRange'),
+        ) ||
+        request.scheduledKeys.some(
+          (key) => key.includes('visibleRange') || key.includes('.document'),
+        ),
+    )
+  expect(mandatory).toEqual([])
+  expect(
+    interval.reads
+      .filter((read) => read.provenance !== 'verifier-source-read')
+      .reduce((total, read) => total + read.fullTextReads, 0),
+  ).toBe(0)
+}
+
 async function verifyPendingFailed(host: Host, b: Pair, cycle: number) {
   const pending = host.borrow(host.a.analysis, 'pending-control')
   const pendingSample = host.census()
   await record({
-    fixture: host.a.analysis.documentId,
+    fixture: host.fixtureId,
+    documentId: host.a.analysis.documentId,
     arm: 'pending-before-worker-fence',
     cycle,
     ...pendingSample,
