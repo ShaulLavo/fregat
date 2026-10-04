@@ -99,14 +99,16 @@ describe('analysis retention notifications', () => {
       const analysis = createEditorDocumentAnalysis({ buffer, documentId: boundary })
       const snapshots: ReturnType<typeof analysis.inspectRetention>[] = []
       analysis.subscribeRetention(() => snapshots.push(analysis.inspectRetention()))
-      const fail = () => {
+      const fail = vi.fn(() => {
         throw new TypeError('Controlled external cleanup failure')
-      }
+      })
+      const dispose = vi.fn(boundary.endsWith('dispose') ? fail : () => undefined)
+      const unsubscribe = vi.fn(boundary === 'highlighter-unsubscribe' ? fail : () => undefined)
       const refresh = async () => ({ tokens: EditorTokenStore.empty() })
       const lease = boundary.startsWith('structural')
         ? analysis.borrowStructural({
             languageId: null,
-            provider: { createSession: () => ({ ...createEmptySyntaxSession(), dispose: fail }) },
+            provider: { createSession: () => ({ ...createEmptySyntaxSession(), dispose }) },
           })
         : analysis.borrowHighlighter({
             languageId: null,
@@ -114,9 +116,8 @@ describe('analysis retention notifications', () => {
               createSession: () => ({
                 refresh,
                 applyChange: refresh,
-                dispose: boundary === 'highlighter-dispose' ? fail : () => undefined,
-                onDidChangeTheme: () =>
-                  boundary === 'highlighter-unsubscribe' ? fail : () => undefined,
+                dispose,
+                onDidChangeTheme: () => unsubscribe,
               }),
             },
           })
@@ -125,6 +126,9 @@ describe('analysis retention notifications', () => {
       expect(() => analysis.reclaimInactive({ reason: 'inactive-budget' })).toThrow(TypeError)
       expect(snapshots).toHaveLength(before + 1)
       expect(snapshots.at(-1)!.entries).toEqual([])
+      expect(fail).toHaveBeenCalledTimes(1)
+      expect(dispose).toHaveBeenCalledTimes(boundary === 'highlighter-unsubscribe' ? 0 : 1)
+      expect(unsubscribe).toHaveBeenCalledTimes(boundary === 'structural-dispose' ? 0 : 1)
       analysis.dispose()
     },
   )
