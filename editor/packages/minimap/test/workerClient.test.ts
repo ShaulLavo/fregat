@@ -748,6 +748,66 @@ describe('MinimapWorkerClient', () => {
     }
   })
 
+  it('queues an expired burst deadline and publishes the latest ordered edits before render', () => {
+    let now = 0
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const tasks: Array<() => void> = []
+    const scheduler = Object.getOwnPropertyDescriptor(globalThis, 'scheduler')
+    Object.defineProperty(globalThis, 'scheduler', {
+      configurable: true,
+      value: {
+        postTask: (run: () => void) => {
+          tasks.push(run)
+          return Promise.resolve()
+        },
+      },
+    })
+    const fixture = createSummaryFixture(Array.from({ length: 20_000 }, () => 'line').join('\n'))
+    while (tasks.length > 0) tasks.shift()?.()
+    fixture.worker.postMessage.mockClear()
+    const edits: TextEdit[] = []
+    let publication: (() => void) | undefined
+    try {
+      for (const time of [0, 100, 200, 301, 302]) {
+        now = time
+        const from = fixture.session.getTextSnapshot().length
+        const edit = { from, to: from, text: String(edits.length) }
+        edits.push(edit)
+        const change = fixture.session.applyEdits([edit])
+        const before = tasks.length
+        fixture.update(change)
+        expect(fixture.worker.postMessage).not.toHaveBeenCalled()
+        const queued = tasks.slice(before)
+        expect(queued).toHaveLength(time === 301 ? 1 : 0)
+        if (time === 301) publication = queued[0]
+      }
+      expect(publication).toBeTypeOf('function')
+      while (tasks.length > 0) tasks.shift()?.()
+      const requests = fixture.worker.postMessage.mock.calls.map((call) => call[0])
+      expect(requests.map((request) => request.type)).toEqual([
+        'applyEdits',
+        'updateViewport',
+        'render',
+      ])
+      expect(requests[0]).toEqual(
+        expect.objectContaining({
+          type: 'applyEdits',
+          edits,
+          document: expect.objectContaining({
+            summaryPatch: expect.objectContaining({
+              textLength: fixture.session.getTextSnapshot().length,
+            }),
+          }),
+        }),
+      )
+      fixture.verify()
+    } finally {
+      fixture.dispose()
+      restoreDescriptor(globalThis, 'scheduler', scheduler)
+      clock.mockRestore()
+    }
+  })
+
   it('defers content worker updates while applying viewport feedback immediately', () => {
     const runtime = installMinimapRuntime()
     try {
@@ -1849,6 +1909,7 @@ function createSummaryFixture(text: string) {
 
   return {
     session,
+    worker,
     update(change: DocumentSessionChange) {
       client.update(snapshot({}, { textSnapshot: change.textSnapshot }), 'content', change)
     },
