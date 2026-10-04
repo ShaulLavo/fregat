@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { Editor } from '../src/editor/Editor'
+import { createInlineMap } from '../src/inlineMap'
+import { createPieceTableSnapshot } from '../src/public/document'
 import { DisplayProjection } from '../src/virtualization/displayProjection'
 import { VirtualizedTextView } from '../src/virtualization/virtualizedTextView'
 
@@ -188,3 +190,101 @@ it('ends a same-line gutter update before changing the disposed row', () => {
   expect(cleanup).toHaveBeenCalledTimes(2)
   expect(view.isRenderingAtomically).toBe(false)
 })
+
+it.each([false, true])(
+  'releases a returned inline widget once when disposal inside render is %s',
+  (disposeInside) => {
+    const host = container()
+    const view = new VirtualizedTextView(host, { rowHeight: 20, overscan: 0 })
+    releases.push(() => view.dispose())
+    const text = 'a ![img](x.png) b\nplain'
+    view.setText(text)
+    view.setScrollMetrics(0, 120, 400)
+    const row = view.getState().mountedRows[0]!.element
+    let returned: HTMLElement | null = null
+    let terminalText: string | null = null
+    const cleanup = vi.fn()
+    const render = vi.fn((element: HTMLElement) => {
+      returned = element
+      element.appendChild(document.createElement('img'))
+      if (disposeInside) {
+        view.dispose()
+        terminalText = row.textContent
+      }
+      return { dispose: cleanup }
+    })
+
+    view.setInlineMap(
+      createInlineMap(createPieceTableSnapshot(text), [
+        {
+          id: 'image',
+          startIndex: 2,
+          endIndex: 15,
+          text: 'IMG',
+          render,
+        },
+      ]),
+    )
+
+    expect(cleanup).toHaveBeenCalledTimes(disposeInside ? 1 : 0)
+    view.dispose()
+    view.dispose()
+    expect(cleanup).toHaveBeenCalledOnce()
+    expect(render).toHaveBeenCalledOnce()
+    expect(returned).not.toBeNull()
+    expect(returned?.parentNode).toBeNull()
+    if (disposeInside) expect(row.textContent).toBe(terminalText)
+    expect(view.getState().mountedRows).toEqual([])
+    expect(Reflect.get(view, 'cancelContentWidthMeasurement')).toBeNull()
+    expect(view.isRenderingAtomically).toBe(false)
+  },
+)
+
+it.each([false, true])(
+  'detaches retiring widget ownership before terminal cleanup is %s',
+  (disposeOnRetire) => {
+    const host = container()
+    const view = new VirtualizedTextView(host, { rowHeight: 20, overscan: 0 })
+    releases.push(() => view.dispose())
+    const text = 'a ![img](x.png) b ![other](y.png) c\nplain'
+    const snapshot = createPieceTableSnapshot(text)
+    view.setText(text)
+    view.setScrollMetrics(0, 120, 400)
+    let armed = false
+    const retired = vi.fn(() => {
+      if (armed) view.dispose()
+    })
+    const survivor = vi.fn()
+    const other = {
+      id: 'other',
+      startIndex: text.indexOf('![other]'),
+      endIndex: text.indexOf('![other]') + '![other](y.png)'.length,
+      text: 'OTHER',
+      render: () => ({ dispose: survivor }),
+    }
+    view.setInlineMap(
+      createInlineMap(snapshot, [
+        {
+          id: 'image',
+          startIndex: 2,
+          endIndex: 15,
+          text: 'IMG',
+          render: () => ({ dispose: retired }),
+        },
+        other,
+      ]),
+    )
+    armed = disposeOnRetire
+
+    view.setInlineMap(createInlineMap(snapshot, [other]))
+
+    expect(retired).toHaveBeenCalledOnce()
+    expect(survivor).toHaveBeenCalledTimes(disposeOnRetire ? 1 : 0)
+    view.dispose()
+    view.dispose()
+    expect(retired).toHaveBeenCalledOnce()
+    expect(survivor).toHaveBeenCalledOnce()
+    expect(view.getState().mountedRows).toEqual([])
+    expect(view.isRenderingAtomically).toBe(false)
+  },
+)
