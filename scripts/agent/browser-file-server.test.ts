@@ -123,7 +123,7 @@ it.skipIf(process.platform === 'win32')(
     const recoveryRequested = Promise.withResolvers<void>()
     const apiClient = new TerminalHostClient({
       stateRoot: host.stateRoot,
-      env: { ...process.env, XDG_RUNTIME_DIR: path.dirname(host.paths.directory) },
+      env: { ...process.env, XDG_RUNTIME_DIR: path.dirname(path.dirname(host.paths.directory)) },
       launch: async (argv, env) => {
         launching.resolve()
         await release.promise
@@ -164,6 +164,7 @@ it.skipIf(process.platform === 'win32')(
       expect(settled).toBe(false)
       release.resolve()
       expect((await ready).ok).toBe(true)
+      expect((await apiClient.host()).pid).toBe((await host.client.host()).pid)
 
       const shell = await host.client.spawn({
         key: 'fixture-cleanup',
