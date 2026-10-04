@@ -2,6 +2,9 @@ type TokenPaintStyle = {
   readonly color: string
   readonly backgroundColor: string
   readonly textDecoration: string
+  readonly textDecorationColor: string
+  readonly textDecorationStyle: string
+  readonly textDecorationThickness: string
 }
 
 type TokenPaintRun = {
@@ -21,17 +24,32 @@ type TokenPaintRow = {
 
 export type TokenPaintFrame = {
   readonly at: number
+  readonly window: { readonly start: number; readonly end: number } | null
   readonly rows: readonly TokenPaintRow[]
   readonly runs: readonly TokenPaintRun[]
 }
 
 type TokenPaintIdentity = {
-  readonly document: string
+  readonly document: string | null
   readonly revision: number | null
   readonly configuration: string
+  readonly paintedGeneration: 'unknown'
 }
 
 export type TokenPaintObservation = TokenPaintFrame & { readonly identity: TokenPaintIdentity }
+
+export type TokenPaintReference = {
+  readonly identity: TokenPaintIdentity
+  readonly source: string
+  readonly runs: readonly TokenPaintRun[]
+  readonly expected: 'colored' | 'plain'
+}
+
+export type TokenPaintHandoff = {
+  readonly frame: TokenPaintObservation
+  readonly subject: 'old-held' | 'requested' | 'unknown' | 'wrong-source'
+  readonly mismatch: string | null
+}
 
 export type TokenPaintProbe = {
   readonly source: string
@@ -52,8 +70,19 @@ export function captureTokenPaint(probe: TokenPaintProbe): TokenPaintFrame {
   const rows: TokenPaintRow[] = []
   const runs: TokenPaintRun[] = []
   const viewport = document.querySelector<HTMLElement>(probe.viewportSelector)
-  if (!viewport) return { at: performance.now(), rows, runs }
+  if (!viewport) return { at: performance.now(), window: null, rows, runs }
   const viewportBounds = viewport.getBoundingClientRect()
+  const scroll = viewport.closest<HTMLElement>('.editor-virtualized')
+  const rowHeight = scroll
+    ? Number.parseFloat(getComputedStyle(scroll).getPropertyValue('--editor-row-height'))
+    : 0
+  const window =
+    scroll && rowHeight > 0 && viewportBounds.height > 0
+      ? {
+          start: Math.floor(scroll.scrollTop / rowHeight),
+          end: Math.ceil((scroll.scrollTop + viewportBounds.height) / rowHeight),
+        }
+      : null
   const rules = new Map<string, CSSStyleDeclaration>()
   for (const sheet of [...document.styleSheets, ...document.adoptedStyleSheets]) {
     try {
@@ -63,7 +92,7 @@ export function captureTokenPaint(probe: TokenPaintProbe): TokenPaintFrame {
     }
   }
   for (const row of viewport.querySelectorAll<HTMLElement>(probe.rowSelector)) captureRow(row)
-  return { at: performance.now(), rows, runs }
+  return { at: performance.now(), window, rows, runs }
 
   function visitRules(list: CSSRuleList): void {
     for (const rule of list) {
@@ -94,7 +123,7 @@ export function captureTokenPaint(probe: TokenPaintProbe): TokenPaintFrame {
     content.selectNodeContents(row)
     const text = textWithoutLayers(content.cloneContents())
     const index = Number(row.dataset.editorVirtualRow)
-    const line = Number.isInteger(index) ? index : sourceLines.indexOf(text)
+    const line = Number.isInteger(index) ? index : -1
     const start = (starts[line] ?? -1) + Number(row.dataset.editorVirtualWindowStart ?? 0)
     const mapped = start >= 0 && probe.source.slice(start, start + text.length) === text
     rows.push({
@@ -152,26 +181,134 @@ export function captureTokenPaint(probe: TokenPaintProbe): TokenPaintFrame {
       color: style.color,
       backgroundColor: style.backgroundColor,
       textDecoration: style.textDecorationLine,
+      textDecorationColor: style.textDecorationColor,
+      textDecorationStyle: style.textDecorationStyle,
+      textDecorationThickness: style.textDecorationThickness,
     }
   }
 }
 
+function tokenPaintReferenceFrame(
+  reference: TokenPaintReference,
+  window: NonNullable<TokenPaintFrame['window']>,
+): TokenPaintObservation {
+  let offset = 0
+  const rows = reference.source
+    .split('\n')
+    .map((text) => {
+      const start = offset
+      offset += text.length + 1
+      return {
+        start,
+        end: start + text.length,
+        text,
+        mapping: 'source',
+        presentation: 'live',
+      } as const
+    })
+    .slice(window.start, window.end)
+  const runs = rows.flatMap((row) =>
+    reference.runs.flatMap((run) => {
+      const start = Math.max(row.start, run.start)
+      const end = Math.min(row.end, run.end)
+      if (start >= end) return []
+      return [{ start, end, text: reference.source.slice(start, end), style: run.style }]
+    }),
+  )
+  return { at: 0, identity: reference.identity, window, rows, runs }
+}
+
 export function tokenPaintMismatch(
   frame: TokenPaintObservation,
-  reference: TokenPaintObservation,
-  expected: 'colored' | 'plain' = 'colored',
+  reference: TokenPaintReference,
 ): string | null {
   if (JSON.stringify(frame.identity) !== JSON.stringify(reference.identity)) return 'identity'
-  if (frame.rows.length === 0 || frame.rows.some((row) => row.mapping !== 'source'))
+  if (
+    !frame.window ||
+    frame.rows.length === 0 ||
+    frame.rows.some((row) => row.mapping !== 'source')
+  )
     return 'coverage'
+  if (frame.rows.some((row) => row.presentation !== 'live')) return 'unsupported saved presentation'
+  const expected = tokenPaintReferenceFrame(reference, frame.window)
   const rows = (value: TokenPaintFrame) =>
-    value.rows.map(({ start, end, text }) => ({ start, end, text }))
-  if (JSON.stringify(rows(frame)) !== JSON.stringify(rows(reference))) return 'source rows'
-  if (expected === 'colored' && reference.runs.length < 2) return 'uncalibrated reference'
-  if (expected === 'plain' && reference.runs.length !== 0) return 'unexpected reference tokens'
-  if (JSON.stringify(normalizedRuns(frame.runs)) !== JSON.stringify(normalizedRuns(reference.runs)))
+    value.rows
+      .map(({ start, end, text }) => ({ start, end, text }))
+      .toSorted((left, right) => left.start - right.start || left.end - right.end)
+  if (JSON.stringify(rows(frame)) !== JSON.stringify(rows(expected))) return 'source rows'
+  if (reference.expected === 'colored' && reference.runs.length < 2) return 'uncalibrated reference'
+  if (reference.expected === 'plain' && reference.runs.length !== 0)
+    return 'unexpected reference tokens'
+  if (JSON.stringify(normalizedRuns(frame.runs)) !== JSON.stringify(normalizedRuns(expected.runs)))
     return 'token offsets or styles'
   return null
+}
+
+export function tokenPaintHandoff(
+  frames: readonly TokenPaintObservation[],
+  held: TokenPaintReference,
+  requested: TokenPaintReference,
+): TokenPaintHandoff[] {
+  let activated = false
+  return frames.map((frame) => {
+    if (frame.identity.document === requested.identity.document) {
+      activated = true
+      return { frame, subject: 'requested', mismatch: tokenPaintMismatch(frame, requested) }
+    }
+    if (!activated && frame.identity.document === held.identity.document)
+      return { frame, subject: 'old-held', mismatch: tokenPaintMismatch(frame, held) }
+    const subject = frame.identity.document === null ? 'unknown' : 'wrong-source'
+    return { frame, subject, mismatch: 'activation identity' }
+  })
+}
+
+export function resolveTokenPaintRuns(input: {
+  readonly source: string
+  readonly viewportSelector: string
+  readonly tokens: readonly {
+    readonly start: number
+    readonly end: number
+    readonly style: {
+      readonly color?: string
+      readonly backgroundColor?: string
+      readonly textDecoration?: string
+    }
+  }[]
+}): TokenPaintRun[] {
+  const viewport = document.querySelector<HTMLElement>(input.viewportSelector)
+  if (!viewport) throw new RangeError('reference style viewport unavailable')
+  const row = document.createElement('div')
+  row.className = 'editor-virtualized-row'
+  row.style.display = 'none'
+  const probe = document.createElement('span')
+  row.append(probe)
+  viewport.append(row)
+  try {
+    return input.tokens
+      .filter(({ style }) => style.color || style.backgroundColor || style.textDecoration)
+      .map((token) => {
+        probe.style.cssText = ''
+        probe.style.color = token.style.color ?? ''
+        probe.style.backgroundColor = token.style.backgroundColor ?? ''
+        probe.style.textDecoration = token.style.textDecoration ?? ''
+        const computed = getComputedStyle(probe)
+        return {
+          start: token.start,
+          end: token.end,
+          text: input.source.slice(token.start, token.end),
+          style: {
+            color: computed.color,
+            backgroundColor: computed.backgroundColor,
+            textDecoration: computed.textDecorationLine,
+            textDecorationColor: computed.textDecorationColor,
+            textDecorationStyle: computed.textDecorationStyle,
+            textDecorationThickness: computed.textDecorationThickness,
+          },
+        }
+      })
+  } finally {
+    row.remove()
+  }
 }
 
 function normalizedRuns(runs: readonly TokenPaintRun[]): TokenPaintRun[] {

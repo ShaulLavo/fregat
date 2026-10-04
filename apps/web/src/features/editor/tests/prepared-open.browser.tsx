@@ -17,6 +17,7 @@ import { holdWallClock } from '../../../../test/factories/wall-clock'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
+import { useEditorUiStoreApi, type EditorUiStoreApi } from '@/features/editor/state/ui-state'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { type EditorCommands } from '@/features/editor/state/commands'
 import {
@@ -59,6 +60,8 @@ import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
   captureTokenPaint,
   tokenPaintMismatch,
+  resolveTokenPaintRuns,
+  type TokenPaintReference,
   type TokenPaintObservation,
 } from '../../../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
 import { AppProviders, seedBootMirrorTheme } from '../../../../test/render'
@@ -118,7 +121,7 @@ test(
     const tab = selectedGroupTab(groups)
     if (!tab) throw new RangeError('known-good split tab unavailable')
     const sessions = workerRuntimeSessionIds('shiki')
-    const reference = currentTokenPaint()
+    const reference = currentTokenReference()
     expect(
       await harness.commands.placeTab({
         tabId: tab.id,
@@ -188,7 +191,7 @@ test(
     await awaitEditorSyntaxWorkerIdleFences()
     expect(firstFrame.tokens).not.toBeNull()
     expect(
-      tokenPaintMismatch(requiredTokenPaint(firstFrame.tokens), currentTokenPaint()),
+      tokenPaintMismatch(requiredTokenPaint(firstFrame.tokens), currentTokenReference()),
     ).toBeNull()
 
     expect(attachmentDiagnostic()?.detail).toMatchObject({
@@ -216,8 +219,8 @@ test('calibrates complete source token paint against a delayed partial install',
   await activateAndCaptureFirstFrame()
   await awaitEditorSyntaxWorkerIdleFences()
   await expect.poll(() => currentTokenPaint().runs.length, { timeout: 10_000 }).toBeGreaterThan(2)
-  const reference = currentTokenPaint()
-  expect(tokenPaintMismatch(reference, reference)).toBeNull()
+  const reference = currentTokenReference()
+  expect(tokenPaintMismatch(currentTokenPaint(), reference)).toBeNull()
   const restore = delayTokenInstall()
   try {
     await nextAnimationFrame()
@@ -231,6 +234,7 @@ test('calibrates complete source token paint against a delayed partial install',
   }
   await nextAnimationFrame()
   expect(tokenPaintMismatch(currentTokenPaint(), reference)).toBeNull()
+  assertPaintedDecorations(reference)
 })
 
 test(
@@ -247,7 +251,7 @@ test(
     await activateAndCaptureFirstFrame()
     await awaitEditorSyntaxWorkerIdleFences()
     await expect.poll(() => currentTokenPaint().runs.length, { timeout: 10_000 }).toBeGreaterThan(2)
-    const reference = currentTokenPaint()
+    const reference = currentTokenReference()
     const sessions = workerRuntimeSessionIds('shiki')
     const structuralSessions = workerRuntimeSessionIds('tree-sitter')
     for (let revisit = 0; revisit < 6; revisit++) {
@@ -290,6 +294,7 @@ test(
     await nextAnimationFrame()
     await expect.poll(() => currentHighlighterRead().kind, { timeout: 10_000 }).toBe('ready')
     console.info('split-analysis-ready', JSON.stringify(currentHighlighterRead()))
+    const reference = currentTokenReference()
     const groups = harness.workspaceStore.getState().workbenchPanels.editorGroups
     const originalTab = selectedGroupTab(groups)
     if (!originalTab) throw new RangeError('split token paint tab unavailable')
@@ -334,7 +339,19 @@ test(
           .slice(0, 5),
       }),
     )
-    expect(tokenPaintMismatch(firstFrame, secondFrame)).toBeNull()
+    const firstMismatch = tokenPaintMismatch(firstFrame, reference)
+    const secondMismatch = tokenPaintMismatch(secondFrame, reference)
+    console.info(
+      'split-independent-oracles',
+      JSON.stringify({
+        firstMismatch,
+        secondMismatch,
+        sourceLength: reference.source.length,
+        referenceRanges: reference.runs.length,
+      }),
+    )
+    expect(firstMismatch).toBeNull()
+    expect(secondMismatch).toBeNull()
     expect(workerRuntimeSessionIds('shiki')).toEqual(sessions)
     const secondViewport = document
       .querySelector(secondSelector)
@@ -346,13 +363,13 @@ test(
     await awaitEditorSyntaxWorkerIdleFences()
     const lowerFrame = currentTokenPaint(secondSelector)
     expect(lowerFrame.rows[0]?.start).toBeGreaterThan(firstFrame.rows.at(-1)?.end ?? 0)
-    expect(tokenPaintMismatch(lowerFrame, lowerFrame)).toBeNull()
-    expect(tokenPaintMismatch(currentTokenPaint(firstSelector), firstFrame)).toBeNull()
+    expect(tokenPaintMismatch(lowerFrame, reference)).toBeNull()
+    expect(tokenPaintMismatch(currentTokenPaint(firstSelector), reference)).toBeNull()
     const copiedTab = second.tabs.find((tab) => tab.id !== originalTab.id)
     if (!copiedTab) throw new RangeError('split token paint copied tab unavailable')
     await harness.commands.closeTab(copiedTab.id)
     await nextAnimationFrame()
-    expect(tokenPaintMismatch(currentTokenPaint(), firstFrame)).toBeNull()
+    expect(tokenPaintMismatch(currentTokenPaint(), reference)).toBeNull()
   },
 )
 
@@ -456,7 +473,7 @@ test(
       "export const retainedDirty = 'retained dirty browser text'\n",
     )
     await awaitEditorSyntaxWorkerIdleFences()
-    const reference = currentTokenPaint()
+    const reference = currentTokenReference()
     const activeTabId =
       selectedGroupTab(harness.workspaceStore.getState().workbenchPanels.editorGroups)?.id ?? null
     if (!activeTabId) throw new RangeError('active browser tab unavailable')
@@ -647,13 +664,14 @@ function PreparedOpenHarness() {
   const queryClient = useQueryClient()
   const groups = useEditorWorkspaceState((state) => state.workbenchPanels.editorGroups)
   const workspaceStore = useEditorWorkspaceStoreApi()
+  const uiStore = useEditorUiStoreApi()
 
   useLayoutEffect(() => {
-    runtime = { commands, documentStore, queryClient, workspaceStore }
+    runtime = { commands, documentStore, queryClient, workspaceStore, uiStore }
     return () => {
       runtime = null
     }
-  }, [commands, documentStore, queryClient, workspaceStore])
+  }, [commands, documentStore, queryClient, workspaceStore, uiStore])
 
   return (
     <>
@@ -917,6 +935,7 @@ type PreparedOpenRuntime = {
   readonly documentStore: EditorDocumentStoreApi
   readonly queryClient: QueryClient
   readonly workspaceStore: EditorWorkspaceStoreApi
+  readonly uiStore: EditorUiStoreApi
 }
 
 type FirstFrameCapture = {
@@ -937,10 +956,27 @@ function currentTokenPaint(
 function tryCurrentTokenPaint(
   viewportSelector = '.editor-virtualized-viewport',
 ): TokenPaintObservation | null {
-  const retained = requiredRuntime()
-    .documentStore.getState()
-    .getLiveEditorDocument(fileDocumentKey(PATH))
-  if (!retained) return null
+  const harness = requiredRuntime()
+  const viewport = document.querySelector<HTMLElement>(viewportSelector)
+  const groupId = viewport?.closest<HTMLElement>('[data-prepared-open-group]')?.dataset
+    .preparedOpenGroup
+  const group = allEditorGroups(
+    harness.workspaceStore.getState().workbenchPanels.editorGroups,
+  ).find((group) => group.id === groupId)
+  const tab = group?.tabs.find((tab) => tab.id === group.selectedTabId)
+  const view = tab ? harness.documentStore.getState().viewsByTabId[tab.id] : null
+  const retained = view
+    ? harness.documentStore.getState().getLiveEditorDocument(view.documentKey)
+    : null
+  const inspection = tab
+    ? harness.uiStore.getState().controllersByTabId.get(tab.id)?.getSnapshot()
+    : null
+  if (!retained || !inspection) return null
+  if (
+    inspection.foldMarkers.length > 0 ||
+    inspection.visibleRows.some((row) => !row.firstWrapSegment)
+  )
+    throw new RangeError('folded and wrapped token paint require calibrated mapping')
   return {
     ...captureTokenPaint({
       source: retained.buffer.materializeFullText(),
@@ -950,11 +986,52 @@ function tryCurrentTokenPaint(
         '.editor-virtualized-selection-layer,.editor-virtualized-hidden-character-layer,.editor-virtualized-fold-placeholder,.editor-virtualized-gutter-row',
       highlightPrefix: 'editor-shared-token-',
     }),
+    window: inspection.viewport.visibleRange,
     identity: {
       document: retained.analysis.documentId,
       revision: retained.buffer.getRevision(),
       configuration: JSON.stringify(currentHighlighterConfiguration()),
+      paintedGeneration: 'unknown',
     },
+  }
+}
+
+function currentTokenReference(): TokenPaintReference {
+  const retained = requiredRuntime()
+    .documentStore.getState()
+    .getLiveEditorDocument(fileDocumentKey(PATH))
+  if (!retained) throw new RangeError('reference source unavailable')
+  const configuration = currentHighlighterConfiguration()
+  const lease = retained.analysis.borrowHighlighter({
+    provider: editorHighlighterProvider(),
+    languageId: 'typescript',
+    configurationTag: configuration,
+  })
+  if (!lease) throw new RangeError('reference real worker unavailable')
+  try {
+    const read = lease.read()
+    expect(read.kind).toBe('ready')
+    if (read.kind !== 'ready') throw new RangeError('reference real worker unsettled')
+    expect(read.revision).toBe(retained.buffer.getRevision())
+    const source = read.snapshot.materializeFullText()
+    expect(source).toBe(retained.buffer.materializeFullText())
+    return {
+      source,
+      identity: {
+        document: retained.analysis.documentId,
+        revision: read.revision,
+        configuration: JSON.stringify(configuration),
+        paintedGeneration: 'unknown',
+      },
+      expected: 'colored',
+      runs: resolveTokenPaintRuns({
+        source,
+        tokens: read.result.tokens.toTokens(),
+        viewportSelector: '.editor-virtualized-viewport',
+      }),
+    }
+  } finally {
+    lease.dispose()
   }
 }
 
@@ -1002,6 +1079,50 @@ function currentHighlighterRead() {
 function requiredTokenPaint(frame: TokenPaintObservation | null): TokenPaintObservation {
   if (!frame) throw new RangeError('first-frame token paint unavailable')
   return frame
+}
+
+function assertPaintedDecorations(reference: TokenPaintReference): void {
+  const rules = Array.from(document.styleSheets)
+    .flatMap((sheet) => Array.from(sheet.cssRules))
+    .filter(
+      (rule): rule is CSSStyleRule =>
+        rule instanceof CSSStyleRule &&
+        rule.selectorText.includes('::highlight(editor-shared-token-'),
+    )
+  expect(rules.length).toBeGreaterThan(0)
+  const originals = rules.map((rule) => rule.style.cssText)
+  try {
+    for (const decoration of [
+      { color: 'rgb(1, 2, 3)', style: 'solid', thickness: '1px' },
+      { color: 'rgb(4, 5, 6)', style: 'wavy', thickness: '1px' },
+      { color: 'rgb(4, 5, 6)', style: 'wavy', thickness: '3px' },
+    ]) {
+      assertPaintedDecoration(rules, decoration, reference)
+    }
+  } finally {
+    rules.forEach((rule, index) => {
+      rule.style.cssText = originals[index] ?? ''
+    })
+  }
+  expect(tokenPaintMismatch(currentTokenPaint(), reference)).toBeNull()
+}
+
+function assertPaintedDecoration(
+  rules: readonly CSSStyleRule[],
+  decoration: { readonly color: string; readonly style: string; readonly thickness: string },
+  reference: TokenPaintReference,
+): void {
+  for (const rule of rules)
+    rule.style.textDecoration = `underline ${decoration.style} ${decoration.color} ${decoration.thickness}`
+  const frame = currentTokenPaint()
+  expect(frame.runs.length).toBeGreaterThan(2)
+  for (const run of frame.runs) {
+    expect(run.style.textDecoration).toBe('underline')
+    expect(run.style.textDecorationColor).toBe(decoration.color)
+    expect(run.style.textDecorationStyle).toBe(decoration.style)
+    expect(run.style.textDecorationThickness).toBe(decoration.thickness)
+  }
+  expect(tokenPaintMismatch(frame, reference)).toBe('token offsets or styles')
 }
 
 function delayTokenInstall(): () => void {

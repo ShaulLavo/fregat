@@ -82,6 +82,10 @@ export const decodeSelectors = {
 } as const
 export const searchEditorSelector = '[aria-label="Search result editor"]'
 export const searchEditorFileRowSelector = '[role="treeitem"][aria-level="1"]'
+export const editorTokenActivationSelectors = {
+  group: '[data-editor-group-id]',
+  selectedTab: '[data-editor-tab-path][aria-selected="true"]',
+} as const
 export const selectedEditorFileTabSelector = '[data-editor-tab-path][aria-selected="true"]'
 export const searchEditorGeometrySelectors = {
   header: searchEditorFileRowSelector,

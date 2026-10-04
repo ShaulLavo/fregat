@@ -6,11 +6,21 @@ import { strictEqual, ok } from 'node:assert'
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { scratchPath } from '../paths'
 import { measurePress, pressStampScript, type PressTiming } from '../press-timing'
-import { openFileByName, selectors, editorTokenPaintSelectors, waitForApp } from '../selectors'
+import {
+  openFileByName,
+  selectors,
+  editorTokenPaintSelectors,
+  waitForApp,
+  editorTokenActivationSelectors,
+} from '../selectors'
 import { recordFrames } from '../blank-frames'
 import {
   captureTokenPaint,
   tokenPaintMismatch,
+  tokenPaintHandoff,
+  resolveTokenPaintRuns,
+  type TokenPaintReference,
+  type TokenPaintHandoff,
   type TokenPaintObservation,
 } from './editor-tab-hover-highlights-probe'
 import {
@@ -22,6 +32,7 @@ import type { Scenario } from './index'
 
 const results = new WeakMap<Page, PressTiming[]>()
 const tokenFrames = new WeakMap<Page, TokenPaintObservation[]>()
+const handoffs = new WeakMap<Page, TokenPaintHandoff[]>()
 
 export const editorTabHoverHighlights: Scenario = {
   name: 'editor-tab-hover-highlights',
@@ -30,6 +41,14 @@ export const editorTabHoverHighlights: Scenario = {
   inspect: async (page) => ({
     timing: results.get(page) ?? [],
     tokenFrames: tokenFrames.get(page) ?? [],
+    handoffs: handoffs.get(page) ?? [],
+    activationEvidence: 'selected tab resource; installed DOM generation unknown',
+    acceptanceGaps: [
+      'held subject after activation',
+      'folded rows',
+      'wrapped rows',
+      'saved presentation',
+    ],
     missingFacts: [
       'buffer revision',
       'effective provider configuration',
@@ -64,6 +83,7 @@ export const editorTabHoverHighlights: Scenario = {
     const fixture = await mkdtemp(scratchPath('fregat-tab-hover-'))
     results.set(page, [])
     tokenFrames.set(page, [])
+    handoffs.set(page, [])
     try {
       const source = await readFile(
         path.resolve(
@@ -90,38 +110,30 @@ export const editorTabHoverHighlights: Scenario = {
         `(${sampleEditorPaint({ needle: 'HOVER_TARGET', kind: 'file' })})().colour`,
       )
       await page.waitForTimeout(1200)
-      const reference = await page.evaluate(captureTokenPaint, {
-        ...editorTokenPaintSelectors,
-        source: targetSource,
-      })
-      const observation: TokenPaintObservation = {
-        ...reference,
-        identity: {
-          document: path.join(fixture, 'target.ts'),
-          revision: null,
-          configuration: 'unavailable',
-        },
-      }
-      strictEqual(
-        tokenPaintMismatch(observation, observation),
-        null,
-        'Settled reference maps every visible source row',
-      )
+      const targetDocument = path.join(fixture.slice(1), 'target.ts')
+      const reference = await settledSourceReference(page, targetSource, targetDocument)
+      const observation = await sampleCurrentSubject(page, targetSource)
       tokenFrames.get(page)?.push(observation)
+      strictEqual(
+        tokenPaintMismatch(observation, reference),
+        null,
+        'Settled DOM matches the complete real-worker source',
+      )
       await openFileByName(page, 'other.ts')
       for (const dwell of [0, 200, 2000, 35_000]) {
         const frames = await measureCompleteTabPaint(page, {
           dwell,
           source: targetSource,
-          reference: observation,
+          reference,
+          heldSource: 'export const OTHER_FILE = false\n',
+          heldDocument: path.join(fixture.slice(1), 'other.ts'),
           other: selectors.editorTab(page, path.join(fixture.slice(1), 'other.ts')),
           target: selectors.editorTab(page, path.join(fixture.slice(1), 'target.ts')),
         })
-        tokenFrames.get(page)?.push(...frames)
         await step(`hover-${dwell}`)
         for (const frame of frames)
           strictEqual(
-            tokenPaintMismatch(frame, observation),
+            frame.mismatch,
             null,
             'Every visible token matches its settled source offsets and styles',
           )
@@ -154,37 +166,92 @@ export const editorTabHoverHighlights: Scenario = {
   },
 }
 
+function subjectSampler(source: string): string {
+  return `() => {
+    const frame = (${captureTokenPaint.toString()})(${JSON.stringify({ ...editorTokenPaintSelectors, source })})
+    const viewport = document.querySelector(${JSON.stringify(editorTokenPaintSelectors.viewportSelector)})
+    const group = viewport?.closest(${JSON.stringify(editorTokenActivationSelectors.group)})
+    const selected = group?.querySelector(${JSON.stringify(editorTokenActivationSelectors.selectedTab)})
+    return { ...frame, identity: { document: selected?.getAttribute('data-editor-tab-path') ?? null, revision: null, configuration: 'unknown', paintedGeneration: 'unknown' } }
+  }`
+}
+
+async function sampleCurrentSubject(page: Page, source: string): Promise<TokenPaintObservation> {
+  return page.evaluate(`(${subjectSampler(source)})()`)
+}
+
+async function settledSourceReference(
+  page: Page,
+  source: string,
+  document: string,
+): Promise<TokenPaintReference> {
+  const coreUrl = `/@fs${path.resolve(import.meta.dirname, '../../../editor/packages/editor/dist/public/document.js')}`
+  const tokens = await page.evaluate<
+    Parameters<typeof resolveTokenPaintRuns>[0]['tokens']
+  >(`(async () => {
+    const core = await import(${JSON.stringify(coreUrl)})
+    const syntax = await import('/src/features/editor/state/syntax-highlighting.ts')
+    const buffer = core.createEditorTextBuffer(${JSON.stringify(source)})
+    const snapshot = buffer.getSnapshot()
+    const textSnapshot = core.createDocumentTextSnapshot(snapshot)
+    const session = syntax.editorHighlighterProvider().createSession({ documentId: 'observer-reference', languageId: 'typescript', snapshot, textSnapshot })
+    if (!session) throw new RangeError('reference worker unavailable')
+    try {
+      const result = await session.refresh(textSnapshot)
+      return result.tokens.toTokens()
+    } finally {
+      session.dispose()
+    }
+  })()`)
+  const runs = await page.evaluate(resolveTokenPaintRuns, {
+    source,
+    tokens,
+    viewportSelector: editorTokenPaintSelectors.viewportSelector,
+  })
+  return {
+    source,
+    runs,
+    expected: 'colored',
+    identity: { document, revision: null, configuration: 'unknown', paintedGeneration: 'unknown' },
+  }
+}
+
 async function measureCompleteTabPaint(
   page: Page,
   {
     dwell,
     source,
     reference,
+    heldSource,
+    heldDocument,
     other,
     target,
   }: {
     readonly dwell: number
     readonly source: string
-    readonly reference: TokenPaintObservation
+    readonly reference: TokenPaintReference
+    readonly heldSource: string
+    readonly heldDocument: string
     readonly other: Locator
     readonly target: Locator
   },
-): Promise<TokenPaintObservation[]> {
+): Promise<TokenPaintHandoff[]> {
   await other.click()
+  const held = await settledSourceReference(page, heldSource, heldDocument)
+  const sampler = `() => {
+    const current = (${subjectSampler(source)})()
+    if (current.identity.document !== ${JSON.stringify(heldDocument)}) return current
+    return (${subjectSampler(heldSource)})()
+  }`
   await page.mouse.move(5, 5)
   await target.hover()
   if (dwell > 0) await page.waitForTimeout(dwell)
-  const sampler = `() => {
-    const frame = (${captureTokenPaint.toString()})(${JSON.stringify({ ...editorTokenPaintSelectors, source })})
-    return { ...frame, targetVisible: frame.rows.some(row => row.text.includes('HOVER_TARGET')) }
-  }`
-  const frames = await recordFrames<TokenPaintObservation & { readonly targetVisible: boolean }>(
-    page,
-    sampler,
-    async () => {
+  const activationErrors: unknown[] = []
+  const frames = await recordFrames<TokenPaintObservation>(page, sampler, async () => {
+    try {
       await target.click()
       await page.waitForFunction(
-        'window.__agentFrameRecorder.frames.some(frame => frame.targetVisible)',
+        `document.querySelector(${JSON.stringify(editorTokenActivationSelectors.selectedTab)})?.getAttribute('data-editor-tab-path') === ${JSON.stringify(reference.identity.document)}`,
         null,
         { timeout: 10_000 },
       )
@@ -194,11 +261,19 @@ async function measureCompleteTabPaint(
             requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
           ),
       )
-    },
+    } catch (error) {
+      activationErrors.push(error)
+    }
+  })
+  tokenFrames.get(page)?.push(...frames)
+  const classified = tokenPaintHandoff(frames, held, reference)
+  handoffs.get(page)?.push(...classified)
+  if (activationErrors.length > 0) throw activationErrors[0]
+  ok(
+    classified.some((sample) => sample.subject === 'requested'),
+    'Target activation was observed independently of text and tokens',
   )
-  const visible = frames.filter((frame) => frame.targetVisible)
-  ok(visible.length > 0, 'At least one target text frame was observed')
-  return visible.map((frame) => ({ ...frame, identity: reference.identity }))
+  return classified
 }
 
 export const editorTabHoverLive: Scenario = {
