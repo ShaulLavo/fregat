@@ -1,5 +1,22 @@
 # @singapore-editor/tree-sitter-languages
 
+## 0.2.2
+
+### Patch Changes
+
+- 0a2cd77: Load URL grammars through fetch when a browser bundle runs with Node globals.
+- Updated dependencies [219bebd]
+- Updated dependencies [8d4694a]
+- Updated dependencies [0f6a1ed]
+- Updated dependencies [ec18def]
+- Updated dependencies [0a2cd77]
+- Updated dependencies [dd900b4]
+- Updated dependencies [2fc90ad]
+- Updated dependencies [7f18c08]
+- Updated dependencies [508fa33]
+  - @singapore-editor/core@0.2.2
+  - @singapore-editor/tree-sitter@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes
