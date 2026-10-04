@@ -1043,6 +1043,17 @@ it.each([1, 2])('commits worker canvas CSS geometry at pixel ratio %s', async (r
   }
 })
 
+function spyOnStyleSetter(style: CSSStyleDeclaration, property: 'width' | 'height') {
+  const setter = vi.spyOn(style, property, 'set')
+  // CSS named properties need their native CSSOM reads and writes preserved by the observer.
+  Object.defineProperty(style, property, {
+    configurable: true,
+    get: () => style.getPropertyValue(property),
+    set: setter.mockImplementation((value: string) => style.setProperty(property, value)),
+  })
+  return setter
+}
+
 it.each([1.5, 2.25])(
   'keeps repeated fractional geometry quiet and commits real layout changes at ratio %s',
   async (ratio) => {
@@ -1056,8 +1067,8 @@ it.each([1.5, 2.25])(
       await terminal.write('fractional geometry')
       await eventually(() => !!terminal.submittedFrame)
       const canvas = terminal.canvas!
-      widthSetter = vi.spyOn(canvas.style, 'width', 'set')
-      heightSetter = vi.spyOn(canvas.style, 'height', 'set')
+      widthSetter = spyOnStyleSetter(canvas.style, 'width')
+      heightSetter = spyOnStyleSetter(canvas.style, 'height')
       const before = terminal.submittedFrame!.frame
       await terminal.refresh(0, terminal.submittedFrame!.grid.rows - 1)
       await eventually(() => terminal.submittedFrame!.frame > before)
