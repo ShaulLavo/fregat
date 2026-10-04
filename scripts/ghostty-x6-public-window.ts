@@ -24,6 +24,7 @@ import {
   type SourceBinding,
 } from './ghostty-x6-public-reuse.ts'
 import {
+  assertX6WindowDirectory,
   claimX6Window,
   verifyX6WindowClaim,
   type ReplacementClaim,
@@ -35,6 +36,7 @@ interface Host {
   readonly quietTurnFile: string
   readonly stateDirectory: string
   readonly settingsHome: string
+  readonly windowDirectories: { readonly initial: string; readonly replacement: string }
 }
 interface Manifest {
   readonly sourceHead: string
@@ -207,6 +209,11 @@ async function prepare(): Promise<void> {
     0,
   )
   const host = readJson<Host>(resolve(argument))
+  assertX6WindowDirectory(host.windowDirectories.initial, host.windowDirectories)
+  assert(
+    !existsSync(host.windowDirectories.initial) && !existsSync(host.windowDirectories.replacement),
+  )
+  files[resolve(argument)] = digest('sha256', readFileSync(resolve(argument)), 'hex')
   assert.equal(
     realpathSync(host.runnerDirectory),
     host.runnerDirectory,
@@ -312,6 +319,7 @@ async function prepare(): Promise<void> {
 
 async function verifyUnit(unit: Unit): Promise<void> {
   assert.equal(unit.root, root)
+  assertX6WindowDirectory(unit.host.windowDirectories.initial, unit.host.windowDirectories)
   assert.equal(realpathSync(unit.host.runnerFile), join(unit.host.runnerDirectory, 'run.js'))
   assert(readFileSync(unit.host.quietTurnFile, 'utf8').includes(unit.host.runnerFile))
   assert.equal(unit.sourceHead, git('rev-parse', 'HEAD'))
@@ -375,6 +383,7 @@ async function drive(unit: Unit, mode: 'startup' | 'block'): Promise<void> {
   if (mode === 'block') {
     assert(argument)
     const approval = authorize(unit, resolve(argument))
+    assertX6WindowDirectory(output, unit.host.windowDirectories, approval.replacement)
     verifyX6WindowClaim(approval.registrationFile, output, approval.replacement)
   }
   const runsDirectory = join(unit.host.stateDirectory, 'runs')
@@ -459,6 +468,7 @@ async function launch(mode: 'startup' | 'block'): Promise<void> {
   if (mode === 'block') {
     assert(argument)
     const approval = authorize(unit, resolve(argument))
+    assertX6WindowDirectory(output, unit.host.windowDirectories, approval.replacement)
     claimX6Window(approval.registrationFile, output, approval.replacement)
   }
   mkdirSync(output)

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 
 export interface ReplacementClaim {
@@ -12,6 +12,16 @@ interface Claim {
   readonly windowDirectory: string
 }
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
+
+export function assertX6WindowDirectory(
+  directory: string,
+  windows: { readonly initial: string; readonly replacement: string },
+  replacement?: ReplacementClaim,
+): void {
+  assert(isAbsolute(directory) && isAbsolute(windows.initial) && isAbsolute(windows.replacement))
+  assert.notEqual(resolve(windows.initial), resolve(windows.replacement))
+  assert.equal(resolve(directory), resolve(replacement ? windows.replacement : windows.initial))
+}
 
 export function claimX6Window(
   registrationFile: string,

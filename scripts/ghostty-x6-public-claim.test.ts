@@ -3,7 +3,11 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
-import { claimX6Window, verifyX6WindowClaim } from './ghostty-x6-public-claim.ts'
+import {
+  assertX6WindowDirectory,
+  claimX6Window,
+  verifyX6WindowClaim,
+} from './ghostty-x6-public-claim.ts'
 
 function fixture(run: (registration: string, original: string, replacement: string) => void): void {
   const directory = mkdtempSync(join(tmpdir(), 'x6-claim-'))
@@ -24,6 +28,25 @@ function overlap(directory: string, valid: boolean): string {
   writeFileSync(file, JSON.stringify({ valid, comparisons: [{ invalid: !valid }] }))
   return createHash('sha256').update(readFileSync(file)).digest('hex')
 }
+
+test('restricts outputs to distinct identities frozen before the initial window', () => {
+  fixture((_registration, original, replacement) => {
+    const windows = { initial: original, replacement }
+    const receipt = { windowDirectory: original, overlapSha256: 'fixture' }
+    expect(() => assertX6WindowDirectory(original, windows)).not.toThrow()
+    expect(() => assertX6WindowDirectory(replacement, windows, receipt)).not.toThrow()
+    expect(() => assertX6WindowDirectory(replacement, windows)).toThrow()
+    expect(() => assertX6WindowDirectory(original, windows, receipt)).toThrow()
+    expect(() => assertX6WindowDirectory(original + '-other', windows)).toThrow()
+    expect(() => assertX6WindowDirectory('relative', windows)).toThrow()
+    expect(() =>
+      assertX6WindowDirectory(original, { initial: original, replacement: 'relative' }),
+    ).toThrow()
+    expect(() =>
+      assertX6WindowDirectory(original, { initial: original, replacement: original }),
+    ).toThrow()
+  })
+})
 
 test('claims one initial whole window and rejects another identity or direct unclaimed drive', () => {
   fixture((registration, original, replacement) => {
