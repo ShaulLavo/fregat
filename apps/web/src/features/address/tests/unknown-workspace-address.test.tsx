@@ -7,6 +7,13 @@ import { expect, test } from '../../../../test/fixtures'
 import { createObservedInProcessClient } from '../../../../test/client'
 import { scopeAddressEnvironment } from '../../../../test/factories/address-environment'
 import { renderAddressHarness, startAt, waitForNavigation } from '../../../../test/address'
+import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'
+import { applyAddressView } from '@/features/address/state/apply-view'
+import { parseAddressIntent } from '@/features/address/utils/intent'
+import {
+  readSettingsCategory,
+  selectSettingsCategory,
+} from '@/features/settings/state/category-store'
 
 // A token minted by a database this server no longer has.
 const DEAD_ADDRESS = 'RjKnJca3LpfzgX1Y'
@@ -48,4 +55,53 @@ test('a workspace link the server does not know lands on the start page once', a
     rendered.application.dispose()
     restoreEnvironment()
   }
+})
+
+test.for(['navigate', 'traverse'] as const)(
+  '%s to an unknown workspace clears the discarded Settings category',
+  async (reason, { client }) => {
+    const { application } = await createAddressTestRuntime(client)
+    selectSettingsCategory('Appearance')
+    const result = await applyAddressView({
+      application,
+      address: parseAddressIntent(
+        `/~reports.${DEAD_ADDRESS}/workbench/settings?settings=Providers`,
+      ),
+      reason,
+      isCurrent: () => true,
+    })
+    expect(result.status).toBe('applied')
+    expect(readSettingsCategory()).toBeNull()
+  },
+)
+
+test.for(['navigate', 'traverse'] as const)(
+  '%s to folderless Settings retains the addressed category',
+  async (reason, { client }) => {
+    const { application } = await createAddressTestRuntime(client)
+    selectSettingsCategory(null)
+    const result = await applyAddressView({
+      application,
+      address: parseAddressIntent('/~-/workbench/settings?settings=Providers'),
+      reason,
+      isCurrent: () => true,
+    })
+    expect(result.status).toBe('applied')
+    expect(readSettingsCategory()).toBe('Providers')
+  },
+)
+
+test('boot to an unknown workspace preserves the previous Settings category', async ({
+  client,
+}) => {
+  const { application } = await createAddressTestRuntime(client)
+  selectSettingsCategory('Appearance')
+  const result = await applyAddressView({
+    application,
+    address: parseAddressIntent(`/~reports.${DEAD_ADDRESS}/workbench/settings?settings=Providers`),
+    reason: 'boot',
+    isCurrent: () => true,
+  })
+  expect(result.status).toBe('applied')
+  expect(readSettingsCategory()).toBe('Appearance')
 })

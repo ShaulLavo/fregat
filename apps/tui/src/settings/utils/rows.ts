@@ -1,7 +1,7 @@
+import { settingRowIds } from '@workspace/contracts/settings/presentation'
 import { presentSetting } from '@workspace/contracts/settings/documentation'
 import { settingRowTitle } from '@workspace/client-core/settings/humanize'
 import {
-  settingRowIds,
   type SettingId,
   type SettingsSnapshot,
   type SettingsDiagnostic,

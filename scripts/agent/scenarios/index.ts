@@ -1,3 +1,4 @@
+import { unknownWorkspaceSettings } from './unknown-workspace-settings'
 import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
 import { installedApp } from './installed-app'
@@ -454,6 +455,7 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  unknownWorkspaceSettings,
   releaseInstallationSettings,
   nativeWindow,
   installedApp,

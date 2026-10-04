@@ -1,3 +1,4 @@
+import { settingRowIds } from '@workspace/contracts/settings/presentation'
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import type { SettingId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -49,7 +50,10 @@ export function RowActions({
         }
       />
       <DropdownMenuContent align='end' className='w-56'>
-        <DropdownMenuItem disabled={!isModified} onClick={() => resetSetting(id, scope)}>
+        <DropdownMenuItem
+          disabled={!isModified}
+          onClick={() => resetSetting(id, settingRowIds(id), scope)}
+        >
           Reset to default
         </DropdownMenuItem>
         <DropdownMenuSeparator />

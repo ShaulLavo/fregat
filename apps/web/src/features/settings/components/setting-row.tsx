@@ -1,3 +1,5 @@
+import { settingRowIds } from '@workspace/contracts/settings/presentation'
+import { settingControl } from '@workspace/contracts/settings/control'
 import { presentSetting } from '@workspace/contracts/settings/documentation'
 import { MachinePreferences } from '@/features/settings/components/machine-preferences'
 import { NotificationModeWidget } from '@/features/settings/components/widgets/notification-mode-widget'
@@ -5,9 +7,7 @@ import { ThemeWidget } from '@/features/settings/components/widgets/theme-widget
 import {
   shownColorMode,
   SCALAR_SETTING_IDS,
-  settingControl,
   settingParentId,
-  settingRowIds,
   type SettingId,
   type ScalarSettingId,
   type SettingsValues,
