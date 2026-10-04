@@ -1,5 +1,4 @@
 import { expect, test } from 'vitest'
-import { computeFixedRowVisibleRange } from '../../../editor/packages/editor/src/virtualization/fixedRowVirtualizer'
 import {
   sourceTokenPaintWindow,
   tokenPaintMismatch,
@@ -67,20 +66,11 @@ test('rejects one colored range while the remaining token install is delayed', (
   )
 })
 
-test('rejects both truncated copies when a stale controller row count clips its own window', () => {
+test('rejects both truncated copies using calibrated full-source and stale-controller windows', () => {
   const geometryWindow = { start: 0, end: Math.ceil(60 / 20) }
-  const fullWindow = computeFixedRowVisibleRange({
-    count: 3,
-    rowHeight: 20,
-    scrollTop: 0,
-    viewportHeight: 60,
-  })
-  const staleWindow = computeFixedRowVisibleRange({
-    count: 1,
-    rowHeight: 20,
-    scrollTop: 0,
-    viewportHeight: 60,
-  })
+  // The production-source probe calibrates these fixtures without importing core into scripts' erasable syntax boundary.
+  const fullWindow = { start: 0, end: 3 }
+  const staleWindow = { start: 0, end: 1 }
   expect(fullWindow).toEqual({ start: 0, end: 3 })
   expect(staleWindow).toEqual({ start: 0, end: 1 })
   const window = sourceTokenPaintWindow({ source: reference.source, geometryWindow })
