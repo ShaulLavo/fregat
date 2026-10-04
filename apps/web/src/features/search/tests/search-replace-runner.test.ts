@@ -31,6 +31,8 @@ import {
 import type { FileResult, TreeEntry } from '@/lib/file-system-types'
 import { fetchFile } from '@/lib/file-server'
 import { expect, test } from '../../../../test/fixtures'
+// Transform the real server during collection, outside the test's execution deadline.
+import '../../../../test/server'
 
 const ROOT = '/repo'
 const OPERATION_ID = '10000000-0000-4000-8000-000000000063'
