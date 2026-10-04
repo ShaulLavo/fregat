@@ -201,11 +201,9 @@ export type MinimapWorkerRequest =
     }
   | { readonly type: 'updateViewport'; readonly viewport: MinimapViewport }
   | { readonly type: 'render'; readonly sequence: number }
-  | { readonly type: 'dispose' }
 
 export type MinimapWorkerResponse =
   | { readonly type: 'layout'; readonly sequence: number; readonly layout: MinimapRenderLayout }
-  | { readonly type: 'disposed' }
   | {
       readonly type: 'rendered'
       readonly sequence: number

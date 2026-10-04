@@ -224,8 +224,21 @@ test.skipIf(!macSdk)(
   () => {
     const desktopDir = path.resolve(import.meta.dirname, '../../..')
     const host = buildNative(desktopDir)
-    expect(host).toBe(path.join(desktopDir, 'native/build/platform-webview'))
+    expect(host).toBe(
+      path.join(desktopDir, 'native/build/Fregat Dev.app/Contents/MacOS/platform-webview'),
+    )
     expect(existsSync(host!)).toBe(true)
+    const contents = path.dirname(path.dirname(host!))
+    const plist = Bun.spawnSync([
+      'plutil',
+      '-extract',
+      'CFBundleName',
+      'raw',
+      path.join(contents, 'Info.plist'),
+    ])
+    expect(plist.exitCode).toBe(0)
+    expect(new TextDecoder().decode(plist.stdout).trim()).toBe('Fregat Dev')
+    expect(existsSync(path.join(contents, 'Resources/Fregat.icns'))).toBe(true)
   },
 )
 

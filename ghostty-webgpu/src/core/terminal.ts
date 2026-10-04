@@ -20,6 +20,7 @@ import type {
   RgbColor,
   TerminalColors,
   TerminalLine,
+  CustomOscObservation,
   TerminalCursor,
   TerminalCursorStyle,
   TerminalEffects,
@@ -159,8 +160,29 @@ export class GhosttyTerminal {
     return this.handleValue
   }
 
+  subscribeCustomOsc(
+    number: number,
+    generation: number,
+    observe: (observation: CustomOscObservation) => void,
+    canCapture?: () => boolean,
+  ): () => void {
+    this.ensureActive()
+    return this.runtime.bridge.subscribeCustomOsc(
+      this.handleValue,
+      number,
+      generation,
+      observe,
+      canCapture,
+    )
+  }
+
   get size(): TerminalSize {
-    return { ...this.sizeValue }
+    this.ensureActive()
+    return {
+      ...this.sizeValue,
+      columns: this.readUint16(TerminalData.Columns, 'COLUMNS'),
+      rows: this.readUint16(TerminalData.Rows, 'ROWS'),
+    }
   }
 
   get title(): string {

@@ -57,6 +57,7 @@ function copiedFrame(snapshot: RendererFrameSnapshot): RendererFrameSnapshot {
 
 /** The local native actor. Its synchronous operations are private to the main-thread entry. */
 export class LocalTerminalExecution {
+  readonly kind = 'sync' as const
   private disposed = false
   private layout?: SubmittedLayout
   private lastFrame?: RendererTextFrameSnapshot
@@ -174,6 +175,18 @@ export class LocalTerminalExecution {
   }
   registerLinkProvider(provider: LinkProvider<Event>) {
     return this.session.registerLinkProvider(provider)
+  }
+  geometry() {
+    return this.session.geometry()
+  }
+  measure(text: string) {
+    return this.session.measure(text)
+  }
+  measureTexts(texts: readonly string[]) {
+    return this.session.measureTexts(texts)
+  }
+  writeAndReadGeometry(data: TerminalInputData) {
+    return this.session.writeAndReadGeometry(data)
   }
   write(data: TerminalInputData) {
     return this.session.write(data)
