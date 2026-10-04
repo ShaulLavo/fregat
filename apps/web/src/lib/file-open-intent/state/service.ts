@@ -1071,7 +1071,11 @@ class FileOpenIntentServiceState {
           joined: queryState?.fetchStatus === 'fetching',
         },
       })
-      const file = await ensureFileSnapshotQuery(this.queryClient, path)
+      const file = await awaitPreparationInterest(
+        ensureFileSnapshotQuery(this.queryClient, path),
+        abortSignal,
+      )
+      if (!file) return
       if (this.intentOperations.get(path) !== operation) return
       event.set({
         fileSize: file.size,
@@ -1276,7 +1280,7 @@ class FileOpenIntentServiceState {
 
       const outcome = stageRecord.stage.start()
       this.noteBenchmarkRuntimeSessionIds(record.preparedDocument)
-      await outcome
+      await awaitPreparationInterest(Promise.resolve(outcome), record.abortController.signal)
     })
     if (!this.recordCanRun(path, record, lifecycleGeneration)) return
     if (record.stages.get(stageRecord.stage.family) !== stageRecord) return
@@ -1897,6 +1901,30 @@ const preparationFamilies: readonly FileOpenIntentPreparationFamily[] = [
   'highlighter',
   'structural',
 ]
+
+function awaitPreparationInterest<T>(
+  operation: Promise<T>,
+  signal: AbortSignal,
+): Promise<T | null> {
+  if (signal.aborted) return Promise.resolve(null)
+  return new Promise((resolve, reject) => {
+    const release = () => {
+      signal.removeEventListener('abort', release)
+      resolve(null)
+    }
+    signal.addEventListener('abort', release, { once: true })
+    operation.then(
+      (value) => {
+        signal.removeEventListener('abort', release)
+        resolve(value)
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', release)
+        reject(error)
+      },
+    )
+  })
+}
 
 function stageRecords(
   stages: readonly FileOpenIntentPreparationStage[],

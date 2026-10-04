@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { QueryClient } from '@tanstack/react-query'
@@ -18,8 +18,9 @@ test('independent caller release preserves a held shared query and survivor prep
   server,
   onTestFinished,
 }) => {
-  const path = filesystemPath(join(server.root, 'shared.ts'))
-  await writeFile(path, 'const shared = true\n')
+  const path = filesystemPath('repo/shared.ts')
+  await mkdir(join(server.root, 'repo'))
+  await writeFile(join(server.root, path), 'const shared = true\n')
   const transport = createGatedMutationClient(server, '/fs/read')
   const queryClient = new QueryClient()
   registerEnvironmentQueryClient(queryClient, server.origin, transport.client)
@@ -29,13 +30,14 @@ test('independent caller release preserves a held shared query and survivor prep
     transport.release()
     fixture.dispose()
   })
-  fixture.owner.setRoot(filesystemPath(server.root))
+  fixture.owner.setRoot(filesystemPath('repo'))
   fixture.owner.connect()
   const first = fixture.owner.service.prepare({ path, source: 'file-tree' })
   const second = fixture.owner.service.prepare({ path, source: 'quick-open' })
   clock.startNext()
   await transport.entered
   const sharedRead = ensureFileSnapshotQuery(queryClient, path)
+  void sharedRead.catch(() => undefined)
   first.release()
   first.release()
   expect(queryClient.getQueryState(fileSnapshotQueryOptions(path).queryKey)?.fetchStatus).toBe(
@@ -62,10 +64,11 @@ test('the existing caller deadline releases its held read without canceling the 
   server,
   onTestFinished,
 }) => {
-  const path = filesystemPath(join(server.root, 'expired.ts'))
-  const next = filesystemPath(join(server.root, 'next.ts'))
-  await writeFile(path, 'const expired = true\n')
-  await writeFile(next, 'const next = true\n')
+  const path = filesystemPath('repo/expired.ts')
+  const next = filesystemPath('repo/next.ts')
+  await mkdir(join(server.root, 'repo'))
+  await writeFile(join(server.root, path), 'const expired = true\n')
+  await writeFile(join(server.root, next), 'const next = true\n')
   const transport = createGatedMutationClient(server, '/fs/read')
   const queryClient = new QueryClient()
   registerEnvironmentQueryClient(queryClient, server.origin, transport.client)
@@ -75,12 +78,13 @@ test('the existing caller deadline releases its held read without canceling the 
     transport.release()
     fixture.dispose()
   })
-  fixture.owner.setRoot(filesystemPath(server.root))
+  fixture.owner.setRoot(filesystemPath('repo'))
   fixture.owner.connect()
   fixture.owner.service.prepare({ path, source: 'file-tree' })
   clock.startNext()
   await transport.entered
   const sharedRead = ensureFileSnapshotQuery(queryClient, path)
+  void sharedRead.catch(() => undefined)
   clock.advance(30_000)
   await clock.settled()
   expect(queryClient.getQueryState(fileSnapshotQueryOptions(path).queryKey)?.fetchStatus).toBe(
