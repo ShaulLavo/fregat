@@ -137,11 +137,15 @@ it('starts the packaged worker default copy during activation before native read
   const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
   let active = false
   let pendingAtWrite = false
+  let started = false
+  let duringDispatch = false
+  let trusted = false
   let copied: string | undefined
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
     value: {
       write: async (items: ClipboardItem[]) => {
+        started = true
         active = navigator.userActivation.isActive
         pendingAtWrite = copied === undefined
         copied = await (await items[0]!.getType('text/plain')).text()
@@ -152,12 +156,19 @@ it('starts the packaged worker default copy during activation before native read
     if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor)
     else Reflect.deleteProperty(navigator, 'clipboard')
   })
+  terminal.textarea!.addEventListener('keydown', (event) => {
+    if (event.code !== 'KeyC' || !event.metaKey) return
+    trusted = event.isTrusted
+    duringDispatch = started && copied === undefined
+  })
   terminal.focus()
   await userEvent.keyboard('{Meta>}c{/Meta}')
   await eventually(() => copied !== undefined || errors.length > 0)
   expect(errors).toEqual([])
   expect(active).toBe(true)
   expect(pendingAtWrite).toBe(true)
+  expect(trusted).toBe(true)
+  expect(duringDispatch).toBe(true)
   expect(copied).toBe('activated')
   await page.screenshot({ element: terminal.element!, path: 'packaged-worker-selection-copy.png' })
 }, 15000)

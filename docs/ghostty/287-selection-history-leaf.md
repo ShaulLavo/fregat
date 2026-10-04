@@ -10,14 +10,17 @@ History snapshots own their lines and scrollbar. A changed identity during eithe
 Selection text and full history are requested on demand. Frame summaries carry coordinates only.
 
 Projected pointer intents accept the submitted generation, layout and native revision. The native
-helper checks that identity before mutating. The host controller owns capture/gesture lifetime and
-accepts synchronous results or asynchronous acknowledgements. It holds pointer ownership immediately,
+helper checks that identity before mutating. A gesture retains a bounded range of its own contiguous
+selection and scroll revisions so queued drags can use the same submitted projection. External output,
+reentrant writes, layout/generation changes, reset and a new gesture invalidate that range.
+The host controller owns capture/gesture lifetime and accepts synchronous results or asynchronous
+acknowledgements. It holds pointer ownership immediately,
 ignores obsolete acknowledgements and permits one outstanding autoscroll tick. Its optional projection
 refresh reads the latest committed submitted geometry before a tick.
 
 The main terminal API keeps synchronous authoritative results. Worker commands use the same names
-and arguments with promise results. Host setup, extension registration, input claim/pass and submitted
-`visibleLines` keep their synchronous convention.
+and arguments with promise results. Host focus, input claim/pass and submitted `visibleLines` keep
+their synchronous convention. Extension registration follows the entry's execution mode.
 
 The async copy helper calls `clipboard.write` during the trusted event, with a `ClipboardItem` whose
 text blob resolves from worker readback. It rejects unsupported delayed clipboard writes. An abort
@@ -27,26 +30,28 @@ browser completion retain their separate meanings.
 
 ## Execution and host wiring
 
-The packaged-worker lane owns runtime, transport, command envelopes, entry points, native lifecycle,
-fonts, direct ports, generic DOM host, input and local/submitted interfaces, exports and builds.
-It must instantiate this helper beside its existing native session, supply execution generation and
-committed layout, route selection/history authority through it and expose `selectionSnapshot`.
-The existing public `captureViewport` stays with that lane. The runnable
-`captureSelectionHistoryViewport` leaf takes an existing session, submitted summary and identities,
-holds capture on stale generation/layout/native/snapshot versions, and returns an owned serialization.
-Core can reuse it in the capture command with the existing renderer and ABI.
+`LocalTerminalExecution` instantiates the helper beside its existing native session and supplies the
+execution generation and committed layout. The worker runtime routes atomic selection readback and
+selection gestures through that native owner. `selectionSnapshot` is an internal transport command;
+the public selection and history API keeps its existing names and return conventions.
+The existing public `captureViewport` remains native-owned. The standalone
+`captureSelectionHistoryViewport` helper also guards generation/layout/native/snapshot identity before
+returning an owned serialization.
 
-The transport needs `selectionSnapshot`, `selectionPress`, `selectionDrag`,
-`selectionAutoscrollTick`, `selectionRelease` and `resetSelectionGesture`. Gesture
-intents carry the submitted `SelectionIdentity` as their last argument. Host input must reserve the
-clipboard write inside its synchronous copy claim, pass an on-demand atomic selection read and
-abort it on disposal. Host selection supplies the latest submitted identity and refreshed geometry.
+The typed transport routes `selectionSnapshot`, `selectionPress`, `selectionDrag`,
+`selectionAutoscrollTick`, `selectionRelease` and `resetSelectionGesture`. Gesture intents carry the
+submitted `SelectionIdentity` as their last argument. Mouse reports validate generation and cell layout;
+acknowledged native metadata determines mouse tracking. Clean native updates publish their submitted
+revision while retaining producer/control output accounting.
+
+The host installs pointer selection for both execution modes. Autoscroll reprojects the last client
+position using the latest committed geometry. Worker default copy starts the browser write in its
+synchronous trusted-event claim and obtains text through atomic native readback. A custom string copy
+callback runs after readback and has a separate activation contract. Host disposal aborts pending copy.
 No extension or other closure crosses the worker boundary.
 
-The tests execute real native sessions on the main thread and inside a dedicated worker fixture.
-The fixture proves the native requests and clone boundary. Packaged transport and public entry
-checks belong to the execution integration. Clipboard tests use trusted browser clicks with no grants.
-
-Landing and publication require #483, then #494, then #497, followed by packaged worker integration.
-Product Phase 2 remains open until its public matrix passes. Version and provenance integration
-remain coordinator-owned. Links, IME and accessibility have separate owners.
+The tests execute real native sessions, the dedicated worker fixture and compiled main/worker public
+entries with the real packaged worker. They cover queued gestures, strict external invalidation, pending
+release cancellation and submitted accessibility. Clipboard checks use trusted events with no grants
+or reads; real completion skips explicitly when the browser denies its ordinary activated-write baseline.
+Links, IME, publication and the remaining Phase 2 matrix keep their separate owners.
