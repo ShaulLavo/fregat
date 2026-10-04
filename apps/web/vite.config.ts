@@ -92,10 +92,11 @@ export default defineConfig(({ command, isPreview, mode }) => {
     optimizeDeps: {
       // Theme subpaths are loaded after boot and must survive optimizer cache invalidation.
       exclude: ['@shikijs/themes', 'ghostty-webgpu', ...packages.map((pkg) => pkg.name)],
-      // The scanner skips excluded editor sources and their workers, so it never sees these
-      // imports; found on a cold server mid-session instead, each one reloads the page.
+      // Linked workspace imports and editor workers can enter the graph after boot.
+      // Prebundle their dependencies so opening a lazy screen keeps the optimizer graph.
       include: [
         'evlog/client',
+        '@fregat/hotkeys > @tanstack/store',
         '@singapore-editor/markdown > micromark-util-decode-string',
         '@singapore-editor/markdown > micromark-util-normalize-identifier',
         '@singapore-editor/markdown > tree-sitter-md',

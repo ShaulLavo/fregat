@@ -79,7 +79,9 @@ test.each([
       await new Promise((resolve) => setTimeout(resolve, 0))
       if (phase === 'active' || phase === 'prevented-departure') {
         expect(onFailed).toHaveBeenCalledOnce()
-        expect(onFailed.mock.calls[0]?.[0]).toContain('Unable to fetch wasm artifact')
+        expect(onFailed).toHaveBeenCalledWith(
+          'Could not open the terminal. Close this terminal tab and open a new one.',
+        )
         expect(error).toMatchObject({ name: 'GhosttyError', operation: 'wasm.fetch', cause })
         expect(resourceQueryClient.getQueryState(queryKey)?.status).toBe('error')
         return
