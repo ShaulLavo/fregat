@@ -34,9 +34,9 @@ export function DiagnosticRow({
   readonly onOpen: () => void
 }) {
   const line = row.target.range.start.line + 1
-  const lifetime = useFileIntentLifetime(onIntent)
+  const { begin, ...handlers } = useFileIntentLifetime(onIntent)
   const { elementRef } = useForesight<HTMLButtonElement>({
-    callback: () => lifetime.begin('trajectory'),
+    callback: () => begin('trajectory'),
     hitSlop: INTENT_PREFETCH_HIT_SLOP_PX,
     name: `diagnostic:${row.id}`,
     reactivateAfter: FILE_SNAPSHOT_STALE_MS,
@@ -45,6 +45,7 @@ export function DiagnosticRow({
     <div className={cn('border-l-2', diagnosticRuleClass(row.diagnostic.severity))}>
       <ListRow
         {...rowProps}
+        {...handlers}
         as='button'
         role='treeitem'
         aria-level={2}
@@ -55,10 +56,6 @@ export function DiagnosticRow({
           rowProps.onClick(event)
           onOpen()
         }}
-        onPointerEnter={lifetime.onPointerEnter}
-        onPointerLeave={lifetime.onPointerLeave}
-        onFocus={lifetime.onFocus}
-        onBlur={lifetime.onBlur}
         ref={elementRef}
       >
         <span className='text-muted-foreground'>
