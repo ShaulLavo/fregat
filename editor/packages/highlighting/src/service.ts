@@ -113,8 +113,12 @@ export interface HighlightingService {
   /** False when the diff is prepared, on screen, or being prepared under this theme's engine. */
   canPrepareDiff(file: DiffFile, theme: HighlightingThemeSource): boolean
   /** Parses a diff ahead of its view and keeps the result; resolves true when it kept one. */
-  prepareDiff(file: DiffFile, theme: HighlightingThemeSource): Promise<boolean>
-  /** Shows a diff with any kept or running preparation; disposing hands the view's parse back. */
+  prepareDiff(
+    file: DiffFile,
+    theme: HighlightingThemeSource,
+    signal?: AbortSignal,
+  ): Promise<boolean>
+  /** Shows a diff with shared source readers; disposing releases this view's interests. */
   showDiff(
     view: HighlightingDiffView,
     file: DiffFile,
@@ -273,12 +277,16 @@ class EditorHighlightingService implements HighlightingService {
 
   public canPrepareDiff(file: DiffFile, theme: HighlightingThemeSource): boolean {
     this.assertLive()
-    return this.diffs.canPrepare(file, this.diffScope(theme))
+    return this.diffs.canPrepare(file, this.diffScope(theme), this.documentBackend(theme))
   }
 
-  public prepareDiff(file: DiffFile, theme: HighlightingThemeSource): Promise<boolean> {
+  public prepareDiff(
+    file: DiffFile,
+    theme: HighlightingThemeSource,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
     if (this.disposeTask) return Promise.reject(disposedError())
-    return this.diffs.prepare(file, this.diffScope(theme), this.documentBackend(theme))
+    return this.diffs.prepare(file, this.diffScope(theme), this.documentBackend(theme), signal)
   }
 
   public showDiff(
@@ -288,7 +296,7 @@ class EditorHighlightingService implements HighlightingService {
     theme: HighlightingThemeSource,
   ): { dispose(): void } {
     this.assertLive()
-    return this.diffs.show(view, file, side, this.diffScope(theme))
+    return this.diffs.show(view, file, side, this.diffScope(theme), this.documentBackend(theme))
   }
 
   public async awaitIdle(): Promise<void> {
@@ -319,6 +327,8 @@ class EditorHighlightingService implements HighlightingService {
   public dispose(): Promise<void> {
     if (this.disposeTask) return this.disposeTask
 
+    const completion = Promise.withResolvers<void>()
+    this.disposeTask = completion.promise
     this.lifetime.abort()
     const pending = [...this.pending]
     const shiki = this.shikiOwner
@@ -328,9 +338,9 @@ class EditorHighlightingService implements HighlightingService {
     this.treeSitterProvider = null
     this.grammars.clear()
     this.diffs.dispose()
-    this.disposeTask = Promise.allSettled(pending)
+    void Promise.allSettled(pending)
       .then(() => Promise.allSettled([shiki?.dispose(), treeSitter?.dispose?.()]))
-      .then(() => undefined)
+      .then(() => completion.resolve(), completion.reject)
     return this.disposeTask
   }
 

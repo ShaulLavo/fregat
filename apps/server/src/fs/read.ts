@@ -1,3 +1,4 @@
+import type { BigIntStats } from 'node:fs'
 import { open, stat, type FileHandle } from 'node:fs/promises'
 import { FsError, mapNodeError } from './errors'
 import { resolveExistingPath, type WorkspacePaths } from './path'
@@ -5,6 +6,7 @@ import { assertFile } from './stat'
 import {
   detectTextEncoding,
   decodeText,
+  type DecodedText,
   type TextEncodingLabel,
 } from '@workspace/contracts/text-encoding'
 import { fileVersion, textFileVersion } from './version'
@@ -112,26 +114,68 @@ export type TextHeadResult = {
   size: number
   /** The file goes on past `content`. */
   truncated: boolean
+  /** File identity and metadata checked on the descriptor and named path across this read. */
+  capture: {
+    device: string
+    inode: string
+    size: number
+    mtimeNs: string
+    ctimeNs: string
+  }
+  coverage: TextHeadCoverage
 }
 
-/** The first `maxBytes` of a text file, cut at a line end so no character is split. */
+type TextHeadCoverage = {
+  /** Byte and UTF-16 coverage both start at zero. */
+  bytesRead: number
+  /** Bytes supplied to decoding after line trimming. */
+  decodedBytes: number
+  /** UTF-16 code units in `content`. */
+  utf16Length: number
+} & (
+  | { kind: 'complete'; version: string; encoding: 'utf8'; lossy: false; lineTrimmed: false }
+  | (Pick<DecodedText, 'encoding' | 'lossy'> & { kind: 'partial'; lineTrimmed: boolean })
+  | { kind: 'lossy'; encoding: TextEncodingLabel; lossy: true; lineTrimmed: false }
+)
+
+export type TextHeadFileSystem = {
+  open: (path: string) => Promise<{
+    stat: () => Promise<BigIntStats>
+    read: (
+      buffer: Uint8Array,
+      offset: number,
+      length: number,
+      position: number,
+    ) => Promise<{ bytesRead: number }>
+    close: () => Promise<void>
+  }>
+  stat: (path: string) => Promise<BigIntStats>
+}
+
+const textHeadFileSystem: TextHeadFileSystem = {
+  async open(path) {
+    const handle = await open(path, 'r')
+    return {
+      stat: () => handle.stat({ bigint: true }),
+      read: (buffer, offset, length, position) => handle.read(buffer, offset, length, position),
+      close: () => handle.close(),
+    }
+  },
+  stat: (path) => stat(path, { bigint: true }),
+}
+
+/** A bounded head, ending at the last newline when one fits inside a partial read. */
 export async function readTextHead(
   paths: WorkspacePaths,
   input: string,
   maxBytes: number,
+  fs: TextHeadFileSystem = textHeadFileSystem,
 ): Promise<TextHeadResult> {
   try {
     const target = await resolveExistingPath(paths, input)
-    const handle = await open(target.absolutePath, 'r')
+    const handle = await fs.open(target.absolutePath)
     try {
-      const stats = await handle.stat()
-      assertFile(stats)
-      const buffer = new Uint8Array(Math.min(maxBytes, stats.size))
-      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
-      const truncated = stats.size > bytesRead
-      const decoded = decodeText(truncated ? wholeLines(buffer.subarray(0, bytesRead)) : buffer)
-      if (decoded.seemsBinary) throw new FsError('FILE_IS_BINARY')
-      return { path: target.relativePath, content: decoded.content, size: stats.size, truncated }
+      return await readOpenedTextHead(paths, target, handle, maxBytes, fs)
     } finally {
       await handle.close()
     }
@@ -141,7 +185,110 @@ export async function readTextHead(
   }
 }
 
-// A budget cut can land inside a multi-byte character; ending at the last newline avoids that.
+type TextHeadHandle = Awaited<ReturnType<TextHeadFileSystem['open']>>
+
+async function readOpenedTextHead(
+  paths: WorkspacePaths,
+  target: Awaited<ReturnType<typeof resolveExistingPath>>,
+  handle: TextHeadHandle,
+  maxBytes: number,
+  fs: TextHeadFileSystem,
+): Promise<TextHeadResult> {
+  const stats = await handle.stat()
+  if (!stats.isFile()) throw new FsError('NOT_A_FILE')
+  const size = Number(stats.size)
+  if (!Number.isSafeInteger(size)) throw new FsError('FILE_TOO_LARGE')
+  await assertHeadCapture(paths, target, handle, stats, fs)
+  const bytes = new Uint8Array(Math.min(maxBytes, size))
+  await readHeadBytes(handle, bytes)
+  await assertHeadCapture(paths, target, handle, stats, fs)
+  const truncated = size > bytes.length
+  const textBytes = truncated ? wholeLines(bytes) : bytes
+  const decoded = decodeText(textBytes)
+  if (decoded.seemsBinary) throw new FsError('FILE_IS_BINARY')
+  return {
+    path: target.relativePath,
+    content: decoded.content,
+    size,
+    truncated,
+    capture: {
+      device: String(stats.dev),
+      inode: String(stats.ino),
+      size,
+      mtimeNs: String(stats.mtimeNs),
+      ctimeNs: String(stats.ctimeNs),
+    },
+    coverage: headCoverage(bytes, textBytes, decoded, truncated),
+  }
+}
+
+async function readHeadBytes(handle: TextHeadHandle, bytes: Uint8Array) {
+  let offset = 0
+  while (offset < bytes.length) {
+    const { bytesRead } = await handle.read(bytes, offset, bytes.length - offset, offset)
+    if (bytesRead === 0) throw new FsError('FILE_CHANGED')
+    offset += bytesRead
+  }
+}
+
+async function assertHeadCapture(
+  paths: WorkspacePaths,
+  target: Awaited<ReturnType<typeof resolveExistingPath>>,
+  handle: TextHeadHandle,
+  expected: BigIntStats,
+  fs: TextHeadFileSystem,
+) {
+  const named = await resolveExistingPath(paths, target.relativePath).catch(() => {
+    throw new FsError('FILE_CHANGED')
+  })
+  if (named.absolutePath !== target.absolutePath) throw new FsError('FILE_CHANGED')
+  const [opened, current] = await Promise.all([
+    handle.stat(),
+    fs.stat(paths.resolve(target.relativePath).absolutePath),
+  ]).catch(() => {
+    throw new FsError('FILE_CHANGED')
+  })
+  if (!sameHeadFacts(expected, opened) || !sameHeadFacts(expected, current))
+    throw new FsError('FILE_CHANGED')
+}
+
+function sameHeadFacts(expected: BigIntStats, actual: BigIntStats) {
+  return (
+    expected.dev === actual.dev &&
+    expected.ino === actual.ino &&
+    expected.size === actual.size &&
+    expected.mtimeNs === actual.mtimeNs &&
+    expected.ctimeNs === actual.ctimeNs
+  )
+}
+
+function headCoverage(
+  bytes: Uint8Array,
+  textBytes: Uint8Array,
+  decoded: DecodedText,
+  truncated: boolean,
+): TextHeadCoverage {
+  const coverage = {
+    bytesRead: bytes.length,
+    decodedBytes: textBytes.length,
+    utf16Length: decoded.content.length,
+    encoding: decoded.encoding,
+    lossy: decoded.lossy,
+    lineTrimmed: textBytes.length < bytes.length,
+  }
+  if (truncated) return { ...coverage, kind: 'partial' }
+  if (decoded.lossy || decoded.encoding !== 'utf8')
+    return { ...coverage, kind: 'lossy', lossy: true, lineTrimmed: false }
+  return {
+    ...coverage,
+    kind: 'complete',
+    encoding: 'utf8',
+    lossy: false,
+    lineTrimmed: false,
+    version: textFileVersion(bytes),
+  }
+}
+
 function wholeLines(bytes: Uint8Array) {
   const lastNewline = bytes.lastIndexOf(0x0a)
   return lastNewline < 0 ? bytes : bytes.subarray(0, lastNewline + 1)

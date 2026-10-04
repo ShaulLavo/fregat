@@ -14,7 +14,11 @@ export {
   PreparedDiffSyntaxSource,
   projectDiffSyntaxTokens,
 } from './diffSyntax'
-export type { PrepareDiffSyntaxOptions, PreparedDiffSyntaxInput } from './diffSyntax'
+export type {
+  DiffSyntaxSourceReader,
+  PrepareDiffSyntaxOptions,
+  PreparedDiffSyntaxInput,
+} from './diffSyntax'
 export type { DiffPlugin, DiffPluginMode, DiffPluginOptions, DiffRowHit } from './editorDiffPlugin'
 export type { DiffEditorOptions } from './editorOptions'
 export type { DiffGutterSide } from './gutters'

@@ -1161,6 +1161,38 @@ describe('MinimapWorkerClient', () => {
     },
   )
 
+  it.each(['selection', 'layout', 'viewport'] as const)(
+    'keeps the worker source baseline when %s arrives before content',
+    (kind) => {
+      const source = Array.from({ length: 64 }, (_, index) => `//${index}😀`).join('\n')
+      const fixture = createSummaryFixture(source)
+      try {
+        for (let index = 0; index < 12; index += 1) {
+          const offset = 24 + index * 4
+          const change = fixture.session.applyEdits([{ from: offset, to: offset, text: 'x\ny\n' }])
+          if (index === 0) fixture.notify(kind)
+          fixture.update(change)
+        }
+        fixture.verify()
+        for (let index = 0; index < 12; index += 1) {
+          const change = fixture.session.undo()
+          if (index === 0) fixture.notify(kind)
+          fixture.update(change)
+        }
+        expect(fixture.session.materializeFullText()).toBe(source)
+        fixture.verify()
+        for (let index = 0; index < 12; index += 1) {
+          const change = fixture.session.redo()
+          if (index === 0) fixture.notify(kind)
+          fixture.update(change)
+        }
+        fixture.verify()
+      } finally {
+        fixture.dispose()
+      }
+    },
+  )
+
   it.each(['edit', 'undo', 'redo'] as const)(
     'tracks cancelling offsets through queued %s',
     (operation) => {
@@ -1910,6 +1942,11 @@ function createSummaryFixture(text: string) {
   return {
     session,
     worker,
+    notify(kind: 'selection' | 'layout' | 'viewport') {
+      client.update(snapshot({}, { textSnapshot: session.getTextSnapshot() }), kind)
+      runtime.flushAnimationFrames()
+      worker.send(renderedResponse(lastRenderSequence(worker)))
+    },
     update(change: DocumentSessionChange) {
       client.update(snapshot({}, { textSnapshot: change.textSnapshot }), 'content', change)
     },

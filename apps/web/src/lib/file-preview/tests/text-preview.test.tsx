@@ -1,18 +1,21 @@
 import { screen } from '@testing-library/react'
+import { writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { TextPreview } from '@/lib/file-preview/components/text-preview'
-import { lineNumbers, type PreviewContent } from '@/lib/file-preview/utils/preview'
+import { lineNumbers } from '@/lib/file-preview/utils/preview'
 import { previewQueryOptions } from '@/lib/file-preview/utils/preview-query'
 import { expect, test } from '../../../../test/fixtures'
 import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
 
 const BUDGET = 64 * 1024
 
-test('a new preview never displays the previous file body under its name', () => {
+test('a new preview never displays the previous file body under its name', async ({
+  server,
+  client: _client,
+}) => {
+  await writeFile(path.join(server.root, 'first.ts'), 'first_file_body')
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(
-    previewQueryOptions('first.ts', BUDGET).queryKey,
-    (): PreviewContent => ({ kind: 'text', text: 'first_file_body', size: 15, truncated: false }),
-  )
+  await queryClient.query(previewQueryOptions('first.ts', BUDGET))
   const view = renderWithProviders(
     <TextPreview name='first.ts' path='first.ts' fallback={<span>File preview</span>} />,
     { queryClient },
@@ -27,14 +30,13 @@ test('a new preview never displays the previous file body under its name', () =>
   expect(screen.getByRole('status', { name: 'Loading second.json' })).toBeInTheDocument()
 })
 
-test('a file longer than the budget says how much of it the preview shows', () => {
+test('a file longer than the budget says how much of it the preview shows', async ({
+  server,
+  client: _client,
+}) => {
+  await writeFile(path.join(server.root, 'big.log'), 'a\nb\n'.repeat(314_573))
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(previewQueryOptions('big.log', BUDGET).queryKey, (): PreviewContent => ({
-    kind: 'text',
-    text: 'a\nb\n',
-    size: 1_258_291,
-    truncated: true,
-  }))
+  await queryClient.query(previewQueryOptions('big.log', BUDGET))
   renderWithProviders(<TextPreview name='big.log' path='big.log' fallback={null} />, {
     queryClient,
   })

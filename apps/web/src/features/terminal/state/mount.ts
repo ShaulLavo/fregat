@@ -2,7 +2,6 @@ import { isCancelledError } from '@tanstack/react-query'
 import { initializeGhostty } from '@/features/terminal/state/runtime'
 import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { createReplayGate } from '@/features/terminal/state/replay'
-import { errorMessage } from '@/lib/error-message'
 import { fetchTerminalCheckout } from '@/features/terminal/state/register-checkout'
 import {
   registerTerminalSession,
@@ -184,7 +183,7 @@ export function mountTerminal({
         return
       }
 
-      onFailed(errorMessage(error, 'Could not open the terminal.'))
+      onFailed('Could not open the terminal. Close this terminal tab and open a new one.')
       reportError(toClientError(error))
     })
   }
