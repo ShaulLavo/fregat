@@ -3,11 +3,7 @@ import { expect, test } from '../../../test/fixtures'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { ours, zed, unmappedPresetBindings } from '@/keymap/presets/inventory'
 import control from '@/keymap/tests/preset-control.json'
-import {
-  presetRuntimeSource,
-  registeredPresetCommandIds,
-} from '../../../scripts/generate-preset-runtime'
-import { readFile } from 'node:fs/promises'
+import { registeredPresetCommandIds } from '../../../scripts/generate-preset-runtime'
 import { fileURLToPath } from 'node:url'
 import { platformCommands } from '@/keymap/table'
 
@@ -62,18 +58,13 @@ function verifyPreset(
   )
 }
 
-test('the checked-in runtime projection matches the guarded authoritative inventory', async () => {
-  const source = await readFile(new URL('../presets/runtime.ts', import.meta.url), 'utf8')
-  expect(source).toBe(await presetRuntimeSource())
-}, 20_000)
-
 test('the generator derives exactly the live web command authority without loading its handlers', () => {
   expect([...registeredPresetCommandIds()].toSorted()).toEqual(
     platformCommands.map(({ id }) => id).toSorted(),
   )
 }, 20_000)
 
-test('the documented bare Bun CLI checks the projection without browser initialization', async () => {
+test('the documented bare Bun CLI checks the exact authoritative projection without browser initialization', async () => {
   const child = Bun.spawn({
     cmd: [
       process.execPath,
