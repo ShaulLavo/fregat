@@ -1109,6 +1109,50 @@ describe('Editor', () => {
       expect(editorRoot().style.getPropertyValue('--editor-foreground')).toBe('')
     })
 
+    it('keeps cold retained attachment on incremental source operations', async () => {
+      const text = 'const value = 1;\n'.repeat(4_096)
+      const refreshLengths: number[] = []
+      const changes: DocumentSessionChange[] = []
+      const events: EditorLogEvent[] = []
+      const highlighter = createMockHighlighterSession({
+        refresh: async (snapshot) => {
+          refreshLengths.push(snapshot.length)
+          return createHighlightResult()
+        },
+        applyChange: async (change) => {
+          changes.push(change)
+          return createHighlightResult()
+        },
+      })
+      editor.dispose()
+      editor = createVisibleEditor(container, {
+        plugins: withTestLanguagePlugins(
+          createHighlighterPlugin(highlighter),
+          createEditorLoggingPlugin((event) => events.push(event)),
+        ),
+      })
+      const buffer = createEditorTextBuffer(text)
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'cold.ts' })
+      analyses.push(analysis)
+      expect(analysis.inspectRetention().entries).toEqual([])
+      const session = createEditorBufferSession(buffer)
+      editor.attachSession(session, { analysis, documentId: 'cold.ts', languageId: 'typescript' })
+      await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('painted'))
+      session.applyText('!')
+      session.applyText('?')
+      await vi.waitFor(() => expect(changes).toHaveLength(2))
+
+      expect(refreshLengths).toEqual([text.length])
+      expect(changes.map((change) => change.edits)).toEqual([
+        [{ from: text.length, to: text.length, text: '!' }],
+        [{ from: text.length + 1, to: text.length + 1, text: '?' }],
+      ])
+      expect(editor.materializeFullText()).toBe(`${text}!?`)
+      expect(
+        events.filter((event) => event.action === 'editor.syntax.highlight_request_failed'),
+      ).toEqual([])
+    })
+
     it('hands retained highlighters every committed edit once', async () => {
       const applied: DocumentSessionChange[] = []
       const highlighter = createMockHighlighterSession({

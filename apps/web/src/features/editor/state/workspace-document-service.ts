@@ -27,6 +27,14 @@ import type {
 } from '@/lib/documents/utils/types'
 
 import type { FileSnapshot } from '@/lib/file-snapshot'
+import type { EnvironmentId } from '@workspace/contracts'
+import type {
+  SavedComparisonLease,
+  SavedComparisonRead,
+  SavedComparisonRequest,
+  SavedComparisonScope,
+  SavedComparisonRefresh,
+} from '@/features/editor/utils/saved-comparison'
 import {
   createEditorViewSession,
   acquireDocumentMutationLease,
@@ -36,6 +44,7 @@ import {
   type EditorTextBufferChange,
   type EditorViewSession,
   type PieceTableSnapshot,
+  type DocumentTextSnapshot,
 } from '@singapore-editor/core/document'
 import {
   createEditorDocumentAnalysis,
@@ -211,6 +220,8 @@ export type UnsyncedLiveEditorDocumentInput = {
 }
 
 export type WorkspaceDocumentServiceState = {
+  savedComparisonTabs: ReadonlyMap<TabId, SavedComparisonLease>
+  savedComparisons: ReadonlyMap<SavedComparisonLease, SavedComparisonRead>
   documentContentRevisions: Readonly<Record<DocumentKey, string>>
   dirtyContentRevision: number
   dirtyDocumentKeys: ReadonlySet<DocumentKey>
@@ -220,7 +231,19 @@ export type WorkspaceDocumentServiceState = {
   viewsByTabId: Readonly<Record<TabId, EditorDocumentView>>
 }
 
+type SavedComparisonInterest = {
+  readonly path: FilesystemPath
+  readonly scope: SavedComparisonScope
+  current: SavedComparisonRead
+  savedRefresh: SavedComparisonRefresh | null
+  stop: () => void
+}
+
 export class WorkspaceDocumentService {
+  private savedComparisonTabs: ReadonlyMap<TabId, SavedComparisonLease> = new Map()
+  private savedComparisons: ReadonlyMap<SavedComparisonLease, SavedComparisonRead> = new Map()
+  private readonly comparisonInterests = new Map<SavedComparisonLease, SavedComparisonInterest>()
+  private sourceOwnerDisposed = false
   private documentContentRevisions: Readonly<Record<DocumentKey, string>> = {}
   private dirtyDocumentKeys: ReadonlySet<DocumentKey> = new Set()
   private dirtyContentRevision = 0
@@ -252,9 +275,73 @@ export class WorkspaceDocumentService {
   private readonly scrollPositionSeeds = new Map<DocumentKey, EditorScrollPosition>()
   private cachedState: WorkspaceDocumentServiceState | null = null
 
-  constructor(private readonly onStateChange: () => void = () => undefined) {}
+  constructor(
+    private readonly onStateChange: () => void = () => undefined,
+    private readonly environmentId: EnvironmentId | null = null,
+  ) {}
+
+  acquireSavedComparison({ scope, saved, signal }: SavedComparisonRequest): SavedComparisonLease {
+    this.assertComparisonOwner(scope)
+    if (saved.seemsBinary)
+      throw createClientInvariantError('Comparison source requires text', { sourceKind: 'binary' })
+    const entry: SavedComparisonInterest = {
+      path: saved.path,
+      scope,
+      current: this.comparisonRead(scope, saved),
+      savedRefresh: null,
+      stop: (): void => undefined,
+    }
+    const lease: SavedComparisonLease = {
+      read: () => entry.current,
+      requestSavedRefresh: () => this.requestSavedRefresh(lease),
+      refreshSaved: (snapshot, request) => this.refreshSavedComparison(lease, snapshot, request),
+      release: () => this.releaseSavedComparison(lease, 'interest-ended'),
+    }
+    if (this.sourceOwnerDisposed || signal.aborted) {
+      entry.current = {
+        kind: 'released',
+        reason: this.sourceOwnerDisposed ? 'owner-disposed' : 'interest-ended',
+      }
+      return lease
+    }
+    const release = () => lease.release()
+    signal.addEventListener('abort', release, { once: true })
+    entry.stop = () => signal.removeEventListener('abort', release)
+    this.comparisonInterests.set(lease, entry)
+    this.publishComparison(lease, entry.current)
+    this.onStateChange()
+    return lease
+  }
+
+  prepareSavedComparisonTab(tabId: TabId, request: SavedComparisonRequest): SavedComparisonLease {
+    this.assertComparisonOwner(request.scope)
+    if (this.sourceOwnerDisposed || request.signal.aborted)
+      return this.acquireSavedComparison(request)
+    const previous = this.savedComparisonTabs.get(tabId)
+    const read = previous?.read()
+    if (
+      previous &&
+      read &&
+      read.kind !== 'released' &&
+      read.saved.snapshot.path === request.saved.path &&
+      read.scope.rootPath === request.scope.rootPath
+    ) {
+      if (read.saved.snapshot !== request.saved)
+        previous.refreshSaved(request.saved, previous.requestSavedRefresh())
+      return previous
+    }
+    previous?.release()
+    const lease = this.acquireSavedComparison(request)
+    if (lease.read().kind === 'released') return lease
+    this.savedComparisonTabs = new Map(this.savedComparisonTabs).set(tabId, lease)
+    this.onStateChange()
+    return lease
+  }
 
   dispose(): void {
+    this.sourceOwnerDisposed = true
+    for (const lease of this.comparisonInterests.keys())
+      this.releaseSavedComparison(lease, 'owner-disposed')
     const prepared = new Set<EditorPreparedDocument>()
     for (const view of this.viewsByTabId.values()) {
       if (view.preparedDocument) prepared.add(view.preparedDocument)
@@ -288,6 +375,9 @@ export class WorkspaceDocumentService {
   private isUnevictableDocument(documentKey: DocumentKey): boolean {
     const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
+    for (const input of this.savedComparisons.values()) {
+      if (input.kind === 'ready' && input.live.buffer === document.buffer) return true
+    }
     if (this.isDirtyDocument(documentKey)) return true
     if (document.sync.kind !== 'file' || document.sync.orphaned) return true
 
@@ -325,6 +415,9 @@ export class WorkspaceDocumentService {
     documentKeys: ReadonlySet<DocumentKey>
     tabIds: ReadonlySet<TabId>
   }): { evictedDocumentKeys: DocumentKey[]; evictedTabIds: TabId[] } {
+    for (const [tabId, lease] of this.savedComparisonTabs) {
+      if (!tabIds.has(tabId)) lease.release()
+    }
     const evictedDocumentKeys: DocumentKey[] = []
     for (const documentKey of this.liveDocumentsByKey.keys()) {
       if (documentKeys.has(documentKey)) continue
@@ -371,6 +464,7 @@ export class WorkspaceDocumentService {
 
     this.deleteDirtyKey(documentKey)
     this.documentContentRevisions = omitKey(this.documentContentRevisions, documentKey)
+    this.refreshLiveComparison(documentKey)
 
     for (const [tabId, view] of this.viewsByTabId) {
       if (view.documentKey !== documentKey) continue
@@ -500,6 +594,7 @@ export class WorkspaceDocumentService {
   }
 
   removeView(tabId: TabId): boolean {
+    this.savedComparisonTabs.get(tabId)?.release()
     const view = this.viewsByTabId.get(tabId)
     if (!view) return false
 
@@ -1107,6 +1202,8 @@ export class WorkspaceDocumentService {
       this.viewsByTabId.set(tabId, { ...view, documentKey: toKey, preparedDocument: null })
     }
 
+    this.refreshLiveComparison(fromKey)
+    this.refreshLiveComparison(toKey)
     return { wasDirty }
   }
 
@@ -1144,6 +1241,13 @@ export class WorkspaceDocumentService {
   }
 
   copyView(from: TabId, to: TabId): void {
+    const comparison = this.savedComparisonTabs.get(from)?.read()
+    if (comparison && comparison.kind !== 'released')
+      this.prepareSavedComparisonTab(to, {
+        scope: comparison.scope,
+        saved: comparison.saved.snapshot,
+        signal: new AbortController().signal,
+      })
     const source = this.viewsByTabId.get(from)
     if (!source || this.viewsByTabId.has(to)) return
     const destination = this.ensureViewForDocument(to, source.documentKey)
@@ -1172,6 +1276,8 @@ export class WorkspaceDocumentService {
     const previous = this.cachedState
     const viewsByTabId = recordFromMap(this.viewsByTabId, previous?.viewsByTabId)
     const next: WorkspaceDocumentServiceState = {
+      savedComparisonTabs: this.savedComparisonTabs,
+      savedComparisons: this.savedComparisons,
       documentContentRevisions: this.documentContentRevisions,
       dirtyContentRevision: this.dirtyContentRevision,
       dirtyDocumentKeys: this.dirtyDocumentKeys,
@@ -1429,6 +1535,7 @@ export class WorkspaceDocumentService {
     if (previous?.buffer !== document.buffer) this.detachPreviousBuffer(previous)
 
     this.liveDocumentsByKey.set(document.key, document)
+    this.refreshLiveComparison(document.key)
     if (!previous) {
       this.pathOwnershipRevision += 1
       const resource = filesystemResource(document.target)
@@ -1475,11 +1582,19 @@ export class WorkspaceDocumentService {
 
     if (event.change.kind === 'synchronize') {
       this.liveDocumentsByKey.set(documentKey, { ...document, localRevision })
+      this.refreshLiveComparison(documentKey, {
+        revision: event.revisionAfter,
+        snapshot: event.change.textSnapshot,
+      })
       this.onStateChange()
       return
     }
 
     this.acceptTextRevision(document, localRevision, event.change.isDirty)
+    this.refreshLiveComparison(documentKey, {
+      revision: event.revisionAfter,
+      snapshot: event.change.textSnapshot,
+    })
     this.onStateChange()
   }
 
@@ -1497,6 +1612,102 @@ export class WorkspaceDocumentService {
       return
     }
     this.deleteDirtyKey(document.key)
+  }
+
+  private comparisonRead(
+    scope: SavedComparisonScope,
+    saved: FileSnapshot,
+    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
+  ): Exclude<SavedComparisonRead, { kind: 'released' }> {
+    const document = this.liveDocumentsByKey.get(fileDocumentKey(saved.path))
+    const savedInput = { kind: 'saved-file' as const, snapshot: saved }
+    if (!document) return { kind: 'unavailable', scope, saved: savedInput }
+    return {
+      kind: 'ready',
+      scope,
+      saved: savedInput,
+      live: {
+        kind: 'live-buffer',
+        key: document.key,
+        buffer: document.buffer,
+        analysis: document.analysis,
+        revision: committed?.revision ?? document.buffer.getRevision(),
+        snapshot: committed?.snapshot ?? document.buffer.getTextSnapshot(),
+      },
+    }
+  }
+
+  private assertComparisonOwner(scope: SavedComparisonScope): void {
+    if (scope.environmentId === this.environmentId) return
+    throw createClientInvariantError('Comparison source belongs to a different environment', {
+      ownerAvailable: this.environmentId !== null,
+      environmentMatches: scope.environmentId === this.environmentId,
+    })
+  }
+
+  private publishComparison(lease: SavedComparisonLease, read: SavedComparisonRead): void {
+    this.savedComparisons = new Map(this.savedComparisons).set(lease, read)
+  }
+
+  private refreshLiveComparison(
+    key: DocumentKey,
+    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
+  ): void {
+    for (const [lease, entry] of this.comparisonInterests) {
+      if (fileDocumentKey(entry.path) !== key || entry.current.kind === 'released') continue
+      entry.current = {
+        ...this.comparisonRead(entry.scope, entry.current.saved.snapshot, committed),
+        saved: entry.current.saved,
+      }
+      this.publishComparison(lease, entry.current)
+    }
+  }
+
+  private refreshSavedComparison(
+    lease: SavedComparisonLease,
+    snapshot: FileSnapshot,
+    request: SavedComparisonRefresh,
+  ): boolean {
+    const entry = this.comparisonInterests.get(lease)
+    if (!entry || entry.savedRefresh !== request || request.lease !== lease) return false
+    if (snapshot.path !== entry.path || snapshot.seemsBinary)
+      throw createClientInvariantError('Comparison saved input identity changed', {
+        pathMatches: snapshot.path === entry.path,
+        sourceKind: snapshot.seemsBinary ? 'binary' : 'text',
+      })
+    if (entry.current.kind === 'released') return false
+    entry.savedRefresh = null
+    entry.current = { ...entry.current, saved: { kind: 'saved-file', snapshot } }
+    this.publishComparison(lease, entry.current)
+    this.onStateChange()
+    return true
+  }
+
+  private requestSavedRefresh(lease: SavedComparisonLease): SavedComparisonRefresh {
+    const request = { lease }
+    const entry = this.comparisonInterests.get(lease)
+    if (entry) entry.savedRefresh = request
+    return request
+  }
+
+  private releaseSavedComparison(
+    lease: SavedComparisonLease,
+    reason: 'interest-ended' | 'owner-disposed',
+  ): void {
+    const entry = this.comparisonInterests.get(lease)
+    if (!entry) return
+    entry.stop()
+    entry.current = { kind: 'released', reason }
+    this.comparisonInterests.delete(lease)
+    const remaining = new Map(this.savedComparisons)
+    remaining.delete(lease)
+    this.savedComparisons = remaining
+    const tabs = new Map(this.savedComparisonTabs)
+    for (const [tabId, owned] of tabs) {
+      if (owned === lease) tabs.delete(tabId)
+    }
+    this.savedComparisonTabs = tabs
+    if (!this.sourceOwnerDisposed) this.onStateChange()
   }
 }
 

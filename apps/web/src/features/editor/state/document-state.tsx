@@ -43,11 +43,19 @@ type DeleteLiveEditorDocumentResult = {
 }
 
 type CreateEditorDocumentStoreOptions = {
+  environmentId?: import('@workspace/contracts').EnvironmentId
   scrollPositionSeeds?: readonly ReopenScrollPosition[]
   viewScrollPositionSeeds?: readonly EditorViewScrollPosition[]
 }
 
 type EditorDocumentStoreActions = {
+  prepareSavedComparisonTab: (
+    tabId: TabId,
+    request: import('@/features/editor/utils/saved-comparison').SavedComparisonRequest,
+  ) => import('@/features/editor/utils/saved-comparison').SavedComparisonLease
+  acquireSavedComparison: (
+    request: import('@/features/editor/utils/saved-comparison').SavedComparisonRequest,
+  ) => import('@/features/editor/utils/saved-comparison').SavedComparisonLease
   disposeEditorDocuments: () => void
   deleteLiveEditorDocument: (documentKey: DocumentKey) => DeleteLiveEditorDocumentResult
   ensureEditorView: (
@@ -194,13 +202,16 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
       let service: WorkspaceDocumentService
       const publication = new StorePublicationGate(() => set(service.state()))
       const publish = () => publication.request()
-      service = new WorkspaceDocumentService(publish)
+      service = new WorkspaceDocumentService(publish, options.environmentId ?? null)
       if (options.scrollPositionSeeds) service.seedScrollPositions(options.scrollPositionSeeds)
       if (options.viewScrollPositionSeeds)
         service.seedViewScrollPositions(options.viewScrollPositionSeeds)
 
       return {
         ...service.state(),
+        prepareSavedComparisonTab: (tabId, request) =>
+          service.prepareSavedComparisonTab(tabId, request),
+        acquireSavedComparison: (request) => service.acquireSavedComparison(request),
         disposeEditorDocuments: () => {
           service.dispose()
           publish()
