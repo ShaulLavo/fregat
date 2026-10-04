@@ -69,6 +69,14 @@ export function observedVulkanRenderer(renderer) {
   }
 }
 
+export function assertHeadedSurfaceTransport(stderr) {
+  assert.equal(typeof stderr, 'string', 'Observed Chrome diagnostics required')
+  assert(
+    !stderr.includes("'--ozone-platform=wayland' is not compatible with Vulkan"),
+    'Observed Chrome surface transport rejects native Wayland with Vulkan',
+  )
+}
+
 export function assertHeadedHardware({
   provenance,
   executable,
@@ -241,6 +249,7 @@ export async function settleOwnedWindowGeometry({
   session,
   observeWindow,
   browserPid,
+  browserIdentity,
   smokeId,
   targetId,
   windowId,
@@ -265,7 +274,7 @@ export async function settleOwnedWindowGeometry({
       1000,
     )
     const compositor = await boundedSmokeOperation(
-      () => observeWindow({ browserPid, smokeId, windowId }),
+      () => observeWindow({ browserPid, browserIdentity, smokeId, windowId }),
       2500,
     )
     assert.equal(window.windowId, windowId, 'Owned window changed during readiness')
@@ -348,26 +357,96 @@ async function processCustody(session, browserPid) {
   return result
 }
 
-/** An optional Hyprland adapter; other compositors supply observeWindow to the launch helper. */
-export async function observeHyprlandWindow({ browserPid, smokeId }) {
-  const { stdout } = await execute('hyprctl', ['clients', '-j'], {
-    timeout: 2000,
-    maxBuffer: 1_000_000,
-  })
-  const candidates = JSON.parse(stdout).filter(
-    (client) => client.pid === browserPid && client.title.includes(smokeId),
-  )
-  assert.equal(candidates.length, 1, 'Exactly one owned nonce-bearing compositor window required')
-  const client = candidates[0]
-  return {
-    backend: 'wayland',
-    browserPid,
-    mapped: client.mapped,
-    hidden: client.hidden,
-    xwayland: client.xwayland,
-    size: { width: client.size[0], height: client.size[1] },
-    client,
+export async function waitForOwnedNonceWindow({
+  browserPid,
+  smokeId,
+  readClients,
+  onObservation = () => {},
+  now = () => performance.now(),
+  sleep = pause,
+  timeoutMilliseconds = 1800,
+}) {
+  assert(Number.isSafeInteger(browserPid) && browserPid > 0, 'Owned browser PID required')
+  assert(typeof smokeId === 'string' && smokeId.length > 0, 'Owned nonce required')
+  assert(timeoutMilliseconds > 0 && timeoutMilliseconds <= 1800, 'Bounded window deadline required')
+  const started = now()
+  const deadline = started + timeoutMilliseconds
+  const observations = []
+  try {
+    for (let attempt = 0; attempt < 40 && now() < deadline; attempt++) {
+      const remaining = Math.min(400, deadline - now())
+      const clients = await boundedSmokeOperation(() => readClients(remaining), remaining)
+      assert(Array.isArray(clients), 'Compositor client list required')
+      // Filter custody before inspecting titles or retaining any desktop observations.
+      const owned = clients.filter((client) => client.pid === browserPid)
+      const observation = {
+        attempt,
+        elapsedMilliseconds: now() - started,
+        clients: owned.map((client) => ({
+          pid: client.pid,
+          title: client.title,
+          class: client.class,
+          mapped: client.mapped,
+          hidden: client.hidden,
+          xwayland: client.xwayland,
+          address: client.address,
+          size: client.size,
+        })),
+      }
+      observations.push(observation)
+      onObservation(observation)
+      const candidates = owned.filter(
+        (client) => typeof client.title === 'string' && client.title.includes(smokeId),
+      )
+      assert(candidates.length <= 1, 'Ambiguous owned nonce-bearing compositor windows')
+      const client = candidates[0]
+      if (client?.mapped !== true || client.hidden !== false) {
+        await sleep(Math.min(50, Math.max(0, deadline - now())))
+        continue
+      }
+      assert.equal(client.xwayland, false, 'Native Wayland compositor window required')
+      assert(now() < deadline, 'Owned compositor binding exceeded its deadline')
+      return {
+        backend: 'wayland',
+        browserPid,
+        mapped: client.mapped,
+        hidden: client.hidden,
+        xwayland: client.xwayland,
+        size: { width: client.size[0], height: client.size[1] },
+        client,
+        observations,
+      }
+    }
+    assert.fail('Owned nonce-bearing compositor window did not map before deadline')
+  } catch (error) {
+    error.ownedWindowObservations = observations
+    throw error
   }
+}
+
+/** An optional Hyprland adapter; other compositors supply observeWindow to the launch helper. */
+export async function observeHyprlandWindow({
+  browserPid,
+  smokeId,
+  browserIdentity,
+  onObservation,
+}) {
+  const owner = browserIdentity ?? (await identity(browserPid))
+  assert.equal(owner.pid, browserPid, 'Compositor observation needs the owned process lifetime')
+  return await waitForOwnedNonceWindow({
+    browserPid,
+    smokeId,
+    onObservation,
+    readClients: async (timeout) => {
+      assert(await ownedProcessAlive(owner), 'Owned browser lifetime ended before client lookup')
+      const { stdout } = await execute('hyprctl', ['clients', '-j'], {
+        timeout,
+        maxBuffer: 1_000_000,
+      })
+      assert(await ownedProcessAlive(owner), 'Owned browser lifetime changed during client lookup')
+      return JSON.parse(stdout)
+    },
+  })
 }
 
 async function devtoolsEndpoint(profile, child) {
@@ -551,7 +630,8 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     child.stderr.on('data', (data) => {
       if (evidence.stderr.length < 64_000) evidence.stderr += data.toString()
     })
-    owned.push(await identity(child.pid))
+    const browserIdentity = await identity(child.pid)
+    owned.push(browserIdentity)
     const endpoint = await devtoolsEndpoint(profile, child)
     browser = await chromium.connectOverCDP(endpoint, { timeout: 5000 })
     const session = await boundedSmokeOperation(() => browser.newBrowserCDPSession(), 2000)
@@ -615,6 +695,7 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       () =>
         observeWindow({
           browserPid: provenance.browserPid,
+          browserIdentity,
           smokeId: evidence.smokeId,
           windowId: window.windowId,
         }),
@@ -622,6 +703,7 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     )
     const systemInfo = await boundedSession.send('SystemInfo.getInfo')
     evidence.hardware = { gpu: systemInfo.gpu, page: facts, compositor, window }
+    assertHeadedSurfaceTransport(evidence.stderr)
     const actualBackend = assertHeadedHardware({
       provenance,
       executable,
@@ -639,6 +721,7 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       session: pageSession,
       observeWindow,
       browserPid: child.pid,
+      browserIdentity,
       smokeId: evidence.smokeId,
       targetId: target.targetId,
       windowId: window.windowId,
@@ -650,8 +733,10 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       url,
       viewport: { width: geometry.page.width, height: geometry.page.height },
     }
+    assertHeadedSurfaceTransport(evidence.stderr)
     return { page, session: pageSession, evidence, ownership, actualBackend, close }
   } catch (error) {
+    if (error.ownedWindowObservations) evidence.windowObservations = error.ownedWindowObservations
     error.launchEvidence = evidence
     try {
       await close()

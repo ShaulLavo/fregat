@@ -9,7 +9,8 @@
     "smoke": "runHeadedPresentationSmoke({ executablePath, taskRoot, observeWindow }) -> evidence; owns launch and cleanup",
     "presentation": "proveHeadedPresentation({ page, session, ownership: { targetId, windowId, url, viewport: { width, height } }, smokeId, frameTimeoutMilliseconds?, commandTimeoutMilliseconds? })",
     "actualBackend": "{ display, angleBackend, vulkanVersion, vendor, vendorId, deviceId, deviceDescription, driver, rawRendererStrings }; observed facts, qualify setup only with PASS_SETUP_ONLY and complete cleanup",
-    "observeWindow": "({ browserPid, smokeId, windowId }) -> { browserPid, backend: 'wayland', mapped: true, hidden: false, xwayland: false, size: { width, height }, ...rawOwnedWindowEvidence }"
+    "observeWindow": "({ browserPid, browserIdentity: { pid, startTimeTicks }, smokeId, windowId }) -> { browserPid, backend: 'wayland', mapped: true, hidden: false, xwayland: false, size: { width, height }, ...rawOwnedWindowEvidence }; verify the owned process lifetime before and after querying the compositor",
+    "windowReadiness": "waitForOwnedNonceWindow filters exact PID before inspecting titles, observes only owned windows, and polls for mapping within 1800 ms with bounded client reads"
   },
   "standalone": {
     "from": "repository root",
@@ -33,6 +34,9 @@
     "All comparison actors and counts retain one qualified display/GPU backend; actual actor custody remains the comparison runner's obligation",
     "Three discrete nonce challenges, no RAF loop, no readPixels, no getImageData and no benchmark acquisition",
     "PNG pixels establish compositor content identity; strictly increasing actual CDP timestamps establish advancement",
-    "This proof does not qualify Canvas2D, WebGPU rendering, terminal correctness, throughput or optical latency"
-  ]
+    "This proof does not qualify Canvas2D, WebGPU rendering, terminal correctness, throughput or optical latency",
+    "Observed native-Wayland/Vulkan incompatibility rejects hardware qualification even when the adapter and Vulkan renderer are physical",
+    "CDP screencast content establishes browser compositor-surface readback; native output presentation additionally requires an independently validated native capture"
+  ],
+  "qualificationStatus": "The Linux native-Wayland Vulkan recipe is unqualified on Chrome builds reporting incompatible surface transport. The helper rejects that diagnostic; absence of the diagnostic alone does not prove native presentation."
 }

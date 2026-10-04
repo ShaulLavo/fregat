@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { promisify } from 'node:util'
 import {
   assertHeadedHardware,
+  assertHeadedSurfaceTransport,
   headedLaunchArguments,
   ownedProcessAlive,
   ownedProcessStates,
   settleOwnedWindowGeometry,
+  waitForOwnedNonceWindow,
 } from './comparison-headed.mjs'
 import { observeOwnedBrowserProvenance } from './comparison-provenance.mjs'
 
@@ -425,5 +428,231 @@ test('setup refuses contradictory page/CDP/compositor sizes without guessing a t
       smokeId: 'owned-smoke',
     }),
     /geometry did not settle/,
+  )
+})
+
+const nativeClient = {
+  pid: 101,
+  title: 'owned-smoke',
+  class: 'chromium',
+  mapped: true,
+  hidden: false,
+  xwayland: false,
+  address: 'owned-address',
+  size: [922, 1030],
+}
+
+test('owned lookup waits for delayed title and mapping without inspecting foreign titles', async () => {
+  let clock = 0
+  let calls = 0
+  const observations = []
+  const frames = [
+    [{ ...nativeClient, title: 'about:blank' }],
+    [{ ...nativeClient, mapped: false }],
+    [nativeClient],
+  ]
+  const foreign = {
+    pid: 999,
+    get title() {
+      assert.fail('Foreign title was inspected')
+    },
+  }
+  const result = await waitForOwnedNonceWindow({
+    browserPid: 101,
+    smokeId: 'owned-smoke',
+    readClients: async () => [...frames[calls++], foreign],
+    onObservation: (observation) => observations.push(observation),
+    now: () => clock,
+    sleep: async (milliseconds) => {
+      clock += milliseconds
+    },
+  })
+  assert.equal(calls, 3)
+  assert.equal(result.client, nativeClient)
+  assert.deepEqual(result.observations, observations)
+  assert.deepEqual(
+    observations.map((observation) => observation.clients[0].title),
+    ['about:blank', 'owned-smoke', 'owned-smoke'],
+  )
+  assert.deepEqual(
+    observations.map((observation) => observation.clients[0].mapped),
+    [true, false, true],
+  )
+  assert(
+    observations.every((observation) => observation.clients.every((client) => client.pid === 101)),
+  )
+  assert.equal(JSON.stringify(observations).includes('999'), false)
+})
+
+test('lookup deadline rejects missing, foreign, unmapped and hidden windows with owned observations', async () => {
+  for (const clients of [
+    [],
+    [{ ...nativeClient, pid: 999, title: 'FOREIGN_PRIVATE_TITLE' }],
+    [{ ...nativeClient, mapped: false }],
+    [{ ...nativeClient, hidden: true }],
+  ]) {
+    let clock = 0
+    let calls = 0
+    await assert.rejects(
+      waitForOwnedNonceWindow({
+        browserPid: 101,
+        smokeId: 'owned-smoke',
+        timeoutMilliseconds: 100,
+        readClients: async () => {
+          calls++
+          return clients
+        },
+        now: () => clock,
+        sleep: async (milliseconds) => {
+          clock += milliseconds
+        },
+      }),
+      (error) => {
+        assert.match(error.message, /did not map before deadline/)
+        assert.equal(error.ownedWindowObservations.length, 2)
+        assert.equal(
+          JSON.stringify(error.ownedWindowObservations).includes('FOREIGN_PRIVATE_TITLE'),
+          false,
+        )
+        assert(
+          error.ownedWindowObservations
+            .flatMap((observation) => observation.clients)
+            .every((client) => client.pid === 101),
+        )
+        return true
+      },
+    )
+    assert.equal(calls, 2)
+    assert.equal(clock, 100)
+  }
+})
+
+test('lookup refuses ambiguous own windows and XWayland without retrying', async () => {
+  for (const clients of [
+    [nativeClient, { ...nativeClient, address: 'second' }],
+    [{ ...nativeClient, xwayland: true }],
+  ]) {
+    let calls = 0
+    await assert.rejects(
+      waitForOwnedNonceWindow({
+        browserPid: 101,
+        smokeId: 'owned-smoke',
+        readClients: async () => {
+          calls++
+          return clients
+        },
+      }),
+      /Ambiguous|Native Wayland/,
+    )
+    assert.equal(calls, 1)
+  }
+})
+
+test('lookup preserves only earlier owned observations when the external reader fails', async () => {
+  let calls = 0
+  let clock = 0
+  await assert.rejects(
+    waitForOwnedNonceWindow({
+      browserPid: 101,
+      smokeId: 'owned-smoke',
+      readClients: async () => {
+        if (calls++) assert.fail('External compositor unavailable')
+        return [
+          { ...nativeClient, title: 'about:blank' },
+          { ...nativeClient, pid: 999, title: 'FOREIGN_PRIVATE_TITLE' },
+        ]
+      },
+      now: () => clock,
+      sleep: async (milliseconds) => {
+        clock += milliseconds
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /External compositor unavailable/)
+      assert.equal(error.ownedWindowObservations.length, 1)
+      assert.equal(error.ownedWindowObservations[0].clients[0].title, 'about:blank')
+      assert.equal(
+        JSON.stringify(error.ownedWindowObservations).includes('FOREIGN_PRIVATE_TITLE'),
+        false,
+      )
+      return true
+    },
+  )
+})
+
+test('lookup bounds an external reader that never responds', async () => {
+  await assert.rejects(
+    waitForOwnedNonceWindow({
+      browserPid: 101,
+      smokeId: 'owned-smoke',
+      timeoutMilliseconds: 20,
+      readClients: () => new Promise(() => {}),
+    }),
+    (error) => {
+      assert.equal(error.ownedWindowObservations.length, 0)
+      return true
+    },
+  )
+})
+
+test('static launch scope check detects a cleanup-local identity referenced from launch', async (t) => {
+  let binary
+  try {
+    const require = createRequire(import.meta.url)
+    binary = join(require.resolve('oxlint/package.json'), '..', 'bin', 'oxlint')
+  } catch (error) {
+    if (error.code !== 'MODULE_NOT_FOUND') throw error
+    t.skip('Optional Oxlint scope checker is absent; install repository dev dependencies to run it')
+    return
+  }
+  const directory = await mkdtemp(join(tmpdir(), 'headed-launch-scope-'))
+  try {
+    const source = await readFile(new URL('./comparison-headed.mjs', import.meta.url), 'utf8')
+    const faulty = source.replace(
+      'browserPid: provenance.browserPid,\n          browserIdentity,',
+      'browserPid: provenance.browserPid,\n          browserIdentity: rootIdentity,',
+    )
+    assert.notEqual(faulty, source, 'Known-bad scope fixture must alter the launch call site')
+    const goodFile = join(directory, 'good.mjs')
+    const badFile = join(directory, 'bad.mjs')
+    const config = join(directory, 'scope.json')
+    await writeFile(goodFile, source)
+    await writeFile(badFile, faulty)
+    await writeFile(
+      config,
+      JSON.stringify({ env: { browser: true, node: true }, rules: { 'no-undef': 'error' } }),
+    )
+    const check = (file) =>
+      promisify(execFile)(
+        process.execPath,
+        [binary, '--config', config, '-A', 'all', '-D', 'no-undef', '--no-ignore', file],
+        { cwd: directory, timeout: 5000, maxBuffer: 100000 },
+      )
+    await assert.rejects(check(badFile), (error) => {
+      assert.match(error.stdout + error.stderr, /rootIdentity/)
+      return true
+    })
+    await check(goodFile)
+  } finally {
+    await rm(directory, { recursive: true })
+  }
+})
+
+test('physical Vulkan adapter facts cannot override an observed incompatible native surface transport', () => {
+  assert.doesNotThrow(() => assertHeadedHardware(observedFacts()))
+  assert.doesNotThrow(() => assertHeadedSurfaceTransport(''))
+  assert.doesNotThrow(() =>
+    assertHeadedSurfaceTransport('WARNING: optional desktop portal is unavailable'),
+  )
+  assert.throws(
+    () =>
+      assertHeadedSurfaceTransport(
+        "ERROR:wayland_surface_factory.cc:249] '--ozone-platform=wayland' is not compatible with Vulkan. Consider switching to '--ozone-platform=x11' or disabling Vulkan",
+      ),
+    /surface transport rejects native Wayland with Vulkan/,
+  )
+  assert.throws(
+    () => assertHeadedSurfaceTransport(undefined),
+    /Observed Chrome diagnostics required/,
   )
 })
