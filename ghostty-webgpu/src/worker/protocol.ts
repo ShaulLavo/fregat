@@ -41,10 +41,12 @@ export interface WorkerState {
   readonly appearance: TerminalAppearance
   readonly scrollbar: LocalTerminalExecution['scrollbar']
   readonly revision: number
+  readonly mouseTracking: boolean
   readonly backend?: 'webgpu' | 'webgl2'
 }
 interface WorkerSubmission extends WorkerWatermarks {
   readonly type: 'frame'
+  readonly mouseTracking: boolean
   readonly base: number
   readonly summary: TerminalSubmittedFrame
   readonly snapshot: RendererTextFrameSnapshot
@@ -70,11 +72,21 @@ type NativeCommands = Pick<
   | 'scrollToRow'
   | 'getSelection'
   | 'selectionCoordinates'
+  | 'selectionSnapshot'
+  | 'selectionPress'
+  | 'selectionDrag'
+  | 'selectionAutoscrollTick'
+  | 'selectionRelease'
+  | 'resetSelectionGesture'
+  | 'mouse'
+  | 'resetMouseTracking'
   | 'clearSelection'
   | 'selectAll'
   | 'selectRange'
   | 'selectLines'
   | 'frameSnapshot'
+  | 'resolveLinkSnapshot'
+  | 'resolveLinkDiscovery'
   | 'captureViewport'
   | 'setAppearance'
 >
@@ -164,11 +176,21 @@ export const workerCommandNames: ReadonlySet<string> = new Set([
   'scrollToRow',
   'getSelection',
   'selectionCoordinates',
+  'selectionSnapshot',
+  'selectionPress',
+  'selectionDrag',
+  'selectionAutoscrollTick',
+  'selectionRelease',
+  'resetSelectionGesture',
+  'mouse',
+  'resetMouseTracking',
   'clearSelection',
   'selectAll',
   'selectRange',
   'selectLines',
   'frameSnapshot',
+  'resolveLinkSnapshot',
+  'resolveLinkDiscovery',
   'captureViewport',
   'setAppearance',
   'open',

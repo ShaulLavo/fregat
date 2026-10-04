@@ -7,7 +7,12 @@ import type {
   TerminalModifierSide,
   TerminalModifiers,
 } from '../term/types.js'
-import { detectPlatform, type KeymapPlatform } from '@fregat/hotkeys'
+import {
+  detectPlatform,
+  normalizeHotkey,
+  normalizeHotkeyFromEvent,
+  type KeymapPlatform,
+} from '@fregat/hotkeys'
 import type { GhosttyWebGpuTerminalInputHooks } from './types.js'
 
 type InputSession = Pick<
@@ -22,6 +27,10 @@ interface LifecycleSession {
 interface DomInputControllerBaseOptions {
   readonly claimKey?: (event: KeyboardEvent) => boolean
   readonly claimText?: (type: 'paste' | 'text' | 'composition', data: TerminalInputData) => boolean
+  readonly selectionReadback?: {
+    readonly hasSelection: () => boolean
+    readonly copy: () => PromiseLike<void> | void
+  }
   readonly hooks?: GhosttyWebGpuTerminalInputHooks
   readonly onError: (cause: unknown, operation: string) => void
   readonly onPreedit?: (value: string) => void
@@ -528,8 +537,26 @@ class BrowserInputController implements DomInputController {
     if (event.getModifierState('AltGraph')) return false
     // ClipboardEvent/input carries browser paste; its physical key must not also encode.
     const modifier = this.platform === 'mac' ? event.metaKey : event.ctrlKey
-    if (!modifier || event.altKey || event.shiftKey || event.code !== 'KeyV') return false
-    this.claimShortcut(event, pastePressPolicy, pasteRepeatPolicy)
+    if (modifier && !event.altKey && !event.shiftKey && event.code === 'KeyV') {
+      this.claimShortcut(event, pastePressPolicy, pasteRepeatPolicy)
+      return true
+    }
+    const readback = this.options.selectionReadback
+    if (
+      !readback ||
+      this.platform !== 'mac' ||
+      normalizeHotkeyFromEvent(event, this.platform) !== normalizeHotkey('Mod+C', this.platform) ||
+      !readback.hasSelection()
+    )
+      return false
+    const result = readback.copy()
+    if (result)
+      void Promise.resolve(result).catch((cause: unknown) => this.options.onError(cause, 'copy'))
+    this.claimShortcut(
+      event,
+      { preventDefault: true, stopPropagation: false },
+      { preventDefault: true, stopPropagation: false },
+    )
     return true
   }
 

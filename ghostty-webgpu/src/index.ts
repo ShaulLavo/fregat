@@ -81,6 +81,7 @@ export type {
   GhosttyWebGpuRenderer,
   GhosttyWebGpuRendererFactory,
   GhosttyWebGpuTerminalAccessibilityOptions,
+  GhosttyWebGpuTerminalCopy,
   GhosttyWebGpuTerminalAppearanceApi,
   GhosttyWebGpuTerminalDiagnostics,
   GhosttyWebGpuTerminalEventMap,

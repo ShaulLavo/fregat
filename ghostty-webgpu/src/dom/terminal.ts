@@ -47,7 +47,7 @@ import {
   createTerminalAccessibility,
   type TerminalAccessibilityController,
 } from './accessibility.js'
-import { createDomClipboardPolicyAdapter } from './clipboard.js'
+import { createDomClipboardPolicyAdapter, writeUserSelectionToClipboard } from './clipboard.js'
 import {
   createTerminalElements,
   type TerminalElements,
@@ -69,11 +69,16 @@ import {
 import { createDomLinkController, type DomLinkController } from './links.js'
 import {
   createTerminalPointerController,
+  projectPointerPosition,
   type CommittedPointerLayout,
   type TerminalPointerController,
 } from './pointer.js'
 import { createTerminalScrollbar, type TerminalScrollbarController } from './scrollbar.js'
-import { createTerminalSelectionController, type TerminalSelectionController } from './selection.js'
+import {
+  createTerminalSelectionController,
+  type TerminalSelectionController,
+  type TerminalSelectionProjection,
+} from './selection.js'
 import type {
   GhosttyWebGpuRenderer,
   GhosttyWebGpuRendererFactory,
@@ -255,6 +260,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private readonly accessibilityOptions?: false | GhosttyWebGpuTerminalAccessibilityOptions
   private readonly autoFit: boolean
   private readonly cleanup = new CleanupStack()
+  private readonly copySelection
   private elementsValue?: TerminalElements
   private readonly emitters = createHostEmitters()
   private fit?: TerminalFitController
@@ -292,6 +298,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   ) {
     this.accessibilityOptions = options.accessibility
     this.autoFit = options.autoFit !== false
+    this.copySelection = options.copySelection
     this.fitEnvironment = options.fitEnvironment
     this.inputHooks = options.inputHooks
     this.keyboard = options.keyboard
@@ -367,10 +374,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.extensions ??= new ExtensionManager({
       dispatch: this.extensionDispatch,
       terminal: this,
-      registerLinkProvider:
-        this.execution.kind === 'sync'
-          ? (provider) => this.registerLinkProvider(provider)
-          : undefined,
+      registerLinkProvider: (provider) => this.registerLinkProvider(provider),
       onError: (cause, operation) => this.emitters.error.emit({ cause, operation }),
     })
     return this.extensions
@@ -547,10 +551,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       this.inputHooks?.inputReady?.()
       this.installFit(elements)
       this.cleanup.add(() => this.disposeCanvasControllers())
-      if (this.execution.kind === 'sync') {
-        this.installPointer(elements)
-        this.installLinks(elements)
-      }
+      this.installPointer(elements)
+      this.installLinks(elements)
       this.replayLastFrame()
       this.stateValue = 'open'
       this.emitHostEvent('open', elements.root)
@@ -658,8 +660,6 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
 
   registerLinkProvider(provider: LinkProvider<Event>): LinkProviderRegistration {
     this.ensureActive()
-    if (this.execution.kind === 'async')
-      throw workerError('capability', 'registerLinkProvider', { phase: 2 })
     const registration = this.execution.registerLinkProvider(provider)
     this.refreshLinks()
     let disposed = false
@@ -833,8 +833,6 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
 
   focusNextLink(): Promise<boolean> {
     this.ensureOpen()
-    if (this.execution.kind === 'async')
-      return Promise.reject(workerError('capability', 'focusNextLink', { phase: 2 }))
     return this.links?.focusNextLink() ?? Promise.resolve(false)
   }
 
@@ -1129,6 +1127,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private installInput(elements: TerminalElements): void {
     let input: DomInputController | undefined
     if (this.keyboard !== false) {
+      const view = elements.root.ownerDocument.defaultView
+      if (!view) throw createGhosttyError('input.install', 'Terminal input requires a window')
       input = createDomInputController({
         claimKey: this.claimDomKey,
         claimText: this.claimText,
@@ -1137,7 +1137,13 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
         onPreedit: (value) => this.updatePreedit(value),
         ...(this.execution.kind === 'sync'
           ? { session: this.execution.input }
-          : { encoding: this.execution }),
+          : {
+              encoding: this.execution,
+              selectionReadback: {
+                hasSelection: () => this.execution.submittedFrame?.selection !== undefined,
+                copy: () => this.copyWorkerSelection(view, elements.signal),
+              },
+            }),
         signal: elements.signal,
         textarea: elements.textarea,
       })
@@ -1188,9 +1194,33 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.cleanup.add(() => fit.dispose())
   }
 
+  private copyWorkerSelection(view: Window, signal: AbortSignal): Promise<void> {
+    if (this.execution.kind !== 'async') return Promise.resolve()
+    const text = this.execution.selectionSnapshot().then((snapshot) => snapshot.selection?.text)
+    const copy = this.copySelection
+    if (!copy) return writeUserSelectionToClipboard(view, text, { signal })
+    return text.then((value) => {
+      signal.throwIfAborted()
+      if (value !== undefined) return copy(value)
+    })
+  }
+
+  private refreshSelectionProjection(
+    previous: TerminalSelectionProjection,
+  ): TerminalSelectionProjection | undefined {
+    const layout = this.committedPointerLayout()
+    if (!layout || !previous.client) return undefined
+    return projectPointerPosition(
+      { clientX: previous.client.x, clientY: previous.client.y },
+      layout,
+    ).selection
+  }
+
   private installPointer(elements: TerminalElements): void {
-    if (this.execution.kind === 'async') return
     const selection = createTerminalSelectionController({
+      getIdentity:
+        this.execution.kind === 'async' ? () => this.execution.selectionIdentity : undefined,
+      getProjection: (previous) => this.refreshSelectionProjection(previous),
       onError: (cause, operation) => this.reportError(cause, operation),
       session: this.execution.selectionGesture,
       view: owningWindow(elements.canvas),
@@ -1214,12 +1244,9 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private installLinks(elements: TerminalElements): void {
-    if (this.execution.kind === 'async') return
     const links = createDomLinkController({
-      getFrame: () =>
-        this.execution.submittedFrame?.nativeRevision === this.execution.revision
-          ? this.readFrame()
-          : undefined,
+      getFrame: () => (this.execution.linkProjection ? this.readFrame() : undefined),
+      getProjection: () => this.execution.linkProjection,
       activationModifier: this.linkActivationModifier,
       canvas: elements.canvas,
       getLayout: () => this.committedPointerLayout(),

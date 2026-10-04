@@ -64,6 +64,8 @@ export type GhosttyWebGpuTerminalListener<TType extends GhosttyWebGpuTerminalEve
 
 export type GhosttyWebGpuTerminalSubscription = EventSubscription
 
+export type GhosttyWebGpuTerminalCopy = (text: string) => PromiseLike<void> | void
+
 export type TerminalGeneratedInput =
   | { readonly type: 'key'; readonly input: import('../term/types.js').TerminalKeyInput }
   | { readonly type: 'text' | 'paste'; readonly data: TerminalInputData }
@@ -131,6 +133,7 @@ export interface GhosttyWebGpuTerminalOptions {
   readonly accessibility?: false | GhosttyWebGpuTerminalAccessibilityOptions
   readonly appearance?: TerminalAppearanceOptions
   readonly clipboardWrite?: DomClipboardWritePolicy
+  readonly copySelection?: GhosttyWebGpuTerminalCopy
   readonly fitEnvironment?: Partial<TerminalFitEnvironment>
   readonly keyboard?: boolean
   readonly extensions?: readonly ExtensionInput[]
