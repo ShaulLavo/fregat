@@ -332,3 +332,49 @@ it.each([false, true])(
     expect(view.isRenderingAtomically).toBe(false)
   },
 )
+
+it.each([false, true])(
+  'preserves gutter cleanup owners when widget release changes contributions is %s',
+  (changesOwners) => {
+    const host = container()
+    const cleanup = vi.fn()
+    const view = new VirtualizedTextView(host, {
+      rowHeight: 20,
+      overscan: 0,
+      gutterContributions: [
+        {
+          id: 'lifecycle',
+          width: () => 20,
+          createCell: (document) => document.createElement('div'),
+          updateCell: () => undefined,
+          disposeCell: cleanup,
+        },
+      ],
+    })
+    releases.push(() => view.dispose())
+    const text = 'a ![img](x.png) b\nplain'
+    view.setText(text)
+    view.setScrollMetrics(0, 120, 400)
+    view.setInlineMap(
+      createInlineMap(createPieceTableSnapshot(text), [
+        {
+          id: 'image',
+          startIndex: 2,
+          endIndex: 15,
+          text: 'IMG',
+          render: () => ({
+            dispose: () => {
+              if (changesOwners) view.setGutterContributions([])
+            },
+          }),
+        },
+      ]),
+    )
+
+    view.dispose()
+
+    expect(cleanup).toHaveBeenCalledTimes(2)
+    expect(view.getState().mountedRows).toEqual([])
+    expect(host.contains(view.scrollElement)).toBe(false)
+  },
+)
