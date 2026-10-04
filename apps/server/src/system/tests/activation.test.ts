@@ -31,7 +31,7 @@ async function freePort() {
   return address.port
 }
 
-async function activate(expectedPort?: number) {
+async function activate(expectedPort?: number, startupDelayMs = 0) {
   const port = await freePort()
   const fixture = path.join(import.meta.dirname, 'fixtures', 'activated-server.ts')
   const runtime = await mkdtemp(path.join(tmpdir(), 'platform-activation-'))
@@ -45,6 +45,7 @@ async function activate(expectedPort?: number) {
       fixture,
       String(expectedPort ?? port),
       runtime,
+      String(startupDelayMs),
     ],
     stdout: 'ignore',
     stderr: 'pipe',
@@ -114,20 +115,26 @@ describe.skipIf(!activator)('socket activation relay', () => {
     )
   })
 
-  it('shuts down within its grace while a client stays connected', async () => {
-    const { port, child } = await activate()
-    const held = net.connect({ host: '127.0.0.1', port })
-    await new Promise<void>((resolve) => held.once('connect', () => resolve()))
-    // Half a request: the relay holds the connection open, waiting for the rest.
-    held.write('GET /hello HTTP/1.1\r\nHost: 127.0.0.1\r\n')
-    await Bun.sleep(200)
-    const started = Date.now()
-    child.kill('SIGTERM')
-    const exited = await Promise.race([child.exited, Bun.sleep(5000).then(() => 'hung')])
-    held.destroy()
-    expect(exited).toBe(0)
-    expect(Date.now() - started).toBeLessThan(3000)
-  })
+  it.each([0, 500])(
+    'shuts down within its grace after %ims startup while a client stays connected',
+    async (startupDelayMs) => {
+      const { base, port, child } = await activate(undefined, startupDelayMs)
+      const ready = await fetch(`${base}/ready`)
+      expect(ready.status).toBe(200)
+      await ready.arrayBuffer()
+      const held = net.connect({ host: '127.0.0.1', port })
+      await new Promise<void>((resolve) => held.once('connect', () => resolve()))
+      // Half a request: the relay holds the connection open, waiting for the rest.
+      held.write('GET /hello HTTP/1.1\r\nHost: 127.0.0.1\r\n')
+      await Bun.sleep(200)
+      const started = Date.now()
+      child.kill('SIGTERM')
+      const exited = await Promise.race([child.exited, Bun.sleep(5000).then(() => 'hung')])
+      held.destroy()
+      expect(exited).toBe(0)
+      expect(Date.now() - started).toBeLessThan(3000)
+    },
+  )
 
   it('keeps serving after a client disconnects mid-request', async () => {
     const { base } = await activate()
