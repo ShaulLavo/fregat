@@ -172,7 +172,7 @@ class Attachment implements ExtensionScope, ExtensionHandle<unknown> {
 
 export interface ExtensionManagerOptions {
   readonly terminal: TerminalApi
-  readonly reservedOsc: ReadonlySet<number>
+  readonly reservedOsc?: ReadonlySet<number>
   readonly onError: ErrorSink
 }
 
@@ -370,12 +370,16 @@ export class ExtensionManager {
   }
 
   private validateOsc(entries: readonly [string, OscObserver][]): void {
+    const reserved = this.options.reservedOsc
+    if (entries.length > 0 && !reserved) {
+      throw createGhosttyError('extension.use', 'Custom OSC observation is unavailable')
+    }
     for (const [key, observer] of entries) {
       const number = Number(key)
       if (!Number.isSafeInteger(number) || number < 0 || String(number) !== key) {
         throw createGhosttyError('extension.use', 'OSC number must be a non-negative safe integer')
       }
-      if (this.options.reservedOsc.has(number) || this.osc.has(number)) {
+      if (reserved?.has(number) || this.osc.has(number)) {
         throw createGhosttyError('extension.use', `OSC ${number} already has an owner`)
       }
       validateFunction(observer, 'OSC')
