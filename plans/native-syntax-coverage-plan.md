@@ -188,7 +188,7 @@ Use the existing benchmark fixture workspace or an equivalent fixed corpus. Repe
 
 Measure production asset requests and retained worker/WASM memory separately from development-module bytes. Verify grammar loading stays proportional to requested language dependencies. Run `look` or a scenario on changed surfaces, read screenshots, and cite trace comparisons for performance claims. Reuse the existing dev server; do not start a replacement if it is down.
 
-For implementation increments, deploy the verified web build with `bun run deploy` and check the served release. Use `--server` only if that increment changes the server. This planning document requires no application deployment.
+For implementation increments, deploy the verified web build with `bun run install-release` and check the served release. Use `--server` only if that increment changes the server. This planning document requires no application deployment.
 
 ## Completion and maintenance
 

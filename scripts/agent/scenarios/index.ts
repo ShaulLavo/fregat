@@ -1,3 +1,4 @@
+import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
 import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
@@ -453,6 +454,7 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  releaseInstallationSettings,
   nativeWindow,
   installedApp,
   binaryFileOpen,

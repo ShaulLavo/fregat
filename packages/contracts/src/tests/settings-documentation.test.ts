@@ -51,6 +51,22 @@ test('quiet concurrency presents its accepted copy with the advanced machine pol
   })
 })
 
+test('installation metadata preserves its execution policy and copy', () => {
+  expect(presentSetting('developer.deployTarget')).toMatchObject({
+    title: 'Installation target',
+    description: 'Install releases and pair through Mesh and systemd.',
+    default: null,
+    scope: 'machine',
+    widget: 'complex',
+    category: 'Developer',
+    visibility: 'advanced',
+  })
+  expect(presentSetting('developer.deployRestartWaitMinutes')).toMatchObject({
+    title: 'Restart wait',
+    description: 'Minutes to wait for busy sessions. --interrupt ends them and restarts.',
+  })
+})
+
 test('startup definitions contain no presentation-only registry fields', () => {
   const fields = [
     'widget',

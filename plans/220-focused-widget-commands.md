@@ -91,8 +91,8 @@ must pass. Browser scenarios use fixture/mock providers only. Put heavy tests,
 scenarios, builds, and deploys through
 `bash /work/tmp/wave-heavy/run.sh "zt-01" -- env PATH="$PATH" <command>`.
 Use an explicit free port for any private dev server and stop it afterward.
-Deploy verified implementation with `bun run deploy`, or
-`bun run deploy --server --restart` when server code changes. Confirm the served release.
+Deploy verified implementation with `bun run install-release`, or
+`bun run install-release --server --restart` when server code changes. Confirm the served release.
 
 ## Out of scope
 

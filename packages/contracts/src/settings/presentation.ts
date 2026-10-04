@@ -457,6 +457,11 @@ export const SETTINGS_PRESENTATION = {
     category: 'Developer',
     visibility: 'advanced',
   },
+  'developer.deployTarget': {
+    widget: 'complex',
+    category: 'Developer',
+    visibility: 'advanced',
+  },
   'developer.deployRestartWaitMinutes': {
     widget: 'number',
     category: 'Developer',

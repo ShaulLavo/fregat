@@ -17,7 +17,7 @@
 - `current` and L4's `pending` are symlinks to a release directory. A bundled server's
   `import.meta.dirname` resolves to `<release>/server` whichever link started it, so a staged but
   unpromoted primary ships its own staged release.
-- Every release built by `deploy --server` carries `server/runtime/package.json`, `server/runtime/bun.lock`, and
+- Every release built by `install-release --server` carries `server/runtime/package.json`, `server/runtime/bun.lock`, and
   `server/remote-support.js`; the update refuses a release without them (`SSH_UPDATE_NOT_A_RELEASE`).
 - Locally `server/node_modules` links to the checkout's installed dependencies; the transfer
   excludes it and the remote links `runtime/<manifest-and-lock sha256>/node_modules` in its place.

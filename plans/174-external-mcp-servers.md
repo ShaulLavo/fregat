@@ -131,7 +131,7 @@ server to `{name, status, error}` (`packages/contracts/src/provider.ts:250`). No
 ## Proposed phases
 
 Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
-(`bun run deploy --server`).
+(`bun run install-release --server`).
 
 1. **Status that says where and why (S–M).** Extend `providerMcpServerSchema` with `source`
    (open string: `user/project/local/dynamic/plugin/claudeai/managed/…`), `transport`
