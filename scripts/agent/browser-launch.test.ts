@@ -13,11 +13,14 @@ import { tmpdir } from 'node:os'
 import { createServer } from 'node:net'
 import path from 'node:path'
 import { expect, test } from 'vitest'
-import { browserTempRoot, launchBrowser, prepareBrowserTemp } from './browser-launch'
-import { chromium } from 'playwright'
-
-const browserUnavailable = process.platform !== 'linux' || !existsSync(chromium.executablePath())
-if (browserUnavailable) console.info('Browser storage checks require Linux and installed Chromium.')
+import {
+  browserAvailable,
+  browserTempRoot,
+  launchBrowser,
+  prepareBrowserTemp,
+} from './browser-launch'
+import { chromiumUnavailable } from './browser-prerequisites'
+const headedUnavailable = !(await browserAvailable('chromium', true))
 
 async function parentPid(pid: string) {
   const stat = await readFile(`/proc/${pid}/stat`, 'utf8').catch(() => '')
@@ -57,7 +60,9 @@ async function chromiumSharedMemory() {
 
 // Playwright's --disable-dev-shm-usage puts these files in TMPDIR, fully allocated; on a tmpfs
 // they count against the job's memory cap, so they must live in the run's disk-backed directory.
-test.skipIf(browserUnavailable)(
+if (process.platform !== 'linux') console.info('Chromium shared-memory proof requires Linux /proc.')
+
+test.skipIf(process.platform !== 'linux' || chromiumUnavailable)(
   'Chromium keeps its shared memory in a run directory it removes on close',
   async () => {
     const browser = await launchBrowser('chromium', false)
@@ -111,7 +116,11 @@ test.skipIf(process.platform === 'win32')(
   },
 )
 
-test.skipIf(browserUnavailable || (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY))(
+test.skipIf(
+  process.platform !== 'linux' ||
+    headedUnavailable ||
+    (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY),
+)(
   'headed Chromium starts with a disk-backed private profile and isolated caller contexts',
   async () => {
     const before = new Set(await readdir(browserTempRoot).catch(() => []))

@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { checkoutRoot } from './paths'
 import { createScriptError } from '../structured-errors'
 
@@ -38,18 +39,41 @@ export async function prepareBrowserTemp(root = browserTempRoot) {
   }
 }
 
-export async function launchBrowser(
-  engine: Engine,
-  headed: boolean,
-  notifications = false,
-): Promise<Browser> {
+async function loadPlaywright() {
   const cache = '/work/cache/ms-playwright'
   if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(cache)) {
     process.env.PLAYWRIGHT_BROWSERS_PATH = cache
   }
   // Imported here: Playwright fixes its browser directory when it loads, and Bun loads a static
   // import before any code in this file runs.
-  const playwright = await import('playwright')
+  return import('playwright')
+}
+
+export async function browserAvailable(
+  engine: Engine,
+  headed = false,
+  notifications = false,
+): Promise<boolean> {
+  const playwright = await loadPlaywright()
+  if (engine !== 'chromium' || headed || notifications)
+    return existsSync(playwright[engine].executablePath())
+  // executablePath() exposes full Chromium; the pinned launch registry resolves its headless shell.
+  const core = createRequire(import.meta.resolve('playwright'))(
+    'playwright-core/lib/coreBundle',
+  ) as {
+    registry: { registry: { findExecutable(name: string): { executablePath(): string } } }
+  }
+  return existsSync(
+    core.registry.registry.findExecutable('chromium-headless-shell').executablePath(),
+  )
+}
+
+export async function launchBrowser(
+  engine: Engine,
+  headed: boolean,
+  notifications = false,
+): Promise<Browser> {
+  const playwright = await loadPlaywright()
   const { chromium } = playwright
   if (engine !== 'chromium') return playwright[engine].launch({ headless: !headed })
   // Playwright hides scrollbars by default. Users have them, and a scrollbar that appears with

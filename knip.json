@@ -123,7 +123,8 @@
       "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
-      "ignoreDependencies": ["typescript-api"]
+      "ignoreDependencies": ["typescript-api"],
+      "vitest": { "config": ["vitest.scripts.config.mjs"] }
     },
     "apps/tui": {
       "entry": [
