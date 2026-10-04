@@ -8,10 +8,16 @@ import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { createEditorPreparedDocument } from '@singapore-editor/core/editor'
 import { QueryClient } from '@tanstack/react-query'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { createEditorRuntime } from '@/features/editor/state/runtime'
+import { createEditorApplyActions } from '@/features/editor/state/apply-actions'
+import { createSnapshotComparisonFixture } from '../../../../test/factories/snapshot-comparison'
+import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
+import { snapshotDocument } from '@/lib/documents/utils/comparisons'
+import { allEditorTabs } from '@/lib/documents/utils/groups'
+import { fetchDiff } from '@/features/git/utils/api'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { openEditorContentInWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { getClient, setClient } from '@/lib/client'
@@ -412,5 +418,149 @@ test('finishes every A save and cache update on A after its first write is delay
     queriesA.clear()
     queriesB.clear()
     await serverB.cleanup()
+  }
+})
+
+test('a trimmed snapshot stays released through unrelated query and workspace publication until explicit activation', async ({
+  server,
+  client,
+}) => {
+  const f = await createSnapshotComparisonFixture(server.root, client)
+  const queries = new QueryClient()
+  registerEnvironmentQueryClient(queries, 'http://localhost:7077', client)
+  const runtime = createEditorRuntime({
+    storage: testScopedStorage,
+    preparation,
+    queryClient: queries,
+    workspaceCache: readWorkspaceCache(testScopedStorage),
+  })
+  const actions = createEditorApplyActions({
+    activation: runtime.editorActivation,
+    documentStore: runtime.documentStore,
+    searchStore: runtime.searchBufferStore,
+    uiStore: runtime.uiStore,
+    workspaceStore: runtime.workspaceStore,
+    retainedTextBudget: () => 10000000,
+  })
+  try {
+    const key = blobDiffQueryOptions(f.comparison).queryKey
+    const data = [f.worktree]
+    queries.setQueryData(key, data)
+    const workspaceAddress = await registerTestWorkspaceAddress(client, f.scope.rootPath)
+    actions.switchRootFolder({
+      workspaceAddress,
+      birthtimeMs: 0,
+      mtimeMs: 0,
+      name: 'repo',
+      path: f.scope.rootPath,
+      size: 0,
+      type: 'directory',
+      version: '',
+    })
+    const content = documentTab({ kind: 'git-diff', source: f.comparison })
+    actions.openTabContent(content)
+    const [tab] = allEditorTabs(runtime.workspaceStore.getState().workbenchPanels.editorGroups)
+    expect(tab).toBeDefined()
+    if (!tab) return
+    const documents = runtime.documentStore.getState()
+    const lease = documents.snapshotComparisonTabs.get(tab.id)
+    expect(lease?.read().kind).toBe('ready')
+    documents.retainEditorDocuments({ documentKeys: new Set(), tabIds: new Set() })
+    expect(lease?.read().kind).toBe('released')
+    expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(0)
+    queries.setQueryData(['unrelated-query'], { settled: true })
+    expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(0)
+    const workspace = runtime.workspaceStore.getState()
+    workspace.setWorkbenchPanels({ ...workspace.workbenchPanels })
+    expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(0)
+    actions.openTabContent(content)
+    const renewed = runtime.documentStore.getState().snapshotComparisonTabs.get(tab.id)
+    expect(renewed?.read().kind).toBe('ready')
+    expect(renewed).not.toBe(lease)
+    expect(queries.getQueryData(key)).toBe(data)
+    expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(1)
+  } finally {
+    runtime.dispose()
+    queries.clear()
+  }
+})
+
+test('normal four-project navigation retains three snapshot interests and explicit revisit reacquires warm data', async ({
+  server,
+  client,
+}) => {
+  const f = await createSnapshotComparisonFixture(server.root, client)
+  const queries = new QueryClient()
+  registerEnvironmentQueryClient(queries, 'http://localhost:7077', client)
+  const runtime = createEditorRuntime({
+    storage: testScopedStorage,
+    preparation,
+    queryClient: queries,
+    workspaceCache: readWorkspaceCache(testScopedStorage),
+  })
+  const actions = createEditorApplyActions({
+    activation: runtime.editorActivation,
+    documentStore: runtime.documentStore,
+    searchStore: runtime.searchBufferStore,
+    uiStore: runtime.uiStore,
+    workspaceStore: runtime.workspaceStore,
+    retainedTextBudget: () => 10000000,
+  })
+  const root = { birthtimeMs: 0, mtimeMs: 0, size: 0, type: 'directory' as const, version: '' }
+  const firstAddress = await registerTestWorkspaceAddress(client, f.scope.rootPath)
+  try {
+    for (const [index, name] of ['repo', 'repo-2', 'repo-3', 'repo-4'].entries()) {
+      if (index > 0)
+        await cp(join(server.root, 'repo'), join(server.root, name), { recursive: true })
+      const [diff] = await fetchDiff(`${name}/source.ts`, false, undefined, client)
+      expect(diff).toBeDefined()
+      if (!diff) return
+      const target = snapshotDocument(diff)
+      expect(target).not.toBeNull()
+      if (!target || target.source.kind !== 'snapshot') return
+      queries.setQueryData(blobDiffQueryOptions(target.source).queryKey, [diff])
+      const path = filesystemPath(name)
+      const workspaceAddress = await registerTestWorkspaceAddress(client, path)
+      actions.switchRootFolder({ ...root, workspaceAddress, name, path })
+      if (index === 3) expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(2)
+      actions.openTabContent(documentTab(target))
+      expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(Math.min(index + 1, 3))
+    }
+    expect(runtime.workspaceStore.getState().parkedWorkspaces.size).toBe(3)
+    const retained = [...runtime.documentStore.getState().snapshotComparisons.values()]
+    expect(
+      retained.flatMap((read) =>
+        read.kind === 'ready'
+          ? [{ scope: read.input.scope, path: read.input.comparison.path }]
+          : [],
+      ),
+    ).toEqual(
+      ['repo-2', 'repo-3', 'repo-4'].map((rootPath) => ({
+        scope: { ...f.scope, rootPath },
+        path: `${rootPath}/source.ts`,
+      })),
+    )
+    const firstKey = blobDiffQueryOptions(f.comparison).queryKey
+    const warmData = queries.getQueryData(firstKey)
+    expect(warmData).toBeDefined()
+    actions.switchRootFolder({
+      ...root,
+      workspaceAddress: firstAddress,
+      name: 'repo',
+      path: f.scope.rootPath,
+    })
+    const [selected] = allEditorTabs(runtime.workspaceStore.getState().workbenchPanels.editorGroups)
+    const read =
+      selected && runtime.documentStore.getState().snapshotComparisonTabs.get(selected.id)?.read()
+    expect(read?.kind).toBe('ready')
+    if (read?.kind === 'ready') {
+      expect(read.input.scope).toEqual(f.scope)
+      expect(read.input.comparison).toEqual(f.comparison)
+    }
+    expect(queries.getQueryData(firstKey)).toBe(warmData)
+    expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(3)
+  } finally {
+    runtime.dispose()
+    queries.clear()
   }
 })

@@ -219,7 +219,7 @@ describe('real Shiki worker retention', () => {
     expect(owner.inspect().pendingRequests).toBe(0)
     pendingRegistrations.resolve(resolved)
     expect((await pendingRefresh.promise).tokens.length).toBe(0)
-    expect(await pendingInspection.promise).toEqual(surviving)
+    expect(await pendingInspection.promise).toEqual({ ...surviving, retiredRuntimeCount: 2 })
     expect(await pendingFence.promise).toBeUndefined()
     expect(fullTextReads).toBe(1)
 
@@ -235,12 +235,63 @@ describe('real Shiki worker retention', () => {
       tokenizerCount: 0,
       lineCount: 0,
       tokenCount: 0,
+      retiredRuntimeCount: 4,
       shared: { highlighterCount: 1 },
     })
     const generation = owner.inspect().workerGeneration
     await owner.dispose()
     expect(await owner.inspectRetention()).toBeNull()
     expect(owner.inspect().workerGeneration).toBe(generation)
+  })
+
+  it('bounds retired runtime metadata while preserving a populated survivor', async ({
+    annotate,
+  }) => {
+    const owner = createShikiWorkerOwner()
+    owners.add(owner)
+    const survivor = await populate(owner, 'retiredSurvivor')
+    const before = await owner.inspectRetention()
+    await annotate('retired metadata before disposal', {
+      body: JSON.stringify(before),
+      contentType: 'application/json',
+      bodyEncoding: 'utf-8',
+    })
+    expect(before?.retiredRuntimeCount).toBe(0)
+    if (!before) expect.unreachable('Populated worker retention was absent')
+    const limit = before.retiredRuntimeLimit
+    expect(Number.isInteger(limit)).toBe(true)
+    expect(limit).toBeGreaterThan(0)
+    expect(before).toMatchObject({ documentCount: 1, tokenizerCount: 1, lineCount: 1 })
+    expect(before.tokenCount).toBeGreaterThan(0)
+    expect(before.shared.highlighterCount).toBe(1)
+
+    const retired = await populate(owner, 'retiredFirst')
+    expect((await owner.inspectRetention())?.documentCount).toBe(2)
+    retired.session.dispose()
+    const afterOne = await owner.inspectRetention()
+    await annotate('retired metadata after one disposal', {
+      body: JSON.stringify(afterOne),
+      contentType: 'application/json',
+      bodyEncoding: 'utf-8',
+    })
+    expect(afterOne).toEqual({ ...before, retiredRuntimeCount: 1 })
+
+    const distinctRetirements = limit + 2
+    for (let index = 1; index < distinctRetirements; index += 1) {
+      await owner.request({ type: 'disposeDocument', runtimeSessionId: `retired-bound-${index}` })
+    }
+    const bounded = await owner.inspectRetention()
+    await annotate('retired metadata after exceeding the limit', {
+      body: JSON.stringify({ distinctRetirements, before, afterOne, bounded }),
+      contentType: 'application/json',
+      bodyEncoding: 'utf-8',
+    })
+    expect(bounded).toEqual({ ...before, retiredRuntimeCount: limit })
+    expect(await owner.awaitIdleFence()).toBeUndefined()
+    expect(
+      (await survivor.session.refresh(createDocumentTextSnapshot(survivor.snapshot))).tokens.length,
+    ).toBeGreaterThan(0)
+    expect(await owner.inspectRetention()).toEqual(bounded)
   })
 
   it.each(['dispose', 'crash'] as const)(
