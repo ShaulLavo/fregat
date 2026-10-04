@@ -1042,3 +1042,67 @@ it.each([1, 2])('commits worker canvas CSS geometry at pixel ratio %s', async (r
     vi.unstubAllGlobals()
   }
 })
+
+it.each([1.5, 2.25])(
+  'keeps repeated fractional geometry quiet and commits real layout changes at ratio %s',
+  async (ratio) => {
+    vi.stubGlobal('devicePixelRatio', ratio)
+    let widthSetter: ReturnType<typeof vi.spyOn> | undefined
+    let heightSetter: ReturnType<typeof vi.spyOn> | undefined
+    try {
+      const terminal = await create('webgl')
+      const host = container()
+      await terminal.open(host)
+      await terminal.write('fractional geometry')
+      await eventually(() => !!terminal.submittedFrame)
+      const canvas = terminal.canvas!
+      widthSetter = vi.spyOn(canvas.style, 'width', 'set')
+      heightSetter = vi.spyOn(canvas.style, 'height', 'set')
+      const before = terminal.submittedFrame!.frame
+      await terminal.refresh(0, terminal.submittedFrame!.grid.rows - 1)
+      await eventually(() => terminal.submittedFrame!.frame > before)
+      expect(widthSetter).not.toHaveBeenCalled()
+      expect(heightSetter).not.toHaveBeenCalled()
+      await terminal.setFont({ size: 18 })
+      await eventually(() => terminal.submittedFrame!.font.settings.size === 18)
+      expect(widthSetter.mock.calls.length + heightSetter.mock.calls.length).toBeGreaterThan(0)
+      widthSetter.mockClear()
+      heightSetter.mockClear()
+      const columns = terminal.submittedFrame!.grid.columns
+      host.style.width = '400px'
+      host.style.height = '220px'
+      await eventually(() => {
+        const frame = terminal.submittedFrame!
+        const bounds = canvas.getBoundingClientRect()
+        const width =
+          frame.grid.columns * frame.font.cssCellWidth + frame.padding.left + frame.padding.right
+        const height =
+          frame.grid.rows * frame.font.cssCellHeight + frame.padding.top + frame.padding.bottom
+        return (
+          frame.grid.columns !== columns &&
+          Math.abs(bounds.width - width) < 0.05 &&
+          Math.abs(bounds.height - height) < 0.05
+        )
+      })
+      expect(widthSetter.mock.calls.length + heightSetter.mock.calls.length).toBeGreaterThan(0)
+      const summary = terminal.submittedFrame!
+      const rect = canvas.getBoundingClientRect()
+      expect(rect.width).toBeCloseTo(
+        summary.grid.columns * summary.font.cssCellWidth +
+          summary.padding.left +
+          summary.padding.right,
+        1,
+      )
+      expect(rect.height).toBeCloseTo(
+        summary.grid.rows * summary.font.cssCellHeight +
+          summary.padding.top +
+          summary.padding.bottom,
+        1,
+      )
+    } finally {
+      widthSetter?.mockRestore()
+      heightSetter?.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  },
+)

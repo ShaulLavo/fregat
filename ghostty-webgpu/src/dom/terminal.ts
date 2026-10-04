@@ -265,6 +265,11 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private readonly emitters = createHostEmitters()
   private fit?: TerminalFitController
   private fittedFont?: TerminalFittedFont
+  private workerCanvasSize?: {
+    readonly canvas: HTMLCanvasElement
+    readonly width: number
+    readonly height: number
+  }
   private readonly fitEnvironment?: Partial<TerminalFitEnvironment>
   private extensions?: ExtensionManager
   private readonly extensionDispatch = createExtensionDispatch()
@@ -1430,10 +1435,14 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     const summary = this.execution.submittedFrame
     const canvas = this.elementsValue?.canvas
     if (summary && canvas && this.execution.kind === 'async') {
-      const width = `${summary.grid.columns * summary.font.cssCellWidth}px`
-      const height = `${summary.grid.rows * summary.font.cssCellHeight}px`
-      if (canvas.style.width !== width) canvas.style.width = width
-      if (canvas.style.height !== height) canvas.style.height = height
+      const width = summary.grid.columns * summary.font.cssCellWidth
+      const height = summary.grid.rows * summary.font.cssCellHeight
+      const previous = this.workerCanvasSize
+      const widthChanged = previous?.canvas !== canvas || previous?.width !== width
+      const heightChanged = previous?.canvas !== canvas || previous?.height !== height
+      if (widthChanged) canvas.style.width = `${width}px`
+      if (heightChanged) canvas.style.height = `${height}px`
+      if (widthChanged || heightChanged) this.workerCanvasSize = { canvas, width, height }
     }
     const scrollbar = summary?.scrollbar ?? this.execution.scrollbar
     if (summary) this.updatePreeditAppearance(summary.font, summary.theme)
