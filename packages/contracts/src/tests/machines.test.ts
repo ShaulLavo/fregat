@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 
 import { machinesSchema } from '../machines'
+import { settingControl } from '../settings/control'
 import { descriptorFor } from '../settings/keys'
+import { presentationFor } from '../settings/presentation'
 import {
   applySettingsOperations,
   settingsMutationResourcesIntersect,
@@ -51,8 +53,9 @@ describe('machines', () => {
       default: {},
       merge: 'record',
       scope: 'machine',
-      widget: 'machines',
     })
+    expect(presentationFor('environments.machines').widget).toBe('machines')
+    expect(settingControl('environments.machines', {})).toEqual({ widget: 'machines' })
   })
 
   it('reserves local for the implicit primary machine at both settings boundaries', () => {
