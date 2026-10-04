@@ -120,6 +120,28 @@ test('captured preparation preserves dirty authority, Undo, snapshot and mutatio
   expect(documents.getLiveDocument(live.key)?.buffer).toBe(live.buffer)
 })
 
+test('a reentrant membership edit is part of the acquired canonical revision', async ({
+  server,
+  client,
+  onTestFinished,
+}) => {
+  const path = filesystemPath('reentrant-revision.ts')
+  await writeFile(join(server.root, path), 'const saved = true\n')
+  const file = await fetchFile(path, new AbortController().signal, client)
+  const documents = new WorkspaceDocumentService()
+  onTestFinished(() => documents.dispose())
+  documents.subscribeEditorAnalyses(() => {
+    const analysis = Array.from(documents.enumerateEditorAnalyses())[0]
+    if (analysis) createEditorBufferSession(analysis.buffer).applyText(' edited')
+  })
+  const source = documents.acquireFilePreparation({ kind: 'captured-file-snapshot', file })!
+  expect(source.document.localRevision).toBe(source.document.buffer.getRevision())
+  expect(documents.getLiveDocument(source.document.key)).toBe(source.document)
+  expect(source.document.buffer.isDirty()).toBe(true)
+  expect(source.document.buffer.canUndo()).toBe(true)
+  source.release()
+})
+
 test('pins cannot veto replacement, rename, deletion or final owner disposal', async ({
   server,
   client,

@@ -619,9 +619,9 @@ export class WorkspaceDocumentService {
     const record = existing
       ? this.replacementDocument(file, existing, cleanClaim)
       : this.createFileDocument(file, cleanClaim)
-    this.setLiveDocument(record)
     this.setContentRevision(record.key, record.contentRevision)
     this.deleteDirtyKey(record.key)
+    this.setLiveDocument(record)
     if (record.buffer !== existing?.buffer) this.rebindViewsForDocument(record.key)
     return record
   }
@@ -630,13 +630,14 @@ export class WorkspaceDocumentService {
     input: FileOpenIntentPreparationSourceInput,
   ): FileOpenIntentPreparationSource | null {
     if (this.sourceOwnerDisposed) return null
-    const document =
+    const acquired =
       input.kind === 'live-document'
         ? this.liveDocumentsByKey.get(input.documentKey)
         : this.ensureLiveDocument(input.file)
-    if (!document) return null
+    if (!acquired) return null
+    const document = this.liveDocumentsByKey.get(acquired.key)
+    if (!document || document.buffer !== acquired.buffer) return null
     const { buffer } = document
-    if (this.liveDocumentsByKey.get(document.key)?.buffer !== buffer) return null
     const token = {}
     const pins = this.preparationPins.get(buffer) ?? new Set<object>()
     pins.add(token)
@@ -1722,21 +1723,21 @@ export class WorkspaceDocumentService {
   private setLiveDocument(document: LiveEditorDocument): void {
     const previous = this.liveDocumentsByKey.get(document.key)
     this.liveDocumentsByKey.set(document.key, document)
-    if (previous?.analysis !== document.analysis) this.notifyEditorAnalyses()
-    if (previous?.buffer !== document.buffer) this.detachPreviousBuffer(previous)
-    this.refreshLiveComparison(document.key)
     if (!previous) {
       this.pathOwnershipRevision += 1
       const resource = filesystemResource(document.target)
       if (resource) this.advancePathOwnership(resource.path)
     }
     this.documentKeysByBuffer.set(document.buffer, document.key)
-    if (this.unsubscribeByBuffer.has(document.buffer)) return
-
-    const unsubscribe = document.buffer.subscribe((event) =>
-      this.acceptBufferChange(document.buffer, event),
-    )
-    this.unsubscribeByBuffer.set(document.buffer, unsubscribe)
+    if (!this.unsubscribeByBuffer.has(document.buffer)) {
+      const unsubscribe = document.buffer.subscribe((event) =>
+        this.acceptBufferChange(document.buffer, event),
+      )
+      this.unsubscribeByBuffer.set(document.buffer, unsubscribe)
+    }
+    this.refreshLiveComparison(document.key)
+    if (previous?.analysis !== document.analysis) this.notifyEditorAnalyses()
+    if (previous?.buffer !== document.buffer) this.detachPreviousBuffer(previous)
   }
 
   private detachPreviousBuffer(document: LiveEditorDocument | undefined): void {

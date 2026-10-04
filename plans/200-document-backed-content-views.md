@@ -7,26 +7,27 @@ document attachment and reusable projections. Cross-project order lives in [PLAN
 ## Execution record
 
 As of 2026-10-04, full units completed: 0 of 6. Units 0–5 below retain their execution order and
-unchecked acceptance work. The following partial deliveries are open for review and merge:
+unchecked acceptance work. These partial deliveries have landed:
 
-- [PR #678](https://github.com/ShaulLavo/fregat/pull/678), head `e9332f10`, is the unit 1
+- [PR #678](https://github.com/ShaulLavo/fregat/pull/678), merged in `cb1c8cf60`, is the unit 1
   compare-with-saved caller pilot. Synchronous source leases retain the current live buffer and
   analysis, exact committed snapshots, and a distinct saved disk snapshot through the existing
-  workspace document owner. Save and Undo keep their current authority. The rename and rollback
-  review finding is under correction. Other comparison callers and full unit 1 acceptance remain open.
-- [PR #675](https://github.com/ShaulLavo/fregat/pull/675), head `73632614`, supplies the Plan 197
-  immutable source syntax prerequisite through borrowed readers. Its grammar admission finding
-  fix is pushed and awaits the coordinator's narrow check. This prerequisite leaves Plan 200's
-  comparison ownership, attachment and caller migration work open.
-- [PR #681](https://github.com/ShaulLavo/fregat/pull/681), head `0b11d6ef`, supplies part of unit 4:
-  captured disk provenance and complete or partial coverage at the bounded-read response and
-  existing preview query adapter. Independent review is pending. Renderer and source-owner
-  binding, text attachment ownership and Markdown buffer verification remain open.
+  workspace document owner. Save and Undo keep their current authority. Other comparison callers
+  and full unit 1 acceptance remain open.
+- [PR #675](https://github.com/ShaulLavo/fregat/pull/675), merged in `d9617a2d4`, supplies the Plan 197
+  immutable source syntax prerequisite through borrowed readers. This prerequisite leaves Plan
+  200's comparison ownership, attachment and caller migration work open.
+- [PR #681](https://github.com/ShaulLavo/fregat/pull/681), merged in `c34876fb9`, supplies part of unit 4.
+  It captures disk provenance and complete or partial coverage at the bounded-read response and
+  existing preview query adapter. Renderer and source-owner binding, text attachment ownership and
+  Markdown buffer verification remain open.
+- [PR #691](https://github.com/ShaulLavo/fregat/pull/691), merged in `ad357f1ae`, retains captured Git
+  snapshot comparison inputs with their environment, root and subject. Released snapshot interests
+  stay released through runtime publication and query settlement. Moving and historical source
+  provenance, checkpoint/history callers and full unit 1 acceptance remain open.
 
-These heads require independent approval and green current-head CI before merge. The execution
-record makes no merged-delivery claim for them. [PR #661](https://github.com/ShaulLavo/fregat/pull/661)
-landed final runtime document disposal in `725f4d29a`; the
-[Plan 198 foundation record](198-document-owned-editor-analysis.md#landed-code-and-remaining-proof)
+[PR #661](https://github.com/ShaulLavo/fregat/pull/661) landed final runtime document disposal in
+`725f4d29a`. The [Plan 198 foundation record](198-document-owned-editor-analysis.md#landed-code-and-remaining-proof)
 separately records landed publication and retained analysis contracts with remaining acceptance.
 
 The pilot's frozen headless fixture records zero selected loading or blank frames on the corrected
