@@ -143,3 +143,9 @@ test('the ownership oracle inspects emitted startup files and ignores lazy or re
   ])
   expect(settingsDocumentationInStartup(chunks, [{ fileName: 'initial.js' }])).toEqual([])
 })
+
+test('the ownership oracle rejects emitted presentation metadata in startup', () => {
+  const id = '/checkout/packages/contracts/src/settings/presentation.ts'
+  const chunks = [{ fileName: 'phone.js', modules: [{ id, renderedLength: 20 }] }]
+  expect(settingsDocumentationInStartup(chunks, [{ fileName: 'phone.js' }])).toEqual([id])
+})

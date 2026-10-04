@@ -43,3 +43,19 @@ test('quiet concurrency presents its accepted copy with the advanced machine pol
     default: { allowedClasses: ['light'], measurementCpus: [], concurrentCpus: [] },
   })
 })
+
+test('startup definitions contain no presentation-only registry fields', () => {
+  const fields = [
+    'widget',
+    'category',
+    'visibility',
+    'rowOwner',
+    'requiresRestart',
+    'readOnlyReason',
+    'deprecationReason',
+  ]
+  for (const id of SETTING_IDS) {
+    for (const field of fields)
+      expect(Object.hasOwn(descriptorFor(id), field), `${id}.${field}`).toBe(false)
+  }
+})
