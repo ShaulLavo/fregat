@@ -26,6 +26,12 @@ export interface IncrementalTokenizerSnapshot {
   lines: readonly TokenLineSnapshot[]
 }
 
+export type IncrementalTokenizerRetentionSnapshot = {
+  readonly sourceUnits: number
+  readonly lineCount: number
+  readonly tokenCount: number
+}
+
 export interface LineTokens {
   tokens: readonly ThemedToken[]
   state: unknown
@@ -64,6 +70,7 @@ export interface IncrementalTokenizer {
   getCode(): string
   getSnapshot(): IncrementalTokenizerSnapshot
   getTokens(): readonly (readonly ThemedToken[])[]
+  inspectRetention(): IncrementalTokenizerRetentionSnapshot
   /** Lines of the current text left plain by the tokenization limit. */
   untokenizedLineCount(): number
 }
@@ -398,6 +405,12 @@ export class IncrementalShikiTokenizer implements IncrementalTokenizer {
 
   public getTokens(): readonly (readonly ThemedToken[])[] {
     return this.lines.map((line) => line.tokens.slice())
+  }
+
+  public inspectRetention(): IncrementalTokenizerRetentionSnapshot {
+    let tokenCount = 0
+    for (const line of this.lines) tokenCount += line.tokens.length
+    return { sourceUnits: this.code.length, lineCount: this.lines.length, tokenCount }
   }
 
   private tokenizeLines(lines: readonly SourceLine[], initialState?: unknown): LineState[] {
