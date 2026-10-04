@@ -12,15 +12,12 @@ import {
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 
-import { productionRoot } from '../deploy/config'
 import { createScriptError, scriptErrors, scriptFailureText } from '../structured-errors'
 
 const USAGE =
-  'Usage: bun scripts/heavy/install.ts [--commit <rev>] [--source <checkout>] [--root <dir>]'
-// run.sh and AGENTS.md name `<root>/current/run.js`, so the root is fixed rather than a setting.
-const INSTALL_ROOT = path.join(productionRoot, 'heavy')
+  'Usage: bun scripts/heavy/install.ts --root <dir> [--commit <rev>] [--source <checkout>]'
 const ENTRIES = ['run.ts', 'report.ts', 'status.ts', 'pi/launch.ts']
-const SHELL_SCRIPTS = ['scope.sh', 'nested-scope.sh']
+const SHELL_SCRIPTS = ['scope.sh', 'nested-scope.sh', 'deadline.sh']
 
 try {
   install()
@@ -37,10 +34,17 @@ function install() {
   const { values } = parseArgs({
     options: {
       commit: { type: 'string' },
-      root: { default: INSTALL_ROOT, type: 'string' },
+      root: { type: 'string' },
       source: { default: path.resolve(import.meta.dirname, '../..'), type: 'string' },
     },
   })
+  if (!values.root)
+    throw createScriptError('An installation root is required for the heavy-job wrapper.', {
+      why: 'The wrapper uses its own installation directory selected by --root.',
+      fix: 'Run bun scripts/heavy/install.ts --root=<directory> with the wrapper directory used by your sessions.',
+      internal: { rootSpecified: false },
+    })
+  const root = path.resolve(values.root)
   const source = path.resolve(values.source)
   const changes = git(source, ['status', '--porcelain']).split('\n').filter(Boolean).length
   if (changes > 0) throw scriptErrors.HEAVY_INSTALL_DIRTY({ changes, source })
@@ -51,7 +55,6 @@ function install() {
     : head
   if (wanted !== head) throw scriptErrors.HEAVY_INSTALL_COMMIT({ head, wanted })
 
-  const root = path.resolve(values.root)
   const target = path.join(root, head)
   const built = !existsSync(target)
   if (built) build(source, root, head)

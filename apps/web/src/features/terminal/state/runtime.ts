@@ -1,6 +1,14 @@
 import { GhosttyRuntime } from 'ghostty-webgpu'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { terminalQueryKeys } from '@/features/terminal/utils/query-keys'
+import { startPageSubscription } from '@/lib/state/page-subscription'
+
+// Mounts share startup, so cancellation belongs to the page's lifetime.
+if (typeof window !== 'undefined') {
+  startPageSubscription(() => () => {
+    void resourceQueryClient.cancelQueries({ queryKey: terminalQueryKeys.runtime, exact: true })
+  })
+}
 
 export function initializeGhostty() {
   return resourceQueryClient.query({

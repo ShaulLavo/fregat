@@ -1,6 +1,9 @@
 import type { SelectionCoordinates, SelectionPoint } from '../core/selection.js'
+import type { Extension, ExtensionHandle } from '../extensions/types.js'
 import type {
   ReadLinesOptions,
+  TerminalGeometry,
+  TerminalTextMeasurement,
   TerminalLine,
   TerminalSelectionFormatOptions,
 } from '../core/types.js'
@@ -47,6 +50,7 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   readonly textarea: HTMLTextAreaElement | undefined
 
   open(parent: HTMLElement): Promise<void>
+  use<Api = void>(extension: Extension<Api>): TerminalResult<Mode, ExtensionHandle<Api>>
   on<Type extends GhosttyWebGpuTerminalEventType>(
     type: Type,
     listener: GhosttyWebGpuTerminalListener<Type>,
@@ -61,6 +65,10 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   setAccessibilityEnabled(enabled: boolean): boolean
   visibleLines(): readonly string[]
 
+  geometry(): TerminalResult<Mode, TerminalGeometry>
+  measure(text: string): TerminalResult<Mode, number>
+  measureTexts(texts: readonly string[]): TerminalResult<Mode, TerminalTextMeasurement>
+  writeAndReadGeometry(data: TerminalInputData): TerminalResult<Mode, TerminalGeometry>
   frameSnapshot(): TerminalResult<Mode, RendererFrameSnapshot | undefined>
   captureViewport(): TerminalResult<Mode, string | undefined>
   lineCount(): TerminalResult<Mode, number>

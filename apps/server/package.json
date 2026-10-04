@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "private": true,
   "type": "module",
   "exports": {
@@ -40,6 +40,7 @@
     "@modelcontextprotocol/server": "2.1.0",
     "@singapore-editor/lsp": "workspace:*",
     "@tanstack/query-core": "^5.104.0",
+    "@valibot/to-json-schema": "1.8.0",
     "@workspace/contracts": "workspace:*",
     "@workspace/observability": "workspace:*",
     "@workspace/pty": "workspace:*",

@@ -1,3 +1,5 @@
+import { settingsCategoriesQueryOptions } from '@/features/address/utils/settings-categories-query'
+import { settingsCategoryForSlug } from '@/features/address/utils/settings-category'
 import { editorDocumentToken, emptyAddress } from '@workspace/client-core/address/grammar'
 import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/address/workspace'
@@ -23,7 +25,7 @@ import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { confirmedEnvironmentId, confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { errorMessage } from '@/lib/error-message'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import type { ApplicationRuntime } from '@/state/application-runtime'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { intentForAddress } from '@/features/address/utils/intent'
@@ -35,6 +37,7 @@ export type AddressApplyResult =
   | { readonly status: 'unavailable' | 'superseded'; readonly reason: string }
 
 type ApplyOptions = {
+  readonly settingsCategory?: string | null
   readonly application: ApplicationRuntime
   readonly address: AddressIntent
   readonly reason: AddressApplyReason
@@ -62,7 +65,7 @@ export async function applyAddressView(options: ApplyOptions): Promise<AddressAp
       options.isCurrent() && !options.signal?.aborted
         ? {
             status: 'unavailable',
-            reason: errorMessage(error, 'The address could not be restored.'),
+            reason: clientErrorDescription(toClientError(error)),
           }
         : superseded()
   }
@@ -98,6 +101,14 @@ async function applyCurrentView(
   const current = () =>
     options.isCurrent() && !signal.aborted && application.getSnapshot() === owner
   if (!current()) return superseded()
+  const settingsCategory = address.settings
+    ? settingsCategoryForSlug(
+        address.settings,
+        await owner.queryClient.query(settingsCategoriesQueryOptions),
+      )
+    : null
+  if (!current()) return superseded()
+  options = { ...options, settingsCategory }
   if (!address.workspace) return { status: 'applied', reason }
   if (address.workspace === NO_WORKSPACE_TOKEN) return applyFolderless(options, owner, trace)
 
@@ -185,7 +196,11 @@ function landOnStart(
     passthrough: address.passthrough,
     workspace: NO_WORKSPACE_TOKEN,
   })
-  const result = applyFolderless({ ...options, address: start }, owner, trace)
+  const result = applyFolderless(
+    { ...options, address: start, settingsCategory: null },
+    owner,
+    trace,
+  )
   if (result.status !== 'applied') return result
   toast.info('Workspace link not found', {
     description: 'This server has no workspace for that link. Open a folder to continue.',
@@ -272,6 +287,7 @@ function applyOwnedView(
       complete: options.address.source === 'command',
     })
   applyAddressFields({
+    settingsCategory: options.settingsCategory ?? null,
     address: options.address.address,
     workspaceStore: editor.workspaceStore,
     searchStore: editor.searchBufferStore,

@@ -210,7 +210,7 @@ test('an async checkout opening failure stays visible in the worktree manager', 
         })
         return frame.captureCharFrame()
       })
-      .toContain('file not found')
+      .toContain('The file or folder could not be found.')
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('worktree-actions')
   } finally {
     await frame.cleanup()

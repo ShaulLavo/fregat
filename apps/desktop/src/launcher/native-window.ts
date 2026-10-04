@@ -9,12 +9,10 @@ import { shellBridge, parsePickRequest } from './shell-bridge'
 import { launcherFailureFacts } from './failure'
 import type { StartupBudget } from './startup'
 import { appBundle } from './bundle'
+import { developmentNativeHost } from '../shared/native-path'
 
 export function nativeHostBinary(root: string) {
-  return (
-    appBundle()?.nativeHost ??
-    path.join(root, 'apps', 'desktop', 'native', 'build', 'platform-webview')
-  )
+  return appBundle()?.nativeHost ?? developmentNativeHost(path.join(root, 'apps', 'desktop'))
 }
 export async function launchWebview(options: {
   binary: string

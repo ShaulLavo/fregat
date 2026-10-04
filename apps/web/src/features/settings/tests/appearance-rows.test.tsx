@@ -1,3 +1,4 @@
+import { settingRowIds } from '@workspace/contracts/settings/presentation'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
@@ -258,8 +259,8 @@ test(
 function ResetTwoPartsButton() {
   const { resetSetting } = useSettingsActions()
   const resetBoth = () => {
-    resetSetting(KEY)
-    resetSetting('workbench.surface.blur')
+    resetSetting(KEY, settingRowIds(KEY))
+    resetSetting('workbench.surface.blur', settingRowIds('workbench.surface.blur'))
   }
   return (
     <Button size='sm' onClick={resetBoth}>

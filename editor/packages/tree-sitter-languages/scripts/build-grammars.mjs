@@ -3,13 +3,14 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { tmpdir } from 'node:os'
+import { runTreeSitter } from './tree-sitter-cli.mjs'
 import assert from 'node:assert/strict'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const { sources } = JSON.parse(await readFile(resolve(root, 'languages.json'), 'utf8'))
 const source = sources.astro
-// NOT-PORTABLE: Scratch falls back to /work/tmp when TMPDIR is unset.
-const scratchRoot = process.env.TMPDIR ?? '/work/tmp'
+const scratchRoot = tmpdir()
 await mkdir(scratchRoot, { recursive: true })
 const scratch = await mkdtemp(resolve(scratchRoot, 'native-grammars-'))
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex')
@@ -18,13 +19,15 @@ function run(command, args, options = {}) {
   assert.equal(result.status, 0, `${command} failed`)
 }
 try {
+  const cliVersion = runTreeSitter(['--version'], scratch)
+  assert(/^tree-sitter 0[.]27[.]0(?: |$)/.test(cliVersion), `Unexpected compiler: ${cliVersion}`)
   const archive = await fetch(`${source.repository}/archive/${source.revision}.tar.gz`)
   assert(archive.ok, `Source download: ${archive.status}`)
   const bytes = Buffer.from(await archive.arrayBuffer())
   await writeFile(resolve(scratch, 'source.tar.gz'), bytes)
   run('tar', ['xf', resolve(scratch, 'source.tar.gz'), '--strip-components=1', '-C', scratch])
   const wasm = resolve(scratch, 'tree-sitter-astro.wasm')
-  run(resolve(root, 'node_modules/.bin/tree-sitter'), ['build', '--wasm', scratch, '-o', wasm])
+  runTreeSitter(['build', '--wasm', scratch, '-o', wasm], scratch)
   const parser = await readFile(resolve(scratch, 'src/parser.c'), 'utf8')
   const lock = {
     repository: source.repository,

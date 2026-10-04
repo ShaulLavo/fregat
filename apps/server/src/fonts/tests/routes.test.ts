@@ -3,6 +3,14 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Elysia } from 'elysia'
+import { readFsLogs } from 'evlog/fs'
+import {
+  flushObservability,
+  initializeObservability,
+  resetObservabilityForTests,
+} from '../../observability/runtime'
+import { closeTestApps, createTestApp } from '../../../test/server'
+import { testSettingsOptions } from '../../settings/testing'
 
 import { FontCatalogService } from '../catalog'
 import { fontRoutes } from '../routes'
@@ -12,6 +20,8 @@ const roots: string[] = []
 const NERD_LATEST = 'https://github.com/ryanoasis/nerd-fonts/releases/latest/download'
 
 afterEach(async () => {
+  await closeTestApps()
+  await resetObservabilityForTests()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -142,6 +152,76 @@ describe('fontRoutes', () => {
     expect(await response.text()).toBe('regular-font')
   })
 
+  it.each([
+    {
+      failure: 'upstream denial',
+      archiveResponse: () => new Response('denied', { status: 403 }),
+      diagnostics: { internal: { stage: 'download', upstreamStatus: 403 } },
+    },
+    {
+      failure: 'transport failure',
+      archiveResponse: (): Response => {
+        const cause = Object.assign(new TypeError('DNS lookup failed'), {
+          code: 'ENOTFOUND',
+          token: 'private-test-token',
+        })
+        throw new TypeError('fetch failed', { cause })
+      },
+      diagnostics: {
+        internal: {
+          stage: 'download',
+          cause: {
+            message: 'fetch failed',
+            cause: { message: 'DNS lookup failed', code: 'ENOTFOUND', token: '[redacted]' },
+          },
+        },
+      },
+    },
+  ])(
+    'returns and logs a structured unavailable response for $failure',
+    async ({ archiveResponse, diagnostics }) => {
+      const { fonts, root } = await testApp({ archiveResponse })
+      const logDir = path.join(root, 'logs')
+      initializeObservability({
+        OBSERVABILITY_CONSOLE: 'false',
+        OBSERVABILITY_DIR: logDir,
+        OBSERVABILITY_ENABLED: 'true',
+        OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+        NODE_ENV: 'production',
+      })
+      const app = createTestApp({
+        fonts,
+        workspaceRoot: root,
+        watch: false,
+        auth: { allowedOrigins: ['http://localhost:5493'] },
+        settings: testSettingsOptions(root),
+      })
+      const response = await app.handle(
+        new Request('http://local/fonts/nerd/JetBrainsMono', {
+          headers: { origin: 'http://localhost:5493' },
+        }),
+      )
+      expect(response.status).toBe(503)
+      expect(await response.json()).toEqual({
+        error: {
+          code: 'fonts.UNAVAILABLE',
+          message: 'The font is temporarily unavailable.',
+          why: expect.stringMatching(/\S/),
+          fix: expect.stringMatching(/\S/),
+        },
+      })
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      await flushObservability()
+      const events = []
+      for await (const event of readFsLogs({ dir: logDir })) events.push(event)
+      expect(events.find((event) => event.path === '/fonts/nerd/JetBrainsMono')).toMatchObject({
+        status: 503,
+        error: { code: 'fonts.UNAVAILABLE', ...diagnostics },
+      })
+      expect(JSON.stringify(events)).not.toContain('private-test-token')
+    },
+  )
+
   it('previews any catalog ref', async () => {
     const { app } = await testApp()
 
@@ -172,14 +252,27 @@ describe('fontRoutes', () => {
 
     expect(responses.map((response) => response.status)).toEqual([404, 404, 404, 404, 404])
     expect(await responses[0]?.json()).toEqual({
-      error: { code: 'NOT_FOUND', message: 'font not found' },
+      error: {
+        code: 'NOT_FOUND',
+        message: 'font not found',
+        why: expect.stringMatching(/\S/),
+        fix: expect.stringMatching(/\S/),
+      },
     })
   })
 })
 
 const FC_LIST = 'Berkeley Mono\t80\t0\t100\t/fonts/BerkeleyMono-Regular.otf\n'
 
-async function testApp({ fontsource = true, nerd = true } = {}) {
+async function testApp({
+  fontsource = true,
+  nerd = true,
+  archiveResponse,
+}: {
+  fontsource?: boolean
+  nerd?: boolean
+  archiveResponse?: () => Response
+} = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-font-routes-'))
   roots.push(root)
   const archive = nerdArchive()
@@ -188,7 +281,7 @@ async function testApp({ fontsource = true, nerd = true } = {}) {
       ? {
           'https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest': () =>
             Response.json(nerdRelease(['JetBrainsMono'])),
-          [`${NERD_LATEST}/JetBrainsMono.zip`]: () => new Response(archive),
+          [`${NERD_LATEST}/JetBrainsMono.zip`]: archiveResponse ?? (() => new Response(archive)),
           [`${NERD_LATEST}/MissingFont.zip`]: () => new Response('Not Found', { status: 404 }),
         }
       : {}),
@@ -201,5 +294,5 @@ async function testApp({ fontsource = true, nerd = true } = {}) {
     listInstalled: async () => FC_LIST,
     readInstalled: async () => Buffer.from('installed-font'),
   })
-  return { app: new Elysia().use(fontRoutes(fonts)) }
+  return { app: new Elysia().use(fontRoutes(fonts)), fonts, root }
 }

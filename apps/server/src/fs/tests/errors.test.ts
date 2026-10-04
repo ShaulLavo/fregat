@@ -62,7 +62,7 @@ describe('FsError', () => {
     }
   })
 
-  it('keeps public error payloads stable', () => {
+  it('sends recovery guidance with the public error and keeps diagnostics private', () => {
     const error = new FsError('OPERATION_FAILED', 'failed internally', {
       detail: 'private',
     })
@@ -71,7 +71,39 @@ describe('FsError', () => {
       error: {
         code: 'OPERATION_FAILED',
         message: 'failed internally',
+        why: expect.any(String),
+        fix: expect.any(String),
       },
+    })
+  })
+
+  it.each(['ENOENT', 'EEXIST', 'ENOTDIR', 'EISDIR', 'EACCES', 'EPERM', 'EIO'])(
+    'gives %s a readable message and recovery guidance across the wire',
+    (code) => {
+      const cause = Object.assign(new Error('private diagnostic'), { code })
+      const error = mapNodeError(cause)
+      const payload = errorPayload(error).error
+
+      expect(payload.message).toMatch(/^[A-Z].+[.]$/)
+      expect(payload.why).toBeTruthy()
+      expect(payload.fix).toBeTruthy()
+      expect(JSON.stringify(payload)).not.toContain('private diagnostic')
+    },
+  )
+
+  it('keeps operation-specific guidance over the defaults', () => {
+    const error = new FsError(
+      'INVALID_PATH',
+      'Choose a destination outside the source folder.',
+      undefined,
+      {
+        why: 'The source contains the destination.',
+        fix: 'Choose another destination.',
+      },
+    )
+    expect(errorPayload(error).error).toMatchObject({
+      why: 'The source contains the destination.',
+      fix: 'Choose another destination.',
     })
   })
 })

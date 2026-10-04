@@ -2,12 +2,12 @@
 
 ## Status and authorization
 
-- Status: IMPLEMENTED 2026-09-26 on `w2/fp` (lane FP), all four phases; deploy pending (`bun run deploy --server`: new `/fs/places` and `/fs/head` routes). The owner took every recommendation in D1–D6; part of wave 2.
+- Status: IMPLEMENTED 2026-09-26 on `w2/fp` (lane FP), all four phases; deploy pending (`bun run install-release --server`: new `/fs/places` and `/fs/head` routes). The owner took every recommendation in D1–D6; part of wave 2.
 - Planned at: Platform `531d78a9e`, 2026-09-26. Follows Plan 159 (columns, previews, icons grid), done and deleted in
   `712270d64`; read it with `git show 712270d64^:plans/159-file-picker.md`.
 - Origin: owner review of the Plan 159 picker, 2026-09-26. Every pane needs to resize, the blue file
   and yellow folder icons do not match the app, and the preview cuts its text and does not scroll.
-- Size: M. Four phases, each ships on its own. Web only: `bun run deploy`.
+- Size: M. Four phases, each ships on its own. Web only: `bun run install-release`.
 - Risk: LOW–MED. The picker is how a project is opened on the web; every phase keeps all three views
   working.
 
@@ -122,7 +122,7 @@ file up to a size limit and scrolls both ways; nothing is cut off at its edges.
   beside the tree for the owner.
 - `bun run gates`; `bun run compiler:memos` on each new file; `design:census` must pass with no new
   allow-list entries.
-- `bun run deploy`, then `GET /platform/release`.
+- `bun run install-release`, then `GET /platform/release`.
 
 ## Decisions
 

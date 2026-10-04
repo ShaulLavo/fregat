@@ -44,7 +44,32 @@ Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun r
 
 The family folders are mirrored to their standalone repositories. Make library changes here and follow `editor/AGENTS.md` and `ghostty-webgpu/AGENTS.md` for their package rules.
 
-## the shared dev server
+## CI turnaround
+
+PR library checks follow the changed family and shared build inputs. Root configuration, patches, workflow actions, scripts, and Turbo global dependencies select every family. Changes confined to app or shared app-package sources leave library checks skipped. Main and manual CI runs validate every family.
+
+Standalone families share one runner. Each uses a fresh `git archive` export and independent install outside the checkout. Editor also installs a second export with hoisted dependencies and checks tree-sitter runtime identity.
+
+The CI verdict summary separates each completed job's queue and execution seconds. It also reports run creation to verdict runner start, including the initial Changes queue. On reruns, that total starts at the original run creation. The diagnostic step can fail without changing the verdict.
+
+To compare two and four web shards at the same branch head, dispatch `ci.yml` with `web_shards=4`, wait for completion, then dispatch with `web_shards=2`. Keep the branch head fixed and repeat under comparable overlapping PR activity. Compare the final CI completion timestamp against run creation, along with the queue table. PR and main runs keep four shards until the measurements support a change.
+
+```bash
+gh workflow run ci.yml --ref <branch> -f web_shards=4
+gh workflow run ci.yml --ref <branch> -f web_shards=2
+```
+
+Each web shard uploads a `web-timings-*` artifact for 14 days. Download reports from several successful runs, then refresh weights using all their paths:
+
+```bash
+bun apps/web/scripts/shard-durations.ts <report-1.json> <report-2.json> <report-3.json>
+```
+
+The updater normalizes checkout paths and records the median duration per file. The current weights cover 777 files from successful CI runs [37149185179](https://github.com/ShaulLavo/fregat/actions/runs/37149185179), [37148852375](https://github.com/ShaulLavo/fregat/actions/runs/37148852375), and [37148631038](https://github.com/ShaulLavo/fregat/actions/runs/37148631038). Each file has three samples, extracted from Vitest's per-file log durations.
+
+Editor retains `--concurrency=1` and the existing Core and Stress cache settings. In run 37149185179, Core reported 117.81 seconds, Textbuffer 54.30 seconds, and Stress 36.00 seconds. A parallelism experiment must bound Vitest workers and keep browser-sensitive tasks serialized, then compare execution and reliability at the same commit.
+
+## optional Mesh dev server
 
 on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh route named `:5173`. mesh holds 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds vite and the api on `127.0.0.1`. the first connection starts it and holds requests until both ports answer; an open tab counts as use, and once nothing has been connected for `developer.devServerIdleMinutes` (15 by default) mesh stops it. rerun `dev:serve` after changing that setting
 
@@ -52,14 +77,55 @@ on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh rou
 
 ## desktop app
 
-The launcher selects an installed Chromium app (Chrome first under automatic selection) or Fregat's native system-webview window. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
+The launcher automatically selects Fregat’s native WebKit window on macOS and prefers an installed Chrome app on Linux. An explicit browser executable selects the installed Chromium path. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
 
 `bun run app:mac` builds a self-contained `Fregat.app` on macOS. Production clients share one machine server per state home. Installation reuses a matching service or registers the OS-activated service; closing or uninstalling the browser app keeps that service, mesh routes and terminals. [Plan 114](../plans/114-installed-app.md) records the approved installation, picker and native-window contracts.
 
-## shipping it
+## portable release build
 
-`bun run deploy` builds the web app, verifies the candidate, swaps a symlink and runs a headless check against the live url. nothing restarts, so open terminals and agent sessions survive it. server changes need `bun run deploy --server`, which stages the release; the app shows "Update available" and the server restarts when someone clicks Restart. `bun run deploy --server --restart` sends that request itself: it waits for running sessions to finish (`developer.deployRestartWaitMinutes`, 30 by default), then restarts and waits for the live check. `--interrupt` ends busy turns and restarts at once, which a deploy run from inside a Platform chat needs because its own turn counts as busy. a restart ends every live session, so do not reach for `--server` on web-only work
+`bun run build-release --output=<new-directory>` builds a self-contained release for the current OS and architecture. Omit `--output` for a unique directory under the OS temporary directory. It uses the documented Bun/build prerequisites, compiles workspaces, web and server, installs the pinned runtime dependency closure, includes `bin/bun`, and verifies the artifacts. Its `web/`, `server/`, relative runtime dependency links and bundled Bun move together. Building never reads machine installation settings, contacts Mesh, changes a service or writes application state.
 
-`bun run deploy --rollback` moves back one release. `GET /platform/release` answers whether a change actually landed, reporting the served release, its commit, and the dirty-file count it was built from
+`--base=/` is the default application route. Pass a route such as `--base=/fregat/` when building for an installation at that route. The web build records this base; installing it requires the same configured route. `--reason=<text>` records the purpose in `build-config.json`. Use a new output directory; the command preserves existing directories and removes only its own incomplete output on failure. Git, a shell and optional provider tools remain host prerequisites when using those features. The bundled runtime is platform-specific.
 
-the route still says `platform`. renaming it costs a restart, and a restart costs every open session, so it waits for a moment when that is free
+```bash
+bun install --frozen-lockfile
+bun run build-release --output=./fregat-release --base=/fregat/
+```
+
+Package publishing is separate: `bun run release` is the Package releases workflow's Changesets publishing step.
+
+## optional local release installation
+
+`bun run install-release` is an optional Linux integration with Mesh and user systemd. It builds first by default; `--from=<release-directory>` installs a previously built release. Installation additionally needs `mesh`, `systemctl`, `df`, Node and Playwright Chromium. This integration owns `platform-prod.service` on loopback port 3301. Run it on the machine serving the configured target.
+
+Configure `developer.deployTarget` in that machine's production settings (`~/.platform/settings.json`). Add the key to the existing JSON object, preserving other settings. The default is `null`; install-release, restart, rollback and pair refuse before effects with guidance for setting the target.
+
+```json
+{
+  "developer.deployTarget": {
+    "productionRoot": "/srv/fregat-production",
+    "meshHost": "my-machine",
+    "meshOrigin": "https://my-machine.example",
+    "meshRoute": "/fregat"
+  }
+}
+```
+
+Choose a dedicated, mounted production directory with at least 2 GiB free and an absolute Unix path with fully resolved segments and systemd-safe characters. Whitespace, quotes, backslashes and systemd `$`/`%` substitutions are rejected. Prepare it with your user's ownership. Use a canonical HTTP or HTTPS origin and `/` or slash-separated alphanumeric, underscore and hyphen route segments. A trailing slash is accepted. Register the matching proxy once with `mesh serve <meshHost> 3301 --at <meshRoute> --isolate`. Installation verifies the route and renders the service's root and allowed origin from the configured target.
+
+```bash
+# First installation: use the built server and stage it for startup/restart.
+bun run install-release --from=./fregat-release --server --restart
+# Build and install web changes, reusing the current server.
+bun run install-release
+# Build a server update, then request the existing Restart workflow.
+bun run install-release --server --restart
+```
+
+Web-only installation reuses the running server bundle, verifies the candidate, swaps the current link and checks the live page while open terminals and sessions continue. When a server release is already pending, web changes reuse that pending server and go live with it at Restart. `--from` follows the same policy: add `--server` to install the built server; omit it to reuse the existing server. A first installation needs `--server`.
+
+`--server` alone stages the release and the app shows "Update available". `--restart` sends the Restart button's request, waits for busy sessions up to `developer.deployRestartWaitMinutes` (30 minutes by default), promotes and waits for the live check. Alone it builds nothing and restarts into the already staged release. `--interrupt` ends busy turns and restarts immediately; an installation run inside a Platform chat needs it because its own turn counts as busy. `--rollback` drops pending, moves current back one release and restarts when the server differs. `--skip-live-check` skips immediate and post-restart browser checks.
+
+The installed release records its configured page URL. Immediate, restart and rollback checks and their messages use the checked release's recorded URL for navigation, release polling, health evidence and observation. A standalone check requires `node scripts/deploy/live-check.mjs --target=<deployed-page-url>`. `bun run pair` prints a link for the configured target. The release endpoint under the configured application base reports the served release, commit, dirty-file count, pending update, phase and live-check result.
+
+Adopting this setting for an existing installation requires recording its current root, host, origin and route before the next installation or pairing command. The command preserves the service identity, loopback port and existing release workflow. Portable release building needs none of these installation settings.

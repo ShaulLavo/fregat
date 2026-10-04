@@ -4,14 +4,14 @@ import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { tmpdir } from 'node:os'
+import { runTreeSitter } from './tree-sitter-cli.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const { sources } = JSON.parse(await readFile(resolve(root, 'languages.json'), 'utf8'))
 const source = sources.mdx
-const cli = resolve(root, 'node_modules/.bin/tree-sitter')
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex')
-// NOT-PORTABLE: Scratch falls back to /work/tmp when TMPDIR is unset.
-const scratchRoot = process.env.TMPDIR ?? '/work/tmp'
+const scratchRoot = tmpdir()
 await mkdir(scratchRoot, { recursive: true })
 const scratch = await mkdtemp(resolve(scratchRoot, 'native-mdx-build-'))
 
@@ -47,7 +47,7 @@ function adaptQuery(query) {
 }
 
 try {
-  const cliVersion = run(cli, ['--version'])
+  const cliVersion = runTreeSitter(['--version'], scratch)
   assert(/^tree-sitter 0[.]27[.]0(?: |$)/.test(cliVersion), `Unexpected compiler: ${cliVersion}`)
   const response = await fetch(`${source.repository}/archive/${source.revision}.tar.gz`)
   assert(response.ok, `MDX source download: ${response.status}`)
@@ -57,9 +57,9 @@ try {
   const patch = await readFile(resolve(root, 'patches/mdx-inline.patch'))
   await writeFile(resolve(scratch, 'inline.patch'), patch)
   run('patch', ['-p1', '-i', 'inline.patch'])
-  run(cli, ['generate'])
-  run(cli, ['test'])
-  run(cli, ['build', '--wasm', '.', '-o', 'tree-sitter-mdx.wasm'])
+  runTreeSitter(['generate'], scratch)
+  runTreeSitter(['test'], scratch)
+  runTreeSitter(['build', '--wasm', '.', '-o', 'tree-sitter-mdx.wasm'], scratch)
   const parser = await readFile(resolve(scratch, 'src/parser.c'))
   const upstreamQuery = await readFile(resolve(scratch, 'queries/highlights.scm'), 'utf8')
   const query = adaptQuery(upstreamQuery)

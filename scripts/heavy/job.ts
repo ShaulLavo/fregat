@@ -5,6 +5,10 @@ import path from 'node:path'
 import { scriptErrors } from '../structured-errors'
 import { DEFAULT_LIMITS } from './pi/lane-command'
 
+// Startup measured 8–17 ms; 10 seconds leaves scheduler headroom with a bounded READY wait.
+// The complete lease is startup + runtime + grace + 3 seconds for stop and slice cleanup.
+export const DEADLINE_START_SECONDS = 10
+
 export const SCOPE_SHIM = path.join(import.meta.dirname, 'scope.sh')
 // install.ts bundles pi/launch.ts beside run.js as pi/launch.js.
 export const PI_LAUNCHER = path.join(
@@ -39,10 +43,12 @@ export function localCommand({
   slice,
   graceSeconds,
   runtimeLimitSeconds = null,
+  runtimeDeadline,
 }: Launch & {
   readonly slice: string
   readonly graceSeconds: number
   readonly runtimeLimitSeconds?: number | null
+  readonly runtimeDeadline?: number
 }) {
   return [
     'systemd-run',
@@ -75,6 +81,12 @@ export function localCommand({
     '--slice',
     '--grace',
     String(graceSeconds),
+    ...(runtimeLimitSeconds === null
+      ? []
+      : ['--runtime', String(runtimeLimitSeconds), '--startup', String(DEADLINE_START_SECONDS)]),
+    ...(runtimeDeadline === undefined
+      ? []
+      : ['--deadline', String(Math.floor(runtimeDeadline * 100))]),
     accountingFile,
     ...command,
   ]
@@ -137,8 +149,10 @@ export type JobSpec =
        * launcher may still start the job.
        */
       readonly entryLock: number
-      /** Wall-clock limit systemd enforces on the job's scope; null for none. */
+      /** Finite runtime enforced by systemd on the scope and the whole slice; null for none. */
       readonly runtimeLimitSeconds: number | null
+      /** Absolute boot-time deadline, also checked inside the scope before payload execution. */
+      readonly runtimeDeadline?: number
     })
   | (JobBase & { readonly host: 'pi'; readonly maxWallSec?: number })
 
@@ -149,36 +163,44 @@ export type JobSpec =
  * and, if they are still running after the grace, kills them. `done` settles once they have all
  * exited; the slice and its ceiling are removed however the launch or the job ends.
  */
-export function startJob(job: JobSpec) {
+export function startJob(
+  job: JobSpec,
+  publish = (launch: () => ReturnType<typeof Bun.spawn>) => launch(),
+  onExit = () => {},
+) {
   const unit = `${job.host === 'local' ? job.sliceRoot : 'heavy'}-${job.id}.scope`
   const accountingFile = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `${unit}.accounting`)
   const slice = job.host === 'local' ? jobSlice(job) : null
   const started = performance.now()
   let child: ReturnType<typeof Bun.spawn>
   try {
-    child = Bun.spawn({
-      cmd: launchCommand(job, unit, accountingFile),
-      cwd: job.cwd,
-      env: {
-        ...process.env,
-        ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
-        VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
-      },
-      stdio: [
-        'inherit',
-        'inherit',
-        'inherit',
-        // Server jobs hold no slot locks; the entry lock must still arrive on fd 6.
-        ...(job.host === 'local'
-          ? [
-              job.slotLocks[0] ?? 'ignore',
-              job.slotLocks[1] ?? 'ignore',
-              job.slotLocks[2] ?? 'ignore',
-              job.entryLock,
-            ]
-          : []),
-      ],
-    })
+    // Manager preparation and refused-launch cleanup must stay outside the publication lock.
+    const command = launchCommand(job, unit, accountingFile)
+    child = publish(() =>
+      Bun.spawn({
+        cmd: command,
+        cwd: job.cwd,
+        env: {
+          ...process.env,
+          ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
+          VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
+        },
+        stdio: [
+          'inherit',
+          'inherit',
+          'inherit',
+          // Server jobs hold no slot locks; the entry lock must still arrive on fd 6.
+          ...(job.host === 'local'
+            ? [
+                job.slotLocks[0] ?? 'ignore',
+                job.slotLocks[1] ?? 'ignore',
+                job.slotLocks[2] ?? 'ignore',
+                job.entryLock,
+              ]
+            : []),
+        ],
+      }),
+    )
   } catch (error) {
     if (slice) removeJobSlice(slice)
     throw error
@@ -198,6 +220,7 @@ export function startJob(job: JobSpec) {
 
   const done = child.exited
     .then((): JobOutcome => {
+      onExit()
       const signalCode = child.signalCode
       const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
       const wallMs = Math.round(performance.now() - started)
@@ -229,6 +252,7 @@ function launchCommand(job: JobSpec, unit: string, accountingFile: string) {
     ...launch,
     graceSeconds: job.graceSeconds,
     runtimeLimitSeconds: job.runtimeLimitSeconds,
+    runtimeDeadline: job.runtimeDeadline,
     slice: jobSlice(job),
   })
 }
@@ -246,29 +270,51 @@ export function reapSlice(root: string, slice: string, signal: AbortSignal) {
   )
 }
 
-/** Stops the slice and drops its drop-ins; false when refused or interrupted. */
+/** Stops the slice, its deadline service and drop-ins; false when refused or interrupted. */
 export async function removeSlice(slice: string, signal: AbortSignal) {
+  const watchdog = `${slice.slice(0, -'.slice'.length)}_deadline.service`
+  const absent = await reaperSystemctl(
+    ['show', watchdog, '-p', 'LoadState', '--value'],
+    signal,
+    'not-found',
+  )
+  const watchdogStopped = absent || (await reaperSystemctl(['stop', watchdog], signal))
   const stopped = await reaperSystemctl(['stop', slice], signal)
-  return (await reaperSystemctl(['revert', slice], signal)) && stopped
+  return (await reaperSystemctl(['revert', slice], signal)) && stopped && watchdogStopped
 }
 
 function removeJobSlice(slice: string) {
+  const watchdog = `${slice.slice(0, -'.slice'.length)}_deadline.service`
+  const loaded = systemctl(['show', watchdog, '-p', 'LoadState', '--value'])
+  const watchdogStopped =
+    loaded.stdout.toString().trim() === 'not-found' || systemctl(['stop', watchdog]).exitCode === 0
   const stopped = systemctl(['stop', slice]).exitCode === 0
-  return systemctl(['revert', slice]).exitCode === 0 && stopped
+  return systemctl(['revert', slice]).exitCode === 0 && stopped && watchdogStopped
 }
 
 // Admission retains its mutex until the interrupted manager client has exited.
-async function reaperSystemctl(args: readonly string[], signal: AbortSignal) {
+async function reaperSystemctl(
+  args: readonly string[],
+  signal: AbortSignal,
+  expectedOutput?: string,
+) {
   if (signal.aborted) return false
   const child = Bun.spawn(['systemctl', '--user', ...args], {
     stdin: 'ignore',
     stderr: 'ignore',
-    stdout: 'ignore',
+    stdout: expectedOutput === undefined ? 'ignore' : 'pipe',
   })
+  const output =
+    expectedOutput === undefined ? Promise.resolve('') : new Response(child.stdout).text()
   const cancel = () => child.kill('SIGKILL')
   signal.addEventListener('abort', cancel, { once: true })
   try {
-    return (await child.exited) === 0 && !signal.aborted
+    const [exitCode, text] = await Promise.all([child.exited, output])
+    return (
+      exitCode === 0 &&
+      !signal.aborted &&
+      (expectedOutput === undefined || text.trim() === expectedOutput)
+    )
   } finally {
     signal.removeEventListener('abort', cancel)
   }
@@ -290,7 +336,7 @@ function limitSlice(slice: string, ceilingBytes: number) {
 }
 
 function systemctl(args: readonly string[]) {
-  return Bun.spawnSync(['systemctl', '--user', ...args], { stderr: 'pipe', stdout: 'ignore' })
+  return Bun.spawnSync(['systemctl', '--user', ...args], { stderr: 'pipe', stdout: 'pipe' })
 }
 
 export function readAccounting(file: string): JobAccounting {

@@ -11,7 +11,6 @@ import {
   errorNumberField,
   errorStringField,
   layerAllowsScope,
-  settingRowIds,
   type ModelRef,
   type MachineDefinition,
   type ProviderInstanceConfig,
@@ -173,10 +172,17 @@ export function useSettingsActions(owner?: QueryClient) {
     },
     resetKeybinding: (command: PlatformCommandId) =>
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command }]),
-    resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
+    resetSetting: (
+      key: SettingId,
+      rowKeys: readonly SettingId[],
+      target: SettingsWriteTarget = 'user',
+    ) => {
       const current = projection()
-      if (!current) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      return submit(target, resetSettingOperations(key, current, target, shownMode(current.values)))
+      if (!current) return submit(target, [{ kind: 'reset', keys: rowKeys }])
+      return submit(
+        target,
+        resetSettingOperations(key, current, target, shownMode(current.values), rowKeys),
+      )
     },
     setColorTheme,
     /** The command's complete list; an empty list or `null` unbinds it. */

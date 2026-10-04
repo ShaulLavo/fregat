@@ -1,5 +1,9 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
+import { Terminal as MainTerminal } from '../../../dist/index.js'
+import { Terminal as WorkerTerminal } from '../../../dist/worker/index.js'
+import type { TerminalApi } from '../../../dist/dom/terminal-api.js'
+import { WebGlTerminalRenderer } from '../../../dist/render/webgl/renderer.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import { CanvasTerminalRenderer } from '../../render/canvas/renderer.js'
 import type { RendererTextFrameSnapshot } from '../../render/renderer.js'
@@ -8,10 +12,10 @@ import { TerminalSession } from '../../term/session.js'
 import type { TerminalAccessibilityController } from '../accessibility.js'
 import { createTerminalElements } from '../elements.js'
 import type { TerminalSubmittedFrame } from '../submitted-frame.js'
-import { createGhosttyWebGpuTerminalFromSession, type Terminal } from '../terminal.js'
+import { createGhosttyWebGpuTerminalFromSession } from '../terminal.js'
 
 const escape = '\u001b'
-const cleanups: Array<() => void> = []
+const cleanups: Array<() => void | Promise<void>> = []
 let runtime: GhosttyRuntime
 
 class DeferredFrameClock implements RenderSchedulerClock {
@@ -47,8 +51,8 @@ beforeAll(async () => {
   runtime = await GhosttyRuntime.create()
 })
 
-afterEach(() => {
-  for (const cleanup of cleanups.splice(0).reverse()) cleanup()
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
 afterAll(() => {
@@ -105,9 +109,7 @@ async function fixture() {
   return { clock, elements, errors, host, renderer: renderer!, session, snapshots, terminal }
 }
 
-type Harness = Awaited<ReturnType<typeof fixture>>
-
-function controller(terminal: Terminal): TerminalAccessibilityController {
+function controller(terminal: object): TerminalAccessibilityController {
   const value = Reflect.get(terminal, 'accessibility') as
     | TerminalAccessibilityController
     | undefined
@@ -115,14 +117,18 @@ function controller(terminal: Terminal): TerminalAccessibilityController {
   return value!
 }
 
-function submittedSnapshot(terminal: Terminal): RendererTextFrameSnapshot {
+function submittedSnapshot(terminal: object): RendererTextFrameSnapshot {
   const value = Reflect.get(terminal, 'lastFrame') as RendererTextFrameSnapshot | undefined
   expect(value).toBeDefined()
   return value!
 }
 
-function expectDisplayed(harness: Harness, summary: TerminalSubmittedFrame): void {
+function expectDisplayed(
+  harness: { readonly terminal: Pick<TerminalApi, 'textarea'> },
+  summary: TerminalSubmittedFrame,
+): void {
   const accessibility = controller(harness.terminal)
+  const textarea = harness.terminal.textarea!
   const rows = accessibility.rowElements
   expect(accessibility.mirror.getAttribute('role')).toBe('list')
   expect(accessibility.mirror.hasAttribute('aria-hidden')).toBe(false)
@@ -142,7 +148,7 @@ function expectDisplayed(harness: Harness, summary: TerminalSubmittedFrame): voi
   const viewport = summary.cursor.viewport
   if (!viewport || !summary.cursor.visible) {
     expect(accessibility.cursorStatus.textContent).toBe('Cursor location unavailable')
-    expect(harness.elements.textarea.hasAttribute('aria-activedescendant')).toBe(false)
+    expect(textarea.hasAttribute('aria-activedescendant')).toBe(false)
     expect(rows.every((row) => !row.hasAttribute('aria-current'))).toBe(true)
     return
   }
@@ -151,13 +157,13 @@ function expectDisplayed(harness: Harness, summary: TerminalSubmittedFrame): voi
   expect(accessibility.cursorStatus.textContent).toBe(
     `Cursor at row ${summary.scrollbar.offset + viewport.y + 1}, column ${column + 1}`,
   )
-  expect(harness.elements.textarea.getAttribute('aria-activedescendant')).toBe(row.id)
+  expect(textarea.getAttribute('aria-activedescendant')).toBe(row.id)
   expect(row.getAttribute('aria-current')).toBe('true')
   expect(rows.filter((row) => row.hasAttribute('aria-current'))).toHaveLength(1)
-  expect(Number.parseFloat(harness.elements.textarea.style.left)).toBeCloseTo(
+  expect(Number.parseFloat(textarea.style.left)).toBeCloseTo(
     summary.padding.left + column * summary.grid.cellWidth,
   )
-  expect(Number.parseFloat(harness.elements.textarea.style.top)).toBeCloseTo(
+  expect(Number.parseFloat(textarea.style.top)).toBeCloseTo(
     summary.padding.top + viewport.y * summary.grid.cellHeight,
   )
 }
@@ -338,3 +344,226 @@ describe('accessibility from real submitted native frames', () => {
     expect(harness.errors).toEqual([])
   })
 })
+
+const packagedFamily = 'SubmittedAccessibilityTest'
+const packagedFontUrl = new URL(
+  '../../../site/public/fonts/jetbrains-mono-latin-400-normal.woff2',
+  import.meta.url,
+).href
+const packagedAssets = {
+  wasm: new URL('../../../ghostty-vt.wasm', import.meta.url).href,
+  bridge: new URL('../../../bridge.wasm', import.meta.url).href,
+}
+
+async function packagedFixture(mode: 'main' | 'webgl' | 'webgpu') {
+  const host = document.createElement('div')
+  host.style.cssText = 'width:400px;height:120px;position:relative'
+  document.body.append(host)
+  cleanups.push(() => host.remove())
+  const options = {
+    accessibility: { label: 'Packaged accessible input' },
+    appearance: { cursor: { blink: false }, font: { family: packagedFamily, size: 16 } },
+    padding: { bottom: 4, left: 5, right: 6, top: 3 },
+  }
+  let terminal: TerminalApi
+  if (mode === 'main') {
+    const face = await new FontFace(
+      packagedFamily,
+      `url(${JSON.stringify(packagedFontUrl)})`,
+    ).load()
+    document.fonts.add(face)
+    cleanups.push(() => {
+      document.fonts.delete(face)
+    })
+    terminal = await MainTerminal.create({
+      ...options,
+      runtime: { kind: 'owned', options: packagedAssets },
+      rendererFactory: (rendererOptions) => WebGlTerminalRenderer.create(rendererOptions),
+    })
+  } else {
+    terminal = await WorkerTerminal.create({
+      ...options,
+      backend: mode,
+      fonts: [{ family: packagedFamily, source: { url: packagedFontUrl } }],
+    })
+  }
+  cleanups.push(() => terminal.dispose())
+  const errors: unknown[] = []
+  terminal.on('error', (error) => errors.push(error))
+  await terminal.open(host)
+  await expect.poll(() => terminal.submittedFrame, { timeout: 5_000 }).toBeDefined()
+  expectDisplayed({ terminal }, terminal.submittedFrame!)
+  return { terminal, host, errors }
+}
+
+describe.each(['main', 'webgl', 'webgpu'] as const)(
+  '%s packaged submitted accessibility',
+  (mode) => {
+    it('pairs accessible rows, scroll positions and the caret with submitted font and grid changes', async () => {
+      const harness = await packagedFixture(mode)
+      const { terminal } = harness
+      const rowCount = terminal.submittedFrame!.grid.rows + 3
+      const lines = Array.from({ length: rowCount }, (_, row) => `line ${row + 1}`)
+      const output = terminal.write(lines.join('\r\n'))
+      expect(output instanceof Promise).toBe(mode !== 'main')
+      await output
+      await expect
+        .poll(() => terminal.submittedFrame?.scrollbar.offset, { timeout: 5_000 })
+        .toBeGreaterThan(0)
+      const bottom = terminal.submittedFrame!
+      expectDisplayed(harness, bottom)
+      const live = controller(terminal).liveRegion
+      const announcements = live.textContent
+      const top = terminal.scrollToTop()
+      expect(top instanceof Promise).toBe(mode !== 'main')
+      await top
+      await expect.poll(() => terminal.submittedFrame?.scrollbar.offset, { timeout: 5_000 }).toBe(0)
+      expect(terminal.submittedFrame!.rows[0]?.text.trimEnd()).toBe('line 1')
+      expectDisplayed(harness, terminal.submittedFrame!)
+      expect(live.textContent).toBe(announcements)
+      const history = terminal.readLines(0, 1)
+      expect(history instanceof Promise).toBe(mode !== 'main')
+      expect((await history)[0]?.text.trimEnd()).toBe('line 1')
+      await terminal.scrollToBottom()
+      await expect
+        .poll(() => terminal.submittedFrame?.scrollbar.offset, { timeout: 5_000 })
+        .toBe(bottom.scrollbar.offset)
+      const previousLayout = terminal.submittedFrame!
+      await terminal.setFont({ size: 20 })
+      await expect
+        .poll(() => terminal.submittedFrame?.font.settings.size, { timeout: 5_000 })
+        .toBe(20)
+      const nextLayout = terminal.submittedFrame!
+      expect(nextLayout.layout).toBeGreaterThan(previousLayout.layout)
+      expect(nextLayout.grid.rows).toBeLessThan(previousLayout.grid.rows)
+      expect(nextLayout.padding).toEqual({ bottom: 4, left: 5, right: 6, top: 3 })
+      expect(previousLayout.font.settings.size).toBe(16)
+      expectDisplayed(harness, nextLayout)
+      expect(live.textContent).toBe(announcements)
+      await terminal.write('\r\nAB界Z\x1b[4G')
+      await expect
+        .poll(() => terminal.submittedFrame?.cursor.viewport, { timeout: 5_000 })
+        .toMatchObject({ x: 3, wideTail: true })
+      expectDisplayed(harness, terminal.submittedFrame!)
+      await terminal.write('\x1b[?25l')
+      await expect
+        .poll(() => terminal.submittedFrame?.cursor.visible, { timeout: 5_000 })
+        .toBe(false)
+      expectDisplayed(harness, terminal.submittedFrame!)
+      await terminal.write('\x1b[?25h')
+      await expect
+        .poll(() => terminal.submittedFrame?.cursor.visible, { timeout: 5_000 })
+        .toBe(true)
+      expectDisplayed(harness, terminal.submittedFrame!)
+      expect(harness.errors).toEqual([])
+      await page.screenshot({
+        element: terminal.element!,
+        path: `../../../.artifacts/submitted-accessibility-packaged-${mode}.png`,
+        scale: 'css',
+      })
+    }, 20_000)
+
+    it('hydrates synchronous controls without native queries and announces output after observer toggle reentry', async () => {
+      const harness = await packagedFixture(mode)
+      const { terminal } = harness
+      await terminal.write('owned rows')
+      await expect
+        .poll(() => terminal.visibleLines()[0]?.trimEnd(), { timeout: 5_000 })
+        .toBe('owned rows')
+      const old = controller(terminal)
+      const snapshot = submittedSnapshot(terminal)
+      const summary = terminal.submittedFrame!
+      const execution = Reflect.get(terminal, 'execution') as {
+        request: (...args: unknown[]) => Promise<unknown>
+      }
+      const requests = mode === 'main' ? undefined : vi.spyOn(execution, 'request')
+      if (requests) cleanups.push(() => requests.mockRestore())
+      const originalAttributes = terminal.textarea!.outerHTML
+      expect(terminal.setAccessibilityEnabled(false)).toBe(true)
+      expect(terminal.setAccessibilityEnabled(false)).toBe(false)
+      expect(old.mirror.isConnected).toBe(false)
+      expect(terminal.textarea!.hasAttribute('aria-activedescendant')).toBe(false)
+      expect(terminal.setAccessibilityEnabled(true)).toBe(true)
+      expect(terminal.setAccessibilityEnabled(true)).toBe(false)
+      expectDisplayed(harness, summary)
+      expect(terminal.textarea!.getAttribute('aria-label')).toBe('Packaged accessible input')
+      expect(terminal.visibleLines()).toEqual(summary.rows.map((row) => row.text))
+      expect(requests?.mock.calls ?? []).toHaveLength(0)
+      const replacement = controller(terminal)
+      expect(replacement).not.toBe(old)
+      expect(replacement.liveRegion.textContent).toBe('')
+      const replacementAttributes = terminal.textarea!.outerHTML
+      expect(replacementAttributes).not.toBe(originalAttributes)
+      old.notifyOutput()
+      expect(old.update(snapshot, summary.scrollbar)).toEqual({
+        announced: false,
+        full: false,
+        updatedRows: 0,
+      })
+      expect(terminal.textarea!.outerHTML).toBe(replacementAttributes)
+      let toggled = false
+      terminal.on('title', (title) => {
+        if (title !== 'toggle accessibility') return
+        const count = requests?.mock.calls.length
+        expect(terminal.setAccessibilityEnabled(false)).toBe(true)
+        expect(terminal.setAccessibilityEnabled(true)).toBe(true)
+        expectDisplayed(harness, terminal.submittedFrame!)
+        expect(requests?.mock.calls.length).toBe(count)
+        toggled = true
+      })
+      const output = terminal.write('!\x1b]0;toggle accessibility\x07')
+      expect(output instanceof Promise).toBe(mode !== 'main')
+      await output
+      expect(toggled).toBe(true)
+      await expect
+        .poll(() => terminal.visibleLines()[0]?.trimEnd(), { timeout: 5_000 })
+        .toBe('owned rows!')
+      expectDisplayed(harness, terminal.submittedFrame!)
+      expect(controller(terminal).liveRegion.textContent).toBe('!')
+      expect(harness.errors).toEqual([])
+    }, 20_000)
+
+    it('rejects late accessibility work after disposal reentry from a real submitted frame observer', async () => {
+      const harness = await packagedFixture(mode)
+      const { terminal, host } = harness
+      const old = controller(terminal)
+      const snapshot = submittedSnapshot(terminal)
+      const summary = terminal.submittedFrame!
+      const textarea = terminal.textarea!
+      let armed = false
+      let disposal: ReturnType<TerminalApi['dispose']> | undefined
+      terminal.on('title', (title) => {
+        armed = title === 'dispose accessible frame'
+      })
+      terminal.onFrame(() => {
+        if (!armed) return
+        armed = false
+        disposal = terminal.dispose()
+      })
+      const output = Promise.resolve(
+        terminal.write('late\x1b]0;dispose accessible frame\x07'),
+      ).then(
+        () => undefined,
+        (cause: unknown) => cause,
+      )
+      await expect.poll(() => terminal.lifecycle, { timeout: 5_000 }).toBe('disposed')
+      await disposal
+      const failure = await output
+      if (failure !== undefined) expect(failure).toMatchObject({ code: 'disposed' })
+      expect(terminal.element).toBeUndefined()
+      expect(host.children).toHaveLength(0)
+      expect(old.mirror.isConnected).toBe(false)
+      const attributes = textarea.outerHTML
+      old.notifyOutput()
+      expect(old.update(snapshot, summary.scrollbar)).toEqual({
+        announced: false,
+        full: false,
+        updatedRows: 0,
+      })
+      expect(textarea.outerHTML).toBe(attributes)
+      expect(textarea.hasAttribute('aria-activedescendant')).toBe(false)
+      expect(() => terminal.setAccessibilityEnabled(true)).toThrow('disposed')
+      expect(harness.errors).toEqual([])
+    }, 20_000)
+  },
+)

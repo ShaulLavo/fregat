@@ -126,6 +126,46 @@ describe('local terminal execution owner', () => {
     expect(resized.font).toBe(font)
   })
 
+  it('keeps live native measurements and atomic prompt geometry with the submitted owner', async () => {
+    const session = await TerminalSession.create<Event>({
+      appearance: { grid: { columns: 6, rows: 3, cellWidth: 10, cellHeight: 20 } },
+    })
+    const execution = new LocalTerminalExecution(session)
+    cleanups.push(() => execution.dispose())
+    const font = calculateTerminalFittedFont(
+      session.appearance.font,
+      { advanceWidth: 10, fontAscent: 16, fontDescent: 4 },
+      1,
+    )
+    execution.commitLayout(font, { bottom: 0, left: 0, right: 0, top: 0 })
+    session.renderState.update()
+    execution.submit({ cursor: session.renderState.readCursor(), rows: [] })
+    const displayed = execution.submittedFrame
+
+    execution.write('\x1b[?2027h')
+    const texts: readonly string[] = ['👩‍💻中é✈️', '']
+    const measured = execution.measureTexts(texts)
+    expect(measured.texts.map((text) => text.cells)).toEqual([7, 0])
+    expect(execution.measure(texts[0]!)).toBe(7)
+    expect(measured.geometry).toEqual(session.geometry())
+    expect(execution.geometry()).toEqual(session.geometry())
+
+    execution.on('title', () => execution.write('later'))
+    const origin = execution.writeAndReadGeometry('\x1b[32m中> \x1b[0m\x1b]0;prompt\x07')
+    expect(origin.cursor).toMatchObject({ x: 4, y: 0, pendingWrap: false })
+    expect(origin.revision).toBeLessThan(execution.revision)
+    expect(execution.geometry()).toEqual(session.geometry())
+    expect(execution.geometry().cursor).not.toEqual(origin.cursor)
+    expect(execution.submittedFrame).toBe(displayed)
+    expect(execution.captureViewport(60, 60)).toBeUndefined()
+
+    execution.dispose()
+    expect(() => execution.geometry()).toThrow('disposed')
+    expect(() => execution.measure('late')).toThrow('disposed')
+    expect(() => execution.measureTexts(texts)).toThrow('disposed')
+    expect(() => execution.writeAndReadGeometry('late')).toThrow('disposed')
+  })
+
   it('invalidates native actions synchronously and disposes idempotently', async () => {
     const execution = await LocalTerminalExecution.create({})
     execution.dispose()

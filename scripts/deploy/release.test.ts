@@ -6,13 +6,19 @@ import {
   readFileSync,
   rmSync,
   symlinkSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
-import { webBase } from './config'
-import { porcelainPaths, readCheckout, verifyCandidateFiles, type Release } from './release'
+import {
+  bootCandidate,
+  porcelainPaths,
+  readCheckout,
+  verifyCandidateFiles,
+  type Release,
+} from './release'
 
 test('the first dirty path keeps its first letter', () => {
   expect(porcelainPaths(' M apps/server/src/index.ts\0?? plans/new.md\0')).toEqual([
@@ -84,45 +90,148 @@ test.each([
   }
 })
 
-test.each(['pty-host.js', 'image-worker.ts', 'THIRD_PARTY_NOTICES.txt'])(
-  'a candidate without %s fails verification',
-  async (missing) => {
-    const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-candidate-'))
+test.each(
+  ['pty-host.js', 'image-worker.ts', 'THIRD_PARTY_NOTICES.txt'].flatMap((missing) =>
+    ['/', '/demo/', '/platform-api/'].map((base) => ({ missing, base })),
+  ),
+)('a candidate with base $base without $missing fails verification', async ({ missing, base }) => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-candidate-'))
+  try {
+    const web = path.join(directory, 'web')
+    const server = path.join(directory, 'server')
+    mkdirSync(path.join(web, 'assets'), { recursive: true })
+    mkdirSync(path.join(server, 'runtime'), { recursive: true })
+    writeFileSync(path.join(web, 'index.html'), `<script src="${base}assets/main.js"></script>`)
+    writeFileSync(path.join(web, 'assets/editor.wasm'), '')
+    for (const file of [
+      'index.js',
+      'remote-support.js',
+      'watch-worker.ts',
+      'runtime/package.json',
+      'runtime/bun.lock',
+      'pty-host.js',
+      'image-worker.ts',
+      'THIRD_PARTY_NOTICES.txt',
+    ].filter((file) => file !== missing))
+      writeFileSync(path.join(server, file), '')
+    const release: Release = { name: 'candidate', directory, web, server, previous: null }
+
+    await expect(verifyCandidateFiles(release, base)).rejects.toThrow(
+      `server/${missing} is missing; install with --server to rebuild the server`,
+    )
+    writeFileSync(path.join(server, missing), '')
+    await expect(verifyCandidateFiles(release, base)).resolves.toBeUndefined()
+  } finally {
+    rmSync(directory, { force: true, recursive: true })
+  }
+})
+
+test.each(['/', '/demo/', '/platform-api/'])(
+  'candidate boot reads the entry asset for base %s',
+  async (base) => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-boot-'))
     try {
       const web = path.join(directory, 'web')
       const server = path.join(directory, 'server')
-      mkdirSync(path.join(web, 'assets'), { recursive: true })
-      mkdirSync(path.join(server, 'runtime'), { recursive: true })
+      mkdirSync(web)
+      mkdirSync(server)
+      writeFileSync(path.join(web, 'index.html'), `<script src="${base}assets/main.js"></script>`)
+      const release: Release = {
+        name: path.basename(directory),
+        directory,
+        web,
+        server,
+        previous: null,
+      }
       writeFileSync(
-        path.join(web, 'index.html'),
-        `<script src="${webBase}assets/main.js"></script>`,
+        path.join(server, 'index.js'),
+        `
+      import { readFileSync, writeFileSync } from 'node:fs'
+      import path from 'node:path'
+      process.on('SIGTERM', () => {})
+      setTimeout(() => {
+        writeFileSync('watchdog-fired', '')
+        process.exit(0)
+      }, 1500)
+      Bun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch(request) {
+        const pathname = new URL(request.url).pathname
+        if (pathname === '/release') return Response.json({ release: ${JSON.stringify(release.name)}, server: { release: ${JSON.stringify(release.name)} } })
+        if (pathname === '/~probe/workbench') return new Response(readFileSync(path.join(process.env.WEB_ROOT, 'index.html')))
+        if (pathname === '/assets/main.js') return new Response('')
+        return new Response('', { status: 401 })
+      } })
+    `,
       )
-      writeFileSync(path.join(web, 'assets/editor.wasm'), '')
-      for (const file of [
-        'index.js',
-        'remote-support.js',
-        'watch-worker.ts',
-        'runtime/package.json',
-        'runtime/bun.lock',
-        'pty-host.js',
-        'image-worker.ts',
-        'THIRD_PARTY_NOTICES.txt',
-      ].filter((file) => file !== missing))
-        writeFileSync(path.join(server, file), '')
-      const release: Release = { name: 'candidate', directory, web, server, previous: null }
-
-      await expect(verifyCandidateFiles(release)).rejects.toThrow(
-        `server/${missing} is missing; deploy with --server to rebuild the server`,
-      )
-      writeFileSync(path.join(server, missing), '')
-      await expect(verifyCandidateFiles(release)).resolves.toBeUndefined()
+      await expect(bootCandidate(release, base)).resolves.toBeUndefined()
+      expect(existsSync(path.join(directory, 'watchdog-fired'))).toBe(false)
+      expect(
+        JSON.parse(readFileSync(path.join(directory, 'candidate-check.json'), 'utf8')),
+      ).toMatchObject({ ok: true })
     } finally {
-      rmSync(directory, { force: true, recursive: true })
+      rmSync(directory, { recursive: true, force: true })
     }
   },
 )
 
 const checkout = path.resolve(import.meta.dirname, '../..')
+
+test.each([
+  ['release', 'Candidate release:'],
+  ['document', 'Candidate document status:'],
+  ['asset', 'Candidate asset status:'],
+  ['shutdown', 'Candidate document status:'],
+])(
+  'failed candidate %s validation stops the server before reading stderr',
+  async (failure, message) => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-failed-'))
+    const release: Release = {
+      name: path.basename(directory),
+      directory,
+      web: path.join(directory, 'web'),
+      server: path.join(directory, 'server'),
+      previous: null,
+    }
+    try {
+      mkdirSync(release.web)
+      mkdirSync(release.server)
+      writeFileSync(path.join(release.web, 'index.html'), '<script src="/assets/main.js"></script>')
+      writeFileSync(
+        path.join(release.server, 'index.js'),
+        `
+import { readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+const failure = ${JSON.stringify(failure)}
+writeFileSync('candidate.pid', String(process.pid))
+console.error('candidate diagnostic')
+if (failure === 'shutdown') process.on('SIGTERM', () => console.error('shutdown stalled'))
+setTimeout(() => {
+  writeFileSync('watchdog-fired', '')
+  process.exit(0)
+}, 2000)
+Bun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch(request) {
+  const pathname = new URL(request.url).pathname
+  if (pathname === '/release') return Response.json({ release: failure === 'release' ? 'wrong' : ${JSON.stringify(release.name)}, server: { release: ${JSON.stringify(release.name)} } })
+  if (pathname === '/~probe/workbench') return new Response(readFileSync(path.join(process.env.WEB_ROOT, 'index.html')), { status: ['document', 'shutdown'].includes(failure) ? 404 : 200 })
+  if (pathname === '/assets/main.js') return new Response('', { status: failure === 'asset' ? 404 : 200 })
+  return new Response('', { status: 401 })
+} })
+`,
+      )
+
+      await expect(bootCandidate(release)).rejects.toThrow(message)
+      expect(existsSync(path.join(directory, 'watchdog-fired'))).toBe(false)
+      expect(readFileSync(path.join(directory, 'candidate-server.log'), 'utf8')).toContain(
+        'candidate diagnostic',
+      )
+      const pid = Number(readFileSync(path.join(directory, 'candidate.pid'), 'utf8'))
+      expect(() => process.kill(pid, 0)).toThrow()
+      expect(existsSync(path.join(tmpdir(), `platform-deploy-${release.name}`))).toBe(false)
+      expect(existsSync(path.join(directory, 'candidate-check.json'))).toBe(false)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  },
+)
 
 function copyDeploymentSources(file: string, fixture: string, copied = new Set<string>()) {
   if (copied.has(file)) return
@@ -134,8 +243,10 @@ function copyDeploymentSources(file: string, fixture: string, copied = new Set<s
   const imports = readFileSync(source, 'utf8').matchAll(/from ['"](\.[^'"]+)['"]/g)
   for (const [, specifier] of imports) {
     const target = path.normalize(path.join(path.dirname(file), specifier!))
-    const resolved = [target, `${target}.ts`, `${target}.mjs`].find((candidate) =>
-      existsSync(path.join(checkout, candidate)),
+    const resolved = [`${target}.ts`, `${target}.mjs`, `${target}/index.ts`, target].find(
+      (candidate) =>
+        existsSync(path.join(checkout, candidate)) &&
+        statSync(path.join(checkout, candidate)).isFile(),
     )
     expect(resolved, `local deployment import ${target}`).toBeDefined()
     copyDeploymentSources(resolved!, fixture, copied)

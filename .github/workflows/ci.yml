@@ -6,6 +6,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      web_shards:
+        description: Web shard count for turnaround measurements.
+        type: choice
+        default: '4'
+        options: ['2', '4']
 
 # Each ref keeps one running and one pending run; newer pushes replace older pending runs.
 # PRs also cancel their running run; main lets its running run finish.
@@ -29,6 +35,11 @@ jobs:
       server: ${{ github.event_name != 'pull_request' || steps.filter.outputs.server == 'true' }}
       tui: ${{ github.event_name != 'pull_request' || steps.filter.outputs.tui == 'true' }}
       site: ${{ github.event_name != 'pull_request' || steps.filter.outputs.site == 'true' }}
+      editor: ${{ github.event_name != 'pull_request' || steps.filter.outputs.editor == 'true' || steps.filter.outputs.library_tools == 'true' }}
+      ghostty: ${{ github.event_name != 'pull_request' || steps.filter.outputs.ghostty == 'true' || steps.filter.outputs.library_tools == 'true' }}
+      hotkeys: ${{ github.event_name != 'pull_request' || steps.filter.outputs.hotkeys == 'true' || steps.filter.outputs.library_tools == 'true' }}
+      web_shards: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.web_shards == '2' && '["1/2","2/2"]' || '["1/4","2/4","3/4","4/4"]' }}
       docs: ${{ steps.filter.outputs.docs == 'true' }}
       docs_files: ${{ steps.filter.outputs.docs_files }}
     steps:
@@ -89,6 +100,24 @@ jobs:
               - 'bun.lock'
               - 'turbo.json'
               - '.github/workflows/site.yml'
+            # Root tooling and Turbo's cross-family global inputs invalidate every family.
+            library_tools:
+              - '*'
+              - '.github/**'
+              - 'scripts/**'
+              - 'patches/**'
+              - '{editor,ghostty-webgpu,hotkeys}/{.oxlintrc.json,.oxfmtrc.json,tsconfig.json}'
+              - 'editor/global.d.ts'
+              - 'editor/scripts/build-package.ts'
+              - 'editor/scripts/workspace-root*'
+              - 'editor/examples/app/tsconfig.json'
+              - '!*.md'
+            editor:
+              - 'editor/**'
+            ghostty:
+              - 'ghostty-webgpu/**'
+            hotkeys:
+              - 'hotkeys/**'
             # Written by `generated:check`'s generators, so a hand edit is a code change.
             generated:
               - 'docs/settings-reference.md'
@@ -232,7 +261,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1/4, 2/4, 3/4, 4/4]
+        shard: ${{ fromJSON(needs.changes.outputs.web_shards) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -241,7 +270,16 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Test
-        run: bun run --cwd apps/web test --shard=${{ matrix.shard }}
+        run: bun run --cwd apps/web test --shard=${{ matrix.shard }} --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/web-tests.json"
+
+      - name: Save web test timings
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-timings-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/web-tests.json
+          if-no-files-found: warn
+          retention-days: 14
 
   # By hash of the path: the recorded split was within 15% (207 s against 182 s of file time).
   test-server:
@@ -367,10 +405,16 @@ jobs:
   libraries:
     name: Libraries
     needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    if: ${{ needs.changes.outputs.editor == 'true' || needs.changes.outputs.ghostty == 'true' || needs.changes.outputs.hotkeys == 'true' }}
     permissions:
       contents: read
     uses: ./.github/workflows/workspace-libraries.yml
+    with:
+      editor: ${{ needs.changes.outputs.editor == 'true' }}
+      ghostty: ${{ needs.changes.outputs.ghostty == 'true' }}
+      standalone_editor: ${{ needs.changes.outputs.editor == 'true' }}
+      standalone_ghostty: ${{ needs.changes.outputs.ghostty == 'true' }}
+      standalone_hotkeys: ${{ needs.changes.outputs.hotkeys == 'true' }}
 
   # The one status to read: red when any job failed or was cancelled; a job skipped because the
   # change cannot affect it counts as passed.
@@ -381,8 +425,30 @@ jobs:
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read
     steps:
       - name: Verdict
         env:
           FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: test "$FAILED" = false
+      - name: Report queue and execution times
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100" --paginate --slurp > "$RUNNER_TEMP/ci-jobs.json"
+          jq -r '
+            def seconds: fromdateiso8601;
+            "| Job | Queue seconds | Execution seconds |",
+            "| --- | ---: | ---: |",
+            (.[].jobs[] | select(.started_at != null and .completed_at != null and .conclusion != "skipped") |
+              "| \(.name) | \((.started_at | seconds) - (.created_at | seconds)) | \((.completed_at | seconds) - (.started_at | seconds)) |")
+          ' "$RUNNER_TEMP/ci-jobs.json" >> "$GITHUB_STEP_SUMMARY"
+          created=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT" --jq '.created_at')
+          started=$(jq -r '.[].jobs[] | select(.name == "CI") | .started_at' "$RUNNER_TEMP/ci-jobs.json")
+          echo "Run created to verdict runner started: $(( $(date -d "$started" +%s) - $(date -d "$created" +%s) )) seconds" >> "$GITHUB_STEP_SUMMARY"

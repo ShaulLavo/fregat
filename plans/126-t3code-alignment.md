@@ -1,10 +1,13 @@
 # Plan 126: Align Platform behavior with pinned T3 Code
 
-Status: **Approved — wave 2 closeout in progress**. The 2026-10-02 reconciliation below is a
+Status: **Approved; bounded Wave 2 scope and finite closeout complete, alignment follow-ons remain open.** The owner
+requested a [finite pre-keymap pass](126-t3code-alignment/finite-closeout-2026-10-03.md) on
+2026-10-03 to reconcile the ledger, attempt the monitoring/draft report and place follow-ons.
+That record owns the current remaining-work list. The 2026-10-02 reconciliation below is a
 bounded delivery snapshot including root corrective deployment, while residual integration work remains open. It does
 not mark the whole plan, provider batch G or forge batch I complete. See the
 [current source reconciliation](126-t3code-alignment/status-2026-09-28.md) for merged,
-accepted-awaiting-CI/merge, active, parked, owner-only and unproved cases.
+accepted-awaiting-CI/merge, active, parked, owner-only and unproved cases at that dated snapshot.
 
 The historical 2026-09-26 ledger records 34 V, 8 D, 7 P, 3 O and 5 K rows, totaling 57. Those
 counts remain historical row states, not a fresh runtime certification or completion percentage.
@@ -29,7 +32,8 @@ state-loss and live-account gates stay open.
 
 LIFE-01/02 shipped on 2026-09-20. Rewind/native permissions/PR lookup have an initial deployment and follow-up validation in [delivery evidence](126-t3code-alignment/rewind-permissions-delivery.md); bounded delivery and MCP approval implementation are recorded in [their delivery evidence](126-t3code-alignment/live-delivery-approvals-delivery.md). The active-list exceptions and automatic unarchive are removed; archive eligibility is separate from settlement. See [archive delivery evidence](126-t3code-alignment/archive-delivery.md). The source-derived archive fixture is the first focused conformance case, not completion of Wave 0 or proof of full upstream parity.
 
-Priority: finish the remaining wave 2 batches in dependency order. The original P0 archive
+Priority: the finite reconciliation is complete; keymap is next. Draw from the named
+provider/forge/host follow-ons in root ordering. The original P0 archive
 fix is delivered. Provider/host follow-ups retain their own capability and proof boundaries;
 paired upstream runtime comparison is no longer a completion requirement.
 
@@ -37,13 +41,15 @@ A 2026-09-24 upstream delta audit against `9383f4ad` added nine groups (57 in to
 
 The user resumed all parity work on 2026-09-23, including providers, remote access, browser/device tools, mobile, desktop and distribution. The previous stop applied to the 2026-09-20 run only. See [the resumed execution record](126-t3code-alignment/resumed-execution.md) for the first batch and [the historical wrap-up](126-t3code-alignment/wrap-up.md) for completed deliveries and their limits.
 
-## Remaining work by batch (bounded snapshot, 2026-10-02)
+## Delivered batches and follow-ons (bounded snapshot, 2026-10-02)
 
 This table records the published delivery state at the reconciliation snapshot, against Platform
 `42133986`. Accepted heads awaiting CI/merge are not merged implementation. The detailed
 [source reconciliation](126-t3code-alignment/status-2026-09-28.md) records exact heads, proof
 limits and active dependencies. Final reconciliation follows the remaining deliveries; no
-whole-row ledger promotion is made here.
+whole-row ledger promotion is made here. The October 3 finite pass supersedes stale absence
+claims, current queue wording and the old Plan 114 desktop gate in this snapshot. It preserves
+the receipts and their limits. Bounded Wave 2 delivery closed in PR #325.
 
 | Batch                 | Rows                                           | Bounded delivery state                                                                                                                                                                                                                                                                                                                                                                           | Remaining action                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -60,7 +66,8 @@ whole-row ledger promotion is made here.
 
 Follow-up scope remains EXT-07 preview/device/browser automation, the unverified EXT-09
 native/mobile operations, EXT-10 pinned background policy/resource measurement and
-INTERACTION-12 workflow coverage. Plan 114's physical desktop/host gates remain parked; web or
+INTERACTION-12 workflow coverage. Plan 114's gates closed on 2026-10-03 after owner Mac acceptance;
+remaining physical device/OS coverage stays with the applicable host matrix. Web or
 fixture proof cannot stand in for Mac/phone hardware, account authentication or credit spending.
 Deployment is coordinated by the root wave owner, separately from this documentation snapshot.
 
@@ -551,7 +558,7 @@ instructions; do not start a competing server on the shared route. Mesh homepage
 `/work/tmp/fregat-evidence/20260920T105844Z-look-platform-1440x1000/`. That evidence proves only
 homepage availability. At audit time, browser/provider/platform cases had not run. The delivery notes now record completed cases; unverified host/provider paths remain open.
 
-After each implemented, verified unit deploy through `bun run deploy --slug=t3code-<unit>`;
+After each implemented, verified unit deploy through `bun run install-release --slug=t3code-<unit>`;
 server changes require dev verification and `--server --restart` per current repository policy. Record the release response and live
 check evidence. Coordinate shared file work before a restart; no restart for web-only changes.
 Completed implementation deliveries deploy through this procedure.

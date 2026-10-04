@@ -65,6 +65,7 @@ async function mountLine(page: Page, server: IsolatedServer, instance: string, s
 
 const BACKEND_LABELS: Record<string, string> = {
   canvas2d: 'Renderer: Canvas',
+  dom: 'Renderer: DOM',
   webgl2: 'Renderer: WebGL2',
   webgpu: 'Renderer: WebGPU',
 }
@@ -92,6 +93,32 @@ export const terminalRenderer: Scenario = {
   async run(page, { server, step }) {
     await readRendererRow(page, server)
     await step('terminal-menu-renderer')
+  },
+}
+
+export const terminalRendererDom: Scenario = {
+  name: 'terminal-renderer-dom',
+  description:
+    'Remove GPU and canvas contexts before reload, then check the terminal menu, mount log and DOM rows.',
+  requiresIsolatedServer: true,
+  async run(page, { server, step }) {
+    await page.addInitScript(() => {
+      Reflect.deleteProperty(Navigator.prototype, 'gpu')
+      HTMLCanvasElement.prototype.getContext = () => null
+    })
+    const label = await readRendererRow(page, server)
+    strictEqual(label, 'Renderer: DOM')
+    const rows = selectors.terminalDomRows(page)
+    await rows.filter({ hasText: /\S/ }).first().waitFor({ state: 'visible' })
+    const contents = await rows.allTextContents()
+    ok(
+      contents.some((text) => text.trim().length > 0),
+      'The DOM rows contain shell output',
+    )
+    console.log(JSON.stringify({ domRows: contents.length }))
+    await step('terminal-menu-renderer-dom')
+    await page.keyboard.press('Escape')
+    await step('terminal-dom-rows')
   },
 }
 

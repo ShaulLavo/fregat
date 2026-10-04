@@ -260,11 +260,40 @@
     },
     "developer.deployRestartWaitMinutes": {
       "default": 30,
-      "description": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.",
-      "markdownDescription": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.\n\nThirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.",
+      "description": "Minutes to wait for busy sessions. --interrupt ends them and restarts.",
       "maximum": 1440,
       "minimum": 1,
       "type": "integer"
+    },
+    "developer.deployTarget": {
+      "anyOf": [
+        {
+          "properties": {
+            "meshHost": {
+              "pattern": "^[a-zA-Z\\d][\\w.-]*(?![\\s\\S])",
+              "type": "string"
+            },
+            "meshOrigin": {
+              "type": "string"
+            },
+            "meshRoute": {
+              "pattern": "^\\/(?:[\\w-]+\\/)*[\\w-]*(?![\\s\\S])",
+              "type": "string"
+            },
+            "productionRoot": {
+              "pattern": "^(?!\\/+$)(?!.*\\/\\.\\.?(?:\\/|$))\\/[^\\s%\"'$\\\\\\0]{1,4095}(?![\\s\\S])",
+              "type": "string"
+            }
+          },
+          "required": ["meshHost", "meshOrigin", "meshRoute", "productionRoot"],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Install releases and pair through Mesh and systemd."
     },
     "developer.devServerIdleMinutes": {
       "default": 15,
@@ -419,6 +448,41 @@
       "maximum": 7200,
       "minimum": 1,
       "type": "integer"
+    },
+    "developer.heavyJobQuietPolicy": {
+      "default": {
+        "allowedClasses": ["light"],
+        "concurrentCpus": [],
+        "measurementCpus": []
+      },
+      "description": "Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.",
+      "markdownDescription": "Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.\n\nUse an empty allowedClasses array to hold new light jobs during measurements. The measurementCpus and concurrentCpus fields currently accept empty arrays, preserving host scheduling. CPU affinity requires a validated scheduling implementation.",
+      "properties": {
+        "allowedClasses": {
+          "items": {
+            "const": "light"
+          },
+          "type": "array"
+        },
+        "concurrentCpus": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 0,
+          "type": "array"
+        },
+        "measurementCpus": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 0,
+          "type": "array"
+        }
+      },
+      "required": ["allowedClasses", "concurrentCpus", "measurementCpus"],
+      "type": "object"
     },
     "developer.heavyJobStopGraceSeconds": {
       "default": 10,
@@ -1284,6 +1348,13 @@
       },
       "type": "array"
     },
+    "providers.proxyUsageRequestIntervalHours": {
+      "default": 1,
+      "description": "Hours between pooled Codex requests. At most one request per account per hour, including failures and restarts. Fresh quota skips requests; three failures pause until newer passive quota arrives.",
+      "maximum": 24,
+      "minimum": 1,
+      "type": "integer"
+    },
     "providers.proxyUsageUrl": {
       "anyOf": [
         {
@@ -1295,7 +1366,7 @@
         }
       ],
       "default": null,
-      "description": "Local CLIProxyAPI management address whose cached Codex quotas Fregat reads. The management key is kept in the secret store."
+      "description": "Local CLIProxyAPI management address for pooled Codex quotas and capped requests. Its management key is kept in the secret store."
     },
     "providers.transcriptHistoryMaxBytes": {
       "default": 268435456,
@@ -1456,7 +1527,7 @@
     },
     "window.browser": {
       "default": "auto",
-      "description": "The desktop window engine: auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.",
+      "description": "The desktop window engine: auto uses the native WebKit window on macOS. On Linux, auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first.",
       "pattern": "^(?:auto|webview|\\/[^\\0\\r\\n]+)$",
       "type": "string"
     },
@@ -1498,7 +1569,7 @@
       "default": "compositor",
       "description": "Choose window-manager transparency or a see-through native window using the system webview.",
       "enum": ["compositor", "window"],
-      "markdownDescription": "Choose window-manager transparency or a see-through native window using the system webview.\n\nTransparent macOS windows use the native WebKit host. Window-manager mode uses the installed browser app.",
+      "markdownDescription": "Choose window-manager transparency or a see-through native window using the system webview.\n\nTransparent macOS windows enable native Frosted and Glass materials. The native WebKit host is the default macOS window engine. On Linux, window-manager mode uses the installed browser app.",
       "type": "string"
     },
     "workbench.colorTheme": {

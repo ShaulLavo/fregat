@@ -105,7 +105,7 @@ Use npm's `bin`, `optionalDependencies`, and platform metadata for the first des
 
 The launcher only selects the installed release, starts its Bun entry point, and forwards signals and exit status. The server owns browser opening and readiness. Desktop suppresses browser opening, receives a structured readiness message through a dedicated child channel, and opens the returned URL. Readiness must not depend on parsing human logs or guessing a port.
 
-Release files are immutable. Application data stays under the existing Platform home, outside npm caches and desktop installation directories. Keep logs and managed downloads out of the release directory and launch working directory. On this development machine, staging and release caches belong under `/work`, following `AGENTS.md`.
+Release files are immutable. Application data stays under the existing Platform home, outside npm caches and desktop installation directories. Keep logs and managed downloads out of the release directory and launch working directory. Choose staging and release-cache locations through the execution host's storage policy.
 
 Resolve code and public assets relative to the installed release. Carry the user's invocation directory separately as the initial project context. Do not automatically load a cloned project's `.env` or Bun configuration as Platform startup configuration.
 
@@ -136,7 +136,7 @@ The proposed module map is deliberately small:
 | `apps/server/src/web/`                     | Asset serving, caching, and constrained frontend navigation fallback.                      |
 | Existing `apps/server/src/app.ts`          | Domain services, routes, and testable application construction.                            |
 | Existing web client transport              | Same-origin production default and existing remote endpoint behavior.                      |
-| `scripts/release.ts`                       | Assemble and audit target artifacts and generate npm package metadata.                     |
+| `scripts/build-release.ts`                 | Assemble and verify portable web/server runtime artifacts.                                 |
 | Existing Electrobun entry point and config | Include the artifact, launch it, and open its ready URL with native preload.               |
 | Existing installation and machine modules  | Describe and invoke the release for managed remote servers.                                |
 
@@ -170,7 +170,7 @@ This is a signature sketch, not a new shared framework. Keep the Node dispatch s
 4. **Package desktop from the same artifact.** Replace source/Vite spawning only in the packaged path. Verify native file picking, preload delivery, editor/terminal rendering, launch without npm/Bun, and quit cleanup. Produce installation artifacts and validate platform signing requirements for advertised distribution targets.
 5. **Unify remote installation and release automation.** Replace source-only installation descriptors and checkout imports in remote launch scripts, updating all callers together. Keep managed servers headless and loopback-bound. CI builds tested target artifacts, verifies their file inventory and linked-dependency closure, then packs desktop and npm outputs from the same release. Publish only after those artifacts pass.
 
-Run the narrow checks for each failure listed above. No package-wide or repository-wide test suite is required merely for editing this design. Future release checks must exercise the packed artifact in a disposable CI environment. During development, reuse the already running dev server rather than starting a competing one.
+Run the narrow checks for each failure listed above. No package-wide or repository-wide test suite is required merely for editing this design. Future release checks must exercise the packed artifact in a disposable CI environment. During development, reuse a suitable dev server or run an isolated server on an explicit free port.
 
 ## Scope still to settle
 

@@ -26,6 +26,7 @@ export interface TerminalAccessibilityController {
   update(
     snapshot: RendererTextFrameSnapshot,
     scrollbar: Readonly<TerminalScrollbar>,
+    submittedOutput?: boolean,
   ): TerminalAccessibilityUpdate
 }
 
@@ -264,6 +265,7 @@ class OwnedTerminalAccessibility implements TerminalAccessibilityController {
   update(
     snapshot: RendererTextFrameSnapshot,
     scrollbar: Readonly<TerminalScrollbar>,
+    submittedOutput?: boolean,
   ): TerminalAccessibilityUpdate {
     if (this.disposed) return { announced: false, full: false, updatedRows: 0 }
     validateScrollbar(scrollbar)
@@ -281,9 +283,10 @@ class OwnedTerminalAccessibility implements TerminalAccessibilityController {
     this.resizeRows(rows.length)
     const updatedRows = this.updateRows(rows, scrollbar, full)
     this.updateCursor(snapshot, scrollbar, rows)
-    const announced = this.announcePendingOutput(rows, scrollbar)
+    if (submittedOutput === true) this.outputPending = true
+    const announced = submittedOutput !== false && this.announcePendingOutput(rows, scrollbar)
     this.previous = previousFrame(snapshot, rows, scrollbar)
-    this.outputPending = false
+    if (submittedOutput !== false) this.outputPending = false
     return { announced, full, updatedRows }
   }
 

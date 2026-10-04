@@ -4,9 +4,11 @@
 
 - Done 2026-09-25 (completion wave, lane L5): Phases 1–4 implemented. This file was Plan 151 and is
   kept as the design record Plan 152 builds on.
-- Owner check pending: the live update of `shaul-mac` (open Connect machine on the mesh, press
-  Update server on the out-of-date Mac, and confirm it goes live and `GET /release` through its
-  proxy names the primary's release). Agent sandboxes cannot reach the Mac.
+- Live update verification pending: on an authorized remote installation, open Connect machine,
+  press Update server on the out-of-date machine, and confirm it goes live and `GET /release`
+  through its proxy names the primary's release.
+- At the 2026-09-25 planning baseline, the pending check targeted `shaul-mac` from the mesh.
+  Agent sandboxes could not reach that Mac at the time.
 
 ## Shared with lane L4 (Plan 148 staged restarts)
 
@@ -15,7 +17,7 @@
 - `current` and L4's `pending` are symlinks to a release directory. A bundled server's
   `import.meta.dirname` resolves to `<release>/server` whichever link started it, so a staged but
   unpromoted primary ships its own staged release.
-- Every release built by `deploy --server` carries `server/runtime/package.json`, `server/runtime/bun.lock`, and
+- Every release built by `install-release --server` carries `server/runtime/package.json`, `server/runtime/bun.lock`, and
   `server/remote-support.js`; the update refuses a release without them (`SSH_UPDATE_NOT_A_RELEASE`).
 - Locally `server/node_modules` links to the checkout's installed dependencies; the transfer
   excludes it and the remote links `runtime/<manifest-and-lock sha256>/node_modules` in its place.
@@ -28,7 +30,7 @@ copies the release over SSH, installs its handful of platform-specific runtime p
 restarts the remote server and reconnects. The same action installs the server on a machine that
 has none, so the only thing a remote needs is `bun` and SSH.
 
-## What exists today
+## Planning baseline (2026-09-25)
 
 - A server release is already self-contained JavaScript. `apps/server` `build`
   (`apps/server/package.json:22`) is `bun build src/index.ts --target bun` with only `sharp` and
@@ -61,7 +63,7 @@ has none, so the only thing a remote needs is `bun` and SSH.
     (`apps/server/src/machines/launcher.ts:175-244`).
 - Nothing copies anything to a remote. Routes are connect, disconnect, auth and events
   (`apps/server/src/machines/routes.ts`).
-- The Mac today runs a hand-built source rig at `/Users/shaul/projects/platform-verification`
+- At that baseline, the Mac ran a hand-built source rig at `/Users/shaul/projects/platform-verification`
   that is not a git checkout (Plan 150's findings, 2026-09-25): `node_modules` links to a curated
   darwin install, `.verification-editor/` holds copied editor packages, and `.env` points settings,
   secrets and the workspace root at isolated paths. The Mac's global `bun link` registry maps
@@ -259,9 +261,9 @@ and to Plan 152.
   connect reaches `live`; each refusal carries its catalog code.
 - Web: a `dom` test that a protocol-mismatch machine shows "Update server", and the button's
   pending state comes from the mutation cache.
-- Live, by the owner (the agent sandboxes cannot resolve the Mac): on the mesh, open Connect machine →
-  `shaul-mac` shows the mismatch → Update server → the machine goes live. `GET /release` through the
-  machine's proxy names the same release as the primary.
+- Live, on an authorized remote installation: open Connect machine → the machine shows the
+  mismatch → Update server → the machine goes live. `GET /release` through the machine's proxy
+  names the same release as the primary.
 
 ## Out of scope
 
@@ -288,5 +290,6 @@ update finishes, then it is removed. Decisions D1–D4 as recommended (completio
   `channel`, `source: 'dev-build'`, `buildMs` and `bundleBytes`; a failed build is
   `machines.SSH_UPDATE_BUILD` with the build log tail in `internal`.
 
-Owner check pending: from `bun dev`, Update server on `shaul-mac` goes live and its `/release`
-names the `dev-…` build while the mesh's connection keeps its production release.
+Live development-channel verification pending: from a development primary, Update server on an
+authorized remote goes live and its `/release` names the `dev-…` build while the production
+primary's connection keeps its production release.

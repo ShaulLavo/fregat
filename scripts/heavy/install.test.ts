@@ -50,6 +50,71 @@ function repoWithCommits(count: number) {
   return repo
 }
 
+test.each([null, 'invalid', 'configured'])(
+  'requires its own root before reading source with deploy target %s',
+  (target) => {
+    const scratch = temp('heavy-install-target-')
+    const home = path.join(scratch, 'home')
+    mkdirSync(path.join(home, '.platform'), { recursive: true })
+    writeFileSync(
+      path.join(home, '.platform/settings.json'),
+      JSON.stringify({
+        'developer.deployTarget':
+          target === 'configured'
+            ? {
+                productionRoot: path.join(scratch, 'application'),
+                meshHost: 'fixture',
+                meshOrigin: 'https://fixture.example',
+                meshRoute: '/',
+              }
+            : target,
+      }),
+    )
+    const result = spawnSync('bun', [INSTALL, '--source', path.join(scratch, 'absent')], {
+      cwd: CHECKOUT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(scratch, 'cache'),
+      },
+    })
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('An installation root is required for the heavy-job wrapper.')
+    expect(result.stderr).toContain('--root=<directory>')
+    expect(result.stderr).not.toContain('git status')
+    expect(readdirSync(home)).toEqual(['.platform'])
+    expect(readdirSync(path.join(home, '.platform'))).toEqual(['settings.json'])
+    expect(readdirSync(scratch).toSorted()).toEqual(['cache', 'home'])
+  },
+)
+
+test('an explicit wrapper root works with a null application deploy target', () => {
+  const repo = repoWithCommits(1)
+  const scratch = temp('heavy-install-explicit-')
+  const home = path.join(scratch, 'home')
+  mkdirSync(path.join(home, '.platform'), { recursive: true })
+  writeFileSync(path.join(home, '.platform/settings.json'), '{"developer.deployTarget":null}')
+  const head = run('git', ['rev-parse', 'HEAD'], repo).stdout.trim()
+  const root = path.join(scratch, 'wrapper')
+  mkdirSync(path.join(root, head), { recursive: true })
+  writeFileSync(path.join(root, head, 'commit'), head)
+  const result = spawnSync('bun', [INSTALL, '--source', repo, '--root', root], {
+    cwd: CHECKOUT,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: home,
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(scratch, 'cache'),
+    },
+  })
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.stdout).toContain('Already installed')
+  expect(readlinkSync(path.join(root, 'current'))).toBe(head)
+  expect(readFileSync(path.join(root, head, 'commit'), 'utf8')).toBe(head)
+  expect(readdirSync(path.join(home, '.platform'))).toEqual(['settings.json'])
+})
+
 test('refuses a tree with uncommitted changes and installs nothing', () => {
   const repo = repoWithCommits(1)
   writeFileSync(path.join(repo, 'stray'), '')
@@ -78,6 +143,7 @@ test.skipIf(!userScopes || !checkoutClean)(
     expect(readlinkSync(path.join(root, 'current'))).toBe(head)
     expect(readdirSync(path.join(root, head)).toSorted()).toEqual([
       'commit',
+      'deadline.sh',
       'nested-scope.sh',
       'pi',
       'report.js',

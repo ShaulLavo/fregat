@@ -1,6 +1,6 @@
 {
   "name": "ghostty-webgpu",
-  "version": "0.3.5",
+  "version": "0.3.11",
   "description": "Ghostty for the web with a damage-aware WebGPU renderer and native API",
   "keywords": [
     "browser",
@@ -28,6 +28,7 @@
     "native/config-resolver/linux-arm64",
     "native/config-resolver/linux-x64",
     "ghostty-vt.wasm",
+    "ghostty-vt.provenance.json",
     "bridge.wasm",
     "README.md",
     "LICENSE",
@@ -45,6 +46,9 @@
       ],
       "types/legacy/index.d.ts": [
         "dist/index.d.ts"
+      ],
+      "worker": [
+        "dist/worker/index.d.ts"
       ]
     },
     "*": {
@@ -53,6 +57,9 @@
       ],
       "types/legacy/index.d.ts": [
         "types/legacy/index.d.ts"
+      ],
+      "worker": [
+        "types/legacy/worker.d.ts"
       ]
     }
   },
@@ -70,18 +77,25 @@
       "node": "./dist/config-resolver/index.js"
     },
     "./ghostty-vt.wasm": "./ghostty-vt.wasm",
-    "./bridge.wasm": "./bridge.wasm"
+    "./bridge.wasm": "./bridge.wasm",
+    "./worker": {
+      "types@>=7.0": "./dist/worker/index.d.ts",
+      "types": "./types/legacy/worker.d.ts",
+      "import": "./dist/worker/index.js",
+      "default": "./dist/worker/index.js"
+    }
   },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "bun run clean && tsc -p tsconfig.build.json",
+    "build": "bun run clean && tsc -p tsconfig.build.json && bun run build:worker",
+    "build:worker": "bun run scripts/build-worker.ts",
     "build:bridge": "bun scripts/build-bridge.ts",
     "build:config-resolver": "bun scripts/build-config-resolver.ts",
     "config-resolver:bootstrap": "bun scripts/config-resolver-native/generate-native-inputs.ts --write && bun scripts/config-resolver-native/generate-bootstrap.ts --write",
-    "build:source-only": "bun run verify:config-resolver-state --state bootstrap && bun run clean && tsc -p tsconfig.build.json",
+    "build:source-only": "bun run verify:config-resolver-state --state bootstrap && bun run clean && tsc -p tsconfig.build.json && bun run build:worker",
     "build:wasm": "bun scripts/build-wasm.ts",
     "bench:compare": "bun scripts/comparison.ts",
     "bench:compare:test": "bun test ./bench/comparison-*.test.mjs ./scripts/comparison-*.test.mjs",
@@ -133,5 +147,8 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.2",
+  "patchedDependencies": {
+    "vitest@5.0.2": "patches/vitest@5.0.2.patch"
+  }
 }

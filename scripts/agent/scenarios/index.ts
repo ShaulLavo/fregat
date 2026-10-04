@@ -1,3 +1,5 @@
+import { unknownWorkspaceSettings } from './unknown-workspace-settings'
+import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
 import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
@@ -71,6 +73,7 @@ import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
 import { backgroundLiveness, backgroundMonitorLiveness } from './background-liveness'
+import { monitorDraftOwnership } from './monitor-draft-ownership'
 import { spinnerPalette } from './spinner-palette'
 import { sessionBulkFailures } from './session-bulk-failures'
 import { sessionLifecycle } from './session-lifecycle'
@@ -202,12 +205,14 @@ import { pushSessionNotice } from './push-session-notice'
 import { chatClaudeCatalog } from './chat-claude-catalog'
 import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
+import { workspaceLinkError } from './workspace-link-error'
 import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
 import { terminalCancelledStartup } from './terminal-cancelled-startup'
-import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
+import { terminalWasmCancelledStartup } from './terminal-wasm-cancelled-startup'
+import { terminalRenderer, terminalRendererDom, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
@@ -451,6 +456,8 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  unknownWorkspaceSettings,
+  releaseInstallationSettings,
   nativeWindow,
   installedApp,
   binaryFileOpen,
@@ -548,6 +555,7 @@ export const scenarios: readonly Scenario[] = [
   asyncQuestions,
   backgroundLiveness,
   backgroundMonitorLiveness,
+  monitorDraftOwnership,
   spinnerPalette,
   checkpointRewind,
   workbenchListFocus,
@@ -570,6 +578,7 @@ export const scenarios: readonly Scenario[] = [
   chatClaudeCatalog,
   chatDraftContextStrip,
   machineConnectError,
+  workspaceLinkError,
   machineProtocolMismatch,
   wallpaperIconHints,
   gitChanges,
@@ -632,8 +641,10 @@ export const scenarios: readonly Scenario[] = [
   editorOfflineResync,
   terminalBackground,
   terminalCancelledStartup,
+  terminalWasmCancelledStartup,
   terminalOfflineHost,
   terminalRenderer,
+  terminalRendererDom,
   terminalRendererWebgl,
   bottomPanelPersistence,
   sidebarToggle,
