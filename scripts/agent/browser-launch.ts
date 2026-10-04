@@ -1,8 +1,10 @@
 import type { Browser } from 'playwright'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { checkoutRoot } from './paths'
+import { createScriptError } from '../structured-errors'
 
 // Playwright's --disable-dev-shm-usage makes Chromium keep shared memory as fully allocated files in
 // TMPDIR. On a tmpfs /tmp each 2 MiB response buffer of a dev page load counts against the job's
@@ -12,6 +14,29 @@ export const browserTempRoot = path.join(checkoutRoot, 'node_modules', '.cache',
 export const ENGINES = ['chromium', 'firefox', 'webkit'] as const
 
 export type Engine = (typeof ENGINES)[number]
+
+export async function prepareBrowserTemp(root = browserTempRoot) {
+  const owned: string[] = []
+  const remove = async () => {
+    for (const directory of owned.toReversed())
+      await rm(directory, { recursive: true, force: true })
+  }
+  try {
+    await mkdir(root, { recursive: true })
+    const directory = await mkdtemp(path.join(root, 'run-'))
+    owned.push(directory)
+    const ipc = await mkdtemp(path.join(tmpdir(), 'b-'))
+    owned.push(ipc)
+    const temporary = path.join(ipc, 'd')
+    // Chromium binds its singleton socket through TMPDIR; the alias keeps the path short.
+    // Files still land in the owned data directory, including shared-memory buffers.
+    await symlink(directory, temporary, process.platform === 'win32' ? 'junction' : 'dir')
+    return { directory, temporary, remove }
+  } catch (error) {
+    await remove()
+    throw error
+  }
+}
 
 export async function launchBrowser(
   engine: Engine,
@@ -30,19 +55,40 @@ export async function launchBrowser(
   // Playwright hides scrollbars by default. Users have them, and a scrollbar that appears with
   // content changes every width the app measures.
   const ignoreDefaultArgs = ['--hide-scrollbars']
-  await mkdir(browserTempRoot, { recursive: true })
-  const temp = await mkdtemp(path.join(browserTempRoot, 'run-'))
-  const removeTemp = () => rm(temp, { recursive: true, force: true })
-  const options = { headless: !headed, ignoreDefaultArgs, env: { ...process.env, TMPDIR: temp } }
+  const temp = await prepareBrowserTemp()
+  const options = {
+    headless: !headed,
+    ignoreDefaultArgs,
+    env: { ...process.env, TMPDIR: temp.temporary },
+    downloadsPath: path.join(temp.directory, 'downloads'),
+    tracesDir: path.join(temp.directory, 'traces'),
+  }
   try {
     // The headless shell denies notification permission; full Chromium in headless mode grants it.
-    const browser = await chromium.launch(
+    const context = await chromium.launchPersistentContext(
+      path.join(temp.directory, 'profile'),
       notifications ? { ...options, channel: 'chromium' } : options,
     )
-    browser.on('disconnected', () => void removeTemp())
+    const browser = context.browser()
+    if (!browser) {
+      await context.close()
+      throw createScriptError('The owned browser context has no browser connection.', {
+        internal: { engine, headed, notifications },
+      })
+    }
+    browser.on('disconnected', () => void temp.remove())
+    const close = browser.close.bind(browser)
+    browser.close = async (options) => {
+      try {
+        await close(options)
+      } finally {
+        // Profile writers can finish after the disconnected event.
+        await temp.remove()
+      }
+    }
     return browser
   } catch (error) {
-    await removeTemp()
+    await temp.remove()
     throw error
   }
 }
