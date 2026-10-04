@@ -113,7 +113,7 @@ chips last.
 ## Tooling and larger features
 
 - **cligentic** for our own CLIs: `--json` + next-step hints on `agent:browser` and `logs`, a gate on
-  `deploy --rollback`, possibly a `fregat` command agents inside the app call to drive the IDE.
+  `install-release --rollback`, possibly a `fregat` command agents inside the app call to drive the IDE.
 - **MCP Apps host** (manifest): render tool-provided UI in chat. Plan-sized; first check whether the Claude
   and Codex SDKs surface those resources at all.
 - **Document viewers** (extend): only if PDF/DOCX/XLSX become first-class; keep-last-4-mounted viewer cache.

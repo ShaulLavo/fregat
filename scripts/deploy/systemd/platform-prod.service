@@ -1,4 +1,4 @@
-# Rendered by scripts/deploy/mesh.ts. Edit the template, not this file.
+# Rendered by scripts/install-release.ts. Edit the template, not this file.
 [Unit]
 Description=Platform production server
 After=network-online.target

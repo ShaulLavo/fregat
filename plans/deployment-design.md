@@ -136,7 +136,7 @@ The proposed module map is deliberately small:
 | `apps/server/src/web/`                     | Asset serving, caching, and constrained frontend navigation fallback.                      |
 | Existing `apps/server/src/app.ts`          | Domain services, routes, and testable application construction.                            |
 | Existing web client transport              | Same-origin production default and existing remote endpoint behavior.                      |
-| `scripts/release.ts`                       | Assemble and audit target artifacts and generate npm package metadata.                     |
+| `scripts/build-release.ts`                 | Assemble and verify portable web/server runtime artifacts.                                 |
 | Existing Electrobun entry point and config | Include the artifact, launch it, and open its ready URL with native preload.               |
 | Existing installation and machine modules  | Describe and invoke the release for managed remote servers.                                |
 

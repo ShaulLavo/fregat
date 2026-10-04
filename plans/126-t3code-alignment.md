@@ -558,7 +558,7 @@ instructions; do not start a competing server on the shared route. Mesh homepage
 `/work/tmp/fregat-evidence/20260920T105844Z-look-platform-1440x1000/`. That evidence proves only
 homepage availability. At audit time, browser/provider/platform cases had not run. The delivery notes now record completed cases; unverified host/provider paths remain open.
 
-After each implemented, verified unit deploy through `bun run deploy --slug=t3code-<unit>`;
+After each implemented, verified unit deploy through `bun run install-release --slug=t3code-<unit>`;
 server changes require dev verification and `--server --restart` per current repository policy. Record the release response and live
 check evidence. Coordinate shared file work before a restart; no restart for web-only changes.
 Completed implementation deliveries deploy through this procedure.

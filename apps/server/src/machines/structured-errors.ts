@@ -77,7 +77,7 @@ const machineErrors = defineErrorCatalog('machines', {
     status: 409,
     message: 'This Platform server has no release to install on another machine.',
     why: 'An update copies the running server’s own release with its runtime manifest, and this release was built before releases carried one.',
-    fix: 'Deploy this server with bun run deploy --server, then press Update server again.',
+    fix: 'Deploy this server with bun run install-release --server, then press Update server again.',
   },
   SSH_UPDATE_BUILD: {
     status: 500,

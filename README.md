@@ -32,6 +32,12 @@ with [mesh](https://github.com/ShaulLavo/mesh), `bun run dev:serve` registers on
 
 `bun run dev:web` skips the desktop app. `bun run dev:tui` is the terminal client, see the [tui guide](apps/tui/README.md)
 
+## build a release
+
+`bun run build-release --output=./fregat-release` builds a self-contained web/server runtime for this OS and architecture. It needs the build prerequisites and writes to your selected directory; its default output is an OS temporary directory.
+
+`bun run install-release` builds and installs into an explicitly configured local Mesh/systemd target. `--from=<directory>` installs an existing release. See [development](docs/development.md#optional-local-release-installation) for target configuration, server updates, restart and rollback.
+
 ## what's in it
 
 - [singapore](https://github.com/ShaulLavo/singapore), the editor. written from scratch
@@ -42,6 +48,6 @@ with [mesh](https://github.com/ShaulLavo/mesh), `bun run dev:serve` registers on
 ## more
 
 - [documentation](docs/README.md), architecture, plans, research and delivery records
-- [development](docs/development.md), repo layout, linked checkouts, checks, deploys
+- [development](docs/development.md), repo layout, linked checkouts, checks, releases and installation
 - [filesystem boundaries](docs/filesystem-boundaries.md), what the editor can reach vs what agents can
 - [settings reference](docs/settings-reference.md), generated from the registry
