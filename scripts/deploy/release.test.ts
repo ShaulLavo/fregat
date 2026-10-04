@@ -174,6 +174,7 @@ test.each([
   ['release', 'Candidate release:'],
   ['document', 'Candidate document status:'],
   ['asset', 'Candidate asset status:'],
+  ['shutdown', 'Candidate document status:'],
 ])(
   'failed candidate %s validation stops the server before reading stderr',
   async (failure, message) => {
@@ -197,6 +198,7 @@ import path from 'node:path'
 const failure = ${JSON.stringify(failure)}
 writeFileSync('candidate.pid', String(process.pid))
 console.error('candidate diagnostic')
+if (failure === 'shutdown') process.on('SIGTERM', () => console.error('shutdown stalled'))
 setTimeout(() => {
   writeFileSync('watchdog-fired', '')
   process.exit(0)
@@ -204,7 +206,7 @@ setTimeout(() => {
 Bun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch(request) {
   const pathname = new URL(request.url).pathname
   if (pathname === '/release') return Response.json({ release: failure === 'release' ? 'wrong' : ${JSON.stringify(release.name)}, server: { release: ${JSON.stringify(release.name)} } })
-  if (pathname === '/~probe/workbench') return new Response(readFileSync(path.join(process.env.WEB_ROOT, 'index.html')), { status: failure === 'document' ? 404 : 200 })
+  if (pathname === '/~probe/workbench') return new Response(readFileSync(path.join(process.env.WEB_ROOT, 'index.html')), { status: ['document', 'shutdown'].includes(failure) ? 404 : 200 })
   if (pathname === '/assets/main.js') return new Response('', { status: failure === 'asset' ? 404 : 200 })
   return new Response('', { status: 401 })
 } })
