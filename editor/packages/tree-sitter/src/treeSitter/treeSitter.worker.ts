@@ -3,6 +3,7 @@ import {
   Language,
   Parser,
   Query,
+  heap,
   type Node,
   type Range as TreeSitterRange,
   type Tree,
@@ -3170,9 +3171,13 @@ const inspectSharedRetention = async (): Promise<TreeSitterWorkerRetentionSnapsh
     if (runtime.injectionQuery) queries.add(runtime.injectionQuery)
   }
   const initialization = await Promise.allSettled(parserInitPromise ? [parserInitPromise] : [])
+  const memoryBytes = initialization[0]?.status === 'fulfilled' ? heap().buffer.byteLength : null
   return {
     registeredLanguages: languageDescriptors.size,
-    parserRuntimeInitialized: initialization[0]?.status === 'fulfilled',
+    wasmMemory:
+      memoryBytes === null
+        ? { kind: 'uninitialized' }
+        : { kind: 'committed', bytes: memoryBytes, pages: memoryBytes / 65_536 },
     runtimeEntries: runtimePromises.size,
     runtimeCount: runtimes.size,
     parserCount: parsers.size,
@@ -3203,6 +3208,8 @@ const inspectRetention = async (): Promise<{
     runtimeSessionId,
     snapshots: cache.snapshots.map((snapshot) => inspectSnapshotRetention(snapshot, resources)),
   }))
+  const unmeasuredWasm: readonly 'wasm-committed'[] =
+    shared.wasmMemory.kind === 'uninitialized' ? ['wasm-committed'] : []
   return {
     retention: {
       documentCount: documentCaches.size,
@@ -3222,7 +3229,7 @@ const inspectRetention = async (): Promise<{
         'trees',
         'markdown-documents',
         'worker-heap',
-        'wasm-committed',
+        ...unmeasuredWasm,
         'wasm-allocator-live',
       ],
     },

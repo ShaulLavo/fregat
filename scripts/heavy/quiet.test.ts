@@ -433,6 +433,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         { quiet: true, jobClass: 'bench', machine: true },
       )
       const children = [quiet]
+      let cancellation: { readonly signal: 'SIGTERM'; readonly sent: boolean } | undefined
       try {
         await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('measuring')
         const short = start(box, 'short-light', ['echo', 'short'], {
@@ -477,7 +478,8 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         ).toEqual(['manager-delayed-light', 'measurement', 'spanning-light'])
         let settled = false
         void quiet.done.then(() => (settled = true))
-        if (mode === 'cancelled') quiet.child.kill('SIGTERM')
+        if (mode === 'cancelled')
+          cancellation = { signal: 'SIGTERM', sent: quiet.child.kill('SIGTERM') }
         if (mode === 'completed') writeFileSync(releaseQuiet, '')
         await expect.poll(() => settled, { timeout: 5_000 }).toBe(true)
         expect((await quiet.done).code).toBe(mode === 'completed' ? 0 : 143)
@@ -510,6 +512,25 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         expect(recordOf(box, 'manager-delayed-light')).toBeUndefined()
         writeFileSync(releaseProperty, '')
         expect((await delayed.done).code).toBe(0)
+      } catch (error) {
+        console.error(
+          '[quiet-measurement-failure]',
+          JSON.stringify({
+            mode,
+            cancellation,
+            receipt: quietFailureReceipt({
+              box,
+              jobs: {
+                control,
+                measurement: quiet,
+                short: children[1],
+                spanning: children[2],
+                delayed: children[3],
+              },
+            }),
+          }),
+        )
+        throw error
       } finally {
         writeFileSync(releaseProperty, '')
         writeFileSync(releaseQuiet, '')

@@ -1877,7 +1877,10 @@ export class Editor {
   }
 
   private notifyContentHeight(height: number): void {
-    for (const listener of this.contentHeightListeners) listener(height)
+    for (const listener of this.contentHeightListeners) {
+      if (this.disposed) return
+      listener(height)
+    }
   }
 
   getScrollPosition(): Required<EditorScrollPosition> {
