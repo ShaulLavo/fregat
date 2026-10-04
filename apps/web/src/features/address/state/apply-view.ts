@@ -196,7 +196,11 @@ function landOnStart(
     passthrough: address.passthrough,
     workspace: NO_WORKSPACE_TOKEN,
   })
-  const result = applyFolderless({ ...options, address: start }, owner, trace)
+  const result = applyFolderless(
+    { ...options, address: start, settingsCategory: null },
+    owner,
+    trace,
+  )
   if (result.status !== 'applied') return result
   toast.info('Workspace link not found', {
     description: 'This server has no workspace for that link. Open a folder to continue.',
