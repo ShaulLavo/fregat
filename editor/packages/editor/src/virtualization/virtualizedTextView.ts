@@ -309,6 +309,7 @@ export class VirtualizedTextView {
   private viewportVisible = false
   private atomicRenderDepth = 0
   private atomicRenderPending = false
+  private flushingAtomicRender = false
   private applyingEdit = false
   private contentHeight = -1
   private readonly onContentHeightChange: ((height: number) => void) | null
@@ -725,7 +726,7 @@ export class VirtualizedTextView {
   }
 
   get isRenderingAtomically(): boolean {
-    return this.atomicRenderDepth > 0
+    return this.atomicRenderDepth > 0 || this.flushingAtomicRender
   }
 
   public setText(
@@ -1652,7 +1653,13 @@ export class VirtualizedTextView {
     if (this.atomicRenderDepth > 0 || this.applyingEdit || !this.atomicRenderPending) return
 
     this.atomicRenderPending = false
-    this.renderSnapshot(this.view.virtualizer.getSnapshot())
+    const wasFlushing = this.flushingAtomicRender
+    this.flushingAtomicRender = true
+    try {
+      this.renderSnapshot(this.view.virtualizer.getSnapshot())
+    } finally {
+      this.flushingAtomicRender = wasFlushing
+    }
   }
 
   /**

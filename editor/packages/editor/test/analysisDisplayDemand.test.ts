@@ -9,6 +9,7 @@ import type { Editor } from '../src/editor'
 import type { EditorPlugin } from '../src/plugins'
 import {
   createEmptySyntaxResult,
+  createEmptySyntaxSession,
   type EditorSyntaxProvider,
   type EditorSyntaxSession,
   type FoldRange,
@@ -30,6 +31,87 @@ function mountedRange(editor: Editor): EditorSyntaxRange {
 }
 
 describe('analysis display demand', () => {
+  it.each(['tokens', 'nested-layout'] as const)(
+    'keeps reentrant %s demand unknown until atomic rows commit',
+    (reentry) => {
+      const oldText = Array.from({ length: 6 }, (_, index) => `old${index}\n`).join('')
+      const nextText = Array.from({ length: 8 }, (_, index) => `new${index}\n`).join('')
+      const buffer = createEditorTextBuffer(oldText)
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reentrant.ts' })
+      const result = createEmptySyntaxResult()
+      const provider: EditorSyntaxProvider = {
+        createSession: () => ({
+          ...createEmptySyntaxSession(),
+          foldingSupport: 'supported',
+          queryRange: async () => result,
+        }),
+      }
+      const host = document.createElement('div')
+      document.body.appendChild(host)
+      const plugin: EditorPlugin = {
+        activate: (context) => context.registerSyntaxProvider(provider),
+      }
+      const editor = createVisibleEditor(host, { plugins: [plugin] })
+      const view = textView(editor)
+      view.setScrollMetrics(0, 72, 400)
+      editor.attachSession(createEditorBufferSession(buffer), {
+        analysis,
+        documentId: 'reentrant.ts',
+        languageId: 'typescript',
+      })
+      const inspect = () => analysis.inspectRetention().entries[0]!.displayDemand
+      expect(inspect()).toMatchObject({
+        frames: 1,
+        unknownLeases: 0,
+        ranges: [{ startIndex: 0, endIndex: oldText.length }],
+      })
+      expect(view.getState().mountedRows[0]!.element.textContent).toBe('old0')
+      const observations: { atomic: boolean; oldDOM: boolean; frames: number; unknown: number }[] =
+        []
+      let entered = false
+      const subscription = editor.onDidChangeContentHeight(() => {
+        if (entered) return
+        entered = true
+        expect(buffer.getTextSnapshot().materializeFullText()).toBe(nextText)
+        const oldDOM = view
+          .getState()
+          .mountedRows.some((row) => row.element.textContent?.startsWith('old'))
+        editor.setSelection(0)
+        if (reentry === 'nested-layout') {
+          view.runAtomicRender(() => view.setScrollMetrics(0, 96, 320))
+        }
+        editor.setTokens([])
+        observations.push({
+          atomic: view.isRenderingAtomically,
+          oldDOM,
+          frames: inspect().frames,
+          unknown: inspect().unknownLeases,
+        })
+      })
+      try {
+        editor.setContent(nextText)
+        expect(view.isRenderingAtomically).toBe(false)
+        expect(view.getState().mountedRows.map((row) => row.element.textContent)).toEqual([
+          ...Array.from({ length: 8 }, (_, index) => `new${index}`),
+          '',
+        ])
+        expect(inspect()).toMatchObject({
+          frames: 1,
+          unknownLeases: 0,
+          ranges: [{ startIndex: 0, endIndex: nextText.length }],
+        })
+        if (reentry === 'nested-layout')
+          expect(view.getState()).toMatchObject({ viewportHeight: 96, viewportWidth: 320 })
+        expect(observations).toEqual([{ atomic: true, oldDOM: true, frames: 0, unknown: 1 }])
+      } finally {
+        subscription.dispose()
+        editor.dispose()
+        analysis.dispose()
+        host.remove()
+      }
+    },
+  )
+
   it('publishes both cached view frames before notifications and tracks layout, folds, edits and clear', async () => {
     const buffer = createEditorTextBuffer(
       Array.from({ length: 500 }, (_, index) => `line${index} ${'x'.repeat(90)}\n`).join(''),
