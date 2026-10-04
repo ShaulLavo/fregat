@@ -1902,3 +1902,54 @@ it('submits an encoded surface before a reentrant font change resizes and config
     canvases.forEach((canvas) => canvas.remove())
   }
 })
+
+it('stops an acquisition retry when flushing a peer callback disposes the failing surface', async () => {
+  const sources = [new FakeRenderState(2, 2), new FakeRenderState(2, 2)]
+  const canvases = [createCanvas(), createCanvas()]
+  let armed = false
+  let disposedByPeer = false
+  let failing: WebGpuTerminalRenderer | undefined
+  const errors = vi.fn()
+  const pair = await Promise.all(
+    sources.map((source, index) =>
+      createRenderer({
+        canvas: canvases[index]!,
+        columns: 2,
+        rows: 2,
+        font: fittedFont(),
+        renderState: source,
+        deviceFactory: undefined,
+        onFrame:
+          index === 0
+            ? () => {
+                if (!armed || !failing) return
+                armed = false
+                failing.dispose()
+                disposedByPeer = true
+              }
+            : undefined,
+        onError: index === 1 ? errors : undefined,
+      }),
+    ),
+  )
+  failing = pair[1]!
+  const context = canvases[1]!.getContext('webgpu')!
+  try {
+    await expect
+      .poll(() => pair.every((renderer) => renderer.metrics.submittedFrames >= 1))
+      .toBe(true)
+    const acquire = vi.spyOn(context, 'getCurrentTexture').mockImplementationOnce(() => {
+      throw new TypeError('injected disposal-triggering acquisition failure')
+    })
+    armed = true
+    sources.forEach((source) => source.dirtyRow(0))
+    pair.forEach((renderer) => renderer.notifyWrite())
+    await expect.poll(() => disposedByPeer).toBe(true)
+    expect(acquire).toHaveBeenCalledOnce()
+    expect(errors).not.toHaveBeenCalled()
+    acquire.mockRestore()
+  } finally {
+    pair.forEach((renderer) => renderer.dispose())
+    canvases.forEach((canvas) => canvas.remove())
+  }
+})

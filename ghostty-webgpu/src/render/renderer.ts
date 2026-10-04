@@ -524,6 +524,7 @@ export class WebGpuTerminalRenderer {
   private drawFrame(): void {
     if (this.disposed) return
     this.coordinator?.flushOwner(this)
+    if (this.disposed) return
     if (this.deviceUnavailable) {
       void this.restoreDevice(this.deviceGeneration).catch(() => {})
       return
@@ -597,6 +598,7 @@ export class WebGpuTerminalRenderer {
         this.textPass.submit(this.context.getCurrentTexture().createView())
       } catch (cause) {
         this.reportFrameFailure(cause)
+        if (this.disposed) return
         // Retry once in this turn; an acquired canvas texture presents empty after an abandoned submit.
         this.textPass.submit(this.context.getCurrentTexture().createView())
       }
@@ -623,6 +625,7 @@ export class WebGpuTerminalRenderer {
       command = this.textPass.encode(this.context.getCurrentTexture().createView())
     } catch (cause) {
       this.reportFrameFailure(cause)
+      if (this.disposed) return
       command = this.textPass.encode(this.context.getCurrentTexture().createView())
     }
     let rows: readonly RenderRow[] | undefined
