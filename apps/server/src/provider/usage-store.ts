@@ -8,6 +8,7 @@ import {
   providerDriverKindSchema,
   providerUsageFeedSchema,
   providerUsageWindowSchema,
+  SETTINGS_REGISTRY,
   type ProviderAccountUsage,
   type ProviderDriverKind,
   type ProviderInstanceId,
@@ -26,7 +27,7 @@ import type { ProviderAdapter, ProviderRuntimeEvent } from './types'
 import { readClaudeUsageCache, readClaudeUsageIdentity } from './usage-claude-cache'
 import { readNativeUsageMetadata, type NativeUsageMetadata } from './utils/usage-native-metadata'
 import { proxyUsageIdentity, usageIdentityContext } from './utils/usage-codex-identity'
-import { mergeProvenUsageAccounts } from './utils/usage-account-merge'
+import { mergeProvenUsageAccounts, mergeUsageCredits } from './utils/usage-account-merge'
 import { CodexUsageRequestBudget, type ProxyUsageRefresh } from './usage-proxy-budget'
 import {
   codexWindowPresentation,
@@ -61,9 +62,9 @@ export type UsageRefreshPolicy = {
   staleAfterMs: number
 }
 const DEFAULT_POLICY: UsageRefreshPolicy = {
-  minIntervalMs: 300_000,
-  failureCooldownMs: 600_000,
-  staleAfterMs: 900_000,
+  minIntervalMs: SETTINGS_REGISTRY['providers.usageRefreshSeconds'].default * 1000,
+  failureCooldownMs: SETTINGS_REGISTRY['providers.usageFailureCooldownSeconds'].default * 1000,
+  staleAfterMs: SETTINGS_REGISTRY['providers.usageStaleAfterSeconds'].default * 1000,
 }
 const cacheSchema = v.object({
   version: v.literal(1),
@@ -98,6 +99,7 @@ type UsageStoreOptions = {
     refresh: ProxyUsageRefresh,
   ) => Promise<ProviderAccountUsage[]>
   proxyRequestIntervalHours?: () => number
+  proxyCurrentIntervalMs?: () => number
   proxyInstanceIds?: () => ProviderInstanceId[]
   proxyConfigured?: () => boolean
   proxySourceKey?: () => string | null
@@ -106,6 +108,7 @@ type UsageStoreOptions = {
 /** Reads never start collection. A lifecycle-owned schedule persists sanitized observations. */
 export class ProviderUsageStore {
   private readonly accounts = new Map<string, StoredAccount>()
+  private readonly proxyQuotaDeadlines = new Map<string, number>()
   private readonly probes = new Map<string, Promise<boolean>>()
   private readonly collectionSkips = new Map<
     string,
@@ -144,7 +147,8 @@ export class ProviderUsageStore {
     this.proxyBudget = new CodexUsageRequestBudget(
       options.cacheFile ? `${options.cacheFile}.codex-requests` : undefined,
       this.now,
-      options.proxyRequestIntervalHours ?? (() => 1),
+      options.proxyRequestIntervalHours ??
+        (() => SETTINGS_REGISTRY['providers.proxyUsageRequestIntervalHours'].default),
       this.identityContextHash,
     )
     this.proxySourceKey = this.sourceKey()
@@ -161,6 +165,7 @@ export class ProviderUsageStore {
   }
 
   reconfigure() {
+    this.proxyQuotaDeadlines.clear()
     const key = this.sourceKey()
     this.proxyGeneration += 1
     if (key !== null && key !== this.proxySourceKey) {
@@ -183,6 +188,7 @@ export class ProviderUsageStore {
   }
 
   async close() {
+    this.proxyQuotaDeadlines.clear()
     this.closed = true
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
@@ -314,16 +320,35 @@ export class ProviderUsageStore {
   }
 
   private async tick(generation: number) {
+    const startedAt = this.now()
     try {
       await this.refresh()
     } finally {
       if (!this.closed && generation === this.generation) {
-        this.timer = setTimeout(() => {
-          void this.tick(generation)
-        }, this.policy().minIntervalMs)
+        const cadence = Math.min(
+          this.policy().minIntervalMs,
+          this.currentIntervalMs(),
+          this.fullIntervalMs(),
+        )
+        const quotaDeadline = this.nextProxyQuotaDeadline()
+        const nextAt =
+          quotaDeadline === null
+            ? startedAt + cadence
+            : Math.min(startedAt + cadence, quotaDeadline)
+        this.timer = setTimeout(
+          () => {
+            void this.tick(generation)
+          },
+          Math.max(0, nextAt - this.now()),
+        )
         this.timer.unref()
       }
     }
+  }
+
+  private nextProxyQuotaDeadline() {
+    if (!this.proxyQuotaDeadlines.size) return null
+    return Math.min(...this.proxyQuotaDeadlines.values())
   }
 
   private proxyMappings() {
@@ -364,7 +389,8 @@ export class ProviderUsageStore {
       return pending
     }
     const previous = this.accounts.get(target.accountKey)
-    const wait = previous?.failed ? this.policy().failureCooldownMs : this.policy().minIntervalMs
+    const interval = this.nativeIntervalMs(target)
+    const wait = previous?.failed ? Math.max(interval, this.policy().failureCooldownMs) : interval
     if (
       !force &&
       previous?.credentialFingerprint === target.credentialFingerprint &&
@@ -372,11 +398,71 @@ export class ProviderUsageStore {
       this.now() - previous.attemptedAt < wait
     ) {
       this.countCollectionSkip(target.accountKey, 'cooldown')
-      return Promise.resolve(false)
+      return this.collectCached(target)
     }
     const probe = this.probe(target, force).finally(() => this.probes.delete(target.accountKey))
     this.probes.set(target.accountKey, probe)
     return probe
+  }
+
+  private fullIntervalMs() {
+    const configured =
+      this.options.proxyRequestIntervalHours?.() ??
+      SETTINGS_REGISTRY['providers.proxyUsageRequestIntervalHours'].default
+    return (Number.isFinite(configured) ? Math.max(1, configured) : 1) * 3_600_000
+  }
+
+  private currentIntervalMs() {
+    const ms =
+      this.options.proxyCurrentIntervalMs?.() ??
+      SETTINGS_REGISTRY['providers.codexUsageRefreshSeconds'].default * 1000
+    const parsed = v.safeParse(
+      SETTINGS_REGISTRY['providers.codexUsageRefreshSeconds'].schema,
+      ms / 1000,
+    )
+    return Math.min(
+      parsed.success ? ms : SETTINGS_REGISTRY['providers.codexUsageRefreshSeconds'].default * 1000,
+      this.fullIntervalMs(),
+    )
+  }
+
+  private nativeIntervalMs(target: AccountTarget) {
+    if (target.driverKind === 'claude')
+      return Math.min(this.policy().minIntervalMs, this.fullIntervalMs())
+    if (target.driverKind !== 'codex') return this.policy().minIntervalMs
+    const proof = this.accounts.get(target.accountKey)?.identityProof
+    const peers = proof
+      ? this.proxyAccounts.filter(
+          (account) => this.proxyIdentityProofs.get(account.accountKey) === proof,
+        )
+      : []
+    if (peers.length && peers.every((account) => !currentQuotaEligible(account)))
+      return this.fullIntervalMs()
+    return this.currentIntervalMs()
+  }
+
+  private collectCached(target: AccountTarget): Promise<boolean> {
+    if (!target.claudeCachePath) return Promise.resolve(false)
+    const pending = this.adoptClaudeCache(target).finally(() =>
+      this.probes.delete(target.accountKey),
+    )
+    this.probes.set(target.accountKey, pending)
+    return pending
+  }
+
+  private async adoptClaudeCache(target: AccountTarget) {
+    const file = target.claudeCachePath
+    if (!file) return false
+    const identity = await readClaudeUsageIdentity(file)
+    const cached = await readClaudeUsageCache(file, this.now())
+    const current = await readClaudeUsageIdentity(file)
+    if (this.closed || identity !== current) return false
+    const account = this.registry.usageAccount(target.providerInstanceIds[0]!)
+    if (account && account.credentialFingerprint !== target.credentialFingerprint) return false
+    this.adoptCredentials(target)
+    this.adoptIdentity(target, identity)
+    if (cached) this.applyProbe(target, cached.probe, cached.observedAt, 'claude-local-cache')
+    return Boolean(cached)
   }
 
   private countCollectionSkip(accountKey: string, reason: 'cooldown' | 'already-in-flight') {
@@ -415,15 +501,20 @@ export class ProviderUsageStore {
         ? await readClaudeUsageCache(target.claudeCachePath, this.now())
         : null
       if (cached) {
+        const knownIds =
+          this.accounts.get(target.accountKey)?.snapshot.windows.map((window) => window.id) ?? []
+        const returnedIds = new Set(cached.probe.update.windows.map((window) => window.id))
+        const coversKnown = knownIds.every((id) => returnedIds.has(id))
         this.applyProbe(target, cached.probe, cached.observedAt, 'claude-local-cache')
         cacheAgeMs = this.now() - Date.parse(cached.observedAt)
         if (
           !force &&
-          cacheAgeMs < Math.min(this.policy().minIntervalMs, this.policy().staleAfterMs)
+          coversKnown &&
+          cacheAgeMs < Math.min(this.nativeIntervalMs(target), this.policy().staleAfterMs)
         ) {
           outcome = 'cache-hit'
           source = 'claude-local-cache'
-          this.markAttempt(target, false)
+          this.markAttempt(target, false, Date.parse(cached.observedAt))
           this.persist()
           return true
         }
@@ -454,12 +545,12 @@ export class ProviderUsageStore {
       }
       this.applyProbe(target, result, new Date(startedAt).toISOString(), source)
       this.applyMetadata(target, metadata)
-      this.markAttempt(target, false)
+      this.markAttempt(target, false, startedAt)
       this.persist()
       outcome = result.kind
       return result.kind === 'reading'
     } catch (error) {
-      this.markAttempt(target, true)
+      this.markAttempt(target, true, startedAt)
       this.persist()
       const structured = isEvlogError(error)
         ? error
@@ -520,7 +611,7 @@ export class ProviderUsageStore {
     })
   }
 
-  private markAttempt(target: AccountTarget, failed: boolean) {
+  private markAttempt(target: AccountTarget, failed: boolean, attemptedAt = this.now()) {
     const stored = this.accounts.get(target.accountKey) ?? {
       snapshot: this.empty(target),
       attemptedAt: null,
@@ -528,7 +619,7 @@ export class ProviderUsageStore {
       unsupported: false,
       credentialFingerprint: target.credentialFingerprint,
     }
-    this.accounts.set(target.accountKey, { ...stored, attemptedAt: this.now(), failed })
+    this.accounts.set(target.accountKey, { ...stored, attemptedAt, failed })
   }
 
   private applyProbe(
@@ -588,8 +679,11 @@ export class ProviderUsageStore {
         planType: newer ? (update.planType ?? previous.planType) : previous.planType,
         label: newer ? (update.label ?? previous.label) : previous.label,
         windows: sortUsageWindows(mergeObservedUsageWindows(previous.windows, updates)),
-        credits:
-          newer && update.credits !== undefined ? update.credits : (previous.credits ?? null),
+        ...mergeUsageCredits(previous, {
+          ...previous,
+          credits: update.credits,
+          creditsObservedAt: update.credits !== undefined ? observedAt : undefined,
+        }),
       },
     })
   }
@@ -644,8 +738,14 @@ export class ProviderUsageStore {
   private async refreshProxy() {
     if (!this.options.readProxy || this.options.proxyConfigured?.() === false) return
     if (this.proxyProbe) return this.proxyProbe
-    const wait = this.proxyFailed ? this.policy().failureCooldownMs : this.policy().minIntervalMs
-    if (this.proxyAttemptedAt !== null && this.now() - this.proxyAttemptedAt < wait) return
+    const wait = this.proxyFailed
+      ? this.policy().failureCooldownMs
+      : Math.min(this.policy().minIntervalMs, this.currentIntervalMs())
+    const quotaDeadline = this.nextProxyQuotaDeadline()
+    const quotaDue = !this.proxyFailed && quotaDeadline !== null && this.now() >= quotaDeadline
+    if (!quotaDue && this.proxyAttemptedAt !== null && this.now() - this.proxyAttemptedAt < wait)
+      return
+    this.proxyQuotaDeadlines.clear()
     const sourceKey = this.sourceKey()
     const generation = this.proxyGeneration
     this.proxyAttemptedAt = this.now()
@@ -658,9 +758,18 @@ export class ProviderUsageStore {
         sourceKey === this.sourceKey() &&
         generation === this.proxyGeneration,
       latest: (account) => this.latestProxyObservation(account),
+      nativeReadPending: (account) => this.nativeQuotaReadPending(account),
+      requestIntervalMs: (account) =>
+        currentQuotaEligible(account) ? this.currentIntervalMs() : this.fullIntervalMs(),
       link: (key, proof) => this.proxyBudget.link(key, proof),
-      reserve: (key, passiveAt) => this.proxyBudget.reserve(key, passiveAt),
-      settle: (reservation, success) => this.proxyBudget.settle(reservation, success),
+      reserve: (key, passiveAt, intervalMs) =>
+        this.proxyBudget.reserve(key, passiveAt, intervalMs, (canonicalKey, deadline) =>
+          this.proxyQuotaDeadlines.set(canonicalKey, deadline),
+        ),
+      settle: (reservation, success) => {
+        const next = this.proxyBudget.settle(reservation, success)
+        if (next && refresh.isCurrent()) this.proxyQuotaDeadlines.set(next.key, next.nextAttemptAt)
+      },
     }
     this.proxyProbe = this.options
       .readProxy(this.identityContext, refresh)
@@ -700,6 +809,20 @@ export class ProviderUsageStore {
         if (generation === this.proxyGeneration) this.proxyAttemptedAt = this.now()
       })
     return this.proxyProbe
+  }
+
+  private nativeQuotaReadPending(account: ProviderAccountUsage) {
+    const proof = proxyUsageIdentity(account)
+    if (!proof) return false
+    return this.targets().some((target) => {
+      const stored = this.accounts.get(target.accountKey)
+      return (
+        target.driverKind === 'codex' &&
+        this.probes.has(target.accountKey) &&
+        stored?.credentialFingerprint === target.credentialFingerprint &&
+        stored?.identityProof === proof
+      )
+    })
   }
 
   private latestProxyObservation(account: ProviderAccountUsage) {
@@ -916,6 +1039,7 @@ function validCachedAccount(account: ProviderAccountUsage, nowMs: number) {
   if (account.checkedAt && !validObservedAt(account.checkedAt, nowMs)) return false
   if (account.lastSeenAt && !validObservedAt(account.lastSeenAt, nowMs)) return false
   if (account.stateObservedAt && !validObservedAt(account.stateObservedAt, nowMs)) return false
+  if (account.creditsObservedAt && !validObservedAt(account.creditsObservedAt, nowMs)) return false
   if (account.routing?.lastServedAt && !validObservedAt(account.routing.lastServedAt, nowMs))
     return false
   if (
@@ -974,12 +1098,17 @@ function retainProxyObservations(
   return {
     ...previous,
     ...(newer ? account : {}),
+    ...mergeUsageCredits(previous, account),
     state: control.state,
     stateObservedAt: control.stateObservedAt,
     routing: control.routing,
     cooldown: control.cooldown ?? null,
     windows: mergeObservedUsageWindows(previous.windows, account.windows),
   }
+}
+
+function currentQuotaEligible(account: ProviderAccountUsage) {
+  return account.state !== 'disabled' && account.routing?.active !== false
 }
 
 function accountState(
