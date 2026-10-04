@@ -3,6 +3,7 @@ type MeshRoute = {
   host: string
   kind: string
   target: string
+  url: string
 }
 
 export function parseMeshRoutes(table: string): MeshRoute[] {
@@ -17,6 +18,7 @@ export function parseMeshRoutes(table: string): MeshRoute[] {
     return { start: columns[index]!.index, end: columns[index + 1]?.index }
   })
   if (fields.some((field) => field === null)) return []
+  const urlColumn = columns.find((column) => column[0] === 'URL')
 
   return lines
     .slice(headerIndex + 1)
@@ -25,6 +27,26 @@ export function parseMeshRoutes(table: string): MeshRoute[] {
       const [route, host, kind, target] = fields.map((field) =>
         line.slice(field!.start, field!.end).trim(),
       )
-      return { route: route!, host: host!, kind: kind!, target: target! }
+      return {
+        route: route!,
+        host: host!,
+        kind: kind!,
+        target: target!,
+        url: urlColumn ? line.slice(urlColumn.index).trim() : '',
+      }
     })
+}
+
+export function matchesMeshRoute(
+  route: MeshRoute,
+  expectedRoute: string,
+  expectedUrl: string,
+  expectedPort: number,
+): boolean {
+  return (
+    route.route === expectedRoute &&
+    route.kind === 'proxy' &&
+    route.target === String(expectedPort) &&
+    route.url.replace(/\/$/, '') === expectedUrl.replace(/\/$/, '')
+  )
 }
