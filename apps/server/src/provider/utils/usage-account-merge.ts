@@ -35,6 +35,7 @@ function mergeAccount(
   const other = control === left ? right : left
   return {
     ...control,
+    ...mergeUsageCredits(left, right),
     resetCredits: newer.resetCredits ?? left.resetCredits ?? right.resetCredits,
     label: control.label ?? newer.label ?? left.label ?? right.label,
     planType: newer.planType ?? control.planType,
@@ -44,6 +45,30 @@ function mergeAccount(
     providerInstanceIds: [...new Set([...left.providerInstanceIds, ...right.providerInstanceIds])],
     windows: mergeObservedUsageWindows(left.windows, right.windows),
   }
+}
+
+export function mergeUsageCredits(left: ProviderAccountUsage, right: ProviderAccountUsage) {
+  let selected = left
+  if (left.credits === undefined) selected = right
+  else if (right.credits !== undefined && newerCredits(left, right)) selected = right
+  return { credits: selected.credits, creditsObservedAt: selected.creditsObservedAt }
+}
+
+function newerCredits(left: ProviderAccountUsage, right: ProviderAccountUsage) {
+  const leftAt = left.creditsObservedAt
+    ? Date.parse(left.creditsObservedAt)
+    : Number.NEGATIVE_INFINITY
+  const rightAt = right.creditsObservedAt
+    ? Date.parse(right.creditsObservedAt)
+    : Number.NEGATIVE_INFINITY
+  if (leftAt !== rightAt) return rightAt > leftAt
+  if (right.credits === null) return left.credits !== null
+  if (left.credits === null) return false
+  if (left.credits?.unlimited !== right.credits?.unlimited) return !right.credits?.unlimited
+  return (
+    (right.credits?.balance ?? Number.POSITIVE_INFINITY) <
+    (left.credits?.balance ?? Number.POSITIVE_INFINITY)
+  )
 }
 
 function latest(left: string | null, right: string | null): string | null {
