@@ -25,6 +25,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'
 import { createEditorConflictStore } from '@/features/editor/state/conflict-state'
 import { createEditorActivation } from '@/features/editor/state/apply-actions'
+import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createEditorOpenBenchmarkControl } from '@/features/editor/state/editor-open-benchmark-control'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'
@@ -82,6 +83,7 @@ export function createEditorRuntime({
   }
   bindWorktrees()
   const documentStore = createEditorDocumentStore({
+    environmentId: storage.environmentId,
     scrollPositionSeeds: workspaceStore.getState().reopenScrollPositions,
     viewScrollPositionSeeds: workspaceStore.getState().viewScrollPositions,
   })
@@ -109,6 +111,18 @@ export function createEditorRuntime({
     fileOpenIntentOwner.activation,
     documentStore,
     fileOpenIntentOwner,
+    (path, tabId) => {
+      const rootPath = workspaceStore.getState().rootFolder?.path
+      const saved = queryClient.getQueryData<import('@/lib/file-snapshot').FileSnapshot>(
+        fileSnapshotQueryOptions(path).queryKey,
+      )
+      if (!rootPath || !saved || saved.seemsBinary) return
+      documentStore.getState().prepareSavedComparisonTab(tabId, {
+        scope: { environmentId: storage.environmentId, rootPath },
+        saved,
+        signal: new AbortController().signal,
+      })
+    },
   )
   const documentSyncController = new LanguageServerDocumentSyncController()
   const languageServerDocuments = new LanguageServerDocuments(preparation.analysisLimitMiCodeUnits)

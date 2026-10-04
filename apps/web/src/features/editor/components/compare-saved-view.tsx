@@ -1,6 +1,5 @@
 import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { CompareSavedLoading } from '@/features/editor/components/compare-saved-loading'
-import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { createTextDiff } from '@singapore-editor/diff'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -8,19 +7,13 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { EditorTabPlaceholder } from '@/features/editor/components/tab-placeholder'
 import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-language-context'
-import { useEditorDocumentState } from '@/features/editor/state/document-state'
+import { useSavedComparison } from '@/features/editor/hooks/use-saved-comparison'
+import type { SavedComparisonRead } from '@/features/editor/utils/saved-comparison'
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
 import { languageIdForFilePath } from '@/lib/file-language'
 import { useSettingValue } from '@/hooks/use-setting-value'
 
-/**
- * Diffs the active buffer against the file on disk — VS Code's "Compare Active File with Saved".
- *
- * Both sides are read live rather than snapshotted when the tab opened: the saved side comes from
- * the file cache and the working side from the live buffer, so the diff keeps answering "what have
- * I changed" as you keep typing.
- */
 export function CompareSavedView({
   languageHost,
   path,
@@ -32,25 +25,14 @@ export function CompareSavedView({
   rootPath: FilesystemPath
   tabId?: TabId
 }) {
-  const key = fileDocumentKey(path)
   const mode = useSettingValue('editor.diff.viewMode')
   const { fileState } = useSelectedFile(path)
-  const buffer = useEditorDocumentState((state) => state.liveDocumentsByKey[key]?.buffer ?? null)
-  // Revision, not the buffer object: the buffer is mutated in place, so its identity never changes
-  // and would never re-run the diff.
-  const revision = useEditorDocumentState((state) => state.documentContentRevisions[key] ?? '')
-  // Its new side IS the live buffer, so it is by construction the text the owning editor sent the
-  // server — the file's own uri names exactly this text, and joining it is a no-op on the wire.
-  const languageServer = useDiffLanguageContext(path, rootPath, true, languageHost)
-
-  const savedText =
-    fileState.status === 'ready' && !fileState.data.seemsBinary
-      ? materializeFileSnapshotText(fileState.data)
-      : null
-  // Keep the text tied to the revision that materialized it. The mutable buffer object does not
-  // change identity as edits arrive.
-  const snapshot = { revision, text: buffer?.materializeFullText() ?? null }
-  const file = savedTextDiff(path, savedText, snapshot.text)
+  const saved = fileState.status === 'ready' && !fileState.data.seemsBinary ? fileState.data : null
+  const { read } = useSavedComparison(rootPath, saved, tabId)
+  const sourcePath = read?.kind === 'ready' ? read.saved.snapshot.path : path
+  const sourceRoot = read?.kind === 'ready' ? read.scope.rootPath : rootPath
+  const languageServer = useDiffLanguageContext(sourcePath, sourceRoot, true, languageHost)
+  const file = read?.kind === 'ready' ? savedTextDiff(read) : null
 
   // No retry: closing and reopening the compare tab re-reads the saved file.
   if (fileState.status === 'error') {
@@ -73,7 +55,7 @@ export function CompareSavedView({
     )
   }
   if (!file) {
-    if (buffer) return <DiffEditor file={null} mode={mode} tabId={tabId} />
+    if (saved && !read) return <CompareSavedLoading />
 
     return (
       <EditorTabPlaceholder tabId={tabId}>
@@ -91,12 +73,11 @@ export function CompareSavedView({
   return <DiffEditor file={file} languageServer={languageServer} mode={mode} tabId={tabId} />
 }
 
-function savedTextDiff(path: FilesystemPath, savedText: string | null, text: string | null) {
-  if (savedText === null || text === null) return null
-
+function savedTextDiff(read: Extract<SavedComparisonRead, { kind: 'ready' }>) {
+  const path = read.saved.snapshot.path
   const languageId = languageIdForFilePath(path)
   return createTextDiff({
-    newFile: { languageId, path, text },
-    oldFile: { languageId, path, text: savedText },
+    newFile: { languageId, path, text: read.live.snapshot.materializeFullText() },
+    oldFile: { languageId, path, text: materializeFileSnapshotText(read.saved.snapshot) },
   })
 }
