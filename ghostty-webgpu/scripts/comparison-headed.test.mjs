@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
 import {
   assertHeadedHardware,
   assertHeadedSurfaceTransport,
@@ -41,7 +42,13 @@ function observedFacts() {
         'Exact whitespace tokens in observed OS rendering; original argv boundaries are unavailable',
       rawCommandLineBase64: Buffer.from(requestedArguments.join(' ') + '\0').toString('base64'),
     },
-    window: { browserPid: 123, backend: 'wayland', mapped: true, hidden: false, xwayland: false },
+    window: {
+      browserPid: 123,
+      backend: 'wayland',
+      mapped: true,
+      hidden: false,
+      xwayland: false,
+    },
     gpu: {
       devices: [
         {
@@ -60,7 +67,11 @@ function observedFacts() {
         inProcessGpu: false,
         glRenderer: renderer,
       },
-      featureStatus: { gpu_compositing: 'enabled', webgl: 'enabled', vulkan: 'enabled_on' },
+      featureStatus: {
+        gpu_compositing: 'enabled',
+        webgl: 'enabled',
+        vulkan: 'enabled_on',
+      },
     },
     gl: { renderer, contextLost: false },
   }
@@ -206,7 +217,10 @@ test('standalone recipe skips with stated reason when the display is absent, wit
         '--window-system',
         'hyprland',
       ],
-      { env: { ...process.env, WAYLAND_DISPLAY: '', XDG_RUNTIME_DIR: '' }, timeout: 5000 },
+      {
+        env: { ...process.env, WAYLAND_DISPLAY: '', XDG_RUNTIME_DIR: '' },
+        timeout: 5000,
+      },
     )
     const result = JSON.parse(await readFile(join(output, 'result.json'), 'utf8'))
     assert.equal(result.status, 'SKIP')
@@ -225,7 +239,11 @@ test('approved real provenance rejects profile-last startup URL and accepts the 
   const session = {
     async send(method) {
       if (method === 'Browser.getVersion')
-        return { product, userAgent: 'Chrome/152.0.7977.82', revision: 'synthetic-version' }
+        return {
+          product,
+          userAgent: 'Chrome/152.0.7977.82',
+          revision: 'synthetic-version',
+        }
       assert.equal(method, 'SystemInfo.getProcessInfo')
       return { processInfo: [{ id: 101, type: 'browser' }] }
     },
@@ -294,7 +312,9 @@ test('the observed vendor-only page driver label matches CDP vendor/version, wit
 test('Linux process disappearance via ESRCH or ENOENT is gone; other OS errors remain unknown', async () => {
   const owned = { pid: 101, startTimeTicks: '123456' }
   for (const code of ['ENOENT', 'ESRCH']) {
-    const gone = Object.assign(new Error('External proc disappearance'), { code })
+    const gone = Object.assign(new Error('External proc disappearance'), {
+      code,
+    })
     assert.equal(
       await ownedProcessAlive(owned, async () => {
         throw gone
@@ -302,7 +322,9 @@ test('Linux process disappearance via ESRCH or ENOENT is gone; other OS errors r
       false,
     )
   }
-  const denied = Object.assign(new Error('External proc read denied'), { code: 'EACCES' })
+  const denied = Object.assign(new Error('External proc read denied'), {
+    code: 'EACCES',
+  })
   await assert.rejects(
     ownedProcessAlive(owned, async () => {
       throw denied
@@ -410,7 +432,10 @@ test('setup refuses contradictory page/CDP/compositor sizes without guessing a t
     }),
   }
   const session = {
-    send: async () => ({ windowId: 7, bounds: { width: 532, height: 560, windowState: 'normal' } }),
+    send: async () => ({
+      windowId: 7,
+      bounds: { width: 532, height: 560, windowState: 'normal' },
+    }),
   }
   const observeWindow = async () => ({
     browserPid: 101,
@@ -623,7 +648,10 @@ test('static launch scope check detects a cleanup-local identity referenced from
     await writeFile(badFile, faulty)
     await writeFile(
       config,
-      JSON.stringify({ env: { browser: true, node: true }, rules: { 'no-undef': 'error' } }),
+      JSON.stringify({
+        env: { browser: true, node: true },
+        rules: { 'no-undef': 'error' },
+      }),
     )
     const check = (file) =>
       promisify(execFile)(
@@ -703,7 +731,13 @@ test('missing child exit notification still closes the server and removes its ow
     },
   }
   await assert.rejects(
-    finishOwnedLaunchCleanup({ child, server, profile, cleanup, exitTimeoutMilliseconds: 20 }),
+    finishOwnedLaunchCleanup({
+      child,
+      server,
+      profile,
+      cleanup,
+      exitTimeoutMilliseconds: 20,
+    }),
     /Owned browser exit must be observed/,
   )
   assert.equal(cleanup.browserExited, false)
@@ -759,3 +793,30 @@ test('observed page OpenGL identity qualifies when only browser diagnostics expo
     assert.throws(() => matchingGlRendererIdentity(browser, rejected))
   assert.throws(() => matchingGlRendererIdentity(page, browser), /driver identities must match/)
 })
+
+for (const scenario of [
+  'healthy',
+  'discovery-error',
+  'termination-error',
+  'reused-pid',
+  'orphan-descendant',
+  'profile-init',
+  'late-transport',
+  'truncated-transport',
+]) {
+  test(`actual launch and cleanup respect external ${scenario} boundaries`, async () => {
+    const execute = promisify(execFile)
+    const script = new URL('./fixtures/headed-launch-boundaries.mjs', import.meta.url)
+    const { stdout } = await execute(
+      process.execPath,
+      ['--experimental-vm-modules', fileURLToPath(script), scenario],
+      {
+        timeout: 15000,
+        maxBuffer: 1_000_000,
+      },
+    )
+    const result = JSON.parse(stdout)
+    assert.equal(result.mockedExternalBoundariesOnly, true)
+    assert.equal(result.realChromeLaunches, 0)
+  })
+}

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn, execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import {
   chmod,
   lstat,
@@ -98,15 +99,39 @@ export function matchingGlRendererIdentity(browserRenderer, pageRenderer) {
       browser.driverLabel,
       'Observed OpenGL driver identities must match',
     )
-  return { ...browser, rawRendererStrings: { browser: browserRenderer, page: pageRenderer } }
+  return {
+    ...browser,
+    rawRendererStrings: { browser: browserRenderer, page: pageRenderer },
+  }
 }
+
+const incompatibleWaylandVulkan = "'--ozone-platform=wayland' is not compatible with Vulkan"
 
 export function assertHeadedSurfaceTransport(stderr) {
   assert.equal(typeof stderr, 'string', 'Observed Chrome diagnostics required')
   assert(
-    !stderr.includes("'--ozone-platform=wayland' is not compatible with Vulkan"),
+    !stderr.includes(incompatibleWaylandVulkan),
     'Observed Chrome surface transport rejects native Wayland with Vulkan',
   )
+}
+
+function headedDiagnosticObserver(evidence) {
+  let suffix = ''
+  return (data) => {
+    const text = data.toString()
+    const observed = suffix + text
+    evidence.stderr += text.slice(0, Math.max(0, 64_000 - evidence.stderr.length))
+    if (observed.includes(incompatibleWaylandVulkan)) evidence.surfaceTransportIncompatible = true
+    suffix = observed.slice(-incompatibleWaylandVulkan.length)
+  }
+}
+
+function assertObservedHeadedTransport(evidence) {
+  assert(
+    !evidence.surfaceTransportIncompatible,
+    'Observed Chrome surface transport rejects native Wayland with Vulkan',
+  )
+  assertHeadedSurfaceTransport(evidence.stderr)
 }
 
 export function assertHeadedHardware({
@@ -245,8 +270,7 @@ export function assertHeadedHardware({
   }
 }
 
-async function identity(pid, read = readFile) {
-  const raw = await read(`/proc/${pid}/stat`, 'utf8')
+function parsedProcessIdentity(pid, raw) {
   const fields = raw
     .slice(raw.lastIndexOf(')') + 1)
     .trim()
@@ -258,6 +282,10 @@ async function identity(pid, read = readFile) {
     startTimeTicks: fields[19],
     state: fields[0],
   }
+}
+
+async function identity(pid, read = readFile) {
+  return parsedProcessIdentity(pid, await read(`/proc/${pid}/stat`, 'utf8'))
 }
 
 export async function ownedProcessAlive(owned, read = readFile) {
@@ -272,7 +300,10 @@ export async function ownedProcessAlive(owned, read = readFile) {
 
 export async function ownedProcessStates(owned, read = readFile) {
   return await Promise.all(
-    owned.map(async (entry) => ({ ...entry, alive: await ownedProcessAlive(entry, read) })),
+    owned.map(async (entry) => ({
+      ...entry,
+      alive: await ownedProcessAlive(entry, read),
+    })),
   )
 }
 
@@ -333,25 +364,38 @@ export async function settleOwnedWindowGeometry({
   assert.fail('Actual page, CDP window and compositor geometry did not settle')
 }
 
+async function assertOriginalProcessGroup(browserIdentity) {
+  try {
+    const current = await identity(browserIdentity.pid)
+    assert.equal(
+      current.startTimeTicks,
+      browserIdentity.startTimeTicks,
+      'Owned group leader PID was reused',
+    )
+    assert.equal(current.processGroup, browserIdentity.pid, 'Owned group leader changed groups')
+  } catch (error) {
+    if (error.code !== 'ENOENT' && error.code !== 'ESRCH') throw error
+  }
+}
+
 async function ownedGroupProcesses(browserIdentity) {
   const result = []
-  assert(
-    await ownedProcessAlive(browserIdentity),
-    'Browser lifetime must remain owned during group discovery',
-  )
+  await assertOriginalProcessGroup(browserIdentity)
   for (const name of await readdir('/proc')) {
     if (!/^\d+$/.test(name)) continue
     try {
       const entry = await identity(Number(name))
-      if (entry.processGroup === browserIdentity.pid) result.push(entry)
+      if (entry.processGroup !== browserIdentity.pid) continue
+      assert(
+        BigInt(entry.startTimeTicks) >= BigInt(browserIdentity.startTimeTicks),
+        'Owned group member predates launch',
+      )
+      result.push(entry)
     } catch (error) {
       if (error.code !== 'ENOENT' && error.code !== 'ESRCH') throw error
     }
   }
-  assert(
-    await ownedProcessAlive(browserIdentity),
-    'Browser lifetime changed during group discovery',
-  )
+  await assertOriginalProcessGroup(browserIdentity)
   return result
 }
 
@@ -579,7 +623,9 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
   } finally {
     await binary.close()
   }
-  const { stdout } = await execute(executable, ['--version'], { timeout: 2000 })
+  const { stdout } = await execute(executable, ['--version'], {
+    timeout: 2000,
+  })
   const version = stdout.match(/(?:Chromium|Google Chrome)\s+(\d+\.\d+\.\d+\.\d+)/)
   assert(version, 'Full Chrome build identity required')
   const expectedProduct = `Chrome/${version[1]}`
@@ -590,31 +636,20 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     'Profile parent must be canonical',
   )
   const profile = await mkdtemp(join(root, 'tmp', 'chrome-'))
-  await chmod(profile, 0o700)
-  const profileStat = await lstat(profile)
-  assert.equal(profileStat.uid, process.getuid(), 'Profile UID custody required')
-  assert.equal(profileStat.mode & 0o777, 0o700, 'Private owned profile required')
-  assert.equal(await realpath(profile), profile, 'Profile must be canonical')
-  const requestedArguments = headedLaunchArguments(profile)
-  assertBrowserAcceptanceRequest({ acceptance: true, requestedHeadless: false, requestedArguments })
+  let requestedArguments
   const evidence = {
     smokeId: randomUUID(),
     requestedExecutable: executablePath,
     executable,
     expectedProduct,
     requestedArguments,
-    requestedArgv: [executable, ...requestedArguments, 'about:blank'],
+    requestedArgv: null,
     originalExecveArguments: null,
     argumentSpaces: false,
     profile,
     filesystemCustody: {
       taskRoot: { path: root, uid: rootStat.uid, canonical: true },
-      profile: {
-        path: profile,
-        uid: profileStat.uid,
-        mode: profileStat.mode & 0o777,
-        canonical: true,
-      },
+      profile: { path: profile },
       executable: {
         path: executable,
         device: executableStat.dev,
@@ -633,58 +668,103 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
   const close = async () => {
     if (closed) return evidence.cleanup
     closed = true
-    const rootIdentity = owned.find((entry) => entry.pid === child?.pid)
-    if (rootIdentity && (await ownedProcessAlive(rootIdentity))) {
-      const group = await ownedGroupProcesses(rootIdentity)
-      owned = [
-        ...owned,
-        ...group.filter((entry) => !owned.some((known) => known.pid === entry.pid)),
-      ]
-    }
-    if (browser) {
+    let failure
+    const attempt = async (field, operation) => {
       try {
-        await boundedSmokeOperation(() => browser.close(), 3000)
+        return await operation()
       } catch (error) {
-        evidence.cleanup.closeError = String(error)
+        evidence.cleanup[field] = String(error)
+        failure ??= error
       }
     }
-    if (child?.pid && !owned.some((entry) => entry.pid === child.pid)) {
-      try {
-        owned.push(await identity(child.pid))
-      } catch (error) {
-        if (error.code !== 'ENOENT') throw error
-      }
-    }
-    for (const signal of ['SIGTERM', 'SIGKILL']) {
-      for (const entry of owned) {
-        if (!(await ownedProcessAlive(entry))) continue
-        try {
-          process.kill(entry.pid, signal)
-        } catch (error) {
-          if (error.code !== 'ESRCH') throw error
+    const rootIdentity = evidence.launchProcessIdentity
+    try {
+      await attempt('discoveryError', async () => {
+        if (!rootIdentity) {
+          assert(!child?.pid, 'Launch-time browser birth custody unavailable')
+          return
+        }
+        const group = await ownedGroupProcesses(rootIdentity)
+        owned = [
+          ...owned,
+          ...group.filter(
+            (entry) =>
+              !owned.some(
+                (known) => known.pid === entry.pid && known.startTimeTicks === entry.startTimeTicks,
+              ),
+          ),
+        ]
+      })
+      if (browser)
+        await attempt('closeError', () => boundedSmokeOperation(() => browser.close(), 3000))
+      for (const signal of ['SIGTERM', 'SIGKILL']) {
+        for (const entry of owned)
+          await attempt('terminationError', async () => {
+            if (!(await ownedProcessAlive(entry))) return
+            try {
+              process.kill(entry.pid, signal)
+            } catch (error) {
+              if (error.code !== 'ESRCH') throw error
+            }
+          })
+        for (let index = 0; index < 20; index++) {
+          const states = await attempt('processObservationError', () => ownedProcessStates(owned))
+          if (!states || states.every((entry) => !entry.alive)) break
+          await pause(50)
         }
       }
-      for (let attempt = 0; attempt < 20; attempt++) {
-        if (!(await ownedProcessStates(owned)).some((entry) => entry.alive)) break
-        await pause(50)
-      }
+      evidence.cleanup.processes = await attempt('processObservationError', () =>
+        ownedProcessStates(owned),
+      )
+      await attempt('survivorError', () =>
+        assert(
+          evidence.cleanup.processes?.every((entry) => !entry.alive),
+          'Owned Chrome processes survived cleanup',
+        ),
+      )
+    } finally {
+      await attempt('finalizationError', () =>
+        finishOwnedLaunchCleanup({
+          child,
+          server,
+          profile,
+          cleanup: evidence.cleanup,
+        }),
+      )
     }
-    evidence.cleanup.processes = await ownedProcessStates(owned)
-    await finishOwnedLaunchCleanup({ child, server, profile, cleanup: evidence.cleanup })
-    assert(
-      evidence.cleanup.processes.every((entry) => !entry.alive),
-      'Owned Chrome processes survived cleanup',
-    )
+    if (failure) throw failure
     return evidence.cleanup
   }
   try {
+    await chmod(profile, 0o700)
+    const profileStat = await lstat(profile)
+    assert.equal(profileStat.uid, process.getuid(), 'Profile UID custody required')
+    assert.equal(profileStat.mode & 0o777, 0o700, 'Private owned profile required')
+    assert.equal(await realpath(profile), profile, 'Profile must be canonical')
+    evidence.filesystemCustody.profile = {
+      path: profile,
+      uid: profileStat.uid,
+      mode: profileStat.mode & 0o777,
+      canonical: true,
+    }
+    requestedArguments = headedLaunchArguments(profile)
+    assertBrowserAcceptanceRequest({
+      acceptance: true,
+      requestedHeadless: false,
+      requestedArguments,
+    })
+    evidence.requestedArguments = requestedArguments
+    evidence.requestedArgv = [executable, ...requestedArguments, 'about:blank']
     server = createServer((request, response) => {
       if (request.url !== `/?smoke=${evidence.smokeId}`) {
         response.writeHead(404).end()
         return
       }
       response
-        .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+        .writeHead(200, {
+          'content-type': 'text/html',
+          'cache-control': 'no-store',
+        })
         .end(presentationSmokeHtml(evidence.smokeId))
     })
     await new Promise((resolve, reject) => {
@@ -698,11 +778,17 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
     child.on('error', (error) => {
       evidence.spawnError = String(error)
     })
-    child.stderr.on('data', (data) => {
-      if (evidence.stderr.length < 64_000) evidence.stderr += data.toString()
-    })
-    const browserIdentity = await identity(child.pid)
+    // Read before yielding: the original child cannot be reaped and its PID reused in this turn.
+    const browserIdentity = parsedProcessIdentity(
+      child.pid,
+      readFileSync(`/proc/${child.pid}/stat`, 'utf8'),
+    )
+    assert.equal(browserIdentity.parentPid, process.pid, 'Direct child launch custody required')
+    assert.equal(browserIdentity.processGroup, child.pid, 'Detached owned process group required')
+    assert(/^\d+$/.test(browserIdentity.startTimeTicks), 'Launch-time process birth required')
+    evidence.launchProcessIdentity = browserIdentity
     owned.push(browserIdentity)
+    child.stderr.on('data', headedDiagnosticObserver(evidence))
     const endpoint = await devtoolsEndpoint(profile, child)
     browser = await chromium.connectOverCDP(endpoint, { timeout: 5000 })
     const session = await boundedSmokeOperation(() => browser.newBrowserCDPSession(), 2000)
@@ -738,15 +824,19 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       await boundedSmokeOperation(() => pageSession.send('Target.getTargetInfo'), 2000)
     ).targetInfo
     const window = await boundedSmokeOperation(
-      () => pageSession.send('Browser.getWindowForTarget', { targetId: target.targetId }),
+      () =>
+        pageSession.send('Browser.getWindowForTarget', {
+          targetId: target.targetId,
+        }),
       2000,
     )
     const facts = await boundedSmokeOperation(
       () =>
         page.evaluate(() => {
-          const gl = document
-            .querySelector('canvas')
-            .getContext('webgl2', { antialias: false, preserveDrawingBuffer: true })
+          const gl = document.querySelector('canvas').getContext('webgl2', {
+            antialias: false,
+            preserveDrawingBuffer: true,
+          })
           if (!gl) throw new Error('Hardware WebGL2 context unavailable')
           const extension = gl.getExtension('WEBGL_debug_renderer_info')
           return {
@@ -773,8 +863,13 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       2500,
     )
     const systemInfo = await boundedSession.send('SystemInfo.getInfo')
-    evidence.hardware = { gpu: systemInfo.gpu, page: facts, compositor, window }
-    assertHeadedSurfaceTransport(evidence.stderr)
+    evidence.hardware = {
+      gpu: systemInfo.gpu,
+      page: facts,
+      compositor,
+      window,
+    }
+    assertObservedHeadedTransport(evidence)
     const actualBackend = assertHeadedHardware({
       provenance,
       executable,
@@ -785,6 +880,11 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       gl: facts,
     })
     owned = await processCustody(boundedSession, child.pid)
+    assert.equal(
+      owned.find((entry) => entry.pid === child.pid)?.startTimeTicks,
+      browserIdentity.startTimeTicks,
+      'Launch-time browser birth must match CDP custody',
+    )
     evidence.ownedProcesses = owned
     evidence.actualBackend = actualBackend
     const geometry = await settleOwnedWindowGeometry({
@@ -804,8 +904,15 @@ export async function launchOwnedHeadedBrowser({ executablePath, taskRoot, obser
       url,
       viewport: { width: geometry.page.width, height: geometry.page.height },
     }
-    assertHeadedSurfaceTransport(evidence.stderr)
-    return { page, session: pageSession, evidence, ownership, actualBackend, close }
+    assertObservedHeadedTransport(evidence)
+    return {
+      page,
+      session: pageSession,
+      evidence,
+      ownership,
+      actualBackend,
+      close,
+    }
   } catch (error) {
     if (error.ownedWindowObservations) evidence.windowObservations = error.ownedWindowObservations
     error.launchEvidence = evidence
@@ -828,7 +935,6 @@ export async function runHeadedPresentationSmoke(options) {
       ownership: owned.ownership,
       smokeId: owned.evidence.smokeId,
     })
-    owned.evidence.status = 'PASS_SETUP_ONLY'
   } catch (error) {
     owned.evidence.presentation = error.smokeEvidence
     failure = error
@@ -840,10 +946,16 @@ export async function runHeadedPresentationSmoke(options) {
       failure ??= error
     }
   }
+  try {
+    assertObservedHeadedTransport(owned.evidence)
+  } catch (error) {
+    failure ??= error
+  }
   if (failure) {
     owned.evidence.status = 'UNKNOWN_FAILED_SETUP'
     failure.launchEvidence = owned.evidence
     throw failure
   }
+  owned.evidence.status = 'PASS_SETUP_ONLY'
   return owned.evidence
 }
