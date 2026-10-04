@@ -66,6 +66,11 @@ export class TreeSitterSourceChunkRetention {
     this.sourceDocumentEpochs.set(documentId, this.currentSourceEpoch(documentId) + 1)
   }
 
+  public retireDocument(documentId: string): void {
+    if (this.sentSourceChunkLengths.has(documentId)) return
+    this.sourceDocumentEpochs.delete(documentId)
+  }
+
   public clear(): void {
     this.sentSourceChunkLengths.clear()
     this.latestDescriptors.clear()
