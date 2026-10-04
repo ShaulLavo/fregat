@@ -6,8 +6,11 @@ import { createLogger, createServer } from 'vite'
 import { expect, test } from 'vitest'
 import { checkoutRoot, evidenceRoot as retainedEvidenceRoot } from './paths'
 import { isPortAvailable, selectAvailablePort } from '../runtime-network'
+import { chromiumUnavailable } from './browser-prerequisites'
 
-test('cold dev startup loads Settings without replacing the optimizer graph', async () => {
+const it = test.skipIf(chromiumUnavailable)
+
+it('cold dev startup loads Settings without replacing the optimizer graph', async () => {
   const scratch = await mkdtemp(path.join(tmpdir(), 'fregat-vite-startup-'))
   const evidenceRoot = path.join(scratch, 'evidence')
   const retainedEvidence = path.join(retainedEvidenceRoot, path.basename(scratch))
