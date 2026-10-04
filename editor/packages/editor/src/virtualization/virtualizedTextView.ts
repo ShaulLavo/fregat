@@ -1584,7 +1584,7 @@ export class VirtualizedTextView {
   private renderSnapshot(snapshot: FixedRowVirtualizerSnapshot): void {
     if (this.view.provisional) {
       this.freezeProvisionalScroll()
-      this.view.onViewportChange?.()
+      this.reportViewportChange()
       return
     }
     if (this.atomicRenderDepth > 0 || this.applyingEdit) {
@@ -1620,7 +1620,7 @@ export class VirtualizedTextView {
     updateSpacerWidth(view, snapshot.viewportWidth)
     const key = rowsKey(view, snapshot)
     if (key === view.lastRenderedRowsKey) {
-      view.onViewportChange?.()
+      this.reportViewportChange()
       this.flushPendingReveal()
       return
     }
@@ -1631,8 +1631,13 @@ export class VirtualizedTextView {
     renderTokenHighlights(view)
     for (const name of view.rangeHighlightGroups.keys()) renderRangeHighlight(view, name)
     renderSelectionHighlight(view)
-    view.onViewportChange?.()
+    this.reportViewportChange()
     this.flushPendingReveal()
+  }
+
+  private reportViewportChange(): void {
+    if (this.flushingAtomicRender) return
+    this.view.onViewportChange?.()
   }
 
   private synchronizeScrollPaint(
@@ -1660,6 +1665,7 @@ export class VirtualizedTextView {
     } finally {
       this.flushingAtomicRender = wasFlushing
     }
+    if (!wasFlushing) this.reportViewportChange()
   }
 
   /**
