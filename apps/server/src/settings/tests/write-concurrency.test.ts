@@ -351,10 +351,13 @@ describe('collection intent', () => {
     ])
 
     const values = store.snapshot().values
-    expect(values['keybindings.overrides']).toMatchObject([
-      { keys: 'Mod+1', command: 'command.one' },
-      { keys: 'Mod+2', command: 'command.two' },
-    ])
+    expect(values['keybindings.overrides']).toHaveLength(2)
+    expect(values['keybindings.overrides']).toEqual(
+      expect.arrayContaining([
+        { keys: 'Mod+1', command: 'command.one' },
+        { keys: 'Mod+2', command: 'command.two' },
+      ]),
+    )
     expect(values['models.hidden']).toEqual(expect.arrayContaining([alpha, beta]))
     expect(values['providers.instances']).toEqual(
       expect.arrayContaining([
@@ -362,6 +365,25 @@ describe('collection intent', () => {
         expect.objectContaining({ enabled: false, providerInstanceId: providerTwo }),
       ]),
     )
+  })
+
+  it.each([
+    ['command.one', 'command.two'],
+    ['command.two', 'command.one'],
+  ])('retains committed authored keybinding precedence from %s to %s', async (first, second) => {
+    const root = await tempRoot()
+    const store = createStore(root)
+    for (const command of [first, second]) {
+      await store.write({
+        mutationId: `authored-${command}`,
+        operations: [{ command, keys: ['Mod+K'], kind: 'keybinding.set' }],
+        target: 'user',
+      })
+    }
+    expect(store.snapshot().values['keybindings.overrides']).toEqual([
+      { keys: 'Mod+K', command: first },
+      { keys: 'Mod+K', command: second },
+    ])
   })
 
   it('preserves concurrent writes to the same command in different exact contexts', async () => {
