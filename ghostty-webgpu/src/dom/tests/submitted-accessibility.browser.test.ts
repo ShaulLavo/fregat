@@ -388,6 +388,8 @@ async function packagedFixture(mode: 'main' | 'webgl' | 'webgpu') {
     })
   }
   cleanups.push(() => terminal.dispose())
+  const background = terminal.appearance.rendererTheme.background
+  host.style.backgroundColor = `rgb(${background.r} ${background.g} ${background.b})`
   const errors: unknown[] = []
   terminal.on('error', (error) => errors.push(error))
   await terminal.open(host)
