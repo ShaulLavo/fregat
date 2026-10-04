@@ -170,6 +170,62 @@ test.each(['/', '/demo/', '/platform-api/'])(
 
 const checkout = path.resolve(import.meta.dirname, '../..')
 
+test.each([
+  ['release', 'Candidate release:'],
+  ['document', 'Candidate document status:'],
+  ['asset', 'Candidate asset status:'],
+])(
+  'failed candidate %s validation stops the server before reading stderr',
+  async (failure, message) => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-failed-'))
+    const release: Release = {
+      name: path.basename(directory),
+      directory,
+      web: path.join(directory, 'web'),
+      server: path.join(directory, 'server'),
+      previous: null,
+    }
+    try {
+      mkdirSync(release.web)
+      mkdirSync(release.server)
+      writeFileSync(path.join(release.web, 'index.html'), '<script src="/assets/main.js"></script>')
+      writeFileSync(
+        path.join(release.server, 'index.js'),
+        `
+import { readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+const failure = ${JSON.stringify(failure)}
+writeFileSync('candidate.pid', String(process.pid))
+console.error('candidate diagnostic')
+setTimeout(() => {
+  writeFileSync('watchdog-fired', '')
+  process.exit(0)
+}, 2000)
+Bun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch(request) {
+  const pathname = new URL(request.url).pathname
+  if (pathname === '/release') return Response.json({ release: failure === 'release' ? 'wrong' : ${JSON.stringify(release.name)}, server: { release: ${JSON.stringify(release.name)} } })
+  if (pathname === '/~probe/workbench') return new Response(readFileSync(path.join(process.env.WEB_ROOT, 'index.html')), { status: failure === 'document' ? 404 : 200 })
+  if (pathname === '/assets/main.js') return new Response('', { status: failure === 'asset' ? 404 : 200 })
+  return new Response('', { status: 401 })
+} })
+`,
+      )
+
+      await expect(bootCandidate(release)).rejects.toThrow(message)
+      expect(existsSync(path.join(directory, 'watchdog-fired'))).toBe(false)
+      expect(readFileSync(path.join(directory, 'candidate-server.log'), 'utf8')).toContain(
+        'candidate diagnostic',
+      )
+      const pid = Number(readFileSync(path.join(directory, 'candidate.pid'), 'utf8'))
+      expect(() => process.kill(pid, 0)).toThrow()
+      expect(existsSync(path.join(tmpdir(), `platform-deploy-${release.name}`))).toBe(false)
+      expect(existsSync(path.join(directory, 'candidate-check.json'))).toBe(false)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  },
+)
+
 function copyDeploymentSources(file: string, fixture: string, copied = new Set<string>()) {
   if (copied.has(file)) return
   copied.add(file)
