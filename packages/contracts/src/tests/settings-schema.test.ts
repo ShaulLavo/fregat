@@ -1,10 +1,11 @@
+import { presentSetting } from '../settings/documentation'
 import { spawnSync } from 'node:child_process'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { descriptorFor, SETTING_IDS } from '../settings/keys'
+import { SETTING_IDS } from '../settings/keys'
 import { SETTINGS_JSON_SCHEMA } from '../settings/schema'
 
 const temporaryDirectories: string[] = []
@@ -25,7 +26,7 @@ describe('settings JSON Schema', () => {
   it('derives descriptions and defaults from each descriptor', () => {
     for (const id of SETTING_IDS) {
       const property = SETTINGS_JSON_SCHEMA.properties[id]
-      const descriptor = descriptorFor(id)
+      const descriptor = presentSetting(id)
 
       expect(property.description).toBe(descriptor.description)
       expect(property.default).toEqual(descriptor.default)

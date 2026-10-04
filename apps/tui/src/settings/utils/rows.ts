@@ -1,7 +1,7 @@
+import { settingRowIds } from '@workspace/contracts/settings/presentation'
+import { presentSetting } from '@workspace/contracts/settings/documentation'
 import { settingRowTitle } from '@workspace/client-core/settings/humanize'
 import {
-  descriptorFor,
-  settingRowIds,
   type SettingId,
   type SettingsSnapshot,
   type SettingsDiagnostic,
@@ -20,8 +20,8 @@ export function settingOptions(ids: readonly SettingId[]) {
 export function settingDetails(id: SettingId, snapshot: Pick<SettingsSnapshot, 'values'>) {
   return settingRowIds(id).map((key) => ({
     id: key,
-    description: descriptorFor(key).description,
-    scope: descriptorFor(key).scope,
+    description: presentSetting(key).description,
+    scope: presentSetting(key).scope,
     value: JSON.stringify(snapshot.values[key], null, 2),
   }))
 }

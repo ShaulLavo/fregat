@@ -1,4 +1,4 @@
-import { settingsDiagnosticLabel } from '@workspace/client-core/settings/humanize'
+import { settingsDiagnosticLabel } from '@workspace/client-core/settings/diagnostic-label'
 import type {
   SettingId,
   SettingsDiagnostic,

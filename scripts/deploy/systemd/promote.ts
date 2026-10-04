@@ -38,6 +38,8 @@ export type LiveCheckTarget = {
   previous: string | null
   /** The checkout that holds live-check.mjs. */
   source: string
+  /** The deployed page URL recorded by this release. */
+  meshUrl: string
 }
 
 export type LiveCheckCommand = { argv: string[]; cwd: string; env: Record<string, string> }
@@ -65,6 +67,7 @@ export function liveCheckCommand(
   const argv = [
     Bun.which('node', { PATH }) ?? 'node',
     path.join(target.source, 'scripts/deploy/live-check.mjs'),
+    `--target=${target.meshUrl}`,
     `--release=${target.name}`,
     `--out=${target.directory}`,
     `--baseline=${baseline}`,
@@ -198,7 +201,14 @@ function startLiveCheck(directory: string, previous: string | null, root: string
   if (config?.liveCheck === false) return log('live check skipped (--skip-live-check)')
   if (!config?.source) return log(`live check skipped: ${directory} records no source checkout`)
 
-  const target = { name: path.basename(directory), directory, previous, source: config.source }
+  if (!config.meshUrl) return log(`live check skipped: ${directory} records no target URL`)
+  const target = {
+    name: path.basename(directory),
+    directory,
+    previous,
+    source: config.source,
+    meshUrl: config.meshUrl,
+  }
   const unit = launchLiveCheck(target, root, launch)
   log(unit ? `live check started in ${unit}` : 'live check did not start')
 }
@@ -233,9 +243,13 @@ export function spawnLauncher(argv: readonly string[]) {
   return false
 }
 
-function readConfig(
-  directory: string,
-): { liveCheck?: boolean; source?: string; readiness?: unknown; previousRelease?: unknown } | null {
+function readConfig(directory: string): {
+  liveCheck?: boolean
+  source?: string
+  meshUrl?: string
+  readiness?: unknown
+  previousRelease?: unknown
+} | null {
   try {
     return JSON.parse(readFileSync(path.join(directory, 'build-config.json'), 'utf8'))
   } catch {

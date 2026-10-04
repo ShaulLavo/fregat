@@ -1,4 +1,5 @@
-import { descriptorFor, SETTING_IDS, type SettingId } from './keys'
+import { SETTING_IDS, type SettingId } from './keys'
+import { presentSetting } from './documentation'
 import type { SettingDescriptor, SettingScope } from './registry'
 
 /**
@@ -35,7 +36,7 @@ export function defaultSettingsDocument(): string {
   let category: string | null = null
 
   SETTING_IDS.forEach((id, index) => {
-    const descriptor = descriptorFor(id)
+    const descriptor = presentSetting(id)
     if (index > 0) lines.push('')
     if (descriptor.category !== category) {
       category = descriptor.category

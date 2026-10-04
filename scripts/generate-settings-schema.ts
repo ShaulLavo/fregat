@@ -8,7 +8,8 @@ import path from 'node:path'
 import { toJsonSchema } from '@valibot/to-json-schema'
 import { format } from 'oxfmt'
 
-import { SETTINGS_REGISTRY } from '../packages/contracts/src/settings/keys'
+import { SETTING_IDS } from '../packages/contracts/src/settings/keys'
+import { presentSetting } from '../packages/contracts/src/settings/documentation'
 
 const DRAFT_07 = 'http://json-schema.org/draft-07/schema#'
 const CONVERTER_OPTIONS: NonNullable<Parameters<typeof toJsonSchema>[1]> = {
@@ -36,10 +37,7 @@ const ORDER_INSENSITIVE_ARRAY_KEYS = new Set([
 
 export function generateSettingsSchema(): JsonObject {
   const properties = Object.fromEntries(
-    Object.entries(SETTINGS_REGISTRY).map(([id, descriptor]) => [
-      id,
-      settingPropertySchema(descriptor),
-    ]),
+    SETTING_IDS.map((id) => [id, settingPropertySchema(presentSetting(id))]),
   )
 
   return normalizeSchema({
@@ -50,9 +48,7 @@ export function generateSettingsSchema(): JsonObject {
   }) as JsonObject
 }
 
-function settingPropertySchema(
-  descriptor: (typeof SETTINGS_REGISTRY)[keyof typeof SETTINGS_REGISTRY],
-): JsonObject {
+function settingPropertySchema(descriptor: ReturnType<typeof presentSetting>): JsonObject {
   const converted = withoutRootSchema(
     toJsonSchema(descriptor.schema, CONVERTER_OPTIONS) as JsonObject,
   )
@@ -108,7 +104,7 @@ async function schemaText(): Promise<string> {
 async function writeSchema(target: string): Promise<void> {
   const content = await schemaText()
   await writeFile(target, content, 'utf8')
-  console.log(`wrote ${target} (${Object.keys(SETTINGS_REGISTRY).length} settings)`)
+  console.log(`wrote ${target} (${SETTING_IDS.length} settings)`)
 }
 
 async function checkSchema(target: string): Promise<void> {

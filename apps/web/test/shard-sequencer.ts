@@ -22,7 +22,7 @@ export default class DurationSequencer extends BaseSequencer {
     const root = this.ctx.config.root
     const weighted = files
       .map((spec) => {
-        const key = path.relative(root, spec.moduleId)
+        const key = path.relative(root, spec.moduleId).replaceAll('\\', '/')
         return { key, spec, weight: (durations[key] ?? fallback) + FILE_OVERHEAD_SECONDS }
       })
       .sort((a, b) => b.weight - a.weight || compareKeys(a.key, b.key))

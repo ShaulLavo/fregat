@@ -8,7 +8,7 @@
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey.
 - Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately
   requested.
-- Every plan changes the server except where noted: deploy with `bun run deploy --server`.
+- Every plan changes the server except where noted: deploy with `bun run install-release --server`.
 
 ## Outcome
 

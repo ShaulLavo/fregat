@@ -3,9 +3,10 @@
  * browser on this machine is at hand (over SSH, say). Made over loopback, which only this machine
  * reaches; the link works once, for 5 minutes, and is printed here and nowhere else.
  */
-import { meshOrigin, meshUrl, serverPort } from './deploy/config'
+import { meshOrigin, meshUrl, requireDeployTarget, serverPort } from './deploy/config'
 import { createScriptError } from './structured-errors'
 
+requireDeployTarget()
 const response = await fetch(`http://127.0.0.1:${serverPort}/pairing/links`, {
   method: 'POST',
   headers: { origin: meshOrigin },
