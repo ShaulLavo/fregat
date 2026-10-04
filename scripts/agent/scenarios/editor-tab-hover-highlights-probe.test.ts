@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest'
+import { computeFixedRowVisibleRange } from '../../../editor/packages/editor/src/virtualization/fixedRowVirtualizer'
 import {
+  sourceTokenPaintWindow,
   tokenPaintMismatch,
   tokenPaintHandoff,
   type TokenPaintReference,
@@ -63,6 +65,39 @@ test('rejects one colored range while the remaining token install is delayed', (
   expect(tokenPaintMismatch({ ...complete, runs: complete.runs.slice(0, 1) }, reference)).toBe(
     'token offsets or styles',
   )
+})
+
+test('rejects both truncated copies when a stale controller row count clips its own window', () => {
+  const geometryWindow = { start: 0, end: Math.ceil(60 / 20) }
+  const fullWindow = computeFixedRowVisibleRange({
+    count: 3,
+    rowHeight: 20,
+    scrollTop: 0,
+    viewportHeight: 60,
+  })
+  const staleWindow = computeFixedRowVisibleRange({
+    count: 1,
+    rowHeight: 20,
+    scrollTop: 0,
+    viewportHeight: 60,
+  })
+  expect(fullWindow).toEqual({ start: 0, end: 3 })
+  expect(staleWindow).toEqual({ start: 0, end: 1 })
+  const window = sourceTokenPaintWindow({ source: reference.source, geometryWindow })
+  expect(window).toEqual(fullWindow)
+  expect(tokenPaintMismatch({ ...complete, window }, reference)).toBeNull()
+  const truncated = {
+    ...complete,
+    window: staleWindow,
+    rows: complete.rows.slice(0, 1),
+    runs: complete.runs.slice(0, 2),
+  }
+  for (const frame of [truncated, { ...truncated }])
+    expect(tokenPaintMismatch({ ...frame, window }, reference)).toBe('source rows')
+  expect(
+    sourceTokenPaintWindow({ source: reference.source, geometryWindow: { start: 0, end: 6 } }),
+  ).toEqual(fullWindow)
+  expect(sourceTokenPaintWindow({ source: reference.source, geometryWindow: null })).toBeNull()
 })
 
 test('rejects stale revision, configuration and document independently of identical paint', () => {

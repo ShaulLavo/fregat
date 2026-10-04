@@ -59,6 +59,7 @@ import { removeEditorVisibleSnapshotCacheForPath } from '@/lib/editor-visible-sn
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
   captureTokenPaint,
+  sourceTokenPaintWindow,
   tokenPaintMismatch,
   resolveTokenPaintRuns,
   type TokenPaintReference,
@@ -977,16 +978,18 @@ function tryCurrentTokenPaint(
     inspection.visibleRows.some((row) => !row.firstWrapSegment)
   )
     throw new RangeError('folded and wrapped token paint require calibrated mapping')
+  const source = retained.buffer.materializeFullText()
+  const frame = captureTokenPaint({
+    source,
+    viewportSelector,
+    rowSelector: '.editor-virtualized-row',
+    excludedLayers:
+      '.editor-virtualized-selection-layer,.editor-virtualized-hidden-character-layer,.editor-virtualized-fold-placeholder,.editor-virtualized-gutter-row',
+    highlightPrefix: 'editor-shared-token-',
+  })
   return {
-    ...captureTokenPaint({
-      source: retained.buffer.materializeFullText(),
-      viewportSelector,
-      rowSelector: '.editor-virtualized-row',
-      excludedLayers:
-        '.editor-virtualized-selection-layer,.editor-virtualized-hidden-character-layer,.editor-virtualized-fold-placeholder,.editor-virtualized-gutter-row',
-      highlightPrefix: 'editor-shared-token-',
-    }),
-    window: inspection.viewport.visibleRange,
+    ...frame,
+    window: sourceTokenPaintWindow({ source, geometryWindow: frame.window }),
     identity: {
       document: retained.analysis.documentId,
       revision: retained.buffer.getRevision(),

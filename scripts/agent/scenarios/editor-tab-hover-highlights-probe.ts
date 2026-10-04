@@ -59,6 +59,18 @@ export type TokenPaintProbe = {
   readonly highlightPrefix: string
 }
 
+export function sourceTokenPaintWindow(input: {
+  readonly source: string
+  readonly geometryWindow: TokenPaintFrame['window']
+}): TokenPaintFrame['window'] {
+  if (!input.geometryWindow) return null
+  const lineCount = input.source.split('\n').length
+  return {
+    start: Math.min(input.geometryWindow.start, lineCount),
+    end: Math.min(input.geometryWindow.end, lineCount),
+  }
+}
+
 export function captureTokenPaint(probe: TokenPaintProbe): TokenPaintFrame {
   const sourceLines = probe.source.split('\n')
   const starts: number[] = []
