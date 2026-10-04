@@ -911,6 +911,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.scrollbar = undefined
     this.selection = undefined
     this.elementsValue = undefined
+    this.workerCanvasSize = undefined
     this.stateValue = 'disposed'
     disposeHostEmitters(this.emitters)
     return this.result(this.execution.dispose())
