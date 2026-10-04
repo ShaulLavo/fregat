@@ -1,3 +1,4 @@
+import { setRetainedSyntaxDisplayDemand } from './documentAnalysis'
 import type {
   EditorDocumentAnalysis,
   EditorRetainedSyntaxSession,
@@ -150,6 +151,9 @@ type PendingSyntaxWarm = {
 type CachedSyntaxFoldRange = {
   readonly range: EditorSyntaxRange
   readonly folds: readonly FoldRange[]
+  readonly result: EditorSyntaxResult
+  readonly snapshot: DocumentTextSnapshot
+  readonly tokenRanges: readonly EditorSyntaxRange[]
 }
 
 type InitialHighlightReplacement = 'all' | 'syntax' | 'theme'
@@ -251,6 +255,25 @@ export class EditorSyntaxController {
     taskClass: 'background-derived',
   })
   private currentTokens = EditorTokenStore.empty()
+  private rangeTokenOwner: {
+    readonly store: EditorTokenStore
+    readonly snapshot: DocumentTextSnapshot
+  } | null = null
+  private rangeCopyOwner: {
+    readonly store: EditorTokenStore
+    readonly contributor: CachedSyntaxFoldRange
+  } | null = null
+  private rangeScopeOwner: CachedSyntaxFoldRange | null = null
+  private stoppedWarm: {
+    readonly snapshot: DocumentTextSnapshot
+    readonly configurationGeneration: number
+  } | null = null
+  private lastRangeTrim: {
+    readonly snapshot: DocumentTextSnapshot
+    readonly ranges: readonly EditorSyntaxRange[]
+    readonly cache: readonly CachedSyntaxFoldRange[]
+    readonly store: EditorTokenStore
+  } | null = null
   private acceptedCopyTokens = EditorTokenStore.empty()
   private acceptedTokensDocumentVersion = -1
   private acceptedTokensTextVersion = -1
@@ -271,7 +294,89 @@ export class EditorSyntaxController {
   constructor(private readonly options: EditorSyntaxControllerOptions) {}
 
   setDisplayDemand(demand: EditorAnalysisDisplayDemand): void {
-    this.retainedSyntax?.setDisplayDemand(demand)
+    const changed = this.trimRangeCache(demand)
+    if (this.retainedSyntax)
+      setRetainedSyntaxDisplayDemand(this.retainedSyntax, demand, this.rangeContributors(demand))
+    if (changed) this.options.adoptTokens(this.currentTokens)
+  }
+
+  private rangeContributors(
+    demand: EditorAnalysisDisplayDemand,
+  ): readonly CachedSyntaxFoldRange[] | null {
+    if (
+      demand.kind !== 'frame' ||
+      this.rangeTokenOwner?.snapshot !== demand.snapshot ||
+      this.highlighterSession
+    )
+      return null
+    const contributors = this.cachedSyntaxFoldRanges.slice()
+    if (this.rangeCopyOwner?.store === this.copyTokens)
+      contributors.push(this.rangeCopyOwner.contributor)
+    if (this.rangeScopeOwner) contributors.push(this.rangeScopeOwner)
+    return contributors.filter((contributor) => contributor.snapshot === demand.snapshot)
+  }
+
+  private trimRangeCache(demand: EditorAnalysisDisplayDemand): boolean {
+    if (
+      demand.kind !== 'frame' ||
+      this.highlighterSession ||
+      this.rangeTokenOwner?.store !== this.currentTokens ||
+      this.rangeTokenOwner.snapshot !== demand.snapshot
+    )
+      return false
+    if (demand.snapshot !== this.options.getSession()?.getTextSnapshot()) return false
+    const visible = this.options.getVisibleSyntaxRange()
+    const ranges = visible ? appendCachedSyntaxRange(demand.ranges, visible) : demand.ranges
+    const previous = this.lastRangeTrim
+    if (
+      previous?.snapshot === demand.snapshot &&
+      previous.cache === this.cachedSyntaxFoldRanges &&
+      previous.store === this.currentTokens &&
+      sameSyntaxRanges(previous.ranges, ranges)
+    )
+      return false
+    const oldCache = this.cachedSyntaxFoldRanges
+    const tokenContributors = oldCache.filter((cached) =>
+      cached.tokenRanges.some((range) =>
+        ranges.some((protectedRange) => syntaxRangesIntersect(range, protectedRange)),
+      ),
+    )
+    const foldContributors = activeFoldContributors(oldCache, ranges)
+    const retained = new Set([...tokenContributors, ...foldContributors])
+    const nextCache = oldCache.filter((cached) => retained.has(cached))
+    const coverage = intersectSyntaxRanges(
+      tokenContributors.flatMap((cached) => cached.tokenRanges),
+      ranges,
+    )
+    const removed =
+      nextCache.length !== oldCache.length || !sameSyntaxRanges(this.cachedSyntaxRanges, coverage)
+    this.cachedSyntaxFoldRanges = nextCache
+    this.cachedSyntaxRanges = coverage
+    let changed = false
+    if (removed) {
+      const tokens = compactSyntaxRangeTokens(this.currentTokens, coverage)
+      this.currentTokens = tokens
+      this.rangeTokenOwner = { store: tokens, snapshot: demand.snapshot }
+      this.stopOptionalWarm(demand.snapshot)
+      changed = true
+    }
+    this.lastRangeTrim = {
+      snapshot: demand.snapshot,
+      ranges,
+      cache: nextCache,
+      store: this.currentTokens,
+    }
+    return changed
+  }
+
+  private stopOptionalWarm(snapshot: DocumentTextSnapshot): void {
+    this.stoppedWarm = {
+      snapshot,
+      configurationGeneration: this.initialHighlightConfigurationGeneration,
+    }
+    this.nextWarmGeneration()
+    this.pendingWarm = null
+    this.warmRangeRequests.cancel()
   }
 
   get status(): EditorSyntaxStatus {
@@ -368,6 +473,8 @@ export class EditorSyntaxController {
   }
 
   setTokens(tokens: EditorTokenStore, current = true, copyTokens = tokens): void {
+    if (this.rangeTokenOwner?.store !== tokens) this.rangeTokenOwner = null
+    if (!current || this.rangeCopyOwner?.store !== copyTokens) this.rangeCopyOwner = null
     if (!current && tokens !== this.currentTokens)
       this.acceptedCopyTokens = EditorTokenStore.empty()
     this.currentTokens = tokens
@@ -792,6 +899,12 @@ export class EditorSyntaxController {
     if (!this.options.getSession()) return
     if (!this.canQueryCurrentSyntaxRange()) return
     if (!seedRange) return
+    const snapshot = this.options.getSession()?.getTextSnapshot()
+    if (
+      this.stoppedWarm?.snapshot === snapshot &&
+      this.stoppedWarm.configurationGeneration === this.initialHighlightConfigurationGeneration
+    )
+      return
 
     const pendingWarm = {
       configurationGeneration: this.initialHighlightConfigurationGeneration,
@@ -1342,8 +1455,9 @@ export class EditorSyntaxController {
     // Ahead of the tokens, because adopting them is the only notification this pass sends the view
     // contributions: a bracket list assigned after it is a parse late to everyone reading the
     // snapshot, and on a document nobody touches after opening it that means never.
-    if (loadResult.range) this.rememberSyntaxRange(loadResult.range, result)
+    const contributor = loadResult.range ? this.rememberSyntaxRange(loadResult.range, result) : null
     if (applyScopeFacts) {
+      this.rangeScopeOwner = contributor
       this.currentBrackets = result.brackets
       this.currentInjections = result.injections
       this.syntaxStatus = result.degraded ? 'degraded' : 'ready'
@@ -1359,14 +1473,14 @@ export class EditorSyntaxController {
     }
     if (!this.highlighterSession) {
       const status: SettledHighlightStatus = result.degraded ? 'degraded' : 'painted'
+      const copyTokens = loadResult.range ? toEditorTokenStore(result.tokens) : nextTokens
+      this.rangeTokenOwner = contributor
+        ? { store: nextTokens, snapshot: contributor.snapshot }
+        : null
+      this.rangeCopyOwner = contributor ? { store: copyTokens, contributor } : null
       this.commitInitialHighlightStatus(
         status,
-        () =>
-          this.setTokens(
-            nextTokens,
-            true,
-            loadResult.range ? toEditorTokenStore(result.tokens) : nextTokens,
-          ),
+        () => this.setTokens(nextTokens, true, copyTokens),
         configurationGeneration,
       )
     }
@@ -1553,15 +1667,33 @@ export class EditorSyntaxController {
     this.options.notifyViewUpdate()
   }
 
-  private rememberSyntaxRange(range: EditorSyntaxRange, result: EditorSyntaxResult): void {
-    this.cachedSyntaxRanges = appendCachedSyntaxRange(this.cachedSyntaxRanges, range)
-    this.cachedSyntaxFoldRanges = appendCachedSyntaxFoldRange(this.cachedSyntaxFoldRanges, {
-      folds: result.folds,
+  private rememberSyntaxRange(
+    range: EditorSyntaxRange,
+    result: EditorSyntaxResult,
+  ): CachedSyntaxFoldRange | null {
+    const snapshot = this.options.getSession()?.getTextSnapshot()
+    if (!snapshot) return null
+    const contributor: CachedSyntaxFoldRange = {
       range,
-    })
+      result,
+      snapshot,
+      folds: result.folds,
+      tokenRanges: [range],
+    }
+    this.cachedSyntaxRanges = appendCachedSyntaxRange(this.cachedSyntaxRanges, range)
+    const previous = this.cachedSyntaxFoldRanges.map((cached) => ({
+      ...cached,
+      tokenRanges: subtractSyntaxRange(cached.tokenRanges, range),
+    }))
+    this.cachedSyntaxFoldRanges = appendCachedSyntaxFoldRange(previous, contributor)
+    return contributor
   }
 
   private clearSyntaxRangeCache(): void {
+    this.lastRangeTrim = null
+    this.rangeTokenOwner = null
+    this.rangeCopyOwner = null
+    this.rangeScopeOwner = null
     this.foldCoverage = null
     this.cachedSyntaxRanges = []
     this.cachedSyntaxFoldRanges = []
@@ -1583,6 +1715,7 @@ export class EditorSyntaxController {
       this.cachedSyntaxFoldRanges,
       edit,
       change.snapshot.length,
+      change.textSnapshot,
     )
   }
 
@@ -2087,13 +2220,17 @@ const projectCachedSyntaxFoldRanges = (
   ranges: readonly CachedSyntaxFoldRange[],
   edit: TextEdit,
   documentLength: number,
+  snapshot: DocumentTextSnapshot,
 ): readonly CachedSyntaxFoldRange[] => {
   const projected: CachedSyntaxFoldRange[] = []
   for (const range of ranges) {
     const nextRange = projectSyntaxRangeThroughInsertion(range.range, edit, documentLength)
     if (nextRange.endIndex <= nextRange.startIndex) continue
     projected.push({
+      ...range,
+      snapshot,
       range: nextRange,
+      tokenRanges: projectCachedSyntaxRanges(range.tokenRanges, edit, documentLength),
       folds: projectFoldRangesThroughInsertion(range.folds, edit, documentLength),
     })
   }
@@ -2352,4 +2489,79 @@ function composeSkippedChanges(
   const composed = chain.changesSince(point, null)
   if (!composed?.edits || composed.syncPointAfter !== chain.point) return change
   return { ...change, edits: composed.edits }
+}
+
+function sameSyntaxRanges(
+  left: readonly EditorSyntaxRange[],
+  right: readonly EditorSyntaxRange[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((range, index) => sameSyntaxRange(range, right[index]!))
+  )
+}
+function subtractSyntaxRange(
+  ranges: readonly EditorSyntaxRange[],
+  removed: EditorSyntaxRange,
+): readonly EditorSyntaxRange[] {
+  const remaining: EditorSyntaxRange[] = []
+  for (const range of ranges) {
+    if (!syntaxRangesIntersect(range, removed)) {
+      remaining.push(range)
+      continue
+    }
+    if (range.startIndex < removed.startIndex)
+      remaining.push({ startIndex: range.startIndex, endIndex: removed.startIndex })
+    if (range.endIndex > removed.endIndex)
+      remaining.push({ startIndex: removed.endIndex, endIndex: range.endIndex })
+  }
+  return remaining
+}
+function intersectSyntaxRanges(
+  ranges: readonly EditorSyntaxRange[],
+  protectedRanges: readonly EditorSyntaxRange[],
+): readonly EditorSyntaxRange[] {
+  let intersection: readonly EditorSyntaxRange[] = []
+  for (const range of ranges) {
+    for (const protectedRange of protectedRanges) {
+      const startIndex = Math.max(range.startIndex, protectedRange.startIndex)
+      const endIndex = Math.min(range.endIndex, protectedRange.endIndex)
+      if (endIndex > startIndex)
+        intersection = appendCachedSyntaxRange(intersection, { startIndex, endIndex })
+    }
+  }
+  return intersection
+}
+function activeFoldContributors(
+  contributors: readonly CachedSyntaxFoldRange[],
+  ranges: readonly EditorSyntaxRange[],
+): readonly CachedSyntaxFoldRange[] {
+  const winners = new Map<string, CachedSyntaxFoldRange>()
+  for (const contributor of contributors) {
+    for (const fold of contributor.folds) {
+      if (ranges.some((range) => foldIntersectsSyntaxRange(fold, range)))
+        winners.set(foldRangeKey(fold), contributor)
+    }
+  }
+  return [...new Set(winners.values())]
+}
+function compactSyntaxRangeTokens(
+  store: EditorTokenStore,
+  ranges: readonly EditorSyntaxRange[],
+): EditorTokenStore {
+  const tokens: ReturnType<EditorTokenStore['tokenAt']>[] = []
+  const selected = new Set<number>()
+  for (const range of ranges) {
+    const last = store.firstStartingAtOrAfter(range.endIndex)
+    store.forEachInRange(
+      store.firstEndingAfter(range.startIndex, last),
+      last,
+      (start, end, _style, index) => {
+        if (end <= range.startIndex || selected.has(index)) return
+        selected.add(index)
+        tokens.push({ start, end, style: store.styleAt(index) })
+      },
+    )
+  }
+  return EditorTokenStore.fromTokens(tokens)
 }
