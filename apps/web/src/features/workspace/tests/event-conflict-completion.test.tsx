@@ -4,11 +4,18 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { Toaster } from '@workspace/ui/components/sonner'
 
-import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import {
+  fileDocument,
+  fileDocumentKey,
+  fileResource,
+  filesystemPath,
+} from '@/lib/documents/utils/identity'
 import { fetchFile } from '@/lib/file-server'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
+import { fileSystemKeys } from '@/lib/query-keys'
 import {
   notifyChangedFilesystemConflict,
+  dismissFilesystemConflicts,
   type WorkspaceConflictContext,
 } from '@/features/workspace/state/event-conflict-adapter'
 import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
@@ -16,7 +23,15 @@ import { expect, test } from '../../../../test/fixtures'
 import { createObservedInProcessClient } from '../../../../test/client'
 import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'
 
-for (const change of ['none', 'conflict', 'destination'] as const) {
+for (const change of [
+  'none',
+  'conflict',
+  'destination',
+  'resolution',
+  'replacement',
+  'root-cleanup',
+  'stale-disk',
+] as const) {
   test(`toast overwrite completion preserves ${change === 'none' ? 'normal resolution' : `a newer ${change}`}`, async ({
     server,
     client,
@@ -62,9 +77,27 @@ for (const change of ['none', 'conflict', 'destination'] as const) {
       fireEvent.click(await screen.findByRole('button', { name: 'Compare' }))
       const conflict = Object.values(conflictStore.getState().conflicts)[0]!
       const resolution = documentStore.getState().getLiveEditorDocument(conflict.diffDocumentKey!)!
-      const resolutionSnapshot = resolution.buffer.getSnapshot()
       holdRead = true
+      if (change === 'stale-disk')
+        await writeFile(join(server.root, path), 'newer disk before write')
       fireEvent.click(screen.getByRole('button', { name: 'Keep my changes' }))
+      if (change === 'stale-disk') {
+        await waitFor(() =>
+          expect(
+            queryClient.getMutationCache().find({
+              mutationKey: workspaceMutationKeys.resolveConflict(conflict.id),
+            })?.state.status,
+          ).toBe('error'),
+        )
+        expect(await readFile(join(server.root, path), 'utf8')).toBe('newer disk before write')
+        expect(documents.getLiveEditorDocument(fileDocumentKey(path))?.buffer).toBe(
+          destination.buffer,
+        )
+        expect(destination.buffer.materializeFullText()).toBe(localText)
+        expect(conflictStore.getState().conflicts[conflict.id]).toBe(conflict)
+        expect(documents.getLiveEditorDocument(conflict.diffDocumentKey!)).toBe(resolution)
+        return
+      }
       await entered.promise
       expect(await readFile(join(server.root, path), 'utf8')).toBe(localText)
 
@@ -77,11 +110,22 @@ for (const change of ['none', 'conflict', 'destination'] as const) {
         setFileSnapshotQueryData(queryClient, incoming)
         act(() => notifyChangedFilesystemConflict(path, incoming, context))
       }
+      if (change === 'resolution') {
+        act(() => createEditorBufferSession(resolution.buffer).applyText('newer resolution '))
+      }
+      if (change === 'replacement') {
+        act(() => commands.discardLiveEditorDocument(fileDocument(fileResource(path))))
+        const reopened = documents.ensureLiveEditorDocument(remote)
+        act(() => createEditorBufferSession(reopened.buffer).applyText('reopened '))
+      }
+      if (change === 'root-cleanup') act(() => dismissFilesystemConflicts(conflictStore))
       const currentConflict = conflictStore.getState().conflicts[conflict.id]
+      const currentResolution = documents.getLiveEditorDocument(conflict.diffDocumentKey!)!
       const currentDestination = documents.getLiveEditorDocument(fileDocumentKey(path))!
       const currentText = currentDestination.buffer.materializeFullText()
-      const destinationSnapshot = destination.buffer.getSnapshot()
-      const destinationRevision = destination.buffer.getRevision()
+      const destinationSnapshot = currentDestination.buffer.getSnapshot()
+      const destinationRevision = currentDestination.buffer.getRevision()
+      const resolutionSnapshot = resolution.buffer.getSnapshot()
       released.resolve()
       await waitFor(() =>
         expect(
@@ -97,6 +141,10 @@ for (const change of ['none', 'conflict', 'destination'] as const) {
           documents.getLiveEditorDocument(fileDocumentKey(path))?.buffer.materializeFullText(),
         ).toBe(localText)
         expect(documents.getLiveEditorDocument(fileDocumentKey(path))?.buffer.isDirty()).toBe(false)
+        expect(documents.getLiveEditorDocument(conflict.diffDocumentKey!)).toBeNull()
+        expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(path))).toMatchObject({
+          content: localText,
+        })
         await waitFor(() => expect(screen.queryByRole('button', { name: 'Compare' })).toBeNull())
         return
       }
@@ -105,17 +153,25 @@ for (const change of ['none', 'conflict', 'destination'] as const) {
       ).toBe(currentText)
       expect(documents.getLiveEditorDocument(fileDocumentKey(path))).toBe(currentDestination)
       expect(conflictStore.getState().conflicts[conflict.id]).toBe(currentConflict)
-      expect(screen.getByRole('button', { name: 'Compare' })).toBeVisible()
+      if (change === 'root-cleanup') {
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Compare' })).toBeNull())
+      }
+      if (change !== 'root-cleanup')
+        expect(screen.getByRole('button', { name: 'Compare' })).toBeVisible()
       expect(documentStore.getState().getLiveEditorDocument(conflict.diffDocumentKey!)).toBe(
-        resolution,
+        currentResolution,
       )
+      expect(currentResolution.buffer).toBe(resolution.buffer)
       expect(resolution.buffer.getSnapshot()).toBe(resolutionSnapshot)
-      expect(destination.buffer.getSnapshot()).toBe(destinationSnapshot)
-      expect(destination.buffer.getRevision()).toBe(destinationRevision)
-      expect(destination.buffer.isDirty()).toBe(true)
+      expect(currentDestination.buffer.getSnapshot()).toBe(destinationSnapshot)
+      expect(currentDestination.buffer.getRevision()).toBe(destinationRevision)
+      expect(currentDestination.buffer.isDirty()).toBe(true)
+      expect(queryClient.getQueryState(fileSystemKeys.fileSnapshot(path))?.isInvalidated).toBe(true)
       expect(await readFile(join(server.root, path), 'utf8')).toBe(
         change === 'conflict' ? 'new incoming revision' : localText,
       )
+      act(() => createEditorBufferSession(currentDestination.buffer).undo())
+      expect(currentDestination.buffer.materializeFullText()).not.toBe(currentText)
     } finally {
       released.resolve()
     }

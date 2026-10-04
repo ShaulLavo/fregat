@@ -214,22 +214,60 @@ function resolveConflict(
 ): Promise<void> {
   return runMutation(
     context.queryClient,
-    conflictResolutionMutationOptions(id, (source) => applyResolvedConflict(id, source, context)),
+    conflictResolutionMutationOptions(id, () => applyResolvedConflict(id, resolution, context)),
     resolution,
   ).catch(() => undefined)
 }
 
 async function applyResolvedConflict(
   id: string,
-  resolution: 'editor' | 'local' | 'remote',
+  resolution: 'local' | 'remote',
   context: WorkspaceConflictContext,
 ) {
   const conflict = context.conflictStore.getState().conflicts[id]
   if (!conflict) return
 
-  if (resolution === 'local') await applyLocalConflict(conflict, context)
-  if (resolution === 'remote') await applyRemoteConflict(conflict, context)
+  const isCurrent = captureConflictCompletion(conflict, context)
+  const file =
+    resolution === 'local' ? await applyLocalConflict(conflict, context) : conflict.remoteFile
+  if (!isCurrent()) {
+    await context.queryClient.invalidateQueries({
+      exact: true,
+      queryKey: fileSystemKeys.fileSnapshot(conflict.remotePath),
+    })
+    return
+  }
+  if (file) adoptFilesystemSnapshot(conflict.localPath, file, context)
+  if (!file) discardResolvedEditorFile(conflict.localPath, context)
   finishConflict(conflict, context)
+}
+
+function captureConflictCompletion(
+  conflict: FilesystemConflict,
+  context: WorkspaceConflictContext,
+) {
+  const keys = [fileDocumentKey(conflict.localPath), fileDocumentKey(conflict.remotePath)]
+  if (conflict.diffDocumentKey) keys.push(conflict.diffDocumentKey)
+  const documentsCurrent = keys.map((key) => captureLiveDocument(key, context))
+  return () =>
+    context.conflictStore.getState().conflicts[conflict.id] === conflict &&
+    documentsCurrent.every((isCurrent) => isCurrent())
+}
+
+function captureLiveDocument(key: DocumentKey, context: WorkspaceConflictContext) {
+  const document = context.getLiveEditorDocument(key)
+  const snapshot = document?.buffer.getSnapshot()
+  const revision = document?.buffer.getRevision()
+  const dirty = document?.buffer.isDirty()
+  return () => {
+    const current = context.getLiveEditorDocument(key)
+    return (
+      current === document &&
+      current?.buffer.getSnapshot() === snapshot &&
+      current?.buffer.getRevision() === revision &&
+      current?.buffer.isDirty() === dirty
+    )
+  }
 }
 
 async function applyLocalConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
@@ -248,25 +286,12 @@ async function applyLocalConflict(conflict: FilesystemConflict, context: Workspa
     )
   }
 
-  const file = await context.fetchFile(conflict.remotePath, new AbortController().signal)
-  adoptFilesystemSnapshot(conflict.localPath, file, context)
+  return context.fetchFile(conflict.remotePath, new AbortController().signal)
 }
 
 async function restoreDeletedLocalConflict(conflict: FilesystemConflict, client: Client) {
   await ensureFolderPath(parentFilesystemPath(conflict.remotePath, filesystemPath('')), client)
   await createFileContent(conflict.remotePath, conflict.localText, client)
-}
-
-async function applyRemoteConflict(
-  conflict: FilesystemConflict,
-  context: WorkspaceConflictContext,
-) {
-  if (!conflict.remoteFile) {
-    discardResolvedEditorFile(conflict.localPath, context)
-    return
-  }
-
-  adoptFilesystemSnapshot(conflict.localPath, conflict.remoteFile, context)
 }
 
 export function adoptFilesystemSnapshot(
@@ -304,6 +329,7 @@ function discardResolvedEditorFile(path: FilesystemPath, context: WorkspaceConfl
 }
 
 function finishConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
+  if (context.conflictStore.getState().conflicts[conflict.id] !== conflict) return
   if (conflict.diffDocumentKey) {
     context.discardLiveEditorDocument({
       kind: 'conflict',
