@@ -1,3 +1,4 @@
+import provenanceFixtureText from '../../../../../test/fixtures/workbench-file-server/provenance/src/live.ts?raw'
 import { expect, test } from '../../../../../test/fixtures'
 import * as v from 'valibot'
 import { QueryClient } from '@tanstack/react-query'
@@ -24,6 +25,7 @@ test('cache and address rejection preserve dirty buffer Undo and saved IndexedDB
   const path = filesystemPath('provenance/src/live.ts')
   const client = getClient()
   const original = await fetchFile(path, new AbortController().signal, client)
+  expect(original.content).toBe(provenanceFixtureText)
   let reopenedPersistence: HistoryPersistenceService | undefined
   let reopenStore: ReturnType<typeof createEditorDocumentStore> | undefined
   try {

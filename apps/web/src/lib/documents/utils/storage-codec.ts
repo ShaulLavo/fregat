@@ -86,7 +86,7 @@ const storedDocumentSchema = v.variant('kind', [
   }),
 ])
 
-export const storedTabContentSchema = v.variant('kind', [
+const storedTabContentSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('settings') }),
   v.strictObject({
     kind: v.literal('document'),

@@ -5,7 +5,7 @@ import type { DocumentRef, ReopenScrollPosition, TabContent } from '@/lib/docume
 import { createClientError } from '@workspace/client-core/errors'
 import { TEST_SESSION_ID } from './chat'
 
-export const DOCUMENT_OLD_OBJECT_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+const DOCUMENT_OLD_OBJECT_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 export const DOCUMENT_NEW_OBJECT_ID = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 
 export const documentTargets = {

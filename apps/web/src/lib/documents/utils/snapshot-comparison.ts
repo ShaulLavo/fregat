@@ -1,7 +1,6 @@
 import type { EnvironmentId } from '@workspace/contracts'
 import type { FilesystemPath, GitComparison } from '@/lib/documents/utils/types'
 
-export type { ResolvedGitObjectId } from '@workspace/contracts'
 import type { ResolvedGitObjectId } from '@workspace/contracts'
 export type SnapshotComparison = Extract<GitComparison, { kind: 'snapshot' }>
 export type SnapshotComparisonScope = {
