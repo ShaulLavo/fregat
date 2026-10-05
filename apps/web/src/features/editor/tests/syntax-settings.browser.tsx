@@ -17,6 +17,36 @@ import { holdSyntaxWorkerReply } from '../../../../test/factories/syntax-setting
 
 const path = filesystemPath('repo/src/editor-tab-a.ts')
 
+test('calibrates the native worker delivery gate', async (context) => {
+  const gate = holdSyntaxWorkerReply('shiki')
+  const url = URL.createObjectURL(
+    new Blob(['onmessage = (event) => postMessage(event.data)'], { type: 'text/javascript' }),
+  )
+  const worker = new Worker(url)
+  const delivered: unknown[] = []
+  worker.onmessage = (event) => delivered.push(event.data)
+  try {
+    gate.arm()
+    performance.mark('editor.worker.request', {
+      detail: { family: 'shiki', type: 'edit', runtimeSessionId: 'calibration' },
+    })
+    worker.postMessage({ id: 1, payload: { type: 'edit', runtimeSessionId: 'calibration' } })
+    await expect.poll(() => gate.held()).not.toBeNull()
+    await context.annotate(
+      JSON.stringify({ held: gate.held(), delivered }),
+      'native-worker-delivery-calibration',
+    )
+    expect(delivered).toEqual([])
+    gate.release()
+    expect(delivered).toHaveLength(1)
+  } finally {
+    gate.restore()
+    worker.terminate()
+    URL.revokeObjectURL(url)
+    performance.clearMarks('editor.worker.request')
+  }
+})
+
 function SyntaxSettingsFixture() {
   const enabled = useSettingValue('editor.syntaxHighlighting.enabled')
   const settings = useSettingsActions()
@@ -58,9 +88,9 @@ test.for(['dark-plus', 'tree-sitter-dark'] as const)(
     expect(controller).toBeDefined()
     if (!controller) return
     const paint = () => captureRetentionAcceptancePaint(app, path, tab.id)
+    await awaitEditorSyntaxWorkerIdleFences()
     await expect.poll(() => controller.getSnapshot()?.syntaxStatus).toBe('ready')
     await expect.poll(() => controller.getSnapshot()?.initialHighlightStatus).toBe('painted')
-    await awaitEditorSyntaxWorkerIdleFences()
     const colored = paint()
     expect(new Set(colored.frame.runs.map((run) => run.style.color)).size).toBeGreaterThan(1)
     const groups = app.read().workspace.getState().workbenchPanels.editorGroups
@@ -183,8 +213,8 @@ test.for(['shiki', 'tree-sitter'] as const)(
     expect(controller).toBeDefined()
     if (!controller) return
     const paint = () => captureRetentionAcceptancePaint(app, path, tab.id)
-    await expect.poll(() => controller.getSnapshot()?.syntaxStatus).toBe('ready')
     await awaitEditorSyntaxWorkerIdleFences()
+    await expect.poll(() => controller.getSnapshot()?.syntaxStatus).toBe('ready')
     const originalSource = paint().source
     gate.arm()
     controller.commands.edit({ from: 0, to: 0, text: '// delayed syntax\n' })

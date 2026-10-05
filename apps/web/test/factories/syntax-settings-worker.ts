@@ -34,7 +34,11 @@ export function holdSyntaxWorkerReply(family: SyntaxWorkerFamily) {
       event.stopImmediatePropagation()
       held = { worker, event, request }
     }
+    const onmessage = worker.onmessage
+    // Worker target listeners run in registration order; hold before onmessage receives the reply.
+    worker.onmessage = null
     worker.addEventListener('message', listener, true)
+    worker.onmessage = onmessage
     listeners.set(worker, listener)
   }
 
