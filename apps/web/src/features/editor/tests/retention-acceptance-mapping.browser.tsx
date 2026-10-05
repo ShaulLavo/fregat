@@ -173,7 +173,7 @@ test.for(['folded', 'wrapped'] as const)(
       retentionAcceptanceProjectionMismatch(
         {
           ...frame,
-          identity: { ...frame.identity, configuration: 'deliberately stale configuration' },
+          identity: { ...frame.identity, configuration: 'deliberately corrupted identity label' },
         },
         projection,
       ),

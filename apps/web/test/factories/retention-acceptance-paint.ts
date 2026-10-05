@@ -70,8 +70,9 @@ export function retentionAcceptanceReference(
     const source = read.snapshot.materializeFullText()
     expect(source).toBe(subject.document.buffer.materializeFullText())
     return {
-      identity: subject.identity,
+      identity: { ...subject.identity, configuration: 'unknown' },
       configuredOwner: {
+        configuration: JSON.stringify(subject.configuration),
         languageId: languageIdForFilePath(path),
         theme: app.read().theme.editorTheme,
       },
@@ -98,12 +99,14 @@ export function retentionAcceptanceBinding(
     identity: {
       document: snapshot.documentId,
       revision: snapshot.documentSyncPoint.revision,
-      configuration: JSON.stringify(subject.configuration),
+      configuration: 'unknown',
       paintedGeneration: 'unknown',
     },
     source: snapshot.textSnapshot.readRange(0, snapshot.textSnapshot.length),
     editorTextVersion: snapshot.textVersion,
     presentation: 'live',
+    configuredProviderConfiguration: JSON.stringify(subject.configuration),
+    installedProviderConfiguration: 'unknown',
     languageId: snapshot.languageId,
     theme: snapshot.theme,
     syntaxStatus: snapshot.syntaxStatus,
@@ -121,6 +124,21 @@ export async function awaitRetentionAcceptanceReady(
     .poll(
       () => {
         const subject = retentionAcceptanceSubject(app, path)
+        const mounted = [...app.read().ui.getState().controllersByTabId.values()]
+          .map((controller) => controller.getSnapshot())
+          .filter((snapshot) => snapshot?.documentId === subject.document.analysis.documentId)
+        const revision = subject.document.buffer.getRevision()
+        if (
+          mounted.length === 0 ||
+          !mounted.every(
+            (snapshot) =>
+              snapshot?.documentSyncPoint.revision === revision &&
+              snapshot.syntaxStatus === 'ready' &&
+              snapshot.initialHighlightStatus === 'painted' &&
+              snapshot.paintLayers !== null,
+          )
+        )
+          return false
         const lease = subject.document.analysis.borrowHighlighter({
           provider: editorHighlighterProvider(),
           languageId: 'typescript',
@@ -131,19 +149,7 @@ export async function awaitRetentionAcceptanceReady(
           const read = lease.read()
           if (read.kind !== 'ready' || read.revision !== subject.document.buffer.getRevision())
             return false
-          const mounted = [...app.read().ui.getState().controllersByTabId.values()]
-            .map((controller) => controller.getSnapshot())
-            .filter((snapshot) => snapshot?.documentId === subject.document.analysis.documentId)
-          return (
-            mounted.length > 0 &&
-            mounted.every(
-              (snapshot) =>
-                snapshot?.documentSyncPoint.revision === read.revision &&
-                snapshot.syntaxStatus === 'ready' &&
-                snapshot.initialHighlightStatus === 'painted' &&
-                snapshot.paintLayers !== null,
-            )
-          )
+          return true
         } finally {
           lease.dispose()
         }

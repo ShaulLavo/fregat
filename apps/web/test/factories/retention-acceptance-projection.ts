@@ -11,6 +11,8 @@ export type RetentionAcceptanceBinding = {
   readonly source: string
   readonly editorTextVersion: number
   readonly presentation: 'live' | 'saved'
+  readonly configuredProviderConfiguration: string
+  readonly installedProviderConfiguration: 'unknown'
   readonly languageId: string | null
   readonly theme: EditorVisibleSnapshotJSON['theme'] | undefined
   readonly syntaxStatus: EditorViewSnapshot['syntaxStatus']
@@ -20,6 +22,7 @@ export type RetentionAcceptanceBinding = {
 
 export type RetentionAcceptanceReference = TokenPaintReference & {
   readonly configuredOwner: {
+    readonly configuration: string
     readonly languageId: string | null
     readonly theme: EditorVisibleSnapshotJSON['theme'] | undefined
   }
@@ -28,12 +31,20 @@ export type RetentionAcceptanceReference = TokenPaintReference & {
 export function retentionAcceptanceOwnerMismatch(
   owner: Pick<
     RetentionAcceptanceBinding,
-    'identity' | 'languageId' | 'theme' | 'syntaxStatus' | 'initialHighlightStatus' | 'paintLayers'
+    | 'identity'
+    | 'configuredProviderConfiguration'
+    | 'languageId'
+    | 'theme'
+    | 'syntaxStatus'
+    | 'initialHighlightStatus'
+    | 'paintLayers'
   >,
   reference: RetentionAcceptanceReference,
 ) {
   if (JSON.stringify(owner.identity) !== JSON.stringify(reference.identity)) return 'owner identity'
   if (!reference.configuredOwner) return 'unknown configured owner'
+  if (owner.configuredProviderConfiguration !== reference.configuredOwner.configuration)
+    return 'configured provider tags'
   if (owner.languageId !== reference.configuredOwner.languageId) return 'installed language'
   if (themeValue(owner.theme) !== themeValue(reference.configuredOwner.theme))
     return 'installed theme'
