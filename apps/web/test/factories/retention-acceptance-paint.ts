@@ -5,6 +5,10 @@ import { allEditorGroups } from '@/lib/documents/utils/groups'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { projectSettings } from '@workspace/client-core/settings/projection'
+import { settingsIntentStore } from '@workspace/client-core/settings/intent-store'
+import type { SettingsSnapshot } from '@workspace/contracts'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import {
   captureTokenPaint,
@@ -14,6 +18,7 @@ import {
   type TokenPaintObservation,
 } from '../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
 import type { RetentionAcceptanceApp } from './retention-acceptance-app'
+import { settingsSnapshot } from './settings'
 import type { EditorViewSnapshot } from '@singapore-editor/core/editor'
 import { languageIdForFilePath } from '@/lib/file-language'
 import {
@@ -113,6 +118,32 @@ export function retentionAcceptanceBinding(
     initialHighlightStatus: snapshot.initialHighlightStatus,
     paintLayers: snapshot.paintLayers,
   }
+}
+
+export async function configureRetentionAcceptanceSyntax(
+  app: RetentionAcceptanceApp,
+  enabled: boolean,
+) {
+  await app.queryClient.cancelQueries({ queryKey: settingsKeys.document(), exact: true })
+  app.queryClient.setQueryData(
+    settingsKeys.document(),
+    settingsSnapshot({ values: { 'editor.syntaxHighlighting.enabled': enabled } }),
+  )
+  await expect
+    .poll(() => {
+      const snapshot = app.queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document())
+      const intents = settingsIntentStore
+        .getState()
+        .active.filter((entry) => entry.patch.owner === app.queryClient)
+      return {
+        confirmed: snapshot?.values['editor.syntaxHighlighting.enabled'],
+        projected: snapshot
+          ? projectSettings(snapshot, intents).values['editor.syntaxHighlighting.enabled']
+          : undefined,
+        mirror: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+      }
+    })
+    .toEqual({ confirmed: enabled, projected: enabled, mirror: enabled })
 }
 
 export type RetentionAcceptanceReadyDiagnostics = {

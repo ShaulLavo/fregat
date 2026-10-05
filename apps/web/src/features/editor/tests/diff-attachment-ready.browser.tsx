@@ -9,7 +9,6 @@ import { projectSettings } from '@workspace/client-core/settings/projection'
 import { settingsIntentStore } from '@workspace/client-core/settings/intent-store'
 import type { SettingsSnapshot } from '@workspace/contracts'
 import { ensureFileSnapshotQuery } from '@/lib/file-snapshot-query-cache'
-import { syncEditorThemeSelection } from '@/features/editor/state/color-theme-store'
 import {
   awaitEditorSyntaxWorkerIdleFences,
   EDITOR_THEME_SOURCE,
@@ -19,8 +18,10 @@ import { joinRenderLines, projectDiffSyntaxTokens } from '@singapore-editor/diff
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { mountRetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
 import type { RetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
+import { settingsSnapshot } from '../../../../test/factories/settings'
 import {
   awaitRetentionAcceptanceReady,
+  configureRetentionAcceptanceSyntax,
   type RetentionAcceptanceReadyDiagnostics,
   retentionAcceptanceSubject,
 } from '../../../../test/factories/retention-acceptance-paint'
@@ -92,6 +93,7 @@ test(
   { timeout: 30_000 },
   async (context) => {
     const app = await mountRetentionAcceptanceApp()
+    await configureRetentionAcceptanceSyntax(app, true)
     const saved = await ensureFileSnapshotQuery(app.queryClient, path)
     expect(await app.read().commands.openFileSurface(path)).toMatchObject({ status: 'applied' })
     await awaitRetentionAcceptanceReady(app, path)
@@ -233,6 +235,7 @@ test.for(['resolve', 'reject'] as const)(
   { timeout: 30_000 },
   async (outcome, context) => {
     const app = await mountRetentionAcceptanceApp()
+    await configureRetentionAcceptanceSyntax(app, true)
     await ensureFileSnapshotQuery(app.queryClient, path)
     expect(await app.read().commands.openFileSurface(path)).toMatchObject({ status: 'applied' })
     const phases: unknown[] = []
@@ -290,7 +293,15 @@ test.for(['resolve', 'reject'] as const)(
     const editing = createEditorBufferSession(document.buffer)
     editing.setSelection(0, 'export const oldLoan = 10\n'.length)
     editing.applyText('export const currentLoan = 20\n')
-    syncEditorThemeSelection('dark', 'tree-sitter-dark')
+    app.queryClient.setQueryData(
+      settingsKeys.document(),
+      settingsSnapshot({
+        values: {
+          'editor.syntaxHighlighting.enabled': true,
+          'editor.codeTheme.dark': 'tree-sitter-dark',
+        },
+      }),
+    )
     await expect.poll(() => app.read().theme.appliedThemeId).toBe('tree-sitter-dark')
     await expect
       .poll(() => app.container.querySelector('.editor-diff-pane')?.getAttribute('data-syntax'))
