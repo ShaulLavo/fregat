@@ -1,17 +1,18 @@
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
+import type { DiffAttachment } from '@/lib/diff-attachment'
+import { createTabPresentation } from '@/features/editor/state/tab-presentation'
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 import {
   createDiffEditorOptions,
   createDiffPlugin,
-  type DiffFile,
   type DiffGutterSide,
   type DiffRegionStore,
   type DiffSyntaxBackend,
 } from '@singapore-editor/diff'
 import { EditorHost, useEditor } from '@singapore-editor/react'
 import type { Editor } from '@singapore-editor/core/editor'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffectEvent, useLayoutEffect, useMemo, useState } from 'react'
 
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
@@ -39,9 +40,9 @@ import { diffSyntaxState } from '@/features/editor/utils/diff-syntax-state'
  * with the diff plugin supplying the rows, the gutter and the expansion clicks.
  */
 export function DiffPane({
-  file,
+  attachment,
   languageServer = null,
-  presentation,
+  presentation: suppliedPresentation,
   regions,
   side,
   syntaxBackend,
@@ -53,7 +54,7 @@ export function DiffPane({
   onRegisterEditor,
   onScroll,
 }: {
-  file: DiffFile | null
+  attachment: DiffAttachment
   /** Present only where a language server may safely be asked about this diff; see `useDiffLanguage`. */
   languageServer?: DiffLanguageServerContext | null
   presentation?: DiffPanePresentation
@@ -67,8 +68,15 @@ export function DiffPane({
   theme: EditorTheme
   onFocus?: (side: DiffGutterSide) => void
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void
-  onScroll?: (side: DiffGutterSide, position: DiffScrollPosition) => void
+  onScroll?: (
+    side: DiffGutterSide,
+    position: DiffScrollPosition,
+    kind: 'restoration' | 'scroll',
+  ) => void
 }) {
+  const file = attachment.file
+  const [localPresentation] = useState(() => createTabPresentation().diffPanes[side])
+  const presentation = suppliedPresentation ?? localPresentation
   // Diff syntax reads row N's tokens from source line N; a patch holds only the lines git printed.
   const highlight = syntaxHighlight && file?.isPartial !== true
   // Manual memo: `plugin` is a useLayoutEffect dependency, and the compiler's cache is a
@@ -88,7 +96,7 @@ export function DiffPane({
     if (!presentation) return
     return bindDiffPlugin(presentation, plugin)
   }, [plugin, presentation])
-  const { rows, syntaxReady, text, tokensRevision } = useDiffRows(
+  const { rows, syntaxReady, text, tokensRevision, appliedFile } = useDiffRows(
     plugin,
     file,
     side,
@@ -101,8 +109,8 @@ export function DiffPane({
   // Manual, because the layout effect below depends on it and the compiler's cache is a cache,
   // not an identity guarantee: a recompute would re-register the context.
   const persistence = useMemo(
-    () => (presentation ? createDiffPresentationBinding(presentation) : null),
-    [presentation],
+    () => (presentation ? createDiffPresentationBinding(presentation, side) : null),
+    [presentation, side],
   )
   const plugins = [
     plugin,
@@ -117,10 +125,6 @@ export function DiffPane({
     ...createDiffEditorOptions(),
     keymapContext: { mode: 'diff', extension: file ? fileExtension(file.path) : '' },
     suspiciousCharacters: unicodeHighlights.options,
-    // No `document`: the React wrapper pushes text through `openDocument`, which takes no scroll
-    // position from us and therefore lands back at the top — so every expansion toggle, and every
-    // keystroke behind a compare-saved diff, would throw the reader's place away. `setText` is the
-    // one that carries the scroll position across, and it is what the package's own contract names.
     ...typography,
     gutterLeadingInset: side === 'new' ? 0 : gutterInset,
     hotkeys: keymap.hotkeys,
@@ -148,61 +152,80 @@ export function DiffPane({
     },
   })
 
-  const installedProjection = useRef<{ editor: Editor; text: string } | null>(null)
-
-  // The plugin re-projects its cached per-side token streams synchronously on a toggle, so the
-  // tokens read here already match the rows just pushed and paint with them.
-  useLayoutEffect(() => {
+  const publishRows = useEffectEvent(() => {
     const editor = controller.getEditor()
-    if (!editor) return
-
-    if (!file || rows !== plugin.getRows()) return
-    persistence?.detach()
-    const tokens = plugin.getTokens()
-    if (
-      installedProjection.current?.editor !== editor ||
-      installedProjection.current.text !== text
-    ) {
-      editor.setText(text, { tokens })
-      installedProjection.current = { editor, text }
-    } else {
-      editor.setTokens(tokens)
-    }
-    persistence?.restore(editor)
+    if (!editor || appliedFile.current !== file) return
+    persistence?.publish(editor, attachment, plugin.getRows(), plugin.getTokens(), {
+      backend: syntaxBackend,
+      theme: syntaxTheme,
+      enabled: highlight,
+    })
     notePressPaint('diffs', file.path, 'text')
-  }, [controller, file, persistence, plugin, rows, text])
+  })
 
-  // A parse landing later changes the tokens without changing a row.
-  useLayoutEffect(() => {
-    const tokens = plugin.getTokens()
+  const publishTokens = useEffectEvent(() => {
     const editor = controller.getEditor()
-    editor?.setTokens(tokens)
-    if (file && rows === plugin.getRows()) {
-      if (!highlight) notePressPaint('diffs', file.path, 'colour', { highlight: 'off' })
-      else if (plugin.isSyntaxReady()) notePressPaint('diffs', file.path, 'colour')
+    if (!editor || appliedFile.current !== file) return
+    persistence?.publishTokens(editor, attachment, plugin.getRows(), plugin.getTokens(), {
+      backend: syntaxBackend,
+      theme: syntaxTheme,
+      enabled: highlight,
+    })
+  })
+
+  useLayoutEffect(() => {
+    const rowChanges = plugin.onDidChangeRows(publishRows)
+    const tokenChanges = plugin.onDidChangeTokens(publishTokens)
+    return () => {
+      rowChanges.dispose()
+      tokenChanges.dispose()
     }
+  }, [plugin])
+
+  useLayoutEffect(() => {
+    publishRows()
+  }, [attachment, controller, persistence, plugin, rows, text])
+
+  useLayoutEffect(() => {
+    if (rows !== plugin.getRows()) return
+    publishTokens()
+    if (!highlight) notePressPaint('diffs', file.path, 'colour', { highlight: 'off' })
+    else if (plugin.isSyntaxReady()) notePressPaint('diffs', file.path, 'colour')
     log.debug({
       action: 'editor.diff.syntax',
       area: 'editor',
-      path: file?.path,
-      languageId: file?.languageId,
+      path: file.path,
+      languageId: file.languageId,
       side,
       backend: syntaxBackend.kind,
       enabled: highlight,
-      tokenCount: tokens.length,
-      oldLineCount: file?.oldLines.length,
-      newLineCount: file?.newLines.length,
-      partial: file?.isPartial,
+      tokenCount: plugin.getTokens().length,
+      oldLineCount: file.oldLines.length,
+      newLineCount: file.newLines.length,
+      partial: file.isPartial,
     })
-  }, [controller, file, highlight, plugin, rows, side, syntaxBackend, tokensRevision])
+  }, [
+    attachment,
+    controller,
+    file,
+    highlight,
+    persistence,
+    plugin,
+    rows,
+    side,
+    syntaxBackend,
+    tokensRevision,
+  ])
 
   useLayoutEffect(() => {
     const editor = controller.getEditor()
     if (!editor || !onScroll) return
 
-    const subscription = editor.onDidScroll((position) => onScroll(side, position))
+    const subscription = editor.onDidScroll((position) =>
+      onScroll(side, position, persistence?.isRestoringProjection() ? 'restoration' : 'scroll'),
+    )
     return () => subscription.dispose()
-  }, [controller, onScroll, side])
+  }, [controller, onScroll, persistence, side])
 
   useLayoutEffect(() => {
     if (!onRegisterEditor) return
