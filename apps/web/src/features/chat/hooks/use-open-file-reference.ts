@@ -1,5 +1,5 @@
 import { markdownServerFilePath } from '@/features/chat/utils/markdown-workspace-path'
-import { use } from 'react'
+import { use, useCallback } from 'react'
 import { toast } from 'sonner'
 import { ChatWorkspaceRootContext } from '@/features/chat/providers/workspace-root-context'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -8,6 +8,7 @@ import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state
 import type { MarkdownFileReference } from '@/features/chat/utils/markdown-file-links'
 import { log } from '@/lib/client-logging'
 import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
+import type { FileOpenIntentTrigger } from '@/lib/file-open-intent/state/service'
 import { fileUriForPath } from '@workspace/contracts'
 
 /**
@@ -23,15 +24,15 @@ export function useOpenFileReference() {
   const workspacePath = chatWorkspace?.path ?? editorRoot
   const prepare = useFileIntent('chat-link')
 
-  /**
-   * A hovered link prepares its file. The intent names the chat's workspace in server form, the
-   * form the editor root takes, so a link under another project is rejected.
-   */
-  function prepareFileReference(source: MarkdownFileReference) {
-    const path = markdownServerFilePath(source.path, rootPath, workspacePath)
-    if (path === null || workspacePath === null) return
-    prepare(filesystemPath(path), 'hover', { rootPath: filesystemPath(workspacePath) })
-  }
+  // Rendered elements key useFileIntentLifetime cleanup on this callback's captured root.
+  const prepareFileReference = useCallback(
+    (source: MarkdownFileReference, trigger: FileOpenIntentTrigger = 'hover') => {
+      const path = markdownServerFilePath(source.path, rootPath, workspacePath)
+      if (path === null || workspacePath === null) return
+      return prepare(filesystemPath(path), trigger, { rootPath: filesystemPath(workspacePath) })
+    },
+    [prepare, rootPath, workspacePath],
+  )
 
   function openFileReference(source: MarkdownFileReference) {
     const path = markdownServerFilePath(source.path, rootPath, workspacePath)

@@ -748,6 +748,7 @@ function fileOpenIntentService(
 ) {
   const prepare = vi.fn((buffer: EditorTextBuffer) => ({ buffer, preparedDocument }))
   const owner = createFileOpenIntentServiceOwner({
+    acquireFilePreparation: (input) => documentStore.getState().acquireFilePreparation(input),
     getLiveDocument: (path) =>
       documentStore.getState().getLiveEditorDocument(testDocumentKey(path)),
     getRetainedScrollPosition: () => null,

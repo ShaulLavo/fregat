@@ -224,7 +224,9 @@ export function CommandPaletteContent() {
 
   function prepareHighlightedEditor(value: string) {
     const path = highlightedEditorFile(editorItems, value)
-    if (path) prepareFile(path, 'active-row')
+    if (!path) return
+    const interest = prepareFile(path, 'active-row')
+    return () => interest.release()
   }
 
   function previewHighlighted(value: string) {
@@ -432,7 +434,9 @@ export function CommandPaletteContent() {
         ref={listRef}
       >
         {isPreviewScope(mode) && <HighlightReporter onHighlight={previewHighlighted} />}
-        {mode === 'editors' && <HighlightReporter onHighlight={prepareHighlightedEditor} />}
+        {open && mode === 'editors' && (
+          <HighlightReporter identity={prepareFile} onHighlight={prepareHighlightedEditor} />
+        )}
         {!fileSearchUnsettled && <CommandEmpty>{emptyLabelForMode(mode)}</CommandEmpty>}
         <CommandPaletteActionsContext value={actions}>
           <GroupsFactory

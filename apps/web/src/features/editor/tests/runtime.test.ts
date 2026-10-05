@@ -80,7 +80,7 @@ test.for([
       runtime.fileOpenIntentOwner.connect()
       expect(runtime.mountedEditors.has(preparationPath)).toBe(false)
 
-      runtime.fileOpenIntent.service.prepare({
+      runtime.fileOpenIntentOwner.service.prepare({
         path: preparationPath,
         rootPath,
         source: 'file-tree',
@@ -227,6 +227,7 @@ test('final disposal releases shared prepared interests before analysis and pres
       buffer: document.buffer,
       documentKey: document.key,
       kind: 'live' as const,
+      release: () => undefined,
       localRevision: document.localRevision,
       path,
       preparedDocument: prepared,

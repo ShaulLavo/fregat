@@ -4,6 +4,7 @@ import type {
   EditorTextBufferChange,
 } from '../documentSession'
 import type { DocumentTextSnapshot } from '../documentTextSnapshot'
+import { EditorEventSource } from './emitter'
 import type {
   EditorHighlighterProvider,
   EditorHighlighterSession,
@@ -124,6 +125,7 @@ export type EditorDocumentAnalysis = {
   borrowHighlighter(
     request: EditorAnalysisHighlighterRequest,
   ): EditorRetainedHighlighterSession | null
+  subscribeRetention(listener: () => void): () => void
   inspectRetention(): AnalysisRetentionInspection
   reclaimInactive(options: AnalysisReclamationOptions): AnalysisReclamation
   dispose(): void
@@ -133,6 +135,64 @@ type AnalysisSession<T> = {
   refresh(snapshot: DocumentTextSnapshot): Promise<T>
   applyChange(change: DocumentSessionChange): Promise<T>
   dispose(): void
+}
+
+class RetentionChanges {
+  private readonly events = new EditorEventSource<void>({
+    action: 'editor.analysis.retention_listener_failed',
+  })
+  private readonly subscriptions = new Set<() => void>()
+  private depth = 0
+  private pending = false
+  private delivering = false
+  private disposed = false
+
+  subscribe(listener: () => void): () => void {
+    if (this.disposed) return () => undefined
+    const subscription = this.events.subscribe(() => {
+      if (!this.disposed) listener()
+    })
+    const release = () => {
+      subscription.dispose()
+      this.subscriptions.delete(release)
+    }
+    this.subscriptions.add(release)
+    return release
+  }
+
+  mutate<T>(run: () => T): T {
+    this.depth++
+    try {
+      return run()
+    } finally {
+      this.depth--
+      this.flush()
+    }
+  }
+
+  changed(): void {
+    this.pending = true
+    this.flush()
+  }
+
+  dispose(): void {
+    this.disposed = true
+    this.pending = false
+    for (const release of this.subscriptions) release()
+  }
+
+  private flush(): void {
+    if (this.disposed || this.depth > 0 || this.delivering || !this.pending) return
+    this.pending = false
+    this.delivering = true
+    try {
+      this.events.fire()
+    } finally {
+      // Reentrant mutations belong to this delivery; hosts reconcile after their callback.
+      this.pending = false
+      this.delivering = false
+    }
+  }
 }
 
 class AnalysisEntry<T extends RetentionResult> {
@@ -150,6 +210,7 @@ class AnalysisEntry<T extends RetentionResult> {
     readonly buffer: EditorTextBuffer,
     readonly session: AnalysisSession<T>,
     runtimeSessionId: string,
+    readonly retention: RetentionChanges,
   ) {
     this.runtimeSessionId = runtimeSessionId
     this.state = { kind: 'pending', revision: buffer.getRevision() }
@@ -194,7 +255,7 @@ class AnalysisEntry<T extends RetentionResult> {
   }
 
   lease(signal?: AbortSignal) {
-    const lease = leaseCancellation(this.signal, signal)
+    const lease = leaseCancellation(this.signal, this.retention, signal)
     if (lease.signal.aborted) return lease
     this.interests++
     lease.signal.addEventListener(
@@ -202,9 +263,11 @@ class AnalysisEntry<T extends RetentionResult> {
       () => {
         this.interests--
         this.lastRelease = Date.now()
+        this.retention.changed()
       },
       { once: true },
     )
+    this.retention.changed()
     return lease
   }
 
@@ -296,6 +359,7 @@ class AnalysisEntry<T extends RetentionResult> {
         this.publish(revision, generation, { kind: 'ready', revision, snapshot, result: value }),
       (error: unknown) => this.publish(revision, generation, { kind: 'failed', revision, error }),
     )
+    this.retention.changed()
   }
 
   private publish(revision: number, generation: number, state: EditorAnalysisRead<T>): void {
@@ -306,6 +370,7 @@ class AnalysisEntry<T extends RetentionResult> {
     )
       return
     this.state = state
+    this.retention.changed()
   }
 
   private assertCurrent(revision: number, generation = this.generation): void {
@@ -335,8 +400,9 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     buffer: EditorTextBuffer,
     readonly structuralSession: EditorSyntaxSession,
     runtimeSessionId: string,
+    retention: RetentionChanges,
   ) {
-    super(buffer, structuralSession, runtimeSessionId)
+    super(buffer, structuralSession, runtimeSessionId, retention)
   }
 
   canQueryRange(): boolean {
@@ -349,7 +415,14 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   registerDisplayDemand(signal: AbortSignal): void {
     if (signal.aborted) return
     this.displayed.set(signal, { kind: 'unmanaged' })
-    signal.addEventListener('abort', () => this.displayed.delete(signal), { once: true })
+    signal.addEventListener(
+      'abort',
+      () => {
+        this.displayed.delete(signal)
+        this.retention.changed()
+      },
+      { once: true },
+    )
   }
 
   setDisplayDemand(signal: AbortSignal, demand: EditorAnalysisDisplayDemand): void {
@@ -362,6 +435,7 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
           }
         : demand
     this.displayed.set(signal, stored)
+    this.retention.changed()
   }
 
   override inspectDisplayDemand(): AnalysisDisplayInspection {
@@ -410,9 +484,13 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       snapshot: this.buffer.getTextSnapshot(),
       range: boundedRange(range, this.buffer.getTextSnapshot().length),
     })
-    const release = () => this.queryWaiters.delete(signal)
+    const release = () => {
+      if (this.queryWaiters.delete(signal)) this.retention.changed()
+    }
     signal.addEventListener('abort', release, { once: true })
-    return interruptible(this.range(range), signal).finally(() => {
+    const pending = interruptible(this.range(range), signal)
+    this.retention.changed()
+    return pending.finally(() => {
       release()
       signal.removeEventListener('abort', release)
     })
@@ -477,10 +555,16 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     }).then((result) => {
       if (queried && this.buffer.getRevision() === revision)
         this.ranges.set(rangeKey(range), { revision, range, result })
+      this.retention.changed()
       return result
     })
     this.queries.set(key, pending)
-    void pending.finally(() => this.queries.delete(key)).catch(() => undefined)
+    this.retention.changed()
+    void pending
+      .finally(() => {
+        if (this.queries.delete(key)) this.retention.changed()
+      })
+      .catch(() => undefined)
     return pending
   }
 
@@ -504,85 +588,155 @@ export function createEditorDocumentAnalysis(options: {
     session: EditorHighlighterSession
     unsubscribeTheme: (() => void) | void
   }[] = []
+  const retention = new RetentionChanges()
   let disposed = false
   let unsubscribe: (() => void) | undefined
   const subscribe = () => {
-    unsubscribe ??= buffer.subscribe((event) => {
-      for (const { entry } of structural) entry.changed(event)
-      for (const { entry } of highlighters) entry.changed(event)
-    })
+    unsubscribe ??= buffer.subscribe((event) =>
+      retention.mutate(() => {
+        for (const { entry } of structural) entry.changed(event)
+        for (const { entry } of highlighters) entry.changed(event)
+      }),
+    )
   }
   const releaseSubscription = () => {
     if (structural.length > 0 || highlighters.length > 0) return
     unsubscribe?.()
     unsubscribe = undefined
   }
+  const borrowStructural = (request: EditorAnalysisStructuralRequest) => {
+    if (disposed || request.signal?.aborted) return null
+    let found = structural.find((candidate) => sameStructuralRequest(candidate.request, request))
+    subscribe()
+    if (!found) {
+      const runtimeSessionId = createEditorRuntimeSessionId()
+      const session = request.provider.createSession({
+        ...request,
+        documentId,
+        runtimeSessionId,
+        snapshot: buffer.getSnapshot(),
+        textSnapshot: buffer.getTextSnapshot(),
+      })
+      if (!session) return null
+      if (disposed || request.signal?.aborted) {
+        try {
+          session.dispose()
+        } finally {
+          releaseSubscription()
+        }
+        return null
+      }
+      found = {
+        request: {
+          ...request,
+          signal: undefined,
+          configurationTag: [...(request.configurationTag ?? [])],
+        },
+        entry: new StructuralEntry(buffer, session, runtimeSessionId, retention),
+      }
+      structural.push(found)
+    }
+    return structuralLease(found.entry, request.signal)
+  }
+  const borrowHighlighter = (request: EditorAnalysisHighlighterRequest) => {
+    if (disposed || request.signal?.aborted) return null
+    let found = highlighters.find((candidate) => sameRequest(candidate.request, request))
+    if (found?.entry.read().kind === 'failed' && found.entry.leaseCount === 0) {
+      const failed = found
+      highlighters.splice(highlighters.indexOf(failed), 1)
+      retention.changed()
+      failed.unsubscribeTheme?.()
+      failed.entry.dispose()
+      if (disposed || request.signal?.aborted) return null
+      found = highlighters.find((candidate) => sameRequest(candidate.request, request))
+    }
+    subscribe()
+    if (!found) {
+      const runtimeSessionId = createEditorRuntimeSessionId()
+      const session = request.provider.createSession({
+        languageId: request.languageId,
+        documentId,
+        runtimeSessionId,
+        snapshot: buffer.getSnapshot(),
+        textSnapshot: buffer.getTextSnapshot(),
+      })
+      if (!session) return null
+      if (disposed || request.signal?.aborted) {
+        try {
+          session.dispose()
+        } finally {
+          releaseSubscription()
+        }
+        return null
+      }
+      const entry = new AnalysisEntry(buffer, session, runtimeSessionId, retention)
+      found = {
+        request: {
+          ...request,
+          signal: undefined,
+          configurationTag: [...(request.configurationTag ?? [])],
+        },
+        session,
+        entry,
+        unsubscribeTheme: undefined,
+      }
+      highlighters.push(found)
+      const unsubscribeTheme = session.onDidChangeTheme?.(() => entry.refresh())
+      if (disposed || entry.signal.aborted) {
+        unsubscribeTheme?.()
+        entry.dispose()
+        releaseSubscription()
+        return null
+      }
+      found.unsubscribeTheme = unsubscribeTheme
+    }
+    return highlighterLease(found.entry, found.session, request.signal)
+  }
+  const reclaimInactive = (options: AnalysisReclamationOptions): AnalysisReclamation => {
+    const requested = options.runtimeSessionIds ? new Set(options.runtimeSessionIds) : null
+    const reclaimed: string[] = []
+    let cachedRangeCount = 0
+    let pendingRangeCount = 0
+    try {
+      for (const retained of structural.slice()) {
+        const { entry } = retained
+        if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
+        const index = structural.indexOf(retained)
+        if (index < 0) continue
+        structural.splice(index, 1)
+        retention.changed()
+        reclaimed.push(entry.runtimeSessionId)
+        cachedRangeCount += entry.cachedRangeCount
+        pendingRangeCount += entry.pendingRangeCount
+        entry.dispose()
+      }
+      for (const retained of highlighters.slice()) {
+        const { entry, unsubscribeTheme } = retained
+        if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
+        const index = highlighters.indexOf(retained)
+        if (index < 0) continue
+        highlighters.splice(index, 1)
+        retention.changed()
+        reclaimed.push(entry.runtimeSessionId)
+        unsubscribeTheme?.()
+        entry.dispose()
+      }
+    } finally {
+      releaseSubscription()
+    }
+    return {
+      reason: options.reason,
+      runtimeSessionIds: reclaimed,
+      cachedRangeCount,
+      pendingRangeCount,
+    }
+  }
   return {
     buffer,
     documentId,
-    borrowStructural(request) {
-      if (disposed || request.signal?.aborted) return null
-      let found = structural.find((candidate) => sameStructuralRequest(candidate.request, request))
-      subscribe()
-      if (!found) {
-        const runtimeSessionId = createEditorRuntimeSessionId()
-        const session = request.provider.createSession({
-          ...request,
-          documentId,
-          runtimeSessionId,
-          snapshot: buffer.getSnapshot(),
-          textSnapshot: buffer.getTextSnapshot(),
-        })
-        if (!session) return null
-        found = {
-          request: {
-            ...request,
-            signal: undefined,
-            configurationTag: [...(request.configurationTag ?? [])],
-          },
-          entry: new StructuralEntry(buffer, session, runtimeSessionId),
-        }
-        structural.push(found)
-      }
-      return structuralLease(found.entry, request.signal)
-    },
-    borrowHighlighter(request) {
-      if (disposed || request.signal?.aborted) return null
-      let found = highlighters.find((candidate) => sameRequest(candidate.request, request))
-      if (found?.entry.read().kind === 'failed' && found.entry.leaseCount === 0) {
-        const failed = found
-        highlighters.splice(highlighters.indexOf(failed), 1)
-        failed.unsubscribeTheme?.()
-        failed.entry.dispose()
-        if (disposed || request.signal?.aborted) return null
-        found = highlighters.find((candidate) => sameRequest(candidate.request, request))
-      }
-      subscribe()
-      if (!found) {
-        const runtimeSessionId = createEditorRuntimeSessionId()
-        const session = request.provider.createSession({
-          languageId: request.languageId,
-          documentId,
-          runtimeSessionId,
-          snapshot: buffer.getSnapshot(),
-          textSnapshot: buffer.getTextSnapshot(),
-        })
-        if (!session) return null
-        const entry = new AnalysisEntry(buffer, session, runtimeSessionId)
-        found = {
-          request: {
-            ...request,
-            signal: undefined,
-            configurationTag: [...(request.configurationTag ?? [])],
-          },
-          session,
-          entry,
-          unsubscribeTheme: session.onDidChangeTheme?.(() => entry.refresh()),
-        }
-        highlighters.push(found)
-      }
-      return highlighterLease(found.entry, found.session, request.signal)
-    },
+    borrowStructural: (request) => retention.mutate(() => borrowStructural(request)),
+    borrowHighlighter: (request) => retention.mutate(() => borrowHighlighter(request)),
+    subscribeRetention: (listener) => retention.subscribe(listener),
     inspectRetention() {
       const records = new Set<ArrayBufferLike>()
       const entries = [
@@ -601,43 +755,11 @@ export function createEditorDocumentAnalysis(options: {
         ],
       }
     },
-    reclaimInactive(options) {
-      const requested = options.runtimeSessionIds ? new Set(options.runtimeSessionIds) : null
-      const reclaimed: string[] = []
-      let cachedRangeCount = 0
-      let pendingRangeCount = 0
-      for (const retained of structural.slice()) {
-        const { entry } = retained
-        if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
-        const index = structural.indexOf(retained)
-        if (index < 0) continue
-        structural.splice(index, 1)
-        reclaimed.push(entry.runtimeSessionId)
-        cachedRangeCount += entry.cachedRangeCount
-        pendingRangeCount += entry.pendingRangeCount
-        entry.dispose()
-      }
-      for (const retained of highlighters.slice()) {
-        const { entry, unsubscribeTheme } = retained
-        if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
-        const index = highlighters.indexOf(retained)
-        if (index < 0) continue
-        highlighters.splice(index, 1)
-        reclaimed.push(entry.runtimeSessionId)
-        unsubscribeTheme?.()
-        entry.dispose()
-      }
-      releaseSubscription()
-      return {
-        reason: options.reason,
-        runtimeSessionIds: reclaimed,
-        cachedRangeCount,
-        pendingRangeCount,
-      }
-    },
+    reclaimInactive: (options) => retention.mutate(() => reclaimInactive(options)),
     dispose() {
       if (disposed) return
       disposed = true
+      retention.dispose()
       const ownedStructural = structural.splice(0)
       const ownedHighlighters = highlighters.splice(0)
       const releaseBuffer = unsubscribe
@@ -714,7 +836,7 @@ function structuralLease(
     canQueryRange: () => entry.read().kind === 'ready' && entry.canQueryRange(),
     queryRange(range, interest = {}) {
       demand = range
-      const waiter = leaseCancellation(lease.signal, interest.signal)
+      const waiter = leaseCancellation(lease.signal, entry.retention, interest.signal)
       return entry.waitForRange(range, waiter.signal).finally(waiter.dispose)
     },
     getResult: () => {
@@ -769,13 +891,18 @@ function highlighterLease(
   }
 }
 
-function leaseCancellation(ownerSignal: AbortSignal, signal?: AbortSignal) {
+function leaseCancellation(
+  ownerSignal: AbortSignal,
+  retention: RetentionChanges,
+  signal?: AbortSignal,
+) {
   const controller = new AbortController()
-  const dispose = () => {
-    controller.abort()
-    ownerSignal.removeEventListener('abort', dispose)
-    signal?.removeEventListener('abort', dispose)
-  }
+  const dispose = () =>
+    retention.mutate(() => {
+      controller.abort()
+      ownerSignal.removeEventListener('abort', dispose)
+      signal?.removeEventListener('abort', dispose)
+    })
   ownerSignal.addEventListener('abort', dispose, { once: true })
   signal?.addEventListener('abort', dispose, { once: true })
   if (ownerSignal.aborted || signal?.aborted) dispose()

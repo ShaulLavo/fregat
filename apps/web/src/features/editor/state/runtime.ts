@@ -44,7 +44,6 @@ import { createSearchBufferStore } from '@/features/search/state/buffer-state'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import type { CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { log } from '@/lib/client-logging'
-import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { HistoryPersistenceService } from '@/features/editor/state/history-persistence'
 import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
 import { bindLanguageCensus } from '@/features/editor/state/language-census'
@@ -96,7 +95,7 @@ export function createEditorRuntime({
   const uiStore = createEditorUiStore()
   const mountedEditors = new MountedEditorRegistry()
   const fileOpenIntentOwner = createFileOpenIntentServiceOwner({
-    createBuffer: createHistoryBuffer,
+    acquireFilePreparation: (input) => documentStore.getState().acquireFilePreparation(input),
     getLiveDocument: (path) =>
       documentStore.getState().getLiveEditorDocument(fileDocumentKey(path)),
     getRetainedScrollPosition: (path) =>
@@ -107,7 +106,14 @@ export function createEditorRuntime({
     preparer: createPlatformFileOpenPreparer(preparation),
     prefetchRelated: () => undefined,
     queryClient,
-    subscribeLiveDocuments: (listener) => documentStore.subscribe(() => listener()),
+    subscribeLiveDocuments: (listener) => {
+      const stopMembership = documentStore.getState().subscribeEditorAnalyses(listener)
+      const stopPublication = documentStore.subscribe(() => listener())
+      return () => {
+        stopMembership()
+        stopPublication()
+      }
+    },
   })
   const snapshotComparisonOwner = createSnapshotComparisonOwner(documentStore, queryClient)
   const syncSnapshotComparisons = () => {
@@ -307,7 +313,6 @@ export function createEditorRuntime({
     uiStore,
     mountedEditors,
     fileOpenIntentOwner,
-    fileOpenIntent: { service: fileOpenIntentOwner.service },
     editorActivation,
     editorOpenBenchmarkControl,
     documentSyncController,
