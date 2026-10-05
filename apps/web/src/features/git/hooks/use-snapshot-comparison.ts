@@ -62,6 +62,7 @@ export function useSnapshotComparison(
     const lease = tabId ? state.snapshotComparisonTabs.get(tabId) : mutation.data
     const read = lease ? state.snapshotComparisons.get(lease) : null
     return read?.kind === 'ready' &&
+      (read.input.kind === 'snapshot' || read.input.kind === 'checkpoint') &&
       read.input.subject === subject &&
       read.input.scope.rootPath === rootPath
       ? read

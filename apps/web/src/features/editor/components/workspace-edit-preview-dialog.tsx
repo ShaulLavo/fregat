@@ -19,14 +19,55 @@ import {
 } from '@workspace/ui/components/dialog'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { Spinner } from '@workspace/ui/components/spinner'
-import { useLayoutEffect, useRef } from 'react'
+import { operationDiffAttachment } from '@/lib/diff-attachment'
+import { useLayoutEffect, useRef, useState } from 'react'
+import type {
+  DiffPanePublication,
+  DiffPanePublicationEvent,
+} from '@/features/editor/state/tab-presentation'
+import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
+import { editorQueryKeys } from '@/features/editor/utils/query-keys'
+import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
+import { mutationOptions, queryOptions, useQuery } from '@tanstack/react-query'
+import { ModuleLoadError } from '@/components/module-load-error'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
+import { runMutation } from '@/lib/mutations/run'
 
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
-import type { WorkspaceEditPreviewRow } from '@/features/editor/state/workspace-edit-service'
+import type {
+  WorkspaceEditPreview,
+  WorkspaceEditPreviewRow,
+} from '@/features/editor/state/workspace-edit-service'
 import { selectWorkspaceEditPreview } from '@/features/editor/utils/workspace-edit-dialog-state'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import type { FocusTargetToken } from '@/lib/focus/state/service'
+
+type PreviewEditorModule = typeof import('@/features/editor/components/diff-editor')
+const loadPreviewEditor = mutationOptions({
+  mutationKey: editorMutationKeys.previewDiffModule,
+  scope: { id: 'editor.workspace-edit-preview.module' },
+  networkMode: 'always',
+  retry: false,
+  mutationFn: async () => {
+    const cached = resourceQueryClient.getQueryData<PreviewEditorModule>(
+      editorQueryKeys.previewDiffModule,
+    )
+    if (cached) return cached
+    return import('@/features/editor/components/diff-editor')
+  },
+  onSuccess: (module) =>
+    resourceQueryClient.setQueryData(editorQueryKeys.previewDiffModule, module),
+})
+const previewEditorOptions = queryOptions({
+  queryKey: editorQueryKeys.previewDiffModule,
+  staleTime: 'static',
+  gcTime: Infinity,
+  structuralSharing: false,
+  networkMode: 'always',
+  retry: false,
+  queryFn: () => runMutation(resourceQueryClient, loadPreviewEditor, undefined),
+})
 
 export function WorkspaceEditPreviewDialog() {
   const service = useWorkspaceEditService()
@@ -40,6 +81,33 @@ export function WorkspaceEditPreviewDialog() {
   const stale = state?.phase === 'stale'
   const open = state !== null
   const preview = state?.preview
+  const mode: EditorDiffViewMode = 'stacked'
+  const operationId = preview?.operationId ?? null
+  const [presentation, setPresentation] = useState<{
+    operationId: string | null
+    mode: EditorDiffViewMode
+    publications: readonly DiffPanePublication[]
+  }>(() => ({ operationId, mode, publications: [] }))
+  if (presentation.operationId !== operationId || presentation.mode !== mode) {
+    setPresentation({ operationId, mode, publications: [] })
+  }
+  const notePublication = (event: DiffPanePublicationEvent) => {
+    if (!preview) return
+    setPresentation((current) => {
+      const publications = updateWorkspaceEditPublications(current.publications, event, preview)
+      return publications === current.publications ? current : { operationId, mode, publications }
+    })
+  }
+  const previewPresented =
+    !!preview && workspaceEditPreviewIsPresented(preview, presentation.publications, mode)
+  const editorModule = useQuery(
+    {
+      ...previewEditorOptions,
+      enabled: preview?.rows.some((row) => row.comparison && row.file) ?? false,
+    },
+    resourceQueryClient,
+  )
+  const DiffEditor = editorModule.data?.DiffEditor
 
   useLayoutEffect(() => {
     if (open) return
@@ -74,7 +142,7 @@ export function WorkspaceEditPreviewDialog() {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
       <DialogContent
-        className='max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden sm:max-w-none'
+        className='flex max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none flex-col overflow-hidden sm:max-w-none'
         finalFocus={false}
         showCloseButton={false}
       >
@@ -88,7 +156,7 @@ export function WorkspaceEditPreviewDialog() {
         {preparing ? <WorkspaceEditPreviewLoading /> : null}
 
         {preview ? (
-          <div className='min-h-0 overflow-y-auto pr-1'>
+          <div className='min-h-0 flex-1 overflow-y-auto pr-1'>
             <div className='text-muted-foreground mb-3 flex items-center justify-between text-xs'>
               <span className='tabular-nums'>
                 {preview.operationCount} {preview.operationCount === 1 ? 'change' : 'changes'}
@@ -123,7 +191,7 @@ export function WorkspaceEditPreviewDialog() {
               <ol className='grid gap-2'>
                 {preview.rows.map((row) => (
                   <li
-                    className='bg-card rounded-lg p-3'
+                    className='bg-card min-w-0 rounded-lg p-3'
                     key={`${row.index}:${row.path}`}
                     title={resourcePathLabel(row)}
                   >
@@ -137,14 +205,26 @@ export function WorkspaceEditPreviewDialog() {
                     <div className='text-muted-foreground text-2xs mt-1 truncate font-mono'>
                       {resourcePathLabel(row)}
                     </div>
-                    {row.beforeText !== undefined && row.afterText !== undefined ? (
-                      <div className='text-2xs mt-2 grid max-h-52 grid-cols-2 overflow-auto overscroll-contain rounded-lg font-mono leading-relaxed'>
-                        <pre className='bg-diff-removed/10 text-diff-removed min-w-0 overflow-visible p-2 whitespace-pre-wrap'>
-                          {row.beforeText}
-                        </pre>
-                        <pre className='bg-diff-added/10 text-diff-added min-w-0 overflow-visible p-2 whitespace-pre-wrap'>
-                          {row.afterText}
-                        </pre>
+                    {row.comparison && row.file ? (
+                      <div className='mt-2 h-52 min-w-0 overflow-hidden'>
+                        {DiffEditor ? (
+                          <DiffEditor
+                            attachment={operationDiffAttachment(row.comparison, row.file)}
+                            mode={mode}
+                            onPublication={notePublication}
+                          />
+                        ) : null}
+                        {!DiffEditor && editorModule.isError ? (
+                          <ModuleLoadError
+                            label='the comparison'
+                            onRetry={() => void editorModule.refetch()}
+                          />
+                        ) : null}
+                        {!DiffEditor && !editorModule.isError ? (
+                          <div className='flex h-full items-center justify-center'>
+                            <Spinner size='md' label='Loading comparison' />
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </li>
@@ -186,8 +266,10 @@ export function WorkspaceEditPreviewDialog() {
             {stale ? 'Close' : 'Cancel'}
           </Button>
           <Button
-            disabled={!awaiting || processing}
-            onClick={() => preview && service.confirmPreview(preview.operationId)}
+            disabled={!awaiting || processing || !previewPresented}
+            onClick={() =>
+              awaiting && preview && previewPresented && service.confirmPreview(preview.operationId)
+            }
             type='button'
           >
             {processing ? (
@@ -201,6 +283,28 @@ export function WorkspaceEditPreviewDialog() {
       </DialogContent>
     </Dialog>
   )
+}
+
+export function updateWorkspaceEditPublications(
+  current: readonly DiffPanePublication[],
+  event: DiffPanePublicationEvent,
+  preview: WorkspaceEditPreview,
+): readonly DiffPanePublication[] {
+  const incoming = event.publication
+  if (!matchesPreview(incoming, preview)) return current
+  if (event.kind === 'withdrawn') {
+    const next = current.filter((publication) => publication !== incoming)
+    return next.length === current.length ? current : next
+  }
+  if (current.includes(incoming)) return current
+  return [
+    ...current.filter(
+      (publication) =>
+        publication.side !== incoming.side ||
+        publication.attachment.file !== incoming.attachment.file,
+    ),
+    incoming,
+  ]
 }
 
 function targetLabel(row: WorkspaceEditPreviewRow): string {
@@ -229,4 +333,38 @@ function rowIcon(row: WorkspaceEditPreviewRow) {
   if (row.kind === 'rename')
     return <FolderSimpleIcon className='text-info size-(--icon-size) shrink-0' />
   return <FileTextIcon className='text-foreground size-(--icon-size) shrink-0' />
+}
+
+function matchesPreview(publication: DiffPanePublication, preview: WorkspaceEditPreview): boolean {
+  const attachment = publication.attachment
+  if (attachment.kind !== 'operation' || attachment.read.input.operationId !== preview.operationId)
+    return false
+  return preview.rows.some(
+    (row) =>
+      row.comparison?.kind === 'ready' &&
+      row.comparison === attachment.read &&
+      row.comparison.input === attachment.read.input &&
+      row.file === attachment.file &&
+      attachment.read.input.display === row.file,
+  )
+}
+
+export function workspaceEditPreviewIsPresented(
+  preview: WorkspaceEditPreview,
+  publications: readonly DiffPanePublication[],
+  mode: EditorDiffViewMode,
+): boolean {
+  const requiredSides = mode === 'split' ? ['old', 'new'] : ['stacked']
+  return preview.rows.every(
+    (row) =>
+      row.kind !== 'text-document' ||
+      requiredSides.every((side) =>
+        publications.some(
+          (publication) =>
+            publication.side === side &&
+            publication.attachment.file === row.file &&
+            matchesPreview(publication, preview),
+        ),
+      ),
+  )
 }
