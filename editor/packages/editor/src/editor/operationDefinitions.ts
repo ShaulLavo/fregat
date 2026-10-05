@@ -21,6 +21,7 @@ export type HighlighterOperationContext = DocumentOperationContext & EditorHighl
 
 export class StructuralDefinition extends DocumentOperation<EditorSyntaxSessionOptions, EditorSyntaxResult, StructuralEntry> {
   readonly kind = 'structural'
+  protected override get cacheInactive(): boolean { return true }
   constructor(private readonly openRuntime: (context: StructuralOperationContext) => EditorSyntaxRuntime | null) { super() }
   protected create(context: BoundOperationContext, input: EditorSyntaxSessionOptions): StructuralEntry | null {
     const { host, sourceScope, initialRead, runtimeSessionId } = context
@@ -35,6 +36,7 @@ export class StructuralDefinition extends DocumentOperation<EditorSyntaxSessionO
 
 export class HighlighterDefinition extends DocumentOperation<EditorHighlighterSessionOptions, EditorHighlightResult, HighlighterEntry> {
   readonly kind = 'highlighter'
+  protected override get cacheInactive(): boolean { return true }
   constructor(private readonly openRuntime: (context: HighlighterOperationContext) => EditorHighlighterRuntime | null) { super() }
   protected create(context: BoundOperationContext, input: EditorHighlighterSessionOptions): HighlighterEntry | null {
     const { host, sourceScope, initialRead, runtimeSessionId } = context

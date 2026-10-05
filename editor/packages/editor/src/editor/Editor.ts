@@ -3335,6 +3335,7 @@ export class Editor {
       highlightPrefix: this.highlightPrefix,
       hasDocument: () => this.session !== null,
       getSnapshot: () => this.createViewSnapshot(),
+      getDocumentContributions: () => this.analysis?.contributions ?? null,
       requestViewUpdate: () => this.requestViewUpdate(owner()),
       onDidType: (listener) => this.claimedBy(claims, () => this.addTypedTextListener(listener)),
       registerPressParticipant: (participant) =>

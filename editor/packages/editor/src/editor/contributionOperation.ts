@@ -55,6 +55,7 @@ export abstract class DocumentOperation<Input, Result, Entry extends Contributio
   protected abstract create(context: BoundOperationContext, input: Input): Entry | null
   protected abstract matches(left: Input, right: Input): boolean
   protected abstract createRuntimeSessionId(): string
+  protected get cacheInactive(): boolean { return false }
 
   public [binding](host: DocumentOperationHost, input: Input, options: DocumentOperationOptions): Entry | null {
     if (options.signal?.aborted || host.signal.aborted) return null
@@ -77,7 +78,7 @@ export abstract class DocumentOperation<Input, Result, Entry extends Contributio
   }
 
   public [leaseBinding](entry: Entry, signal?: AbortSignal): DocumentContributionLease<Result> {
-    return contributionLease<Result>(entry, signal)
+    return contributionLease<Result>(entry, signal, !this.cacheInactive)
   }
 
   private retire(host: DocumentOperationHost, slot: Slot<Input, Entry>): void {
@@ -102,12 +103,17 @@ export function retainDocumentOperation<Input, Result, Entry extends Contributio
   return entry ? operation[leaseBinding](entry, options.signal) : null
 }
 
-export function contributionLease<Result>(entry: ContributionEntry<Result>, signal?: AbortSignal): DocumentContributionLease<Result> {
+export function contributionLease<Result>(entry: ContributionEntry<Result>, signal?: AbortSignal, retire = false): DocumentContributionLease<Result> {
   const lease = entry.lease(signal)
+  if (retire) lease.signal.addEventListener('abort', () => {
+    if (!entry.signal.aborted && entry.leaseCount === 0) entry.dispose()
+  }, { once: true })
   return {
     runtimeSessionId: entry.runtimeSessionId,
     request: () => lease.wait(() => entry.current()),
-    read: () => entry.read(),
+    read: () => lease.signal.aborted
+      ? { kind: 'failed', revision: entry.read().revision, error: new DOMException('Document contribution interest was released', 'AbortError') }
+      : entry.read(),
     dispose: lease.dispose,
   }
 }

@@ -1,4 +1,5 @@
 import type { EditorKeymapNodeOptions } from './editor/hotkeys'
+import type { EditorDocumentContributions } from './editor/documentAnalysis'
 import type { EditorRowPresentation } from './rowPresentation'
 import type { EditorPointHit, EditorMarkerHit } from './pointQueries'
 import type { TextContent } from './textContent'
@@ -537,6 +538,7 @@ export type EditorViewContributionContext = {
   readonly highlightPrefix: string
   hasDocument(): boolean
   getSnapshot(): EditorViewSnapshot
+  getDocumentContributions(): EditorDocumentContributions | null
   requestViewUpdate(): void
   /**
    * The character the user typed, after its edit has landed. A contribution that acts on a
