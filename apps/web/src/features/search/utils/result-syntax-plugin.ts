@@ -1,6 +1,4 @@
 import {
-  type DocumentSessionChange,
-  type DocumentTextSnapshot,
   type TextReadSnapshot,
 } from '@singapore-editor/core/document'
 import {
@@ -8,12 +6,12 @@ import {
   type EditorSyntaxLanguageId,
   type EditorSyntaxProvider,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
-  type EditorSyntaxSessionOptions,
+  type EditorSyntaxRuntime,
   type EditorToken,
   type EditorTokenInput,
 } from '@singapore-editor/core/syntax'
 import { type EditorPlugin } from '@singapore-editor/core/extensions'
+import { createEditorStructuralOperation, type EditorStructuralOperationContext, type DocumentRead } from '@singapore-editor/core/editor'
 
 import { SEARCH_RESULT_FILE_DOCUMENT_ID_PREFIX } from '@/features/search/utils/result-editor'
 import {
@@ -43,26 +41,26 @@ export function createSearchResultSyntaxProvider(
 ): EditorSyntaxProvider {
   const cache = searchResultSyntaxCache(syntaxProvider)
   return {
-    createSession: (options) => {
+    operation: createEditorStructuralOperation((options) => {
       if (!searchResultSyntaxSessionOptions(options)) return null
 
       return new SearchResultSyntaxSession(cache, options)
-    },
+    }),
   }
 }
 
 function searchResultSyntaxSessionOptions(
-  options: EditorSyntaxSessionOptions,
-): options is EditorSyntaxSessionOptions & { readonly languageId: EditorSyntaxLanguageId } {
+  options: EditorStructuralOperationContext,
+): options is EditorStructuralOperationContext & { readonly languageId: EditorSyntaxLanguageId } {
   if (!options.documentId.startsWith(SEARCH_RESULT_FILE_DOCUMENT_ID_PREFIX)) return false
 
   return options.languageId !== null
 }
 
-class SearchResultSyntaxSession implements EditorSyntaxSession {
+class SearchResultSyntaxSession implements EditorSyntaxRuntime {
   public readonly foldingSupport = 'unsupported'
   private readonly cache: SearchResultSyntaxCache
-  private readonly options: EditorSyntaxSessionOptions & {
+  private readonly options: EditorStructuralOperationContext & {
     readonly languageId: EditorSyntaxLanguageId
   }
   private disposed = false
@@ -72,26 +70,22 @@ class SearchResultSyntaxSession implements EditorSyntaxSession {
 
   public constructor(
     cache: SearchResultSyntaxCache,
-    options: EditorSyntaxSessionOptions & { readonly languageId: EditorSyntaxLanguageId },
+    options: EditorStructuralOperationContext & { readonly languageId: EditorSyntaxLanguageId },
   ) {
     this.cache = cache
     this.options = options
-    this.result = this.createResult([], options.snapshot, 0)
+    this.result = this.createResult([], options.initialRead.text, 0)
   }
 
-  public async refresh(textSnapshot: DocumentTextSnapshot): Promise<EditorSyntaxResult> {
+  public async analyze(read: DocumentRead): Promise<EditorSyntaxResult> {
     if (this.disposed) return this.result
 
     const snapshotVersion = this.nextSnapshotVersion()
-    const tokens = await this.parseLines(searchResultSyntaxLines(textSnapshot), snapshotVersion)
+    const tokens = await this.parseLines(searchResultSyntaxLines(read.text), snapshotVersion)
     if (!this.canApplySnapshotVersion(snapshotVersion)) return this.result
 
-    this.result = this.createResult(tokens, textSnapshot, snapshotVersion)
+    this.result = this.createResult(tokens, read.text, snapshotVersion)
     return this.result
-  }
-
-  public applyChange(change: DocumentSessionChange): Promise<EditorSyntaxResult> {
-    return this.refresh(change.textSnapshot)
   }
 
   public getResult(): EditorSyntaxResult {

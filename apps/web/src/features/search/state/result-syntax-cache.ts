@@ -1,19 +1,18 @@
-import {
-  createDocumentTextSnapshot,
-  createPieceTableSnapshot,
-} from '@singapore-editor/core/document'
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorDocumentAnalysis, type EditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import {
   toEditorTokenStore,
   type EditorSyntaxProvider,
-  type EditorSyntaxSession,
-  type EditorSyntaxSessionOptions,
   type EditorToken,
 } from '@singapore-editor/core/syntax'
 
-type ExcerptOptions = Pick<
-  EditorSyntaxSessionOptions,
-  'documentId' | 'languageId' | 'includeCaptures' | 'includeHighlights'
-> & { readonly text: string }
+type ExcerptOptions = {
+  readonly documentId: string
+  readonly languageId: string | null
+  readonly includeCaptures?: boolean
+  readonly includeHighlights?: boolean
+  readonly text: string
+}
 
 export type SearchResultSyntaxLease = {
   readonly result: Promise<readonly EditorToken[]>
@@ -22,7 +21,7 @@ export type SearchResultSyntaxLease = {
 
 type PendingExcerpt = {
   readonly result: Promise<readonly EditorToken[]>
-  readonly session: EditorSyntaxSession
+  readonly analysis: EditorDocumentAnalysis
   readers: number
 }
 
@@ -73,22 +72,21 @@ export class SearchResultSyntaxCache {
   }
 
   private start(key: string, options: ExcerptOptions): PendingExcerpt | null {
-    const snapshot = createPieceTableSnapshot('')
-    const session = this.provider.createSession({
-      documentId: `${options.documentId}:excerpt:${++this.nextDocumentId}`,
+    const buffer = createEditorTextBuffer(options.text)
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: `${options.documentId}:excerpt:${++this.nextDocumentId}` })
+    const owner = analysis.contributions.pin()
+    if (!owner) { analysis.dispose(); return null }
+    const task = analysis.contributions.request(this.provider.operation, {
       languageId: options.languageId,
       includeCaptures: options.includeCaptures,
       includeHighlights: options.includeHighlights,
       syntaxMode: 'full',
-      snapshot,
-      textSnapshot: createDocumentTextSnapshot(snapshot, ''),
-    })
-    if (!session) return null
-
-    const result = session
-      .refresh(createDocumentTextSnapshot(createPieceTableSnapshot(options.text), options.text))
-      .then((syntax) => toEditorTokenStore(syntax.tokens).toTokens())
-    const entry = { readers: 0, result, session }
+    }, { kind: 'pinned', owner })
+    const result = task.settled.then(outcome => {
+      if (outcome.kind === 'failed') throw outcome.failure
+      return outcome.kind === 'completed' ? toEditorTokenStore(outcome.result.tokens).toTokens() : []
+    }).finally(() => owner.dispose())
+    const entry = { readers: 0, result, analysis }
     this.pending.set(key, entry)
     void result.then(
       (tokens) => this.finish(key, entry, tokens),
@@ -119,7 +117,7 @@ export class SearchResultSyntaxCache {
     if (this.pending.get(key) !== entry) return
 
     this.pending.delete(key)
-    entry.session.dispose()
+    entry.analysis.dispose()
   }
 }
 

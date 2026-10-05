@@ -69,8 +69,6 @@ export function DiffPane({
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void
   onScroll?: (side: DiffGutterSide, position: DiffScrollPosition) => void
 }) {
-  // Diff syntax reads row N's tokens from source line N; a patch holds only the lines git printed.
-  const highlight = syntaxHighlight && file?.isPartial !== true
   // Manual memo: `plugin` is a useLayoutEffect dependency, and the compiler's cache is a
   // cache, not an identity guarantee — when it recomputes, the useLayoutEffect re-runs.
   const plugin = useMemo(
@@ -80,9 +78,9 @@ export function DiffPane({
         regions,
         side,
         syntaxBackend,
-        syntaxHighlight: highlight,
+        syntaxHighlight: syntaxHighlight,
       }),
-    [highlight, regions, side, syntaxBackend],
+    [syntaxHighlight, regions, side, syntaxBackend],
   )
   useLayoutEffect(() => {
     if (!presentation) return
@@ -92,7 +90,7 @@ export function DiffPane({
     plugin,
     file,
     side,
-    highlight ? syntaxTheme : null,
+    syntaxHighlight ? syntaxTheme : null,
   )
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const { keymap } = useCommand()
@@ -178,7 +176,7 @@ export function DiffPane({
     const editor = controller.getEditor()
     editor?.setTokens(tokens)
     if (file && rows === plugin.getRows()) {
-      if (!highlight) notePressPaint('diffs', file.path, 'colour', { highlight: 'off' })
+      if (!syntaxHighlight) notePressPaint('diffs', file.path, 'colour', { syntaxHighlight: 'off' })
       else if (plugin.isSyntaxReady()) notePressPaint('diffs', file.path, 'colour')
     }
     log.debug({
@@ -188,13 +186,13 @@ export function DiffPane({
       languageId: file?.languageId,
       side,
       backend: syntaxBackend.kind,
-      enabled: highlight,
+      enabled: syntaxHighlight,
       tokenCount: tokens.length,
       oldLineCount: file?.oldLines.length,
       newLineCount: file?.newLines.length,
       partial: file?.isPartial,
     })
-  }, [controller, file, highlight, plugin, rows, side, syntaxBackend, tokensRevision])
+  }, [controller, file, syntaxHighlight, plugin, rows, side, syntaxBackend, tokensRevision])
 
   useLayoutEffect(() => {
     const editor = controller.getEditor()
@@ -214,7 +212,7 @@ export function DiffPane({
   return (
     <div
       className={`editor-diff-pane editor-diff-pane-${side} flex h-full min-h-0 w-full min-w-0 overflow-hidden`}
-      data-syntax={diffSyntaxState(highlight, syntaxReady)}
+      data-syntax={diffSyntaxState(syntaxHighlight, syntaxReady)}
       ref={file ? focusTarget.ref : undefined}
       onFocusCapture={onFocus ? () => onFocus(side) : undefined}
     >

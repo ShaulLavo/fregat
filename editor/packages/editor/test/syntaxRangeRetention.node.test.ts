@@ -310,7 +310,7 @@ describe('syntax range contributor lifetime', () => {
   })
 
   it.each(['clear', 'replace', 'dispose', 'configuration', 'text-change'] as const)(
-    'releases the unretained stopped-warm snapshot on %s',
+    'retires outgoing view warming through %s with canonical analysis',
     async (boundary) => {
       const buffer = createEditorTextBuffer('x\n'.repeat(250_000))
       const analysis = createEditorDocumentAnalysis({ buffer, documentId: boundary })
@@ -331,12 +331,12 @@ describe('syntax range contributor lifetime', () => {
         provider,
         { startIndex: 0, endIndex: 512 },
         undefined,
-        false,
       )
       try {
         view.syntax.refresh(1, null, { delayMs: 0 })
         await vi.waitFor(() => expect(view.syntax.copyTokens.startAt(0)).toBe(240_000))
-        expect(Reflect.get(view.syntax, 'stoppedWarm')).not.toBeNull()
+        const outgoing = Reflect.get(view.syntax, 'retainedSyntax')
+        expect(retainedSyntaxCanWarm(outgoing)).toBe(false)
         if (boundary === 'clear') view.syntax.clearDocument()
         if (boundary === 'dispose') view.syntax.dispose()
         if (boundary === 'configuration') view.syntax.reloadSyntaxSession()
@@ -355,6 +355,13 @@ describe('syntax range contributor lifetime', () => {
           view.syntax.acceptChange(change)
         }
         expect(Reflect.get(view.syntax, 'stoppedWarm')).toBeNull()
+        if (boundary === 'text-change') {
+          expect(Reflect.get(view.syntax, 'retainedSyntax')).toBe(outgoing)
+          expect(retainedSyntaxCanWarm(outgoing)).toBe(true)
+        } else {
+          expect(Reflect.get(view.syntax, 'retainedSyntax')).not.toBe(outgoing)
+          expect(retainedSyntaxCanWarm(outgoing)).toBe(false)
+        }
       } finally {
         view.dispose()
         analysis.dispose()
@@ -369,7 +376,6 @@ function createView(
   provider: EditorSyntaxProvider,
   initialRange: EditorSyntaxRange,
   highlighter?: EditorHighlighterProvider,
-  retainAnalysis = true,
 ) {
   const session = createEditorBufferSession(buffer)
   const editChain = new DocumentEditChain(0, 0)
@@ -411,7 +417,7 @@ function createView(
     notifyThemeChanged: () => undefined,
   })
   syntax.startDocument({
-    analysis: retainAnalysis ? analysis : undefined,
+    analysis,
     documentId: 'retention.ts',
     languageId: 'typescript',
     snapshot: session.getSnapshot(),

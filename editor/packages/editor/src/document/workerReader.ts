@@ -32,7 +32,12 @@ export type DocumentWorkerPoint = {
 
 export type DocumentWorkerSourceCommand =
   | { readonly kind: 'register'; readonly identity: DocumentWorkerIdentity }
-  | { readonly kind: 'pin'; readonly identity: DocumentWorkerIdentity; readonly point: DocumentWorkerPoint; readonly readId: string }
+  | {
+      readonly kind: 'pin'
+      readonly identity: DocumentWorkerIdentity
+      readonly point: DocumentWorkerPoint
+      readonly readId: string
+    }
   | { readonly kind: 'unpin'; readonly identity: DocumentWorkerIdentity; readonly readId: string }
   | {
       readonly kind: 'importRead'
@@ -106,26 +111,55 @@ export function documentWorkerPointsEqual(
   left: DocumentWorkerPoint | null,
   right: DocumentWorkerPoint | null,
 ): boolean {
-  return left === right || Boolean(left && right && left.segment === right.segment && left.revision === right.revision && left.textVersion === right.textVersion)
+  return (
+    left === right ||
+    Boolean(
+      left &&
+      right &&
+      left.segment === right.segment &&
+      left.revision === right.revision &&
+      left.textVersion === right.textVersion,
+    )
+  )
 }
 
 function identitiesEqual(left: DocumentWorkerIdentity, right: DocumentWorkerIdentity): boolean {
-  return left.documentId === right.documentId && left.documentGeneration === right.documentGeneration && left.endpointGeneration === right.endpointGeneration && left.registrationId === right.registrationId
+  return (
+    left.documentId === right.documentId &&
+    left.documentGeneration === right.documentGeneration &&
+    left.endpointGeneration === right.endpointGeneration &&
+    left.registrationId === right.registrationId
+  )
 }
 
 function validPoint(point: unknown): point is DocumentWorkerPoint {
-  return typeof point === 'object' && point !== null && 'segment' in point &&
-    typeof point.segment === 'string' && point.segment.length > 0 &&
-    'revision' in point && validOrdinal(point.revision, 0) &&
-    'textVersion' in point && validOrdinal(point.textVersion, 0)
+  return (
+    typeof point === 'object' &&
+    point !== null &&
+    'segment' in point &&
+    typeof point.segment === 'string' &&
+    point.segment.length > 0 &&
+    'revision' in point &&
+    validOrdinal(point.revision, 0) &&
+    'textVersion' in point &&
+    validOrdinal(point.textVersion, 0)
+  )
 }
 
 function validIdentity(identity: unknown): identity is DocumentWorkerIdentity {
-  return typeof identity === 'object' && identity !== null && 'documentId' in identity &&
-    typeof identity.documentId === 'string' && identity.documentId.length > 0 &&
-    'documentGeneration' in identity && validOrdinal(identity.documentGeneration, 1) &&
-    'endpointGeneration' in identity && validOrdinal(identity.endpointGeneration, 1) &&
-    'registrationId' in identity && validOrdinal(identity.registrationId, 1)
+  return (
+    typeof identity === 'object' &&
+    identity !== null &&
+    'documentId' in identity &&
+    typeof identity.documentId === 'string' &&
+    identity.documentId.length > 0 &&
+    'documentGeneration' in identity &&
+    validOrdinal(identity.documentGeneration, 1) &&
+    'endpointGeneration' in identity &&
+    validOrdinal(identity.endpointGeneration, 1) &&
+    'registrationId' in identity &&
+    validOrdinal(identity.registrationId, 1)
+  )
 }
 
 function validOrdinal(value: unknown, minimum: number): value is number {
@@ -133,10 +167,17 @@ function validOrdinal(value: unknown, minimum: number): value is number {
 }
 
 function validReference(reference: unknown): reference is DocumentWorkerReadReference {
-  return typeof reference === 'object' && reference !== null &&
-    'identity' in reference && validIdentity(reference.identity) &&
-    'point' in reference && validPoint(reference.point) &&
-    'readId' in reference && typeof reference.readId === 'string' && reference.readId.length > 0
+  return (
+    typeof reference === 'object' &&
+    reference !== null &&
+    'identity' in reference &&
+    validIdentity(reference.identity) &&
+    'point' in reference &&
+    validPoint(reference.point) &&
+    'readId' in reference &&
+    typeof reference.readId === 'string' &&
+    reference.readId.length > 0
+  )
 }
 
 function isSourceReply(value: unknown): value is DocumentWorkerSourceResult {
@@ -145,23 +186,49 @@ function isSourceReply(value: unknown): value is DocumentWorkerSourceResult {
   if (!('identity' in value) || !validIdentity(value.identity)) return false
   if (value.kind === 'registered' || value.kind === 'released') return true
   if (value.kind === 'applied')
-    return 'target' in value && validPoint(value.target) && 'base' in value && (value.base === null || validPoint(value.base))
+    return (
+      'target' in value &&
+      validPoint(value.target) &&
+      'base' in value &&
+      (value.base === null || validPoint(value.base))
+    )
   if (value.kind !== 'rejected' || !('reason' in value)) return false
-  return value.reason === 'disposed' || value.reason === 'detached' || value.reason === 'generation' || value.reason === 'base' || value.reason === 'point' || value.reason === 'unavailable'
+  return (
+    value.reason === 'disposed' ||
+    value.reason === 'detached' ||
+    value.reason === 'generation' ||
+    value.reason === 'base' ||
+    value.reason === 'point' ||
+    value.reason === 'unavailable'
+  )
 }
 
-function replyMatches(command: DocumentWorkerSourceCommand, result: DocumentWorkerSourceResult): boolean {
+function replyMatches(
+  command: DocumentWorkerSourceCommand,
+  result: DocumentWorkerSourceResult,
+): boolean {
   if (result.kind === 'pinned')
-    return (command.kind === 'pin' || command.kind === 'importRead') && identitiesEqual(command.identity, result.reference.identity) && documentWorkerPointsEqual(command.point, result.reference.point) && command.readId === result.reference.readId
+    return (
+      (command.kind === 'pin' || command.kind === 'importRead') &&
+      identitiesEqual(command.identity, result.reference.identity) &&
+      documentWorkerPointsEqual(command.point, result.reference.point) &&
+      command.readId === result.reference.readId
+    )
   if (!identitiesEqual(command.identity, result.identity)) return false
   if (result.kind === 'rejected') return true
   if (result.kind === 'registered') return command.kind === 'register'
   if (result.kind === 'released') return command.kind === 'release' || command.kind === 'unpin'
   if (command.kind !== 'reset' && command.kind !== 'advance') return false
-  return documentWorkerPointsEqual(command.base, result.base) && documentWorkerPointsEqual(command.target, result.target)
+  return (
+    documentWorkerPointsEqual(command.base, result.base) &&
+    documentWorkerPointsEqual(command.target, result.target)
+  )
 }
 
-export function decodeDocumentWorkerReply(command: DocumentWorkerSourceCommand, value: unknown): DocumentWorkerSourceResult {
+export function decodeDocumentWorkerReply(
+  command: DocumentWorkerSourceCommand,
+  value: unknown,
+): DocumentWorkerSourceResult {
   if (isSourceReply(value) && replyMatches(command, value)) return value
   throw createError({
     message: 'Document source acknowledgement failed',
@@ -169,7 +236,11 @@ export function decodeDocumentWorkerReply(command: DocumentWorkerSourceCommand, 
     status: 409,
     why: 'The reply does not match the source operation and its scope.',
     fix: 'Reconnect the contribution and inspect the worker protocol.',
-    internal: { operation: command.kind, endpointGeneration: command.identity.endpointGeneration, registrationId: command.identity.registrationId },
+    internal: {
+      operation: command.kind,
+      endpointGeneration: command.identity.endpointGeneration,
+      registrationId: command.identity.registrationId,
+    },
   })
 }
 
@@ -190,19 +261,27 @@ export class DocumentWorkerReader {
     if (command.kind === 'reset') return this.reset(command)
     const document = this.documents.get(command.identity.documentId)
     if (!document) return rejected(command.identity, 'detached')
-    if (!identitiesEqual(document.identity, command.identity)) return rejected(command.identity, 'generation')
+    if (!identitiesEqual(document.identity, command.identity))
+      return rejected(command.identity, 'generation')
     if (command.kind === 'importRead') {
-      if (!validPoint(command.point) || document.pins.has(command.readId)) return rejected(command.identity, 'point')
+      if (!validPoint(command.point) || document.pins.has(command.readId))
+        return rejected(command.identity, 'point')
       const read = this.createRead(document, command.point, resetSnapshot(command))
       document.pins.set(command.readId, read)
-      return { kind: 'pinned', reference: { identity: command.identity, point: command.point, readId: command.readId } }
+      return {
+        kind: 'pinned',
+        reference: { identity: command.identity, point: command.point, readId: command.readId },
+      }
     }
     if (command.kind === 'pin') {
       if (document.pins.has(command.readId)) return rejected(command.identity, 'point')
       const read = this.acquire({ identity: command.identity, point: command.point })
       if (!read) return rejected(command.identity, 'unavailable')
       document.pins.set(command.readId, read)
-      return { kind: 'pinned', reference: { identity: command.identity, point: command.point, readId: command.readId } }
+      return {
+        kind: 'pinned',
+        reference: { identity: command.identity, point: command.point, readId: command.readId },
+      }
     }
     if (command.kind === 'unpin') {
       const read = document.pins.get(command.readId)
@@ -216,14 +295,26 @@ export class DocumentWorkerReader {
     }
     const frame = document.frame
     if (!frame) return rejected(command.identity, 'detached')
-    if (!documentWorkerPointsEqual(frame.point, command.base)) return rejected(command.identity, 'base')
-    if (!validPoint(command.target) || command.target.segment !== command.base.segment) return rejected(command.identity, 'point')
+    if (!documentWorkerPointsEqual(frame.point, command.base))
+      return rejected(command.identity, 'base')
+    if (!validPoint(command.target) || command.target.segment !== command.base.segment)
+      return rejected(command.identity, 'point')
     if (olderPoint(command.target, command.base)) return rejected(command.identity, 'unavailable')
-    document.frame = { snapshot: applyBatchToPieceTable(frame.snapshot, command.edits), point: command.target }
-    return { kind: 'applied', identity: command.identity, base: command.base, target: command.target }
+    document.frame = {
+      snapshot: applyBatchToPieceTable(frame.snapshot, command.edits),
+      point: command.target,
+    }
+    return {
+      kind: 'applied',
+      identity: command.identity,
+      base: command.base,
+      target: command.target,
+    }
   }
 
-  public acquire(reference: Omit<DocumentWorkerReadReference, 'readId'> & { readonly readId?: string }): DocumentWorkerRead | null {
+  public acquire(
+    reference: Omit<DocumentWorkerReadReference, 'readId'> & { readonly readId?: string },
+  ): DocumentWorkerRead | null {
     if (this.disposed) return null
     const document = this.documents.get(reference.identity.documentId)
     if (!document || !identitiesEqual(document.identity, reference.identity)) return null
@@ -231,21 +322,31 @@ export class DocumentWorkerReader {
       const pin = document.pins.get(reference.readId)
       if (!pin || !documentWorkerPointsEqual(pin.point, reference.point)) return null
     }
-    const snapshot = document.frame && documentWorkerPointsEqual(document.frame.point, reference.point)
-      ? document.frame.snapshot
-      : retainedSnapshot(document, reference.point)
+    const snapshot =
+      document.frame && documentWorkerPointsEqual(document.frame.point, reference.point)
+        ? document.frame.snapshot
+        : retainedSnapshot(document, reference.point)
     if (!snapshot) return null
     return this.createRead(document, reference.point, snapshot)
   }
 
-  private createRead(document: SourceDocument, point: DocumentWorkerPoint, snapshot: PieceTableSnapshot): DocumentWorkerRead {
+  private createRead(
+    document: SourceDocument,
+    point: DocumentWorkerPoint,
+    snapshot: PieceTableSnapshot,
+  ): DocumentWorkerRead {
     const text = createDocumentTextSnapshot(retainPieceTableSnapshot(snapshot))
     let released = false
     const read: DocumentWorkerRead = {
-      identity: document.identity, point,
+      identity: document.identity,
+      point,
       text,
-      isValid: () => !released && !this.disposed && this.documents.get(document.identity.documentId) === document,
-      retain: () => read.isValid() ? this.acquire({ identity: read.identity, point: read.point }) : null,
+      isValid: () =>
+        !released &&
+        !this.disposed &&
+        this.documents.get(document.identity.documentId) === document,
+      retain: () =>
+        read.isValid() ? this.acquire({ identity: read.identity, point: read.point }) : null,
       dispose: () => {
         if (released) return
         released = true
@@ -256,7 +357,12 @@ export class DocumentWorkerReader {
     return read
   }
 
-  public inspect(): { readonly documents: number; readonly reads: number; readonly pins: number; readonly sourceUnits: number } {
+  public inspect(): {
+    readonly documents: number
+    readonly reads: number
+    readonly pins: number
+    readonly sourceUnits: number
+  } {
     let reads = 0
     let pins = 0
     const roots = new Map<PieceTableSnapshot['root'], number>()
@@ -278,28 +384,45 @@ export class DocumentWorkerReader {
     this.documents.clear()
   }
 
-  private reset(command: Extract<DocumentWorkerSourceCommand, { kind: 'reset' }>): DocumentWorkerSourceResult {
+  private reset(
+    command: Extract<DocumentWorkerSourceCommand, { kind: 'reset' }>,
+  ): DocumentWorkerSourceResult {
     const previous = this.documents.get(command.identity.documentId)
     if (!previous) return rejected(command.identity, 'detached')
-    if (!identitiesEqual(previous.identity, command.identity)) return rejected(command.identity, 'generation')
+    if (!identitiesEqual(previous.identity, command.identity))
+      return rejected(command.identity, 'generation')
     if (!validPoint(command.target)) return rejected(command.identity, 'point')
     const frame = previous.frame
-    if (!documentWorkerPointsEqual(frame?.point ?? null, command.base)) return rejected(command.identity, 'base')
-    if (frame && olderPoint(command.target, frame.point)) return rejected(command.identity, 'unavailable')
+    if (!documentWorkerPointsEqual(frame?.point ?? null, command.base))
+      return rejected(command.identity, 'base')
+    if (frame && olderPoint(command.target, frame.point))
+      return rejected(command.identity, 'unavailable')
     const snapshot = resetSnapshot(command)
     previous.frame = { snapshot, point: command.target }
-    return { kind: 'applied', identity: command.identity, base: command.base, target: command.target }
+    return {
+      kind: 'applied',
+      identity: command.identity,
+      base: command.base,
+      target: command.target,
+    }
   }
 
   private register(identity: DocumentWorkerIdentity): DocumentWorkerSourceResult {
-    if (this.endpointGeneration !== null && identity.endpointGeneration !== this.endpointGeneration) return rejected(identity, 'generation')
+    if (this.endpointGeneration !== null && identity.endpointGeneration !== this.endpointGeneration)
+      return rejected(identity, 'generation')
     if (identity.registrationId <= this.lastRegistration) return rejected(identity, 'generation')
     const previous = this.documents.get(identity.documentId)
-    if (previous && identity.documentGeneration < previous.identity.documentGeneration) return rejected(identity, 'generation')
+    if (previous && identity.documentGeneration < previous.identity.documentGeneration)
+      return rejected(identity, 'generation')
     if (previous) this.release(previous)
     this.endpointGeneration = identity.endpointGeneration
     this.lastRegistration = identity.registrationId
-    this.documents.set(identity.documentId, { identity, frame: null, reads: new Set(), pins: new Map() })
+    this.documents.set(identity.documentId, {
+      identity,
+      frame: null,
+      reads: new Set(),
+      pins: new Map(),
+    })
     return { kind: 'registered', identity }
   }
 
@@ -310,14 +433,19 @@ export class DocumentWorkerReader {
   }
 }
 
-function retainedSnapshot(document: SourceDocument, point: DocumentWorkerPoint): PieceTableSnapshot | null {
+function retainedSnapshot(
+  document: SourceDocument,
+  point: DocumentWorkerPoint,
+): PieceTableSnapshot | null {
   for (const read of document.reads) {
     if (documentWorkerPointsEqual(read.point, point)) return read.text.snapshot
   }
   return null
 }
 
-function resetSnapshot(command: Extract<DocumentWorkerSourceCommand, { kind: 'reset' | 'importRead' }>): PieceTableSnapshot {
+function resetSnapshot(
+  command: Extract<DocumentWorkerSourceCommand, { kind: 'reset' | 'importRead' }>,
+): PieceTableSnapshot {
   let snapshot = createPieceTableSnapshot('', {
     normalized: true,
     transient: true,
@@ -327,18 +455,39 @@ function resetSnapshot(command: Extract<DocumentWorkerSourceCommand, { kind: 're
   })
   for (const text of command.chunks) {
     if (!text.length) continue
-    snapshot = applyBatchToPieceTable(snapshot, [{ from: snapshot.length, to: snapshot.length, text }])
+    snapshot = applyBatchToPieceTable(snapshot, [
+      { from: snapshot.length, to: snapshot.length, text },
+    ])
   }
   return retainPieceTableSnapshot(snapshot)
 }
 
-function rejected(identity: DocumentWorkerIdentity, reason: Extract<DocumentWorkerSourceResult, { kind: 'rejected' }>['reason']): DocumentWorkerSourceResult {
+function rejected(
+  identity: DocumentWorkerIdentity,
+  reason: Extract<DocumentWorkerSourceResult, { kind: 'rejected' }>['reason'],
+): DocumentWorkerSourceResult {
   return { kind: 'rejected', identity, reason }
 }
 
-export { defineDocumentOperation, defineStructuralOperation, defineHighlighterOperation } from '../editor/operationDefinitions'
-export type { StructuralOperationContext, HighlighterOperationContext } from '../editor/operationDefinitions'
+export {
+  defineDocumentOperation,
+  defineStructuralOperation,
+  defineHighlighterOperation,
+} from '../editor/operationDefinitions'
+export { acquireEditorDocumentAnalysis } from '../editor/documentAnalysis'
+export type {
+  StructuralOperationContext,
+  HighlighterOperationContext,
+} from '../editor/operationDefinitions'
 
-export type { DocumentOperationContext, DocumentOperationRuntime } from '../editor/operationDefinitions'
+export type {
+  DocumentOperationContext,
+  DocumentOperationRuntime,
+} from '../editor/operationDefinitions'
 
-export type { DocumentProjectionEndpoint, DocumentProjectionConnection, DocumentProjectionUpdate, DocumentProjectionReceipt } from '../editor/documentDelivery'
+export type {
+  DocumentProjectionEndpoint,
+  DocumentProjectionConnection,
+  DocumentProjectionUpdate,
+  DocumentProjectionReceipt,
+} from '../editor/documentDelivery'

@@ -6,7 +6,7 @@ import { createMinimapPlugin } from '@singapore-editor/minimap'
 import {
   createTreeSitterSyntaxProvider,
   createTreeSitterSyntaxPlugin,
-  TreeSitterWorkerClient,
+  createTreeSitterWorkerOwner,
 } from '@singapore-editor/tree-sitter'
 import {
   TREE_SITTER_LANGUAGE_CONTRIBUTIONS,
@@ -26,10 +26,10 @@ import {
 export function createInputConsumers(id: string, fixture: string, length: number) {
   const configuration = inputConsumerConfiguration(id, fixture, length)
   const plugins: EditorPlugin[] = []
-  const tree = configuration.treeSitter && id !== 'native' ? new TreeSitterWorkerClient() : null
+  const tree = configuration.treeSitter && id !== 'native' ? createTreeSitterWorkerOwner() : null
   const shiki = configuration.shiki ? createShikiWorkerOwner() : null
   if (tree) {
-    const provider = createTreeSitterSyntaxProvider({ backend: tree })
+    const provider = createTreeSitterSyntaxProvider({ workerOwner: tree })
     for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS)
       provider.registerLanguage(contribution, { replace: true })
     plugins.push(createTreeSitterSyntaxPlugin(provider))
